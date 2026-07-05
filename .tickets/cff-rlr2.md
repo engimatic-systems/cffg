@@ -1,6 +1,6 @@
 ---
 id: cff-rlr2
-status: open
+status: closed
 deps: [cff-br53]
 links: []
 created: 2026-07-05T22:12:32Z
