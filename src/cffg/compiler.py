@@ -87,6 +87,9 @@ class Arena:
     log_params: dict[str, np.ndarray] = field(default_factory=dict)  # group -> [M, ...]
     gfe_groups: list[GfePlan] = field(default_factory=list)
     gfe_x_edges: frozenset[str] = frozenset()  # entropy absorbed into composite term
+    delta_pairs: np.ndarray = field(
+        default_factory=lambda: np.zeros((0, 2), dtype=np.int64)
+    )  # [n_delta_edges, 2] slot pairs projected to a pointmass each sweep
 
     @property
     def interior_slot_pairs(self) -> np.ndarray:
@@ -254,6 +257,13 @@ def compile_template(
         if stacked is not None:
             log_params[gname] = stacked
 
+    delta_edges = sorted(
+        c.target for c in t.constraints if c.kind is ConstraintKind.DELTA
+    )
+    delta_pairs = np.array(
+        [[edges[v].slot0, edges[v].slot1] for v in delta_edges], dtype=np.int64
+    ).reshape(-1, 2)
+
     k_max = max(e.card for e in edges.values())
     return Arena(
         template_name=t.name,
@@ -265,6 +275,7 @@ def compile_template(
         log_params=log_params,
         gfe_groups=gfe_groups,
         gfe_x_edges=frozenset(gfe_x_edges),
+        delta_pairs=delta_pairs,
     )
 
 

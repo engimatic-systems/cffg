@@ -81,20 +81,49 @@ class Engine:
 
     # -- execution --------------------------------------------------------
 
-    def step(self, state: State) -> State:
-        return State(messages=self._step(state.messages, state.params), params=state.params)
+    def step(self, state: State, damp: float = 0.0, harden: bool = True) -> State:
+        return State(
+            messages=self._step(state.messages, state.params, damp, harden),
+            params=state.params,
+        )
 
-    def run(self, state: State, n_iters: int, *, tol: float | None = None) -> tuple[State, list[float]]:
+    def run(
+        self,
+        state: State,
+        n_iters: int,
+        *,
+        tol: float | None = None,
+        damp: float = 0.0,
+        harden_last: int | None = None,
+    ) -> tuple[State, list[float]]:
         """Flood n_iters sweeps (or until max message delta < tol); returns the
-        final state and the per-sweep delta trace — the 'coherence' signal."""
+        final state and the per-sweep delta trace — the 'coherence' signal.
+
+        `damp` (0..1) blends in the previous messages; use ~0.5 for models with
+        multiple GFE composites, whose outer coordination can limit-cycle.
+
+        δ form-constraints must not fire while beliefs are still garbage — a
+        premature pointmass locks in its own arbitrary argmax. With
+        `harden_last=k` (default: k = n_iters // 2 when δ edges exist), the
+        first phase runs soft to coherence, then δ edges harden for the final
+        k sweeps so decisions commit sequentially."""
+        if harden_last is None:
+            harden_last = n_iters // 2 if len(self.arena.delta_pairs) else 0
         deltas: list[float] = []
-        for _ in range(n_iters):
-            nxt = self.step(state)
-            delta = float(jnp.max(jnp.abs(nxt.messages - state.messages)))
-            deltas.append(delta)
-            state = nxt
-            if tol is not None and delta < tol:
-                break
+
+        def phase(n: int, harden: bool, st: State) -> State:
+            for _ in range(n):
+                nxt = self.step(st, damp, harden)
+                delta = float(jnp.max(jnp.abs(nxt.messages - st.messages)))
+                deltas.append(delta)
+                st = nxt
+                if tol is not None and delta < tol:
+                    break
+            return st
+
+        state = phase(n_iters - harden_last, harden=False, st=state)
+        if harden_last:
+            state = phase(harden_last, harden=True, st=state)
         return state, deltas
 
     # -- readouts ---------------------------------------------------------
@@ -117,7 +146,12 @@ def _make_step(arena: Arena):
     groups = arena.groups
     k_max = arena.k_max
 
-    def step(messages: jax.Array, params: dict[str, jax.Array]) -> jax.Array:
+    def step(
+        messages: jax.Array,
+        params: dict[str, jax.Array],
+        damp: float = 0.0,
+        harden: bool = True,
+    ) -> jax.Array:
         new = messages
         for g in groups:
             logf = params.get(g.name)
@@ -134,6 +168,24 @@ def _make_step(arena: Arena):
             mu2, log_qx = gfe_update(log_d, params[g.name + ":A"], params[g.name + ":c"], k_max)
             new = new.at[g.scatter_z].set(mu2)
             new = new.at[g.scatter_x].set(log_qx)
+        # Log-space damping: stabilizes the outer coordination between GFE
+        # composites (their local solves are exact, but synchronous flooding
+        # between them can limit-cycle — the outer face of Part II §4.5).
+        new = damp * messages + (1.0 - damp) * new
+        # Floor at NEG: exact log-zeros compound additively through chains
+        # (NEG + NEG + ...), and unchecked they overflow to -inf and NaN once
+        # δ-hardened controls make states truly impossible. exp(NEG) == 0
+        # either way, so clamping changes nothing semantically.
+        new = jnp.maximum(new, NEG)
+        if harden and len(arena.delta_pairs):
+            # δ form constraint: project each constrained edge onto a pointmass
+            # at the argmax of its current marginal (both slots one-hot).
+            p0, p1 = arena.delta_pairs[:, 0], arena.delta_pairs[:, 1]
+            lq = new[p0] + new[p1]
+            hot = jnp.where(
+                jnp.arange(k_max)[None, :] == jnp.argmax(lq, axis=-1)[:, None], 0.0, NEG
+            ).astype(new.dtype)
+            new = new.at[p0].set(hot).at[p1].set(hot)
         return new
 
     return step
