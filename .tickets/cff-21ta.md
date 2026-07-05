@@ -1,6 +1,6 @@
 ---
 id: cff-21ta
-status: closed
+status: open
 deps: []
 links: []
 created: 2026-07-05T23:57:38Z
