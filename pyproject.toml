@@ -21,4 +21,15 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
+    "setuptools<81",
+    "simglucose",
+]
+
+[tool.uv.sources]
+simglucose = { git = "https://github.com/jxx123/simglucose" }
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::SyntaxWarning",
+    "ignore:pkg_resources is deprecated:UserWarning",
 ]
