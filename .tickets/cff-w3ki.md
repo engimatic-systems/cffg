@@ -1,6 +1,6 @@
 ---
 id: cff-w3ki
-status: in_progress
+status: closed
 deps: [cff-kv7p]
 links: []
 created: 2026-07-05T23:03:40Z
@@ -13,3 +13,9 @@ parent: cff-mwjo
 
 P_SUBSTITUTION bead on a matrix_cat obs factor facing a categorical goal factor across the x edge -> GfePlan composite group; members excluded from normal groups; x edge excluded from interior entropy pairs (absorbed into composite term); A/c stay in params dict (colony contract). M3 restrictions: fixed A blob, fixed c blob; learned variants are separate tickets.
 
+
+## Notes
+
+**2026-07-05T23:09:13Z**
+
+Landed in compiler: psub detection, facing-goal check, GfePlan groups, x-edge entropy exclusion, A/c in params dict. Restrictions enforced with pointers to cff-5iuz/cff-gjjk.
