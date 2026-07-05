@@ -36,6 +36,43 @@ https://github.com/biaslab/LAIF (Julia/RxInfer).
    answer and have it report back a short summary. Do not read whole papers into the
    main context window mid-task.
 
+## Session protocol (context hygiene)
+
+This project will span many context windows. The rule that makes that survivable:
+**tickets are the shared memory; the repo carries no session state.**
+
+- **Start of session**: read this file, run `tk ready`, pick ONE ticket (or a few
+  trivially small ones). Don't re-derive project state from scratch — the ticket's
+  description, design notes, and comments are the handoff.
+- **During**: atomic commits referencing the ticket ID. Discovered work becomes a
+  *new ticket* (linked with a dependency), not scope drift in the current one.
+- **End of session**: leave `main` green and the tree clean. Update the ticket with
+  a handoff comment — what's done, what's next, any gotcha — then close it or leave
+  it `in_progress` with that comment as the resume point. A session that ends with
+  uncommitted work or an un-updated ticket has failed its landing.
+- **One ticket ≈ one context window.** If a ticket can't fit, split it before
+  starting, not after running out of context.
+
+### Sub-agent research protocol
+
+- Spawn research sub-agents with **specific questions**, not topics ("What update
+  rule does PGMax use for factor-to-variable messages and how are its arenas
+  indexed?" — not "read about PGMax").
+- The sub-agent's report gets **distilled into the ticket that needed it** as a
+  comment (question → answer → source → confidence). Durable engine-relevant
+  conclusions go into docstrings next to the code they justify.
+- Never paste a paper or long raw report into the main context; never let a
+  sub-agent's full output become a new markdown file.
+
+### Document policy
+
+Exactly four canonical documents: `AGENTS.md` (rules), `docs/ARCHITECTURE.md`
+(design), `docs/LIMITATIONS.md` (scope honesty), `README.md` (once there's
+something to run). **Update in place; do not create new markdown files.** Everything
+else lives in tickets (state, decisions-in-progress, research findings), code
+docstrings (durable knowledge), or tests (executable claims). If a decision changes
+the architecture, edit ARCHITECTURE.md in the same commit as the change.
+
 ## Technical invariants
 
 - **True Bethe/Generalised free energy.** No shortcuts in the objective: free-energy

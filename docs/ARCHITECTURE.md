@@ -137,6 +137,39 @@ A registry keyed by `(factor_type, constraint_config, out_edge_role)`:
 - Sensor/actuator adapters are plain Python callbacks mapping env observations to
   one-hot data bindings and control marginals to env actions.
 
+### 5b. Colony execution (many small graphs, one machine)
+
+A first-class use case: ~10²–10³ small CFFG instances running concurrently as
+adaptive components ("learning goo") inside a larger deterministic host system.
+This costs three design constraints, adopted from M1 onward, and one extra layer —
+not an architecture change:
+
+- **Stateless engine, state as pytree.** An instance is pure data:
+  `(structure_hash, params, messages, rng_key)`. The compiled step is a pure
+  function `state → state`. No singletons, no Python object holding arrays.
+  (JAX pushes us here anyway; we make it a contract.)
+- **Batch axis by construction.** The compiled step must be `vmap`-compatible
+  (no data-dependent Python control flow; Newton loops as `lax` primitives with
+  fixed iteration caps). Then N instances *sharing a structure* execute as one
+  batched XLA kernel — a colony of clones with different parameters, data, and
+  RNG keys is barely more expensive than one instance.
+- **Batching by structure hash.** The JIT cache is already keyed on structure;
+  the colony scheduler groups instances by that key and runs one vmapped call
+  per group per tick. A hundred goo blobs = (few unique templates) compiled
+  kernels, not a hundred compilations.
+- **`Colony` layer** above the agent runtime: owns the instance table, groups by
+  structure, ticks groups (sync round-robin first; JAX's async dispatch already
+  overlaps host code and XLA), routes host-system signals to instance data/goal
+  ports and actions back. Inter-instance coupling happens **through the host via
+  ports** (the Part II buyer/seller pattern: nested Markov blankets, exchanging
+  observations/actions), never by merging graphs at runtime.
+
+Known cost: per-instance *structure* evolution fragments the batching (each
+divergent structure = its own compile). The goo pattern should draw structures
+from a small template library and evolve parameters freely; structure variants
+get promoted to the library deliberately, not mutated ad hoc. Memory is a
+non-issue at this scale (a T-maze-sized instance's arenas are kilobytes).
+
 ## Test suite (three tiers, per the brief)
 
 1. **Undirected / CSP**: small Ising or Potts grids and a mini-Sudoku; check BP
