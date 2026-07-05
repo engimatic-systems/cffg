@@ -29,6 +29,7 @@ EPIC_FILES = {
     "M1 · Core IR": ["test_ir.py", "test_serialize.py", "test_edits.py", "test_compose.py"],
     "M2 · BP Engine": ["test_engine_tree.py", "test_engine_hmm.py"],
     "M3 · VMP + GFE": ["test_vmp.py", "test_gfe.py"],
+    "M4 · T-maze": ["test_tmaze.py"],
 }
 FILE_TO_EPIC = {f: e for e, fs in EPIC_FILES.items() for f in fs}
 EPIC_ORDER = list(EPIC_FILES) + ["Unassigned"]
