@@ -28,7 +28,7 @@ from pathlib import Path
 
 import numpy as np
 
-from cffg.core.ir import FACTOR_TYPES, PortRole, Template
+from cffg.core.ir import FACTOR_TYPES, ConstraintKind, PortRole, Template
 from cffg.core.validate import validate
 
 NEG = -1.0e30  # log-space "zero"; finite so NEG - NEG == 0 (no inf-inf NaNs)
@@ -49,7 +49,7 @@ class EdgeInfo:
 
 @dataclass(frozen=True)
 class GroupPlan:
-    """All factors of one (type, cardinality-signature), executed together."""
+    """All factors of one (type, cardinality-signature, mode), run together."""
 
     name: str
     type: str
@@ -58,6 +58,22 @@ class GroupPlan:
     members: tuple[str, ...]  # factor names, defines the stacking order
     gather: np.ndarray  # [n_members, n_roles] slot to read (opposite side)
     scatter: np.ndarray  # [n_members, n_roles] slot to write (own side)
+    mode: str = "bp"  # "bp" (sum-product) | "vmp" (mean-field bead)
+    gather_both: np.ndarray | None = None  # [M, R, 2] both slots (vmp: marginals)
+
+
+@dataclass(frozen=True)
+class GfePlan:
+    """A P-substituted goal-observation composite (Part II §4): matrix_cat
+    observation node facing a categorical goal node across the x edge. The
+    composite owns both factors' updates and their joint FE term."""
+
+    name: str
+    cards: tuple[int, int]  # (M_obs, K_state)
+    members: tuple[str, ...]  # obs-factor names
+    gather_z: np.ndarray  # [M] incoming state-message slot (μ_D)
+    scatter_z: np.ndarray  # [M] outgoing backward-message slot (μ 2)
+    scatter_x: np.ndarray  # [M] obs-side x slot (posterior predictive q_x)
 
 
 @dataclass
@@ -69,11 +85,18 @@ class Arena:
     groups: list[GroupPlan]
     data_slots: dict[str, int]  # DATA port name -> external slot
     log_params: dict[str, np.ndarray] = field(default_factory=dict)  # group -> [M, ...]
+    gfe_groups: list[GfePlan] = field(default_factory=list)
+    gfe_x_edges: frozenset[str] = frozenset()  # entropy absorbed into composite term
 
     @property
     def interior_slot_pairs(self) -> np.ndarray:
         return np.array(
-            [[e.slot0, e.slot1] for e in self.edges.values() if e.interior], dtype=np.int64
+            [
+                [e.slot0, e.slot1]
+                for e in self.edges.values()
+                if e.interior and e.name not in self.gfe_x_edges
+            ],
+            dtype=np.int64,
         ).reshape(-1, 2)
 
 
@@ -88,11 +111,25 @@ def compile_template(
     validate(t)
     problems: list[str] = []
 
+    mean_field = {
+        c.target for c in t.constraints if c.kind is ConstraintKind.MEAN_FIELD
+    }
+    psub = {
+        c.target: c.detail_dict()
+        for c in t.constraints
+        if c.kind is ConstraintKind.P_SUBSTITUTION
+    }
+
     for f in t.factors.values():
         if f.param_edges:
             problems.append(
                 f"factor {f.name!r} has parameter edges {sorted(f.param_edges.values())}: "
-                "learned parameters need Dirichlet VMP (M3)"
+                "learned parameters are separate tickets (cff-5iuz, cff-gjjk)"
+            )
+        if f.name in mean_field and f.type == "equality":
+            problems.append(
+                f"factor {f.name!r}: mean-field bead on an equality node is ill-defined "
+                "(geometric expectation of a hard constraint)"
             )
     for p in t.ports.values():
         if p.role in (PortRole.PRIOR, PortRole.GOAL):
@@ -130,27 +167,89 @@ def compile_template(
                 if port.role is PortRole.DATA:
                     data_slots[port.name] = s1
 
-    # Group factors by (type, cardinality signature).
+    resolved = _resolve_arrays(t, arrays, root)
+
+    # GFE composites: P-substituted obs factor + facing goal factor across x.
+    consumed: set[str] = set()
+    gfe_x_edges: set[str] = set()
+    gfe_buckets: dict[tuple[int, int], list[tuple[str, str]]] = {}  # cards -> (obs, goal)
+    for fname, detail in sorted(psub.items()):
+        f = t.factors[fname]
+        if f.type != "matrix_cat" or detail.get("substituted_role") != "out":
+            problems.append(
+                f"p_substitution on {fname!r}: M3 supports matrix_cat nodes with "
+                "substituted_role 'out' only"
+            )
+            continue
+        x_var = f.edges["out"]
+        facing = [fn for fn, _ in endpoints[x_var] if fn != fname]
+        goal = t.factors[facing[0]] if facing else None
+        if goal is None or goal.type != "categorical" or "statistic" not in goal.param_blobs:
+            problems.append(
+                f"p_substitution on {fname!r}: edge {x_var!r} must face a categorical "
+                "goal factor with a fixed statistic blob (learned goals: cff-gjjk)"
+            )
+            continue
+        ko, ki = (t.variables[f.edges[r]].cardinality for r in ("out", "in"))
+        gfe_buckets.setdefault((ko, ki), []).append((fname, goal.name))
+        consumed.update((fname, goal.name))
+        gfe_x_edges.add(x_var)
+    if problems:
+        raise CompileError(f"cannot compile {t.name!r}:\n  - " + "\n  - ".join(problems))
+
+    gfe_groups: list[GfePlan] = []
+    log_params: dict[str, np.ndarray] = {}
+    for (ko, ki), pairs in sorted(gfe_buckets.items()):
+        gname = f"gfe:{ko}x{ki}"
+        obs_names = tuple(o for o, _ in pairs)
+        gfe_groups.append(
+            GfePlan(
+                name=gname,
+                cards=(ko, ki),
+                members=obs_names,
+                gather_z=np.array([opposite[(o, "in")] for o, _ in pairs], dtype=np.int64),
+                scatter_z=np.array([slot_of[(o, "in")] for o, _ in pairs], dtype=np.int64),
+                scatter_x=np.array([slot_of[(o, "out")] for o, _ in pairs], dtype=np.int64),
+            )
+        )
+        la, lc = [], []
+        for obs_name, goal_name in pairs:
+            a = resolved[next(iter(t.factors[obs_name].param_blobs.values()))]
+            c = resolved[t.factors[goal_name].param_blobs["statistic"]]
+            _expect(obs_name, a, (ko, ki))
+            _stochastic(obs_name, a)
+            _expect(goal_name, c, (ko,))
+            _stochastic(goal_name, c[:, None])
+            la.append(_log_of(a))
+            lc.append(_log_of(c))
+        log_params[f"{gname}:A"] = np.stack(la)
+        log_params[f"{gname}:c"] = np.stack(lc)
+
+    # Group remaining factors by (type, cardinality signature, mode).
     buckets: dict[tuple, list[str]] = {}
     for fname in sorted(t.factors):
+        if fname in consumed:
+            continue
         f = t.factors[fname]
         roles = FACTOR_TYPES[f.type].edge_roles
         cards = tuple(t.variables[f.edges[r]].cardinality for r in roles)
-        buckets.setdefault((f.type, cards), []).append(fname)
+        mode = "vmp" if fname in mean_field else "bp"
+        buckets.setdefault((f.type, cards, mode), []).append(fname)
 
     groups: list[GroupPlan] = []
-    log_params: dict[str, np.ndarray] = {}
-    resolved = _resolve_arrays(t, arrays, root)
-    for (ftype, cards), members in sorted(buckets.items()):
+    for (ftype, cards, mode), members in sorted(buckets.items()):
         roles = FACTOR_TYPES[ftype].edge_roles
-        gname = f"{ftype}:{'x'.join(map(str, cards))}"
+        gname = f"{mode}:{ftype}:{'x'.join(map(str, cards))}"
         gather = np.array(
             [[opposite[(m, r)] for r in roles] for m in members], dtype=np.int64
         )
         scatter = np.array(
             [[slot_of[(m, r)] for r in roles] for m in members], dtype=np.int64
         )
-        groups.append(GroupPlan(gname, ftype, roles, cards, tuple(members), gather, scatter))
+        both = np.stack([scatter, gather], axis=-1)  # own & opposite = the edge pair
+        groups.append(
+            GroupPlan(gname, ftype, roles, cards, tuple(members), gather, scatter, mode, both)
+        )
         stacked = _stack_params(t, ftype, cards, members, resolved)
         if stacked is not None:
             log_params[gname] = stacked
@@ -164,6 +263,8 @@ def compile_template(
         groups=groups,
         data_slots=data_slots,
         log_params=log_params,
+        gfe_groups=gfe_groups,
+        gfe_x_edges=frozenset(gfe_x_edges),
     )
 
 
@@ -210,9 +311,7 @@ def _stack_params(
     and column-stochasticity checks ("true FE" needs normalized conditionals)."""
     if ftype == "equality":
         return None
-
-    def log_of(arr: np.ndarray) -> np.ndarray:
-        return np.where(arr > 0.0, np.log(np.maximum(arr, 1e-300)), NEG)
+    log_of = _log_of
 
     stacked = []
     for m in members:
@@ -237,6 +336,10 @@ def _stack_params(
         else:
             raise CompileError(f"factor {m!r}: no BP rule for type {ftype!r} in M2")
     return np.stack(stacked)
+
+
+def _log_of(arr: np.ndarray) -> np.ndarray:
+    return np.where(arr > 0.0, np.log(np.maximum(arr, 1e-300)), NEG)
 
 
 def _expect(name: str, arr: np.ndarray, shape: tuple[int, ...]) -> None:

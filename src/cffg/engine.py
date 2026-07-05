@@ -20,7 +20,14 @@ import numpy as np
 from jax.scipy.special import logsumexp
 
 from cffg.compiler import NEG, Arena
-from cffg.rules import BP_UPDATES, NODE_ENERGIES
+from cffg.rules import (
+    BP_UPDATES,
+    NODE_ENERGIES,
+    VMP_ENERGIES,
+    VMP_UPDATES,
+    gfe_energy,
+    gfe_update,
+)
 
 _TINY = 1e-12
 
@@ -113,10 +120,20 @@ def _make_step(arena: Arena):
     def step(messages: jax.Array, params: dict[str, jax.Array]) -> jax.Array:
         new = messages
         for g in groups:
-            inc = messages[g.gather]  # [M, R, k_max] (synchronous: reads old)
             logf = params.get(g.name)
-            out = BP_UPDATES[g.type](inc, logf, g.cards, k_max)
+            if g.mode == "vmp":
+                inc2 = messages[g.gather_both]  # [M, R, 2, k_max]
+                out = VMP_UPDATES[g.type](inc2, logf, g.cards, k_max)
+            else:
+                inc = messages[g.gather]  # [M, R, k_max] (synchronous: reads old)
+                out = BP_UPDATES[g.type](inc, logf, g.cards, k_max)
             new = new.at[g.scatter.reshape(-1)].set(out.reshape(-1, k_max))
+        for g in arena.gfe_groups:
+            _, ki = g.cards
+            log_d = messages[g.gather_z][:, :ki]
+            mu2, log_qx = gfe_update(log_d, params[g.name + ":A"], params[g.name + ":c"], k_max)
+            new = new.at[g.scatter_z].set(mu2)
+            new = new.at[g.scatter_x].set(log_qx)
         return new
 
     return step
@@ -129,11 +146,17 @@ def _make_bfe(arena: Arena):
     def bfe(messages: jax.Array, params: dict[str, jax.Array]) -> jax.Array:
         total = jnp.asarray(0.0, dtype=messages.dtype)
         for g in groups:
-            inc = messages[g.gather]
             logf = params.get(g.name)
             if logf is None:
                 logf = jnp.zeros(())  # equality handles its own zero log-f
-            total = total + NODE_ENERGIES[g.type](inc, logf, g.cards).sum()
+            if g.mode == "vmp":
+                total = total + VMP_ENERGIES[g.type](messages[g.gather_both], logf, g.cards).sum()
+            else:
+                total = total + NODE_ENERGIES[g.type](messages[g.gather], logf, g.cards).sum()
+        for g in arena.gfe_groups:
+            _, ki = g.cards
+            log_d = messages[g.gather_z][:, :ki]
+            total = total + gfe_energy(log_d, params[g.name + ":A"], params[g.name + ":c"]).sum()
         if len(pairs):
             lq = messages[pairs[:, 0]] + messages[pairs[:, 1]]  # [E_int, k_max]
             lq = lq - logsumexp(lq, axis=-1, keepdims=True)
