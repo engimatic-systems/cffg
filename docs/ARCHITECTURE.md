@@ -225,6 +225,14 @@ Explicitly not adopted (revisit only with a ticket making the case):
   continuous milestone.
 - **`pgmax`** — read for arena-layout ideas; BP-only scope makes it a dead-end
   dependency.
+- **`inferactively-pymdp` (1.x JAX rewrite)** — investigated (ticket cff-9n7o):
+  contains zero Bethe/CFFG/GFE machinery (fixed-form POMDP only), and drags in
+  matplotlib/seaborn/mctx/networkx as hard deps. Policy: *read-only reference +
+  selective vendoring* — small pure MIT functions (stable_xlogx-style numerics,
+  dirichlet_kl_divergence, spm_wnorm exact form, info-gain decompositions) may
+  be vendored into `cffg/vendor/` with attribution; its `calc_vfe`
+  (return_decomposition=True) and chain-VMP serve as cross-validation oracles
+  for our FE ledger in M2/M3 tests.
 - **`optax`/`jaxopt`** — first-order optimizers; our Newton solves are a few
   lines of `jax.jacobian` + `lax.while_loop` on tiny systems.
 
