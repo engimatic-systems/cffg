@@ -66,8 +66,13 @@ A pure-Python (dataclass) representation, independent of JAX:
   and composing templates — one invariant instead of four features.
 - **Serialization**: versioned JSON (or msgpack) schema for structure and
   constraints; all array data (A matrices, Dirichlet counts, goal statistics)
-  referenced as file paths to `safetensors`/`.npz` blobs. Content hash of the
-  structural part keys the JIT cache.
+  referenced as relative file paths to `safetensors`/`.npz` blobs. Content hash
+  of the structural part keys the JIT cache.
+- **Portable bundle**: the deployable unit is a ZIP (`.cffgz`) containing
+  `model.json` (structure + constraints), `blobs/` (parameter arrays), and
+  `manifest.json` (schema version, content hashes, provenance). Unzipping and
+  pointing the engine at `model.json` is a full restore; checkpointing writes
+  the same bundle. No third-party interchange format — this schema is canonical.
 - **Edit actions**: the only public mutation API is transactional bundles
   (`add_slice`, `bind_data`, `set_constraint`, `compose(template, port_map)`) that
   validate the port invariant before committing. This is the GUI-ready surface —
@@ -161,13 +166,11 @@ Cheap to build once the compiler exists; don't build it before.
 
 ## Positions on open questions from the brief
 
-- **ONNX (brief item 8)**: skip as a model format. ONNX encodes directed
-  computational graphs of NN operators; it cannot represent factor-graph structure,
-  variational constraints, or P-substitution without stuffing everything into
-  opaque custom ops — at which point it's our format wearing an ONNX costume. What
-  *is* worth doing later: exporting the compiled inference step function (a pure
-  JAX function) via StableHLO/jax2onnx for deployment runtimes. Model interchange
-  stays our schema.
+- **Interchange format (brief item 8)**: decided — no ONNX. ONNX encodes directed
+  computational graphs of NN operators and cannot represent factor-graph
+  structure, variational constraints, or P-substitution. The canonical format is
+  our own schema, and the deployable model is the self-contained `.cffgz` ZIP
+  bundle described above.
 - **Existing probabilistic libraries**: borrow PGMax's arena/tensor-layout ideas
   (by reading, not depending — its scope is BP-only and we need custom messages),
   and use `distrax`/`tfp.substrates.jax` only for distribution math utilities.
@@ -189,5 +192,5 @@ Cheap to build once the compiler exists; don't build it before.
 - **M4** — T-maze parity: all three variants, BFE ablation, golden tests vs LAIF.
 - **M5** — agent runtime: receding horizon, continual learning, checkpointing;
   a live gridworld demo driven through the sensor/actuator adapters.
-- **M6** — resource estimator; StableHLO export spike; GUI-facing edit-action
-  hardening.
+- **M6** — resource estimator; `.cffgz` bundle export/import round-trip; GUI-facing
+  edit-action hardening.
