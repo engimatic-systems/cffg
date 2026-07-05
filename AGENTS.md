@@ -46,7 +46,9 @@ This project will span many context windows. The rule that makes that survivable
   description, design notes, and comments are the handoff.
 - **During**: atomic commits referencing the ticket ID. Discovered work becomes a
   *new ticket* (linked with a dependency), not scope drift in the current one.
-- **End of session**: leave `main` green and the tree clean. Update the ticket with
+- **End of session**: run `uv run python tools/dashboard.py` to refresh the
+  mobile test dashboard (~/agent-share/cffg-tests.html; add new test files to
+  EPIC_FILES). Leave `main` green and the tree clean. Update the ticket with
   a handoff comment — what's done, what's next, any gotcha — then close it or leave
   it `in_progress` with that comment as the resume point. A session that ends with
   uncommitted work or an un-updated ticket has failed its landing.
