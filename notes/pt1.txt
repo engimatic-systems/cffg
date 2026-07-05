@@ -1,0 +1,3337 @@
+arXiv:2306.08014v2 [cs.AI] 16 Oct 2023
+
+Realising Synthetic Active Inference Agents,
+Part I: Epistemic Objectives and Graphical
+Specification Language
+Magnus Koudahl1,2 , Thijs van de Laar1 , and Bert de Vries1,3
+1
+
+BIASLab, Department of Electrical Engineering, Eindhoven
+University of Technology, The Netherlands
+2
+VERSES AI Research Lab, Los Angeles, CA, USA, 90016
+3
+GN Hearing, JF Kennedylaan 2, 5612 AB Eindhoven, The
+Netherlands
+October 17, 2023
+Abstract
+The Free Energy Principle (FEP) is a theoretical framework for describing how (intelligent) systems self-organise into coherent, stable structures by minimising a free energy functional. Active Inference (AIF) is a
+corollary of the FEP that specifically details how systems that are able to
+plan for the future (agents) function by minimising particular free energy
+functionals that incorporate information seeking components. This paper
+is the first in a series of two where we derive a synthetic version of AIF
+on free form factor graphs. The present paper focuses on deriving a local
+version of the free energy functionals used for AIF. This enables us to
+construct a version of AIF which applies to arbitrary graphical models
+and interfaces with prior work on message passing (MP) algorithms. The
+resulting messages are derived in our companion paper. We also identify a
+gap in the graphical notation used for factor graphs. While factor graphs
+are great at expressing a generative model, they have so far been unable
+to specify the full optimisation problem including constraints. To solve
+this problem we develop constrained Forney-style factor graph (CFFG)
+notation which permits a fully graphical description of variational inference objectives. We then proceed to show how CFFGs can be used to
+reconstruct prior algorithms for AIF as well as derive new ones. The
+latter is demonstrated by deriving an algorithm that permits direct policy inference for AIF agents, circumventing a long standing scaling issue
+that has so far hindered the application of AIF in industrial settings. We
+demonstrate our algorithm on the classic T-maze task and show that it
+reproduces the information seeking behaviour that is a hallmark feature
+of AIF.
+
+1
+
+1
+
+Introduction
+
+Active Inference (AIF) is an emerging framework for modelling intelligent agents
+interacting with an environment. Originating in the ﬁeld of computational neuroscience, it has since been spread to numerous other ﬁelds such as modern
+machine learning. At its core, AIF relies on variational inference techniques
+to minimise a free energy functional. A key diﬀerentiator of AIF compared to
+other approaches is the use of custom free energy functionals such as Expected
+and Generalised free energies (expected free energy (EFE) and generalised free
+energy (GFE), respectively). These functionals are speciﬁcally constructed so
+as to elicit epistemic, information-seeking behaviour when used to infer actions.
+Optimisation of these functionals have so far relied on custom algorithms
+that require evaluating very large search trees which has rendered upscaling of
+AIF diﬃcult. Many recent works, such as Branching Time AIF [3] and sophisticated inference [7] have investigated algorithmic ways to prune the search tree
+in order to solve this problem.
+This paper is the ﬁrst in a series of two parts where we take a diﬀerent
+approach and formulate a variation of the GFE optimisation problem using
+a custom Lagrangian derived from constrained Bethe free energy (CBFE) on
+factor graphs. Using variational calculus we then derive a custom MP algorithm
+that can directly solve for ﬁxed points of local GFE terms, removing the need for
+a search tree. This allows us to construct a purely optimisation-based approach
+to AIF which we name Lagrangian Active Inference (LAIF).
+LAIF applies to arbitrary graph topologies and interfaces with generic MP
+algorithms which allow for scaling up of AIF using oﬀ-the-shelf tools. We accomplish this by constructing a node-local GFE on generic factor graphs.
+The present paper is structured as follows: In section 2, we review relevant
+background material concerning Forney-style factor graphs (FFGs) and Bethe
+free energy (BFE). In section 3 we formalise what we mean by "epistemics" and
+construct an objective that is local to a single node on an FFG and possesses
+an epistemic, information-seeking drive. This objective turns out to be a local
+version of the GFE which we review in section 3.2.
+Once we start modifying the free energy functional, we recognise a problem with current FFG notation. FFGs visualise generative models but fail to
+display a signiﬁcant part of the optimisation problem, namely, the variational
+distribution and the functional to be optimised.
+To remedy this, we develop the CFFG graphical notation in section 5 as a
+method for visualising both the variational distribution and any adaptations to
+the free energy functional that are needed for AIF. These tools form the basis
+of the update rules derived in our companion paper [15].
+With the CFFG notation in hand, in section 6 we then proceed to demonstrate how to recover prior algorithms for AIF as MP on a CFFG. AIF is often
+described as MP on a probabilistic graphical model, see [4, 6, 13, 26] for examples. However, this relationship has not been properly formalised before, in part
+because adequate notation has been lacking. Using CFFGs it is straightforward
+to accurately write down this relation. Further, due to the modular nature of
+2
+
+CFFGs it becomes easy to devise extensions to prior AIF algorithms that can
+be implemented using oﬀ-the-shelf MP tools.
+Finally, section 7 demonstrates a new algorithm for policy inference using
+LAIF that scales linearly in the planning horizon, providing a solution to a longstanding barrier for scaling AIF to larger models and more complex tasks.
+
+2
+
+The Lagrangian approach to message passing
+
+In this section, we review the Bethe free energy along with FFGs. These concepts form the foundation from which we will build towards local epistemic,
+objectives.
+As a free energy functional, the BFE is unique because stationary points of
+the BFE correspond to solutions of the belief propagation algorithm [20, 25, 28]
+which provides exact inference on tree-structured graphs.
+Furthermore, by adding constraints to the BFE using Lagrange multipliers,
+one can form a custom Lagrangian for an inference problem. Taking the ﬁrst
+variation of this Lagrangian, one can then solve for stationary points and obtain
+MP algorithms that solve the desired problem. Prior work [25, 28] have shown
+that adding additional constraints to the BFE allows for deriving a host of different message passing algorithms including variational message passing (VMP)
+[27] and expectation propagation (EP) [18] among others. We refer interested
+readers to [25] for a comprehensive overview of this technique and how diﬀerent
+choices of constraints can lead to diﬀerent algorithms.
+Constraints are speciﬁed at the level of nodes and edges, meaning this procedure can produce hybrid MP algorithms, foreshadowing the approach we are
+going to take for deriving a local, epistemic objective for AIF.
+
+2.1
+
+Bethe free energy and Forney-style factor graphs
+
+Throughout the remainder of the paper we will use FFGs to visualise probabilistic models models. In Section 5 we extend this notation to additionally allow
+for specifying constraints on the variational optimisation objective.
+Following [25] we deﬁne an FFG as a graph G = (V, E) with nodes V and
+edges E ⊆ V × V. For a node a ∈ V we denote the connected edges by E(a).
+Similarly for an edge i ∈ E, we denote the connected nodes by V(i).
+An FFG can be used to represent a factorised function (model) over variables
+s, as
+f (s) =
+
+Y
+
+fa (sa ) ,
+
+(1)
+
+a∈V
+
+where sa collects the argument variables of the factor fa . Throughout this
+paper we will use cursive bold font to denote collections of variables. In the
+corresponding FFG, the factor fa is denoted by a square node and connected
+edges E(a) represent the argument variables sa .
+3
+
+s1
+
+fa
+
+fb
+
+s2
+
+s3
+
+fc
+s4
+
+fd
+
+fe
+
+Figure 1: Example of an FFG
+As an example, we can consider the FFG shown in Fig. 1 which corresponds
+to the model
+f (s1 , s2 , s3 , s4 ) = fa (s1 )fb (s1 , s2 , s3 )fc (s2 , s4 )fd (s3 )fe (s4 )
+
+(2)
+
+In Fig. 1, the vertex set is V = {a, . . . , e} and the edge set is E = {1, . . . , 4}.
+As an example, the neighbouring edges of the node c are given by E(c) = {2, 4}.
+In this way, FFGs allow for a simple visualisation of the factorisation properties
+of a high-dimensional function.
+The problem we will focus on concerns minimisation of a free energy functional over a generative model. More formally, given a model (1) and a "variational" distribution q(s), the variational free energy (VFE) is deﬁned as
+
+F [q] ,
+
+Z
+
+q(s) log
+
+q(s)
+ds .
+f (s)
+
+(3)
+
+Variational inference concerns minimising this functional, leading to the solution
+q ∗ = arg min F [q] ,
+q∈Q
+
+(4)
+
+with Q denoting the admissible family of functions q. The optimised VFE
+upper-bounds the negative log-evidence (surprisal), as
+
+∗
+
+F [q ] =
+
+Z
+
+q ∗(s)
+q ∗(s) log
+ds − log Z ,
+| {z }
+p(s)
+{z
+} Surprisal
+|
+
+(5)
+
+Posterior divergence
+
+R
+with Z = f (s)ds is the model evidence and the exact posterior is given by
+p(s) = f (s)/Z.
+The BFE applies the Bethe assumption to the factorisation of q which yields
+an objective that decomposes into a sum of local free energy terms, each local
+to a node on the corresponding FFG. Each node local free energy will include
+entropy terms from all connected edges. Since an edge is connected to (at most)
+4
+
+two nodes, that means the corresponding entropy term would be counted twice.
+To prevent overcounting of the edge entropies, the BFE includes additional
+terms entropy terms that cancel out overcounted terms.
+Under the Bethe approximation q(s) is given by
+q(s) =
+
+Y
+
+qa (sa )
+
+a∈V
+
+Y
+
+qi (si )1−di
+
+(6)
+
+i∈E
+
+with di the degree of edge i. As an example, on the FFG shown in Fig. 1
+this would correspond to a variational distribution of the form
+
+q(s1 , . . . , s4 ) =
+
+qa (s1 )qb (s1 , s2 , s3 )qc (s2 , s4 )qd (s3 )qe (s4 )
+q1 (s1 )q2 (s2 )q3 (s3 )q4 (s4 )
+
+(7)
+
+where we see terms for the edges in the denominator and for the nodes in
+the numerator. With this deﬁnition, the free energy factorises over the FFG as
+XZ
+
+Z
+X
+qa (sa )
+1
+F [q] =
+dsa +
+dsi .
+qa (sa ) log
+(1 − di ) qi (si ) log
+fa (sa )
+qi (si )
+a∈V |
+|
+{z
+} i∈E
+{z
+}
+F [qa ]
+
+(8)
+
+H[qi ]
+
+Eq. (8) deﬁnes the BFE. Note that F deﬁnes a free energy functional which
+can be either local or global depending on its arguments. More speciﬁcally, F [q]
+deﬁnes the free energy for the entire model, while F [qa ] deﬁnes a node-local (to
+the node a) BFE contribution of the same functional form.
+Under optimisation of the BFE- solving Eq. (4) - the admissible set of functions Q enforces consistent normalisation and marginalisation of the node and
+edge local distributions, such that
+
+Z
+
+Z
+
+Z
+
+qi (si ) dsi = 1 for all i ∈ E
+
+(9a)
+
+qa (sa ) dsa = 1 for all a ∈ V
+
+(9b)
+
+qa (sa ) dsa\i = qi (si ) for all a ∈ V, i ∈ E(a) .
+
+(9c)
+
+Because we always assume the constraints given by Eq. (9) to be in eﬀect,
+we will omit the subscript on individual q’s moving forwards and instead let the
+arguments determine which marginal we are referring to, for example writing
+q(sa ) instead of qa (sa ).
+A core aspect of FFGs is that they allow for easy visualisation of MP algorithms. MP algorithms are a family of distributed inference algorithms with
+the common trait that they can be viewed as messages ﬂowing on an FFG.
+
+5
+
+As a general rule, to infer a marginal for a variable, messages are passed on
+the graph toward the associated edge for that variable. Multiplication of colliding (forward and backward) messages on an edge yields the desired posterior
+marginal. We denote a message on an FFG by arrows pointing in the direction
+that the message ﬂows.
+fa
+
+→
+s1
+
+fb
+
+→←
+s2
+
+fc
+
+↑ s3
+
+↑ s4
+
+fd
+
+fe
+
+Figure 2: Example of messages ﬂowing on an FFG
+We show an example in Fig. 2 of inferring a posterior marginal for the
+variable s2 . In this example, messages are ﬂowing on the FFG of Fig. (1)
+towards the variable s2 where we see two arrows colliding. The exact form of
+the individual messages depend on the algorithm being used.
+
+3
+
+Defining epistemic objectives
+
+Now we move on to the central topic of AIF, namely agents that interact with
+the world they inhabit. Under the heading of AIF, an agent entails a generative
+model of its environment and is engaged in the process of achieving future goals
+(speciﬁed by a target distribution or goal prior) through actions. This task can
+be cast as a process of free energy minimisation [5, 7, 8]. A natural question to
+ask is then, what should this free energy functional look like and why? Here we
+wish to highlight a core feature of AIF that sets it apart from other approaches:
+Systematic information gathering by targeted exploration of an environment.
+Whatever the form of our free energy functional, it should lead to agents that
+possess an exploratory drive consistent with AIF.
+While it is tempting to default to a standard VFE, prior work [24] has
+shown that directly optimising BFE or VFE when inferring a sequence of actions
+(which we will refer to as a policy) does not lead to agents that systematically
+explore their environment. Instead, directly inferring a policy by minimising a
+VFE/BFE leads to Kullback-Leibler divergence (KL)-control [12] 1 . This means
+that VFE/BFE is not the correct choice when we desire an agent that actively
+samples its environment with the explicit purpose of gathering information.
+Instead a hallmark feature of AIF is the use of alternative functionals in
+place of either the VFE or the BFE, speciﬁcally for inferring policies. The
+goal of these alternative functionals is often speciﬁcally to induce an epistemic,
+explorative term that drives AIF agents to seek out information.
+1 Other works will sometimes use π as a symbol to denote a policy
+
+6
+
+Epistemics, epistemic behaviour or "foraging for information" are commonly
+used terms in the AIF literature and related ﬁelds. While we have used the term
+colloquially until this point, we now clarify formally how we use the term in the
+present paper and how it relates to the objective functionals we consider. A
+core problem is that epistemics is most often deﬁned in terms of the behaviour
+of agents ("what does my agent do?") rather than from a mathematical point
+of view. Prior work on this point includes [10, 17].
+We take the view that epistemics arise from the optimisation of either an mutual information (MI) term or a bound thereon. The MI (between two variables
+x and z) is deﬁned as [16]
+
+I[ x, z ] =
+
+x
+
+p(x, z) log
+
+p(x, z)
+dxdz .
+p(x)p(z)
+
+(10)
+
+To gain an intuition for why maximising MI leads to agents that seek out
+information, we can rewrite MI as
+x
+
+p(z | x)
+dxdz
+p(z)
+= H[z] − H[z | x] = H[x] − H[x | z]
+
+I[ x, z ] =
+
+p(x, z) log
+
+(11)
+
+Since MI is symmetric in its arguments, Eq. (11) can equally well be written
+in terms of x rather than z. Eq. (11) shows that MI decomposes as the diﬀerence
+between the marginal entropy z and the expected entropy of z conditional on
+x.
+If we let z denote an internal state of an agent and x an observation and
+allow our agent to choose x - for instance through acting on an environment
+- we can see why maximising Eq. (10) biases the agent towards seeking our
+observations that reduce entropy in z. Maximising Eq. (10) means the agent
+will prefer observations that provide useful (in the sense of reducing uncertainty)
+information about its internal states z. For this reason MI is also known as
+Information Gain.
+Actually computing Eq. (10) is often intractable and in practice, a bound is
+often optimised instead.
+
+3.1
+
+Constructing a local epistemic objective
+
+At this point, we have seen that the BFE is deﬁned over arbitrary FFGs, yet
+does not lead to epistemic behaviour. On the other hand, maximising MI leads
+to the types of epistemic behaviour we desire, yet is not distributed like the BFE.
+The question becomes whether there is a way to merge the two and obtain a
+distributed functional - like the BFE- that includes an epistemic term?
+We will now show how to construct such a functional. Our starting point
+will be the BFE given by Eq. (8). We will focus on a single node a and its
+
+7
+
+associated local energy term and partition the incoming edges into two sets, x
+and z. This gives the node local free energy
+
+F [qa ] =
+
+x
+
+q(x, z) log
+
+q(x, z)
+dxdz
+f (x, z)
+
+(12)
+
+Now we need to add on an MI term to induce epistemics. Since we are
+minimising our free energy functional and want to maximise MI, we augment
+the free energy with a negative MI term as
+Negative mutual information
+
+Variational free energy
+
+}|
+{ z
+}|
+{
+x
+q(x, z)
+q(x)q(z)
+q(x, z) log
+q(x, z) log
+dxdz +
+dxdz
+G[ qa ] =
+f (x, z)
+q(x, z)
+x
+x
+✘
+✘✘
+q(x)q(z)
+q(x,
+z)
+✘
+dxdz +
+q(x, z) log
+=
+q(x, z) log
+✘ dxdz
+✘✘
+f (x, z)
+q(x,
+z)
+✘
+x
+q(x)q(z)
+dxdz
+=
+q(x, z) log
+f (x, z)
+z
+x
+
+(13a)
+(13b)
+(13c)
+
+which we can recognise as a node-local GFE [19]. In section 3.2 we review
+the results of [19] to expand upon this statement. Eq. (13a) provides a straightforward explanation of the kinds of behaviour that we can expect out of agents
+optimising a GFE. Namely, minimising BFE with a goal prior corresponds to
+performing KL-control [12] while the MI term adds an epistemic, informationseeking component. Viewed in this way, there is nothing mysterious about the
+kind of objective optimised by AIF agents: It is simply the sum of two wellknown and established objectives that are each widely used within the control
+and reinforcement learning communities.
+
+3.2
+
+Generalised free energy
+
+The objective derived in Eq. (13) is a node local version of the GFE originally
+introduced by [19]. In this section, we review the GFE as constructed by [19] in
+order to relate our construction to prior work on designing AIF functionals. In
+section 6, we show how to reconstruct the exact method of [19] using the tools
+we develop in this paper. Prior to [19], the functional of choice was the EFE [4,
+6]. [19] identiﬁed some issues with the EFE and proposed the GFE as a possible
+solution.
+We show how to reconstruct the original EFE-based algorithm of [6] using
+our local objective in section 6. We also provide a detailed description of the
+EFE in Appendix. A since it is still a popular choice for designing AIF agents.
+A core issue with the EFE is that it is strictly limited to planning over future
+timesteps. This means that AIF agents that utilise the EFE functional need
+to maintain two separate models: One for inferring policies (using EFE) and
+one for state inference (using VFE/BFE) that updates as observations become
+8
+
+available. The key advantage of EFE is that it induces the epistemic drive that
+we desire from AIF agents.
+The goal of [19] was to extend upon the EFE by introducing a functional
+that could induce similar epistemic behaviour when used to infer policies while
+at the same time reducing to a VFE when dealing with past data points. In
+this way, an agent would no longer have to maintain two separate models and
+could instead utilise only one.
+The GFE as introduced by [19] is tied to a speciﬁc choice of generative model.
+The model introduced by [19] is given by
+
+p(x, z | û) ∝ p(z0 )
+
+T
+Y
+
+p(xk |zk )p(zk |ûk , zk−1 )p̃(xk )
+
+(14)
+
+k=1
+
+where x denotes observations, z denotes latent states and û denotes a ﬁxed
+policy. Throughout this paper we will use t to refer to the current time step in
+a given model and denote ﬁxed values by a hat, here exempliﬁed by û. Further,
+we also use z to denote vectors.
+Given a current time step t, we have that for future time steps k > t, p̃(xk )
+deﬁnes a goal prior over desired future observations. For past time steps k ≤ t,
+we instead have p̃(xk ) = 1 which makes it uninformative 2 . Writing the model
+in this way allows for a single model for both perception (integrating past data
+points) and action (inferring policies) since both past and future time steps are
+included. GFE is deﬁned as [19]
+
+G[ q; û ] =
+
+T x
+X
+
+q(xk |zk )q(zk |ûk ) log
+
+k=1
+
+q(xk |ûk )q(zk |ûk )
+dxk dzk
+p̃(xk )p(xk , zk |ûk )
+
+(15)
+
+where
+
+q(xk |zk ) =
+
+(
+
+δ(xk − x̂k ) if k ≤ t
+.
+p(xk |zk )
+if k > t
+
+(16)
+
+and x̂k denotes the observed data point at time step k. p(xk , zk | ûk ) can
+be found recursively by Bayesian smoothing, see [14, 23] for details. To see how
+the GFE reduces to a VFE when data is available, we refer to Appendix B.
+The GFE introduced by [19] improves upon prior work utilising EFE but
+still has some issues. The ﬁrst lies in tying it to the model deﬁnition in Eq. (14).
+Being committed to a model speciﬁcation apriori severely limits what the GFE
+can be applied to since not all problems are going to ﬁt the model speciﬁcation.
+Additionally, a more subtle issue lies in the commitment to a hard time horizon.
+If t denotes the current timestep, at some point time will advance to the point
+t > T . When this happens Eq. (14) loses the capacity to plan and becomes
+2 [19] writes this as the prior being flat to achieve a similar effect
+
+9
+
+static since all observations are clamped by Eq. (16). A further complication
+arises from û being a ﬁxed parameter and not a random variable. Being a
+ﬁxed parameter means it is not possible to perform inference for û which in
+turn makes scaling diﬃcult. Moving to a fully local version of the GFE instead
+means we can construct a new synthetic approach to AIF that addresses these
+issues.
+
+4
+
+LAIF - Lagrangian Active Inference
+
+Armed with the node local GFE derived in Eq. (13), we can construct a Lagrangian for AIF. The goal is to adapt the Lagrangian approach to MP sketched
+in section 2 to derive a MP algorithm that optimises local GFE in order to have
+a distributed inference procedure that incorporates epistemic terms. Naively
+applying the method of [25] to Eq. (13) does not yield useful results because the
+numerator diﬀers from the term we take the expectation with respect to. To
+obtain a useful solution we need that
+q(x, z) = q(x | z)q(z)
+
+(17)
+
+and add the original assumption in [19], given by Eq. (16)
+q(x | z) , p(x | z) .
+
+(18)
+
+With these additional assumptions, we can obtain meaningful solutions and
+derive a message passing algorithm that optimises a local GFE and induces
+epistemic behaviour which we demonstrate in section7. The detailed derivation
+of these results can be found in our companion paper [15]. For practical AIF
+modelling, we provide the relevant messages in Fig. 21.
+At this point, we will instead show a diﬀerent way to arrive at the local
+GFE. This approach is more "mechanical" but has the advantage that it can
+more easily be written in terms of constraints on the BFE. Our starting point
+will once again be a free energy term local to the node a
+
+F [qa ] =
+
+Z
+
+q(sa ) log
+
+q(sa )
+dsa
+f (sa )
+
+(19)
+
+To turn Eq. (19) into a local GFE we need to perform two steps. The ﬁrst
+is to enforce a mean ﬁeld factorisation
+q(sa ) =
+
+Y
+
+q(si )
+
+i∈E(a)
+
+The second is to change the expectation to obtain
+10
+
+(20)
+
+Z
+
+q(sa )
+dsa =⇒
+q(sa ) log
+f (sa )
+
+Z
+
+p(si |sa\i )q(sa\i ) log
+
+q(sa )
+dsa
+f (sa )
+
+(21)
+
+where i ∈ E(a). This partitions the connected variables into two sets: A set
+of variables where the expectation is modiﬁed and any remainder that is not
+modiﬁed. p(si | sa\i ) denotes a conditional probability distribution. We write
+p here instead of f to emphasise that the conditional needs to be normalised in
+order for us to be able to take the expectation.
+We refer to this move as a P-substitution. Once the mean ﬁeld factorisation
+is enforced, we can recognise Eq. (21) as a node-local GFE G[qa ].
+As an example of constructing a node-local GFE with this approach, we can
+consider a node with two connected variables, {x, z}.
+The local free energy becomes
+F [qa ] =
+
+x
+
+q(x, z) log
+
+q(x, z)
+dxdz
+p(x, z)
+
+(22)
+
+q(x)q(z)
+dxdz
+p(x, z)
+
+(23)
+
+Now we apply a mean ﬁeld factorisation
+F [qa ] =
+
+x
+
+q(x)q(z) log
+
+And ﬁnally, perform P-substitution to obtain a node-local GFE
+x
+
+x
+q(x)q(z)
+q(x)q(z)
+dxdz =⇒
+dxdz
+p(x | z)q(z) log
+p(x, z)
+p(x, z)
+
+q(x)q(z) log
+
+(24)
+
+We denote the set of nodes for which we want to perform P-substitution with
+P ⊆ V. When performing P-substitution, we are replacing a local variational
+free energy F [qa ] with a local generalised free energy G[ qa ]. Armed with Psubstitution, we can now write the simplest instance of a Lagrangian for Active
+Inference
+X
+
+L[q] =
+
+G[ qa ]
+
++
+
+a∈P
+
+|
+
+XXZ
+
+}
+
++
+
+X
+
+a∈V
+
+|
+
+|
+
+}
+
+λia (si ) q(si ) −
+{z
+
+X
+(1 − di ) H[q(si )]
+| {z }
+i∈E
+
+{z
+
+Node local
+free energies
+
+"
+
+a∈V i∈E
+
+|
+
+F [qb ] +
+
+b∈V\P
+
+{z
+
+P-substituted subgraph
+w / naive mean field
+
++
+
+X
+
+Z
+
+Edge entropy
+
+#
+
+q(sa )dsa\i dsi
+
+Marginalisation
+
+λa
+
+"Z
+
+q(sa )dsa − 1
+{z
+
+#
+}
+
+Normalisation of node marginals
+
+11
+
++
+
+X
+i∈E
+
+|
+
+λi
+
+"Z
+
+}
+
+(25)
+
+q(si )dsi − 1
+
+#
+
+{z
+
+}
+
+Normalisation of edge marginals
+
+.
+
+With the Active Inference Lagrangian in hand, we can now solve for stationary points using variational calculus and obtain MP algorithms for LAIF. The
+key insight is that messages ﬂowing out of P derived from stationary points of
+Eq. (25) will correspond to stationary points of the local GFE rather than BFE,
+meaning the result will include an epistemic component. This paves the way for
+a localised version of AIF that applies to arbitrary graph structures, does not
+suﬀer from scaling issues as the planning horizon increases, and can be solved
+eﬃciently and asynchronously using MP.
+
+5
+
+Constrained Forney-style factor graphs
+
+While FFGs are a useful tool for writing down generative models, we have by
+now established the importance of knowing the exact functional to be minimised.
+This requires specifying not just the model f but also the family Q through
+constraints and any potential P-substitutions. This is important if we want to
+be able to succinctly specify not just the model but also the exact inference
+problem we aim to solve.
+We will now develop just such a new notation for writing constraints directly
+as part of the FFG. We refer to FFGs with added constraints speciﬁcation as
+CFFGs.
+
+Figure 3: An example FFG.
+Fig 3 shows a model comprised of ﬁve edges and six nodes. FFGs traditionally represent the model f using squares connected by lines as shown in Fig. 3.
+The squares represent factors and the connections between them represent variables. Connecting an edge to a square node indicates that the variable on that
+edge is an argument of the factor it is connected to.
+The notation for CFFGs adheres to similar principles when specifying f .
+However, we augment the FFG with circular beads to indicate the constraints
+that deﬁne our family Q. Each factor of the variational distribution in q will
+correspond to a bead and the position of a bead indicates to which marginal
+it refers - a bead on an edge denotes an edge marginal q(si ) and a bead inside
+a node denotes a node marginal q(sa ). An empty bead will denote the default
+normalisation constraints while a connection between beads indicates marginalisation constraints following Eq. (9). These beads form the basic building blocks
+of our notation.
+To write the objective corresponding to the model in Fig. 3 given the default
+constraints of Eq. (9), we add beads for every term and extend edges through the
+12
+
+node boundary to connect variables that are under marginalisation constraints
+as shown in Fig. 4.
+
+Figure 4: Example CFFG with normalisation and marginalisation constraints.
+
+5.1
+
+Factorisation constraints
+
+We will now extend our notation with the most common types of constraints
+used for deﬁning Q. A common choice is factorisation of the variational distribution with the most well-known example being the naive mean ﬁeld approximation. Under a naive mean-ﬁeld factorisation, all marginals are considered
+independent. Formally this means we enforce
+q(sa ) =
+
+Y
+
+(26)
+
+q(si ) .
+
+i∈E(a)
+
+To write Eq. (26) on a CFFG we need to replace the joint node marginal
+with the product of adjacent edge marginals.
+
+fa
+
+fa
+
+Figure 5: Changing a local joint factorisation to a naive mean ﬁeld assumption
+on a CFFG.
+To do this we can replace the bead indicating the joint marginal with a bead
+for each edge marginal in Eq. (26) as shown in Fig. 5.
+The naive mean ﬁeld is the strongest factorisation possible. It is possible
+to utilise less aggressive factorisations by appealing to a structured mean ﬁeld
+approximation instead. The structured mean ﬁeld constraint takes the form
+q(sa ) =
+
+Y
+
+n∈l(a)
+
+13
+
+q n (sna )
+
+(27)
+
+where l(a) denotes a set of one or more edges connected to the node a such
+that each element in E(a) can only appear in l(a) once [25]. For example if
+E(a) = {i, j, k} corresponding to variables {x, y, z}, we can factorise q(x, y, z)
+as q(x)q(y, z) or q(z)q(x, y) but not as q(x, y)q(y, z) since y appears twice. The
+naive mean ﬁeld is a special case of the structured mean ﬁeld where every
+variable appears only by itself.
+To write a structured mean ﬁeld factorisation on a CFFG we can apply a
+similar logic and replace the single bead denoting the joint with beads that
+match the structure of l(a). Each set of variables that are factorised together
+corresponds to a single bead connected to the edges in the set that factor together.
+
+fa
+
+fa
+
+fa
+
+Figure 6: Changing a local joint factorisation to structured mean ﬁeld on a
+CFFG.
+Fig. 6 shows two example factorisations. The ﬁrst option factorises the four
+incoming edges into two sets of two while the second partitions the incoming
+edges into two sets of one and a single set of two. Using these principles it is
+possible to specify complex factorisation constraints as part of the CFFG by
+augmenting each node on the original FFG.
+The ﬁnal situation we need to consider is the case when a single node has
+a variable or very high number of incoming edges. An example could be a
+Gaussian Mixture Model with a variable number of mixture components. On a
+CFFG we indicate variable or large numbers of identical edges by drawing two
+of the relevant edges and separating them with dots (· · · ) as shown in Fig. 7.
+To indicate factorisation constraints we can write either a joint or a naive mean
+ﬁeld factorisation between the two edges, letting the dots denote that a similar
+factorisation applies to the remaining edges.
+14
+
+fa
+
+fa
+
+Figure 7: Mean ﬁeld (left) and joint (right) factorisation constraints for variable
+numbers of edges on a CFFG.
+
+5.2
+
+Form constraints
+
+We will now extend CFFG notation with constraints on the functional form of
+nodes and edges. Form constraints are used to enforce a particular form for a
+local marginal on either an edge or a node. For an edge si they enforce
+Z
+
+q(sa )dsa\i = q(si ) = g(si )
+
+(28)
+
+where g(si ) denotes the functional form we are constraining the edge marginal
+si to take. Form constraints on node marginals take the form
+q(sa ) = g(sa )
+
+(29)
+
+Conventionally FFGs denote the form of a factor by a symbol inside the node.
+We adopt a similar convention to denote form constraints on q by adding symbols
+within the corresponding beads. For instance, we can indicate a Gaussian form
+constraint on an edge as shown in Fig 8
+N
+Figure 8: Notation for enforcing a Gaussian form constraint on an edge.
+Note that this is not dependent on the form of the neighbouring factors. This
+is a subtle point as it allows us to write approximations into the speciﬁcation
+of Q. As an example, the unconstrained marginal in Fig 8 might be bimodal
+or highly skewed but by adding a form constraint, we are enforcing a Gaussian
+approximation. Outside of a few special cases, enforcing form constraints on
+edges is rarely done in practice since the functional form of q most often follows
+from optimisation [25].
+A special case of form constraints is the case of dangling edges (edges that
+are not terminated by a factor node). Technically these would not warrant a
+bead since they would not appear explicitly in the BFE due to having degree
+1. Intuitively this means that the edge marginal is only counted once and we
+therefore do not need to correct for overcounting. However, without a bead,
+there is nowhere to annotate a form constraint which is problematic.
+15
+
+The solution for CFFG notation is to simply draw the bead anyway, in case
+a form constraint is needed. This is formally equivalent to terminating the
+dangling edge by a factor node with the node function fa (sa ) = 1. Terminating
+the edge in this way means the edge in question now has degree 2 and therefore
+warrants a bead. This is always a valid move since multiplication by 1 does not
+change the underlying function [25].
+We can denote form constraints on node marginals in the same manner as
+edge marginals. We show an example in Fig 9 where we enforce a Gaussian
+form constraint on one node marginal and a Wishart on the other. Again it is
+important to note that these are constraints on q and not part of the underlying
+model speciﬁcation f .
+N
+
+W
+
+Figure 9: Notation for enforcing form constraints on nodes.
+Two kinds of form constraints warrant extra attention: δ-constraints and
+moment matching. We will now deal with these in turn.
+
+5.3
+
+δ-constraints and data points
+
+δ-constraints are the most commonly used form constraints because they allow
+us to incorporate data points into a model. A δ-constraint on an edge deﬁnes
+the function g(si ) in Eq. (28) to be
+(30)
+
+g(si ) = δ(si − ŝi )
+
+What makes the δ-constraint special is that ŝi can either be a known value
+or a parameter to optimise [25]. In the case where ŝi is known, it commonly
+corresponds to a data point. We will refer to this case as a data constraint and
+denote it with a ﬁlled circle as shown in Fig 10
+δ
+
+δ
+
+Figure 10: Terminating and non-terminating notation for data constraints.
+Data constraints are special because they denote observations. They also
+block any information ﬂow across the edge in question [25]. Because they block
+information ﬂow, CFFG notation optionally allows data constraints to terminate
+edges.
+Here we wish to raise a subtle point about prior FFG notation. Previous
+work has used small black squares to denote data constraints following [21].
+In keeping with our convention, a small black square on a CFFG denotes a
+16
+
+δ-distributed variable in the model f rather than the variational distribution
+q. Being able to diﬀerentiate data constrained variables in q and apriori ﬁxed
+parameter of the model f allows us to be explicit about what actually constitutes
+a data point for the inference problem at hand [caticha_entropic_2012].
+In the case where ŝj is not known, it can be treated as a parameter to be
+optimised. We refer to this case as a δ-constraint or a pointmass constraint and
+notate it with an unﬁlled circle as shown in Fig 11
+δ
+Figure 11: Notation for δ-constraints.
+Unlike data constraints, the δ-constraint allows messages to pass and is therefore not allowed to terminate an edge. Optimising the value of ŝi under a
+δ-constraint leads to EM as message passing [25].
+
+5.4
+
+Moment matching constraints
+
+Moment matching constraints are special in that they replace the hard marginalisation constraints of Eq. (8) with constraints of the form
+q(si ) =
+
+Z
+
+q(sa )dsa\i =⇒
+
+Z
+
+q(sa )Ti (si )dsa =
+
+Z
+
+q(si )Ti (si )dsi
+
+(31)
+
+where Ti (si ) are the suﬃcient statistics of an exponential family distribution.
+This move loosens the marginalisation constraint by instead only requiring that
+the moments in question align. When taking the ﬁrst variation and solving, one
+obtains the expectation propagation (EP) algorithm [18].
+For notational purposes, moment matching constraints are unique in that
+they involve both an edge- and a node-marginal. That means the eﬀects are not
+localised to a single bead. To indicate which beads are involved, we replace the
+solid lines between them with dashed lines instead.
+We denote moment matching constraints by an E inside the corresponding
+edge-bead as shown in Fig 12. Choosing the edge-bead over the node-bead is
+an arbitrary decision made mainly for convenience.
+E
+
+E
+
+Figure 12: Notation for moment matching with a single-sided (left) and doublesided (right) node/edge pairs.
+The left side of Fig. 12 shows notation for constraining a single node/edge
+pair by moment matching. If both nodes connected to an edge are under moment
+matching constraints, the double-sided notation on the right of Fig. 12 applies.
+17
+
+Given the modular nature of CFFG notation it is easy to compose diﬀerent local constraints to accurately specify a Lagrangian and by extension an
+inference problem. Adding custom marginal constraints to a CFFG is also
+straightforward as it simply requires deﬁning the meaning of a symbol inside a
+bead.
+
+5.5
+
+P-substitution on CFFGs
+
+The ﬁnal piece needed to represent the Active Inference Lagrangian on a CFFG
+is P-substitution. Being able to represent LAIF on a CFFG is the reason for
+constructing the local GFE using a mean-ﬁeld factorisation and P-substitution.
+This construction is much more amenable to the tools we have developed so far
+as we will now demonstrate.
+Recall that P-substitution involves substituting part of the model p for q in
+the expectation only. To write P-substitution on a CFFG, the logical notation
+is therefore to replace a circle with a square. Fig. 13 shows an example of adding
+a P-substitution to a mean-ﬁeld factorised node marginal
+
+x
+z
+
+x
+z
+
+fa
+
+fa
+y
+
+y
+
+Figure 13: P-substitution on a CFFG with naive mean ﬁeld factorisation.
+The square notation for P-substitution on CFFGs implies a conditioning
+of the P-substituted variable on all other connected variables that are not Psubstituted. For example, in Fig. 13 the P-substitution changes local VFE to a
+GFE by
+y
+
+q(y)q(x)q(z)
+dydxdz
+p(y, x, z)
+y
+q(y)q(x)q(z)
+p(y | x, z)q(x)q(z) log
+=⇒
+dydxdz
+p(y, x, z)
+
+q(y)q(x)q(z) log
+
+(32)
+
+Here, the P-substituted variable is y, and the remainder are {x, z}.
+
+5.6
+
+CFFG Compression
+
+The value of CFFG notation is measured by how much it aids other researchers
+and practitioners in expressing their ideas accurately and succinctly. We envi18
+
+sion two main groups for whom CFFGs might be of particular interest. The
+ﬁrst group is comprised of mathematical researchers working on constrained free
+energy optimisation on FFGs For this group we expect that the notation developed so far will be both useful and practically applicable since work is often
+focused on the intricacies of performing local optimisation. Commonly an FFG
+in this tradition is small but a very high level of accuracy is desired in order to
+be mathematically rigorous.
+However there is a second group composed of applied researchers for whom
+the challenge is to accurately specify a larger inference problem and its solution to solve an auxiliary goal - for instance controlling a drone, transmitting
+a coded message or simulating some phenomenon using AIF. For this group
+of researchers in particular, CFFG notation as described so far might be too
+verbose and the overhead of using it may not outweigh the beneﬁts gained. To
+this end, we now complete CFFG notation by a mandatory compression step.
+The compression step is designed to remove redundant information by enforcing an emphasis on deviations from a default BFE. By default, we mean
+no constraints other than normalisation and marginalisation and with a joint
+factorisation around every node. Recall that default normalisation constraints
+are denoted by empty, round beads and marginalisation by connected lines. A
+joint factorisation means all incoming edges are connected and the node only
+has a single, internal bead.
+To provide a recipe for compressing a CFFG, we will need the concept of a
+bead chain. A bead chain is simply a series of beads connected by edges. In the
+following recipe, a bead will only be summarised as part of a chain if it contains
+no additional information, meaning if it is round and empty. To compress a
+CFFG, we follow a series of four steps:
+1. Summarise every bead chain by their terminating beads.
+2. For nodes with no factorisation constraints, remove empty, internal beads.
+3. For nodes with no factorisation constraints, remove all internal edges.
+4. For all factor nodes, push remaining internal beads to the border of the
+corresponding factor node.
+After performing these steps, we are left with a compressed version of the
+original CFFG where each node can be much smaller and more concise. To
+exemplify, we apply the recipe to the CFFG in Fig. 14.
+
+19
+
+fc
+
+fa
+
+fb
+
+δ
+
+δ
+
+E
+=
+
+fd
+
+fe
+
+ff
+
+fg
+
+Figure 14: Initial CFFG before compression.
+Fig. 14 is a complicated graph with loops, dangling edges, and multiple
+diﬀerent factorisations in play. As a result, Fig. 14 covers a lot of special cases
+that one might encounter on a CFFG. We will now apply the steps in sequence,
+starting by removing empty beads on chains. This removes most of the beads
+in the inner loop as shown in Fig. 15
+
+20
+
+fc
+
+fa
+
+fb
+
+δ
+=
+
+fd
+
+ff
+
+fc
+
+δ
+
+E
+
+δ
+
+fe
+
+fd
+
+fg
+
+fa
+
+fb
+
+E
+=
+
+ff
+
+fe
+
+fg
+
+Figure 15: Step 1: Removing empty beads from chains. Aﬀected beads are
+highlighted in red.
+Note that the dangling edge extending from fa is treated as terminated by a
+bead and the bead on the edge is removed. Next, we remove any internal beads
+for nodes with no factorisation constraints. We show this step in Fig. 16
+
+21
+
+δ
+
+fc
+
+fa
+
+fb
+
+δ
+=
+
+fd
+
+ff
+
+fc
+
+δ
+
+E
+
+δ
+
+fe
+
+fd
+
+fg
+
+fa
+
+fb
+
+E
+=
+
+ff
+
+fe
+
+fg
+
+Figure 16: Step 2. Removing beads on nodes with default factorisation. Aﬀected
+nodes are highlighted in red.
+The next step is to remove any internal edge extensions for nodes with no
+factorisation constraints. We demonstrate this step in Fig. 17. Note that the
+internal edge of the node fd does not get cancelled since one of the connected
+edges is a pointmass in the model and therefore not present in q, meaning fd
+does not have a default factorisation.
+
+22
+
+δ
+
+fc
+
+fa
+
+fb
+
+δ
+=
+
+fd
+
+ff
+
+fc
+
+δ
+
+E
+
+δ
+
+fe
+
+fd
+
+fg
+
+fa
+
+E
+=
+
+fe
+
+ff
+
+fg
+
+Figure 17: Step 3. Removing internal edges. Aﬀected edges are highlighted in
+red.
+Finally, we can push any remaining internal beads to their node border, illustrated in Fig. 18. This step allows for writing the CFFG much more compactly,
+as we can see in Fig. 19.
+
+23
+
+fb
+
+δ
+
+fc
+
+fa
+
+δ
+fd
+
+fb
+
+fc
+
+δ
+
+E
+
+δ
+
+=
+
+fe
+
+fd
+
+ff
+
+fg
+
+fa
+
+E
+=
+
+fe
+
+ff
+
+fg
+
+Figure 18: Step 4. Pushing beads to node borders. Aﬀected beads are highlighted in red.
+At this point, we have removed most of the beads and edges and still retain
+most of the relevant information around all nodes. What is left is only what
+deviates from a default BFE speciﬁcation. The goal here is, as stated initially, to
+make it easier to work with CFFG’s for larger models which necessitate working
+with smaller nodes.
+
+24
+
+fb
+
+δ
+
+fc
+
+fa
+
+fb
+
+δ
+
+fc
+
+fa
+
+δ
+
+δ
+
+E
+=
+
+fd
+
+ff
+
+fd
+
+fb
+E
+
+=
+
+fe
+
+ff
+
+fg
+
+fe
+
+fg
+
+Figure 19: Compression allows for much more compact CFFGs which in turn
+are better suited for larger inference problems.
+From Fig. 19 it is clear that compression allows for much more compact
+CFFG’s which in turn are more amenable to larger CFFG’s. This is especially
+true in the absence of any factorisation or form constraints and P-substitutions
+in which case the compressed CFFG and underlying FFG are identical. We see
+this with nodes fc , ff , fg and = in Fig. 19.
+
+6
+
+Classical AIF and the original GFE algorithm
+as special cases of LAIF
+
+An integral part of working with MP algorithms is the choice of schedule the order in which messages are passed. Many MP algorithms are iterative in
+nature and can therefore be sensitive to scheduling. LAIF is also an iterative
+MP algorithm and might consequently be sensitive to the choice of schedule.
+A particularly interesting observation is that we can recover both the classical AIF planning algorithm of [6] and the scheme proposed by [19] as special
+cases of LAIF by carefully choosing the schedule and performing model comparison. This result extends upon prior work by [13] who reinterpreted the classical
+algorithm through the lens of MP on an FFG.
+
+25
+
+δ
+
+6.1
+
+Example: CFFG and message updates for a discrete
+observation model with goals
+
+z ↑ 2
+A
+←
+3
+
+T
+x
+Cat
+
+c ↓ 1
+Figure 20: CFFG of composite node for LAIF on discrete state spaces, reproduced from [15].
+In order to both demonstrate LAIF and recover prior work, we need to derive
+the required messages. We refer to our companion paper [15] for the detailed
+derivations and summarise the results here. For the remaining paragraphs, we
+will use x to denote that x is vector-valued and A to denote that A is either
+a matrix or a tensor. For the discrete case, we work with a composite node
+corresponding to the factor
+p(x | A, z) = Cat(x | Az)
+
+(33a)
+
+p̃(x | c) = Cat(x | c) .
+
+(33b)
+
+We show the corresponding CFFG in Fig. 20 where we indicate the necessary factorisation and P-substitution. In the parlance of AIF Eq. 33a deﬁnes
+a model composed of a discrete state transition (T ) with transition matrix A
+and a categorical goal prior (Cat) with parameter vector c. Before stating the
+messages, we deﬁne the vector
+h(A) = −diag(AT log A)
+
+(34)
+
+This term is often denoted H in other works [4, 19]. We instead opt for
+using lowercase since the term is a vector and for making the dependence on A
+explicit. In the following section, we will sometimes use an overbar to denote
+expectations, such that Eq(x) [g(x)] = g(x). Additionally, we deﬁne
+
+26
+
+
+ξ(A) = AT log c − log Az − h(A)
+
+T
+ρ = A log c − log Az − h(A) .
+
+(35a)
+(35b)
+
+in order to make the expressions more concise. Where expectations cannot
+be computed in closed form, we instead resort to Monte Carlo estimates. With
+this notation in place, we can write the required messages as
+µ 1 (c) ∝ Dir(c|Az + 1)
+µ 2 (z) ∝ Cat(z|σ(ρ))
+!
+
+Solve: z = σ(ρ(z) + log d)
+µ 2 (z) ∝ Cat(z|σ(log z∗ − log d))
+log µ 3 (A) = zT ξ(A)
+Ux = −zT ρ
+Figure 21: Message updates for the discrete composite node, reproduced from
+[15].
+Fig. 21 shows the message updates towards all connected variables as well as
+the average energy term (Ux ) for the composite node. d denotes the parameters
+of the incoming message from the rest of the CFFG on the edge z. Interestingly,
+the energy term Ux corresponds exactly to the EFE as used in standard AIF [4,
+6].
+Special attention needs to be given to the messages µ 2 (z) and µ 3 (A). While
+µ 2 (z) can be solved for in closed form, in practice applying this result directly
+can lead to unstable solutions that ﬂuctuate between multiple extrema. For this
+reason, we opt for parameterising the message by z and solving for parameters
+of the marginal directly using Newtons method. Having found the optimum z∗
+we can then substitute the result into the message expression to obtain a stable
+solution.
+The message µ 3 (A) does not follow a nice exponential family distribution.
+To circumvent this problem, we can pass on the logpdf directly. When we need
+to compute the marginal q(A), we can then use sampling procedures to estimate
+the necessary expectations [1]. Further details and full derivations can be found
+in our companion paper [15].
+
+6.2
+
+Reconstructing classical AIF
+
+With our new messages in hand and equipped with CFFG notation, we can now
+restate prior work unambiguously, starting with the classical algorithm of [6].
+To reconstruct the algorithm of [6], we start by deﬁning the generative model.
+
+27
+
+The generative model is a discrete partially observed Markov decision process
+(POMDP) over future time steps given by
+p(xt+1:T , zt:T | ût+1:T , x1:t , u1:t )
+|
+{z
+} | {z } | {z }
+Future
+
+Past
+
+Policy
+
+∝ p(zt | x1:t , u1:t )
+|
+{z
+}
+State Prior
+
+where
+
+T
+Y
+
+p(xk | zk ) p(zk | zk−1 , ûk ) p̃(xk )
+{z
+} | {z }
+| {z } |
+k=t+1 Likelihood State Transition Goal prior
+
+(36)
+
+(37)
+
+p(zt | x1:t , u1:t ) = Cat(zt | d)
+p(zk | zk−1 , ûk ) = Cat(zk | Bûk zk−1 )
+
+(38)
+
+p(xk | zk ) = Cat(xk | Azk )
+p̃(xk ) = Cat(xk | ck ) .
+
+(39)
+(40)
+
+Here we let xk denote observations, zk latent states, and ûk a ﬁxed control,
+with the subscript k indicating the future time step in question. The initial state
+zt represents the ﬁltering solution given the agents trajectory so far which we
+summarise in the parameter vector d. Control signals correspond to particular
+transition matrices Bûk where we use the subscript to emphasize that each B
+matches a particular control ûk . The observation model is given by the known
+matrix A. Note that Eq. (36) is not normalised as it includes goal priors over
+x. The CFFG of (36) is shown in Fig 22.
+
+Bût+1
+d
+
+Cat
+
+zt
+
+Bût+2
+zt+1
+
+=
+
+T
+
+A
+
+=
+
+T
+
+A
+
+T
+xt+1
+
+ct+1
+
+Cat
+
+zt+2
+
+···
+
+T
+xt+2
+
+ct+2
+
+Cat
+
+Figure 22: CFFG of discrete POMDP as used for planning in standard AIF
+models.
+where T nodes denote a discrete state transition (multiplication of a categorical variable by a transition matrix). Given a generative model with a ﬁxed
+28
+
+set of controls, the next step is to compute the EFE [4, 6, 13, 14]. We provide
+a brief description here and refer to Appendix A and [4, 13, 14, 22] for more
+detailed descriptions. The EFE is given by
+
+G(ût+1:T ) =
+
+T x
+X
+
+p(xk | zk )q(zk | ûk ) log
+
+k=t
+
+q(zk | ûk )
+dxk dzk
+p(xk , zk | ûk )
+
+(41)
+
+With a slight abuse of notation, we can compute EFE by ﬁrst applying
+transition matrices to the latent state and generating predicted observations as
+zk = Bûk zk−1
+
+(42)
+
+xk = Azk .
+
+In Eq. (42) we slightly abuse notation by having zk (resp. xk ) refer to the
+prediction after applying the transition matrix Bûk (resp. A) instead of the
+random variable as we have done elsewhere.
+We can recognise these operations as performing a forwards MP sweep using
+belief propagation messages. With this choice of generative model, the EFE of
+a policy ût+1:T is found by [4, Eq. D.2-3].
+
+G(ût+1:T ) =
+
+T
+X
+
+k=t+1
+
+
+T
+− diag AT log A zk + xTk (log xk − log ck )
+
+(43)
+
+where ck denotes the parameter vector of a goal prior at the k’th time step.
+To select a policy we simply pick the sequence ût+1:T that results in the lowest
+numerical value when solving Eq. (43).
+To write this method on the CFFG in Fig. 22, we can simply add messages to
+the CFFG and note that the sum of energy terms of the P-substituted composite
+nodes in Fig. 21 matches Eq. (43). We show this result in Fig. 23.
+
+↓
+→
+
+Cat
+
+→
+
+T
+
+↓
+→
+
+→
+
+=
+
+T
+
+→
+
+↓
+→
+
+→
+
+=
+
+→
+
+↓
+→
+
+T
+
+Cat
+
+→
+
+T
+
+Cat
+
+Figure 23: Classical EFE computation on the corresponding CFFG.
+29
+
+···
+
+Comparing diﬀerent policies (choices of ût+1:T ) and computing the energy
+terms of the P-substituted composite nodes is then exactly equal to the EFEcomputation detailed in [6].
+
+6.3
+
+Reconstructing the original GFE method
+
+We can further exemplify the capabilities of CFFG notation by recapitulating
+the update rules given in the original GFE paper [19]. To recover the procedure
+of [19], we need to extend the generative model to encompass past observations
+as
+p(x1:T , z0:T | û1:T )
+∝ p(z0 )
+
+t
+Y
+
+p(xl | zl )p(zl | zl−1 , ûl )
+
+k=t+1
+
+l=1
+
+|
+
+T
+Y
+
+{z
+
+Past
+
+}|
+
+Goal prior
+
+z }| {
+p(xk | zk )p(zk | zk−1 , ûk ) p̃(xk )
+{z
+
+Future
+
+(44)
+
+where
+p(z0 ) = Cat(z0 | d)
+p(zt | zt−1 , ût ) = Cat(zt | Bût zt−1 )
+p(xt | zt ) = Cat(xt | Azt )
+p̃(xk ) = Cat(xk | ck ) .
+
+(45)
+
+For past time steps, we add data constraints and for future time steps we
+perform P-substitution. We also apply a naive mean ﬁeld factorisation for every
+node. The ﬁnal ingredient we need is a schedule that includes both forwards
+and backwards passes as hinted at in [13]. For t = 1 the corresponding CFFG
+is shown in Fig. 24 with messages out of the P-substituted nodes highlighted in
+red. These messages are given by µ 2 (z) in Fig. 21.
+
+30
+
+}
+
+↓
+Cat
+
+→
+←
+
+T
+
+→
+←
+
+=
+
+zt
+→
+←
+
+↓
+T
+
+↓
+→
+←
+
+↑
+
+↑
+→
+
+=
+
+→
+←
+
+T
+
+→
+←
+
+↓ ↑
+→
+
+T
+
+T
+
+=
+↓ ↑
+
+→
+
+T
+
+↑
+→
+
+δ
+
+Cat
+
+→
+
+Figure 24: GFE computation on the CFFG.
+With these choices, the update equations become identical to those of [19].
+Indeed, careful inspection of the update rules given in [19] reveals the component parts of the P-substituted message. However, by using CFFGs and
+P-substitution, we can cast their results as MP on generic graphs which immediately generalises their results to free-form graphical models.
+Once inference has converged, we note that [19] shows that GFE evaluates
+identically to the EFE, meaning we can use the same model comparison procedure to select between policies as we used for reconstructing the classical
+algorithm. This shows how we can obtain the algorithm of [19] as a special case
+of LAIF.
+
+7
+
+LAIF for policy inference
+
+The tools presented in this chapter are not limited to restating prior work. Indeed, LAIF oﬀers several advantages over prior methods, one of which is the
+ability to directly infer a policy instead of relying on a post hoc comparison of
+energy terms. To demonstrate, we solve two variations of the classic T-maze
+task [6]. This is a well-studied setting within the AIF literature and therefore
+constitutes a good minimal benchmark. In the T-maze experiment, the agent
+lives in a maze with four locations as depicted in Fig. 25. The agent (,) starts
+in position 1 and knows that a reward is present at either position 2 or 3, but
+not which one. At position 4 is a cue that informs the agent which arm contains the reward. The optimal action to take is therefore to ﬁrst visit 4 and
+learn which arm contains the reward before going to the rewarded arm. Because this course of action requires delaying the reward, an agent following a
+greedy policy behaves sub-optimally. The T-maze is therefore considered a reasonable minimal example of the epistemic, information-seeking behaviour that
+is a hallmark of AIF agents. We implemented our experiments in the reactive
+MP toolbox RxInfer [2]. The source code for our simulations is available at
+31
+
+Cat
+
+→
+←
+
+···
+
+https://github.com/biaslab/LAIF.
+
+2
+
+3
+
+1
+
+,
+
+4
+Figure 25: The T-maze environment
+
+7.1
+
+Model specification
+
+The generative model for the T-maze is an adaptation of the discrete POMDP
+used by [6, 19]. We assume the agent starts at some current timestep t and
+want to infer a policy up to a known time horizon T . The generative model is
+then
+
+p(x, z, u) ∝ p(zt )
+| {z }
+
+T
+Y
+
+p(xk | zk ) p(zk | zk−1 , uk ) p(uk ) p̃(xk )
+| {z } |
+{z
+} | {z } | {z }
+
+Initial k=t+1 Observation
+state
+model
+
+where
+
+Transition
+model
+
+(46)
+
+Control Goal
+prior prior
+
+p(zt ) = Cat(zt |d)
+p(xk |zk ) = Cat(xk |Azk )
+Y
+p(zk |zk−1 , uk ) =
+Cat(zk |Bn zk−1 )unk
+
+(47a)
+(47b)
+
+p(uk ) = Cat(uk |ek )
+
+(47d)
+
+p̃(xk ) = Cat(xk |ck ) .
+
+(47e)
+
+(47c)
+
+n
+
+uk is a one-hot encoded vector of length n. The notation unk picks the n’th
+entry of uk . We show the corresponding CFFG in Fig 26.
+
+32
+
+et
+
+et+1
+
+Cat
+
+Cat
+ut+1
+
+ut
+d
+
+Cat
+
+zt
+
+=
+
+TM
+B1 · · · B4
+
+zt+1
+
+TM
+
+B1 · · · B4
+
+At
+
+T
+
+ct
+
+Cat
+
+At+1
+
+ct+1
+
+T
+
+Cat
+
+Figure 26: CFFG for the T-maze experiment
+Eq. (47c) deﬁnes a mixture model over candidate transition matrices indexed
+by uk . We give the details of this node function and the required messages in
+Appendix C. The MP schedule is shown in Fig. 27 with GFE-based messages
+highlighted in red
+
+33
+
+→
+
+→
+
+Cat
+↑ ↓
+
+→
+
+Cat
+
+→
+←
+
+TM
+
+Cat
+↑ ↓
+
+→
+←
+
+↑ ··· ↑
+
+=
+
+→
+←
+
+→
+
+T
+
+→
+
+↑
+
+↑ ··· ↑
+
+↑ ↓
+→
+
+→
+
+TM
+
+→
+
+Cat
+
+T
+
+Cat
+
+Figure 27: Message passing schedule for the T-maze experiment
+Following [6] we deﬁne the initial state and control prior as
+d = (1, 0, 0, 0)T ⊗ (0.5, 0.5)T
+ek = (0.25, 0.25, 0.25, 0.25)∀k
+
+(48a)
+(48b)
+
+with ⊗ denoting the Kronecker product. The transition mixture node requires a set of candidate transition matrices. The T-maze utilises four possible
+transitions, given below
+
+1
+0
+B1 = 
+0
+0
+
+0
+0
+
+B3 = 
+1
+0
+
+1
+0
+0
+0
+
+1
+0
+0
+0
+
+1
+0
+0
+0
+
+1
+0
+0
+0
+
+
+
+0
+1
+1
+0
+ ⊗ I2 , B2 = 
+0
+0
+0
+0
+
+
+0
+0
+
+0
+ ⊗ I2 , B4 = 0
+0
+1
+1
+0
+
+1
+0
+0
+0
+
+1
+0
+0
+0
+
+1
+0
+0
+0
+
+1
+0
+0
+0
+
+
+0
+1
+ ⊗ I2
+0
+0
+
+0
+0
+ ⊗ I2
+0
+1
+
+(49)
+
+where I2 denotes a 2 × 2 identity matrix. Note that these diﬀer slightly from
+the original implementation of [6]. In [6] invalid transitions are represented
+by an identity mapping where we instead model invalid transitions by sending
+the agent back to position 1. The likelihood matrix A is given by four blocks,
+corresponding to the observation likelihood in each position.
+34
+
+
+
+
+
+A1
+
+
+A=
+
+
+A2
+A3
+A4
+
+
+,
+
+
+(50)
+
+with everything outside the blocks being set to 0. The blocks are
+
+0
+0
+ 0
+0 
+
+A2 = 
+ α
+1 − α
+1−α
+α
+
+
+1 0
+ 0 1
+
+A4 = 
+ 0 0 ,
+0 0
+
+
+
+0.5 0.5
+0.5 0.5
+,
+A1 = 
+0
+0
+0
+0
+
+
+0
+0
+ 0
+0 
+,
+A3 = 
+1 − α
+α 
+α
+1−α
+
+
+
+(51)
+
+with α being the probability of observing a reward. The goal prior is given
+by
+
+ck = σ (0, 0, c, −c)T ⊗ (1, 1, 1, 1)T ∀k
+
+(52)
+
+with c being the utility ascribed to a reward and σ(·) the softmax function.
+Inference for the parts of the model not in P can be accomplished using belief
+propagation. We follow the experimental setup of [6] and let c = 2, α = 0.9. For
+inference, we perform two iterations of our MP procedure and use 20 Newton
+steps to obtain the parameters of the outgoing message from the P-substituted
+nodes.
+We show the results in Fig. 28. The number in each cell is the posterior
+probability mass assigned to the corresponding action, with the most likely
+actions highlighted in red.
+
+35
+
+Controls at time step 1
+
+0.20
+
+Controls at time step 2
+
+0.20
+
+0.30
+
+0.30
+
+0.25
+
+0.13
+
+0.35
+
+0.26
+
+Figure 28: Posterior controls for the T-maze experiment
+Fig. 28 shows an agent that initially prefers the epistemic action (move to
+state 4) at time t + 1 and subsequently exhibits a preference for either of the
+potentially rewarding arms (indiﬀerent between states 2 and 3). This shows that
+LAIF is able to infer the optimal policy and that our approach can reproduce
+prior results on the T-maze.
+Since CFFGs are inherently modular, they allow us to modify the inference
+task without changing the model. To demonstrate, we now add δ-constraints
+to the control variables. This corresponds to selecting the MAP estimate of the
+control posterior [25] and results in the CFFG shown in Fig. 29. The schedule
+and all messages remain the same as our previous experiment - however now the
+agent will select the most likely course of action instead of providing us with a
+posterior distribution.
+
+36
+
+Cat
+
+Cat
+
+Cat
+
+δ
+
+δ
+=
+
+TM
+
+TM
+
+B1 · · · B4
+
+B1 · · · B4
+T
+
+T
+
+Cat
+
+Cat
+
+Figure 29: CFFG for the T-maze model with additional δ-constraints
+Performing this experiment yields the policy shown in Fig. 30
+
+Controls at time step 1
+
+0.0
+
+Controls at time step 2
+
+0.0
+
+1.0
+
+0.0
+
+0.0
+
+0.0
+
+1.0
+
+0.0
+
+Figure 30: Posterior controls for the T-maze experiment with δ-constraints
+Fig. 30 once again shows that the agent is able to infer the optimal policy for
+solving the task. For repeated runs, the agent will randomly select to move to
+either position 2 or 3 at the second step due to minute diﬀerences in the Monte
+Carlo estimates used for computing the messages. The pointmass constraint
+obscures this since it forces the marginal to put all mass on the MAP estimate.
+37
+
+The point of repeating the experiments with δ-constraints is not to show
+that the behaviour of the agent changes dramatically. Instead, the idea is to
+demonstrate that CFFGs allow for modular speciﬁcation of AIF agents which
+allows for adapting parts of the model without having to touch the rest. In
+this case, the only parts of inference that change are those involving the control
+marginal. This means all messages out of the P-substituted composite nodes
+are unaﬀected since the δ-constraints are only applied to the control marginals.
+
+8
+
+Conclusions
+
+In this paper we have proposed a novel approach to AIF based on lagrangian
+optimisation which we have named Lagrangian Active Inference (LAIF). We
+demonstrated LAIF on a classic benchmark problem from the AIF literature
+and found that it inherits the epistemic drive that is a hallmark feature of AIF.
+LAIF presents three main advantages over previous algorithms for AIF.
+Firstly, an advantage of LAIF is the computational eﬃciency aﬀorded by
+being able to pass backward messages instead of needing to perform forwards
+rollouts for every policy. While LAIF is still an iterative procedure, the computational complexity of each iteration scales linearly in the size of the planning
+horizon T instead of exponentially.
+A second advantage is that LAIF allows for directly inferring posteriors
+over control signals instead of relying on a model comparison step based on
+EFE/GFE. This means that LAIF uniﬁes inference for perception, learning,
+and actions into a single procedure without any overhead - it all becomes part
+of the same inference procedure. See our companion paper [15] for more details.
+Thirdly, LAIF is inherently modular and consequently works for freely deﬁnable CFFGs, while prior work has focused mostly on speciﬁc generative models.
+Extensions to hierarchical or heterarchical models are straightforward and only
+require writing out the corresponding CFFG.
+We have also introduced CFFG notation for writing down constraints and
+P-subtitutions on an FFG. CFFGs are useful not just for AIF but for specifying
+free energy functionals in general. CFFGs accomplish this through a simple
+and intuitive graphical syntax. Our hope is that CFFGs can become a standard
+tool similar to FFGs when it is desirable to write not just a model f but also
+a family of approximating distributions Q. Speciﬁcally in the context of AIF
+we have also introduced P-substitution as a way to modify the underlying free
+energy functional. In doing so we have formalised the relation between AIF and
+message passing on a CFFG, paving the way for future developments.
+In future work, we plan to extend LAIF to more node constructions to further
+open up the scope of available problems that can be attacked using AIF.
+
+38
+
+Acknowledgements
+This research was made possible by funding from GN Hearing A/S. This work
+is part of the research programme Eﬃcient Deep Learning with project number
+P16-25 project 5, which is (partly) ﬁnanced by the Netherlands Organisation
+for Scientiﬁc Research (NWO).
+We gratefully acknowledge stimulating discussions with the members of the
+BIASlab research group at the Eindhoven University of Technology and members of VERSES Research Lab, in particular Ismail Senoz, Bart van Erp, Dmitry
+Bagaev, Karl Friston, Chris Buckley, Conor Heins and Tim Verbelen.
+
+References
+[1] Semih Akbayrak, Ivan Bocharov, and Bert de Vries. “Extended variational
+message passing for automated approximate Bayesian inference”. In: Entropy 23.7 (2021), p. 815.
+[2] Dmitry Bagaev and Bert de Vries. “Reactive Message Passing for Scalable
+Bayesian Inference”. en. In: (2022). Submitted to the Journal of Machine
+Learning Research.
+[3] Théophile Champion et al. “Branching Time Active Inference: The theory and its generality”. In: Neural Networks 151 (2022), pp. 295–316. issn:
+0893-6080. doi: https://doi.org/10.1016/j.neunet.2022.03.036. url:
+https://www.sciencedirect.com/science/article/pii/S0893608022001149.
+[4] Lancelot Da Costa et al. “Active inference on discrete state-spaces: a synthesis”. en. In: arXiv:2001.07203 [q-bio] (Jan. 2020). arXiv: 2001.07203.
+url: http://arxiv.org/abs/2001.07203 (visited on 01/22/2020).
+[5] Karl Friston. “A free energy principle for a particular physics”. In: arXiv:1906.10184
+[q-bio] (June 2019). arXiv: 1906.10184. url: http://arxiv.org/abs/1906.10184
+(visited on 06/12/2020).
+[6] Karl Friston et al. “Active inference and epistemic value”. In: Cognitive Neuroscience 6.4 (Oct. 2015), pp. 187–214. issn: 1758-8928. doi:
+10.1080/17588928.2015.1020053. url: https://doi.org/10.1080/17588928.2015.1020053
+(visited on 09/09/2019).
+[7] Karl Friston et al. “Sophisticated Inference”. In: Neural Computation 33.3
+(Mar. 2021), pp. 713–763. issn: 0899-7667. doi: 10.1162/neco_a_01351.
+url: https://doi.org/10.1162/neco_a_01351 (visited on 12/22/2021).
+
+[8] Karl J. Friston et al. “Action and behavior: a free-energy formulation”. en.
+In: Biological Cybernetics 102.3 (Mar. 2010), pp. 227–260. issn: 0340-1200,
+1432-0770. doi: 10.1007/s00422-010-0364-z. url: http://link.springer.com/10.1007/s00422-010
+(visited on 04/13/2020).
+[9] Karl J. Friston et al. SPM12 toolbox, http://www.fil.ion.ucl.ac.uk/spm/software/.
+2014.
+
+39
+
+[10] Danijar Hafner et al. “Action and Perception as Divergence Minimization”.
+In: arXiv:2009.01791 [cs, math, stat] (Oct. 2020). arXiv: 2009.01791. url:
+http://arxiv.org/abs/2009.01791 (visited on 01/07/2021).
+[11] Conor Heins et al. “pymdp: A Python library for active inference in discrete state spaces”. In: arXiv preprint arXiv:2201.03904 (2022).
+[12] Hilbert J. Kappen, Vicenç Gómez, and Manfred Opper. “Optimal control
+as a graphical model inference problem”. en. In: Machine Learning 87.2
+(May 2012), pp. 159–182. issn: 0885-6125, 1573-0565. doi: 10.1007/s10994-012-5278-7.
+url: http://link.springer.com/10.1007/s10994-012-5278-7 (visited
+on 02/07/2020).
+[13] Magnus Koudahl, Christopher L Buckley, and Bert de Vries. “A Message Passing Perspective on Planning Under Active Inference”. In: Active
+Inference: Third International Workshop, IWAI 2022, Grenoble, France,
+September 19, 2022, Revised Selected Papers. Springer. 2023, pp. 319–327.
+[14] Magnus T. Koudahl, Wouter M. Kouw, and Bert de Vries. “On Epistemics
+in Expected Free Energy for Linear Gaussian State Space Models”. In: Entropy 23.12 (Nov. 2021), p. 1565. issn: 1099-4300. doi: 10.3390/e23121565.
+url: http://dx.doi.org/10.3390/e23121565.
+[15] Thijs van de Laar, Magnus Koudahl, and Bert de Vries. “Realising Synthetic Active Inference Agents, Part II: Variational Message Updates”. In:
+(2023). arXiv: 2306.02733 [stat.ML].
+[16] David MacKay. Information theory, inference and learning algorithms.
+Cambridge university press, 2003.
+[17] Beren Millidge et al. “Understanding the Origin of Information-Seeking
+Exploration in Probabilistic Objectives for Control”. In: arXiv:2103.06859
+[cs] (June 2021). arXiv: 2103.06859. url: http://arxiv.org/abs/2103.06859
+(visited on 07/02/2021).
+[18] Thomas P. Minka. “Expectation Propagation for Approximate Bayesian
+Inference”. In: Proceedings of the Seventeenth Conference on Uncertainty
+in Artificial Intelligence. Uai’01. San Francisco, CA, USA: Morgan Kaufmann Publishers Inc., 2001, pp. 362–369. isbn: 978-1-55860-800-9. url:
+http://dl.acm.org/citation.cfm?id=2074022.2074067 (visited on 04/04/2018).
+[19] Thomas Parr and Karl J. Friston. “Generalised free energy and active inference”. en. In: Biological Cybernetics 113.5-6 (Dec. 2019), pp. 495–513.
+issn: 0340-1200, 1432-0770. doi: 10.1007/s00422-019-00805-w. url:
+http://link.springer.com/10.1007/s00422-019-00805-w (visited on
+08/18/2020).
+[20] Judea Pearl. “Reverend Bayes on Inference Engines: A Distributed Hierarchical Approach”. In: Proceedings of the Second AAAI Conference on Artificial Intelligence. Aaai’82. Pittsburgh, Pennsylvania: AAAI Press, 1982,
+pp. 133–136. url: http://www.aaai.org/Papers/AAAI/1982/AAAI82-032.pdf
+(visited on 07/28/2017).
+
+40
+
+[21] Christoph Reller. State-space methods in statistical signal processing: New
+ideas and applications. Vol. 23. ETH Zurich, 2013.
+[22] Noor Sajid, Philip J. Ball, and Karl J. Friston. “Active inference: demystiﬁed and compared”. en. In: arXiv:1909.10863 [cs, q-bio] (Jan. 2020).
+arXiv: 1909.10863. url: http://arxiv.org/abs/1909.10863 (visited on
+02/10/2020).
+[23] Simo Sarkka. Bayesian Filtering and Smoothing. en. Cambridge: Cambridge University Press, 2013. isbn: 978-1-139-34420-3. doi: 10.1017/cbo9781139344203.
+url: http://ebooks.cambridge.org/ref/id/CBO9781139344203 (visited
+on 04/04/2019).
+[24] Sarah Schwöbel, Stefan Kiebel, and Dimitrije Marković. “Active Inference,
+Belief Propagation, and the Bethe Approximation”. en. In: Neural Computation 30.9 (Sept. 2018), pp. 2530–2567. issn: 0899-7667, 1530-888x. doi:
+10.1162/neco_a_01108. url: https://direct.mit.edu/neco/article/30/9/2530-2567/8396
+(visited on 05/13/2021).
+[25] İsmail Şenöz et al. “Variational Message Passing and Local Constraint Manipulation in Factor Graphs”. en. In: Entropy 23.7 (July 2021). Number:
+7 Publisher: Multidisciplinary Digital Publishing Institute, p. 807. doi:
+10.3390/e23070807. url: https://www.mdpi.com/1099-4300/23/7/807
+(visited on 10/04/2021).
+[26] Ryan Smith, Karl Friston, and Christopher Whyte. A Step-by-Step Tutorial on Active Inference and its Application to Empirical Data. Jan. 2021.
+doi: 10.31234/osf.io/b4jm6.
+[27] John Winn and Christopher M. Bishop. “Variational message passing”.
+In: Journal of Machine Learning Research 6.4 (2005), pp. 661–694. url:
+http://www.jmlr.org/papers/volume6/winn05a/winn05a.pdf.
+[28] Dan Zhang et al. “Unifying message passing algorithms under the framework of constrained Bethe free energy minimization”. In: IEEE Transactions on Wireless Communications 20.7 (2021), pp. 4144–4158.
+
+A
+
+Expected free energy
+
+This section will focus on the most common alternative functional used for AIF,
+the expected free energy (EFE).
+EFE is the standard choice for AIF models and is what is found in most AIF
+focused software such as SPM [9] and PyMDP [11]. In this section, we will cover
+the details of how EFE is commonly treated.
+EFE is deﬁned speciﬁcally over future time steps and on a particular choice
+of generative model. The model in question is a state space model (SSM) of the
+form
+
+41
+
+p(x, z | û) = p(zt )
+| {z }
+
+T
+Y
+
+p(xk |zk ) p(zk |zk−1 , ûk )
+| {z } |
+{z
+}
+
+State k=t+1 Observation
+prior
+model
+
+(53)
+
+Transition
+model
+
+where ûk denotes a particular control parameter that is known apriori and
+ﬁxed. Note that (53) does not include a prior over actions u and is instead
+conditional on a ﬁxed policy û = ût+1:T . We use theˆnotation on u to indicate
+that it is treated as a known value instead of a random variable.
+The EFE is evaluated as a function of a particular policy. The EFE is deﬁned
+as [6]
+
+G[q; û] =
+
+T
+x
+X
+
+k=t+1
+
+=
+
+T
+X
+
+x
+
+q(zk |ûk )
+dxk dzk
+p(xk |zk ) q(zk |ûk ) log
+p(xk , zk |ûk )
+{z
+}
+|
+
+(54a)
+
+VFE conditioned on ûk
+
+p(xk |zk )q(zk |ûk ) log
+
+k=t+1
+
+q(zk |ûk )
+− log p(xk )dxk dzk (54b)
+p(zk |xk , ûk )
+
+where p(xk ) denotes a goal prior over preferred observations. Note that
+p(xk ) is not part of the generative model in Eq. (53). To compute Eq. (54) we
+also need
+p(xk , zk | ûk ) =
+
+Z
+
+p(xk | zk )p(zk | zk−1 , ûk )q(zk−1 )dzk−1
+
+(55)
+
+meaning we use the forward prediction from the previous time step to compute p(xk , zk | ûk ). If we further we assume that
+q(xk , zk | ûk ) = p(xk | zk )q(zk | ûk )
+
+(56)
+
+It can be shown [4, 6, 14, 22] that (54) can be decomposed into a bound on
+a mutual information term and a cross-entropy loss between predicted observations and the goal prior.
+
+B
+
+VFE and GFE
+
+In this section, we walk through how the formulation of GFE given by [19]
+reduces to the VFE when observations are available. To show how this comes
+about, we note that [19] assumes that
+
+q(xk |zk ) =
+
+(
+
+δ(xk − x̂k ) if k ≤ t
+.
+p(xk |zk )
+if k > t
+42
+
+(57)
+
+where t is the current time step and x̂k denotes the observed data point at
+time step k. This is a problematic move since q(xk | zk ) is no longer a function
+of zk for k ≤ t. However if we do take Eq. (16) as valid and further assume
+(58a)
+(58b)
+
+q(xk , zk | ûk ) = q(xk | zk )q(zk | ûk )
+p̃(xk ) = 1 if k ≤ t
+and note that
+
+q(xk |ûk ) =
+
+Z
+
+(59)
+
+q(xk |zk )q(zk |ûk )dzk .
+
+We can plug this result into (15) and obtain for k ≤ t
+t x
+X
+
+q(xk | ûk )q(zk | ûk )
+dxk dzk
+p(xk , zk | ûk )p̃(xk )
+k=1
+R
+t x
+X
+[q(xk |zk )q(zk | ûk )] dzk q(zk | ûk )
+=
+q(xk |zk )q(zk | ûk ) log
+dxk dzk
+p(xk , zk | ûk )
+q(xk |zk )q(zk | ûk ) log
+
+k=1
+
+(60a)
+
+where the last line follows from Eq. (58b). Then by (16) we have
+
+=
+
+t
+Xx
+
+δ(xk − x̂k )q(zk | ûk ) log
+
+k=1
+
+R
+
+[δ(xk − x̂k )q(zk | ûk )] dzk q(zk | ûk )
+dxk dzk
+p(xk , zk | ûk )
+(61)
+
+Now we pull δ(xk − x̂k ) out of the integral and solve to ﬁnd
+Integrates to 1
+
+=
+
+t
+Xx
+
+δ(xk − x̂k )
+δ(xk − x̂k )q(zk | ûk ) log
+
+=
+
+k=1
+
+}|
+
+{
+i
+
+q(zk | ûk )dzk q(zk | ûk )
+
+p(xk , zk | ûk )
+
+k=1
+
+t
+XZ
+
+zZ
+h
+
+dxk dzk
+(62a)
+
+q(zk | ûk ) log
+
+q(zk | ûk )
+dzk
+p(x̂k , zk | ûk )
+
+which we can recognise as a VFE with data constraints.
+
+43
+
+(62b)
+
+C
+
+The transition mixture node
+
+In this section, we derive the MP rules required for the Transition Mixture node
+used in our experiments on policy inference. Before doing so, we ﬁrst establish
+some preliminary results for the categorical distribution and the standard transition node. In this section we will also on occasion use an overbar to indicate
+an expectation, Eq(x) [g(x)] = g(x) The categorical distribution is given by
+
+Cat(x | z) =
+
+I
+Y
+
+zxi i
+
+(63a)
+
+xi zi
+
+(63b)
+
+i=1
+
+=
+
+I
+X
+i=1
+
+where x and z are both one-hot encoded vectors. The move Eq. (63a) to
+Eq. (63b) is possible only because x is one-hot encoded. Similarly, we have for
+the standard Transition node that
+
+Cat(x | Az) =
+
+I
+Y I
+Y
+
+i=1 j=1
+
+=
+
+xi zj
+
+Aij
+
+(64a)
+
+xi zj Aij
+
+(64b)
+
+I
+X I
+X
+i=1 j=1
+
+and again, since x and z are one-hot encoded
+#
+" I I
+YY
+xi zj
+Aij
+log Cat(x | Az) = log
+
+(65a)
+
+i=1 j=1
+
+=
+
+I X
+I
+X
+i=1 j=1
+
+=
+
+I X
+I
+X
+
+#
+
+(65b)
+
+xi zj log Aij
+
+(65c)
+
+log
+
+"
+
+x z
+Aiji j
+
+i=1 j=1
+
+Now, we are ready to start derivations for the transition mixture node. The
+transition mixture node has the node function
+
+44
+
+f (x, y, z, A) =
+
+Y
+
+y
+Cat x | Ak z k
+
+k
+
+(66a)
+
+#y
+"
+Y Y Y  zi xj k
+=
+Ak ij
+i
+
+k
+
+=
+
+Y
+
+(66b)
+
+j
+
+z x y
+
+(66c)
+
+i j k
+Aijk
+
+i,j,k
+
+Where we use i to index over columns, j to index over rows and k to index
+over factors. A is a 3-tensor that is normalised over columns. In other words,
+each slice of A corresponds to a valid transition matrix and slices are indexed
+by k. We assume a structured mean-ﬁeld factorisation such that
+q(x, y, z, A) = q(x, y, z)
+
+Y
+
+(67)
+
+q(Ak )
+
+k
+
+The CFFG of the transition mixture node is shown in Fig. 31
+z
+A1
+y
+
+TM
+Ak
+x
+
+Figure 31: The transition mixture node
+We now deﬁne
+h
+i
+log fA (x, y, z) = Eq(A) log f (x, y, z, A)
+hX
+i
+= Eq(A)
+zi xj yk log Aijk
+
+(68a)
+(68b)
+
+ijk
+
+=
+
+X
+
+yk Eq(Ak )
+
+X
+k
+
+zi xj log Aijk
+
+ij
+
+k
+
+=
+
+hX
+
+yk
+
+X
+ij
+
+45
+
+h
+i
+zi xj log Ak
+
+ij
+
+i
+
+(68c)
+(68d)
+
+which implies that
+
+fA (x, y, z) = exp
+
+X
+
+yk
+
+k
+
+=
+
+Y
+ijk
+
+=
+
+h
+
+X
+
+zi xj log Ak
+
+ijk
+
+
+zi xj yk
+exp log Ak
+
+i
+
+ij
+
+!
+
+
+
+zi xj yk exp log Ak
+ij
+ijk
+{z
+}
+|
+
+X
+
+(69a)
+(69b)
+(69c)
+
+Ãijk
+
+Now, we are ready to derive the desired messages. The ﬁrst message ν(·)
+will be towards x. If we use µ(y) to denote the incoming message on the edge
+y (similar for µz), then the message towards x is given by
+ν(x) =
+
+XX
+z
+
+=
+
+y
+
+XX
+z
+
+=
+
+y
+
+XX
+z
+
+
+
+µ(z)µ(y) exp Eq(A) log f (x, y, z, A)
+
+
+µ(z)µ(y)fA (x, y, z)
+µ(z)µ(y)
+
+y
+
+X
+
+zi xj yk Ãijk
+
+(70a)
+(70b)
+(70c)
+
+ijk
+
+Assuming the incoming messages are Categorically distributed, we can continue as
+= ECat(z|πz ) ECat(y|πy )
+
+X
+
+zi xj yk Ãijk
+
+(71a)
+
+ijk
+
+=
+
+X
+
+(71b)
+
+πzi πyk xj Ãijk
+
+ijk
+
+=
+
+YhX
+j
+
+πzi πyk Ãijk
+
+ik
+
+ixj
+
+(71c)
+
+where the last line follows from x being one-hot encoded. At this point, we
+can recognise the message
+P
+πzi πyk Ãijk
+ν(x) ∝ Cat(x | ρ) where ρj = P ik
+ijk πzi πyk Ãijk
+
+(72)
+
+By symmetry, similar results hold for messages ν(z) and ν(y). ν(z) is given
+by
+
+46
+
+ν(z) =
+
+XX
+x
+
+(73a)
+
+µ(x)µ(y)fA (x, y, z)
+
+y
+
+P
+
+∝ Cat(z | ρ) where ρi = P
+
+jk πxj πyk Ãijk
+
+ijk πxj πyk Ãijk
+
+(73b)
+
+.
+
+Similarly, ν(y) evaluates to
+XX
+ν(y) =
+µ(x)µ(z)fA (x, y, z)
+x
+
+(74a)
+
+z
+
+P
+
+∝ Cat(y | ρ) where ρk = P
+
+ij πx,j πz,i Ãijk
+
+ijk πx,j πz,i Ãijk
+
+.
+
+(74b)
+
+To compute the message towards the n’th candidate transition matrix An ,
+we will need to take an expectation with respect to q(x, y, z). It is given by
+q(x, y, z) = µ(y)µ(x)µ(z)fA (x, y, z)
+Y x
+zi yk xj zi yk
+=
+πyk Ãijk
+πxjj πzi
+
+(75a)
+(75b)
+
+ijk
+
+=
+
+Yh
+
+πxj πzi πyk Ãijk
+
+ijk
+
+ixj zi yk
+
+∝ Cat(x, y, z | B)
+
+(75c)
+(75d)
+
+where B is a three-dimensional contingency tensor with entries
+
+Bijk = P
+
+πxj πzi πyk Ãijk
+ijk πxj πzi πyk Ãijk
+
+(76)
+
+Now we can compute the message towards a transition matrix An as
+h
+i
+log ν(An ) = Eq(Ak\n )q(x,y,z) log f (x, y, z, A)
+i
+hX
+= Eq(Ak\n )q(x,y,z)
+xj zi yk log Aijk
+
+(77a)
+(77b)
+
+ijk
+
+= Eq(Ak\n )
+
+hX
+
+Bijk log Aijk
+
+ijk
+
+=
+
+XhX
+k\n
+
+|
+
+ijk
+
+i X
+Bijk log Aijk +
+Bijn log Aijn
+
+(77c)
+(77d)
+
+ij
+
+{z
+
+Constant w.r.t An
+
+
+
+i
+
+∝ tr Bijn log Aijn
+47
+
+
+
+}
+
+(77e)
+
+which implies that
+ν(An ) ∝ Dir(An | Bn + 1) .
+
+(78)
+
+We see that messages towards each component in A are distributed according
+to a Dirichlet distribution with parameters Bn +1. The ﬁnal expression we need
+to derive is the average energy term for the transition mixture node. It is given
+by
+
+
+Ux [q] = −Eq(A)q(x,y,z) log f (x, y, z, A)
+
+
+= −Eq(x,y,z) fA (x, y, z)
+hX
+
+ 
+= −Eq(x,y,z)
+xj zi yk log Ak ij
+
+(79a)
+(79b)
+(79c)
+
+ijk
+
+=−
+
+X
+ijk
+
+=−
+
+
+
+Bijk log Ak ij
+
+
+X 
+tr BTk log Ak
+k
+
+48
+
+(79d)
+(79e)
+
+
