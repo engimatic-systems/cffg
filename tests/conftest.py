@@ -10,7 +10,10 @@ slices; the data port awaits an observation clamp.
                           z_obs --[obs]-- x : data
 """
 
+import jax
 import pytest
+
+jax.config.update("jax_enable_x64", True)  # FE parity tests need f64
 
 from cffg.core import (
     BlobRef,
