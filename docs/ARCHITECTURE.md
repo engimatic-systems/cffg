@@ -197,6 +197,60 @@ FLOPs/bytes per MP sweep. Estimator = analytic memory + cost-analysis FLOPs +
 a small calibration run (fit sweep-time curve on 3–4 model sizes per backend).
 Cheap to build once the compiler exists; don't build it before.
 
+## Dependency policy (JAX ecosystem)
+
+Adopt (well-established, matched to our actual needs):
+
+- **`jax`** — the engine substrate.
+- **`equinox`** — pytree containers for engine/instance state. `eqx.Module` gives
+  typed dataclass-pytrees, and `filter_jit`/`filter_vmap` cleanly separate static
+  fields (structure hash, shapes, schedule) from dynamic arrays (messages,
+  parameters) — exactly our compile boundary. Used for *state containers and
+  compiled callables*, not neural networks.
+- **`jaxtyping`** — shape/dtype annotations on message-rule signatures, runtime
+  checked in tests. Message-passing bugs are shape bugs; catch them at the rule
+  boundary.
+- **`chex`** — test assertions (pytree/shape equality, jit-vs-nojit variants).
+- **`safetensors`** — parameter blobs in the `.cffgz` bundle.
+- **`hypothesis`** — property tests (FE accounting invariants, normalization).
+
+Explicitly not adopted (revisit only with a ticket making the case):
+
+- **`flax`/NNX** — neural-network library; nothing here is a neural net until
+  hybrid surrogate nodes (LIMITATIONS S5), and Equinox covers that day too.
+- **`numpyro`/`blackjax`** — sampling-based inference; different paradigm, and
+  leaning on it risks "shortcut" FE evaluation.
+- **`distrax`/`tfp.substrates.jax`** — heavyweight for what Cat/Dirichlet need;
+  `jax.scipy.special` (digamma, logsumexp) covers the math. Reconsider at the
+  continuous milestone.
+- **`pgmax`** — read for arena-layout ideas; BP-only scope makes it a dead-end
+  dependency.
+- **`optax`/`jaxopt`** — first-order optimizers; our Newton solves are a few
+  lines of `jax.jacobian` + `lax.while_loop` on tiny systems.
+
+One structural rule: **`cffg.core` (IR + serialization) imports neither JAX nor
+Equinox.** Templates must be loadable, validatable, and editable on a machine
+with no accelerator stack; JAX enters at the compiler boundary.
+
+## Staging for hierarchical and sophisticated inference
+
+- **Hierarchical models: cleanly additive, plan as M7.** Templates-with-ports
+  already compose vertically: a higher level places priors on a lower level's
+  parameters or goal statistics (Part II §7.2's goal hyperprior is the depth-2
+  base case, and the buyer/seller simulation is two coupled models at different
+  timescales). What M7 adds is message rules for inter-level couplings
+  (Dirichlet hyperpriors exist; Cat-parameters-from-a-parent and temporal
+  thickness à la de Vries & Friston 2017 need deriving) and nested-schedule
+  support in the VM. No IR or compiler changes anticipated.
+- **Sophisticated inference: shallow yes, deep no.** Contingent planning
+  ("branch on what I might observe") can be expressed as a *bigger template* —
+  observation-branch mixture nodes unrolled into a policy tree — so the engine
+  runs it without architectural change; the cost is combinatorial in branch
+  depth (practical to depth ~2–3). Deep SI is tree search, which is precisely
+  what LAIF exists to avoid; it will not fall out of message passing
+  (LIMITATIONS H5/S4). Default posture: receding-horizon replanning first,
+  shallow branch templates where contingency demonstrably pays.
+
 ## Positions on open questions from the brief
 
 - **Interchange format (brief item 8)**: decided — no ONNX. ONNX encodes directed
@@ -227,3 +281,6 @@ Cheap to build once the compiler exists; don't build it before.
   a live gridworld demo driven through the sensor/actuator adapters.
 - **M6** — resource estimator; `.cffgz` bundle export/import round-trip; GUI-facing
   edit-action hardening.
+- **M7** — hierarchical couplings: inter-level message rules, nested schedules,
+  goal hyperpriors as the validation case; shallow contingent-planning template
+  spike.
