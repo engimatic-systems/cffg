@@ -1,6 +1,6 @@
 ---
 id: cff-br53
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-07-05T22:12:32Z
