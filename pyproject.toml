@@ -7,7 +7,12 @@ authors = [
     { name = "coopwilliams", email = "ken.c.williams.iii@gmail.com" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "equinox>=0.13.8",
+    "jax>=0.10.2",
+    "numpy>=2.5.1",
+    "safetensors>=0.8.0",
+]
 
 [build-system]
 requires = ["uv_build>=0.11.16,<0.12.0"]
