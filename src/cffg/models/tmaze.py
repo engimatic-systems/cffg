@@ -75,11 +75,19 @@ def build_tmaze(
     alpha: float = 0.9,
     c_util: float = 2.0,
     *,
+    past: int = 0,
     gfe: bool = True,
     map_policy: bool = False,
 ) -> tuple[Template, dict[str, np.ndarray]]:
-    """Policy-inference CFFG over `steps` future timesteps, plus its arrays."""
-    t = Template(name=f"tmaze[{steps}]")
+    """Policy-inference CFFG over `steps` timesteps, plus its arrays.
+
+    The first `past` slices are perception-style: the control edge becomes a
+    DATA port (`act{k}`, the executed move) and the observation branch is a
+    plain likelihood with a DATA port (`obs{k}`) — no control prior, no goal,
+    no P-substitution. Remaining slices are future/planning-style as before.
+    This is the receding-horizon constraint flip of the agent runtime: as time
+    advances, a slice's beads change from goal to data (same wiring)."""
+    t = Template(name=f"tmaze[{past}|{steps}]")
     t.blobs = {
         "d": BlobRef("d", "d.npy"),
         "A": BlobRef("A", "A.npy"),
@@ -102,9 +110,6 @@ def build_tmaze(
             x: VariableSpec(x, N_OBS),
         }
         t.factors |= {
-            f"e{k}": FactorSpec(
-                f"e{k}", "categorical", edges={"out": u}, param_blobs={"statistic": "e"}
-            ),
             f"tm{k}": FactorSpec(
                 f"tm{k}", "transition_mixture",
                 edges={"out": zm, "in": prev, "selector": u},
@@ -114,18 +119,25 @@ def build_tmaze(
             f"obs{k}": FactorSpec(
                 f"obs{k}", "matrix_cat", edges={"out": x, "in": zo}, param_blobs={"matrix": "A"}
             ),
-            f"goal{k}": FactorSpec(
-                f"goal{k}", "categorical", edges={"out": x}, param_blobs={"statistic": "c"}
-            ),
         }
-        if gfe:
-            t.constraints.append(
-                ConstraintSpec(
-                    ConstraintKind.P_SUBSTITUTION, f"obs{k}", (("substituted_role", "out"),)
-                )
+        if k <= past:  # perception slice: executed control + observed outcome
+            t.ports[f"act{k}"] = PortSpec(f"act{k}", u, PortRole.DATA)
+            t.ports[f"obs{k}"] = PortSpec(f"obs{k}", x, PortRole.DATA)
+        else:  # planning slice: control prior + goal-constrained observation
+            t.factors[f"e{k}"] = FactorSpec(
+                f"e{k}", "categorical", edges={"out": u}, param_blobs={"statistic": "e"}
             )
-        if map_policy:
-            t.constraints.append(ConstraintSpec(ConstraintKind.DELTA, u))
+            t.factors[f"goal{k}"] = FactorSpec(
+                f"goal{k}", "categorical", edges={"out": x}, param_blobs={"statistic": "c"}
+            )
+            if gfe:
+                t.constraints.append(
+                    ConstraintSpec(
+                        ConstraintKind.P_SUBSTITUTION, f"obs{k}", (("substituted_role", "out"),)
+                    )
+                )
+            if map_policy:
+                t.constraints.append(ConstraintSpec(ConstraintKind.DELTA, u))
         prev = zt
     t.ports["horizon"] = PortSpec("horizon", prev, PortRole.GLUE)  # open half-edge
 
