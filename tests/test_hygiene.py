@@ -21,7 +21,8 @@ CANONICAL_DOCS = {
 EXEMPT_DIRS = {
     ".git",
     ".venv",
-    ".tickets",  # tk stores tickets as markdown; tickets are the ONE sanctioned pile
+    ".tickets",  # tk stores tickets as markdown; tickets are the sanctioned pile
+    "todo-notes",  # docs/todo-notes: one note per remaining thread, deleted on landing
     ".pytest_cache",
     ".ruff_cache",
     "node_modules",
@@ -51,3 +52,15 @@ def test_canonical_docs_exist():
     """The rule cuts both ways: the four documents must actually be there."""
     missing = sorted(d for d in CANONICAL_DOCS if not (REPO / d).is_file())
     assert not missing, f"Canonical documents missing: {missing}"
+
+
+def test_todo_notes_name_their_ticket():
+    """A todo-note without a ticket is a wish, not a plan: every note in
+    docs/todo-notes must reference a tk ticket id (or say why not)."""
+    import re
+
+    for note in (REPO / "docs" / "todo-notes").glob("*.md"):
+        text = note.read_text()
+        assert re.search(r"cff-\w+|Ticket:\*?\*? *none", text), (
+            f"{note.name}: no ticket reference — file one or state 'Ticket: none yet'"
+        )

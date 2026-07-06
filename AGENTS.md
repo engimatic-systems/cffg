@@ -70,12 +70,17 @@ This project will span many context windows. The rule that makes that survivable
 
 ### Document policy
 
-Exactly four canonical documents: `AGENTS.md` (rules), `docs/ARCHITECTURE.md`
-(design), `docs/LIMITATIONS.md` (scope honesty), `README.md` (once there's
-something to run). **Update in place; do not create new markdown files.** Everything
-else lives in tickets (state, decisions-in-progress, research findings), code
-docstrings (durable knowledge), or tests (executable claims). If a decision changes
-the architecture, edit ARCHITECTURE.md in the same commit as the change.
+Four canonical documents: `AGENTS.md` (rules), `docs/ARCHITECTURE.md`
+(design), `docs/LIMITATIONS.md` (scope honesty), `README.md` (the user guide).
+**Update in place; do not create new markdown files** — with one sanctioned
+exception: `docs/todo-notes/` holds one note per *remaining* under-explained
+work thread (per Cooper, 2026-07-05). Each note names its `tk` ticket; when
+the work lands, **delete the note in the same commit** — todo-notes describe
+the future only, never the present (the present belongs to README/
+ARCHITECTURE/docstrings). Everything else lives in tickets (state,
+decisions-in-progress, research findings), code docstrings (durable
+knowledge), or tests (executable claims). If a decision changes the
+architecture, edit ARCHITECTURE.md in the same commit as the change.
 
 ## Technical invariants
 
