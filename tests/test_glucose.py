@@ -3,8 +3,16 @@
 The contract: an unannounced-meal controller (CGM only) must keep the adult
 cohort's blood glucose in [70, 180] mg/dL at least 70% of the time — the
 FDA-cited lower bound. Reference points on this exact scenario: announced
-basal-bolus ~96% (privileged ceiling), basal-only ~34% (floor), overnight
-pymdp report 74.7%, current reactive controller ~87.6%.
+basal-bolus ~96% (privileged ceiling), basal-only ~34% (floor), a prior
+agent's pymdp attempt 74.7%, current reactive controller ~87.6%.
+
+THE REAL BAR (do not chase until CFFG is done — see ticket cff-t2g3): Ken's
+own VERSES-era experiments reached 67% TIR on unannounced adults AND
+adolescents with ZERO critical episodes, on 8-virtual-hour episodes. The
+end goal is an insulin pump that does continual learning with a white-box
+algorithm and a modular physiological world model. Note the reactive
+controller here is NOT comparable: adults-only, 24 h, and no critical-episode
+accounting — a harder-cohort benchmark variant is part of the later stage.
 """
 
 import numpy as np
