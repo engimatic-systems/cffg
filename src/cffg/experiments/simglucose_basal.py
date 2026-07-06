@@ -14,7 +14,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from importlib import resources
 from pathlib import Path
@@ -113,6 +113,18 @@ class BasalPolicyConfig:
     iob_gain: float = 0.03
     iob_half_life_min: float = 100.0
     forecast_min: float = 30.0
+    hard_suspend_cgm: float = 105.0
+    hard_predicted_low: float = 100.0
+    hard_cap_cgm: float = 130.0
+    hard_cap_trend: float = -0.2
+    hard_cap_multiplier: float = 1.0
+    bolus_cgm_threshold: float = 185.0
+    bolus_target_cgm: float = 145.0
+    bolus_fraction: float = 0.45
+    bolus_meal_fraction: float = 0.25
+    bolus_max_u: float = 2.5
+    bolus_cooldown_min: float = 30.0
+    bolus_iob_half_life_min: float = 75.0
 
 
 @dataclass
@@ -243,7 +255,10 @@ class ClockPriorBasalController:
                 multiplier = min(multiplier, cfg.down_multiplier)
 
             multiplier -= cfg.iob_gain * self.extra_iob / max(self.basal, 1e-9)
-            multiplier = _nearest_action(max(0.0, multiplier), cfg.basal_multipliers)
+            multiplier = _apply_hard_basal_mask(
+                max(0.0, multiplier), cgm=cgm, trend=trend, config=cfg
+            )
+            multiplier = _nearest_action(multiplier, cfg.basal_multipliers)
 
         basal = self.basal * multiplier
         self.extra_iob += max(0.0, basal - self.basal) * self.sample_min
@@ -303,14 +318,111 @@ class ReactivePhysiologyBasalController:
             multiplier -= 0.035 * self.extra_iob / max(self.basal, 1e-9)
             if cgm < 145.0 and trend < 0.0:
                 multiplier = min(multiplier, 0.5)
+            multiplier = _apply_hard_basal_mask(
+                max(0.0, multiplier), cgm=cgm, trend=trend, config=cfg
+            )
             multiplier = _nearest_action(
-                max(0.0, multiplier),
+                multiplier,
                 (0.0, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 12.0, 18.0, 25.0, 30.0),
             )
 
         basal = self.basal * multiplier
         self.extra_iob += max(0.0, basal - self.basal) * self.sample_min
         return Action(basal=basal, bolus=0.0)
+
+
+class BolusPhysiologyController:
+    """CGM-only basal+bolus comparison controller.
+
+    This keeps the same broad hazard/physiology structure but allows small
+    correction boluses once glucose is high and not falling. Bolus delivery is
+    hard-masked by the same predicted-low guard as basal.
+    """
+
+    def __init__(
+        self,
+        patient_name: str,
+        sample_min: float,
+        config: BasalPolicyConfig = BasalPolicyConfig(),
+    ):
+        self.basal = _patient_basal(patient_name)
+        self.cr, self.cf = _patient_therapy(patient_name)
+        self.sample_min = float(sample_min)
+        self.config = config
+        self.previous_cgm: float | None = None
+        self.previous_trend = 0.0
+        self.elapsed_min = 0.0
+        self.extra_iob = 0.0
+        self.bolus_iob = 0.0
+        self.meal_drive = 0.0
+        self.bolus_cooldown = 0.0
+        self.iob_decay = 0.5 ** (self.sample_min / 100.0)
+        self.bolus_decay = 0.5 ** (self.sample_min / config.bolus_iob_half_life_min)
+        self.meal_decay = 0.5 ** (self.sample_min / 55.0)
+
+    def policy(self, cgm: float) -> Action:
+        cfg = self.config
+        trend = 0.0 if self.previous_cgm is None else (cgm - self.previous_cgm) / self.sample_min
+        accel = trend - self.previous_trend
+        self.previous_cgm = cgm
+        self.previous_trend = trend
+        self.extra_iob *= self.iob_decay
+        self.bolus_iob *= self.bolus_decay
+        self.meal_drive *= self.meal_decay
+        self.bolus_cooldown = max(0.0, self.bolus_cooldown - self.sample_min)
+
+        if cgm > 105.0 and trend > 0.35:
+            self.meal_drive += 8.0 * trend + 10.0 * max(0.0, accel)
+        if cgm > 160.0 and trend > -0.1:
+            self.meal_drive += 0.05 * (cgm - 160.0)
+        self.meal_drive = min(self.meal_drive, 55.0)
+
+        predicted = cgm + cfg.forecast_min * trend
+        if (
+            cgm < cfg.suspend_cgm
+            or predicted < cfg.predicted_low
+            or (cgm < cfg.falling_cgm and trend < cfg.falling_trend)
+        ):
+            multiplier = 0.0
+        else:
+            multiplier = 1.0
+            for window in cfg.windows:
+                if window.active(self.elapsed_min):
+                    multiplier = max(multiplier, window.multiplier)
+            multiplier += cfg.high_gain * max(0.0, cgm - cfg.target_cgm)
+            multiplier += cfg.trend_gain * max(0.0, trend)
+            multiplier += 0.12 * self.meal_drive
+            multiplier -= cfg.iob_gain * (self.extra_iob + self.bolus_iob) / max(self.basal, 1e-9)
+            multiplier = _apply_hard_basal_mask(
+                max(0.0, multiplier), cgm=cgm, trend=trend, config=cfg
+            )
+            multiplier = _nearest_action(multiplier, cfg.basal_multipliers)
+
+        unsafe = _hard_mask_unsafe(cgm=cgm, trend=trend, config=cfg)
+        bolus_u = 0.0
+        if (
+            not unsafe
+            and self.bolus_cooldown == 0.0
+            and cgm > cfg.bolus_cgm_threshold
+            and trend > -0.4
+        ):
+            correction = max(0.0, (cgm - cfg.bolus_target_cgm) / self.cf - self.bolus_iob)
+            meal_correction = (
+                max(0.0, self.meal_drive - 18.0)
+                / max(self.cr, 1e-9)
+                * cfg.bolus_meal_fraction
+            )
+            bolus_u = min(cfg.bolus_max_u, cfg.bolus_fraction * correction + meal_correction)
+            if bolus_u > 0.05:
+                self.bolus_cooldown = cfg.bolus_cooldown_min
+            else:
+                bolus_u = 0.0
+
+        basal = self.basal * multiplier
+        self.extra_iob += max(0.0, basal - self.basal) * self.sample_min
+        self.bolus_iob += bolus_u
+        self.elapsed_min += self.sample_min
+        return Action(basal=basal, bolus=bolus_u / self.sample_min)
 
 
 def run_patient(
@@ -455,43 +567,43 @@ def preset_config(name: str) -> BasalPolicyConfig | dict[str, BasalPolicyConfig]
     if name == "reactive-physiology-v1":
         return BasalPolicyConfig()
     if name == "randomized-hazard-v1":
-        return BasalPolicyConfig(
-            windows=(
-                MealPriorWindow(center_min=90.0, pre_min=75.0, post_min=90.0, multiplier=10.0),
-                MealPriorWindow(center_min=360.0, pre_min=90.0, post_min=120.0, multiplier=12.0),
-            ),
-            suspend_cgm=110.0,
-            predicted_low=105.0,
-            falling_cgm=135.0,
-            down_cgm=155.0,
-            meal_multiplier=18.0,
-            basal_multipliers=(0.0, 0.25, 0.5, 1.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 18.0, 25.0),
-            high_gain=0.06,
-            trend_gain=1.7,
-            iob_gain=0.035,
-        )
+        return _randomized_hazard_config()
     if name == "randomized-hazard-safe-v1":
-        return BasalPolicyConfig(
-            windows=(
-                MealPriorWindow(center_min=90.0, pre_min=75.0, post_min=90.0, multiplier=6.0),
-                MealPriorWindow(center_min=360.0, pre_min=90.0, post_min=120.0, multiplier=8.0),
-            ),
-            suspend_cgm=120.0,
-            predicted_low=115.0,
-            falling_cgm=145.0,
-            down_cgm=165.0,
-            meal_multiplier=14.0,
-            basal_multipliers=(0.0, 0.25, 0.5, 1.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0),
-            high_gain=0.045,
-            trend_gain=1.2,
-            iob_gain=0.05,
+        return _randomized_hazard_safe_config()
+    if name in (
+        "patient-specific-hard-mask-v1",
+        "patient-specific-hard-mask-bolus-v1",
+        "patient-specific-hard-mask-bolus-safe-v1",
+    ):
+        hazard = _randomized_hazard_config()
+        safe = _randomized_hazard_safe_config()
+        resistant = _randomized_resistant_hazard_config()
+        configs = {patient: hazard for patient in COHORT}
+        configs.update(
+            {
+                "adult#004": safe,
+                "adult#006": safe,
+                "adult#007": safe,
+                "adolescent#003": safe,
+                "adolescent#005": safe,
+                "adolescent#002": resistant,
+                "adolescent#007": resistant,
+                "adolescent#008": resistant,
+            }
         )
+        if name == "patient-specific-hard-mask-bolus-safe-v1":
+            configs = {patient: _safer_bolus_config(config) for patient, config in configs.items()}
+        return configs
     raise ValueError(f"unknown preset: {name}")
 
 
 def preset_controller(name: str) -> str:
     if name == "reactive-physiology-v1":
         return "reactive-physiology"
+    if name == "patient-specific-hard-mask-bolus-v1":
+        return "bolus-physiology"
+    if name == "patient-specific-hard-mask-bolus-safe-v1":
+        return "bolus-physiology"
     return "clock"
 
 
@@ -569,6 +681,87 @@ def _resistant_config(
     )
 
 
+def _randomized_hazard_config() -> BasalPolicyConfig:
+    return BasalPolicyConfig(
+        windows=(
+            MealPriorWindow(center_min=90.0, pre_min=75.0, post_min=90.0, multiplier=10.0),
+            MealPriorWindow(center_min=360.0, pre_min=90.0, post_min=120.0, multiplier=12.0),
+        ),
+        suspend_cgm=110.0,
+        predicted_low=105.0,
+        falling_cgm=135.0,
+        down_cgm=155.0,
+        meal_multiplier=18.0,
+        basal_multipliers=(0.0, 0.25, 0.5, 1.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 18.0, 25.0),
+        high_gain=0.06,
+        trend_gain=1.7,
+        iob_gain=0.035,
+        hard_suspend_cgm=110.0,
+        hard_predicted_low=105.0,
+        hard_cap_cgm=135.0,
+        hard_cap_trend=-0.15,
+    )
+
+
+def _randomized_hazard_safe_config() -> BasalPolicyConfig:
+    return BasalPolicyConfig(
+        windows=(
+            MealPriorWindow(center_min=90.0, pre_min=75.0, post_min=90.0, multiplier=6.0),
+            MealPriorWindow(center_min=360.0, pre_min=90.0, post_min=120.0, multiplier=8.0),
+        ),
+        suspend_cgm=120.0,
+        predicted_low=115.0,
+        falling_cgm=145.0,
+        down_cgm=165.0,
+        meal_multiplier=14.0,
+        basal_multipliers=(0.0, 0.25, 0.5, 1.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0),
+        high_gain=0.045,
+        trend_gain=1.2,
+        iob_gain=0.05,
+        hard_suspend_cgm=120.0,
+        hard_predicted_low=115.0,
+        hard_cap_cgm=145.0,
+        hard_cap_trend=-0.1,
+    )
+
+
+def _randomized_resistant_hazard_config() -> BasalPolicyConfig:
+    return BasalPolicyConfig(
+        windows=(
+            MealPriorWindow(center_min=90.0, pre_min=90.0, post_min=120.0, multiplier=14.0),
+            MealPriorWindow(center_min=360.0, pre_min=105.0, post_min=150.0, multiplier=20.0),
+        ),
+        suspend_cgm=110.0,
+        predicted_low=105.0,
+        falling_cgm=135.0,
+        down_cgm=155.0,
+        meal_multiplier=24.0,
+        basal_multipliers=(0.0, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 12.0, 18.0, 25.0, 30.0),
+        high_gain=0.075,
+        trend_gain=2.0,
+        iob_gain=0.03,
+        hard_suspend_cgm=110.0,
+        hard_predicted_low=105.0,
+        hard_cap_cgm=135.0,
+        hard_cap_trend=-0.15,
+    )
+
+
+def _safer_bolus_config(config: BasalPolicyConfig) -> BasalPolicyConfig:
+    return replace(
+        config,
+        bolus_cgm_threshold=220.0,
+        bolus_target_cgm=165.0,
+        bolus_fraction=0.18,
+        bolus_meal_fraction=0.06,
+        bolus_max_u=0.75,
+        bolus_cooldown_min=45.0,
+        bolus_iob_half_life_min=150.0,
+        hard_suspend_cgm=max(config.hard_suspend_cgm, 115.0),
+        hard_predicted_low=max(config.hard_predicted_low, 110.0),
+    )
+
+
 def _config_for_patient(
     config: BasalPolicyConfig | Mapping[str, BasalPolicyConfig], patient_name: str
 ) -> BasalPolicyConfig:
@@ -587,6 +780,8 @@ def _build_controller(
         return ClockPriorBasalController(patient_name, sample_min, config)
     if controller == "reactive-physiology":
         return ReactivePhysiologyBasalController(patient_name, sample_min, config)
+    if controller == "bolus-physiology":
+        return BolusPhysiologyController(patient_name, sample_min, config)
     raise ValueError(f"unknown controller: {controller}")
 
 
@@ -729,6 +924,12 @@ def _plot_patient(patient: PatientTrace, path: Path, protocol: Protocol) -> None
     axes[2].step(times, basal, where="post", color="#9467bd", label="basal U/min")
     axes[2].set_ylabel("basal")
     axes[2].set_xlabel("episode minute")
+    if any(b > 0 for b in patient.bolus):
+        dt = float(np.median(np.diff(times))) if len(times) > 1 else 3.0
+        bolus_units = np.asarray(patient.bolus) * dt
+        bolus_axis = axes[2].twinx()
+        bolus_axis.bar(times, bolus_units, width=dt * 0.75, color="#d62728", alpha=0.35, label="bolus U")
+        bolus_axis.set_ylabel("bolus U")
 
     for axis in axes:
         for meal_hour, grams in patient.meals or protocol.meals:
@@ -747,6 +948,21 @@ def _fraction(values: list[float], predicate) -> float:
 
 def _nearest_action(value: float, actions: tuple[float, ...]) -> float:
     return min(actions, key=lambda action: abs(action - value))
+
+
+def _hard_mask_unsafe(cgm: float, trend: float, config: BasalPolicyConfig) -> bool:
+    predicted = cgm + config.forecast_min * trend
+    return cgm < config.hard_suspend_cgm or predicted < config.hard_predicted_low
+
+
+def _apply_hard_basal_mask(
+    multiplier: float, *, cgm: float, trend: float, config: BasalPolicyConfig
+) -> float:
+    if _hard_mask_unsafe(cgm=cgm, trend=trend, config=config):
+        return 0.0
+    if cgm < config.hard_cap_cgm and trend < config.hard_cap_trend:
+        return min(multiplier, config.hard_cap_multiplier)
+    return multiplier
 
 
 def _clipped_normal(
@@ -772,6 +988,15 @@ def _patient_basal(patient_name: str) -> float:
     return float(patient.u2ss.iloc[0]) * float(patient.BW.iloc[0]) / 6000.0
 
 
+def _patient_therapy(patient_name: str) -> tuple[float, float]:
+    quest_path = resources.files("simglucose") / "params" / "Quest.csv"
+    quest = pd.read_csv(str(quest_path))
+    patient = quest[quest.Name == patient_name]
+    if len(patient) != 1:
+        return 15.0, 40.0
+    return float(patient.CR.iloc[0]), float(patient.CF.iloc[0])
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -785,6 +1010,9 @@ def main(argv: list[str] | None = None) -> int:
             "reactive-physiology-v1",
             "randomized-hazard-v1",
             "randomized-hazard-safe-v1",
+            "patient-specific-hard-mask-v1",
+            "patient-specific-hard-mask-bolus-v1",
+            "patient-specific-hard-mask-bolus-safe-v1",
         ],
     )
     parser.add_argument("--trials", type=int, default=0)

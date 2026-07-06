@@ -1,0 +1,5 @@
+Experiment 012 smoke.
+Approach: patient-specific hard-mask basal-only controller on randomized meals.
+Changed from previous: patient-specific hazard/safe/resistant configs plus structural predicted-low basal mask.
+Results: cohort TIR 65.16%, low 0.00%, high 34.84%, critical 12.81% over 4 smoke trials.
+Learnings: smoke artifact generation worked. The resistant adolescent cases still dominate hyperglycemia, so the full run needs per-patient inspection rather than only cohort averages.

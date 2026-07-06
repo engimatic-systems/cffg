@@ -1,0 +1,5 @@
+Experiment 017 randomized 200 trials.
+Approach: safer bolus-enabled patient-specific hard-mask policy with 10 randomized episodes per patient. Bolus threshold and IOB memory are conservative to avoid delayed hypoglycemia.
+Changed from previous: safety-biased bolus comparison after experiment 015 over-corrected and created lows.
+Results: cohort TIR 81.64%, low 4.61%, high 13.75%, critical 3.64% over 200 randomized episodes.
+Learnings: safer bolus reduces lows versus experiment 015 but still underperforms basal-only experiment 014. Under this CGM-only unannounced-meal setup, bolus needs a stronger hypoglycemia forecast or patient-specific bolus eligibility mask before it is worth keeping.

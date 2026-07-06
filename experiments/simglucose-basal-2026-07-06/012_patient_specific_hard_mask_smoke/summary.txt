@@ -1,0 +1,5 @@
+cohort TIR 65.16% low 0.00% high 34.84% crit 12.81% critical_samples 82
+  trial001_adult#004: TIR  97.5% low  0.0% high  2.5% crit  0.0% BG [ 93.9, 210.4]
+  trial002_adult#004: TIR  78.1% low  0.0% high 21.9% crit  0.0% BG [ 77.2, 212.9]
+  trial003_adolescent#008: TIR  21.2% low  0.0% high 78.8% crit 44.4% BG [140.5, 358.9]
+  trial004_adolescent#008: TIR  63.7% low  0.0% high 36.2% crit  6.9% BG [119.7, 314.9]

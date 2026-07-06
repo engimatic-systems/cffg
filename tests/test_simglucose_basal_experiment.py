@@ -56,3 +56,15 @@ def test_randomized_trial_runner_records_hidden_meals():
     assert result.patients[0].patient == "adult#001"
     assert result.patients[0].meals != result.patients[1].meals
     assert max(max(trace.bolus) for trace in result.patients) == 0.0
+
+
+def test_patient_specific_bolus_preset_emits_bolus_actions():
+    result = run_trials(
+        "patient-specific-hard-mask-bolus-v1",
+        n_trials=2,
+        seed=123,
+        patients=["adolescent#008"],
+    )
+
+    assert len(result.patients) == 2
+    assert max(max(trace.bolus) for trace in result.patients) > 0.0

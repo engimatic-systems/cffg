@@ -1,0 +1,5 @@
+Experiment 015 randomized 200 trials.
+Approach: same patient-specific hard-mask policy as experiment 014, but permits small CGM-only correction boluses when high and not falling. 10 randomized episodes per patient.
+Changed from previous: bolus-enabled comparison against basal-only hard-mask policy on the same randomized trial seed.
+Results: cohort TIR 81.06%, low 6.28%, high 12.66%, critical 3.47% over 200 randomized episodes.
+Learnings: bolus lowered hyperglycemia but over-corrected delayed insulin effects, increasing lows enough to lose to basal-only on TIR and safety.

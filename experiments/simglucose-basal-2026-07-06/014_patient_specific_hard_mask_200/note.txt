@@ -1,0 +1,5 @@
+Experiment 014 randomized 200 trials.
+Approach: patient-specific basal-only hard-mask policy with 10 randomized episodes per adult/adolescent patient. Patients use safe, hazard, or resistant hazard configs based on prior randomized batch failure modes.
+Changed from previous: doubles per-patient power to 10 trials and adds structural predicted-low basal mask.
+Results: cohort TIR 82.96%, low 1.41%, high 15.64%, critical 3.12% over 200 randomized episodes.
+Learnings: this is the strongest basal-only randomized result so far. Hypoglycemia is low but not zero; adolescent#008, adolescent#005, adolescent#007, adolescent#002, and adult#004 remain the main high-glucose failure modes.

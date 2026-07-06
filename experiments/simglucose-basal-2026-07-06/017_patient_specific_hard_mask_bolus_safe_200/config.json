@@ -1,0 +1,26 @@
+{
+  "preset": "patient-specific-hard-mask-bolus-safe-v1",
+  "protocol": {
+    "start": "2018-01-01T06:00:00",
+    "hours": 8.0,
+    "meals": [
+      [
+        1.0,
+        45.0
+      ],
+      [
+        5.0,
+        70.0
+      ]
+    ],
+    "seed": 7
+  },
+  "n_traces": 200,
+  "metrics": {
+    "tir": 0.81640625,
+    "time_low": 0.046125000000000006,
+    "time_high": 0.13746875,
+    "critical_time": 0.03640625,
+    "critical_samples": 1165
+  }
+}

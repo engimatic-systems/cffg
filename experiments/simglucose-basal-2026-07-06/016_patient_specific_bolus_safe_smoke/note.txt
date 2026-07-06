@@ -1,0 +1,5 @@
+Experiment 016 smoke.
+Approach: safer bolus variant with higher CGM threshold, smaller correction fraction, lower max bolus, longer bolus IOB memory, and the same hard mask.
+Changed from previous: addresses experiment 015 delayed hypoglycemia from over-correction.
+Results: cohort TIR 67.34%, low 0.00%, high 32.66%, critical 10.00% over 4 smoke trials.
+Learnings: safer bolus avoids smoke-trial lows but gives back more hyperglycemia. Full run still needed to test whether lower low risk beats the aggressive bolus.

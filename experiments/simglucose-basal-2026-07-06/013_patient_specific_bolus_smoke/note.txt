@@ -1,0 +1,5 @@
+Experiment 013 smoke.
+Approach: same patient-specific hard-mask policy, but allows small CGM-only correction boluses when high and not falling.
+Changed from previous: bolus-enabled comparison with the same randomized smoke patients.
+Results: cohort TIR 70.00%, low 0.00%, high 30.00%, critical 8.59% over 4 smoke trials.
+Learnings: bolus traces and plots render correctly. Smoke results improved high/critical time without lows, but the full randomized run is needed because bolus risk is delayed.
