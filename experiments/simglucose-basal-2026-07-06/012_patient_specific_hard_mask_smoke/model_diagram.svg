@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 2414 1358" preserveAspectRatio="xMidYMid meet">
+<style>
+    .bg { fill: #fbfaf7; }
+    .title { font: 700 24px Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif; fill: #1f2933; }
+    .legend { font: 500 13px Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif; fill: #52606d; }
+    .node text { font-family: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif; text-anchor: middle; }
+    .label { font-size: 13px; font-weight: 700; fill: #17212b; }
+    .detail { font-size: 10px; fill: #52606d; }
+    .factor rect { fill: #e8f1ff; stroke: #2f68b7; }
+    .variable ellipse { fill: #f4f0ff; stroke: #7c5cc4; }
+    .blob path { fill: #eef8ef; stroke: #3b8a4b; }
+    .constraint rect { fill: #fff4df; stroke: #b7791f; stroke-dasharray: 5 3; }
+    .port rect { fill: #f4f6f8; stroke: #697386; }
+    .edge { fill: none; stroke: #7b8794; stroke-width: 1.4; }
+    .edge.parameter { stroke: #3b8a4b; stroke-dasharray: 4 3; }
+    .edge.constraint { stroke: #b7791f; stroke-dasharray: 5 4; }
+    .edge.port { stroke: #697386; stroke-dasharray: 2 4; }
+    .edge-label { font: 10px Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif; fill: #52606d; paint-order: stroke; stroke: #fbfaf7; stroke-width: 3px; }
+    </style>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#7b8794"/></marker></defs>
+<rect class="bg" width="2414" height="1358"/>
+<text class="title" x="32" y="42">012_patient_specific_hard_mask_smoke: simglucose policy: patient-specific-hard-mask-v1</text>
+<text class="legend" x="32" y="64">rect=factor  ellipse=variable  green=parameter/blob  dashed=constraint/port</text>
+<path class="edge parameter" marker-end="url(#arrow)" d="M90.0,87.0 C195.0,87.0 195.0,319.0 300.0,319.0"/>
+<text class="edge-label" x="195.0" y="199.0">actions</text>
+<path class="edge parameter" marker-end="url(#arrow)" d="M90.0,145.0 C195.0,145.0 195.0,319.0 300.0,319.0"/>
+<text class="edge-label" x="195.0" y="228.0">gains</text>
+<path class="edge parameter" marker-end="url(#arrow)" d="M90.0,203.0 C195.0,203.0 195.0,493.0 300.0,493.0"/>
+<text class="edge-label" x="195.0" y="344.0">decay</text>
+<path class="edge parameter" marker-end="url(#arrow)" d="M90.0,261.0 C195.0,261.0 195.0,551.0 300.0,551.0"/>
+<text class="edge-label" x="195.0" y="402.0">windows</text>
+<path class="edge parameter" marker-end="url(#arrow)" d="M90.0,319.0 C195.0,319.0 195.0,319.0 300.0,319.0"/>
+<text class="edge-label" x="195.0" y="315.0">config</text>
+<path class="edge parameter" marker-end="url(#arrow)" d="M90.0,319.0 C195.0,319.0 195.0,551.0 300.0,551.0"/>
+<text class="edge-label" x="195.0" y="431.0">config</text>
+<path class="edge parameter" marker-end="url(#arrow)" d="M90.0,319.0 C195.0,319.0 195.0,609.0 300.0,609.0"/>
+<text class="edge-label" x="195.0" y="460.0">config</text>
+<path class="edge parameter" marker-end="url(#arrow)" d="M90.0,377.0 C195.0,377.0 195.0,377.0 300.0,377.0"/>
+<text class="edge-label" x="195.0" y="373.0">horizon</text>
+<path class="edge parameter" marker-end="url(#arrow)" d="M90.0,377.0 C195.0,377.0 195.0,435.0 300.0,435.0"/>
+<text class="edge-label" x="195.0" y="402.0">thresholds</text>
+<path class="edge port" marker-end="url(#arrow)" d="M500.0,435.0 C575.0,435.0 575.0,667.0 650.0,667.0"/>
+<text class="edge-label" x="575.0" y="547.0">glue</text>
+<path class="edge port" marker-end="url(#arrow)" d="M500.0,609.0 C575.0,609.0 575.0,551.0 650.0,551.0"/>
+<text class="edge-label" x="575.0" y="576.0">data</text>
+<path class="edge port" marker-end="url(#arrow)" d="M500.0,841.0 C575.0,841.0 575.0,609.0 650.0,609.0"/>
+<text class="edge-label" x="575.0" y="721.0">data</text>
+<path class="edge structural" marker-end="url(#arrow)" d="M300.0,319.0 C400.0,319.0 400.0,493.0 500.0,493.0"/>
+<text class="edge-label" x="400.0" y="402.0">out</text>
+<path class="edge structural" marker-end="url(#arrow)" d="M300.0,319.0 C400.0,319.0 400.0,609.0 500.0,609.0"/>
+<text class="edge-label" x="400.0" y="460.0">cgm</text>
+<path class="edge structural" marker-end="url(#arrow)" d="M300.0,319.0 C400.0,319.0 400.0,667.0 500.0,667.0"/>
+<text class="edge-label" x="400.0" y="489.0">iob</text>
+<path class="edge structural" marker-end="url(#arrow)" d="M300.0,319.0 C400.0,319.0 400.0,783.0 500.0,783.0"/>
+<text class="edge-label" x="400.0" y="547.0">hazard</text>
+<path class="edge structural" marker-end="url(#arrow)" d="M300.0,319.0 C400.0,319.0 400.0,957.0 500.0,957.0"/>
+<text class="edge-label" x="400.0" y="634.0">safety</text>
+<path class="edge structural" marker-end="url(#arrow)" d="M300.0,319.0 C400.0,319.0 400.0,1015.0 500.0,1015.0"/>
+<text class="edge-label" x="400.0" y="663.0">trend</text>
+<path class="edge structural" marker-end="url(#arrow)" d="M300.0,377.0 C400.0,377.0 400.0,609.0 500.0,609.0"/>
+<text class="edge-label" x="400.0" y="489.0">cgm</text>
+<path class="edge structural" marker-end="url(#arrow)" d="M300.0,377.0 C400.0,377.0 400.0,899.0 500.0,899.0"/>
+<text class="edge-label" x="400.0" y="634.0">out</text>
+<path class="edge structural" marker-end="url(#arrow)" d="M300.0,377.0 C400.0,377.0 400.0,1015.0 500.0,1015.0"/>
+<text class="edge-label" x="400.0" y="692.0">trend</text>
+<path class="edge structural" marker-end="url(#arrow)" d="M300.0,435.0 C400.0,435.0 400.0,609.0 500.0,609.0"/>
+<text class="edge-label" x="400.0" y="518.0">cgm</text>
+<path class="edge structural" marker-end="url(#arrow)" d="M300.0,435.0 C400.0,435.0 400.0,899.0 500.0,899.0"/>
+<text class="edge-label" x="400.0" y="663.0">predicted</text>
+<path class="edge structural" marker-end="url(#arrow)" d="M300.0,435.0 C400.0,435.0 400.0,957.0 500.0,957.0"/>
+<text class="edge-label" x="400.0" y="692.0">out</text>
+<path class="edge structural" marker-end="url(#arrow)" d="M300.0,435.0 C400.0,435.0 400.0,1015.0 500.0,1015.0"/>
+<text class="edge-label" x="400.0" y="721.0">trend</text>
+<path class="edge structural" marker-end="url(#arrow)" d="M300.0,493.0 C400.0,493.0 400.0,435.0 500.0,435.0"/>
+<text class="edge-label" x="400.0" y="460.0">basal</text>
+<path class="edge structural" marker-end="url(#arrow)" d="M300.0,493.0 C400.0,493.0 400.0,667.0 500.0,667.0"/>
+<text class="edge-label" x="400.0" y="576.0">out</text>
+<path class="edge structural" marker-end="url(#arrow)" d="M300.0,551.0 C400.0,551.0 400.0,783.0 500.0,783.0"/>
+<text class="edge-label" x="400.0" y="663.0">out</text>
+<path class="edge structural" marker-end="url(#arrow)" d="M300.0,551.0 C400.0,551.0 400.0,841.0 500.0,841.0"/>
+<text class="edge-label" x="400.0" y="692.0">patient</text>
+<path class="edge structural" marker-end="url(#arrow)" d="M300.0,609.0 C400.0,609.0 400.0,435.0 500.0,435.0"/>
+<text class="edge-label" x="400.0" y="518.0">out</text>
+<path class="edge structural" marker-end="url(#arrow)" d="M300.0,609.0 C400.0,609.0 400.0,493.0 500.0,493.0"/>
+<text class="edge-label" x="400.0" y="547.0">multiplier</text>
+<path class="edge structural" marker-end="url(#arrow)" d="M300.0,609.0 C400.0,609.0 400.0,841.0 500.0,841.0"/>
+<text class="edge-label" x="400.0" y="721.0">patient</text>
+<path class="edge structural" marker-end="url(#arrow)" d="M300.0,667.0 C400.0,667.0 400.0,551.0 500.0,551.0"/>
+<text class="edge-label" x="400.0" y="605.0">previous</text>
+<path class="edge structural" marker-end="url(#arrow)" d="M300.0,667.0 C400.0,667.0 400.0,609.0 500.0,609.0"/>
+<text class="edge-label" x="400.0" y="634.0">now</text>
+<path class="edge structural" marker-end="url(#arrow)" d="M300.0,667.0 C400.0,667.0 400.0,1015.0 500.0,1015.0"/>
+<text class="edge-label" x="400.0" y="837.0">out</text>
+<g class="node blob"><path d="M24.0,77.0 C24.0,68.0 156.0,68.0 156.0,77.0 L156.0,97.0 C156.0,106.0 24.0,106.0 24.0,97.0 Z"/><text class="label" x="90.0" y="86.0">basal_actions</text><text class="detail" x="90.0" y="97.0">BasalPolicyConfig.basal_mul...</text></g>
+<g class="node blob"><path d="M24.0,135.0 C24.0,126.0 156.0,126.0 156.0,135.0 L156.0,155.0 C156.0,164.0 24.0,164.0 24.0,155.0 Z"/><text class="label" x="90.0" y="144.0">feedback_gains</text><text class="detail" x="90.0" y="155.0">BasalPolicyConfig.*gain</text></g>
+<g class="node blob"><path d="M24.0,193.0 C24.0,184.0 156.0,184.0 156.0,193.0 L156.0,213.0 C156.0,222.0 24.0,222.0 24.0,213.0 Z"/><text class="label" x="90.0" y="202.0">iob_params</text><text class="detail" x="90.0" y="213.0">BasalPolicyConfig.iob_*</text></g>
+<g class="node blob"><path d="M24.0,251.0 C24.0,242.0 156.0,242.0 156.0,251.0 L156.0,271.0 C156.0,280.0 24.0,280.0 24.0,271.0 Z"/><text class="label" x="90.0" y="260.0">meal_windows</text><text class="detail" x="90.0" y="271.0">BasalPolicyConfig.windows</text></g>
+<g class="node blob"><path d="M24.0,309.0 C24.0,300.0 156.0,300.0 156.0,309.0 L156.0,329.0 C156.0,338.0 24.0,338.0 24.0,329.0 Z"/><text class="label" x="90.0" y="318.0">patient_config</text><text class="detail" x="90.0" y="329.0">preset_config</text></g>
+<g class="node blob"><path d="M24.0,367.0 C24.0,358.0 156.0,358.0 156.0,367.0 L156.0,387.0 C156.0,396.0 24.0,396.0 24.0,387.0 Z"/><text class="label" x="90.0" y="376.0">safety_thresholds</text><text class="detail" x="90.0" y="387.0">BasalPolicyConfig.suspend/p...</text></g>
+<g class="node factor"><rect x="234.0" y="302.0" width="132.0" height="34.0" rx="4"/><text class="label" x="300.0" y="318.0">basal_policy</text><text class="detail" x="300.0" y="329.0">discrete_argmin_policy</text></g>
+<g class="node factor"><rect x="234.0" y="360.0" width="132.0" height="34.0" rx="4"/><text class="label" x="300.0" y="376.0">forecast</text><text class="detail" x="300.0" y="387.0">linear_forecast</text></g>
+<g class="node factor"><rect x="234.0" y="418.0" width="132.0" height="34.0" rx="4"/><text class="label" x="300.0" y="434.0">hard_safety_mask</text><text class="detail" x="300.0" y="445.0">threshold_guard</text></g>
+<g class="node factor"><rect x="234.0" y="476.0" width="132.0" height="34.0" rx="4"/><text class="label" x="300.0" y="492.0">iob_state</text><text class="detail" x="300.0" y="503.0">insulin_on_board</text></g>
+<g class="node factor"><rect x="234.0" y="534.0" width="132.0" height="34.0" rx="4"/><text class="label" x="300.0" y="550.0">meal_prior</text><text class="detail" x="300.0" y="561.0">hidden_meal_hazard</text></g>
+<g class="node factor"><rect x="234.0" y="592.0" width="132.0" height="34.0" rx="4"/><text class="label" x="300.0" y="608.0">pump_basal</text><text class="detail" x="300.0" y="619.0">basal_delivery</text></g>
+<g class="node factor"><rect x="234.0" y="650.0" width="132.0" height="34.0" rx="4"/><text class="label" x="300.0" y="666.0">trend_filter</text><text class="detail" x="300.0" y="677.0">finite_difference</text></g>
+<g class="node port"><rect x="584.0" y="534.0" width="132.0" height="34.0" rx="12"/><text class="label" x="650.0" y="550.0">cgm</text><text class="detail" x="650.0" y="561.0">data</text></g>
+<g class="node port"><rect x="584.0" y="592.0" width="132.0" height="34.0" rx="12"/><text class="label" x="650.0" y="608.0">patient</text><text class="detail" x="650.0" y="619.0">data</text></g>
+<g class="node port"><rect x="584.0" y="650.0" width="132.0" height="34.0" rx="12"/><text class="label" x="650.0" y="666.0">basal</text><text class="detail" x="650.0" y="677.0">glue</text></g>
+<g class="node variable"><ellipse cx="500.0" cy="435.0" rx="66.0" ry="17.0"/><text class="label" x="500.0" y="434.0">basal_action</text></g>
+<g class="node variable"><ellipse cx="500.0" cy="493.0" rx="66.0" ry="17.0"/><text class="label" x="500.0" y="492.0">basal_multiplier</text></g>
+<g class="node variable"><ellipse cx="500.0" cy="551.0" rx="66.0" ry="17.0"/><text class="label" x="500.0" y="550.0">cgm_prev</text></g>
+<g class="node variable"><ellipse cx="500.0" cy="609.0" rx="66.0" ry="17.0"/><text class="label" x="500.0" y="608.0">cgm_t</text></g>
+<g class="node variable"><ellipse cx="500.0" cy="667.0" rx="66.0" ry="17.0"/><text class="label" x="500.0" y="666.0">extra_iob</text></g>
+<g class="node variable"><ellipse cx="500.0" cy="725.0" rx="66.0" ry="17.0"/><text class="label" x="500.0" y="724.0">meal_drive</text></g>
+<g class="node variable"><ellipse cx="500.0" cy="783.0" rx="66.0" ry="17.0"/><text class="label" x="500.0" y="782.0">meal_hazard</text></g>
+<g class="node variable"><ellipse cx="500.0" cy="841.0" rx="66.0" ry="17.0"/><text class="label" x="500.0" y="840.0">patient</text></g>
+<g class="node variable"><ellipse cx="500.0" cy="899.0" rx="66.0" ry="17.0"/><text class="label" x="500.0" y="898.0">predicted_cgm</text></g>
+<g class="node variable"><ellipse cx="500.0" cy="957.0" rx="66.0" ry="17.0"/><text class="label" x="500.0" y="956.0">safety_state</text></g>
+<g class="node variable"><ellipse cx="500.0" cy="1015.0" rx="66.0" ry="17.0"/><text class="label" x="500.0" y="1014.0">trend</text></g>
+</svg>

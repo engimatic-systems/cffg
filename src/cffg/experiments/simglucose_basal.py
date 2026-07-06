@@ -24,6 +24,7 @@ import numpy as np
 import pandas as pd
 
 from cffg.benchmarks.glucose import _shim_legacy_gym
+from cffg.core.ir import BlobRef, FactorSpec, PortRole, PortSpec, Template, VariableSpec
 
 _shim_legacy_gym()
 
@@ -605,6 +606,167 @@ def preset_controller(name: str) -> str:
     if name == "patient-specific-hard-mask-bolus-safe-v1":
         return "bolus-physiology"
     return "clock"
+
+
+def policy_template_for_preset(name: str) -> Template:
+    """Diagram-only CFFG-style template for a simglucose controller preset.
+
+    The simglucose experiments are white-box controllers rather than compiled
+    CFFG templates. This adapter exposes their policy structure in the same
+    factor/variable/blob vocabulary as the core renderer so experiment folders
+    can still carry comparable model diagrams.
+    """
+
+    controller = preset_controller(name)
+    template = Template(name=f"simglucose policy: {name}")
+    for variable in (
+        "patient",
+        "cgm_t",
+        "cgm_prev",
+        "trend",
+        "predicted_cgm",
+        "meal_hazard",
+        "meal_drive",
+        "extra_iob",
+        "safety_state",
+        "basal_multiplier",
+        "basal_action",
+    ):
+        template.variables[variable] = VariableSpec(variable, 0)
+    template.blobs = {
+        "patient_config": BlobRef("patient_config", "preset_config"),
+        "basal_actions": BlobRef("basal_actions", "BasalPolicyConfig.basal_multipliers"),
+        "meal_windows": BlobRef("meal_windows", "BasalPolicyConfig.windows"),
+        "feedback_gains": BlobRef("feedback_gains", "BasalPolicyConfig.*gain"),
+        "safety_thresholds": BlobRef(
+            "safety_thresholds",
+            "BasalPolicyConfig.suspend/predicted_low/hard_mask",
+        ),
+        "iob_params": BlobRef("iob_params", "BasalPolicyConfig.iob_*"),
+    }
+    template.factors = {
+        "trend_filter": FactorSpec(
+            "trend_filter",
+            "finite_difference",
+            edges={"now": "cgm_t", "previous": "cgm_prev", "out": "trend"},
+        ),
+        "forecast": FactorSpec(
+            "forecast",
+            "linear_forecast",
+            edges={"cgm": "cgm_t", "trend": "trend", "out": "predicted_cgm"},
+            param_blobs={"horizon": "safety_thresholds"},
+        ),
+        "meal_prior": FactorSpec(
+            "meal_prior",
+            "hidden_meal_hazard",
+            edges={"patient": "patient", "out": "meal_hazard"},
+            param_blobs={"windows": "meal_windows", "config": "patient_config"},
+        ),
+        "iob_state": FactorSpec(
+            "iob_state",
+            "insulin_on_board",
+            edges={"basal": "basal_action", "out": "extra_iob"},
+            param_blobs={"decay": "iob_params"},
+        ),
+        "hard_safety_mask": FactorSpec(
+            "hard_safety_mask",
+            "threshold_guard",
+            edges={
+                "cgm": "cgm_t",
+                "trend": "trend",
+                "predicted": "predicted_cgm",
+                "out": "safety_state",
+            },
+            param_blobs={"thresholds": "safety_thresholds"},
+        ),
+        "basal_policy": FactorSpec(
+            "basal_policy",
+            "discrete_argmin_policy",
+            edges={
+                "cgm": "cgm_t",
+                "trend": "trend",
+                "hazard": "meal_hazard",
+                "iob": "extra_iob",
+                "safety": "safety_state",
+                "out": "basal_multiplier",
+            },
+            param_blobs={
+                "actions": "basal_actions",
+                "gains": "feedback_gains",
+                "config": "patient_config",
+            },
+        ),
+        "pump_basal": FactorSpec(
+            "pump_basal",
+            "basal_delivery",
+            edges={"patient": "patient", "multiplier": "basal_multiplier", "out": "basal_action"},
+            param_blobs={"config": "patient_config"},
+        ),
+    }
+    template.ports = {
+        "patient": PortSpec("patient", "patient", PortRole.DATA),
+        "cgm": PortSpec("cgm", "cgm_t", PortRole.DATA),
+        "basal": PortSpec("basal", "basal_action", PortRole.GLUE),
+    }
+    if controller == "reactive-physiology":
+        template.factors["meal_drive_filter"] = FactorSpec(
+            "meal_drive_filter",
+            "reactive_absorption_state",
+            edges={"cgm": "cgm_t", "trend": "trend", "out": "meal_drive"},
+            param_blobs={"gains": "feedback_gains"},
+        )
+        template.factors["basal_policy"] = FactorSpec(
+            "basal_policy",
+            "reactive_discrete_policy",
+            edges={
+                "cgm": "cgm_t",
+                "trend": "trend",
+                "meal_drive": "meal_drive",
+                "iob": "extra_iob",
+                "safety": "safety_state",
+                "out": "basal_multiplier",
+            },
+            param_blobs={
+                "actions": "basal_actions",
+                "gains": "feedback_gains",
+                "config": "patient_config",
+            },
+        )
+    if controller == "bolus-physiology":
+        template.variables["bolus_iob"] = VariableSpec("bolus_iob", 0)
+        template.variables["bolus_action"] = VariableSpec("bolus_action", 0)
+        template.blobs["therapy_profile"] = BlobRef("therapy_profile", "Quest.csv CR/CF")
+        template.factors["meal_drive_filter"] = FactorSpec(
+            "meal_drive_filter",
+            "reactive_absorption_state",
+            edges={"cgm": "cgm_t", "trend": "trend", "out": "meal_drive"},
+            param_blobs={"gains": "feedback_gains"},
+        )
+        template.factors["bolus_iob_state"] = FactorSpec(
+            "bolus_iob_state",
+            "bolus_on_board",
+            edges={"bolus": "bolus_action", "out": "bolus_iob"},
+            param_blobs={"decay": "iob_params"},
+        )
+        template.factors["bolus_policy"] = FactorSpec(
+            "bolus_policy",
+            "correction_bolus_policy",
+            edges={
+                "cgm": "cgm_t",
+                "trend": "trend",
+                "meal_drive": "meal_drive",
+                "bolus_iob": "bolus_iob",
+                "safety": "safety_state",
+                "out": "bolus_action",
+            },
+            param_blobs={
+                "config": "patient_config",
+                "therapy": "therapy_profile",
+                "thresholds": "safety_thresholds",
+            },
+        )
+        template.ports["bolus"] = PortSpec("bolus", "bolus_action", PortRole.GLUE)
+    return template
 
 
 def _safer_config() -> BasalPolicyConfig:
