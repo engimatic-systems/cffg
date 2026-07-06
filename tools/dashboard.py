@@ -31,6 +31,7 @@ EPIC_FILES = {
     "M3 · VMP + GFE": ["test_vmp.py", "test_gfe.py"],
     "M4 · T-maze": ["test_tmaze.py", "test_tmaze_learning.py"],
     "M5 · Runtime": ["test_agent.py", "test_colony.py"],
+    "M6 · Tooling": ["test_bundle.py", "test_estimate.py", "test_edit_codec.py"],
     "SG · Glucose": ["test_glucose.py"],
 }
 FILE_TO_EPIC = {f: e for e, fs in EPIC_FILES.items() for f in fs}
