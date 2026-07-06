@@ -1,0 +1,5 @@
+Experiment 003 full cohort.
+Approach: safer clock-prior basal-only policy with lower temp-basal windows and earlier predicted-low suspend.
+Changed from previous: trades hyperglycemia correction strength for reduced hypoglycemia and critical lows.
+Results: 72.00% TIR, 2.19% low, 4.78% critical time, 153 critical samples.
+Learnings: a global safety shift prevents some dangerous lows but loses too much hyperglycemia control in resistant adolescents.

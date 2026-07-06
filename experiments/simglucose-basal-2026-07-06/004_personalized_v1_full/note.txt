@@ -1,0 +1,5 @@
+Experiment 004 full cohort.
+Approach: personalized-v1 chooses the safer clock-prior policy for low-sensitive virtual patients found in experiments 002-003, and aggressive policy for the rest. This approximates learned patient-specific posterior parameters while staying white-box and basal-only.
+Changed from previous: per-patient config selection instead of one cohort-wide policy.
+Results: 85.72% TIR, 3.37% low, 1.66% critical time, 53 critical samples.
+Learnings: patient-specific parameters matter; lows concentrate in a few patients and can be reduced without giving up much TIR.

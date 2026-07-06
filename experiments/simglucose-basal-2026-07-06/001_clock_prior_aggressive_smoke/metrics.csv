@@ -1,0 +1,3 @@
+patient,tir,time_low,time_high,critical_time,critical_samples,min_bg,max_bg
+adult#001,1.0,0.0,0.0,0.0,0,88.42390494908233,164.58008453128224
+adolescent#002,0.6375,0.0,0.3625,0.0,0,106.4219273262371,229.8095379366389

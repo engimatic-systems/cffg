@@ -1,0 +1,5 @@
+Experiment 001 smoke.
+Approach: first artifact run for the aggressive clock-prior basal-only controller on one easy adult and one hard adolescent.
+Changed from previous: adds run folder, CSV traces, summary, config, and plots.
+Results: 81.88% TIR, 0.00% low, 0 critical samples on adult#001 and adolescent#002.
+Learnings: artifact shape and plots are valid; adolescent#002 is a useful hard hyperglycemia case.

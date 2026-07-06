@@ -1,0 +1,5 @@
+Experiment 005 full cohort.
+Approach: personalized-v2 keeps the aggressive controller for most patients, uses safer schedules for low-sensitive patients, and uses longer/higher capped schedules for two hyperglycemia-resistant adolescents. Still basal-only and CGM-only; meal times are a prior, not observations.
+Changed from previous: patient-specific schedule variants selected from targeted inspection of experiments 002-004.
+Results: 86.66% TIR, 0.00% low, 1.16% critical time, 37 critical samples.
+Learnings: this is the best frontier found. Remaining failures are hyperglycemia-limited in adult#004, adolescent#005, and adolescent#007; stronger basal starts causing lows before it reaches 94% TIR.

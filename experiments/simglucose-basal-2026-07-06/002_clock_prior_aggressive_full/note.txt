@@ -1,0 +1,5 @@
+Experiment 002 full cohort.
+Approach: aggressive clock-prior basal-only policy on all 10 adults and 10 adolescents. Meals are unannounced to the controller but expected by a prior at +1h and +5h.
+Changed from previous: full 20-patient cohort instead of smoke subset.
+Results: 82.84% TIR, 8.31% low, 4.97% critical time, 159 critical samples.
+Learnings: strong scheduled basal can keep many patients perfect, but insulin-sensitive patients get unacceptable lows.
