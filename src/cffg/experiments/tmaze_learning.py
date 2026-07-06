@@ -93,26 +93,36 @@ def elog_a(counts: np.ndarray) -> np.ndarray:
 @dataclass
 class Phase:
     engine: Engine
-    a_keys: list[tuple[str, int]]  # (params key, n_members) to refresh with Ā
+    elog_keys: list[tuple[str, int]]  # perception likelihoods: get E[log A]
+    count_keys: list[tuple[str, int]]  # learned GFE composites: get raw counts α
 
-    def state_with(self, log_a: np.ndarray) -> State:
+    def state_with(self, counts: np.ndarray) -> State:
         st = self.engine.init_state()
         params = dict(st.params)
-        for key, m in self.a_keys:
-            params[key] = jnp.asarray(np.broadcast_to(log_a, (m, *log_a.shape)))
+        if self.elog_keys:
+            log_a = elog_a(counts)
+            for key, m in self.elog_keys:
+                params[key] = jnp.asarray(np.broadcast_to(log_a, (m, *log_a.shape)))
+        for key, m in self.count_keys:
+            params[key] = jnp.asarray(np.broadcast_to(counts, (m, *counts.shape)))
         return State(messages=st.messages, params=params)
 
 
 def _make_phase(past: int, steps: int, alpha: float, c_util: float, gfe: bool) -> Phase:
-    template, arrays = build_tmaze(steps, alpha, c_util, past=past, gfe=gfe)
+    template, arrays = build_tmaze(
+        steps, alpha, c_util, past=past, gfe=gfe, learned_a=gfe
+    )
     engine = Engine(compile_template(template, arrays=arrays))
-    a_keys = []
+    elog_keys, count_keys = [], []
     for g in engine.arena.groups:
         if g.type == "matrix_cat":
-            a_keys.append((g.name, len(g.members)))
+            elog_keys.append((g.name, len(g.members)))
     for g in engine.arena.gfe_groups:
-        a_keys.append((g.name + ":A", len(g.members)))
-    return Phase(engine, a_keys)
+        if g.learned:
+            count_keys.append((g.name + ":counts", len(g.members)))
+        else:
+            elog_keys.append((g.name + ":A", len(g.members)))
+    return Phase(engine, elog_keys, count_keys)
 
 
 @dataclass
@@ -134,36 +144,42 @@ def run_learning(
     seed: int = 0,
     damp: float = 0.5,
     n_sweeps: int = 400,
+    select: str = "map",
 ) -> LearningResult:
+    """`select`: "map" (argmax, default — exploration comes from the epistemic
+    objective itself, matching the paper's δ-selection) or "sample" (posterior
+    sampling; injects so much action noise that soft control posteriors reduce
+    to a random walk — kept for ablation)."""
     env = TMazeEnv(alpha, np.random.default_rng(seed))
     plan2 = _make_phase(0, 2, alpha, c_util, gfe)
     plan1 = _make_phase(1, 2, alpha, c_util, gfe)
     smooth = _make_phase(2, 2, alpha, c_util, gfe)
 
+    def choose(q: np.ndarray) -> int:
+        if select == "map":
+            return int(np.argmax(q))
+        return int(env.rng.choice(N_POS, p=q / q.sum()))
+
     counts = initial_counts()
     wins: list[bool] = []
     for _ in range(n_trials):
         env.reset()
-        log_a = elog_a(counts)
 
-        # Move 1: plan both steps with the current world model; sample the
-        # control posterior (argmax is brittle on early near-uniform beliefs).
-        st = plan2.state_with(log_a)
+        # Move 1: plan both steps with the current world model.
+        st = plan2.state_with(counts)
         st, _ = plan2.engine.run(st, n_sweeps, tol=1e-10, damp=damp)
-        q_u1 = np.asarray(plan2.engine.marginals(st)["u1"])
-        u1 = int(env.rng.choice(N_POS, p=q_u1 / q_u1.sum()))
+        u1 = choose(np.asarray(plan2.engine.marginals(st)["u1"]))
         x1 = env.step(u1)
 
         # Move 2: replan with move 1 clamped as data.
-        st = plan1.state_with(log_a)
+        st = plan1.state_with(counts)
         st = plan1.engine.bind_data(st, {"act1": u1, "obs1": x1})
         st, _ = plan1.engine.run(st, n_sweeps, tol=1e-10, damp=damp)
-        q_u2 = np.asarray(plan1.engine.marginals(st)["u2"])
-        u2 = int(env.rng.choice(N_POS, p=q_u2 / q_u2.sum()))
+        u2 = choose(np.asarray(plan1.engine.marginals(st)["u2"]))
         x2 = env.step(u2)
 
         # Learning: smooth the completed trial, conjugate Dirichlet update.
-        st = smooth.state_with(log_a)
+        st = smooth.state_with(counts)
         st = smooth.engine.bind_data(
             st, {"act1": u1, "obs1": x1, "act2": u2, "obs2": x2}
         )

@@ -123,3 +123,47 @@ def test_posterior_predictive_on_x():
     engine, state = solve(A_EPI, UNIF, UNIF)
     zbar = engine.marginals(state)["z"]
     np.testing.assert_allclose(engine.marginals(state)["x"], A_EPI @ zbar, atol=1e-8)
+
+
+def test_learned_composite_recovers_fixed_at_high_counts():
+    """Dirichlet mode with enormous counts must converge to the fixed-A
+    composite: Ā → A and the closed-form E[A log A] pseudo-entropy → h(A)."""
+    from cffg.core import ConstraintKind, ConstraintSpec
+
+    t = make_model(A_EPI, UNIF, UNIF, p_substitute=False)
+    t.constraints.append(
+        ConstraintSpec(
+            ConstraintKind.P_SUBSTITUTION, "obs",
+            (("parameter_uncertainty", "dirichlet"), ("substituted_role", "out")),
+        )
+    )
+    counts = A_EPI * 1e7 + 1e-3
+    engine = Engine(compile_template(t, arrays={"A": counts, "c": UNIF, "d": UNIF}))
+    state, deltas = engine.run(engine.init_state(), 8, tol=1e-14)
+    assert deltas[-1] < 1e-10
+
+    fixed_engine, fixed_state = solve(A_EPI, UNIF, UNIF)
+    np.testing.assert_allclose(
+        engine.marginals(state)["z"], fixed_engine.marginals(fixed_state)["z"], atol=1e-6
+    )
+    np.testing.assert_allclose(engine.bfe(state), fixed_engine.bfe(fixed_state), atol=1e-5)
+
+
+def test_learned_composite_novelty_direction():
+    """Uncertain-but-maybe-sharp beats confidently-uniform: with a uniform
+    goal and prior, the agent should prefer the state whose column is
+    unexplored over the one it knows is 50/50."""
+    from cffg.core import ConstraintKind, ConstraintSpec
+
+    t = make_model(A_EPI, UNIF, UNIF, p_substitute=False)
+    t.constraints.append(
+        ConstraintSpec(
+            ConstraintKind.P_SUBSTITUTION, "obs",
+            (("parameter_uncertainty", "dirichlet"), ("substituted_role", "out")),
+        )
+    )
+    counts = np.array([[50.0, 0.3], [50.0, 0.3]])  # state 0: known 50/50; state 1: unexplored
+    engine = Engine(compile_template(t, arrays={"A": counts, "c": UNIF, "d": UNIF}))
+    state, _ = engine.run(engine.init_state(), 8, tol=1e-14)
+    q = engine.marginals(state)["z"]
+    assert q[1] > 0.55, f"no parameter-novelty pull toward the unexplored state: {q}"

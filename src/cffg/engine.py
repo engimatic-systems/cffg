@@ -165,7 +165,10 @@ def _make_step(arena: Arena):
         for g in arena.gfe_groups:
             _, ki = g.cards
             log_d = messages[g.gather_z][:, :ki]
-            mu2, log_qx = gfe_update(log_d, params[g.name + ":A"], params[g.name + ":c"], k_max)
+            a_key = g.name + (":counts" if g.learned else ":A")
+            mu2, log_qx = gfe_update(
+                log_d, params[a_key], params[g.name + ":c"], k_max, learned=g.learned
+            )
             new = new.at[g.scatter_z].set(mu2)
             new = new.at[g.scatter_x].set(log_qx)
         # Log-space damping: stabilizes the outer coordination between GFE
@@ -208,7 +211,10 @@ def _make_bfe(arena: Arena):
         for g in arena.gfe_groups:
             _, ki = g.cards
             log_d = messages[g.gather_z][:, :ki]
-            total = total + gfe_energy(log_d, params[g.name + ":A"], params[g.name + ":c"]).sum()
+            a_key = g.name + (":counts" if g.learned else ":A")
+            total = total + gfe_energy(
+                log_d, params[a_key], params[g.name + ":c"], learned=g.learned
+            ).sum()
         if len(pairs):
             lq = messages[pairs[:, 0]] + messages[pairs[:, 1]]  # [E_int, k_max]
             lq = lq - logsumexp(lq, axis=-1, keepdims=True)

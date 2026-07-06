@@ -224,14 +224,32 @@ VMP_ENERGIES = {
 _N_NEWTON = 25
 
 
-def _gfe_solve(logA, logc, log_d):
-    """Single composite: z* in the simplex. logA [Mo,K], logc [Mo], log_d [K]."""
+def _fixed_stats(logA):
+    """(Ā, h) for a known matrix: Ā = A, h = column entropies."""
     a = jnp.exp(logA)
     h = -jnp.sum(jnp.where(a > _TINY, a * logA, 0.0), axis=0)  # [K]
+    return a, h
+
+
+def _dirichlet_stats(counts):
+    """(Ā, h̃) under per-column Dirichlet q(A): Ā = E[A] = α/α₀, and the
+    coupled term E[A_xz log A_xz] = (α/α₀)(ψ(α+1) − ψ(α₀+1)) in closed form,
+    so h̃_z = −Σ_x E[A log A]. By Jensen h̃ ≤ H[Ā·z-column]: an *uncertain*
+    column has lower expected entropy than its blurry mean suggests — the
+    parameter-novelty channel that makes unexplored states attractive."""
+    a0 = counts.sum(axis=0, keepdims=True)
+    abar = counts / a0
+    e_alog = abar * (jax.scipy.special.digamma(counts + 1.0) - jax.scipy.special.digamma(a0 + 1.0))
+    h = -e_alog.sum(axis=0)  # [K]
+    return abar, h
+
+
+def _gfe_solve(abar, h, logc, log_d):
+    """Single composite: z* in the simplex. abar [Mo,K], h [K], logc [Mo]."""
 
     def rho(zbar):
-        qx = a @ zbar
-        return a.T @ (logc - jnp.log(jnp.maximum(qx, 1e-300))) - h
+        qx = abar @ zbar
+        return abar.T @ (logc - jnp.log(jnp.maximum(qx, 1e-300))) - h
 
     def center(v):
         return v - v.mean()
@@ -248,27 +266,39 @@ def _gfe_solve(logA, logc, log_d):
     return jax.nn.softmax(v)
 
 
-def _gfe_rho(logA, logc, zbar):
-    a = jnp.exp(logA)
-    h = -jnp.sum(jnp.where(a > _TINY, a * logA, 0.0), axis=0)
-    qx = a @ zbar
-    return a.T @ (logc - jnp.log(jnp.maximum(qx, 1e-300))) - h
+def _gfe_rho(abar, h, logc, zbar):
+    qx = abar @ zbar
+    return abar.T @ (logc - jnp.log(jnp.maximum(qx, 1e-300))) - h
 
 
-def gfe_update(log_d, logA, logc, k_max):
-    """Batched over members. log_d [M,K] normalized; returns (μ2, log q_x)
-    padded to k_max."""
-    ko, ki = logA.shape[1], logA.shape[2]
-    zbar = jax.vmap(_gfe_solve)(logA, logc, log_d)  # [M, K]
+def _stats(a_param, learned):
+    return _dirichlet_stats(a_param) if learned else _fixed_stats(a_param)
+
+
+def gfe_update(log_d, a_param, logc, k_max, learned=False):
+    """Batched over members. log_d [M,K] normalized; a_param is logA (fixed)
+    or Dirichlet counts α (learned); returns (μ2, log q_x) padded to k_max."""
+    ko, ki = a_param.shape[1], a_param.shape[2]
+
+    def one(a_p, lc, ld):
+        abar, h = _stats(a_p, learned)
+        zbar = _gfe_solve(abar, h, lc, ld)
+        return zbar, abar @ zbar
+
+    zbar, qx = jax.vmap(one)(a_param, logc, log_d)
     mu2 = jnp.log(zbar) - log_d
-    qx = jnp.einsum("mok,mk->mo", jnp.exp(logA), zbar)
     log_qx = jnp.log(jnp.maximum(qx, 1e-300))
     return _norm_pad(mu2, ki, k_max), _norm_pad(log_qx, ko, k_max)
 
 
-def gfe_energy(log_d, logA, logc):
+def gfe_energy(log_d, a_param, logc, learned=False):
     """Composite FE term per member: −z*ᵀ rho(z*) − H[z*]."""
-    zbar = jax.vmap(_gfe_solve)(logA, logc, log_d)
-    rho = jax.vmap(_gfe_rho)(logA, logc, zbar)
-    lz = jnp.log(jnp.maximum(zbar, 1e-300))
-    return -(zbar * rho).sum(-1) + (zbar * lz).sum(-1)
+
+    def one(a_p, lc, ld):
+        abar, h = _stats(a_p, learned)
+        zbar = _gfe_solve(abar, h, lc, ld)
+        rho = _gfe_rho(abar, h, lc, zbar)
+        lz = jnp.log(jnp.maximum(zbar, 1e-300))
+        return -(zbar * rho).sum(-1) + (zbar * lz).sum(-1)
+
+    return jax.vmap(one)(a_param, logc, log_d)

@@ -66,7 +66,12 @@ class GroupPlan:
 class GfePlan:
     """A P-substituted goal-observation composite (Part II §4): matrix_cat
     observation node facing a categorical goal node across the x edge. The
-    composite owns both factors' updates and their joint FE term."""
+    composite owns both factors' updates and their joint FE term.
+
+    `learned=True` (P-bead detail parameter_uncertainty=dirichlet): the matrix
+    parameter is a Dirichlet *count* array α, not probabilities. Messages then
+    use Ā = E[A] for probability terms and the closed-form coupled term
+    E[A log A] for the pseudo-entropy — the parameter-novelty channel."""
 
     name: str
     cards: tuple[int, int]  # (M_obs, K_state)
@@ -74,6 +79,7 @@ class GfePlan:
     gather_z: np.ndarray  # [M] incoming state-message slot (μ_D)
     scatter_z: np.ndarray  # [M] outgoing backward-message slot (μ 2)
     scatter_x: np.ndarray  # [M] obs-side x slot (posterior predictive q_x)
+    learned: bool = False
 
 
 @dataclass
@@ -194,7 +200,8 @@ def compile_template(
             )
             continue
         ko, ki = (t.variables[f.edges[r]].cardinality for r in ("out", "in"))
-        gfe_buckets.setdefault((ko, ki), []).append((fname, goal.name))
+        learned = detail.get("parameter_uncertainty") == "dirichlet"
+        gfe_buckets.setdefault((ko, ki, learned), []).append((fname, goal.name))
         consumed.update((fname, goal.name))
         gfe_x_edges.add(x_var)
     if problems:
@@ -202,8 +209,8 @@ def compile_template(
 
     gfe_groups: list[GfePlan] = []
     log_params: dict[str, np.ndarray] = {}
-    for (ko, ki), pairs in sorted(gfe_buckets.items()):
-        gname = f"gfe:{ko}x{ki}"
+    for (ko, ki, learned), pairs in sorted(gfe_buckets.items()):
+        gname = f"gfe{'L' if learned else ''}:{ko}x{ki}"
         obs_names = tuple(o for o, _ in pairs)
         gfe_groups.append(
             GfePlan(
@@ -213,6 +220,7 @@ def compile_template(
                 gather_z=np.array([opposite[(o, "in")] for o, _ in pairs], dtype=np.int64),
                 scatter_z=np.array([slot_of[(o, "in")] for o, _ in pairs], dtype=np.int64),
                 scatter_x=np.array([slot_of[(o, "out")] for o, _ in pairs], dtype=np.int64),
+                learned=learned,
             )
         )
         la, lc = [], []
@@ -220,12 +228,17 @@ def compile_template(
             a = resolved[next(iter(t.factors[obs_name].param_blobs.values()))]
             c = resolved[t.factors[goal_name].param_blobs["statistic"]]
             _expect(obs_name, a, (ko, ki))
-            _stochastic(obs_name, a)
+            if learned:
+                if not np.all(a > 0):
+                    raise CompileError(f"factor {obs_name!r}: Dirichlet counts must be > 0")
+                la.append(a)  # raw counts α, not probabilities
+            else:
+                _stochastic(obs_name, a)
+                la.append(_log_of(a))
             _expect(goal_name, c, (ko,))
             _stochastic(goal_name, c[:, None])
-            la.append(_log_of(a))
             lc.append(_log_of(c))
-        log_params[f"{gname}:A"] = np.stack(la)
+        log_params[f"{gname}:counts" if learned else f"{gname}:A"] = np.stack(la)
         log_params[f"{gname}:c"] = np.stack(lc)
 
     # Group remaining factors by (type, cardinality signature, mode).

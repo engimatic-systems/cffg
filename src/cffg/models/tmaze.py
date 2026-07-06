@@ -78,6 +78,7 @@ def build_tmaze(
     past: int = 0,
     gfe: bool = True,
     map_policy: bool = False,
+    learned_a: bool = False,
 ) -> tuple[Template, dict[str, np.ndarray]]:
     """Policy-inference CFFG over `steps` timesteps, plus its arrays.
 
@@ -91,6 +92,7 @@ def build_tmaze(
     t.blobs = {
         "d": BlobRef("d", "d.npy"),
         "A": BlobRef("A", "A.npy"),
+        "Ac": BlobRef("Ac", "Ac.npy"),
         "c": BlobRef("c", "c.npy"),
         "e": BlobRef("e", "e.npy"),
         "Bs": BlobRef("Bs", "Bs.npy"),
@@ -117,7 +119,10 @@ def build_tmaze(
             ),
             f"eq{k}": FactorSpec(f"eq{k}", "equality", edges={"a": zm, "b": zo, "c": zt}),
             f"obs{k}": FactorSpec(
-                f"obs{k}", "matrix_cat", edges={"out": x, "in": zo}, param_blobs={"matrix": "A"}
+                f"obs{k}", "matrix_cat", edges={"out": x, "in": zo},
+                # Learned-A planning slices read Dirichlet counts ("Ac");
+                # perception slices and fixed-A models read probabilities ("A").
+                param_blobs={"matrix": "Ac" if (learned_a and k > past) else "A"},
             ),
         }
         if k <= past:  # perception slice: executed control + observed outcome
@@ -131,9 +136,12 @@ def build_tmaze(
                 f"goal{k}", "categorical", edges={"out": x}, param_blobs={"statistic": "c"}
             )
             if gfe:
+                detail = [("substituted_role", "out")]
+                if learned_a:
+                    detail.append(("parameter_uncertainty", "dirichlet"))
                 t.constraints.append(
                     ConstraintSpec(
-                        ConstraintKind.P_SUBSTITUTION, f"obs{k}", (("substituted_role", "out"),)
+                        ConstraintKind.P_SUBSTITUTION, f"obs{k}", tuple(sorted(detail))
                     )
                 )
             if map_policy:
@@ -144,6 +152,7 @@ def build_tmaze(
     arrays = {
         "d": initial_state(),
         "A": observation_matrix(alpha),
+        "Ac": np.ones((N_OBS, N_STATE)),  # placeholder counts; swapped per trial
         "c": goal_statistic(c_util),
         "e": np.full(N_POS, 0.25),
         "Bs": transition_stack(),
