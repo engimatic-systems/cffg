@@ -6,7 +6,7 @@ FDA-cited lower bound. Reference points on this exact scenario: announced
 basal-bolus ~96% (privileged ceiling), basal-only ~34% (floor), a prior
 agent's pymdp attempt 74.7%, current reactive controller ~87.6%.
 
-THE REAL BAR (do not chase until CFFG is done — see ticket cff-t2g3): Ken's
+THE REAL BAR (do not chase until CFFG is done — see ticket cff-t2g3): Cooper's
 own VERSES-era experiments reached 67% TIR on unannounced adults AND
 adolescents with ZERO critical episodes, on 8-virtual-hour episodes. The
 end goal is an insulin pump that does continual learning with a white-box

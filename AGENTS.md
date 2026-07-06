@@ -1,5 +1,7 @@
 # AGENTS.md — Ground Rules for the CFFG Project
 
+This project is a collaboration with a user named Cooper.
+
 This repository implements **Constrained Forney-style Factor Graphs (CFFGs)** and
 **Lagrangian Active Inference (LAIF)** in JAX, following:
 
