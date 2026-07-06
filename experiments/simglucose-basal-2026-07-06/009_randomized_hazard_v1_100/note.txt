@@ -1,0 +1,5 @@
+Experiment 009 randomized 100 trials.
+Approach: broad meal-hazard prior over likely breakfast/lunch windows plus CGM trend feedback and IOB safety. Meals are randomized and not observed by the controller.
+Changed from previous: replaces exact high temp-basal clock windows with lower broad physiological hazard windows.
+Results: 79.91% TIR, 4.56% low, 15.53% high, 3.86% critical time, 617 critical samples.
+Learnings: this is the best randomized TIR/safety tradeoff in this batch; broad meal hazards reduce hypoglycemia versus exact clocking.

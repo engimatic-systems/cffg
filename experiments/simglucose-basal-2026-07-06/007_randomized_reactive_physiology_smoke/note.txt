@@ -1,0 +1,5 @@
+Experiment 007 smoke.
+Approach: randomized meals with reactive physiological controller that infers meal drive from CGM dynamics, no clock meal windows.
+Changed from previous: controller uses CGM velocity/acceleration and IOB state rather than exact meal-time priors.
+Results: 69.84% TIR, 3.28% low, 7.50% critical time on 4 smoke episodes.
+Learnings: pure reaction is too late for resistant adolescents, but it avoids exact meal-time memorization.

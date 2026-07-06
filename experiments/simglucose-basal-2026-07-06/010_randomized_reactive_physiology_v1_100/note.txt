@@ -1,0 +1,5 @@
+Experiment 010 randomized 100 trials.
+Approach: reactive physiological basal-only policy with hidden meal-drive inferred from CGM velocity/acceleration and damped by insulin-on-board. No meal-time clock windows.
+Changed from previous: removes meal clock prior entirely.
+Results: 72.38% TIR, 15.08% low, 12.54% high, 10.87% critical time, 1739 critical samples.
+Learnings: reactive meal-drive inference alone is not safe; it needs a stronger patient-specific safety layer and better insulin-action state estimation.

@@ -1,0 +1,26 @@
+{
+  "preset": "randomized-hazard-safe-v1",
+  "protocol": {
+    "start": "2018-01-01T06:00:00",
+    "hours": 8.0,
+    "meals": [
+      [
+        1.0,
+        45.0
+      ],
+      [
+        5.0,
+        70.0
+      ]
+    ],
+    "seed": 7
+  },
+  "n_traces": 100,
+  "metrics": {
+    "tir": 0.7258125,
+    "time_low": 0.0016875000000000002,
+    "time_high": 0.2725,
+    "critical_time": 0.059125,
+    "critical_samples": 946
+  }
+}

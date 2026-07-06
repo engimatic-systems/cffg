@@ -1,0 +1,5 @@
+Experiment 008 randomized 100 trials.
+Approach: replay personalized-v2 from the fixed-meal experiment under randomized meal times/grams. 100 total episodes, balanced across adults and adolescents.
+Changed from previous: randomized hidden meals, five episodes per virtual patient.
+Results: 80.02% TIR, 9.25% low, 10.72% high, 4.36% critical time, 698 critical samples.
+Learnings: fixed-meal personalization was partly timing-specific; randomization preserves TIR but creates too much hypoglycemia.

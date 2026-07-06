@@ -1,0 +1,5 @@
+Experiment 011 randomized 100 trials.
+Approach: safety-biased broad meal-hazard prior with earlier suspend, lower temp-basal multipliers, and stronger IOB damping. Meals are randomized and unobserved.
+Changed from previous: sacrifices hyperglycemia correction to test the low-hypoglycemia frontier.
+Results: 72.58% TIR, 0.17% low, 27.25% high, 5.91% critical time, 946 critical samples.
+Learnings: this nearly eliminates hypoglycemia but leaves resistant adolescents hyperglycemic; the next step needs patient-specific insulin sensitivity and meal-response state learning, not just global basal tuning.

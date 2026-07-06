@@ -1,0 +1,5 @@
+Experiment 006 smoke.
+Approach: randomized meal timing/grams, 4 trial smoke for personalized-v2.
+Changed from previous: meals vary by trial and are stored per trace.
+Results: 77.81% TIR, 10.78% low, 5.47% critical time on 4 smoke episodes.
+Learnings: randomized meals expose the fixed-clock controller's tendency to over-deliver insulin when meals shift later or smaller.

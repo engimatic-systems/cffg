@@ -55,6 +55,13 @@ class Protocol:
 
 
 @dataclass(frozen=True)
+class TrialSpec:
+    trial: int
+    patient: str
+    protocol: Protocol
+
+
+@dataclass(frozen=True)
 class MealPriorWindow:
     center_min: float
     pre_min: float
@@ -111,6 +118,9 @@ class BasalPolicyConfig:
 @dataclass
 class PatientTrace:
     name: str
+    trial: int | None = None
+    patient: str | None = None
+    meals: tuple[tuple[float, float], ...] = ()
     time_min: list[float] = field(default_factory=list)
     bg: list[float] = field(default_factory=list)
     cgm: list[float] = field(default_factory=list)
@@ -241,23 +251,92 @@ class ClockPriorBasalController:
         return Action(basal=basal, bolus=0.0)
 
 
+class ReactivePhysiologyBasalController:
+    """Basal-only controller with meal-state inference from CGM dynamics.
+
+    The physiological sketch is deliberately small: CGM velocity and
+    acceleration raise a hidden meal-absorption drive; delivered temp basal
+    raises an insulin-on-board state; both decay on separate time scales. The
+    policy acts on predicted glucose and inferred meal drive, not known meal
+    times.
+    """
+
+    def __init__(
+        self,
+        patient_name: str,
+        sample_min: float,
+        config: BasalPolicyConfig = BasalPolicyConfig(),
+    ):
+        self.basal = _patient_basal(patient_name)
+        self.sample_min = float(sample_min)
+        self.config = config
+        self.previous_cgm: float | None = None
+        self.previous_trend = 0.0
+        self.meal_drive = 0.0
+        self.extra_iob = 0.0
+        self.meal_decay = 0.5 ** (self.sample_min / 55.0)
+        self.iob_decay = 0.5 ** (self.sample_min / 100.0)
+
+    def policy(self, cgm: float) -> Action:
+        cfg = self.config
+        trend = 0.0 if self.previous_cgm is None else (cgm - self.previous_cgm) / self.sample_min
+        accel = trend - self.previous_trend
+        self.previous_cgm = cgm
+        self.previous_trend = trend
+
+        self.meal_drive *= self.meal_decay
+        self.extra_iob *= self.iob_decay
+        if cgm > 105.0 and trend > 0.35:
+            self.meal_drive += 10.0 * trend + 14.0 * max(0.0, accel)
+        if cgm > 150.0 and trend > -0.1:
+            self.meal_drive += 0.08 * (cgm - 150.0)
+        self.meal_drive = min(self.meal_drive, 70.0)
+
+        predicted = cgm + cfg.forecast_min * trend
+        if cgm < 100.0 or predicted < 92.0 or (cgm < 125.0 and trend < -0.35):
+            multiplier = 0.0
+        else:
+            multiplier = 1.0
+            multiplier += 0.055 * max(0.0, cgm - 125.0)
+            multiplier += 1.8 * max(0.0, trend)
+            multiplier += 0.33 * self.meal_drive
+            multiplier -= 0.035 * self.extra_iob / max(self.basal, 1e-9)
+            if cgm < 145.0 and trend < 0.0:
+                multiplier = min(multiplier, 0.5)
+            multiplier = _nearest_action(
+                max(0.0, multiplier),
+                (0.0, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 12.0, 18.0, 25.0, 30.0),
+            )
+
+        basal = self.basal * multiplier
+        self.extra_iob += max(0.0, basal - self.basal) * self.sample_min
+        return Action(basal=basal, bolus=0.0)
+
+
 def run_patient(
     patient_name: str,
     *,
     protocol: Protocol = Protocol(),
     config: BasalPolicyConfig = BasalPolicyConfig(),
+    controller: str = "clock",
+    trial: int | None = None,
 ) -> PatientTrace:
     env = _build_env(patient_name, protocol)
     step = env.reset()
-    controller = ClockPriorBasalController(patient_name, env.sample_time, config)
-    trace = PatientTrace(name=patient_name)
+    basal_controller = _build_controller(controller, patient_name, env.sample_time, config)
+    trace = PatientTrace(
+        name=patient_name if trial is None else f"trial{trial:03d}_{patient_name}",
+        trial=trial,
+        patient=patient_name,
+        meals=protocol.meals,
+    )
 
     n_steps = int(protocol.hours * 60 / env.sample_time)
     for _ in range(n_steps):
         cgm = float(step.observation.CGM)
-        action = controller.policy(cgm)
+        action = basal_controller.policy(cgm)
         step = env.step(action)
-        trace.time_min.append(float(controller.elapsed_min))
+        trace.time_min.append((len(trace.time_min) + 1) * float(env.sample_time))
         trace.cgm.append(cgm)
         trace.basal.append(float(action.basal))
         trace.bolus.append(float(action.bolus))
@@ -277,6 +356,67 @@ def run_cohort(
             for name in patients
         )
     )
+
+
+def run_trials(
+    preset: str,
+    *,
+    n_trials: int = 100,
+    seed: int = 20260706,
+    patients: Iterable[str] = COHORT,
+) -> CohortTrace:
+    patient_list = list(patients)
+    config = preset_config(preset)
+    controller = preset_controller(preset)
+    specs = randomized_trial_specs(n_trials, seed=seed, patients=patient_list)
+    return CohortTrace(
+        tuple(
+            run_patient(
+                spec.patient,
+                protocol=spec.protocol,
+                config=_config_for_patient(config, spec.patient),
+                controller=controller,
+                trial=spec.trial,
+            )
+            for spec in specs
+        )
+    )
+
+
+def randomized_trial_specs(
+    n_trials: int,
+    *,
+    seed: int = 20260706,
+    patients: Iterable[str] = COHORT,
+) -> tuple[TrialSpec, ...]:
+    patient_list = list(patients)
+    rng = np.random.default_rng(seed)
+    patient_order = [patient_list[i % len(patient_list)] for i in range(n_trials)]
+    rng.shuffle(patient_order)
+    return tuple(
+        TrialSpec(
+            trial=i,
+            patient=patient,
+            protocol=randomized_protocol(int(rng.integers(0, 2**31 - 1))),
+        )
+        for i, patient in enumerate(patient_order, start=1)
+    )
+
+
+def randomized_protocol(seed: int) -> Protocol:
+    rng = np.random.default_rng(seed)
+
+    breakfast_time = _clipped_normal(rng, mean=1.0, sd=0.45, lo=0.25, hi=2.75)
+    lunch_time = _clipped_normal(rng, mean=6.0, sd=0.7, lo=4.5, hi=7.65)
+    breakfast_g = _clipped_normal(rng, mean=45.0, sd=10.0, lo=20.0, hi=75.0)
+    lunch_g = _clipped_normal(rng, mean=70.0, sd=12.0, lo=35.0, hi=105.0)
+    meals = [(breakfast_time, breakfast_g), (lunch_time, lunch_g)]
+    if rng.random() < 0.30:
+        snack_time = _clipped_normal(rng, mean=3.5, sd=0.35, lo=3.0, hi=4.25)
+        snack_g = _clipped_normal(rng, mean=12.0, sd=5.0, lo=4.0, hi=25.0)
+        meals.append((snack_time, snack_g))
+    meals = sorted((round(t, 3), round(g, 1)) for t, g in meals)
+    return Protocol(meals=tuple(meals), seed=seed)
 
 
 def preset_config(name: str) -> BasalPolicyConfig | dict[str, BasalPolicyConfig]:
@@ -312,7 +452,47 @@ def preset_config(name: str) -> BasalPolicyConfig | dict[str, BasalPolicyConfig]
             }
         )
         return configs
+    if name == "reactive-physiology-v1":
+        return BasalPolicyConfig()
+    if name == "randomized-hazard-v1":
+        return BasalPolicyConfig(
+            windows=(
+                MealPriorWindow(center_min=90.0, pre_min=75.0, post_min=90.0, multiplier=10.0),
+                MealPriorWindow(center_min=360.0, pre_min=90.0, post_min=120.0, multiplier=12.0),
+            ),
+            suspend_cgm=110.0,
+            predicted_low=105.0,
+            falling_cgm=135.0,
+            down_cgm=155.0,
+            meal_multiplier=18.0,
+            basal_multipliers=(0.0, 0.25, 0.5, 1.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 18.0, 25.0),
+            high_gain=0.06,
+            trend_gain=1.7,
+            iob_gain=0.035,
+        )
+    if name == "randomized-hazard-safe-v1":
+        return BasalPolicyConfig(
+            windows=(
+                MealPriorWindow(center_min=90.0, pre_min=75.0, post_min=90.0, multiplier=6.0),
+                MealPriorWindow(center_min=360.0, pre_min=90.0, post_min=120.0, multiplier=8.0),
+            ),
+            suspend_cgm=120.0,
+            predicted_low=115.0,
+            falling_cgm=145.0,
+            down_cgm=165.0,
+            meal_multiplier=14.0,
+            basal_multipliers=(0.0, 0.25, 0.5, 1.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0),
+            high_gain=0.045,
+            trend_gain=1.2,
+            iob_gain=0.05,
+        )
     raise ValueError(f"unknown preset: {name}")
+
+
+def preset_controller(name: str) -> str:
+    if name == "reactive-physiology-v1":
+        return "reactive-physiology"
+    return "clock"
 
 
 def _safer_config() -> BasalPolicyConfig:
@@ -397,6 +577,19 @@ def _config_for_patient(
     return config[patient_name]
 
 
+def _build_controller(
+    controller: str,
+    patient_name: str,
+    sample_min: float,
+    config: BasalPolicyConfig,
+):
+    if controller == "clock":
+        return ClockPriorBasalController(patient_name, sample_min, config)
+    if controller == "reactive-physiology":
+        return ReactivePhysiologyBasalController(patient_name, sample_min, config)
+    raise ValueError(f"unknown controller: {controller}")
+
+
 def write_artifacts(
     result: CohortTrace,
     out_dir: Path,
@@ -421,6 +614,7 @@ def write_artifacts(
                     "meals": protocol.meals,
                     "seed": protocol.seed,
                 },
+                "n_traces": len(result.patients),
                 "metrics": {
                     "tir": result.tir,
                     "time_low": result.time_low,
@@ -436,11 +630,28 @@ def write_artifacts(
 
     with (out_dir / "metrics.csv").open("w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["patient", "tir", "time_low", "time_high", "critical_time", "critical_samples", "min_bg", "max_bg"])
+        writer.writerow(
+            [
+                "name",
+                "trial",
+                "patient",
+                "meals",
+                "tir",
+                "time_low",
+                "time_high",
+                "critical_time",
+                "critical_samples",
+                "min_bg",
+                "max_bg",
+            ]
+        )
         for patient in result.patients:
             writer.writerow(
                 [
                     patient.name,
+                    patient.trial,
+                    patient.patient or patient.name,
+                    json.dumps(patient.meals),
                     patient.tir,
                     patient.time_low,
                     patient.time_high,
@@ -453,7 +664,19 @@ def write_artifacts(
 
     with (out_dir / "traces.csv").open("w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["patient", "time_min", "bg", "cgm", "basal", "bolus", "cumulative_tir"])
+        writer.writerow(
+            [
+                "name",
+                "trial",
+                "patient",
+                "time_min",
+                "bg",
+                "cgm",
+                "basal",
+                "bolus",
+                "cumulative_tir",
+            ]
+        )
         for patient in result.patients:
             in_range = 0
             for i, (time_min, bg, cgm, basal, bolus) in enumerate(
@@ -461,7 +684,19 @@ def write_artifacts(
                 start=1,
             ):
                 in_range += RANGE_LO <= bg <= RANGE_HI
-                writer.writerow([patient.name, time_min, bg, cgm, basal, bolus, in_range / i])
+                writer.writerow(
+                    [
+                        patient.name,
+                        patient.trial,
+                        patient.patient or patient.name,
+                        time_min,
+                        bg,
+                        cgm,
+                        basal,
+                        bolus,
+                        in_range / i,
+                    ]
+                )
 
     for patient in result.patients:
         _plot_patient(patient, plots_dir / f"{patient.name}.png", protocol)
@@ -496,7 +731,7 @@ def _plot_patient(patient: PatientTrace, path: Path, protocol: Protocol) -> None
     axes[2].set_xlabel("episode minute")
 
     for axis in axes:
-        for meal_hour, grams in protocol.meals:
+        for meal_hour, grams in patient.meals or protocol.meals:
             axis.axvline(meal_hour * 60, color="#111111", linewidth=1, alpha=0.35)
             axis.text(meal_hour * 60, axis.get_ylim()[1], f"{grams:g}g", va="top", ha="right", fontsize=8)
         axis.grid(True, alpha=0.2)
@@ -512,6 +747,12 @@ def _fraction(values: list[float], predicate) -> float:
 
 def _nearest_action(value: float, actions: tuple[float, ...]) -> float:
     return min(actions, key=lambda action: abs(action - value))
+
+
+def _clipped_normal(
+    rng: np.random.Generator, *, mean: float, sd: float, lo: float, hi: float
+) -> float:
+    return float(np.clip(rng.normal(mean, sd), lo, hi))
 
 
 def _build_env(patient_name: str, protocol: Protocol) -> T1DSimEnv:
@@ -541,8 +782,13 @@ def main(argv: list[str] | None = None) -> int:
             "clock-prior-safer",
             "personalized-v1",
             "personalized-v2",
+            "reactive-physiology-v1",
+            "randomized-hazard-v1",
+            "randomized-hazard-safe-v1",
         ],
     )
+    parser.add_argument("--trials", type=int, default=0)
+    parser.add_argument("--seed", type=int, default=20260706)
     parser.add_argument(
         "--patients",
         nargs="*",
@@ -553,7 +799,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--note", default="")
     args = parser.parse_args(argv)
     protocol = Protocol()
-    result = run_cohort(args.patients, protocol=protocol, config=preset_config(args.preset))
+    if args.trials:
+        result = run_trials(
+            args.preset,
+            n_trials=args.trials,
+            seed=args.seed,
+            patients=args.patients,
+        )
+    else:
+        result = run_cohort(
+            args.patients,
+            protocol=protocol,
+            config=preset_config(args.preset),
+        )
     print(result.summary())
     if args.out_dir is not None:
         note = args.note or (

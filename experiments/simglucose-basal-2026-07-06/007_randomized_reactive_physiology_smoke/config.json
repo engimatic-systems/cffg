@@ -1,0 +1,26 @@
+{
+  "preset": "reactive-physiology-v1",
+  "protocol": {
+    "start": "2018-01-01T06:00:00",
+    "hours": 8.0,
+    "meals": [
+      [
+        1.0,
+        45.0
+      ],
+      [
+        5.0,
+        70.0
+      ]
+    ],
+    "seed": 7
+  },
+  "n_traces": 4,
+  "metrics": {
+    "tir": 0.6984375,
+    "time_low": 0.0328125,
+    "time_high": 0.26875000000000004,
+    "critical_time": 0.075,
+    "critical_samples": 48
+  }
+}
