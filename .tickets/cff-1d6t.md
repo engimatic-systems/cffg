@@ -1,6 +1,6 @@
 ---
 id: cff-1d6t
-status: open
+status: closed
 deps: [cff-mwjo]
 links: []
 created: 2026-07-05T22:12:32Z
@@ -18,3 +18,7 @@ Three variants: known-A policy inference (Part I Fig.28 posteriors), learning-A 
 **2026-07-05T23:32:49Z**
 
 M4 status: known-A policy inference DONE with golden parity 1.7e-6 vs Julia reference; delta MAP variant DONE; BFE ablation DONE (qualitative). Remaining for epic: learning-A over trials (needs cff-5iuz IS message) and win-rate curves vs Part II Fig.9.
+
+**2026-07-06T00:26:48Z**
+
+M4 COMPLETE: known-A golden parity (1.7e-6 vs Julia), delta MAP variant, BFE ablations (policy + learning), learning-A trials reproducing Fig.9 win ramp. Remaining paper machinery (mu3 IS: cff-iwgl, goal hyperprior: cff-gjjk) tracked under M3 epic at low priority.
