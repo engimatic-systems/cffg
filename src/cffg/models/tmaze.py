@@ -17,16 +17,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from cffg.core.ir import (
-    BlobRef,
-    ConstraintKind,
-    ConstraintSpec,
-    FactorSpec,
-    PortRole,
-    PortSpec,
-    Template,
-    VariableSpec,
-)
+from cffg.core.ir import Template
+from cffg.models.rollout import build_rollout
 
 O, L, R, C = 0, 1, 2, 3  # noqa: E741  (paper's position names)
 N_POS, N_CTX, N_OUT = 4, 2, 4
@@ -82,79 +74,18 @@ def build_tmaze(
 ) -> tuple[Template, dict[str, np.ndarray]]:
     """Policy-inference CFFG over `steps` timesteps, plus its arrays.
 
-    The first `past` slices are perception-style: the control edge becomes a
-    DATA port (`act{k}`, the executed move) and the observation branch is a
-    plain likelihood with a DATA port (`obs{k}`) — no control prior, no goal,
-    no P-substitution. Remaining slices are future/planning-style as before.
-    This is the receding-horizon constraint flip of the agent runtime: as time
-    advances, a slice's beads change from goal to data (same wiring)."""
-    t = Template(name=f"tmaze[{past}|{steps}]")
-    t.blobs = {
-        "d": BlobRef("d", "d.npy"),
-        "A": BlobRef("A", "A.npy"),
-        "Ac": BlobRef("Ac", "Ac.npy"),
-        "c": BlobRef("c", "c.npy"),
-        "e": BlobRef("e", "e.npy"),
-        "Bs": BlobRef("Bs", "Bs.npy"),
-    }
-    t.variables["z0"] = VariableSpec("z0", N_STATE)
-    t.factors["prior"] = FactorSpec(
-        "prior", "categorical", edges={"out": "z0"}, param_blobs={"statistic": "d"}
+    A thin wrapper over the generic rollout template (models/rollout.py) with
+    the T-maze's d/A/c/e/Bs; see build_rollout for the past/future semantics."""
+    return build_rollout(
+        f"tmaze[{past}|{steps}]",
+        steps=steps,
+        past=past,
+        d=initial_state(),
+        A=observation_matrix(alpha),
+        c=goal_statistic(c_util),
+        e=np.full(N_POS, 1.0 / N_POS),
+        Bs=transition_stack(),
+        gfe=gfe,
+        map_policy=map_policy,
+        learned_a=learned_a,
     )
-    prev = "z0"
-    for k in range(1, steps + 1):
-        u, zm, zo, zt, x = f"u{k}", f"zm{k}", f"zo{k}", f"zt{k}", f"x{k}"
-        t.variables |= {
-            u: VariableSpec(u, N_POS),
-            zm: VariableSpec(zm, N_STATE),
-            zo: VariableSpec(zo, N_STATE),
-            zt: VariableSpec(zt, N_STATE),
-            x: VariableSpec(x, N_OBS),
-        }
-        t.factors |= {
-            f"tm{k}": FactorSpec(
-                f"tm{k}", "transition_mixture",
-                edges={"out": zm, "in": prev, "selector": u},
-                param_blobs={"matrices": "Bs"},
-            ),
-            f"eq{k}": FactorSpec(f"eq{k}", "equality", edges={"a": zm, "b": zo, "c": zt}),
-            f"obs{k}": FactorSpec(
-                f"obs{k}", "matrix_cat", edges={"out": x, "in": zo},
-                # Learned-A planning slices read Dirichlet counts ("Ac");
-                # perception slices and fixed-A models read probabilities ("A").
-                param_blobs={"matrix": "Ac" if (learned_a and k > past) else "A"},
-            ),
-        }
-        if k <= past:  # perception slice: executed control + observed outcome
-            t.ports[f"act{k}"] = PortSpec(f"act{k}", u, PortRole.DATA)
-            t.ports[f"obs{k}"] = PortSpec(f"obs{k}", x, PortRole.DATA)
-        else:  # planning slice: control prior + goal-constrained observation
-            t.factors[f"e{k}"] = FactorSpec(
-                f"e{k}", "categorical", edges={"out": u}, param_blobs={"statistic": "e"}
-            )
-            t.factors[f"goal{k}"] = FactorSpec(
-                f"goal{k}", "categorical", edges={"out": x}, param_blobs={"statistic": "c"}
-            )
-            if gfe:
-                detail = [("substituted_role", "out")]
-                if learned_a:
-                    detail.append(("parameter_uncertainty", "dirichlet"))
-                t.constraints.append(
-                    ConstraintSpec(
-                        ConstraintKind.P_SUBSTITUTION, f"obs{k}", tuple(sorted(detail))
-                    )
-                )
-            if map_policy:
-                t.constraints.append(ConstraintSpec(ConstraintKind.DELTA, u))
-        prev = zt
-    t.ports["horizon"] = PortSpec("horizon", prev, PortRole.GLUE)  # open half-edge
-
-    arrays = {
-        "d": initial_state(),
-        "A": observation_matrix(alpha),
-        "Ac": np.ones((N_OBS, N_STATE)),  # placeholder counts; swapped per trial
-        "c": goal_statistic(c_util),
-        "e": np.full(N_POS, 0.25),
-        "Bs": transition_stack(),
-    }
-    return t, arrays

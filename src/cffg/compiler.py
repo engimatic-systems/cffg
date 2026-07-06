@@ -96,6 +96,10 @@ class Arena:
     delta_pairs: np.ndarray = field(
         default_factory=lambda: np.zeros((0, 2), dtype=np.int64)
     )  # [n_delta_edges, 2] slot pairs projected to a pointmass each sweep
+    member_of: dict[str, tuple[str, int]] = field(default_factory=dict)
+    # factor name -> (params key, member index): lets the runtime swap ONE
+    # member's parameters (same-cardinality factors share a stacked group;
+    # a whole-group write would clobber siblings).
 
     @property
     def interior_slot_pairs(self) -> np.ndarray:
@@ -177,6 +181,7 @@ def compile_template(
                     data_slots[port.name] = s1
 
     resolved = _resolve_arrays(t, arrays, root)
+    member_of: dict[str, tuple[str, int]] = {}
 
     # GFE composites: P-substituted obs factor + facing goal factor across x.
     consumed: set[str] = set()
@@ -240,6 +245,9 @@ def compile_template(
             lc.append(_log_of(c))
         log_params[f"{gname}:counts" if learned else f"{gname}:A"] = np.stack(la)
         log_params[f"{gname}:c"] = np.stack(lc)
+        for i, (obs_name, goal_name) in enumerate(pairs):
+            member_of[obs_name] = (f"{gname}:counts" if learned else f"{gname}:A", i)
+            member_of[goal_name] = (f"{gname}:c", i)
 
     # Group remaining factors by (type, cardinality signature, mode).
     buckets: dict[tuple, list[str]] = {}
@@ -266,6 +274,8 @@ def compile_template(
         groups.append(
             GroupPlan(gname, ftype, roles, cards, tuple(members), gather, scatter, mode, both)
         )
+        for i, m in enumerate(members):
+            member_of[m] = (gname, i)
         stacked = _stack_params(t, ftype, cards, members, resolved)
         if stacked is not None:
             log_params[gname] = stacked
@@ -289,6 +299,7 @@ def compile_template(
         gfe_groups=gfe_groups,
         gfe_x_edges=frozenset(gfe_x_edges),
         delta_pairs=delta_pairs,
+        member_of=member_of,
     )
 
 
