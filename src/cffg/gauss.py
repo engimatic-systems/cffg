@@ -191,20 +191,24 @@ def linear_energy(eta_o, lam_o, eta_i, lam_i, a, b, w):
 
 
 def linear_observed_energy(eta_i, lam_i, y, mask, a, b, w):
-    """Observed gaussian_linear: q(x) ∝ N(y*; Ax+b, V)·mu_in(x). The energy is
-    the node's likelihood contribution to −log p(y*); zero when missing."""
+    """Observed gaussian_linear: q(x) ∝ N(y*; Ax+b, V)·mu_in(x); the energy is
+    the node's likelihood contribution to −log p(y*). When the observation is
+    missing (mask 0) only the likelihood part drops: the node belief becomes
+    f(y|x)·mu_in(x), whose energy telescopes to −H[mu_in] (same cancellation
+    as the discrete missing-data rule) — exactly what cancels the interior
+    in-edge's +H in the Bethe ledger, keeping BFE = −log p(bound ys)."""
 
     def one(ei, li, yy, mk, A, bb, W):
         do, di = A.shape
-        lam_q = A.T @ W @ A + li
-        m_q = _solve(lam_q, A.T @ (W @ (yy - bb)) + ei)
+        lam_q = mk * (A.T @ W @ A) + li
+        m_q = _solve(lam_q, mk * (A.T @ (W @ (yy - bb))) + ei)
         sig_q = jnp.linalg.inv(lam_q + _RIDGE * jnp.eye(di, dtype=W.dtype))
         r = yy - A @ m_q - bb
         _, logdet_w = jnp.linalg.slogdet(W)
         e_logf = 0.5 * logdet_w - 0.5 * do * _LOG2PI - 0.5 * (
             r @ W @ r + jnp.trace(W @ (A @ sig_q @ A.T))
         )
-        return mk * (_neg_entropy(lam_q) - e_logf)
+        return _neg_entropy(lam_q) - mk * e_logf
 
     return jax.vmap(one)(eta_i, lam_i, y, mask, a, b, w)
 
