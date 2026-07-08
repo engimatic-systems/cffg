@@ -119,6 +119,36 @@ def test_vmap_batch_equals_sequential():
         )
 
 
+def test_lgssm_renders_at_every_level(viz_gallery):
+    # The viz pipeline is domain-agnostic (it never reads cardinality), so the
+    # Gaussian chain renders today; Gaussian-specific glyphs are cff-bxk4.
+    import xml.etree.ElementTree as ET
+
+    from cffg.viz import render_svg
+
+    t, _ = lgssm(3, F, Q, H, R, M0, P0)
+    for level in (0, 4):
+        svg = render_svg(t, level=level)
+        ET.fromstring(svg)
+        viz_gallery(svg, tag=f"LGSSM T=3, level {level}")
+
+
+def test_lgssm_with_glue_ports_renders(viz_gallery):
+    # A single Kalman slice the way the rollout machinery would see it:
+    # glue in/out plus the emission branch — the composable unit.
+    import xml.etree.ElementTree as ET
+
+    from cffg.core.ir import PortRole, PortSpec
+    from cffg.viz import render_svg
+
+    t, _ = lgssm(2, F, Q, H, R, M0, P0)
+    del t.factors["prior"]
+    t.ports["head"] = PortSpec("head", "x0", PortRole.GLUE)
+    svg = render_svg(t, level=4)
+    ET.fromstring(svg)
+    viz_gallery(svg, tag="Kalman slice with glue port")
+
+
 def test_data_port_elsewhere_rejected():
     import pytest
 
