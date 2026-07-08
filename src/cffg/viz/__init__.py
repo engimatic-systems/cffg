@@ -5,6 +5,7 @@ Pipeline: `Template` -> semantic diagram (`derive`) -> compression passes
 importable on its own so GUIs can stop at the scene graph and hit-test.
 """
 
+from cffg.viz.compress import FULL_COMPRESSION, Presentation, present
 from cffg.viz.diagram import (
     BeadGroup,
     BeadShape,
@@ -17,16 +18,31 @@ from cffg.viz.diagram import (
     WireView,
     derive,
 )
+from cffg.viz.layout import LayoutStyle, layout
+from cffg.viz.scene import Scene
+from cffg.viz.svg import SvgStyle, build_scene, render_svg, save_png, save_svg, to_svg
 
 __all__ = [
     "BeadGroup",
     "BeadShape",
     "CompositeView",
     "Diagram",
+    "FULL_COMPRESSION",
+    "LayoutStyle",
     "NodeEnd",
     "NodeView",
+    "Presentation",
+    "Scene",
+    "SvgStyle",
     "TerminalEnd",
     "TerminalKind",
     "WireView",
+    "build_scene",
     "derive",
+    "layout",
+    "present",
+    "render_svg",
+    "save_png",
+    "save_svg",
+    "to_svg",
 ]

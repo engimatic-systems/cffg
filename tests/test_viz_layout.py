@@ -55,9 +55,9 @@ class TestHmmSlice:
     def test_terminal_sides_match_paper_convention(self, hmm_slice):
         scene = scene_of(hmm_slice)
         boxes = scene.boxes()
-        pm = {t.label: t for t in terminals(scene, TerminalKind.POINTMASS)}
-        assert pm["B"].y < boxes["factor:trans"].y  # left taken by glue -> up
-        assert pm["A"].x < boxes["factor:obs"].x  # obs branch: A to the left
+        pm = {t.ref: t for t in terminals(scene, TerminalKind.POINTMASS)}
+        assert pm["blob:B"].y < boxes["factor:trans"].y  # left taken by glue -> up
+        assert pm["blob:A"].x < boxes["factor:obs"].x  # obs branch: A to the left
         (sense,) = terminals(scene, TerminalKind.DATA)
         assert sense.y > boxes["factor:obs"].y  # clamp continues downward
 

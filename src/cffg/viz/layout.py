@@ -280,19 +280,34 @@ def _emit(
     domes: list[Dome] = []
     for name, node in diagram.nodes.items():
         cx, cy = centers[name]
-        boxes.append(Box(f"factor:{name}", cx, cy, box, box, node.glyph, name))
         directive = presentation.nodes[name]
         b, i, d = _node_marginals(name, node, directive, anchors, (cx, cy), style)
         beads += b
         internal += i
         domes += d
+        glyph_at = _glyph_pos(directive, (cx, cy), box)
+        boxes.append(
+            Box(f"factor:{name}", cx, cy, box, box, node.glyph, name, glyph_at)
+        )
 
     composites = [
         _composite_box(c, centers, box, style) for c in diagram.composites
     ]
 
-    items = [*composites, *wires, *internal, *boxes, *domes, *beads, *terminals, *ellipses]
+    # Boxes fill white, so anything drawn inside them must come later.
+    items = [*composites, *wires, *boxes, *internal, *domes, *beads, *terminals, *ellipses]
     return _framed(diagram.name, items, style)
+
+
+def _glyph_pos(directive, center, box) -> tuple[float, float] | None:
+    """Vacate the box center when beads/domes occupy it (Fig 14's top-left
+    labels): internal beads -> top-left; a border dome -> nudged up."""
+    cx, cy = center
+    if not any(len(g.roles) > 1 for g in directive.groups):
+        return None  # single-role beads hug the borders; the center is free
+    if directive.placement is Placement.INTERNAL:
+        return (cx - box * 0.22, cy - box * 0.26)  # joint bead sits center
+    return (cx, cy - box * 0.2)  # dome bulges down; lift the glyph
 
 
 def _anchor_points(diagram, sides, centers, grid, box, pitch):
@@ -356,7 +371,10 @@ def _wire_geometry(wire, anchors, centers, sides, style, pitch):
             angle = 0.0 if side in ("left", "right") else 90.0
             ellipsis = EllipsisMark(ref, tx, ty, angle)
         else:
-            terminal = Terminal(ref, tx, ty, term.kind, term.label)
+            # Pointmass parameters are labeled on their wire (like any edge);
+            # port terminals keep their name as a caption.
+            label = "" if term.kind is TerminalKind.POINTMASS else term.label
+            terminal = Terminal(ref, tx, ty, term.kind, label)
     return tuple(pts), terminal, ellipsis
 
 
@@ -385,8 +403,17 @@ def _midpoint(pts) -> tuple[float, float]:
 
 
 def _label_pos(pts, style) -> tuple[float, float]:
-    mx, my = _midpoint(pts)
-    return mx + 5.0, my - 7.0
+    """Above a horizontal run, right of a vertical one (the papers' habit)."""
+    best, best_len = pts[:2], -1.0
+    for p, q in zip(pts, pts[1:]):
+        seg = abs(p[0] - q[0]) + abs(p[1] - q[1])
+        if seg > best_len:
+            best, best_len = (p, q), seg
+    (x1, y1), (x2, y2) = best
+    mx, my = (x1 + x2) / 2, (y1 + y2) / 2
+    if abs(x2 - x1) >= abs(y2 - y1):
+        return mx + 2.0, my - 7.0
+    return mx + 8.0, my + 4.0
 
 
 def _node_marginals(name, node, directive, anchors, center, style):
@@ -485,5 +512,12 @@ def _shift(item, dx: float, dy: float):
             anchors=tuple((x + dx, y + dy) for x, y in item.anchors),
             cx=item.cx + dx,
             cy=item.cy + dy,
+        )
+    if isinstance(item, Box) and item.glyph_at is not None:
+        return replace(
+            item,
+            x=item.x + dx,
+            y=item.y + dy,
+            glyph_at=(item.glyph_at[0] + dx, item.glyph_at[1] + dy),
         )
     return replace(item, x=item.x + dx, y=item.y + dy)

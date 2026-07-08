@@ -197,6 +197,35 @@ FLOPs/bytes per MP sweep. Estimator = analytic memory + cost-analysis FLOPs +
 a small calibration run (fit sweep-time curve on 3–4 model sizes per backend).
 Cheap to build once the compiler exists; don't build it before.
 
+## Diagram rendering (`cffg.viz`)
+
+Templates render in the papers' own visual algebra (Part I §5) through a
+four-stage pipeline, each stage importable on its own:
+
+1. **`diagram.derive`** — semantic model: the default variational spec made
+   explicit (joint bead per node, normalisation bead per internal edge), then
+   perturbed by constraints/ports/blobs exactly as the notation prescribes
+   (mean-field splits, P-substitution squares, δ symbols, pointmass
+   terminals, glue-port ellipses, GFE composite boxes mirroring the
+   compiler's detection).
+2. **`compress.present`** — Part I p.19's four compression passes as
+   *presentation directives* (level 0 = Fig 14, level 4 = Fig 19); passes
+   change what is drawn, never what the diagram means. A node with a
+   pointmass edge keeps its beads at every level (the f_d case).
+3. **`layout.layout`** — deterministic rectilinear grid: glue-anchored rail
+   left→right (time), selector branches above, obs/goal stacks below,
+   terminals on the first free side. Placement is a pure function of names
+   and topology, so edits move only the rows/columns they touch — the
+   stability property a template editor needs.
+4. **`scene` / `svg`** — the layout emits a typed scene graph whose
+   primitives carry template refs (`factor:`/`var:`/`port:`/`blob:`/`gfe:`)
+   for GUI hit-testing; `svg.to_svg` serialises it dependency-free. PNG goes
+   through the optional `viz` extra (cairosvg). Golden SVGs pin the pipeline
+   for the canonical models.
+
+Message-schedule overlays (Figs 23/24/27 arrows) are deferred (cff-jude);
+the scene graph anchors overlays to wires by ref when that lands.
+
 ## Dependency policy (JAX ecosystem)
 
 Adopt (well-established, matched to our actual needs):

@@ -28,6 +28,8 @@ class Box:
     h: float
     glyph: str
     name: str
+    glyph_at: tuple[float, float] | None = None  # None: centered; set when
+    # beads/domes occupy the center (papers put the label top-left, Fig 14)
 
 
 @dataclass(frozen=True)

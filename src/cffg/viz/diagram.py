@@ -168,7 +168,7 @@ def derive(template: Template) -> Diagram:
             wid = f"blob:{f.name}.{role}"
             diagram.wires[wid] = WireView(
                 id=wid,
-                label="",
+                label=blob,  # the parameter's name labels its wire (Fig 22's d, A, c)
                 ends=(
                     NodeEnd(f.name, role),
                     TerminalEnd(TerminalKind.POINTMASS, label=blob, ref=f"blob:{blob}"),
