@@ -1,6 +1,6 @@
 ---
 id: cff-fcg2
-status: open
+status: in_progress
 deps: [cff-2wse]
 links: []
 created: 2026-07-08T02:57:59Z
