@@ -281,8 +281,6 @@ def _detect_composites(
         goal = facing[0]
         if goal.type == "categorical" and "statistic" in goal.param_blobs:
             composites.append(
-                CompositeView(
-                    name=f"gfe:{fname}", members=(fname, goal.name), x_variable=x_var
-                )
+                CompositeView(name=fname, members=(fname, goal.name), x_variable=x_var)
             )
     return composites
