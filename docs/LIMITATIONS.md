@@ -78,18 +78,33 @@ constraints the modeler adds.
 
 ## Soft limitations
 
-**S1. Message-rule coverage (the big one).** At completion we have: BP/VMP for
-Cat/Dirichlet/equality/δ/transition-mixture, and GFE messages for the discrete
-goal-observation composite. Everything else is a derivation ticket:
-- *Gaussian/linear-Gaussian GFE messages* — genuinely open research: Koudahl 2021
-  showed EFE in linear-Gaussian systems yields no purposeful exploration, so the
-  continuous epistemic story is unresolved, not merely underived.
-- *Nonlinear continuous factors* — need EP/moment-matching or sampling messages
-  with controlled FE accounting.
-- *Chance constraints, mixture/hierarchical continuous nodes* — flagged as future
-  work by the papers themselves.
+**S1. Message-rule coverage (the big one).** We have: BP/VMP for
+Cat/Dirichlet/equality/δ/transition-mixture, GFE messages for the discrete
+goal-observation composite, and BP for the linear-Gaussian family (gaussian,
+gaussian_linear, Gaussian equality — cff-4e5z: Kalman-smoother parity, exact
+continuous tree identity BFE = −log p(y)). Everything else is a derivation
+ticket under the roadmap epic cff-ahps:
+- *Gaussian VMP + conjugate learning (NIW/Gamma)* — cff-7c5o.
+- *Hybrid discrete–continuous (switching KF, mixture collapse)* — cff-pksr;
+  the first place exact FE meets a necessary approximation (mixture entropy).
+- *Nonlinear continuous factors* — cff-o7hs: EP/moment-matching or sigma-point
+  messages with controlled FE accounting.
+- *Gaussian/continuous GFE messages* — genuinely open research (cff-dfpi):
+  Koudahl 2021 showed EFE in linear-Gaussian systems yields no purposeful
+  exploration, so the continuous epistemic story is unresolved, not merely
+  underived.
 The registry architecture exists precisely so each of these lands as an isolated
 contribution.
+
+**S1b. Gaussian numerics.** Rules never invert incoming precisions (improper/
+vacuous messages propagate exactly), but potentially singular solves are ridged
+with 1e-10·I so transiently underdetermined systems stay finite mid-flooding;
+at a proper fixed point the ridge perturbs results at ~1e-10 relative — visible
+only under extreme covariance scaling (condition numbers ≳ 1e8). Continuous
+δ-clamps are rejected by design: a Gaussian observation is *conditioned into*
+its likelihood node (a huge-precision clamp would diverge the differential-
+entropy ledger). Free energies on models with improper beliefs (e.g. unbonded
+Gaussian glue ports) come out ±inf — deliberate loudness, not a bug.
 
 **S2. Importance-sampling noise in parameter messages.** The message to A is a
 non-conjugate log-message evaluated by importance sampling; variance grows with
