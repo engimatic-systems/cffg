@@ -4,6 +4,10 @@ Runs the suite (junitxml), groups tests by M-epic, diffs against the previous
 run's snapshot (NEW badges), and renders a self-contained dark/light HTML page
 served by the agent-share file browser (port 8080 over Tailscale).
 
+Tests that render diagrams record SVGs into tests/.artifacts/ (gitignored)
+via the `viz_gallery` fixture; those rows become twirl-down galleries here,
+with images copied to ~/agent-share/cffg-viz/ so the page works remotely.
+
 Run after any test-affecting commit:  uv run python tools/dashboard.py
 When a new test file appears, add it to EPIC_FILES.
 """
@@ -13,6 +17,7 @@ from __future__ import annotations
 import datetime
 import html
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -23,6 +28,8 @@ REPO = Path(__file__).resolve().parents[1]
 SHARE = Path.home() / "agent-share"
 OUT = SHARE / "cffg-tests.html"
 STATE = SHARE / ".cffg-dashboard-state.json"
+ARTIFACTS = REPO / "tests" / ".artifacts"
+GALLERY = SHARE / "cffg-viz"
 
 EPIC_FILES = {
     "M0 · Foundations": ["test_hygiene.py"],
@@ -53,7 +60,10 @@ def run_suite() -> list[dict]:
     )
     tests = []
     for case in ET.parse(xml_path).getroot().iter("testcase"):
-        file = (case.get("classname") or "").split(".")[-1] + ".py"
+        # classname is dotted and may end in a test class (tests.test_x.TestY);
+        # the module is the last segment that looks like a test file.
+        parts = [p for p in (case.get("classname") or "").split(".") if p.startswith("test_")]
+        file = (parts[-1] if parts else "?") + ".py"
         failure = case.find("failure") is not None or case.find("error") is not None
         tests.append(
             {
@@ -66,6 +76,23 @@ def run_suite() -> list[dict]:
             }
         )
     return tests
+
+
+def collect_gallery() -> dict[str, list[dict]]:
+    """Copy test-recorded SVGs into the share and map test id -> images."""
+    shutil.rmtree(GALLERY, ignore_errors=True)
+    gallery: dict[str, list[dict]] = {}
+    for sidecar in sorted(ARTIFACTS.glob("*.json")) if ARTIFACTS.is_dir() else []:
+        svg = sidecar.with_suffix(".svg")
+        if not svg.exists():
+            continue
+        meta = json.loads(sidecar.read_text())
+        GALLERY.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(svg, GALLERY / svg.name)
+        gallery.setdefault(meta["id"], []).append(
+            {"file": svg.name, "tag": meta.get("tag", "")}
+        )
+    return gallery
 
 
 def git_head() -> str:
@@ -101,7 +128,43 @@ def trend_svg(history: list[dict]) -> str:
     )
 
 
-def render(tests: list[dict], new_ids: set[str], history: list[dict], commit: str) -> str:
+def test_row(t: dict, new_ids: set[str], gallery: dict[str, list[dict]]) -> str:
+    inner = (
+        (
+            '<span class="st ok">✓</span>'
+            if t["ok"]
+            else '<span class="st bad">✗ FAIL</span>'
+        )
+        + f'<span class="tn">{html.escape(t["name"])}</span>'
+        + ('<span class="new">NEW</span>' if t["id"] in new_ids else "")
+    )
+    images = gallery.get(t["id"], [])
+    if not images:
+        return f'<div class="row">{inner}<span class="ms">{t["ms"]:g} ms</span></div>'
+    shots = "".join(
+        f'<figure><a href="cffg-viz/{html.escape(img["file"])}" target="_blank">'
+        f'<img src="cffg-viz/{html.escape(img["file"])}" loading="lazy" '
+        f'alt="{html.escape(img["tag"] or t["name"])}"></a>'
+        + (f'<figcaption>{html.escape(img["tag"])}</figcaption>' if img["tag"] else "")
+        + "</figure>"
+        for img in images
+    )
+    return (
+        '<details class="viz"><summary class="row">'
+        + inner
+        + f'<span class="shots-n">◫ {len(images)}</span>'
+        + f'<span class="ms">{t["ms"]:g} ms</span></summary>'
+        + f'<div class="shots">{shots}</div></details>'
+    )
+
+
+def render(
+    tests: list[dict],
+    new_ids: set[str],
+    history: list[dict],
+    commit: str,
+    gallery: dict[str, list[dict]],
+) -> str:
     when = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     failed = [t for t in tests if not t["ok"]]
     by_epic: dict[str, list[dict]] = {}
@@ -128,15 +191,7 @@ def render(tests: list[dict], new_ids: set[str], history: list[dict], commit: st
         n_new = sum(1 for t in ts if t["id"] in new_ids)
         bar_pct = 100.0 * len(ts) / max_count
         rows = "".join(
-            '<div class="row">'
-            + (
-                '<span class="st ok">✓</span>'
-                if t["ok"]
-                else '<span class="st bad">✗ FAIL</span>'
-            )
-            + f'<span class="tn">{html.escape(t["name"])}</span>'
-            + (f'<span class="new">NEW</span>' if t["id"] in new_ids else "")
-            + f'<span class="ms">{t["ms"]:g} ms</span></div>'
+            test_row(t, new_ids, gallery)
             for t in sorted(ts, key=lambda t: (t["file"], t["name"]))
         )
         newtxt = f' · <span class="accent">+{n_new} new</span>' if n_new else ""
@@ -187,6 +242,17 @@ h2 {{ font-size:15px; margin-bottom:8px; }}
 .ms {{ color:var(--mut); font-variant-numeric:tabular-nums; white-space:nowrap; }}
 .new {{ color:var(--chip); border:1px solid var(--chip); border-radius:4px;
   font-size:10px; font-weight:700; padding:0 4px; }}
+details.viz {{ border-left:3px solid rgba(42,120,214,.5); border-radius:4px;
+  background:rgba(42,120,214,.07); margin:2px 0; }}
+details.viz > summary {{ list-style:none; cursor:pointer; padding:3px 6px; }}
+details.viz > summary::-webkit-details-marker {{ display:none; }}
+.shots-n {{ color:var(--chip); font-size:11px; white-space:nowrap; }}
+details.viz[open] .shots-n {{ opacity:.5; }}
+.shots {{ padding:4px 6px 8px; display:grid; gap:8px; }}
+.shots figure {{ margin:0; }}
+.shots img {{ display:block; width:100%; background:#fff; border-radius:6px;
+  border:1px solid rgba(0,0,0,.15); }}
+.shots figcaption {{ color:var(--ink2); font-size:11px; margin-top:2px; }}
 svg {{ width:100%; height:80px; display:block; }}
 footer {{ color:var(--mut); font-size:12px; margin:18px 0 8px; }}
 </style></head><body>
@@ -223,11 +289,16 @@ def main() -> None:
         }
     )
     state["history"] = state["history"][-120:]
-    OUT.write_text(render(tests, new_ids, state["history"], commit))
+    gallery = collect_gallery()
+    OUT.write_text(render(tests, new_ids, state["history"], commit, gallery))
     state["previous_ids"] = sorted(t["id"] for t in tests)
     STATE.write_text(json.dumps(state))
     failed = sum(1 for t in tests if not t["ok"])
-    print(f"{OUT}: {len(tests)} tests, {failed} failing, {len(new_ids)} new")
+    n_shots = sum(len(v) for v in gallery.values())
+    print(
+        f"{OUT}: {len(tests)} tests, {failed} failing, {len(new_ids)} new, "
+        f"{n_shots} diagrams in {len(gallery)} galleries"
+    )
 
 
 if __name__ == "__main__":
