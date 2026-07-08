@@ -76,7 +76,7 @@ def test_compose_prior_onto_chain(hmm_slice):
 
 
 def test_bond_cardinality_mismatch_rejected(hmm_slice):
-    with pytest.raises(ComposeError, match="cardinality"):
+    with pytest.raises(ComposeError, match="domain"):
         compose(make_state_prior(cardinality=K + 1), hmm_slice, {"attach": "head"}, name="bad")
 
 

@@ -208,6 +208,8 @@ def _spec_to_dict(spec) -> dict:
     from cffg.core.ir import ConstraintSpec, PortSpec, VariableSpec as VS
 
     if isinstance(spec, VS):
+        if spec.dim:
+            return {"name": spec.name, "dim": spec.dim}
         return {"name": spec.name, "cardinality": spec.cardinality}
     if isinstance(spec, FactorSpec):
         return {
@@ -244,7 +246,7 @@ def action_from_dict(d: dict) -> EditAction:
     if cls is None:
         raise EditError(f"unknown edit action {d.get('action')!r}")
     if cls is AddVariable:
-        return cls(VS(d["spec"]["name"], d["spec"]["cardinality"]))
+        return cls(VS(d["spec"]["name"], d["spec"].get("cardinality", 0), d["spec"].get("dim", 0)))
     if cls in (AddFactor, ReplaceFactor):
         s = d["spec"]
         return cls(

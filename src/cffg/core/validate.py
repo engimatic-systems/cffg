@@ -65,14 +65,25 @@ def _check_factors(t: Template) -> list[str]:
             if blob not in t.blobs:
                 problems.append(f"factor {f.name!r}: role {role!r} references unknown blob {blob!r}")
         if ft.symmetric_domain:
-            cards = {
-                t.variables[v].cardinality
+            domains = {
+                t.variables[v].domain_key
                 for v in f.edges.values()
                 if v in t.variables
             }
-            if len(cards) > 1:
+            if len(domains) > 1:
                 problems.append(
-                    f"factor {f.name!r}: type {f.type!r} requires one shared cardinality, got {sorted(cards)}"
+                    f"factor {f.name!r}: type {f.type!r} requires one shared domain, got {sorted(domains)}"
+                )
+        if ft.family in ("discrete", "gaussian"):
+            wrong = {
+                v: t.variables[v].family
+                for v in f.edges.values()
+                if v in t.variables and t.variables[v].family != ft.family
+            }
+            if wrong:
+                problems.append(
+                    f"factor {f.name!r}: type {f.type!r} needs {ft.family} edges, got "
+                    + ", ".join(f"{v!r} ({fam})" for v, fam in sorted(wrong.items()))
                 )
     return problems
 
