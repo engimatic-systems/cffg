@@ -36,13 +36,19 @@ from cffg.core.ir import (
     Template,
 )
 
-# Conventional glyphs used by the papers' figures (Part I Figs 22/26).
+# Conventional glyphs used by the papers' figures (Part I Figs 22/26) and the
+# wider FFG community (Loeliger 2007: 𝒩 for normal factors). Box glyphs are
+# capped at 3 characters so labels never overflow the box (test_viz_diagram
+# enforces this for every registered factor type — add an entry here when you
+# register a type; the fallback truncates, it does not save you).
 GLYPHS = {
     "categorical": "Cat",
     "matrix_cat": "T",
     "transition_mixture": "TM",
     "equality": "=",
     "dirichlet": "Dir",
+    "gaussian": "𝒩",
+    "gaussian_linear": "𝒩A",
 }
 
 
@@ -218,7 +224,7 @@ def _node_view(
     return NodeView(
         factor=f.name,
         type=f.type,
-        glyph=GLYPHS.get(f.type, f.type),
+        glyph=GLYPHS.get(f.type, f.type[:3]),  # 3-char cap; tooltip has the name
         groups=tuple(groups),
         pointmass_roles=pointmass,
         default_factorisation=not mean_field and psub is None and not pointmass,
