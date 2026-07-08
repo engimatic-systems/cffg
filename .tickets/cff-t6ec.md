@@ -1,6 +1,6 @@
 ---
 id: cff-t6ec
-status: in_progress
+status: closed
 deps: [cff-dmfi, cff-fcg2]
 links: []
 created: 2026-07-08T02:57:59Z

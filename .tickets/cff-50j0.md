@@ -1,6 +1,6 @@
 ---
 id: cff-50j0
-status: open
+status: closed
 deps: [cff-t6ec]
 links: []
 created: 2026-07-08T02:57:59Z

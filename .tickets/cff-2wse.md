@@ -1,6 +1,6 @@
 ---
 id: cff-2wse
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-07-08T02:57:59Z

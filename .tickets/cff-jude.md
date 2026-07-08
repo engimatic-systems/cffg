@@ -13,3 +13,9 @@ parent: cff-ql2n
 
 Backlog: arrows along wires from an engine schedule, GFE messages in red. Scene graph already anchors overlays to wires by source IDs.
 
+
+## Notes
+
+**2026-07-08T03:26:08Z**
+
+Unblocked: scene/svg landed. Overlay = arrows along Path items keyed by wire ref, red for GFE messages; needs schedule->wire mapping from engine.

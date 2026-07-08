@@ -1,6 +1,6 @@
 ---
 id: cff-dmfi
-status: in_progress
+status: closed
 deps: [cff-2wse]
 links: []
 created: 2026-07-08T02:57:59Z
