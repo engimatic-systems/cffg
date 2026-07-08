@@ -224,6 +224,14 @@ VMP_ENERGIES = {
 _N_NEWTON = 25
 
 
+def _safe_log(x):
+    """log clamped at the dtype's smallest normal. A literal 1e-300 floor is
+    a silent no-op under float32 (it underflows to 0), and log(0) = −inf
+    turns 0·inf into NaN one matmul later — the engine only ever ran f64 in
+    tests, so this bit consumers on JAX's default f32 first (cff-i45j)."""
+    return jnp.log(jnp.maximum(x, jnp.finfo(jnp.result_type(x)).tiny))
+
+
 def _fixed_stats(logA):
     """(Ā, h) for a known matrix: Ā = A, h = column entropies."""
     a = jnp.exp(logA)
@@ -255,7 +263,7 @@ def _gfe_solve(abar, h, logc, log_d):
 
     def rho(zbar):
         qx = abar @ zbar
-        return abar.T @ (logc - jnp.log(jnp.maximum(qx, 1e-300))) - h
+        return abar.T @ (logc - _safe_log(qx)) - h
 
     def center(v):
         return v - v.mean()
@@ -263,10 +271,27 @@ def _gfe_solve(abar, h, logc, log_d):
     def resid(v):
         return center(v) - center(rho(jax.nn.softmax(v)) + log_d)
 
+    # Newton with backtracking: the full step can overshoot and limit-cycle
+    # on large simplexes (observed at a few hundred states, cff-i45j), so
+    # each iteration tries fractional steps and keeps the best residual —
+    # near the fixed point the full step wins and quadratic convergence is
+    # untouched (the small-model goldens pin this).
+    _TS = jnp.array([1.0, 0.5, 0.25, 0.125, 0.03125])
+
     def newton(_, v):
+        r = resid(v)
         j = jax.jacfwd(resid)(v)
         k = v.shape[0]
-        return v - jnp.linalg.solve(j + 1e-9 * jnp.eye(k, dtype=v.dtype), resid(v))
+        # The centered residual is gauge-invariant along 1, so j always has a
+        # zero eigenvalue there; the ridge must sit above the dtype's
+        # roundoff (a fixed 1e-9 is *below* f32 eps — numerically singular,
+        # solve returns inf). Re-centering the step kills any gauge drift.
+        ridge = jnp.sqrt(jnp.finfo(v.dtype).eps)
+        full = jnp.linalg.solve(j + ridge * jnp.eye(k, dtype=v.dtype), r)
+        full = full - full.mean()
+        cands = v[None, :] - _TS[:, None].astype(v.dtype) * full[None, :]
+        norms = jax.vmap(lambda vv: jnp.sum(resid(vv) ** 2))(cands)
+        return cands[jnp.argmin(norms)]
 
     v = jax.lax.fori_loop(0, _N_NEWTON, newton, center(log_d))
     return jax.nn.softmax(v)
@@ -274,7 +299,7 @@ def _gfe_solve(abar, h, logc, log_d):
 
 def _gfe_rho(abar, h, logc, zbar):
     qx = abar @ zbar
-    return abar.T @ (logc - jnp.log(jnp.maximum(qx, 1e-300))) - h
+    return abar.T @ (logc - _safe_log(qx)) - h
 
 
 def _stats(a_param, learned):
@@ -299,7 +324,7 @@ def gfe_update(log_d, a_param, logc, k_max, learned=False):
         return _gfe_rho(abar, h, lc, zbar), abar @ zbar
 
     mu2, qx = jax.vmap(one)(a_param, logc, log_d)
-    log_qx = jnp.log(jnp.maximum(qx, 1e-300))
+    log_qx = _safe_log(qx)
     return _norm_pad(mu2, ki, k_max), _norm_pad(log_qx, ko, k_max)
 
 
@@ -310,7 +335,7 @@ def gfe_energy(log_d, a_param, logc, learned=False):
         abar, h = _stats(a_p, learned)
         zbar = _gfe_solve(abar, h, lc, ld)
         rho = _gfe_rho(abar, h, lc, zbar)
-        lz = jnp.log(jnp.maximum(zbar, 1e-300))
+        lz = _safe_log(zbar)
         return -(zbar * rho).sum(-1) + (zbar * lz).sum(-1)
 
     return jax.vmap(one)(a_param, logc, log_d)

@@ -235,3 +235,22 @@ def test_sparse_support_messages_stay_bounded_at_scale():
     assert np.abs(finite).max() < 1e4, f"message magnitude {np.abs(finite).max():.3g}"
     np.testing.assert_allclose(engine.marginals(state)["z"][3], 1.0, atol=1e-9)
     np.testing.assert_allclose(engine.marginals(state)["x"], a[:, 3], atol=1e-6)
+
+
+def test_float32_composite_stays_finite():
+    """Consumers on JAX's default f32 (the test suite forces x64) used to NaN:
+    a 1e-300 log-floor underflows to 0 in f32, log(0) = -inf, and 0*inf = NaN
+    inside rho one matmul later. The floor must track the dtype."""
+    import jax
+
+    d = np.array([0.7, 0.3])
+    with jax.enable_x64(False):
+        engine = Engine(
+            compile_template(
+                make_model(A_EPI, UNIF, d), arrays={"A": A_EPI, "c": UNIF, "d": d}
+            )
+        )
+        state, _ = engine.run(engine.init_state(), 10)
+        assert bool(np.isfinite(np.asarray(state.messages)).all())
+        z_ref, _ = brute_force_zstar(A_EPI, UNIF, d)
+        np.testing.assert_allclose(engine.marginals(state)["z"], z_ref, atol=1e-4)
