@@ -8,11 +8,54 @@ type: bug
 priority: 1
 assignee: coopwilliams
 ---
-# RockSample pathology: GFE agent checks the least-informative rock forever
+# GFE planner diverges to NaN on large sparse-support models; run() reports the garbage as converged
 
-Diagnosed 2026-07-08 from experiments/cffg-rl-0 artifacts (episodes=8, horizon=4, 3x3, 3 rocks): the GFE agent spends ALL 10 steps on check_2 — the FARTHEST rock (distance 4 from start, sensor accuracy ~0.568, barely above coin-flip) — never moves, never samples, return -1.0. The BFE ablation never checks: south-south-sample blind (62% success = p_good luck). Neither balances epistemic and pragmatic value; and picking the LEAST informative check suggests something worse than over-exploration — candidate: the near-uninformative check maximally PRESERVES the epistemic term for future slices (a curiosity trap: the composite scores expected info gain per slice, and a slow-resolving sensor keeps that term alive every tick), or the policy posterior is near-flat and MAP tie-breaking lands on it (cff-cj5h's diagnostic would tell us). CANDIDATE CAUSES to discriminate, in order: (1) no termination/absorbing-state modeling — env ends on sample but the model plans past it, so cashing in is never urgent (receding-horizon procrastination; the papers' hard-horizon caveat); (2) epistemic term does not saturate along a planned path — T-maze works because the cue resolves in ONE perfect observation; noisy repeated checks are outside the papers' validated regime; (3) under-convergence: 4 P-substituted composites + damp 0.5 + 220 sweeps may limit-cycle (check FE trace + message deltas); (4) MAP tie-breaking on a flat posterior. EXPERIMENTS: hand-score per-action GFE from the start belief (which term prefers check_2?); log policy posteriors per tick; horizon sweep 2..6; utility_scale sweep; add an absorbing 'done' mode to the model and re-run. NOTE: this is a PLANNING-side weakness — RockSample's parameters are exactly known, so the learning tickets (cff-cd1i etc.) will not fix it. DELEGATION: the scoring/diagnosis experiments are Fable-level; Sonnet can run parameter sweeps once the diagnostic script exists.
+Found 2026-07-08 stress-testing a receding-horizon GFE agent on a 576-state
+POMDP (mostly-deterministic transitions, a distance-decaying noisy sensor,
+horizon 4, damp 0.5). Symptom: the agent repeats one low-information sensing
+action every tick, never acting pragmatically. The T-maze/gridworld tiers
+never see this regime (small state spaces, a perfect cue).
+
+DIAGNOSIS (top-level analysis of a sub-agent's instrumented runs):
+
+1. ROOT CAUSE — GFE message overflow on sparse supports. The planner's
+   messages saturate at the ±1e30 clamp and go NaN by sweep ~6. Mechanism:
+   `gfe_update` computes mu2 = log(zbar) − log_d, and with deterministic
+   transitions log_d contains exact NEG (−1e30) zeros, so mu2 hits +1e30 at
+   impossible states; `_norm_pad`'s logsumexp is then dominated by the junk
+   and destroys the whole message. The BFE ablation (gfe=False) converges
+   cleanly in 55 sweeps — the composite is the sole source.
+2. MASKING BUG — Engine.run's tol-break accepts non-finite deltas: the
+   delta trace goes 5e29, 2.5e29, −inf and the −inf "passes" tol, returning
+   a sweep-4 transient as if converged (220 and 1000 sweeps byte-identical).
+   The read-off posterior is a near-flat transient (top 0.171 vs uniform
+   0.111; two symmetric actions get different mass — a non-convergence
+   fingerprint) and argmax picks noise.
+3. TO RE-TEST AFTER THE FIX — epistemic-term audit: in the pre-NaN transient
+   the composite pushed mass toward the LOWEST-MI sensing action (exact MI
+   0.009 nats vs 0.069 for the better sensors — an inversion). If that
+   ranking persists once messages are finite and converged, the P-sub term
+   is mis-weighting ambiguity retention as value; that becomes its own
+   derivation bug. Also secondary: with weak goal utilities the
+   move-then-act plan cannot compete inside the horizon (utility-scale
+   sweep flipped the argmax to movement) — a modeling-recipe note, plus the
+   absorbing-mode/termination question for episodic tasks.
+
+FIX PLAN: (a) engine.run: never treat a non-finite delta as convergence;
+surface divergence loudly. (b) gfe_update: mask mu2 to NEG where log_d has
+no support BEFORE normalization (value there is irrelevant downstream —
+the receiving product re-zeroes it — but it must not poison logsumexp).
+(c) minimal repro test: a GFE composite fed a log_d with exact zeros
+currently NaNs; must converge finite after. (d) re-run the epistemic-term
+audit on the fixed engine and update this ticket with the verdict.
+
+DELEGATION: fixes (a)-(c) and the term audit are Fable-level (FE/message
+semantics); parameter sweeps for the audit can go to a Sonnet sub-agent
+once the engine is fixed.
 
 ## Acceptance Criteria
 
-Root cause identified with a written ticket comment + minimal reproducing test in the cffg repo; either a fix (engine/model-pattern) or a documented modeling recipe (absorbing modes, check budgets) that gets GFE RockSample to check-then-sample behavior beating the BFE ablation.
-
+Non-finite deltas never satisfy tol (test); GFE messages stay finite on
+sparse-support models (repro test converges); epistemic-term audit re-run
+on the fixed engine with a written verdict in this ticket — either the MI
+inversion disappears (close) or it becomes a derivation ticket (link it).
