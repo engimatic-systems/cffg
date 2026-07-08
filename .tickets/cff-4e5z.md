@@ -1,6 +1,6 @@
 ---
 id: cff-4e5z
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-07-08T16:49:01Z
@@ -21,3 +21,13 @@ Messages in information form (eta, Lambda): products are additive, vacuous/impro
 
 Kalman smoother parity (means, covs) at 1e-8; bfe == -log p(y) on the LGSSM tree; serialization round-trip with Gaussian variables; discrete tests all green; docs (ARCHITECTURE, LIMITATIONS S1, todo-note) updated in the landing commits.
 
+
+## Notes
+
+**2026-07-08T17:17:17Z**
+
+LANDED (session 2026-07-08, branch gaussian, commits e1ebf10..8213c92). All acceptance criteria met: RTS smoother parity at 1e-8 (means+covs, T=5 n=2 m=1), BFE == -log p(y) on the LGSSM tree including missing observations, serialization round-trip, vmap/colony contract test, discrete suite untouched (167 green).
+
+DERIVATION SUMMARY (full math in cffg/gauss.py docstring): information-form messages (eta, Lambda); forward/backward through N(out; A@in+b, V) derived so only PD 'noise+incoming' systems are inverted -> vacuous/improper messages propagate exactly. Gaussian DATA ports compile to CONDITIONING (obs value + missing-mask as runtime inputs), never precision clamps -- continuous delta has -inf differential entropy and would diverge the ledger. Missing-data node energy = -H[mu_in] (mirrors discrete cancellation); found and fixed via the missing-obs tree-identity test.
+
+GOTCHAS for successors: (1) two solves are ridged 1e-10*I -- fine to 1e-8 tolerances, revisit for extreme covariance scales (LIMITATIONS S1b); (2) observed-edge marginal is the CAVITY predictive (excludes own likelihood), not the posterior predictive -- useful for innovation monitoring, don't 'fix' it; (3) member_of deliberately excludes gaussian members -- per-member param update scheme is cff-7c5o's call; (4) viz does not render gaussian templates yet (cff-bxk4).
