@@ -45,6 +45,9 @@ class EdgeInfo:
     slot0: int  # side-0 message: into the edge from its first endpoint
     slot1: int  # side-1 message: second endpoint, or the external side
     interior: bool  # both sides are factors (degree 2)
+    dim: int = 0  # Gaussian dimension; 0 = discrete. Gaussian slots index the
+    # (eta, Lambda) arena, discrete slots the log-probability arena — the two
+    # numberings are independent (cff-4e5z).
 
 
 @dataclass(frozen=True)
@@ -60,6 +63,26 @@ class GroupPlan:
     scatter: np.ndarray  # [n_members, n_roles] slot to write (own side)
     mode: str = "bp"  # "bp" (sum-product) | "vmp" (mean-field bead)
     gather_both: np.ndarray | None = None  # [M, R, 2] both slots (vmp: marginals)
+
+
+@dataclass(frozen=True)
+class GaussGroupPlan:
+    """All Gaussian-family factors of one (type, dim-signature), run together.
+
+    Types: "gaussian" (prior), "gaussian_linear", "gaussian_linear_obs" (a
+    gaussian_linear whose out edge is a DATA port — compiled to *conditioning*
+    on the runtime observation, never a huge-precision clamp, so the
+    differential-entropy ledger stays finite; see cffg.gauss), and "equality"
+    (family-polymorphic, routed here when its edges are Gaussian)."""
+
+    name: str
+    type: str
+    roles: tuple[str, ...]
+    dims: tuple[int, ...]  # dimension per role
+    members: tuple[str, ...]
+    gather: np.ndarray  # [M, R] gaussian slot to read (opposite side)
+    scatter: np.ndarray  # [M, R] gaussian slot to write (own side)
+    obs_rows: np.ndarray | None = None  # [M] rows into the g_obs array
 
 
 @dataclass(frozen=True)
@@ -91,6 +114,17 @@ class Arena:
     groups: list[GroupPlan]
     data_slots: dict[str, int]  # DATA port name -> external slot
     log_params: dict[str, np.ndarray] = field(default_factory=dict)  # group -> [M, ...]
+    # Gaussian arena (cff-4e5z): messages are (eta [n_gslots, d_max],
+    # Lambda [n_gslots, d_max, d_max]) information-form pairs, zero-padded
+    # past each edge's dim; vacuous = zeros, so init and half-edges are free.
+    d_max: int = 1
+    n_gslots: int = 0
+    gauss_groups: list[GaussGroupPlan] = field(default_factory=list)
+    gauss_data: dict[str, tuple[int, int]] = field(default_factory=dict)
+    # Gaussian DATA port -> (row in g_obs, dim of the observed edge)
+    n_obs_rows: int = 0
+    gauss_interior: list[tuple[int, np.ndarray]] = field(default_factory=list)
+    # [(dim, [E, 2] slot pairs)] interior Gaussian edges for the entropy ledger
     gfe_groups: list[GfePlan] = field(default_factory=list)
     gfe_x_edges: frozenset[str] = frozenset()  # entropy absorbed into composite term
     delta_pairs: np.ndarray = field(
@@ -107,7 +141,7 @@ class Arena:
             [
                 [e.slot0, e.slot1]
                 for e in self.edges.values()
-                if e.interior and e.name not in self.gfe_x_edges
+                if e.interior and not e.dim and e.name not in self.gfe_x_edges
             ],
             dtype=np.int64,
         ).reshape(-1, 2)
@@ -144,6 +178,16 @@ def compile_template(
                 f"factor {f.name!r}: mean-field bead on an equality node is ill-defined "
                 "(geometric expectation of a hard constraint)"
             )
+        if f.name in mean_field and FACTOR_TYPES[f.type].family == "gaussian":
+            problems.append(
+                f"factor {f.name!r}: mean-field bead on a Gaussian node is Gaussian VMP "
+                "(ticket cff-7c5o)"
+            )
+        if f.name in psub and FACTOR_TYPES[f.type].family == "gaussian":
+            problems.append(
+                f"factor {f.name!r}: P-substitution on Gaussian nodes is open research "
+                "(ticket cff-dfpi)"
+            )
     for p in t.ports.values():
         if p.role in (PortRole.PRIOR, PortRole.GOAL):
             problems.append(
@@ -163,21 +207,40 @@ def compile_template(
     slot_of: dict[tuple[str, str], int] = {}  # (factor, role) -> its own slot
     opposite: dict[tuple[str, str], int] = {}  # (factor, role) -> slot it reads
     data_slots: dict[str, int] = {}
+    gauss_data_ports: dict[str, str] = {}  # variable -> DATA port name (gaussian)
     next_slot = 0
+    next_gslot = 0
     for vname in sorted(t.variables):
         ends = endpoints[vname]
-        card = t.variables[vname].cardinality
-        s0, s1 = next_slot, next_slot + 1
-        next_slot += 2
-        edges[vname] = EdgeInfo(vname, card, s0, s1, interior=len(ends) == 2)
+        v = t.variables[vname]
+        if v.dim:  # gaussian slots have their own numbering (own arena)
+            s0, s1 = next_gslot, next_gslot + 1
+            next_gslot += 2
+        else:
+            s0, s1 = next_slot, next_slot + 1
+            next_slot += 2
+        edges[vname] = EdgeInfo(vname, v.cardinality, s0, s1, len(ends) == 2, v.dim)
         slot_of[ends[0]] = s0
         if len(ends) == 2:
             slot_of[ends[1]] = s1
             opposite[ends[0]], opposite[ends[1]] = s1, s0
-        else:  # dangling: outer side s1 is external (clamp or uniform)
+        else:  # dangling: outer side s1 is external (clamp or uniform/vacuous)
             opposite[ends[0]] = s1
             for port in t.ports_of(vname):
-                if port.role is PortRole.DATA:
+                if port.role is not PortRole.DATA:
+                    continue
+                if v.dim:
+                    # Gaussian observations compile to conditioning: legal only
+                    # where a conditioned rule exists (gaussian_linear "out").
+                    fname, role = ends[0]
+                    if t.factors[fname].type == "gaussian_linear" and role == "out":
+                        gauss_data_ports[vname] = port.name
+                    else:
+                        problems.append(
+                            f"port {port.name!r}: Gaussian DATA ports must clamp a "
+                            f"gaussian_linear 'out' edge, not {fname!r}/{role!r}"
+                        )
+                else:
                     data_slots[port.name] = s1
 
     resolved = _resolve_arrays(t, arrays, root)
@@ -249,16 +312,55 @@ def compile_template(
             member_of[obs_name] = (f"{gname}:counts" if learned else f"{gname}:A", i)
             member_of[goal_name] = (f"{gname}:c", i)
 
-    # Group remaining factors by (type, cardinality signature, mode).
+    # Group remaining factors by (type, cardinality signature, mode); the
+    # Gaussian family (and equality nodes on Gaussian edges) go to their own
+    # arena's buckets, keyed by (type, dim signature, observed?).
     buckets: dict[tuple, list[str]] = {}
+    gauss_buckets: dict[tuple, list[str]] = {}
     for fname in sorted(t.factors):
         if fname in consumed:
             continue
         f = t.factors[fname]
-        roles = FACTOR_TYPES[f.type].edge_roles
+        ft = FACTOR_TYPES[f.type]
+        roles = ft.edge_roles
+        gaussian = ft.family == "gaussian" or (
+            ft.family == "any" and t.variables[f.edges[roles[0]]].dim > 0
+        )
+        if gaussian:
+            dims = tuple(t.variables[f.edges[r]].dim for r in roles)
+            observed = f.type == "gaussian_linear" and f.edges["out"] in gauss_data_ports
+            gtype = "gaussian_linear_obs" if observed else f.type
+            gauss_buckets.setdefault((gtype, dims), []).append(fname)
+            continue
         cards = tuple(t.variables[f.edges[r]].cardinality for r in roles)
         mode = "vmp" if fname in mean_field else "bp"
         buckets.setdefault((f.type, cards, mode), []).append(fname)
+
+    gauss_groups: list[GaussGroupPlan] = []
+    gauss_data: dict[str, int] = {}
+    n_obs_rows = 0
+    for (gtype, dims), members in sorted(gauss_buckets.items()):
+        base = "gaussian_linear" if gtype == "gaussian_linear_obs" else gtype
+        roles = FACTOR_TYPES[base].edge_roles
+        gname = f"gauss:{gtype}:{'x'.join(map(str, dims))}"
+        gather = np.array([[opposite[(m, r)] for r in roles] for m in members], dtype=np.int64)
+        scatter = np.array([[slot_of[(m, r)] for r in roles] for m in members], dtype=np.int64)
+        obs_rows = None
+        if gtype == "gaussian_linear_obs":
+            rows = []
+            for m in members:
+                port = gauss_data_ports[t.factors[m].edges["out"]]
+                gauss_data[port] = (n_obs_rows, dims[0])
+                rows.append(n_obs_rows)
+                n_obs_rows += 1
+            obs_rows = np.array(rows, dtype=np.int64)
+        gauss_groups.append(
+            GaussGroupPlan(gname, gtype, roles, dims, tuple(members), gather, scatter, obs_rows)
+        )
+        for key, arr in _stack_gauss_params(t, base, dims, members, resolved).items():
+            log_params[f"{gname}:{key}"] = arr
+        # member_of stays discrete-only: per-member Gaussian parameter updates
+        # are the learning ticket's call (cff-7c5o).
 
     groups: list[GroupPlan] = []
     for (ftype, cards, mode), members in sorted(buckets.items()):
@@ -283,11 +385,28 @@ def compile_template(
     delta_edges = sorted(
         c.target for c in t.constraints if c.kind is ConstraintKind.DELTA
     )
+    for v in delta_edges:
+        if edges[v].dim:
+            raise CompileError(
+                f"delta constraint on Gaussian edge {v!r}: the MAP of a Gaussian "
+                "marginal is its mean — read gaussian_marginals instead (hybrid "
+                "pointmass forms: cff-pksr)"
+            )
     delta_pairs = np.array(
         [[edges[v].slot0, edges[v].slot1] for v in delta_edges], dtype=np.int64
     ).reshape(-1, 2)
 
-    k_max = max(e.card for e in edges.values())
+    # Interior Gaussian edges, grouped by dim, for the Bethe entropy ledger.
+    by_dim: dict[int, list[list[int]]] = {}
+    for e in edges.values():
+        if e.dim and e.interior:
+            by_dim.setdefault(e.dim, []).append([e.slot0, e.slot1])
+    gauss_interior = [
+        (d, np.array(pairs, dtype=np.int64)) for d, pairs in sorted(by_dim.items())
+    ]
+
+    k_max = max((e.card for e in edges.values() if not e.dim), default=1)
+    d_max = max((e.dim for e in edges.values() if e.dim), default=1)
     return Arena(
         template_name=t.name,
         k_max=k_max,
@@ -296,6 +415,12 @@ def compile_template(
         groups=groups,
         data_slots=data_slots,
         log_params=log_params,
+        d_max=d_max,
+        n_gslots=next_gslot,
+        gauss_groups=gauss_groups,
+        gauss_data=gauss_data,
+        n_obs_rows=n_obs_rows,
+        gauss_interior=gauss_interior,
         gfe_groups=gfe_groups,
         gfe_x_edges=frozenset(gfe_x_edges),
         delta_pairs=delta_pairs,
@@ -371,6 +496,45 @@ def _stack_params(
         else:
             raise CompileError(f"factor {m!r}: no BP rule for type {ftype!r} in M2")
     return np.stack(stacked)
+
+
+def _stack_gauss_params(
+    t: Template,
+    ftype: str,
+    dims: tuple[int, ...],
+    members: list[str],
+    resolved: dict[str, np.ndarray],
+) -> dict[str, np.ndarray]:
+    """Per-member Gaussian parameters, stacked [M, ...]. Covariances are
+    validated SPD and stored as precisions W = V⁻¹ (the form every rule
+    consumes); the compile-time Cholesky is also the SPD check."""
+    if ftype == "equality":
+        return {}
+    out: dict[str, list[np.ndarray]] = {}
+    for m in members:
+        f = t.factors[m]
+        blobs = {role: resolved[f.param_blobs[role]] for role in sorted(f.param_blobs)}
+        cov = blobs["cov"]
+        if ftype == "gaussian":
+            (d,) = dims
+            _expect(m, blobs["mean"], (d,))
+            _expect(m, cov, (d, d))
+            out.setdefault("m", []).append(blobs["mean"])
+        else:  # gaussian_linear
+            do, di = dims
+            _expect(m, blobs["matrix"], (do, di))
+            _expect(m, blobs["offset"], (do,))
+            _expect(m, cov, (do, do))
+            out.setdefault("A", []).append(blobs["matrix"])
+            out.setdefault("b", []).append(blobs["offset"])
+        if not np.allclose(cov, cov.T, atol=1e-12):
+            raise CompileError(f"factor {m!r}: covariance not symmetric")
+        try:
+            np.linalg.cholesky(cov)
+        except np.linalg.LinAlgError:
+            raise CompileError(f"factor {m!r}: covariance not positive definite") from None
+        out.setdefault("W", []).append(np.linalg.inv(cov))
+    return {k: np.stack(v) for k, v in out.items()}
 
 
 def _log_of(arr: np.ndarray) -> np.ndarray:

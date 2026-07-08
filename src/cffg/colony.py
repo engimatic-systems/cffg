@@ -19,7 +19,7 @@ import numpy as np
 from cffg.compiler import compile_template
 from cffg.core.ir import Template
 from cffg.core.serialize import structure_hash
-from cffg.engine import Engine, State
+from cffg.engine import Engine, State, _replace
 
 
 @dataclass
@@ -49,8 +49,8 @@ class Colony:
         else:
             # Same structure, this instance's own parameters.
             arena = compile_template(template, arrays=arrays)
-            state = State(
-                messages=self.engines[key].init_state().messages,
+            state = _replace(
+                self.engines[key].init_state(),
                 params={k: jnp.asarray(v) for k, v in arena.log_params.items()},
             )
         if observations:
@@ -81,14 +81,20 @@ class Colony:
                 self.instances[iids[0]].state = st
                 continue
             batched = jax.tree_util.tree_map(lambda *xs: jnp.stack(xs), *states)
-            step_v = eqx.filter_vmap(lambda m, p: engine._step(m, p, damp, True))
-            msgs, params = batched.messages, batched.params
+
+            def one(st: State) -> State:
+                msgs, g_eta, g_lam = engine._step(
+                    st.messages, st.g_eta, st.g_lam, st.g_obs, st.g_mask,
+                    st.params, damp, True,
+                )
+                return _replace(st, messages=msgs, g_eta=g_eta, g_lam=g_lam)
+
+            step_v = eqx.filter_vmap(one)
             for _ in range(n_iters):
-                msgs = step_v(msgs, params)
+                batched = step_v(batched)
             for b, iid in enumerate(iids):
-                self.instances[iid].state = State(
-                    messages=msgs[b],
-                    params=jax.tree_util.tree_map(lambda x: x[b], params),
+                self.instances[iid].state = jax.tree_util.tree_map(
+                    lambda x: x[b], batched
                 )
 
     def marginals(self, iid: int) -> dict[str, np.ndarray]:
