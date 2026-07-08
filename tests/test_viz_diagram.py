@@ -103,7 +103,8 @@ class TestRollout:
         assert d.wires["var:u1"].bead == "delta"  # Fig 29's MAP readout
         assert d.wires["var:zt1"].bead == ""
 
-    def test_perception_slice_ports(self):
+    def test_perception_slice_ports(self, viz_gallery):
+        viz_gallery(rollout(steps=2, past=1), tag="past slice: act/obs clamps")
         d = derive(rollout(steps=2, past=1))
         for wire_id in ("var:u1", "var:x1"):
             (term,) = [
@@ -122,12 +123,13 @@ class TestRollout:
 
 
 class TestEdgeCases:
-    def test_mean_field_splits_joint_bead(self, hmm_slice):
+    def test_mean_field_splits_joint_bead(self, hmm_slice, viz_gallery):
         hmm_slice.constraints.append(
             ConstraintSpec(ConstraintKind.MEAN_FIELD, "eq")
         )
         d = derive(hmm_slice)
         assert [g.roles for g in d.nodes["eq"].groups] == [("a",), ("b",), ("c",)]
+        viz_gallery(hmm_slice, level=0, tag="mean-field eq, uncompressed")
 
     def test_disconnected_variable_rejected(self):
         t = Template(name="bad", variables={"loose": VariableSpec("loose", 2)})

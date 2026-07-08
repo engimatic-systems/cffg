@@ -28,9 +28,11 @@ def tmaze():
     return build_tmaze()[0]
 
 
-def test_svg_is_well_formed_at_every_level(tmaze):
+def test_svg_is_well_formed_at_every_level(tmaze, viz_gallery):
     for level in range(5):
-        ET.fromstring(render_svg(tmaze, level=level))
+        svg = render_svg(tmaze, level=level)
+        ET.fromstring(svg)
+        viz_gallery(svg, tag=f"level {level}")  # the p.19 compression story
 
 
 def test_notation_inventory(tmaze):
@@ -61,13 +63,22 @@ def test_render_is_deterministic(tmaze):
     assert render_svg(tmaze) == render_svg(tmaze)
 
 
+def test_gridworld_renders(viz_gallery):
+    from cffg.models.gridworld import build_gridworld
+
+    svg = render_svg(build_gridworld()[0], level=4)
+    ET.fromstring(svg)
+    viz_gallery(svg, tag="gridworld, compressed")
+
+
 @pytest.mark.parametrize(
     "name,level",
     [("hmm_slice", 0), ("hmm_slice", 4), ("tmaze", 4)],
 )
-def test_golden(name, level, hmm_slice, tmaze):
+def test_golden(name, level, hmm_slice, tmaze, viz_gallery):
     template = {"hmm_slice": hmm_slice, "tmaze": tmaze}[name]
     svg = render_svg(template, level=level)
+    viz_gallery(svg, tag=f"{name}, level {level}")
     path = GOLDEN / f"{name}_l{level}.svg"
     if os.environ.get("CFFG_UPDATE_GOLDENS"):
         path.parent.mkdir(exist_ok=True)

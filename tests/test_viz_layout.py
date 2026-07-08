@@ -93,8 +93,10 @@ class TestRollout:
         (mark,) = [i for i in scene.items if isinstance(i, EllipsisMark)]
         assert mark.x > max(b.x for b in scene.boxes().values()) - 1
 
-    def test_delta_bead_sits_on_control_wire(self):
-        scene = scene_of(rollout_template(map_policy=True))
+    def test_delta_bead_sits_on_control_wire(self, viz_gallery):
+        template = rollout_template(map_policy=True)
+        viz_gallery(template, tag="MAP policy: Fig 29's ∂ beads")
+        scene = scene_of(template)
         deltas = [
             i for i in scene.items if isinstance(i, Bead) and i.symbol == "delta"
         ]
@@ -107,7 +109,9 @@ class TestRollout:
 
 
 class TestStability:
-    def test_growing_the_rollout_moves_nothing(self):
+    def test_growing_the_rollout_moves_nothing(self, viz_gallery):
+        viz_gallery(rollout_template(2), tag="2 steps")
+        viz_gallery(rollout_template(3), tag="3 steps: nothing moved")
         small, big = scene_of(rollout_template(2)), scene_of(rollout_template(3))
         sb, bb = small.boxes(), big.boxes()
         assert set(sb) < set(bb)
