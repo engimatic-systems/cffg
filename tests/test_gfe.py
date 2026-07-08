@@ -167,3 +167,71 @@ def test_learned_composite_novelty_direction():
     state, _ = engine.run(engine.init_state(), 8, tol=1e-14)
     q = engine.marginals(state)["z"]
     assert q[1] > 0.55, f"no parameter-novelty pull toward the unexplored state: {q}"
+
+
+# --- sparse support (cff-i45j) -----------------------------------------------
+
+
+def test_sparse_support_prior_stays_finite():
+    """A prior with an exact zero (deterministic transitions upstream produce
+    these) used to poison the composite: mu2 = log(zbar) − log_d hits +1e30
+    at the impossible state and its logsumexp normalization destroys the
+    whole message, cascading to NaN on larger models. The impossible state
+    must simply stay impossible, everything finite."""
+    d = np.array([1.0, 0.0])
+    engine = Engine(
+        compile_template(make_model(A_EPI, UNIF, d), arrays={"A": A_EPI, "c": UNIF, "d": d})
+    )
+    state, _ = engine.run(engine.init_state(), 10)
+    assert bool(np.isfinite(state.messages).all()), "messages went non-finite"
+    q = engine.marginals(state)
+    np.testing.assert_allclose(q["z"], [1.0, 0.0], atol=1e-9)  # z pinned by d
+    np.testing.assert_allclose(q["x"], A_EPI[:, 0], atol=1e-6)  # predictive = A col 0
+    assert np.isfinite(engine.bfe(state))
+
+
+def test_run_ignores_nonfinite_deltas():
+    """A diverging model must never satisfy tol: non-finite deltas (inf/nan)
+    don't count as convergence — run exhausts its budget instead of returning
+    a transient as if converged."""
+    import jax.numpy as jnp
+
+    from cffg.engine import _replace
+
+    engine, state = solve(A_EPI, UNIF, UNIF)
+    poisoned = _replace(state, messages=state.messages.at[0, 0].set(jnp.inf))
+    _, deltas = engine.run(poisoned, 5, tol=1e-6)
+    assert len(deltas) == 5, f"stopped early on non-finite delta: {deltas}"
+
+
+def test_sparse_support_messages_stay_bounded_at_scale():
+    """K=40 with an exact-zero prior support: pre-fix, mu2 hit +1e30 at the
+    impossible states (finite − NEG), and those entries leak probability into
+    any downstream update whose log-factor is not also NEG. The rho-form
+    message is bounded by the model's own log-scales."""
+    rng = np.random.default_rng(0)
+    k, m = 40, 8
+    a = rng.dirichlet(np.full(m, 0.3), size=k).T
+    d = np.zeros(k)
+    d[3] = 1.0
+    c = np.full(m, 1 / m)
+    t = Template(
+        "big",
+        variables={"z": VariableSpec("z", k), "x": VariableSpec("x", m)},
+        factors={
+            "prior": FactorSpec("prior", "categorical", edges={"out": "z"}, param_blobs={"statistic": "d"}),
+            "obs": FactorSpec("obs", "matrix_cat", edges={"out": "x", "in": "z"}, param_blobs={"matrix": "A"}),
+            "goal": FactorSpec("goal", "categorical", edges={"out": "x"}, param_blobs={"statistic": "c"}),
+        },
+        blobs={n: BlobRef(n, n) for n in ("d", "A", "c")},
+    )
+    t.constraints.append(
+        ConstraintSpec(ConstraintKind.P_SUBSTITUTION, "obs", (("substituted_role", "out"),))
+    )
+    engine = Engine(compile_template(t, arrays={"A": a, "c": c, "d": d}))
+    state, _ = engine.run(engine.init_state(), 10)
+    msgs = np.asarray(state.messages)
+    finite = msgs[msgs > -1e29]  # NEG padding/zeros are legitimate
+    assert np.abs(finite).max() < 1e4, f"message magnitude {np.abs(finite).max():.3g}"
+    np.testing.assert_allclose(engine.marginals(state)["z"][3], 1.0, atol=1e-9)
+    np.testing.assert_allclose(engine.marginals(state)["x"], a[:, 3], atol=1e-6)

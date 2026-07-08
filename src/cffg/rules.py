@@ -245,7 +245,13 @@ def _dirichlet_stats(counts):
 
 
 def _gfe_solve(abar, h, logc, log_d):
-    """Single composite: z* in the simplex. abar [Mo,K], h [K], logc [Mo]."""
+    """Single composite: z* in the simplex. abar [Mo,K], h [K], logc [Mo].
+
+    log_d is clamped at −1e3 before the solve: exp(−1000) underflows to an
+    exact 0 in f64, so the fixed point is unchanged, but Newton's residual
+    and Jacobian stay O(1e3) instead of O(1e30) when the incoming message
+    carries exact log-zeros (sparse supports, cff-i45j)."""
+    log_d = jnp.maximum(log_d, -1e3)
 
     def rho(zbar):
         qx = abar @ zbar
@@ -277,16 +283,22 @@ def _stats(a_param, learned):
 
 def gfe_update(log_d, a_param, logc, k_max, learned=False):
     """Batched over members. log_d [M,K] normalized; a_param is logA (fixed)
-    or Dirichlet counts α (learned); returns (μ2, log q_x) padded to k_max."""
+    or Dirichlet counts α (learned); returns (μ2, log q_x) padded to k_max.
+
+    μ2 is computed in the ρ form: the fixed point gives log z̄ = ρ(z̄) +
+    log d − log Z, so μ2 = log z̄ − log d = ρ(z̄) − log Z, and _norm_pad
+    absorbs the constant — identical to the subtraction form wherever
+    d > 0, but bounded on zero-support states, where log z̄ − log d is a
+    (−∞) − (−∞) that used to surface as ±1e30 junk and leak probability
+    into downstream updates (cff-i45j)."""
     ko, ki = a_param.shape[1], a_param.shape[2]
 
     def one(a_p, lc, ld):
         abar, h = _stats(a_p, learned)
         zbar = _gfe_solve(abar, h, lc, ld)
-        return zbar, abar @ zbar
+        return _gfe_rho(abar, h, lc, zbar), abar @ zbar
 
-    zbar, qx = jax.vmap(one)(a_param, logc, log_d)
-    mu2 = jnp.log(zbar) - log_d
+    mu2, qx = jax.vmap(one)(a_param, logc, log_d)
     log_qx = jnp.log(jnp.maximum(qx, 1e-300))
     return _norm_pad(mu2, ki, k_max), _norm_pad(log_qx, ko, k_max)
 
