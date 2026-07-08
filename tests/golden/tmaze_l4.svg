@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="676" height="412" viewBox="0 0 676 412" font-family="STIXGeneral, 'STIX Two Math', 'Cambria Math', 'Times New Roman', serif">
+<title>tmaze[0|2]</title>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<g stroke="#1a1a1a" stroke-width="1.3" fill="none" stroke-linecap="round">
+<rect x="307.0" y="217.0" width="62.0" height="146.0" rx="4" stroke-dasharray="5 4"/>
+<rect x="507.0" y="217.0" width="62.0" height="146.0" rx="4" stroke-dasharray="5 4"/>
+<path d="M156.0,164.0 L220.0,164.0"/><text x="190.0" y="157.0" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">z<tspan font-size="9.1" dy="2.9">0</tspan></text>
+<path d="M238.0,146.0 L238.0,98.0"/><text x="246.0" y="126.0" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">u<tspan font-size="9.1" dy="2.9">1</tspan></text>
+<path d="M256.0,164.0 L320.0,164.0"/><text x="290.0" y="157.0" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">zm<tspan font-size="9.1" dy="2.9">1</tspan></text>
+<path d="M338.0,182.0 L338.0,230.0"/><text x="346.0" y="210.0" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">zo<tspan font-size="9.1" dy="2.9">1</tspan></text>
+<path d="M356.0,164.0 L420.0,164.0"/><text x="390.0" y="157.0" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">zt<tspan font-size="9.1" dy="2.9">1</tspan></text>
+<path d="M338.0,266.0 L338.0,314.0"/><text x="346.0" y="294.0" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">x<tspan font-size="9.1" dy="2.9">1</tspan></text>
+<path d="M438.0,146.0 L438.0,98.0"/><text x="446.0" y="126.0" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">u<tspan font-size="9.1" dy="2.9">2</tspan></text>
+<path d="M456.0,164.0 L520.0,164.0"/><text x="490.0" y="157.0" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">zm<tspan font-size="9.1" dy="2.9">2</tspan></text>
+<path d="M538.0,182.0 L538.0,230.0"/><text x="546.0" y="210.0" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">zo<tspan font-size="9.1" dy="2.9">2</tspan></text>
+<path d="M556.0,164.0 L608.0,164.0"/><text x="584.0" y="157.0" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">zt<tspan font-size="9.1" dy="2.9">2</tspan></text>
+<path d="M538.0,266.0 L538.0,314.0"/><text x="546.0" y="294.0" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">x<tspan font-size="9.1" dy="2.9">2</tspan></text>
+<path d="M120.0,164.0 L68.0,164.0"/><text x="96.0" y="157.0" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">d</text>
+<path d="M238.0,182.0 L238.0,225.7"/><text x="246.0" y="207.8" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">Bs</text>
+<path d="M320.0,248.0 L268.0,248.0"/><text x="296.0" y="241.0" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">A</text>
+<path d="M220.0,80.0 L168.0,80.0"/><text x="196.0" y="73.0" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">e</text>
+<path d="M320.0,332.0 L268.0,332.0"/><text x="296.0" y="325.0" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">c</text>
+<path d="M438.0,182.0 L438.0,225.7"/><text x="446.0" y="207.8" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">Bs</text>
+<path d="M520.0,248.0 L468.0,248.0"/><text x="496.0" y="241.0" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">A</text>
+<path d="M420.0,80.0 L368.0,80.0"/><text x="396.0" y="73.0" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">e</text>
+<path d="M520.0,332.0 L468.0,332.0"/><text x="496.0" y="325.0" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">c</text>
+<g><title>prior</title><rect x="120.0" y="146.0" width="36.0" height="36.0" fill="#ffffff"/><text x="138.0" y="164.0" font-size="15.0" font-style="italic" stroke="none" fill="#1a1a1a" text-anchor="middle" dominant-baseline="central">Cat</text></g>
+<g><title>tm1</title><rect x="220.0" y="146.0" width="36.0" height="36.0" fill="#ffffff"/><text x="238.0" y="156.8" font-size="12.8" font-style="italic" stroke="none" fill="#1a1a1a" text-anchor="middle" dominant-baseline="central">TM</text></g>
+<g><title>eq1</title><rect x="320.0" y="146.0" width="36.0" height="36.0" fill="#ffffff"/><text x="338.0" y="164.0" font-size="15.0" stroke="none" fill="#1a1a1a" text-anchor="middle" dominant-baseline="central">=</text></g>
+<g><title>obs1</title><rect x="320.0" y="230.0" width="36.0" height="36.0" fill="#ffffff"/><text x="338.0" y="248.0" font-size="15.0" font-style="italic" stroke="none" fill="#1a1a1a" text-anchor="middle" dominant-baseline="central">T</text></g>
+<g><title>e1</title><rect x="220.0" y="62.0" width="36.0" height="36.0" fill="#ffffff"/><text x="238.0" y="80.0" font-size="15.0" font-style="italic" stroke="none" fill="#1a1a1a" text-anchor="middle" dominant-baseline="central">Cat</text></g>
+<g><title>goal1</title><rect x="320.0" y="314.0" width="36.0" height="36.0" fill="#ffffff"/><text x="338.0" y="332.0" font-size="15.0" font-style="italic" stroke="none" fill="#1a1a1a" text-anchor="middle" dominant-baseline="central">Cat</text></g>
+<g><title>tm2</title><rect x="420.0" y="146.0" width="36.0" height="36.0" fill="#ffffff"/><text x="438.0" y="156.8" font-size="12.8" font-style="italic" stroke="none" fill="#1a1a1a" text-anchor="middle" dominant-baseline="central">TM</text></g>
+<g><title>eq2</title><rect x="520.0" y="146.0" width="36.0" height="36.0" fill="#ffffff"/><text x="538.0" y="164.0" font-size="15.0" stroke="none" fill="#1a1a1a" text-anchor="middle" dominant-baseline="central">=</text></g>
+<g><title>obs2</title><rect x="520.0" y="230.0" width="36.0" height="36.0" fill="#ffffff"/><text x="538.0" y="248.0" font-size="15.0" font-style="italic" stroke="none" fill="#1a1a1a" text-anchor="middle" dominant-baseline="central">T</text></g>
+<g><title>e2</title><rect x="420.0" y="62.0" width="36.0" height="36.0" fill="#ffffff"/><text x="438.0" y="80.0" font-size="15.0" font-style="italic" stroke="none" fill="#1a1a1a" text-anchor="middle" dominant-baseline="central">Cat</text></g>
+<g><title>goal2</title><rect x="520.0" y="314.0" width="36.0" height="36.0" fill="#ffffff"/><text x="538.0" y="332.0" font-size="15.0" font-style="italic" stroke="none" fill="#1a1a1a" text-anchor="middle" dominant-baseline="central">Cat</text></g>
+<path d="M220.0,164.0 Q238.0,192.8 256.0,164.0 M238.0,146.0 L238.0,178.4"/>
+<path d="M420.0,164.0 Q438.0,192.8 456.0,164.0 M438.0,146.0 L438.0,178.4"/>
+<circle cx="156.0" cy="164.0" r="6.0" fill="#ffffff"/>
+<circle cx="338.0" cy="230.0" r="6.0" fill="#ffffff"/>
+<rect x="332.0" y="260.0" width="12.0" height="12.0" fill="#ffffff"/>
+<circle cx="238.0" cy="98.0" r="6.0" fill="#ffffff"/>
+<circle cx="338.0" cy="314.0" r="6.0" fill="#ffffff"/>
+<circle cx="538.0" cy="230.0" r="6.0" fill="#ffffff"/>
+<rect x="532.0" y="260.0" width="12.0" height="12.0" fill="#ffffff"/>
+<circle cx="438.0" cy="98.0" r="6.0" fill="#ffffff"/>
+<circle cx="538.0" cy="314.0" r="6.0" fill="#ffffff"/>
+<g><title>blob:d</title><rect x="63.5" y="159.5" width="9.0" height="9.0" fill="#1a1a1a"/></g>
+<g><title>blob:Bs</title><rect x="233.5" y="221.2" width="9.0" height="9.0" fill="#1a1a1a"/></g>
+<g><title>blob:A</title><rect x="263.5" y="243.5" width="9.0" height="9.0" fill="#1a1a1a"/></g>
+<g><title>blob:e</title><rect x="163.5" y="75.5" width="9.0" height="9.0" fill="#1a1a1a"/></g>
+<g><title>blob:c</title><rect x="263.5" y="327.5" width="9.0" height="9.0" fill="#1a1a1a"/></g>
+<g><title>blob:Bs</title><rect x="433.5" y="221.2" width="9.0" height="9.0" fill="#1a1a1a"/></g>
+<g><title>blob:A</title><rect x="463.5" y="243.5" width="9.0" height="9.0" fill="#1a1a1a"/></g>
+<g><title>blob:e</title><rect x="363.5" y="75.5" width="9.0" height="9.0" fill="#1a1a1a"/></g>
+<g><title>blob:c</title><rect x="463.5" y="327.5" width="9.0" height="9.0" fill="#1a1a1a"/></g>
+<circle cx="601.0" cy="164.0" r="2.1" fill="#1a1a1a" stroke="none"/><circle cx="608.0" cy="164.0" r="2.1" fill="#1a1a1a" stroke="none"/><circle cx="615.0" cy="164.0" r="2.1" fill="#1a1a1a" stroke="none"/>
+</g>
+</svg>
