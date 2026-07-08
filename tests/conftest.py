@@ -10,6 +10,11 @@ slices; the data port awaits an observation clamp.
                           z_obs --[obs]-- x : data
 """
 
+import json
+import re
+import shutil
+from pathlib import Path
+
 import jax
 import pytest
 
@@ -23,6 +28,45 @@ from cffg.core import (
     Template,
     VariableSpec,
 )
+
+# Rendered-diagram gallery: tests record SVGs here (gitignored); the dashboard
+# (tools/dashboard.py) picks them up and shows them under the matching test row.
+VIZ_ARTIFACTS = Path(__file__).parent / ".artifacts"
+
+
+def pytest_sessionstart(session):
+    shutil.rmtree(VIZ_ARTIFACTS, ignore_errors=True)
+
+
+@pytest.fixture
+def viz_gallery(request):
+    """Record diagrams this test produces: `viz_gallery(template, level=4,
+    tag="...")`. Accepts a Template (rendered via cffg.viz) or a ready SVG
+    string. Each image gets a JSON sidecar naming the test, so the dashboard
+    can attach it to the right row without any registry to maintain."""
+
+    from cffg.viz import render_svg
+
+    file = Path(request.node.location[0]).name
+    test_id = f"{file}::{request.node.name}"
+    slug = re.sub(r"[^A-Za-z0-9_.-]+", "-", f"{Path(file).stem}-{request.node.name}")
+    count = iter(range(100))
+
+    def record(template_or_svg, *, level=4, tag=""):
+        svg = (
+            template_or_svg
+            if isinstance(template_or_svg, str)
+            else render_svg(template_or_svg, level=level)
+        )
+        suffix = f"-{tag}" if tag else ""
+        stem = f"{slug}-{next(count):02d}{re.sub(r'[^A-Za-z0-9_.-]+', '-', suffix)}"
+        VIZ_ARTIFACTS.mkdir(exist_ok=True)
+        (VIZ_ARTIFACTS / f"{stem}.svg").write_text(svg)
+        (VIZ_ARTIFACTS / f"{stem}.json").write_text(
+            json.dumps({"id": test_id, "tag": tag})
+        )
+
+    return record
 
 K = 3  # latent cardinality
 M = 2  # observation cardinality

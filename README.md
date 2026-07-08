@@ -142,6 +142,25 @@ print(estimate(engine).summary())
 # state 9.1 KiB (messages 2.8, params 6.4) · 2.76e+04 flops/sweep · 0.203 ms/sweep
 ```
 
+## Draw a model
+
+```python
+from cffg.viz import render_svg, save_svg, save_png
+
+svg = render_svg(template)            # the papers' visual algebra, compressed
+save_svg(template, "model.svg", level=0)   # every bead explicit (Part I Fig 14)
+save_png(template, "model.png")            # needs: uv sync --extra viz
+```
+
+`level=0..4` selects how much of Part I's compression recipe (p.19) is
+applied: 0 shows every bead and internal edge of the variational spec; 4
+(default) is the compact form the papers use for real models — beads pushed
+to node borders, dashed boxes around GFE composites, `⋯` where glue ports
+continue the rollout. Layout is deterministic and *edit-stable*: growing a
+model appends rows/columns without moving what was already drawn. For GUIs,
+`build_scene(template)` returns the typed scene graph (every primitive
+carries the `factor:`/`var:`/`port:` ref it depicts) instead of SVG text.
+
 ## Where things are
 
 | | |
@@ -152,6 +171,7 @@ print(estimate(engine).summary())
 | `cffg/engine.py` | jitted flooding step, damping, δ-hardening, marginals, BFE |
 | `cffg/agent.py` `cffg/colony.py` | receding-horizon runtime; many-instance execution |
 | `cffg/models/` `cffg/experiments/` | rollout builder, T-maze, gridworld, learning loop |
+| `cffg/viz/` | paper-notation diagrams: derive → compress → layout → scene → SVG/PNG |
 | `docs/ARCHITECTURE.md` | design + decisions · `docs/LIMITATIONS.md` — what this will never do |
 | `docs/todo-notes/` | remaining threads, one note each, tied to `tk` tickets |
 
