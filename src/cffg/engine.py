@@ -194,6 +194,51 @@ class Engine:
             out[e.name] = q / q.sum()
         return out
 
+    def node_beliefs(self, state: State) -> dict[str, np.ndarray]:
+        """Factor name -> the node belief q_a, the object conjugate updates
+        integrate against (cff-cd1i): e.g. a transition_mixture's q_a(z', z, u)
+        is the smoothed pairwise marginal whose slices are Dirichlet count
+        increments for B-learning.
+
+        BP groups: exact q_a ∝ f_a · Π incoming, shaped [*cards]. VMP groups:
+        the mean-field belief (outer product of edge marginals) — the correct
+        expectation measure under that bead. Equality nodes report the shared
+        marginal [k] (their joint lives on the diagonal). GFE composites and
+        Gaussian groups are not included: composites own their update path
+        (agent A-learning), Gaussian sufficient stats land with cff-7c5o."""
+        out: dict[str, np.ndarray] = {}
+        msgs = np.asarray(state.messages)
+
+        def norm_exp(lb: np.ndarray) -> np.ndarray:
+            m = lb.shape[0]
+            flat = lb.reshape(m, -1)
+            flat = flat - flat.max(axis=1, keepdims=True)
+            q = np.exp(flat)
+            return (q / q.sum(axis=1, keepdims=True)).reshape(lb.shape)
+
+        for g in self.arena.groups:
+            inc = msgs[g.gather]  # [M, R, k_max]
+            if g.type == "equality":
+                k = g.cards[0]
+                q = norm_exp(inc[:, :, :k].sum(axis=1))
+            elif g.mode == "vmp":
+                both = msgs[g.gather_both]  # [M, R, 2, k_max]
+                q = None
+                for r, k in enumerate(g.cards):
+                    lq = both[:, r, 0, :k] + both[:, r, 1, :k]
+                    edge_q = norm_exp(lq).reshape(len(g.members), *([1] * r), k)
+                    q = edge_q if q is None else q[..., None] * edge_q
+            else:
+                lb = np.asarray(state.params[g.name]).copy()  # [M, *cards]
+                for r, k in enumerate(g.cards):
+                    shape = [len(g.members)] + [1] * len(g.cards)
+                    shape[1 + r] = k
+                    lb = lb + inc[:, r, :k].reshape(shape)
+                q = norm_exp(lb)
+            for i, name in enumerate(g.members):
+                out[name] = q[i]
+        return out
+
     def gaussian_marginals(self, state: State) -> dict[str, tuple[np.ndarray, np.ndarray]]:
         """Edge name -> (mean, cov). Requires a proper combined precision —
         run to coherence (and bind data) first; improper beliefs surface as
