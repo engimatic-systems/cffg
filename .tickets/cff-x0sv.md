@@ -16,3 +16,9 @@ GPT-5.5 feedback item 4 (agreed, but sequenced AFTER B-learning so the API gener
 
 A- and B-learning re-expressed on the API with zero test regressions; d and e learnable with recovery tests; contract documented in ARCHITECTURE (rule-library section).
 
+
+## Notes
+
+**2026-07-09T21:23:55Z**
+
+cff-7c5o landed the Gaussian half of what this API generalizes: Engine.gaussian_node_stats (NIW/MNIW sufficient stats per node belief, obs-masked) + cffg.conj (NIW/MNIW updates with rollover() returning VMP-correct E-parameters — mean and E[W]=nu*Psi^-1, per D4.1.3). The generic declared-learnables API should unify: discrete counts (agent.py learn_a/_elog), Gaussian NIW/MNIW (conj.py + stats readout), and EF-edge conjugates (in-loop, free — cff-8s6a). The trial-loop pattern to generalize is tests/test_conj.py::test_trial_loop_recovers_lgssm_parameters (compile once, swap params through state, accumulate stats, update, roll).
