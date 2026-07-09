@@ -100,11 +100,26 @@ class CompositeBox:
     h: float
 
 
+@dataclass(frozen=True)
+class PlateBox:
+    """The literature's rectangle-with-count badge (cff-cpxj): a labeled box
+    drawn around a replicated fragment's own diagram, with an `×N` (or `×R×C`)
+    badge in the corner. Drawn from the plate SPEC, never the expansion."""
+
+    ref: str
+    x: float  # top-left
+    y: float
+    w: float
+    h: float
+    label: str  # plate name
+    badge: str  # "×16", "×4×4", ...
+
+
 class ItemKind(str, Enum):
     pass  # reserved: scenes are heterogeneous lists, discriminated by type
 
 
-SceneItem = Box | Path | Bead | Dome | Terminal | EllipsisMark | CompositeBox
+SceneItem = Box | Path | Bead | Dome | Terminal | EllipsisMark | CompositeBox | PlateBox
 
 
 @dataclass

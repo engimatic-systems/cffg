@@ -17,9 +17,13 @@ from typing import Any
 
 from cffg.core.ir import (
     BlobRef,
+    Broadcast,
+    Chain,
     ConstraintKind,
     ConstraintSpec,
+    Expose,
     FactorSpec,
+    PlateSpec,
     PortRole,
     PortSpec,
     Template,
@@ -29,8 +33,53 @@ from cffg.core.ir import (
 SCHEMA_VERSION = "1"
 
 
-def to_dict(t: Template) -> dict[str, Any]:
+def _bond_to_dict(rule: Any) -> dict[str, Any]:
+    if isinstance(rule, Chain):
+        return {
+            "kind": "chain",
+            "port_a": rule.port_a,
+            "port_b": rule.port_b,
+            "axis": rule.axis,
+            "offset": rule.offset,
+        }
+    if isinstance(rule, Broadcast):
+        return {"kind": "broadcast", "port": rule.port, "hub": rule.hub}
+    if isinstance(rule, Expose):
+        return {"kind": "expose"}
+    raise TypeError(f"unserializable wiring rule {rule!r}")
+
+
+def _bond_from_dict(d: dict[str, Any]) -> Any:
+    kind = d["kind"]
+    if kind == "chain":
+        return Chain(d["port_a"], d["port_b"], d.get("axis", 0), d.get("offset", 1))
+    if kind == "broadcast":
+        return Broadcast(d["port"], d["hub"])
+    if kind == "expose":
+        return Expose()
+    raise ValueError(f"unknown wiring rule kind {kind!r}")
+
+
+def _plate_to_dict(spec: PlateSpec) -> dict[str, Any]:
     return {
+        "fragment": to_dict(spec.fragment),
+        "dims": list(spec.dims),
+        "bonds": [_bond_to_dict(b) for b in spec.bonds],
+        "per_copy_blobs": list(spec.per_copy_blobs),
+    }
+
+
+def _plate_from_dict(d: dict[str, Any]) -> PlateSpec:
+    return PlateSpec(
+        fragment=from_dict(d["fragment"]),
+        dims=tuple(d["dims"]),
+        bonds=tuple(_bond_from_dict(b) for b in d.get("bonds", [])),
+        per_copy_blobs=tuple(d.get("per_copy_blobs", [])),
+    )
+
+
+def to_dict(t: Template) -> dict[str, Any]:
+    d: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "name": t.name,
         "variables": {
@@ -65,6 +114,10 @@ def to_dict(t: Template) -> dict[str, Any]:
             for b in _sorted(t.blobs)
         },
     }
+    # Additive: templates without plates serialize byte-identically to before.
+    if t.plates:
+        d["plates"] = {name: _plate_to_dict(t.plates[name]) for name in sorted(t.plates)}
+    return d
 
 
 def from_dict(d: dict[str, Any]) -> Template:
@@ -108,6 +161,9 @@ def from_dict(d: dict[str, Any]) -> Template:
             )
             for name, spec in d["blobs"].items()
         },
+        plates={
+            name: _plate_from_dict(pspec) for name, pspec in d.get("plates", {}).items()
+        },
         schema_version=d["schema_version"],
     )
 
@@ -133,9 +189,17 @@ def structure_hash(t: Template) -> str:
     kept — both are parameter data, not structure (colony batching groups
     instances that differ only in parameters)."""
     d = to_dict(t)
-    d["blobs"] = {name: {} for name in d["blobs"]}
+    _erase_blob_data(d)
     canonical = json.dumps(d, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def _erase_blob_data(d: dict[str, Any]) -> None:
+    """Blank blob paths/init here and inside every nested plate fragment, so a
+    parameter-file move (at any depth) leaves the structure hash untouched."""
+    d["blobs"] = {name: {} for name in d.get("blobs", {})}
+    for pspec in d.get("plates", {}).values():
+        _erase_blob_data(pspec["fragment"])
 
 
 def _sorted(mapping: dict[str, Any]) -> list[Any]:

@@ -18,6 +18,7 @@ from cffg.core.ir import Template
 from cffg.viz.compress import FULL_COMPRESSION, present
 from cffg.viz.diagram import BeadShape, TerminalKind, derive
 from cffg.viz.layout import LayoutStyle, layout
+from cffg.viz.layout import _shift as _shift_item
 from cffg.viz.scene import (
     Bead,
     Box,
@@ -25,6 +26,7 @@ from cffg.viz.scene import (
     Dome,
     EllipsisMark,
     Path,
+    PlateBox,
     Scene,
     Terminal,
 )
@@ -61,7 +63,41 @@ def build_scene(
     template: Template, *, level: int = FULL_COMPRESSION, style: LayoutStyle = LayoutStyle()
 ) -> Scene:
     diagram = derive(template)
-    return layout(diagram, present(diagram, level), style)
+    if diagram.nodes:
+        scene = layout(diagram, present(diagram, level), style)
+    else:  # a pure plate host has no top-level factors to lay out
+        m = style.margin
+        scene = Scene(name=template.name, width=2 * m, height=2 * m, items=[])
+    if template.plates:
+        scene = _attach_plates(template, scene, level, style)
+    return scene
+
+
+def _attach_plates(
+    template: Template, scene: Scene, level: int, style: LayoutStyle
+) -> Scene:
+    """Draw each plate as the literature's rectangle-with-count badge: the
+    fragment's own diagram inside a labeled box, stacked below the host."""
+    pad = 26.0
+    gap = 28.0
+    items = list(scene.items)
+    y = scene.height + gap
+    width = scene.width
+    for name in sorted(template.plates):
+        spec = template.plates[name]
+        frag_scene = build_scene(spec.fragment, level=level, style=style)
+        dx = style.margin + pad
+        dy = y + pad + 14.0  # leave room for the label strip
+        items += [_shift_item(it, dx, dy) for it in frag_scene.items]
+        box_w = frag_scene.width + 2 * pad
+        box_h = frag_scene.height + 2 * pad + 14.0
+        badge = "×" + "×".join(str(d) for d in spec.dims)
+        items.append(
+            PlateBox(f"plate:{name}", style.margin, y, box_w, box_h, name, badge)
+        )
+        y += box_h + gap
+        width = max(width, style.margin + box_w + style.margin)
+    return Scene(name=scene.name, width=width, height=y, items=items)
 
 
 def save_svg(template: Template, path: str | FilePath, **kw) -> FilePath:
@@ -113,6 +149,18 @@ def to_svg(scene: Scene, style: SvgStyle = SvgStyle()) -> str:
 
 
 def _render_item(item, s: SvgStyle) -> str:
+    if isinstance(item, PlateBox):
+        return (
+            f"<g><title>{escape(item.ref)}</title>"
+            f'<rect x="{item.x:.1f}" y="{item.y:.1f}" width="{item.w:.1f}" '
+            f'height="{item.h:.1f}" rx="6"/>'
+            f'<text x="{item.x + 8:.1f}" y="{item.y + 15:.1f}" '
+            f'font-size="{s.label_size}" font-style="italic" stroke="none" '
+            f'fill="{s.stroke}">{_mathify(item.label, s.label_size)}</text>'
+            f'<text x="{item.x + item.w - 8:.1f}" y="{item.y + 15:.1f}" '
+            f'font-size="{s.label_size}" stroke="none" fill="{s.stroke}" '
+            f'text-anchor="end">{escape(item.badge)}</text></g>'
+        )
     if isinstance(item, CompositeBox):
         return (
             f'<rect x="{item.x:.1f}" y="{item.y:.1f}" width="{item.w:.1f}" '
