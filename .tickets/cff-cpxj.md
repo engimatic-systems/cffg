@@ -1,6 +1,6 @@
 ---
 id: cff-cpxj
-status: open
+status: closed
 deps: [cff-wx28]
 links: []
 created: 2026-07-09T03:56:19Z
@@ -29,3 +29,9 @@ VALIDATION USE CASES: pixel-grid observation layer (2-D plate, tied A, aggregate
 
 Phase 1: all four validation use cases compile, run, and serialize compactly (spec size independent of dims); equality-tree synthesis correct (marginals match a hand-expanded reference); structure hash covers spec not expansion; viz shows plate boxes. Phase 2 (may split): index-table expansion with the 64x64 compile-time target.
 
+
+## Notes
+
+**2026-07-09T22:04:33Z**
+
+CLOSED (branch plates, chained on gauss-vmp PR #11). Phase 1 landed as designed: PlateSpec IR (fragment/dims/bonds/per_copy_blobs) + Chain/Broadcast/Expose wiring; expand_plates at the top of grounding (pure, reuses compose scoping); equality-tree synthesis for broadcast (N=1 hub==branch, N=2 one ternary eq, N>=3 chain); serialization additive with recursive blob-path erasure in structure_hash (spec-level: dims change the hash, fragment blob moves don't; spec JSON size independent of copy count — 4x4 vs 9x9 identical length); SetPlateDims edit + codec; viz plate boxes with xN badges drawn from the SPEC. All four validation use cases pass against hand-built references (pixel grid == single-pixel model 1e-9; broadcast hub == hand-expanded equality tree AND analytic product 1e-10; sensor array == information addition 1e-9; resize edit rehashes+recompiles). Design refinements (reported, consistent with intent): broadcast hub is SYNTHESIZED and exposed as a GLUE parent port <plate>/<hub>; leftover fragment ports always exposed (Expose() is the explicit marker); estimate.py untouched (analytic-in-dims is phase 2). OPEN QUESTION ANSWERED: unroll stays separate — rollout slices are not homogeneous (past=data beads, future=goal/P-sub beads); the 1-D chain plate reproduces an unrolled HMM's smoothed marginals exactly where copies ARE homogeneous (test included). Phase 2 (index-table expansion, ~1s 64x64 target, analytic estimator): cff-6s31. Suite: 1067 green.
