@@ -23,5 +23,6 @@ regime variable inside a hybrid model; alternatives to experiment with are
 nonlinear observation maps and state-dependent noise. Decision + experiment
 is the deliverable, not shipped rules.
 
-`distrax`/`tfp.substrates.jax` adoption question stays open until the
-exponential-family abstraction (cff-8s6a) — that ticket owns the decision.
+The `distrax`/`tfp.substrates.jax` adoption question was resolved with the
+exponential-family abstraction (cff-8s6a, 2026-07-09): not adopted —
+`jax.scipy.special` covers the math. See ARCHITECTURE §Dependency policy.

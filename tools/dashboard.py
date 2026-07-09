@@ -48,7 +48,12 @@ EPIC_FILES = {
     "M9 · Gaussian": ["test_gauss_rules.py", "test_kalman.py"],
     "L1 · B-learning": ["test_b_learning.py"],
     "L2 · Dynamics curiosity": ["test_b_epistemics.py"],
-    "M13 · Exp. families": ["test_ef.py"],
+    "M13 · Exp. families": [
+        "test_ef.py",
+        "test_ef_properties.py",
+        "test_ef_rules.py",
+        "test_ef_engine.py",
+    ],
     "SG · Glucose": ["test_glucose.py"],
 }
 FILE_TO_EPIC = {f: e for e, fs in EPIC_FILES.items() for f in fs}
