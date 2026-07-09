@@ -285,6 +285,76 @@ class Engine:
             out[e.name] = (np.asarray(mean), np.asarray(cov))
         return out
 
+    def gaussian_node_stats(self, state: State) -> dict[str, dict[str, np.ndarray]]:
+        """Factor name -> expected sufficient statistics of the node belief
+        (cff-7c5o, D4): the continuous analog of node_beliefs, feeding the
+        NIW/MNIW conjugate updates in cffg.conj.
+
+        gaussian:            {"mean" E[x], "second" E[xxᵀ]}
+        gaussian_linear:     {"Syy" E[yyᵀ], "Syx" E[yx̃ᵀ], "Sxx" E[x̃x̃ᵀ]}
+                             with x̃ = [x; 1] (offset column absorbed)
+        gaussian_linear_obs: same keys with y fixed at the bound observation,
+                             plus "mask" (0.0 = missing: skip the occurrence).
+        Requires proper beliefs (run to coherence first); equality and hybrid
+        nodes are not learnable and are skipped."""
+        out: dict[str, dict[str, np.ndarray]] = {}
+        g_eta, g_lam = np.asarray(state.g_eta), np.asarray(state.g_lam)
+        g_obs, g_mask = np.asarray(state.g_obs), np.asarray(state.g_mask)
+        for g in self.arena.gauss_groups:
+            if g.type == "equality":
+                continue
+            inc_e, inc_l = g_eta[g.gather], g_lam[g.gather]
+            for i, name in enumerate(g.members):
+                w = np.asarray(state.params[g.name + ":W"][i])
+                if g.type == "gaussian":
+                    (d,) = g.dims
+                    m_blob = np.asarray(state.params[g.name + ":m"][i])
+                    lam_q = w + inc_l[i, 0, :d, :d]
+                    sig_q = np.linalg.inv(lam_q)
+                    m_q = sig_q @ (w @ m_blob + inc_e[i, 0, :d])
+                    out[name] = {"mean": m_q, "second": sig_q + np.outer(m_q, m_q)}
+                elif g.type == "gaussian_linear":
+                    do, di = g.dims
+                    a = np.asarray(state.params[g.name + ":A"][i])
+                    b = np.asarray(state.params[g.name + ":b"][i])
+                    e_o, l_o = inc_e[i, 0, :do], inc_l[i, 0, :do, :do]
+                    e_i, l_i = inc_e[i, 1, :di], inc_l[i, 1, :di, :di]
+                    lam_j = np.block([[w + l_o, -w @ a], [-a.T @ w, a.T @ w @ a + l_i]])
+                    eta_j = np.concatenate([w @ b + e_o, -a.T @ w @ b + e_i])
+                    sig_j = np.linalg.inv(lam_j)
+                    m_j = sig_j @ eta_j
+                    m_y, m_x = m_j[:do], m_j[do:]
+                    s_yy = sig_j[:do, :do] + np.outer(m_y, m_y)
+                    s_yx = sig_j[:do, do:] + np.outer(m_y, m_x)
+                    s_xx = sig_j[do:, do:] + np.outer(m_x, m_x)
+                    out[name] = {
+                        "Syy": s_yy,
+                        "Syx": np.concatenate([s_yx, m_y[:, None]], axis=1),
+                        "Sxx": np.block([[s_xx, m_x[:, None]], [m_x[None, :], np.ones((1, 1))]]),
+                    }
+                else:  # gaussian_linear_obs: y is data; q(x) is conditioned
+                    do, di = g.dims
+                    a = np.asarray(state.params[g.name + ":A"][i])
+                    b = np.asarray(state.params[g.name + ":b"][i])
+                    e_i, l_i = inc_e[i, 1, :di], inc_l[i, 1, :di, :di]
+                    row = int(g.obs_rows[i])
+                    y, mk = g_obs[row, :do], g_mask[row]
+                    lam_q = mk * (a.T @ w @ a) + l_i
+                    sig_q = np.linalg.inv(lam_q)
+                    m_x = sig_q @ (mk * (a.T @ (w @ (y - b))) + e_i)
+                    s_xx = sig_q + np.outer(m_x, m_x)
+                    out[name] = {
+                        "Syy": np.outer(y, y),
+                        "Syx": np.concatenate(
+                            [np.outer(y, m_x), y[:, None]], axis=1
+                        ),
+                        "Sxx": np.block(
+                            [[s_xx, m_x[:, None]], [m_x[None, :], np.ones((1, 1))]]
+                        ),
+                        "mask": np.asarray(mk),
+                    }
+        return out
+
     def ef_marginals(self, state: State) -> dict[str, "EfMarginal"]:
         """Edge name -> EF marginal in standard parameters. Observation-family
         edges (poisson/bernoulli DATA ports) carry no messages and are

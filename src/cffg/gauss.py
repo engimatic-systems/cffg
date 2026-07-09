@@ -223,6 +223,62 @@ def edge_entropy(lam0, lam1):
     return -_neg_entropy(lam0 + lam1)
 
 
+# --- gaussian_prec VMP (cff-7c5o, DERIVATIONS.md D4) ---------------------------
+#
+# f(x; m, τ) = N(x; m, τ⁻¹): scalar Gaussian node whose precision lives on an
+# ef:gamma edge — the EF abstraction's first mixed client. Mean-field
+# q(x)q(τ); both messages read *marginals* (VMP convention), all closed form.
+# Batched [M] without vmap (everything is scalar). Guards: improper marginals
+# ⇒ vacuous message / +inf energy (engine-wide loudness convention).
+
+
+def _gamma_ab(eta_tau):
+    """(α, β) from a gamma-natural marginal [M, 2] (η = (α−1, −β))."""
+    return eta_tau[..., 0] + 1.0, -eta_tau[..., 1]
+
+
+def prec_to_x(eta_tau_q, m):
+    """→ x edge: N(x; m, E[τ]⁻¹) in info form ((E[τ]·m, E[τ])); E[τ] = α/β.
+    eta_tau_q [M, 2] is the τ-edge *marginal*; m [M, 1] the mean blob."""
+    a, b = _gamma_ab(eta_tau_q)
+    ok = (a > 0) & (b > 0)
+    etau = jnp.where(ok, a / jnp.where(ok, b, 1.0), 0.0)  # vacuous when improper
+    return etau[:, None] * m, etau[:, None, None] * jnp.ones_like(m)[..., None]
+
+
+def _e_sq_dev(eta_x_q, lam_x_q, m):
+    """E[(x−m)²] = (x̄−m)² + var from the x-edge marginal; (value, proper)."""
+    lam = lam_x_q[..., 0, 0]
+    ok = lam > 0
+    safe = jnp.where(ok, lam, 1.0)
+    xbar = eta_x_q[..., 0] / safe
+    return (xbar - m[..., 0]) ** 2 + 1.0 / safe, ok
+
+
+def prec_to_tau(eta_x_q, lam_x_q, m):
+    """→ τ edge: gamma-natural increment (1/2, −E[(x−m)²]/2) [M, 2]."""
+    s, ok = _e_sq_dev(eta_x_q, lam_x_q, m)
+    msg = jnp.stack([0.5 * jnp.ones_like(s), -0.5 * s], axis=-1)
+    return jnp.where(ok[:, None], msg, 0.0)
+
+
+def prec_energy(eta_tau_q, eta_x_q, lam_x_q, m):
+    """Node energy −E_q[log f] = −½(ψ(α) − ln β) + ½ ln 2π + ½ (α/β) E[(x−m)²].
+    The ψ(α) is the digamma correction that makes the mean-field VFE exact."""
+    from jax.scipy.special import digamma
+
+    a, b = _gamma_ab(eta_tau_q)
+    s, ok_x = _e_sq_dev(eta_x_q, lam_x_q, m)
+    ok = ok_x & (a > 0) & (b > 0)
+    safe_b = jnp.where(ok, b, 1.0)
+    val = (
+        -0.5 * (digamma(jnp.where(ok, a, 1.0)) - jnp.log(safe_b))
+        + 0.5 * _LOG2PI
+        + 0.5 * (jnp.where(ok, a, 1.0) / safe_b) * s
+    )
+    return jnp.where(ok, val, jnp.inf)
+
+
 # --- Readout -----------------------------------------------------------------
 
 
