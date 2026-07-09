@@ -30,6 +30,7 @@ import numpy as np
 
 from cffg import ef
 from cffg.core.ir import FACTOR_TYPES, ConstraintKind, PortRole, Template
+from cffg.core.plates import expand_plates
 from cffg.core.validate import validate
 
 NEG = -1.0e30  # log-space "zero"; finite so NEG - NEG == 0 (no inf-inf NaNs)
@@ -257,6 +258,7 @@ def compile_template(
 ) -> Arena:
     """Ground `t` into an Arena. Blob data comes from `arrays` (name -> array,
     wins) or is loaded from `root`/blob.path."""
+    t = expand_plates(t)  # materialize plates (validates the spec first); no-op when plateless
     validate(t)
     problems: list[str] = []
 

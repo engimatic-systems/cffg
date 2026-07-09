@@ -14,7 +14,11 @@ from cffg.core.ir import (
     EF_EDGE_FAMILIES,
     FACTOR_TYPES,
     HYBRID_EDGE_FAMILIES,
+    Broadcast,
+    Chain,
     ConstraintKind,
+    Expose,
+    PortRole,
     Template,
 )
 from cffg.ef import FAMILIES as EF_FAMILIES, OBS_FAMILIES as EF_OBS_FAMILIES
@@ -35,6 +39,7 @@ def validate(t: Template) -> None:
     problems += _check_factors(t)
     problems += _check_degrees_and_ports(t)
     problems += _check_constraints(t)
+    problems += _check_plates(t)
 
     if problems:
         raise ModelError(t.name, problems)
@@ -135,6 +140,56 @@ def _check_degrees_and_ports(t: Template) -> list[str]:
                 f"variable {v.name!r}: fully connected (degree 2) but exposed by "
                 f"{[p.name for p in t.ports_of(v.name)]}"
             )
+    return problems
+
+
+def _check_plates(t: Template) -> list[str]:
+    """Validate every plate SPEC (cff-cpxj): the fragment on its own, the
+    dims arity (1-D/2-D in phase 1), and each wiring rule's references."""
+    problems: list[str] = []
+    for name, spec in sorted(t.plates.items()):
+        if not 1 <= len(spec.dims) <= 2:
+            problems.append(
+                f"plate {name!r}: dims {spec.dims} must be 1-D or 2-D in phase 1"
+            )
+        if any(d < 1 for d in spec.dims):
+            problems.append(f"plate {name!r}: dims {spec.dims} must all be >= 1")
+        frag = spec.fragment
+        try:
+            validate(frag)
+        except ModelError as err:
+            problems += [f"plate {name!r} fragment: {p}" for p in err.problems]
+        for b in spec.per_copy_blobs:
+            if b not in frag.blobs:
+                problems.append(f"plate {name!r}: per_copy_blob {b!r} is not a fragment blob")
+        for rule in spec.bonds:
+            if isinstance(rule, Chain):
+                if not 0 <= rule.axis < len(spec.dims):
+                    problems.append(
+                        f"plate {name!r}: chain axis {rule.axis} out of range for dims {spec.dims}"
+                    )
+                if rule.offset < 1:
+                    problems.append(f"plate {name!r}: chain offset {rule.offset} must be >= 1")
+                for role, pname in (("port_a", rule.port_a), ("port_b", rule.port_b)):
+                    port = frag.ports.get(pname)
+                    if port is None:
+                        problems.append(
+                            f"plate {name!r}: chain {role} {pname!r} is not a fragment port"
+                        )
+                    elif port.role is not PortRole.GLUE:
+                        problems.append(
+                            f"plate {name!r}: chain {role} {pname!r} must be a glue port "
+                            f"(has role {port.role.value})"
+                        )
+            elif isinstance(rule, Broadcast):
+                if rule.port not in frag.ports:
+                    problems.append(
+                        f"plate {name!r}: broadcast port {rule.port!r} is not a fragment port"
+                    )
+            elif isinstance(rule, Expose):
+                pass
+            else:  # pragma: no cover - closed vocabulary
+                problems.append(f"plate {name!r}: unknown wiring rule {rule!r}")
     return problems
 
 
