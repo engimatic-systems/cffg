@@ -27,6 +27,8 @@ from cffg.rules import (
     VMP_ENERGIES,
     VMP_UPDATES,
     gfe_energy,
+    gfe_tm_energy,
+    gfe_tm_update,
     gfe_update,
 )
 
@@ -345,6 +347,18 @@ def _make_step(arena: Arena):
             )
             new = new.at[g.scatter_z].set(mu2)
             new = new.at[g.scatter_x].set(log_qx)
+        for g in arena.gfe_tm_groups:
+            ko, ki, ku = g.cards
+            md = messages[g.gather[:, 0]][:, :ko]
+            mi = messages[g.gather[:, 1]][:, :ki]
+            me = messages[g.gather[:, 2]][:, :ku]
+            b_key = g.name + (":counts" if g.learned else ":B")
+            to_out, to_in, to_sel = gfe_tm_update(
+                mi, me, md, params[b_key], k_max, learned=g.learned
+            )
+            new = new.at[g.scatter[:, 0]].set(to_out)
+            new = new.at[g.scatter[:, 1]].set(to_in)
+            new = new.at[g.scatter[:, 2]].set(to_sel)
         # Gaussian sweep: information-form damping below is the log-space
         # damping of the Gaussian family (log of a Gaussian is its (eta,
         # Lambda) quadratic), so one damp knob covers both arenas.
@@ -438,6 +452,15 @@ def _make_bfe(arena: Arena):
             a_key = g.name + (":counts" if g.learned else ":A")
             total = total + gfe_energy(
                 log_d, params[a_key], params[g.name + ":c"], learned=g.learned
+            ).sum()
+        for g in arena.gfe_tm_groups:
+            ko, ki, ku = g.cards
+            md = messages[g.gather[:, 0]][:, :ko]
+            mi = messages[g.gather[:, 1]][:, :ki]
+            me = messages[g.gather[:, 2]][:, :ku]
+            b_key = g.name + (":counts" if g.learned else ":B")
+            total = total + gfe_tm_energy(
+                mi, me, md, params[b_key], learned=g.learned
             ).sum()
         if len(pairs):
             lq = messages[pairs[:, 0]] + messages[pairs[:, 1]]  # [E_int, k_max]

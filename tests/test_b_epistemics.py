@@ -174,3 +174,154 @@ def test_uncomfortable_scale_stays_finite():
     np.testing.assert_allclose(
         float(logsumexp(jnp.asarray(to_sel)[0, :u])), 0.0, atol=1e-6
     )
+
+
+def dirichlet_kl(beta, alpha):
+    from jax.scipy.special import digamma, gammaln
+
+    b0, a0 = beta.sum(), alpha.sum()
+    return float(
+        gammaln(b0) - gammaln(a0)
+        - (gammaln(jnp.asarray(beta)).sum() - gammaln(jnp.asarray(alpha)).sum())
+        + ((beta - alpha) * (digamma(jnp.asarray(beta)) - digamma(b0))).sum()
+    )
+
+
+def test_novelty_identity():
+    """Executable proof of the derivation's Prop 3: the novelty term
+    I(z'; B | z,u) = H[E[B]-column] − ĥ equals the EXPECTED one-step Bayesian
+    update magnitude E_{z'~B̄}[ KL( Dir(α + e_{z'}) ‖ Dir(α) ) ] — exact by
+    Dirichlet-categorical conjugacy and the MI = expected-posterior-KL
+    identity. This is what pymdp's B-novelty bonus linearizes."""
+    rng = np.random.default_rng(21)
+    for _ in range(5):
+        alpha = rng.uniform(0.3, 8.0, size=4)
+        counts = alpha.reshape(1, 4, 1)  # one action, one column: [U=1, K'=4, K=1]
+        bbar, h = rules._tm_dirichlet_stats(jnp.asarray(counts))
+        bbar, h = np.asarray(bbar)[0, :, 0], float(np.asarray(h)[0, 0])
+        novelty = -(bbar * np.log(bbar)).sum() - h  # H[B̄] − ĥ
+        expected_kl = sum(
+            bbar[i] * dirichlet_kl(alpha + np.eye(4)[i], alpha) for i in range(4)
+        )
+        np.testing.assert_allclose(novelty, expected_kl, rtol=1e-8)
+
+
+# --- end-to-end: compiler + engine + agent ------------------------------------
+
+KC, UC = 4, 2
+
+
+def corridor_arrays(unknown_action=1, known_strength=60.0):
+    acc = 0.9
+    a = np.full((KC, KC), (1 - acc) / (KC - 1))
+    np.fill_diagonal(a, acc)
+    counts = np.full((UC, KC, KC), known_strength / KC)
+    counts[unknown_action] = 1.0  # same posterior MEAN, different certainty
+    return a, counts
+
+
+def build_curiosity_engine(epistemic: bool):
+    from cffg.compiler import compile_template
+    from cffg.engine import Engine
+    from cffg.models.rollout import build_rollout
+
+    a, counts = corridor_arrays()
+    t, arrays = build_rollout(
+        "curious", steps=2, past=0,
+        d=np.full(KC, 1.0 / KC), A=a, c=np.full(KC, 1.0 / KC),
+        e=np.full(UC, 1.0 / UC), Bs=np.full((UC, KC, KC), 1.0 / KC),
+        gfe=False, epistemic_b=epistemic,
+    )
+    arrays["Bc"] = counts
+    return Engine(compile_template(t, arrays=arrays))
+
+
+def test_engine_prefers_unknown_dynamics():
+    engine = build_curiosity_engine(epistemic=True)
+    state, _ = engine.run(engine.init_state(), 40, tol=1e-11)
+    q_u = engine.marginals(state)["u1"]
+    assert q_u[1] > 0.55, f"no curiosity through the full engine: {q_u}"
+    assert np.isfinite(engine.bfe(state))
+
+    ablation = build_curiosity_engine(epistemic=False)
+    st2, _ = ablation.run(ablation.init_state(), 40, tol=1e-11)
+    q_u2 = ablation.marginals(st2)["u1"]
+    np.testing.assert_allclose(q_u2, 0.5, atol=1e-6)  # plain BP: no preference
+
+
+def test_agent_curiosity_decays_with_experience():
+    """Both actions have IDENTICAL true dynamics (right-shift with slip), so
+    once both are learned the state-MI channel is symmetric and only the
+    novelty channel separates them: the planner's q(u1 = unknown action)
+    starts elevated and must decay toward 0.5 as counts accumulate. The
+    ablation (no composite) is flat at 0.5 throughout."""
+    from cffg.agent import RollingAgent
+    from cffg.models.rollout import build_rollout
+
+    acc = 0.9
+    a = np.full((KC, KC), (1 - acc) / (KC - 1))
+    np.fill_diagonal(a, acc)
+    # Uniform TRUE dynamics for both actions: learned means stay uniform, so
+    # the state-MI channel is symmetric throughout and only count-novelty
+    # separates the actions.
+    true_bs = np.full((UC, KC, KC), 1.0 / KC)
+
+    def builder(**kw):
+        return build_rollout(
+            "corridor", d=np.full(KC, 1.0 / KC), A=a, c=np.full(KC, 1.0 / KC),
+            e=np.full(UC, 1.0 / UC), Bs=np.full((UC, KC, KC), 1.0 / KC),
+            gfe=False, **kw,
+        )
+
+    counts0 = np.stack([np.full((KC, KC), 25.0 / KC), np.full((KC, KC), 0.3)])
+    # action 0: alpha0 = 25 per column (novelty ~0.08 nats); action 1:
+    # alpha0 = 1.2 (novelty ~0.78 nats) -> ~0.7-nat initial curiosity gap.
+
+    def run_agent(epistemic):
+        rng = np.random.default_rng(4)
+        agent = RollingAgent(
+            builder, horizon=2, learn_b=True, initial_b_counts=counts0.copy(),
+            epistemic_b=epistemic, n_sweeps=50, select="map", seed=4,
+        )
+        z, q1_trace = int(rng.integers(KC)), []
+        for _ in range(50):
+            st = agent._with_params(agent.plan)
+            st, _ = agent.plan.run(st, agent.n_sweeps, tol=1e-10, damp=agent.damp)
+            q = np.asarray(agent.plan.marginals(st)["u1"])
+            q1_trace.append(float(q[1] / q.sum()))
+            u = int(np.argmax(q))
+            z = int(rng.choice(KC, p=true_bs[u, :, z]))
+            agent.observe(u, int(rng.choice(KC, p=a[:, z])))
+        return np.asarray(q1_trace)
+
+    q1 = run_agent(True)
+    assert q1[0] > 0.6, f"no initial curiosity: q1[0] = {q1[0]:.3f}"
+    early, late = q1[:10].mean(), q1[-10:].mean()
+    assert late < early - 0.05, f"curiosity did not decay: {early:.3f} -> {late:.3f}"
+    assert late < 0.57, f"late preference should approach indifference: {late:.3f}"
+
+    q1_flat = run_agent(False)
+    # Ablation is never curious — in fact plain BP with E[log B] digamma
+    # point estimates is ambiguity-AVERSE (low-count columns are
+    # sub-stochastic in expectation and read as evidence against the
+    # action), the classic failure the composite exists to correct.
+    assert (q1_flat <= 0.501).all(), f"ablation showed curiosity: max {q1_flat.max():.3f}"
+    assert q1_flat[0] < 0.5, f"expected ambiguity aversion, got {q1_flat[0]:.3f}"
+
+
+def test_epistemic_template_renders(viz_gallery):
+    import xml.etree.ElementTree as ET
+
+    from cffg.models.rollout import build_rollout
+    from cffg.viz import render_svg
+
+    a, _ = corridor_arrays()
+    t, _ = build_rollout(
+        "curious_viz", steps=2, past=0,
+        d=np.full(KC, 1.0 / KC), A=a, c=np.full(KC, 1.0 / KC),
+        e=np.full(UC, 1.0 / UC), Bs=np.full((UC, KC, KC), 1.0 / KC),
+        gfe=True, epistemic_b=True,
+    )
+    svg = render_svg(t, level=4)
+    ET.fromstring(svg)
+    viz_gallery(svg, tag="dynamics-curiosity rollout (P-sub on TM + obs)")

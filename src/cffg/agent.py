@@ -58,6 +58,7 @@ class RollingAgent:
         initial_counts: np.ndarray | None = None,
         learn_b: bool = False,
         initial_b_counts: np.ndarray | None = None,
+        epistemic_b: bool = False,
         damp: float = 0.5,
         n_sweeps: int = 400,
         select: str = "map",
@@ -67,7 +68,12 @@ class RollingAgent:
         self.learn_a = learn_a
         self.rng = np.random.default_rng(seed)
 
-        plan_t, plan_arrays = builder(past=0, steps=horizon, learned_a=learn_a)
+        if epistemic_b and not learn_b:
+            raise ValueError("epistemic_b needs learn_b counts to score novelty")
+        plan_kwargs = {"learned_a": learn_a}
+        if epistemic_b:
+            plan_kwargs["epistemic_b"] = True
+        plan_t, plan_arrays = builder(past=0, steps=horizon, **plan_kwargs)
         filt_t, filt_arrays = builder(past=1, steps=1, learned_a=False)
         self.plan = Engine(compile_template(plan_t, arrays=plan_arrays))
         self.filter = Engine(compile_template(filt_t, arrays=filt_arrays))
@@ -112,6 +118,13 @@ class RollingAgent:
                 if g.type == "transition_mixture":
                     params[g.name] = jnp.asarray(
                         np.broadcast_to(elog_b, (len(g.members), *elog_b.shape))
+                    )
+            for g in engine.arena.gfe_tm_groups:
+                if g.learned:  # curiosity composites read the raw counts
+                    params[g.name + ":counts"] = jnp.asarray(
+                        np.broadcast_to(
+                            self.b_counts, (len(g.members), *self.b_counts.shape)
+                        )
                     )
         return _replace(st, params=params)
 
