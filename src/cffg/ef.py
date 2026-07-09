@@ -181,6 +181,15 @@ BETA = EFFamily(
 
 FAMILIES = {f.name: f for f in (GAMMA, BETA)}
 
+# Observation families (cff-8s6a): legal `VariableSpec.ef` tags for edges that
+# are *conditioned DATA ports only*. They get no EFFamily table because their
+# message algebra is degenerate — Poisson has no closed-form entropy and is
+# not closed under products (h(x) = 1/x! doubles), and an unobserved
+# predictive leaves the family (negative-binomial / Beta-Bernoulli mixture).
+# Observing them is exact: a constant conjugate increment to the parameter
+# edge (the *_likelihood_message functions below) plus a closed-form energy.
+OBS_FAMILIES = frozenset({"poisson", "bernoulli"})
+
 
 # --- Conjugate likelihood messages (constants in T-space) ----------------------
 

@@ -79,3 +79,17 @@ def test_unsupported_schema_version_rejected(hmm_slice):
     d["schema_version"] = "999"
     with pytest.raises(ValueError, match="schema version"):
         from_json(json.dumps(d))
+
+
+def test_ef_domain_round_trips(hmm_slice):
+    from cffg.core import VariableSpec
+
+    hmm_slice.variables["lam"] = VariableSpec("lam", ef="gamma")  # unused: no validate
+    d = to_dict(hmm_slice)
+    assert d["variables"]["lam"] == {"ef": "gamma"}
+    back = from_json(to_json(hmm_slice))
+    assert back.variables["lam"].ef == "gamma" and back.variables["lam"].family == "ef"
+    assert structure_hash(back) == structure_hash(hmm_slice)
+    # The domain tag is structure: retagging the family must change the hash.
+    hmm_slice.variables["lam"] = VariableSpec("lam", ef="beta")
+    assert structure_hash(hmm_slice) != structure_hash(back)
