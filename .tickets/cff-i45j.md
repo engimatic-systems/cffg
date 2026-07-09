@@ -1,6 +1,6 @@
 ---
 id: cff-i45j
-status: open
+status: closed
 deps: []
 links: [cff-cj5h]
 created: 2026-07-08T22:00:50Z
@@ -59,3 +59,17 @@ Non-finite deltas never satisfy tol (test); GFE messages stay finite on
 sparse-support models (repro test converges); epistemic-term audit re-run
 on the fixed engine with a written verdict in this ticket — either the MI
 inversion disappears (close) or it becomes a derivation ticket (link it).
+
+## Notes
+
+**2026-07-08T22:44:52Z**
+
+RESOLVED (2026-07-08, branch gfe-stability, commits 661ef6a + 4f9db28). Root cause was FOUR stacked engine defects, all fixed with tests:
+1. mu2 = log(zbar) - log_d emitted +-1e30 junk on zero-support states (deterministic transitions upstream); now computed in the bounded rho form (identical where d>0 — goldens pinned).
+2. The 1e-300 log-floor was a silent no-op under float32 (test suite forces x64; consumers get JAX's default f32): log(0) -> -inf -> 0*inf = NaN inside rho. Floors now track dtype (_safe_log).
+3. Newton's Jacobian is ALWAYS singular along the gauge direction (centered residual); the fixed 1e-9 ridge is below f32 eps -> solve returned inf. Ridge now sqrt(dtype eps) + step re-centered. Plus backtracking: the full step limit-cycled on simplexes of a few hundred states.
+4. Engine.run accepted non-finite deltas as convergence, returning transient garbage as converged. Now isfinite-guarded.
+
+EPISTEMIC-TERM AUDIT (acceptance item), re-run on the fixed engine at 432 states/composite, horizon 4: converges (delta 3e-5, finite), posterior decisive and SYMMETRY-CORRECT (two mirror-image moves get 0.4979/0.4978), and the sensing actions now rank exactly by their true MI (0.0693 = 0.0693 > 0.0092 nats). The apparent MI inversion was a divergence artifact — NO derivation bug in the P-sub epistemic term. VERDICT: close.
+
+REMAINING (modeling recipe, not engine): with weak goal utilities the epistemic term (~0.07 nats) cannot buy a sensing detour, so the agent acts pragmatically without checking; getting check-then-sample behavior is utility/sensor-scale tuning in the model, plus the still-open MAP tie-breaking diagnostic (cff-cj5h) for near-tied posteriors.
