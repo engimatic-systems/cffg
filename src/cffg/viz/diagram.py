@@ -56,6 +56,10 @@ GLYPHS = {
     "beta": "β",
     "poisson_obs": "Poi",
     "bernoulli_obs": "Ber",
+    "alldifferent": "!=",
+    "exactly_k": "Σk",
+    "at_most_k": "≤k",
+    "table": "tab",
 }
 
 

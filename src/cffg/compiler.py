@@ -70,6 +70,27 @@ class GroupPlan:
 
 
 @dataclass(frozen=True)
+class ConstraintPlan:
+    """One hard-constraint (indicator) factor, run on its own (cff-e8zk).
+
+    Carries structural metadata only — NO dense potential is stacked. Edges are
+    the variadic roles x0..x{n-1} in order; `gather`/`scatter` are per-edge
+    slots (read opposite, write own). `cards` is the per-edge cardinality. The
+    static compile-time detail (`k` for exactly/at_most, `table` [T, n] for
+    table) is baked into the plan. The same plan drives sum-product (BFE) and
+    max-product (MAP): the engine passes the semiring's reduction op."""
+
+    name: str
+    type: str
+    cards: tuple[int, ...]  # per-edge cardinality
+    members: tuple[str, ...]  # single factor name (kept a tuple for symmetry)
+    gather: np.ndarray  # [n] slot to read (opposite side)
+    scatter: np.ndarray  # [n] slot to write (own side)
+    k: int = 0  # exactly_k / at_most_k threshold
+    table: np.ndarray | None = None  # [T, n] allowed tuples (table)
+
+
+@dataclass(frozen=True)
 class GaussGroupPlan:
     """All Gaussian-family factors of one (type, dim-signature), run together.
 
@@ -199,6 +220,8 @@ class Arena:
     edges: dict[str, EdgeInfo]
     groups: list[GroupPlan]
     data_slots: dict[str, int]  # DATA port name -> external slot
+    semiring: str = "sum"  # "sum" (sum-product / BFE) | "max" (min-sum / MAP)
+    constraint_groups: list[ConstraintPlan] = field(default_factory=list)
     log_params: dict[str, np.ndarray] = field(default_factory=dict)  # group -> [M, ...]
     # Gaussian arena (cff-4e5z): messages are (eta [n_gslots, d_max],
     # Lambda [n_gslots, d_max, d_max]) information-form pairs, zero-padded
@@ -255,9 +278,18 @@ def compile_template(
     *,
     arrays: dict[str, np.ndarray] | None = None,
     root: str | Path | None = None,
+    semiring: str = "sum",
 ) -> Arena:
     """Ground `t` into an Arena. Blob data comes from `arrays` (name -> array,
-    wins) or is loaded from `root`/blob.path."""
+    wins) or is loaded from `root`/blob.path.
+
+    `semiring` selects the inference algebra (cff-e8zk): "sum" is sum-product
+    (the BFE ledger; -log Z on trees), "max" is min-sum / max-product (MAP
+    decoding; Engine.objective, not Engine.bfe). MAP semantics are defined in v1
+    for discrete BP groups and hard constraints only — "max" REJECTS vmp/mean-
+    field beads, P-substitution/GFE composites, and Gaussian/EF/hybrid groups."""
+    if semiring not in ("sum", "max"):
+        raise CompileError(f"semiring must be 'sum' or 'max', got {semiring!r}")
     t = expand_plates(t)  # materialize plates (validates the spec first); no-op when plateless
     validate(t)
     problems: list[str] = []
@@ -508,11 +540,15 @@ def compile_template(
     ef_buckets: dict[tuple[str, str], list[str]] = {}
     mix_buckets: dict[tuple, list[str]] = {}
     prec_members: list[str] = []
+    constraint_names: list[str] = []
     for fname in sorted(t.factors):
         if fname in consumed:
             continue
         f = t.factors[fname]
         ft = FACTOR_TYPES[f.type]
+        if ft.family == "constraint":
+            constraint_names.append(fname)
+            continue
         roles = ft.edge_roles
         gaussian = ft.family == "gaussian" or (
             ft.family == "any" and t.variables[f.edges[roles[0]]].dim > 0
@@ -678,6 +714,98 @@ def compile_template(
         if stacked is not None:
             log_params[gname] = stacked
 
+    constraint_groups: list[ConstraintPlan] = []
+    for fname in constraint_names:
+        f = t.factors[fname]
+        n = len(f.edges)
+        roles = tuple(f"x{i}" for i in range(n))
+        cards = tuple(t.variables[f.edges[r]].cardinality for r in roles)
+        gather = np.array([opposite[(fname, r)] for r in roles], dtype=np.int64)
+        scatter = np.array([slot_of[(fname, r)] for r in roles], dtype=np.int64)
+        k = 0
+        table_arr = None
+        if f.type == "alldifferent":
+            K = cards[0]
+            if any(c != K for c in cards):
+                raise CompileError(
+                    f"factor {fname!r}: alldifferent needs one shared cardinality, got {cards}"
+                )
+            if K < n:
+                raise CompileError(
+                    f"factor {fname!r}: alldifferent over {n} edges needs cardinality "
+                    f"K >= {n}, got K={K} (pigeonhole: unsatisfiable)"
+                )
+            if n > 10 or K > 10:
+                raise CompileError(
+                    f"factor {fname!r}: exact alldifferent DP is capped at n, K <= 10 "
+                    f"(got n={n}, K={K}); larger n is the permanent-approximation regime "
+                    "(Huang & Jebara, arXiv:0908.1769)"
+                )
+        elif f.type in ("exactly_k", "at_most_k"):
+            if any(c != 2 for c in cards):
+                raise CompileError(
+                    f"factor {fname!r}: {f.type} operates on binary edges (cardinality 2), "
+                    f"got {cards}"
+                )
+            karr = resolved[f.param_blobs["k"]]
+            if karr.size != 1 or int(karr.reshape(())) != karr.reshape(()):
+                raise CompileError(f"factor {fname!r}: parameter 'k' must be a scalar integer")
+            k = int(karr.reshape(()))
+            if not 0 <= k <= n:
+                raise CompileError(
+                    f"factor {fname!r}: k={k} out of range [0, {n}] for {n} binary edges"
+                )
+        else:  # table
+            table_arr = np.asarray(resolved[f.param_blobs["table"]])
+            if table_arr.ndim != 2 or table_arr.shape[1] != n:
+                raise CompileError(
+                    f"factor {fname!r}: table must be [T, {n}] (T tuples over {n} edges), "
+                    f"got shape {table_arr.shape}"
+                )
+            if table_arr.shape[0] >= 100000:
+                raise CompileError(
+                    f"factor {fname!r}: table has {table_arr.shape[0]} tuples (>= 1e5); "
+                    "large tables leave the explicit-enumeration regime"
+                )
+            if not np.issubdtype(table_arr.dtype, np.integer) and not np.allclose(
+                table_arr, np.round(table_arr)
+            ):
+                raise CompileError(f"factor {fname!r}: table entries must be integers")
+            table_arr = np.round(table_arr).astype(np.int64)
+            for j in range(n):
+                if table_arr[:, j].min() < 0 or table_arr[:, j].max() >= cards[j]:
+                    raise CompileError(
+                        f"factor {fname!r}: table column {j} has values outside [0, {cards[j]})"
+                    )
+        constraint_groups.append(
+            ConstraintPlan(
+                name=fname,
+                type=f.type,
+                cards=cards,
+                members=(fname,),
+                gather=gather,
+                scatter=scatter,
+                k=k,
+                table=table_arr,
+            )
+        )
+
+    if semiring == "max":
+        rejects = []
+        if any(g.mode == "vmp" for g in groups):
+            rejects.append("mean-field (vmp) beads")
+        if gfe_groups or gfe_tm_groups:
+            rejects.append("P-substitution / GFE composites")
+        if gauss_groups or mix_groups or prec_groups:
+            rejects.append("Gaussian/hybrid groups")
+        if ef_groups:
+            rejects.append("EF groups")
+        if rejects:
+            raise CompileError(
+                f"semiring='max' (MAP) is defined in v1 for discrete BP groups and hard "
+                f"constraints only; template {t.name!r} has: " + ", ".join(rejects)
+            )
+
     delta_edges = sorted(
         c.target for c in t.constraints if c.kind is ConstraintKind.DELTA
     )
@@ -726,6 +854,8 @@ def compile_template(
         edges=edges,
         groups=groups,
         data_slots=data_slots,
+        semiring=semiring,
+        constraint_groups=constraint_groups,
         log_params=log_params,
         d_max=d_max,
         n_gslots=next_gslot,

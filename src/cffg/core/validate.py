@@ -52,7 +52,15 @@ def _check_factors(t: Template) -> list[str]:
         if ft is None:
             problems.append(f"factor {f.name!r}: unknown type {f.type!r}")
             continue
-        if set(f.edges) != set(ft.edge_roles):
+        if ft.variadic:
+            n = len(f.edges)
+            want = {f"x{i}" for i in range(n)}
+            if n < 2 or set(f.edges) != want:
+                problems.append(
+                    f"factor {f.name!r}: variadic type {f.type!r} needs contiguous edge "
+                    f"roles x0..x{{n-1}} (n >= 2), got {sorted(f.edges)}"
+                )
+        elif set(f.edges) != set(ft.edge_roles):
             problems.append(
                 f"factor {f.name!r}: edge roles {sorted(f.edges)} != required {sorted(ft.edge_roles)}"
             )
@@ -91,6 +99,17 @@ def _check_factors(t: Template) -> list[str]:
             if wrong:
                 problems.append(
                     f"factor {f.name!r}: type {f.type!r} needs {ft.family} edges, got "
+                    + ", ".join(f"{v!r} ({fam})" for v, fam in sorted(wrong.items()))
+                )
+        if ft.family == "constraint":
+            wrong = {
+                v: t.variables[v].family
+                for v in f.edges.values()
+                if v in t.variables and t.variables[v].family != "discrete"
+            }
+            if wrong:
+                problems.append(
+                    f"factor {f.name!r}: constraint type {f.type!r} needs discrete edges, got "
                     + ", ".join(f"{v!r} ({fam})" for v, fam in sorted(wrong.items()))
                 )
         for role, want in EF_EDGE_FAMILIES.get(f.type, {}).items():

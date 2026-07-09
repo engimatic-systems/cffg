@@ -153,7 +153,9 @@ class FactorType:
     edge_roles: tuple[str, ...]  # required structural edges
     param_roles: tuple[str, ...] = ()  # each bound by exactly one edge or blob
     symmetric_domain: bool = False  # all structural edges share one domain
-    family: str = "discrete"  # "discrete" | "gaussian" | "any"
+    family: str = "discrete"  # "discrete" | "gaussian" | "any" | "constraint"
+    variadic: bool = False  # edges are x0..x{n-1} for a runtime-chosen n
+    # (hard-constraint factors: alldifferent over any arity — cff-e8zk)
 
 
 FACTOR_TYPES: dict[str, FactorType] = {}
@@ -178,6 +180,34 @@ register_factor_type(
 register_factor_type(FactorType("dirichlet", edge_roles=("out",), param_roles=("counts",)))
 register_factor_type(
     FactorType("equality", edge_roles=("a", "b", "c"), symmetric_domain=True, family="any")
+)
+
+# The hard-constraint vocabulary (cff-e8zk): indicator factors over a runtime-
+# chosen number of discrete edges x0..x{n-1}. family="constraint" marks them as
+# indicator factors (log-potential entries in {0, NEG}) — exempt from the
+# column-stochastic check (unnormalized by design), carrying structural metadata
+# only (no dense potential tensor is ever materialized). Their combinatorial
+# message and node-energy functions live in cffg.csp. `variadic` edges are
+# validated to be the contiguous roles x0..x{n-1}; per-type cardinality rules
+# (alldifferent: shared K >= n; exactly/at_most: binary; table: enumerated) are
+# checked at compile.
+register_factor_type(
+    FactorType("alldifferent", edge_roles=(), family="constraint", variadic=True)
+)
+register_factor_type(
+    FactorType(
+        "exactly_k", edge_roles=(), param_roles=("k",), family="constraint", variadic=True
+    )
+)
+register_factor_type(
+    FactorType(
+        "at_most_k", edge_roles=(), param_roles=("k",), family="constraint", variadic=True
+    )
+)
+register_factor_type(
+    FactorType(
+        "table", edge_roles=(), param_roles=("table",), family="constraint", variadic=True
+    )
 )
 
 # The Gaussian vocabulary (cff-4e5z): enough for linear-Gaussian state-space
