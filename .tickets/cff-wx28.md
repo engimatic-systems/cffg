@@ -1,6 +1,6 @@
 ---
 id: cff-wx28
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-07-09T03:50:32Z
@@ -17,3 +17,9 @@ Solve the warm-start problem generally (Cooper 2026-07-09): parameters rarely wa
 
 Property tests per kind (stochasticity/SPD/shape/seed-reproducibility); counts-strength semantics tested; serialization + hash-erasure round trip; end-to-end compile from an init-only template (no arrays, no files); docs updated in place.
 
+
+## Notes
+
+**2026-07-09T03:55:13Z**
+
+LANDED (branch init-templates, single commit). All acceptance criteria met: per-kind property tests, counts-strength semantics, JSON+hash round trip (hash provably unmoved by init specs), compile-and-run from specs alone, file-beats-spec checkpoint semantics, RebindBlobPath preserves init. Vocabulary is an open registry — EF distributions (cff-8s6a) should add their natural-parameter inits as table entries. NOT done (deliberate): no init specs on the existing model builders (tmaze/gridworld/kalman pass arrays explicitly — converting them is cosmetic and would churn goldens).
