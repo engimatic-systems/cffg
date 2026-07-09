@@ -34,7 +34,11 @@ def to_dict(t: Template) -> dict[str, Any]:
         "schema_version": SCHEMA_VERSION,
         "name": t.name,
         "variables": {
-            v.name: ({"dim": v.dim} if v.dim else {"cardinality": v.cardinality})
+            v.name: (
+                {"dim": v.dim}
+                if v.dim
+                else {"ef": v.ef} if v.ef else {"cardinality": v.cardinality}
+            )
             for v in _sorted(t.variables)
         },
         "factors": {
@@ -71,7 +75,9 @@ def from_dict(d: dict[str, Any]) -> Template:
     return Template(
         name=d["name"],
         variables={
-            name: VariableSpec(name, spec.get("cardinality", 0), spec.get("dim", 0))
+            name: VariableSpec(
+                name, spec.get("cardinality", 0), spec.get("dim", 0), spec.get("ef", "")
+            )
             for name, spec in d["variables"].items()
         },
         factors={

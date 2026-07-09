@@ -31,32 +31,41 @@ class PortRole(str, Enum):
 class VariableSpec:
     """An edge in the FFG: a named random variable.
 
-    Two domain families: discrete one-hot (`cardinality` = k) or Gaussian
-    (`dim` = d, a point in R^d). Exactly one of the two is set; `family`
-    names which. Messages, arenas, and rules dispatch on the family — a
-    discrete edge lives in the log-probability arena, a Gaussian edge in
-    the information-form (eta, Lambda) arena (cff-4e5z).
+    Three domain families, tagged by which field is set (exactly one):
+    discrete one-hot (`cardinality` = k), Gaussian (`dim` = d, a point in
+    R^d), or scalar exponential-family (`ef` = a family name, cff-8s6a).
+    Messages, arenas, and rules dispatch on the family — a discrete edge
+    lives in the log-probability arena, a Gaussian edge in the
+    information-form (eta, Lambda) arena (cff-4e5z), an EF edge in the
+    natural-parameter arena. EF names come in two kinds (cffg.ef): message
+    families (gamma, beta) whose edges carry natural-parameter messages,
+    and observation families (poisson, bernoulli) whose edges are
+    conditioned DATA ports only — their predictives leave the family, so
+    no message ever flows on them.
     """
 
     name: str
     cardinality: int = 0
     dim: int = 0
+    ef: str = ""
 
     def __post_init__(self):
-        if (self.cardinality > 0) == (self.dim > 0):
+        if (self.cardinality > 0) + (self.dim > 0) + bool(self.ef) != 1:
             raise ValueError(
-                f"variable {self.name!r}: exactly one of cardinality ({self.cardinality}) "
-                f"and dim ({self.dim}) must be positive"
+                f"variable {self.name!r}: exactly one of cardinality ({self.cardinality}), "
+                f"dim ({self.dim}), and ef ({self.ef!r}) must be set"
             )
 
     @property
     def family(self) -> str:
-        return "gaussian" if self.dim else "discrete"
+        return "gaussian" if self.dim else "ef" if self.ef else "discrete"
 
     @property
     def domain_key(self) -> tuple[str, int]:
         """Hashable domain identity: what must match across an equality node
-        or a glue bond."""
+        or a glue bond. EF domains are scalar; the family name is the key."""
+        if self.ef:
+            return (f"ef:{self.ef}", 1)
         return (self.family, self.dim or self.cardinality)
 
 
@@ -134,9 +143,11 @@ class FactorType:
     """Structural signature of a factor kind. Math lives in cffg.rules (M2+)
     and cffg.gauss (Gaussian family, cff-4e5z).
 
-    `family` constrains the structural edges' domains: "discrete" and
-    "gaussian" require every edge in that family; "any" (equality) accepts
-    either family but `symmetric_domain` then forces one shared domain."""
+    `family` constrains the structural edges' domains: "discrete",
+    "gaussian", and "ef" require every edge in that family ("ef" types
+    additionally pin each role to a specific EF family via
+    EF_EDGE_FAMILIES); "any" (equality) accepts any family but
+    `symmetric_domain` then forces one shared domain."""
 
     name: str
     edge_roles: tuple[str, ...]  # required structural edges
@@ -184,6 +195,30 @@ register_factor_type(
         family="gaussian",
     )
 )
+
+# The scalar exponential-family vocabulary (cff-8s6a): prior leaves over
+# rates/precisions (gamma) and probabilities (beta), plus their conjugate
+# observation factors. poisson_obs/bernoulli_obs are *conditioned* likelihoods
+# (Gaussian DATA convention, cff-4e5z): the "out" edge must be a DATA port —
+# the unobserved predictives (negative-binomial / Beta-Bernoulli mixture)
+# leave the exponential family, so no message rule exists for them.
+register_factor_type(
+    FactorType("gamma", edge_roles=("out",), param_roles=("shape", "rate"), family="ef")
+)
+register_factor_type(
+    FactorType("beta", edge_roles=("out",), param_roles=("a", "b"), family="ef")
+)
+register_factor_type(FactorType("poisson_obs", edge_roles=("out", "rate"), family="ef"))
+register_factor_type(FactorType("bernoulli_obs", edge_roles=("out", "prob"), family="ef"))
+
+# Per-role EF family constraints for family="ef" types: which `VariableSpec.ef`
+# tag each structural edge must carry (validated in cffg.core.validate).
+EF_EDGE_FAMILIES: dict[str, dict[str, str]] = {
+    "gamma": {"out": "gamma"},
+    "beta": {"out": "beta"},
+    "poisson_obs": {"out": "poisson", "rate": "gamma"},
+    "bernoulli_obs": {"out": "bernoulli", "prob": "beta"},
+}
 
 
 @dataclass

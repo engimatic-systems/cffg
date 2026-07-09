@@ -137,3 +137,68 @@ def test_factor_type_registry_rejects_duplicates():
 def test_unknown_factor_type_rejected(hmm_slice):
     hmm_slice.factors["woo"] = FactorSpec("woo", "quantum", edges={"out": "z_out"})
     assert "unknown type 'quantum'" in problems_of(hmm_slice)
+
+
+# --- EF domains (cff-8s6a) ----------------------------------------------------
+
+
+def ef_chain(name="ef_chain") -> "Template":
+    """gamma prior --lam(ef:gamma)-- poisson_obs --x(ef:poisson): data port."""
+    from cffg.core import BlobRef, Template
+
+    return Template(
+        name=name,
+        variables={
+            "lam": VariableSpec("lam", ef="gamma"),
+            "x": VariableSpec("x", ef="poisson"),
+        },
+        factors={
+            "prior": FactorSpec(
+                "prior", "gamma", edges={"out": "lam"},
+                param_blobs={"shape": "a0", "rate": "b0"},
+            ),
+            "obs": FactorSpec("obs", "poisson_obs", edges={"out": "x", "rate": "lam"}),
+        },
+        ports={"count": PortSpec("count", "x", PortRole.DATA)},
+        blobs={
+            "a0": BlobRef("a0", "blobs/a0.npy"),
+            "b0": BlobRef("b0", "blobs/b0.npy"),
+        },
+    )
+
+
+def test_ef_variable_spec_domain():
+    v = VariableSpec("lam", ef="gamma")
+    assert v.family == "ef" and v.domain_key == ("ef:gamma", 1)
+    with pytest.raises(ValueError, match="exactly one"):
+        VariableSpec("both", cardinality=3, ef="gamma")
+
+
+def test_ef_chain_validates():
+    validate(ef_chain())
+
+
+def test_unknown_ef_family_rejected():
+    t = ef_chain()
+    t.variables["lam"] = VariableSpec("lam", ef="cauchy")
+    text = problems_of(t)
+    assert "unknown EF family 'cauchy'" in text
+
+
+def test_ef_factor_rejects_wrong_edge_family():
+    t = ef_chain()
+    t.variables["lam"] = VariableSpec("lam", ef="beta")  # rate edge must be gamma
+    assert "needs an ef='gamma' edge" in problems_of(t)
+
+
+def test_ef_factor_rejects_discrete_edge():
+    t = ef_chain()
+    t.variables["lam"] = VariableSpec("lam", 3)
+    assert "needs ef edges" in problems_of(t)
+
+
+def test_ef_equality_requires_same_family():
+    t = ef_chain()
+    t.variables["p"] = VariableSpec("p", ef="beta")
+    t.factors["eq"] = FactorSpec("eq", "equality", edges={"a": "lam", "b": "p", "c": "p"})
+    assert "shared domain" in problems_of(t)

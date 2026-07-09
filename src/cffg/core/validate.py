@@ -11,10 +11,12 @@ from __future__ import annotations
 
 from cffg.core.ir import (
     EDGE_CONSTRAINTS,
+    EF_EDGE_FAMILIES,
     FACTOR_TYPES,
     ConstraintKind,
     Template,
 )
+from cffg.ef import FAMILIES as EF_FAMILIES, OBS_FAMILIES as EF_OBS_FAMILIES
 
 
 class ModelError(ValueError):
@@ -74,7 +76,7 @@ def _check_factors(t: Template) -> list[str]:
                 problems.append(
                     f"factor {f.name!r}: type {f.type!r} requires one shared domain, got {sorted(domains)}"
                 )
-        if ft.family in ("discrete", "gaussian"):
+        if ft.family in ("discrete", "gaussian", "ef"):
             wrong = {
                 v: t.variables[v].family
                 for v in f.edges.values()
@@ -84,6 +86,13 @@ def _check_factors(t: Template) -> list[str]:
                 problems.append(
                     f"factor {f.name!r}: type {f.type!r} needs {ft.family} edges, got "
                     + ", ".join(f"{v!r} ({fam})" for v, fam in sorted(wrong.items()))
+                )
+        for role, want in EF_EDGE_FAMILIES.get(f.type, {}).items():
+            var = f.edges.get(role)
+            if var in t.variables and t.variables[var].ef not in ("", want):
+                problems.append(
+                    f"factor {f.name!r}: role {role!r} needs an ef={want!r} edge, "
+                    f"got {var!r} (ef={t.variables[var].ef!r})"
                 )
     return problems
 
@@ -95,6 +104,11 @@ def _check_degrees_and_ports(t: Template) -> list[str]:
             problems.append(f"port {p.name!r}: unknown variable {p.variable!r}")
 
     for v in t.variables.values():
+        if v.ef and v.ef not in EF_FAMILIES and v.ef not in EF_OBS_FAMILIES:
+            problems.append(
+                f"variable {v.name!r}: unknown EF family {v.ef!r}; message families "
+                f"are {sorted(EF_FAMILIES)}, observation families {sorted(EF_OBS_FAMILIES)}"
+            )
         deg = t.degree(v.name)
         n_ports = len(t.ports_of(v.name))
         if deg == 0:
