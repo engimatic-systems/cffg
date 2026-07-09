@@ -17,3 +17,9 @@ Refactor message families around natural parameters + log-partition functions so
 
 Cat/Dir/Gaussian re-expressed on the abstraction with zero test regressions; at least Gamma+Beta live with BP/VMP rules and FE terms; property tests vs scipy for moments/KL.
 
+
+## Notes
+
+**2026-07-09T04:02:13Z**
+
+PARTIAL LAND (branch exp-families): the Fable-level math is done and tested — cffg/ef.py (contract + Gamma/Beta tables + conjugate messages + observation energies, all quadrature-pinned) and DERIVATIONS.md D2 (plain-English + contract + integration plan). REMAINING (engine-facing, deliberately left for fresh context per the robustness contract): (1) VariableSpec domain generalization to tagged domains; (2) third arena ef_eta [n,2] with per-group family tags; (3) factor types gamma/beta priors + poisson_obs/bernoulli_obs conditioned likelihoods; (4) SEPARATE zero-regression refactor ticket for re-expressing Cat/Dir/Gaussian on the abstraction — do NOT fold into feature work. gaussian_prec (Gamma precision edge on a Gaussian node) belongs to cff-7c5o as the abstraction's first mixed client. Hostile-inputs checklist for the arena work: vacuous eta=0 propriety, improper products mid-flooding, f32 (the vendored psi is f64-tuned — mirror in jnp with dtype-aware series), observed x=0 counts.
