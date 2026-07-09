@@ -68,6 +68,14 @@ A pure-Python (dataclass) representation, independent of JAX:
   constraints; all array data (A matrices, Dirichlet counts, goal statistics)
   referenced as relative file paths to `safetensors`/`.npz` blobs. Content hash
   of the structural part keys the JIT cache.
+- **Init templates (cff-wx28)**: a `BlobRef` may carry a canonical-initializer
+  spec (`cffg.inits`: uniform/one-hot/sticky/banded/shift/seeded-random plus
+  Gaussian eye/SPD), so warm-start parameters need no external file; any
+  probability template takes a `strength` knob that turns it into Dirichlet
+  counts (confidence-weighted priors for learn_a/learn_b). Resolution order:
+  explicit arrays > existing blob file > init spec — checkpoints override
+  warm starts on reload. Init specs, like paths, are erased from the
+  structure hash (parameter data, not structure).
 - **Portable bundle**: the deployable unit is a ZIP (`.cffgz`) containing
   `model.json` (structure + constraints), `blobs/` (parameter arrays), and
   `manifest.json` (schema version, content hashes, provenance). Unzipping and
