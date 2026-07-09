@@ -13,6 +13,7 @@ from cffg.core.ir import (
     EDGE_CONSTRAINTS,
     EF_EDGE_FAMILIES,
     FACTOR_TYPES,
+    HYBRID_EDGE_FAMILIES,
     ConstraintKind,
     Template,
 )
@@ -93,6 +94,13 @@ def _check_factors(t: Template) -> list[str]:
                 problems.append(
                     f"factor {f.name!r}: role {role!r} needs an ef={want!r} edge, "
                     f"got {var!r} (ef={t.variables[var].ef!r})"
+                )
+        for role, want in HYBRID_EDGE_FAMILIES.get(f.type, {}).items():
+            var = f.edges.get(role)
+            if var in t.variables and t.variables[var].family != want:
+                problems.append(
+                    f"factor {f.name!r}: role {role!r} needs a {want} edge, "
+                    f"got {var!r} ({t.variables[var].family})"
                 )
     return problems
 
