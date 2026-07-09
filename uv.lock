@@ -69,6 +69,7 @@ viz = [
 [package.dev-dependencies]
 dev = [
     { name = "pytest" },
+    { name = "scipy" },
     { name = "setuptools" },
     { name = "simglucose" },
 ]
@@ -86,6 +87,7 @@ provides-extras = ["viz"]
 [package.metadata.requires-dev]
 dev = [
     { name = "pytest", specifier = ">=9.1.1" },
+    { name = "scipy", specifier = ">=1.18.0" },
     { name = "setuptools", specifier = "<81" },
     { name = "simglucose", git = "https://github.com/jxx123/simglucose" },
 ]
