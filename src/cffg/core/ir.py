@@ -220,6 +220,37 @@ EF_EDGE_FAMILIES: dict[str, dict[str, str]] = {
     "bernoulli_obs": {"out": "bernoulli", "prob": "beta"},
 }
 
+# The hybrid Gaussian-mixture vocabulary (cff-pksr): a discrete selector edge
+# steers a continuous Gaussian output. `gaussian_mixture` is the mixture-of-
+# priors leaf N(out; m_s, V_s); `gaussian_mixture_linear` is the switching
+# conditional N(out; A_s in + b_s, V_s) — the continuous sibling of
+# transition_mixture. Messages on the Gaussian edges are moment-matched
+# collapses; the selector message is exact (cffg.mixg, DERIVATIONS.md D3).
+register_factor_type(
+    FactorType(
+        "gaussian_mixture",
+        edge_roles=("out", "selector"),
+        param_roles=("mean", "cov"),
+        family="hybrid",
+    )
+)
+register_factor_type(
+    FactorType(
+        "gaussian_mixture_linear",
+        edge_roles=("out", "in", "selector"),
+        param_roles=("matrix", "offset", "cov"),
+        family="hybrid",
+    )
+)
+
+# Per-role domain-family constraints for family="hybrid" types: unlike EF
+# (which pins the `ef` tag), each structural edge here must carry a whole
+# VariableSpec.family (validated in cffg.core.validate).
+HYBRID_EDGE_FAMILIES: dict[str, dict[str, str]] = {
+    "gaussian_mixture": {"out": "gaussian", "selector": "discrete"},
+    "gaussian_mixture_linear": {"out": "gaussian", "in": "gaussian", "selector": "discrete"},
+}
+
 
 @dataclass
 class Template:

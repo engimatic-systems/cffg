@@ -89,6 +89,30 @@ class GaussGroupPlan:
 
 
 @dataclass(frozen=True)
+class MixGroupPlan:
+    """All hybrid Gaussian-mixture factors of one (type, dim-signature,
+    selector cardinality), run together (cff-pksr). A hybrid node straddles
+    two arenas: its out(/in) edges live in the Gaussian (eta, Lambda) arena
+    (g_gather/g_scatter, read-opposite/write-own like GaussGroupPlan), its
+    selector edge in the discrete log-probability arena (s_gather/s_scatter).
+
+    Types: "gaussian_mixture" (roles out, selector; dims (do,)) and
+    "gaussian_mixture_linear" (roles out, in, selector; dims (do, di)).
+    Parameters are per-regime stacks keyed under f"{name}:W" [M, K, do, do]
+    plus f"{name}:m" (mixture) or f"{name}:A"/f"{name}:b" (linear)."""
+
+    name: str
+    type: str
+    dims: tuple[int, ...]  # (do,) or (do, di)
+    k_sel: int  # selector cardinality K (the per-regime stack axis)
+    members: tuple[str, ...]
+    g_gather: np.ndarray  # [M, R_g] gaussian slot to read (opposite side)
+    g_scatter: np.ndarray  # [M, R_g] gaussian slot to write (own side)
+    s_gather: np.ndarray  # [M] selector discrete slot to read (opposite side)
+    s_scatter: np.ndarray  # [M] selector discrete slot to write (own side)
+
+
+@dataclass(frozen=True)
 class EfGroupPlan:
     """All EF-family factors of one (type, family), run together (cff-8s6a).
 
@@ -166,6 +190,9 @@ class Arena:
     gauss_data: dict[str, tuple[int, int]] = field(default_factory=dict)
     # Gaussian DATA port -> (row in g_obs, dim of the observed edge)
     n_obs_rows: int = 0
+    mix_groups: list[MixGroupPlan] = field(default_factory=list)
+    # Hybrid Gaussian-mixture groups (cff-pksr): each writes both the Gaussian
+    # arena (out/in edges) and the discrete arena (selector edge).
     gauss_interior: list[tuple[int, np.ndarray]] = field(default_factory=list)
     # [(dim, [E, 2] slot pairs)] interior Gaussian edges for the entropy ledger
     # EF arena (cff-8s6a): messages are natural parameters ef_eta
@@ -247,6 +274,11 @@ def compile_template(
                 f"factor {f.name!r}: beads on EF nodes are undefined in M-scope — "
                 "conjugate BP is already exact on EF subgraphs (cff-8s6a)"
             )
+        if FACTOR_TYPES[f.type].family == "hybrid" and f.name in (mean_field | set(psub)):
+            problems.append(
+                f"factor {f.name!r}: hybrid beads are undefined; collapse rules are "
+                "already assumed-density (cff-pksr)"
+            )
         if f.type in ("poisson_obs", "bernoulli_obs"):
             out_var = f.edges["out"]
             out_ports = [p for p in t.ports_of(out_var) if p.role is PortRole.DATA]
@@ -305,8 +337,14 @@ def compile_template(
                     # Gaussian observations compile to conditioning: legal only
                     # where a conditioned rule exists (gaussian_linear "out").
                     fname, role = ends[0]
-                    if t.factors[fname].type == "gaussian_linear" and role == "out":
+                    ftype_here = t.factors[fname].type
+                    if ftype_here == "gaussian_linear" and role == "out":
                         gauss_data_ports[vname] = port.name
+                    elif ftype_here in ("gaussian_mixture", "gaussian_mixture_linear"):
+                        problems.append(
+                            f"port {port.name!r}: observed mixture outputs are not "
+                            f"supported yet (Gaussian DATA port on {fname!r}/{role!r})"
+                        )
                     else:
                         problems.append(
                             f"port {port.name!r}: Gaussian DATA ports must clamp a "
@@ -440,6 +478,7 @@ def compile_template(
     buckets: dict[tuple, list[str]] = {}
     gauss_buckets: dict[tuple, list[str]] = {}
     ef_buckets: dict[tuple[str, str], list[str]] = {}
+    mix_buckets: dict[tuple, list[str]] = {}
     for fname in sorted(t.factors):
         if fname in consumed:
             continue
@@ -454,6 +493,11 @@ def compile_template(
             observed = f.type == "gaussian_linear" and f.edges["out"] in gauss_data_ports
             gtype = "gaussian_linear_obs" if observed else f.type
             gauss_buckets.setdefault((gtype, dims), []).append(fname)
+            continue
+        if ft.family == "hybrid":  # Gaussian-mixture nodes: their own arena pair
+            dims = tuple(t.variables[f.edges[r]].dim for r in roles if r != "selector")
+            k_sel = t.variables[f.edges["selector"]].cardinality
+            mix_buckets.setdefault((f.type, dims, k_sel), []).append(fname)
             continue
         ef_family = ft.family == "ef" or (
             ft.family == "any" and bool(t.variables[f.edges[roles[0]]].ef)
@@ -499,6 +543,28 @@ def compile_template(
             log_params[f"{gname}:{key}"] = arr
         # member_of stays discrete-only: per-member Gaussian parameter updates
         # are the learning ticket's call (cff-7c5o).
+
+    mix_groups: list[MixGroupPlan] = []
+    for (mtype, dims, k_sel), members in sorted(mix_buckets.items()):
+        gauss_roles = tuple(r for r in FACTOR_TYPES[mtype].edge_roles if r != "selector")
+        gname = f"mix:{mtype}:{'x'.join(map(str, dims))}:{k_sel}"
+        g_gather = np.array(
+            [[opposite[(m, r)] for r in gauss_roles] for m in members], dtype=np.int64
+        )
+        g_scatter = np.array(
+            [[slot_of[(m, r)] for r in gauss_roles] for m in members], dtype=np.int64
+        )
+        s_gather = np.array([opposite[(m, "selector")] for m in members], dtype=np.int64)
+        s_scatter = np.array([slot_of[(m, "selector")] for m in members], dtype=np.int64)
+        mix_groups.append(
+            MixGroupPlan(
+                gname, mtype, dims, k_sel, tuple(members),
+                g_gather, g_scatter, s_gather, s_scatter,
+            )
+        )
+        for key, arr in _stack_mix_params(t, mtype, dims, k_sel, members, resolved).items():
+            log_params[f"{gname}:{key}"] = arr
+        # member_of stays discrete-only, as with the Gaussian and EF families.
 
     ef_groups: list[EfGroupPlan] = []
     ef_data: dict[str, int] = {}
@@ -606,6 +672,7 @@ def compile_template(
         gauss_groups=gauss_groups,
         gauss_data=gauss_data,
         n_obs_rows=n_obs_rows,
+        mix_groups=mix_groups,
         gauss_interior=gauss_interior,
         n_efslots=next_efslot,
         ef_groups=ef_groups,
@@ -678,6 +745,12 @@ def _blob_shape(t: Template, blob_name: str) -> tuple[int, ...] | None:
             if f.type == "gaussian_linear":
                 do, di = dim("out"), dim("in")
                 return {"matrix": (do, di), "offset": (do,), "cov": (do, do)}[role]
+            if f.type == "gaussian_mixture":
+                d, k = dim("out"), card("selector")
+                return {"mean": (k, d), "cov": (k, d, d)}[role]
+            if f.type == "gaussian_mixture_linear":
+                do, di, k = dim("out"), dim("in"), card("selector")
+                return {"matrix": (k, do, di), "offset": (k, do), "cov": (k, do, do)}[role]
             if f.type in ("gamma", "beta"):
                 return ()  # scalar prior parameters
     return None
@@ -771,6 +844,51 @@ def _stack_gauss_params(
         except np.linalg.LinAlgError:
             raise CompileError(f"factor {m!r}: covariance not positive definite") from None
         out.setdefault("W", []).append(np.linalg.inv(cov))
+    return {k: np.stack(v) for k, v in out.items()}
+
+
+def _stack_mix_params(
+    t: Template,
+    ftype: str,
+    dims: tuple[int, ...],
+    k_sel: int,
+    members: list[str],
+    resolved: dict[str, np.ndarray],
+) -> dict[str, np.ndarray]:
+    """Per-member hybrid parameters, stacked [M, K, ...] over the K regimes
+    (cff-pksr). Blobs are per-regime stacks: mean [K, d]/cov [K, d, d] for
+    gaussian_mixture, matrix [K, do, di]/offset [K, do]/cov [K, do, do] for
+    gaussian_mixture_linear. Each cov[k] is validated symmetric + SPD (the
+    Cholesky is the check) and stored as a precision W = V⁻¹, the form every
+    mixg rule consumes."""
+    out: dict[str, list[np.ndarray]] = {}
+    for m in members:
+        f = t.factors[m]
+        blobs = {role: resolved[f.param_blobs[role]] for role in sorted(f.param_blobs)}
+        cov = blobs["cov"]
+        if ftype == "gaussian_mixture":
+            (d,) = dims
+            _expect(m, blobs["mean"], (k_sel, d))
+            _expect(m, cov, (k_sel, d, d))
+            out.setdefault("m", []).append(blobs["mean"])
+        else:  # gaussian_mixture_linear
+            do, di = dims
+            _expect(m, blobs["matrix"], (k_sel, do, di))
+            _expect(m, blobs["offset"], (k_sel, do))
+            _expect(m, cov, (k_sel, do, do))
+            out.setdefault("A", []).append(blobs["matrix"])
+            out.setdefault("b", []).append(blobs["offset"])
+        w_regimes = []
+        for k in range(k_sel):
+            ck = cov[k]
+            if not np.allclose(ck, ck.T, atol=1e-12):
+                raise CompileError(f"factor {m!r}: covariance not symmetric")
+            try:
+                np.linalg.cholesky(ck)
+            except np.linalg.LinAlgError:
+                raise CompileError(f"factor {m!r}: covariance not positive definite") from None
+            w_regimes.append(np.linalg.inv(ck))
+        out.setdefault("W", []).append(np.stack(w_regimes))
     return {k: np.stack(v) for k, v in out.items()}
 
 

@@ -21,7 +21,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax.scipy.special import logsumexp
 
-from cffg import ef, efrules, gauss
+from cffg import ef, efrules, gauss, mixg
 from cffg.compiler import NEG, Arena
 from cffg.rules import (
     BP_UPDATES,
@@ -335,6 +335,49 @@ def _pad_gauss(eta: jax.Array, lam: jax.Array, d_max: int) -> tuple[jax.Array, j
     )
 
 
+def _pad_disc(rows: jax.Array, k_max: int) -> jax.Array:
+    """NEG-pad a [M, K] block of log-messages out to the discrete arena width
+    (log-space zero past the selector's own cardinality)."""
+    return jnp.pad(rows, ((0, 0), (0, k_max - rows.shape[-1])), constant_values=NEG)
+
+
+def _mix_sweep(arena, messages, g_eta, g_lam, params, k_max, d_max):
+    """One synchronous flooding sweep over the hybrid Gaussian-mixture groups
+    (cff-pksr). Reads only the pre-sweep arrays; returns the writes for both
+    arenas so the caller can fold them into each arena's damping phase:
+    `sel_writes` [(s_scatter, [M, k_max])] to the discrete messages, and
+    `gauss_writes` [(g_scatter, [M, d_max], [M, d_max, d_max])] to (eta, Lam).
+    Dims and K are static per group, so every rule sees exact slices."""
+    sel_writes: list[tuple[jax.Array, jax.Array]] = []
+    gauss_writes: list[tuple[jax.Array, jax.Array, jax.Array]] = []
+    for g in arena.mix_groups:
+        mu_e = messages[g.s_gather][:, : g.k_sel]  # [M, K] incoming selector msg
+        inc_e = g_eta[g.g_gather]  # [M, R_g, d_max]
+        inc_l = g_lam[g.g_gather]  # [M, R_g, d_max, d_max]
+        w = params[g.name + ":W"]
+        if g.type == "gaussian_mixture_linear":
+            do, di = g.dims
+            a, b = params[g.name + ":A"], params[g.name + ":b"]
+            e_o, l_o = inc_e[:, 0, :do], inc_l[:, 0, :do, :do]
+            e_i, l_i = inc_e[:, 1, :di], inc_l[:, 1, :di, :di]
+            g_outs = [
+                mixg.mixlin_forward(e_i, l_i, mu_e, a, b, w),  # -> out
+                mixg.mixlin_backward(e_o, l_o, mu_e, a, b, w),  # -> in
+            ]
+            to_sel = mixg.mixlin_to_selector(e_o, l_o, e_i, l_i, a, b, w)  # [M, K]
+        else:  # gaussian_mixture
+            (do,) = g.dims
+            m = params[g.name + ":m"]
+            e_o, l_o = inc_e[:, 0, :do], inc_l[:, 0, :do, :do]
+            g_outs = [mixg.mix_forward(mu_e, m, w)]  # -> out
+            to_sel = mixg.mix_to_selector(e_o, l_o, m, w)  # [M, K]
+        for r, (oe, ol) in enumerate(g_outs):
+            oe, ol = _pad_gauss(oe, ol, d_max)
+            gauss_writes.append((g.g_scatter[:, r], oe, ol))
+        sel_writes.append((g.s_scatter, _pad_disc(to_sel, k_max)))
+    return sel_writes, gauss_writes
+
+
 def _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params):
     """One synchronous flooding sweep over the Gaussian groups; returns the
     fully rewritten (eta, Lambda) arrays. Dims are static per group, so every
@@ -440,12 +483,25 @@ def _make_step(arena: Arena):
             new = new.at[g.scatter[:, 0]].set(to_out)
             new = new.at[g.scatter[:, 1]].set(to_in)
             new = new.at[g.scatter[:, 2]].set(to_sel)
+        # Hybrid Gaussian-mixture sweep (cff-pksr): straddles both arenas.
+        # Computed here from the pre-sweep arrays so its writes fold into each
+        # arena's damping phase — Gaussian writes below, selector writes with
+        # the discrete blend (synchronous flooding: gather from OLD arrays).
+        mix_sel, mix_gauss = (
+            _mix_sweep(arena, messages, g_eta, g_lam, params, k_max, arena.d_max)
+            if arena.mix_groups
+            else ([], [])
+        )
         # Gaussian sweep: information-form damping below is the log-space
         # damping of the Gaussian family (log of a Gaussian is its (eta,
         # Lambda) quadratic), so one damp knob covers both arenas.
         new_eta, new_lam = g_eta, g_lam
         if arena.gauss_groups:
             new_eta, new_lam = _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params)
+        for scatter, oe, ol in mix_gauss:
+            new_eta = new_eta.at[scatter].set(oe)
+            new_lam = new_lam.at[scatter].set(ol)
+        if arena.gauss_groups or arena.mix_groups:
             new_eta = damp * g_eta + (1.0 - damp) * new_eta
             new_lam = damp * g_lam + (1.0 - damp) * new_lam
         # EF sweep: natural parameters are the log-space of their family, so
@@ -454,6 +510,9 @@ def _make_step(arena: Arena):
         if arena.ef_groups:
             new_ef = _ef_sweep(arena, ef_eta, ef_obs, ef_mask, params)
             new_ef = damp * ef_eta + (1.0 - damp) * new_ef
+        # Hybrid selector writes join the discrete arena before its damping.
+        for scatter, rows in mix_sel:
+            new = new.at[scatter].set(rows)
         # Log-space damping: stabilizes the outer coordination between GFE
         # composites (their local solves are exact, but synchronous flooding
         # between them can limit-cycle — the outer face of Part II §4.5).
@@ -510,6 +569,30 @@ def _gauss_bfe(arena, g_eta, g_lam, g_obs, g_mask, params):
     return total
 
 
+def _mix_bfe(arena, messages, g_eta, g_lam, params):
+    """Hybrid Gaussian-mixture node energies (cff-pksr): exact for the held
+    labelled-mixture beliefs (mixg energies). The Gaussian and selector edge
+    entropies need no code here — the out/in edges land in gauss_interior and
+    the selector edge in interior_slot_pairs, both factor-agnostic tables."""
+    total = jnp.asarray(0.0, dtype=g_eta.dtype)
+    for g in arena.mix_groups:
+        mu_e = messages[g.s_gather][:, : g.k_sel]
+        inc_e, inc_l = g_eta[g.g_gather], g_lam[g.g_gather]
+        w = params[g.name + ":W"]
+        if g.type == "gaussian_mixture_linear":
+            do, di = g.dims
+            a, b = params[g.name + ":A"], params[g.name + ":b"]
+            e_o, l_o = inc_e[:, 0, :do], inc_l[:, 0, :do, :do]
+            e_i, l_i = inc_e[:, 1, :di], inc_l[:, 1, :di, :di]
+            total = total + mixg.mixlin_energy(e_o, l_o, e_i, l_i, mu_e, a, b, w).sum()
+        else:
+            (do,) = g.dims
+            m = params[g.name + ":m"]
+            e_o, l_o = inc_e[:, 0, :do], inc_l[:, 0, :do, :do]
+            total = total + mixg.mix_energy(e_o, l_o, mu_e, m, w).sum()
+    return total
+
+
 def _ef_bfe(arena, ef_eta, ef_obs, ef_mask, params):
     """EF node energies + interior-edge entropies, all closed form
     (cffg.efrules). Improper beliefs anywhere make the total +inf — loud.
@@ -557,6 +640,8 @@ def _make_bfe(arena: Arena):
         total = jnp.asarray(0.0, dtype=messages.dtype)
         if arena.gauss_groups:
             total = total + _gauss_bfe(arena, g_eta, g_lam, g_obs, g_mask, params)
+        if arena.mix_groups:
+            total = total + _mix_bfe(arena, messages, g_eta, g_lam, params)
         if arena.ef_groups:
             total = total + _ef_bfe(arena, ef_eta, ef_obs, ef_mask, params)
         for g in groups:
