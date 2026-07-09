@@ -49,6 +49,10 @@ GLYPHS = {
     "dirichlet": "Dir",
     "gaussian": "𝒩",
     "gaussian_linear": "𝒩A",
+    "gamma": "Γ",
+    "beta": "β",
+    "poisson_obs": "Poi",
+    "bernoulli_obs": "Ber",
 }
 
 

@@ -117,7 +117,8 @@ def test_vmap_batch_equals_sequential():
 
     step_v = eqx.filter_vmap(
         lambda st: engine._step(
-            st.messages, st.g_eta, st.g_lam, st.g_obs, st.g_mask, st.params
+            st.messages, st.g_eta, st.g_lam, st.g_obs, st.g_mask,
+            st.ef_eta, st.ef_obs, st.ef_mask, st.params,
         )[0]
     )
     msgs = batched.messages

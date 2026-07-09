@@ -173,8 +173,8 @@ class Arena:
     # zeros, so init and half-edges are free (η = 0 is the empty product).
     n_efslots: int = 0
     ef_groups: list[EfGroupPlan] = field(default_factory=list)
-    ef_data: dict[str, int] = field(default_factory=dict)
-    # EF DATA port -> row in the ef_obs/ef_mask arrays
+    ef_data: dict[str, tuple[int, str]] = field(default_factory=dict)
+    # EF DATA port -> (row in the ef_obs/ef_mask arrays, observation family)
     n_ef_obs: int = 0
     ef_interior: list[tuple[str, np.ndarray]] = field(default_factory=list)
     # [(family, [E, 2] slot pairs)] interior EF edges for the entropy ledger
@@ -519,8 +519,8 @@ def compile_template(
         if ftype in ("poisson_obs", "bernoulli_obs"):
             rows = []
             for m in members:
-                port = ef_data_ports[t.factors[m].edges["out"]]
-                ef_data[port] = n_ef_obs
+                out_var = t.factors[m].edges["out"]
+                ef_data[ef_data_ports[out_var]] = (n_ef_obs, t.variables[out_var].ef)
                 rows.append(n_ef_obs)
                 n_ef_obs += 1
             obs_rows = np.array(rows, dtype=np.int64)

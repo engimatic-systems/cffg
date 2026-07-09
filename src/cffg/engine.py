@@ -13,13 +13,15 @@ On tree graphs at the BP fixed point, F = −log Z.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
 from jax.scipy.special import logsumexp
 
-from cffg import gauss
+from cffg import ef, efrules, gauss
 from cffg.compiler import NEG, Arena
 from cffg.rules import (
     BP_UPDATES,
@@ -47,11 +49,15 @@ class State(eqx.Module):
     g_lam: jax.Array  # [n_gslots, d_max, d_max] precisions
     g_obs: jax.Array  # [n_obs_rows, d_max] observation values
     g_mask: jax.Array  # [n_obs_rows] 1.0 = bound, 0.0 = missing
+    ef_eta: jax.Array  # [n_efslots, 2] EF natural parameters (cff-8s6a)
+    ef_obs: jax.Array  # [n_ef_obs] conditioned counts/flips
+    ef_mask: jax.Array  # [n_ef_obs] 1.0 = bound, 0.0 = missing
 
 
 def _replace(state: State, **kw) -> State:
     return State(**{f: kw.get(f, getattr(state, f)) for f in (
-        "messages", "params", "g_eta", "g_lam", "g_obs", "g_mask"
+        "messages", "params", "g_eta", "g_lam", "g_obs", "g_mask",
+        "ef_eta", "ef_obs", "ef_mask",
     )})
 
 
@@ -74,23 +80,40 @@ class Engine:
             g_lam=jnp.zeros((a.n_gslots, a.d_max, a.d_max)),
             g_obs=jnp.zeros((a.n_obs_rows, a.d_max)),
             g_mask=jnp.zeros(a.n_obs_rows),
+            ef_eta=jnp.zeros((a.n_efslots, 2)),  # zeros = vacuous
+            ef_obs=jnp.zeros(a.n_ef_obs),
+            ef_mask=jnp.zeros(a.n_ef_obs),
         )
 
     def _uniform_messages(self) -> jax.Array:
         rows = np.full((self.arena.n_slots, self.arena.k_max), NEG)
         for e in self.arena.edges.values():
-            if e.dim:
-                continue  # gaussian slots live in the (eta, Lambda) arena
+            if e.dim or e.ef:
+                continue  # gaussian/EF slots live in their own arenas
             rows[e.slot0, : e.card] = -np.log(e.card)
             rows[e.slot1, : e.card] = -np.log(e.card)
         return jnp.asarray(rows)
 
     def bind_data(self, state: State, observations: dict) -> State:
         """Bind DATA ports: discrete ports take an int (None = missing =
-        uniform); Gaussian ports take a length-dim vector (None = missing =
-        the likelihood node drops out)."""
+        uniform); Gaussian ports take a length-dim vector, EF ports a scalar
+        count/flip (None = missing = the likelihood node drops out)."""
         msgs, g_obs, g_mask = state.messages, state.g_obs, state.g_mask
+        ef_obs, ef_mask = state.ef_obs, state.ef_mask
         for port, value in observations.items():
+            if port in self.arena.ef_data:
+                row, fam = self.arena.ef_data[port]
+                if value is None:
+                    ef_mask = ef_mask.at[row].set(0.0)
+                    continue
+                val = float(value)
+                if fam == "poisson" and not (val >= 0 and val == int(val)):
+                    raise ValueError(f"port {port!r}: Poisson counts are integers >= 0, got {value}")
+                if fam == "bernoulli" and val not in (0.0, 1.0):
+                    raise ValueError(f"port {port!r}: Bernoulli flips are 0 or 1, got {value}")
+                ef_obs = ef_obs.at[row].set(val)
+                ef_mask = ef_mask.at[row].set(1.0)
+                continue
             if port in self.arena.gauss_data:
                 row, dim = self.arena.gauss_data[port]
                 if value is None:
@@ -109,13 +132,13 @@ class Engine:
             if port not in self.arena.data_slots:
                 raise KeyError(
                     f"no DATA port {port!r}; have "
-                    f"{sorted([*self.arena.data_slots, *self.arena.gauss_data])}"
+                    f"{sorted([*self.arena.data_slots, *self.arena.gauss_data, *self.arena.ef_data])}"
                 )
             slot = self.arena.data_slots[port]
             card = next(
                 e.card
                 for e in self.arena.edges.values()
-                if not e.dim and slot in (e.slot0, e.slot1)
+                if not e.dim and not e.ef and slot in (e.slot0, e.slot1)
             )
             row = np.full(self.arena.k_max, NEG)
             if value is None:
@@ -125,16 +148,18 @@ class Engine:
                     raise ValueError(f"port {port!r}: value {value} out of range [0, {card})")
                 row[value] = 0.0
             msgs = msgs.at[slot].set(jnp.asarray(row, dtype=msgs.dtype))
-        return _replace(state, messages=msgs, g_obs=g_obs, g_mask=g_mask)
+        return _replace(
+            state, messages=msgs, g_obs=g_obs, g_mask=g_mask, ef_obs=ef_obs, ef_mask=ef_mask
+        )
 
     # -- execution --------------------------------------------------------
 
     def step(self, state: State, damp: float = 0.0, harden: bool = True) -> State:
-        msgs, g_eta, g_lam = self._step(
+        msgs, g_eta, g_lam, ef_eta = self._step(
             state.messages, state.g_eta, state.g_lam, state.g_obs, state.g_mask,
-            state.params, damp, harden,
+            state.ef_eta, state.ef_obs, state.ef_mask, state.params, damp, harden,
         )
-        return _replace(state, messages=msgs, g_eta=g_eta, g_lam=g_lam)
+        return _replace(state, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta)
 
     def run(
         self,
@@ -166,7 +191,7 @@ class Engine:
                 delta = max(
                     (
                         float(jnp.max(jnp.abs(getattr(nxt, f) - getattr(st, f))))
-                        for f in ("messages", "g_eta", "g_lam")
+                        for f in ("messages", "g_eta", "g_lam", "ef_eta")
                         if getattr(st, f).size
                     ),
                     default=0.0,
@@ -191,8 +216,8 @@ class Engine:
         out: dict[str, np.ndarray] = {}
         msgs = np.asarray(state.messages)
         for e in self.arena.edges.values():
-            if e.dim:
-                continue  # gaussian_marginals
+            if e.dim or e.ef:
+                continue  # gaussian_marginals / ef_marginals
             lq = msgs[e.slot0, : e.card] + msgs[e.slot1, : e.card]
             lq -= lq.max()
             q = np.exp(lq)
@@ -260,13 +285,45 @@ class Engine:
             out[e.name] = (np.asarray(mean), np.asarray(cov))
         return out
 
+    def ef_marginals(self, state: State) -> dict[str, "EfMarginal"]:
+        """Edge name -> EF marginal in standard parameters. Observation-family
+        edges (poisson/bernoulli DATA ports) carry no messages and are
+        skipped. An improper combined belief (e.g. before any sweep) reports
+        proper=False with NaN moments — check it before trusting `mean`."""
+        out: dict[str, EfMarginal] = {}
+        eta = np.asarray(state.ef_eta)
+        for e in self.arena.edges.values():
+            if not e.ef or e.ef not in ef.FAMILIES:
+                continue
+            fam = ef.FAMILIES[e.ef]
+            eta_q = eta[e.slot0] + eta[e.slot1]
+            proper = bool(fam.is_proper(eta_q))
+            out[e.name] = EfMarginal(
+                family=e.ef,
+                params=tuple(float(p) for p in fam.from_natural(eta_q)),
+                mean=float(fam.mean(eta_q)) if proper else float("nan"),
+                proper=proper,
+            )
+        return out
+
     def bfe(self, state: State) -> float:
         return float(
             self._bfe(
                 state.messages, state.g_eta, state.g_lam, state.g_obs, state.g_mask,
-                state.params,
+                state.ef_eta, state.ef_obs, state.ef_mask, state.params,
             )
         )
+
+
+@dataclass(frozen=True)
+class EfMarginal:
+    """A scalar EF edge belief: standard parameters, e.g. (shape, rate) for
+    gamma, (a, b) for beta."""
+
+    family: str
+    params: tuple[float, ...]
+    mean: float
+    proper: bool
 
 
 def _pad_gauss(eta: jax.Array, lam: jax.Array, d_max: int) -> tuple[jax.Array, jax.Array]:
@@ -314,6 +371,27 @@ def _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params):
     return new_eta, new_lam
 
 
+def _ef_sweep(arena, ef_eta, ef_obs, ef_mask, params):
+    """One synchronous flooding sweep over the EF groups: prior and observed
+    messages are constants (natural-parameter increments), equality is
+    sum-minus-self — conjugate BP in its entirety (DERIVATIONS.md D2)."""
+    new = ef_eta
+    for g in arena.ef_groups:
+        if g.type in ("gamma", "beta"):
+            out = params[g.name + ":eta"].astype(new.dtype)
+            new = new.at[g.scatter[:, 0]].set(out)
+        elif g.type == "poisson_obs":
+            x, mk = ef_obs[g.obs_rows], ef_mask[g.obs_rows]
+            new = new.at[g.scatter[:, 0]].set(efrules.poisson_likelihood_message(x, mk))
+        elif g.type == "bernoulli_obs":
+            y, mk = ef_obs[g.obs_rows], ef_mask[g.obs_rows]
+            new = new.at[g.scatter[:, 0]].set(efrules.bernoulli_likelihood_message(y, mk))
+        else:  # equality
+            out = efrules.equality_messages(ef_eta[g.gather])  # [M, 3, 2]
+            new = new.at[g.scatter.reshape(-1)].set(out.reshape(-1, 2))
+    return new
+
+
 def _make_step(arena: Arena):
     groups = arena.groups
     k_max = arena.k_max
@@ -324,10 +402,13 @@ def _make_step(arena: Arena):
         g_lam: jax.Array,
         g_obs: jax.Array,
         g_mask: jax.Array,
+        ef_eta: jax.Array,
+        ef_obs: jax.Array,
+        ef_mask: jax.Array,
         params: dict[str, jax.Array],
         damp: float = 0.0,
         harden: bool = True,
-    ) -> tuple[jax.Array, jax.Array, jax.Array]:
+    ) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
         new = messages
         for g in groups:
             logf = params.get(g.name)
@@ -367,6 +448,12 @@ def _make_step(arena: Arena):
             new_eta, new_lam = _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params)
             new_eta = damp * g_eta + (1.0 - damp) * new_eta
             new_lam = damp * g_lam + (1.0 - damp) * new_lam
+        # EF sweep: natural parameters are the log-space of their family, so
+        # the same damp knob is log-space damping here too.
+        new_ef = ef_eta
+        if arena.ef_groups:
+            new_ef = _ef_sweep(arena, ef_eta, ef_obs, ef_mask, params)
+            new_ef = damp * ef_eta + (1.0 - damp) * new_ef
         # Log-space damping: stabilizes the outer coordination between GFE
         # composites (their local solves are exact, but synchronous flooding
         # between them can limit-cycle — the outer face of Part II §4.5).
@@ -385,7 +472,7 @@ def _make_step(arena: Arena):
                 jnp.arange(k_max)[None, :] == jnp.argmax(lq, axis=-1)[:, None], 0.0, NEG
             ).astype(new.dtype)
             new = new.at[p0].set(hot).at[p1].set(hot)
-        return new, new_eta, new_lam
+        return new, new_eta, new_lam, new_ef
 
     return step
 
@@ -423,6 +510,35 @@ def _gauss_bfe(arena, g_eta, g_lam, g_obs, g_mask, params):
     return total
 
 
+def _ef_bfe(arena, ef_eta, ef_obs, ef_mask, params):
+    """EF node energies + interior-edge entropies, all closed form
+    (cffg.efrules). Improper beliefs anywhere make the total +inf — loud.
+    With conditioned observations the tree identity BFE = −log p(data)
+    holds exactly (no ridge: nothing here is iterative or solved)."""
+    total = jnp.asarray(0.0, dtype=ef_eta.dtype)
+    for g in arena.ef_groups:
+        fam = efrules.JFAMILIES[g.family]
+        inc = ef_eta[g.gather]  # [M, R, 2]
+        if g.type in ("gamma", "beta"):
+            total = total + efrules.prior_energy(
+                fam, inc[:, 0], params[g.name + ":eta"].astype(ef_eta.dtype)
+            ).sum()
+        elif g.type == "poisson_obs":
+            x, mk = ef_obs[g.obs_rows], ef_mask[g.obs_rows]
+            total = total + efrules.poisson_obs_energy(inc[:, 0], x, mk).sum()
+        elif g.type == "bernoulli_obs":
+            y, mk = ef_obs[g.obs_rows], ef_mask[g.obs_rows]
+            total = total + efrules.bernoulli_obs_energy(inc[:, 0], y, mk).sum()
+        else:  # equality
+            total = total + efrules.equality_energy(fam, inc).sum()
+    for fam_name, pairs in arena.ef_interior:
+        fam = efrules.JFAMILIES[fam_name]
+        total = total + efrules.edge_entropy(
+            fam, ef_eta[pairs[:, 0]], ef_eta[pairs[:, 1]]
+        ).sum()
+    return total
+
+
 def _make_bfe(arena: Arena):
     groups = arena.groups
     pairs = arena.interior_slot_pairs
@@ -433,11 +549,16 @@ def _make_bfe(arena: Arena):
         g_lam: jax.Array,
         g_obs: jax.Array,
         g_mask: jax.Array,
+        ef_eta: jax.Array,
+        ef_obs: jax.Array,
+        ef_mask: jax.Array,
         params: dict[str, jax.Array],
     ) -> jax.Array:
         total = jnp.asarray(0.0, dtype=messages.dtype)
         if arena.gauss_groups:
             total = total + _gauss_bfe(arena, g_eta, g_lam, g_obs, g_mask, params)
+        if arena.ef_groups:
+            total = total + _ef_bfe(arena, ef_eta, ef_obs, ef_mask, params)
         for g in groups:
             logf = params.get(g.name)
             if logf is None:
