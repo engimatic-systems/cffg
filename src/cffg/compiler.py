@@ -113,6 +113,24 @@ class MixGroupPlan:
 
 
 @dataclass(frozen=True)
+class PrecGroupPlan:
+    """All gaussian_prec factors, run together (cff-7c5o). A scalar Gaussian
+    node f(x; m, τ) = N(x; m, τ⁻¹) whose precision lives on an ef:gamma edge —
+    the first factor straddling the Gaussian (eta, Lambda) arena (its `out`
+    edge) and the EF natural-parameter arena (its `prec` edge). Both VMP
+    messages read *marginals* (both slots of each edge, like the discrete vmp
+    groups), so the gather tables carry both slots. Parameters: the scalar
+    means stacked [M, 1] under f"{name}:m"."""
+
+    name: str
+    members: tuple[str, ...]
+    x_gather_both: np.ndarray  # [M, 2] both Gaussian slots of the out edge
+    tau_gather_both: np.ndarray  # [M, 2] both EF slots of the prec edge
+    x_scatter: np.ndarray  # [M] own Gaussian slot on the out edge
+    tau_scatter: np.ndarray  # [M] own EF slot on the prec edge
+
+
+@dataclass(frozen=True)
 class EfGroupPlan:
     """All EF-family factors of one (type, family), run together (cff-8s6a).
 
@@ -193,6 +211,9 @@ class Arena:
     mix_groups: list[MixGroupPlan] = field(default_factory=list)
     # Hybrid Gaussian-mixture groups (cff-pksr): each writes both the Gaussian
     # arena (out/in edges) and the discrete arena (selector edge).
+    prec_groups: list["PrecGroupPlan"] = field(default_factory=list)
+    # gaussian_prec groups (cff-7c5o): each writes both the Gaussian arena
+    # (out edge) and the EF arena (prec edge).
     gauss_interior: list[tuple[int, np.ndarray]] = field(default_factory=list)
     # [(dim, [E, 2] slot pairs)] interior Gaussian edges for the entropy ledger
     # EF arena (cff-8s6a): messages are natural parameters ef_eta
@@ -345,6 +366,11 @@ def compile_template(
                             f"port {port.name!r}: observed mixture outputs are not "
                             f"supported yet (Gaussian DATA port on {fname!r}/{role!r})"
                         )
+                    elif ftype_here == "gaussian_prec":
+                        problems.append(
+                            f"port {port.name!r}: observed gaussian_prec outputs: bind "
+                            "observations via a gaussian_linear emission or an equality branch"
+                        )
                     else:
                         problems.append(
                             f"port {port.name!r}: Gaussian DATA ports must clamp a "
@@ -479,6 +505,7 @@ def compile_template(
     gauss_buckets: dict[tuple, list[str]] = {}
     ef_buckets: dict[tuple[str, str], list[str]] = {}
     mix_buckets: dict[tuple, list[str]] = {}
+    prec_members: list[str] = []
     for fname in sorted(t.factors):
         if fname in consumed:
             continue
@@ -493,6 +520,15 @@ def compile_template(
             observed = f.type == "gaussian_linear" and f.edges["out"] in gauss_data_ports
             gtype = "gaussian_linear_obs" if observed else f.type
             gauss_buckets.setdefault((gtype, dims), []).append(fname)
+            continue
+        if f.type == "gaussian_prec":  # mixed Gaussian/EF node: its own arena pair
+            d_out = t.variables[f.edges["out"]].dim
+            if d_out != 1:
+                raise CompileError(
+                    f"factor {fname!r}: gaussian_prec is scalar (dim-1 out edge); "
+                    "vector precision-mean priors are cff-7c5o follow-up work"
+                )
+            prec_members.append(fname)
             continue
         if ft.family == "hybrid":  # Gaussian-mixture nodes: their own arena pair
             dims = tuple(t.variables[f.edges[r]].dim for r in roles if r != "selector")
@@ -564,6 +600,28 @@ def compile_template(
         )
         for key, arr in _stack_mix_params(t, mtype, dims, k_sel, members, resolved).items():
             log_params[f"{gname}:{key}"] = arr
+        # member_of stays discrete-only, as with the Gaussian and EF families.
+
+    prec_groups: list[PrecGroupPlan] = []
+    if prec_members:
+        members = sorted(prec_members)
+        gname = "prec:gaussian_prec"
+        x_scatter = np.array([slot_of[(m, "out")] for m in members], dtype=np.int64)
+        x_gather_both = np.stack(
+            [x_scatter, np.array([opposite[(m, "out")] for m in members], dtype=np.int64)],
+            axis=-1,
+        )
+        tau_scatter = np.array([slot_of[(m, "prec")] for m in members], dtype=np.int64)
+        tau_gather_both = np.stack(
+            [tau_scatter, np.array([opposite[(m, "prec")] for m in members], dtype=np.int64)],
+            axis=-1,
+        )
+        prec_groups.append(
+            PrecGroupPlan(
+                gname, tuple(members), x_gather_both, tau_gather_both, x_scatter, tau_scatter
+            )
+        )
+        log_params[f"{gname}:m"] = _stack_prec_means(t, members, resolved)
         # member_of stays discrete-only, as with the Gaussian and EF families.
 
     ef_groups: list[EfGroupPlan] = []
@@ -673,6 +731,7 @@ def compile_template(
         gauss_data=gauss_data,
         n_obs_rows=n_obs_rows,
         mix_groups=mix_groups,
+        prec_groups=prec_groups,
         gauss_interior=gauss_interior,
         n_efslots=next_efslot,
         ef_groups=ef_groups,
@@ -753,6 +812,8 @@ def _blob_shape(t: Template, blob_name: str) -> tuple[int, ...] | None:
                 return {"matrix": (k, do, di), "offset": (k, do), "cov": (k, do, do)}[role]
             if f.type in ("gamma", "beta"):
                 return ()  # scalar prior parameters
+            if f.type == "gaussian_prec":
+                return (dim("out"),)  # scalar mean (dim-1 out edge)
     return None
 
 
@@ -890,6 +951,23 @@ def _stack_mix_params(
             w_regimes.append(np.linalg.inv(ck))
         out.setdefault("W", []).append(np.stack(w_regimes))
     return {k: np.stack(v) for k, v in out.items()}
+
+
+def _stack_prec_means(
+    t: Template, members: list[str], resolved: dict[str, np.ndarray]
+) -> np.ndarray:
+    """Stack per-member gaussian_prec means [M, 1]. The mean is the scalar m in
+    N(x; m, τ⁻¹); the out edge is dim-1, so any size-1 blob is accepted and
+    reshaped to a length-1 vector (the form gauss.prec_to_x consumes)."""
+    means = []
+    for m in members:
+        arr = resolved[t.factors[m].param_blobs["mean"]]
+        if arr.size != 1:
+            raise CompileError(
+                f"factor {m!r}: parameter 'mean' must be a scalar, got shape {arr.shape}"
+            )
+        means.append(arr.reshape(1))
+    return np.stack(means)
 
 
 def _stack_ef_priors(

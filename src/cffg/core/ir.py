@@ -218,6 +218,10 @@ EF_EDGE_FAMILIES: dict[str, dict[str, str]] = {
     "beta": {"out": "beta"},
     "poisson_obs": {"out": "poisson", "rate": "gamma"},
     "bernoulli_obs": {"out": "bernoulli", "prob": "beta"},
+    # gaussian_prec is family="hybrid" (its out edge is Gaussian), but its
+    # prec edge must carry an ef=gamma tag — the per-role check keys on f.type,
+    # not on the factor's family, so it applies here just the same (cff-7c5o).
+    "gaussian_prec": {"prec": "gamma"},
 }
 
 # The hybrid Gaussian-mixture vocabulary (cff-pksr): a discrete selector edge
@@ -243,12 +247,29 @@ register_factor_type(
     )
 )
 
+# The mixed Gaussian/EF vocabulary (cff-7c5o): a scalar Gaussian node whose
+# precision lives on an ef:gamma edge. `gaussian_prec` is f(x; m, τ) =
+# N(x; m, τ⁻¹) — the EF abstraction's first mixed client, joining the
+# information-form (out) and natural-parameter (prec) arenas under a
+# mean-field q(x)q(τ) VMP bead. Messages are closed-form (cffg.gauss,
+# DERIVATIONS.md D4); the free energy is the exact mean-field VFE.
+register_factor_type(
+    FactorType(
+        "gaussian_prec",
+        edge_roles=("out", "prec"),
+        param_roles=("mean",),
+        family="hybrid",
+    )
+)
+
 # Per-role domain-family constraints for family="hybrid" types: unlike EF
 # (which pins the `ef` tag), each structural edge here must carry a whole
 # VariableSpec.family (validated in cffg.core.validate).
 HYBRID_EDGE_FAMILIES: dict[str, dict[str, str]] = {
     "gaussian_mixture": {"out": "gaussian", "selector": "discrete"},
     "gaussian_mixture_linear": {"out": "gaussian", "in": "gaussian", "selector": "discrete"},
+    # out is a Gaussian edge, prec an EF edge (pinned to ef=gamma above).
+    "gaussian_prec": {"out": "gaussian", "prec": "ef"},
 }
 
 
