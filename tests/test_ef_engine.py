@@ -166,3 +166,142 @@ def test_bead_on_ef_node_rejected():
     t.constraints.append(ConstraintSpec(ConstraintKind.MEAN_FIELD, "prior"))
     with pytest.raises(CompileError, match="beads on EF nodes"):
         compile_template(t, arrays=arrays)
+
+
+# --- engine: exact conjugate inference ------------------------------------------
+
+from math import lgamma, log
+
+from cffg.engine import Engine
+
+
+def _gamma_poisson_log_evidence(a0, b0, counts):
+    s, n = sum(counts), len(counts)
+    return (
+        lgamma(a0 + s) - lgamma(a0) + a0 * log(b0) - (a0 + s) * log(b0 + n)
+        - sum(lgamma(x + 1.0) for x in counts)
+    )
+
+
+def _beta_bernoulli_log_evidence(a0, b0, ys):
+    from scipy.special import betaln
+
+    h = sum(ys)
+    return float(betaln(a0 + h, b0 + len(ys) - h) - betaln(a0, b0))
+
+
+def test_gamma_poisson_exact_posterior_and_evidence(viz_gallery):
+    a0, b0, counts = 2.0, 1.5, [4, 0, 7]
+    t, arrays = gamma_poisson(3, a0, b0)
+    viz_gallery(t)
+    eng = Engine(compile_template(t, arrays=arrays))
+    st = eng.bind_data(eng.init_state(), {f"count{i}": x for i, x in enumerate(counts)})
+    st, deltas = eng.run(st, 10, tol=1e-12)
+    assert deltas[-1] < 1e-12  # conjugate BP: converged, not budget-exhausted
+    post = eng.ef_marginals(st)
+    # every rate edge is the same variable: all report the exact posterior
+    for name, m in post.items():
+        assert m.family == "gamma" and m.proper, name
+        np.testing.assert_allclose(m.params, (a0 + sum(counts), b0 + 3), rtol=1e-12)
+    np.testing.assert_allclose(
+        eng.bfe(st), -_gamma_poisson_log_evidence(a0, b0, counts), rtol=1e-12
+    )
+
+
+def test_beta_bernoulli_exact_posterior_and_evidence(viz_gallery):
+    a0, b0, ys = 2.0, 5.0, [1, 0, 1, 1]
+    t, arrays = beta_bernoulli(4, a0, b0)
+    viz_gallery(t)
+    eng = Engine(compile_template(t, arrays=arrays))
+    st = eng.bind_data(eng.init_state(), {f"flip{i}": y for i, y in enumerate(ys)})
+    st, _ = eng.run(st, 12, tol=1e-12)
+    post = eng.ef_marginals(st)
+    for m in post.values():
+        np.testing.assert_allclose(m.params, (a0 + 3, b0 + 1), rtol=1e-12)
+        np.testing.assert_allclose(m.mean, (a0 + 3) / (a0 + b0 + 4), rtol=1e-12)
+    np.testing.assert_allclose(
+        eng.bfe(st), -_beta_bernoulli_log_evidence(a0, b0, ys), rtol=1e-12
+    )
+
+
+def test_missing_observation_drops_node():
+    """None at a DATA port removes the node: posterior and evidence are
+    exactly those of the two remaining counts."""
+    a0, b0 = 2.0, 1.5
+    t, arrays = gamma_poisson(3, a0, b0)
+    eng = Engine(compile_template(t, arrays=arrays))
+    st = eng.bind_data(eng.init_state(), {"count0": 4, "count1": None, "count2": 7})
+    st, _ = eng.run(st, 10)
+    m = eng.ef_marginals(st)["lam0"]
+    np.testing.assert_allclose(m.params, (a0 + 11, b0 + 2), rtol=1e-12)
+    np.testing.assert_allclose(
+        eng.bfe(st), -_gamma_poisson_log_evidence(a0, b0, [4, 7]), rtol=1e-12
+    )
+
+
+def test_no_data_is_free():
+    """With every observation missing, the posterior is the prior and the
+    ledger telescopes to exactly zero — the continuous missing-data identity."""
+    t, arrays = gamma_poisson(2, 3.0, 2.0)
+    eng = Engine(compile_template(t, arrays=arrays))
+    st, _ = eng.run(eng.init_state(), 8)
+    m = eng.ef_marginals(st)["lam0"]
+    np.testing.assert_allclose(m.params, (3.0, 2.0), rtol=1e-12)
+    np.testing.assert_allclose(eng.bfe(st), 0.0, atol=1e-12)
+
+
+def test_bfe_of_vacuous_state_is_loud():
+    """Before any sweep every belief is vacuous; the Gamma vacuous point is
+    improper, so the ledger must scream +inf, not return a plausible number."""
+    t, arrays = gamma_poisson(1)
+    eng = Engine(compile_template(t, arrays=arrays))
+    assert eng.bfe(eng.init_state()) == np.inf
+    st, deltas = eng.run(eng.init_state(), 5)
+    assert np.isfinite(eng.bfe(st)) and all(np.isfinite(d) for d in deltas)
+
+
+def test_ef_marginals_report_impropriety():
+    t, arrays = gamma_poisson(1)
+    eng = Engine(compile_template(t, arrays=arrays))
+    m = eng.ef_marginals(eng.init_state())["lam0"]
+    assert not m.proper and np.isnan(m.mean)
+
+
+def test_bind_data_validates_ef_values():
+    t, arrays = gamma_poisson(1)
+    eng = Engine(compile_template(t, arrays=arrays))
+    with pytest.raises(ValueError, match="integers >= 0"):
+        eng.bind_data(eng.init_state(), {"count0": -1})
+    with pytest.raises(ValueError, match="integers >= 0"):
+        eng.bind_data(eng.init_state(), {"count0": 2.5})
+    tb, ab = beta_bernoulli(1)
+    engb = Engine(compile_template(tb, arrays=ab))
+    with pytest.raises(ValueError, match="0 or 1"):
+        engb.bind_data(engb.init_state(), {"flip0": 2})
+
+
+def test_mixed_discrete_and_ef_arenas_coexist():
+    """The arenas are independent numberings: a discrete factor alongside an
+    EF chain must leave both readouts exact. (No gallery image: the layout
+    engine cannot place disconnected components — pre-existing limitation.)"""
+    t, arrays = gamma_poisson(1, 2.0, 1.0)
+    t.variables["z"] = VariableSpec("z", 3)
+    t.factors["cat"] = FactorSpec(
+        "cat", "categorical", edges={"out": "z"}, param_blobs={"statistic": "c"}
+    )
+    from cffg.core import BlobRef
+
+    t.blobs["c"] = BlobRef("c", "blobs/c.npy")
+    t.ports["zp"] = PortSpec("zp", "z", PortRole.DATA)
+    arrays["c"] = np.array([0.5, 0.25, 0.25])
+    eng = Engine(compile_template(t, arrays=arrays))
+    st = eng.bind_data(eng.init_state(), {"count0": 3, "zp": 2})
+    st, _ = eng.run(st, 6)
+    np.testing.assert_allclose(eng.ef_marginals(st)["lam0"].params, (5.0, 2.0), rtol=1e-12)
+    np.testing.assert_allclose(eng.marginals(st)["z"], [0.0, 0.0, 1.0], atol=1e-12)
+    # BFE splits over the disconnected components: EF evidence + discrete −log p(z=2)
+    np.testing.assert_allclose(
+        eng.bfe(st),
+        -_gamma_poisson_log_evidence(2.0, 1.0, [3]) - log(0.25),
+        rtol=1e-12,
+    )
