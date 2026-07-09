@@ -1,6 +1,6 @@
 ---
 id: cff-8s6a
-status: open
+status: in_progress
 deps: [cff-4e5z]
 links: []
 created: 2026-07-08T16:49:34Z

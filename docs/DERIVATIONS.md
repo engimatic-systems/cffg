@@ -179,3 +179,50 @@ GFE contribution (no −log Z identity is claimed for models containing it).
 **Cost.** The Newton solve is over K·U logits: O((K·U)³) per member per
 sweep. Fine at planning scale; a structure-exploitation ticket if colonies
 ever need it at hundreds of states × many actions.
+
+---
+
+## D2 — The exponential-family message contract (cff-8s6a)
+
+### D2.1 The plain-English version
+
+Every message family this engine already runs is secretly the same trick.
+Discrete messages are vectors of log-probabilities: multiplying two of them
+means *adding* the vectors. Gaussian messages are (η, Λ) information pairs:
+multiplying means *adding* the pairs. Both are instances of one fact: for
+any exponential-family distribution p(x|η) = h(x)·exp(ηᵀT(x) − A(η)),
+products of densities add their natural parameters η. And everything else
+message passing needs is algebra on A(η): the moments any VMP rule or FE
+term wants are the gradient ∇A(η) = E[T(x)]; entropy and KL are one-line
+combinations of A and ∇A. So "adding a new distribution" should never mean
+new engine machinery — it means a *table entry*: the family's T, A, ∇A, and
+domain. `cffg/ef.py` is that table (Gamma and Beta first — rates/precisions
+and probabilities), NumPy-pure, with every closed form pinned against
+numerical quadrature, and the conjugate-update identity (natural addition ==
+exact Bayes: Gamma+Poisson counts, Beta+Bernoulli flips) tested exactly.
+Conditioned observations work like the Gaussian convention from cff-4e5z:
+an observed count/flip contributes a closed-form energy term and a constant
+likelihood message — never a δ-clamp.
+
+### D2.2 Contract and integration plan (formal part is the table itself)
+
+**Contract.** A family is (T, h, A) with: message = η; product = η₁+η₂;
+vacuous = 0; moments = ∇A(η); H = A(η) − ηᵀ∇A(η) − E[log h];
+KL(η₁‖η₂) = (η₁−η₂)ᵀ∇A(η₁) − A(η₁) + A(η₂); propriety = η in the domain of
+A. Gamma: T=(log x, x), η=(α−1, −β), A=lnΓ(α)−α ln β. Beta:
+T=(log x, log(1−x)), η=(a−1, b−1), A=lnB(a,b). Executable anchors:
+`tests/test_ef.py` (gradient identity, quadrature moments/entropy/KL,
+conjugate addition, observation energies).
+
+**Integration plan (next session, engine-facing — deliberately not rushed):**
+1. `VariableSpec` domain generalizes from the cardinality/dim pair to a
+   tagged domain (discrete k | gaussian d | ef family name), keeping the
+   existing fields as accessors (serialization additive, mirrors cff-4e5z).
+2. A third arena for scalar EF edges: `ef_eta [n_slots, 2]` + per-group
+   family tag; vacuous = zeros; same slot discipline as the Gaussian arena.
+3. Factor vocabulary v1: `gamma`/`beta` prior leaves; `poisson_obs` /
+   `bernoulli_obs` conditioned likelihood factors (DATA ports, Gaussian-
+   style conditioning); the mixed `gaussian_prec` node (Gaussian with a
+   Gamma precision edge) belongs to cff-7c5o and should be its first client.
+4. Cat/Dir/Gaussian re-expression on the abstraction is a REFACTOR ticket
+   with zero-regression acceptance — do not fold it into the feature work.
