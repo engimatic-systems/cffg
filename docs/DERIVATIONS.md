@@ -239,3 +239,104 @@ conjugate addition, observation energies).
    cff-7c5o as the abstraction's first mixed client.
 4. Cat/Dir/Gaussian re-expression on the abstraction is a REFACTOR ticket
    with zero-regression acceptance, deliberately not folded into this work.
+
+---
+
+## D3 — Gaussian mixtures: hybrid collapse rules and the bounded ledger (cff-pksr)
+
+### D3.1 The plain-English version
+
+A switching Kalman filter has a discrete "which regime are we in?" variable
+steering a continuous state: x' = A_s x + b_s + noise, with s categorical.
+The node connecting them, `gaussian_mixture_linear(out, in, selector)`, is
+the continuous sibling of `transition_mixture`. Exact inference is
+exponential (every regime *sequence* spawns its own Kalman filter), so every
+practical algorithm — IMM, assumed-density filtering, RxInfer's switching
+models — does the same thing: wherever a message would be a *mixture* of
+Gaussians, replace it with the single Gaussian that has the mixture's mean
+and covariance ("moment matching", "collapse"). Three subtleties make the
+difference between folklore and a correct implementation:
+
+1. **The message to the selector is exact and free.** "How much does each
+   regime explain the data?" is a per-regime Gaussian integral — the joint
+   log-partition of (node × both Gaussian neighbours' messages). No
+   approximation, closed form.
+2. **The collapse weights are direction-dependent.** Collapsing the
+   *forward* message (to `out`), the components' masses are identical, so
+   the weights are exactly the incoming selector probabilities. Collapsing
+   the *backward* message (to `in`), each component carries a different
+   evidence scale c̃_s·Z_s — engine messages are deliberately scale-free,
+   so these factors must be rebuilt inside the rule or the weights are
+   silently wrong.
+3. **The free-energy ledger stays *almost* exact.** The node belief
+   q(y, x, s) is a labelled mixture whose joint entropy is closed form
+   (H(s-marginal) + Σ_s ρ_s·H[Gaussian_s]) — node energies are exact for
+   the beliefs the engine holds. The single approximation in the reported
+   BFE: interior Gaussian *edge* entropies score the collapsed Gaussian,
+   and a Gaussian is the max-entropy distribution for given moments, so
+   each such +H term is an over-estimate and the reported BFE is a **lower
+   bound** (optimistic) relative to the mixture-Bethe value at the same
+   moments. Same optimistic-bound semantics as the GFE composite
+   (LIMITATIONS S1c); pinned by a bound-direction test.
+
+### D3.2 Rules (f_s(y,x) = N(y; A_s x + b_s, V_s), W_s = V_s⁻¹, K regimes)
+
+Incoming: μ_o = (η_o, Λ_o) on out, μ_i = (η_i, Λ_i) on in (information form,
+scale-free), μ_e(s) selector log-message. Z(η, Λ) := (2π)^{d/2}
+det(Λ)^{−1/2} exp(½ηᵀΛ⁻¹η) is the unnormalized-Gaussian mass; all propriety
+guards below fall back to the vacuous message mid-flooding and to +inf in
+ledger terms (the engine-wide loudness convention).
+
+**→ selector (exact).** Per regime, the joint over (y, x) of node × μ_o × μ_i
+has (same blocks as `gauss.linear_energy`):
+
+    Λ_J(s) = [[W_s+Λ_o, −W_sA_s], [−A_sᵀW_s, A_sᵀW_sA_s+Λ_i]],
+    η_J(s) = [W_s b_s + η_o, −A_sᵀW_s b_s + η_i]
+
+    log μ(s) = log Z(η_J(s), Λ_J(s)) − ½ b_sᵀW_s b_s + ½ log det(W_s/2π·I…)
+             = log Z(η_J, Λ_J) − ½ b_sᵀW_s b_s + ½ log det W_s − ½ d_y log 2π.
+
+Guard: Λ_J(s) ≻ 0 for all s, else uniform. (Prior variant f_s(y) = N(y; m_s,
+V_s): Λ_J = W_s + Λ_o ≻ 0 always; log μ(s) = log Z(W_s m_s + η_o, W_s + Λ_o)
+− ½ m_sᵀW_s m_s + ½ log det W_s − ½ d log 2π.)
+
+**→ out (collapsed forward).** Component s: the scale-free forward
+predictive (η_f(s), Λ_f(s)) = `linear_forward`(μ_i; A_s, b_s, W_s). Masses
+∫∫ f_s μ_i dy dx = ∫ μ_i are s-independent, so weights w_s = softmax of the
+incoming selector log-message alone. Moment match:
+
+    m̄ = Σ w_s m_s,   C̄ = Σ w_s (C_s + m_s m_sᵀ) − m̄ m̄ᵀ,
+    (m_s, C_s) = (Λ_f⁻¹η_f, Λ_f⁻¹);   message = (C̄⁻¹ m̄, C̄⁻¹).
+
+Guard: every Λ_f(s) ≻ 0 (needs Λ_i ≻ 0), else vacuous.
+
+**→ in (collapsed backward, the weight trap).** Component s: scale-free
+(η_b(s), Λ_b(s)) = `linear_backward`(μ_o; A_s, b_s, W_s), plus the scale the
+engine's convention dropped:
+
+    log c̃_s = log ∫ N(y; b_s, V_s) μ_o(y) dy
+             = log Z(W_s b_s + η_o, W_s + Λ_o) − ½ b_sᵀW_s b_s
+               + ½ log det W_s − ½ d_y log 2π.
+
+Weights w̃_s ∝ exp(μ_e(s)) · c̃_s · Z(η_b(s), Λ_b(s)); moment match as above.
+Guard: every Λ_b(s) ≻ 0 (needs Λ_o ≻ 0 and rank(A_s) = d_x), else vacuous.
+
+**Node energy (exact for the held beliefs).** ρ_s = softmax over s of
+[μ_e(s) + log μ(s)-integrand above]; q(y,x|s) is Gaussian with (η_J, Λ_J):
+
+    F_a = −H(ρ) − Σ_s ρ_s H[q(y,x|s)] − Σ_s ρ_s E_{q|s}[log f_s],
+
+with E_{q|s}[log f_s] = ½ log det W_s − ½ d_y log 2π − ½ (r_sᵀW_s r_s +
+tr(W_s J_s Σ_J J_sᵀ)), r_s = J_s m_J − b_s, J_s = [I, −A_s] — the
+`gauss.linear_energy` residual algebra per component. The selector edge and
+the Gaussian edges keep their standard interior +H corrections; the Gaussian
+ones use collapsed beliefs, which is the ledger's one bounded term (D3.1.3).
+
+Checks: K = 1 reduces every rule to the plain `gaussian_linear` rules and
+the energy to `linear_energy`. Vacuous μ_e ⇒ w_s uniform in the forward
+collapse. A_s ≡ A, b_s ≡ b, V_s ≡ V across s ⇒ collapse is exact (mixture
+of identical Gaussians) and F_a reduces to linear_energy + H-cancellation
+on the selector edge. Executable anchors: `tests/test_mixg.py` (quadrature
+moments/energy, weight-trap regression, bound direction),
+`tests/test_switching_kf.py` (enumeration + independent collapsed-smoother
+parity).
