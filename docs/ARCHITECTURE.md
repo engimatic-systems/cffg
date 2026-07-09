@@ -153,6 +153,21 @@ make every ledger term +inf — loud by construction, never NaN. The
 re-expression of Cat/Dir/Gaussian onto the same abstraction is a separate
 zero-regression refactor ticket.
 
+### 2d. Hybrid discrete-continuous nodes (cff-pksr)
+
+`gaussian_mixture(_linear)` factors straddle two arenas: Gaussian out/in
+edges, a discrete selector edge (`MixGroupPlan` carries slot tables into
+both). Inference is assumed-density: mixture messages on Gaussian edges are
+collapsed by moment matching with the direction-dependent weights derived
+in DERIVATIONS.md D3 (backward collapse must rebuild the per-component
+scales the scale-free message convention drops); selector messages and node
+energies are exact for the held beliefs. The reported BFE is a documented
+lower bound (LIMITATIONS S1d). The switching-KF test tier holds the engine
+to an *independent* numpy implementation of the same rules (tight) and to
+exhaustive regime-sequence enumeration (measured gap with headroom — never
+pretending assumed-density equals exact). Observed mixture outputs are a
+compile error in v1; emissions route through plain `gaussian_linear` nodes.
+
 ### 3. Message rule library (`cffg.rules`)
 
 A registry keyed by `(factor_type, constraint_config, out_edge_role)`:

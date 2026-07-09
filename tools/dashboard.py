@@ -54,6 +54,12 @@ EPIC_FILES = {
         "test_ef_rules.py",
         "test_ef_engine.py",
     ],
+    "M14 · Hybrid": [
+        "test_mixg.py",
+        "test_swkf_reference.py",
+        "test_hybrid_engine.py",
+        "test_switching_kf.py",
+    ],
     "SG · Glucose": ["test_glucose.py"],
 }
 FILE_TO_EPIC = {f: e for e, fs in EPIC_FILES.items() for f in fs}
