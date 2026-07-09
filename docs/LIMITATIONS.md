@@ -111,9 +111,10 @@ Gaussian glue ports) come out ±inf — deliberate loudness, not a bug.
 beliefs and plans with E[log B], but unlike A-learning there is no GFE
 channel for B: uncertainty about *dynamics* generates no epistemic value, so
 an agent will not act to visit poorly-modeled transitions. Deriving a
-P-substitution-style term for the transition node is open derivation work
-(no ticket yet — open one before starting; the generic-learnables ticket
-cff-x0sv is the natural home for the decision).
+P-substitution-style term for the transition node is ticket cff-fk2u
+(principled route: substitute q(z')→p(z'|z,u) at the transition node and
+derive the local GFE; pragmatic interim: a separately-labeled count-novelty
+term, never folded into BFE/GFE numbers).
 
 **S2. Importance-sampling noise in parameter messages.** The message to A is a
 non-conjugate log-message evaluated by importance sampling; variance grows with
