@@ -21,7 +21,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax.scipy.special import logsumexp
 
-from cffg import ef, efrules, gauss, mixg
+from cffg import csp, ef, efrules, gauss, mixg
 from cffg.compiler import NEG, Arena
 from cffg.rules import (
     BP_UPDATES,
@@ -377,12 +377,65 @@ class Engine:
         return out
 
     def bfe(self, state: State) -> float:
+        if self.arena.semiring == "max":
+            raise RuntimeError(
+                "min-sum reports an objective value, not a free energy — call Engine.objective"
+            )
         return float(
             self._bfe(
                 state.messages, state.g_eta, state.g_lam, state.g_obs, state.g_mask,
                 state.ef_eta, state.ef_obs, state.ef_mask, state.params,
             )
         )
+
+    def decode(self, state: State) -> dict[str, int]:
+        """MAP decode x-hat: the per-edge argmax of the (max-)marginals. Defined
+        in both semirings (sum-mode marginals decode too); in max mode at a tree
+        fixed point this is the exact Viterbi assignment (cff-e8zk)."""
+        return {name: int(np.argmax(q)) for name, q in self.marginals(state).items()}
+
+    def objective(self, state: State) -> float:
+        """Exact -log f(x-hat) of the decoded assignment, summed over every
+        factor from the compiled parameters + the decode (NOT from messages;
+        messages only guide the decode). Equality and hard-constraint indicators
+        contribute 0 when the decode is consistent and +inf when it is not — an
+        inconsistent decode is reported loudly. On a tree at the max-product
+        fixed point this equals the brute-force MAP energy (Viterbi identity)."""
+        xhat = self.decode(state)
+        slot2var = {}
+        for e in self.arena.edges.values():
+            if e.dim or e.ef:
+                continue
+            slot2var[e.slot0] = e.name
+            slot2var[e.slot1] = e.name
+        total = 0.0
+        for g in self.arena.groups:
+            vals = [
+                [xhat[slot2var[int(g.scatter[i, r])]] for r in range(len(g.roles))]
+                for i in range(len(g.members))
+            ]
+            if g.type == "equality":
+                for v in vals:
+                    total += 0.0 if v[0] == v[1] == v[2] else np.inf
+                continue
+            logf = np.asarray(state.params[g.name])  # [M, *cards], log potential
+            for i, v in enumerate(vals):
+                total += -float(logf[(i, *v)])
+        for c in self.arena.constraint_groups:
+            v = [xhat[slot2var[int(c.scatter[j])]] for j in range(len(c.cards))]
+            total += 0.0 if self._constraint_ok(c, v) else np.inf
+        return total
+
+    @staticmethod
+    def _constraint_ok(c, v: list[int]) -> bool:
+        if c.type == "alldifferent":
+            return len(set(v)) == len(v)
+        if c.type == "exactly_k":
+            return sum(v) == c.k
+        if c.type == "at_most_k":
+            return sum(v) <= c.k
+        # table: the assignment must be one of the allowed tuples
+        return any(np.array_equal(np.asarray(v), row) for row in np.asarray(c.table))
 
 
 @dataclass(frozen=True)
@@ -526,9 +579,28 @@ def _ef_sweep(arena, ef_eta, ef_obs, ef_mask, params):
     return new
 
 
+def _constraint_writes(arena: Arena, messages: jax.Array, k_max: int, op):
+    """Combinatorial messages for the hard-constraint factors (cff-e8zk). Reads
+    the pre-sweep messages (synchronous flooding); returns [(scatter, [n, k_max])]
+    writes for the discrete arena, folded into its damping phase by the caller."""
+    writes = []
+    for c in arena.constraint_groups:
+        inc = messages[c.gather]  # [n, k_max]
+        fn = csp.CONSTRAINT_MESSAGES[c.type]
+        if c.type in ("exactly_k", "at_most_k"):
+            out = fn(inc, c.cards, k_max, op, k=c.k)
+        elif c.type == "table":
+            out = fn(inc, c.cards, k_max, op, table=jnp.asarray(c.table))
+        else:
+            out = fn(inc, c.cards, k_max, op)
+        writes.append((c.scatter, out))
+    return writes
+
+
 def _make_step(arena: Arena):
     groups = arena.groups
     k_max = arena.k_max
+    op = jnp.max if arena.semiring == "max" else logsumexp
 
     def step(
         messages: jax.Array,
@@ -551,8 +623,10 @@ def _make_step(arena: Arena):
                 out = VMP_UPDATES[g.type](inc2, logf, g.cards, k_max)
             else:
                 inc = messages[g.gather]  # [M, R, k_max] (synchronous: reads old)
-                out = BP_UPDATES[g.type](inc, logf, g.cards, k_max)
+                out = BP_UPDATES[g.type](inc, logf, g.cards, k_max, op)
             new = new.at[g.scatter.reshape(-1)].set(out.reshape(-1, k_max))
+        for scatter, out in _constraint_writes(arena, messages, k_max, op):
+            new = new.at[scatter].set(out)
         for g in arena.gfe_groups:
             _, ki = g.cards
             log_d = messages[g.gather_z][:, :ki]
@@ -782,6 +856,15 @@ def _make_bfe(arena: Arena):
                 total = total + VMP_ENERGIES[g.type](messages[g.gather_both], logf, g.cards).sum()
             else:
                 total = total + NODE_ENERGIES[g.type](messages[g.gather], logf, g.cards).sum()
+        for c in arena.constraint_groups:
+            inc = messages[c.gather]  # [n, k_max]
+            fn = csp.CONSTRAINT_ENERGIES[c.type]
+            if c.type in ("exactly_k", "at_most_k"):
+                total = total + fn(inc, c.cards, k=c.k)
+            elif c.type == "table":
+                total = total + fn(inc, c.cards, table=jnp.asarray(c.table))
+            else:
+                total = total + fn(inc, c.cards)
         for g in arena.gfe_groups:
             _, ki = g.cards
             log_d = messages[g.gather_z][:, :ki]
