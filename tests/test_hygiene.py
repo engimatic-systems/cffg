@@ -1,4 +1,4 @@
-"""Repo hygiene: the four-canonical-documents rule from AGENTS.md, enforced by machine.
+"""Repo hygiene: the five-canonical-documents rule from AGENTS.md, enforced by machine.
 
 Project state lives in tickets, durable knowledge lives in docstrings, and
 executable claims live in tests. Markdown files multiplying in the repo is the
@@ -15,6 +15,7 @@ CANONICAL_DOCS = {
     "README.md",
     "docs/ARCHITECTURE.md",
     "docs/LIMITATIONS.md",
+    "docs/DERIVATIONS.md",  # formal derivations + plain-English companions (cff-fk2u)
 }
 
 # Directories whose markdown is none of our business.
@@ -38,7 +39,7 @@ def test_no_contraband_markdown():
     contraband = sorted(found - CANONICAL_DOCS)
     assert not contraband, (
         f"Contraband markdown detected: {contraband}. "
-        "Per AGENTS.md document policy there are exactly four canonical docs, "
+        "Per AGENTS.md document policy there are exactly five canonical docs, "
         "updated in place. Session state belongs in tickets (tk add-note), "
         "research findings in the ticket that needed them, durable knowledge "
         "in docstrings, claims in tests. Delete the file and relocate its "
@@ -49,7 +50,7 @@ def test_no_contraband_markdown():
 
 
 def test_canonical_docs_exist():
-    """The rule cuts both ways: the four documents must actually be there."""
+    """The rule cuts both ways: the canonical documents must actually be there."""
     missing = sorted(d for d in CANONICAL_DOCS if not (REPO / d).is_file())
     assert not missing, f"Canonical documents missing: {missing}"
 

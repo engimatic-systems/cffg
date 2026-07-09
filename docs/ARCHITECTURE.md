@@ -135,6 +135,11 @@ A registry keyed by `(factor_type, constraint_config, out_edge_role)`:
   (Corollary 1 form, 20-ish Newton steps as in the paper), importance-sampled
   log-message to A. All in log-space; every stochastic rule takes an explicit PRNG
   key.
+- **GFE-TM rules** (cff-fk2u, beyond the papers): P-substitution on the
+  transition node gives dynamics curiosity — the same Corollary-1 fixed point
+  over the joint (state, action) simplex, with the downstream message in the
+  goal prior's role, so the obs composite becomes a special case. Formal
+  derivation + plain-English companion in docs/DERIVATIONS.md D1.
 - Each rule ships with a **local free-energy contribution** function (average
   energy + entropy terms with correct edge-entropy overcounting), so global
   BFE/GFE is always exactly the sum of registered local terms — the "true BFE, no

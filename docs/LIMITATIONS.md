@@ -106,15 +106,17 @@ its likelihood node (a huge-precision clamp would diverge the differential-
 entropy ledger). Free energies on models with improper beliefs (e.g. unbonded
 Gaussian glue ports) come out ±inf — deliberate loudness, not a bug.
 
-**S1c. B-learning is pragmatic-only (no dynamics curiosity).** `learn_b`
-(cff-cd1i) updates per-action transition Dirichlets from smoothed pair
-beliefs and plans with E[log B], but unlike A-learning there is no GFE
-channel for B: uncertainty about *dynamics* generates no epistemic value, so
-an agent will not act to visit poorly-modeled transitions. Deriving a
-P-substitution-style term for the transition node is ticket cff-fk2u
-(principled route: substitute q(z')→p(z'|z,u) at the transition node and
-derive the local GFE; pragmatic interim: a separately-labeled count-novelty
-term, never folded into BFE/GFE numbers).
+**S1c. Dynamics curiosity is an optimistic bound.** The GFE-TM composite
+(cff-fk2u, `epistemic_b=True`; derivation in docs/DERIVATIONS.md D1) gives
+transition learning an epistemic channel: the parameter-novelty term is
+*exactly* the expected KL of the next Dirichlet update. Two honest limits:
+(1) z' is latent, so the channel prices information as if the next state
+were revealed — by data processing it upper-bounds the realizable gain
+about B, tightly only when sensors pin the state down; (2) the fixed point
+is solved over the joint (state, action) simplex, O((K·U)³) per composite
+per sweep — fine at planning scale, a structure-exploitation ticket at
+colony scale. Models containing the composite report GFE, not BFE (no
+−log Z identity claimed).
 
 **S2. Importance-sampling noise in parameter messages.** The message to A is a
 non-conjugate log-message evaluated by importance sampling; variance grows with
