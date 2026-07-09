@@ -171,7 +171,10 @@ class Engine:
                 )
                 deltas.append(delta)
                 st = nxt
-                if tol is not None and delta < tol:
+                # A non-finite delta is divergence, never convergence: it must
+                # not satisfy tol (cff-i45j: an -inf delta once returned a
+                # transient sweep-4 state as "converged").
+                if tol is not None and np.isfinite(delta) and delta < tol:
                     break
             return st
 
