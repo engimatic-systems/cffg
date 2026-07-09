@@ -156,6 +156,21 @@ precision — both pinned in `tests/test_gauss_vmp.py`). The mean-field ledger
 itself is exact: BFE at the `gaussian_prec` fixed point equals −log evidence
 by quadrature to 1e-6.
 
+**S1f. Constraint factors and min-sum: exact but bounded envelope.** The
+constraint library (cff-e8zk) computes all messages AND Bethe node energies
+exactly by combinatorial DP (never materializing the K^n potential), so
+sum-mode BFE = −log Z holds even through indicator factors. The envelope:
+`alldifferent` is capped at n, K ≤ 10 at compile (the bitmask-permanent DP;
+larger instances need Huang–Jebara approximate messages, arXiv:0908.1769 —
+a follow-up, and it would make that node's ledger term approximate).
+Min-sum (`semiring="max"`) is discrete-only in v1 (VMP/GFE/Gaussian/EF/
+hybrid groups reject it) and reports `Engine.objective` — an exact
+−log f(x̂) at the decoded assignment — while `bfe` deliberately raises: an
+objective value is not a free energy. Max-product on loopy graphs keeps BP's
+usual caveat (exact on trees — the pinned Viterbi identity; on loops, exact
+for unique-MAP bipartite matching per Bayati–Shah–Sharma, otherwise a
+heuristic that decimation, `cffg.csp.decimate`, drives to feasibility).
+
 **S2. Importance-sampling noise in parameter messages.** The message to A is a
 non-conjugate log-message evaluated by importance sampling; variance grows with
 column dimensionality and makes the GFE trace stochastic (hence burn-in

@@ -1,6 +1,6 @@
 ---
 id: cff-e8zk
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-07-08T16:50:10Z
@@ -27,3 +27,7 @@ SEMIRING/LEDGER SEMANTICS SPEC (Fable, per delegation note — binding for imple
 **2026-07-09T21:49:02Z**
 
 RESEARCH (Sonnet survey, distilled; confidence high — primary sources checked): (Q1 PGMax semiring) One code path: BP(bp_state, temperature=0.0|1.0) interpolates max-/sum-product inside the same per-factor update dispatch, same damping (linear, default .5), same arenas; no convergence detection in max mode (returns delta trace, caller decides) [github google-deepmind/PGMax pgmax/infer/bp.py; JMLR 25(23-1010)]. Validates our engine-level mode-flag design; our run() tol-on-delta already matches their convergence stance. (Q2/Q3 parity targets, all brute-forceable <1e7 states, no new deps): tree graphs vs Viterbi (exact, no enumeration); 4-Queens alldiff (256 states); toulbar2 LatinSquare2 vendored as tiny CFN snippet (16 states, format parity); 4x4 mini-Sudoku ~8 givens (~1e6) [Goldberger BP-Sudoku]; myciel3 DIMACS 4-coloring (4^11~4.2e6); SATLIB uf20-01 as weighted CSP (2^20) [satlib]. (Q4 alldiff messages) Huang-Jebara arXiv:0908.1769 — permanent as Bethe partition fn, O(n^2)/iter updates; exactness anchor: Bayati-Shah-Sharma IEEE-IT 54(3) 2008 — max-product EXACT+convergent for max-weight bipartite matching iff MAP unique; test K_{n,n} n<=6 random distinct weights. (Q5 decimation) fix lowest-marginal-entropy variable, clamp to argmax, rerun; cite Montanari-Ricci-Tersenghi-Semerjian arXiv:0709.1667 (BP-guided decimation). Test-tier plan: Viterbi identity + 4-Queens + LatinSquare2 + mini-Sudoku-with-decimation + matching exactness; myciel3/uf20 optional slow-tier.
+
+**2026-07-09T22:28:29Z**
+
+CLOSED (branch constraints, chained on plates PR #12). Both halves landed per the two spec notes on this ticket. (1) Semiring: engine-level semiring='sum'|'max' on compile_template; the bp_* rules take an op parameter (logsumexp default — sum-product byte-identical, all 1067 pre-existing tests unchanged); max mode rejects vmp/GFE/Gaussian/EF/hybrid at compile. Ledger API split as specified: Engine.objective(state) = exact -log f(decode) from params + assignment (equality inconsistency loud); Engine.bfe raises in max mode. (2) Constraint library (cffg/csp.py, family='constraint', stochasticity-exempt, no dense potentials): alldifferent (bitmask-permanent DP, n,K<=10 compile cap citing Huang-Jebara for beyond), exactly_k/at_most_k (O(nk) prefix DP), table (support enumeration, T<1e5). BETTER THAN SPEC: node energies are EXACT closed forms from the same DPs (F_a = E_q[weight] - log Z_a) — no enumeration fallback, no bfe rejection; sum-mode BFE = -log Z through indicators verified vs enumeration 1e-9. Acceptance all pinned: Viterbi identity 1e-12 (+100-var chain vs numpy DP), 4-Queens, vendored LatinSquare2 table instance, 4x4 mini-Sudoku via csp.decimate (uniqueness backtrack-verified), mixed soft+hard MAP vs enumeration, K44 matching == Hungarian (Bayati-Shah-Sharma exactness), f32. LIMITATIONS S1f records the envelope. Suite: 1087 green.
