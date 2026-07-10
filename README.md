@@ -142,6 +142,43 @@ print(estimate(engine).summary())
 # state 9.1 KiB (messages 2.8, params 6.4) · 2.76e+04 flops/sweep · 0.203 ms/sweep
 ```
 
+## Consume the engine from an experiment harness
+
+Evaluation harnesses live *outside* this repo (sibling folders under
+`../experiments/`, one uv project per experiment, results never committed
+here). The patterns that matter, learned the measured way (2026-07-09):
+
+```toml
+# pyproject.toml of the harness
+[tool.uv.sources]
+cffg = { path = "../../cffg", editable = true }
+```
+
+- **Enable x64 once, first** (`jax.config.update("jax_enable_x64", True)`)
+  — the ledger identities the tests pin assume it; f32 works but your
+  tolerances won't match the docs.
+- **Compile once, swap parameters through state.** Parameters are *inputs*
+  to the jitted step (the colony contract): for trial loops, build the
+  Engine once for the graph *shape*, then write `state.params[...]` (see
+  `member_of` for per-factor discrete writes) and rebind observations. A
+  loop that recompiles per trial is ~50× slower for nothing.
+- **Sliding windows are the streaming pattern**: fixed window shape,
+  compile once, thread the previous posterior in as the next window's
+  prior params. Measured: flat steady-state memory over 10⁵-step streams
+  (drift ≈ 0 after JIT warmup) at hundreds of filtered steps/sec.
+- **Convergence is diameter-bound, not FLOP-bound**, on wide fan-in models:
+  a two-level 784-leaf plate compiles in ~1 s and each sweep is cheap, but
+  a linear equality chain needs ~1 sweep per leaf (cff-9xmq tracks the
+  balanced-tree fix). Budget `run()` sweeps against your graph's diameter,
+  and always pass `tol=` so coherent models exit early.
+- **Read beliefs, not messages**: `marginals`, `gaussian_marginals`,
+  `ef_marginals`, `node_beliefs`, `gaussian_node_stats` are the supported
+  readouts; learning loops mirror `cffg.agent`'s count pattern (infer →
+  accumulate stats → conjugate update → roll expected params back).
+- **Report framework gaps in framework terms.** When a harness needs a
+  numpy workaround, that sentence is a ticket (see cff-9xmq, cff-lquu,
+  cff-5edo, cff-mjku, cff-gul8 — all minted from one evaluation round).
+
 ## Draw a model
 
 ```python
