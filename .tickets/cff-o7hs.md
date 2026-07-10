@@ -2,7 +2,7 @@
 id: cff-o7hs
 status: open
 deps: [cff-4e5z]
-links: []
+links: [cff-1o72, cff-fxmj, cff-ri8m, cff-l6i5]
 created: 2026-07-08T16:49:34Z
 type: feature
 priority: 2
