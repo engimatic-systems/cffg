@@ -17,3 +17,9 @@ Receding-horizon plan graphs measured at slices H in {5..25} on a 60-state alias
 
 H=25 success within noise of H=20 on the same fixture (or a documented LIMITATIONS entry explaining why not); warm-started replanning >=3x faster than cold at H=20 with identical action choices.
 
+
+## Notes
+
+**2026-07-10T03:34:54Z**
+
+DIAGNOSIS LANDED (evaluation round): the H=25 success drop is PURE UNDER-CONVERGENCE, not model error or limit-cycling — messages propagate ~one slice per sweep, and a fixed n_sweeps=120 leaves the deep-rollout control posterior unconverged (measured residual 5.5 @120 sweeps vs 4.9e-4 @400). Thread (1) resolves to: depth-aware or tol-driven sweep budgets in the agent planning loop (run-to-tol with cap exists in Engine.run; RollingAgent should use it). Thread (2) warm-started replanning unchanged. Also measured: per-step plan cost linear in H (sweeps x per-sweep, compile negligible).
