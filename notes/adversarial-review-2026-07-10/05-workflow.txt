@@ -1,0 +1,94 @@
+QUESTION 5: WORKFLOW ASSESSMENT
+
+EVIDENCE
+
+The repository contains 96 commits across three active development days. The
+review branch is 52 commits past main. It has 8,394 source LOC, 7,546 test LOC,
+1,091 passing tests, and 78 tickets (49 closed before this review). Six archived
+agent chats total about 9.8 MB / 3,279 JSONL records.
+
+WHAT IS WORKING WELL
+
+1. Tickets as durable memory are effective. The better tickets contain design,
+   acceptance, hostile inputs, sources, experiment outcomes, and handoffs.
+2. The branch history often separates math/rules, plumbing, reference models,
+   and closure/docs. That is much better than one giant generated diff.
+3. External experiment repos are excellent practice. Active vision, Hallway,
+   switching KF, and RockSample found real framework gaps instead of only
+   confirming unit tests.
+4. The test/source ratio is unusually healthy. Many core claims have enumeration,
+   quadrature, forward-backward, RTS, or Julia reference oracles.
+5. Restarting with a ticket handoff is not the problem. It is a reasonable way
+   to manage long agent work.
+
+THE MAIN FAILURE MODE
+
+The same model family often performs every epistemic role:
+
+  interprets the paper;
+  writes the derivation;
+  defines acceptance;
+  implements it;
+  writes a test that restates the implementation;
+  updates docs;
+  closes the ticket.
+
+cff-fk2u is the concrete failure. Its novelty identity is good, but the edge
+cavity message and FE ledger were wrong. The local energy test simply recomputed
+the same rho expression, so 23 focused tests passed. This is common-mode error,
+not lack of model intelligence.
+
+OTHER RISKS
+
+1. A 52-commit PR chain is too much unreviewed semantic surface. Review cost and
+   cross-feature interaction grow faster than commit count.
+2. Some "atomic" commits exceed 1,000 inserted lines. They may be one feature,
+   but they are not one human-reviewable proof obligation.
+3. Priority is inflated historically: 18 tickets carry P0 and 25 P1. Closed
+   epics and docs sometimes retain outdated roadmap wording.
+4. Experiments sometimes happen after ticket closure. The RockSample and
+   Hallway results should have been acceptance gates for calibrated curiosity,
+   not only post-hoc ticket generators.
+5. Raw chat archives in the repository conflict with the stated rule that
+   tickets, not the repo, carry session state. They add review and privacy noise
+   without becoming reliable design records.
+6. "Run until context gets expensive" is not a technical session boundary. It
+   encourages one context to own too many independent claims.
+
+RECOMMENDED WORKFLOW
+
+1. One claim per session, not one feature per context window. A claim might be
+   "this cavity message preserves the substituted marginal" or "this schedule
+   is O(E) on a tree."
+2. Lock acceptance before implementation. A different context/model writes the
+   oracle and hostile cases. The implementer cannot weaken them.
+3. Math ticket roles:
+     A derives from the primary PDF;
+     B attacks signs, counting numbers, cavities, supports, and limiting cases;
+     C implements;
+     D reruns independent numerical/behavioral oracles and closes.
+   These can be separate fresh contexts, not necessarily expensive sub-agents.
+4. Add a merge gate every 3-5 commits or one vertical capability. Do not let an
+   end-of-chain review accumulate across six architectural milestones.
+5. Require a claim-evidence table in each risky ticket:
+     claim; independent oracle; hostile inputs; behavior; benchmark;
+     serialization round-trip; remaining approximation.
+6. Run the smallest external experiment before closing a new objective or factor
+   family. Negative results are acceptance evidence, not cleanup.
+7. Make P0 mean "do not trust results/deploy" and P1 mean "blocks the next
+   milestone." Keep research bets separate from production blockers.
+8. Distill chats into tickets and delete/archive raw logs outside the source
+   branch unless Cooper explicitly needs them.
+
+RATING
+
+Research velocity: 8/10
+Testing and artifacts: 8/10
+Handoffs and memory: 8/10
+Reviewability: 5/10
+Independent mathematical validation: 4/10
+Overall: 6/10
+
+The workflow is productive enough to continue. The next improvement is not a
+larger context window or a stronger single model. It is enforced independence
+between author, oracle, and closer.

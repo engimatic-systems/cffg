@@ -1,0 +1,109 @@
+CFFG ADVERSARIAL REVIEW: EXECUTIVE SUMMARY
+Date: 2026-07-10
+Branch reviewed: eval-notes at 9471f06, the end of the Gaussian, hybrid,
+learning, plates, constraints, and evaluation PR chain.
+
+BOTTOM LINE
+
+CFFG is an unusually strong research prototype, but it is not yet a scalable,
+modular inference engine or a trustworthy production policy scorer. I would not
+restart it. I would freeze feature breadth while repairing the trust and
+execution layers.
+
+The strongest assets are:
+
+1. A clean, JAX-free, serializable graph IR with ports, composition, validation,
+   edit actions, and structure hashing.
+2. Correct independent parity for ordinary discrete BP/BFE, fixed-parameter
+   observation GFE, HMMs, linear Gaussian models, exponential-family conjugacy,
+   and the authors' Julia T-maze result.
+3. A serious testing culture: 1,091 tests pass; source and test LOC are roughly
+   balanced; rule tests often use quadrature, enumeration, or independent
+   implementations.
+4. A productive experiment loop that has already found diameter, batching,
+   readout, and long-horizon limitations.
+
+The highest-risk findings are:
+
+1. cff-hp3y: the new transition-curiosity GFE extension violates cavity
+   consistency and includes an incoming-message coupling in node energy. It
+   double-counts downstream evidence/preferences. Hallway epistemic-B results
+   and GFE-TM energy values must be treated as invalid until rerun.
+2. cff-j4mu: Engine.run cannot distinguish converged, budget-exhausted,
+   diverged, or infeasible. It does not use free energy as the convergence
+   signal and returns poisoned or under-converged states normally.
+3. cff-vamy: .cffgz export silently removes plate specifications and then hashes
+   the truncated graph, so integrity checks pass on the wrong model.
+
+The scalability claim is also premature. Against Dynamax on the same M2 Max CPU
+and identical posterior tasks, CFFG was 316-399x slower for ordinary HMMs,
+623-4,206x slower for a full-diameter HMM, and 74-137x slower for LGSSM
+smoothing before CFFG readout. Results were accurate. The problem is execution:
+Python dispatch, whole-graph flooding, and globally padded arenas, not the local
+probability algebra.
+
+RECOMMENDED ORDER
+
+P0 trust gate:
+  cff-hp3y, cff-j4mu, cff-vamy.
+
+P1 engine gate:
+  cff-3hgi Gaussian numerical validity;
+  cff-ri8m executable factor/rule registration;
+  cff-d56d schedule-aware inference;
+  cff-44we shape-segmented arenas;
+  cff-wbhu jitted run loop after convergence semantics are fixed;
+  cff-9xmq balanced fan-out;
+  cff-4oq8 behavioral epistemics.
+
+Parallel bounded research:
+  execute cff-dfpi as a P1 feasibility spike after cff-hp3y. Derive one exact
+  action-dependent linear-Gaussian sensing class and
+  one discrete-regime/continuous-state hybrid. Do not attempt universal exact
+  nonlinear or mixture GFE.
+
+WHAT TO ABANDON
+
+Abandon the goal of one universal exact message rule for arbitrary continuous,
+nonlinear, and hybrid factors. General nonlinear mutual information and Gaussian
+mixture entropy do not have universal closed forms. Abandon the near-term claim
+that CFFG is a commodity continual-learning layer: it currently learns declared
+conjugate parameters in a fixed ontology, not representations or structure.
+Abandon performance claims based only on JAX, vmap, or a successful 100k stream;
+the algorithmic schedule still dominates relevant chains.
+
+WHAT IS WORTH TOKENS
+
+Spend frontier-model tokens on narrowly stated derivations with independent
+oracles: action-dependent Gaussian sensing, switching/regime epistemics,
+parameter information gain, cavity-consistent messages, and explicit FE bounds.
+Spend engineering tokens on schedules, segmented storage, executable rule
+contracts, status-bearing runs, and vertical benchmarks. Use LLMs as model and
+template authors around a deterministic verifier, not as the source of truth for
+the math they also implement and test.
+
+COMMERCIAL VERDICT
+
+There is a plausible commercial wedge, but it is not "factor graphs for
+everything." The credible wedge is active diagnostics, adaptive sensing,
+system identification, or constrained low-data control where uncertainty,
+inspection cost, model auditability, and online updates are valuable. The
+generic market already contains PGMax, RxInfer, Dynamax, GTSAM, River, Bayes
+Server/Bayesia, and VERSES Genius. CFFG must win one vertical benchmark and make
+its constraint/GFE audit trail materially better than those alternatives.
+
+Current commercial readiness: 2/10.
+Technical option value if the P0/P1 gates land: 6/10.
+
+WORKFLOW VERDICT
+
+Research velocity: 8/10.
+Artifact and handoff discipline: 8/10.
+Independent risk control: 4/10.
+Overall: 6/10.
+
+The restart-and-handoff pattern works. The failure is common-mode validation:
+the same model can write a derivation, implementation, test oracle, docs, and
+ticket closure. Make math tickets cross-context and cross-model by construction,
+and stop every 3-5 commits for an adversarial merge gate instead of reviewing a
+52-commit chain at the end.

@@ -2,7 +2,7 @@
 id: cff-fk2u
 status: closed
 deps: []
-links: []
+links: [cff-fxmj, cff-hp3y]
 created: 2026-07-09T02:47:20Z
 type: feature
 priority: 1

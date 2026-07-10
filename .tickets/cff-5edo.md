@@ -2,7 +2,7 @@
 id: cff-5edo
 status: open
 deps: []
-links: []
+links: [cff-fxmj, cff-j4mu, cff-i45j, cff-wbhu, cff-d56d]
 created: 2026-07-10T03:31:09Z
 type: feature
 priority: 2

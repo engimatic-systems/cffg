@@ -1,0 +1,95 @@
+QUESTION 2: HOW FAST IS CFFG?
+
+TEST ENVIRONMENT
+
+Apple M2 Max, 64 GB, CPU-only JAX 0.10.2/jaxlib 0.10.2, Python 3.12.13.
+Benchmarks enabled x64 for parity with the CFFG suite. Dynamax 1.0.2 was the
+specialized JAX comparator. The harness is in:
+
+  ../experiments/cffg-adversarial-bench
+  commit a543c6b
+
+It uses identical model parameters and observations, separates CFFG Python
+compile, cold JIT, warm inference, and readout, and checks posterior parity.
+Dynamax's HMM call computed its full default posterior, so that comparison is
+slightly biased in CFFG's favor.
+
+BASELINE
+
+  Full CFFG suite: 1,091 passed in 130.23 seconds.
+
+HMM, K=8, M=5, MIXING DYNAMICS
+
+T     CFFG warm     Dynamax warm     ratio     max posterior error
+16      7.41 ms       0.0186 ms       399x       2.2e-16
+32      9.50 ms       0.0275 ms       346x       3.1e-12
+64     15.23 ms       0.0440 ms       346x       5.1e-12
+128    28.17 ms       0.0892 ms       316x       4.7e-12
+
+HMM, IDENTITY DYNAMICS, ONLY FINAL STATE OBSERVED
+
+T     sweeps       CFFG warm     Dynamax warm     ratio
+32       65          6.85 ms       0.0110 ms        623x
+64      129         16.23 ms       0.0113 ms      1,432x
+128     257         35.36 ms       0.0146 ms      2,425x
+256     513         83.24 ms       0.0198 ms      4,206x
+
+All posteriors matched exactly in this hostile case. This is the cleanest
+diagnosis: the local rules are correct, but flooding executes O(T) complete
+O(T) sweeps where forward-backward executes two O(T) passes.
+
+LGSSM, STATE d=4, OBSERVATION d=2
+
+T     CFFG warm     Dynamax warm     ratio     CFFG warm readout
+16     10.63 ms        0.143 ms        74x          9.49 ms
+32     22.98 ms        0.225 ms       102x         19.45 ms
+64     55.74 ms        0.406 ms       137x         39.26 ms
+
+Maximum mean error was 5.7e-9, consistent with CFFG's absolute Gaussian ridge.
+
+EXISTING CONSUMER MEASUREMENTS
+
+1. Active vision: 4.1 sequential and 5.1 batched images/s, missing a 20/s bar.
+   The engine agrees with closed-form naive Bayes, but uses about 70 sweeps for
+   a 49-patch linear equality fan-out.
+2. Long-horizon POMDP: 0.61 s/action at H=5 to 2.47 s/action at H=25. H=25 was
+   initially mis-scored because 120 sweeps had not converged.
+3. Colony: 32 instances achieved only 1.5x sequential throughput on CPU.
+4. Hybrid switching stream: 455 filtered steps/s with flat steady-state memory
+   on a compile-once W=25 workload. This is a useful positive result, but it is
+   not evidence of parity with a specialized switching-state-space library.
+
+INTERPRETATION
+
+CFFG's covered HMM and LGSSM paths are currently correct but slow. It is fast
+enough for small
+research models, interactive diagrams, and some fixed-window streaming. It is
+not fast enough for the stated claim of scalable factor-graph inference and
+cannot compete with specialized routines on their home territory.
+
+The gap is not solved by one optimization:
+
+  cff-j4mu first defines correct termination semantics;
+  cff-wbhu removes Python dispatch;
+  cff-d56d removes needless whole-graph iterations;
+  cff-44we removes global padding;
+  cff-9xmq shortens one generated topology;
+  sparse/factored parameters remain future work.
+
+No GPU was available. CFFG's grouping may improve relatively on GPU or large
+batches, but current 1.2-1.5x CPU batching does not justify a GPU scalability
+claim. A GPU benchmark must report transfer, compile, warm kernel, batch size,
+memory, convergence status, and specialized baselines.
+
+EXTERNAL CONTEXT
+
+Dynamax documents efficient JAX HMM, LGSSM, nonlinear, and generalized SSM
+algorithms:
+  https://probml.github.io/dynamax/
+
+PGMax is the relevant general discrete JAX competitor and reports scalable,
+differentiable loopy BP with accelerator support:
+  https://www.jmlr.org/papers/v25/23-1010.html
+
+This review did not produce a local PGMax comparison because its current PyPI
+0.6.0 dependency chain was incompatible with this Python 3.12 environment.

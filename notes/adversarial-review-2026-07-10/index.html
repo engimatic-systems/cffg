@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CFFG adversarial review</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8f7;
+      --paper: #ffffff;
+      --ink: #17211d;
+      --muted: #5c6862;
+      --line: #ccd3cf;
+      --green: #176b55;
+      --red: #a33a32;
+      --amber: #8b6416;
+      --blue: #28678f;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+    header, main, footer { max-width: 1020px; margin: 0 auto; }
+    header { padding: 32px 22px 20px; }
+    h1 { margin: 0 0 8px; font-size: 30px; line-height: 1.15; letter-spacing: 0; }
+    .dek { max-width: 760px; margin: 0; color: var(--muted); font-size: 16px; }
+    .meta { margin-top: 14px; color: var(--muted); font-size: 13px; }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin-top: 24px;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+    .metric { min-width: 0; padding: 14px 12px 14px 0; }
+    .metric strong { display: block; font-size: 22px; line-height: 1.1; }
+    .metric span { display: block; margin-top: 5px; color: var(--muted); font-size: 12px; }
+    .critical strong { color: var(--red); }
+    .positive strong { color: var(--green); }
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      overflow-x: auto;
+      background: rgba(247, 248, 247, 0.96);
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(8px);
+    }
+    nav .inner {
+      display: flex;
+      gap: 4px;
+      max-width: 1020px;
+      margin: 0 auto;
+      padding: 8px 18px;
+      white-space: nowrap;
+    }
+    nav a {
+      padding: 6px 8px;
+      color: var(--ink);
+      text-decoration: none;
+      font-size: 13px;
+      border-bottom: 2px solid transparent;
+    }
+    nav a:hover, nav a:focus { color: var(--green); border-color: var(--green); }
+    main { background: var(--paper); border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+    article { padding: 34px 28px; border-bottom: 1px solid var(--line); scroll-margin-top: 58px; }
+    article:nth-child(3n+1) { border-left: 4px solid var(--green); }
+    article:nth-child(3n+2) { border-left: 4px solid var(--blue); }
+    article:nth-child(3n) { border-left: 4px solid var(--amber); }
+    h2 { margin: 0 0 18px; font-size: 20px; line-height: 1.25; letter-spacing: 0; }
+    .report-text {
+      max-width: 88ch;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font: 14px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      letter-spacing: 0;
+    }
+    .report-text a { color: var(--blue); text-underline-offset: 2px; }
+    .loading { color: var(--muted); }
+    .raw { margin-top: 18px; font-size: 12px; }
+    .raw a { color: var(--muted); }
+    footer { padding: 22px; color: var(--muted); font-size: 12px; }
+    @media (max-width: 720px) {
+      header { padding: 24px 16px 16px; }
+      h1 { font-size: 25px; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      article { padding: 26px 16px; }
+      main { border-left: 0; border-right: 0; }
+      .report-text { font-size: 12px; line-height: 1.55; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>CFFG adversarial review</h1>
+    <p class="dek">Independent review of the end-of-chain branch: mathematical fidelity, engine architecture, measured performance, epistemic behavior, roadmap, commercial value, and the AI-assisted workflow.</p>
+    <div class="meta">Reviewed 2026-07-10 at <code>9471f06</code> on <code>eval-notes</code>. CPU benchmark: Apple M2 Max, JAX 0.10.2, x64.</div>
+    <div class="metrics" aria-label="Key findings">
+      <div class="metric positive"><strong>1,091</strong><span>baseline tests passing</span></div>
+      <div class="metric critical"><strong>3</strong><span>P0 trust blockers found</span></div>
+      <div class="metric critical"><strong>4,206x</strong><span>slowdown on T=256 hostile HMM</span></div>
+      <div class="metric"><strong>6/10</strong><span>commercial option value after gates</span></div>
+    </div>
+  </header>
+
+  <nav aria-label="Report sections">
+    <div class="inner" id="nav"></div>
+  </nav>
+
+  <main id="reports" aria-live="polite"></main>
+  <footer>Ticket <code>cff-fxmj</code>. Raw reports are stored beside this index. Findings labeled <code>adversarial-reviewer</code> in <code>.tickets/</code>.</footer>
+
+  <script>
+    const reports = [
+      ["summary", "Executive summary", "00-executive-summary.txt"],
+      ["architecture", "1. Architecture", "01-architecture.txt"],
+      ["performance", "2. Performance", "02-performance.txt"],
+      ["curiosity", "3. Curiosity and tractability", "03-curiosity-and-tractability.txt"],
+      ["commercial", "4. Commercial value", "04-commercial-value.txt"],
+      ["workflow", "5. Workflow", "05-workflow.txt"],
+      ["priorities", "6. Ticket priorities", "06-ticket-priorities.txt"],
+      ["math", "7. Math audit", "07-math-audit.txt"],
+    ];
+
+    const nav = document.getElementById("nav");
+    const root = document.getElementById("reports");
+
+    function renderLinkedText(target, text) {
+      const url = /https?:\/\/[^\s]+/g;
+      let cursor = 0;
+      for (const match of text.matchAll(url)) {
+        target.append(document.createTextNode(text.slice(cursor, match.index)));
+        const a = document.createElement("a");
+        a.href = match[0];
+        a.textContent = match[0];
+        a.target = "_blank";
+        a.rel = "noreferrer";
+        target.append(a);
+        cursor = match.index + match[0].length;
+      }
+      target.append(document.createTextNode(text.slice(cursor)));
+    }
+
+    for (const [id, title, file] of reports) {
+      const link = document.createElement("a");
+      link.href = `#${id}`;
+      link.textContent = title;
+      nav.append(link);
+
+      const article = document.createElement("article");
+      article.id = id;
+      const h2 = document.createElement("h2");
+      h2.textContent = title;
+      const body = document.createElement("div");
+      body.className = "report-text loading";
+      body.textContent = "Loading report...";
+      const raw = document.createElement("div");
+      raw.className = "raw";
+      raw.innerHTML = `<a href="${file}">Open raw report</a>`;
+      article.append(h2, body, raw);
+      root.append(article);
+
+      fetch(file, {cache: "no-store"})
+        .then(response => {
+          if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+          return response.text();
+        })
+        .then(text => {
+          body.classList.remove("loading");
+          body.textContent = "";
+          renderLinkedText(body, text);
+        })
+        .catch(error => {
+          body.textContent = `Could not load ${file}: ${error.message}. Use the raw report link.`;
+        });
+    }
+  </script>
+</body>
+</html>
