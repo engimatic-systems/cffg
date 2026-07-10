@@ -171,6 +171,18 @@ usual caveat (exact on trees — the pinned Viterbi identity; on loops, exact
 for unique-MAP bipartite matching per Bayati–Shah–Sharma, otherwise a
 heuristic that decimation, `cffg.csp.decimate`, drives to feasibility).
 
+**S1g. Long receding-horizon plans: measured envelope (2026-07-09).** On a
+60-state aliased-corridor planning stack, GFE planning beat a QMDP baseline
+(0.79 vs 0.64 success, median 13 vs 19 steps) at horizons 5–20 with
+per-env-step planning time growing roughly linearly (0.6 s at H=5 → 1.9 s
+at H=20, sweep-dominated), but success *dropped* to 0.57 at H=25 (2.5 s per
+step). The degradation is undiagnosed — plausibly GFE outer-coordination
+limit-cycling under a fixed sweep budget at long chains — and each env step
+currently re-solves a nearly identical graph cold. Both threads are
+cff-5edo; until it lands, treat H ≳ 20 as unvalidated territory and check
+the delta trace before trusting a long plan. (Small-sample numbers: 14
+episodes per horizon — direction is reliable, third digits are not.)
+
 **S2. Importance-sampling noise in parameter messages.** The message to A is a
 non-conjugate log-message evaluated by importance sampling; variance grows with
 column dimensionality and makes the GFE trace stochastic (hence burn-in

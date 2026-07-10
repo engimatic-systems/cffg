@@ -271,6 +271,53 @@ Property tests throughout: FE never counted twice (edge entropy correction),
 messages normalized, VMP monotonically decreases BFE on tree graphs, BP exact on
 trees.
 
+## Evaluation at scale: what consumer harnesses taught us (2026-07-09)
+
+One round of library-consumer evaluation (three independent harnesses in
+sibling experiment folders, engine consumed as an editable dependency,
+nothing committed here) — the durable engine-level findings:
+
+**Confirmed at scale.**
+- *Exactness survives real graphs*: a two-level 784-leaf plate classifier's
+  decisions matched the closed-form posterior on 100% of items; a hybrid
+  switching filter matched its independent numpy reference to 3e-12 *in
+  situ*, not just in unit fixtures.
+- *The compile boundary is the killer feature*: compile-once/swap-params
+  turns trial loops from ~90 s to ~2 s; streaming filters hold literally
+  flat memory over 10⁵ steps at ~455 steps/s (all growth is one-time JIT
+  warmup). This is what "parameters are inputs" was for.
+- *Epistemic value is real and cheap*: information-gain-driven observation
+  selection reached ~84% of full-observation accuracy from a quarter of the
+  input, +27 points over random selection at the same budget — computed
+  from engine beliefs with a page of numpy (cff-gul8 promotes it inward).
+- *Conjugate continual learning behaves*: online hard-EM recovered
+  switching dynamics to 0.009 Frobenius error; Dirichlet count learning
+  recovered planning performance to 0.80 success over 200 episodes.
+- *Long-horizon GFE planning beat a QMDP baseline* (0.79 vs 0.64 success)
+  through H=20 — with a measured degradation at H=25 (LIMITATIONS S1g,
+  cff-5edo).
+
+**Bottlenecks found (each a ticket, in priority order).**
+- Sweeps, not FLOPs: wide fan-ins expand to *linear* equality chains, so
+  BP diameter — hence sweeps-to-convergence — is O(N) in plate size; this,
+  not compile time (1.2 s for 784 leaves) and not per-sweep cost, capped
+  perception throughput (cff-9xmq: balanced trees).
+- Hybrid nodes are read-opaque: no soft sufficient statistics, no
+  posterior-predictive readout — consumers fall back to hard-EM and
+  hand-assembled predictives (cff-lquu).
+- Long rollouts re-solve cold every step and degrade past ~20 slices
+  (cff-5edo); fan-out and observe-an-interior-latent need one-call helpers
+  (cff-mjku); per-member parameter writes beyond discrete groups need the
+  generic learnables API (note on cff-x0sv).
+
+**Method note.** The evaluation discipline that made this productive:
+every harness declares numeric pass/fail standards *before* running,
+misses require a one-line diagnosis phrased in engine terms (those lines
+became the tickets above verbatim), and oracle baselines are implemented
+independently in numpy so the engine is never graded on its own homework.
+Consumer-harness conventions live in README ("Consume the engine from an
+experiment harness").
+
 ## Resource estimator
 
 Because shapes are static post-compile, memory is computable analytically from
