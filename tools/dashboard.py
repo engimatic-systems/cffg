@@ -37,7 +37,7 @@ EPIC_FILES = {
     "M2 · BP Engine": ["test_engine_tree.py", "test_engine_hmm.py"],
     "M3 · VMP + GFE": ["test_vmp.py", "test_gfe.py"],
     "M4 · T-maze": ["test_tmaze.py", "test_tmaze_learning.py"],
-    "M5 · Runtime": ["test_agent.py", "test_colony.py"],
+    "M5 · Runtime": ["test_agent.py", "test_colony.py", "test_runtime_status.py"],
     "M6 · Tooling": ["test_bundle.py", "test_estimate.py", "test_edit_codec.py"],
     "M8 · Plotting": [
         "test_viz_diagram.py",

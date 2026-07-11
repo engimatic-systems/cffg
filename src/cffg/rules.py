@@ -322,7 +322,9 @@ def _gfe_solve_result(abar, h, logc, log_d, max_iters: int = _N_NEWTON):
     # non-increasing even when the local linear model is poor.  Step fractions
     # are dimensionless; numeric validity guards come only from finfo(dtype).
     fractions = jnp.asarray([1.0, 0.5, 0.25, 0.125, 0.0625, 0.0], dtype=dtype)
-    tol = jnp.asarray(64.0, dtype=dtype) * jnp.finfo(dtype).eps
+    # A few hundred ulps are required after the softmax/Jacobian round trip;
+    # below this floor Newton can only repeat a zero-length backtracking step.
+    tol = jnp.asarray(512.0, dtype=dtype) * jnp.finfo(dtype).eps
 
     v0 = center(log_d)
     u0 = v0[:-1] - v0[-1]
@@ -373,7 +375,7 @@ def _stats(a_param, learned):
     return _dirichlet_stats(a_param) if learned else _fixed_stats(a_param)
 
 
-def gfe_update(log_d, a_param, logc, k_max, learned=False):
+def gfe_update(log_d, a_param, logc, k_max, learned=False, return_diagnostics=False):
     """Batched over members. log_d [M,K] normalized; a_param is logA (fixed)
     or Dirichlet counts α (learned); returns (μ2, log q_x) padded to k_max.
 
@@ -387,12 +389,13 @@ def gfe_update(log_d, a_param, logc, k_max, learned=False):
 
     def one(a_p, lc, ld):
         abar, h = _stats(a_p, learned)
-        zbar = _gfe_solve(abar, h, lc, ld)
-        return _gfe_rho(abar, h, lc, zbar), abar @ zbar
+        solved = _gfe_solve_result(abar, h, lc, ld)
+        zbar = solved.solution
+        return _gfe_rho(abar, h, lc, zbar), abar @ zbar, solved.residual, solved.status
 
-    mu2, qx = jax.vmap(one)(a_param, logc, log_d)
-    log_qx = _safe_log(qx)
-    return _norm_pad(mu2, ki, k_max), _norm_pad(log_qx, ko, k_max)
+    mu2, qx, residual, status = jax.vmap(one)(a_param, logc, log_d)
+    messages = (_norm_pad(mu2, ki, k_max), _norm_pad(_safe_log(qx), ko, k_max))
+    return (*messages, residual, status) if return_diagnostics else messages
 
 
 def gfe_energy(log_d, a_param, logc, learned=False):
@@ -501,7 +504,9 @@ def _tm_joint_stats(b_param, learned):
     return abar, h.T.reshape(kz * ku)
 
 
-def gfe_tm_update(mu_in, mu_e, mu_down, b_param, k_max, learned=False):
+def gfe_tm_update(
+    mu_in, mu_e, mu_down, b_param, k_max, learned=False, return_diagnostics=False
+):
     """Batched over members. mu_in [M,K], mu_e [M,U], mu_down [M,K']
     normalized log-messages; b_param is log B (fixed) or Dirichlet counts α
     (learned), [M, U, K', K]. Returns (to_out, to_in, to_sel) padded.
@@ -517,7 +522,8 @@ def gfe_tm_update(mu_in, mu_e, mu_down, b_param, k_max, learned=False):
     def one(bp, mi, me, md):
         abar, h = _tm_joint_stats(bp, learned)
         log_d = (mi[:, None] + me[None, :]).reshape(-1)
-        qj = _gfe_solve(abar, h, md, log_d)
+        solved = _gfe_solve_result(abar, h, md, log_d)
+        qj = solved.solution
         rho = _gfe_rho(abar, h, md, qj).reshape(kz, ku)
         to_sel = logsumexp(rho + mi[:, None], axis=0)
         to_in = logsumexp(rho + me[None, :], axis=1)
@@ -531,14 +537,17 @@ def gfe_tm_update(mu_in, mu_e, mu_down, b_param, k_max, learned=False):
         feasible = jnp.all(~qw_support | md_support)
         to_out = jnp.where(qw_support & md_support, jnp.log(qw) - md, NEG)
         to_out = jnp.where(feasible, to_out, jnp.nan)
-        return to_out, to_in, to_sel
+        return to_out, to_in, to_sel, solved.residual, solved.status
 
-    to_out, to_in, to_sel = jax.vmap(one)(b_param, mu_in, mu_e, mu_down)
-    return (
+    to_out, to_in, to_sel, residual, status = jax.vmap(one)(
+        b_param, mu_in, mu_e, mu_down
+    )
+    messages = (
         _norm_pad(to_out, kp, k_max),
         _norm_pad(to_in, kz, k_max),
         _norm_pad(to_sel, ku, k_max),
     )
+    return (*messages, residual, status) if return_diagnostics else messages
 
 
 def gfe_tm_energy(mu_in, mu_e, mu_down, b_param, learned=False):

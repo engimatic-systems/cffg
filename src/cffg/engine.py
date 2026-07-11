@@ -14,6 +14,7 @@ On tree graphs at the BP fixed point, F = −log Z.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 
 import equinox as eqx
 import jax
@@ -52,6 +53,64 @@ class State(eqx.Module):
     ef_eta: jax.Array  # [n_efslots, 2] EF natural parameters (cff-8s6a)
     ef_obs: jax.Array  # [n_ef_obs] conditioned counts/flips
     ef_mask: jax.Array  # [n_ef_obs] 1.0 = bound, 0.0 = missing
+
+
+class RunStatus(str, Enum):
+    """Mutually exclusive public termination outcomes for :meth:`Engine.run`."""
+
+    CONVERGED = "converged"
+    BUDGET_EXHAUSTED = "budget_exhausted"
+    DIVERGED = "diverged"
+    INFEASIBLE = "infeasible"
+
+
+class InferenceError(RuntimeError):
+    """Raised when a caller requires a converged state and did not get one."""
+
+    def __init__(self, result: "RunResult"):
+        super().__init__(
+            f"inference {result.status.value} after {result.iterations} iterations "
+            f"(residual={result.residual!r})"
+        )
+        self.result = result
+
+
+@dataclass(frozen=True)
+class RunResult:
+    """Status-bearing result of an inference run.
+
+    This intentionally is not tuple-compatible: migrating callers must name
+    ``state`` and therefore cross the status-bearing API boundary explicitly.
+    ``free_energies`` contains only sweeps on which the ledger is defined
+    (improper continuous beliefs during propagation have no FE entry).
+    """
+
+    state: State
+    status: RunStatus
+    iterations: int
+    message_deltas: tuple[float, ...]
+    free_energies: tuple[float, ...]
+    residual: float
+    inner_status: RunStatus = RunStatus.CONVERGED
+    inner_residual: float = 0.0
+
+    @property
+    def delta_trace(self) -> tuple[float, ...]:
+        return self.message_deltas
+
+    @property
+    def fe_trace(self) -> tuple[float, ...]:
+        return self.free_energies
+
+    def require_converged(self) -> State:
+        """Return the state only when the run proved convergence."""
+        if self.status is not RunStatus.CONVERGED:
+            raise InferenceError(self)
+        return self.state
+
+    def require_converged_with_trace(self) -> tuple[State, tuple[float, ...]]:
+        """Explicit migration helper for the old ``state, deltas`` API."""
+        return self.require_converged(), self.message_deltas
 
 
 def _replace(state: State, **kw) -> State:
@@ -155,7 +214,7 @@ class Engine:
     # -- execution --------------------------------------------------------
 
     def step(self, state: State, damp: float = 0.0, harden: bool = True) -> State:
-        msgs, g_eta, g_lam, ef_eta = self._step(
+        msgs, g_eta, g_lam, ef_eta, _, _ = self._step(
             state.messages, state.g_eta, state.g_lam, state.g_obs, state.g_mask,
             state.ef_eta, state.ef_obs, state.ef_mask, state.params, damp, harden,
         )
@@ -169,9 +228,19 @@ class Engine:
         tol: float | None = None,
         damp: float = 0.0,
         harden_last: int | None = None,
-    ) -> tuple[State, list[float]]:
-        """Flood n_iters sweeps (or until max message delta < tol); returns the
-        final state and the per-sweep delta trace — the 'coherence' signal.
+    ) -> RunResult:
+        """Flood up to ``n_iters`` sweeps and return explicit termination data.
+
+        In sum/GFE mode, ``tol`` applies to free-energy stationarity; message
+        delta must also be below the dtype-scaled tolerance so an accidentally
+        flat ledger cannot certify incoherent messages.  In max mode there is
+        no FE: the message fixed-point residual is the stopping criterion and
+        the decoded objective is validated when stationarity is reached.
+
+        With ``tol=None`` the requested fixed sweep budget is always consumed
+        and the status is ``budget_exhausted`` unless the run fails earlier.
+        Callers that require actionable beliefs should use
+        ``result.require_converged()``.
 
         `damp` (0..1) blends in the previous messages; use ~0.5 for models with
         multiple GFE composites, whose outer coordination can limit-cycle.
@@ -181,13 +250,46 @@ class Engine:
         `harden_last=k` (default: k = n_iters // 2 when δ edges exist), the
         first phase runs soft to coherence, then δ edges harden for the final
         k sweeps so decisions commit sequentially."""
+        if n_iters < 0:
+            raise ValueError("n_iters must be non-negative")
         if harden_last is None:
             harden_last = n_iters // 2 if len(self.arena.delta_pairs) else 0
-        deltas: list[float] = []
+        if not 0 <= harden_last <= n_iters:
+            raise ValueError("harden_last must be between 0 and n_iters")
 
-        def phase(n: int, harden: bool, st: State) -> State:
+        deltas: list[float] = []
+        energies: list[float] = []
+        status = RunStatus.BUDGET_EXHAUSTED
+        residual = float("inf")
+        inner_status = RunStatus.CONVERGED
+        inner_residual = 0.0
+
+        dtype = np.asarray(state.messages).dtype
+        # A requested tolerance below the active dtype's resolution cannot be
+        # falsified.  This floor protects truthful convergence in consumer f32.
+        effective_tol = None if tol is None else max(float(tol), 64.0 * np.finfo(dtype).eps)
+
+        if not self._state_is_finite(state):
+            return RunResult(
+                state, RunStatus.DIVERGED, 0, (), (), float("inf"),
+                RunStatus.DIVERGED, float("inf"),
+            )
+        if self._has_zero_support(state):
+            return RunResult(
+                state, RunStatus.INFEASIBLE, 0, (), (float("inf"),), float("inf")
+            )
+
+        def phase(n: int, harden: bool, st: State) -> tuple[State, bool]:
+            nonlocal status, residual, inner_status, inner_residual
+            previous_fe: float | None = None
             for _ in range(n):
-                nxt = self.step(st, damp, harden)
+                msgs, g_eta, g_lam, ef_eta, inner_r, inner_code = self._step(
+                    st.messages, st.g_eta, st.g_lam, st.g_obs, st.g_mask,
+                    st.ef_eta, st.ef_obs, st.ef_mask, st.params, damp, harden,
+                )
+                nxt = _replace(
+                    st, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta
+                )
                 delta = max(
                     (
                         float(jnp.max(jnp.abs(getattr(nxt, f) - getattr(st, f))))
@@ -198,17 +300,166 @@ class Engine:
                 )
                 deltas.append(delta)
                 st = nxt
-                # A non-finite delta is divergence, never convergence: it must
-                # not satisfy tol (cff-i45j: an -inf delta once returned a
-                # transient sweep-4 state as "converged").
-                if tol is not None and np.isfinite(delta) and delta < tol:
-                    break
-            return st
+                inner_residual = float(inner_r)
+                code = int(inner_code)
+                inner_status = (
+                    RunStatus.CONVERGED if code == 0 else
+                    RunStatus.BUDGET_EXHAUSTED if code == 1 else
+                    RunStatus.DIVERGED
+                )
 
-        state = phase(n_iters - harden_last, harden=False, st=state)
-        if harden_last:
-            state = phase(harden_last, harden=True, st=state)
-        return state, deltas
+                if (
+                    not np.isfinite(delta)
+                    or not self._state_is_finite(st)
+                    or not np.isfinite(inner_residual)
+                    or inner_status is RunStatus.DIVERGED
+                ):
+                    status = RunStatus.DIVERGED
+                    residual = float("inf")
+                    return st, True
+                if self._has_zero_support(st):
+                    status = RunStatus.INFEASIBLE
+                    residual = float("inf")
+                    energies.append(float("inf"))
+                    return st, True
+                if inner_status is RunStatus.BUDGET_EXHAUSTED:
+                    status = RunStatus.BUDGET_EXHAUSTED
+                    residual = inner_residual
+                    return st, True
+
+                if self.arena.semiring == "max":
+                    residual = delta
+                    if effective_tol is not None and delta <= effective_tol:
+                        objective = self.objective(st)
+                        if not np.isfinite(objective):
+                            status = RunStatus.DIVERGED
+                            residual = float("inf")
+                        else:
+                            status = RunStatus.CONVERGED
+                        return st, True
+                    continue
+
+                fe = self.bfe(st)
+                if np.isfinite(fe):
+                    energies.append(fe)
+                    if previous_fe is not None:
+                        residual = abs(fe - previous_fe)
+                        if (
+                            effective_tol is not None
+                            and residual <= effective_tol
+                            and delta <= effective_tol
+                        ):
+                            status = RunStatus.CONVERGED
+                            return st, True
+                    previous_fe = fe
+                elif previous_fe is not None or not (
+                    self.arena.gauss_groups or self.arena.ef_groups or self.arena.prec_groups
+                ):
+                    status = RunStatus.DIVERGED
+                    residual = float("inf")
+                    return st, True
+            return st, False
+
+        state, stopped = phase(n_iters - harden_last, harden=False, st=state)
+        if not stopped and harden_last:
+            state, stopped = phase(harden_last, harden=True, st=state)
+        elif stopped and harden_last and status is RunStatus.CONVERGED:
+            # Soft coherence is only the start state for the hardening phase.
+            status = RunStatus.BUDGET_EXHAUSTED
+            state, stopped = phase(harden_last, harden=True, st=state)
+
+        if (
+            status is RunStatus.BUDGET_EXHAUSTED
+            and self.arena.semiring != "max"
+            and not energies
+            and deltas
+            and (self.arena.gauss_groups or self.arena.ef_groups or self.arena.prec_groups)
+        ):
+            # A continuous/EF ledger that never became defined is not a
+            # usable budget result; it is a numerically failed inference.
+            status = RunStatus.DIVERGED
+            residual = float("inf")
+        return RunResult(
+            state=state,
+            status=status,
+            iterations=len(deltas),
+            message_deltas=tuple(deltas),
+            free_energies=tuple(energies),
+            residual=residual,
+            inner_status=inner_status,
+            inner_residual=inner_residual,
+        )
+
+    @staticmethod
+    def _state_is_finite(state: State) -> bool:
+        """All numeric runtime leaves must remain finite (NEG is finite)."""
+        return all(
+            bool(np.isfinite(np.asarray(leaf)).all())
+            for leaf in jax.tree_util.tree_leaves(state)
+        )
+
+    def _has_zero_support(self, state: State) -> bool:
+        """Whether an edge or ordinary factor belief has empty exact support."""
+        messages = np.asarray(state.messages)
+        for edge in self.arena.edges.values():
+            if edge.dim or edge.ef:
+                continue
+            logq = messages[edge.slot0, : edge.card] + messages[edge.slot1, : edge.card]
+            if not np.any(np.exp(logq) > 0):
+                return True
+
+        for group in self.arena.groups:
+            incoming = messages[group.gather]
+            for member in range(len(group.members)):
+                supports = [
+                    np.exp(incoming[member, role, :card]) > 0
+                    for role, card in enumerate(group.cards)
+                ]
+                if group.type == "equality":
+                    if not np.any(np.logical_and.reduce(supports)):
+                        return True
+                    continue
+                factor_support = np.exp(np.asarray(state.params[group.name])[member]) > 0
+                for role, support in enumerate(supports):
+                    shape = [1] * len(group.cards)
+                    shape[role] = group.cards[role]
+                    factor_support &= support.reshape(shape)
+                if not np.any(factor_support):
+                    return True
+
+        for constraint in self.arena.constraint_groups:
+            incoming = messages[constraint.gather]
+            supports = [
+                np.flatnonzero(np.exp(incoming[i, :card]) > 0).tolist()
+                for i, card in enumerate(constraint.cards)
+            ]
+            if any(not support for support in supports):
+                return True
+            if constraint.type == "exactly_k":
+                possible = {0}
+                for support in supports:
+                    possible = {total + value for total in possible for value in support}
+                feasible = constraint.k in possible
+            elif constraint.type == "at_most_k":
+                feasible = sum(min(support) for support in supports) <= constraint.k
+            elif constraint.type == "table":
+                feasible = any(
+                    all(int(row[i]) in supports[i] for i in range(len(supports)))
+                    for row in np.asarray(constraint.table)
+                )
+            else:  # alldifferent, n/card <= 10 by compiler validation
+                def match(i: int, used: set[int]) -> bool:
+                    if i == len(supports):
+                        return True
+                    return any(
+                        value not in used and match(i + 1, used | {value})
+                        for value in supports[i]
+                    )
+
+                feasible = match(0, set())
+            if not feasible:
+                return True
+        return False
 
     # -- readouts ---------------------------------------------------------
 
@@ -381,6 +632,11 @@ class Engine:
             raise RuntimeError(
                 "min-sum reports an objective value, not a free energy — call Engine.objective"
             )
+        # NEG is a finite representation of log zero, so the local ledger can
+        # otherwise turn log Z = -inf into a huge finite sentinel score.  Empty
+        # exact edge support proves Z=0 and therefore F=+inf.
+        if self._has_zero_support(state):
+            return float("inf")
         return float(
             self._bfe(
                 state.messages, state.g_eta, state.g_lam, state.g_obs, state.g_mask,
@@ -614,8 +870,10 @@ def _make_step(arena: Arena):
         params: dict[str, jax.Array],
         damp: float = 0.0,
         harden: bool = True,
-    ) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+    ) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array, jax.Array, jax.Array]:
         new = messages
+        inner_residual = jnp.asarray(0.0, dtype=messages.dtype)
+        inner_status = jnp.asarray(0)
         for g in groups:
             logf = params.get(g.name)
             if g.mode == "vmp":
@@ -631,23 +889,29 @@ def _make_step(arena: Arena):
             _, ki = g.cards
             log_d = messages[g.gather_z][:, :ki]
             a_key = g.name + (":counts" if g.learned else ":A")
-            mu2, log_qx = gfe_update(
-                log_d, params[a_key], params[g.name + ":c"], k_max, learned=g.learned
+            mu2, log_qx, residuals, statuses = gfe_update(
+                log_d, params[a_key], params[g.name + ":c"], k_max,
+                learned=g.learned, return_diagnostics=True,
             )
             new = new.at[g.scatter_z].set(mu2)
             new = new.at[g.scatter_x].set(log_qx)
+            inner_residual = jnp.maximum(inner_residual, jnp.max(residuals))
+            inner_status = jnp.maximum(inner_status, jnp.max(statuses))
         for g in arena.gfe_tm_groups:
             ko, ki, ku = g.cards
             md = messages[g.gather[:, 0]][:, :ko]
             mi = messages[g.gather[:, 1]][:, :ki]
             me = messages[g.gather[:, 2]][:, :ku]
             b_key = g.name + (":counts" if g.learned else ":B")
-            to_out, to_in, to_sel = gfe_tm_update(
-                mi, me, md, params[b_key], k_max, learned=g.learned
+            to_out, to_in, to_sel, residuals, statuses = gfe_tm_update(
+                mi, me, md, params[b_key], k_max,
+                learned=g.learned, return_diagnostics=True,
             )
             new = new.at[g.scatter[:, 0]].set(to_out)
             new = new.at[g.scatter[:, 1]].set(to_in)
             new = new.at[g.scatter[:, 2]].set(to_sel)
+            inner_residual = jnp.maximum(inner_residual, jnp.max(residuals))
+            inner_status = jnp.maximum(inner_status, jnp.max(statuses))
         # Hybrid Gaussian-mixture sweep (cff-pksr): straddles both arenas.
         # Computed here from the pre-sweep arrays so its writes fold into each
         # arena's damping phase — Gaussian writes below, selector writes with
@@ -708,7 +972,7 @@ def _make_step(arena: Arena):
                 jnp.arange(k_max)[None, :] == jnp.argmax(lq, axis=-1)[:, None], 0.0, NEG
             ).astype(new.dtype)
             new = new.at[p0].set(hot).at[p1].set(hot)
-        return new, new_eta, new_lam, new_ef
+        return new, new_eta, new_lam, new_ef, inner_residual, inner_status
 
     return step
 

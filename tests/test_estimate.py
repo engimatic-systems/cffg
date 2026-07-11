@@ -3,7 +3,7 @@
 import numpy as np
 
 from cffg.compiler import compile_template
-from cffg.engine import Engine
+from cffg.engine import Engine, RunStatus
 from cffg.estimate import estimate
 from cffg.models.tmaze import build_tmaze
 
@@ -27,6 +27,7 @@ def test_calibration_and_prediction():
     engine = make_engine()
     est = estimate(engine, sample_iters=5)
     assert est.seconds_per_sweep is not None and est.seconds_per_sweep > 0
+    assert est.calibration_status is RunStatus.BUDGET_EXHAUSTED
     assert abs(est.predict_seconds(100) - 100 * est.seconds_per_sweep) < 1e-12
     assert "sweep" in est.summary()
 

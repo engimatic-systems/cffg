@@ -133,7 +133,9 @@ class RollingAgent:
     def act(self) -> int:
         """Plan over the horizon from the current belief; pick a control."""
         st = self._with_params(self.plan)
-        st, _ = self.plan.run(st, self.n_sweeps, tol=1e-10, damp=self.damp)
+        st = self.plan.run(
+            st, self.n_sweeps, tol=1e-10, damp=self.damp
+        ).require_converged()
         q = np.asarray(self.plan.marginals(st)["u1"])
         if self.select == "map":
             return int(np.argmax(q))
@@ -143,7 +145,7 @@ class RollingAgent:
         """Fold (action, observation) into the belief; conjugate updates."""
         st = self._with_params(self.filter)
         st = self.filter.bind_data(st, {"act1": action, "obs1": observation})
-        st, _ = self.filter.run(st, 60, tol=1e-12)
+        st = self.filter.run(st, 60, tol=1e-12).require_converged()
         q_z = np.asarray(self.filter.marginals(st)["zm1"])
         self.belief = q_z / q_z.sum()
         if self.counts is not None:

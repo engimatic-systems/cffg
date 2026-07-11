@@ -39,7 +39,7 @@ def test_inner_newton_reports_converged_budget_and_diverged():
     converged = rules._gfe_solve_result(abar, h, logc, logd)
     assert int(converged.status) == 0
     assert int(converged.iterations) < rules._N_NEWTON
-    assert float(converged.residual) <= 64 * np.finfo(np.float64).eps
+    assert float(converged.residual) <= 512 * np.finfo(np.float64).eps
 
     exhausted = rules._gfe_solve_result(abar, h, logc, logd, max_iters=0)
     assert int(exhausted.status) == 1
@@ -92,7 +92,9 @@ def make_model(A, c, d, p_substitute=True) -> Template:
 
 def solve(A, c, d, p_substitute=True, iters=8):
     engine = Engine(compile_template(make_model(A, c, d, p_substitute), arrays={"A": A, "c": c, "d": d}))
-    state, deltas = engine.run(engine.init_state(), iters, tol=1e-14)
+    state, deltas = engine.run(
+        engine.init_state(), iters, tol=1e-14
+    ).require_converged_with_trace()
     assert deltas[-1] < 1e-10
     return engine, state
 
@@ -187,7 +189,9 @@ def test_learned_composite_recovers_fixed_at_high_counts():
     )
     counts = A_EPI * 1e7 + 1e-3
     engine = Engine(compile_template(t, arrays={"A": counts, "c": UNIF, "d": UNIF}))
-    state, deltas = engine.run(engine.init_state(), 8, tol=1e-14)
+    state, deltas = engine.run(
+        engine.init_state(), 8, tol=1e-14
+    ).require_converged_with_trace()
     assert deltas[-1] < 1e-10
 
     fixed_engine, fixed_state = solve(A_EPI, UNIF, UNIF)
@@ -212,7 +216,7 @@ def test_learned_composite_novelty_direction():
     )
     counts = np.array([[50.0, 0.3], [50.0, 0.3]])  # state 0: known 50/50; state 1: unexplored
     engine = Engine(compile_template(t, arrays={"A": counts, "c": UNIF, "d": UNIF}))
-    state, _ = engine.run(engine.init_state(), 8, tol=1e-14)
+    state = engine.run(engine.init_state(), 8, tol=1e-14).require_converged()
     q = engine.marginals(state)["z"]
     assert q[1] > 0.55, f"no parameter-novelty pull toward the unexplored state: {q}"
 
@@ -230,7 +234,7 @@ def test_sparse_support_prior_stays_finite():
     engine = Engine(
         compile_template(make_model(A_EPI, UNIF, d), arrays={"A": A_EPI, "c": UNIF, "d": d})
     )
-    state, _ = engine.run(engine.init_state(), 10)
+    state = engine.run(engine.init_state(), 10).state
     assert bool(np.isfinite(state.messages).all()), "messages went non-finite"
     q = engine.marginals(state)
     np.testing.assert_allclose(q["z"], [1.0, 0.0], atol=1e-9)  # z pinned by d
@@ -238,18 +242,19 @@ def test_sparse_support_prior_stays_finite():
     assert np.isfinite(engine.bfe(state))
 
 
-def test_run_ignores_nonfinite_deltas():
-    """A diverging model must never satisfy tol: non-finite deltas (inf/nan)
-    don't count as convergence — run exhausts its budget instead of returning
-    a transient as if converged."""
+def test_run_reports_nonfinite_messages_as_diverged():
+    """A poisoned message terminates immediately and cannot masquerade as
+    convergence or ordinary budget exhaustion."""
     import jax.numpy as jnp
 
     from cffg.engine import _replace
 
     engine, state = solve(A_EPI, UNIF, UNIF)
     poisoned = _replace(state, messages=state.messages.at[0, 0].set(jnp.inf))
-    _, deltas = engine.run(poisoned, 5, tol=1e-6)
-    assert len(deltas) == 5, f"stopped early on non-finite delta: {deltas}"
+    result = engine.run(poisoned, 5, tol=1e-6)
+    assert result.status.value == "diverged"
+    assert result.iterations == 0
+    assert result.message_deltas == ()
 
 
 def test_sparse_support_messages_stay_bounded_at_scale():
@@ -277,7 +282,7 @@ def test_sparse_support_messages_stay_bounded_at_scale():
         ConstraintSpec(ConstraintKind.P_SUBSTITUTION, "obs", (("substituted_role", "out"),))
     )
     engine = Engine(compile_template(t, arrays={"A": a, "c": c, "d": d}))
-    state, _ = engine.run(engine.init_state(), 10)
+    state = engine.run(engine.init_state(), 10).state
     msgs = np.asarray(state.messages)
     finite = msgs[msgs > -1e29]  # NEG padding/zeros are legitimate
     assert np.abs(finite).max() < 1e4, f"message magnitude {np.abs(finite).max():.3g}"
@@ -298,7 +303,7 @@ def test_float32_composite_stays_finite():
                 make_model(A_EPI, UNIF, d), arrays={"A": A_EPI, "c": UNIF, "d": d}
             )
         )
-        state, _ = engine.run(engine.init_state(), 10)
+        state = engine.run(engine.init_state(), 10).state
         assert bool(np.isfinite(np.asarray(state.messages)).all())
         z_ref, _ = brute_force_zstar(A_EPI, UNIF, d)
         np.testing.assert_allclose(engine.marginals(state)["z"], z_ref, atol=1e-4)

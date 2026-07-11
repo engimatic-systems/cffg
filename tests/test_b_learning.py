@@ -51,7 +51,7 @@ def test_pair_belief_matches_enumeration():
         st = engine.bind_data(
             engine.init_state(), {"act1": u1, "obs1": x1, "act2": u2, "obs2": x2}
         )
-        st, _ = engine.run(st, 30, tol=1e-13)
+        st = engine.run(st, 30, tol=1e-13).require_converged()
         pair = engine.node_beliefs(st)["tm1"]  # [z', z, u]
         assert pair.shape == (K, K, U)
         np.testing.assert_allclose(pair[:, :, u1], brute_force_pair(u1, x1, u2, x2), atol=1e-9)
@@ -61,7 +61,7 @@ def test_pair_belief_matches_enumeration():
 def test_node_belief_of_leaf_matches_edge_marginal():
     engine = two_step_engine()
     st = engine.bind_data(engine.init_state(), {"act1": 0, "obs1": 1, "act2": 1, "obs2": 0})
-    st, _ = engine.run(st, 30, tol=1e-13)
+    st = engine.run(st, 30, tol=1e-13).require_converged()
     np.testing.assert_allclose(
         engine.node_beliefs(st)["prior"], engine.marginals(st)["z0"], atol=1e-9
     )
@@ -75,7 +75,7 @@ def test_vmp_node_belief_is_outer_product_of_marginals():
     t.constraints.append(ConstraintSpec(ConstraintKind.MEAN_FIELD, "obs1"))
     engine = Engine(compile_template(t, arrays=arrays))
     st = engine.bind_data(engine.init_state(), {"act1": 0, "obs1": 1})
-    st, _ = engine.run(st, 40, tol=1e-13)
+    st = engine.run(st, 40, tol=1e-13).require_converged()
     q = engine.node_beliefs(st)["obs1"]  # [x, z]
     m = engine.marginals(st)
     np.testing.assert_allclose(q, np.outer(m["x1"], m["zo1"]), atol=1e-9)
@@ -166,7 +166,7 @@ def test_partial_pairs_still_sum_to_one():
     st = engine.bind_data(
         engine.init_state(), {"act1": None, "obs1": 1, "act2": 1, "obs2": 0}
     )
-    st, _ = engine.run(st, 30, tol=1e-13)
+    st = engine.run(st, 30, tol=1e-13).require_converged()
     pair = engine.node_beliefs(st)["tm1"]
     np.testing.assert_allclose(pair.sum(), 1.0, atol=1e-9)
     np.testing.assert_allclose(

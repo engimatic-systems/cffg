@@ -240,7 +240,9 @@ def test_two_composite_chain_matches_constrained_objective():
         ],
     )
     engine = Engine(compile_template(t, arrays=dict(zip(names, (d, e1, e2, c, b1, b2)))))
-    state, deltas = engine.run(engine.init_state(), 600, tol=1e-12, damp=0.5)
+    state, deltas = engine.run(
+        engine.init_state(), 600, tol=1e-12, damp=0.5
+    ).require_converged_with_trace()
     assert deltas[-1] < 1e-10
 
     def stats(b):
@@ -483,13 +485,13 @@ def build_curiosity_engine(epistemic: bool):
 
 def test_engine_prefers_unknown_dynamics():
     engine = build_curiosity_engine(epistemic=True)
-    state, _ = engine.run(engine.init_state(), 40, tol=1e-11)
+    state = engine.run(engine.init_state(), 40, tol=1e-11).require_converged()
     q_u = engine.marginals(state)["u1"]
     assert q_u[1] > 0.55, f"no curiosity through the full engine: {q_u}"
     assert np.isfinite(engine.bfe(state))
 
     ablation = build_curiosity_engine(epistemic=False)
-    st2, _ = ablation.run(ablation.init_state(), 40, tol=1e-11)
+    st2 = ablation.run(ablation.init_state(), 40, tol=1e-11).require_converged()
     q_u2 = ablation.marginals(st2)["u1"]
     np.testing.assert_allclose(q_u2, 0.5, atol=1e-6)  # plain BP: no preference
 
@@ -526,12 +528,14 @@ def test_agent_curiosity_decays_with_experience():
         rng = np.random.default_rng(4)
         agent = RollingAgent(
             builder, horizon=2, learn_b=True, initial_b_counts=counts0.copy(),
-            epistemic_b=epistemic, n_sweeps=50, select="map", seed=4,
+            epistemic_b=epistemic, n_sweeps=100, select="map", seed=4,
         )
         z, q1_trace = int(rng.integers(KC)), []
         for _ in range(50):
             st = agent._with_params(agent.plan)
-            st, _ = agent.plan.run(st, agent.n_sweeps, tol=1e-10, damp=agent.damp)
+            st = agent.plan.run(
+                st, agent.n_sweeps, tol=1e-10, damp=agent.damp
+            ).require_converged()
             q = np.asarray(agent.plan.marginals(st)["u1"])
             q1_trace.append(float(q[1] / q.sum()))
             u = int(np.argmax(q))

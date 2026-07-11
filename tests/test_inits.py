@@ -124,7 +124,7 @@ def test_compile_from_init_specs_alone(tmp_path):
 
     engine = Engine(compile_template(model, root=tmp_path))
     state = engine.bind_data(engine.init_state(), {"s/sense": 1})
-    state, _ = engine.run(state, 20, tol=1e-12)
+    state = engine.run(state, 20, tol=1e-12).require_converged()
     q = engine.marginals(state)["s/z_mid"]
     assert np.isfinite(engine.bfe(state)) and abs(q.sum() - 1.0) < 1e-9
 
@@ -133,7 +133,7 @@ def test_compile_from_init_specs_alone(tmp_path):
     np.save(tmp_path / "B.npy", np.roll(np.eye(3), 1, axis=0))  # different dynamics
     engine2 = Engine(compile_template(model, root=tmp_path))
     st2 = engine2.bind_data(engine2.init_state(), {"s/sense": 1})
-    st2, _ = engine2.run(st2, 20, tol=1e-12)
+    st2 = engine2.run(st2, 20, tol=1e-12).require_converged()
     assert np.abs(engine2.marginals(st2)["s/z_mid"] - q).max() > 1e-3
     del banded
 
