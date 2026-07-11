@@ -12,6 +12,8 @@ its role's cardinality and NEG-padded beyond it.
 
 from __future__ import annotations
 
+from typing import NamedTuple
+
 import jax
 import jax.numpy as jnp
 from jax.scipy.special import logsumexp
@@ -229,7 +231,21 @@ VMP_ENERGIES = {
 # G = −z*ᵀ rho(z*) − H[z*]  (the goal node's term and the x-edge entropy are
 # absorbed — see cff-007q for the derivation).
 
-_N_NEWTON = 25
+_N_NEWTON = 64
+
+
+class GfeSolveResult(NamedTuple):
+    """JAX-compatible diagnostics for one Corollary-1 Newton solve.
+
+    ``status`` is an integer so the record can flow through ``jit``/``vmap``:
+    0 = converged, 1 = iteration budget exhausted, 2 = diverged.  The outer
+    runtime translates it to the public string-valued ``RunStatus``.
+    """
+
+    solution: jax.Array
+    status: jax.Array
+    iterations: jax.Array
+    residual: jax.Array
 
 
 def _safe_log(x):
@@ -260,14 +276,25 @@ def _dirichlet_stats(counts):
     return abar, h
 
 
-def _gfe_solve(abar, h, logc, log_d):
-    """Single composite: z* in the simplex. abar [Mo,K], h [K], logc [Mo].
+def _gfe_solve_result(abar, h, logc, log_d, max_iters: int = _N_NEWTON):
+    """Solve one composite and expose termination diagnostics.
 
-    log_d is clamped at −1e3 before the solve: exp(−1000) underflows to an
-    exact 0 in f64, so the fixed point is unchanged, but Newton's residual
-    and Jacobian stay O(1e3) instead of O(1e30) when the incoming message
-    carries exact log-zeros (sparse supports, cff-i45j)."""
-    log_d = jnp.maximum(log_d, -1e3)
+    The solve is performed in a ``K-1`` dimensional gauge-fixed chart rather
+    than regularising the singular all-ones direction.  Exact-zero incoming
+    support is represented at the dtype's smallest normal log-probability
+    while Newton runs; this bounds the residual without a dtype-specific
+    literal and does not give that support mass in the engine's cavity update.
+    """
+    dtype = jnp.result_type(abar, h, logc, log_d)
+    abar = jnp.asarray(abar, dtype=dtype)
+    h = jnp.asarray(h, dtype=dtype)
+    logc = jnp.asarray(logc, dtype=dtype)
+    log_d = jnp.asarray(log_d, dtype=dtype)
+    # Protect the Newton residual from the finite NEG sentinel.  This guard is
+    # the smallest normal value representable by the active dtype, so it
+    # scales correctly in both f32 and f64.
+    log_floor = jnp.log(jnp.finfo(dtype).tiny)
+    log_d = jnp.maximum(log_d, log_floor)
 
     def rho(zbar):
         qx = abar @ zbar
@@ -279,30 +306,62 @@ def _gfe_solve(abar, h, logc, log_d):
     def resid(v):
         return center(v) - center(rho(jax.nn.softmax(v)) + log_d)
 
-    # Newton with backtracking: the full step can overshoot and limit-cycle
-    # on large simplexes (observed at a few hundred states, cff-i45j), so
-    # each iteration tries fractional steps and keeps the best residual —
-    # near the fixed point the full step wins and quadratic convergence is
-    # untouched (the small-model goldens pin this).
-    _TS = jnp.array([1.0, 0.5, 0.25, 0.125, 0.03125])
+    k = log_d.shape[0]
+    # K=1 has no free coordinate and is stationary by construction.
+    if k == 1:
+        zero = jnp.asarray(0.0, dtype=dtype)
+        return GfeSolveResult(jnp.ones_like(log_d), jnp.asarray(0), jnp.asarray(0), zero)
 
-    def newton(_, v):
-        r = resid(v)
-        j = jax.jacfwd(resid)(v)
-        k = v.shape[0]
-        # The centered residual is gauge-invariant along 1, so j always has a
-        # zero eigenvalue there; the ridge must sit above the dtype's
-        # roundoff (a fixed 1e-9 is *below* f32 eps — numerically singular,
-        # solve returns inf). Re-centering the step kills any gauge drift.
-        ridge = jnp.sqrt(jnp.finfo(v.dtype).eps)
-        full = jnp.linalg.solve(j + ridge * jnp.eye(k, dtype=v.dtype), r)
-        full = full - full.mean()
-        cands = v[None, :] - _TS[:, None].astype(v.dtype) * full[None, :]
-        norms = jax.vmap(lambda vv: jnp.sum(resid(vv) ** 2))(cands)
-        return cands[jnp.argmin(norms)]
+    def unpack(u):
+        return center(jnp.concatenate([u, jnp.zeros((1,), dtype=dtype)]))
 
-    v = jax.lax.fori_loop(0, _N_NEWTON, newton, center(log_d))
-    return jax.nn.softmax(v)
+    def reduced_resid(u):
+        return resid(unpack(u))[:-1]
+
+    # Newton with globalization: a zero-length candidate makes every step
+    # non-increasing even when the local linear model is poor.  Step fractions
+    # are dimensionless; numeric validity guards come only from finfo(dtype).
+    fractions = jnp.asarray([1.0, 0.5, 0.25, 0.125, 0.0625, 0.0], dtype=dtype)
+    tol = jnp.asarray(64.0, dtype=dtype) * jnp.finfo(dtype).eps
+
+    v0 = center(log_d)
+    u0 = v0[:-1] - v0[-1]
+
+    def residual_norm(u):
+        return jnp.max(jnp.abs(reduced_resid(u)))
+
+    r0 = residual_norm(u0)
+
+    def cond(carry):
+        i, _, rn = carry
+        return (i < max_iters) & jnp.isfinite(rn) & (rn > tol)
+
+    def body(carry):
+        i, u, _ = carry
+        r = reduced_resid(u)
+        jac = jax.jacfwd(reduced_resid)(u)
+        full = jnp.linalg.solve(jac, r)
+        cands = u[None, :] - fractions[:, None] * full[None, :]
+        norms = jax.vmap(residual_norm)(cands)
+        best = jnp.argmin(jnp.where(jnp.isfinite(norms), norms, jnp.inf))
+        next_u = cands[best]
+        return i + 1, next_u, norms[best]
+
+    iterations, u, residual = jax.lax.while_loop(
+        cond, body, (jnp.asarray(0), u0, r0)
+    )
+    finite = jnp.isfinite(residual) & jnp.all(jnp.isfinite(u))
+    status = jnp.where(~finite, 2, jnp.where(residual <= tol, 0, 1))
+    return GfeSolveResult(jax.nn.softmax(unpack(u)), status, iterations, residual)
+
+
+def _gfe_solve(abar, h, logc, log_d):
+    """Compatibility helper returning only the stationary simplex belief.
+
+    Runtime code uses :func:`_gfe_solve_result` so budget exhaustion and
+    divergence cannot be discarded.
+    """
+    return _gfe_solve_result(abar, h, logc, log_d).solution
 
 
 def _gfe_rho(abar, h, logc, zbar):
