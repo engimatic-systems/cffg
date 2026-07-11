@@ -9,6 +9,7 @@ z*, and the engine's total BFE must equal J(z*) (prior node + z-edge entropy
 
 import numpy as np
 
+from cffg import rules
 from cffg.compiler import compile_template
 from cffg.core import (
     ConstraintKind,
@@ -22,6 +23,53 @@ from cffg.engine import Engine
 
 K = 2
 M = 2
+
+
+def test_inner_newton_reports_converged_budget_and_diverged():
+    """The local solve has falsifiable termination states of its own; the
+    engine can therefore distinguish a stationary composite from a usable but
+    unfinished iterate or a poisoned linear solve."""
+    import jax.numpy as jnp
+
+    abar = jnp.asarray(A_EPI)
+    h = -(abar * jnp.log(abar)).sum(axis=0)
+    logc = jnp.log(jnp.asarray(UNIF))
+    logd = jnp.log(jnp.asarray([0.6, 0.4]))
+
+    converged = rules._gfe_solve_result(abar, h, logc, logd)
+    assert int(converged.status) == 0
+    assert int(converged.iterations) < rules._N_NEWTON
+    assert float(converged.residual) <= 64 * np.finfo(np.float64).eps
+
+    exhausted = rules._gfe_solve_result(abar, h, logc, logd, max_iters=0)
+    assert int(exhausted.status) == 1
+    assert int(exhausted.iterations) == 0
+    assert np.isfinite(float(exhausted.residual))
+
+    diverged = rules._gfe_solve_result(abar, h, logc.at[0].set(jnp.nan), logd)
+    assert int(diverged.status) == 2
+    assert not np.isfinite(float(diverged.residual))
+
+
+def test_inner_newton_float32_at_uncomfortable_scale():
+    """K=80 is 40x the golden fixture and exercises the dtype-scaled stopping
+    rule and explicit gauge projection in consumer-default float32."""
+    import jax
+    import jax.numpy as jnp
+
+    rng = np.random.default_rng(9)
+    k, m = 80, 12
+    with jax.enable_x64(False):
+        abar = rng.dirichlet(np.full(m, 0.8), size=k).T.astype(np.float32)
+        h = -(np.where(abar > 0, abar * np.log(abar), 0.0)).sum(axis=0)
+        logc = np.log(np.full(m, 1 / m, dtype=np.float32))
+        logd = np.log(rng.dirichlet(np.ones(k)).astype(np.float32))
+        result = rules._gfe_solve_result(
+            jnp.asarray(abar), jnp.asarray(h), jnp.asarray(logc), jnp.asarray(logd)
+        )
+        assert int(result.status) == 0
+        assert np.isfinite(float(result.residual))
+        np.testing.assert_allclose(np.asarray(result.solution).sum(), 1.0, atol=2e-6)
 
 
 def make_model(A, c, d, p_substitute=True) -> Template:

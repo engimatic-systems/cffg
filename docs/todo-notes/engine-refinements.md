@@ -12,11 +12,6 @@
   delta trace already detects limit cycles (period-2 oscillation in
   `deltas`), so `run()` could auto-engage damping on detection instead of
   requiring the caller to know the folklore. Cheap and kind.
-- **Newton solver hardening.** Fixed 25 iterations, 1e-9 ridge. Fine at
-  K ≤ 16; for larger state spaces add a residual-based early exit
-  (`lax.while_loop`) and a fallback halving step. Watch for saddle-point
-  convergence (LIMITATIONS H6) — log the residual into the FE breakdown when
-  the ergonomics diagnostic lands.
 - **Sparse/structured parameters.** T-maze B's are 0/1-sparse; arenas store
   them dense. Fine at 8×8; the glucose factored state will want factored
   transitions (kron-structured `transition_mixture` variant) before dense
