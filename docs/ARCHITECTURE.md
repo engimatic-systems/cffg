@@ -182,7 +182,9 @@ A registry keyed by `(factor_type, constraint_config, out_edge_role)`:
 - **GFE-TM rules** (cff-fk2u, beyond the papers): P-substitution on the
   transition node gives dynamics curiosity — the same Corollary-1 fixed point
   over the joint (state, action) simplex, with the downstream message in the
-  goal prior's role, so the obs composite becomes a special case. Formal
+  goal prior's role. Its substituted interior edge emits the predictive
+  cavity (so the two facing messages reconstruct q_w), while its ledger uses
+  the node-local objective without the downstream Lagrange coupling. Formal
   derivation + plain-English companion in docs/DERIVATIONS.md D1.
 - Each rule ships with a **local free-energy contribution** function (average
   energy + entropy terms with correct edge-entropy overcounting), so global
@@ -291,8 +293,10 @@ nothing committed here) — the durable engine-level findings:
   input, +27 points over random selection at the same budget — computed
   from engine beliefs with a page of numpy (cff-gul8 promotes it inward).
 - *Conjugate continual learning behaves*: online hard-EM recovered
-  switching dynamics to 0.009 Frobenius error; Dirichlet count learning
-  recovered planning performance to 0.80 success over 200 episodes.
+  switching dynamics to 0.009 Frobenius error; the no-transition-curiosity
+  Dirichlet count-learning arm recovered planning performance to 0.80 success
+  over 200 episodes. GFE-TM behavioral calibration is tracked separately in
+  LIMITATIONS S1c and cff-2gev.
 - *Long-horizon GFE planning beat a QMDP baseline* (0.79 vs 0.64 success)
   through H=20 — with a measured degradation at H=25 (LIMITATIONS S1g,
   cff-5edo).
