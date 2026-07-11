@@ -78,18 +78,26 @@ from cffg.engine import Engine
 engine = Engine(compile_template(template, arrays=arrays))
 state  = engine.init_state()
 state  = engine.bind_data(state, {"obs1": 4, "obs2": None})   # clamp / missing
-state, deltas = engine.run(state, 200, tol=1e-12, damp=0.5)   # flood to coherence
+result = engine.run(state, 200, tol=1e-12, damp=0.5)            # flood to stationarity
+state  = result.require_converged()                             # raises on every other status
 
 engine.marginals(state)["u1"]   # posteriors by variable name
 engine.bfe(state)               # exact Bethe/Generalised free energy
 ```
 
 Rules of thumb: `damp=0.5` whenever the model has ≥ 2 GFE composites (their
-outer coordination can limit-cycle undamped); `deltas` is the coherence
-signal — trees converge hard, so treat a plateau as a smell. On tree graphs
+outer coordination can limit-cycle undamped). `result.status` is one of
+`converged`, `budget_exhausted`, `diverged`, or `infeasible`; its
+`free_energies`, `message_deltas`, `iterations`, and `residual` explain that
+classification. FE stationarity is the primary sum/GFE stopping signal and
+message delta guards coherence. On tree graphs
 `bfe` equals −log evidence exactly; with no data it is 0 for a normalized
 model — both make good sanity checks. Parameters are *inputs* (`state.params`),
 so you can swap them per run without recompiling.
+
+`Engine.run` returned `(state, deltas)` before cff-j4mu. That tuple API is
+intentionally not iterable now: use `result.state` when a fixed sweep budget is
+deliberate, or `result.require_converged()` before acting on beliefs.
 
 ## Run an agent
 

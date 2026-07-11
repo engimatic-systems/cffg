@@ -8,9 +8,9 @@
   observation models with two parents. Mechanical extension of
   `GfePlan`/`gfe_update` (the Lemmas are already multi-edge); grow it when a
   model demands it, with a two-parent unit test vs. brute force.
-- **Damping/schedule autotuning.** `damp=0.5` is folklore that works; the
-  delta trace already detects limit cycles (period-2 oscillation in
-  `deltas`), so `run()` could auto-engage damping on detection instead of
+- **Damping/schedule autotuning.** `damp=0.5` is folklore that works; the FE
+  and message-delta traces expose limit cycles (including period-2
+  oscillation), so `run()` could auto-engage damping on detection instead of
   requiring the caller to know the folklore. Cheap and kind.
 - **Sparse/structured parameters.** T-maze B's are 0/1-sparse; arenas store
   them dense. Fine at 8×8; the glucose factored state will want factored

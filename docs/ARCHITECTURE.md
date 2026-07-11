@@ -193,10 +193,13 @@ A registry keyed by `(factor_type, constraint_config, out_edge_role)`:
 
 ### 4. Inference VM (`cffg.infer`)
 
-- Schedules: flooding (default) and sequential; damping as a knob. The brief is
-  right that scheduling shouldn't be overthought — flooding + iterate-to-coherence
-  covers the discrete case — but "coherence" needs a number: we track per-node FE
-  and message deltas each sweep and stop on tolerance or budget.
+- Schedules: flooding (default) and sequential; damping as a knob. The runtime
+  records a `RunResult` with converged / budget-exhausted / diverged /
+  infeasible status, iteration count, FE and message-delta traces, and final
+  residual. Sum/GFE mode stops only when FE is stationary and messages are
+  coherent; max mode uses its message fixed-point residual and validates the
+  decoded objective. Non-finite arenas/residuals are divergence, while proven
+  empty exact support is infeasible with FE = +∞.
 - GFE nodes are stochastic (importance sampling), so FE traces get burn-in
   averaging (paper uses ~10 iterations) before any decision is read off.
 - Inference *modes* are just constraint presets on the same grounded model:
