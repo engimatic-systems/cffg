@@ -1,6 +1,6 @@
 ---
 id: cff-vamy
-status: open
+status: closed
 deps: []
 links: [cff-fxmj, cff-cpxj]
 created: 2026-07-10T17:57:24Z
@@ -22,3 +22,7 @@ ADVERSARIAL REVIEWER FINDING (2026-07-10). bundle.save_bundle reconstructs Templ
 **2026-07-11T17:41:58Z**
 
 CLOSED: ae9c310 preserves the complete PlateSpec hierarchy in model.json and hashes the untruncated template; bundle manifests now inventory all grounded tied/per-copy arrays with collision-free paths, per-copy {index} paths compile directly after extraction, missing arrays are rejected before opening the destination, and nested/per-copy missing or tampered members fail loudly. Original flat schema-1 manifests remain loadable; plate models without the new inventory are explicitly rejected. Acceptance proof: test_bundle compares plate dims/bonds/per_copy_blobs/hash, arena edges/groups/params/data bindings, marginals, and FE; extracted-root compilation also passes. Serialization hostile-input checklist: sparse support, dtype, and scale are N/A because arrays are byte-preserved without numeric transforms; missing/corrupt/inventory-collision cases are guarded. Verification: focused bundle+plate 32 passed; full suite/dashboard 1112 passed, 4 dependency warnings, 0 failures.
+
+**2026-07-11T18:37:51Z**
+
+FOLLOW-UP CLOSED: 82b0be3 adds the phase-1 framework guard requested by review. _check_plates now rejects a plate whose fragment declares plates, so validate, expand/compile, and save all fail before grounding or destination creation; load wraps the same ModelError (a ValueError subclass) as a clear BundleError. Regressions cover validate + expand, save-before-write, and a hand-built nested-plate bundle. LIMITATIONS records the boundary, and cff-6s31 carries the explicit guard-lifting checklist. Verification: focused plate+bundle suite 35 passed; full suite and dashboard 1115 passed, 4 dependency warnings, 0 failures.
