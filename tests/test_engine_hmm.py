@@ -69,7 +69,9 @@ def run_case(obs):
     engine = build_engine()
     ports = {f"chain/t{t}/sense": obs[t] for t in range(T)}
     state = engine.bind_data(engine.init_state(), ports)
-    state, deltas = engine.run(state, 3 * T + 10, tol=1e-14)
+    state, deltas = engine.run(
+        state, 3 * T + 10, tol=1e-14
+    ).require_converged_with_trace()
     assert deltas[-1] < 1e-12
     return engine, state
 
@@ -127,5 +129,5 @@ def test_vmap_batch_equals_sequential():
     msgs = batched.messages
 
     for b, s in enumerate(sequences):
-        solo, _ = engine.run(states[b], 3 * T + 10)
+        solo = engine.run(states[b], 3 * T + 10).state
         np.testing.assert_allclose(np.asarray(msgs[b]), np.asarray(solo.messages), atol=1e-10)

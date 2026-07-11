@@ -167,14 +167,14 @@ def run_learning(
 
         # Move 1: plan both steps with the current world model.
         st = plan2.state_with(counts)
-        st, _ = plan2.engine.run(st, n_sweeps, tol=1e-10, damp=damp)
+        st = plan2.engine.run(st, n_sweeps, tol=1e-10, damp=damp).require_converged()
         u1 = choose(np.asarray(plan2.engine.marginals(st)["u1"]))
         x1 = env.step(u1)
 
         # Move 2: replan with move 1 clamped as data.
         st = plan1.state_with(counts)
         st = plan1.engine.bind_data(st, {"act1": u1, "obs1": x1})
-        st, _ = plan1.engine.run(st, n_sweeps, tol=1e-10, damp=damp)
+        st = plan1.engine.run(st, n_sweeps, tol=1e-10, damp=damp).require_converged()
         u2 = choose(np.asarray(plan1.engine.marginals(st)["u2"]))
         x2 = env.step(u2)
 
@@ -183,7 +183,7 @@ def run_learning(
         st = smooth.engine.bind_data(
             st, {"act1": u1, "obs1": x1, "act2": u2, "obs2": x2}
         )
-        st, _ = smooth.engine.run(st, 60, tol=1e-12)
+        st = smooth.engine.run(st, 60, tol=1e-12).require_converged()
         q = smooth.engine.marginals(st)
         for k, x in ((1, x1), (2, x2)):
             counts[x] += np.asarray(q[f"zm{k}"])

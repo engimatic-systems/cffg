@@ -4,7 +4,7 @@ import numpy as np
 
 from cffg.colony import Colony
 from cffg.compiler import compile_template
-from cffg.engine import Engine
+from cffg.engine import Engine, RunStatus
 from cffg.models.gridworld import build_gridworld
 from cffg.models.tmaze import build_tmaze
 
@@ -23,12 +23,13 @@ def test_batched_equals_sequential():
     colony = Colony()
     starts = [0, 1, 2, 3, 4]
     ids = spawn_gridworlds(colony, starts)
-    colony.run(N_ITERS, damp=0.5)
+    results = colony.run(N_ITERS, damp=0.5)
+    assert all(result.status is RunStatus.BUDGET_EXHAUSTED for result in results.values())
 
     for s, iid in zip(starts, ids):
         t, arrays = build_gridworld(k=6, start=s)
         engine = Engine(compile_template(t, arrays=arrays))
-        solo, _ = engine.run(engine.init_state(), N_ITERS, damp=0.5)
+        solo = engine.run(engine.init_state(), N_ITERS, damp=0.5).state
         ref = engine.marginals(solo)
         got = colony.marginals(iid)
         for var in ("u1", "zm1"):
@@ -67,7 +68,7 @@ def test_kill_shrinks_batch_without_corruption():
     colony.run(N_ITERS, damp=0.5)
     t, arrays = build_gridworld(k=6, start=2)
     engine = Engine(compile_template(t, arrays=arrays))
-    solo, _ = engine.run(engine.init_state(), N_ITERS, damp=0.5)
+    solo = engine.run(engine.init_state(), N_ITERS, damp=0.5).state
     np.testing.assert_allclose(
         colony.marginals(ids[2])["u1"], engine.marginals(solo)["u1"], atol=1e-10
     )

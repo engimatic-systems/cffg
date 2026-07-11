@@ -30,7 +30,9 @@ def run_engine(ys):
     t, arrays = lgssm(T, F, Q, H, R, M0, P0)
     engine = Engine(compile_template(t, arrays=arrays))
     state = engine.bind_data(engine.init_state(), {f"y{k}": ys[k] for k in range(T)})
-    state, deltas = engine.run(state, 3 * T + 10, tol=1e-12)
+    state, deltas = engine.run(
+        state, 3 * T + 10, tol=1e-12
+    ).require_converged_with_trace()
     assert deltas[-1] < 1e-12  # tree: exact convergence, not near-convergence
     return engine, state
 
@@ -82,7 +84,7 @@ def test_serialization_round_trip_compiles_and_agrees():
     back = from_json(to_json(t))
     engine = Engine(compile_template(back, arrays=arrays))
     state = engine.bind_data(engine.init_state(), {f"y{k}": YS[k] for k in range(T)})
-    state, _ = engine.run(state, 3 * T + 10)
+    state = engine.run(state, 3 * T + 10).state
     means, _, _ = kalman_smoother(YS, F, Q, H, R, M0, P0)
     np.testing.assert_allclose(
         engine.gaussian_marginals(state)["x3"][0], means[3], atol=1e-8
@@ -101,7 +103,7 @@ def test_vmap_batch_equals_sequential():
     batched = jax.tree_util.tree_map(lambda *xs: jnp.stack(xs), *states)
 
     def one(st):
-        msgs, g_eta, g_lam, ef_eta = engine._step(
+        msgs, g_eta, g_lam, ef_eta, _, _ = engine._step(
             st.messages, st.g_eta, st.g_lam, st.g_obs, st.g_mask,
             st.ef_eta, st.ef_obs, st.ef_mask, st.params,
         )
@@ -111,7 +113,7 @@ def test_vmap_batch_equals_sequential():
     for _ in range(3 * T + 10):
         batched = step_v(batched)
     for b in range(len(seqs)):
-        solo, _ = engine.run(states[b], 3 * T + 10)
+        solo = engine.run(states[b], 3 * T + 10).state
         np.testing.assert_allclose(
             np.asarray(batched.g_eta[b]), np.asarray(solo.g_eta), atol=1e-10
         )

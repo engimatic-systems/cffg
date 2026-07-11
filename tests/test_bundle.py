@@ -25,8 +25,8 @@ def test_round_trip_reproduces_inference(tmp_path):
 
     a = Engine(compile_template(template, arrays=arrays))
     b = Engine(compile_template(loaded_t, arrays=loaded_arrays))
-    sa, _ = a.run(a.init_state(), 400, tol=1e-13, damp=0.5)
-    sb, _ = b.run(b.init_state(), 400, tol=1e-13, damp=0.5)
+    sa = a.run(a.init_state(), 400, tol=1e-13, damp=0.5).require_converged()
+    sb = b.run(b.init_state(), 400, tol=1e-13, damp=0.5).require_converged()
     np.testing.assert_allclose(a.marginals(sa)["u1"], b.marginals(sb)["u1"], atol=1e-12)
 
 

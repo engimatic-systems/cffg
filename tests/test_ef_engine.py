@@ -196,7 +196,7 @@ def test_gamma_poisson_exact_posterior_and_evidence(viz_gallery):
     viz_gallery(t)
     eng = Engine(compile_template(t, arrays=arrays))
     st = eng.bind_data(eng.init_state(), {f"count{i}": x for i, x in enumerate(counts)})
-    st, deltas = eng.run(st, 10, tol=1e-12)
+    st, deltas = eng.run(st, 10, tol=1e-12).require_converged_with_trace()
     assert deltas[-1] < 1e-12  # conjugate BP: converged, not budget-exhausted
     post = eng.ef_marginals(st)
     # every rate edge is the same variable: all report the exact posterior
@@ -214,7 +214,7 @@ def test_beta_bernoulli_exact_posterior_and_evidence(viz_gallery):
     viz_gallery(t)
     eng = Engine(compile_template(t, arrays=arrays))
     st = eng.bind_data(eng.init_state(), {f"flip{i}": y for i, y in enumerate(ys)})
-    st, _ = eng.run(st, 12, tol=1e-12)
+    st = eng.run(st, 12, tol=1e-12).require_converged()
     post = eng.ef_marginals(st)
     for m in post.values():
         np.testing.assert_allclose(m.params, (a0 + 3, b0 + 1), rtol=1e-12)
@@ -231,7 +231,7 @@ def test_missing_observation_drops_node():
     t, arrays = gamma_poisson(3, a0, b0)
     eng = Engine(compile_template(t, arrays=arrays))
     st = eng.bind_data(eng.init_state(), {"count0": 4, "count1": None, "count2": 7})
-    st, _ = eng.run(st, 10)
+    st = eng.run(st, 10).state
     m = eng.ef_marginals(st)["lam0"]
     np.testing.assert_allclose(m.params, (a0 + 11, b0 + 2), rtol=1e-12)
     np.testing.assert_allclose(
@@ -244,7 +244,7 @@ def test_no_data_is_free():
     ledger telescopes to exactly zero — the continuous missing-data identity."""
     t, arrays = gamma_poisson(2, 3.0, 2.0)
     eng = Engine(compile_template(t, arrays=arrays))
-    st, _ = eng.run(eng.init_state(), 8)
+    st = eng.run(eng.init_state(), 8).state
     m = eng.ef_marginals(st)["lam0"]
     np.testing.assert_allclose(m.params, (3.0, 2.0), rtol=1e-12)
     np.testing.assert_allclose(eng.bfe(st), 0.0, atol=1e-12)
@@ -256,7 +256,8 @@ def test_bfe_of_vacuous_state_is_loud():
     t, arrays = gamma_poisson(1)
     eng = Engine(compile_template(t, arrays=arrays))
     assert eng.bfe(eng.init_state()) == np.inf
-    st, deltas = eng.run(eng.init_state(), 5)
+    result = eng.run(eng.init_state(), 5)
+    st, deltas = result.state, result.message_deltas
     assert np.isfinite(eng.bfe(st)) and all(np.isfinite(d) for d in deltas)
 
 
@@ -296,7 +297,7 @@ def test_mixed_discrete_and_ef_arenas_coexist():
     arrays["c"] = np.array([0.5, 0.25, 0.25])
     eng = Engine(compile_template(t, arrays=arrays))
     st = eng.bind_data(eng.init_state(), {"count0": 3, "zp": 2})
-    st, _ = eng.run(st, 6)
+    st = eng.run(st, 6).state
     np.testing.assert_allclose(eng.ef_marginals(st)["lam0"].params, (5.0, 2.0), rtol=1e-12)
     np.testing.assert_allclose(eng.marginals(st)["z"], [0.0, 0.0, 1.0], atol=1e-12)
     # BFE splits over the disconnected components: EF evidence + discrete −log p(z=2)

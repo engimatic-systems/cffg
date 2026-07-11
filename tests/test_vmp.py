@@ -55,7 +55,7 @@ def test_vmp_exact_in_conjugate_case():
     x_obs = 2
     engine = Engine(compile_template(make_conjugate(True), arrays={"d": D, "A": A}))
     state = engine.bind_data(engine.init_state(), {"px": x_obs})
-    state, deltas = engine.run(state, 20, tol=1e-14)
+    state, deltas = engine.run(state, 20, tol=1e-14).require_converged_with_trace()
     assert deltas[-1] < 1e-12
     np.testing.assert_allclose(engine.marginals(state)["z"], posterior(x_obs), atol=1e-10)
     # For a single latent, mean-field is exact: BFE still equals -log evidence.
@@ -68,7 +68,7 @@ def test_vmp_matches_bp_here():
     for mf in (False, True):
         engine = Engine(compile_template(make_conjugate(mf), arrays={"d": D, "A": A}))
         state = engine.bind_data(engine.init_state(), {"px": x_obs})
-        state, _ = engine.run(state, 20)
+        state = engine.run(state, 20).state
         results.append(engine.marginals(state)["z"])
     np.testing.assert_allclose(results[0], results[1], atol=1e-10)
 
@@ -111,7 +111,7 @@ def test_vmp_tm_with_clamped_parents_matches_bp():
     for mf in (False, True):
         engine = Engine(compile_template(make_tm(mf), arrays={"Bs": BS}))
         state = engine.bind_data(engine.init_state(), obs)
-        state, _ = engine.run(state, 10)
+        state = engine.run(state, 10).state
         outs.append(engine.marginals(state)["o"])
     np.testing.assert_allclose(outs[0], BS[1][:, 0], atol=1e-12)
     np.testing.assert_allclose(outs[1], BS[1][:, 0], atol=1e-12)
@@ -125,7 +125,7 @@ def test_vmp_differs_from_bp_with_two_free_edges():
     for mf in (False, True):
         engine = Engine(compile_template(make_tm(mf), arrays={"Bs": BS}))
         state = engine.bind_data(engine.init_state(), obs)
-        state, _ = engine.run(state, 40)
+        state = engine.run(state, 40).state
         outs.append(engine.marginals(state)["u"])
     assert not np.allclose(outs[0], outs[1], atol=1e-6)
 

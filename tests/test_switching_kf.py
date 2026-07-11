@@ -102,7 +102,7 @@ def _run_engine(model, ys, n_iters=150):
     st = eng.bind_data(
         eng.init_state(), {f"obs{i + 1}": (None if y is None else y) for i, y in enumerate(ys)}
     )
-    st, deltas = eng.run(st, n_iters, tol=1e-12)
+    st, deltas = eng.run(st, n_iters, tol=1e-12).require_converged_with_trace()
     assert deltas[-1] < 1e-9, "engine did not reach the collapse fixed point"
     marg = eng.marginals(st)
     gmarg = eng.gaussian_marginals(st)
