@@ -80,7 +80,12 @@ A pure-Python (dataclass) representation, independent of JAX:
   `model.json` (structure + constraints), `blobs/` (parameter arrays), and
   `manifest.json` (schema version, content hashes, provenance). Unzipping and
   pointing the engine at `model.json` is a full restore; checkpointing writes
-  the same bundle. No third-party interchange format — this schema is canonical.
+  the same bundle. Plate fragments remain nested specs in `model.json`; the
+  manifest inventories every grounded tied/per-copy array, and per-copy blob
+  paths use an `{index}` marker resolved during grounding. Array-key-derived
+  subpaths prevent collisions without flattening the plate spec. Original flat
+  schema-1 manifests remain loadable. No third-party interchange format — this
+  schema is canonical.
 - **Edit actions**: the only public mutation API is transactional bundles
   (`add_slice`, `bind_data`, `set_constraint`, `compose(template, port_map)`) that
   validate the port invariant before committing. This is the GUI-ready surface —

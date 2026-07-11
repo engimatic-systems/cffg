@@ -232,6 +232,8 @@ math.
 **S7. Scale engineering.** Sparse A/B matrices, factored transition tensors,
 GPU-resident arenas, incremental recompilation, smarter (residual) schedules —
 ordinary optimization work, unbounded appetite.
+Plate fragments may not themselves declare plates in phase 1; validation rejects
+that unsupported grounding shape until recursive/index-table expansion in cff-6s31.
 
 **S8. Goal-specification ergonomics.** Goals are prior distributions over future
 observations; translating task intent into calibrated `c` vectors (the softmax

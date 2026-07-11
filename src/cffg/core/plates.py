@@ -40,6 +40,12 @@ from cffg.core.ir import (
 from cffg.core.validate import validate
 
 
+# Portable bundles use this marker in a per-copy BlobRef path.  Expansion is
+# the point where a compact plate spec acquires concrete indices, so it is also
+# the only layer that can turn one declared path into one path per copy.
+PLATE_INDEX_TOKEN = "{index}"
+
+
 def expand_plates(t: Template) -> Template:
     """Materialize every plate in `t`, returning a flat, plate-free Template.
 
@@ -76,7 +82,7 @@ def _prefix(plate: str, idx: tuple[int, ...]) -> str:
 
 
 def _scope_copy(
-    frag: Template, prefix: str, per_copy: frozenset[str]
+    frag: Template, prefix: str, index: tuple[int, ...], per_copy: frozenset[str]
 ) -> tuple[dict, dict, list, dict, dict]:
     """Scope one fragment copy under `prefix/`. Tied blob names stay unscoped
     (copies reference the same parent blob entry); per-copy blob names are
@@ -107,7 +113,11 @@ def _scope_copy(
         s(pt.name): PortSpec(s(pt.name), s(pt.variable), pt.role) for pt in frag.ports.values()
     }
     per_copy_blobs = {
-        s(b.name): BlobRef(s(b.name), b.path, b.init)
+        s(b.name): BlobRef(
+            s(b.name),
+            b.path.replace(PLATE_INDEX_TOKEN, SCOPE_SEP.join(map(str, index))),
+            b.init,
+        )
         for b in frag.blobs.values()
         if b.name in per_copy
     }
@@ -128,7 +138,9 @@ def _expand_one(out: Template, plate: str, spec: PlateSpec) -> None:
     # disjoint, so a clash means the plate name collides with existing content).
     for idx in idxs:
         prefix = _prefix(plate, idx)
-        variables, factors, constraints, ports, pblobs = _scope_copy(frag, prefix, per_copy)
+        variables, factors, constraints, ports, pblobs = _scope_copy(
+            frag, prefix, idx, per_copy
+        )
         for kind, new in (
             ("variables", variables),
             ("factors", factors),
