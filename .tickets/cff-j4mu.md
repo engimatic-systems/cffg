@@ -1,6 +1,6 @@
 ---
 id: cff-j4mu
-status: open
+status: closed
 deps: []
 links: [cff-fxmj, cff-5edo, cff-i45j]
 created: 2026-07-10T18:04:08Z
@@ -16,3 +16,35 @@ ADVERSARIAL REVIEWER FINDING (2026-07-10). Engine.run returns only (State, delta
 ## Acceptance Criteria
 
 1. Public RunResult reports status in {converged,budget_exhausted,diverged,infeasible}, iterations, message-delta trace, FE trace (where defined), and final residual; compatibility migration is explicit. 2. FE change/stationarity is the primary convergence criterion in sum/GFE mode, with message delta retained as a coherence diagnostic; max mode uses a documented objective/residual criterion. 3. Any non-finite message, delta, FE, or inner-solver residual terminates as divergence and cannot return a normal-looking State without an explicit opt-in. 4. All-zero support/contradictory hard constraints report infeasible with FE=+inf, never a finite NEG-sentinel score. 5. GFE Newton solves expose convergence/budget/divergence and use dtype-scaled tolerances. 6. RollingAgent, Colony, decimation, estimator, tests, and dashboards consume status rather than guessing from trace length. 7. Hostile tests cover sparse support, float32, a large chain, poisoned messages, an unsatisfiable CSP, and deliberate budget exhaustion.
+
+## Notes
+
+**2026-07-11T15:45:55Z**
+
+Planning hostile-input contract (2026-07-11):
+
+- Sparse/exact-zero support: retain log-zero semantics; any edge/factor belief with empty support classifies infeasible and its FE is +inf.
+- Improper/vacuous incoming: transient FE is recorded only once the ledger is defined; a non-finite evaluated FE or inner residual is divergence, while proven empty discrete support takes infeasible precedence.
+- Float32: outer/inner tolerances and Newton safeguards derive from `jnp.finfo(dtype)`; no absolute floors/ridges.
+- Scale: tests cover a 100-variable chain plus a larger GFE simplex; iteration status must remain truthful at budget.
+- Poisoned messages: terminate immediately as diverged.
+- Budget: deliberate too-small budgets report `budget_exhausted`, never converged.
+
+Design: `Engine.run` returns a non-tuple `RunResult`; callers must explicitly inspect status / require convergence. Sum/GFE convergence requires FE stationarity plus message coherence. Max mode uses message fixed-point residual and validates the final decoded objective.
+
+**2026-07-11T16:10:12Z**
+
+Implemented on branch `cff-j4mu-inference-status`.
+
+Commits:
+
+- `956269c`: dtype-scaled, gauge-projected GFE Newton solver with converged/budget/diverged diagnostics and K=80 float32 test.
+- `4c81798`: public non-tuple `RunResult`; FE-stationarity + coherence convergence; max residual/objective validation; divergence and exact-support infeasibility; GFE diagnostics threaded outward; RollingAgent/Colony/decimation/estimator/test/dashboard migrations.
+
+Hostile coverage: sparse/exact-zero support, float32, 100-variable chain, poisoned message, contradictory `exactly_k` CSP, deliberate budget exhaustion, large GFE simplex.
+
+Compatibility: old `state, deltas` unpack is intentionally loud; use `result.state` for deliberate fixed budgets or `result.require_converged()`.
+
+Verification: dashboard full suite 1102 passed, 0 failed on 2026-07-11. Dashboard refreshed at `~/agent-share/cffg-tests.html`.
+
+Gotcha: one curiosity fixture's old 50-sweep budget was genuinely under-converged; increased to 100 after status exposed it.
