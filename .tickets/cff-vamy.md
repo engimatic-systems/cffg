@@ -1,6 +1,6 @@
 ---
 id: cff-vamy
-status: open
+status: in_progress
 deps: []
 links: [cff-fxmj, cff-cpxj]
 created: 2026-07-10T17:57:24Z
