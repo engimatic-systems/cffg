@@ -341,6 +341,26 @@ def test_reject_3d_dims():
         validate(host)
 
 
+def test_reject_plate_nested_inside_fragment_before_grounding():
+    middle = Template(
+        name="middle",
+        plates={"inner": PlateSpec(pixel_fragment(), (2,), (Expose(),))},
+    )
+    host = Template(
+        name="host",
+        plates={"outer": PlateSpec(middle, (2,), (Expose(),))},
+    )
+    message = (
+        r"plate 'outer': fragment declares nested plates \['inner'\]; "
+        r"nested plate grounding is not supported in phase 1"
+    )
+
+    with pytest.raises(ModelError, match=message):
+        validate(host)
+    with pytest.raises(ModelError, match=message):
+        expand_plates(host)
+
+
 def test_chain_endpoints_must_be_glue():
     # 'x' is a DATA port, not glue — chaining on it is rejected.
     host = Template(

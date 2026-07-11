@@ -13,13 +13,14 @@ from cffg.core import (
     BlobRef,
     Expose,
     FactorSpec,
+    ModelError,
     PlateSpec,
     PortRole,
     PortSpec,
     Template,
     VariableSpec,
 )
-from cffg.core.serialize import structure_hash, to_dict
+from cffg.core.serialize import SCHEMA_VERSION, structure_hash, to_dict, to_json
 from cffg.engine import Engine
 from cffg.models.gridworld import build_gridworld
 from cffg.models.tmaze import build_tmaze
@@ -58,6 +59,14 @@ def _plate_model() -> tuple[Template, dict[str, np.ndarray]]:
         "leaf/2/d": np.array([0.2, 0.2, 0.6]),
     }
     return template, arrays
+
+
+def _nested_plate_model() -> Template:
+    middle, _ = _plate_model()
+    return Template(
+        name="nested-host",
+        plates={"outer": PlateSpec(middle, (2,), (Expose(),))},
+    )
 
 
 def _zip_contents(path):
@@ -260,4 +269,37 @@ def test_legacy_flat_manifest_rejects_plate_instead_of_truncating(tmp_path):
     _write_zip(path, contents)
 
     with pytest.raises(BundleError, match="legacy flat blob manifest"):
+        load_bundle(path)
+
+
+def test_save_rejects_nested_plate_before_creating_destination(tmp_path):
+    path = tmp_path / "nested.cffgz"
+    with pytest.raises(
+        ModelError,
+        match=r"plate 'outer': fragment declares nested plates \['leaf'\]",
+    ):
+        save_bundle(path, _nested_plate_model(), {})
+    assert not path.exists()
+
+
+def test_load_rejects_hand_built_nested_plate_bundle(tmp_path):
+    template = _nested_plate_model()
+    manifest = {
+        "schema_version": SCHEMA_VERSION,
+        "structure_hash": structure_hash(template),
+        "blob_sha256": {},
+        "blob_paths": {},
+    }
+    path = tmp_path / "hand-built-nested.cffgz"
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("model.json", to_json(template))
+        zf.writestr("manifest.json", json.dumps(manifest))
+
+    with pytest.raises(
+        BundleError,
+        match=(
+            r"invalid bundled plate structure:[\s\S]*plate 'outer': fragment "
+            r"declares nested plates \['leaf'\]"
+        ),
+    ):
         load_bundle(path)
