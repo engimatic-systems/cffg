@@ -10,6 +10,7 @@ things that must change together, change together, inside one bundle.
 from __future__ import annotations
 
 import copy
+import dataclasses
 from dataclasses import dataclass
 
 from cffg.core.ir import (
@@ -146,6 +147,20 @@ class ReplaceFactor:
         t.factors[self.spec.name] = self.spec
 
 
+@dataclass(frozen=True)
+class SetPlateDims:
+    """Resize a plate (cff-cpxj). Resizing IS a structural change: the copy
+    count is part of the structure hash, so the model recompiles."""
+
+    name: str
+    dims: tuple[int, ...]
+
+    def apply(self, t: Template) -> None:
+        if self.name not in t.plates:
+            raise EditError(f"plate {self.name!r} does not exist")
+        t.plates[self.name] = dataclasses.replace(t.plates[self.name], dims=tuple(self.dims))
+
+
 EditAction = (
     AddVariable
     | AddFactor
@@ -158,6 +173,7 @@ EditAction = (
     | RemovePort
     | AddBlob
     | RebindBlobPath
+    | SetPlateDims
 )
 
 
@@ -202,6 +218,7 @@ _ACTIONS: dict[str, type] = {
     "remove_port": RemovePort,
     "add_blob": AddBlob,
     "rebind_blob_path": RebindBlobPath,
+    "set_plate_dims": SetPlateDims,
 }
 _ACTION_NAMES = {cls: name for name, cls in _ACTIONS.items()}
 
@@ -240,6 +257,8 @@ def action_to_dict(action: EditAction) -> dict:
         return {"action": name, "ref": _spec_to_dict(action.ref)}
     if isinstance(action, RebindBlobPath):
         return {"action": name, "name": action.name, "path": action.path}
+    if isinstance(action, SetPlateDims):
+        return {"action": name, "name": action.name, "dims": list(action.dims)}
     return {"action": name, "name": action.name}
 
 
@@ -281,6 +300,8 @@ def action_from_dict(d: dict) -> EditAction:
         )
     if cls is RebindBlobPath:
         return cls(d["name"], d["path"])
+    if cls is SetPlateDims:
+        return cls(d["name"], tuple(d["dims"]))
     return cls(d["name"])  # Remove{Factor,Variable,Port}
 
 

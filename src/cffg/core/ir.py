@@ -273,6 +273,67 @@ HYBRID_EDGE_FAMILIES: dict[str, dict[str, str]] = {
 }
 
 
+# --- Plates: compact replication of a fragment (cff-cpxj) --------------------
+# A plate declares "duplicate this fragment N times (or R×C) and wire the copies
+# together by these rules." The wiring vocabulary is a small closed set of
+# frozen rules — patterns, not arbitrary index arithmetic — expanded naively
+# (materialized copies) in the compiler's grounding phase for phase 1.
+
+
+@dataclass(frozen=True)
+class Chain:
+    """Bond copy i's `port_a` to copy (i+offset)'s `port_b` along `axis`.
+
+    A 1-D chain plate reproduces unrolling's glue pattern; a grid is one Chain
+    per axis. Both endpoints must be GLUE ports of the fragment (validated).
+    Boundary copies keep their unbonded chain ports exposed (like unroll keeps
+    t0's head and t{n-1}'s tail)."""
+
+    port_a: str
+    port_b: str
+    axis: int = 0
+    offset: int = 1
+
+
+@dataclass(frozen=True)
+class Broadcast:
+    """Every copy's `port` faces one shared parent-level edge named `hub`.
+
+    FFG edges have max degree 2, so expansion SYNTHESIZES an equality tree (a
+    chain of ternary equality factors) tying all copies' branch edges to the
+    hub. The hub edge is exposed as a GLUE port on the parent for the rest of
+    the model to terminate (a prior, a goal, further gluing)."""
+
+    port: str
+    hub: str
+
+
+@dataclass(frozen=True)
+class Expose:
+    """All remaining unbonded fragment ports become parent ports named
+    `plate/<i>/port` (or `plate/<i>/<j>/port` for 2-D), roles preserved.
+
+    Leftover ports are always exposed in phase 1 (a dangling internal edge is
+    otherwise invalid); Expose() is the explicit, serializable marker of that
+    intent."""
+
+
+WiringRule = Chain | Broadcast | Expose
+
+
+@dataclass(frozen=True)
+class PlateSpec:
+    """A replicated fragment: `dims` copies (1-D or 2-D in phase 1) of
+    `fragment`, wired by `bonds`. Parameters are TIED by default (copies share
+    the fragment's blob names); `per_copy_blobs` opts specific blobs out into
+    per-copy indexed names."""
+
+    fragment: "Template"
+    dims: tuple[int, ...]
+    bonds: tuple[WiringRule, ...] = ()
+    per_copy_blobs: tuple[str, ...] = ()
+
+
 @dataclass
 class Template:
     """A CFFG fragment: the unit of serialization, composition, and compilation."""
@@ -283,6 +344,7 @@ class Template:
     constraints: list[ConstraintSpec] = field(default_factory=list)
     ports: dict[str, PortSpec] = field(default_factory=dict)
     blobs: dict[str, BlobRef] = field(default_factory=dict)
+    plates: dict[str, PlateSpec] = field(default_factory=dict)
     schema_version: str = "1"
 
     def degree(self, variable: str) -> int:
