@@ -118,6 +118,26 @@ per sweep — fine at planning scale, a structure-exploitation ticket at
 colony scale. Models containing the composite report GFE, not BFE (no
 −log Z identity claimed).
 
+**S1d. Hybrid mixture inference is assumed-density; its BFE is a lower
+bound.** The `gaussian_mixture(_linear)` collapse rules (cff-pksr,
+DERIVATIONS.md D3) moment-match every Gaussian-edge mixture message to one
+Gaussian — the IMM/ADF family of approximations, and the reason exact
+switching-KF inference (exponential in T) stays tractable. Honest
+accounting: (1) marginals are approximate away from single-node models —
+the switching-KF tier measures the gap against exact enumeration and pins
+it with headroom rather than pretending parity; (2) selector messages and
+node energies are exact *for the beliefs the engine holds*; the one
+approximated ledger term is the interior Gaussian edge entropy, which
+scores the collapsed Gaussian — the max-entropy density for its moments —
+so each +H is an over-estimate and the reported BFE *lower-bounds* the
+mixture-Bethe value at the same moments (bound direction pinned in
+`tests/test_mixg.py`). Same optimistic-bound reporting stance as S1c.
+(3) Observed mixture outputs (regime-dependent emissions with a DATA port)
+are rejected at compile time in v1 — route observations through a plain
+`gaussian_linear` emission node; (4) rank-deficient per-regime backward
+messages have no well-defined collapse and fall back to vacuous — full-rank
+A_s per regime is the supported envelope.
+
 **S2. Importance-sampling noise in parameter messages.** The message to A is a
 non-conjugate log-message evaluated by importance sampling; variance grows with
 column dimensionality and makes the GFE trace stochastic (hence burn-in
