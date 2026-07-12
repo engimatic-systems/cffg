@@ -161,8 +161,12 @@ A registry keyed by `(factor_type, constraint_config, out_edge_role)`:
   original GFE formulation.
 - **Continual learning**: conjugate posteriors roll into next-trial priors
   (`q_s(A) → p_{s+1}(A)` Dirichlet count accumulation, same for goal statistics
-  c). Checkpoint = serialize current parameter blobs + template ref; can happen
-  at any tick.
+  c). Transition learning (`learn_b`, cff-cd1i) follows the same pattern with
+  per-action Dirichlets, integrated against the *node belief* at the
+  transition factor (`Engine.node_beliefs`, the smoothed pairwise marginal) —
+  node beliefs are the general sufficient-statistic source the learnables API
+  (cff-x0sv) will build on. Checkpoint = serialize current parameter blobs +
+  template ref; can happen at any tick.
 - Sensor/actuator adapters are plain Python callbacks mapping env observations to
   one-hot data bindings and control marginals to env actions.
 

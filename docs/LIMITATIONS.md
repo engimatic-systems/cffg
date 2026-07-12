@@ -106,6 +106,16 @@ its likelihood node (a huge-precision clamp would diverge the differential-
 entropy ledger). Free energies on models with improper beliefs (e.g. unbonded
 Gaussian glue ports) come out ±inf — deliberate loudness, not a bug.
 
+**S1c. B-learning is pragmatic-only (no dynamics curiosity).** `learn_b`
+(cff-cd1i) updates per-action transition Dirichlets from smoothed pair
+beliefs and plans with E[log B], but unlike A-learning there is no GFE
+channel for B: uncertainty about *dynamics* generates no epistemic value, so
+an agent will not act to visit poorly-modeled transitions. Deriving a
+P-substitution-style term for the transition node is ticket cff-fk2u
+(principled route: substitute q(z')→p(z'|z,u) at the transition node and
+derive the local GFE; pragmatic interim: a separately-labeled count-novelty
+term, never folded into BFE/GFE numbers).
+
 **S2. Importance-sampling noise in parameter messages.** The message to A is a
 non-conjugate log-message evaluated by importance sampling; variance grows with
 column dimensionality and makes the GFE trace stochastic (hence burn-in

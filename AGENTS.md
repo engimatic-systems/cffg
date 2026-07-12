@@ -95,3 +95,38 @@ architecture, edit ARCHITECTURE.md in the same commit as the change.
 - **Serialization is the source of truth.** Model structure lives in the template
   format (no large blobs inline — blobs are file paths); the compiled JAX arena is a
   derived artifact and must always be reconstructible from the template + data.
+
+## Numerical robustness contract
+
+Adopted 2026-07-09 after a divergent solver was reported as converged and four
+stacked defects went undetected. Their shared root: rules were only ever
+exercised inside the test fixtures' comfort zone. Every message rule, solver,
+and energy term — including all future factor families on the roadmap — ships
+against this contract.
+
+- **Hostile-inputs checklist at planning time.** A rule ticket states, before
+  implementation, what happens at: sparse/zero support (exact log-zeros),
+  improper or vacuous incoming messages, float32 (the test suite forces x64;
+  consumers get JAX's default), and 10–100× the fixture's domain size.
+  "Provably N/A" is an acceptable answer; not asking is not. Answers become
+  acceptance criteria.
+- **Guards scale with the dtype.** No absolute numeric literals as floors,
+  ridges, or clamps: 1e-300 is exactly zero in f32, and a 1e-9 ridge sits
+  below f32's machine epsilon (numerically singular). Derive guards from
+  `jnp.finfo(dtype)`, and comment which invariant each one protects — a guard
+  whose purpose isn't stated can't be reviewed.
+- **Convergence claims are falsifiable.** Any iterative loop distinguishes
+  converged / budget-exhausted / diverged, and a non-finite delta or FE is
+  divergence — loud, never a returned state that looks like success. The
+  existing "FE is the convergence signal" invariant is enforced in code, not
+  prose.
+- **Inner solvers get globalization by default.** A fixed iteration count
+  tuned on a small fixture is a scale trap. Newton-type solves take
+  backtracking/damping unless the ticket argues the domain is provably safe;
+  gauge freedoms (shift-invariant residuals) are projected out explicitly,
+  not left to a ridge.
+- **Test the contract, not just goldens.** Each rule family carries at least
+  one sparse-support case, one float32 case, and one case at uncomfortable
+  scale. Golden parity on small models proves correctness; these prove
+  survival. When a defect is found, the regression test reproduces the
+  *mechanism* (the hostile input), not the incident.
