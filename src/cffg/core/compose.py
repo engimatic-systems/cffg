@@ -55,7 +55,7 @@ def scoped(template: Template, prefix: str) -> Template:
         },
         constraints=[dataclasses.replace(c, target=s(c.target)) for c in template.constraints],
         ports={s(pt.name): PortSpec(s(pt.name), s(pt.variable), pt.role) for pt in template.ports.values()},
-        blobs={s(b.name): BlobRef(s(b.name), b.path) for b in template.blobs.values()},
+        blobs={s(b.name): BlobRef(s(b.name), b.path, b.init) for b in template.blobs.values()},
         schema_version=template.schema_version,
     )
 

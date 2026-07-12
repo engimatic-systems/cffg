@@ -488,19 +488,62 @@ def compile_template(
 def _resolve_arrays(
     t: Template, arrays: dict[str, np.ndarray] | None, root: str | Path | None
 ) -> dict[str, np.ndarray]:
+    """Resolution order per blob: explicit arrays > existing file > init spec.
+    Files beat init specs so a continual-learning checkpoint written to the
+    blob path overrides the warm start on reload (cff-wx28)."""
     needed = {b for f in t.factors.values() for b in f.param_blobs.values()}
     out: dict[str, np.ndarray] = {}
     for name in sorted(needed):
         if arrays is not None and name in arrays:
             out[name] = np.asarray(arrays[name], dtype=np.float64)
             continue
-        if root is None:
-            raise CompileError(f"blob {name!r}: no array override and no root directory")
-        path = Path(root) / t.blobs[name].path
-        if not path.exists():
-            raise CompileError(f"blob {name!r}: file not found: {path}")
-        out[name] = _load_blob(path, name)
+        path = Path(root) / t.blobs[name].path if root is not None else None
+        if path is not None and path.exists():
+            out[name] = _load_blob(path, name)
+            continue
+        if t.blobs[name].init:
+            from cffg import inits
+
+            shape = _blob_shape(t, name)
+            if shape is None:
+                raise CompileError(f"blob {name!r}: cannot infer shape for init spec")
+            try:
+                out[name] = np.asarray(
+                    inits.from_spec(t.blobs[name].init, shape), dtype=np.float64
+                )
+            except ValueError as e:
+                raise CompileError(f"blob {name!r}: init spec failed: {e}") from None
+            continue
+        raise CompileError(
+            f"blob {name!r}: no array override, no file"
+            + (f" at {path}" if path is not None else " (no root directory)")
+            + ", and no init spec"
+        )
     return out
+
+
+def _blob_shape(t: Template, blob_name: str) -> tuple[int, ...] | None:
+    """Expected array shape for a blob, inferred from the first factor role
+    that references it (the compiler validates full agreement later)."""
+    for f in t.factors.values():
+        for role, b in f.param_blobs.items():
+            if b != blob_name:
+                continue
+            card = lambda r: t.variables[f.edges[r]].cardinality  # noqa: E731
+            dim = lambda r: t.variables[f.edges[r]].dim  # noqa: E731
+            if f.type in ("categorical", "dirichlet"):
+                return (card("out"),)
+            if f.type == "matrix_cat":
+                return (card("out"), card("in"))
+            if f.type == "transition_mixture":
+                return (card("selector"), card("out"), card("in"))
+            if f.type == "gaussian":
+                d = dim("out")
+                return {"mean": (d,), "cov": (d, d)}[role]
+            if f.type == "gaussian_linear":
+                do, di = dim("out"), dim("in")
+                return {"matrix": (do, di), "offset": (do,), "cov": (do, do)}[role]
+    return None
 
 
 def _load_blob(path: Path, name: str) -> np.ndarray:

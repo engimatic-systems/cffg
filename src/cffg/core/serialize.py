@@ -56,7 +56,10 @@ def to_dict(t: Template) -> dict[str, Any]:
         "ports": {
             p.name: {"variable": p.variable, "role": p.role.value} for p in _sorted(t.ports)
         },
-        "blobs": {b.name: {"path": b.path} for b in _sorted(t.blobs)},
+        "blobs": {
+            b.name: ({"path": b.path, "init": dict(b.init)} if b.init else {"path": b.path})
+            for b in _sorted(t.blobs)
+        },
     }
 
 
@@ -93,7 +96,12 @@ def from_dict(d: dict[str, Any]) -> Template:
             name: PortSpec(name, spec["variable"], PortRole(spec["role"]))
             for name, spec in d["ports"].items()
         },
-        blobs={name: BlobRef(name, spec["path"]) for name, spec in d["blobs"].items()},
+        blobs={
+            name: BlobRef(
+                name, spec["path"], tuple(sorted(spec.get("init", {}).items()))
+            )
+            for name, spec in d["blobs"].items()
+        },
         schema_version=d["schema_version"],
     )
 
@@ -115,7 +123,9 @@ def load(path: str | Path) -> Template:
 
 
 def structure_hash(t: Template) -> str:
-    """Hex sha256 of the structure: blob paths erased, names kept."""
+    """Hex sha256 of the structure: blob paths AND init specs erased, names
+    kept — both are parameter data, not structure (colony batching groups
+    instances that differ only in parameters)."""
     d = to_dict(t)
     d["blobs"] = {name: {} for name in d["blobs"]}
     canonical = json.dumps(d, sort_keys=True, separators=(",", ":"))

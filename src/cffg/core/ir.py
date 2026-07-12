@@ -62,10 +62,17 @@ class VariableSpec:
 
 @dataclass(frozen=True)
 class BlobRef:
-    """Named reference to an array stored outside the template (never inline)."""
+    """Named reference to an array stored outside the template (never inline).
+
+    `init` (cff-wx28) is an optional canonical-initializer spec (see
+    cffg.inits.spec): when the file is absent at compile time, the array is
+    materialized from the spec — templates with warm-start parameters are
+    self-contained, and a checkpoint written to `path` overrides the warm
+    start on reload."""
 
     name: str
     path: str  # relative to the bundle root
+    init: tuple[tuple[str, str], ...] = ()  # sorted (key, value) pairs; () = none
 
 
 @dataclass(frozen=True)
