@@ -20,7 +20,9 @@ N_ITERS = 400  # damp=0.5 contracts ~0.91/sweep on this model
 def solve(**kwargs):
     template, arrays = build_tmaze(**kwargs)
     engine = Engine(compile_template(template, arrays=arrays))
-    state, deltas = engine.run(engine.init_state(), N_ITERS, tol=1e-13, damp=0.5)
+    state, deltas = engine.run(
+        engine.init_state(), N_ITERS, tol=1e-13, damp=0.5
+    ).require_converged_with_trace()
     assert deltas[-1] < 1e-10, f"not converged: {deltas[-6:]}"
     return engine, state
 
@@ -64,7 +66,7 @@ def test_map_policy_variant():
     engine = Engine(compile_template(template, arrays=arrays))
     state, deltas = engine.run(
         engine.init_state(), 900, tol=1e-13, damp=0.5, harden_last=450
-    )
+    ).require_converged_with_trace()
     assert deltas[-1] < 1e-10, f"not converged: {deltas[-4:]}"
     q = engine.marginals(state)
     np.testing.assert_allclose(sorted(q["u1"])[-1], 1.0, atol=1e-12)
@@ -76,7 +78,7 @@ def test_map_policy_variant():
 def test_gfe_is_finite_and_stable():
     engine, state = solve()
     g1 = engine.bfe(state)
-    state2, _ = engine.run(state, 5)
+    state2 = engine.run(state, 5).state
     g2 = engine.bfe(state2)
     assert np.isfinite(g1) and abs(g1 - g2) < 1e-9
 

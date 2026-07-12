@@ -12,6 +12,8 @@ its role's cardinality and NEG-padded beyond it.
 
 from __future__ import annotations
 
+from typing import NamedTuple
+
 import jax
 import jax.numpy as jnp
 from jax.scipy.special import logsumexp
@@ -229,7 +231,21 @@ VMP_ENERGIES = {
 # G = −z*ᵀ rho(z*) − H[z*]  (the goal node's term and the x-edge entropy are
 # absorbed — see cff-007q for the derivation).
 
-_N_NEWTON = 25
+_N_NEWTON = 64
+
+
+class GfeSolveResult(NamedTuple):
+    """JAX-compatible diagnostics for one Corollary-1 Newton solve.
+
+    ``status`` is an integer so the record can flow through ``jit``/``vmap``:
+    0 = converged, 1 = iteration budget exhausted, 2 = diverged.  The outer
+    runtime translates it to the public string-valued ``RunStatus``.
+    """
+
+    solution: jax.Array
+    status: jax.Array
+    iterations: jax.Array
+    residual: jax.Array
 
 
 def _safe_log(x):
@@ -260,14 +276,25 @@ def _dirichlet_stats(counts):
     return abar, h
 
 
-def _gfe_solve(abar, h, logc, log_d):
-    """Single composite: z* in the simplex. abar [Mo,K], h [K], logc [Mo].
+def _gfe_solve_result(abar, h, logc, log_d, max_iters: int = _N_NEWTON):
+    """Solve one composite and expose termination diagnostics.
 
-    log_d is clamped at −1e3 before the solve: exp(−1000) underflows to an
-    exact 0 in f64, so the fixed point is unchanged, but Newton's residual
-    and Jacobian stay O(1e3) instead of O(1e30) when the incoming message
-    carries exact log-zeros (sparse supports, cff-i45j)."""
-    log_d = jnp.maximum(log_d, -1e3)
+    The solve is performed in a ``K-1`` dimensional gauge-fixed chart rather
+    than regularising the singular all-ones direction.  Exact-zero incoming
+    support is represented at the dtype's smallest normal log-probability
+    while Newton runs; this bounds the residual without a dtype-specific
+    literal and does not give that support mass in the engine's cavity update.
+    """
+    dtype = jnp.result_type(abar, h, logc, log_d)
+    abar = jnp.asarray(abar, dtype=dtype)
+    h = jnp.asarray(h, dtype=dtype)
+    logc = jnp.asarray(logc, dtype=dtype)
+    log_d = jnp.asarray(log_d, dtype=dtype)
+    # Protect the Newton residual from the finite NEG sentinel.  This guard is
+    # the smallest normal value representable by the active dtype, so it
+    # scales correctly in both f32 and f64.
+    log_floor = jnp.log(jnp.finfo(dtype).tiny)
+    log_d = jnp.maximum(log_d, log_floor)
 
     def rho(zbar):
         qx = abar @ zbar
@@ -279,30 +306,64 @@ def _gfe_solve(abar, h, logc, log_d):
     def resid(v):
         return center(v) - center(rho(jax.nn.softmax(v)) + log_d)
 
-    # Newton with backtracking: the full step can overshoot and limit-cycle
-    # on large simplexes (observed at a few hundred states, cff-i45j), so
-    # each iteration tries fractional steps and keeps the best residual —
-    # near the fixed point the full step wins and quadratic convergence is
-    # untouched (the small-model goldens pin this).
-    _TS = jnp.array([1.0, 0.5, 0.25, 0.125, 0.03125])
+    k = log_d.shape[0]
+    # K=1 has no free coordinate and is stationary by construction.
+    if k == 1:
+        zero = jnp.asarray(0.0, dtype=dtype)
+        return GfeSolveResult(jnp.ones_like(log_d), jnp.asarray(0), jnp.asarray(0), zero)
 
-    def newton(_, v):
-        r = resid(v)
-        j = jax.jacfwd(resid)(v)
-        k = v.shape[0]
-        # The centered residual is gauge-invariant along 1, so j always has a
-        # zero eigenvalue there; the ridge must sit above the dtype's
-        # roundoff (a fixed 1e-9 is *below* f32 eps — numerically singular,
-        # solve returns inf). Re-centering the step kills any gauge drift.
-        ridge = jnp.sqrt(jnp.finfo(v.dtype).eps)
-        full = jnp.linalg.solve(j + ridge * jnp.eye(k, dtype=v.dtype), r)
-        full = full - full.mean()
-        cands = v[None, :] - _TS[:, None].astype(v.dtype) * full[None, :]
-        norms = jax.vmap(lambda vv: jnp.sum(resid(vv) ** 2))(cands)
-        return cands[jnp.argmin(norms)]
+    def unpack(u):
+        return center(jnp.concatenate([u, jnp.zeros((1,), dtype=dtype)]))
 
-    v = jax.lax.fori_loop(0, _N_NEWTON, newton, center(log_d))
-    return jax.nn.softmax(v)
+    def reduced_resid(u):
+        return resid(unpack(u))[:-1]
+
+    # Newton with globalization: a zero-length candidate makes every step
+    # non-increasing even when the local linear model is poor.  Step fractions
+    # are dimensionless; numeric validity guards come only from finfo(dtype).
+    fractions = jnp.asarray([1.0, 0.5, 0.25, 0.125, 0.0625, 0.0], dtype=dtype)
+    # A few hundred ulps are required after the softmax/Jacobian round trip;
+    # below this floor Newton can only repeat a zero-length backtracking step.
+    tol = jnp.asarray(512.0, dtype=dtype) * jnp.finfo(dtype).eps
+
+    v0 = center(log_d)
+    u0 = v0[:-1] - v0[-1]
+
+    def residual_norm(u):
+        return jnp.max(jnp.abs(reduced_resid(u)))
+
+    r0 = residual_norm(u0)
+
+    def cond(carry):
+        i, _, rn = carry
+        return (i < max_iters) & jnp.isfinite(rn) & (rn > tol)
+
+    def body(carry):
+        i, u, _ = carry
+        r = reduced_resid(u)
+        jac = jax.jacfwd(reduced_resid)(u)
+        full = jnp.linalg.solve(jac, r)
+        cands = u[None, :] - fractions[:, None] * full[None, :]
+        norms = jax.vmap(residual_norm)(cands)
+        best = jnp.argmin(jnp.where(jnp.isfinite(norms), norms, jnp.inf))
+        next_u = cands[best]
+        return i + 1, next_u, norms[best]
+
+    iterations, u, residual = jax.lax.while_loop(
+        cond, body, (jnp.asarray(0), u0, r0)
+    )
+    finite = jnp.isfinite(residual) & jnp.all(jnp.isfinite(u))
+    status = jnp.where(~finite, 2, jnp.where(residual <= tol, 0, 1))
+    return GfeSolveResult(jax.nn.softmax(unpack(u)), status, iterations, residual)
+
+
+def _gfe_solve(abar, h, logc, log_d):
+    """Compatibility helper returning only the stationary simplex belief.
+
+    Runtime code uses :func:`_gfe_solve_result` so budget exhaustion and
+    divergence cannot be discarded.
+    """
+    return _gfe_solve_result(abar, h, logc, log_d).solution
 
 
 def _gfe_rho(abar, h, logc, zbar):
@@ -314,7 +375,7 @@ def _stats(a_param, learned):
     return _dirichlet_stats(a_param) if learned else _fixed_stats(a_param)
 
 
-def gfe_update(log_d, a_param, logc, k_max, learned=False):
+def gfe_update(log_d, a_param, logc, k_max, learned=False, return_diagnostics=False):
     """Batched over members. log_d [M,K] normalized; a_param is logA (fixed)
     or Dirichlet counts α (learned); returns (μ2, log q_x) padded to k_max.
 
@@ -328,12 +389,13 @@ def gfe_update(log_d, a_param, logc, k_max, learned=False):
 
     def one(a_p, lc, ld):
         abar, h = _stats(a_p, learned)
-        zbar = _gfe_solve(abar, h, lc, ld)
-        return _gfe_rho(abar, h, lc, zbar), abar @ zbar
+        solved = _gfe_solve_result(abar, h, lc, ld)
+        zbar = solved.solution
+        return _gfe_rho(abar, h, lc, zbar), abar @ zbar, solved.residual, solved.status
 
-    mu2, qx = jax.vmap(one)(a_param, logc, log_d)
-    log_qx = _safe_log(qx)
-    return _norm_pad(mu2, ki, k_max), _norm_pad(log_qx, ko, k_max)
+    mu2, qx, residual, status = jax.vmap(one)(a_param, logc, log_d)
+    messages = (_norm_pad(mu2, ki, k_max), _norm_pad(_safe_log(qx), ko, k_max))
+    return (*messages, residual, status) if return_diagnostics else messages
 
 
 def gfe_energy(log_d, a_param, logc, learned=False):
@@ -442,7 +504,9 @@ def _tm_joint_stats(b_param, learned):
     return abar, h.T.reshape(kz * ku)
 
 
-def gfe_tm_update(mu_in, mu_e, mu_down, b_param, k_max, learned=False):
+def gfe_tm_update(
+    mu_in, mu_e, mu_down, b_param, k_max, learned=False, return_diagnostics=False
+):
     """Batched over members. mu_in [M,K], mu_e [M,U], mu_down [M,K']
     normalized log-messages; b_param is log B (fixed) or Dirichlet counts α
     (learned), [M, U, K', K]. Returns (to_out, to_in, to_sel) padded.
@@ -458,7 +522,8 @@ def gfe_tm_update(mu_in, mu_e, mu_down, b_param, k_max, learned=False):
     def one(bp, mi, me, md):
         abar, h = _tm_joint_stats(bp, learned)
         log_d = (mi[:, None] + me[None, :]).reshape(-1)
-        qj = _gfe_solve(abar, h, md, log_d)
+        solved = _gfe_solve_result(abar, h, md, log_d)
+        qj = solved.solution
         rho = _gfe_rho(abar, h, md, qj).reshape(kz, ku)
         to_sel = logsumexp(rho + mi[:, None], axis=0)
         to_in = logsumexp(rho + me[None, :], axis=1)
@@ -472,14 +537,17 @@ def gfe_tm_update(mu_in, mu_e, mu_down, b_param, k_max, learned=False):
         feasible = jnp.all(~qw_support | md_support)
         to_out = jnp.where(qw_support & md_support, jnp.log(qw) - md, NEG)
         to_out = jnp.where(feasible, to_out, jnp.nan)
-        return to_out, to_in, to_sel
+        return to_out, to_in, to_sel, solved.residual, solved.status
 
-    to_out, to_in, to_sel = jax.vmap(one)(b_param, mu_in, mu_e, mu_down)
-    return (
+    to_out, to_in, to_sel, residual, status = jax.vmap(one)(
+        b_param, mu_in, mu_e, mu_down
+    )
+    messages = (
         _norm_pad(to_out, kp, k_max),
         _norm_pad(to_in, kz, k_max),
         _norm_pad(to_sel, ku, k_max),
     )
+    return (*messages, residual, status) if return_diagnostics else messages
 
 
 def gfe_tm_energy(mu_in, mu_e, mu_down, b_param, learned=False):

@@ -179,7 +179,9 @@ def test_conjugate_fixed_point():
     xs = (1.0, -0.5, 2.0, 0.7)
     t, arrays = gamma_gauss_prec(4, a0, b0, xs, m)
     eng = Engine(compile_template(t, arrays=arrays))
-    st, deltas = eng.run(eng.init_state(), 40, tol=1e-13)
+    st, deltas = eng.run(
+        eng.init_state(), 40, tol=1e-13
+    ).require_converged_with_trace()
     assert np.isfinite(deltas[-1]) and deltas[-1] < 1e-12  # converged, not budget-exhausted
     post = eng.ef_marginals(st)
     a_n, b_n = _exact_post(a0, b0, xs, m)
@@ -269,7 +271,9 @@ def test_mixed_ledger_identity():
     a0, b0, m, x_obs = 2.5, 1.5, 0.4, 1.3
     t, arrays = gamma_gauss_prec(1, a0, b0, (x_obs,), m)
     eng = Engine(compile_template(t, arrays=arrays))
-    st, deltas = eng.run(eng.init_state(), 30, tol=1e-13)
+    st, deltas = eng.run(
+        eng.init_state(), 30, tol=1e-13
+    ).require_converged_with_trace()
     assert np.isfinite(eng.bfe(st))
     np.testing.assert_allclose(
         eng.bfe(st), _neg_log_evidence_quad(a0, b0, x_obs, m), rtol=1e-6

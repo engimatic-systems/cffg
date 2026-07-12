@@ -80,7 +80,12 @@ A pure-Python (dataclass) representation, independent of JAX:
   `model.json` (structure + constraints), `blobs/` (parameter arrays), and
   `manifest.json` (schema version, content hashes, provenance). Unzipping and
   pointing the engine at `model.json` is a full restore; checkpointing writes
-  the same bundle. No third-party interchange format — this schema is canonical.
+  the same bundle. Plate fragments remain nested specs in `model.json`; the
+  manifest inventories every grounded tied/per-copy array, and per-copy blob
+  paths use an `{index}` marker resolved during grounding. Array-key-derived
+  subpaths prevent collisions without flattening the plate spec. Original flat
+  schema-1 manifests remain loadable. No third-party interchange format — this
+  schema is canonical.
 - **Edit actions**: the only public mutation API is transactional bundles
   (`add_slice`, `bind_data`, `set_constraint`, `compose(template, port_map)`) that
   validate the port invariant before committing. This is the GUI-ready surface —
@@ -193,10 +198,13 @@ A registry keyed by `(factor_type, constraint_config, out_edge_role)`:
 
 ### 4. Inference VM (`cffg.infer`)
 
-- Schedules: flooding (default) and sequential; damping as a knob. The brief is
-  right that scheduling shouldn't be overthought — flooding + iterate-to-coherence
-  covers the discrete case — but "coherence" needs a number: we track per-node FE
-  and message deltas each sweep and stop on tolerance or budget.
+- Schedules: flooding (default) and sequential; damping as a knob. The runtime
+  records a `RunResult` with converged / budget-exhausted / diverged /
+  infeasible status, iteration count, FE and message-delta traces, and final
+  residual. Sum/GFE mode stops only when FE is stationary and messages are
+  coherent; max mode uses its message fixed-point residual and validates the
+  decoded objective. Non-finite arenas/residuals are divergence, while proven
+  empty exact support is infeasible with FE = +∞.
 - GFE nodes are stochastic (importance sampling), so FE traces get burn-in
   averaging (paper uses ~10 iterations) before any decision is read off.
 - Inference *modes* are just constraint presets on the same grounded model:

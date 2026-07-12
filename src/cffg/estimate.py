@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 import jax
 
-from cffg.engine import Engine, State
+from cffg.engine import Engine, RunStatus, State
 
 
 @dataclass
@@ -27,6 +27,7 @@ class Estimate:
     flops_per_sweep: float | None
     bytes_accessed_per_sweep: float | None
     seconds_per_sweep: float | None
+    calibration_status: RunStatus | None
 
     @property
     def state_bytes(self) -> int:
@@ -73,11 +74,12 @@ def estimate(engine: Engine, *, calibrate: bool = True, sample_iters: int = 10) 
         warm = engine.step(state)  # compile + first dispatch
         warm.messages.block_until_ready()
         t0 = time.perf_counter()
-        st = warm
-        for _ in range(sample_iters):
-            st = engine.step(st)
-        st.messages.block_until_ready()
+        result = engine.run(warm, sample_iters)
+        result.state.messages.block_until_ready()
         seconds = (time.perf_counter() - t0) / sample_iters
+        calibration_status = result.status
+    else:
+        calibration_status = None
 
     return Estimate(
         message_bytes=message_bytes,
@@ -85,4 +87,5 @@ def estimate(engine: Engine, *, calibrate: bool = True, sample_iters: int = 10) 
         flops_per_sweep=flops,
         bytes_accessed_per_sweep=bytes_accessed,
         seconds_per_sweep=seconds,
+        calibration_status=calibration_status,
     )

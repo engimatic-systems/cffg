@@ -52,7 +52,9 @@ Part II §4.5 documents that the naive fixed-point message diverges in cases, an
 the Newton-solved variant still finds only local stationary points — Part II
 Fig. 9's bimodal win histogram is the framework itself telling you agents
 sometimes lock into bad optima depending on initialization. Expect and monitor
-this; do not debug it as an implementation defect.
+this; do not debug it as an implementation defect. The runtime can certify only
+termination mechanics (stationary, exhausted, numerically diverged, or proven
+empty support), not global optimality or correctness of a loopy Bethe fixed point.
 
 **H7. Conjugate continual learning has no principled forgetting.** Dirichlet
 counts accumulate forever: the posterior sharpens monotonically, so a
@@ -193,8 +195,9 @@ and 2.650 visitation-weighted transition KL versus 0.76 and 2.534 for the
 learn-only/no-curiosity arm: the unannealed channel bought neither task return
 nor faster early learning in that setting. Annealing or disabling it is
 cff-2gev.
-Until cff-5edo lands, check the delta trace before trusting a plan deeper
-than ~20 slices. (Small-sample numbers: 14 episodes per horizon —
+Until cff-5edo lands, require `RunStatus.CONVERGED` and inspect both FE and
+message-delta traces before trusting a plan deeper than ~20 slices.
+(Small-sample numbers: 14 episodes per horizon —
 direction is reliable, third digits are not.)
 
 **S2. Importance-sampling noise in parameter messages.** The message to A is a
@@ -229,6 +232,8 @@ math.
 **S7. Scale engineering.** Sparse A/B matrices, factored transition tensors,
 GPU-resident arenas, incremental recompilation, smarter (residual) schedules —
 ordinary optimization work, unbounded appetite.
+Plate fragments may not themselves declare plates in phase 1; validation rejects
+that unsupported grounding shape until recursive/index-table expansion in cff-6s31.
 
 **S8. Goal-specification ergonomics.** Goals are prior distributions over future
 observations; translating task intent into calibrated `c` vectors (the softmax

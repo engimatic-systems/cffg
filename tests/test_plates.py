@@ -123,14 +123,14 @@ def test_pixel_grid_matches_single_pixel(viz_gallery):
     assert set(obs) == {f"pix/{r}/{c}/x" for r in range(4) for c in range(4)}
 
     state = engine.bind_data(state, obs)
-    state, _ = engine.run(state, 25)
+    state = engine.run(state, 25).state
     marg = engine.marginals(state)
 
     # One pixel's latent posterior must equal a hand-built single-pixel model.
     single = Engine(compile_template(pixel_fragment()))
     for (r, c), _ in np.ndenumerate(image):
         ss = single.bind_data(single.init_state(), {"x": int(image[r, c])})
-        ss, _ = single.run(ss, 25)
+        ss = single.run(ss, 25).state
         np.testing.assert_allclose(
             marg[f"pix/{r}/{c}/z"], single.marginals(ss)["z"], atol=1e-9
         )
@@ -162,7 +162,7 @@ def test_broadcast_matches_hand_expanded_reference(viz_gallery):
     )
     arrays = {f"b/{i}/w": weights[i] for i in range(n)}
     engine = Engine(compile_template(host, arrays=arrays))
-    state, _ = engine.run(engine.init_state(), 20)
+    state = engine.run(engine.init_state(), 20).state
     hub = engine.marginals(state)["b/sel"]
 
     # Hand-expanded reference: the same equality tree, built without plates.
@@ -186,7 +186,7 @@ def test_broadcast_matches_hand_expanded_reference(viz_gallery):
         blobs={f"w{i}": BlobRef(f"w{i}", f"w{i}.npy") for i in range(n)},
     )
     ref_engine = Engine(compile_template(ref, arrays={f"w{i}": weights[i] for i in range(n)}))
-    ref_state, _ = ref_engine.run(ref_engine.init_state(), 20)
+    ref_state = ref_engine.run(ref_engine.init_state(), 20).state
 
     np.testing.assert_allclose(hub, ref_engine.marginals(ref_state)["hub"], atol=1e-10)
     # And the analytic anchor: normalized elementwise product of the weights.
@@ -208,7 +208,7 @@ def test_broadcast_n1_and_n2_edge_cases():
         )
         arrays = {f"b/{i}/w": weights[i] for i in range(n)}
         engine = Engine(compile_template(host, arrays=arrays))
-        state, _ = engine.run(engine.init_state(), 20)
+        state = engine.run(engine.init_state(), 20).state
         hub = engine.marginals(state)["b/sel"]
         prod = np.ones(K)
         for i in range(n):
@@ -231,7 +231,7 @@ def test_sensor_array_information_addition(viz_gallery):
     state = engine.bind_data(
         engine.init_state(), {f"s/{i}/y": [ys[i]] for i in range(n)}
     )
-    state, _ = engine.run(state, 30)
+    state = engine.run(state, 30).state
     mean, cov = engine.gaussian_marginals(state)["s/state"]
 
     # Hand posterior: product of N sensors, A=I, b=0, W=1/2 (cov=2). Information
@@ -260,7 +260,7 @@ def test_set_plate_dims_edit_recompiles():
     engine = Engine(compile_template(resized))
     obs = plate_observations("pix", np.zeros((3, 3), dtype=int), "x")
     state = engine.bind_data(engine.init_state(), obs)
-    state, _ = engine.run(state, 10)
+    state = engine.run(state, 10).state
     assert "pix/2/2/z" in engine.marginals(state)
 
 
@@ -339,6 +339,26 @@ def test_reject_3d_dims():
     host = Template(name="g", plates={"p": PlateSpec(pixel_fragment(), (2, 2, 2), (Expose(),))})
     with pytest.raises(ModelError, match="1-D or 2-D"):
         validate(host)
+
+
+def test_reject_plate_nested_inside_fragment_before_grounding():
+    middle = Template(
+        name="middle",
+        plates={"inner": PlateSpec(pixel_fragment(), (2,), (Expose(),))},
+    )
+    host = Template(
+        name="host",
+        plates={"outer": PlateSpec(middle, (2,), (Expose(),))},
+    )
+    message = (
+        r"plate 'outer': fragment declares nested plates \['inner'\]; "
+        r"nested plate grounding is not supported in phase 1"
+    )
+
+    with pytest.raises(ModelError, match=message):
+        validate(host)
+    with pytest.raises(ModelError, match=message):
+        expand_plates(host)
 
 
 def test_chain_endpoints_must_be_glue():
@@ -420,7 +440,7 @@ def test_chain_plate_reproduces_unrolled_hmm(hmm_slice):
     state = engine.bind_data(
         engine.init_state(), {f"ch/c/{t}/sense": obs[t] for t in range(T)}
     )
-    state, _ = engine.run(state, 60, tol=1e-10)
+    state = engine.run(state, 60, tol=1e-10).require_converged()
     marg = engine.marginals(state)
 
     # Hand forward-backward: z_0 prior-only; x_t emitted from z_t (t>=1).

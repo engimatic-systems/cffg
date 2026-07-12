@@ -18,7 +18,7 @@ from cffg import csp
 from cffg.compiler import CompileError, compile_template
 from cffg.core import FactorSpec, PortRole, PortSpec, Template, VariableSpec
 from cffg.core.ir import BlobRef
-from cffg.engine import Engine
+from cffg.engine import Engine, RunStatus
 
 
 # --- builders ---------------------------------------------------------------
@@ -110,7 +110,7 @@ def test_viterbi_identity_on_tree(seed):
                  blobs={b: BlobRef(b, b) for b in ("d0", "T1", "T2", "T3")})
     arrays = {"d0": d0, "T1": T1, "T2": T2, "T3": T3}
     eng = Engine(compile_template(t, arrays=arrays, semiring="max"))
-    st, _ = eng.run(eng.init_state(), 20, harden_last=0)
+    st = eng.run(eng.init_state(), 20, harden_last=0).state
     dec = eng.decode(st)
 
     best, best_w = None, -np.inf
@@ -141,14 +141,16 @@ def test_alldifferent_marginals_and_map():
         t, arrays = priors_plus_constraints(n, K, priors, _alldiff(n))
 
         eng = Engine(compile_template(t, arrays=arrays))
-        st, deltas = eng.run(eng.init_state(), 40, tol=1e-13)
+        st, deltas = eng.run(
+            eng.init_state(), 40, tol=1e-13
+        ).require_converged_with_trace()
         marg, logZ = enumerate_marginals(n, K, priors, feasible)
         for i in range(n):
             np.testing.assert_allclose(eng.marginals(st)[f"x{i}"], marg[i], atol=1e-9)
         np.testing.assert_allclose(eng.bfe(st), -logZ, atol=1e-9)
 
         engm = Engine(compile_template(t, arrays=arrays, semiring="max"))
-        stm, _ = engm.run(engm.init_state(), 40, harden_last=0)
+        stm = engm.run(engm.init_state(), 40, harden_last=0).state
         dec = tuple(engm.decode(stm)[f"x{i}"] for i in range(n))
         assert len(set(dec)) == n  # a valid permutation (rooks non-attacking)
         assert dec == tuple(brute_map(n, K, priors, feasible)[0])
@@ -182,14 +184,14 @@ def test_table_constraint_latin_square():
     feasible = lambda a: any(np.array_equal(a, row) for row in allowed)
 
     eng = Engine(compile_template(t, arrays=arrays))
-    st, _ = eng.run(eng.init_state(), 20, tol=1e-13)
+    st = eng.run(eng.init_state(), 20, tol=1e-13).require_converged()
     marg, logZ = enumerate_marginals(n, cards, priors, feasible)
     for i in range(n):
         np.testing.assert_allclose(eng.marginals(st)[f"x{i}"], marg[i], atol=1e-9)
     np.testing.assert_allclose(eng.bfe(st), -logZ, atol=1e-9)
 
     engm = Engine(compile_template(t, arrays=arrays, semiring="max"))
-    stm, _ = engm.run(engm.init_state(), 20, harden_last=0)
+    stm = engm.run(engm.init_state(), 20, harden_last=0).state
     dec = [engm.decode(stm)[f"x{i}"] for i in range(n)]
     assert dec == brute_map(n, cards, priors, feasible)[0]
 
@@ -297,14 +299,14 @@ def test_exactly_k_marginals_and_map():
     feasible = lambda a: sum(a) == k
 
     eng = Engine(compile_template(t, arrays=arrays))
-    st, _ = eng.run(eng.init_state(), 40, tol=1e-13)
+    st = eng.run(eng.init_state(), 40, tol=1e-13).require_converged()
     marg, logZ = enumerate_marginals(n, 2, priors, feasible)
     for i in range(n):
         np.testing.assert_allclose(eng.marginals(st)[f"x{i}"], marg[i], atol=1e-9)
     np.testing.assert_allclose(eng.bfe(st), -logZ, atol=1e-9)
 
     engm = Engine(compile_template(t, arrays=arrays, semiring="max"))
-    stm, _ = engm.run(engm.init_state(), 40, harden_last=0)
+    stm = engm.run(engm.init_state(), 40, harden_last=0).state
     assert [engm.decode(stm)[f"x{i}"] for i in range(n)] == brute_map(n, 2, priors, feasible)[0]
 
 
@@ -321,7 +323,7 @@ def test_at_most_k_marginals():
     arrays["kk"] = np.array(k)
     feasible = lambda a: sum(a) <= k
     eng = Engine(compile_template(t, arrays=arrays))
-    st, _ = eng.run(eng.init_state(), 40, tol=1e-13)
+    st = eng.run(eng.init_state(), 40, tol=1e-13).require_converged()
     marg, logZ = enumerate_marginals(n, 2, priors, feasible)
     for i in range(n):
         np.testing.assert_allclose(eng.marginals(st)[f"x{i}"], marg[i], atol=1e-9)
@@ -342,12 +344,12 @@ def test_mixed_soft_hard_tree():
     feasible = lambda a: len(set(a)) == n
 
     eng = Engine(compile_template(t, arrays=arrays))
-    st, _ = eng.run(eng.init_state(), 40, tol=1e-13)
+    st = eng.run(eng.init_state(), 40, tol=1e-13).require_converged()
     marg, logZ = enumerate_marginals(n, K, priors, feasible)
     np.testing.assert_allclose(eng.bfe(st), -logZ, atol=1e-9)
 
     engm = Engine(compile_template(t, arrays=arrays, semiring="max"))
-    stm, _ = engm.run(engm.init_state(), 40, harden_last=0)
+    stm = engm.run(engm.init_state(), 40, harden_last=0).state
     _, map_energy = brute_map(n, K, priors, feasible)
     np.testing.assert_allclose(engm.objective(stm), map_energy, atol=1e-12)
 
@@ -361,12 +363,12 @@ def test_bfe_raises_in_max_mode():
     priors = [rng.dirichlet(np.ones(K)) for _ in range(n)]
     t, arrays = priors_plus_constraints(n, K, priors, _alldiff(n))
     engm = Engine(compile_template(t, arrays=arrays, semiring="max"))
-    stm, _ = engm.run(engm.init_state(), 20, harden_last=0)
+    stm = engm.run(engm.init_state(), 20, harden_last=0).state
     with pytest.raises(RuntimeError, match="objective value, not a free energy"):
         engm.bfe(stm)
     # objective is meaningful in both semirings — sum mode decodes too.
     eng = Engine(compile_template(t, arrays=arrays))
-    st, _ = eng.run(eng.init_state(), 20, tol=1e-13)
+    st = eng.run(eng.init_state(), 20, tol=1e-13).require_converged()
     assert isinstance(eng.objective(st), float)
 
 
@@ -395,7 +397,7 @@ def test_bipartite_matching_exact(seed):
     t, arrays = priors_plus_constraints(n, K, priors, _alldiff(n))
 
     engm = Engine(compile_template(t, arrays=arrays, semiring="max"))
-    stm, _ = engm.run(engm.init_state(), 40, harden_last=0)
+    stm = engm.run(engm.init_state(), 40, harden_last=0).state
     dec = [engm.decode(stm)[f"x{i}"] for i in range(n)]
     _, opt = linear_sum_assignment(-W)  # max-weight assignment
     assert dec == list(opt)
@@ -417,7 +419,7 @@ def test_f32_smoke_alldifferent():
         priors = [rng.dirichlet(np.ones(K)).astype(np.float32) for _ in range(n)]
         t, arrays = priors_plus_constraints(n, K, priors, _alldiff(n))
         eng = Engine(compile_template(t, arrays=arrays))
-        st, _ = eng.run(eng.init_state(), 30)
+        st = eng.run(eng.init_state(), 30).state
         for i in range(n):
             assert np.all(np.isfinite(eng.marginals(st)[f"x{i}"]))
         assert np.isfinite(eng.bfe(st))
@@ -446,7 +448,9 @@ def test_100_variable_chain_vs_viterbi_dp():
     t = Template("chain100", variables=variables, factors=factors, ports=ports, blobs=blobs)
     arrays = {"d0": d0, **{f"T{i}": Ts[i] for i in range(n - 1)}}
     eng = Engine(compile_template(t, arrays=arrays, semiring="max"))
-    st, _ = eng.run(eng.init_state(), 2 * n, harden_last=0)
+    result = eng.run(eng.init_state(), 2 * n, tol=1e-12, harden_last=0)
+    assert result.status is RunStatus.CONVERGED
+    st = result.state
     dec = [eng.decode(st)[f"z{i}"] for i in range(n)]
 
     # numpy Viterbi in log space

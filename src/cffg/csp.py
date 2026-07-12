@@ -270,7 +270,9 @@ def decimate(engine, state, *, max_rounds=None, n_sweeps=20, damp=0.0, tol=1e-9)
         max_rounds = len(free)
     clamped: dict[str, int] = {}
     for _ in range(min(max_rounds, len(free))):
-        state, _ = engine.run(state, n_sweeps, tol=tol, damp=damp, harden_last=0)
+        state = engine.run(
+            state, n_sweeps, tol=tol, damp=damp, harden_last=0
+        ).require_converged()
         q = engine.marginals(state)
         best, best_ent, best_val = None, np.inf, None
         for name in free:
@@ -284,5 +286,7 @@ def decimate(engine, state, *, max_rounds=None, n_sweeps=20, damp=0.0, tol=1e-9)
             break
         clamped[best] = best_val
         state = clamp_edge(engine, state, best, best_val)
-    state, _ = engine.run(state, n_sweeps, tol=tol, damp=damp, harden_last=0)
+    state = engine.run(
+        state, n_sweeps, tol=tol, damp=damp, harden_last=0
+    ).require_converged()
     return state, clamped

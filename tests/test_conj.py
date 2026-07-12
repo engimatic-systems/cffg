@@ -103,7 +103,7 @@ def test_stats_readout_matches_hand_computation():
     }
     eng = Engine(compile_template(t, arrays=arrays))
     st = eng.bind_data(eng.init_state(), {"obs": np.array([1.2])})
-    st, _ = eng.run(st, 20, tol=1e-13)
+    st = eng.run(st, 20, tol=1e-13).require_converged()
     stats = eng.gaussian_node_stats(st)
     gm = eng.gaussian_marginals(st)
     # prior node: E[x0], E[x0²] match the x0 marginal (tree exactness)
@@ -161,7 +161,7 @@ def test_trial_loop_recovers_lgssm_parameters():
             params[prior_key] = jnp.asarray(np.array([[x0]]))
             st = _replace(st0, params=dict(params))
             st = eng.bind_data(st, {"obs": np.array([x1])})
-            st, _ = eng.run(st, 15, tol=1e-13)
+            st = eng.run(st, 15, tol=1e-13).require_converged()
             s = eng.gaussian_node_stats(st)["trans"]
             syy += s["Syy"]
             syx += s["Syx"]

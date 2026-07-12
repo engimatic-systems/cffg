@@ -58,7 +58,7 @@ ARRAYS = {"d": D, "A": A, "Bm": BM}
 def run_tree(observations):
     engine = Engine(compile_template(make_tree(), arrays=ARRAYS))
     state = engine.bind_data(engine.init_state(), observations)
-    state, deltas = engine.run(state, 12, tol=1e-14)
+    state, deltas = engine.run(state, 12, tol=1e-14).require_converged_with_trace()
     assert deltas[-1] < 1e-12  # tree: converged, hard
     return engine, state
 
@@ -134,12 +134,12 @@ def test_transition_mixture_against_einsum():
 
     # in and selector clamped: q(o) is the selected column.
     state = engine.bind_data(engine.init_state(), {"pi": 2, "pu": 1, "po": None})
-    state, _ = engine.run(state, 3)
+    state = engine.run(state, 3).state
     np.testing.assert_allclose(engine.marginals(state)["o"], bs[1][:, 2], atol=1e-12)
 
     # out clamped, others free: q(u) from the einsum reference.
     state = engine.bind_data(engine.init_state(), {"po": 0, "pi": None, "pu": None})
-    state, _ = engine.run(state, 3)
+    state = engine.run(state, 3).state
     ref = np.einsum("uoi,o->u", bs, np.eye(K)[0])  # uniform in-message cancels
     np.testing.assert_allclose(engine.marginals(state)["u"], ref / ref.sum(), atol=1e-12)
 

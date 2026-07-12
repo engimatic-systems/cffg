@@ -178,6 +178,12 @@ def _check_plates(t: Template) -> list[str]:
             validate(frag)
         except ModelError as err:
             problems += [f"plate {name!r} fragment: {p}" for p in err.problems]
+        if frag.plates:
+            problems.append(
+                f"plate {name!r}: fragment declares nested plates "
+                f"{sorted(frag.plates)}; nested plate grounding is not "
+                "supported in phase 1"
+            )
         for b in spec.per_copy_blobs:
             if b not in frag.blobs:
                 problems.append(f"plate {name!r}: per_copy_blob {b!r} is not a fragment blob")
