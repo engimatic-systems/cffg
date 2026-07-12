@@ -12,9 +12,18 @@ Two compiled engines cover an unbounded episode:
 
 The belief d is a per-member parameter update (Arena.member_of), so ticks
 never recompile — the same property that lets a Colony vmap many agents.
-Optional continual learning: with `learn_a=True` the observation model is a
-Dirichlet count array updated conjugately each tick and fed to the planner's
-learned-GFE composites; `checkpoint`/`restore` round-trip belief + counts.
+Optional continual learning, conjugate updates per tick, checkpointable:
+
+- `learn_a=True`: the observation model as Dirichlet counts, fed to the
+  planner's learned-GFE composites (epistemic value of A-learning included,
+  Part II §5).
+- `learn_b=True` (cff-cd1i): per-action transition Dirichlets. The count
+  increment is the filter slice's *node belief* q(z', z, u) at the
+  transition_mixture factor (Engine.node_beliefs) — the smoothed pairwise
+  marginal, sliced at the executed action. Planning and filtering both use
+  E[log B_u] = ψ(α) − ψ(α₀) (the mean-field-consistent point, mirroring the
+  A path's digamma form). Unlike A, there is no GFE channel for B: dynamics
+  uncertainty does not yet generate epistemic value (LIMITATIONS S1c).
 """
 
 from __future__ import annotations
@@ -47,6 +56,8 @@ class RollingAgent:
         *,
         learn_a: bool = False,
         initial_counts: np.ndarray | None = None,
+        learn_b: bool = False,
+        initial_b_counts: np.ndarray | None = None,
         damp: float = 0.5,
         n_sweeps: int = 400,
         select: str = "map",
@@ -63,6 +74,12 @@ class RollingAgent:
 
         self.belief = np.asarray(plan_arrays["d"], dtype=float).copy()
         self.counts = None if not learn_a else np.asarray(initial_counts, dtype=float).copy()
+        # b_counts[u][z', z]: per-action Dirichlet columns over z' given z.
+        self.b_counts = (
+            None if not learn_b else np.asarray(initial_b_counts, dtype=float).copy()
+        )
+        if self.b_counts is not None and not np.all(self.b_counts > 0):
+            raise ValueError("initial_b_counts must be positive Dirichlet counts")
         self.n_ctrl = len(plan_arrays["e"])
         self.tick = 0
 
@@ -87,6 +104,15 @@ class RollingAgent:
                     params[g.name] = jnp.asarray(
                         np.broadcast_to(elog, (len(g.members), *elog.shape))
                     )
+        if self.b_counts is not None:
+            # b_counts is [U, Z', Z]; digamma per column, then to the arena's
+            # transition_mixture layout [Z', Z, U] (compiler._stack_params).
+            elog_b = np.stack([_elog(c) for c in self.b_counts]).transpose(1, 2, 0)
+            for g in engine.arena.groups:
+                if g.type == "transition_mixture":
+                    params[g.name] = jnp.asarray(
+                        np.broadcast_to(elog_b, (len(g.members), *elog_b.shape))
+                    )
         return _replace(st, params=params)
 
     # -- the perception-action cycle --------------------------------------
@@ -101,7 +127,7 @@ class RollingAgent:
         return int(self.rng.choice(self.n_ctrl, p=q / q.sum()))
 
     def observe(self, action: int, observation: int) -> np.ndarray:
-        """Fold (action, observation) into the belief; conjugate A update."""
+        """Fold (action, observation) into the belief; conjugate updates."""
         st = self._with_params(self.filter)
         st = self.filter.bind_data(st, {"act1": action, "obs1": observation})
         st, _ = self.filter.run(st, 60, tol=1e-12)
@@ -109,6 +135,12 @@ class RollingAgent:
         self.belief = q_z / q_z.sum()
         if self.counts is not None:
             self.counts[observation] += self.belief
+        if self.b_counts is not None:
+            # Smoothed pairwise q(z', z, u) at the filter's transition node;
+            # the executed action's slice is the Dirichlet increment. (u is
+            # data-clamped, so the other slices carry no mass.)
+            pair = self.filter.node_beliefs(st)["tm1"]
+            self.b_counts[action] += pair[:, :, action]
         self.tick += 1
         return self.belief
 
@@ -124,6 +156,8 @@ class RollingAgent:
         data = {"belief": self.belief, "tick": np.asarray(self.tick)}
         if self.counts is not None:
             data["counts"] = self.counts
+        if self.b_counts is not None:
+            data["b_counts"] = self.b_counts
         np.savez(path, **data)
 
     def restore(self, path: str | Path) -> None:
@@ -132,3 +166,5 @@ class RollingAgent:
         self.tick = int(data["tick"])
         if "counts" in data:
             self.counts = data["counts"].copy()
+        if "b_counts" in data:
+            self.b_counts = data["b_counts"].copy()
