@@ -132,6 +132,27 @@ call sees static shapes. Design decisions worth remembering:
 - The Kalman test tier (`tests/test_kalman.py`) mirrors the HMM tier
   exactly: smoother parity, tree-identity FE, missing data, vmap batching.
 
+### 2c. The exponential-family arena (cff-8s6a)
+
+The third domain family (`ef: <family name>`) generalizes the pattern:
+scalar EF edges carry natural-parameter messages in `ef_eta [n_efslots, 2]`,
+where — as in the other two arenas — products add and vacuous is zeros.
+DERIVATIONS.md D2 states the contract; `cffg/ef.py` is the NumPy table
+(compile time, tests), `cffg/efrules.py` the jnp mirror (jitted step/BFE).
+Adding a distribution is a table entry, not an engine change. Family names
+come in two kinds: *message* families (gamma, beta) whose edges carry
+beliefs, and *observation* families (poisson, bernoulli) whose edges are
+conditioned DATA ports only — their unobserved predictives leave the
+exponential family, so `poisson_obs`/`bernoulli_obs` compile exactly like
+observed Gaussian nodes (constant conjugate increment + closed-form energy;
+missing data drops the node). Conjugate BP is exact on EF subgraphs, so
+beads (mean-field, P-substitution) on EF nodes are compile errors, and the
+tree identity BFE = −log evidence is pinned to 1e-12 in
+`tests/test_ef_engine.py`. Improper beliefs (e.g. the vacuous Gamma point)
+make every ledger term +inf — loud by construction, never NaN. The
+re-expression of Cat/Dir/Gaussian onto the same abstraction is a separate
+zero-regression refactor ticket.
+
 ### 3. Message rule library (`cffg.rules`)
 
 A registry keyed by `(factor_type, constraint_config, out_edge_role)`:
@@ -296,8 +317,14 @@ Explicitly not adopted (revisit only with a ticket making the case):
 - **`numpyro`/`blackjax`** — sampling-based inference; different paradigm, and
   leaning on it risks "shortcut" FE evaluation.
 - **`distrax`/`tfp.substrates.jax`** — heavyweight for what Cat/Dirichlet need;
-  `jax.scipy.special` (digamma, logsumexp) covers the math. Reconsider at the
-  continuous milestone.
+  `jax.scipy.special` (digamma, logsumexp) covers the math. Reconsidered at
+  the continuous milestone as promised (cff-8s6a, 2026-07-09) and the answer
+  held: the EF abstraction needs exactly two special functions (digamma,
+  gammaln), both in `jax.scipy.special`; everything else is one-line
+  natural-parameter algebra (`cffg/ef.py`, `cffg/efrules.py`). A framework
+  dependency would buy nothing and cost the closed-ledger discipline —
+  distrax/tfp log-probs don't decompose into our node/edge Bethe terms.
+  scipy was adopted as a *dev* dependency only (property-test oracle).
 - **`pgmax`** — read for arena-layout ideas; BP-only scope makes it a dead-end
   dependency.
 - **`inferactively-pymdp` (1.x JAX rewrite)** — investigated (ticket cff-9n7o):

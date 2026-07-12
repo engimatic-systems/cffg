@@ -28,6 +28,7 @@ from pathlib import Path
 
 import numpy as np
 
+from cffg import ef
 from cffg.core.ir import FACTOR_TYPES, ConstraintKind, PortRole, Template
 from cffg.core.validate import validate
 
@@ -48,6 +49,8 @@ class EdgeInfo:
     dim: int = 0  # Gaussian dimension; 0 = discrete. Gaussian slots index the
     # (eta, Lambda) arena, discrete slots the log-probability arena — the two
     # numberings are independent (cff-4e5z).
+    ef: str = ""  # EF family name; slots then index the natural-parameter
+    # arena ef_eta [n_efslots, 2], a third independent numbering (cff-8s6a).
 
 
 @dataclass(frozen=True)
@@ -83,6 +86,28 @@ class GaussGroupPlan:
     gather: np.ndarray  # [M, R] gaussian slot to read (opposite side)
     scatter: np.ndarray  # [M, R] gaussian slot to write (own side)
     obs_rows: np.ndarray | None = None  # [M] rows into the g_obs array
+
+
+@dataclass(frozen=True)
+class EfGroupPlan:
+    """All EF-family factors of one (type, family), run together (cff-8s6a).
+
+    Types: "gamma"/"beta" (prior leaves sending the constant natural
+    parameters stacked in params["<name>:eta"]), "poisson_obs"/
+    "bernoulli_obs" (conditioned likelihoods: the "out" edge is a DATA port,
+    the message is a constant conjugate increment to the parameter edge, and
+    a missing observation drops the node — the Gaussian conditioning
+    convention), and "equality" (family-polymorphic, routed here when its
+    edges are EF: sum-minus-self on natural parameters)."""
+
+    name: str
+    type: str
+    family: str  # message family of the edges it reads/writes
+    roles: tuple[str, ...]  # message-carrying roles only (obs "out" is data)
+    members: tuple[str, ...]
+    gather: np.ndarray  # [M, R] ef slot to read (opposite side)
+    scatter: np.ndarray  # [M, R] ef slot to write (own side)
+    obs_rows: np.ndarray | None = None  # [M] rows into the ef_obs array
 
 
 @dataclass(frozen=True)
@@ -143,6 +168,16 @@ class Arena:
     n_obs_rows: int = 0
     gauss_interior: list[tuple[int, np.ndarray]] = field(default_factory=list)
     # [(dim, [E, 2] slot pairs)] interior Gaussian edges for the entropy ledger
+    # EF arena (cff-8s6a): messages are natural parameters ef_eta
+    # [n_efslots, 2], zero-padded past each family's n_params; vacuous =
+    # zeros, so init and half-edges are free (η = 0 is the empty product).
+    n_efslots: int = 0
+    ef_groups: list[EfGroupPlan] = field(default_factory=list)
+    ef_data: dict[str, tuple[int, str]] = field(default_factory=dict)
+    # EF DATA port -> (row in the ef_obs/ef_mask arrays, observation family)
+    n_ef_obs: int = 0
+    ef_interior: list[tuple[str, np.ndarray]] = field(default_factory=list)
+    # [(family, [E, 2] slot pairs)] interior EF edges for the entropy ledger
     gfe_groups: list[GfePlan] = field(default_factory=list)
     gfe_tm_groups: list[GfeTmPlan] = field(default_factory=list)
     gfe_x_edges: frozenset[str] = frozenset()  # entropy absorbed into composite term
@@ -160,7 +195,7 @@ class Arena:
             [
                 [e.slot0, e.slot1]
                 for e in self.edges.values()
-                if e.interior and not e.dim and e.name not in self.gfe_x_edges
+                if e.interior and not e.dim and not e.ef and e.name not in self.gfe_x_edges
             ],
             dtype=np.int64,
         ).reshape(-1, 2)
@@ -207,6 +242,19 @@ def compile_template(
                 f"factor {f.name!r}: P-substitution on Gaussian nodes is open research "
                 "(ticket cff-dfpi)"
             )
+        if FACTOR_TYPES[f.type].family == "ef" and f.name in (mean_field | set(psub)):
+            problems.append(
+                f"factor {f.name!r}: beads on EF nodes are undefined in M-scope — "
+                "conjugate BP is already exact on EF subgraphs (cff-8s6a)"
+            )
+        if f.type in ("poisson_obs", "bernoulli_obs"):
+            out_var = f.edges["out"]
+            out_ports = [p for p in t.ports_of(out_var) if p.role is PortRole.DATA]
+            if t.degree(out_var) == 2 or not out_ports:
+                problems.append(
+                    f"factor {f.name!r}: {f.type} is a conditioned likelihood — its 'out' "
+                    "edge must be a DATA port (unobserved predictives leave the family)"
+                )
     for p in t.ports.values():
         if p.role in (PortRole.PRIOR, PortRole.GOAL):
             problems.append(
@@ -227,18 +275,23 @@ def compile_template(
     opposite: dict[tuple[str, str], int] = {}  # (factor, role) -> slot it reads
     data_slots: dict[str, int] = {}
     gauss_data_ports: dict[str, str] = {}  # variable -> DATA port name (gaussian)
+    ef_data_ports: dict[str, str] = {}  # variable -> DATA port name (ef obs)
     next_slot = 0
     next_gslot = 0
+    next_efslot = 0
     for vname in sorted(t.variables):
         ends = endpoints[vname]
         v = t.variables[vname]
         if v.dim:  # gaussian slots have their own numbering (own arena)
             s0, s1 = next_gslot, next_gslot + 1
             next_gslot += 2
+        elif v.ef:  # ef slots likewise (third arena)
+            s0, s1 = next_efslot, next_efslot + 1
+            next_efslot += 2
         else:
             s0, s1 = next_slot, next_slot + 1
             next_slot += 2
-        edges[vname] = EdgeInfo(vname, v.cardinality, s0, s1, len(ends) == 2, v.dim)
+        edges[vname] = EdgeInfo(vname, v.cardinality, s0, s1, len(ends) == 2, v.dim, v.ef)
         slot_of[ends[0]] = s0
         if len(ends) == 2:
             slot_of[ends[1]] = s1
@@ -258,6 +311,17 @@ def compile_template(
                         problems.append(
                             f"port {port.name!r}: Gaussian DATA ports must clamp a "
                             f"gaussian_linear 'out' edge, not {fname!r}/{role!r}"
+                        )
+                elif v.ef:
+                    # EF observations compile to conditioning too: legal only
+                    # on a conjugate observation factor's "out" edge.
+                    fname, role = ends[0]
+                    if t.factors[fname].type in ("poisson_obs", "bernoulli_obs") and role == "out":
+                        ef_data_ports[vname] = port.name
+                    else:
+                        problems.append(
+                            f"port {port.name!r}: EF DATA ports must clamp a poisson_obs/"
+                            f"bernoulli_obs 'out' edge, not {fname!r}/{role!r}"
                         )
                 else:
                     data_slots[port.name] = s1
@@ -370,9 +434,12 @@ def compile_template(
 
     # Group remaining factors by (type, cardinality signature, mode); the
     # Gaussian family (and equality nodes on Gaussian edges) go to their own
-    # arena's buckets, keyed by (type, dim signature, observed?).
+    # arena's buckets, keyed by (type, dim signature, observed?); the EF
+    # family (and equality nodes on EF edges) to theirs, keyed by (type,
+    # message family).
     buckets: dict[tuple, list[str]] = {}
     gauss_buckets: dict[tuple, list[str]] = {}
+    ef_buckets: dict[tuple[str, str], list[str]] = {}
     for fname in sorted(t.factors):
         if fname in consumed:
             continue
@@ -387,6 +454,21 @@ def compile_template(
             observed = f.type == "gaussian_linear" and f.edges["out"] in gauss_data_ports
             gtype = "gaussian_linear_obs" if observed else f.type
             gauss_buckets.setdefault((gtype, dims), []).append(fname)
+            continue
+        ef_family = ft.family == "ef" or (
+            ft.family == "any" and bool(t.variables[f.edges[roles[0]]].ef)
+        )
+        if ef_family:
+            if f.type in ("poisson_obs", "bernoulli_obs"):
+                family = {"poisson_obs": "gamma", "bernoulli_obs": "beta"}[f.type]
+            else:  # gamma/beta priors, or equality routed by its edges' family
+                family = f.type if f.type in ef.FAMILIES else t.variables[f.edges[roles[0]]].ef
+                if family not in ef.FAMILIES:
+                    raise CompileError(
+                        f"factor {fname!r}: no messages flow on observation-family "
+                        f"({family!r}) edges — they are conditioned DATA ports only"
+                    )
+            ef_buckets.setdefault((f.type, family), []).append(fname)
             continue
         cards = tuple(t.variables[f.edges[r]].cardinality for r in roles)
         mode = "vmp" if fname in mean_field else "bp"
@@ -418,6 +500,38 @@ def compile_template(
         # member_of stays discrete-only: per-member Gaussian parameter updates
         # are the learning ticket's call (cff-7c5o).
 
+    ef_groups: list[EfGroupPlan] = []
+    ef_data: dict[str, int] = {}
+    n_ef_obs = 0
+    _EF_ROLES = {
+        "gamma": ("out",),
+        "beta": ("out",),
+        "poisson_obs": ("rate",),
+        "bernoulli_obs": ("prob",),
+        "equality": ("a", "b", "c"),
+    }
+    for (ftype, family), members in sorted(ef_buckets.items()):
+        roles = _EF_ROLES[ftype]
+        gname = f"ef:{ftype}:{family}"
+        gather = np.array([[opposite[(m, r)] for r in roles] for m in members], dtype=np.int64)
+        scatter = np.array([[slot_of[(m, r)] for r in roles] for m in members], dtype=np.int64)
+        obs_rows = None
+        if ftype in ("poisson_obs", "bernoulli_obs"):
+            rows = []
+            for m in members:
+                out_var = t.factors[m].edges["out"]
+                ef_data[ef_data_ports[out_var]] = (n_ef_obs, t.variables[out_var].ef)
+                rows.append(n_ef_obs)
+                n_ef_obs += 1
+            obs_rows = np.array(rows, dtype=np.int64)
+        elif ftype != "equality":  # gamma/beta prior leaves: stack constant η_p
+            log_params[f"{gname}:eta"] = _stack_ef_priors(t, ftype, members, resolved)
+        ef_groups.append(
+            EfGroupPlan(gname, ftype, family, roles, tuple(members), gather, scatter, obs_rows)
+        )
+        # member_of stays discrete-only: per-member EF prior updates are the
+        # conjugate-learning ticket's call (cff-x0sv), as with Gaussian.
+
     groups: list[GroupPlan] = []
     for (ftype, cards, mode), members in sorted(buckets.items()):
         roles = FACTOR_TYPES[ftype].edge_roles
@@ -448,6 +562,11 @@ def compile_template(
                 "marginal is its mean — read gaussian_marginals instead (hybrid "
                 "pointmass forms: cff-pksr)"
             )
+        if edges[v].ef:
+            raise CompileError(
+                f"delta constraint on EF edge {v!r}: read the mode from "
+                "ef_marginals instead (hybrid pointmass forms: cff-pksr)"
+            )
     delta_pairs = np.array(
         [[edges[v].slot0, edges[v].slot1] for v in delta_edges], dtype=np.int64
     ).reshape(-1, 2)
@@ -459,6 +578,17 @@ def compile_template(
             by_dim.setdefault(e.dim, []).append([e.slot0, e.slot1])
     gauss_interior = [
         (d, np.array(pairs, dtype=np.int64)) for d, pairs in sorted(by_dim.items())
+    ]
+
+    # Interior EF edges, grouped by family, likewise. Observation-family
+    # edges are always exterior DATA ports (enforced above), so every
+    # interior EF edge has a message family with a closed-form entropy.
+    by_fam: dict[str, list[list[int]]] = {}
+    for e in edges.values():
+        if e.ef and e.interior:
+            by_fam.setdefault(e.ef, []).append([e.slot0, e.slot1])
+    ef_interior = [
+        (fam, np.array(pairs, dtype=np.int64)) for fam, pairs in sorted(by_fam.items())
     ]
 
     k_max = max((e.card for e in edges.values() if not e.dim), default=1)
@@ -477,6 +607,11 @@ def compile_template(
         gauss_data=gauss_data,
         n_obs_rows=n_obs_rows,
         gauss_interior=gauss_interior,
+        n_efslots=next_efslot,
+        ef_groups=ef_groups,
+        ef_data=ef_data,
+        n_ef_obs=n_ef_obs,
+        ef_interior=ef_interior,
         gfe_groups=gfe_groups,
         gfe_tm_groups=gfe_tm_groups,
         gfe_x_edges=frozenset(gfe_x_edges),
@@ -543,6 +678,8 @@ def _blob_shape(t: Template, blob_name: str) -> tuple[int, ...] | None:
             if f.type == "gaussian_linear":
                 do, di = dim("out"), dim("in")
                 return {"matrix": (do, di), "offset": (do,), "cov": (do, do)}[role]
+            if f.type in ("gamma", "beta"):
+                return ()  # scalar prior parameters
     return None
 
 
@@ -635,6 +772,32 @@ def _stack_gauss_params(
             raise CompileError(f"factor {m!r}: covariance not positive definite") from None
         out.setdefault("W", []).append(np.linalg.inv(cov))
     return {k: np.stack(v) for k, v in out.items()}
+
+
+def _stack_ef_priors(
+    t: Template, ftype: str, members: list[str], resolved: dict[str, np.ndarray]
+) -> np.ndarray:
+    """Stack per-member prior natural parameters [M, 2]. Priors must be
+    proper — an improper prior makes every downstream belief and ledger term
+    undefined, so it is a compile error, not a runtime +inf."""
+    fam = ef.FAMILIES[ftype]
+    p_roles = ("shape", "rate") if ftype == "gamma" else ("a", "b")
+    etas = []
+    for m in members:
+        vals = []
+        for role in p_roles:
+            arr = resolved[t.factors[m].param_blobs[role]]
+            if arr.size != 1:
+                raise CompileError(
+                    f"factor {m!r}: parameter {role!r} must be a scalar, got shape {arr.shape}"
+                )
+            vals.append(float(arr.reshape(())))
+        if not all(v > 0 for v in vals):
+            raise CompileError(
+                f"factor {m!r}: improper {ftype} prior {tuple(vals)}; parameters must be > 0"
+            )
+        etas.append(fam.to_natural(*vals))
+    return np.stack(etas)
 
 
 def _log_of(arr: np.ndarray) -> np.ndarray:

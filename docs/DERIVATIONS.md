@@ -214,15 +214,28 @@ T=(log x, log(1−x)), η=(a−1, b−1), A=lnB(a,b). Executable anchors:
 `tests/test_ef.py` (gradient identity, quadrature moments/entropy/KL,
 conjugate addition, observation energies).
 
-**Integration plan (next session, engine-facing — deliberately not rushed):**
-1. `VariableSpec` domain generalizes from the cardinality/dim pair to a
-   tagged domain (discrete k | gaussian d | ef family name), keeping the
-   existing fields as accessors (serialization additive, mirrors cff-4e5z).
-2. A third arena for scalar EF edges: `ef_eta [n_slots, 2]` + per-group
-   family tag; vacuous = zeros; same slot discipline as the Gaussian arena.
-3. Factor vocabulary v1: `gamma`/`beta` prior leaves; `poisson_obs` /
-   `bernoulli_obs` conditioned likelihood factors (DATA ports, Gaussian-
-   style conditioning); the mixed `gaussian_prec` node (Gaussian with a
-   Gamma precision edge) belongs to cff-7c5o and should be its first client.
+**Integration (landed 2026-07-09, the engine-facing half of cff-8s6a):**
+1. `VariableSpec` carries a tagged domain (discrete k | gaussian d | ef
+   family name); serialization is additive (`{"ef": "gamma"}`), mirroring
+   cff-4e5z. Message families (gamma, beta) live in `ef.FAMILIES`;
+   observation families (poisson, bernoulli) in `ef.OBS_FAMILIES` — the
+   latter tag edges that exist only to hang a conditioned DATA port on
+   (their unobserved predictives leave the exponential family, so no
+   message ever flows there).
+2. The third arena is `ef_eta [n_efslots, 2]` with per-group family tags
+   (`EfGroupPlan`); vacuous = zeros; same slot discipline as the Gaussian
+   arena, independent numbering. The entire update vocabulary: priors and
+   observed likelihoods send constants, equality sends sum-minus-self —
+   conjugate BP converges in one sweep per graph diameter.
+3. Factor vocabulary v1: `gamma`/`beta` prior leaves (scalar shape/rate,
+   a/b blobs; propriety is a compile error, not a runtime surprise);
+   `poisson_obs`/`bernoulli_obs` conditioned likelihoods (the out edge must
+   be a DATA port; missing data drops the node exactly as in the Gaussian
+   convention). The ledger is exact and loud: closed-form node energies and
+   interior-edge entropies (`cffg/efrules.py`), improper beliefs → +inf
+   (never NaN), and `tests/test_ef_engine.py` pins BFE = −log evidence
+   (negative-binomial / Beta-Bernoulli marginals) to 1e-12. The mixed
+   `gaussian_prec` node (Gaussian with a Gamma precision edge) belongs to
+   cff-7c5o as the abstraction's first mixed client.
 4. Cat/Dir/Gaussian re-expression on the abstraction is a REFACTOR ticket
-   with zero-regression acceptance — do not fold it into the feature work.
+   with zero-regression acceptance, deliberately not folded into this work.

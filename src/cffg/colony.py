@@ -83,11 +83,11 @@ class Colony:
             batched = jax.tree_util.tree_map(lambda *xs: jnp.stack(xs), *states)
 
             def one(st: State) -> State:
-                msgs, g_eta, g_lam = engine._step(
+                msgs, g_eta, g_lam, ef_eta = engine._step(
                     st.messages, st.g_eta, st.g_lam, st.g_obs, st.g_mask,
-                    st.params, damp, True,
+                    st.ef_eta, st.ef_obs, st.ef_mask, st.params, damp, True,
                 )
-                return _replace(st, messages=msgs, g_eta=g_eta, g_lam=g_lam)
+                return _replace(st, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta)
 
             step_v = eqx.filter_vmap(one)
             for _ in range(n_iters):
