@@ -1,6 +1,6 @@
 ---
 id: cff-fk2u
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-07-09T02:47:20Z
@@ -26,3 +26,15 @@ DELEGATION: derivation and ledger semantics are Fable-only; Sonnet may fetch the
 
 A written derivation (docstring + ticket comment) for the transition P-substitution or a documented decision that route 2 is the interim; dynamics-curiosity demonstrated on the slip-corridor with ablation; any interim bonus term separately labeled in the FE ledger; LIMITATIONS S1c updated to point here.
 
+
+## Notes
+
+**2026-07-09T03:23:30Z**
+
+LANDED (2026-07-09, branch b-epistemics — merge of b-learning + gfe-stability — commits 8cd4fda, c61fe8e, 51b3530). Route 1 (principled P-substitution) closed in full; no interim bonus needed. All acceptance criteria met.
+
+DERIVATION (full formal version: docs/DERIVATIONS.md D1; module docstring in rules.py): P-sub on transition_mixture with per-action Dirichlet q(B) yields local GFE G_tm = -I(z'; (z,u), B) - H[q(z,u)]. The MI splits into state-transition info + parameter novelty, and the novelty term is EXACTLY the expected KL of the next Dirichlet update (executable proof: test_novelty_identity). Stationarity gives Corollary 1's fixed point over the JOINT (z,u) simplex with mu_down in the goal prior's role — _gfe_solve/_gfe_rho reused verbatim; the obs composite is now a special case. Optimistic-bound semantics proved via data processing (z' latent), recorded in LIMITATIONS S1c.
+
+BEHAVIOR: engine-level curiosity with exact-indifference ablation; 50-tick agent q(unknown action) starts at the analytic gap and decays toward indifference; notable finding — the ablation is ambiguity-AVERSE (digamma E[log B] penalizes low-count columns), so the composite corrects a bias, not just an absence.
+
+GOTCHAS for successors: (1) hostile-inputs contract tests included (sparse/f32/scale) per AGENTS.md — keep them when refactoring; (2) joint solve is O((K.U)^3) per composite/sweep — structure-exploitation ticket if needed at colony scale; (3) the state-MI channel legitimately favors PREDICTABLE-and-distinctive actions — when testing novelty in isolation hold B-bar equal across actions (see test comments); (4) epistemic_b requires learn_b (counts are the novelty input); (5) models with the composite report GFE, not BFE.

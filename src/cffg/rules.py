@@ -339,3 +339,127 @@ def gfe_energy(log_d, a_param, logc, learned=False):
         return -(zbar * rho).sum(-1) + (zbar * lz).sum(-1)
 
     return jax.vmap(one)(a_param, logc, log_d)
+
+
+# --- GFE-TM composite (P-substituted transition node, cff-fk2u) --------------
+#
+# The dynamics-curiosity channel. P-substitution on a transition_mixture node
+# f(z', z, u) = p(z'|z,u,B) with per-action-column Dirichlet q(B): replace the
+# node's conditional belief q(z'|z,u) with the model's own (parameter-averaged)
+# conditional, exactly as Part II does for the observation node. The node-local
+# BFE term F_a = E[log q_a − log f_a] becomes, under the substituted joint
+# q̃(z',z,u,B) = q(z,u)·q(B)·p(z'|z,u,B) and with the joint entropy split as
+# log q̃ → log q_w(z') + log q(z,u):
+#
+#   G_tm = −H[q_w] + E_{q(z,u)}[ĥ(z,u)] − H[q(z,u)]
+#        = −I(z' ; (z,u), B) − H[q(z,u)]
+#
+# with q_w(z') = Σ_{z,u} q(z,u)·B̄_u[z',z] (the predictive next-state marginal),
+# B̄ = E[B], and ĥ(z,u) = −Σ_{z'} E_q(B)[B log B] (the expected column pseudo-
+# entropy — the same closed-form ψ(α+1)−ψ(α₀+1) channel as the A-composite).
+# The mutual information decomposes as I(z'; z,u) + I(z'; B | z,u): a
+# state-transition term and the PARAMETER NOVELTY term that makes low-count
+# (z,u) columns attractive. Both are free — the Dirichlet algebra transfers
+# from _dirichlet_stats untouched.
+#
+# Stationarity of the local Lagrangian (incoming messages μ_in(z), μ_e(u) as
+# linear couplings; the downstream message μ_down(z') couples through q_w
+# because the composite's z'-marginal IS q_w) gives the fixed point
+#
+#   q̄(z,u) = softmax( ρ(q̄)(z,u) + μ_in(z) + μ_e(u) )
+#   ρ(z,u)  = Σ_{z'} B̄_u[z',z]·(μ_down(z') − log q_w(z')) − ĥ(z,u)
+#
+# — Corollary 1's equation over the JOINT (z,u) simplex, with μ_down playing
+# the role log c played at the observation leaf. The observation composite is
+# the special case where the substituted edge faces a goal prior and s = z.
+# _gfe_solve/_gfe_rho are therefore reused verbatim with
+#   abar := B̄ as a [K', K·U] column matrix,  h := ĥ flattened,
+#   logc := μ_down,                          log_d := μ_in ⊕ μ_e.
+#
+# Outgoing messages (log q̄ = ρ̄ + μ_in + μ_e − log Z, so the node's opinion
+# toward each edge drops that edge's own incoming term and marginalizes —
+# the additive incoming message cancels exactly, keeping every output bounded
+# on sparse supports, per the cff-i45j lesson):
+#   to selector: logsumexp_z( ρ̄(z,u) + μ_in(z) )   ← the action-curiosity score
+#   to in:       logsumexp_u( ρ̄(z,u) + μ_e(u) )
+#   to out:      log q_w                             (substituted predictive)
+# FE term: G_tm = −q̄ᵀρ̄ − H[q̄], the same closed form as the A-composite.
+#
+# HONESTY NOTE (ledger semantics, LIMITATIONS S1c): z' is never observed
+# directly, so I(z'; B | z,u) scores information gain as if the next state
+# were revealed. It is an OPTIMISTIC BOUND on realizable info gain about B —
+# tight when observations pin the state down (good sensors), loose otherwise.
+# This is the same semantics as the field's standard count-novelty bonus, but
+# derived inside the constrained-Bethe machinery rather than bolted onto the
+# objective. Cost note: the Newton solve is over K·U logits, O((K·U)³) per
+# member per sweep — fine for planning-sized models, a structure-exploitation
+# ticket at colony scale.
+
+
+def _tm_fixed_stats(log_b):
+    """(B̄, ĥ) for a known stack log B [U, K', K]: ĥ = per-(z,u) column entropy."""
+    b = jnp.exp(log_b)
+    h = -jnp.sum(jnp.where(b > _TINY, b * log_b, 0.0), axis=1)  # [U, K]
+    return b, h
+
+
+def _tm_dirichlet_stats(counts):
+    """(B̄, ĥ) under per-(action, column) Dirichlets, counts [U, K', K]:
+    B̄ = α/α₀ and E[B log B] = (α/α₀)(ψ(α+1) − ψ(α₀+1)) in closed form, so
+    ĥ ≤ H[B̄-column] with the gap = the parameter-novelty channel (unexplored
+    transition columns look attractive), mirroring _dirichlet_stats."""
+    a0 = counts.sum(axis=1, keepdims=True)
+    bbar = counts / a0
+    e_blog = bbar * (
+        jax.scipy.special.digamma(counts + 1.0) - jax.scipy.special.digamma(a0 + 1.0)
+    )
+    h = -e_blog.sum(axis=1)  # [U, K]
+    return bbar, h
+
+
+def _tm_joint_stats(b_param, learned):
+    """Flatten [U, K', K] stats onto the joint column index j = z·U + u,
+    matching (μ_in ⊕ μ_e).reshape(-1): abar [K', K·U], h [K·U]."""
+    bbar, h = _tm_dirichlet_stats(b_param) if learned else _tm_fixed_stats(b_param)
+    kp, ku = bbar.shape[1], bbar.shape[0]
+    kz = bbar.shape[2]
+    abar = bbar.transpose(1, 2, 0).reshape(kp, kz * ku)
+    return abar, h.T.reshape(kz * ku)
+
+
+def gfe_tm_update(mu_in, mu_e, mu_down, b_param, k_max, learned=False):
+    """Batched over members. mu_in [M,K], mu_e [M,U], mu_down [M,K']
+    normalized log-messages; b_param is log B (fixed) or Dirichlet counts α
+    (learned), [M, U, K', K]. Returns (to_out, to_in, to_sel) padded."""
+    ku, kp, kz = b_param.shape[1], b_param.shape[2], b_param.shape[3]
+
+    def one(bp, mi, me, md):
+        abar, h = _tm_joint_stats(bp, learned)
+        log_d = (mi[:, None] + me[None, :]).reshape(-1)
+        qj = _gfe_solve(abar, h, md, log_d)
+        rho = _gfe_rho(abar, h, md, qj).reshape(kz, ku)
+        to_sel = logsumexp(rho + mi[:, None], axis=0)
+        to_in = logsumexp(rho + me[None, :], axis=1)
+        to_out = _safe_log(abar @ qj)
+        return to_out, to_in, to_sel
+
+    to_out, to_in, to_sel = jax.vmap(one)(b_param, mu_in, mu_e, mu_down)
+    return (
+        _norm_pad(to_out, kp, k_max),
+        _norm_pad(to_in, kz, k_max),
+        _norm_pad(to_sel, ku, k_max),
+    )
+
+
+def gfe_tm_energy(mu_in, mu_e, mu_down, b_param, learned=False):
+    """Composite FE term per member: G_tm = −q̄ᵀρ(q̄) − H[q̄] (a GFE term —
+    optimistic-bound semantics, see the section note)."""
+
+    def one(bp, mi, me, md):
+        abar, h = _tm_joint_stats(bp, learned)
+        log_d = (mi[:, None] + me[None, :]).reshape(-1)
+        qj = _gfe_solve(abar, h, md, log_d)
+        rho = _gfe_rho(abar, h, md, qj)
+        return -(qj * rho).sum(-1) + (qj * _safe_log(qj)).sum(-1)
+
+    return jax.vmap(one)(b_param, mu_in, mu_e, mu_down)

@@ -129,7 +129,9 @@ class RebindBlobPath:
     def apply(self, t: Template) -> None:
         if self.name not in t.blobs:
             raise EditError(f"blob {self.name!r} does not exist")
-        t.blobs[self.name] = BlobRef(self.name, self.path)
+        # Keep the init spec: rebinding the file location must not erase the
+        # warm start (the file still wins when it exists).
+        t.blobs[self.name] = BlobRef(self.name, self.path, t.blobs[self.name].init)
 
 
 @dataclass(frozen=True)
@@ -224,6 +226,8 @@ def _spec_to_dict(spec) -> dict:
     if isinstance(spec, PortSpec):
         return {"name": spec.name, "variable": spec.variable, "role": spec.role.value}
     if isinstance(spec, BlobRef):
+        if spec.init:
+            return {"name": spec.name, "path": spec.path, "init": dict(spec.init)}
         return {"name": spec.name, "path": spec.path}
     raise TypeError(f"unserializable spec {type(spec).__name__}")
 
@@ -268,7 +272,13 @@ def action_from_dict(d: dict) -> EditAction:
         s = d["spec"]
         return cls(PortSpec(s["name"], s["variable"], PortRole(s["role"])))
     if cls is AddBlob:
-        return cls(BlobRef(d["ref"]["name"], d["ref"]["path"]))
+        return cls(
+            BlobRef(
+                d["ref"]["name"],
+                d["ref"]["path"],
+                tuple(sorted(d["ref"].get("init", {}).items())),
+            )
+        )
     if cls is RebindBlobPath:
         return cls(d["name"], d["path"])
     return cls(d["name"])  # Remove{Factor,Variable,Port}

@@ -41,6 +41,7 @@ def build_rollout(
     gfe: bool = True,
     map_policy: bool = False,
     learned_a: bool = False,
+    epistemic_b: bool = False,
 ) -> tuple[Template, dict[str, np.ndarray]]:
     n_state, n_obs, n_ctrl = len(d), A.shape[0], len(e)
     assert Bs.shape == (n_ctrl, n_state, n_state), f"Bs shape {Bs.shape}"
@@ -48,7 +49,8 @@ def build_rollout(
 
     t = Template(name=name)
     t.blobs = {
-        blob: BlobRef(blob, f"{blob}.npy") for blob in ("d", "A", "Ac", "c", "e", "Bs")
+        blob: BlobRef(blob, f"{blob}.npy")
+        for blob in ("d", "A", "Ac", "c", "e", "Bs", "Bc")
     }
     t.variables["z0"] = VariableSpec("z0", n_state)
     t.factors["prior"] = FactorSpec(
@@ -68,7 +70,10 @@ def build_rollout(
             f"tm{k}": FactorSpec(
                 f"tm{k}", "transition_mixture",
                 edges={"out": zm, "in": prev, "selector": u},
-                param_blobs={"matrices": "Bs"},
+                # Curiosity-enabled planning slices read Dirichlet counts
+                # ("Bc", the dynamics posterior); perception slices and plain
+                # models read probabilities ("Bs").
+                param_blobs={"matrices": "Bc" if (epistemic_b and k > past) else "Bs"},
             ),
             f"eq{k}": FactorSpec(f"eq{k}", "equality", edges={"a": zm, "b": zo, "c": zt}),
             f"obs{k}": FactorSpec(
@@ -95,6 +100,19 @@ def build_rollout(
                 t.constraints.append(
                     ConstraintSpec(ConstraintKind.P_SUBSTITUTION, f"obs{k}", tuple(sorted(detail)))
                 )
+            if epistemic_b:
+                # Dynamics curiosity (cff-fk2u): P-substituted transition with
+                # Dirichlet parameter uncertainty — the GFE-TM composite.
+                t.constraints.append(
+                    ConstraintSpec(
+                        ConstraintKind.P_SUBSTITUTION,
+                        f"tm{k}",
+                        tuple(sorted([
+                            ("substituted_role", "out"),
+                            ("parameter_uncertainty", "dirichlet"),
+                        ])),
+                    )
+                )
             if map_policy:
                 t.constraints.append(ConstraintSpec(ConstraintKind.DELTA, u))
         prev = zt
@@ -107,5 +125,6 @@ def build_rollout(
         "c": c,
         "e": e,
         "Bs": Bs,
+        "Bc": np.ones_like(Bs),  # placeholder counts; swapped at runtime
     }
     return t, arrays

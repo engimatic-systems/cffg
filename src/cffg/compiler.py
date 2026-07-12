@@ -86,6 +86,24 @@ class GaussGroupPlan:
 
 
 @dataclass(frozen=True)
+class GfeTmPlan:
+    """A P-substituted transition_mixture node (cff-fk2u): the dynamics-
+    curiosity composite. Solves the Corollary-1 fixed point over the joint
+    (z, u) simplex with the downstream state message in the goal prior's
+    role; `learned=True` (detail parameter_uncertainty=dirichlet) reads
+    per-action Dirichlet counts α [U, K', K] and adds the count-novelty
+    channel. FE contribution is a GFE term with optimistic-bound semantics
+    (LIMITATIONS S1c)."""
+
+    name: str
+    cards: tuple[int, int, int]  # (K_out, K_in, U)
+    members: tuple[str, ...]
+    gather: np.ndarray  # [M, 3] incoming slots: (out=μ_down, in=μ_in, sel=μ_e)
+    scatter: np.ndarray  # [M, 3] outgoing slots, same role order
+    learned: bool = False
+
+
+@dataclass(frozen=True)
 class GfePlan:
     """A P-substituted goal-observation composite (Part II §4): matrix_cat
     observation node facing a categorical goal node across the x edge. The
@@ -126,6 +144,7 @@ class Arena:
     gauss_interior: list[tuple[int, np.ndarray]] = field(default_factory=list)
     # [(dim, [E, 2] slot pairs)] interior Gaussian edges for the entropy ledger
     gfe_groups: list[GfePlan] = field(default_factory=list)
+    gfe_tm_groups: list[GfeTmPlan] = field(default_factory=list)
     gfe_x_edges: frozenset[str] = frozenset()  # entropy absorbed into composite term
     delta_pairs: np.ndarray = field(
         default_factory=lambda: np.zeros((0, 2), dtype=np.int64)
@@ -250,12 +269,21 @@ def compile_template(
     consumed: set[str] = set()
     gfe_x_edges: set[str] = set()
     gfe_buckets: dict[tuple[int, int], list[tuple[str, str]]] = {}  # cards -> (obs, goal)
+    tm_buckets: dict[tuple, list[str]] = {}
     for fname, detail in sorted(psub.items()):
         f = t.factors[fname]
+        if f.type == "transition_mixture" and detail.get("substituted_role") == "out":
+            cards3 = tuple(
+                t.variables[f.edges[r]].cardinality for r in ("out", "in", "selector")
+            )
+            learned = detail.get("parameter_uncertainty") == "dirichlet"
+            tm_buckets.setdefault((cards3, learned), []).append(fname)
+            consumed.add(fname)
+            continue
         if f.type != "matrix_cat" or detail.get("substituted_role") != "out":
             problems.append(
-                f"p_substitution on {fname!r}: M3 supports matrix_cat nodes with "
-                "substituted_role 'out' only"
+                f"p_substitution on {fname!r}: supported on matrix_cat and "
+                "transition_mixture nodes with substituted_role 'out' only"
             )
             continue
         x_var = f.edges["out"]
@@ -311,6 +339,34 @@ def compile_template(
         for i, (obs_name, goal_name) in enumerate(pairs):
             member_of[obs_name] = (f"{gname}:counts" if learned else f"{gname}:A", i)
             member_of[goal_name] = (f"{gname}:c", i)
+
+    gfe_tm_groups: list[GfeTmPlan] = []
+    for ((ko, ki, ku), learned), members in sorted(tm_buckets.items()):
+        gname = f"gfeTM{'L' if learned else ''}:{ko}x{ki}x{ku}"
+        gather = np.array(
+            [[opposite[(m, r)] for r in ("out", "in", "selector")] for m in members],
+            dtype=np.int64,
+        )
+        scatter = np.array(
+            [[slot_of[(m, r)] for r in ("out", "in", "selector")] for m in members],
+            dtype=np.int64,
+        )
+        stacked = []
+        for m in members:
+            arr = resolved[t.factors[m].param_blobs["matrices"]]
+            _expect(m, arr, (ku, ko, ki))
+            if learned:
+                if not np.all(arr > 0):
+                    raise CompileError(f"factor {m!r}: Dirichlet counts must be > 0")
+                stacked.append(arr)  # raw counts α [U, K', K]
+            else:
+                for u in range(ku):
+                    _stochastic(f"{m}[u={u}]", arr[u])
+                stacked.append(_log_of(arr))
+        log_params[f"{gname}:counts" if learned else f"{gname}:B"] = np.stack(stacked)
+        gfe_tm_groups.append(
+            GfeTmPlan(gname, (ko, ki, ku), tuple(members), gather, scatter, learned)
+        )
 
     # Group remaining factors by (type, cardinality signature, mode); the
     # Gaussian family (and equality nodes on Gaussian edges) go to their own
@@ -422,6 +478,7 @@ def compile_template(
         n_obs_rows=n_obs_rows,
         gauss_interior=gauss_interior,
         gfe_groups=gfe_groups,
+        gfe_tm_groups=gfe_tm_groups,
         gfe_x_edges=frozenset(gfe_x_edges),
         delta_pairs=delta_pairs,
         member_of=member_of,
@@ -431,19 +488,62 @@ def compile_template(
 def _resolve_arrays(
     t: Template, arrays: dict[str, np.ndarray] | None, root: str | Path | None
 ) -> dict[str, np.ndarray]:
+    """Resolution order per blob: explicit arrays > existing file > init spec.
+    Files beat init specs so a continual-learning checkpoint written to the
+    blob path overrides the warm start on reload (cff-wx28)."""
     needed = {b for f in t.factors.values() for b in f.param_blobs.values()}
     out: dict[str, np.ndarray] = {}
     for name in sorted(needed):
         if arrays is not None and name in arrays:
             out[name] = np.asarray(arrays[name], dtype=np.float64)
             continue
-        if root is None:
-            raise CompileError(f"blob {name!r}: no array override and no root directory")
-        path = Path(root) / t.blobs[name].path
-        if not path.exists():
-            raise CompileError(f"blob {name!r}: file not found: {path}")
-        out[name] = _load_blob(path, name)
+        path = Path(root) / t.blobs[name].path if root is not None else None
+        if path is not None and path.exists():
+            out[name] = _load_blob(path, name)
+            continue
+        if t.blobs[name].init:
+            from cffg import inits
+
+            shape = _blob_shape(t, name)
+            if shape is None:
+                raise CompileError(f"blob {name!r}: cannot infer shape for init spec")
+            try:
+                out[name] = np.asarray(
+                    inits.from_spec(t.blobs[name].init, shape), dtype=np.float64
+                )
+            except ValueError as e:
+                raise CompileError(f"blob {name!r}: init spec failed: {e}") from None
+            continue
+        raise CompileError(
+            f"blob {name!r}: no array override, no file"
+            + (f" at {path}" if path is not None else " (no root directory)")
+            + ", and no init spec"
+        )
     return out
+
+
+def _blob_shape(t: Template, blob_name: str) -> tuple[int, ...] | None:
+    """Expected array shape for a blob, inferred from the first factor role
+    that references it (the compiler validates full agreement later)."""
+    for f in t.factors.values():
+        for role, b in f.param_blobs.items():
+            if b != blob_name:
+                continue
+            card = lambda r: t.variables[f.edges[r]].cardinality  # noqa: E731
+            dim = lambda r: t.variables[f.edges[r]].dim  # noqa: E731
+            if f.type in ("categorical", "dirichlet"):
+                return (card("out"),)
+            if f.type == "matrix_cat":
+                return (card("out"), card("in"))
+            if f.type == "transition_mixture":
+                return (card("selector"), card("out"), card("in"))
+            if f.type == "gaussian":
+                d = dim("out")
+                return {"mean": (d,), "cov": (d, d)}[role]
+            if f.type == "gaussian_linear":
+                do, di = dim("out"), dim("in")
+                return {"matrix": (do, di), "offset": (do,), "cov": (do, do)}[role]
+    return None
 
 
 def _load_blob(path: Path, name: str) -> np.ndarray:

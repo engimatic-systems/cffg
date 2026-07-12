@@ -33,7 +33,7 @@ GALLERY = SHARE / "cffg-viz"
 
 EPIC_FILES = {
     "M0 · Foundations": ["test_hygiene.py"],
-    "M1 · Core IR": ["test_ir.py", "test_serialize.py", "test_edits.py", "test_compose.py"],
+    "M1 · Core IR": ["test_ir.py", "test_serialize.py", "test_edits.py", "test_compose.py", "test_inits.py"],
     "M2 · BP Engine": ["test_engine_tree.py", "test_engine_hmm.py"],
     "M3 · VMP + GFE": ["test_vmp.py", "test_gfe.py"],
     "M4 · T-maze": ["test_tmaze.py", "test_tmaze_learning.py"],
@@ -47,6 +47,8 @@ EPIC_FILES = {
     ],
     "M9 · Gaussian": ["test_gauss_rules.py", "test_kalman.py"],
     "L1 · B-learning": ["test_b_learning.py"],
+    "L2 · Dynamics curiosity": ["test_b_epistemics.py"],
+    "M13 · Exp. families": ["test_ef.py"],
     "SG · Glucose": ["test_glucose.py"],
 }
 FILE_TO_EPIC = {f: e for e, fs in EPIC_FILES.items() for f in fs}

@@ -68,6 +68,14 @@ A pure-Python (dataclass) representation, independent of JAX:
   constraints; all array data (A matrices, Dirichlet counts, goal statistics)
   referenced as relative file paths to `safetensors`/`.npz` blobs. Content hash
   of the structural part keys the JIT cache.
+- **Init templates (cff-wx28)**: a `BlobRef` may carry a canonical-initializer
+  spec (`cffg.inits`: uniform/one-hot/sticky/banded/shift/seeded-random plus
+  Gaussian eye/SPD), so warm-start parameters need no external file; any
+  probability template takes a `strength` knob that turns it into Dirichlet
+  counts (confidence-weighted priors for learn_a/learn_b). Resolution order:
+  explicit arrays > existing blob file > init spec — checkpoints override
+  warm starts on reload. Init specs, like paths, are erased from the
+  structure hash (parameter data, not structure).
 - **Portable bundle**: the deployable unit is a ZIP (`.cffgz`) containing
   `model.json` (structure + constraints), `blobs/` (parameter arrays), and
   `manifest.json` (schema version, content hashes, provenance). Unzipping and
@@ -135,6 +143,11 @@ A registry keyed by `(factor_type, constraint_config, out_edge_role)`:
   (Corollary 1 form, 20-ish Newton steps as in the paper), importance-sampled
   log-message to A. All in log-space; every stochastic rule takes an explicit PRNG
   key.
+- **GFE-TM rules** (cff-fk2u, beyond the papers): P-substitution on the
+  transition node gives dynamics curiosity — the same Corollary-1 fixed point
+  over the joint (state, action) simplex, with the downstream message in the
+  goal prior's role, so the obs composite becomes a special case. Formal
+  derivation + plain-English companion in docs/DERIVATIONS.md D1.
 - Each rule ships with a **local free-energy contribution** function (average
   energy + entropy terms with correct edge-entropy overcounting), so global
   BFE/GFE is always exactly the sum of registered local terms — the "true BFE, no

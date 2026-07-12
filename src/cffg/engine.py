@@ -27,6 +27,8 @@ from cffg.rules import (
     VMP_ENERGIES,
     VMP_UPDATES,
     gfe_energy,
+    gfe_tm_energy,
+    gfe_tm_update,
     gfe_update,
 )
 
@@ -197,6 +199,51 @@ class Engine:
             out[e.name] = q / q.sum()
         return out
 
+    def node_beliefs(self, state: State) -> dict[str, np.ndarray]:
+        """Factor name -> the node belief q_a, the object conjugate updates
+        integrate against (cff-cd1i): e.g. a transition_mixture's q_a(z', z, u)
+        is the smoothed pairwise marginal whose slices are Dirichlet count
+        increments for B-learning.
+
+        BP groups: exact q_a ∝ f_a · Π incoming, shaped [*cards]. VMP groups:
+        the mean-field belief (outer product of edge marginals) — the correct
+        expectation measure under that bead. Equality nodes report the shared
+        marginal [k] (their joint lives on the diagonal). GFE composites and
+        Gaussian groups are not included: composites own their update path
+        (agent A-learning), Gaussian sufficient stats land with cff-7c5o."""
+        out: dict[str, np.ndarray] = {}
+        msgs = np.asarray(state.messages)
+
+        def norm_exp(lb: np.ndarray) -> np.ndarray:
+            m = lb.shape[0]
+            flat = lb.reshape(m, -1)
+            flat = flat - flat.max(axis=1, keepdims=True)
+            q = np.exp(flat)
+            return (q / q.sum(axis=1, keepdims=True)).reshape(lb.shape)
+
+        for g in self.arena.groups:
+            inc = msgs[g.gather]  # [M, R, k_max]
+            if g.type == "equality":
+                k = g.cards[0]
+                q = norm_exp(inc[:, :, :k].sum(axis=1))
+            elif g.mode == "vmp":
+                both = msgs[g.gather_both]  # [M, R, 2, k_max]
+                q = None
+                for r, k in enumerate(g.cards):
+                    lq = both[:, r, 0, :k] + both[:, r, 1, :k]
+                    edge_q = norm_exp(lq).reshape(len(g.members), *([1] * r), k)
+                    q = edge_q if q is None else q[..., None] * edge_q
+            else:
+                lb = np.asarray(state.params[g.name]).copy()  # [M, *cards]
+                for r, k in enumerate(g.cards):
+                    shape = [len(g.members)] + [1] * len(g.cards)
+                    shape[1 + r] = k
+                    lb = lb + inc[:, r, :k].reshape(shape)
+                q = norm_exp(lb)
+            for i, name in enumerate(g.members):
+                out[name] = q[i]
+        return out
+
     def gaussian_marginals(self, state: State) -> dict[str, tuple[np.ndarray, np.ndarray]]:
         """Edge name -> (mean, cov). Requires a proper combined precision —
         run to coherence (and bind data) first; improper beliefs surface as
@@ -300,6 +347,18 @@ def _make_step(arena: Arena):
             )
             new = new.at[g.scatter_z].set(mu2)
             new = new.at[g.scatter_x].set(log_qx)
+        for g in arena.gfe_tm_groups:
+            ko, ki, ku = g.cards
+            md = messages[g.gather[:, 0]][:, :ko]
+            mi = messages[g.gather[:, 1]][:, :ki]
+            me = messages[g.gather[:, 2]][:, :ku]
+            b_key = g.name + (":counts" if g.learned else ":B")
+            to_out, to_in, to_sel = gfe_tm_update(
+                mi, me, md, params[b_key], k_max, learned=g.learned
+            )
+            new = new.at[g.scatter[:, 0]].set(to_out)
+            new = new.at[g.scatter[:, 1]].set(to_in)
+            new = new.at[g.scatter[:, 2]].set(to_sel)
         # Gaussian sweep: information-form damping below is the log-space
         # damping of the Gaussian family (log of a Gaussian is its (eta,
         # Lambda) quadratic), so one damp knob covers both arenas.
@@ -393,6 +452,15 @@ def _make_bfe(arena: Arena):
             a_key = g.name + (":counts" if g.learned else ":A")
             total = total + gfe_energy(
                 log_d, params[a_key], params[g.name + ":c"], learned=g.learned
+            ).sum()
+        for g in arena.gfe_tm_groups:
+            ko, ki, ku = g.cards
+            md = messages[g.gather[:, 0]][:, :ko]
+            mi = messages[g.gather[:, 1]][:, :ki]
+            me = messages[g.gather[:, 2]][:, :ku]
+            b_key = g.name + (":counts" if g.learned else ":B")
+            total = total + gfe_tm_energy(
+                mi, me, md, params[b_key], learned=g.learned
             ).sum()
         if len(pairs):
             lq = messages[pairs[:, 0]] + messages[pairs[:, 1]]  # [E_int, k_max]
