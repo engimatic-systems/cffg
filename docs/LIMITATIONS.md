@@ -116,7 +116,10 @@ about B, tightly only when sensors pin the state down; (2) the fixed point
 is solved over the joint (state, action) simplex, O((K·U)³) per composite
 per sweep — fine at planning scale, a structure-exploitation ticket at
 colony scale. Models containing the composite report GFE, not BFE (no
-−log Z identity claimed).
+−log Z identity claimed). Because its substituted next-state edge is
+interior, its outgoing message is the cavity `log q_w - mu_down`, and its
+ledger contribution is the direct node-local G_tm from D1 Proposition 1;
+downstream message couplings are not node energy.
 
 **S1d. Hybrid mixture inference is assumed-density; its BFE is a lower
 bound.** The `gaussian_mixture(_linear)` collapse rules (cff-pksr,
@@ -184,7 +187,12 @@ loop plus warm-started replanning (cff-5edo). Related measured limits:
 colony batching is dispatch-bound on CPU, 1.5× at 32 instances until the
 sweep loop is a jitted scan (cff-wbhu); the GFE-TM curiosity composite
 costs ~4× a plain act() in every slice and its novelty channel outcompetes
-the goal channel while counts are near-uniform — annealing is cff-2gev.
+the goal channel while counts are near-uniform. After the cff-hp3y cavity and
+ledger repair, the like-for-like 25-episode Hallway rerun scored 0.16 success
+and 2.650 visitation-weighted transition KL versus 0.76 and 2.534 for the
+learn-only/no-curiosity arm: the unannealed channel bought neither task return
+nor faster early learning in that setting. Annealing or disabling it is
+cff-2gev.
 Until cff-5edo lands, check the delta trace before trusting a plan deeper
 than ~20 slices. (Small-sample numbers: 14 episodes per horizon —
 direction is reliable, third digits are not.)

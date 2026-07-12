@@ -64,7 +64,11 @@ stationarity conditions (Prop. 4) produces a fixed-point equation of exactly
 the same shape as the papers' Corollary 1 — just over the *joint*
 (state, action) belief, with the incoming message from the future standing
 where the goal prior stood. So the existing Newton solver runs it verbatim,
-and the observation composite becomes a special case of the transition one.
+and the observation composite's local solve is a special case of the
+transition one. There is one crucial interior-edge difference: the transition
+composite must send a *cavity* `log q_w - mu_down`, because the downstream
+factor remains in the graph. Their product, not either message alone, is the
+substituted next-state marginal.
 
 **The honest caveat.** z′ is a latent state — you never observe it directly;
 you observe y through the sensor model. The channel prices information as if
@@ -152,18 +156,34 @@ Collect and exponentiate. ∎
 Outgoing messages drop each edge's own incoming term from log q̄ (it is
 additive and constant along the marginalized axes, so it cancels exactly):
 to the selector, logsumexp_z(ρ̄ + μ_in); to the in-edge,
-logsumexp_u(ρ̄ + μ_e); to the out-edge, log q_w. The FE contribution is
-G_tm(q̄) = −q̄ᵀρ̄ − H[q̄], the same closed form as the A-composite.
+logsumexp_u(ρ̄ + μ_e). The substituted out-edge is interior, so its
+outgoing message must divide out the facing message:
+
+    μ_to_out(z′) = log q_w(z′) − μ_down(z′) + const,
+    softmax(μ_to_out + μ_down) = q_w.
+
+On exact-zero support the subtraction is masked: q_w=0 remains a zero cavity;
+q_w>0 against μ_down=−∞ is infeasible. The node-local FE contribution is
+Proposition 1 evaluated directly,
+
+    G_tm(q̄) = Σ q_w log q_w + Σ q̄ ĥ + Σ q̄ log q̄.
+
+It is not −q̄ᵀρ̄−H[q̄]: because ρ contains μ_down, that stationary
+Lagrangian value equals G_tm−E_qw[μ_down]. Scoring it as node energy would
+count the downstream coupling once here and again in the downstream node plus
+edge correction.
 *Executable:* `test_fixed_point_satisfies_its_equation`,
-`test_energy_is_stationary_value`,
-`test_goal_information_flows_backward_through_substituted_node` (the
-μ_down coupling is what keeps pragmatic planning intact).
+`test_out_edge_cavity_reconstructs_substituted_marginal`,
+`test_energy_is_direct_node_local_gfe`, and
+`test_two_composite_chain_matches_constrained_objective` (the latter solves
+the coupled objective independently and checks beliefs, messages, and ledger).
 
 **Proposition 5 (consistency).** (a) Existence of a fixed point: T(q) =
 softmax(ρ(q) + log d) is continuous on the (K·U)-simplex, so Brouwer
 applies (uniqueness is not claimed, matching Part II). (b) The observation
 composite of Part II (Corollary 1) is the special case s = z (drop u),
-μ_down = log c (a goal leaf), B̄ → Ā: identical equation, identical solver.
+μ_down = log c (an absorbed goal leaf), B̄ → Ā: identical local equation
+and solver, but not identical exterior/interior cavity bookkeeping.
 (c) As α₀ → ∞, ψ(α+1) − ψ(α₀+1) → log(α/α₀), so ĥ → H[B̄-column] and the
 novelty channel vanishes: fully-learned dynamics generate no curiosity.
 *Executable:* `test_novelty_channel_prefers_unexplored_action` (decay),

@@ -2,8 +2,9 @@
 
 Pins the derivation in rules.py: the fixed point satisfies its own equation,
 the parameter-novelty channel prefers unexplored (z, u) columns with the
-state-MI channel held constant, goal information still flows backward through
-the substituted node, and the hostile-inputs contract (AGENTS.md) holds.
+state-MI channel held constant, substituted-edge cavities reconstruct q_w,
+the ledger contains only node-local G_tm, a two-composite chain matches an
+independent constrained optimizer, and the hostile-inputs contract holds.
 """
 
 import jax
@@ -96,7 +97,77 @@ def test_goal_information_flows_backward_through_substituted_node():
     assert q_u[1] > 0.75, f"goal did not propagate: q(u) = {q_u}"
 
 
-def test_energy_is_stationary_value():
+def test_out_edge_cavity_reconstructs_substituted_marginal():
+    rng = np.random.default_rng(41)
+    k, u = 3, 2
+    counts = rng.uniform(0.5, 4.0, size=(u, k, k))
+    mu_in = norm_log(rng.dirichlet(np.ones(k)))
+    mu_e = norm_log(rng.dirichlet(np.ones(u)))
+    mu_down = norm_log([0.72, 0.19, 0.09])
+
+    to_out, _, _ = rules.gfe_tm_update(
+        mu_in[None], mu_e[None], mu_down[None], counts[None], k_max=k, learned=True
+    )
+    qj, _, (abar, _, _) = solve_joint(mu_in, mu_e, mu_down, counts, learned=True)
+    qw = abar @ qj
+    edge_q = q_of(np.asarray(to_out)[0, :k] + mu_down)
+    np.testing.assert_allclose(edge_q, qw, atol=1e-9)
+
+    # A vacuous/uniform facing message is only a constant gauge, so the
+    # cavity itself reduces to the substituted predictive marginal.
+    vacuous = norm_log(np.ones(k))
+    vac_out, _, _ = rules.gfe_tm_update(
+        mu_in[None], mu_e[None], vacuous[None], counts[None], k_max=k, learned=True
+    )
+    vac_qj, _, (vac_abar, _, _) = solve_joint(mu_in, mu_e, vacuous, counts, learned=True)
+    np.testing.assert_allclose(q_of(np.asarray(vac_out)[0, :k]), vac_abar @ vac_qj, atol=1e-9)
+
+
+def test_out_edge_cavity_preserves_exact_zero_support():
+    # Every transition ends in state 0. Both q_w and the facing message have
+    # exact zero support elsewhere: the masked 0/0 cavity must not resurrect it.
+    k, u = 3, 1
+    b = np.zeros((u, k, k))
+    b[0, 0, :] = 1.0
+    log_b = np.where(b > 0, np.log(np.maximum(b, np.finfo(float).tiny)), NEG)
+    mu_in, mu_e = norm_log([0.2, 0.3, 0.5]), np.array([0.0])
+    mu_down = np.array([0.0, NEG, NEG])
+    to_out, _, _ = rules.gfe_tm_update(
+        mu_in[None], mu_e[None], mu_down[None], log_b[None], k_max=k, learned=False
+    )
+    edge_q = q_of(np.asarray(to_out)[0, :k] + mu_down)
+    np.testing.assert_array_equal(edge_q, [1.0, 0.0, 0.0])
+    assert np.all(np.asarray(to_out)[0, 1:] == NEG)
+
+
+def test_out_edge_cavity_float32_and_infeasible_support():
+    k, u = 2, 2
+    b = np.array([
+        [[0.8, 0.3], [0.2, 0.7]],
+        [[0.45, 0.1], [0.55, 0.9]],
+    ])
+    with jax.enable_x64(False):
+        mi = jnp.asarray(norm_log([0.6, 0.4])[None], dtype=jnp.float32)
+        me = jnp.asarray(norm_log([0.35, 0.65])[None], dtype=jnp.float32)
+        md = jnp.asarray(norm_log([0.83, 0.17])[None], dtype=jnp.float32)
+        lb = jnp.log(jnp.asarray(b[None], dtype=jnp.float32))
+        to_out, _, _ = rules.gfe_tm_update(mi, me, md, lb, k_max=k, learned=False)
+        abar, _ = rules._tm_joint_stats(lb[0], learned=False)
+        qj = rules._gfe_solve(
+            abar, rules._tm_joint_stats(lb[0], False)[1], md[0],
+            (mi[0, :, None] + me[0, None, :]).reshape(-1),
+        )
+        edge_q = jax.nn.softmax(to_out[0, :k] + md[0])
+        np.testing.assert_allclose(edge_q, abar @ qj, atol=2e-6)
+
+        # A positive predictive marginal cannot be reconstructed when the
+        # facing factor assigns exact zero support. Surface infeasibility.
+        impossible_md = jnp.asarray([[0.0, NEG]], dtype=jnp.float32)
+        bad, _, _ = rules.gfe_tm_update(mi, me, impossible_md, lb, k_max=k, learned=False)
+        assert bool(jnp.isnan(bad).all())
+
+
+def test_energy_is_direct_node_local_gfe():
     rng = np.random.default_rng(5)
     k, u = 3, 2
     counts = rng.uniform(0.5, 4.0, size=(u, k, k))
@@ -104,10 +175,174 @@ def test_energy_is_stationary_value():
     mu_e = norm_log(rng.dirichlet(np.ones(u)))
     mu_down = norm_log(rng.dirichlet(np.ones(k)))
     g = rules.gfe_tm_energy(mu_in[None], mu_e[None], mu_down[None], counts[None], learned=True)
-    qj, rho, _ = solve_joint(mu_in, mu_e, mu_down, counts, learned=True)
-    ref = -(qj * rho).sum() + (qj * np.log(np.maximum(qj, 1e-300))).sum()
+    qj, _, (abar, h, _) = solve_joint(mu_in, mu_e, mu_down, counts, learned=True)
+    qw = abar @ qj
+    # Direct enumeration of Proposition 1; deliberately does not restate rho,
+    # because rho contains the downstream Lagrange coupling that caused hp3y.
+    ref = (qw * np.log(qw)).sum() + qj @ h + (qj * np.log(qj)).sum()
     np.testing.assert_allclose(float(g[0]), ref, atol=1e-8)
     assert np.isfinite(float(g[0]))
+
+
+def test_two_composite_chain_matches_constrained_objective():
+    """Independent SLSQP minimization pins both interior cavities and ledger.
+
+    The optimizer sees only the two direct G_tm objectives and the constraint
+    B1 q1 = sum_u q2. It does not call either GFE-TM update or energy rule.
+    """
+    from scipy.optimize import minimize
+
+    from cffg.compiler import compile_template
+    from cffg.core.ir import (
+        BlobRef,
+        ConstraintKind,
+        ConstraintSpec,
+        FactorSpec,
+        Template,
+        VariableSpec,
+    )
+    from cffg.engine import Engine
+
+    k, u = 2, 2
+    b1 = np.array([
+        [[0.82, 0.28], [0.18, 0.72]],
+        [[0.41, 0.12], [0.59, 0.88]],
+    ])
+    b2 = np.array([
+        [[0.87, 0.24], [0.13, 0.76]],
+        [[0.36, 0.19], [0.64, 0.81]],
+    ])
+    d, e1, e2, c = (
+        np.array([0.64, 0.36]),
+        np.array([0.57, 0.43]),
+        np.array([0.38, 0.62]),
+        np.array([0.23, 0.77]),
+    )
+
+    names = ("d", "e1", "e2", "c", "B1", "B2")
+    t = Template(
+        "two_gfe_tm",
+        variables={name: VariableSpec(name, card) for name, card in (
+            ("z0", k), ("u1", u), ("z1", k), ("u2", u), ("z2", k)
+        )},
+        factors={
+            "prior": FactorSpec("prior", "categorical", {"out": "z0"}, param_blobs={"statistic": "d"}),
+            "e1": FactorSpec("e1", "categorical", {"out": "u1"}, param_blobs={"statistic": "e1"}),
+            "tm1": FactorSpec("tm1", "transition_mixture", {"out": "z1", "in": "z0", "selector": "u1"}, param_blobs={"matrices": "B1"}),
+            "e2": FactorSpec("e2", "categorical", {"out": "u2"}, param_blobs={"statistic": "e2"}),
+            "tm2": FactorSpec("tm2", "transition_mixture", {"out": "z2", "in": "z1", "selector": "u2"}, param_blobs={"matrices": "B2"}),
+            "goal": FactorSpec("goal", "categorical", {"out": "z2"}, param_blobs={"statistic": "c"}),
+        },
+        blobs={name: BlobRef(name, f"{name}.npy") for name in names},
+        constraints=[
+            ConstraintSpec(ConstraintKind.P_SUBSTITUTION, "tm1", (("substituted_role", "out"),)),
+            ConstraintSpec(ConstraintKind.P_SUBSTITUTION, "tm2", (("substituted_role", "out"),)),
+        ],
+    )
+    engine = Engine(compile_template(t, arrays=dict(zip(names, (d, e1, e2, c, b1, b2)))))
+    state, deltas = engine.run(engine.init_state(), 600, tol=1e-12, damp=0.5)
+    assert deltas[-1] < 1e-10
+
+    def stats(b):
+        abar = b.transpose(1, 2, 0).reshape(k, k * u)
+        h = -(b * np.log(b)).sum(axis=1).T.reshape(k * u)
+        return abar, h
+
+    a1, h1 = stats(b1)
+    a2, h2 = stats(b2)
+    ld, le1, le2, lc = map(np.log, (d, e1, e2, c))
+
+    def split(x):
+        return x[: k * u], x[k * u :]
+
+    def terms(q1, q2):
+        w1, r, w2 = a1 @ q1, q2.reshape(k, u).sum(1), a2 @ q2
+        g1 = (w1 * np.log(w1)).sum() + q1 @ h1 + (q1 * np.log(q1)).sum()
+        g2 = (w2 * np.log(w2)).sum() + q2 @ h2 + (q2 * np.log(q2)).sum()
+        total = (
+            g1 + g2 - (r * np.log(r)).sum()
+            - q1.reshape(k, u).sum(1) @ ld - q1.reshape(k, u).sum(0) @ le1
+            - q2.reshape(k, u).sum(0) @ le2 - w2 @ lc
+        )
+        return total, (g1, g2, w1, r, w2)
+
+    q10 = np.full(k * u, 1.0 / (k * u))
+    w10 = a1 @ q10
+    q20 = (w10[:, None] * np.full((k, u), 1.0 / u)).reshape(-1)
+    result = minimize(
+        lambda x: terms(*split(x))[0],
+        np.concatenate([q10, q20]),
+        method="SLSQP",
+        bounds=[(np.finfo(float).eps, 1.0)] * (2 * k * u),
+        constraints=[
+            {"type": "eq", "fun": lambda x: split(x)[0].sum() - 1.0},
+            {"type": "eq", "fun": lambda x: split(x)[1].sum() - 1.0},
+            {"type": "eq", "fun": lambda x: (a1 @ split(x)[0] - split(x)[1].reshape(k, u).sum(1))[0]},
+        ],
+        options={"ftol": 1e-13, "maxiter": 2000},
+    )
+    assert result.success, result.message
+    q1, q2 = split(result.x)
+    direct_total, (g1, g2, w1, r, w2) = terms(q1, q2)
+    np.testing.assert_allclose(w1, r, atol=2e-8)
+
+    plan = engine.arena.gfe_tm_groups[0]
+    bp = state.params[plan.name + ":B"]
+    runtime_q = {}
+    for name in ("tm1", "tm2"):
+        i = plan.members.index(name)
+        md = state.messages[plan.gather[i, 0], :k]
+        mi = state.messages[plan.gather[i, 1], :k]
+        me = state.messages[plan.gather[i, 2], :u]
+        abar, h = rules._tm_joint_stats(bp[i], learned=False)
+        runtime_q[name] = np.asarray(
+            rules._gfe_solve(abar, h, md, (mi[:, None] + me[None, :]).reshape(-1))
+        )
+    np.testing.assert_allclose(runtime_q["tm1"], q1, atol=2e-7)
+    np.testing.assert_allclose(runtime_q["tm2"], q2, atol=2e-7)
+
+    marginals = engine.marginals(state)
+    np.testing.assert_allclose(marginals["z0"], q1.reshape(k, u).sum(1), atol=2e-7)
+    np.testing.assert_allclose(marginals["u1"], q1.reshape(k, u).sum(0), atol=2e-7)
+    np.testing.assert_allclose(marginals["z1"], w1, atol=2e-7)
+    np.testing.assert_allclose(marginals["u2"], q2.reshape(k, u).sum(0), atol=2e-7)
+    np.testing.assert_allclose(marginals["z2"], w2, atol=2e-7)
+
+    # Reconstruct all six composite messages from the optimizer's stationary
+    # beliefs, independently of gfe_tm_update, and compare up to log gauge.
+    def norm(x):
+        return x - np.logaddexp.reduce(x)
+
+    rho2 = (a2.T @ (lc - np.log(w2)) - h2).reshape(k, u)
+    back = norm(np.logaddexp.reduce(rho2 + le2[None, :], axis=1))
+    forward = norm(np.log(w1) - back)
+    rho1 = (a1.T @ (back - np.log(w1)) - h1).reshape(k, u)
+    expected = {
+        ("tm1", 0): forward,
+        ("tm1", 1): norm(np.logaddexp.reduce(rho1 + le1[None, :], axis=1)),
+        ("tm1", 2): norm(np.logaddexp.reduce(rho1 + ld[:, None], axis=0)),
+        ("tm2", 0): norm(np.log(w2) - lc),
+        ("tm2", 1): back,
+        ("tm2", 2): norm(np.logaddexp.reduce(rho2 + forward[:, None], axis=0)),
+    }
+    for (name, role), want in expected.items():
+        i = plan.members.index(name)
+        got = np.asarray(state.messages[plan.scatter[i, role], : len(want)])
+        np.testing.assert_allclose(got, want, atol=3e-7)
+    np.testing.assert_allclose(q_of(forward + back), w1, atol=2e-8)
+
+    np.testing.assert_allclose(
+        rules.gfe_tm_energy(
+            state.messages[plan.gather[:, 1], :k],
+            state.messages[plan.gather[:, 2], :u],
+            state.messages[plan.gather[:, 0], :k],
+            bp,
+            learned=False,
+        ),
+        [g1, g2],
+        atol=2e-7,
+    )
+    np.testing.assert_allclose(engine.bfe(state), direct_total, atol=3e-7)
 
 
 # --- hostile-inputs contract (AGENTS.md) -------------------------------------
@@ -154,6 +389,14 @@ def test_float32_stays_finite():
             k_max=k, learned=True,
         )
         assert all(bool(jnp.isfinite(o).all()) for o in outs)
+        g = rules.gfe_tm_energy(
+            jnp.asarray(mu_in, dtype=jnp.float32),
+            jnp.asarray(mu_e, dtype=jnp.float32),
+            jnp.asarray(mu_down, dtype=jnp.float32),
+            jnp.asarray(counts, dtype=jnp.float32),
+            learned=True,
+        )
+        assert bool(jnp.isfinite(g).all())
 
 
 def test_uncomfortable_scale_stays_finite():
@@ -170,6 +413,8 @@ def test_uncomfortable_scale_stays_finite():
     )
     for arr in (to_out, to_in, to_sel):
         assert bool(np.isfinite(np.asarray(arr)).all())
+    g = rules.gfe_tm_energy(mu_in, mu_e, mu_down, counts, learned=True)
+    assert bool(np.isfinite(np.asarray(g)).all())
     # outputs are normalized log-distributions
     np.testing.assert_allclose(
         float(logsumexp(jnp.asarray(to_sel)[0, :u])), 0.0, atol=1e-6

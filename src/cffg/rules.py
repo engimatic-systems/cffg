@@ -390,8 +390,13 @@ def gfe_energy(log_d, a_param, logc, learned=False):
 # on sparse supports, per the cff-i45j lesson):
 #   to selector: logsumexp_z( ρ̄(z,u) + μ_in(z) )   ← the action-curiosity score
 #   to in:       logsumexp_u( ρ̄(z,u) + μ_e(u) )
-#   to out:      log q_w                             (substituted predictive)
-# FE term: G_tm = −q̄ᵀρ̄ − H[q̄], the same closed form as the A-composite.
+#   to out:      log q_w − μ_down                    (predictive cavity)
+# because the out-edge belief multiplies this message by μ_down and must
+# recover q_w. The node-local FE term is evaluated directly as
+#   G_tm = −H[q_w] + E_q̄[ĥ] − H[q̄].
+# Unlike the leaf A-composite, −q̄ᵀρ̄ − H[q̄] is NOT the local FE:
+# ρ contains the interior edge's downstream Lagrange coupling, which is
+# already represented by the downstream node and the edge-entropy correction.
 #
 # HONESTY NOTE (ledger semantics, LIMITATIONS S1c): z' is never observed
 # directly, so I(z'; B | z,u) scores information gain as if the next state
@@ -407,7 +412,9 @@ def gfe_energy(log_d, a_param, logc, learned=False):
 def _tm_fixed_stats(log_b):
     """(B̄, ĥ) for a known stack log B [U, K', K]: ĥ = per-(z,u) column entropy."""
     b = jnp.exp(log_b)
-    h = -jnp.sum(jnp.where(b > _TINY, b * log_b, 0.0), axis=1)  # [U, K]
+    # Only exact zeros are omitted from 0*log(0); a fixed numeric threshold
+    # would silently erase valid small probabilities in a dtype-dependent way.
+    h = -jnp.sum(jnp.where(b > 0, b * log_b, 0.0), axis=1)  # [U, K]
     return b, h
 
 
@@ -438,7 +445,14 @@ def _tm_joint_stats(b_param, learned):
 def gfe_tm_update(mu_in, mu_e, mu_down, b_param, k_max, learned=False):
     """Batched over members. mu_in [M,K], mu_e [M,U], mu_down [M,K']
     normalized log-messages; b_param is log B (fixed) or Dirichlet counts α
-    (learned), [M, U, K', K]. Returns (to_out, to_in, to_sel) padded."""
+    (learned), [M, U, K', K]. Returns (to_out, to_in, to_sel) padded.
+
+    ``to_out`` is the cavity ``log(q_w) - mu_down``, not ``log(q_w)``:
+    multiplying it by the facing message must reconstruct the substituted
+    marginal q_w. Exact-zero q_w entries stay exact zero even when the facing
+    message is also zero. Positive q_w against a zero-support facing message
+    is infeasible and deliberately produces NaN so the runtime cannot present
+    the state as coherent (status classification is cff-j4mu)."""
     ku, kp, kz = b_param.shape[1], b_param.shape[2], b_param.shape[3]
 
     def one(bp, mi, me, md):
@@ -448,7 +462,16 @@ def gfe_tm_update(mu_in, mu_e, mu_down, b_param, k_max, learned=False):
         rho = _gfe_rho(abar, h, md, qj).reshape(kz, ku)
         to_sel = logsumexp(rho + mi[:, None], axis=0)
         to_in = logsumexp(rho + me[None, :], axis=1)
-        to_out = _safe_log(abar @ qj)
+        qw = abar @ qj
+        qw_support = qw > 0
+        # exp(md)==0 is the dtype-aware definition of a log-message's exact
+        # zero support. It covers the engine's NEG sentinel without inventing
+        # a second absolute cutoff. Subtract only on common support: 0/0 is a
+        # cavity zero, while positive/0 is a genuinely infeasible edge belief.
+        md_support = jnp.exp(md) > 0
+        feasible = jnp.all(~qw_support | md_support)
+        to_out = jnp.where(qw_support & md_support, jnp.log(qw) - md, NEG)
+        to_out = jnp.where(feasible, to_out, jnp.nan)
         return to_out, to_in, to_sel
 
     to_out, to_in, to_sel = jax.vmap(one)(b_param, mu_in, mu_e, mu_down)
@@ -460,14 +483,21 @@ def gfe_tm_update(mu_in, mu_e, mu_down, b_param, k_max, learned=False):
 
 
 def gfe_tm_energy(mu_in, mu_e, mu_down, b_param, learned=False):
-    """Composite FE term per member: G_tm = −q̄ᵀρ(q̄) − H[q̄] (a GFE term —
-    optimistic-bound semantics, see the section note)."""
+    """Node-local GFE per member.
+
+    ``mu_down`` influences the stationary q̄ but its linear coupling is not
+    itself node energy. The direct local term is
+    ``sum(q_w log q_w) + q̄·ĥ + sum(q̄ log q̄)``. This distinction matters
+    for an interior substituted edge, whose downstream node and Bethe edge
+    correction are scored separately (cff-hp3y)."""
 
     def one(bp, mi, me, md):
         abar, h = _tm_joint_stats(bp, learned)
         log_d = (mi[:, None] + me[None, :]).reshape(-1)
         qj = _gfe_solve(abar, h, md, log_d)
-        rho = _gfe_rho(abar, h, md, qj)
-        return -(qj * rho).sum(-1) + (qj * _safe_log(qj)).sum(-1)
+        qw = abar @ qj
+        qw_log_qw = jnp.where(qw > 0, qw * _safe_log(qw), 0.0).sum(-1)
+        qj_log_qj = jnp.where(qj > 0, qj * _safe_log(qj), 0.0).sum(-1)
+        return qw_log_qw + qj @ h + qj_log_qj
 
     return jax.vmap(one)(b_param, mu_in, mu_e, mu_down)
