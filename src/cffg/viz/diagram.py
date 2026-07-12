@@ -51,6 +51,7 @@ GLYPHS = {
     "gaussian_linear": "𝒩A",
     "gaussian_mixture": "𝒩M",
     "gaussian_mixture_linear": "𝒩MA",
+    "gaussian_prec": "𝒩τ",
     "gamma": "Γ",
     "beta": "β",
     "poisson_obs": "Poi",

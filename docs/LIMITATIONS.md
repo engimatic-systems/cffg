@@ -138,6 +138,24 @@ are rejected at compile time in v1 — route observations through a plain
 messages have no well-defined collapse and fall back to vacuous — full-rank
 A_s per regime is the supported envelope.
 
+**S1e. Gaussian parameter learning is EM-rollover; flooding VMP is not
+strictly monotone.** Continuous conjugate learning (cff-7c5o, DERIVATIONS.md
+D4) has two honest edges. (1) NIW/MNIW updates run *between* trials from
+node-belief sufficient statistics, rolling the expected natural parameters
+(mean, E[W] = νΨ⁻¹) into the next trial — empirical-Bayes EM, the exact
+mirror of the Dirichlet count loop. Messages built from E[W] are the VMP
+geometric-mean messages, but the x-dependent trace term that would feed
+*parameter* uncertainty into *state* inference (inflated effective noise) is
+deferred; in-loop parameter uncertainty exists today only where it is exactly
+tractable — `gaussian_prec`'s Gamma-precision edge. (2) "VMP monotonically
+decreases free energy" holds for sequential coordinate updates; this engine
+floods (Jacobi), which converges to the same fixed point but can take
+bounded non-monotone steps on multi-node models (measured ≈4e-3 nats at
+damp 0.5, ≈0.2 undamped; single-node flooding is monotone to machine
+precision — both pinned in `tests/test_gauss_vmp.py`). The mean-field ledger
+itself is exact: BFE at the `gaussian_prec` fixed point equals −log evidence
+by quadrature to 1e-6.
+
 **S2. Importance-sampling noise in parameter messages.** The message to A is a
 non-conjugate log-message evaluated by importance sampling; variance grows with
 column dimensionality and makes the GFE trace stochastic (hence burn-in

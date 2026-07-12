@@ -54,6 +54,7 @@ EPIC_FILES = {
         "test_ef_rules.py",
         "test_ef_engine.py",
     ],
+    "M15 · Learning (Gaussian)": ["test_conj.py", "test_gauss_vmp.py"],
     "M14 · Hybrid": [
         "test_mixg.py",
         "test_swkf_reference.py",

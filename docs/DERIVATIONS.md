@@ -340,3 +340,93 @@ on the selector edge. Executable anchors: `tests/test_mixg.py` (quadrature
 moments/energy, weight-trap regression, bound direction),
 `tests/test_switching_kf.py` (enumeration + independent collapsed-smoother
 parity).
+
+---
+
+## D4 — Gaussian conjugate learning: sufficient stats, NIW/MNIW/Gamma, gaussian_prec (cff-7c5o)
+
+### D4.1 The plain-English version
+
+The continuous mirror of Dirichlet A-learning. Discrete learning already
+works like this: run inference, read each learned node's *belief*, add its
+expected sufficient statistics to the conjugate prior's counts, and roll the
+posterior's expected-log parameters (`agent._elog`) back into the next
+trial's messages. Gaussians follow the identical shape with three castings:
+
+1. **Sufficient statistics are node-belief moments.** A gaussian(_linear)
+   node's belief is itself Gaussian (the joint (η_J, Λ_J) the energies
+   already build), so E[x], E[xxᵀ], E[yx̃ᵀ], E[x̃x̃ᵀ] (x̃ = [x; 1] to catch
+   the offset) are closed-form reads — `Engine.gaussian_node_stats`.
+2. **Conjugate updates are count bookkeeping.** NIW for a prior node's
+   (mean, cov); matrix-normal-inverse-Wishart (MNIW) for a linear node's
+   ([A b], V); Gamma for a scalar precision. Soft statistics (beliefs, not
+   samples) enter exactly like soft Dirichlet counts.
+3. **What rolls forward is the *expected natural parameter*.** Dirichlet
+   rolls E[log A] because log A is what multiplies the sufficient statistic;
+   for Gaussians that role is played by the precision, so the rollover is
+   E[W] = ν_n Ψ_n⁻¹ (and Ā = M_n), NOT the naive Ψ_n/(ν_n−d−1) point
+   covariance. Messages built from E[W] are exactly the VMP geometric-mean
+   messages; the remaining difference from full VMP is (a) the FE constant
+   E[log det W] − log det E[W] and (b) an x-dependent trace term coupling
+   A's posterior covariance into state inference. v1 ships the rollover
+   (empirical-Bayes EM, matching the Dirichlet loop) and defers (b) —
+   documented, not silently approximated (LIMITATIONS S1e).
+
+`gaussian_prec` is the exception where we do full in-loop VMP, because it is
+scalar and exactly tractable: a Gaussian node whose precision lives on an
+`ef:gamma` edge — the EF abstraction's first mixed client (cff-8s6a's
+promise). Mean-field q(x)q(τ) makes both VMP messages closed-form and the
+free energy the exact mean-field VFE, so sweeps must not increase it — the
+monotonicity acceptance test.
+
+### D4.2 Rules and updates
+
+**gaussian_prec** f(x; m, τ) = N(x; m, τ⁻¹), x scalar Gaussian edge, τ on an
+ef:gamma edge (natural η = (α−1, −β)), m a blob. With q(τ) the τ-edge
+marginal (α, β from η_q) and q(x) the x-edge marginal (mean x̄, var v):
+
+    → x edge:  exp(E_τ[log f]) ∝ N(x; m, E[τ]⁻¹),  info form (E[τ]·m, E[τ]),
+               E[τ] = α/β.
+    → τ edge:  exp(E_x[log f]) ∝ τ^{1/2} e^{−τ·s/2},  gamma-natural
+               increment η = (1/2, −s/2),  s = E[(x−m)²] = (x̄−m)² + v.
+    node energy:  −E_q[log f] = −½(ψ(α) − ln β) + ½ ln 2π + ½·(α/β)·s.
+
+Both messages read *marginals* (both slots), not cavity messages — the
+VMP convention, same as the discrete vmp groups. Guards: improper q(x) or
+q(τ) ⇒ vacuous messages / +inf energy (engine-wide loudness). Vacuous τ-edge
+belief never arises after one sweep when a proper gamma prior terminates the
+edge (its message is a proper constant).
+
+**NIW update** (gaussian node, prior (μ0, κ0, Ψ0, ν0), trial stats
+(x̄_t, S_t = E[xxᵀ]_t), n trials):
+
+    κn = κ0 + n,  νn = ν0 + n,  μn = (κ0 μ0 + Σ x̄_t) / κn,
+    Ψn = Ψ0 + Σ (S_t − x̄_t x̄_tᵀ) + Σ x̄_t x̄_tᵀ + κ0 μ0 μ0ᵀ − κn μn μnᵀ.
+
+(The first sum is within-trial covariance E[xxᵀ] − x̄x̄ᵀ — soft stats enter
+here; with point observations it vanishes into the scatter term.)
+Rollover: mean μn, precision E[W] = νn Ψn⁻¹.
+
+**MNIW update** (gaussian_linear node, x̃ = [x; 1], prior (M0 [dy,di+1],
+Λ0 [di+1,di+1] column precision, Ψ0, ν0), per-trial stats Syy = E[yyᵀ],
+Syx̃ = E[yx̃ᵀ], Sx̃x̃ = E[x̃x̃ᵀ], summed over the trial's node occurrences,
+n = total occurrences):
+
+    Λn = Λ0 + Σ Sx̃x̃,  Mn = (M0 Λ0 + Σ Syx̃) Λn⁻¹,  νn = ν0 + n,
+    Ψn = Ψ0 + Σ Syy + M0 Λ0 M0ᵀ − Mn Λn Mnᵀ.
+
+Rollover: [Ā b̄] = Mn, E[W] = νn Ψn⁻¹. Ψn ≻ 0 is guaranteed in exact
+arithmetic (Schur complement of a PSD block matrix); the implementation
+asserts it rather than ridging — a violation means broken stats, not noise.
+
+**Gamma precision update** (gaussian_prec nodes sharing a τ edge):
+αn = α0 + n/2, βn = β0 + Σ s_t / 2 — but note this one usually needs no
+trial loop at all: it is the exact in-loop conjugate posterior the τ edge
+already carries at the VMP fixed point (prior η + Σ node increments), which
+is precisely why gaussian_prec is the mixed client and not a rollover client.
+
+Checks: NIW/MNIW with hard stats and n → ∞ concentrate at the empirical
+MLE; E_q[stats] with vague priors recover generating LGSSM parameters
+(acceptance test); gaussian_prec fixed point equals the exact
+Gamma-posterior when x is observed (conjugacy, zero collapse error).
+Executable anchors: `tests/test_conj.py`, `tests/test_gauss_vmp.py`.

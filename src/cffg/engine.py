@@ -285,6 +285,76 @@ class Engine:
             out[e.name] = (np.asarray(mean), np.asarray(cov))
         return out
 
+    def gaussian_node_stats(self, state: State) -> dict[str, dict[str, np.ndarray]]:
+        """Factor name -> expected sufficient statistics of the node belief
+        (cff-7c5o, D4): the continuous analog of node_beliefs, feeding the
+        NIW/MNIW conjugate updates in cffg.conj.
+
+        gaussian:            {"mean" E[x], "second" E[xxᵀ]}
+        gaussian_linear:     {"Syy" E[yyᵀ], "Syx" E[yx̃ᵀ], "Sxx" E[x̃x̃ᵀ]}
+                             with x̃ = [x; 1] (offset column absorbed)
+        gaussian_linear_obs: same keys with y fixed at the bound observation,
+                             plus "mask" (0.0 = missing: skip the occurrence).
+        Requires proper beliefs (run to coherence first); equality and hybrid
+        nodes are not learnable and are skipped."""
+        out: dict[str, dict[str, np.ndarray]] = {}
+        g_eta, g_lam = np.asarray(state.g_eta), np.asarray(state.g_lam)
+        g_obs, g_mask = np.asarray(state.g_obs), np.asarray(state.g_mask)
+        for g in self.arena.gauss_groups:
+            if g.type == "equality":
+                continue
+            inc_e, inc_l = g_eta[g.gather], g_lam[g.gather]
+            for i, name in enumerate(g.members):
+                w = np.asarray(state.params[g.name + ":W"][i])
+                if g.type == "gaussian":
+                    (d,) = g.dims
+                    m_blob = np.asarray(state.params[g.name + ":m"][i])
+                    lam_q = w + inc_l[i, 0, :d, :d]
+                    sig_q = np.linalg.inv(lam_q)
+                    m_q = sig_q @ (w @ m_blob + inc_e[i, 0, :d])
+                    out[name] = {"mean": m_q, "second": sig_q + np.outer(m_q, m_q)}
+                elif g.type == "gaussian_linear":
+                    do, di = g.dims
+                    a = np.asarray(state.params[g.name + ":A"][i])
+                    b = np.asarray(state.params[g.name + ":b"][i])
+                    e_o, l_o = inc_e[i, 0, :do], inc_l[i, 0, :do, :do]
+                    e_i, l_i = inc_e[i, 1, :di], inc_l[i, 1, :di, :di]
+                    lam_j = np.block([[w + l_o, -w @ a], [-a.T @ w, a.T @ w @ a + l_i]])
+                    eta_j = np.concatenate([w @ b + e_o, -a.T @ w @ b + e_i])
+                    sig_j = np.linalg.inv(lam_j)
+                    m_j = sig_j @ eta_j
+                    m_y, m_x = m_j[:do], m_j[do:]
+                    s_yy = sig_j[:do, :do] + np.outer(m_y, m_y)
+                    s_yx = sig_j[:do, do:] + np.outer(m_y, m_x)
+                    s_xx = sig_j[do:, do:] + np.outer(m_x, m_x)
+                    out[name] = {
+                        "Syy": s_yy,
+                        "Syx": np.concatenate([s_yx, m_y[:, None]], axis=1),
+                        "Sxx": np.block([[s_xx, m_x[:, None]], [m_x[None, :], np.ones((1, 1))]]),
+                    }
+                else:  # gaussian_linear_obs: y is data; q(x) is conditioned
+                    do, di = g.dims
+                    a = np.asarray(state.params[g.name + ":A"][i])
+                    b = np.asarray(state.params[g.name + ":b"][i])
+                    e_i, l_i = inc_e[i, 1, :di], inc_l[i, 1, :di, :di]
+                    row = int(g.obs_rows[i])
+                    y, mk = g_obs[row, :do], g_mask[row]
+                    lam_q = mk * (a.T @ w @ a) + l_i
+                    sig_q = np.linalg.inv(lam_q)
+                    m_x = sig_q @ (mk * (a.T @ (w @ (y - b))) + e_i)
+                    s_xx = sig_q + np.outer(m_x, m_x)
+                    out[name] = {
+                        "Syy": np.outer(y, y),
+                        "Syx": np.concatenate(
+                            [np.outer(y, m_x), y[:, None]], axis=1
+                        ),
+                        "Sxx": np.block(
+                            [[s_xx, m_x[:, None]], [m_x[None, :], np.ones((1, 1))]]
+                        ),
+                        "mask": np.asarray(mk),
+                    }
+        return out
+
     def ef_marginals(self, state: State) -> dict[str, "EfMarginal"]:
         """Edge name -> EF marginal in standard parameters. Observation-family
         edges (poisson/bernoulli DATA ports) carry no messages and are
@@ -376,6 +446,27 @@ def _mix_sweep(arena, messages, g_eta, g_lam, params, k_max, d_max):
             gauss_writes.append((g.g_scatter[:, r], oe, ol))
         sel_writes.append((g.s_scatter, _pad_disc(to_sel, k_max)))
     return sel_writes, gauss_writes
+
+
+def _prec_sweep(arena, messages_unused, g_eta, g_lam, ef_eta, params, d_max):
+    """One synchronous flooding sweep over the gaussian_prec groups (cff-7c5o).
+    Straddles the Gaussian and EF arenas; reads only the pre-sweep arrays and
+    returns the writes for both so they fold into each arena's damping phase:
+    `gauss_writes` [(x_scatter, [M, d_max], [M, d_max, d_max])] to (eta, Lam),
+    `ef_writes` [(tau_scatter, [M, 2])] to the natural parameters. Both VMP
+    messages read marginals (both slots summed), the mean-field convention."""
+    gauss_writes: list[tuple[jax.Array, jax.Array, jax.Array]] = []
+    ef_writes: list[tuple[jax.Array, jax.Array]] = []
+    for g in arena.prec_groups:
+        tau_q = ef_eta[g.tau_gather_both].sum(axis=1)  # [M, 2] τ-edge marginal
+        x_eta_q = g_eta[g.x_gather_both].sum(axis=1)[:, :1]  # [M, 1]
+        x_lam_q = g_lam[g.x_gather_both].sum(axis=1)[:, :1, :1]  # [M, 1, 1]
+        m = params[g.name + ":m"]  # [M, 1]
+        oe, ol = gauss.prec_to_x(tau_q, m)  # (eta [M,1], lam [M,1,1])
+        oe, ol = _pad_gauss(oe, ol, d_max)
+        gauss_writes.append((g.x_scatter, oe, ol))
+        ef_writes.append((g.tau_scatter, gauss.prec_to_tau(x_eta_q, x_lam_q, m)))  # [M, 2]
+    return gauss_writes, ef_writes
 
 
 def _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params):
@@ -492,23 +583,35 @@ def _make_step(arena: Arena):
             if arena.mix_groups
             else ([], [])
         )
+        # gaussian_prec sweep (cff-7c5o): also straddles two arenas — its out
+        # edge writes the Gaussian arena, its prec edge the EF arena. Computed
+        # here from the pre-sweep arrays so both writes fold into the matching
+        # arena's damping phase (synchronous flooding: gather from OLD arrays).
+        prec_gauss, prec_ef = (
+            _prec_sweep(arena, messages, g_eta, g_lam, ef_eta, params, arena.d_max)
+            if arena.prec_groups
+            else ([], [])
+        )
         # Gaussian sweep: information-form damping below is the log-space
         # damping of the Gaussian family (log of a Gaussian is its (eta,
         # Lambda) quadratic), so one damp knob covers both arenas.
         new_eta, new_lam = g_eta, g_lam
         if arena.gauss_groups:
             new_eta, new_lam = _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params)
-        for scatter, oe, ol in mix_gauss:
+        for scatter, oe, ol in [*mix_gauss, *prec_gauss]:
             new_eta = new_eta.at[scatter].set(oe)
             new_lam = new_lam.at[scatter].set(ol)
-        if arena.gauss_groups or arena.mix_groups:
+        if arena.gauss_groups or arena.mix_groups or arena.prec_groups:
             new_eta = damp * g_eta + (1.0 - damp) * new_eta
             new_lam = damp * g_lam + (1.0 - damp) * new_lam
         # EF sweep: natural parameters are the log-space of their family, so
         # the same damp knob is log-space damping here too.
         new_ef = ef_eta
-        if arena.ef_groups:
-            new_ef = _ef_sweep(arena, ef_eta, ef_obs, ef_mask, params)
+        if arena.ef_groups or arena.prec_groups:
+            if arena.ef_groups:
+                new_ef = _ef_sweep(arena, ef_eta, ef_obs, ef_mask, params)
+            for scatter, out in prec_ef:
+                new_ef = new_ef.at[scatter].set(out)
             new_ef = damp * ef_eta + (1.0 - damp) * new_ef
         # Hybrid selector writes join the discrete arena before its damping.
         for scatter, rows in mix_sel:
@@ -593,6 +696,28 @@ def _mix_bfe(arena, messages, g_eta, g_lam, params):
     return total
 
 
+def _prec_bfe(arena, g_eta, g_lam, ef_eta, params):
+    """gaussian_prec node energies (cff-7c5o): the mean-field VFE contribution
+    −H[q_x] − H[q_τ] − E_q[log f]. gauss.prec_energy supplies −E_q[log f] (with
+    the digamma correction that makes the mean-field VFE exact); the two edge
+    neg-entropies are added here, exactly as the discrete VMP energies add one
+    _neg_entropy per edge (cffg.rules.vmp_energy_matrix_cat). They net against
+    the neighbours' −H and the interior +H (gauss_interior / ef_interior) to
+    the single mean-field −H[q_i] per variable. Improper marginals ⇒ +inf."""
+    total = jnp.asarray(0.0, dtype=g_eta.dtype)
+    for g in arena.prec_groups:
+        tau_q = ef_eta[g.tau_gather_both].sum(axis=1)  # [M, 2]
+        x_eta_q = g_eta[g.x_gather_both].sum(axis=1)[:, :1]  # [M, 1]
+        x_lam_q = g_lam[g.x_gather_both].sum(axis=1)[:, :1, :1]  # [M, 1, 1]
+        m = params[g.name + ":m"]
+        e = gauss.prec_energy(tau_q, x_eta_q, x_lam_q, m)  # −E_q[log f], +inf if improper
+        neg_h_x = gauss._neg_entropy(x_lam_q)  # −H[q_x]
+        neg_h_tau = -efrules.GAMMA.entropy(tau_q)  # −H[q_τ]
+        ok = (x_lam_q[..., 0, 0] > 0) & efrules.GAMMA.is_proper(tau_q)
+        total = total + jnp.where(ok, neg_h_x + neg_h_tau + e, jnp.inf).sum()
+    return total
+
+
 def _ef_bfe(arena, ef_eta, ef_obs, ef_mask, params):
     """EF node energies + interior-edge entropies, all closed form
     (cffg.efrules). Improper beliefs anywhere make the total +inf — loud.
@@ -638,12 +763,17 @@ def _make_bfe(arena: Arena):
         params: dict[str, jax.Array],
     ) -> jax.Array:
         total = jnp.asarray(0.0, dtype=messages.dtype)
-        if arena.gauss_groups:
+        # prec_groups included so the interior-edge entropy tables run even for
+        # a prec-only model: _gauss_bfe owns gauss_interior (the out edges),
+        # _ef_bfe owns ef_interior (the prec edges), both EdgeInfo-driven.
+        if arena.gauss_groups or arena.prec_groups:
             total = total + _gauss_bfe(arena, g_eta, g_lam, g_obs, g_mask, params)
         if arena.mix_groups:
             total = total + _mix_bfe(arena, messages, g_eta, g_lam, params)
-        if arena.ef_groups:
+        if arena.ef_groups or arena.prec_groups:
             total = total + _ef_bfe(arena, ef_eta, ef_obs, ef_mask, params)
+        if arena.prec_groups:
+            total = total + _prec_bfe(arena, g_eta, g_lam, ef_eta, params)
         for g in groups:
             logf = params.get(g.name)
             if logf is None:
