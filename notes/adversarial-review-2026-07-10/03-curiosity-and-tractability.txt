@@ -1,0 +1,100 @@
+QUESTION 3: CURIOSITY TESTING AND MATHEMATICAL TRACTABILITY
+
+DO THE TESTS ESTABLISH GENUINE CURIOSITY?
+
+For the fixed observation-GFE path, yes, within a narrow model class.
+
+The strongest evidence is not a local algebra test:
+
+1. The known-A T-maze matches the authors' Julia/LAIF control posterior.
+2. With the P-substitution bead, the first action seeks an unrewarded cue and
+   the second-step posterior favors the reward arms. Removing the bead skips
+   the cue.
+3. Across repeated trials with unknown A, the GFE agent learns the cue mapping
+   and wins; the BFE ablation largely does not. This is realized behavior, not
+   only a negative entropy term.
+
+That is meaningful curiosity-driven behavior.
+
+WHAT THE TESTS DO NOT YET ESTABLISH
+
+1. Relevance: an equally uncertain but reward-irrelevant sensor should not win.
+2. Satiation: after a useful observation, repeat-sense value should collapse and
+   exploitation should begin.
+3. Calibration: sensing should cross a hand-computed Bayes-optimal threshold as
+   its cost changes.
+4. Realizable information: transition novelty is scored as if the latent next
+   state were observed. Its value should weaken with sensor noise, or be labeled
+   explicitly as an upper bound.
+5. Robust task return: RockSample's GFE arm checked on every step, scored -1 and
+   0% success, while no-GFE reached 62.5% success. The experiment omitted check
+   cost from preferences, so this is partly a modeling failure, but a mature
+   epistemics suite should catch it before celebrating information seeking.
+6. Independent transition-GFE behavior: cff-hp3y currently invalidates the
+   engine-level GFE-TM path and its FE values.
+
+cff-4oq8 specifies relevance, satiation, cost crossover, sensor quality, return,
+and ablation tests.
+
+IS CONTINUOUS/HYBRID GFE TRACTABLE FOR FRONTIER MODELS?
+
+The right answer depends on scope.
+
+Tractable and worth spending tokens on:
+
+1. Fixed linear-Gaussian sensing. For q(z)=N(m,S), x|z=N(Cz,R), and a Gaussian
+   goal, predictive q(x) is Gaussian, mutual information is
+
+     I(x;z) = 0.5 * (logdet(C S C' + R) - logdet R),
+
+   and Gaussian goal cross-entropy is closed form. The remaining stationary
+   optimization over mean and SPD covariance is difficult but ordinary. It can
+   be checked with 1D quadrature, automatic differentiation, and finite
+   differences.
+2. Action-dependent sensing C_u or R_u. This makes information gain policy
+   dependent and gives a purposeful-exploration positive control.
+3. A discrete regime selector over continuous Gaussian dynamics. Epistemics can
+   stay on the discrete regime while Gaussian messages carry state inference.
+4. Conjugate unknown linear parameters, one family at a time, with explicit
+   Student-t or variational approximations where prediction leaves Gaussianity.
+
+Not universally tractable, regardless of model capability:
+
+1. Arbitrary nonlinear mutual information.
+2. Exact entropy of a general Gaussian mixture.
+3. A universal exact message for every factor x constraint configuration.
+4. High-dimensional nonconjugate parameter messages without quadrature, Monte
+   Carlo, Laplace, or a declared variational bound.
+
+The frontier model can derive a specified class and produce executable checks.
+It cannot make a nonexistent closed form exist. Ask it for assumptions, bound
+direction, cavity semantics, and an independent oracle before code.
+
+LITERATURE POSITION
+
+The repository's "open problem" label is too broad.
+
+Koudahl, Kouw, and de Vries show standard additive-control linear-Gaussian EFE
+does not yield purposeful exploration, but also discuss epistemic objectives and
+multiplicative/switching controls that can explore:
+  https://wmkouw.github.io/publication/efe-glds/
+
+Collis et al. (2024) learn recurrent switching LDS abstractions and put a
+discrete active-inference planner above a continuous controller, explicitly
+lifting information-theoretic exploration to discrete space:
+  https://arxiv.org/abs/2409.01066
+
+This supports the project's discrete-regime hybrid route. It does not supply a
+CFFG continuous-GFE message table.
+
+A 2026 preprint applies a pragmatic-plus-information objective to constrained
+system identification, active search, and optimization, suggesting useful
+commercial tasks but not solving CFFG message derivation:
+  https://alphaxiv.org/abs/2602.06104v1
+
+RECOMMENDATION
+
+Treat cff-dfpi as a bounded P1 research spike, after the
+transition math is repaired. Require one negative linear-Gaussian control, one
+positive action-dependent sensing case, one discrete-regime hybrid, and an
+explicit decision about exact, bounded, or sampled ledger semantics.

@@ -1,0 +1,91 @@
+QUESTION 6: TICKET PRIORITIES
+
+VERDICT
+
+The backlog contains many good tickets, but it is ordered as feature expansion
+around an engine whose trust, extension, and execution contracts are not yet
+stable. Continuous/hybrid epistemics is under-prioritized as research, while
+neural factors and some breadth/refactor work are over-prioritized relative to
+the current risks.
+
+RECOMMENDED QUEUE
+
+P0: RESULTS ARE NOT TRUSTWORTHY UNTIL THESE LAND
+
+1. cff-hp3y transition-GFE cavity and ledger correction.
+2. cff-j4mu converged/exhausted/diverged/infeasible runtime result with FE
+   convergence.
+3. cff-vamy preserve plates and nested blobs in .cffgz.
+
+All experiments using epistemic_b must be rerun after cff-hp3y. cff-2gev now
+correctly depends on it; annealing before correcting the objective would hide a
+math defect behind calibration.
+
+P1: STABILIZE THE ENGINE BEFORE MORE FACTOR FAMILIES
+
+1. cff-3hgi Gaussian/hybrid numerical propriety and scale invariance.
+2. cff-ri8m executable factor kernel/registry.
+3. cff-d56d topology-aware schedules.
+4. cff-44we segmented/ragged arenas.
+5. cff-wbhu jitted run loop, after cff-j4mu fixes semantics.
+6. cff-9xmq balanced Broadcast topology.
+7. cff-4oq8 behavioral epistemics suite.
+
+These should form one engine-hardening milestone with explicit dependencies so
+they do not race incompatible State, scheduler, and registry refactors.
+
+P1 IN PARALLEL: BOUNDED RESEARCH, NOT PLATFORM IMPLEMENTATION
+
+cff-dfpi is now a high-priority feasibility spike, blocked on cff-hp3y. Cooper
+is right that continuous/discrete epistemics could
+unlock important uses. The spike should be deliberately narrow:
+
+  exact fixed/action-dependent linear-Gaussian sensing;
+  negative additive-control case;
+  discrete-regime hybrid over a continuous model;
+  decision on exact vs bounded vs sampled FE.
+
+This research can proceed while schedule/registry work lands, but it should not
+merge a new factor until cff-hp3y and cff-ri8m establish the correctness and
+extension contracts.
+
+P2: PRODUCTIVE API WORK AFTER THE GATE
+
+  cff-x0sv generic learnables, coordinated with cff-ri8m;
+  cff-lquu hybrid sufficient statistics/predictive readout;
+  cff-cj5h epistemic diagnostics;
+  cff-gul8 engine EIG readout;
+  cff-mjku fan-out/observation ergonomics;
+  cff-j7mm resource estimator;
+  cff-6s31 non-materialized plates after schedule/storage design.
+
+cff-gul8 may become P1 if active sensing is chosen as the commercial wedge.
+
+P3: DEFER UNTIL A VERTICAL REQUIRES THEM
+
+  cff-o7hs general nonlinear EP beyond the research spike;
+  cff-1o72 neural factors and implicit differentiation;
+  cff-pyy9 broad hierarchical/contingent planning;
+  cff-iwgl full planning-to-A IS message;
+  cff-gjjk learned goal hyperprior;
+  visualization polish;
+  glucose optimization before a CFFG model and comparison protocol exist.
+
+The full Part II mu1/mu3 messages matter for paper completeness, but they are not
+the shortest path to a commercially useful engine. Keep the M3 epic honest and
+open; do not let it block a vertical that only needs fixed goals and perceptual
+conjugate learning.
+
+REFACTOR ORDER WARNING
+
+cff-l6i5 wants to move Cat/Dir/Gaussian onto the EF abstraction. That could be a
+good internal unification, but it does not solve executable registration by
+itself. Design cff-ri8m first, then use cff-l6i5 as a migration test. Otherwise
+the repository risks doing two large zero-behavior refactors in succession.
+
+PRIORITY PRINCIPLE
+
+Optimize the next six weeks for falsifiable trust and a vertical benchmark, not
+for the number of factor families. A smaller engine that reports failure and
+runs fast is more valuable than a universal-looking engine whose objective,
+termination, or serialization can be wrong silently.

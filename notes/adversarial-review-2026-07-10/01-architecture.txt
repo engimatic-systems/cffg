@@ -1,0 +1,107 @@
+QUESTION 1: ARCHITECTURE, SCALE, PERFORMANCE, AND MODULARITY
+
+ASSESSMENT
+
+The repository has a good model-specification layer and a brittle execution
+extension layer. It will not require a rewrite for every new factor in an
+existing family, but every new domain family, cross-arena factor, observation
+form, or message algorithm currently requires coordinated edits in central
+modules. That is exactly the refactor pattern Cooper is worried about.
+
+WHAT IS WORKING
+
+1. Template is a strong source IR. VariableSpec, FactorSpec, constraints, ports,
+   blobs, plates, validation, composition, and edit actions form a coherent
+   language independent of JAX.
+2. Serialization is canonical in intent. Derived arenas are reconstructible and
+   parameter blobs are external. The plate bundle defect is an implementation
+   breach, not a bad architectural premise.
+3. Data-oriented compilation is directionally right. Factors are grouped by
+   type and shape; gather/scatter tables are constants; parameters remain State
+   inputs; one compiled Engine can serve changing evidence and parameters.
+4. Message math and energy math are co-located by rule family. Independent FE
+   tests make the ledger much more trustworthy than the typical "loss" method.
+5. The separate discrete, Gaussian, and EF natural representations are sensible
+   implementation choices. Products are additions in each arena.
+
+WHERE THE DOCUMENTED ARCHITECTURE DOES NOT EXIST YET
+
+core.ir.register_factor_type registers only a structural signature. It does not
+register executable behavior. A working factor additionally needs some subset
+of:
+
+  rules.py BP/VMP update and energy tables;
+  compiler.py family/type branches, Plan dataclasses, and parameter stackers;
+  engine.py sweep, damping, readout, and BFE branches;
+  validate.py global family maps and special cases;
+  serialization/version knowledge for external implementations.
+
+Recent evidence:
+
+  gaussian_mixture plumbing: compiler +120 lines, engine +87, plus IR/validation;
+  gaussian_prec plumbing: compiler +78, engine +72, plus IR;
+  constraints: compiler +132, engine +87, plus IR/validation.
+
+compiler.py is now 1,146 lines and engine.py 892 with a still-small vocabulary.
+The claim in LIMITATIONS that "the registry architecture exists" is premature.
+
+The right abstraction is a typed executable FactorKernel or RuleSpec declaring:
+
+  structural roles and domain requirements;
+  parameter schema and packing;
+  legal constraints/message modes;
+  update kernels and node energy;
+  observation conditioning;
+  optional sufficient-statistic/predictive readouts;
+  implementation namespace and version for serialization.
+
+A test-only custom factor should be registrable without changing compiler.py or
+engine.py. cff-ri8m tracks this.
+
+SCALABILITY DEFECTS IN THE CURRENT SHAPE
+
+1. Whole-graph synchronous flooding is O(E * diameter). Exact BP on a tree can
+   be two directed passes, O(E). A T=256 identity HMM required 513 complete
+   sweeps. cff-d56d tracks schedule-aware execution.
+2. A Python loop dispatches every sweep and synchronizes to read delta. cff-wbhu
+   fixes dispatch, but not the algorithmic O(T^2) work.
+3. Every discrete slot is padded to global k_max; every Gaussian precision is
+   padded to global d_max squared. One outlier domain can add 800-900x storage
+   overhead to otherwise small edges. cff-44we tracks segmented arenas.
+4. Plate expansion materializes Python objects; Broadcast builds a linear
+   equality chain. Existing cff-6s31 and cff-9xmq are valid, but scheduling and
+   segmented storage are more fundamental.
+5. State.params uses implicit string suffix contracts and member_of covers only
+   discrete groups. This makes learning/readout extensions fragile. Coordinate
+   cff-x0sv with the executable kernel contract rather than adding another
+   parallel registry.
+6. Colony shares a JIT kernel but still calls compile_template for every same-
+   structure spawn to obtain parameters. Large plated colonies will pay Python
+   compilation repeatedly even when XLA compilation is shared.
+
+BOUNDARY JUDGMENT
+
+Adding another ordinary discrete BP factor is reasonably modular today. Adding
+nonlinear Gaussian, a new EF observation family, a neural factor, a continuous
+P-substitution, or another cross-arena factor is not. Freeze those breadth items
+until cff-ri8m has a credible contract. There are now enough concrete factor
+families to generalize from evidence rather than speculation.
+
+GRADE
+
+IR/model language: A-
+Serialization design: B+, current plate implementation: F
+Rule math organization: B
+Executable extensibility: C-
+Runtime scalability: D
+Overall architecture for a research prototype: B-
+Overall architecture for the stated production goal: C
+
+TICKETS FROM THIS REVIEW
+
+cff-ri8m executable rule registration
+cff-d56d schedule-aware inference
+cff-44we segmented arenas
+cff-j4mu status-bearing convergence
+cff-vamy plate bundle integrity
+cff-j7mm resource estimator repair

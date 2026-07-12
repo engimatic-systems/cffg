@@ -1,0 +1,98 @@
+QUESTION 4: COMMERCIAL VALUE
+
+VERDICT
+
+This is not merely a novelty, but "commodity continual learning" is too broad a
+commercial thesis for the artifacts that exist. There is a plausible narrow
+product around adaptive sensing, diagnostics, system identification, and
+constrained decision-making in low-data systems. The engine must earn that wedge
+with vertical outcomes and production trust, not with active-inference theory.
+
+WHY THERE MAY BE VALUE
+
+1. Many operational systems have an authored state ontology: machines, devices,
+   protocols, inspections, scientific experiments, and process-control loops.
+   CFFG does not need to learn raw representations to be useful there.
+2. Online conjugate updates are deterministic, cheap, auditable, and naturally
+   paired with active data acquisition.
+3. Constraints, uncertainty, goals, and information gain in one inspectable
+   model can be valuable when actions or measurements cost money.
+4. The Template/edit/bundle design could let an LLM propose model changes while
+   a deterministic compiler validates structure, resource cost, inference, and
+   policy. That is a credible LLM-plus-symbolic architecture.
+5. The active-vision experiment's +27 percentage-point EIG advantage at eight
+   patches illustrates a product-shaped benefit, even though EIG was external
+   NumPy and the inference throughput missed its bar.
+
+WHY THE GENERAL THESIS IS NOT YET DEFENSIBLE
+
+1. Current "continual learning" means accumulating conjugate counts or Gaussian
+   sufficient statistics in a fixed graph. It is not representation learning,
+   structural learning, concept-drift handling, or a solution to catastrophic
+   forgetting.
+2. Runtime inference is 2-4 orders of magnitude slower than specialized JAX
+   smoothers on representative chains.
+3. The extension contract is not yet public or executable. Customers cannot add
+   a new factor without central engine work.
+4. Policy trust is not production-grade: termination status is absent, one new
+   curiosity derivation is wrong, and plated bundles silently truncate.
+5. Deep contingency and large tabular state spaces remain combinatorial.
+
+THE MARKET IS NOT EMPTY
+
+PGMax provides scalable differentiable discrete loopy BP in JAX:
+  https://www.jmlr.org/papers/v25/23-1010.html
+
+RxInfer is a mature reactive message-passing ecosystem:
+  https://docs.rxinfer.com/
+
+Dynamax provides specialized JAX state-space inference and learning:
+  https://probml.github.io/dynamax/
+
+GTSAM provides mature incremental continuous factor-graph inference for sensor
+fusion and robotics:
+  https://gtsam.org/docs/
+
+River covers practical online/incremental ML and concept drift:
+  https://github.com/online-ml/river
+
+Bayes Server and Bayesia already sell Bayesian-network reasoning, diagnostics,
+decision automation, and deployment APIs:
+  https://www.bayesserver.com/docs/
+  https://www.bayesia.com/
+
+VERSES Genius explicitly markets POMDPs, continuous learning, active inference,
+model tooling, hosted deployment, and diagnostics:
+  https://www.verses.ai/genius
+
+These products validate demand but remove "nobody has this" as a moat.
+
+RECOMMENDED WEDGE
+
+Pick one expensive-observation workflow where the customer controls the model
+ontology and can measure avoided cost:
+
+  adaptive industrial diagnostics or inspection sequencing;
+  constrained system identification / experimental design;
+  sensor scheduling for a device or digital twin;
+  low-data anomaly triage with active follow-up measurements.
+
+Sell the outcome and audit trail. The engine can be open source; paid value can
+sit in model tooling, connectors, deployment, monitoring, verified factor packs,
+and domain templates.
+
+GO/NO-GO EVIDENCE BEFORE A PLATFORM BET
+
+1. Fix all P0 trust tickets.
+2. Demonstrate a custom factor without central engine edits.
+3. Get within 10-20x of specialized inference on the important vertical and win
+   end-to-end because CFFG offers decisions/learning those routines do not.
+4. Beat strong task baselines on at least two external benchmarks with costs,
+   regret, calibration, and wall-clock included.
+5. Show a month-scale streaming deployment with versioned model updates,
+   status-bearing inference, deterministic replay, and intact bundle restore.
+6. Have a domain expert, not an agent that wrote the code, audit the model and
+   objective.
+
+Current commercial readiness: 2/10.
+Commercial option value after trust/performance gates: 6/10.

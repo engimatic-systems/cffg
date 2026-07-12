@@ -1,0 +1,131 @@
+QUESTION 7: IS THE MATH RIGHT?
+
+SUMMARY TABLE
+
+Area                                      Confidence / verdict
+Discrete BP on feasible small graphs      High; correct against enumeration/HMM
+Discrete Bethe FE                         High on feasible support/tree cases
+Fixed-A observation GFE                   High; correct reduced composite
+Known-A T-maze                            High; Julia/LAIF parity
+Learned-A observation novelty             Medium-high; closed-form channel tested
+Full Part II Fig. 5 interface             Incomplete: mu1(c), mu3(A) remain
+Transition/dynamics GFE                   Wrong; do not trust until cff-hp3y
+Linear Gaussian BP algebra                High, but numerical guards are wrong
+Gaussian/EF tree FE                       High in tested proper regimes
+Hybrid Gaussian mixtures                  Medium; declared moment approximation
+Conjugate learning                        Medium-high in covered fixed ontology
+Hard constraints                          High when feasible; infeasibility wrong
+Continuous/hybrid GFE                     Not implemented; bounded classes tractable
+
+OBSERVATION GFE
+
+rules._gfe_solve, gfe_update, and gfe_energy match the reduced fixed-goal,
+fixed-or-external-Dirichlet parameter case from:
+
+  Part II p.11 Eq. (5);
+  Part II p.15 Eqs. (20)-(22);
+  Part II Appendix C pp.32-34 Eqs. (24)-(25);
+  Part I pp.26-27 Eqs. (33)-(35), Fig. 21.
+
+The engine folds the facing categorical goal node and internal observation edge
+into the composite, so the additional state entropy in gfe_energy is appropriate.
+Independent local-objective minimization and Julia control-posterior tests are
+good evidence.
+
+Scope caveat: gfe_update emits only the backward state message and observation
+predictive. It does not implement Part II Fig. 5's Dirichlet goal message mu1(c)
+or nonconjugate message mu3(A). A and c are external blobs/counts. This is an
+explicit gap, not a defect in the reduced math.
+
+TRANSITION GFE: CONCRETE DEFECT
+
+This is project-original; Papers I/II do not derive P-substitution on an
+interior transition_mixture node.
+
+1. rules.py:451 writes to_out = log(q_w). The downstream factor still supplies
+   mu_down, so the edge belief becomes normalize(q_w * exp(mu_down)). Marginal
+   consistency requires the cavity message:
+
+     to_out = log(q_w) - mu_down + constant.
+
+2. rules.py:471 reports -q^T rho - H(q). Because rho includes mu_down, this is
+
+     G_tm - E_qw[mu_down],
+
+   not the node-local G_tm already stated in DERIVATIONS D1:
+
+     G_tm = sum(q_w log q_w) + q^T h + sum(q log q).
+
+   The downstream node and edge are scored elsewhere, so the current ledger
+   folds a Lagrangian coupling into node energy and double-counts it.
+
+Independent two-state reproduction:
+
+  required q_w                         [0.679691, 0.320309]
+  current engine edge belief           [0.894603, 0.105397]
+  maximum error                         0.214912
+  reported energy                      -0.094125
+  correct local G_tm                   -0.761311
+  difference                            0.667186
+  -E_qw[mu_down]                        0.667186
+
+Practical implication: downstream goals/evidence are propagated twice through
+GFE-TM edges. Next-state marginals, upstream control messages in longer chains,
+reported GFE, and the observed novelty/goal tradeoff are unreliable. cff-hp3y
+contains acceptance tests and requires rerunning the Hallway epistemic-B results.
+RockSample uses observation GFE, so it remains a separate behavioral-balance
+warning rather than evidence for or against this transition-rule defect.
+
+GAUSSIAN NUMERICAL MATH
+
+gauss.py uses absolute _RIDGE=1e-10. An invertible linear factor with a vacuous
+input must emit a vacuous forward message for every noise scale. At W=1e-12 the
+code emits Lambda=9.901e-13, 99% of W; at W=1e-20 it emits effectively 100% of W.
+The result depends on units and dtype.
+
+_neg_entropy ignores slogdet's sign. Precision [-1] produces a finite entropy,
+and moments returns covariance [-1]. mixg._pd_ok has a different scale problem:
+it rejects a valid precision 1e-4 in float32 but accepts it in float64.
+
+Practical implication: diffuse Gaussian/hybrid models can become vacuous,
+overconfident, or finitely scored solely because of units/dtype. cff-3hgi tracks
+the repair.
+
+INFEASIBLE SUPPORT
+
+NEG=-1e30 is treated as an exact log zero but is finite. A contradictory
+exactly_k=0 factor with both binary variables clamped to 1 stops with delta 0 and
+BFE about 1e30, while the true partition function is zero and FE is +infinity.
+The runtime reports no infeasible status. cff-j4mu includes this mechanism.
+
+OTHER AREAS
+
+The hybrid mixture derivation is internally careful about direction-dependent
+collapse weights and labels its Gaussian edge entropy as an optimistic bound.
+Quadrature and an independent collapsed smoother are good evidence. It remains
+an assumed-density approximation, not exact switching-model inference.
+
+NIW/MNIW and EF conjugate identities are standard and well checked. The current
+learning loops are empirical-Bayes/conjugate rollovers in a fixed graph, not full
+joint parameter-state inference. Do not market them as general Bayesian
+continual learning.
+
+TEST DESIGN LESSON
+
+Tests that compare an implementation to a re-expression of its own rho or
+energy formula are necessary but not independent. Every new constrained node
+needs at least one of:
+
+  direct constrained-objective optimization;
+  cavity/marginal consistency;
+  brute-force enumeration or quadrature;
+  a separate reference implementation;
+  a limiting-case reduction;
+  end-to-end behavior with a causal intervention.
+
+MATH TICKETS FILED BY THIS REVIEW
+
+cff-hp3y transition GFE cavity and FE
+cff-j4mu convergence/infeasible semantics
+cff-3hgi Gaussian/hybrid numerical validity
+cff-4oq8 behavioral epistemics oracles
