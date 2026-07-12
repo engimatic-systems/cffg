@@ -2,7 +2,7 @@
 id: cff-cj5h
 status: open
 deps: []
-links: [cff-i45j]
+links: [cff-i45j, cff-gul8]
 created: 2026-07-06T00:37:22Z
 type: task
 priority: 2

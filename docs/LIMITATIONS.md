@@ -171,6 +171,24 @@ usual caveat (exact on trees — the pinned Viterbi identity; on loops, exact
 for unique-MAP bipartite matching per Bayati–Shah–Sharma, otherwise a
 heuristic that decimation, `cffg.csp.decimate`, drives to feasibility).
 
+**S1g. Long receding-horizon plans: measured envelope (2026-07-09).** On a
+60-state aliased-corridor planning stack, GFE planning beat a QMDP baseline
+(0.79 vs 0.64 success, median 13 vs 19 steps) at horizons 5–20 with
+per-env-step planning time growing roughly linearly (0.6 s at H=5 → 1.9 s
+at H=20, sweep-dominated), but success *dropped* to 0.57 at H=25 (2.5 s per
+step). The degradation is DIAGNOSED: pure under-convergence — messages
+travel ~one slice per sweep, and a fixed 120-sweep budget leaves the H=25
+control posterior at residual 5.5 (vs 4.9e-4 at 400 sweeps). Fixes are
+mechanical, not research: depth-aware/tol-driven sweep budgets in the agent
+loop plus warm-started replanning (cff-5edo). Related measured limits:
+colony batching is dispatch-bound on CPU, 1.5× at 32 instances until the
+sweep loop is a jitted scan (cff-wbhu); the GFE-TM curiosity composite
+costs ~4× a plain act() in every slice and its novelty channel outcompetes
+the goal channel while counts are near-uniform — annealing is cff-2gev.
+Until cff-5edo lands, check the delta trace before trusting a plan deeper
+than ~20 slices. (Small-sample numbers: 14 episodes per horizon —
+direction is reliable, third digits are not.)
+
 **S2. Importance-sampling noise in parameter messages.** The message to A is a
 non-conjugate log-message evaluated by importance sampling; variance grows with
 column dimensionality and makes the GFE trace stochastic (hence burn-in
