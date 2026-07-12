@@ -31,32 +31,40 @@ def _norm_pad(x: jnp.ndarray, card: int, k_max: int) -> jnp.ndarray:
 # --- BP updates ------------------------------------------------------------
 
 
-def bp_categorical(inc, logf, cards, k_max):
+# The marginalization reduction is a parameter (cff-e8zk): `op` = logsumexp for
+# sum-product (default; byte-identical to the original rules) and jnp.max for
+# min-sum / max-product. Only the sum-over-the-other-variables reduction swaps;
+# _norm_pad's normalization stays logsumexp (an arbitrary constant shift under
+# max-product, so it does not affect the decode). categorical/equality carry no
+# such reduction, so `op` is inert there.
+
+
+def bp_categorical(inc, logf, cards, k_max, op=logsumexp):
     (k,) = cards
     return _norm_pad(logf, k, k_max)[:, None, :]
 
 
-def bp_matrix_cat(inc, logf, cards, k_max):
+def bp_matrix_cat(inc, logf, cards, k_max, op=logsumexp):
     ko, ki = cards
     m_out, m_in = inc[:, 0, :ko], inc[:, 1, :ki]
-    to_out = logsumexp(logf + m_in[:, None, :], axis=2)
-    to_in = logsumexp(logf + m_out[:, :, None], axis=1)
+    to_out = op(logf + m_in[:, None, :], axis=2)
+    to_in = op(logf + m_out[:, :, None], axis=1)
     return jnp.stack([_norm_pad(to_out, ko, k_max), _norm_pad(to_in, ki, k_max)], axis=1)
 
 
-def bp_transition_mixture(inc, logf, cards, k_max):
+def bp_transition_mixture(inc, logf, cards, k_max, op=logsumexp):
     ko, ki, ku = cards  # logf: [M, ko, ki, ku]
     m_out, m_in, m_sel = inc[:, 0, :ko], inc[:, 1, :ki], inc[:, 2, :ku]
-    to_out = logsumexp(logf + m_in[:, None, :, None] + m_sel[:, None, None, :], axis=(2, 3))
-    to_in = logsumexp(logf + m_out[:, :, None, None] + m_sel[:, None, None, :], axis=(1, 3))
-    to_sel = logsumexp(logf + m_out[:, :, None, None] + m_in[:, None, :, None], axis=(1, 2))
+    to_out = op(logf + m_in[:, None, :, None] + m_sel[:, None, None, :], axis=(2, 3))
+    to_in = op(logf + m_out[:, :, None, None] + m_sel[:, None, None, :], axis=(1, 3))
+    to_sel = op(logf + m_out[:, :, None, None] + m_in[:, None, :, None], axis=(1, 2))
     return jnp.stack(
         [_norm_pad(to_out, ko, k_max), _norm_pad(to_in, ki, k_max), _norm_pad(to_sel, ku, k_max)],
         axis=1,
     )
 
 
-def bp_equality(inc, logf, cards, k_max):
+def bp_equality(inc, logf, cards, k_max, op=logsumexp):
     k = cards[0]
     a, b, c = inc[:, 0, :k], inc[:, 1, :k], inc[:, 2, :k]
     return jnp.stack(
