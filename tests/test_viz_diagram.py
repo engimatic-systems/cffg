@@ -135,3 +135,25 @@ class TestEdgeCases:
         t = Template(name="bad", variables={"loose": VariableSpec("loose", 2)})
         with pytest.raises(ValueError, match="loose"):
             derive(t)
+
+
+def test_every_factor_type_has_a_short_glyph():
+    """Box labels are capped at 3 characters (Cooper, 2026-07-08): anything
+    longer overflows the box. Registering a factor type without a GLYPHS
+    entry is a bug — the truncating fallback is a safety net, not a label."""
+    from cffg.core.ir import FACTOR_TYPES
+    from cffg.viz.diagram import GLYPHS
+
+    missing = set(FACTOR_TYPES) - set(GLYPHS)
+    assert not missing, f"factor types without a viz glyph: {sorted(missing)}"
+    too_long = {name: g for name, g in GLYPHS.items() if len(g) > 3}
+    assert not too_long, f"glyphs over 3 chars: {too_long}"
+
+
+def test_gaussian_boxes_use_script_n():
+    from cffg.models.kalman import lgssm
+
+    t, _ = lgssm(2, np.eye(1), np.eye(1), np.eye(1), np.eye(1), np.zeros(1), np.eye(1))
+    d = derive(t)
+    assert d.nodes["prior"].glyph == "𝒩"
+    assert d.nodes["emis0"].glyph == "𝒩A"

@@ -26,7 +26,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from cffg.compiler import compile_template
-from cffg.engine import Engine, State
+from cffg.engine import Engine, State, _replace
 
 Builder = Callable[..., tuple]  # build_rollout-style: (past, steps) -> (Template, arrays)
 
@@ -87,7 +87,7 @@ class RollingAgent:
                     params[g.name] = jnp.asarray(
                         np.broadcast_to(elog, (len(g.members), *elog.shape))
                     )
-        return State(messages=st.messages, params=params)
+        return _replace(st, params=params)
 
     # -- the perception-action cycle --------------------------------------
 

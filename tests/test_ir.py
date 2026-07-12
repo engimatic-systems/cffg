@@ -75,7 +75,34 @@ def test_param_role_must_have_exactly_one_source(hmm_slice):
 
 def test_equality_requires_shared_cardinality(hmm_slice):
     hmm_slice.variables["z_obs"] = VariableSpec("z_obs", 7)
-    assert "shared cardinality" in problems_of(hmm_slice)
+    assert "shared domain" in problems_of(hmm_slice)
+
+
+# --- domain families (cff-4e5z) ---------------------------------------------
+
+
+def test_variable_spec_requires_exactly_one_domain():
+    with pytest.raises(ValueError, match="exactly one"):
+        VariableSpec("both", cardinality=3, dim=2)
+    with pytest.raises(ValueError, match="exactly one"):
+        VariableSpec("neither")
+    assert VariableSpec("d", 3).family == "discrete"
+    assert VariableSpec("g", dim=2).family == "gaussian"
+    assert VariableSpec("g", dim=2).domain_key == ("gaussian", 2)
+
+
+def test_gaussian_factor_rejects_discrete_edge(hmm_slice):
+    hmm_slice.variables["y"] = VariableSpec("y", 4)  # discrete, wrong family
+    hmm_slice.factors["prior"] = FactorSpec(
+        "prior", "gaussian", edges={"out": "y"}, param_blobs={"mean": "A", "cov": "A"}
+    )
+    hmm_slice.ports["yp"] = PortSpec("yp", "y", PortRole.GLUE)
+    assert "needs gaussian edges" in problems_of(hmm_slice)
+
+
+def test_equality_rejects_mixed_families(hmm_slice):
+    hmm_slice.variables["z_obs"] = VariableSpec("z_obs", dim=3)
+    assert "shared domain" in problems_of(hmm_slice)
 
 
 def test_p_substitution_role_checked(hmm_slice):

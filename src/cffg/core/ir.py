@@ -31,12 +31,33 @@ class PortRole(str, Enum):
 class VariableSpec:
     """An edge in the FFG: a named random variable.
 
-    Discrete one-hot domains only for now; a continuous domain becomes an
-    alternative to `cardinality` when Gaussian support lands (LIMITATIONS S1).
+    Two domain families: discrete one-hot (`cardinality` = k) or Gaussian
+    (`dim` = d, a point in R^d). Exactly one of the two is set; `family`
+    names which. Messages, arenas, and rules dispatch on the family — a
+    discrete edge lives in the log-probability arena, a Gaussian edge in
+    the information-form (eta, Lambda) arena (cff-4e5z).
     """
 
     name: str
-    cardinality: int
+    cardinality: int = 0
+    dim: int = 0
+
+    def __post_init__(self):
+        if (self.cardinality > 0) == (self.dim > 0):
+            raise ValueError(
+                f"variable {self.name!r}: exactly one of cardinality ({self.cardinality}) "
+                f"and dim ({self.dim}) must be positive"
+            )
+
+    @property
+    def family(self) -> str:
+        return "gaussian" if self.dim else "discrete"
+
+    @property
+    def domain_key(self) -> tuple[str, int]:
+        """Hashable domain identity: what must match across an equality node
+        or a glue bond."""
+        return (self.family, self.dim or self.cardinality)
 
 
 @dataclass(frozen=True)
@@ -103,12 +124,18 @@ class PortSpec:
 
 @dataclass(frozen=True)
 class FactorType:
-    """Structural signature of a factor kind. Math lives in cffg.rules (M2+)."""
+    """Structural signature of a factor kind. Math lives in cffg.rules (M2+)
+    and cffg.gauss (Gaussian family, cff-4e5z).
+
+    `family` constrains the structural edges' domains: "discrete" and
+    "gaussian" require every edge in that family; "any" (equality) accepts
+    either family but `symmetric_domain` then forces one shared domain."""
 
     name: str
     edge_roles: tuple[str, ...]  # required structural edges
     param_roles: tuple[str, ...] = ()  # each bound by exactly one edge or blob
-    symmetric_domain: bool = False  # all structural edges share one cardinality
+    symmetric_domain: bool = False  # all structural edges share one domain
+    family: str = "discrete"  # "discrete" | "gaussian" | "any"
 
 
 FACTOR_TYPES: dict[str, FactorType] = {}
@@ -131,7 +158,25 @@ register_factor_type(
     FactorType("transition_mixture", edge_roles=("out", "in", "selector"), param_roles=("matrices",))
 )
 register_factor_type(FactorType("dirichlet", edge_roles=("out",), param_roles=("counts",)))
-register_factor_type(FactorType("equality", edge_roles=("a", "b", "c"), symmetric_domain=True))
+register_factor_type(
+    FactorType("equality", edge_roles=("a", "b", "c"), symmetric_domain=True, family="any")
+)
+
+# The Gaussian vocabulary (cff-4e5z): enough for linear-Gaussian state-space
+# models. `gaussian` is the prior/leaf node N(out; mean, cov); `gaussian_linear`
+# is the conditional N(out; matrix @ in + offset, cov) — one type covers both
+# Kalman transitions and emissions.
+register_factor_type(
+    FactorType("gaussian", edge_roles=("out",), param_roles=("mean", "cov"), family="gaussian")
+)
+register_factor_type(
+    FactorType(
+        "gaussian_linear",
+        edge_roles=("out", "in"),
+        param_roles=("matrix", "offset", "cov"),
+        family="gaussian",
+    )
+)
 
 
 @dataclass

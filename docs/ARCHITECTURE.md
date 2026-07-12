@@ -95,6 +95,35 @@ Two-phase, mirroring PGMax:
    trigger recompile; data/parameter edits are just new arena inputs (no
    recompile). Static shapes throughout.
 
+### 2b. Domain families and the Gaussian arena (cff-4e5z)
+
+Variables carry a domain family: discrete (`cardinality: k`, one-hot) or
+Gaussian (`dim: d`, a point in R^d). The two families get *separate arenas*
+in one State pytree: discrete messages stay in the flat `[n_slots, k_max]`
+log tensor; Gaussian messages are information-form pairs
+(`eta [n_gslots, d_max]`, `Lambda [n_gslots, d_max, d_max]`), where products
+add and the vacuous message is exactly zeros (half-edges and initialization
+are free). Factor types declare their family (`equality` is polymorphic and
+routes by its edges' family); groups key on the dim signature so every rule
+call sees static shapes. Design decisions worth remembering:
+
+- **Never invert an incoming precision.** All linear-Gaussian rules are
+  derived (docstring of `cffg.gauss`) in forms whose only inversions are
+  `noise + incoming` combinations — improper/partially-informative messages
+  propagate exactly rather than through a lossy moment conversion.
+- **Observations condition, they don't clamp.** A continuous δ-clamp has
+  −∞ differential entropy and diverges the Bethe ledger, so a Gaussian DATA
+  port compiles the likelihood node into an *observed* group taking the
+  value (and a missing-mask) as runtime inputs. This keeps the continuous
+  tree identity exact: BFE = −log p(bound observations), the Kalman tier's
+  pinned test. Missing data contributes −H[mu_in], mirroring the discrete
+  missing-data cancellation.
+- **One damp knob.** Linear damping on (eta, Lambda) *is* log-space damping
+  for Gaussians, so the engine's damp parameter acts uniformly across
+  families.
+- The Kalman test tier (`tests/test_kalman.py`) mirrors the HMM tier
+  exactly: smoother parity, tree-identity FE, missing data, vmap batching.
+
 ### 3. Message rule library (`cffg.rules`)
 
 A registry keyed by `(factor_type, constraint_config, out_edge_role)`:
@@ -321,3 +350,36 @@ with no accelerator stack; JAX enters at the compiler boundary.
 - **M7** — hierarchical couplings: inter-level message rules, nested schedules,
   goal hyperpriors as the validation case; shallow contingent-planning template
   spike.
+- **M8** — plotting facility: paper-faithful CFFG diagrams (landed, cff-ql2n).
+
+### Factor-library roadmap (epic cff-ahps)
+
+The long game is a general factor-graph engine: all useful probability
+distributions (continuous, discrete, hybrid), constraint-satisfaction factors
+for optimization under uncertainty, and neural-network factors with backprop.
+Ordered by dependency, one ticket each — derivations happen at top level and
+land as docstrings; delegation guidance lives in the epic:
+
+- **M9 — Gaussian core** (cff-4e5z, landed): domain families, information-form
+  arena, linear-Gaussian BP, Kalman parity (§2b above).
+- **M10 — Gaussian VMP + conjugate learning** (cff-7c5o): NIW/Gamma priors,
+  the continuous analog of Dirichlet count rollover.
+- **M11 — Hybrid discrete–continuous** (cff-pksr): conditional-Gaussian
+  factors, moment-matched mixture collapse, switching-KF tier. The epistemic
+  path: GFE stays on discrete regime variables while Gaussians carry
+  perception (what the glucose agent needs).
+- **M12 — Nonlinear factors** (cff-o7hs): Jacobian linearization and
+  sigma-point moment matching; activates the reserved MOMENT_MATCHING bead
+  as EP.
+- **M13 — Exponential-family abstraction** (cff-8s6a): natural parameters +
+  log-partitions as the message contract; Gamma/Beta/Poisson/Wishart as
+  table entries. Cat/Dir/Gaussian re-expressed with zero test regressions.
+- **M14 — Constraint/optimization factors** (cff-e8zk): min-sum semiring mode
+  on the existing arenas + combinatorial hard-constraint messages
+  (alldifferent, cardinality, linear inequalities); the ledger API must
+  distinguish FE (sum-product) from objective value (min-sum).
+- **M15 — Neural factors** (cff-1o72): NN nodes via Equinox, FE-gradient
+  training through the (implicitly differentiated) fixed point, amortized
+  message initialization.
+- **Research track** (cff-dfpi): continuous/hybrid GFE epistemics — open in
+  the literature; hybrid regime-variable epistemics is the working bet.

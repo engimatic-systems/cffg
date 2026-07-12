@@ -45,6 +45,7 @@ EPIC_FILES = {
         "test_viz_layout.py",
         "test_viz_svg.py",
     ],
+    "M9 · Gaussian": ["test_gauss_rules.py", "test_kalman.py"],
     "SG · Glucose": ["test_glucose.py"],
 }
 FILE_TO_EPIC = {f: e for e, fs in EPIC_FILES.items() for f in fs}

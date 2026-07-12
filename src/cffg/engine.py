@@ -19,6 +19,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax.scipy.special import logsumexp
 
+from cffg import gauss
 from cffg.compiler import NEG, Arena
 from cffg.rules import (
     BP_UPDATES,
@@ -33,8 +34,23 @@ _TINY = 1e-12
 
 
 class State(eqx.Module):
+    """Pure-data instance state. The Gaussian arrays are zero-size on
+    discrete-only models — same pytree structure either way, so colonies mix
+    freely. g_obs/g_mask are the *conditioned* Gaussian observations (see
+    cffg.gauss: conditioning, not clamping) with mask 0 = missing."""
+
     messages: jax.Array  # [n_slots, k_max] log-space
     params: dict[str, jax.Array]  # group name -> [M, ...] log-factors
+    g_eta: jax.Array  # [n_gslots, d_max] information vectors
+    g_lam: jax.Array  # [n_gslots, d_max, d_max] precisions
+    g_obs: jax.Array  # [n_obs_rows, d_max] observation values
+    g_mask: jax.Array  # [n_obs_rows] 1.0 = bound, 0.0 = missing
+
+
+def _replace(state: State, **kw) -> State:
+    return State(**{f: kw.get(f, getattr(state, f)) for f in (
+        "messages", "params", "g_eta", "g_lam", "g_obs", "g_mask"
+    )})
 
 
 class Engine:
@@ -48,26 +64,56 @@ class Engine:
     # -- state construction ---------------------------------------------
 
     def init_state(self) -> State:
-        return State(messages=self._uniform_messages(), params={
-            name: jnp.asarray(logf) for name, logf in self.arena.log_params.items()
-        })
+        a = self.arena
+        return State(
+            messages=self._uniform_messages(),
+            params={name: jnp.asarray(p) for name, p in a.log_params.items()},
+            g_eta=jnp.zeros((a.n_gslots, a.d_max)),  # zeros = vacuous
+            g_lam=jnp.zeros((a.n_gslots, a.d_max, a.d_max)),
+            g_obs=jnp.zeros((a.n_obs_rows, a.d_max)),
+            g_mask=jnp.zeros(a.n_obs_rows),
+        )
 
     def _uniform_messages(self) -> jax.Array:
         rows = np.full((self.arena.n_slots, self.arena.k_max), NEG)
         for e in self.arena.edges.values():
+            if e.dim:
+                continue  # gaussian slots live in the (eta, Lambda) arena
             rows[e.slot0, : e.card] = -np.log(e.card)
             rows[e.slot1, : e.card] = -np.log(e.card)
         return jnp.asarray(rows)
 
-    def bind_data(self, state: State, observations: dict[str, int | None]) -> State:
-        """Clamp DATA ports to observed values (None = missing = uniform)."""
-        msgs = state.messages
+    def bind_data(self, state: State, observations: dict) -> State:
+        """Bind DATA ports: discrete ports take an int (None = missing =
+        uniform); Gaussian ports take a length-dim vector (None = missing =
+        the likelihood node drops out)."""
+        msgs, g_obs, g_mask = state.messages, state.g_obs, state.g_mask
         for port, value in observations.items():
+            if port in self.arena.gauss_data:
+                row, dim = self.arena.gauss_data[port]
+                if value is None:
+                    g_mask = g_mask.at[row].set(0.0)
+                else:
+                    val = np.asarray(value, dtype=np.float64).reshape(-1)
+                    if val.shape[0] != dim:
+                        raise ValueError(
+                            f"port {port!r}: observation has dim {val.shape[0]}, edge has {dim}"
+                        )
+                    vec = np.zeros(self.arena.d_max)
+                    vec[:dim] = val
+                    g_obs = g_obs.at[row].set(jnp.asarray(vec, dtype=g_obs.dtype))
+                    g_mask = g_mask.at[row].set(1.0)
+                continue
             if port not in self.arena.data_slots:
-                raise KeyError(f"no DATA port {port!r}; have {sorted(self.arena.data_slots)}")
+                raise KeyError(
+                    f"no DATA port {port!r}; have "
+                    f"{sorted([*self.arena.data_slots, *self.arena.gauss_data])}"
+                )
             slot = self.arena.data_slots[port]
             card = next(
-                e.card for e in self.arena.edges.values() if slot in (e.slot0, e.slot1)
+                e.card
+                for e in self.arena.edges.values()
+                if not e.dim and slot in (e.slot0, e.slot1)
             )
             row = np.full(self.arena.k_max, NEG)
             if value is None:
@@ -77,15 +123,16 @@ class Engine:
                     raise ValueError(f"port {port!r}: value {value} out of range [0, {card})")
                 row[value] = 0.0
             msgs = msgs.at[slot].set(jnp.asarray(row, dtype=msgs.dtype))
-        return State(messages=msgs, params=state.params)
+        return _replace(state, messages=msgs, g_obs=g_obs, g_mask=g_mask)
 
     # -- execution --------------------------------------------------------
 
     def step(self, state: State, damp: float = 0.0, harden: bool = True) -> State:
-        return State(
-            messages=self._step(state.messages, state.params, damp, harden),
-            params=state.params,
+        msgs, g_eta, g_lam = self._step(
+            state.messages, state.g_eta, state.g_lam, state.g_obs, state.g_mask,
+            state.params, damp, harden,
         )
+        return _replace(state, messages=msgs, g_eta=g_eta, g_lam=g_lam)
 
     def run(
         self,
@@ -114,7 +161,14 @@ class Engine:
         def phase(n: int, harden: bool, st: State) -> State:
             for _ in range(n):
                 nxt = self.step(st, damp, harden)
-                delta = float(jnp.max(jnp.abs(nxt.messages - st.messages)))
+                delta = max(
+                    (
+                        float(jnp.max(jnp.abs(getattr(nxt, f) - getattr(st, f))))
+                        for f in ("messages", "g_eta", "g_lam")
+                        if getattr(st, f).size
+                    ),
+                    default=0.0,
+                )
                 deltas.append(delta)
                 st = nxt
                 if tol is not None and delta < tol:
@@ -132,14 +186,82 @@ class Engine:
         out: dict[str, np.ndarray] = {}
         msgs = np.asarray(state.messages)
         for e in self.arena.edges.values():
+            if e.dim:
+                continue  # gaussian_marginals
             lq = msgs[e.slot0, : e.card] + msgs[e.slot1, : e.card]
             lq -= lq.max()
             q = np.exp(lq)
             out[e.name] = q / q.sum()
         return out
 
+    def gaussian_marginals(self, state: State) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+        """Edge name -> (mean, cov). Requires a proper combined precision —
+        run to coherence (and bind data) first; improper beliefs surface as
+        huge covariances, deliberately loud."""
+        out: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+        eta, lam = np.asarray(state.g_eta), np.asarray(state.g_lam)
+        for e in self.arena.edges.values():
+            if not e.dim:
+                continue
+            d = e.dim
+            eta_q = eta[e.slot0, :d] + eta[e.slot1, :d]
+            lam_q = lam[e.slot0, :d, :d] + lam[e.slot1, :d, :d]
+            mean, cov = gauss.moments(eta_q, lam_q)
+            out[e.name] = (np.asarray(mean), np.asarray(cov))
+        return out
+
     def bfe(self, state: State) -> float:
-        return float(self._bfe(state.messages, state.params))
+        return float(
+            self._bfe(
+                state.messages, state.g_eta, state.g_lam, state.g_obs, state.g_mask,
+                state.params,
+            )
+        )
+
+
+def _pad_gauss(eta: jax.Array, lam: jax.Array, d_max: int) -> tuple[jax.Array, jax.Array]:
+    """Zero-pad [M, d]/[M, d, d] rule outputs back to arena width."""
+    p = d_max - eta.shape[-1]
+    return (
+        jnp.pad(eta, ((0, 0), (0, p))),
+        jnp.pad(lam, ((0, 0), (0, p), (0, p))),
+    )
+
+
+def _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params):
+    """One synchronous flooding sweep over the Gaussian groups; returns the
+    fully rewritten (eta, Lambda) arrays. Dims are static per group, so every
+    rule call sees exact [:d] slices of the padded arena."""
+    d_max = arena.d_max
+    new_eta, new_lam = g_eta, g_lam
+    for g in arena.gauss_groups:
+        inc_e = g_eta[g.gather]  # [M, R, d_max]
+        inc_l = g_lam[g.gather]  # [M, R, d_max, d_max]
+        outs: list[tuple[jax.Array, jax.Array]] = []  # per role, [M, d]/[M, d, d]
+        if g.type == "gaussian":
+            (d,) = g.dims
+            w, m = params[g.name + ":W"], params[g.name + ":m"]
+            outs.append(gauss.prior_message(jnp.einsum("mij,mj->mi", w, m), w))
+        elif g.type == "equality":
+            d = g.dims[0]
+            to_e, to_l = gauss.equality_messages(inc_e[..., :d], inc_l[..., :d, :d])
+            outs = [(to_e[:, r], to_l[:, r]) for r in range(len(g.roles))]
+        else:  # gaussian_linear / gaussian_linear_obs; roles = (out, in)
+            do, di = g.dims
+            a, b, w = (params[g.name + k] for k in (":A", ":b", ":W"))
+            e_in, l_in = inc_e[:, 1, :di], inc_l[:, 1, :di, :di]
+            outs.append(gauss.linear_forward(e_in, l_in, a, b, w))
+            if g.type == "gaussian_linear_obs":
+                y, mk = g_obs[g.obs_rows][:, :do], g_mask[g.obs_rows]
+                outs.append(gauss.linear_observed_backward(y, mk, a, b, w))
+            else:
+                e_out, l_out = inc_e[:, 0, :do], inc_l[:, 0, :do, :do]
+                outs.append(gauss.linear_backward(e_out, l_out, a, b, w))
+        for r, (oe, ol) in enumerate(outs):
+            oe, ol = _pad_gauss(oe, ol, d_max)
+            new_eta = new_eta.at[g.scatter[:, r]].set(oe)
+            new_lam = new_lam.at[g.scatter[:, r]].set(ol)
+    return new_eta, new_lam
 
 
 def _make_step(arena: Arena):
@@ -148,10 +270,14 @@ def _make_step(arena: Arena):
 
     def step(
         messages: jax.Array,
+        g_eta: jax.Array,
+        g_lam: jax.Array,
+        g_obs: jax.Array,
+        g_mask: jax.Array,
         params: dict[str, jax.Array],
         damp: float = 0.0,
         harden: bool = True,
-    ) -> jax.Array:
+    ) -> tuple[jax.Array, jax.Array, jax.Array]:
         new = messages
         for g in groups:
             logf = params.get(g.name)
@@ -171,6 +297,14 @@ def _make_step(arena: Arena):
             )
             new = new.at[g.scatter_z].set(mu2)
             new = new.at[g.scatter_x].set(log_qx)
+        # Gaussian sweep: information-form damping below is the log-space
+        # damping of the Gaussian family (log of a Gaussian is its (eta,
+        # Lambda) quadratic), so one damp knob covers both arenas.
+        new_eta, new_lam = g_eta, g_lam
+        if arena.gauss_groups:
+            new_eta, new_lam = _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params)
+            new_eta = damp * g_eta + (1.0 - damp) * new_eta
+            new_lam = damp * g_lam + (1.0 - damp) * new_lam
         # Log-space damping: stabilizes the outer coordination between GFE
         # composites (their local solves are exact, but synchronous flooding
         # between them can limit-cycle — the outer face of Part II §4.5).
@@ -189,17 +323,59 @@ def _make_step(arena: Arena):
                 jnp.arange(k_max)[None, :] == jnp.argmax(lq, axis=-1)[:, None], 0.0, NEG
             ).astype(new.dtype)
             new = new.at[p0].set(hot).at[p1].set(hot)
-        return new
+        return new, new_eta, new_lam
 
     return step
+
+
+def _gauss_bfe(arena, g_eta, g_lam, g_obs, g_mask, params):
+    """Gaussian node energies + interior-edge differential entropies. Exact
+    closed forms (cffg.gauss docstring); with conditioned observations the
+    tree identity BFE = −log p(y) holds to fixed-point/ridge precision."""
+    total = jnp.asarray(0.0, dtype=g_eta.dtype)
+    for g in arena.gauss_groups:
+        inc_e, inc_l = g_eta[g.gather], g_lam[g.gather]
+        if g.type == "gaussian":
+            (d,) = g.dims
+            total = total + gauss.prior_energy(
+                inc_e[:, 0, :d], inc_l[:, 0, :d, :d],
+                params[g.name + ":m"], params[g.name + ":W"],
+            ).sum()
+        elif g.type == "equality":
+            d = g.dims[0]
+            total = total + gauss.equality_energy(inc_e[..., :d], inc_l[..., :d, :d]).sum()
+        else:
+            do, di = g.dims
+            a, b, w = (params[g.name + k] for k in (":A", ":b", ":W"))
+            e_i, l_i = inc_e[:, 1, :di], inc_l[:, 1, :di, :di]
+            if g.type == "gaussian_linear_obs":
+                y, mk = g_obs[g.obs_rows][:, :do], g_mask[g.obs_rows]
+                total = total + gauss.linear_observed_energy(e_i, l_i, y, mk, a, b, w).sum()
+            else:
+                e_o, l_o = inc_e[:, 0, :do], inc_l[:, 0, :do, :do]
+                total = total + gauss.linear_energy(e_o, l_o, e_i, l_i, a, b, w).sum()
+    for d, pairs in arena.gauss_interior:
+        l0 = g_lam[pairs[:, 0], :d, :d]
+        l1 = g_lam[pairs[:, 1], :d, :d]
+        total = total + gauss.edge_entropy(l0, l1).sum()
+    return total
 
 
 def _make_bfe(arena: Arena):
     groups = arena.groups
     pairs = arena.interior_slot_pairs
 
-    def bfe(messages: jax.Array, params: dict[str, jax.Array]) -> jax.Array:
+    def bfe(
+        messages: jax.Array,
+        g_eta: jax.Array,
+        g_lam: jax.Array,
+        g_obs: jax.Array,
+        g_mask: jax.Array,
+        params: dict[str, jax.Array],
+    ) -> jax.Array:
         total = jnp.asarray(0.0, dtype=messages.dtype)
+        if arena.gauss_groups:
+            total = total + _gauss_bfe(arena, g_eta, g_lam, g_obs, g_mask, params)
         for g in groups:
             logf = params.get(g.name)
             if logf is None:

@@ -115,10 +115,15 @@ def test_vmap_batch_equals_sequential():
     ]
     batched = jax.tree_util.tree_map(lambda *xs: jnp.stack(xs), *states)
 
-    step_v = eqx.filter_vmap(lambda m, p: engine._step(m, p))
-    msgs, params = batched.messages, batched.params
+    step_v = eqx.filter_vmap(
+        lambda st: engine._step(
+            st.messages, st.g_eta, st.g_lam, st.g_obs, st.g_mask, st.params
+        )[0]
+    )
+    msgs = batched.messages
     for _ in range(3 * T + 10):
-        msgs = step_v(msgs, params)
+        batched = eqx.tree_at(lambda s: s.messages, batched, step_v(batched))
+    msgs = batched.messages
 
     for b, s in enumerate(sequences):
         solo, _ = engine.run(states[b], 3 * T + 10)

@@ -21,7 +21,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from cffg.compiler import compile_template
-from cffg.engine import Engine, State
+from cffg.engine import Engine, State, _replace
 from cffg.models.tmaze import (
     C,
     N_CTX,
@@ -105,7 +105,7 @@ class Phase:
                 params[key] = jnp.asarray(np.broadcast_to(log_a, (m, *log_a.shape)))
         for key, m in self.count_keys:
             params[key] = jnp.asarray(np.broadcast_to(counts, (m, *counts.shape)))
-        return State(messages=st.messages, params=params)
+        return _replace(st, params=params)
 
 
 def _make_phase(past: int, steps: int, alpha: float, c_util: float, gfe: bool) -> Phase:

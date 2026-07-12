@@ -86,9 +86,9 @@ def bond(t: Template, port_a: str, port_b: str) -> Template:
         raise ComposeError(f"cannot bond port {port_a!r} to itself")
     pa, pb = t.ports[port_a], t.ports[port_b]
     va, vb = t.variables[pa.variable], t.variables[pb.variable]
-    if va.cardinality != vb.cardinality:
+    if va.domain_key != vb.domain_key:
         raise ComposeError(
-            f"bond {port_a!r}~{port_b!r}: cardinality {va.cardinality} != {vb.cardinality}"
+            f"bond {port_a!r}~{port_b!r}: domain {va.domain_key} != {vb.domain_key}"
         )
     if va.name == vb.name:
         raise ComposeError(f"bond {port_a!r}~{port_b!r}: ports share variable {va.name!r}")
