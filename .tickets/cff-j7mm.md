@@ -1,7 +1,7 @@
 ---
 id: cff-j7mm
 status: open
-deps: []
+deps: [cff-44we]
 links: [cff-fxmj, cff-44we]
 created: 2026-07-10T18:05:50Z
 type: bug

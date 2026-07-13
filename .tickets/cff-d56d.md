@@ -1,7 +1,7 @@
 ---
 id: cff-d56d
 status: open
-deps: [cff-j4mu]
+deps: [cff-j4mu, cff-ri8m]
 links: [cff-fxmj, cff-5edo, cff-wbhu]
 created: 2026-07-10T18:05:00Z
 type: feature

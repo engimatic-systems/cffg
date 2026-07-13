@@ -1,7 +1,7 @@
 ---
 id: cff-mjku
 status: open
-deps: []
+deps: [cff-9xmq]
 links: []
 created: 2026-07-10T03:31:28Z
 type: feature

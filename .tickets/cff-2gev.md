@@ -1,7 +1,7 @@
 ---
 id: cff-2gev
 status: open
-deps: [cff-hp3y]
+deps: [cff-hp3y, cff-4oq8]
 links: []
 created: 2026-07-10T03:34:54Z
 type: feature

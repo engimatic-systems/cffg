@@ -1,7 +1,7 @@
 ---
 id: cff-ri8m
 status: open
-deps: []
+deps: [cff-3hgi]
 links: [cff-1o72, cff-fxmj, cff-o7hs, cff-l6i5]
 created: 2026-07-10T18:05:00Z
 type: feature

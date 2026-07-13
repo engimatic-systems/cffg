@@ -1,7 +1,7 @@
 ---
 id: cff-lquu
 status: open
-deps: []
+deps: [cff-3hgi]
 links: []
 created: 2026-07-10T03:31:09Z
 type: feature

@@ -1,7 +1,7 @@
 ---
 id: cff-iwgl
 status: open
-deps: []
+deps: [cff-fr5c]
 links: [cff-fr5c]
 created: 2026-07-06T00:26:48Z
 type: task

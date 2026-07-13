@@ -1,7 +1,7 @@
 ---
 id: cff-gul8
 status: open
-deps: []
+deps: [cff-cj5h]
 links: [cff-cj5h, cff-fxmj, cff-hp3y, cff-4oq8]
 created: 2026-07-10T03:31:28Z
 type: feature

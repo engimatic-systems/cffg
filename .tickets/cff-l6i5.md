@@ -1,7 +1,7 @@
 ---
 id: cff-l6i5
 status: open
-deps: [cff-8s6a]
+deps: [cff-8s6a, cff-ri8m]
 links: [cff-1o72, cff-fxmj, cff-o7hs, cff-ri8m, cff-3hgi]
 created: 2026-07-09T17:16:15Z
 type: chore

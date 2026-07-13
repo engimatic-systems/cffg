@@ -1,7 +1,7 @@
 ---
 id: cff-jude
 status: open
-deps: [cff-t6ec]
+deps: [cff-t6ec, cff-d56d]
 links: []
 created: 2026-07-08T02:57:59Z
 type: task

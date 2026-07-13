@@ -1,7 +1,7 @@
 ---
 id: cff-mwjo
 status: open
-deps: [cff-rlr2]
+deps: [cff-rlr2, cff-2gev, cff-4oq8, cff-gjjk, cff-iwgl]
 links: []
 created: 2026-07-05T22:12:32Z
 type: epic

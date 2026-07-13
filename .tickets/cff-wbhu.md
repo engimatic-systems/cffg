@@ -1,7 +1,7 @@
 ---
 id: cff-wbhu
 status: open
-deps: [cff-j4mu]
+deps: [cff-j4mu, cff-d56d, cff-44we]
 links: [cff-fxmj, cff-5edo, cff-d56d]
 created: 2026-07-10T03:34:54Z
 type: feature

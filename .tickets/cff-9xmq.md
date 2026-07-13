@@ -1,7 +1,7 @@
 ---
 id: cff-9xmq
 status: open
-deps: []
+deps: [cff-wbhu]
 links: [cff-6s31]
 created: 2026-07-10T03:30:52Z
 type: feature

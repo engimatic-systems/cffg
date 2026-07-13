@@ -1,7 +1,7 @@
 ---
 id: cff-21ta
 status: open
-deps: []
+deps: [cff-t2g3]
 links: []
 created: 2026-07-05T23:57:38Z
 type: epic
