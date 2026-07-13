@@ -70,11 +70,13 @@ This project will span many context windows. The rule that makes that survivable
 
 ### Document policy
 
-Five canonical documents: `AGENTS.md` (rules), `docs/ARCHITECTURE.md`
+Six canonical documents: `AGENTS.md` (rules), `docs/ARCHITECTURE.md`
 (design), `docs/LIMITATIONS.md` (scope honesty), `docs/DERIVATIONS.md`
 (formal message/FE derivations beyond the papers, each with a plain-English
 companion and executable-test anchors — added 2026-07-09 at Cooper's request
-for cff-fk2u), `README.md` (the user guide).
+for cff-fk2u), `docs/READING.md` (curated external reading list — added
+2026-07-12 at Cooper's request; keep it cream-of-the-crop short, verified
+links only), `README.md` (the user guide).
 **Update in place; do not create new markdown files** — with one sanctioned
 exception: `docs/todo-notes/` holds one note per *remaining* under-explained
 work thread (per Cooper, 2026-07-05). Each note names its `tk` ticket; when
