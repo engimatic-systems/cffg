@@ -98,15 +98,18 @@ ticket under the roadmap epic cff-ahps:
 The registry architecture exists precisely so each of these lands as an isolated
 contribution.
 
-**S1b. Gaussian numerics.** Rules never invert incoming precisions (improper/
-vacuous messages propagate exactly), but potentially singular solves are ridged
-with 1e-10·I so transiently underdetermined systems stay finite mid-flooding;
-at a proper fixed point the ridge perturbs results at ~1e-10 relative — visible
-only under extreme covariance scaling (condition numbers ≳ 1e8). Continuous
-δ-clamps are rejected by design: a Gaussian observation is *conditioned into*
-its likelihood node (a huge-precision clamp would diverge the differential-
-entropy ledger). Free energies on models with improper beliefs (e.g. unbonded
-Gaussian glue ports) come out ±inf — deliberate loudness, not a bug.
+**S1b. Gaussian numerics.** Rules do not require incoming precisions to be
+invertible: improper/vacuous messages propagate exactly. Potentially singular
+Schur systems use a Moore-Penrose limit whose numerical-rank cutoff scales with
+dtype and matrix dimension; accepted proper beliefs use unregularized Cholesky
+solves, so there is no deliberate ridge bias or unit-dependent information
+floor. At working-precision rank boundaries, directions below that relative
+cutoff are treated as unconstrained. Continuous δ-clamps are rejected by design: a Gaussian
+observation is *conditioned into* its likelihood node (a huge-precision clamp
+would diverge the differential-entropy ledger). Nonsymmetric, non-PD, or
+non-finite beliefs make node/edge energy terms `+inf`; marginal readouts return
+NaNs, and sufficient-statistic readouts also carry `proper=False` — deliberate
+loudness, not a plausible negative covariance.
 
 **S1c. Dynamics curiosity is an optimistic bound.** The GFE-TM composite
 (cff-fk2u, `epistemic_b=True`; derivation in docs/DERIVATIONS.md D1) gives

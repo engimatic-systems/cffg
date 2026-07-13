@@ -8,9 +8,9 @@ because the two operations message passing needs are trivial there: products
 of messages add their (η, Λ), and the *vacuous* message (a half-edge, an
 unbonded glue port, an uninitialized slot) is exactly (0, 0) — no infinities,
 no special cases. Λ may be singular (an improper, partially-informative
-message); that is a feature, and every rule below is derived so that it never
-inverts an *incoming* Λ. The only matrices inverted are `noise + incoming`
-combinations that are positive definite whenever the noise covariance is.
+message); that is a feature, and no rule requires an inverse of an arbitrary
+incoming Λ. Proper inputs use a stable covariance-form solve; singular inputs
+use the Schur complement's relative-rank pseudoinverse limit.
 
 Derivations (recorded per AGENTS.md: durable math lives next to the code).
 Both node rules come from one Gaussian integral. For f(y, x) =
@@ -25,11 +25,10 @@ FORWARD (marginalize x against mu_in = (η_i, Λ_i)):
     Checks: Λ_i = 0, A square invertible ⇒ Λ_out = 0 (vacuous propagates
     exactly, by Woodbury); Λ_i ≻ 0 ⇒ Λ_out = (V + A Λ_i⁻¹ Aᵀ)⁻¹, the
     covariance-form Kalman prediction. S can be singular while beliefs are
-    still forming (vacuous Λ_i, rank-deficient A), so the solve is ridged
-    with _RIDGE·I: transient messages stay finite, and on trees synchronous
-    flooding overwrites every message each sweep, so the transient washes
-    out; at a proper fixed point the ridge is an O(1e-10) relative
-    perturbation. See LIMITATIONS (Gaussian numerics).
+    still forming (vacuous Λ_i, rank-deficient A), so its Moore-Penrose
+    inverse is taken with a dtype-relative numerical-rank threshold. This is
+    the zero-ridge limit and therefore preserves vacuous propagation at every
+    precision scale instead of injecting an absolute information floor.
 
 BACKWARD (marginalize y against mu_out = (η_o, Λ_o)):
     mu(x) = ∫ f(y,x) mu_out(y) dy.  Quadratic in y with curvature W + Λ_o
@@ -70,7 +69,7 @@ Conventions: rules are batched over a group's members ([M, ...] leading
 axis) via vmap; dims are static per group; the engine slices [:d] out of the
 d_max-padded arena before calling and zero-pads the results after. Energies
 are only meaningful at (near-)fixed points with proper beliefs — improper
-beliefs surface as ±inf, deliberately loud.
+beliefs surface as +inf, deliberately loud.
 """
 
 from __future__ import annotations
@@ -78,21 +77,128 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 
-_RIDGE = 1e-10
 _LOG2PI = 1.8378770664093453  # log(2*pi)
 
 
-def _solve(mat: jnp.ndarray, rhs: jnp.ndarray) -> jnp.ndarray:
-    """Ridged symmetric solve: finite on transiently singular systems."""
+def _matrix_scale(mat: jnp.ndarray) -> jnp.ndarray:
+    """Per-matrix absolute scale with a dtype-derived nonzero fallback."""
+    scale = jnp.max(jnp.abs(mat), axis=(-2, -1))
+    return jnp.maximum(scale, jnp.asarray(jnp.finfo(mat.dtype).tiny, dtype=mat.dtype))
+
+
+def _symmetry_ok(mat: jnp.ndarray) -> jnp.ndarray:
+    """Numerical symmetry test relative to matrix scale and dimension."""
     d = mat.shape[-1]
-    return jnp.linalg.solve(mat + _RIDGE * jnp.eye(d, dtype=mat.dtype), rhs)
+    err = jnp.max(jnp.abs(mat - mat.swapaxes(-1, -2)), axis=(-2, -1))
+    # Invariant protected: only a genuinely symmetric precision enters a
+    # Cholesky/readout.  The d*eps allowance admits roundoff from A.T@W@A and
+    # rescales with units; it is not an eigenvalue floor.
+    tol = 16.0 * d * jnp.finfo(mat.dtype).eps * _matrix_scale(mat)
+    return jnp.isfinite(mat).all(axis=(-2, -1)) & (err <= tol)
+
+
+def _pd_ok(mat: jnp.ndarray) -> jnp.ndarray:
+    """Scale-invariant strict-PD predicate, batched and JIT-safe.
+
+    A positive scalar precision remains proper however diffuse its units are.
+    Symmetry plus a finite, strictly-positive Cholesky diagonal rejects
+    singular and indefinite matrices; sign+logdet is retained as an
+    independent guard against backend-specific borderline factorizations.
+    """
+    sym = 0.5 * (mat + mat.swapaxes(-1, -2))
+    chol = jnp.linalg.cholesky(sym)
+    diag = jnp.diagonal(chol, axis1=-2, axis2=-1)
+    sign, logdet = jnp.linalg.slogdet(sym)
+    return (
+        _symmetry_ok(mat)
+        & jnp.isfinite(chol).all(axis=(-2, -1))
+        & (diag > 0).all(axis=-1)
+        & (sign > 0)
+        & jnp.isfinite(logdet)
+    )
+
+
+def is_proper_precision(mat: jnp.ndarray) -> jnp.ndarray:
+    """Public propriety predicate used by Gaussian engine readouts."""
+    return _pd_ok(jnp.asarray(mat))
+
+
+def _psd_ok(mat: jnp.ndarray) -> jnp.ndarray:
+    """Scale-relative PSD predicate for possibly-vacuous messages."""
+    sym = 0.5 * (mat + mat.swapaxes(-1, -2))
+    eig = jnp.linalg.eigvalsh(sym)
+    tol = 16.0 * mat.shape[-1] * jnp.finfo(mat.dtype).eps * _matrix_scale(mat)
+    return _symmetry_ok(mat) & jnp.isfinite(eig).all(axis=-1) & (eig[..., 0] >= -tol)
+
+
+def _safe_pd(mat: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
+    """Return `(proper, safe_matrix)` for branch-safe linear algebra.
+
+    Invalid matrices are replaced by a scale-matched identity solely so JAX
+    can evaluate untaken `where` branches without NaNs.  Accepted matrices
+    are never ridged, so proper solves have zero deliberate regularization
+    bias.
+    """
+    ok = _pd_ok(mat)
+    sym = 0.5 * (mat + mat.swapaxes(-1, -2))
+    eye = jnp.eye(mat.shape[-1], dtype=mat.dtype)
+    fallback = _matrix_scale(mat)[..., None, None] * eye
+    return ok, jnp.where(ok[..., None, None], sym, fallback)
+
+
+def _pd_solve(mat: jnp.ndarray, rhs: jnp.ndarray) -> jnp.ndarray:
+    """Unregularized solve on proper matrices; finite placeholder otherwise."""
+    _, safe = _safe_pd(mat)
+    chol = jnp.linalg.cholesky(safe)
+    vector_rhs = rhs.ndim == mat.ndim - 1
+    rhs_matrix = rhs[..., None] if vector_rhs else rhs
+    y = jax.lax.linalg.triangular_solve(
+        chol, rhs_matrix, left_side=True, lower=True
+    )
+    solved = jax.lax.linalg.triangular_solve(
+        chol, y, left_side=True, lower=True, transpose_a=True
+    )
+    return solved[..., 0] if vector_rhs else solved
+
+
+def _pd_inverse(mat: jnp.ndarray) -> jnp.ndarray:
+    eye = jnp.eye(mat.shape[-1], dtype=mat.dtype)
+    return _pd_solve(mat, jnp.broadcast_to(eye, mat.shape))
+
+
+def _pd_logdet(mat: jnp.ndarray) -> jnp.ndarray:
+    """Unregularized logdet on the safe PD branch."""
+    _, safe = _safe_pd(mat)
+    chol = jnp.linalg.cholesky(safe)
+    return 2.0 * jnp.log(jnp.diagonal(chol, axis1=-2, axis2=-1)).sum(axis=-1)
+
+
+def _psd_pinv(mat: jnp.ndarray) -> jnp.ndarray:
+    """Moore-Penrose inverse with dtype/dimension-relative numerical rank."""
+    sym = 0.5 * (mat + mat.swapaxes(-1, -2))
+    rtol = 16.0 * mat.shape[-1] * jnp.finfo(mat.dtype).eps
+    return jnp.linalg.pinv(sym, rtol=rtol, hermitian=True)
+
+
+def _project_psd(mat: jnp.ndarray, reference: jnp.ndarray) -> jnp.ndarray:
+    """Remove only roundoff-scale Schur-complement eigenvalues.
+
+    Invariant protected: algebraically vacuous messages are represented by
+    exact zero even after subtractive cancellation.  The cutoff is relative
+    to the parent precision, so changing units cannot create information.
+    """
+    sym = 0.5 * (mat + mat.swapaxes(-1, -2))
+    eig, vec = jnp.linalg.eigh(sym)
+    tol = 4.0 * mat.shape[-1] * jnp.finfo(mat.dtype).eps * _matrix_scale(reference)
+    eig = jnp.where(eig > tol[..., None], eig, 0.0)
+    return (vec * eig[..., None, :]) @ vec.swapaxes(-1, -2)
 
 
 def _neg_entropy(lam_q: jnp.ndarray) -> jnp.ndarray:
-    """−H[q] for precision Λ_q: ½ log det Λ_q − d/2 (1 + log 2π)."""
+    """−H[q], or +inf when Λ is nonsymmetric/non-PD/non-finite."""
     d = lam_q.shape[-1]
-    _, logdet = jnp.linalg.slogdet(lam_q)
-    return 0.5 * logdet - 0.5 * d * (1.0 + _LOG2PI)
+    val = 0.5 * _pd_logdet(lam_q) - 0.5 * d * (1.0 + _LOG2PI)
+    return jnp.where(_pd_ok(lam_q), val, jnp.inf)
 
 
 # --- BP messages -------------------------------------------------------------
@@ -108,24 +214,75 @@ def linear_forward(eta_i, lam_i, a, b, w):
 
     def one(ei, li, A, bb, W):
         s = A.T @ W @ A + li
-        c_eta = _solve(s, ei)  # S⁻¹ η_i
-        c_awt = _solve(s, A.T @ W)  # S⁻¹ AᵀW
-        lam = W - W @ A @ c_awt
+        s_inv = _psd_pinv(s)
+        c_eta = s_inv @ ei
+        c_awt = s_inv @ (A.T @ W)
+        lam = _project_psd(W - W @ A @ c_awt, W)
         eta = lam @ bb + W @ A @ c_eta
-        return eta, lam
+        # When the incoming belief is proper, covariance form avoids the
+        # subtractive Schur cancellation that would lose a weak (but valid)
+        # precision against much stronger process noise in float32.
+        proper_i = _pd_ok(li)
+        cov_i = _pd_inverse(li)
+        mean_i = _pd_solve(li, ei)
+        pred_cov = _pd_inverse(W) + A @ cov_i @ A.T
+        lam_proper = _pd_inverse(pred_cov)
+        eta_proper = lam_proper @ (bb + A @ mean_i)
+        lam = jnp.where(proper_i, lam_proper, lam)
+        eta = jnp.where(proper_i, eta_proper, eta)
+        if A.shape[0] == A.shape[1]:
+            # For an algebraically invertible square map, a vacuous input has
+            # an exactly vacuous output.  Taking this identity symbolically
+            # avoids losing it when coordinate scaling makes A.T@W@A exceed
+            # the working dtype's numerical condition range.
+            sign_a, logdet_a = jnp.linalg.slogdet(A)
+            exact_vacuous = (
+                (li == 0).all()
+                & (ei == 0).all()
+                & (sign_a != 0)
+                & jnp.isfinite(logdet_a)
+            )
+            eta = jnp.where(exact_vacuous, jnp.zeros_like(eta), eta)
+            lam = jnp.where(exact_vacuous, jnp.zeros_like(lam), lam)
+        ok = (
+            _pd_ok(W)
+            & _psd_ok(li)
+            & jnp.isfinite(A).all()
+            & jnp.isfinite(bb).all()
+            & jnp.isfinite(ei).all()
+        )
+        return jnp.where(ok, eta, 0.0), jnp.where(ok, lam, 0.0)
 
     return jax.vmap(one)(eta_i, lam_i, a, b, w)
 
 
 def linear_backward(eta_o, lam_o, a, b, w):
-    """gaussian_linear → in. (W + Λ_o) is PD: no ridge needed, but harmless."""
+    """gaussian_linear → in; invalid incoming precisions yield vacuous."""
 
     def one(eo, lo, A, bb, W):
-        k = _solve(W + lo, W)  # (W+Λo)⁻¹ W
-        g = W - W @ k  # = W − W(W+Λo)⁻¹W, symmetric PSD
+        k = _pd_solve(W + lo, W)  # (W+Λo)⁻¹ W
+        g = _project_psd(W - W @ k, W)  # symmetric PSD
         lam = A.T @ g @ A
         eta = A.T @ (k.T @ eo - g @ bb)
-        return eta, lam
+        proper_o = _pd_ok(lo)
+        cov_o = _pd_inverse(lo)
+        mean_o = _pd_solve(lo, eo)
+        g_proper = _pd_inverse(_pd_inverse(W) + cov_o)
+        lam_proper = A.T @ g_proper @ A
+        eta_proper = A.T @ (g_proper @ (mean_o - bb))
+        lam = jnp.where(proper_o, lam_proper, lam)
+        eta = jnp.where(proper_o, eta_proper, eta)
+        exact_vacuous = (lo == 0).all() & (eo == 0).all()
+        lam = jnp.where(exact_vacuous, jnp.zeros_like(lam), lam)
+        eta = jnp.where(exact_vacuous, jnp.zeros_like(eta), eta)
+        ok = (
+            _pd_ok(W)
+            & _psd_ok(lo)
+            & jnp.isfinite(A).all()
+            & jnp.isfinite(bb).all()
+            & jnp.isfinite(eo).all()
+        )
+        return jnp.where(ok, eta, 0.0), jnp.where(ok, lam, 0.0)
 
     return jax.vmap(one)(eta_o, lam_o, a, b, w)
 
@@ -157,14 +314,16 @@ def prior_energy(eta_i, lam_i, mean, w):
 
     def one(ei, li, m, W):
         lam_q = W + li
-        m_q = _solve(lam_q, W @ m + ei)
-        sig_q = jnp.linalg.inv(lam_q + _RIDGE * jnp.eye(W.shape[0], dtype=W.dtype))
-        _, logdet_w = jnp.linalg.slogdet(W)
+        m_q = _pd_solve(lam_q, W @ m + ei)
+        sig_q = _pd_inverse(lam_q)
+        logdet_w = _pd_logdet(W)
         d = m - m_q
         e_logf = 0.5 * logdet_w - 0.5 * W.shape[0] * _LOG2PI - 0.5 * (
             d @ W @ d + jnp.trace(W @ sig_q)
         )
-        return _neg_entropy(lam_q) - e_logf
+        val = _neg_entropy(lam_q) - e_logf
+        ok = _pd_ok(W) & _pd_ok(lam_q) & jnp.isfinite(val)
+        return jnp.where(ok, val, jnp.inf)
 
     return jax.vmap(one)(eta_i, lam_i, mean, w)
 
@@ -176,16 +335,18 @@ def linear_energy(eta_o, lam_o, eta_i, lam_i, a, b, w):
         do, di = A.shape
         lam_j = jnp.block([[W + lo, -W @ A], [-A.T @ W, A.T @ W @ A + li]])
         eta_j = jnp.concatenate([W @ bb + eo, -A.T @ W @ bb + ei])
-        sig_j = jnp.linalg.inv(lam_j + _RIDGE * jnp.eye(do + di, dtype=W.dtype))
-        m_j = sig_j @ eta_j
+        sig_j = _pd_inverse(lam_j)
+        m_j = _pd_solve(lam_j, eta_j)
         j = jnp.concatenate([jnp.eye(do, dtype=W.dtype), -A], axis=1)  # r = J[y;x] − b
         r = j @ m_j - bb
         sig_r = j @ sig_j @ j.T
-        _, logdet_w = jnp.linalg.slogdet(W)
+        logdet_w = _pd_logdet(W)
         e_logf = 0.5 * logdet_w - 0.5 * do * _LOG2PI - 0.5 * (
             r @ W @ r + jnp.trace(W @ sig_r)
         )
-        return _neg_entropy(lam_j) - e_logf
+        val = _neg_entropy(lam_j) - e_logf
+        ok = _pd_ok(W) & _pd_ok(lam_j) & jnp.isfinite(val)
+        return jnp.where(ok, val, jnp.inf)
 
     return jax.vmap(one)(eta_o, lam_o, eta_i, lam_i, a, b, w)
 
@@ -201,14 +362,16 @@ def linear_observed_energy(eta_i, lam_i, y, mask, a, b, w):
     def one(ei, li, yy, mk, A, bb, W):
         do, di = A.shape
         lam_q = mk * (A.T @ W @ A) + li
-        m_q = _solve(lam_q, mk * (A.T @ (W @ (yy - bb))) + ei)
-        sig_q = jnp.linalg.inv(lam_q + _RIDGE * jnp.eye(di, dtype=W.dtype))
+        m_q = _pd_solve(lam_q, mk * (A.T @ (W @ (yy - bb))) + ei)
+        sig_q = _pd_inverse(lam_q)
         r = yy - A @ m_q - bb
-        _, logdet_w = jnp.linalg.slogdet(W)
+        logdet_w = _pd_logdet(W)
         e_logf = 0.5 * logdet_w - 0.5 * do * _LOG2PI - 0.5 * (
             r @ W @ r + jnp.trace(W @ (A @ sig_q @ A.T))
         )
-        return _neg_entropy(lam_q) - mk * e_logf
+        val = _neg_entropy(lam_q) - mk * e_logf
+        ok = _pd_ok(W) & _pd_ok(lam_q) & jnp.isfinite(val)
+        return jnp.where(ok, val, jnp.inf)
 
     return jax.vmap(one)(eta_i, lam_i, y, mask, a, b, w)
 
@@ -220,7 +383,9 @@ def equality_energy(eta, lam):
 
 def edge_entropy(lam0, lam1):
     """+H[q_e] per interior edge (Bethe counting number d_e − 1 = 1)."""
-    return -_neg_entropy(lam0 + lam1)
+    lam_q = lam0 + lam1
+    val = -_neg_entropy(lam_q)
+    return jnp.where(_pd_ok(lam_q), val, jnp.inf)
 
 
 # --- gaussian_prec VMP (cff-7c5o, DERIVATIONS.md D4) ---------------------------
@@ -283,7 +448,16 @@ def prec_energy(eta_tau_q, eta_x_q, lam_x_q, m):
 
 
 def moments(eta, lam):
-    """(mean, cov) from information form; caller guarantees Λ ≻ 0."""
-    d = lam.shape[-1]
-    cov = jnp.linalg.inv(lam + _RIDGE * jnp.eye(d, dtype=lam.dtype))
-    return jnp.einsum("...ij,...j->...i", cov, eta), cov
+    """(mean, cov) from information form; improper beliefs are all-NaN.
+
+    NaNs are an explicit readout status: they cannot be mistaken for the
+    negative covariance previously returned for an indefinite precision.
+    Use :func:`is_proper_precision` when a boolean status is needed.
+    """
+    ok = _pd_ok(lam) & jnp.isfinite(eta).all(axis=-1)
+    cov = _pd_inverse(lam)
+    mean = jnp.einsum("...ij,...j->...i", cov, eta)
+    return (
+        jnp.where(ok[..., None], mean, jnp.nan),
+        jnp.where(ok[..., None, None], cov, jnp.nan),
+    )

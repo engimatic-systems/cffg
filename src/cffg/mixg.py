@@ -17,9 +17,9 @@ axis) via vmap, per-member parameter stacks carry the regime axis K
 ([M, K, ...]); dims and K are static per group. Propriety guards fall back
 to the *vacuous* message mid-flooding (never NaN); ledger terms go +inf on
 improper beliefs, the engine-wide loudness convention. Guards are
-dtype-derived per the robustness contract: ridge = eps**0.75 of the working
-dtype (f64 ≈ 2e-12, f32 ≈ 6e-6) — big enough to be representable, small
-enough to be an O(ulp) perturbation at fixed points.
+scale-relative per the robustness contract: proper systems are solved without
+regularization, while singular message systems use the same dtype-relative
+Moore-Penrose limit as the plain Gaussian rules.
 """
 
 from __future__ import annotations
@@ -27,34 +27,18 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 
+from cffg import gauss
+
 _LOG2PI = 1.8378770664093453
-
-
-def _ridge(dtype) -> jnp.ndarray:
-    # eps**0.75: invariant protected — solves on transiently singular
-    # systems stay finite in BOTH f64 and f32 (an absolute 1e-10 ridge is
-    # below f32's resolution and would be a silent no-op there).
-    return jnp.asarray(jnp.finfo(dtype).eps ** 0.75)
-
-
-def _pd_ok(mat: jnp.ndarray) -> jnp.ndarray:
-    """Strict-PD test usable under jit. Cholesky won't do: it is finite on
-    exactly-singular PSD input, and a singular Λ is precisely the improper
-    case the guards must catch (vacuous forward, rank-deficient backward).
-    Invariant protected: moments/entropies are only evaluated where they
-    exist. Threshold is dtype-scaled (√eps): below it a direction is
-    indistinguishable from unconstrained at working precision."""
-    return jnp.linalg.eigvalsh(mat).min(axis=-1) > jnp.sqrt(jnp.finfo(mat.dtype).eps)
 
 
 def _log_z(eta: jnp.ndarray, lam: jnp.ndarray) -> jnp.ndarray:
     """log ∫ exp(−½yᵀΛy + ηᵀy) dy = ½ηᵀΛ⁻¹η + d/2·log2π − ½·logdet Λ.
-    Caller guarantees Λ ≻ 0 (guarded upstream); ridged solve keeps the
-    untaken branch of a jnp.where finite."""
+    Caller guarantees Λ ≻ 0 (guarded upstream); branch-safe helpers keep an
+    untaken invalid path finite without perturbing an accepted matrix."""
     d = lam.shape[-1]
-    ridged = lam + _ridge(lam.dtype) * jnp.eye(d, dtype=lam.dtype)
-    sol = jnp.linalg.solve(ridged, eta[..., None])[..., 0]
-    _, logdet = jnp.linalg.slogdet(ridged)
+    sol = gauss._pd_solve(lam, eta[..., None])[..., 0]
+    logdet = gauss._pd_logdet(lam)
     return 0.5 * (eta * sol).sum(-1) + 0.5 * d * _LOG2PI - 0.5 * logdet
 
 
@@ -74,7 +58,7 @@ def _joint_blocks(eta_o, lam_o, eta_i, lam_i, a, b, w):
 
 def _node_const(b, w):
     """Per-regime constant of log f_s: −½ b_sᵀW_s b_s + ½ logdet W_s − ½ d_y log2π."""
-    _, logdet_w = jnp.linalg.slogdet(w)
+    logdet_w = gauss._pd_logdet(w)
     return -0.5 * jnp.einsum("ki,kij,kj->k", b, w, b) + 0.5 * logdet_w - 0.5 * b.shape[-1] * _LOG2PI
 
 
@@ -82,19 +66,13 @@ def _collapse(log_w: jnp.ndarray, eta: jnp.ndarray, lam: jnp.ndarray):
     """Moment-match Σ_s softmax(log_w)_s · N(η_s, Λ_s) → one (η, Λ).
     All components must be proper (guarded by callers)."""
     w_s = jax.nn.softmax(log_w)  # [K]
-    d = lam.shape[-1]
-    ridge_eye = _ridge(lam.dtype) * jnp.eye(d, dtype=lam.dtype)
-    cov = jnp.linalg.inv(lam + ridge_eye)  # [K, d, d]
+    cov = gauss._pd_inverse(lam)  # [K, d, d]
     m = jnp.einsum("kij,kj->ki", cov, eta)
     m_bar = jnp.einsum("k,ki->i", w_s, m)
     spread = m - m_bar[None]
     c_bar = jnp.einsum("k,kij->ij", w_s, cov) + jnp.einsum("k,ki,kj->ij", w_s, spread, spread)
-    lam_out = jnp.linalg.inv(c_bar + ridge_eye)
+    lam_out = gauss._pd_inverse(c_bar)
     return lam_out @ m_bar, lam_out
-
-
-def _vacuous_like(eta, lam):
-    return jnp.zeros_like(eta), jnp.zeros_like(lam)
 
 
 # --- gaussian_mixture_linear ---------------------------------------------------
@@ -106,7 +84,7 @@ def mixlin_to_selector(eta_o, lam_o, eta_i, lam_i, a, b, w):
 
     def one(eo, lo, ei, li, A, bb, W):
         eta_j, lam_j = _joint_blocks(eo, lo, ei, li, A, bb, W)
-        ok = _pd_ok(lam_j).all()
+        ok = gauss._pd_ok(W).all() & gauss._pd_ok(lam_j).all()
         logmu = _log_z(eta_j, lam_j) + _node_const(bb, W)
         return jnp.where(ok, logmu - logmu.max(), jnp.zeros_like(logmu))
 
@@ -120,14 +98,25 @@ def mixlin_forward(eta_i, lam_i, log_mu_e, a, b, w):
     def one(ei, li, le, A, bb, W):
         def fwd(Ak, bk, Wk):
             s = Ak.T @ Wk @ Ak + li
-            ridge_eye = _ridge(s.dtype) * jnp.eye(s.shape[-1], dtype=s.dtype)
-            c_awt = jnp.linalg.solve(s + ridge_eye, Ak.T @ Wk)
-            lam = Wk - Wk @ Ak @ c_awt
-            eta = lam @ bk + Wk @ Ak @ jnp.linalg.solve(s + ridge_eye, ei)
+            s_inv = gauss._psd_pinv(s)
+            lam = gauss._project_psd(Wk - Wk @ Ak @ s_inv @ Ak.T @ Wk, Wk)
+            eta = lam @ bk + Wk @ Ak @ (s_inv @ ei)
+            proper_i = gauss._pd_ok(li)
+            cov_i = gauss._pd_inverse(li)
+            mean_i = gauss._pd_solve(li, ei)
+            pred_cov = gauss._pd_inverse(Wk) + Ak @ cov_i @ Ak.T
+            lam_proper = gauss._pd_inverse(pred_cov)
+            eta_proper = lam_proper @ (bk + Ak @ mean_i)
+            lam = jnp.where(proper_i, lam_proper, lam)
+            eta = jnp.where(proper_i, eta_proper, eta)
             return eta, lam
 
         eta_f, lam_f = jax.vmap(fwd)(A, bb, W)  # [K, do], [K, do, do]
-        ok = _pd_ok(lam_f).all()
+        ok = (
+            gauss._pd_ok(W).all()
+            & gauss._psd_ok(li)
+            & gauss._pd_ok(lam_f).all()
+        )
         eta, lam = _collapse(le, eta_f, lam_f)
         return jnp.where(ok, eta, 0.0), jnp.where(ok, lam, 0.0)
 
@@ -141,20 +130,30 @@ def mixlin_backward(eta_o, lam_o, log_mu_e, a, b, w):
 
     def one(eo, lo, le, A, bb, W):
         def bwd(Ak, bk, Wk):
-            d = Wk.shape[-1]
-            ridge_eye = _ridge(Wk.dtype) * jnp.eye(d, dtype=Wk.dtype)
-            k = jnp.linalg.solve(Wk + lo + ridge_eye, Wk)
-            g = Wk - Wk @ k
+            k = gauss._pd_solve(Wk + lo, Wk)
+            g = gauss._project_psd(Wk - Wk @ k, Wk)
             lam = Ak.T @ g @ Ak
             eta = Ak.T @ (k.T @ eo - g @ bk)
+            proper_o = gauss._pd_ok(lo)
+            cov_o = gauss._pd_inverse(lo)
+            mean_o = gauss._pd_solve(lo, eo)
+            g_proper = gauss._pd_inverse(gauss._pd_inverse(Wk) + cov_o)
+            lam_proper = Ak.T @ g_proper @ Ak
+            eta_proper = Ak.T @ (g_proper @ (mean_o - bk))
+            lam = jnp.where(proper_o, lam_proper, lam)
+            eta = jnp.where(proper_o, eta_proper, eta)
             # log c̃: mass of ∫ N(y; b_k, V_k) μ_o(y) dy (D3)
             log_c = _log_z(Wk @ bk + eo, Wk + lo) - 0.5 * bk @ Wk @ bk
-            _, logdet_w = jnp.linalg.slogdet(Wk)
+            logdet_w = gauss._pd_logdet(Wk)
             log_c = log_c + 0.5 * logdet_w - 0.5 * bk.shape[-1] * _LOG2PI
             return eta, lam, log_c
 
         eta_b, lam_b, log_c = jax.vmap(bwd)(A, bb, W)
-        ok = _pd_ok(lam_b).all()
+        ok = (
+            gauss._pd_ok(W).all()
+            & gauss._psd_ok(lo)
+            & gauss._pd_ok(lam_b).all()
+        )
         log_w = le + log_c + jnp.where(ok, _log_z(eta_b, lam_b), 0.0)
         eta, lam = _collapse(log_w - log_w.max(), eta_b, lam_b)
         return jnp.where(ok, eta, 0.0), jnp.where(ok, lam, 0.0)
@@ -170,23 +169,22 @@ def mixlin_energy(eta_o, lam_o, eta_i, lam_i, log_mu_e, a, b, w):
 
     def one(eo, lo, ei, li, le, A, bb, W):
         eta_j, lam_j = _joint_blocks(eo, lo, ei, li, A, bb, W)
-        ok = _pd_ok(lam_j).all()
+        ok = gauss._pd_ok(W).all() & gauss._pd_ok(lam_j).all()
         d = lam_j.shape[-1]
-        ridge_eye = _ridge(lam_j.dtype) * jnp.eye(d, dtype=lam_j.dtype)
         log_rho = le + _log_z(eta_j, lam_j) + _node_const(bb, W)
         rho = jax.nn.softmax(log_rho)
         log_rho_n = jax.nn.log_softmax(log_rho)
         h_s = -(rho * log_rho_n).sum()
-        _, logdet_j = jnp.linalg.slogdet(lam_j + ridge_eye)
+        logdet_j = gauss._pd_logdet(lam_j)
         h_gauss = 0.5 * d * (1.0 + _LOG2PI) - 0.5 * logdet_j  # [K]
 
-        sig_j = jnp.linalg.inv(lam_j + ridge_eye)
+        sig_j = gauss._pd_inverse(lam_j)
         m_j = jnp.einsum("kij,kj->ki", sig_j, eta_j)
         do = bb.shape[-1]
         jm = jnp.concatenate([jnp.eye(do, dtype=A.dtype)[None].repeat(A.shape[0], 0), -A], axis=-1)
         r = jnp.einsum("kij,kj->ki", jm, m_j) - bb  # [K, do]
         sig_r = jnp.einsum("kij,kjl,kml->kim", jm, sig_j, jm)
-        _, logdet_w = jnp.linalg.slogdet(W)
+        logdet_w = gauss._pd_logdet(W)
         e_logf = (
             0.5 * logdet_w
             - 0.5 * do * _LOG2PI
@@ -209,10 +207,11 @@ def mix_to_selector(eta_o, lam_o, mean, w):
         logmu = (
             _log_z(wm + eo[None], W + lo[None])
             - 0.5 * jnp.einsum("ki,kij,kj->k", m, W, m)
-            + 0.5 * jnp.linalg.slogdet(W)[1]
+            + 0.5 * gauss._pd_logdet(W)
             - 0.5 * m.shape[-1] * _LOG2PI
         )
-        return logmu - logmu.max()
+        ok = gauss._pd_ok(W).all() & gauss._pd_ok(W + lo[None]).all()
+        return jnp.where(ok, logmu - logmu.max(), jnp.zeros_like(logmu))
 
     return jax.vmap(one)(eta_o, lam_o, mean, w)
 
@@ -222,7 +221,9 @@ def mix_forward(log_mu_e, mean, w):
     weights (masses are all 1 — no trap in this direction)."""
 
     def one(le, m, W):
-        return _collapse(le, jnp.einsum("kij,kj->ki", W, m), W)
+        eta, lam = _collapse(le, jnp.einsum("kij,kj->ki", W, m), W)
+        ok = gauss._pd_ok(W).all()
+        return jnp.where(ok, eta, 0.0), jnp.where(ok, lam, 0.0)
 
     return jax.vmap(one)(log_mu_e, mean, w)
 
@@ -235,27 +236,26 @@ def mix_energy(eta_o, lam_o, log_mu_e, mean, w):
         eta_q = jnp.einsum("kij,kj->ki", W, m) + eo[None]
         lam_q = W + lo[None]
         d = lam_q.shape[-1]
-        ridge_eye = _ridge(lam_q.dtype) * jnp.eye(d, dtype=lam_q.dtype)
         log_rho = (
             le + _log_z(eta_q, lam_q)
             - 0.5 * jnp.einsum("ki,kij,kj->k", m, W, m)
-            + 0.5 * jnp.linalg.slogdet(W)[1]
+            + 0.5 * gauss._pd_logdet(W)
             - 0.5 * d * _LOG2PI
         )
         rho = jax.nn.softmax(log_rho)
         h_s = -(rho * jax.nn.log_softmax(log_rho)).sum()
-        _, logdet_q = jnp.linalg.slogdet(lam_q + ridge_eye)
+        logdet_q = gauss._pd_logdet(lam_q)
         h_gauss = 0.5 * d * (1.0 + _LOG2PI) - 0.5 * logdet_q
-        sig_q = jnp.linalg.inv(lam_q + ridge_eye)
+        sig_q = gauss._pd_inverse(lam_q)
         m_q = jnp.einsum("kij,kj->ki", sig_q, eta_q)
         r = m_q - m
-        _, logdet_w = jnp.linalg.slogdet(W)
+        logdet_w = gauss._pd_logdet(W)
         e_logf = (
             0.5 * logdet_w
             - 0.5 * d * _LOG2PI
             - 0.5 * (jnp.einsum("ki,kij,kj->k", r, W, r) + jnp.einsum("kij,kji->k", W, sig_q))
         )
-        ok = _pd_ok(lam_q).all()
+        ok = gauss._pd_ok(W).all() & gauss._pd_ok(lam_q).all()
         f = -h_s - (rho * h_gauss).sum() - (rho * e_logf).sum()
         return jnp.where(ok, f, jnp.inf)
 

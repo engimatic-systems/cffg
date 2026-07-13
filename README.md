@@ -182,7 +182,9 @@ cffg = { path = "../../cffg", editable = true }
 - **Read beliefs, not messages**: `marginals`, `gaussian_marginals`,
   `ef_marginals`, `node_beliefs`, `gaussian_node_stats` are the supported
   readouts; learning loops mirror `cffg.agent`'s count pattern (infer →
-  accumulate stats → conjugate update → roll expected params back).
+  accumulate stats → conjugate update → roll expected params back). Improper
+  Gaussian marginals are NaN-marked; node statistics also expose
+  `proper=False`, which learning loops must check before accumulation.
 - **Report framework gaps in framework terms.** When a harness needs a
   numpy workaround, that sentence is a ticket (see cff-9xmq, cff-lquu,
   cff-5edo, cff-mjku, cff-gul8 — all minted from one evaluation round).

@@ -290,3 +290,42 @@ def test_float32_finite_and_close():
     for fn in (mixg.mixlin_forward, mixg.mixlin_backward):
         e, l = fn(args32[0], args32[1], args32[4], args32[5], args32[6], args32[7])
         assert np.all(np.isfinite(np.asarray(e))) and np.all(np.isfinite(np.asarray(l)))
+
+
+def test_float32_diffuse_but_proper_components_are_not_rejected():
+    """Regression cff-3hgi: propriety is relative, not λ_min > sqrt(eps)."""
+    dt = jnp.float32
+    z1 = jnp.zeros((1, 1), dtype=dt)
+    z2 = jnp.zeros((1, 1, 1), dtype=dt)
+    le = jnp.zeros((1, 1), dtype=dt)
+    mean = jnp.zeros((1, 1, 1), dtype=dt)
+    weak = jnp.full((1, 1, 1, 1), 1e-6, dtype=dt)
+
+    # A diffuse K=1 prior is still a proper Gaussian and has zero node energy
+    # against a vacuous incoming message.
+    f = mixg.mix_energy(z1, z2, le, mean, weak)
+    assert np.isfinite(float(f[0]))
+    np.testing.assert_allclose(float(f[0]), 0.0, atol=2e-5)
+
+    # A weak but proper input through y=x+noise must remain informative; the
+    # old absolute eigenvalue threshold silently returned a vacuous message.
+    a = jnp.ones((1, 1, 1, 1), dtype=dt)
+    b = jnp.zeros((1, 1, 1), dtype=dt)
+    w = jnp.ones((1, 1, 1, 1), dtype=dt)
+    lam_i = jnp.full((1, 1, 1), 1e-6, dtype=dt)
+    eta_f, lam_f = mixg.mixlin_forward(z1, lam_i, le, a, b, w)
+    assert float(lam_f[0, 0, 0]) > 0.0
+    np.testing.assert_allclose(float(lam_f[0, 0, 0]), 1e-6, rtol=2e-3)
+    np.testing.assert_allclose(eta_f, 0.0, atol=0.0)
+
+
+def test_mixture_energy_rejects_invalid_factor_precision():
+    bad_w = np.array([[[[-1.0]]]])
+    f = mixg.mix_energy(
+        np.zeros((1, 1)),
+        np.array([[[3.0]]]),
+        np.zeros((1, 1)),
+        np.zeros((1, 1, 1)),
+        bad_w,
+    )
+    assert np.isposinf(np.asarray(f)).all()

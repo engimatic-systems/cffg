@@ -1,6 +1,6 @@
 ---
 id: cff-3hgi
-status: open
+status: closed
 deps: []
 links: [cff-fxmj, cff-l6i5]
 created: 2026-07-10T18:06:32Z
@@ -21,6 +21,14 @@ ADVERSARIAL REVIEWER FINDING (2026-07-10). gauss.py uses _RIDGE=1e-10 in every s
 
 ## Notes
 
+**2026-07-12T00:00:00Z**
+
+HOSTILE-INPUT PLAN (before implementation): (1) exact vacuous `(eta, Lambda)=(0,0)` must remain finite and propagate through full-rank linear maps without an absolute floor; singular/rank-deficient Schur systems use a dtype- and matrix-scale-relative pseudoinverse limit; (2) nonsymmetric, indefinite, singular, or non-finite combined precisions are improper — energies report `+inf`, edge readouts report NaNs, and node-stat readouts additionally expose `proper=False`; (3) float32 uses only `finfo(dtype)`-derived relative rank/symmetry tolerances and must agree with float64 within its representable accuracy; (4) tests cover precision scaling across at least 12 orders, coordinate rescaling, mixed-scale ill conditioning/rank deficiency, and `d>=100`; (5) accepted proper solves have no regularization bias, while any JIT branch-sanitizing matrix is used only after the propriety predicate has rejected the original matrix.
+
 **2026-07-10T18:08:57Z**
 
 ADDITIONAL REPRO: mixg._pd_ok is dtype-derived but not matrix-scale-relative: it requires lambda_min > sqrt(eps). A valid scalar precision 1e-4 is rejected in float32 (threshold ~3.45e-4) but accepted in float64; 1e-6 likewise. Thus diffuse but proper hybrid components fall back to vacuous messages/+inf solely by dtype/units. Include mixg._pd_ok/_ridge and relative Cholesky guards in this ticket, not just gauss.py.
+
+**2026-07-13T02:46:26Z**
+
+DONE: Removed absolute Gaussian/mixg ridges. Proper beliefs now use unregularized, batched Cholesky solves; singular Schur systems use dtype/dimension-relative Moore-Penrose limits; stable covariance-form forward/backward paths preserve weak proper float32 information; exact vacuous square-map propagation is symbolic. All Gaussian and mixture energies reject nonsymmetric/non-PD/non-finite beliefs with +inf. Edge readouts return NaNs when improper; node sufficient-stat readouts add proper=False and NaN stats. Hostile coverage spans 24 orders of precision, 12 orders of coordinate scale, vacuous/sparse support, rank deficiency, mixed-scale d=100, float32 diffuse components, and mutated invalid params. Deliberate regularization bias: zero; only numerical-rank cutoff remains and is documented in LIMITATIONS. Verification: 93 focused Gaussian/hybrid/Kalman/learning tests passed; full suite 1131 passed, 4 third-party warnings; dashboard refreshed with 1131 tests, 0 failing.
