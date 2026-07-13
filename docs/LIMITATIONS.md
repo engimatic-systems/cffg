@@ -91,10 +91,15 @@ ticket under the roadmap epic cff-ahps:
   the first place exact FE meets a necessary approximation (mixture entropy).
 - *Nonlinear continuous factors* — cff-o7hs: EP/moment-matching or sigma-point
   messages with controlled FE accounting.
-- *Gaussian/continuous GFE messages* — genuinely open research (cff-dfpi):
-  Koudahl 2021 showed EFE in linear-Gaussian systems yields no purposeful
-  exploration, so the continuous epistemic story is unresolved, not merely
-  underived.
+- *Gaussian/continuous GFE messages* — RESOLVED as a position, 2026-07-12
+  (cff-dfpi, DERIVATIONS.md D5): none will be added, and that is a theorem,
+  not a gap. Additive-control linear-Gaussian models provably have
+  policy-independent epistemic terms (Koudahl 2021; re-derived and pinned in
+  `test_additive_lgssm_epistemics_constant_across_policies`), so a
+  Gaussian-only GFE message family has nothing to express. Continuous
+  epistemics live on the discrete regime/selector variables of hybrid
+  models instead — see S1h. Engine integration of the hybrid composite is
+  the follow-up ticket.
 The registry architecture exists precisely so each of these lands as an isolated
 contribution.
 
@@ -199,6 +204,31 @@ Until cff-5edo lands, require `RunStatus.CONVERGED` and inspect both FE and
 message-delta traces before trusting a plan deeper than ~20 slices.
 (Small-sample numbers: 14 episodes per horizon —
 direction is reliable, third digits are not.)
+
+**S1h. Continuous epistemics are discrete-channelled; the regime channel is
+a declared optimistic bound.** The cff-dfpi position (DERIVATIONS.md D5,
+2026-07-12): purposeful exploration in continuous/hybrid models comes from
+P-substitution on *hybrid mixture* composites, never from Gaussian-only GFE
+messages — additive-control linear-Gaussian epistemics are provably
+policy-independent (Koudahl 2021, re-derived as D5 Prop. 5), so "make the
+uncertainty discrete" (regimes, sensor choices, operating modes) is the
+supported modelling recipe, matching Collis et al. 2024. Honest edges:
+(1) the regime channel I(x;s) needs a Gaussian-mixture entropy and is scored
+with the D3 moment-matched collapse — an upper bound on the entropy, so the
+scored information gain over-states the exact channel (measured 1.86 nats
+scored vs log 2 realizable on well-separated regimes) and the reported GFE
+lower-bounds the exact substituted objective, the same optimism family as
+S1c/S1d; the exact channel's H[q(s)] ≤ log K cap and a two-sided sandwich
+are computed as diagnostics (bound directions pinned by quadrature in
+`tests/test_hybrid_epistemics.py`). (2) The per-regime state channel
+I(x;z|s) and the goal cross-entropy are exact. (3) Nonlinear observation
+maps and heteroscedastic noise remain out of closed form by nature (H8);
+regime mixtures are their tractable discretization. (4) v1 scope solves the
+substituted fixed point over the regime simplex only — continuous edges keep
+their D3 BP/collapse messages (full coupled stationarity would let the
+epistemic term push per-regime state beliefs toward wishful separation;
+excluded until derived and tested). Engine integration of the composite is
+the follow-up ticket; the spike ships formulas + experiments, not rules.
 
 **S2. Importance-sampling noise in parameter messages.** The message to A is a
 non-conjugate log-message evaluated by importance sampling; variance grows with

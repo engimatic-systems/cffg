@@ -450,3 +450,239 @@ MLE; E_q[stats] with vague priors recover generating LGSSM parameters
 (acceptance test); gaussian_prec fixed point equals the exact
 Gamma-posterior when x is observed (conjugacy, zero collapse error).
 Executable anchors: `tests/test_conj.py`, `tests/test_gauss_vmp.py`.
+
+---
+
+## D5 — Hybrid GFE epistemics: where continuous curiosity lives (cff-dfpi)
+
+### D5.1 The plain-English version
+
+**The open problem, stated honestly.** Koudahl, Kouw & de Vries (Entropy
+23:1565, 2021) proved that in a linear-Gaussian state-space model with
+*additive* controls, the epistemic terms of the expected free energy are the
+same for every policy — a Kalman agent scored by EFE/GFE has nothing to be
+curious *about*, because no action changes what it would learn. This is not
+an implementation gap; it is a property of the model class. The same paper,
+and Collis et al. (arXiv:2409.01066, 2024), point at the door left open:
+controls that enter *multiplicatively* — switching dynamics or emissions —
+do carry policy-dependent information.
+
+**The position this derivation takes (the cff-dfpi decision).** CFFG does
+not promise a "curious Kalman agent", because none can exist (Prop. 5 below
+re-proves the negative result inside our own objective, so it is pinned by a
+test rather than folklore). Instead, **continuous epistemics live on the
+discrete regime/selector variables of hybrid models** — exactly the
+variables the switching-KF factors (D3) already carry. The recipe is the
+same single trick as everywhere else in this engine: put the P-substitution
+bead on a *hybrid mixture* observation composite. The substituted objective
+then splits into
+
+1. a **regime channel** I(x; s) — "which mode is the world in?" — the term
+   Koudahl's negative result says is missing from pure Gaussian models, and
+   the one that makes probing/sensing actions valuable;
+2. a **state channel** I(x; z | s) — a per-regime log-det ratio, closed form,
+   which prices sensor precision (and is constant across policies exactly
+   when the negative result says it must be);
+3. the **goal term** — the cross-entropy of the predictive mixture against a
+   Gaussian goal, which stays *exactly* closed form (a mixture against a
+   quadratic log-density integrates term by term).
+
+**The one approximation, declared.** The regime channel needs the entropy of
+a Gaussian mixture — the known non-closed-form (LIMITATIONS S1d's sibling).
+We score it with the moment-matched collapse the D3 rules already compute.
+The collapsed Gaussian is the max-entropy density for its moments, so the
+surrogate *over*-states information gain and the reported GFE *lower-bounds*
+the exact substituted objective — the same optimistic-bound stance as S1c
+and S1d, with the direction pinned by quadrature tests. Two exact
+consistency anchors: coincident components ⇒ the surrogate is exact and the
+channel is exactly zero (so the negative control is *inside* the formula,
+not a special case); and the exact channel can never exceed H[q(s)] ≤ log K
+— a cap the diagnostics report alongside the surrogate, because for
+well-separated regimes the surrogate exceeds it (measured: 1.86 nats scored
+vs log 2 = 0.69 realizable in the probe experiment).
+
+**What the experiment shows** (all in `tests/test_hybrid_epistemics.py`,
+formulas in `cffg/experiments/hybrid_epistemics.py`): a plant with an
+unknown binary regime and a Gaussian latent state, where a PROBE action is
+strictly *worse* than IDLE on risk alone. The GFE scorer probes in 100% of
+episodes and commits correctly in 100%; probing collapses the regime channel
+to ~0 (satiation) so a second probe is never valued. The KL-control ablation
+(same formulas, MI terms dropped) never probes and scores 44.5% — a coin
+flip. Purposeful exploration, attributable to the derived term and nothing
+else. A second experiment re-runs the *same* general formulas on an
+additive-control LGSSM and finds every epistemic/entropy term identical
+across random policies to 1e-10 — Koudahl 2021, reproduced through our own
+code path.
+
+**What this is not.** Not engine rules yet (this is the research spike; the
+composite node is a follow-up ticket), not a claim about arbitrary nonlinear
+MI or exact mixture entropies (impossible in closed form — any future
+nonlinear channel enters through declared quadrature/MC bounds per H8), and
+not contingent planning (the commit slice is mean-field, H5 as always).
+
+### D5.2 The formal derivation
+
+**Setting.** Hybrid composite: emission node f(x|z,s) = N(x; A_s z + b_s, V_s)
+with discrete selector s ∈ [K] (regime or control), Gaussian state
+z ∈ ℝ^{d_z}, substituted future observation x ∈ ℝ^{d_x}, facing an absorbed
+Gaussian goal p̃(x) = N(g, Γ). Beliefs: the labelled-mixture family the D3
+rules hold, q(z,s) = q(s) q(z|s) with q(s) = ρ, q(z|s) = N(m_s, S_s).
+Per-regime predictive: x̄_s = A_s m_s + b_s, P_s = A_s S_s A_sᵀ + V_s;
+substituted marginal q_w(x) = Σ_s ρ_s N(x; x̄_s, P_s) — a mixture.
+Notation: 𝒩H(P) := ½ log det(2πe P); h_s := 𝒩H(V_s).
+
+**Definition (substituted objective).** P-substitution on {x} constrains the
+node belief to q̃(x,z,s) = q(z,s) f(x|z,s) and replaces log q(x) by
+log q_w(x) inside the expectation (papers Part II Eq. 6–8, as in D1):
+
+    G[q] = E_q̃[ log q_w(x) + log q(z,s) − log f(x|z,s) − log p̃(x) ].
+
+**Proposition 1 (closed form up to one term).**
+
+    G = −H[q_w] + Σ_s ρ_s h_s − H(ρ) − Σ_s ρ_s 𝒩H(S_s) + C(q_w, p̃),
+    C(q_w, p̃) = ½ log det(2πΓ)
+              + ½ Σ_s ρ_s [ (x̄_s−g)ᵀΓ⁻¹(x̄_s−g) + tr(Γ⁻¹ P_s) ].
+
+*Proof.* (i) the x-marginal of q̃ is q_w, giving −H[q_w]; (ii)
+−E[log f] = Σ_s ρ_s E_{q(z|s)} H[N(A_s z+b_s, V_s)] = Σ ρ_s h_s (the Gaussian
+entropy is mean-independent); (iii) E[log q(z,s)] = −H(ρ) − Σρ_s 𝒩H(S_s);
+(iv) −E_{q_w}[log p̃] is the expectation of a quadratic under each mixture
+component — exact. Every term except H[q_w] is closed form. ∎
+
+**Proposition 2 (two epistemic channels).**
+G = −I(x; z,s) − H[q(z,s)] + C(q_w, p̃), with the chain rule split
+
+    I(x; z,s) = I(x; s) + Σ_s ρ_s I(x; z|s),
+    I(x; z|s) = ½( log det P_s − log det V_s )          (exact),
+    I(x; s)   = H[q_w] − Σ_s ρ_s 𝒩H(P_s)               (mixture entropy).
+
+*Proof.* I(x; z,s) = H[q_w] − E_{q(z,s)}H[f] = H[q_w] − Σρ_s h_s; substitute
+into Prop. 1. The split is the MI chain rule; the conditional term is the
+log-det ratio of a joint Gaussian. ∎
+Unlike D1's transition channel, x here is the variable that will actually be
+observed — there is **no data-processing gap** (no S1c-style optimism in the
+channel itself); the only approximation is Prop. 3's surrogate.
+
+**Proposition 3 (mixture-entropy surrogate and sandwich).** Let
+(x̄̄, P̄) = Σρ_s(x̄_s, ·) be the moment-matched collapse (D3), and
+Ĥ := 𝒩H(P̄). Then
+
+    max( Σ_s ρ_s 𝒩H(P_s),  −Σ_s ρ_s log Σ_t ρ_t N(x̄_s; x̄_t, P_s+P_t) )
+      ≤ H[q_w] ≤ min( Ĥ,  H(ρ) + Σ_s ρ_s 𝒩H(P_s) ),
+
+so the surrogate regime channel Î(x;s) := Ĥ − Σρ_s 𝒩H(P_s) satisfies
+0 ≤ I(x;s) ≤ Î(x;s), and the exact channel obeys I(x;s) ≤ H(ρ) ≤ log K.
+Scoring G with Ĥ gives Ĝ ≤ G: the reported GFE is a lower bound
+(optimistic), the S1c/S1d stance. Tight iff the components coincide, where
+Î = I = 0 exactly.
+*Proof.* Upper-left: Gaussian is max-entropy at fixed moments. Upper-right:
+H[x] ≤ H[x,s] = H(ρ) + Σρ_s H[x|s]. Lower-left: conditioning reduces
+entropy. Lower-right: Jensen inside each component (Hershey–Olsen), with
+E_{N_s}[q_w] = Σ_t ρ_t N(x̄_s; x̄_t, P_s+P_t). Î ≥ 0 because
+P̄ ⪰ Σρ_s P_s and log det is Loewner-monotone and concave. I(x;s) ≤ H(ρ)
+because MI with a discrete variable is capped by its entropy. ∎
+*Executable:* `test_entropy_sandwich_against_quadrature`,
+`test_sandwich_strict_when_separated_tight_when_coincident`,
+`test_gfe_hat_lower_bounds_exact_objective`.
+
+**Proposition 4 (stationarity over the regime simplex ⇒ same solver shape).**
+Hold the per-regime Gaussians (m_s, S_s) at their D3 message-passing values
+(decision: continuous edges keep BP/collapse messages — see remark below)
+and add the selector's incoming log-message μ_e. Stationarity of
+Ĝ[ρ] − Σ_s ρ_s μ_e(s) on the simplex is the fixed point
+
+    ρ̄ = σ( r(ρ̄) + μ_e ),
+    r_s(ρ) = ∂Ĥ/∂ρ_s − h_s + 𝒩H(S_s) − c_s,
+    ∂Ĥ/∂ρ_s = ½ tr( P̄⁻¹ [ P_s + x̄_s x̄_sᵀ − x̄_s x̄̄ᵀ − x̄̄ x̄_sᵀ ] ),
+    c_s = ½[ (x̄_s−g)ᵀΓ⁻¹(x̄_s−g) + tr(Γ⁻¹P_s) ].
+
+Same shape as D1 Prop. 4 / Part II Corollary 1: a K-logit solve the existing
+Newton machinery runs unchanged; T(ρ) = σ(r(ρ)+μ_e) is continuous on the
+simplex so Brouwer gives existence (uniqueness not claimed, matching Part
+II). Outgoing selector message: μ_out(s) = r_s(ρ̄) (own incoming dropped,
+the D1 convention). Node ledger term: Ĝ(ρ̄) evaluated directly — not the
+stationary Lagrangian value (the cff-hp3y lesson: message couplings are not
+node energy). The substituted x-edge is exterior with the goal absorbed in
+v1; an interior variant must send the collapsed cavity
+collapse(q_w) ⊘ μ_down in information form (D1's cavity rule + D3's
+collapse), deferred to the implementation ticket.
+*Proof.* ∂/∂ρ_s of Prop. 1 with Ĥ: the goal and entropy terms are linear or
+−Σρ log ρ in ρ; the Ĥ gradient is the chain rule through (x̄̄, P̄), which
+are linear/quadratic in ρ. Exponentiate the multiplier equation. ∎
+*Executable:* `test_collapse_entropy_gradient_matches_finite_differences`,
+`test_fixed_point_satisfies_its_equation`,
+`test_fixed_point_is_constrained_minimum` (dense simplex search oracle).
+
+**Proposition 5 (the negative result, GFE form — Koudahl 2021 restated).**
+Additive-control LGSSM slice: z′ = F z + B u + w, w ~ N(0,Q), emission
+x = C z′ + e, e ~ N(0,R), deterministic policy u_{1:T}, prior N(m₀, S₀).
+This is the K = 1 case of Prop. 1–2, where the covariance recursion
+S_t = F S_{t−1} Fᵀ + Q contains no u, hence at every slice
+
+    I(x_t; z_t) = ½( log det(C S_t Cᵀ + R) − log det R ),   and all of
+    I(x;s) = 0,  H-terms,  tr(Γ⁻¹P_t)
+
+are identical for every policy; only the goal quadratic
+(C m_t(u) − g)ᵀΓ⁻¹(C m_t(u) − g) varies. argmin over policies of the GFE
+therefore equals the KL-control optimum: **no purposeful exploration exists
+in this class**, at any horizon. (Remark: with *stochastic* q(u) entering
+the mean, Var(u) inflates S_t — the agent is rewarded for keeping its own
+controls entropic, which is noise-seeking, not information-seeking; the
+per-policy statement is the meaningful one.) Any of C, R, F, Q made
+s-dependent through a discrete selector (multiplicative/switching control,
+action-dependent sensing) re-opens the regime channel of Prop. 2 —
+policy-dependent again. Nonlinear observation maps and state-dependent
+(heteroscedastic) noise are the non-closed-form generalizations; the regime
+mixture is their tractable discretization.
+*Executable:* `test_additive_lgssm_epistemics_constant_across_policies`
+(runs the *general* hybrid formulas per policy — the constancy is measured,
+not assumed), `test_switching_emission_restores_policy_dependent_epistemics`.
+
+**Proposition 6 (parameter novelty, the continuous mirror of D1 Prop. 3).**
+If a regime's emission mean is uncertain, p(x|s,μ_s) = N(x; μ_s, V_s) with
+conjugate q(μ_s) = N(n_s, U_s) (D4), the substituted objective acquires
+
+    I(x; μ_s | s) = ½( log det(V_s + U_s) − log det V_s )
+                  = E_x[ KL( q(μ_s | x) ‖ q(μ_s) ) ]  ≥ 0,
+
+exact and closed form: the expected size of tomorrow's Bayesian update of
+that regime's mean. As evidence accumulates U_s → 0 and the channel
+vanishes — the same satiation law as the Dirichlet channel (D1 Prop. 5c).
+With full NIW uncertainty the predictive is Student-t: its entropy and
+E_IW[log det V] are still closed form (digamma family), so the channel stays
+exact — recorded here for the implementation ticket, not exercised by the
+spike's tests.
+*Proof.* Gaussian–Gaussian MI is the log-det ratio; MI = expected
+posterior-to-prior KL always. ∎
+
+**Cost.** The regime solve is K logits — O(K³) Newton per composite per
+sweep, plus one d_x×d_x collapse (already computed by the D3 rules). Cheaper
+than the discrete GFE-TM composite (K·U logits); nothing new to exploit.
+
+### D5.3 The decision and the experiment
+
+**Decision (acceptance criterion of cff-dfpi):** CFFG adopts the
+**discrete-regime epistemic mechanism**: P-substitution composites attach to
+hybrid mixture nodes and score Î(x;s) + Σρ_s I(x;z|s) with the collapse
+surrogate (declared optimistic bound, H(ρ) cap reported as a diagnostic);
+continuous edges keep their exact/collapsed BP messages and no
+Gaussian-only GFE message family is added — Prop. 5 says there is nothing
+for one to express. Purposeful continuous exploration is modelled by making
+the relevant uncertainty discrete (regimes, sensor choices, operating
+modes), which is also what the post-2023 literature converged on (Collis et
+al. 2024's rSLDS abstractions).
+
+**Probe-then-commit experiment** (`cffg/experiments/hybrid_epistemics.py`):
+binary regime (prior ½/½), scalar latent state z ~ N(0, 0.25), step-1 choice
+between PROBE (emission x = 0.3z ± 1, σ = 0.05 — separates regimes; slightly
+*higher* risk than idling) and IDLE (regime-blind emission), step-2 forced
+commit scored N(+1, 0.2²) if correct / N(−1, 0.2²) if wrong. Measured
+(200 episodes, seed 0): GFE scorer — probe rate 1.0, success 1.0, post-probe
+Î < 1e-5 (satiation); KL-control ablation (identical formulas, MI dropped) —
+probe rate 0.0, success 0.445. Scored margins: probe wins by ≈3.0 nats with
+the epistemic terms, loses by ≈0.0025 nats without. The surrogate's optimism
+is visible and bounded exactly as Prop. 3 predicts: Î = 1.857 nats scored,
+exact channel log 2 ≈ 0.693, sandwich [0.540, 0.693].
+*Executable:* `test_probe_experiment_gfe_explores_and_wins`,
+`test_probe_experiment_ablation_never_explores`, plus the float32 /
+degenerate-belief / improper-covariance contract tests.
