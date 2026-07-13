@@ -3,12 +3,13 @@ D4's update algebra against MLE concentration, and the acceptance pin —
 recovering known LGSSM parameters from data through the engine's smoother
 in a Dirichlet-style trial loop."""
 
+import jax.numpy as jnp
 import numpy as np
 import pytest
 
 from cffg import conj
 from cffg.compiler import compile_template
-from cffg.engine import Engine
+from cffg.engine import Engine, _replace
 
 
 def _rng():
@@ -118,6 +119,30 @@ def test_stats_readout_matches_hand_computation():
     # observed emission node: y is the bound data
     np.testing.assert_allclose(stats["em"]["Syy"], np.outer([1.2], [1.2]), atol=1e-12)
     assert stats["em"]["mask"] == 1.0
+    assert all(bool(s["proper"]) for s in stats.values())
+
+
+def test_stats_readout_marks_mutated_invalid_precision_improper():
+    t = _lgssm_template(1, 1)
+    arrays = {
+        "m0": np.zeros(1), "P0": np.eye(1), "A": np.ones((1, 1)),
+        "boff": np.zeros(1), "Q": np.eye(1), "H": np.eye(1),
+        "h0": np.zeros(1), "R": np.eye(1),
+    }
+    eng = Engine(compile_template(t, arrays=arrays))
+    st = eng.bind_data(eng.init_state(), {"obs": np.array([0.0])})
+    st = eng.run(st, 10, tol=1e-12).require_converged()
+    params = dict(st.params)
+    key = next(k for k in params if "gaussian_linear" in k and k.endswith(":W"))
+    params[key] = -jnp.ones_like(params[key])
+    bad = _replace(st, params=params)
+
+    stats = eng.gaussian_node_stats(bad)["trans"]
+    assert not bool(stats["proper"])
+    assert np.isnan(stats["Syy"]).all()
+    assert np.isnan(stats["Syx"]).all()
+    assert np.isnan(stats["Sxx"]).all()
+    assert np.isposinf(eng.bfe(bad))
 
 
 def test_trial_loop_recovers_lgssm_parameters():

@@ -79,6 +79,13 @@ def test_predictive_readout_on_observed_edge():
     np.testing.assert_allclose(cov_y, H @ covs_loo[0] @ H.T + R, atol=1e-8)
 
 
+def test_improper_edge_readout_is_explicit_nan():
+    engine, state = run_engine(YS)
+    bad = _replace(state, g_lam=-jnp.ones_like(state.g_lam))
+    mean, cov = engine.gaussian_marginals(bad)["x0"]
+    assert np.isnan(mean).all() and np.isnan(cov).all()
+
+
 def test_serialization_round_trip_compiles_and_agrees():
     t, arrays = lgssm(T, F, Q, H, R, M0, P0)
     back = from_json(to_json(t))

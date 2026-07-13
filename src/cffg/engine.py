@@ -522,8 +522,9 @@ class Engine:
 
     def gaussian_marginals(self, state: State) -> dict[str, tuple[np.ndarray, np.ndarray]]:
         """Edge name -> (mean, cov). Requires a proper combined precision —
-        run to coherence (and bind data) first; improper beliefs surface as
-        huge covariances, deliberately loud."""
+        run to coherence (and bind data) first. Improper beliefs return NaN
+        mean/cov arrays, an explicit readout that cannot resemble a valid
+        negative or huge covariance."""
         out: dict[str, tuple[np.ndarray, np.ndarray]] = {}
         eta, lam = np.asarray(state.g_eta), np.asarray(state.g_lam)
         for e in self.arena.edges.values():
@@ -546,8 +547,9 @@ class Engine:
                              with x̃ = [x; 1] (offset column absorbed)
         gaussian_linear_obs: same keys with y fixed at the bound observation,
                              plus "mask" (0.0 = missing: skip the occurrence).
-        Requires proper beliefs (run to coherence first); equality and hybrid
-        nodes are not learnable and are skipped."""
+        Every record includes ``proper``. Improper beliefs or mutated non-PD
+        node precisions return ``proper=False`` with NaN sufficient statistics;
+        equality and hybrid nodes are not learnable and are skipped."""
         out: dict[str, dict[str, np.ndarray]] = {}
         g_eta, g_lam = np.asarray(state.g_eta), np.asarray(state.g_lam)
         g_obs, g_mask = np.asarray(state.g_obs), np.asarray(state.g_mask)
@@ -561,9 +563,21 @@ class Engine:
                     (d,) = g.dims
                     m_blob = np.asarray(state.params[g.name + ":m"][i])
                     lam_q = w + inc_l[i, 0, :d, :d]
-                    sig_q = np.linalg.inv(lam_q)
-                    m_q = sig_q @ (w @ m_blob + inc_e[i, 0, :d])
-                    out[name] = {"mean": m_q, "second": sig_q + np.outer(m_q, m_q)}
+                    proper = bool(gauss.is_proper_precision(w)) and bool(
+                        gauss.is_proper_precision(lam_q)
+                    )
+                    m_q, sig_q = gauss.moments(
+                        w @ m_blob + inc_e[i, 0, :d], lam_q
+                    )
+                    m_q, sig_q = np.asarray(m_q), np.asarray(sig_q)
+                    if not proper:
+                        m_q = np.full_like(m_q, np.nan)
+                        sig_q = np.full_like(sig_q, np.nan)
+                    out[name] = {
+                        "mean": m_q,
+                        "second": sig_q + np.outer(m_q, m_q),
+                        "proper": np.asarray(proper),
+                    }
                 elif g.type == "gaussian_linear":
                     do, di = g.dims
                     a = np.asarray(state.params[g.name + ":A"][i])
@@ -572,16 +586,31 @@ class Engine:
                     e_i, l_i = inc_e[i, 1, :di], inc_l[i, 1, :di, :di]
                     lam_j = np.block([[w + l_o, -w @ a], [-a.T @ w, a.T @ w @ a + l_i]])
                     eta_j = np.concatenate([w @ b + e_o, -a.T @ w @ b + e_i])
-                    sig_j = np.linalg.inv(lam_j)
-                    m_j = sig_j @ eta_j
+                    proper = bool(gauss.is_proper_precision(w)) and bool(
+                        gauss.is_proper_precision(lam_j)
+                    )
+                    m_j, sig_j = gauss.moments(eta_j, lam_j)
+                    m_j, sig_j = np.asarray(m_j), np.asarray(sig_j)
+                    if not proper:
+                        m_j = np.full_like(m_j, np.nan)
+                        sig_j = np.full_like(sig_j, np.nan)
                     m_y, m_x = m_j[:do], m_j[do:]
                     s_yy = sig_j[:do, :do] + np.outer(m_y, m_y)
                     s_yx = sig_j[:do, do:] + np.outer(m_y, m_x)
                     s_xx = sig_j[do:, do:] + np.outer(m_x, m_x)
+                    syx_aug = np.concatenate([s_yx, m_y[:, None]], axis=1)
+                    sxx_aug = np.block(
+                        [[s_xx, m_x[:, None]], [m_x[None, :], np.ones((1, 1))]]
+                    )
+                    if not proper:
+                        s_yy = np.full_like(s_yy, np.nan)
+                        syx_aug = np.full_like(syx_aug, np.nan)
+                        sxx_aug = np.full_like(sxx_aug, np.nan)
                     out[name] = {
                         "Syy": s_yy,
-                        "Syx": np.concatenate([s_yx, m_y[:, None]], axis=1),
-                        "Sxx": np.block([[s_xx, m_x[:, None]], [m_x[None, :], np.ones((1, 1))]]),
+                        "Syx": syx_aug,
+                        "Sxx": sxx_aug,
+                        "proper": np.asarray(proper),
                     }
                 else:  # gaussian_linear_obs: y is data; q(x) is conditioned
                     do, di = g.dims
@@ -591,18 +620,36 @@ class Engine:
                     row = int(g.obs_rows[i])
                     y, mk = g_obs[row, :do], g_mask[row]
                     lam_q = mk * (a.T @ w @ a) + l_i
-                    sig_q = np.linalg.inv(lam_q)
-                    m_x = sig_q @ (mk * (a.T @ (w @ (y - b))) + e_i)
+                    proper = bool(gauss.is_proper_precision(w)) and bool(
+                        gauss.is_proper_precision(lam_q)
+                    )
+                    m_x, sig_q = gauss.moments(
+                        mk * (a.T @ (w @ (y - b))) + e_i, lam_q
+                    )
+                    m_x, sig_q = np.asarray(m_x), np.asarray(sig_q)
+                    if not proper:
+                        m_x = np.full_like(m_x, np.nan)
+                        sig_q = np.full_like(sig_q, np.nan)
                     s_xx = sig_q + np.outer(m_x, m_x)
+                    syx_aug = np.concatenate(
+                        [np.outer(y, m_x), y[:, None]], axis=1
+                    )
+                    sxx_aug = np.block(
+                        [[s_xx, m_x[:, None]], [m_x[None, :], np.ones((1, 1))]]
+                    )
+                    if not proper:
+                        syx_aug = np.full_like(syx_aug, np.nan)
+                        sxx_aug = np.full_like(sxx_aug, np.nan)
                     out[name] = {
-                        "Syy": np.outer(y, y),
-                        "Syx": np.concatenate(
-                            [np.outer(y, m_x), y[:, None]], axis=1
+                        "Syy": (
+                            np.outer(y, y)
+                            if proper
+                            else np.full((do, do), np.nan)
                         ),
-                        "Sxx": np.block(
-                            [[s_xx, m_x[:, None]], [m_x[None, :], np.ones((1, 1))]]
-                        ),
+                        "Syx": syx_aug,
+                        "Sxx": sxx_aug,
                         "mask": np.asarray(mk),
+                        "proper": np.asarray(proper),
                     }
         return out
 
