@@ -17,3 +17,9 @@ Re-express the discrete (categorical/Dirichlet log-space) and Gaussian (informat
 
 Full test suite passes unchanged (zero test-file edits except imports if a module moves); structure hashes unchanged; no new dependencies; BFE values bit-comparable on the HMM/Kalman/T-maze goldens.
 
+
+## Notes
+
+**2026-07-13T03:03:27Z**
+
+Follow-up from cff-3hgi judging: conj.py _spd still uses an absolute symmetry tolerance (np.allclose atol=1e-10) in the learning-side SPD assert. It fails loudly (raises) rather than silently accepting, but it is the same absolute-tolerance family cff-3hgi removed from gauss.py/mixg.py and can spuriously reject large-unit accumulated statistics. When migrating the Gaussian family onto the EF natural-parameter abstraction, replace it with the matrix-scale/dtype-relative symmetry check (gauss._symmetry_ok pattern).

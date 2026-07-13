@@ -103,9 +103,8 @@ invertible: improper/vacuous messages propagate exactly. Potentially singular
 Schur systems use a Moore-Penrose limit whose numerical-rank cutoff scales with
 dtype and matrix dimension; accepted proper beliefs use unregularized Cholesky
 solves, so there is no deliberate ridge bias or unit-dependent information
-floor. At working-
-precision rank boundaries, directions below that relative cutoff are treated
-as unconstrained. Continuous δ-clamps are rejected by design: a Gaussian
+floor. At working-precision rank boundaries, directions below that relative
+cutoff are treated as unconstrained. Continuous δ-clamps are rejected by design: a Gaussian
 observation is *conditioned into* its likelihood node (a huge-precision clamp
 would diverge the differential-entropy ledger). Nonsymmetric, non-PD, or
 non-finite beliefs make node/edge energy terms `+inf`; marginal readouts return
