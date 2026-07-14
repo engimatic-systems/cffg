@@ -112,13 +112,17 @@ Two-phase, mirroring PGMax:
 
 Variables carry a domain family: discrete (`cardinality: k`, one-hot) or
 Gaussian (`dim: d`, a point in R^d). The two families get *separate arenas*
-in one State pytree: discrete messages stay in the flat `[n_slots, k_max]`
-log tensor; Gaussian messages are information-form pairs
-(`eta [n_gslots, d_max]`, `Lambda [n_gslots, d_max, d_max]`), where products
-add and the vacuous message is exactly zeros (half-edges and initialization
-are free). Factor types declare their family (`equality` is polymorphic and
-routes by its edges' family); groups key on the dim signature so every rule
-call sees static shapes. Design decisions worth remembering:
+in one State pytree. Persistent storage is shape-segmented: discrete messages
+are one flat `sum_slot K` log array, while Gaussian information-form messages
+use flat `eta` (`sum_slot d`) and flattened `Lambda` (`sum_slot d²`) arrays.
+Compiler prefix-offset tables map logical slots into each array, so one outlier
+domain cannot pad every other edge. Products still add and the vacuous
+Gaussian message is exactly zeros (half-edges and initialization are free).
+Factor groups key on their full cardinality/dimension signature (`equality` is
+polymorphic and routes by family); the VM gathers transient dense blocks only
+to that group's local maximum and scatters exact segments back. Thus rule calls
+retain static shapes without persistent model-wide padding. Design decisions
+worth remembering:
 
 - **Never invert an incoming precision.** All linear-Gaussian rules are
   derived (docstring of `cffg.gauss`) in forms whose only inversions are
@@ -333,10 +337,12 @@ experiment harness").
 ## Resource estimator
 
 Because shapes are static post-compile, memory is computable analytically from
-arena sizes, and `jax.jit(...).lower(...).compile().cost_analysis()` gives
-FLOPs/bytes per MP sweep. Estimator = analytic memory + cost-analysis FLOPs +
-a small calibration run (fit sweep-time curve on 3–4 model sizes per backend).
-Cheap to build once the compiler exists; don't build it before.
+arena sizes. The estimator reports exact named byte counts for every persistent
+State arena (`messages`, Gaussian eta/Lambda/observations/masks, and EF
+messages/observations/masks) plus parameters; the wider XLA/calibration audit
+remains tracked by cff-j7mm. `jax.jit(...).lower(...).compile().cost_analysis()`
+can provide FLOPs/bytes per MP sweep, with a calibration run supplying measured
+sweep time.
 
 ## Diagram rendering (`cffg.viz`)
 

@@ -1,11 +1,12 @@
 """Template → executable arena.
 
-Grounds a validated template into a flat message arena (PGMax-inspired):
-messages live in one [n_slots, k_max] log-space array — each FFG edge owns two
-slots, one per side, holding the message flowing *into* the edge from that
-side. Factors are grouped by (type, cardinality signature) so each group
-updates as a single vectorized einsum over its members, driven by numpy
-gather/scatter index tables that jit treats as constants.
+Grounds a validated template into shape-segmented message arenas
+(PGMax-inspired). Each FFG edge owns two logical slots, one per side, holding
+the message flowing *into* the edge from that side. Persistent values are
+packed exactly into flat arrays; prefix-offset tables map logical slots to
+their cardinality/dimension-sized segments. Factors are grouped by (type,
+shape signature), so rule calls still use dense static local shapes without a
+model-wide maximum padding every unrelated edge.
 
 Parameters are *inputs* to the compiled step, not baked constants: instances
 sharing a structure hash can be vmapped with different parameters (the colony
@@ -215,23 +216,31 @@ class GfePlan:
 @dataclass
 class Arena:
     template_name: str
-    k_max: int
     n_slots: int
+    message_starts: np.ndarray  # [n_slots + 1] prefix offsets into flat messages
     edges: dict[str, EdgeInfo]
     groups: list[GroupPlan]
     data_slots: dict[str, int]  # DATA port name -> external slot
     semiring: str = "sum"  # "sum" (sum-product / BFE) | "max" (min-sum / MAP)
     constraint_groups: list[ConstraintPlan] = field(default_factory=list)
     log_params: dict[str, np.ndarray] = field(default_factory=dict)  # group -> [M, ...]
-    # Gaussian arena (cff-4e5z): messages are (eta [n_gslots, d_max],
-    # Lambda [n_gslots, d_max, d_max]) information-form pairs, zero-padded
-    # past each edge's dim; vacuous = zeros, so init and half-edges are free.
-    d_max: int = 1
+    # Gaussian arena (cff-4e5z): eta and Lambda are separate flat arrays.
+    # Prefix offsets make each logical slot exactly d and d*d values;
+    # vacuous = zeros, so init and half-edges remain free.
     n_gslots: int = 0
+    g_eta_starts: np.ndarray = field(
+        default_factory=lambda: np.zeros(1, dtype=np.int64)
+    )
+    g_lam_starts: np.ndarray = field(
+        default_factory=lambda: np.zeros(1, dtype=np.int64)
+    )
     gauss_groups: list[GaussGroupPlan] = field(default_factory=list)
     gauss_data: dict[str, tuple[int, int]] = field(default_factory=dict)
     # Gaussian DATA port -> (row in g_obs, dim of the observed edge)
     n_obs_rows: int = 0
+    g_obs_starts: np.ndarray = field(
+        default_factory=lambda: np.zeros(1, dtype=np.int64)
+    )
     mix_groups: list[MixGroupPlan] = field(default_factory=list)
     # Hybrid Gaussian-mixture groups (cff-pksr): each writes both the Gaussian
     # arena (out/in edges) and the discrete arena (selector edge).
@@ -271,6 +280,80 @@ class Arena:
             ],
             dtype=np.int64,
         ).reshape(-1, 2)
+
+    @property
+    def interior_slot_groups(self) -> list[tuple[int, np.ndarray]]:
+        """Interior discrete slot pairs grouped by cardinality.
+
+        The logical slot table stays useful for graph inspection, while the
+        grouped form lets the VM materialize only shape-local dense blocks.
+        """
+        by_card: dict[int, list[list[int]]] = {}
+        for e in self.edges.values():
+            if e.interior and not e.dim and not e.ef and e.name not in self.gfe_x_edges:
+                by_card.setdefault(e.card, []).append([e.slot0, e.slot1])
+        return [
+            (card, np.asarray(pairs, dtype=np.int64).reshape(-1, 2))
+            for card, pairs in sorted(by_card.items())
+        ]
+
+    @property
+    def delta_slot_groups(self) -> list[tuple[int, np.ndarray]]:
+        """Delta-constrained logical slot pairs grouped by cardinality."""
+        if not len(self.delta_pairs):
+            return []
+        card_of = {
+            slot: e.card
+            for e in self.edges.values()
+            if not e.dim and not e.ef
+            for slot in (e.slot0, e.slot1)
+        }
+        by_card: dict[int, list[np.ndarray]] = {}
+        for pair in self.delta_pairs:
+            by_card.setdefault(card_of[int(pair[0])], []).append(pair)
+        return [
+            (card, np.asarray(pairs, dtype=np.int64).reshape(-1, 2))
+            for card, pairs in sorted(by_card.items())
+        ]
+
+    @property
+    def n_message_values(self) -> int:
+        return int(self.message_starts[-1])
+
+    @property
+    def n_g_eta_values(self) -> int:
+        return int(self.g_eta_starts[-1])
+
+    @property
+    def n_g_lam_values(self) -> int:
+        return int(self.g_lam_starts[-1])
+
+    @property
+    def n_g_obs_values(self) -> int:
+        return int(self.g_obs_starts[-1])
+
+    @staticmethod
+    def _segment_indices(starts: np.ndarray, slots: np.ndarray | int, width: int) -> np.ndarray:
+        base = starts[np.asarray(slots, dtype=np.int64)]
+        return base[..., None] + np.arange(width, dtype=np.int64)
+
+    def message_indices(self, slots: np.ndarray | int, card: int) -> np.ndarray:
+        """Flat value indices for discrete logical ``slots`` of one card."""
+        return self._segment_indices(self.message_starts, slots, card)
+
+    def g_eta_indices(self, slots: np.ndarray | int, dim: int) -> np.ndarray:
+        """Flat eta indices for Gaussian logical ``slots`` of one dimension."""
+        return self._segment_indices(self.g_eta_starts, slots, dim)
+
+    def g_lam_indices(self, slots: np.ndarray | int, dim: int) -> np.ndarray:
+        """Flat Lambda indices, shaped ``slots + (dim, dim)``."""
+        base = self.g_lam_starts[np.asarray(slots, dtype=np.int64)]
+        block = np.arange(dim * dim, dtype=np.int64).reshape(dim, dim)
+        return base[..., None, None] + block
+
+    def g_obs_indices(self, rows: np.ndarray | int, dim: int) -> np.ndarray:
+        """Flat conditioned-observation indices for equal-dimension rows."""
+        return self._segment_indices(self.g_obs_starts, rows, dim)
 
 
 def compile_template(
@@ -845,23 +928,40 @@ def compile_template(
         (fam, np.array(pairs, dtype=np.int64)) for fam, pairs in sorted(by_fam.items())
     ]
 
-    k_max = max((e.card for e in edges.values() if not e.dim), default=1)
-    d_max = max((e.dim for e in edges.values() if e.dim), default=1)
+    message_lengths = np.zeros(next_slot, dtype=np.int64)
+    g_eta_lengths = np.zeros(next_gslot, dtype=np.int64)
+    g_lam_lengths = np.zeros(next_gslot, dtype=np.int64)
+    for e in edges.values():
+        if e.dim:
+            g_eta_lengths[[e.slot0, e.slot1]] = e.dim
+            g_lam_lengths[[e.slot0, e.slot1]] = e.dim * e.dim
+        elif not e.ef:
+            message_lengths[[e.slot0, e.slot1]] = e.card
+
+    def prefix(lengths: np.ndarray) -> np.ndarray:
+        return np.concatenate([np.zeros(1, dtype=np.int64), np.cumsum(lengths)])
+
+    obs_lengths = np.zeros(n_obs_rows, dtype=np.int64)
+    for row, dim in gauss_data.values():
+        obs_lengths[row] = dim
+
     return Arena(
         template_name=t.name,
-        k_max=k_max,
         n_slots=next_slot,
+        message_starts=prefix(message_lengths),
         edges=edges,
         groups=groups,
         data_slots=data_slots,
         semiring=semiring,
         constraint_groups=constraint_groups,
         log_params=log_params,
-        d_max=d_max,
         n_gslots=next_gslot,
+        g_eta_starts=prefix(g_eta_lengths),
+        g_lam_starts=prefix(g_lam_lengths),
         gauss_groups=gauss_groups,
         gauss_data=gauss_data,
         n_obs_rows=n_obs_rows,
+        g_obs_starts=prefix(obs_lengths),
         mix_groups=mix_groups,
         prec_groups=prec_groups,
         gauss_interior=gauss_interior,

@@ -66,8 +66,8 @@ NODE ENERGIES  F[q_a] = E_{q_a}[log q_a − log f_a],  q_a ∝ f_a · Π incomin
     Kalman tests pin down.
 
 Conventions: rules are batched over a group's members ([M, ...] leading
-axis) via vmap; dims are static per group; the engine slices [:d] out of the
-d_max-padded arena before calling and zero-pads the results after. Energies
+axis) via vmap; dims are static per group; the engine gathers shape-local
+blocks before calling and scatters exact segments after. Energies
 are only meaningful at (near-)fixed points with proper beliefs — improper
 beliefs surface as +inf, deliberately loud.
 """

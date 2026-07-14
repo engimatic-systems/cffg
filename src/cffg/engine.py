@@ -1,9 +1,10 @@
 """The inference VM: flooding message passing over a compiled arena.
 
-State is pure data (an Equinox pytree of the message array plus per-group
-log-parameters); the step is a pure function of it. Index tables from the
-Arena are captured as numpy constants inside the jitted step, so instances
-sharing a structure batch under `eqx.filter_vmap` (colony contract).
+State is pure data (an Equinox pytree of flat, shape-segmented message arrays
+plus per-group log-parameters); the step is a pure function of it. Prefix
+offsets and logical-slot tables from the Arena are captured as numpy constants
+inside the jitted step, so instances sharing a structure batch under
+`eqx.filter_vmap` (colony contract).
 
 Free energy: `bfe` evaluates F = Σ_a F[q_a] + Σ_{interior edges} H[q_i]
 exactly — node terms from the rule registry, plus the Bethe edge-entropy
@@ -44,11 +45,11 @@ class State(eqx.Module):
     freely. g_obs/g_mask are the *conditioned* Gaussian observations (see
     cffg.gauss: conditioning, not clamping) with mask 0 = missing."""
 
-    messages: jax.Array  # [n_slots, k_max] log-space
+    messages: jax.Array  # [sum_slot K] log-space discrete segments
     params: dict[str, jax.Array]  # group name -> [M, ...] log-factors
-    g_eta: jax.Array  # [n_gslots, d_max] information vectors
-    g_lam: jax.Array  # [n_gslots, d_max, d_max] precisions
-    g_obs: jax.Array  # [n_obs_rows, d_max] observation values
+    g_eta: jax.Array  # [sum_slot d] information-vector segments
+    g_lam: jax.Array  # [sum_slot d*d] flattened precision blocks
+    g_obs: jax.Array  # [sum_observation d] conditioned observation segments
     g_mask: jax.Array  # [n_obs_rows] 1.0 = bound, 0.0 = missing
     ef_eta: jax.Array  # [n_efslots, 2] EF natural parameters (cff-8s6a)
     ef_obs: jax.Array  # [n_ef_obs] conditioned counts/flips
@@ -120,6 +121,109 @@ def _replace(state: State, **kw) -> State:
     )})
 
 
+def _disc_rows(
+    arena: Arena,
+    messages: jax.Array,
+    slots: np.ndarray,
+    cards: tuple[int, ...],
+) -> jax.Array:
+    """Gather logical discrete slots into one shape-local padded block.
+
+    Padding exists only in this transient rule input and only to the maximum
+    role cardinality of one homogeneous factor group. Persistent storage is
+    exactly segmented, so an unrelated model-wide outlier cannot widen it.
+    """
+    width = max(cards)
+    blocks = []
+    for role, card in enumerate(cards):
+        block = messages[arena.message_indices(slots[..., role], card)]
+        blocks.append(
+            jnp.pad(block, [(0, 0)] * (block.ndim - 1) + [(0, width - card)],
+                    constant_values=NEG)
+        )
+    return jnp.stack(blocks, axis=-2)
+
+
+def _disc_both(
+    arena: Arena,
+    messages: jax.Array,
+    slots: np.ndarray,
+    cards: tuple[int, ...],
+) -> jax.Array:
+    """Gather both logical slots per VMP edge as ``[M, R, 2, local_k]``."""
+    width = max(cards)
+    blocks = []
+    for role, card in enumerate(cards):
+        block = messages[arena.message_indices(slots[:, role, :], card)]
+        blocks.append(jnp.pad(block, ((0, 0), (0, 0), (0, width - card)),
+                              constant_values=NEG))
+    return jnp.stack(blocks, axis=1)
+
+
+def _set_disc_rows(
+    arena: Arena,
+    messages: jax.Array,
+    slots: np.ndarray,
+    cards: tuple[int, ...],
+    rows: jax.Array,
+) -> jax.Array:
+    """Scatter a shape-local ``[..., R, local_k]`` rule output exactly."""
+    out = messages
+    for role, card in enumerate(cards):
+        idx = arena.message_indices(slots[..., role], card)
+        out = out.at[idx].set(rows[..., role, :card])
+    return out
+
+
+def _set_disc_block(
+    arena: Arena,
+    messages: jax.Array,
+    slots: np.ndarray,
+    card: int,
+    rows: jax.Array,
+) -> jax.Array:
+    return messages.at[arena.message_indices(slots, card)].set(rows[..., :card])
+
+
+def _gauss_rows(
+    arena: Arena,
+    eta: jax.Array,
+    lam: jax.Array,
+    slots: np.ndarray,
+    dims: tuple[int, ...],
+) -> tuple[jax.Array, jax.Array]:
+    """Gather Gaussian segments into one shape-local padded rule block."""
+    width = max(dims)
+    eta_blocks, lam_blocks = [], []
+    for role, dim in enumerate(dims):
+        e = eta[arena.g_eta_indices(slots[..., role], dim)]
+        l = lam[arena.g_lam_indices(slots[..., role], dim)]
+        eta_blocks.append(jnp.pad(e, [(0, 0)] * (e.ndim - 1) + [(0, width - dim)]))
+        lam_blocks.append(
+            jnp.pad(l, [(0, 0)] * (l.ndim - 2) + [(0, width - dim), (0, width - dim)])
+        )
+    return jnp.stack(eta_blocks, axis=-2), jnp.stack(lam_blocks, axis=-3)
+
+
+def _set_gauss_block(
+    arena: Arena,
+    eta: jax.Array,
+    lam: jax.Array,
+    slots: np.ndarray,
+    dim: int,
+    eta_rows: jax.Array,
+    lam_rows: jax.Array,
+) -> tuple[jax.Array, jax.Array]:
+    return (
+        eta.at[arena.g_eta_indices(slots, dim)].set(eta_rows[..., :dim]),
+        lam.at[arena.g_lam_indices(slots, dim)].set(lam_rows[..., :dim, :dim]),
+    )
+
+
+def _obs_rows(arena: Arena, observations: jax.Array, rows: np.ndarray, dim: int) -> jax.Array:
+    return observations[arena.g_obs_indices(rows, dim)]
+
+
 class Engine:
     """Compiled, executable model. Construction is cheap; `step` is jitted."""
 
@@ -135,9 +239,9 @@ class Engine:
         return State(
             messages=self._uniform_messages(),
             params={name: jnp.asarray(p) for name, p in a.log_params.items()},
-            g_eta=jnp.zeros((a.n_gslots, a.d_max)),  # zeros = vacuous
-            g_lam=jnp.zeros((a.n_gslots, a.d_max, a.d_max)),
-            g_obs=jnp.zeros((a.n_obs_rows, a.d_max)),
+            g_eta=jnp.zeros(a.n_g_eta_values),  # zeros = vacuous
+            g_lam=jnp.zeros(a.n_g_lam_values),
+            g_obs=jnp.zeros(a.n_g_obs_values),
             g_mask=jnp.zeros(a.n_obs_rows),
             ef_eta=jnp.zeros((a.n_efslots, 2)),  # zeros = vacuous
             ef_obs=jnp.zeros(a.n_ef_obs),
@@ -145,12 +249,12 @@ class Engine:
         )
 
     def _uniform_messages(self) -> jax.Array:
-        rows = np.full((self.arena.n_slots, self.arena.k_max), NEG)
+        rows = np.empty(self.arena.n_message_values)
         for e in self.arena.edges.values():
             if e.dim or e.ef:
                 continue  # gaussian/EF slots live in their own arenas
-            rows[e.slot0, : e.card] = -np.log(e.card)
-            rows[e.slot1, : e.card] = -np.log(e.card)
+            rows[self.arena.message_indices(e.slot0, e.card)] = -np.log(e.card)
+            rows[self.arena.message_indices(e.slot1, e.card)] = -np.log(e.card)
         return jnp.asarray(rows)
 
     def bind_data(self, state: State, observations: dict) -> State:
@@ -183,9 +287,8 @@ class Engine:
                         raise ValueError(
                             f"port {port!r}: observation has dim {val.shape[0]}, edge has {dim}"
                         )
-                    vec = np.zeros(self.arena.d_max)
-                    vec[:dim] = val
-                    g_obs = g_obs.at[row].set(jnp.asarray(vec, dtype=g_obs.dtype))
+                    idx = self.arena.g_obs_indices(row, dim)
+                    g_obs = g_obs.at[idx].set(jnp.asarray(val, dtype=g_obs.dtype))
                     g_mask = g_mask.at[row].set(1.0)
                 continue
             if port not in self.arena.data_slots:
@@ -199,14 +302,15 @@ class Engine:
                 for e in self.arena.edges.values()
                 if not e.dim and not e.ef and slot in (e.slot0, e.slot1)
             )
-            row = np.full(self.arena.k_max, NEG)
+            row = np.full(card, NEG)
             if value is None:
                 row[:card] = -np.log(card)
             else:
                 if not 0 <= value < card:
                     raise ValueError(f"port {port!r}: value {value} out of range [0, {card})")
                 row[value] = 0.0
-            msgs = msgs.at[slot].set(jnp.asarray(row, dtype=msgs.dtype))
+            idx = self.arena.message_indices(slot, card)
+            msgs = msgs.at[idx].set(jnp.asarray(row, dtype=msgs.dtype))
         return _replace(
             state, messages=msgs, g_obs=g_obs, g_mask=g_mask, ef_obs=ef_obs, ef_mask=ef_mask
         )
@@ -404,12 +508,15 @@ class Engine:
         for edge in self.arena.edges.values():
             if edge.dim or edge.ef:
                 continue
-            logq = messages[edge.slot0, : edge.card] + messages[edge.slot1, : edge.card]
+            logq = (
+                messages[self.arena.message_indices(edge.slot0, edge.card)]
+                + messages[self.arena.message_indices(edge.slot1, edge.card)]
+            )
             if not np.any(np.exp(logq) > 0):
                 return True
 
         for group in self.arena.groups:
-            incoming = messages[group.gather]
+            incoming = np.asarray(_disc_rows(self.arena, state.messages, group.gather, group.cards))
             for member in range(len(group.members)):
                 supports = [
                     np.exp(incoming[member, role, :card]) > 0
@@ -428,7 +535,9 @@ class Engine:
                     return True
 
         for constraint in self.arena.constraint_groups:
-            incoming = messages[constraint.gather]
+            incoming = np.asarray(
+                _disc_rows(self.arena, state.messages, constraint.gather, constraint.cards)
+            )
             supports = [
                 np.flatnonzero(np.exp(incoming[i, :card]) > 0).tolist()
                 for i, card in enumerate(constraint.cards)
@@ -469,7 +578,10 @@ class Engine:
         for e in self.arena.edges.values():
             if e.dim or e.ef:
                 continue  # gaussian_marginals / ef_marginals
-            lq = msgs[e.slot0, : e.card] + msgs[e.slot1, : e.card]
+            lq = (
+                msgs[self.arena.message_indices(e.slot0, e.card)]
+                + msgs[self.arena.message_indices(e.slot1, e.card)]
+            )
             lq -= lq.max()
             q = np.exp(lq)
             out[e.name] = q / q.sum()
@@ -498,12 +610,12 @@ class Engine:
             return (q / q.sum(axis=1, keepdims=True)).reshape(lb.shape)
 
         for g in self.arena.groups:
-            inc = msgs[g.gather]  # [M, R, k_max]
+            inc = np.asarray(_disc_rows(self.arena, state.messages, g.gather, g.cards))
             if g.type == "equality":
                 k = g.cards[0]
                 q = norm_exp(inc[:, :, :k].sum(axis=1))
             elif g.mode == "vmp":
-                both = msgs[g.gather_both]  # [M, R, 2, k_max]
+                both = np.asarray(_disc_both(self.arena, state.messages, g.gather_both, g.cards))
                 q = None
                 for r, k in enumerate(g.cards):
                     lq = both[:, r, 0, :k] + both[:, r, 1, :k]
@@ -531,8 +643,14 @@ class Engine:
             if not e.dim:
                 continue
             d = e.dim
-            eta_q = eta[e.slot0, :d] + eta[e.slot1, :d]
-            lam_q = lam[e.slot0, :d, :d] + lam[e.slot1, :d, :d]
+            eta_q = (
+                eta[self.arena.g_eta_indices(e.slot0, d)]
+                + eta[self.arena.g_eta_indices(e.slot1, d)]
+            )
+            lam_q = (
+                lam[self.arena.g_lam_indices(e.slot0, d)]
+                + lam[self.arena.g_lam_indices(e.slot1, d)]
+            )
             mean, cov = gauss.moments(eta_q, lam_q)
             out[e.name] = (np.asarray(mean), np.asarray(cov))
         return out
@@ -556,7 +674,8 @@ class Engine:
         for g in self.arena.gauss_groups:
             if g.type == "equality":
                 continue
-            inc_e, inc_l = g_eta[g.gather], g_lam[g.gather]
+            inc_e, inc_l = _gauss_rows(self.arena, state.g_eta, state.g_lam, g.gather, g.dims)
+            inc_e, inc_l = np.asarray(inc_e), np.asarray(inc_l)
             for i, name in enumerate(g.members):
                 w = np.asarray(state.params[g.name + ":W"][i])
                 if g.type == "gaussian":
@@ -618,7 +737,7 @@ class Engine:
                     b = np.asarray(state.params[g.name + ":b"][i])
                     e_i, l_i = inc_e[i, 1, :di], inc_l[i, 1, :di, :di]
                     row = int(g.obs_rows[i])
-                    y, mk = g_obs[row, :do], g_mask[row]
+                    y, mk = g_obs[self.arena.g_obs_indices(row, do)], g_mask[row]
                     lam_q = mk * (a.T @ w @ a) + l_i
                     proper = bool(gauss.is_proper_precision(w)) and bool(
                         gauss.is_proper_precision(lam_q)
@@ -752,34 +871,17 @@ class EfMarginal:
     proper: bool
 
 
-def _pad_gauss(eta: jax.Array, lam: jax.Array, d_max: int) -> tuple[jax.Array, jax.Array]:
-    """Zero-pad [M, d]/[M, d, d] rule outputs back to arena width."""
-    p = d_max - eta.shape[-1]
-    return (
-        jnp.pad(eta, ((0, 0), (0, p))),
-        jnp.pad(lam, ((0, 0), (0, p), (0, p))),
-    )
-
-
-def _pad_disc(rows: jax.Array, k_max: int) -> jax.Array:
-    """NEG-pad a [M, K] block of log-messages out to the discrete arena width
-    (log-space zero past the selector's own cardinality)."""
-    return jnp.pad(rows, ((0, 0), (0, k_max - rows.shape[-1])), constant_values=NEG)
-
-
-def _mix_sweep(arena, messages, g_eta, g_lam, params, k_max, d_max):
+def _mix_sweep(arena, messages, g_eta, g_lam, params):
     """One synchronous flooding sweep over the hybrid Gaussian-mixture groups
     (cff-pksr). Reads only the pre-sweep arrays; returns the writes for both
     arenas so the caller can fold them into each arena's damping phase:
-    `sel_writes` [(s_scatter, [M, k_max])] to the discrete messages, and
-    `gauss_writes` [(g_scatter, [M, d_max], [M, d_max, d_max])] to (eta, Lam).
-    Dims and K are static per group, so every rule sees exact slices."""
-    sel_writes: list[tuple[jax.Array, jax.Array]] = []
-    gauss_writes: list[tuple[jax.Array, jax.Array, jax.Array]] = []
+    Each write carries its exact cardinality/dimension; no model-wide padded
+    representation is constructed. Dims and K are static per group."""
+    sel_writes = []
+    gauss_writes = []
     for g in arena.mix_groups:
-        mu_e = messages[g.s_gather][:, : g.k_sel]  # [M, K] incoming selector msg
-        inc_e = g_eta[g.g_gather]  # [M, R_g, d_max]
-        inc_l = g_lam[g.g_gather]  # [M, R_g, d_max, d_max]
+        mu_e = messages[arena.message_indices(g.s_gather, g.k_sel)]
+        inc_e, inc_l = _gauss_rows(arena, g_eta, g_lam, g.g_gather, g.dims)
         w = params[g.name + ":W"]
         if g.type == "gaussian_mixture_linear":
             do, di = g.dims
@@ -798,42 +900,37 @@ def _mix_sweep(arena, messages, g_eta, g_lam, params, k_max, d_max):
             g_outs = [mixg.mix_forward(mu_e, m, w)]  # -> out
             to_sel = mixg.mix_to_selector(e_o, l_o, m, w)  # [M, K]
         for r, (oe, ol) in enumerate(g_outs):
-            oe, ol = _pad_gauss(oe, ol, d_max)
-            gauss_writes.append((g.g_scatter[:, r], oe, ol))
-        sel_writes.append((g.s_scatter, _pad_disc(to_sel, k_max)))
+            gauss_writes.append((g.g_scatter[:, r], g.dims[r], oe, ol))
+        sel_writes.append((g.s_scatter, g.k_sel, to_sel))
     return sel_writes, gauss_writes
 
 
-def _prec_sweep(arena, messages_unused, g_eta, g_lam, ef_eta, params, d_max):
+def _prec_sweep(arena, g_eta, g_lam, ef_eta, params):
     """One synchronous flooding sweep over the gaussian_prec groups (cff-7c5o).
     Straddles the Gaussian and EF arenas; reads only the pre-sweep arrays and
     returns the writes for both so they fold into each arena's damping phase:
-    `gauss_writes` [(x_scatter, [M, d_max], [M, d_max, d_max])] to (eta, Lam),
-    `ef_writes` [(tau_scatter, [M, 2])] to the natural parameters. Both VMP
-    messages read marginals (both slots summed), the mean-field convention."""
-    gauss_writes: list[tuple[jax.Array, jax.Array, jax.Array]] = []
-    ef_writes: list[tuple[jax.Array, jax.Array]] = []
+    Both VMP messages read marginals (both slots summed), the mean-field
+    convention."""
+    gauss_writes = []
+    ef_writes = []
     for g in arena.prec_groups:
         tau_q = ef_eta[g.tau_gather_both].sum(axis=1)  # [M, 2] τ-edge marginal
-        x_eta_q = g_eta[g.x_gather_both].sum(axis=1)[:, :1]  # [M, 1]
-        x_lam_q = g_lam[g.x_gather_both].sum(axis=1)[:, :1, :1]  # [M, 1, 1]
+        x_eta_q = g_eta[arena.g_eta_indices(g.x_gather_both, 1)].sum(axis=1)
+        x_lam_q = g_lam[arena.g_lam_indices(g.x_gather_both, 1)].sum(axis=1)
         m = params[g.name + ":m"]  # [M, 1]
         oe, ol = gauss.prec_to_x(tau_q, m)  # (eta [M,1], lam [M,1,1])
-        oe, ol = _pad_gauss(oe, ol, d_max)
-        gauss_writes.append((g.x_scatter, oe, ol))
+        gauss_writes.append((g.x_scatter, 1, oe, ol))
         ef_writes.append((g.tau_scatter, gauss.prec_to_tau(x_eta_q, x_lam_q, m)))  # [M, 2]
     return gauss_writes, ef_writes
 
 
 def _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params):
     """One synchronous flooding sweep over the Gaussian groups; returns the
-    fully rewritten (eta, Lambda) arrays. Dims are static per group, so every
-    rule call sees exact [:d] slices of the padded arena."""
-    d_max = arena.d_max
+    fully rewritten flat (eta, Lambda) arrays. Dims are static per group, so
+    every rule call sees a shape-local block."""
     new_eta, new_lam = g_eta, g_lam
     for g in arena.gauss_groups:
-        inc_e = g_eta[g.gather]  # [M, R, d_max]
-        inc_l = g_lam[g.gather]  # [M, R, d_max, d_max]
+        inc_e, inc_l = _gauss_rows(arena, g_eta, g_lam, g.gather, g.dims)
         outs: list[tuple[jax.Array, jax.Array]] = []  # per role, [M, d]/[M, d, d]
         if g.type == "gaussian":
             (d,) = g.dims
@@ -849,15 +946,15 @@ def _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params):
             e_in, l_in = inc_e[:, 1, :di], inc_l[:, 1, :di, :di]
             outs.append(gauss.linear_forward(e_in, l_in, a, b, w))
             if g.type == "gaussian_linear_obs":
-                y, mk = g_obs[g.obs_rows][:, :do], g_mask[g.obs_rows]
+                y, mk = _obs_rows(arena, g_obs, g.obs_rows, do), g_mask[g.obs_rows]
                 outs.append(gauss.linear_observed_backward(y, mk, a, b, w))
             else:
                 e_out, l_out = inc_e[:, 0, :do], inc_l[:, 0, :do, :do]
                 outs.append(gauss.linear_backward(e_out, l_out, a, b, w))
         for r, (oe, ol) in enumerate(outs):
-            oe, ol = _pad_gauss(oe, ol, d_max)
-            new_eta = new_eta.at[g.scatter[:, r]].set(oe)
-            new_lam = new_lam.at[g.scatter[:, r]].set(ol)
+            new_eta, new_lam = _set_gauss_block(
+                arena, new_eta, new_lam, g.scatter[:, r], g.dims[r], oe, ol
+            )
     return new_eta, new_lam
 
 
@@ -882,27 +979,27 @@ def _ef_sweep(arena, ef_eta, ef_obs, ef_mask, params):
     return new
 
 
-def _constraint_writes(arena: Arena, messages: jax.Array, k_max: int, op):
+def _constraint_writes(arena: Arena, messages: jax.Array, op):
     """Combinatorial messages for the hard-constraint factors (cff-e8zk). Reads
-    the pre-sweep messages (synchronous flooding); returns [(scatter, [n, k_max])]
-    writes for the discrete arena, folded into its damping phase by the caller."""
+    the pre-sweep messages (synchronous flooding); returns exact segmented
+    writes for the discrete arena, folded into damping by the caller."""
     writes = []
     for c in arena.constraint_groups:
-        inc = messages[c.gather]  # [n, k_max]
+        k_local = max(c.cards)
+        inc = _disc_rows(arena, messages, c.gather, c.cards)
         fn = csp.CONSTRAINT_MESSAGES[c.type]
         if c.type in ("exactly_k", "at_most_k"):
-            out = fn(inc, c.cards, k_max, op, k=c.k)
+            out = fn(inc, c.cards, k_local, op, k=c.k)
         elif c.type == "table":
-            out = fn(inc, c.cards, k_max, op, table=jnp.asarray(c.table))
+            out = fn(inc, c.cards, k_local, op, table=jnp.asarray(c.table))
         else:
-            out = fn(inc, c.cards, k_max, op)
-        writes.append((c.scatter, out))
+            out = fn(inc, c.cards, k_local, op)
+        writes.append((c.scatter, c.cards, out))
     return writes
 
 
 def _make_step(arena: Arena):
     groups = arena.groups
-    k_max = arena.k_max
     op = jnp.max if arena.semiring == "max" else logsumexp
 
     def step(
@@ -923,40 +1020,43 @@ def _make_step(arena: Arena):
         inner_status = jnp.asarray(0)
         for g in groups:
             logf = params.get(g.name)
+            k_local = max(g.cards)
             if g.mode == "vmp":
-                inc2 = messages[g.gather_both]  # [M, R, 2, k_max]
-                out = VMP_UPDATES[g.type](inc2, logf, g.cards, k_max)
+                inc2 = _disc_both(arena, messages, g.gather_both, g.cards)
+                out = VMP_UPDATES[g.type](inc2, logf, g.cards, k_local)
             else:
-                inc = messages[g.gather]  # [M, R, k_max] (synchronous: reads old)
-                out = BP_UPDATES[g.type](inc, logf, g.cards, k_max, op)
-            new = new.at[g.scatter.reshape(-1)].set(out.reshape(-1, k_max))
-        for scatter, out in _constraint_writes(arena, messages, k_max, op):
-            new = new.at[scatter].set(out)
+                inc = _disc_rows(arena, messages, g.gather, g.cards)
+                out = BP_UPDATES[g.type](inc, logf, g.cards, k_local, op)
+            new = _set_disc_rows(arena, new, g.scatter, g.cards, out)
+        for scatter, cards, out in _constraint_writes(arena, messages, op):
+            new = _set_disc_rows(arena, new, scatter, cards, out)
         for g in arena.gfe_groups:
-            _, ki = g.cards
-            log_d = messages[g.gather_z][:, :ki]
+            ko, ki = g.cards
+            k_local = max(g.cards)
+            log_d = messages[arena.message_indices(g.gather_z, ki)]
             a_key = g.name + (":counts" if g.learned else ":A")
             mu2, log_qx, residuals, statuses = gfe_update(
-                log_d, params[a_key], params[g.name + ":c"], k_max,
+                log_d, params[a_key], params[g.name + ":c"], k_local,
                 learned=g.learned, return_diagnostics=True,
             )
-            new = new.at[g.scatter_z].set(mu2)
-            new = new.at[g.scatter_x].set(log_qx)
+            new = _set_disc_block(arena, new, g.scatter_z, ki, mu2)
+            new = _set_disc_block(arena, new, g.scatter_x, ko, log_qx)
             inner_residual = jnp.maximum(inner_residual, jnp.max(residuals))
             inner_status = jnp.maximum(inner_status, jnp.max(statuses))
         for g in arena.gfe_tm_groups:
             ko, ki, ku = g.cards
-            md = messages[g.gather[:, 0]][:, :ko]
-            mi = messages[g.gather[:, 1]][:, :ki]
-            me = messages[g.gather[:, 2]][:, :ku]
+            k_local = max(g.cards)
+            md = messages[arena.message_indices(g.gather[:, 0], ko)]
+            mi = messages[arena.message_indices(g.gather[:, 1], ki)]
+            me = messages[arena.message_indices(g.gather[:, 2], ku)]
             b_key = g.name + (":counts" if g.learned else ":B")
             to_out, to_in, to_sel, residuals, statuses = gfe_tm_update(
-                mi, me, md, params[b_key], k_max,
+                mi, me, md, params[b_key], k_local,
                 learned=g.learned, return_diagnostics=True,
             )
-            new = new.at[g.scatter[:, 0]].set(to_out)
-            new = new.at[g.scatter[:, 1]].set(to_in)
-            new = new.at[g.scatter[:, 2]].set(to_sel)
+            new = _set_disc_block(arena, new, g.scatter[:, 0], ko, to_out)
+            new = _set_disc_block(arena, new, g.scatter[:, 1], ki, to_in)
+            new = _set_disc_block(arena, new, g.scatter[:, 2], ku, to_sel)
             inner_residual = jnp.maximum(inner_residual, jnp.max(residuals))
             inner_status = jnp.maximum(inner_status, jnp.max(statuses))
         # Hybrid Gaussian-mixture sweep (cff-pksr): straddles both arenas.
@@ -964,7 +1064,7 @@ def _make_step(arena: Arena):
         # arena's damping phase — Gaussian writes below, selector writes with
         # the discrete blend (synchronous flooding: gather from OLD arrays).
         mix_sel, mix_gauss = (
-            _mix_sweep(arena, messages, g_eta, g_lam, params, k_max, arena.d_max)
+            _mix_sweep(arena, messages, g_eta, g_lam, params)
             if arena.mix_groups
             else ([], [])
         )
@@ -973,7 +1073,7 @@ def _make_step(arena: Arena):
         # here from the pre-sweep arrays so both writes fold into the matching
         # arena's damping phase (synchronous flooding: gather from OLD arrays).
         prec_gauss, prec_ef = (
-            _prec_sweep(arena, messages, g_eta, g_lam, ef_eta, params, arena.d_max)
+            _prec_sweep(arena, g_eta, g_lam, ef_eta, params)
             if arena.prec_groups
             else ([], [])
         )
@@ -983,9 +1083,10 @@ def _make_step(arena: Arena):
         new_eta, new_lam = g_eta, g_lam
         if arena.gauss_groups:
             new_eta, new_lam = _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params)
-        for scatter, oe, ol in [*mix_gauss, *prec_gauss]:
-            new_eta = new_eta.at[scatter].set(oe)
-            new_lam = new_lam.at[scatter].set(ol)
+        for scatter, dim, oe, ol in [*mix_gauss, *prec_gauss]:
+            new_eta, new_lam = _set_gauss_block(
+                arena, new_eta, new_lam, scatter, dim, oe, ol
+            )
         if arena.gauss_groups or arena.mix_groups or arena.prec_groups:
             new_eta = damp * g_eta + (1.0 - damp) * new_eta
             new_lam = damp * g_lam + (1.0 - damp) * new_lam
@@ -999,8 +1100,8 @@ def _make_step(arena: Arena):
                 new_ef = new_ef.at[scatter].set(out)
             new_ef = damp * ef_eta + (1.0 - damp) * new_ef
         # Hybrid selector writes join the discrete arena before its damping.
-        for scatter, rows in mix_sel:
-            new = new.at[scatter].set(rows)
+        for scatter, card, rows in mix_sel:
+            new = _set_disc_block(arena, new, scatter, card, rows)
         # Log-space damping: stabilizes the outer coordination between GFE
         # composites (their local solves are exact, but synchronous flooding
         # between them can limit-cycle — the outer face of Part II §4.5).
@@ -1013,12 +1114,17 @@ def _make_step(arena: Arena):
         if harden and len(arena.delta_pairs):
             # δ form constraint: project each constrained edge onto a pointmass
             # at the argmax of its current marginal (both slots one-hot).
-            p0, p1 = arena.delta_pairs[:, 0], arena.delta_pairs[:, 1]
-            lq = new[p0] + new[p1]
-            hot = jnp.where(
-                jnp.arange(k_max)[None, :] == jnp.argmax(lq, axis=-1)[:, None], 0.0, NEG
-            ).astype(new.dtype)
-            new = new.at[p0].set(hot).at[p1].set(hot)
+            for card, pairs in arena.delta_slot_groups:
+                p0, p1 = pairs[:, 0], pairs[:, 1]
+                i0 = arena.message_indices(p0, card)
+                i1 = arena.message_indices(p1, card)
+                lq = new[i0] + new[i1]
+                hot = jnp.where(
+                    jnp.arange(card)[None, :] == jnp.argmax(lq, axis=-1)[:, None],
+                    0.0,
+                    NEG,
+                ).astype(new.dtype)
+                new = new.at[i0].set(hot).at[i1].set(hot)
         return new, new_eta, new_lam, new_ef, inner_residual, inner_status
 
     return step
@@ -1030,7 +1136,7 @@ def _gauss_bfe(arena, g_eta, g_lam, g_obs, g_mask, params):
     tree identity BFE = −log p(y) holds to fixed-point/ridge precision."""
     total = jnp.asarray(0.0, dtype=g_eta.dtype)
     for g in arena.gauss_groups:
-        inc_e, inc_l = g_eta[g.gather], g_lam[g.gather]
+        inc_e, inc_l = _gauss_rows(arena, g_eta, g_lam, g.gather, g.dims)
         if g.type == "gaussian":
             (d,) = g.dims
             total = total + gauss.prior_energy(
@@ -1045,14 +1151,14 @@ def _gauss_bfe(arena, g_eta, g_lam, g_obs, g_mask, params):
             a, b, w = (params[g.name + k] for k in (":A", ":b", ":W"))
             e_i, l_i = inc_e[:, 1, :di], inc_l[:, 1, :di, :di]
             if g.type == "gaussian_linear_obs":
-                y, mk = g_obs[g.obs_rows][:, :do], g_mask[g.obs_rows]
+                y, mk = _obs_rows(arena, g_obs, g.obs_rows, do), g_mask[g.obs_rows]
                 total = total + gauss.linear_observed_energy(e_i, l_i, y, mk, a, b, w).sum()
             else:
                 e_o, l_o = inc_e[:, 0, :do], inc_l[:, 0, :do, :do]
                 total = total + gauss.linear_energy(e_o, l_o, e_i, l_i, a, b, w).sum()
     for d, pairs in arena.gauss_interior:
-        l0 = g_lam[pairs[:, 0], :d, :d]
-        l1 = g_lam[pairs[:, 1], :d, :d]
+        l0 = g_lam[arena.g_lam_indices(pairs[:, 0], d)]
+        l1 = g_lam[arena.g_lam_indices(pairs[:, 1], d)]
         total = total + gauss.edge_entropy(l0, l1).sum()
     return total
 
@@ -1064,8 +1170,8 @@ def _mix_bfe(arena, messages, g_eta, g_lam, params):
     the selector edge in interior_slot_pairs, both factor-agnostic tables."""
     total = jnp.asarray(0.0, dtype=g_eta.dtype)
     for g in arena.mix_groups:
-        mu_e = messages[g.s_gather][:, : g.k_sel]
-        inc_e, inc_l = g_eta[g.g_gather], g_lam[g.g_gather]
+        mu_e = messages[arena.message_indices(g.s_gather, g.k_sel)]
+        inc_e, inc_l = _gauss_rows(arena, g_eta, g_lam, g.g_gather, g.dims)
         w = params[g.name + ":W"]
         if g.type == "gaussian_mixture_linear":
             do, di = g.dims
@@ -1092,8 +1198,8 @@ def _prec_bfe(arena, g_eta, g_lam, ef_eta, params):
     total = jnp.asarray(0.0, dtype=g_eta.dtype)
     for g in arena.prec_groups:
         tau_q = ef_eta[g.tau_gather_both].sum(axis=1)  # [M, 2]
-        x_eta_q = g_eta[g.x_gather_both].sum(axis=1)[:, :1]  # [M, 1]
-        x_lam_q = g_lam[g.x_gather_both].sum(axis=1)[:, :1, :1]  # [M, 1, 1]
+        x_eta_q = g_eta[arena.g_eta_indices(g.x_gather_both, 1)].sum(axis=1)
+        x_lam_q = g_lam[arena.g_lam_indices(g.x_gather_both, 1)].sum(axis=1)
         m = params[g.name + ":m"]
         e = gauss.prec_energy(tau_q, x_eta_q, x_lam_q, m)  # −E_q[log f], +inf if improper
         neg_h_x = gauss._neg_entropy(x_lam_q)  # −H[q_x]
@@ -1134,7 +1240,6 @@ def _ef_bfe(arena, ef_eta, ef_obs, ef_mask, params):
 
 def _make_bfe(arena: Arena):
     groups = arena.groups
-    pairs = arena.interior_slot_pairs
 
     def bfe(
         messages: jax.Array,
@@ -1164,11 +1269,13 @@ def _make_bfe(arena: Arena):
             if logf is None:
                 logf = jnp.zeros(())  # equality handles its own zero log-f
             if g.mode == "vmp":
-                total = total + VMP_ENERGIES[g.type](messages[g.gather_both], logf, g.cards).sum()
+                inc = _disc_both(arena, messages, g.gather_both, g.cards)
+                total = total + VMP_ENERGIES[g.type](inc, logf, g.cards).sum()
             else:
-                total = total + NODE_ENERGIES[g.type](messages[g.gather], logf, g.cards).sum()
+                inc = _disc_rows(arena, messages, g.gather, g.cards)
+                total = total + NODE_ENERGIES[g.type](inc, logf, g.cards).sum()
         for c in arena.constraint_groups:
-            inc = messages[c.gather]  # [n, k_max]
+            inc = _disc_rows(arena, messages, c.gather, c.cards)
             fn = csp.CONSTRAINT_ENERGIES[c.type]
             if c.type in ("exactly_k", "at_most_k"):
                 total = total + fn(inc, c.cards, k=c.k)
@@ -1178,22 +1285,25 @@ def _make_bfe(arena: Arena):
                 total = total + fn(inc, c.cards)
         for g in arena.gfe_groups:
             _, ki = g.cards
-            log_d = messages[g.gather_z][:, :ki]
+            log_d = messages[arena.message_indices(g.gather_z, ki)]
             a_key = g.name + (":counts" if g.learned else ":A")
             total = total + gfe_energy(
                 log_d, params[a_key], params[g.name + ":c"], learned=g.learned
             ).sum()
         for g in arena.gfe_tm_groups:
             ko, ki, ku = g.cards
-            md = messages[g.gather[:, 0]][:, :ko]
-            mi = messages[g.gather[:, 1]][:, :ki]
-            me = messages[g.gather[:, 2]][:, :ku]
+            md = messages[arena.message_indices(g.gather[:, 0], ko)]
+            mi = messages[arena.message_indices(g.gather[:, 1], ki)]
+            me = messages[arena.message_indices(g.gather[:, 2], ku)]
             b_key = g.name + (":counts" if g.learned else ":B")
             total = total + gfe_tm_energy(
                 mi, me, md, params[b_key], learned=g.learned
             ).sum()
-        if len(pairs):
-            lq = messages[pairs[:, 0]] + messages[pairs[:, 1]]  # [E_int, k_max]
+        for card, pairs in arena.interior_slot_groups:
+            lq = (
+                messages[arena.message_indices(pairs[:, 0], card)]
+                + messages[arena.message_indices(pairs[:, 1], card)]
+            )
             lq = lq - logsumexp(lq, axis=-1, keepdims=True)
             q = jnp.exp(lq)
             entropy = -jnp.where(q > _TINY, q * lq, 0.0).sum()
