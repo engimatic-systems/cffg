@@ -11,7 +11,8 @@ against the authors' Julia reference on the T-maze benchmark.
 
 ```sh
 uv sync          # install
-uv run pytest    # 105 tests; the T-maze + gridworld suites are living examples
+uv run pytest tests/test_engine_tree.py  # focused iteration
+uv run python tools/dashboard.py --run-suite  # one full pass + dashboard
 ```
 
 ## The mental model
