@@ -1,9 +1,9 @@
-"""Repo hygiene: the five-canonical-documents rule from AGENTS.md, enforced by machine.
+"""Repo hygiene: the canonical-documents rule from AGENTS.md, enforced by machine.
 
 Project state lives in tickets, durable knowledge lives in docstrings, and
 executable claims live in tests. Markdown files multiplying in the repo is the
 first symptom of context leaking out of that system — so this test fails the
-build the moment a fifth document appears.
+build the moment an unsanctioned document appears.
 """
 
 from pathlib import Path
@@ -16,6 +16,7 @@ CANONICAL_DOCS = {
     "docs/ARCHITECTURE.md",
     "docs/LIMITATIONS.md",
     "docs/DERIVATIONS.md",  # formal derivations + plain-English companions (cff-fk2u)
+    "docs/READING.md",  # curated external reading list (Cooper, 2026-07-12)
 }
 
 # Directories whose markdown is none of our business.
@@ -39,11 +40,11 @@ def test_no_contraband_markdown():
     contraband = sorted(found - CANONICAL_DOCS)
     assert not contraband, (
         f"Contraband markdown detected: {contraband}. "
-        "Per AGENTS.md document policy there are exactly five canonical docs, "
+        "Per AGENTS.md document policy there is a fixed allowlist of canonical docs, "
         "updated in place. Session state belongs in tickets (tk add-note), "
         "research findings in the ticket that needed them, durable knowledge "
         "in docstrings, claims in tests. Delete the file and relocate its "
-        "contents — or, if this is a genuine fifth pillar of the project, "
+        "contents — or, if this is a genuine new pillar of the project, "
         "amend AGENTS.md and this allowlist in the same commit and be ready "
         "to defend that in review."
     )
