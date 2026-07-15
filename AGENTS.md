@@ -13,6 +13,17 @@ Both papers live in `notes/` (PDFs plus extracted text). The project brief is in
 Obsidian vault at `agents/CFFG/0.0.md`. Reference implementation for parity testing:
 https://github.com/biaslab/LAIF (Julia/RxInfer).
 
+## Session bootstrap
+
+Before creating a work branch, update its intended base so upstream changes and
+conflicts surface before implementation instead of as a late rebase surprise:
+
+```sh
+BASE_BRANCH=main  # replace when the ticket names another base
+git switch "$BASE_BRANCH"
+git pull --ff-only origin "$BASE_BRANCH"
+```
+
 ## Rules
 
 1. **Package management: `uv` only.** Use `uv init`, `uv add`, `uv run`, `uv sync`.
@@ -53,8 +64,9 @@ This project will span many context windows. The rule that makes that survivable
 **tickets are the shared memory; the repo carries no session state.**
 
 - **Start of session**: read this file, run `tk ready`, pick ONE ticket (or a few
-  trivially small ones). Don't re-derive project state from scratch — the ticket's
-  description, design notes, and comments are the handoff.
+  trivially small ones), then follow **Session bootstrap** before branching. Don't
+  re-derive project state from scratch — the ticket's description, design notes,
+  and comments are the handoff.
 - **During**: atomic commits referencing the ticket ID. Discovered work becomes a
   *new ticket* (linked with a dependency), not scope drift in the current one.
 - **During implementation**, prefer focused test files for the changed
