@@ -23,3 +23,7 @@ AGENTS.md tells agents to switch to the intended base and run git pull --ff-only
 **2026-07-15T04:07:25Z**
 
 Implemented the top-level Session bootstrap: choose BASE_BRANCH, switch to it, then git pull --ff-only origin before creating the work branch. The start-of-session checklist links to the bootstrap. This makes stale upstream history/conflicts visible before implementation. Docs-only change; git diff --check passes.
+
+**2026-07-15T04:07:49Z**
+
+PR: https://github.com/engimatic-systems/cffg/pull/31
