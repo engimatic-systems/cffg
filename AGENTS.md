@@ -32,7 +32,16 @@ https://github.com/biaslab/LAIF (Julia/RxInfer).
    asking for permission on routine steps. Ask only for genuinely irreversible or
    scope-changing decisions.
 
-5. **Side research goes to sub-agents.** When background reading is needed
+5. **GitHub auth: token from the git credential store.** `gh auth status` reports
+   not-logged-in on this machine, but a PAT (user coopwilliams) lives in
+   `~/.git-credentials`. Prefix `gh` commands with, in the same shell call
+   (exports don't persist between calls):
+
+   ```sh
+   export GH_TOKEN=$(printf "protocol=https\nhost=github.com\n" | git credential fill | sed -n 's/^password=//p')
+   ```
+
+6. **Side research goes to sub-agents.** When background reading is needed
    (downloading another paper, checking how PGMax allocates tensors, clarifying an
    active-inference derivation), spawn a sub-agent with the *specific questions* to
    answer and have it report back a short summary. Do not read whole papers into the
