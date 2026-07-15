@@ -2,7 +2,7 @@
 id: cff-lquu
 status: open
 deps: [cff-3hgi]
-links: []
+links: [cff-o7hs, cff-pksr, cff-k9ws]
 created: 2026-07-10T03:31:09Z
 type: feature
 priority: 2

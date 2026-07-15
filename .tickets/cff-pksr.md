@@ -2,7 +2,7 @@
 id: cff-pksr
 status: closed
 deps: [cff-4e5z]
-links: []
+links: [cff-o7hs, cff-lquu, cff-k9ws]
 created: 2026-07-08T16:49:34Z
 type: feature
 priority: 1

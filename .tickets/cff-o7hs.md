@@ -2,7 +2,7 @@
 id: cff-o7hs
 status: open
 deps: [cff-4e5z, cff-ri8m]
-links: [cff-1o72, cff-fxmj, cff-ri8m, cff-l6i5]
+links: [cff-1o72, cff-fxmj, cff-ri8m, cff-l6i5, cff-pksr, cff-lquu, cff-k9ws]
 created: 2026-07-08T16:49:34Z
 type: feature
 priority: 2
@@ -17,3 +17,9 @@ Deterministic nonlinear function nodes g(x) with Gaussian message approximations
 
 Nonlinear observation model (e.g. range-bearing) posterior matches dense-grid/MC ground truth within documented tolerance; EP iteration stable with damping; MOMENT_MATCHING bead validated end to end.
 
+
+## Notes
+
+**2026-07-15T01:45:14Z**
+
+Scope boundary (2026-07-14, from the recurrence-link design discussion): this ticket remains valid for its own domain — deterministic nonlinear maps between GAUSSIAN edges (nonlinear dynamics/emissions, EKF/UKF perception), with the approximate FE term labeled in the ledger as already specified. It is explicitly NOT the route for continuous→discrete links (e.g. a recurrence factor p(z'|z,x) with a softmax/stick-breaking link): those get a dedicated hybrid factor with a provable variational bound (Pólya-Gamma / Jaakkola-Jordan), per the cff-fxmj audit directive to prefer declared subclasses with bounds over universal approximate machinery. Epistemic (GFE) scoring through nonlinear nodes stays out of scope here (cff-dfpi owns that question).
