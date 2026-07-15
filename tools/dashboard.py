@@ -1,19 +1,25 @@
 """Generate the mobile test dashboard into ~/agent-share/cffg-tests.html.
 
-Runs the suite (junitxml), groups tests by M-epic, diffs against the previous
-run's snapshot (NEW badges), and renders a self-contained dark/light HTML page
-served by the agent-share file browser (port 8080 over Tailscale).
+Consumes a completed full-suite JUnit report, groups tests by M-epic, diffs
+against the previous run's snapshot (NEW badges), and renders a self-contained
+dark/light HTML page served by the agent-share file browser (port 8080 over
+Tailscale). ``--run-suite`` remains the one-command standalone path; it runs
+pytest exactly once with live output and renders that report.
 
 Tests that render diagrams record SVGs into tests/.artifacts/ (gitignored)
 via the `viz_gallery` fixture; those rows become twirl-down galleries here,
 with images copied to ~/agent-share/cffg-viz/ so the page works remotely.
 
-Run after any test-affecting commit:  uv run python tools/dashboard.py
+After an existing full run:
+  uv run python tools/dashboard.py --junitxml /tmp/cffg-tests.xml
+Standalone full run + refresh:
+  uv run python tools/dashboard.py --run-suite
 When a new test file appears, add it to EPIC_FILES.
 """
 
 from __future__ import annotations
 
+import argparse
 import datetime
 import html
 import json
@@ -38,7 +44,13 @@ EPIC_FILES = {
     "M3 · VMP + GFE": ["test_vmp.py", "test_gfe.py"],
     "M4 · T-maze": ["test_tmaze.py", "test_tmaze_learning.py"],
     "M5 · Runtime": ["test_agent.py", "test_colony.py", "test_runtime_status.py"],
-    "M6 · Tooling": ["test_bundle.py", "test_estimate.py", "test_edit_codec.py", "test_ticket_dashboard.py"],
+    "M6 · Tooling": [
+        "test_bundle.py",
+        "test_dashboard.py",
+        "test_estimate.py",
+        "test_edit_codec.py",
+        "test_ticket_dashboard.py",
+    ],
     "M8 · Plotting": [
         "test_viz_diagram.py",
         "test_viz_compress.py",
@@ -70,30 +82,123 @@ FILE_TO_EPIC = {f: e for e, fs in EPIC_FILES.items() for f in fs}
 EPIC_ORDER = list(EPIC_FILES) + ["Unassigned"]
 
 
-def run_suite() -> list[dict]:
+class DashboardError(ValueError):
+    """A JUnit report cannot truthfully certify the current full suite."""
+
+
+def run_suite() -> tuple[Path, int]:
+    """Run the full suite once with live output and return its JUnit report."""
     with tempfile.NamedTemporaryFile(suffix=".xml", delete=False) as tmp:
-        xml_path = tmp.name
-    subprocess.run(
-        ["uv", "run", "pytest", "-q", f"--junitxml={xml_path}"],
-        cwd=REPO, capture_output=True, text=True,
+        xml_path = Path(tmp.name)
+    result = subprocess.run(
+        ["uv", "run", "pytest", "-q", f"--junitxml={xml_path}"], cwd=REPO
     )
+    return xml_path, result.returncode
+
+
+def repository_test_files(repo: Path = REPO) -> set[str]:
+    return {path.name for path in (repo / "tests").glob("test_*.py")}
+
+
+def newest_test_input(
+    repo: Path = REPO, *, exclude: Path | None = None
+) -> tuple[float, Path]:
+    """Newest mtime among files whose contents can affect the full result."""
+    candidates = [repo / "pyproject.toml", repo / "uv.lock"]
+    for directory in (repo / "src", repo / "tests", repo / "tools"):
+        candidates.extend(directory.rglob("*.py"))
+    existing = [
+        path for path in candidates
+        if path.is_file() and (exclude is None or path.resolve() != exclude.resolve())
+    ]
+    if not existing:
+        raise DashboardError(f"no test inputs found under {repo}")
+    newest = max(existing, key=lambda path: path.stat().st_mtime)
+    return newest.stat().st_mtime, newest
+
+
+def load_junit(
+    xml_path: Path,
+    *,
+    expected_files: set[str] | None = None,
+    newest_input: tuple[float, Path] | None = None,
+) -> list[dict]:
+    """Parse and validate a full-suite JUnit report.
+
+    Completeness is checked without spawning pytest: every repository test
+    module must appear, declared suite counts must match the testcase records,
+    and the report must be newer than the code/test/tool inputs it certifies.
+    """
+    if not xml_path.is_file():
+        raise DashboardError(f"JUnit report does not exist: {xml_path}")
+    try:
+        root = ET.parse(xml_path).getroot()
+    except ET.ParseError as error:
+        raise DashboardError(f"malformed JUnit report {xml_path}: {error}") from error
+
+    suites = [root] if root.tag == "testsuite" else list(root.iter("testsuite"))
+    if not suites:
+        raise DashboardError(f"JUnit report has no testsuite: {xml_path}")
+    cases = list(root.iter("testcase"))
+    if not cases:
+        raise DashboardError(f"JUnit report has no testcases: {xml_path}")
+    try:
+        declared = sum(int(suite.get("tests", "0")) for suite in suites)
+        declared_failed = sum(
+            int(suite.get("failures", "0")) + int(suite.get("errors", "0"))
+            for suite in suites
+        )
+    except ValueError as error:
+        raise DashboardError(f"JUnit report has a non-integer count: {xml_path}") from error
+    if declared != len(cases):
+        raise DashboardError(
+            f"JUnit count mismatch: suites declare {declared}, report contains {len(cases)} cases"
+        )
+
     tests = []
-    for case in ET.parse(xml_path).getroot().iter("testcase"):
+    for case in cases:
         # classname is dotted and may end in a test class (tests.test_x.TestY);
         # the module is the last segment that looks like a test file.
         parts = [p for p in (case.get("classname") or "").split(".") if p.startswith("test_")]
         file = (parts[-1] if parts else "?") + ".py"
         failure = case.find("failure") is not None or case.find("error") is not None
+        try:
+            milliseconds = round(float(case.get("time", 0)) * 1000, 1)
+        except ValueError as error:
+            raise DashboardError(
+                f"JUnit testcase {case.get('name')!r} has invalid time {case.get('time')!r}"
+            ) from error
         tests.append(
             {
                 "id": f"{file}::{case.get('name')}",
                 "file": file,
                 "name": case.get("name"),
-                "ms": round(float(case.get("time", 0)) * 1000, 1),
+                "ms": milliseconds,
                 "ok": not failure,
                 "epic": FILE_TO_EPIC.get(file, "Unassigned"),
             }
         )
+
+    actual_failed = sum(not test["ok"] for test in tests)
+    if declared_failed != actual_failed:
+        raise DashboardError(
+            f"JUnit failure-count mismatch: suites declare {declared_failed}, "
+            f"report contains {actual_failed} failed cases"
+        )
+
+    if expected_files is not None:
+        present = {test["file"] for test in tests}
+        missing = sorted(expected_files - present)
+        if missing:
+            raise DashboardError(
+                "JUnit report is partial; missing test modules: " + ", ".join(missing)
+            )
+    if newest_input is not None:
+        newest_mtime, newest_path = newest_input
+        if xml_path.stat().st_mtime < newest_mtime:
+            raise DashboardError(
+                f"JUnit report is stale; {newest_path} is newer than {xml_path}"
+            )
     return tests
 
 
@@ -287,14 +392,26 @@ footer {{ color:var(--mut); font-size:12px; margin:18px 0 8px; }}
 </div>
 {trend_block}
 {"".join(sections)}
-<footer>generated by tools/dashboard.py · regen: uv run python tools/dashboard.py</footer>
+<footer>generated by tools/dashboard.py · regen: uv run python tools/dashboard.py --run-suite</footer>
 </body></html>"""
 
 
-def main() -> None:
-    tests = run_suite()
-    if not tests:
-        sys.exit("no tests collected — junitxml empty?")
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument(
+        "--junitxml", type=Path, metavar="PATH",
+        help="reuse an existing completed full-suite JUnit report",
+    )
+    mode.add_argument(
+        "--run-suite", action="store_true",
+        help="run the full suite once with live output, then render its report",
+    )
+    return parser.parse_args(argv)
+
+
+def publish(tests: list[dict]) -> int:
+    """Render and persist the dashboard; return the number of failed tests."""
     state = load_state()
     prev = set(state["previous_ids"])
     new_ids = {t["id"] for t in tests} - prev if prev else set()
@@ -309,6 +426,7 @@ def main() -> None:
     )
     state["history"] = state["history"][-120:]
     gallery = collect_gallery()
+    OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(render(tests, new_ids, state["history"], commit, gallery))
     state["previous_ids"] = sorted(t["id"] for t in tests)
     STATE.write_text(json.dumps(state))
@@ -318,6 +436,37 @@ def main() -> None:
         f"{OUT}: {len(tests)} tests, {failed} failing, {len(new_ids)} new, "
         f"{n_shots} diagrams in {len(gallery)} galleries"
     )
+    return failed
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
+    generated_report = None
+    pytest_code = 0
+    if args.run_suite:
+        generated_report, pytest_code = run_suite()
+        xml_path = generated_report
+    else:
+        xml_path = args.junitxml
+
+    try:
+        tests = load_junit(
+            xml_path,
+            expected_files=repository_test_files(),
+            newest_input=newest_test_input(exclude=xml_path),
+        )
+        failed = publish(tests)
+    except DashboardError as error:
+        sys.exit(str(error))
+    finally:
+        if generated_report is not None:
+            generated_report.unlink(missing_ok=True)
+
+    if pytest_code or failed:
+        sys.exit(
+            f"dashboard reflects a failing suite: pytest exit {pytest_code}, "
+            f"{failed} failing test(s)"
+        )
 
 
 if __name__ == "__main__":
