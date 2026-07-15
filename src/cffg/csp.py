@@ -7,7 +7,8 @@ materialized (K^n). Each type ships a message function and a node-energy
 function, mirroring cffg.rules conventions:
 
   * message fn (inc [n, k_max] log-messages, cards, k_max, op) -> [n, k_max]
-    normalized+padded outgoing log-messages. `op` is the marginalization
+    normalized+padded outgoing log-messages. `k_max` is local to this
+    constraint, never a model-wide arena width. `op` is the marginalization
     reduction: logsumexp for sum-product / max for min-sum (max-product). The
     engine passes op = arena's semiring reduction, so one code path serves both
     the BFE ledger (sum) and MAP inference (max).
@@ -240,10 +241,12 @@ def clamp_edge(engine, state, var: str, value: int):
     import numpy as np
 
     e = engine.arena.edges[var]
-    row = np.full(engine.arena.k_max, NEG)
+    row = np.full(e.card, NEG)
     row[value] = 0.0
     row = jnp.asarray(row, dtype=state.messages.dtype)
-    msgs = state.messages.at[e.slot0].set(row).at[e.slot1].set(row)
+    i0 = engine.arena.message_indices(e.slot0, e.card)
+    i1 = engine.arena.message_indices(e.slot1, e.card)
+    msgs = state.messages.at[i0].set(row).at[i1].set(row)
     from cffg.engine import _replace
 
     return _replace(state, messages=msgs)

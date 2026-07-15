@@ -293,9 +293,9 @@ def test_two_composite_chain_matches_constrained_objective():
     runtime_q = {}
     for name in ("tm1", "tm2"):
         i = plan.members.index(name)
-        md = state.messages[plan.gather[i, 0], :k]
-        mi = state.messages[plan.gather[i, 1], :k]
-        me = state.messages[plan.gather[i, 2], :u]
+        md = state.messages[engine.arena.message_indices(plan.gather[i, 0], k)]
+        mi = state.messages[engine.arena.message_indices(plan.gather[i, 1], k)]
+        me = state.messages[engine.arena.message_indices(plan.gather[i, 2], u)]
         abar, h = rules._tm_joint_stats(bp[i], learned=False)
         runtime_q[name] = np.asarray(
             rules._gfe_solve(abar, h, md, (mi[:, None] + me[None, :]).reshape(-1))
@@ -329,15 +329,19 @@ def test_two_composite_chain_matches_constrained_objective():
     }
     for (name, role), want in expected.items():
         i = plan.members.index(name)
-        got = np.asarray(state.messages[plan.scatter[i, role], : len(want)])
+        got = np.asarray(
+            state.messages[
+                engine.arena.message_indices(plan.scatter[i, role], len(want))
+            ]
+        )
         np.testing.assert_allclose(got, want, atol=3e-7)
     np.testing.assert_allclose(q_of(forward + back), w1, atol=2e-8)
 
     np.testing.assert_allclose(
         rules.gfe_tm_energy(
-            state.messages[plan.gather[:, 1], :k],
-            state.messages[plan.gather[:, 2], :u],
-            state.messages[plan.gather[:, 0], :k],
+            state.messages[engine.arena.message_indices(plan.gather[:, 1], k)],
+            state.messages[engine.arena.message_indices(plan.gather[:, 2], u)],
+            state.messages[engine.arena.message_indices(plan.gather[:, 0], k)],
             bp,
             learned=False,
         ),

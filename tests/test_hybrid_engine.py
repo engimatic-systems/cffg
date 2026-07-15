@@ -230,21 +230,33 @@ def test_written_messages_match_mixg_calls():
     ge, gl = np.asarray(state.g_eta), np.asarray(state.g_lam)
     msgs = np.asarray(state.messages)
 
-    mu_e = msgs[g.s_gather][:, : g.k_sel]
-    e_o, l_o = ge[g.g_gather[:, 0]][:, :do], gl[g.g_gather[:, 0]][:, :do, :do]
-    e_i, l_i = ge[g.g_gather[:, 1]][:, :di], gl[g.g_gather[:, 1]][:, :di, :di]
+    mu_e = msgs[arena.message_indices(g.s_gather, g.k_sel)]
+    e_o = ge[arena.g_eta_indices(g.g_gather[:, 0], do)]
+    l_o = gl[arena.g_lam_indices(g.g_gather[:, 0], do)]
+    e_i = ge[arena.g_eta_indices(g.g_gather[:, 1], di)]
+    l_i = gl[arena.g_lam_indices(g.g_gather[:, 1], di)]
 
     # → out (forward collapse)
     eta_out, lam_out = mixg.mixlin_forward(e_i, l_i, mu_e, A, b, W)
-    np.testing.assert_allclose(ge[g.g_scatter[:, 0]][:, :do], eta_out, atol=1e-10)
-    np.testing.assert_allclose(gl[g.g_scatter[:, 0]][:, :do, :do], lam_out, atol=1e-10)
+    np.testing.assert_allclose(
+        ge[arena.g_eta_indices(g.g_scatter[:, 0], do)], eta_out, atol=1e-10
+    )
+    np.testing.assert_allclose(
+        gl[arena.g_lam_indices(g.g_scatter[:, 0], do)], lam_out, atol=1e-10
+    )
     # → in (backward collapse, the weight trap)
     eta_in, lam_in = mixg.mixlin_backward(e_o, l_o, mu_e, A, b, W)
-    np.testing.assert_allclose(ge[g.g_scatter[:, 1]][:, :di], eta_in, atol=1e-10)
-    np.testing.assert_allclose(gl[g.g_scatter[:, 1]][:, :di, :di], lam_in, atol=1e-10)
+    np.testing.assert_allclose(
+        ge[arena.g_eta_indices(g.g_scatter[:, 1], di)], eta_in, atol=1e-10
+    )
+    np.testing.assert_allclose(
+        gl[arena.g_lam_indices(g.g_scatter[:, 1], di)], lam_in, atol=1e-10
+    )
     # → selector (exact)
     to_sel = mixg.mixlin_to_selector(e_o, l_o, e_i, l_i, A, b, W)
-    np.testing.assert_allclose(msgs[g.s_scatter][:, : g.k_sel], to_sel, atol=1e-10)
+    np.testing.assert_allclose(
+        msgs[arena.message_indices(g.s_scatter, g.k_sel)], to_sel, atol=1e-10
+    )
 
 
 def test_bfe_equals_hand_assembled_terms():
@@ -259,33 +271,41 @@ def test_bfe_equals_hand_assembled_terms():
     # Hybrid node energy (mixg).
     W = state.params[g.name + ":W"]
     A, b = state.params[g.name + ":A"], state.params[g.name + ":b"]
-    mu_e = msgs[g.s_gather][:, : g.k_sel]
-    e_o, l_o = ge[g.g_gather[:, 0]][:, :do], gl[g.g_gather[:, 0]][:, :do, :do]
-    e_i, l_i = ge[g.g_gather[:, 1]][:, :di], gl[g.g_gather[:, 1]][:, :di, :di]
+    mu_e = msgs[arena.message_indices(g.s_gather, g.k_sel)]
+    e_o = ge[arena.g_eta_indices(g.g_gather[:, 0], do)]
+    l_o = gl[arena.g_lam_indices(g.g_gather[:, 0], do)]
+    e_i = ge[arena.g_eta_indices(g.g_gather[:, 1], di)]
+    l_i = gl[arena.g_lam_indices(g.g_gather[:, 1], di)]
     mix_term = mixg.mixlin_energy(e_o, l_o, e_i, l_i, mu_e, A, b, W).sum()
 
     # Gaussian prior node energy (xprior). Its incoming is mix's message to x.
     gp = next(gg for gg in arena.gauss_groups if gg.type == "gaussian")
     (d,) = gp.dims
     prior_term = gauss.prior_energy(
-        ge[gp.gather[:, 0]][:, :d], gl[gp.gather[:, 0]][:, :d, :d],
+        ge[arena.g_eta_indices(gp.gather[:, 0], d)],
+        gl[arena.g_lam_indices(gp.gather[:, 0], d)],
         state.params[gp.name + ":m"], state.params[gp.name + ":W"],
     ).sum()
 
     # Categorical node energy (sprior).
     cg = next(gg for gg in arena.groups if gg.type == "categorical")
+    cat_inc = msgs[arena.message_indices(cg.gather[:, 0], cg.cards[0])][:, None, :]
     cat_term = NODE_ENERGIES["categorical"](
-        msgs[cg.gather], state.params[cg.name], cg.cards
+        cat_inc, state.params[cg.name], cg.cards
     ).sum()
 
     # Interior edge entropies: Gaussian x edge + discrete selector edge.
     gauss_H = jnp.asarray(0.0)
     for dd, pairs in arena.gauss_interior:
         gauss_H = gauss_H + gauss.edge_entropy(
-            gl[pairs[:, 0], :dd, :dd], gl[pairs[:, 1], :dd, :dd]
+            gl[arena.g_lam_indices(pairs[:, 0], dd)],
+            gl[arena.g_lam_indices(pairs[:, 1], dd)],
         ).sum()
     pairs = arena.interior_slot_pairs
-    lq = msgs[pairs[:, 0]] + msgs[pairs[:, 1]]
+    lq = (
+        msgs[arena.message_indices(pairs[:, 0], g.k_sel)]
+        + msgs[arena.message_indices(pairs[:, 1], g.k_sel)]
+    )
     lq = lq - jax.scipy.special.logsumexp(lq, axis=-1, keepdims=True)
     q = jnp.exp(lq)
     disc_H = -jnp.where(q > 1e-12, q * lq, 0.0).sum()

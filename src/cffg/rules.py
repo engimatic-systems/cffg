@@ -5,9 +5,10 @@ Every rule ships with its node-energy function so the global Bethe free energy
 is structurally the sum of registered local terms (AGENTS.md invariant): for a
 node a, F[q_a] = Σ q_a (log q_a − log f_a) with q_a ∝ f_a · Π incoming.
 
-Conventions: `inc` is [M, R, k_max] gathered incoming log-messages (role order
-fixed by the FactorType); returns are [M, R, k_max], each row normalized over
-its role's cardinality and NEG-padded beyond it.
+Conventions: `inc` is [M, R, k_max] gathered incoming log-messages, where
+`k_max` is local to one homogeneous factor group (not the model); returns have
+the same local shape, with each row normalized over its role's cardinality and
+NEG-padded beyond it.
 """
 
 from __future__ import annotations

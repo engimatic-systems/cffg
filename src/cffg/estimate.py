@@ -1,8 +1,8 @@
 """Resource estimation for a compiled model (brief item 7).
 
 Three sources, in order of trustworthiness:
-- **Analytic memory** — exact, from arena shapes: the message array and the
-  parameter stacks are the persistent state; sizes are static post-compile.
+- **Analytic memory** — exact, from every persistent State arena plus the
+  parameter stacks; sizes are static post-compile.
 - **XLA cost analysis** — flops and bytes-accessed per sweep from the
   compiled step's own cost model (`lower(...).compile().cost_analysis()`).
   Backend-dependent; None when the backend won't say.
@@ -22,7 +22,7 @@ from cffg.engine import Engine, RunStatus, State
 
 @dataclass
 class Estimate:
-    message_bytes: int
+    arena_bytes: dict[str, int]
     param_bytes: int
     flops_per_sweep: float | None
     bytes_accessed_per_sweep: float | None
@@ -30,8 +30,17 @@ class Estimate:
     calibration_status: RunStatus | None
 
     @property
+    def message_bytes(self) -> int:
+        """Discrete log-message bytes (the pre-segmentation compatibility field)."""
+        return self.arena_bytes["messages"]
+
+    @property
+    def arena_state_bytes(self) -> int:
+        return sum(self.arena_bytes.values())
+
+    @property
     def state_bytes(self) -> int:
-        return self.message_bytes + self.param_bytes
+        return self.arena_state_bytes + self.param_bytes
 
     def predict_seconds(self, n_iters: int) -> float | None:
         if self.seconds_per_sweep is None:
@@ -43,7 +52,8 @@ class Estimate:
         secs = f"{self.seconds_per_sweep * 1e3:.3f} ms" if self.seconds_per_sweep else "n/a"
         return (
             f"state {self.state_bytes / 1024:.1f} KiB "
-            f"(messages {self.message_bytes / 1024:.1f}, params {self.param_bytes / 1024:.1f}) · "
+            f"(arenas {self.arena_state_bytes / 1024:.1f}, "
+            f"params {self.param_bytes / 1024:.1f}) · "
             f"{flops} flops/sweep · {secs}/sweep"
         )
 
@@ -65,7 +75,13 @@ def _cost_analysis(engine: Engine, state: State) -> tuple[float | None, float | 
 
 def estimate(engine: Engine, *, calibrate: bool = True, sample_iters: int = 10) -> Estimate:
     state = engine.init_state()
-    message_bytes = int(state.messages.nbytes)
+    arena_bytes = {
+        name: int(getattr(state, name).nbytes)
+        for name in (
+            "messages", "g_eta", "g_lam", "g_obs", "g_mask",
+            "ef_eta", "ef_obs", "ef_mask",
+        )
+    }
     param_bytes = int(sum(leaf.nbytes for leaf in jax.tree_util.tree_leaves(state.params)))
     flops, bytes_accessed = _cost_analysis(engine, state)
 
@@ -82,7 +98,7 @@ def estimate(engine: Engine, *, calibrate: bool = True, sample_iters: int = 10) 
         calibration_status = None
 
     return Estimate(
-        message_bytes=message_bytes,
+        arena_bytes=arena_bytes,
         param_bytes=param_bytes,
         flops_per_sweep=flops,
         bytes_accessed_per_sweep=bytes_accessed,

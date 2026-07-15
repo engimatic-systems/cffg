@@ -74,7 +74,7 @@ def test_deliberate_budget_exhaustion_is_not_convergence():
 def test_poisoned_message_diverges_before_a_sweep():
     engine = categorical_engine()
     state = engine.init_state()
-    poisoned = _replace(state, messages=state.messages.at[0, 0].set(jnp.nan))
+    poisoned = _replace(state, messages=state.messages.at[0].set(jnp.nan))
     result = engine.run(poisoned, 20, tol=1e-10)
     assert result.status is RunStatus.DIVERGED
     assert result.iterations == 0

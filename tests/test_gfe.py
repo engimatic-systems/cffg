@@ -250,7 +250,7 @@ def test_run_reports_nonfinite_messages_as_diverged():
     from cffg.engine import _replace
 
     engine, state = solve(A_EPI, UNIF, UNIF)
-    poisoned = _replace(state, messages=state.messages.at[0, 0].set(jnp.inf))
+    poisoned = _replace(state, messages=state.messages.at[0].set(jnp.inf))
     result = engine.run(poisoned, 5, tol=1e-6)
     assert result.status.value == "diverged"
     assert result.iterations == 0
