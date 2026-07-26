@@ -58,3 +58,7 @@ Post-fetch verification correction (2026-07-14 local): the branch was initially 
 **2026-07-15T04:05:55Z**
 
 PR: https://github.com/engimatic-systems/cffg/pull/30
+
+**2026-07-26T20:40:57Z**
+
+Landed. All 7 acceptance criteria have a direct test in tests/test_behavioral_epistemics.py, plus a float32 sparse-support case per the robustness contract. This session rebased the branch onto origin/main@1af53f0 (post PR #31), reran the file (7 passed), then ran the one-pass dashboard suite: 1168 passed, 0 failing, 540.79s. PR #30 merged to main. Unblocks cff-2gev; the counts-based satiation arm stays with cff-2gev, since the acceptance wording here needs only the observation route.
