@@ -45,7 +45,10 @@ control posterior factorizes per timestep (mean-field over u_t), so the agent
 infers marginal action tendencies, not contingent plans ("if the cue says left,
 go left" as a *policy tree*). Sophisticated-inference-style conditional planning
 is outside this factorization; replanning every tick recovers much of it in
-practice but is not the same object.
+practice but is not the same object. The costly-cue behavioral tier makes this
+boundary executable: the open-loop second-action marginal is not treated as a
+conditional policy, while replanning after the cue chooses the indicated arm
+and improves realized return over the BFE ablation.
 
 **H6. No convergence or optimality guarantees for GFE.** The GFE is non-convex;
 Part II §4.5 documents that the naive fixed-point message diverges in cases, and
@@ -130,6 +133,10 @@ colony scale. Models containing the composite report GFE, not BFE (no
 interior, its outgoing message is the cavity `log q_w - mu_down`, and its
 ledger contribution is the direct node-local G_tm from D1 Proposition 1;
 downstream message couplings are not node energy.
+Do not transfer that caveat to the ordinary goal-observation composite: its
+channel is the realizable observation itself. The costly-cue sensor-quality
+tier checks that its posterior MI and sensing probability weaken together as
+observation noise rises, reaching the random-distractor posture at chance.
 
 **S1d. Hybrid mixture inference is assumed-density; its BFE is a lower
 bound.** The `gaussian_mixture(_linear)` collapse rules (cff-pksr,

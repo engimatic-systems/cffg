@@ -280,6 +280,11 @@ non-issue at this scale (a T-maze-sized instance's arenas are kilobytes).
    beats BFE-ablation agent (flip one constraint bead — great ablation test);
    (c) δ-constrained MAP policy variant.
    Golden numbers cross-checked against biaslab/LAIF via a sub-agent.
+   The adversarial costly-cue tier then leaves the paper fixture: a binary
+   Bayes decision independently checks relevance against a random distractor,
+   post-observation satiation, sensor-quality and sensing-cost monotonicity,
+   preference calibration, realized information gain, return/regret, and
+   truthful convergence status (`tests/test_behavioral_epistemics.py`).
 
 Property tests throughout: FE never counted twice (edge entropy correction),
 messages normalized, VMP monotonically decreases BFE on tree graphs, BP exact on

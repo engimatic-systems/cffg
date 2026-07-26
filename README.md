@@ -121,6 +121,26 @@ current belief and a one-slice filter that re-anchors it. Pass
 observation model (see `cffg/experiments/tmaze_learning.py` for the full
 perception–action–learning cycle reproducing Part II Fig. 9).
 
+For behavioral calibration beyond the T-maze golden, the costly-cue experiment
+reports the quantities needed to audit an epistemic decision directly:
+
+```python
+from cffg.experiments.behavioral_epistemics import run_benchmark
+
+gfe = run_benchmark(gfe=True)
+bfe = run_benchmark(gfe=False)
+gfe.candidate_posterior_mi             # MI for left/right/cue/distractor
+gfe.realized_information_gain_by_seed  # posterior KL after the chosen action
+gfe.task_return_by_seed, gfe.regret_by_seed
+gfe.convergence_statuses, gfe.free_energies
+```
+
+The cue is reward-relevant, the distractor has the same uniform observation
+marginal but no context information, and the second action is replanned after
+the first observation. This is exact observation epistemics; dynamics
+curiosity's latent-next-state optimistic bound is a separate contract in
+`docs/LIMITATIONS.md` S1c.
+
 Many agents on one machine:
 
 ```python
