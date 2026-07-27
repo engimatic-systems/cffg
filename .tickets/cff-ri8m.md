@@ -17,3 +17,9 @@ ADVERSARIAL REVIEWER FINDING (2026-07-10). core.ir.register_factor_type register
 ## Acceptance Criteria
 
 1. One typed executable FactorKernel/RuleSpec contract declares structural roles/domains, parameter schema/packing, applicable constraint modes, message update(s), node energy, observation conditioning, and optional readouts. 2. Compiler and VM group/dispatch generically from that contract, including multi-arena factors; no factor-type string branches in central compiler/engine for a representative new factor. 3. A test-only custom factor and energy can be registered without editing cffg compiler/engine/validation source and survives template JSON/.cffgz round-trip via namespaced implementation id + version; missing implementation fails loudly. 4. Built-ins migrate incrementally with parity and central module size/churn decreases. 5. Rule registration requires hostile-input declarations and an independent energy/oracle test. 6. Public vs internal extension compatibility policy is documented before 1.0.
+
+## Notes
+
+**2026-07-27T03:27:04Z**
+
+PR: https://github.com/engimatic-systems/cffg/pull/33 (stacked on cff-ey4p PR #32; base branch cff-ey4p-belief-log-floor; awaiting Cooper's review — do not merge from a session). Delivered: cffg/kernels.py FactorKernel contract + registry; EF built-ins migrated; serialization manifest with loud missing-implementation failure; tests/test_kernels.py exponential_obs worked example with independent evidence oracle. Remaining scope deliberately deferred: discrete/Gaussian/hybrid migration is cff-l6i5/cff-x0sv (recorded in LIMITATIONS S1i). Full pass on branch: 1184 passed, 0 failing.
