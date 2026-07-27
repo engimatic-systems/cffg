@@ -130,3 +130,20 @@ OUTCOMES, decided in advance
 No metric, window, threshold or arm definition changes after the first run
 starts. If something must change, the run is void and the reason is recorded
 here before the replacement run.
+
+**2026-07-27T19:47:26Z**
+
+n_half fixed at 10, before any run.
+
+Set from the prior, not from results: n_half = 10 * prior column mass, and
+the new spec puts prior column mass at 1. So the novelty bonus halves once a
+column carries 10 times the prior's worth of evidence, and falls to about
+0.09 at 100 observations. That matches the "data dominates after roughly 10
+visits" reasoning already used to justify the 1/K prior, so the two choices
+come from one argument rather than two.
+
+Stated as a rule rather than a number so it stays correct if the prior
+changes: n_half = 10 * sum(alpha_prior[u,:,z]).
+
+Drop-back threshold for the plain composite: max lambda over all columns
+below 0.05.
