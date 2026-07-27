@@ -1,8 +1,8 @@
 ---
 id: cff-d56d
-status: open
+status: in_progress
 deps: [cff-j4mu, cff-ri8m]
-links: [cff-fxmj, cff-5edo, cff-wbhu]
+links: [cff-fxmj, cff-5edo, cff-wbhu, cff-3kdk]
 created: 2026-07-10T18:05:00Z
 type: feature
 priority: 1

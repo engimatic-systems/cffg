@@ -238,13 +238,40 @@ A registry keyed by `(factor_type, constraint_config, out_edge_role)`:
 
 ### 4. Inference VM (`cffg.infer`)
 
-- Schedules: flooding (default) and sequential; damping as a knob. The runtime
-  records a `RunResult` with converged / budget-exhausted / diverged /
-  infeasible status, iteration count, FE and message-delta traces, and final
-  residual. Sum/GFE mode stops only when FE is stationary and messages are
-  coherent; max mode uses its message fixed-point residual and validates the
-  decoded objective. Non-finite arenas/residuals are divergence, while proven
-  empty exact support is infeasible with FE = +∞.
+- Schedules (cff-d56d, `cffg.schedule`): the engine builds a schedule from
+  the compiled arena instead of always flooding. On an acyclic BP graph over
+  the discrete and Gaussian arenas it builds an exact two-pass directed
+  schedule: factors fire by decreasing BFS depth (rooted at a diameter
+  endpoint per component), then in reverse. Each directed message is updated
+  O(1) times, so a chain costs O(E) instead of flooding's O(E × diameter).
+  One execution reaches the BP fixed point; a certification sweep (one
+  synchronous step) then measures the true fixed-point residual, so a stale
+  message can only surface as a non-converged status, never as silently
+  wrong marginals. Periodic runs of rounds compile to a single `lax.scan`
+  whose carry holds only the message blocks that cross steps (registerized;
+  chains classify automatically), so compile cost is O(1) in chain length
+  and the warm kernel has no per-step dispatch.
+- Schedule boundaries: anything outside that contract floods, and
+  `Schedule.reason` names why. Mean-field (vmp) beads, GFE composites,
+  gaussian_prec, and hybrid mixtures iterate to fixed points; hard
+  constraints and δ form constraints act per sweep; cyclic graphs need
+  iterative schedules; EF conjugate-BP subgraphs are tree-exact but their
+  directed scheduling is follow-up work. Mixing schedulable and
+  unschedulable structure in one model therefore floods the whole model —
+  there is no partial phase boundary a stale message could cross unnoticed.
+  `damp > 0` and hardening phases also use the flooding loop. The schedule
+  is a pure function of the arena (which is a pure function of the
+  template), so it reconstructs deterministically from a serialized bundle;
+  `Schedule.describe()` is the stable textual form.
+- The runtime records a `RunResult` with converged / budget-exhausted /
+  diverged / infeasible status, iteration count, FE and message-delta
+  traces, and final residual. Sum/GFE mode stops only when FE is stationary
+  and messages are coherent; max mode uses its message fixed-point residual
+  and validates the decoded objective. Non-finite arenas/residuals are
+  divergence, while proven empty exact support is infeasible with FE = +∞.
+  On a two-pass schedule there is no sweep budget: one execution either
+  certifies (converged, also with `tol=None`) or reports honestly that it
+  did not.
 - GFE nodes are stochastic (importance sampling), so FE traces get burn-in
   averaging (paper uses ~10 iterations) before any decision is read off.
 - Inference *modes* are just constraint presets on the same grounded model:

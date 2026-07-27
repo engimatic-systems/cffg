@@ -251,6 +251,21 @@ epistemic term push per-regime state beliefs toward wishful separation;
 excluded until derived and tested). Engine integration of the composite is
 the follow-up ticket; the spike ships formulas + experiments, not rules.
 
+**S1j. Directed schedules cover acyclic discrete/Gaussian BP subgraphs;
+the hostile-chain gap to a dedicated SSM scan is ~50x, down from ~4,200x
+(cff-d56d, 2026-07-26).** Two-pass schedules make tree and chain inference
+O(E) with exact marginals and FE (certified by a fixed-point sweep). What
+still floods: cyclic graphs (no residual or colored iterative schedule
+yet), vmp/GFE/prec/hybrid iterative structures, hard and δ constraints,
+and EF conjugate-BP subgraphs. Measured on the recorded M2 Max CPU/x64
+protocol: hostile 256-step K=8 chain warm kernel 0.99 ms (was 83.24 ms
+flooding; recorded reference 0.0198 ms, so 50x — the ticket's 20x target
+needs slice-fused composite kernels, a follow-up); LGSSM is 9-15x its
+derived references through T=256 (within target). The status-bearing run
+adds ~1.2 ms of certification sweep, support checks, and ledger on top of
+the kernel; `gaussian_marginals` readout is a Python-per-edge loop and
+dominates end-to-end LGSSM time at scale (separate ticket).
+
 **S2. Importance-sampling noise in parameter messages.** The message to A is a
 non-conjugate log-message evaluated by importance sampling; variance grows with
 column dimensionality and makes the GFE trace stochastic (hence burn-in
