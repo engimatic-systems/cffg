@@ -180,15 +180,19 @@ def from_dict(d: dict[str, Any]) -> Template:
 
 def _check_kernel_requirements(d: dict[str, Any]) -> None:
     """Loud-failure gate for kernel-backed factor types (cff-ri8m): a type
-    that is not registered cannot be compiled or executed, so refusing at
-    load names the missing implementation instead of failing later and
-    vaguer. A registered kernel must match the recorded impl identity and
-    MAJOR version — MINOR/PATCH drift is compatible by the policy in
+    that cannot execute must be refused at load, naming the missing
+    implementation, instead of failing later and vaguer. Two distinct gaps
+    are checked — an unknown FactorType, and (per the manifest) a known
+    FactorType whose *executable kernel* is not registered: a structural
+    registry entry is not evidence the implementation is installed. A
+    registered kernel must match the recorded impl identity and MAJOR
+    version — MINOR/PATCH drift is compatible by the policy in
     cffg.kernels."""
     from cffg.core.ir import FACTOR_TYPES  # local: avoid confusion with module import list
     from cffg import kernels
 
     required = d.get("kernels", {})
+    used_types = {spec["type"] for spec in d.get("factors", {}).values()}
     for name, spec in d.get("factors", {}).items():
         ftype = spec["type"]
         if ftype in FACTOR_TYPES:
@@ -207,7 +211,14 @@ def _check_kernel_requirements(d: dict[str, Any]) -> None:
     for ftype, need in required.items():
         k = kernels.kernel_for(ftype)
         if k is None:
-            continue  # unused-by-any-factor requirement: nothing to check
+            if ftype in used_types:
+                raise ValueError(
+                    f"factor type {ftype!r} has a structural registration but no "
+                    f"executable kernel; the template requires implementation "
+                    f"{need.get('impl')!r} version {need.get('version')!r} — "
+                    "register its FactorKernel before loading"
+                )
+            continue  # unused-by-any-factor requirement: nothing to run
         same_major = k.version.split(".")[0] == str(need.get("version", "")).split(".")[0]
         if k.impl_id != need.get("impl") or not same_major:
             raise ValueError(
