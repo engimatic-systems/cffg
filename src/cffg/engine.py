@@ -263,10 +263,12 @@ class Engine:
         self._iter_step = self._step
         self.scan_registerized: tuple[bool, ...] = ()
         kind = self.schedule.kind
+        self._exact_unit = None
         if kind == "two_pass":
             raw = _make_propagate(arena, self.schedule.stages)
             self.scan_registerized = raw.scan_registerized
             self._propagate = eqx.filter_jit(raw)
+            self._exact_unit = eqx.filter_jit(_make_exact_unit(arena, raw))
         elif kind in ("colored", "mixed"):
             island = _make_propagate(arena, self.schedule.stages)
             self.scan_registerized = island.scan_registerized
@@ -658,40 +660,31 @@ class Engine:
                 state, RunStatus.DIVERGED, 0, (), (), float("inf"),
                 RunStatus.DIVERGED, float("inf"),
             )
-        if self._has_zero_support(state):
+
+        # One dispatch: pre/post support flags, propagation, certification
+        # sweep, residual, and ledger execute as a single XLA computation
+        # (review item (c)).
+        msgs, g_eta, g_lam, ef_eta, delta_dev, fe_dev, pre_bad, post_bad = (
+            self._exact_unit(
+                state.messages, state.g_eta, state.g_lam, state.g_obs,
+                state.g_mask, state.ef_eta, state.ef_obs, state.ef_mask,
+                state.params,
+            )
+        )
+        if bool(pre_bad):  # proven-empty support before any propagation
             return RunResult(
                 state, RunStatus.INFEASIBLE, 0, (), (float("inf"),), float("inf")
             )
-
-        msgs, g_eta, g_lam, ef_eta = self._propagate(
-            state.messages, state.g_eta, state.g_lam, state.ef_eta,
-            state.g_obs, state.g_mask, state.ef_obs, state.ef_mask, state.params,
-        )
         st = _replace(state, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta)
-        if not self._state_is_finite(st):
-            return RunResult(st, RunStatus.DIVERGED, 1, (), (), float("inf"))
-        if self._has_zero_support(st):
+        delta = float(delta_dev)
+        if not np.isfinite(delta) or not self._state_is_finite(st):
+            return RunResult(st, RunStatus.DIVERGED, 1, (delta,), (), float("inf"))
+        if bool(post_bad):
+            # The fused ledger value is discarded: Z = 0 means F = +inf, and
+            # a finite NEG-sentinel score must never leak (cff-j4mu).
             return RunResult(
                 st, RunStatus.INFEASIBLE, 1, (), (float("inf"),), float("inf")
             )
-
-        v_msgs, v_eta, v_lam, v_ef, _, _ = self._step(
-            st.messages, st.g_eta, st.g_lam, st.g_obs, st.g_mask,
-            st.ef_eta, st.ef_obs, st.ef_mask, st.params, 0.0, False,
-        )
-        verified = _replace(
-            st, messages=v_msgs, g_eta=v_eta, g_lam=v_lam, ef_eta=v_ef
-        )
-        delta = max(
-            (
-                float(jnp.max(jnp.abs(getattr(verified, f) - getattr(st, f))))
-                for f in ("messages", "g_eta", "g_lam", "ef_eta")
-                if getattr(st, f).size
-            ),
-            default=0.0,
-        )
-        if not np.isfinite(delta):
-            return RunResult(st, RunStatus.DIVERGED, 1, (delta,), (), float("inf"))
 
         floor = self._certificate_floor(st)
         certificate = floor if tol is None else max(float(tol), floor)
@@ -703,14 +696,7 @@ class Engine:
                 return RunResult(st, RunStatus.DIVERGED, 1, (delta,), (), float("inf"))
             return RunResult(st, status, 1, (delta,), (), delta)
 
-        # Direct ledger call: the zero-support precondition bfe() re-checks
-        # was established two lines up, and Z=0 would have returned already.
-        fe = float(
-            self._bfe(
-                st.messages, st.g_eta, st.g_lam, st.g_obs, st.g_mask,
-                st.ef_eta, st.ef_obs, st.ef_mask, st.params,
-            )
-        )
+        fe = float(fe_dev)
         if not np.isfinite(fe):
             return RunResult(st, RunStatus.DIVERGED, 1, (delta,), (), float("inf"))
         return RunResult(st, status, 1, (delta,), (fe,), delta)
@@ -1915,6 +1901,87 @@ def _flat_scan_fn(arena: Arena, stage, op):
         return messages, g_eta, g_lam, ef_eta
 
     return fn
+
+
+def _make_support_check(arena: Arena):
+    """Jitted mirror of ``Engine._has_zero_support`` for constraint-free
+    models (every two-pass model): True iff an edge or factor belief has
+    empty exact support. Semantics identical to the numpy check — exp of the
+    NEG log-zero underflows to exactly 0 in either backend."""
+    if arena.constraint_groups:  # combinatorial feasibility is host-side
+        raise ValueError("jitted support check requires a constraint-free model")
+    by_card: dict[int, list[list[int]]] = {}
+    for e in arena.edges.values():
+        if not e.dim and not e.ef:
+            by_card.setdefault(e.card, []).append([e.slot0, e.slot1])
+    edge_buckets = [
+        (card, np.asarray(pairs, dtype=np.int64).reshape(-1, 2))
+        for card, pairs in sorted(by_card.items())
+    ]
+
+    def check(messages, params):
+        bad = jnp.asarray(False)
+        for card, pairs in edge_buckets:
+            lq = (
+                messages[arena.message_indices(pairs[:, 0], card)]
+                + messages[arena.message_indices(pairs[:, 1], card)]
+            )
+            bad |= ~jnp.all(jnp.any(jnp.exp(lq) > 0, axis=-1))
+        for group in arena.groups:
+            supports = [
+                jnp.exp(messages[arena.message_indices(group.gather[:, r], card)]) > 0
+                for r, card in enumerate(group.cards)
+            ]
+            n = len(group.members)
+            if group.type == "equality":
+                joint = supports[0]
+                for s in supports[1:]:
+                    joint = joint & s
+                bad |= ~jnp.all(jnp.any(joint, axis=-1))
+                continue
+            factor_support = jnp.exp(params[group.name]) > 0
+            for role, card in enumerate(group.cards):
+                shape = [n] + [1] * len(group.cards)
+                shape[1 + role] = card
+                factor_support = factor_support & supports[role].reshape(shape)
+            bad |= ~jnp.all(jnp.any(factor_support.reshape(n, -1), axis=-1))
+        return bad
+
+    return check
+
+
+def _make_exact_unit(arena: Arena, propagate):
+    """Propagation + certification sweep + residual, support flags, and
+    ledger in one XLA computation: the warm status-bearing run is a single
+    dispatch (review continuation (c), 2026-07-27). ``propagate`` is an
+    unjitted stage pipeline from :func:`_make_propagate`."""
+    raw_step = _make_step(arena)
+    raw_bfe = _make_bfe(arena)
+    support_bad = _make_support_check(arena)
+    is_max = arena.semiring == "max"
+
+    def exact_unit(
+        messages, g_eta, g_lam, g_obs, g_mask, ef_eta, ef_obs, ef_mask, params
+    ):
+        pre_bad = support_bad(messages, params)
+        m, e, l, f = propagate(
+            messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params
+        )
+        vm, ve, vl, vf, _, _ = raw_step(
+            m, e, l, g_obs, g_mask, f, ef_obs, ef_mask, params, 0.0, False
+        )
+        delta = jnp.asarray(0.0, dtype=m.dtype)
+        for a, b in ((vm, m), (ve, e), (vl, l), (vf, f)):
+            if a.size:
+                delta = jnp.maximum(delta, jnp.max(jnp.abs(a - b)))
+        fe = (
+            jnp.asarray(jnp.nan, dtype=m.dtype)
+            if is_max
+            else raw_bfe(m, e, l, g_obs, g_mask, f, ef_obs, ef_mask, params)
+        )
+        return m, e, l, f, delta, fe, pre_bad, support_bad(m, params)
+
+    return exact_unit
 
 
 def _make_propagate(arena: Arena, stages: tuple):

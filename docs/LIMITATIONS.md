@@ -251,20 +251,26 @@ epistemic term push per-regime state beliefs toward wishful separation;
 excluded until derived and tested). Engine integration of the composite is
 the follow-up ticket; the spike ships formulas + experiments, not rules.
 
-**S1j. Directed schedules cover acyclic discrete/Gaussian BP subgraphs;
-the hostile-chain gap to a dedicated SSM scan is ~50x, down from ~4,200x
-(cff-d56d, 2026-07-26).** Two-pass schedules make tree and chain inference
-O(E) with exact marginals and FE (certified by a fixed-point sweep). What
-still floods: cyclic graphs (no residual or colored iterative schedule
-yet), vmp/GFE/prec/hybrid iterative structures, hard and δ constraints,
-and EF conjugate-BP subgraphs. Measured on the recorded M2 Max CPU/x64
-protocol: hostile 256-step K=8 chain warm kernel 0.99 ms (was 83.24 ms
-flooding; recorded reference 0.0198 ms, so 50x — the ticket's 20x target
-needs slice-fused composite kernels, a follow-up); LGSSM is 9-15x its
-derived references through T=256 (within target). The status-bearing run
-adds ~1.2 ms of certification sweep, support checks, and ledger on top of
-the kernel; `gaussian_marginals` readout is a Python-per-edge loop and
-dominates end-to-end LGSSM time at scale (separate ticket).
+**S1j. Schedules: measured envelope (cff-d56d, revised 2026-07-27 after
+review).** Two-pass schedules make tree and chain inference O(E) with
+exact marginals and FE; loopy pure BP gets colored Gauss–Seidel sweeps;
+models with iterative structures get block-phased mixed scheduling. Only δ
+form constraints and models with nothing schedulable still flood (plus any
+run with `damp>0` on an otherwise-exact model). Live matched-shape
+reference (same machine, same timing protocol, M2 Max CPU/x64,
+`uv sync --group bench` for the reference library): hostile K=2 chains run
+status-bearing at 13-19x the reference smoother through T=256 (kernel
+8-12x; flooding was 1,300-5,700x), ordinary K=8 chains at 7-8x, LGSSM
+d=4/m=2 at 17-19x (kernel 13-17x) — all inside the ticket's 20x envelope,
+but with little margin: treat LGSSM mid-sizes (~19x) as at-risk on other
+machines. The earlier recorded reference figure (0.0171-0.0198 ms at
+T=256) is ~2x below what the same library measures live here; ratios
+against that stricter figure are ~2x worse. Honest residuals: the
+certificate is scale-relative (64 eps × largest live magnitude), so
+extremely ill-scaled models widen it proportionally; `gaussian_marginals`
+readout is a Python-per-edge loop and dominates end-to-end LGSSM time at
+scale (cff-3kdk); slice-fused composite kernels (cff-yl0a) remain the
+lever if the envelope must tighten below ~10x.
 
 **S2. Importance-sampling noise in parameter messages.** The message to A is a
 non-conjugate log-message evaluated by importance sampling; variance grows with

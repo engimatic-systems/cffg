@@ -476,8 +476,10 @@ def test_float32_missing_phase_cannot_certify_at_t256():
         inward_only = engine_mod._make_propagate(
             arena, engine.schedule.stages[: len(engine.schedule.stages) // 2]
         )
-        engine._propagate = eqx.filter_jit(inward_only)  # bypasses the
-        # fingerprint guard on purpose: this pins the *certificate* itself
+        engine._exact_unit = eqx.filter_jit(
+            engine_mod._make_exact_unit(arena, inward_only)
+        )  # bypasses the fingerprint guard on purpose: this pins the
+        # *certificate* itself, not the schedule validation
         obs = [int(v) for v in np.random.default_rng(1).integers(0, M, size=n)]
         state = engine.bind_data(
             engine.init_state(), {f"chain/t{t}/sense": obs[t] for t in range(n)}

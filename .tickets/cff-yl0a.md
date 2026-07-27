@@ -17,3 +17,9 @@ cff-d56d's two-pass schedules cut the hostile 256-step K=8 chain from 83.24 ms t
 
 A fusion pass recognizes repeating (transition, equality, emission) slice patterns inside a registerized ScanStage and emits one composite update per step (algebraically identical: composition of the registered rules, normalization preserved). Hostile T=256 warm kernel within 20x of the recorded 0.0198 ms reference. Parity tests: bit/tolerance-identical marginals and FE against the unfused schedule and flooding. Fusion is an execution detail: Schedule.describe() unchanged.
 
+
+## Notes
+
+**2026-07-27T14:13:01Z**
+
+Scope update after the 2026-07-27 review round: the fused status path plus live matched-shape referencing brought every benchmark configuration inside the ticket's 20x envelope (hostile K=2 run 13-19x, ordinary K=8 7-8x, LGSSM d=4/m=2 17-19x), so slice fusion is no longer an acceptance blocker for cff-d56d. It remains the right lever if the envelope must tighten (LGSSM mid-sizes sit at ~19x with little margin) or if the stricter recorded reference figure (~2x below live) becomes the standard.

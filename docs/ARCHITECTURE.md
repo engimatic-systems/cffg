@@ -239,30 +239,42 @@ A registry keyed by `(factor_type, constraint_config, out_edge_role)`:
 ### 4. Inference VM (`cffg.infer`)
 
 - Schedules (cff-d56d, `cffg.schedule`): the engine builds a schedule from
-  the compiled arena instead of always flooding. On an acyclic BP graph over
-  the discrete and Gaussian arenas it builds an exact two-pass directed
-  schedule: factors fire by decreasing BFS depth (rooted at a diameter
-  endpoint per component), then in reverse. Each directed message is updated
-  O(1) times, so a chain costs O(E) instead of flooding's O(E × diameter).
-  One execution reaches the BP fixed point; a certification sweep (one
-  synchronous step) then measures the true fixed-point residual, so a stale
-  message can only surface as a non-converged status, never as silently
-  wrong marginals. Periodic runs of rounds compile to a single `lax.scan`
-  whose carry holds only the message blocks that cross steps (registerized;
-  chains classify automatically), so compile cost is O(1) in chain length
-  and the warm kernel has no per-step dispatch.
-- Schedule boundaries: anything outside that contract floods, and
-  `Schedule.reason` names why. Mean-field (vmp) beads, GFE composites,
-  gaussian_prec, and hybrid mixtures iterate to fixed points; hard
-  constraints and δ form constraints act per sweep; cyclic graphs need
-  iterative schedules; EF conjugate-BP subgraphs are tree-exact but their
-  directed scheduling is follow-up work. Mixing schedulable and
-  unschedulable structure in one model therefore floods the whole model —
-  there is no partial phase boundary a stale message could cross unnoticed.
-  `damp > 0` and hardening phases also use the flooding loop. The schedule
-  is a pure function of the arena (which is a pure function of the
-  template), so it reconstructs deterministically from a serialized bundle;
-  `Schedule.describe()` is the stable textual form.
+  the compiled arena instead of always flooding. The factor graph over the
+  schedulable arenas (discrete BP, Gaussian, EF conjugate-BP) is
+  partitioned into islands, and each model gets the strongest schedule its
+  topology admits:
+  - two_pass (everything schedulable, all islands forests): factors fire by
+    decreasing BFS depth (rooted at a diameter endpoint per component),
+    then in reverse. Each directed message is updated O(1) times, so a
+    chain costs O(E) instead of flooding's O(E × diameter). One execution
+    reaches the BP fixed point; the warm status-bearing run is a single
+    fused XLA dispatch (propagation + certification sweep + support flags +
+    FE ledger). The certification sweep re-derives every message and its
+    max change gates `converged` under a dtype- and scale-relative
+    certificate — a stale message can only surface as a non-converged
+    status, never as silently wrong marginals.
+  - colored (pure BP with cycles): forest islands still run their exact
+    pass once; cyclic islands iterate greedy-colored Gauss–Seidel sweeps
+    (no two adjacent factors share a color) under the ordinary convergence
+    loop — same fixed points as flooding, information travels further per
+    sweep.
+  - mixed (iterative structures present — vmp beads, GFE composites, hard
+    constraints, hybrid mixtures, gaussian_prec): each outer iteration
+    updates the iterative phase synchronously (with its damping), then
+    exactly re-equilibrates the BP islands before the loop evaluates the
+    global residual and FE — convergence is never measured on a stale
+    island. Budgets, tolerances, and statuses keep flooding-loop semantics.
+  - flood: retained as an explicit option, and the fallback for δ form
+    constraints (whose per-sweep hardening is defined against flooding) and
+    models with nothing schedulable. `Schedule.reason` names what forced it.
+  Periodic runs of forest rounds compile to a single `lax.scan` whose carry
+  holds only the message blocks that cross steps (registerized; chains
+  classify automatically), so compile cost is O(1) in chain length and the
+  warm kernel has no per-step dispatch. The schedule is a pure function of
+  the arena (which is a pure function of the template), so it reconstructs
+  deterministically from a serialized bundle; `Schedule.describe()` is the
+  stable textual form, and its fingerprint (arena structure hash + content)
+  lets the engine reject stale or doctored prebuilt schedules.
 - The runtime records a `RunResult` with converged / budget-exhausted /
   diverged / infeasible status, iteration count, FE and message-delta
   traces, and final residual. Sum/GFE mode stops only when FE is stationary

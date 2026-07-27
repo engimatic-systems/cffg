@@ -56,3 +56,21 @@ Blocking findings:
 3. The fixed-point certificate can falsely converge in float32. Its floor is 64*eps*schedule.rounds, which is 0.0039215 at T=256. Through the documented prebuilt-Schedule path, removing the outward ScanStage produced residual 0.0010006, wrong z0=[0.5,0.5] instead of [0.5005,0.4995], and RunStatus.CONVERGED. Thus a stale phase can pass unnoticed, contrary to the documented guarantee.
 
 Recommended continuation: (a) validate prebuilt schedules against an arena/structure fingerprint and use a local mixed absolute/relative dtype-scaled certificate that does not grow with global diameter; add a negative float32 T=256 missing-phase regression; (b) benchmark Dynamax live on exactly matching K/M/dimensions, without ratio-derived references; (c) JIT the exact status path as one unit (propagation + certificate + support/status + ledger) and fuse repeating scan dataflow so the full run, not only _propagate, meets 20x; (d) implement static colored loopy BP plus block-phased mixed scheduling under this ticket, or explicitly amend the ticket before closing and remove the follow-up dependency cycle. Flooding should remain an explicit safe fallback, but it is not required for most message passing.
+
+**2026-07-27T14:13:21Z**
+
+Review continuation implemented (2026-07-27); PR #34 updated on the same branch.
+
+Blocking finding 3 (certificate soundness): fixed. The certificate floor is now dtype- and scale-relative (64 eps x the largest live magnitude in the state; NEG log-zeros excluded), not diameter-scaled. The reviewer's exploit is pinned as a regression: a float32 T=256 chain with the outward pass removed now reports budget_exhausted (residual ~1e-3 against a ~e-6-scale certificate). Prebuilt Schedules are validated by recomputing their content fingerprint against the arena structure hash: doctored stage lists and cross-arena schedules raise at Engine construction.
+
+Blocking finding 1 (AC1/AC4 scope): implemented under this ticket, per the recommended continuation. build_schedule partitions the schedulable factor graph (discrete BP + Gaussian + EF conjugate-BP) into islands: forests get exact two-pass; cyclic pure-BP components get static greedy-colored Gauss-Seidel sweeps; models with iterative structures (vmp, GFE, constraints, hybrid, gaussian_prec) get block-phased mixed scheduling with the reviewer's phase order - iterative phase update, then exact island re-equilibration, then residual/FE evaluation, so convergence is never judged on a stale island. delta form constraints and nothing-schedulable models keep flooding, with the reason recorded. cff-1p2f is closed as absorbed. The full suite (1,201 tests incl. GFE/agent/hybrid/colony) passes under the new defaults; the colony batched path now vmaps the scheduled iteration, preserving vmap/sequential parity.
+
+Blocking finding 2 (AC3 protocol): the benchmark now runs the reference library live on exactly matching shapes (hostile K=2 identity dynamics, ordinary K=8, LGSSM d=4/m=2), same timing protocol both sides, no ratio-derived references; the reference is an optional bench dependency group. With the status path fused into one XLA dispatch (propagation + certification sweep + support flags + ledger - continuation (c)), measured on this machine (M2 Max CPU/x64, medians):
+
+- hostile K=2: status-bearing run 18.1x/19.1x/12.8x/17.0x at T=32/64/128/256 (kernel 8-12x; flooding run 1,348-5,727x)
+- ordinary K=8: run 7.1-7.9x (kernel 3.6-4.9x)
+- LGSSM d=4/m=2: run 16.9x/19.0x/17.3x at T=16/64/256 (kernel 13.0-17.1x)
+
+All configurations are inside the 20x-including-general-engine-overhead envelope with linear or sublinear scaling, but the margin is thin (LGSSM T=64 at 19.0x). Caveat recorded in LIMITATIONS S1j: the reviewer's recorded reference figure (0.0171 ms at T=256) is ~2x below what the same library measures live here under the shared protocol; against that stricter figure the hostile run would be ~45x. If that figure is the standard, cff-yl0a (slice-fused composite kernels) is the remaining lever; its note reflects the scope change.
+
+Docs updated (ARCHITECTURE section 4 schedule taxonomy, LIMITATIONS S1j envelope, README). Readout vectorization remains cff-3kdk.
