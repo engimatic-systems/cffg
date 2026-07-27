@@ -250,8 +250,9 @@ A registry keyed by `(factor_type, constraint_config, out_edge_role)`:
     reaches the BP fixed point; the warm status-bearing run is a single
     fused XLA dispatch (propagation + certification sweep + support flags +
     FE ledger). The certification sweep re-derives every message and its
-    max change gates `converged` under a dtype- and scale-relative
-    certificate — a stale message can only surface as a non-converged
+    elementwise mixed absolute/relative change gates `converged` at a
+    dtype-derived threshold. No unrelated block or graph depth can widen
+    the certificate, so a stale message can only surface as a non-converged
     status, never as silently wrong marginals.
   - colored (pure BP with cycles): forest islands still run their exact
     pass once; cyclic islands iterate greedy-colored Gauss–Seidel sweeps

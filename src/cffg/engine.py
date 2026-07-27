@@ -461,8 +461,9 @@ class Engine:
         schedule once instead of flooding: each directed message is updated
         O(1) times, a certification sweep measures the true fixed-point
         residual, and the status is ``converged`` when that residual passes
-        the dtype- and depth-scaled certificate (also with ``tol=None`` —
-        the schedule proves the fixed point, so no sweep budget applies)."""
+        the elementwise dtype-scaled mixed absolute/relative certificate
+        (also with ``tol=None`` — the schedule proves the fixed point, so no
+        sweep budget applies)."""
         if n_iters < 0:
             raise ValueError("n_iters must be non-negative")
         if harden_last is None:

@@ -267,14 +267,18 @@ run-to-run jitter swings that ratio several x; ordinary K=8 chains at
 7-8x; LGSSM d=4/m=2 at 15-18x (kernel 13-17x). That straddles the
 ticket's 20x envelope with no margin; per the operator's 2026-07-27 call
 the remaining performance gap is deferred (cff-yl0a is the lever), and
-correctness/scheduling work proceeds independently. The earlier recorded reference figure (0.0171-0.0198 ms at
-T=256) is ~2x below what the same library measures live here; ratios
-against that stricter figure are ~2x worse. Honest residuals: the
-certificate is scale-relative (64 eps × largest live magnitude), so
-extremely ill-scaled models widen it proportionally; `gaussian_marginals`
-readout is a Python-per-edge loop and dominates end-to-end LGSSM time at
-scale (cff-3kdk); slice-fused composite kernels (cff-yl0a) remain the
-lever if the envelope must tighten below ~10x.
+correctness/scheduling work proceeds independently. The earlier recorded
+minimal-output reference (0.0171-0.0198 ms at T=256) projected only the
+requested smoother output inside JIT (and supplied precomputed HMM
+likelihoods), allowing XLA to eliminate the rest of the posterior work; it
+is ~1.5-2x faster and remains a useful strict kernel ceiling, but it is a
+different output contract rather than machine variance. Honest residuals:
+the exact certificate is elementwise,
+`max(|new-old| / (1+|old|)) <= 64 eps`, so neither graph depth nor an
+unrelated large-magnitude block can widen it; `gaussian_marginals` readout
+is a Python-per-edge loop and dominates end-to-end LGSSM time at scale
+(cff-3kdk); slice-fused composite kernels (cff-yl0a) remain the lever if
+the envelope must tighten below ~10x.
 
 **S2. Importance-sampling noise in parameter messages.** The message to A is a
 non-conjugate log-message evaluated by importance sampling; variance grows with
