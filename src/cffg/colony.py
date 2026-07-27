@@ -93,8 +93,24 @@ class Colony:
                 continue
             batched = jax.tree_util.tree_map(lambda *xs: jnp.stack(xs), *states)
 
+            # The batch runs the engine's *scheduled* iteration (cff-d56d) —
+            # the same function the sequential path loops — so vmapped and
+            # sequential results stay bitwise-comparable. Colored/mixed
+            # schedules also prime once (their exact island passes).
+            if engine._prime is not None and n_iters >= 1:
+                def prime_one(st: State):
+                    msgs, g_eta, g_lam, ef_eta = engine._prime(
+                        st.messages, st.g_eta, st.g_lam, st.ef_eta,
+                        st.g_obs, st.g_mask, st.ef_obs, st.ef_mask, st.params,
+                    )
+                    return _replace(
+                        st, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta
+                    )
+
+                batched = eqx.filter_vmap(prime_one)(batched)
+
             def one(st: State):
-                msgs, g_eta, g_lam, ef_eta, inner_residual, inner_status = engine._step(
+                msgs, g_eta, g_lam, ef_eta, inner_residual, inner_status = engine._iter_step(
                     st.messages, st.g_eta, st.g_lam, st.g_obs, st.g_mask,
                     st.ef_eta, st.ef_obs, st.ef_mask, st.params, damp, True,
                 )

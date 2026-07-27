@@ -25,7 +25,7 @@ from jax.scipy.special import logsumexp
 
 from cffg import csp, ef, efrules, gauss, kernels, mixg
 from cffg.compiler import NEG, Arena
-from cffg.schedule import BatchStage, Schedule, build_schedule
+from cffg.schedule import BatchStage, Schedule, _fingerprint, build_schedule
 from cffg.rules import (
     BP_UPDATES,
     NODE_ENERGIES,
@@ -229,25 +229,94 @@ class Engine:
     """Compiled, executable model. Construction is cheap; `step` is jitted.
 
     ``schedule`` selects the message-passing schedule (cff-d56d): "auto"
-    builds an exact two-pass directed schedule when the model is an acyclic
-    BP graph over the discrete/Gaussian arenas and falls back to synchronous
-    flooding otherwise; "flood" forces flooding; "two_pass" requires the
-    directed schedule and raises when the model is outside its contract. A
-    prebuilt :class:`~cffg.schedule.Schedule` is accepted as-is."""
+    builds the strongest schedule the topology admits — exact two-pass for
+    acyclic BP over the discrete/Gaussian/EF arenas, colored sweeps for
+    loopy pure BP, block-phased mixed scheduling when iterative structures
+    (vmp/GFE/constraints/hybrid/prec) are present — and floods otherwise.
+    "flood" forces flooding; "two_pass" requires the exact schedule and
+    raises when the model is outside its contract. A prebuilt
+    :class:`~cffg.schedule.Schedule` is validated against this arena's
+    structure fingerprint and rejected on mismatch."""
 
     def __init__(self, arena: Arena, schedule: str | Schedule = "auto"):
         self.arena = arena
         self._step = eqx.filter_jit(_make_step(arena))
         self._bfe = eqx.filter_jit(_make_bfe(arena))
-        self.schedule = (
-            schedule if isinstance(schedule, Schedule) else build_schedule(arena, schedule)
-        )
+        if isinstance(schedule, Schedule):
+            if schedule.kind != "flood":  # flooding is always safe as given
+                # Recompute the fingerprint from the prebuilt schedule's own
+                # content: a doctored stage list cannot ride in on a genuine
+                # stored fingerprint, and a schedule built for another arena
+                # cannot match this one's structure hash.
+                expected = build_schedule(arena, "auto")
+                if _fingerprint(arena, schedule.describe()) != expected.fingerprint:
+                    raise ValueError(
+                        "prebuilt schedule does not match this arena "
+                        "(stale, doctored, or built for another model); "
+                        "rebuild it with cffg.schedule.build_schedule"
+                    )
+            self.schedule = schedule
+        else:
+            self.schedule = build_schedule(arena, schedule)
         self._propagate = None
+        self._prime = None
+        self._iter_step = self._step
         self.scan_registerized: tuple[bool, ...] = ()
-        if self.schedule.kind == "two_pass":
-            raw = _make_propagate(arena, self.schedule)
+        kind = self.schedule.kind
+        if kind == "two_pass":
+            raw = _make_propagate(arena, self.schedule.stages)
             self.scan_registerized = raw.scan_registerized
             self._propagate = eqx.filter_jit(raw)
+        elif kind in ("colored", "mixed"):
+            island = _make_propagate(arena, self.schedule.stages)
+            self.scan_registerized = island.scan_registerized
+            if self.schedule.prime_stages:
+                prime_raw = (
+                    island
+                    if self.schedule.prime_stages == self.schedule.stages
+                    else _make_propagate(arena, self.schedule.prime_stages)
+                )
+                self._prime = eqx.filter_jit(prime_raw)
+            if kind == "mixed":
+                # Reviewer-ordered outer iteration (cff-d56d, 2026-07-27):
+                # update the iterative phase synchronously, then exactly
+                # re-equilibrate the BP islands, so the loop's residual/FE
+                # is never evaluated on a stale island.
+                phase_step = _make_step(arena, skip_scheduled=True)
+
+                def iter_step(
+                    messages, g_eta, g_lam, g_obs, g_mask,
+                    ef_eta, ef_obs, ef_mask, params, damp=0.0, harden=True,
+                ):
+                    messages, g_eta, g_lam, ef_eta, ir, ic = phase_step(
+                        messages, g_eta, g_lam, g_obs, g_mask,
+                        ef_eta, ef_obs, ef_mask, params, damp, harden,
+                    )
+                    messages, g_eta, g_lam, ef_eta = island(
+                        messages, g_eta, g_lam, ef_eta,
+                        g_obs, g_mask, ef_obs, ef_mask, params,
+                    )
+                    return messages, g_eta, g_lam, ef_eta, ir, ic
+            else:
+                # Colored Gauss-Seidel sweep; damping blends the sweep's
+                # result with its input (fixed points are preserved).
+                def iter_step(
+                    messages, g_eta, g_lam, g_obs, g_mask,
+                    ef_eta, ef_obs, ef_mask, params, damp=0.0, harden=True,
+                ):
+                    m2, e2, l2, f2 = island(
+                        messages, g_eta, g_lam, ef_eta,
+                        g_obs, g_mask, ef_obs, ef_mask, params,
+                    )
+                    m2 = damp * messages + (1.0 - damp) * m2
+                    e2 = damp * g_eta + (1.0 - damp) * e2
+                    l2 = damp * g_lam + (1.0 - damp) * l2
+                    f2 = damp * ef_eta + (1.0 - damp) * f2
+                    zero = jnp.asarray(0.0, dtype=m2.dtype)
+                    return m2, e2, l2, f2, zero, jnp.asarray(0)
+
+                iter_step.__doc__ = "one colored sweep over the cyclic islands"
+            self._iter_step = eqx.filter_jit(iter_step)
         # Discrete edge slot pairs bucketed by cardinality: the zero-support
         # check runs per bucket instead of per edge (Python-loop-free).
         by_card: dict[int, list[list[int]]] = {}
@@ -426,11 +495,23 @@ class Engine:
                 state, RunStatus.INFEASIBLE, 0, (), (float("inf"),), float("inf")
             )
 
+        if self._prime is not None and n_iters >= 1:
+            # Colored/mixed priming: equilibrate the forest islands once
+            # (exact, O(E)) before the iterative loop starts counting.
+            msgs, g_eta, g_lam, ef_eta = self._prime(
+                state.messages, state.g_eta, state.g_lam, state.ef_eta,
+                state.g_obs, state.g_mask, state.ef_obs, state.ef_mask,
+                state.params,
+            )
+            state = _replace(
+                state, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta
+            )
+
         def phase(n: int, harden: bool, st: State) -> tuple[State, bool]:
             nonlocal status, residual, inner_status, inner_residual
             previous_fe: float | None = None
             for _ in range(n):
-                msgs, g_eta, g_lam, ef_eta, inner_r, inner_code = self._step(
+                msgs, g_eta, g_lam, ef_eta, inner_r, inner_code = self._iter_step(
                     st.messages, st.g_eta, st.g_lam, st.g_obs, st.g_mask,
                     st.ef_eta, st.ef_obs, st.ef_mask, st.params, damp, harden,
                 )
@@ -537,6 +618,30 @@ class Engine:
             inner_residual=inner_residual,
         )
 
+    @staticmethod
+    def _certificate_floor(state: State) -> float:
+        """Dtype- and scale-relative certificate for the fixed-point residual.
+
+        The certification sweep recomputes each message once from already-
+        final inputs, so its residual is a few ulps of the values involved —
+        *local* rounding, independent of graph diameter. The floor is
+        therefore 64 eps times the largest live magnitude in the state
+        (log-messages near the NEG log-zero sentinel recompute exactly and
+        are excluded from the scale). A diameter-scaled floor would grow
+        past genuine staleness signals on long float32 chains — the false-
+        convergence defect this replaces (cff-d56d review, 2026-07-27)."""
+        dtype = np.asarray(state.messages).dtype
+        scale = 1.0
+        msgs = np.asarray(state.messages)
+        live = msgs[np.abs(msgs) < 0.5 * abs(NEG)]
+        if live.size:
+            scale = max(scale, float(np.max(np.abs(live))))
+        for arr in (state.g_eta, state.g_lam, state.ef_eta):
+            a = np.asarray(arr)
+            if a.size:
+                scale = max(scale, float(np.max(np.abs(a))))
+        return 64.0 * float(np.finfo(dtype).eps) * scale
+
     def _run_exact(self, state: State, tol: float | None) -> RunResult:
         """Execute the two-pass directed schedule once and certify it.
 
@@ -546,11 +651,7 @@ class Engine:
         every directed message from the propagated state; its max change is
         the true fixed-point residual, so a scheduling defect — any stale
         message — surfaces as a non-converged status rather than as silently
-        wrong marginals. The certificate tolerance scales with dtype and
-        schedule depth (rounding accumulates along the passes)."""
-        dtype = np.asarray(state.messages).dtype
-        floor = 64.0 * np.finfo(dtype).eps * max(1, self.schedule.rounds)
-        certificate = floor if tol is None else max(float(tol), floor)
+        wrong marginals."""
 
         if not self._state_is_finite(state):
             return RunResult(
@@ -562,11 +663,11 @@ class Engine:
                 state, RunStatus.INFEASIBLE, 0, (), (float("inf"),), float("inf")
             )
 
-        msgs, g_eta, g_lam = self._propagate(
-            state.messages, state.g_eta, state.g_lam,
-            state.g_obs, state.g_mask, state.params,
+        msgs, g_eta, g_lam, ef_eta = self._propagate(
+            state.messages, state.g_eta, state.g_lam, state.ef_eta,
+            state.g_obs, state.g_mask, state.ef_obs, state.ef_mask, state.params,
         )
-        st = _replace(state, messages=msgs, g_eta=g_eta, g_lam=g_lam)
+        st = _replace(state, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta)
         if not self._state_is_finite(st):
             return RunResult(st, RunStatus.DIVERGED, 1, (), (), float("inf"))
         if self._has_zero_support(st):
@@ -592,6 +693,8 @@ class Engine:
         if not np.isfinite(delta):
             return RunResult(st, RunStatus.DIVERGED, 1, (delta,), (), float("inf"))
 
+        floor = self._certificate_floor(st)
+        certificate = floor if tol is None else max(float(tol), floor)
         status = (
             RunStatus.CONVERGED if delta <= certificate else RunStatus.BUDGET_EXHAUSTED
         )
@@ -1119,6 +1222,22 @@ def _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params):
     return new_eta, new_lam
 
 
+def _ef_group_out(g, inc, params, rows=None, obs=None, mask=None):
+    """Outgoing EF messages [m, R, 2] for one group from gathered ``inc``.
+
+    Shared by the flooding sweep and the directed-schedule executors
+    (cff-d56d): ``rows`` optionally subsets the group's parameter stacks to
+    the members being fired."""
+    if g.type == "equality":
+        return efrules.equality_messages(inc)
+    kern = kernels.KERNELS[g.type]
+    gp = {
+        key: params[f"{g.name}:{key}"] if rows is None else params[f"{g.name}:{key}"][rows]
+        for key in kern.param_keys
+    }
+    return kern.message(inc, gp, obs, mask)
+
+
 def _ef_sweep(arena, ef_eta, ef_obs, ef_mask, params):
     """One synchronous flooding sweep over the EF groups — conjugate BP in
     its entirety (DERIVATIONS.md D2). Each non-equality group's update comes
@@ -1127,14 +1246,9 @@ def _ef_sweep(arena, ef_eta, ef_obs, ef_mask, params):
     at trace time and the jitted step is branch-free."""
     new = ef_eta
     for g in arena.ef_groups:
-        if g.type == "equality":
-            out = efrules.equality_messages(ef_eta[g.gather])  # [M, 3, 2]
-        else:
-            kern = kernels.KERNELS[g.type]
-            gp = {key: params[f"{g.name}:{key}"] for key in kern.param_keys}
-            obs = ef_obs[g.obs_rows] if g.obs_rows is not None else None
-            mask = ef_mask[g.obs_rows] if g.obs_rows is not None else None
-            out = kern.message(ef_eta[g.gather], gp, obs, mask).astype(new.dtype)
+        obs = ef_obs[g.obs_rows] if g.obs_rows is not None else None
+        mask = ef_mask[g.obs_rows] if g.obs_rows is not None else None
+        out = _ef_group_out(g, ef_eta[g.gather], params, None, obs, mask).astype(new.dtype)
         new = new.at[g.scatter.reshape(-1)].set(out.reshape(-1, out.shape[-1]))
     return new
 
@@ -1158,8 +1272,16 @@ def _constraint_writes(arena: Arena, messages: jax.Array, op):
     return writes
 
 
-def _make_step(arena: Arena):
-    groups = arena.groups
+def _make_step(arena: Arena, skip_scheduled: bool = False):
+    """The synchronous sweep. With ``skip_scheduled=True`` (the mixed-mode
+    phase step, cff-d56d) the plain BP discrete groups, Gaussian groups, and
+    EF groups are omitted — the directed island passes own them — while
+    every iterative structure (vmp beads, GFE composites, constraints,
+    hybrid mixtures, gaussian_prec) still fires and damps exactly as in
+    flooding."""
+    groups = (
+        [g for g in arena.groups if g.mode != "bp"] if skip_scheduled else arena.groups
+    )
     op = jnp.max if arena.semiring == "max" else logsumexp
 
     def step(
@@ -1241,7 +1363,7 @@ def _make_step(arena: Arena):
         # damping of the Gaussian family (log of a Gaussian is its (eta,
         # Lambda) quadratic), so one damp knob covers both arenas.
         new_eta, new_lam = g_eta, g_lam
-        if arena.gauss_groups:
+        if arena.gauss_groups and not skip_scheduled:
             new_eta, new_lam = _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params)
         for scatter, dim, oe, ol in [*mix_gauss, *prec_gauss]:
             new_eta, new_lam = _set_gauss_block(
@@ -1254,7 +1376,7 @@ def _make_step(arena: Arena):
         # the same damp knob is log-space damping here too.
         new_ef = ef_eta
         if arena.ef_groups or arena.prec_groups:
-            if arena.ef_groups:
+            if arena.ef_groups and not skip_scheduled:
                 new_ef = _ef_sweep(arena, ef_eta, ef_obs, ef_mask, params)
             for scatter, out in prec_ef:
                 new_ef = new_ef.at[scatter].set(out)
@@ -1300,14 +1422,33 @@ def _batch_stage_fn(arena: Arena, stage, op):
         gather, scatter = g.gather[rows], g.scatter[rows]
         k_local = max(g.cards)
 
-        def fn(messages, g_eta, g_lam, g_obs, g_mask, params):
+        def fn(messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params):
             inc = _disc_rows(arena, messages, gather, g.cards)
             logf = params.get(g.name)
             if logf is not None:
                 logf = logf[rows]
             out = BP_UPDATES[g.type](inc, logf, g.cards, k_local, op)
             out = jnp.maximum(out, NEG)
-            return _set_disc_rows(arena, messages, scatter, g.cards, out), g_eta, g_lam
+            messages = _set_disc_rows(arena, messages, scatter, g.cards, out)
+            return messages, g_eta, g_lam, ef_eta
+
+        return fn
+
+    if stage.kind == "ef":
+        g = arena.ef_groups[stage.group]
+        rows = stage.rows
+        gather, scatter = g.gather[rows], g.scatter[rows]
+        obs_rows = g.obs_rows[rows] if g.obs_rows is not None else None
+
+        def fn(messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params):
+            obs = ef_obs[obs_rows] if obs_rows is not None else None
+            mask = ef_mask[obs_rows] if obs_rows is not None else None
+            out = _ef_group_out(g, ef_eta[gather], params, rows, obs, mask)
+            out = out.astype(ef_eta.dtype)
+            ef_eta = ef_eta.at[scatter.reshape(-1)].set(
+                out.reshape(-1, out.shape[-1])
+            )
+            return messages, g_eta, g_lam, ef_eta
 
         return fn
 
@@ -1316,7 +1457,7 @@ def _batch_stage_fn(arena: Arena, stage, op):
     gather, scatter = g.gather[rows], g.scatter[rows]
     obs_rows = g.obs_rows[rows] if g.obs_rows is not None else None
 
-    def fn(messages, g_eta, g_lam, g_obs, g_mask, params):
+    def fn(messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params):
         inc_e, inc_l = _gauss_rows(arena, g_eta, g_lam, gather, g.dims)
         y = mk = None
         if g.type == "gaussian_linear_obs":
@@ -1326,13 +1467,17 @@ def _batch_stage_fn(arena: Arena, stage, op):
             g_eta, g_lam = _set_gauss_block(
                 arena, g_eta, g_lam, scatter[:, r], g.dims[r], oe, ol
             )
-        return messages, g_eta, g_lam
+        return messages, g_eta, g_lam, ef_eta
 
     return fn
 
 
 def _scan_group_of(arena: Arena, elem):
-    return arena.groups[elem.group] if elem.kind == "disc" else arena.gauss_groups[elem.group]
+    return {
+        "disc": arena.groups,
+        "gauss": arena.gauss_groups,
+        "ef": arena.ef_groups,
+    }[elem.kind][elem.group]
 
 
 def _classify_scan(arena: Arena, stage):
@@ -1352,16 +1497,22 @@ def _classify_scan(arena: Arena, stage):
     per-column mixed ("mix") — or None when any column's dependency is
     non-uniform, in which case the flat-carry executor stays correct."""
     elems = stage.elems
+    # Slot numberings are independent per arena (disc/gauss/ef), so reader
+    # and writer tables only compare within the same kind.
     writers = []
+    written_by_kind: dict[str, set[int]] = {}
     for ei, elem in enumerate(elems):
         sc = _scan_group_of(arena, elem).scatter[elem.rows]  # [S, m, R]
         for r in range(sc.shape[2]):
             writers.append((ei, r, sc[:, :, r]))
-    all_written = {int(s) for _, _, tab in writers for s in tab.reshape(-1)}
+            written_by_kind.setdefault(elem.kind, set()).update(
+                int(s) for s in sc[:, :, r].reshape(-1)
+            )
 
     plans = []
     for ei, elem in enumerate(elems):
         ga = _scan_group_of(arena, elem).gather[elem.rows]  # [S, m, R]
+        all_written = written_by_kind.get(elem.kind, set())
         role_plans = []
         for r in range(ga.shape[2]):
             cols = []
@@ -1369,6 +1520,8 @@ def _classify_scan(arena: Arena, stage):
                 tab = ga[:, c, r]  # [S]
                 match = None
                 for we, wr, wt in writers:
+                    if elems[we].kind != elem.kind:
+                        continue
                     for wc in range(wt.shape[1]):
                         col = wt[:, wc]
                         if stage.length > 1 and np.array_equal(col[:-1], tab[1:]):
@@ -1446,7 +1599,7 @@ def _registerized_scan_fn(arena: Arena, stage, plans, op):
                         reg_init_slots[key] = we_sc[0, :, cp[2]].copy()
                     reg_init_slots[key][cp[3]] = ga[0, c, r]
 
-    def fn(messages, g_eta, g_lam, g_obs, g_mask, params):
+    def fn(messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params):
         xs = []
         for ei, (elem, g, ga, _) in enumerate(metas):
             x = {}
@@ -1461,6 +1614,8 @@ def _registerized_scan_fn(arena: Arena, stage, plans, op):
                 if elem.kind == "disc":
                     idx = arena.message_indices(slots, g.cards[r])
                     x[f"s{r}"] = messages[jnp.asarray(idx)]
+                elif elem.kind == "ef":
+                    x[f"s{r}"] = ef_eta[jnp.asarray(slots)]
                 else:
                     d = g.dims[r]
                     x[f"se{r}"] = g_eta[jnp.asarray(arena.g_eta_indices(slots, d))]
@@ -1469,6 +1624,15 @@ def _registerized_scan_fn(arena: Arena, stage, plans, op):
                 logf = params.get(g.name)
                 if logf is not None:
                     x["lf"] = logf[elem.rows]
+            elif elem.kind == "ef":
+                kern = kernels.kernel_for(g.type)
+                if kern is not None:
+                    for key in kern.param_keys:
+                        x[f"p{key}"] = params[f"{g.name}:{key}"][elem.rows]
+                if g.obs_rows is not None:
+                    orows = g.obs_rows[elem.rows]
+                    x["ov"] = ef_obs[jnp.asarray(orows)]
+                    x["om"] = ef_mask[jnp.asarray(orows)]
             else:
                 for k, v in _gauss_group_params(g, params).items():
                     x[f"p{k}"] = v[elem.rows]
@@ -1486,6 +1650,8 @@ def _registerized_scan_fn(arena: Arena, stage, plans, op):
                 init[f"{we}:{wr}"] = messages[
                     jnp.asarray(arena.message_indices(slots, wg.cards[wr]))
                 ]
+            elif elems[we].kind == "ef":
+                init[f"{we}:{wr}"] = ef_eta[jnp.asarray(slots)]
             else:
                 d = wg.dims[wr]
                 init[f"{we}:{wr}:e"] = g_eta[jnp.asarray(arena.g_eta_indices(slots, d))]
@@ -1556,6 +1722,24 @@ def _registerized_scan_fn(arena: Arena, stage, plans, op):
                         block = out[:, r, :card]
                         cur[f"{ei}:{r}"] = block
                         ys[f"{ei}:{r}"] = block
+                elif elem.kind == "ef":
+                    inc = jnp.stack(
+                        [read(ei, r, False) for r in range(len(g.roles))], axis=-2
+                    )
+                    if g.type == "equality":
+                        out = efrules.equality_messages(inc)
+                    else:
+                        gp = {
+                            k[1:]: v for k, v in x_t[ei].items() if k.startswith("p")
+                        }
+                        out = kernels.KERNELS[g.type].message(
+                            inc, gp, x_t[ei].get("ov"), x_t[ei].get("om")
+                        )
+                    out = out.astype(inc.dtype)
+                    for r in range(len(g.roles)):
+                        block = out[:, r]
+                        cur[f"{ei}:{r}"] = block
+                        ys[f"{ei}:{r}"] = block
                 else:
                     width = max(g.dims)
                     eb, lb = [], []
@@ -1584,13 +1768,16 @@ def _registerized_scan_fn(arena: Arena, stage, plans, op):
                 for r, card in enumerate(g.cards):
                     idx = jnp.asarray(arena.message_indices(sc[:, :, r], card))
                     messages = messages.at[idx].set(ys[f"{ei}:{r}"])
+            elif elem.kind == "ef":
+                for r in range(len(g.roles)):
+                    ef_eta = ef_eta.at[jnp.asarray(sc[:, :, r])].set(ys[f"{ei}:{r}"])
             else:
                 for r, d in enumerate(g.dims):
                     ei_idx = jnp.asarray(arena.g_eta_indices(sc[:, :, r], d))
                     li_idx = jnp.asarray(arena.g_lam_indices(sc[:, :, r], d))
                     g_eta = g_eta.at[ei_idx].set(ys[f"{ei}:{r}:e"])
                     g_lam = g_lam.at[li_idx].set(ys[f"{ei}:{r}:l"])
-        return messages, g_eta, g_lam
+        return messages, g_eta, g_lam, ef_eta
 
     return fn
 
@@ -1630,6 +1817,15 @@ def _flat_scan_fn(arena: Arena, stage, op):
                     for r, card in enumerate(g.cards)
                 ),
             }
+        elif elem.kind == "ef":
+            g = arena.ef_groups[elem.group]
+            x = {
+                "rows": jnp.asarray(elem.rows),
+                "gs": jnp.asarray(g.gather[elem.rows]),  # [S, m, R] ef slots
+                "ss": jnp.asarray(g.scatter[elem.rows]),
+            }
+            if g.obs_rows is not None:
+                x["or"] = jnp.asarray(g.obs_rows[elem.rows])
         else:
             g = arena.gauss_groups[elem.group]
             slots_g, slots_s = g.gather[elem.rows], g.scatter[elem.rows]
@@ -1660,9 +1856,9 @@ def _flat_scan_fn(arena: Arena, stage, op):
         xs.append(x)
     xs = tuple(xs)
 
-    def fn(messages, g_eta, g_lam, g_obs, g_mask, params):
+    def fn(messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params):
         def body(carry, x_t):
-            messages, g_eta, g_lam = carry
+            messages, g_eta, g_lam, ef_eta = carry
             for (kind, g), x in zip(metas, x_t):
                 if kind == "disc":
                     k_local = max(g.cards)
@@ -1681,6 +1877,13 @@ def _flat_scan_fn(arena: Arena, stage, op):
                     out = jnp.maximum(out, NEG)
                     for r, card in enumerate(g.cards):
                         messages = messages.at[x["sv"][r]].set(out[:, r, :card])
+                elif kind == "ef":
+                    obs = ef_obs[x["or"]] if "or" in x else None
+                    mask = ef_mask[x["or"]] if "or" in x else None
+                    out = _ef_group_out(
+                        g, ef_eta[x["gs"]], params, x["rows"], obs, mask
+                    ).astype(ef_eta.dtype)
+                    ef_eta = ef_eta.at[x["ss"]].set(out)
                 else:
                     width = max(g.dims)
                     eb = [
@@ -1704,34 +1907,37 @@ def _flat_scan_fn(arena: Arena, stage, op):
                         d = g.dims[r]
                         g_eta = g_eta.at[x["se"][r]].set(oe[..., :d])
                         g_lam = g_lam.at[x["sl"][r]].set(ol[..., :d, :d])
-            return (messages, g_eta, g_lam), None
+            return (messages, g_eta, g_lam, ef_eta), None
 
-        (messages, g_eta, g_lam), _ = jax.lax.scan(
-            body, (messages, g_eta, g_lam), xs
+        (messages, g_eta, g_lam, ef_eta), _ = jax.lax.scan(
+            body, (messages, g_eta, g_lam, ef_eta), xs
         )
-        return messages, g_eta, g_lam
+        return messages, g_eta, g_lam, ef_eta
 
     return fn
 
 
-def _make_propagate(arena: Arena, sched: Schedule):
-    """Compile a two-pass Schedule into one jittable propagation function.
+def _make_propagate(arena: Arena, stages: tuple):
+    """Compile a stage list into one jittable propagation function.
 
     Stages execute in order against the running arrays (asynchronous /
     directed semantics), unlike `_make_step`, which gathers everything from
-    the pre-sweep arrays (synchronous flooding). EF/hybrid/GFE structures
-    never reach here — their presence forces a flooding schedule."""
+    the pre-sweep arrays (synchronous flooding). Iterative structures (vmp,
+    GFE, constraints, hybrid, prec) never appear as stages — they run in the
+    restricted synchronous step of the mixed loop."""
     op = jnp.max if arena.semiring == "max" else logsumexp
     stage_fns = [
         _batch_stage_fn(arena, s, op) if isinstance(s, BatchStage)
         else _scan_stage_fn(arena, s, op)
-        for s in sched.stages
+        for s in stages
     ]
 
-    def propagate(messages, g_eta, g_lam, g_obs, g_mask, params):
+    def propagate(messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params):
         for fn in stage_fns:
-            messages, g_eta, g_lam = fn(messages, g_eta, g_lam, g_obs, g_mask, params)
-        return messages, g_eta, g_lam
+            messages, g_eta, g_lam, ef_eta = fn(
+                messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params
+            )
+        return messages, g_eta, g_lam, ef_eta
 
     propagate.scan_registerized = tuple(
         fn.registerized for fn in stage_fns if hasattr(fn, "registerized")

@@ -4,9 +4,14 @@ tolerance, update each directed message O(1) times, stay deterministic under
 template round-trips, and fall back to flooding (with a recorded reason) for
 every structure outside the directed contract."""
 
+from dataclasses import replace
+
+import equinox as eqx
+import jax
 import numpy as np
 import pytest
 
+from cffg import engine as engine_mod
 from cffg.compiler import compile_template
 from cffg.core import (
     BlobRef,
@@ -275,8 +280,8 @@ def unit_categorical(constraints=()):
     )
 
 
-def test_vmp_bead_forces_flooding():
-    t = Template(
+def vmp_unit_template():
+    return Template(
         "vmp_unit",
         variables={"z": VariableSpec("z", K), "x": VariableSpec("x", M)},
         factors={
@@ -287,9 +292,23 @@ def test_vmp_bead_forces_flooding():
         blobs={"d": BlobRef("d", "d"), "A": BlobRef("A", "A")},
         constraints=[ConstraintSpec(ConstraintKind.MEAN_FIELD, "obs")],
     )
-    sched = build_schedule(compile_template(t, arrays={"d": D, "A": A}))
-    assert sched.kind == "flood"
-    assert "vmp" in sched.reason
+
+
+def test_vmp_bead_gets_mixed_schedule_with_flooding_parity():
+    arrays = {"d": D, "A": A}
+    mixed = Engine(compile_template(vmp_unit_template(), arrays=arrays))
+    assert mixed.schedule.kind == "mixed"
+    assert "vmp" in mixed.schedule.reason
+    flood = Engine(compile_template(vmp_unit_template(), arrays=arrays), schedule="flood")
+    st_m = mixed.bind_data(mixed.init_state(), {"px": 1})
+    st_f = flood.bind_data(flood.init_state(), {"px": 1})
+    res_m = mixed.run(st_m, 60, tol=1e-13)
+    res_f = flood.run(st_f, 60, tol=1e-13)
+    assert res_m.status is RunStatus.CONVERGED
+    assert res_f.status is RunStatus.CONVERGED
+    for name, q in flood.marginals(res_f.state).items():
+        np.testing.assert_allclose(mixed.marginals(res_m.state)[name], q, atol=1e-9)
+    np.testing.assert_allclose(mixed.bfe(res_m.state), flood.bfe(res_f.state), atol=1e-9)
 
 
 def test_delta_constraint_forces_flooding():
@@ -299,7 +318,7 @@ def test_delta_constraint_forces_flooding():
     assert "delta" in sched.reason
 
 
-def test_hard_constraints_force_flooding():
+def test_constraint_only_model_floods_and_constraint_chain_mixes():
     t = Template(
         "csp_unit",
         variables={"x0": VariableSpec("x0", 2), "x1": VariableSpec("x1", 2)},
@@ -313,31 +332,79 @@ def test_hard_constraints_force_flooding():
         blobs={"k": BlobRef("k", "k")},
     )
     sched = build_schedule(compile_template(t, arrays={"k": np.asarray(1)}))
-    assert sched.kind == "flood"
-    assert "constraint" in sched.reason
+    assert sched.kind == "flood"  # nothing schedulable: only the constraint
+    assert "no schedulable" in sched.reason
 
-
-def test_cycle_forces_flooding():
-    t = Template(
-        "loopy",
+    t2 = Template(
+        "csp_mixed",
         variables={
-            "x1": VariableSpec("x1", K),
-            "x2": VariableSpec("x2", K),
-            "x3": VariableSpec("x3", K),
-            "x4": VariableSpec("x4", K),
+            "x0": VariableSpec("x0", 2),
+            "x1": VariableSpec("x1", 2),
         },
         factors={
-            "eq1": FactorSpec("eq1", "equality", edges={"a": "x1", "b": "x2", "c": "x3"}),
-            "eq2": FactorSpec("eq2", "equality", edges={"a": "x1", "b": "x2", "c": "x4"}),
+            "p0": FactorSpec("p0", "categorical", edges={"out": "x0"}, param_blobs={"statistic": "p"}),
+            "c": FactorSpec("c", "exactly_k", edges={"x0": "x0", "x1": "x1"}, param_blobs={"k": "k"}),
         },
-        ports={
-            "p3": PortSpec("p3", "x3", PortRole.GLUE),
-            "p4": PortSpec("p4", "x4", PortRole.GLUE),
-        },
+        ports={"d1": PortSpec("d1", "x1", PortRole.DATA)},
+        blobs={"k": BlobRef("k", "k"), "p": BlobRef("p", "p")},
     )
-    sched = build_schedule(compile_template(t))
-    assert sched.kind == "flood"
-    assert "cycle" in sched.reason
+    arena2 = compile_template(
+        t2, arrays={"k": np.asarray(1), "p": np.array([0.3, 0.7])}
+    )
+    sched2 = build_schedule(arena2)
+    assert sched2.kind == "mixed"
+    assert "constraint" in sched2.reason
+    mixed = Engine(arena2)
+    flood = Engine(arena2, schedule="flood")
+    st = mixed.bind_data(mixed.init_state(), {"d1": 0})
+    res_m = mixed.run(st, 30, tol=1e-13)
+    res_f = flood.run(flood.bind_data(flood.init_state(), {"d1": 0}), 30, tol=1e-13)
+    assert res_m.status is RunStatus.CONVERGED and res_f.status is RunStatus.CONVERGED
+    for name, q in flood.marginals(res_f.state).items():
+        np.testing.assert_allclose(mixed.marginals(res_m.state)[name], q, atol=1e-9)
+
+
+def test_cycle_gets_colored_schedule_with_flooding_parity():
+    """A transition ring (loopy, contracting): colored Gauss–Seidel sweeps
+    must reach the same loopy-BP fixed point flooding reaches."""
+    t = Template(
+        "ring",
+        variables={
+            "z1": VariableSpec("z1", K),
+            "z1e": VariableSpec("z1e", K),
+            "z2": VariableSpec("z2", K),
+            "z3": VariableSpec("z3", K),
+            "zo": VariableSpec("zo", K),
+            "x": VariableSpec("x", M),
+        },
+        factors={
+            "t1": FactorSpec("t1", "matrix_cat", edges={"out": "z2", "in": "z1e"}, param_blobs={"matrix": "B"}),
+            "t2": FactorSpec("t2", "matrix_cat", edges={"out": "z3", "in": "z2"}, param_blobs={"matrix": "B"}),
+            "t3": FactorSpec("t3", "matrix_cat", edges={"out": "z1", "in": "z3"}, param_blobs={"matrix": "B"}),
+            "eq": FactorSpec("eq", "equality", edges={"a": "z1", "b": "z1e", "c": "zo"}),
+            "obs": FactorSpec("obs", "matrix_cat", edges={"out": "x", "in": "zo"}, param_blobs={"matrix": "A"}),
+        },
+        ports={"px": PortSpec("px", "x", PortRole.DATA)},
+        blobs={"B": BlobRef("B", "B"), "A": BlobRef("A", "A")},
+    )
+    arena = compile_template(t, arrays={"B": B, "A": A})
+    sched = build_schedule(arena)
+    assert sched.kind == "colored"
+    assert sched.colors >= 2
+    colored = Engine(arena)
+    flood = Engine(arena, schedule="flood")
+    st_c = colored.bind_data(colored.init_state(), {"px": 1})
+    st_f = flood.bind_data(flood.init_state(), {"px": 1})
+    res_c = colored.run(st_c, 200, tol=1e-12)
+    res_f = flood.run(st_f, 200, tol=1e-12)
+    assert res_c.status is RunStatus.CONVERGED
+    assert res_f.status is RunStatus.CONVERGED
+    assert res_c.iterations <= res_f.iterations  # GS never loses to Jacobi here
+    for name, q in flood.marginals(res_f.state).items():
+        np.testing.assert_allclose(colored.marginals(res_c.state)[name], q, atol=1e-8)
+    np.testing.assert_allclose(
+        colored.bfe(res_c.state), flood.bfe(res_f.state), atol=1e-8
+    )
 
 
 def test_two_pass_mode_raises_outside_contract():
@@ -378,3 +445,79 @@ def test_zero_support_reports_infeasible_on_exact_path():
     result = engine.run(state, 1, tol=1e-12)
     assert result.status is RunStatus.INFEASIBLE
     assert np.isposinf(result.free_energies[-1])
+
+
+# -- certificate soundness and prebuilt-schedule validation ------------------
+
+
+def test_doctored_prebuilt_schedule_is_rejected():
+    arena = compile_template(hmm_template(8), arrays=hmm_arrays(8))
+    sched = build_schedule(arena)
+    half = replace(sched, stages=sched.stages[: len(sched.stages) // 2])
+    with pytest.raises(ValueError, match="does not match this arena"):
+        Engine(arena, schedule=half)
+    other = compile_template(hmm_template(9), arrays=hmm_arrays(9))
+    with pytest.raises(ValueError, match="does not match this arena"):
+        Engine(other, schedule=sched)
+    Engine(arena, schedule=sched)  # the genuine schedule is accepted
+
+
+def test_float32_missing_phase_cannot_certify_at_t256():
+    """The reviewer's exploit (2026-07-27): drop the outward pass on a long
+    float32 chain. The stale-message residual (~1e-3) is far above the
+    scale-relative certificate, so the run must not report converged — a
+    diameter-scaled floor (64 eps rounds ≈ 3.9e-3 in f32 at T=256) would
+    have swallowed it."""
+    n = 256
+    with jax.enable_x64(False):
+        arena = compile_template(hmm_template(n), arrays=hmm_arrays(n))
+        engine = Engine(arena)
+        assert engine.schedule.kind == "two_pass"
+        inward_only = engine_mod._make_propagate(
+            arena, engine.schedule.stages[: len(engine.schedule.stages) // 2]
+        )
+        engine._propagate = eqx.filter_jit(inward_only)  # bypasses the
+        # fingerprint guard on purpose: this pins the *certificate* itself
+        obs = [int(v) for v in np.random.default_rng(1).integers(0, M, size=n)]
+        state = engine.bind_data(
+            engine.init_state(), {f"chain/t{t}/sense": obs[t] for t in range(n)}
+        )
+        result = engine.run(state, 1, tol=None)
+        assert result.status is not RunStatus.CONVERGED
+        with pytest.raises(Exception):
+            result.require_converged()
+
+
+def test_float32_genuine_two_pass_still_certifies_at_t256():
+    n = 256
+    with jax.enable_x64(False):
+        engine = Engine(compile_template(hmm_template(n), arrays=hmm_arrays(n)))
+        obs = [int(v) for v in np.random.default_rng(1).integers(0, M, size=n)]
+        state = engine.bind_data(
+            engine.init_state(), {f"chain/t{t}/sense": obs[t] for t in range(n)}
+        )
+        result = engine.run(state, 1, tol=None)
+        assert result.status is RunStatus.CONVERGED
+        assert result.message_deltas[0] <= engine._certificate_floor(result.state)
+
+
+# -- EF directed passes ------------------------------------------------------
+
+
+def test_ef_tree_runs_two_pass_with_flooding_parity():
+    from test_ef_engine import gamma_poisson
+
+    t, arrays = gamma_poisson(6)
+    arena = compile_template(t, arrays=arrays)
+    exact = Engine(arena)
+    assert exact.schedule.kind == "two_pass"
+    flood = Engine(arena, schedule="flood")
+    data = {f"count{i}": c for i, c in enumerate((3, 5, 1, None, 4, 2))}
+    res_e = exact.run(exact.bind_data(exact.init_state(), data), 1, tol=1e-12)
+    assert res_e.status is RunStatus.CONVERGED
+    res_f = flood.run(flood.bind_data(flood.init_state(), data), 40, tol=1e-12)
+    assert res_f.status is RunStatus.CONVERGED
+    me, mf = exact.ef_marginals(res_e.state), flood.ef_marginals(res_f.state)
+    for name in mf:
+        np.testing.assert_allclose(me[name].params, mf[name].params, atol=1e-10)
+    np.testing.assert_allclose(exact.bfe(res_e.state), flood.bfe(res_f.state), atol=1e-10)
