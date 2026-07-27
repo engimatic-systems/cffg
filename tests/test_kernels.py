@@ -220,6 +220,39 @@ def test_missing_implementation_fails_loudly(exponential_kernel):
         kernels.register_kernel(_make_kernel())
 
 
+def test_missing_implementation_fails_when_factor_type_was_pre_registered():
+    """A structural FactorType is not evidence that its executable kernel is
+    installed: the serialized implementation requirement must still fail at
+    load time (cff-ri8m)."""
+    from cffg.core import register_factor_type
+    from cffg.core.ir import EF_EDGE_FAMILIES
+
+    factor_type = "predeclared_exponential_obs"
+    impl = "cffgtests.predeclared_exponential_obs"
+    ft = register_factor_type(
+        FactorType(factor_type, edge_roles=("out", "rate"), family="ef")
+    )
+    try:
+        kernels.register_kernel(_make_kernel(factor_type=ft, impl_id=impl))
+        t, _ = gamma_exponential()
+        t.factors["obs"] = FactorSpec(
+            "obs", factor_type, edges={"out": "x0", "rate": "lam"}
+        )
+        text = to_json(t)
+
+        # unregister_kernel deliberately leaves a FactorType it did not add.
+        # Loading must check the executable manifest, not just that structural
+        # registry entry.
+        kernels.unregister_kernel(factor_type)
+        assert factor_type in FACTOR_TYPES
+        with pytest.raises(ValueError, match=f"{factor_type}.*{impl}.*{VERSION}"):
+            from_json(text)
+    finally:
+        kernels.unregister_kernel(factor_type)
+        FACTOR_TYPES.pop(factor_type, None)
+        EF_EDGE_FAMILIES.pop(factor_type, None)
+
+
 def test_incompatible_major_version_fails_loudly(exponential_kernel):
     text = to_json(gamma_exponential()[0])
     kernels.unregister_kernel(CUSTOM)

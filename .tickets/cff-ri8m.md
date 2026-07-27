@@ -23,3 +23,7 @@ ADVERSARIAL REVIEWER FINDING (2026-07-10). core.ir.register_factor_type register
 **2026-07-27T03:27:04Z**
 
 PR: https://github.com/engimatic-systems/cffg/pull/33 (stacked on cff-ey4p PR #32; base branch cff-ey4p-belief-log-floor; awaiting Cooper's review — do not merge from a session). Delivered: cffg/kernels.py FactorKernel contract + registry; EF built-ins migrated; serialization manifest with loud missing-implementation failure; tests/test_kernels.py exponential_obs worked example with independent evidence oracle. Remaining scope deliberately deferred: discrete/Gaussian/hybrid migration is cff-l6i5/cff-x0sv (recorded in LIMITATIONS S1i). Full pass on branch: 1184 passed, 0 failing.
+
+**2026-07-27T04:04:28Z**
+
+Review regression added in tests/test_kernels.py: loading a serialized external kernel must fail even when its FactorType was structurally pre-registered and remains after unregister_kernel. The new test intentionally fails on the current PR head with DID NOT RAISE; it should turn green when _check_kernel_requirements checks the executable kernel manifest independently of FACTOR_TYPES.
