@@ -117,6 +117,15 @@ def to_dict(t: Template) -> dict[str, Any]:
     # Additive: templates without plates serialize byte-identically to before.
     if t.plates:
         d["plates"] = {name: _plate_to_dict(t.plates[name]) for name in sorted(t.plates)}
+    # Additive: record (impl, version) for factor types backed by *external*
+    # FactorKernels (cff-ri8m), so loading without them fails loudly and
+    # names what to install. Built-in (cffg.) kernels ship with the package
+    # and are omitted — existing template JSON stays byte-identical.
+    from cffg import kernels  # deferred: cffg.kernels imports cffg.core.ir
+
+    required = kernels.manifest(f.type for f in t.factors.values())
+    if required:
+        d["kernels"] = required
     return d
 
 
@@ -125,6 +134,7 @@ def from_dict(d: dict[str, Any]) -> Template:
         raise ValueError(
             f"schema version {d.get('schema_version')!r} != supported {SCHEMA_VERSION!r}"
         )
+    _check_kernel_requirements(d)
     return Template(
         name=d["name"],
         variables={
@@ -166,6 +176,56 @@ def from_dict(d: dict[str, Any]) -> Template:
         },
         schema_version=d["schema_version"],
     )
+
+
+def _check_kernel_requirements(d: dict[str, Any]) -> None:
+    """Loud-failure gate for kernel-backed factor types (cff-ri8m): a type
+    that cannot execute must be refused at load, naming the missing
+    implementation, instead of failing later and vaguer. Two distinct gaps
+    are checked — an unknown FactorType, and (per the manifest) a known
+    FactorType whose *executable kernel* is not registered: a structural
+    registry entry is not evidence the implementation is installed. A
+    registered kernel must match the recorded impl identity and MAJOR
+    version — MINOR/PATCH drift is compatible by the policy in
+    cffg.kernels."""
+    from cffg.core.ir import FACTOR_TYPES  # local: avoid confusion with module import list
+    from cffg import kernels
+
+    required = d.get("kernels", {})
+    used_types = {spec["type"] for spec in d.get("factors", {}).values()}
+    for name, spec in d.get("factors", {}).items():
+        ftype = spec["type"]
+        if ftype in FACTOR_TYPES:
+            continue
+        need = required.get(ftype)
+        hint = (
+            f" (template requires implementation {need['impl']!r} "
+            f"version {need['version']})"
+            if need
+            else ""
+        )
+        raise ValueError(
+            f"factor {name!r}: unregistered factor type {ftype!r}{hint}; "
+            "register its FactorKernel before loading"
+        )
+    for ftype, need in required.items():
+        k = kernels.kernel_for(ftype)
+        if k is None:
+            if ftype in used_types:
+                raise ValueError(
+                    f"factor type {ftype!r} has a structural registration but no "
+                    f"executable kernel; the template requires implementation "
+                    f"{need.get('impl')!r} version {need.get('version')!r} — "
+                    "register its FactorKernel before loading"
+                )
+            continue  # unused-by-any-factor requirement: nothing to run
+        same_major = k.version.split(".")[0] == str(need.get("version", "")).split(".")[0]
+        if k.impl_id != need.get("impl") or not same_major:
+            raise ValueError(
+                f"factor type {ftype!r}: registered kernel {k.impl_id!r} "
+                f"v{k.version} is incompatible with the template requirement "
+                f"{need.get('impl')!r} v{need.get('version')}"
+            )
 
 
 def to_json(t: Template) -> str:

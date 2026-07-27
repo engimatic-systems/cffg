@@ -106,6 +106,17 @@ ticket under the roadmap epic cff-ahps:
 The registry architecture exists precisely so each of these lands as an isolated
 contribution.
 
+**S1i. Executable registration covers the EF arena only (cff-ri8m).** The
+`FactorKernel` contract (`cffg.kernels`, ARCHITECTURE 2e) makes factor
+registration executable — but in v1 only EF-arena factors dispatch through
+it (gamma, beta, poisson_obs, bernoulli_obs, plus externally registered
+kernels). Discrete, Gaussian, and hybrid factors still run on central
+compiler/engine branches, so adding a factor in those families still means
+central surgery until they migrate onto the contract (cff-l6i5, cff-x0sv).
+The registration API itself is internal-unstable pre-1.0; only the
+serialized `(impl, version)` manifest and its loud-failure guarantee are
+stable now.
+
 **S1b. Gaussian numerics.** Rules do not require incoming precisions to be
 invertible: improper/vacuous messages propagate exactly. Potentially singular
 Schur systems use a Moore-Penrose limit whose numerical-rank cutoff scales with

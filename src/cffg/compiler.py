@@ -29,7 +29,7 @@ from pathlib import Path
 
 import numpy as np
 
-from cffg import ef
+from cffg import ef, kernels
 from cffg.core.ir import FACTOR_TYPES, ConstraintKind, PortRole, Template
 from cffg.core.plates import expand_plates
 from cffg.core.validate import validate
@@ -157,13 +157,13 @@ class PrecGroupPlan:
 class EfGroupPlan:
     """All EF-family factors of one (type, family), run together (cff-8s6a).
 
-    Types: "gamma"/"beta" (prior leaves sending the constant natural
-    parameters stacked in params["<name>:eta"]), "poisson_obs"/
-    "bernoulli_obs" (conditioned likelihoods: the "out" edge is a DATA port,
-    the message is a constant conjugate increment to the parameter edge, and
-    a missing observation drops the node — the Gaussian conditioning
-    convention), and "equality" (family-polymorphic, routed here when its
-    edges are EF: sum-minus-self on natural parameters)."""
+    Every non-equality type dispatches through its registered FactorKernel
+    (cffg.kernels, cff-ri8m): prior kernels stack constant natural parameters
+    into params["<name>:<key>"], conditioned observation kernels
+    (observed_out) take the "out" edge as a DATA port with the message a
+    constant conjugate increment to the parameter edge (missing observation
+    drops the node — the Gaussian conditioning convention). "equality" stays
+    structural: family-polymorphic sum-minus-self on natural parameters."""
 
     name: str
     type: str
@@ -407,7 +407,20 @@ def compile_template(
                 f"factor {f.name!r}: P-substitution on Gaussian nodes is open research "
                 "(ticket cff-dfpi)"
             )
-        if FACTOR_TYPES[f.type].family == "ef" and f.name in (mean_field | set(psub)):
+        kern = kernels.kernel_for(f.type)
+        if kern is not None:
+            requested = set()
+            if f.name in mean_field:
+                requested.add(ConstraintKind.MEAN_FIELD.value)
+            if f.name in psub:
+                requested.add(ConstraintKind.P_SUBSTITUTION.value)
+            bad = sorted(requested - set(kern.constraint_modes))
+            if bad:
+                problems.append(
+                    f"factor {f.name!r}: kernel {kern.impl_id!r} does not accept "
+                    f"{bad} beads (conjugate BP is already exact on EF subgraphs)"
+                )
+        elif FACTOR_TYPES[f.type].family == "ef" and f.name in (mean_field | set(psub)):
             problems.append(
                 f"factor {f.name!r}: beads on EF nodes are undefined in M-scope — "
                 "conjugate BP is already exact on EF subgraphs (cff-8s6a)"
@@ -417,7 +430,7 @@ def compile_template(
                 f"factor {f.name!r}: hybrid beads are undefined; collapse rules are "
                 "already assumed-density (cff-pksr)"
             )
-        if f.type in ("poisson_obs", "bernoulli_obs"):
+        if f.type in kernels.conditioned_out_types():
             out_var = f.edges["out"]
             out_ports = [p for p in t.ports_of(out_var) if p.role is PortRole.DATA]
             if t.degree(out_var) == 2 or not out_ports:
@@ -497,12 +510,14 @@ def compile_template(
                     # EF observations compile to conditioning too: legal only
                     # on a conjugate observation factor's "out" edge.
                     fname, role = ends[0]
-                    if t.factors[fname].type in ("poisson_obs", "bernoulli_obs") and role == "out":
+                    if t.factors[fname].type in kernels.conditioned_out_types() and role == "out":
                         ef_data_ports[vname] = port.name
                     else:
                         problems.append(
-                            f"port {port.name!r}: EF DATA ports must clamp a poisson_obs/"
-                            f"bernoulli_obs 'out' edge, not {fname!r}/{role!r}"
+                            f"port {port.name!r}: EF DATA ports must clamp a conditioned "
+                            f"observation kernel's 'out' edge "
+                            f"({sorted(kernels.conditioned_out_types())}), not "
+                            f"{fname!r}/{role!r}"
                         )
                 else:
                     data_slots[port.name] = s1
@@ -660,15 +675,21 @@ def compile_template(
             ft.family == "any" and bool(t.variables[f.edges[roles[0]]].ef)
         )
         if ef_family:
-            if f.type in ("poisson_obs", "bernoulli_obs"):
-                family = {"poisson_obs": "gamma", "bernoulli_obs": "beta"}[f.type]
-            else:  # gamma/beta priors, or equality routed by its edges' family
-                family = f.type if f.type in ef.FAMILIES else t.variables[f.edges[roles[0]]].ef
+            kern = kernels.kernel_for(f.type)
+            if kern is not None:  # executable registration owns the family
+                family = kern.family
+            elif f.type == "equality":  # structural: routed by its edges' family
+                family = t.variables[f.edges[roles[0]]].ef
                 if family not in ef.FAMILIES:
                     raise CompileError(
                         f"factor {fname!r}: no messages flow on observation-family "
                         f"({family!r}) edges — they are conditioned DATA ports only"
                     )
+            else:
+                raise CompileError(
+                    f"factor {fname!r}: EF type {f.type!r} has no registered "
+                    "FactorKernel — register one before compiling (cff-ri8m)"
+                )
             ef_buckets.setdefault((f.type, family), []).append(fname)
             continue
         cards = tuple(t.variables[f.edges[r]].cardinality for r in roles)
@@ -748,20 +769,14 @@ def compile_template(
     ef_groups: list[EfGroupPlan] = []
     ef_data: dict[str, int] = {}
     n_ef_obs = 0
-    _EF_ROLES = {
-        "gamma": ("out",),
-        "beta": ("out",),
-        "poisson_obs": ("rate",),
-        "bernoulli_obs": ("prob",),
-        "equality": ("a", "b", "c"),
-    }
     for (ftype, family), members in sorted(ef_buckets.items()):
-        roles = _EF_ROLES[ftype]
+        kern = kernels.kernel_for(ftype)
+        roles = ("a", "b", "c") if kern is None else kern.message_roles
         gname = f"ef:{ftype}:{family}"
         gather = np.array([[opposite[(m, r)] for r in roles] for m in members], dtype=np.int64)
         scatter = np.array([[slot_of[(m, r)] for r in roles] for m in members], dtype=np.int64)
         obs_rows = None
-        if ftype in ("poisson_obs", "bernoulli_obs"):
+        if kern is not None and kern.observed_out is not None:
             rows = []
             for m in members:
                 out_var = t.factors[m].edges["out"]
@@ -769,8 +784,18 @@ def compile_template(
                 rows.append(n_ef_obs)
                 n_ef_obs += 1
             obs_rows = np.array(rows, dtype=np.int64)
-        elif ftype != "equality":  # gamma/beta prior leaves: stack constant η_p
-            log_params[f"{gname}:eta"] = _stack_ef_priors(t, ftype, members, resolved)
+        elif kern is not None and kern.pack_params is not None:
+            try:
+                packed = kern.pack_params(t, members, resolved)
+            except ValueError as err:
+                raise CompileError(str(err)) from err
+            if set(packed) != set(kern.param_keys):
+                raise CompileError(
+                    f"kernel {kern.impl_id!r}: pack_params returned keys "
+                    f"{sorted(packed)}, declared param_keys {sorted(kern.param_keys)}"
+                )
+            for key, arr in packed.items():
+                log_params[f"{gname}:{key}"] = arr
         ef_groups.append(
             EfGroupPlan(gname, ftype, family, roles, tuple(members), gather, scatter, obs_rows)
         )
@@ -1200,32 +1225,6 @@ def _stack_prec_means(
             )
         means.append(arr.reshape(1))
     return np.stack(means)
-
-
-def _stack_ef_priors(
-    t: Template, ftype: str, members: list[str], resolved: dict[str, np.ndarray]
-) -> np.ndarray:
-    """Stack per-member prior natural parameters [M, 2]. Priors must be
-    proper — an improper prior makes every downstream belief and ledger term
-    undefined, so it is a compile error, not a runtime +inf."""
-    fam = ef.FAMILIES[ftype]
-    p_roles = ("shape", "rate") if ftype == "gamma" else ("a", "b")
-    etas = []
-    for m in members:
-        vals = []
-        for role in p_roles:
-            arr = resolved[t.factors[m].param_blobs[role]]
-            if arr.size != 1:
-                raise CompileError(
-                    f"factor {m!r}: parameter {role!r} must be a scalar, got shape {arr.shape}"
-                )
-            vals.append(float(arr.reshape(())))
-        if not all(v > 0 for v in vals):
-            raise CompileError(
-                f"factor {m!r}: improper {ftype} prior {tuple(vals)}; parameters must be > 0"
-            )
-        etas.append(fam.to_natural(*vals))
-    return np.stack(etas)
 
 
 def _log_of(arr: np.ndarray) -> np.ndarray:

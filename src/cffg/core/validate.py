@@ -21,7 +21,7 @@ from cffg.core.ir import (
     PortRole,
     Template,
 )
-from cffg.ef import FAMILIES as EF_FAMILIES, OBS_FAMILIES as EF_OBS_FAMILIES
+from cffg.ef import FAMILIES as EF_FAMILIES
 
 
 class ModelError(ValueError):
@@ -135,11 +135,16 @@ def _check_degrees_and_ports(t: Template) -> list[str]:
         if p.variable not in t.variables:
             problems.append(f"port {p.name!r}: unknown variable {p.variable!r}")
 
+    # Deferred import: cffg.kernels imports cffg.core.ir, so a module-level
+    # import here would cycle through the cffg.core package init.
+    from cffg.kernels import observation_families
+
+    obs_families = observation_families()  # built-ins + registered kernels
     for v in t.variables.values():
-        if v.ef and v.ef not in EF_FAMILIES and v.ef not in EF_OBS_FAMILIES:
+        if v.ef and v.ef not in EF_FAMILIES and v.ef not in obs_families:
             problems.append(
                 f"variable {v.name!r}: unknown EF family {v.ef!r}; message families "
-                f"are {sorted(EF_FAMILIES)}, observation families {sorted(EF_OBS_FAMILIES)}"
+                f"are {sorted(EF_FAMILIES)}, observation families {sorted(obs_families)}"
             )
         deg = t.degree(v.name)
         n_ports = len(t.ports_of(v.name))

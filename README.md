@@ -171,6 +171,33 @@ print(estimate(engine).summary())
 # state 9.1 KiB (messages 2.8, params 6.4) · 2.76e+04 flops/sweep · 0.203 ms/sweep
 ```
 
+## Register a custom factor
+
+EF-arena factor types are executable registrations, not engine edits
+(`cffg.kernels`, ARCHITECTURE 2e). Declare the structure, math, and
+robustness answers in one `FactorKernel`; the compiler, VM, ledger, and
+serialization dispatch from the registry:
+
+```python
+from cffg.core import FactorType
+from cffg.kernels import FactorKernel, HostileInputs, register_kernel
+
+register_kernel(FactorKernel(
+    factor_type=FactorType("exponential_obs", edge_roles=("out", "rate"), family="ef"),
+    impl_id="mypkg.exponential_obs", version="1.0.0",   # namespaced; serialized
+    arena="ef", family="gamma", message_roles=("rate",),
+    edge_families={"out": "exponential", "rate": "gamma"},
+    message=my_message, energy=my_energy,               # jnp, trace-safe
+    observed_out="exponential", validate_observation=my_validator,
+    hostile=HostileInputs(...),                         # required, or registration is refused
+))
+```
+
+Templates using the type record `(impl, version)` in their JSON/.cffgz;
+loading without the kernel registered fails loudly and names what to
+install. `tests/test_kernels.py` is the worked example, including the
+independent evidence oracle every kernel is expected to ship with.
+
 ## Consume the engine from an experiment harness
 
 Evaluation harnesses live *outside* this repo (sibling folders under
