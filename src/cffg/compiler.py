@@ -1229,7 +1229,17 @@ def _stack_ef_priors(
 
 
 def _log_of(arr: np.ndarray) -> np.ndarray:
-    return np.where(arr > 0.0, np.log(np.maximum(arr, 1e-300)), NEG)
+    """Elementwise log with exact zeros mapped to NEG, the engine's finite
+    log-zero (semantically zero: exp(NEG) == 0, and NEG - NEG == 0).
+
+    The floor under the log branch is the dtype's smallest normal, so log(0)
+    is never evaluated even for the entries the where-mask discards — a
+    literal 1e-300 floor underflows to exactly 0 under float32 and both warns
+    and returns -inf (cff-ey4p). Positive normal values are unchanged in any
+    float dtype; positive subnormals clamp to log(tiny), which is finite.
+    """
+    dtype = arr.dtype if np.issubdtype(arr.dtype, np.floating) else np.float64
+    return np.where(arr > 0.0, np.log(np.maximum(arr, np.finfo(dtype).tiny)), NEG)
 
 
 def _expect(name: str, arr: np.ndarray, shape: tuple[int, ...]) -> None:

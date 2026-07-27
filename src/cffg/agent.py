@@ -34,7 +34,7 @@ from typing import Callable
 import jax.numpy as jnp
 import numpy as np
 
-from cffg.compiler import compile_template
+from cffg.compiler import _log_of, compile_template
 from cffg.engine import Engine, State, _replace
 
 Builder = Callable[..., tuple]  # build_rollout-style: (past, steps) -> (Template, arrays)
@@ -95,7 +95,10 @@ class RollingAgent:
         st = engine.init_state()
         params = dict(st.params)
         key, idx = engine.arena.member_of["prior"]
-        log_d = np.log(np.maximum(self.belief, 1e-300))
+        # Exact-zero belief entries stay semantically zero (NEG, the engine's
+        # finite log-zero) instead of underflowing to log(0) = -inf when the
+        # consumer belief is float32 (cff-ey4p).
+        log_d = _log_of(np.asarray(self.belief))
         params[key] = params[key].at[idx].set(jnp.asarray(log_d))
         if self.counts is not None:
             for g in engine.arena.gfe_groups:
