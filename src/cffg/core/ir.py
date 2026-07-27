@@ -85,6 +85,44 @@ class BlobRef:
 
 
 @dataclass(frozen=True)
+class LearnableSpec:
+    """A declared learnable parameter: one conjugate posterior, and every blob
+    through which the model reads it (cff-x0sv).
+
+    The unit of learning is the *blob set*, not the factor, because blobs are
+    how the IR already ties parameters — build_rollout names one `Bs` blob on
+    every slice's transition, and plates tie by name across copies. Counts
+    from every factor instance reading a blob in this set accumulate into one
+    posterior, which is what makes learning transfer across states.
+
+    A learnable spans several blobs when one parameter is read in more than
+    one form. Two cases exist today:
+
+    - consumption form — the discrete groups read expected log-parameters
+      (E[log θ] = ψ(α) − ψ(α₀)) while the GFE composites read the raw counts α
+      that their novelty term differentiates. build_rollout carries both as
+      `A`/`Ac` and `Bs`/`Bc`.
+    - joint family — an MNIW over a gaussian_linear node governs its
+      `matrix`, `offset`, and `cov` blobs together, so all three name the
+      same learnable.
+
+    `family` keys cffg.learn.FAMILIES; the per-factor-type sufficient
+    statistic comes from the factor type, not from this spec.
+
+    `sources` restricts which factor instances *supply* statistics; empty
+    means every reader does. Tying is about reading — a habit prior applies
+    at every step of the horizon, so every planning slice reads the blob —
+    while the statistic is the executed control alone. Where those differ it
+    is a property of the model, so the model declares it.
+    """
+
+    name: str
+    family: str  # "dirichlet" | ... (key into cffg.learn.FAMILIES)
+    blobs: tuple[str, ...]  # every blob this posterior writes
+    sources: tuple[str, ...] = ()  # factor instances supplying stats; () = all readers
+
+
+@dataclass(frozen=True)
 class FactorSpec:
     """A node in the FFG.
 
@@ -375,6 +413,7 @@ class Template:
     ports: dict[str, PortSpec] = field(default_factory=dict)
     blobs: dict[str, BlobRef] = field(default_factory=dict)
     plates: dict[str, PlateSpec] = field(default_factory=dict)
+    learnables: dict[str, LearnableSpec] = field(default_factory=dict)
     schema_version: str = "1"
 
     def degree(self, variable: str) -> int:

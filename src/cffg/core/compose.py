@@ -18,6 +18,7 @@ from cffg.core.ir import (
     BlobRef,
     ConstraintSpec,
     FactorSpec,
+    LearnableSpec,
     PortRole,
     PortSpec,
     Template,
@@ -56,13 +57,24 @@ def scoped(template: Template, prefix: str) -> Template:
         constraints=[dataclasses.replace(c, target=s(c.target)) for c in template.constraints],
         ports={s(pt.name): PortSpec(s(pt.name), s(pt.variable), pt.role) for pt in template.ports.values()},
         blobs={s(b.name): BlobRef(s(b.name), b.path, b.init) for b in template.blobs.values()},
+        # Learnables scope with their blobs: two scoped copies learn separate
+        # posteriors, matching the blob-name tying rule (cff-x0sv).
+        learnables={
+            s(ln.name): LearnableSpec(
+                s(ln.name),
+                ln.family,
+                tuple(s(b) for b in ln.blobs),
+                tuple(s(f) for f in ln.sources),
+            )
+            for ln in template.learnables.values()
+        },
         schema_version=template.schema_version,
     )
 
 
 def merge(a: Template, b: Template, name: str) -> Template:
     """Disjoint union; caller is responsible for prior scoping."""
-    for kind in ("variables", "factors", "ports", "blobs"):
+    for kind in ("variables", "factors", "ports", "blobs", "learnables"):
         clash = set(getattr(a, kind)) & set(getattr(b, kind))
         if clash:
             raise ComposeError(f"{kind} name clash: {sorted(clash)} (scope the operands)")
@@ -73,6 +85,7 @@ def merge(a: Template, b: Template, name: str) -> Template:
         constraints=[*a.constraints, *b.constraints],
         ports={**a.ports, **b.ports},
         blobs={**a.blobs, **b.blobs},
+        learnables={**a.learnables, **b.learnables},
     )
 
 
