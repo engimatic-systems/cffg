@@ -25,6 +25,7 @@ from jax.scipy.special import logsumexp
 
 from cffg import csp, ef, efrules, gauss, kernels, mixg
 from cffg.compiler import NEG, Arena
+from cffg.schedule import BatchStage, Schedule, build_schedule
 from cffg.rules import (
     BP_UPDATES,
     NODE_ENERGIES,
@@ -225,12 +226,27 @@ def _obs_rows(arena: Arena, observations: jax.Array, rows: np.ndarray, dim: int)
 
 
 class Engine:
-    """Compiled, executable model. Construction is cheap; `step` is jitted."""
+    """Compiled, executable model. Construction is cheap; `step` is jitted.
 
-    def __init__(self, arena: Arena):
+    ``schedule`` selects the message-passing schedule (cff-d56d): "auto"
+    builds an exact two-pass directed schedule when the model is an acyclic
+    BP graph over the discrete/Gaussian arenas and falls back to synchronous
+    flooding otherwise; "flood" forces flooding; "two_pass" requires the
+    directed schedule and raises when the model is outside its contract. A
+    prebuilt :class:`~cffg.schedule.Schedule` is accepted as-is."""
+
+    def __init__(self, arena: Arena, schedule: str | Schedule = "auto"):
         self.arena = arena
         self._step = eqx.filter_jit(_make_step(arena))
         self._bfe = eqx.filter_jit(_make_bfe(arena))
+        self.schedule = (
+            schedule if isinstance(schedule, Schedule) else build_schedule(arena, schedule)
+        )
+        self._propagate = (
+            eqx.filter_jit(_make_propagate(arena, self.schedule))
+            if self.schedule.kind == "two_pass"
+            else None
+        )
 
     # -- state construction ---------------------------------------------
 
@@ -353,13 +369,29 @@ class Engine:
         premature pointmass locks in its own arbitrary argmax. With
         `harden_last=k` (default: k = n_iters // 2 when δ edges exist), the
         first phase runs soft to coherence, then δ edges harden for the final
-        k sweeps so decisions commit sequentially."""
+        k sweeps so decisions commit sequentially.
+
+        Two-pass schedules (cff-d56d): when the engine compiled an exact
+        directed schedule and the call keeps its contract (``damp=0``, no
+        hardening phase, at least one iteration), the run executes the
+        schedule once instead of flooding: each directed message is updated
+        O(1) times, a certification sweep measures the true fixed-point
+        residual, and the status is ``converged`` when that residual passes
+        the dtype- and depth-scaled certificate (also with ``tol=None`` —
+        the schedule proves the fixed point, so no sweep budget applies)."""
         if n_iters < 0:
             raise ValueError("n_iters must be non-negative")
         if harden_last is None:
             harden_last = n_iters // 2 if len(self.arena.delta_pairs) else 0
         if not 0 <= harden_last <= n_iters:
             raise ValueError("harden_last must be between 0 and n_iters")
+        if (
+            self._propagate is not None
+            and n_iters >= 1
+            and damp == 0.0
+            and harden_last == 0
+        ):
+            return self._run_exact(state, tol)
 
         deltas: list[float] = []
         energies: list[float] = []
@@ -493,6 +525,74 @@ class Engine:
             inner_status=inner_status,
             inner_residual=inner_residual,
         )
+
+    def _run_exact(self, state: State, tol: float | None) -> RunResult:
+        """Execute the two-pass directed schedule once and certify it.
+
+        On an acyclic BP graph one inward+outward execution reaches the BP
+        fixed point, so there is no sweep loop: the run costs O(E). A
+        certification sweep (one synchronous flooding step) then re-derives
+        every directed message from the propagated state; its max change is
+        the true fixed-point residual, so a scheduling defect — any stale
+        message — surfaces as a non-converged status rather than as silently
+        wrong marginals. The certificate tolerance scales with dtype and
+        schedule depth (rounding accumulates along the passes)."""
+        dtype = np.asarray(state.messages).dtype
+        floor = 64.0 * np.finfo(dtype).eps * max(1, self.schedule.rounds)
+        certificate = floor if tol is None else max(float(tol), floor)
+
+        if not self._state_is_finite(state):
+            return RunResult(
+                state, RunStatus.DIVERGED, 0, (), (), float("inf"),
+                RunStatus.DIVERGED, float("inf"),
+            )
+        if self._has_zero_support(state):
+            return RunResult(
+                state, RunStatus.INFEASIBLE, 0, (), (float("inf"),), float("inf")
+            )
+
+        msgs, g_eta, g_lam = self._propagate(
+            state.messages, state.g_eta, state.g_lam,
+            state.g_obs, state.g_mask, state.params,
+        )
+        st = _replace(state, messages=msgs, g_eta=g_eta, g_lam=g_lam)
+        if not self._state_is_finite(st):
+            return RunResult(st, RunStatus.DIVERGED, 1, (), (), float("inf"))
+        if self._has_zero_support(st):
+            return RunResult(
+                st, RunStatus.INFEASIBLE, 1, (), (float("inf"),), float("inf")
+            )
+
+        v_msgs, v_eta, v_lam, v_ef, _, _ = self._step(
+            st.messages, st.g_eta, st.g_lam, st.g_obs, st.g_mask,
+            st.ef_eta, st.ef_obs, st.ef_mask, st.params, 0.0, False,
+        )
+        verified = _replace(
+            st, messages=v_msgs, g_eta=v_eta, g_lam=v_lam, ef_eta=v_ef
+        )
+        delta = max(
+            (
+                float(jnp.max(jnp.abs(getattr(verified, f) - getattr(st, f))))
+                for f in ("messages", "g_eta", "g_lam", "ef_eta")
+                if getattr(st, f).size
+            ),
+            default=0.0,
+        )
+        if not np.isfinite(delta):
+            return RunResult(st, RunStatus.DIVERGED, 1, (delta,), (), float("inf"))
+
+        status = (
+            RunStatus.CONVERGED if delta <= certificate else RunStatus.BUDGET_EXHAUSTED
+        )
+        if self.arena.semiring == "max":
+            if status is RunStatus.CONVERGED and not np.isfinite(self.objective(st)):
+                return RunResult(st, RunStatus.DIVERGED, 1, (delta,), (), float("inf"))
+            return RunResult(st, status, 1, (delta,), (), delta)
+
+        fe = self.bfe(st)
+        if not np.isfinite(fe):
+            return RunResult(st, RunStatus.DIVERGED, 1, (delta,), (), float("inf"))
+        return RunResult(st, status, 1, (delta,), (fe,), delta)
 
     @staticmethod
     def _state_is_finite(state: State) -> bool:
@@ -942,6 +1042,45 @@ def _prec_sweep(arena, g_eta, g_lam, ef_eta, params):
     return gauss_writes, ef_writes
 
 
+def _gauss_outs(g, inc_e, inc_l, par, y=None, mk=None):
+    """Per-role outgoing (eta, Lambda) messages for one Gaussian group.
+
+    Shared by the flooding sweep and the directed-schedule executors
+    (cff-d56d): `par` holds the group's parameter stacks already subset to
+    the members being fired, `inc_e`/`inc_l` the matching gathered rows."""
+    if g.type == "gaussian":
+        w, m = par["W"], par["m"]
+        return [gauss.prior_message(jnp.einsum("mij,mj->mi", w, m), w)]
+    if g.type == "equality":
+        d = g.dims[0]
+        to_e, to_l = gauss.equality_messages(inc_e[..., :d], inc_l[..., :d, :d])
+        return [(to_e[:, r], to_l[:, r]) for r in range(len(g.roles))]
+    do, di = g.dims  # gaussian_linear / gaussian_linear_obs; roles = (out, in)
+    a, b, w = par["A"], par["b"], par["W"]
+    e_in, l_in = inc_e[:, 1, :di], inc_l[:, 1, :di, :di]
+    outs = [gauss.linear_forward(e_in, l_in, a, b, w)]
+    if g.type == "gaussian_linear_obs":
+        outs.append(gauss.linear_observed_backward(y, mk, a, b, w))
+    else:
+        e_out, l_out = inc_e[:, 0, :do], inc_l[:, 0, :do, :do]
+        outs.append(gauss.linear_backward(e_out, l_out, a, b, w))
+    return outs
+
+
+def _gauss_group_params(g, params, rows=None):
+    """The group's parameter stacks, keyed bare and optionally row-subset."""
+    keys = {
+        "gaussian": ("W", "m"),
+        "equality": (),
+        "gaussian_linear": ("A", "b", "W"),
+        "gaussian_linear_obs": ("A", "b", "W"),
+    }[g.type]
+    return {
+        k: params[f"{g.name}:{k}"] if rows is None else params[f"{g.name}:{k}"][rows]
+        for k in keys
+    }
+
+
 def _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params):
     """One synchronous flooding sweep over the Gaussian groups; returns the
     fully rewritten flat (eta, Lambda) arrays. Dims are static per group, so
@@ -949,26 +1088,10 @@ def _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params):
     new_eta, new_lam = g_eta, g_lam
     for g in arena.gauss_groups:
         inc_e, inc_l = _gauss_rows(arena, g_eta, g_lam, g.gather, g.dims)
-        outs: list[tuple[jax.Array, jax.Array]] = []  # per role, [M, d]/[M, d, d]
-        if g.type == "gaussian":
-            (d,) = g.dims
-            w, m = params[g.name + ":W"], params[g.name + ":m"]
-            outs.append(gauss.prior_message(jnp.einsum("mij,mj->mi", w, m), w))
-        elif g.type == "equality":
-            d = g.dims[0]
-            to_e, to_l = gauss.equality_messages(inc_e[..., :d], inc_l[..., :d, :d])
-            outs = [(to_e[:, r], to_l[:, r]) for r in range(len(g.roles))]
-        else:  # gaussian_linear / gaussian_linear_obs; roles = (out, in)
-            do, di = g.dims
-            a, b, w = (params[g.name + k] for k in (":A", ":b", ":W"))
-            e_in, l_in = inc_e[:, 1, :di], inc_l[:, 1, :di, :di]
-            outs.append(gauss.linear_forward(e_in, l_in, a, b, w))
-            if g.type == "gaussian_linear_obs":
-                y, mk = _obs_rows(arena, g_obs, g.obs_rows, do), g_mask[g.obs_rows]
-                outs.append(gauss.linear_observed_backward(y, mk, a, b, w))
-            else:
-                e_out, l_out = inc_e[:, 0, :do], inc_l[:, 0, :do, :do]
-                outs.append(gauss.linear_backward(e_out, l_out, a, b, w))
+        y = mk = None
+        if g.type == "gaussian_linear_obs":
+            y, mk = _obs_rows(arena, g_obs, g.obs_rows, g.dims[0]), g_mask[g.obs_rows]
+        outs = _gauss_outs(g, inc_e, inc_l, _gauss_group_params(g, params), y, mk)
         for r, (oe, ol) in enumerate(outs):
             new_eta, new_lam = _set_gauss_block(
                 arena, new_eta, new_lam, g.scatter[:, r], g.dims[r], oe, ol
@@ -1145,6 +1268,174 @@ def _make_step(arena: Arena):
         return new, new_eta, new_lam, new_ef, inner_residual, inner_status
 
     return step
+
+
+def _batch_stage_fn(arena: Arena, stage, op):
+    """Executor for one BatchStage: fire a member subset of one group,
+    reading the *current* arrays (sequential semantics — the whole point of
+    a directed schedule) and scattering all of its outgoing roles."""
+    if stage.kind == "disc":
+        g = arena.groups[stage.group]
+        rows = stage.rows
+        gather, scatter = g.gather[rows], g.scatter[rows]
+        k_local = max(g.cards)
+
+        def fn(messages, g_eta, g_lam, g_obs, g_mask, params):
+            inc = _disc_rows(arena, messages, gather, g.cards)
+            logf = params.get(g.name)
+            if logf is not None:
+                logf = logf[rows]
+            out = BP_UPDATES[g.type](inc, logf, g.cards, k_local, op)
+            out = jnp.maximum(out, NEG)
+            return _set_disc_rows(arena, messages, scatter, g.cards, out), g_eta, g_lam
+
+        return fn
+
+    g = arena.gauss_groups[stage.group]
+    rows = stage.rows
+    gather, scatter = g.gather[rows], g.scatter[rows]
+    obs_rows = g.obs_rows[rows] if g.obs_rows is not None else None
+
+    def fn(messages, g_eta, g_lam, g_obs, g_mask, params):
+        inc_e, inc_l = _gauss_rows(arena, g_eta, g_lam, gather, g.dims)
+        y = mk = None
+        if g.type == "gaussian_linear_obs":
+            y, mk = _obs_rows(arena, g_obs, obs_rows, g.dims[0]), g_mask[obs_rows]
+        outs = _gauss_outs(g, inc_e, inc_l, _gauss_group_params(g, params, rows), y, mk)
+        for r, (oe, ol) in enumerate(outs):
+            g_eta, g_lam = _set_gauss_block(
+                arena, g_eta, g_lam, scatter[:, r], g.dims[r], oe, ol
+            )
+        return messages, g_eta, g_lam
+
+    return fn
+
+
+def _scan_stage_fn(arena: Arena, stage, op):
+    """Executor for one ScanStage: S structurally identical rounds as one
+    ``lax.scan``. All flat value indices are precomputed [S, ...] tables fed
+    through the scan inputs, so trace/compile cost is O(1) in S while the
+    executed work stays the same as the unrolled rounds."""
+    metas, xs = [], []
+    for elem in stage.elems:
+        if elem.kind == "disc":
+            g = arena.groups[elem.group]
+            slots_g, slots_s = g.gather[elem.rows], g.scatter[elem.rows]  # [S, m, R]
+            x = {
+                "rows": jnp.asarray(elem.rows),
+                "gv": tuple(
+                    jnp.asarray(arena.message_indices(slots_g[:, :, r], card))
+                    for r, card in enumerate(g.cards)
+                ),
+                "sv": tuple(
+                    jnp.asarray(arena.message_indices(slots_s[:, :, r], card))
+                    for r, card in enumerate(g.cards)
+                ),
+            }
+        else:
+            g = arena.gauss_groups[elem.group]
+            slots_g, slots_s = g.gather[elem.rows], g.scatter[elem.rows]
+            x = {
+                "rows": jnp.asarray(elem.rows),
+                "ge": tuple(
+                    jnp.asarray(arena.g_eta_indices(slots_g[:, :, r], d))
+                    for r, d in enumerate(g.dims)
+                ),
+                "gl": tuple(
+                    jnp.asarray(arena.g_lam_indices(slots_g[:, :, r], d))
+                    for r, d in enumerate(g.dims)
+                ),
+                "se": tuple(
+                    jnp.asarray(arena.g_eta_indices(slots_s[:, :, r], d))
+                    for r, d in enumerate(g.dims)
+                ),
+                "sl": tuple(
+                    jnp.asarray(arena.g_lam_indices(slots_s[:, :, r], d))
+                    for r, d in enumerate(g.dims)
+                ),
+            }
+            if g.type == "gaussian_linear_obs":
+                orows = g.obs_rows[elem.rows]  # [S, m]
+                x["ov"] = jnp.asarray(arena.g_obs_indices(orows, g.dims[0]))
+                x["mr"] = jnp.asarray(orows)
+        metas.append((elem.kind, g))
+        xs.append(x)
+    xs = tuple(xs)
+
+    def fn(messages, g_eta, g_lam, g_obs, g_mask, params):
+        def body(carry, x_t):
+            messages, g_eta, g_lam = carry
+            for (kind, g), x in zip(metas, x_t):
+                if kind == "disc":
+                    k_local = max(g.cards)
+                    blocks = [
+                        jnp.pad(
+                            messages[x["gv"][r]], ((0, 0), (0, k_local - card)),
+                            constant_values=NEG,
+                        )
+                        for r, card in enumerate(g.cards)
+                    ]
+                    inc = jnp.stack(blocks, axis=-2)
+                    logf = params.get(g.name)
+                    if logf is not None:
+                        logf = logf[x["rows"]]
+                    out = BP_UPDATES[g.type](inc, logf, g.cards, k_local, op)
+                    out = jnp.maximum(out, NEG)
+                    for r, card in enumerate(g.cards):
+                        messages = messages.at[x["sv"][r]].set(out[:, r, :card])
+                else:
+                    width = max(g.dims)
+                    eb = [
+                        jnp.pad(g_eta[x["ge"][r]], ((0, 0), (0, width - d)))
+                        for r, d in enumerate(g.dims)
+                    ]
+                    lb = [
+                        jnp.pad(
+                            g_lam[x["gl"][r]],
+                            ((0, 0), (0, width - d), (0, width - d)),
+                        )
+                        for r, d in enumerate(g.dims)
+                    ]
+                    inc_e, inc_l = jnp.stack(eb, axis=-2), jnp.stack(lb, axis=-3)
+                    par = _gauss_group_params(g, params, x["rows"])
+                    y = mk = None
+                    if g.type == "gaussian_linear_obs":
+                        y, mk = g_obs[x["ov"]], g_mask[x["mr"]]
+                    outs = _gauss_outs(g, inc_e, inc_l, par, y, mk)
+                    for r, (oe, ol) in enumerate(outs):
+                        d = g.dims[r]
+                        g_eta = g_eta.at[x["se"][r]].set(oe[..., :d])
+                        g_lam = g_lam.at[x["sl"][r]].set(ol[..., :d, :d])
+            return (messages, g_eta, g_lam), None
+
+        (messages, g_eta, g_lam), _ = jax.lax.scan(
+            body, (messages, g_eta, g_lam), xs
+        )
+        return messages, g_eta, g_lam
+
+    return fn
+
+
+def _make_propagate(arena: Arena, sched: Schedule):
+    """Compile a two-pass Schedule into one jittable propagation function.
+
+    Stages execute in order against the running arrays (asynchronous /
+    directed semantics), unlike `_make_step`, which gathers everything from
+    the pre-sweep arrays (synchronous flooding). EF/hybrid/GFE structures
+    never reach here — their presence forces a flooding schedule."""
+    op = jnp.max if arena.semiring == "max" else logsumexp
+    stage_fns = [
+        _batch_stage_fn(arena, s, op) if isinstance(s, BatchStage)
+        else _scan_stage_fn(arena, s, op)
+        for s in sched.stages
+    ]
+
+    def propagate(messages, g_eta, g_lam, g_obs, g_mask, params):
+        for fn in stage_fns:
+            messages, g_eta, g_lam = fn(messages, g_eta, g_lam, g_obs, g_mask, params)
+        return messages, g_eta, g_lam
+
+    return propagate
 
 
 def _gauss_bfe(arena, g_eta, g_lam, g_obs, g_mask, params):
