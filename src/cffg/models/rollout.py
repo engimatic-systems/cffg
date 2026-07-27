@@ -100,8 +100,32 @@ def build_rollout(
             ),
         }
         if k <= past:  # perception slice: executed control + observed outcome
-            t.ports[f"act{k}"] = PortSpec(f"act{k}", u, PortRole.DATA)
             t.ports[f"obs{k}"] = PortSpec(f"obs{k}", x, PortRole.DATA)
+            if "e" in learn:
+                # Habit learning needs the control prior HERE, in the graph
+                # that sees what was actually done — the sufficient statistic
+                # is the executed control, not the policy the planner
+                # considered. The control edge already carries the transition
+                # selector, so branching it through an equality node makes
+                # room for both the prior and the data port; clamping the
+                # port drives q at the prior to the executed one-hot.
+                uc, ud = f"uc{k}", f"ud{k}"
+                t.variables |= {
+                    uc: VariableSpec(uc, n_ctrl),
+                    ud: VariableSpec(ud, n_ctrl),
+                }
+                t.factors |= {
+                    f"e{k}": FactorSpec(
+                        f"e{k}", "categorical", edges={"out": uc},
+                        param_blobs={"statistic": "e"},
+                    ),
+                    f"ueq{k}": FactorSpec(
+                        f"ueq{k}", "equality", edges={"a": u, "b": uc, "c": ud}
+                    ),
+                }
+                t.ports[f"act{k}"] = PortSpec(f"act{k}", ud, PortRole.DATA)
+            else:
+                t.ports[f"act{k}"] = PortSpec(f"act{k}", u, PortRole.DATA)
         else:  # planning slice: control prior + goal-constrained observation
             t.factors[f"e{k}"] = FactorSpec(
                 f"e{k}", "categorical", edges={"out": u}, param_blobs={"statistic": "e"}
@@ -144,10 +168,13 @@ def build_rollout(
         blobs = tuple(b for b in LEARNABLE_BLOBS[lname] if b in read)
         if not blobs:
             continue
-        # Habits accumulate the *executed* control, not the whole horizon's
-        # policy: every planning slice reads e (the prior applies at every
-        # step), one slice supplies the statistic.
-        sources = ("e1",) if lname == "e" and "e1" in t.factors else ()
+        # Habits accumulate the executed control. Every planning slice reads
+        # e, because the prior applies at every step of the horizon, but only
+        # the perception slices are evidence — so the planning window gets an
+        # empty restriction and learns nothing from what it merely considered.
+        sources = (
+            tuple(f"e{k}" for k in range(1, past + 1)) if lname == "e" else None
+        )
         t.learnables[lname] = LearnableSpec(lname, "dirichlet", blobs, sources)
 
     arrays = {

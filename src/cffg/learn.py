@@ -15,11 +15,15 @@ Three pieces:
   is what makes learning transfer across states.
 
 - **The family** (`FAMILIES`): the conjugate update itself, plus the map from
-  a node belief to that family's sufficient statistic, keyed by the factor
-  type it is attached to. `Dirichlet` covers the discrete vocabulary; the
-  Gaussian half of the contract is `cffg.conj` (NIW/MNIW), which reads
-  `Engine.gaussian_node_stats` instead of `Engine.node_beliefs` and owns
-  several blobs at different shapes — hence `shapes` being a per-blob map.
+  an engine readout to that family's sufficient statistic, keyed by the
+  factor type it is attached to. `Dirichlet` covers the discrete vocabulary.
+  Hyperparameters, statistics and rollover outputs are all keyed dicts rather
+  than bare arrays, and a family names which engine readout it draws from,
+  because a conjugate posterior is not always one array read off one
+  readout: an MNIW over a `gaussian_linear` carries four hyperparameters,
+  accumulates three statistics from `Engine.gaussian_node_stats`, and rolls
+  over into three blobs at different shapes. Dirichlet is the degenerate case
+  of that contract, not the shape of it.
 
 - **The runtime** (`Learnables`): holds the hyperparameters, accumulates
   statistics from a converged state, and writes parameters back. It has no
@@ -53,27 +57,73 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from cffg.engine import Engine, State
 
 
+#: Engine readouts a family can draw sufficient statistics from. A family
+#: names one; `Learnables.accumulate` calls it once per state and hands each
+#: source's entry to `Family.stats`. Discrete conjugacy integrates against
+#: node beliefs; the Gaussian families integrate against the expected
+#: sufficient statistics of the same nodes, which is a different readout of
+#: the same object, not a different object.
+READOUTS = {
+    "node_beliefs": lambda engine, state: engine.node_beliefs(state),
+    "gaussian_node_stats": lambda engine, state: engine.gaussian_node_stats(state),
+}
+
+
 class Family(Protocol):
-    """A conjugate family: what shape the hyperparameters take, how a node
-    belief turns into sufficient statistics, and how the posterior rolls over
-    into the parameters the message rules consume."""
+    """A conjugate family: where its statistics come from, what its
+    hyperparameters look like, and how the posterior rolls over into the
+    parameters the message rules consume.
+
+    Hyperparameters and statistics are both keyed dicts, not bare arrays,
+    because a conjugate posterior is not always one array. An MNIW over a
+    `gaussian_linear` carries `m`, `lam`, `psi` and `nu`, accumulates `Syy`,
+    `Syx` and `Sxx`, and rolls over into three separate blobs — matrix,
+    offset and covariance. `rollover` therefore returns values keyed by the
+    parameter ROLE the target blob fills, which is how a multi-blob write
+    routes. Dirichlet uses a single role and is the degenerate case, not the
+    shape of the contract.
+    """
 
     name: str
+    #: key into READOUTS: which engine readout supplies this family's stats
+    readout: str
 
-    def check(self, learnable: str, ftype: str, shapes: dict[str, tuple[int, ...]]) -> None:
-        """Reject a declaration this family cannot serve, at compile time."""
+    def check(
+        self, learnable: str, ftype: str, shapes: dict[str, tuple[int, ...]], roles: dict[str, str]
+    ) -> None:
+        """Reject a declaration this family cannot serve, at compile time.
+        `roles` maps blob name -> the parameter role it fills."""
 
-    def stats(self, ftype: str, belief: np.ndarray) -> np.ndarray:
-        """Node belief -> a sufficient-statistic increment in blob layout."""
+    def stats(self, ftype: str, readout: object) -> dict[str, np.ndarray]:
+        """One node's readout entry -> a sufficient-statistic increment."""
 
-    def expected(self, alpha: np.ndarray, ftype: str) -> np.ndarray:
-        """Hyperparameters -> the expected natural parameter, blob layout."""
+    def fold(
+        self, params: dict[str, np.ndarray], stats: dict[str, np.ndarray]
+    ) -> dict[str, np.ndarray]:
+        """Hyperparameters + statistics -> updated hyperparameters."""
 
-    def axis(self, ftype: str) -> int:
-        """The axis the conditional normalizes over, in blob layout."""
+    def rollover(self, params: dict[str, np.ndarray], ftype: str) -> dict[str, np.ndarray]:
+        """Hyperparameters -> the values each parameter ROLE should hold,
+        as the message rules consume them (expected natural parameters)."""
 
-    def validate_prior(self, learnable: str, alpha: np.ndarray) -> None:
-        """Reject hyperparameters outside the family's admissible set."""
+    def raw(self, params: dict[str, np.ndarray], ftype: str) -> dict[str, np.ndarray]:
+        """Hyperparameters -> the values a `counts`-form target wants, keyed
+        by role. GFE composites differentiate the hyperparameters directly
+        rather than an expectation of them."""
+
+    def mean(self, params: dict[str, np.ndarray], ftype: str) -> dict[str, np.ndarray]:
+        """Hyperparameters -> the posterior MEAN parameter, keyed by role.
+        For reporting and recovery tests, not for rollover."""
+
+    def as_params(self, prior: object) -> dict[str, np.ndarray]:
+        """Normalize a caller-supplied prior into keyed hyperparameters. A
+        one-parameter family may accept a bare array here."""
+
+    def validate_prior(
+        self, learnable: str, params: dict[str, np.ndarray], shapes: dict[str, tuple[int, ...]]
+    ) -> None:
+        """Reject hyperparameters outside the family's admissible set, or
+        inconsistent with the blob shapes they have to write."""
 
 
 def _elog(counts: np.ndarray, axis: int) -> np.ndarray:
@@ -104,40 +154,97 @@ class Dirichlet:
     blob is [U, K', K], so the statistic transposes. Summing over u rather
     than slicing at the executed action is the same number when the control is
     clamped, and the right number when it is not.
+
+    Dirichlet is the degenerate case of the keyed contract: one
+    hyperparameter array `alpha`, one statistic `n`, and one output role —
+    whichever single parameter role the factor type takes.
     """
 
     name: str = "dirichlet"
+    readout: str = "node_beliefs"
 
     _AXIS = {"categorical": 0, "matrix_cat": 0, "transition_mixture": 1}
+    _ROLE = {
+        "categorical": "statistic",
+        "matrix_cat": "matrix",
+        "transition_mixture": "matrices",
+    }
 
-    def check(self, learnable: str, ftype: str, shapes: dict[str, tuple[int, ...]]) -> None:
+    def check(
+        self,
+        learnable: str,
+        ftype: str,
+        shapes: dict[str, tuple[int, ...]],
+        roles: dict[str, str],
+    ) -> None:
         if ftype not in self._AXIS:
             raise ValueError(
                 f"learnable {learnable!r}: no Dirichlet sufficient statistic for "
                 f"factor type {ftype!r} (have: {sorted(self._AXIS)})"
             )
-        distinct = set(shapes.values())
-        if len(distinct) > 1:
+        if len(set(shapes.values())) > 1:
             raise ValueError(
                 f"learnable {learnable!r}: blobs disagree on shape {shapes}; a "
                 "Dirichlet posterior has one hyperparameter array"
+            )
+        wrong = {b: r for b, r in roles.items() if r != self._ROLE[ftype]}
+        if wrong:
+            raise ValueError(
+                f"learnable {learnable!r}: a Dirichlet over {ftype!r} governs its "
+                f"{self._ROLE[ftype]!r} role only, but {wrong} fills another"
             )
 
     def axis(self, ftype: str) -> int:
         return self._AXIS[ftype]
 
-    def stats(self, ftype: str, belief: np.ndarray) -> np.ndarray:
-        belief = np.asarray(belief, dtype=float)
+    def stats(self, ftype: str, readout: np.ndarray) -> dict[str, np.ndarray]:
+        belief = np.asarray(readout, dtype=float)
         if ftype == "transition_mixture":
-            return belief.transpose(2, 0, 1)  # [K', K, U] -> [U, K', K]
-        return belief
+            belief = belief.transpose(2, 0, 1)  # [K', K, U] -> [U, K', K]
+        return {"n": belief}
 
-    def expected(self, alpha: np.ndarray, ftype: str) -> np.ndarray:
-        return _elog(alpha, axis=self._AXIS[ftype])
+    def fold(
+        self, params: dict[str, np.ndarray], stats: dict[str, np.ndarray]
+    ) -> dict[str, np.ndarray]:
+        return {"alpha": params["alpha"] + stats["n"]}
 
-    def validate_prior(self, learnable: str, alpha: np.ndarray) -> None:
+    def rollover(self, params: dict[str, np.ndarray], ftype: str) -> dict[str, np.ndarray]:
+        return {self._ROLE[ftype]: _elog(params["alpha"], axis=self._AXIS[ftype])}
+
+    def raw(self, params: dict[str, np.ndarray], ftype: str) -> dict[str, np.ndarray]:
+        return {self._ROLE[ftype]: params["alpha"]}
+
+    def mean(self, params: dict[str, np.ndarray], ftype: str) -> dict[str, np.ndarray]:
+        alpha = params["alpha"]
+        return {self._ROLE[ftype]: alpha / alpha.sum(axis=self._AXIS[ftype], keepdims=True)}
+
+    def validate_prior(
+        self,
+        learnable: str,
+        params: dict[str, np.ndarray],
+        shapes: dict[str, tuple[int, ...]],
+    ) -> None:
+        if set(params) != {"alpha"}:
+            raise ValueError(
+                f"learnable {learnable!r}: a Dirichlet posterior is {{'alpha'}}, "
+                f"got {sorted(params)}"
+            )
+        alpha = params["alpha"]
+        want = next(iter(shapes.values()), alpha.shape)
+        if alpha.shape != want:
+            raise ValueError(
+                f"learnable {learnable!r}: prior shape {alpha.shape} != blob shape {want}"
+            )
         if not np.all(alpha > 0):
             raise ValueError(f"learnable {learnable!r}: Dirichlet counts must be > 0")
+
+    # A bare array is the natural spelling for a one-parameter family, so the
+    # runtime accepts it and normalizes here rather than making every caller
+    # write {"alpha": ...}.
+    def as_params(self, prior: object) -> dict[str, np.ndarray]:
+        if isinstance(prior, dict):
+            return {k: np.asarray(v, dtype=float).copy() for k, v in prior.items()}
+        return {"alpha": np.asarray(prior, dtype=float).copy()}
 
 
 FAMILIES: dict[str, Family] = {"dirichlet": Dirichlet()}
@@ -156,37 +263,34 @@ class Learnables:
     `write` therefore take the engine to act on, and resolve targets against
     *that* graph's plans.
 
-    Prior hyperparameters come from `priors`, keyed by learnable name. A
-    learnable whose graph already stores raw counts (a GFE composite's
-    Dirichlet parameter) can recover its prior from the compiled arena; one
-    stored only as expected parameters cannot — the log of a probability
-    table is not a hyperparameter — and must be given a prior.
+    Prior hyperparameters come from `priors`, keyed by learnable name. Each
+    is a dict keyed the way its family keys hyperparameters; a one-parameter
+    family also accepts the bare array. A learnable whose graph already
+    stores raw counts (a GFE composite's Dirichlet parameter) can recover its
+    prior from the compiled arena; one stored only as expected parameters
+    cannot — the log of a probability table is not a hyperparameter — and
+    must be given a prior.
     """
 
     def __init__(
         self,
         engine: "Engine",
-        priors: dict[str, np.ndarray] | None = None,
+        priors: dict[str, object] | None = None,
     ):
         self.plans = {p.name: p for p in engine.arena.learn_plans}
-        self.params: dict[str, np.ndarray] = {}
+        self.params: dict[str, dict[str, np.ndarray]] = {}
         priors = priors or {}
-        for name, plan in self.plans.items():
-            alpha = (
-                np.asarray(priors[name], dtype=float).copy()
-                if name in priors
-                else self._from_compiled(engine, plan)
-            )
-            shape = next(iter(plan.shapes.values()))
-            if alpha.shape != shape:
-                raise ValueError(
-                    f"learnable {name!r}: prior shape {alpha.shape} != blob shape {shape}"
-                )
-            FAMILIES[plan.family].validate_prior(name, alpha)
-            self.params[name] = alpha
         for name in priors:
             if name not in self.plans:
                 raise KeyError(f"prior for {name!r}, which this graph does not declare")
+        for name, plan in self.plans.items():
+            family = FAMILIES[plan.family]
+            given = (
+                priors[name] if name in priors else self._from_compiled(engine, plan)
+            )
+            params = family.as_params(given)
+            family.validate_prior(name, params, plan.shapes)
+            self.params[name] = params
 
     @staticmethod
     def _from_compiled(engine: "Engine", plan: "LearnPlan") -> np.ndarray:
@@ -213,7 +317,7 @@ class Learnables:
         The state must be converged: the node belief of an unconverged graph
         is not a posterior, and folding it in is not a conjugate update.
         """
-        beliefs = None
+        readouts: dict[str, dict] = {}
         for plan in engine.arena.learn_plans:
             name = plan.name
             if (only is not None and name not in only) or not plan.sources:
@@ -221,17 +325,20 @@ class Learnables:
             if name not in self.params:
                 raise KeyError(f"engine declares {name!r}, which this Learnables lacks")
             family = FAMILIES[plan.family]
-            if beliefs is None:
-                beliefs = engine.node_beliefs(state)
+            if family.readout not in readouts:
+                readouts[family.readout] = READOUTS[family.readout](engine, state)
+            per_node = readouts[family.readout]
             for src in plan.sources:
-                self.params[name] = self.params[name] + family.stats(
-                    plan.ftype, beliefs[src]
+                self.params[name] = family.fold(
+                    self.params[name], family.stats(plan.ftype, per_node[src])
                 )
 
     def write(self, engine: "Engine", params: dict) -> dict:
         """Return `params` with every learnable's targets in this engine
-        refreshed. Expected targets get E[log θ] in the consumer's layout;
-        counts targets get the raw hyperparameters."""
+        refreshed. Expected targets get the rolled-over parameters the rules
+        consume; counts targets get the raw hyperparameters. A target names
+        the parameter role its blob fills, so a family with several
+        parameters writes each one where it belongs."""
         import jax.numpy as jnp
 
         out = dict(params)
@@ -240,10 +347,12 @@ class Learnables:
             if name not in self.params:
                 raise KeyError(f"engine declares {name!r}, which this Learnables lacks")
             family = FAMILIES[plan.family]
-            alpha = self.params[name]
-            expected = family.expected(alpha, plan.ftype)
+            by_form = {
+                "expected": family.rollover(self.params[name], plan.ftype),
+                "counts": family.raw(self.params[name], plan.ftype),
+            }
             for tgt in plan.targets:
-                value = alpha if tgt.form == "counts" else expected
+                value = by_form[tgt.form][tgt.role]
                 if tgt.layout == "tm":
                     value = value.transpose(1, 2, 0)  # [U, K', K] -> [K', K, U]
                 out[tgt.key] = out[tgt.key].at[tgt.index].set(jnp.asarray(value))
@@ -251,24 +360,40 @@ class Learnables:
 
     # -- readouts and persistence -----------------------------------------
 
-    def expected(self, name: str) -> np.ndarray:
-        """The posterior mean parameter α/α₀ — for reporting and recovery
-        tests. Not what the rules consume (see the module docstring)."""
+    def expected(self, name: str, role: str | None = None) -> np.ndarray:
+        """The posterior MEAN parameter — for reporting and recovery tests,
+        not what the rules consume (see the module docstring). `role` picks
+        one of a multi-parameter family's outputs; a one-role family needs no
+        argument."""
         plan = self.plans[name]
-        alpha = self.params[name]
-        axis = FAMILIES[plan.family].axis(plan.ftype)
-        return alpha / alpha.sum(axis=axis, keepdims=True)
+        out = FAMILIES[plan.family].mean(self.params[name], plan.ftype)
+        if role is not None:
+            return out[role]
+        if len(out) != 1:
+            raise ValueError(
+                f"learnable {name!r} has roles {sorted(out)}; name one"
+            )
+        return next(iter(out.values()))
 
     def state_dict(self) -> dict[str, np.ndarray]:
-        return {name: alpha.copy() for name, alpha in self.params.items()}
+        """Flat name/key -> array, so a checkpoint stays a flat npz."""
+        return {
+            f"{name}/{key}": arr.copy()
+            for name, params in self.params.items()
+            for key, arr in params.items()
+        }
 
     def load_state_dict(self, data: dict[str, np.ndarray]) -> None:
-        for name, alpha in data.items():
+        for flat, arr in data.items():
+            name, _, key = flat.partition("/")
             if name not in self.params:
                 raise KeyError(f"no learnable {name!r} in this graph")
-            if np.shape(alpha) != self.params[name].shape:
+            key = key or next(iter(self.params[name]))
+            if key not in self.params[name]:
+                raise KeyError(f"learnable {name!r} has no hyperparameter {key!r}")
+            if np.shape(arr) != self.params[name][key].shape:
                 raise ValueError(
-                    f"learnable {name!r}: checkpoint shape {np.shape(alpha)} != "
-                    f"{self.params[name].shape}"
+                    f"learnable {name!r}: checkpoint shape {np.shape(arr)} != "
+                    f"{self.params[name][key].shape}"
                 )
-            self.params[name] = np.asarray(alpha, dtype=float).copy()
+            self.params[name][key] = np.asarray(arr, dtype=float).copy()

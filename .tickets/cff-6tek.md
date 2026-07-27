@@ -24,3 +24,33 @@ The trial-loop pattern to bring onto the API is tests/test_conj.py::test_trial_l
 
 A gaussian_linear parameter learns through Template.learnables with no hand-rolled accumulation, recovering the LGSSM parameters the existing conj trial loop recovers. member_of addresses every parameterized factor family, and set_params writes members by name.
 
+## Notes
+
+**2026-07-27T21:57:56Z**
+
+Scope narrowed by review of cff-x0sv (2026-07-27).
+
+The structural half of this ticket landed in cff-x0sv instead, because a
+reviewer correctly pointed out that deferring it meant the contract did not
+actually admit NIW/MNIW, whatever the docstring claimed. Now done:
+
+- hyperparameters, statistics and rollover outputs are keyed dicts, not bare
+  arrays, so a posterior with four hyperparameters and three statistics fits
+- a Family names which engine readout supplies its statistics
+  (cffg.learn.READOUTS), so a family reading gaussian_node_stats rather than
+  node_beliefs needs no change to the runtime
+- LearnTarget carries the blob it writes and the parameter role that blob
+  fills, so one MNIW rollover routes into a gaussian_linear's separate
+  matrix, offset and cov blobs
+- LearnPlan carries per-blob shapes, which differ across a joint family
+
+What remains here is genuinely registration plus the map it needs:
+
+1. extend Arena.member_of past the discrete families, so every parameterized
+   factor has an addressable per-member slot (Gaussian, EF, hybrid and
+   plate-expanded group builders all skip it today). A Gaussian learnable
+   currently raises a compile error naming exactly this.
+2. register NIW and MNIW against the Family protocol, wrapping the updates
+   already in cffg.conj.
+3. the bulk set_params(factor_name -> arrays) helper from the 2026-07-10
+   evaluation note, which falls out of the same map.

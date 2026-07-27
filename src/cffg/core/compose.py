@@ -64,7 +64,7 @@ def scoped(template: Template, prefix: str) -> Template:
                 s(ln.name),
                 ln.family,
                 tuple(s(b) for b in ln.blobs),
-                tuple(s(f) for f in ln.sources),
+                None if ln.sources is None else tuple(s(f) for f in ln.sources),
             )
             for ln in template.learnables.values()
         },

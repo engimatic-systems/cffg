@@ -255,13 +255,27 @@ them. Four rules define the contract:
 
 2. **Factor type fixes the sufficient statistic; family fixes the update.**
    The registry `cffg.learn.FAMILIES` maps a family name to a `Family`:
-   `check` (compile-time admissibility), `stats` (node belief → statistic, in
-   blob layout), `expected` (hyperparameters → expected natural parameter),
-   `axis` (which axis the conditional normalizes over). `Dirichlet` serves the
-   discrete vocabulary: `categorical` over `[K]`, `matrix_cat` over
-   `[K_out, K_in]`, `transition_mixture` over `[U, K', K]`. The Gaussian half
-   of the contract is `cffg.conj` (NIW/MNIW, cff-7c5o), which reads
-   `Engine.gaussian_node_stats` rather than `Engine.node_beliefs`.
+   `check` (compile-time admissibility), `stats` (engine readout → statistic),
+   `fold` (statistic into hyperparameters), `rollover` (hyperparameters →
+   what the rules consume), `raw` (→ what a counts target consumes), `mean`
+   (→ the reporting readout). `Dirichlet` serves the discrete vocabulary:
+   `categorical` over `[K]`, `matrix_cat` over `[K_out, K_in]`,
+   `transition_mixture` over `[U, K', K]`.
+
+   Hyperparameters, statistics and rollover outputs are keyed dicts, and a
+   family names which engine readout it draws from (`cffg.learn.READOUTS`),
+   because a conjugate posterior is not always one array read off one
+   readout. An MNIW over a `gaussian_linear` carries four hyperparameters,
+   accumulates three statistics from `Engine.gaussian_node_stats`, and rolls
+   over into three blobs at different shapes — so a `LearnTarget` names both
+   the blob it writes and the parameter role that blob fills, which is what
+   routes a multi-parameter write. `Dirichlet` is the degenerate case of that
+   contract: one hyperparameter, one statistic, one role.
+
+   Registering NIW and MNIW is still open (cff-6tek). It needs
+   `Arena.member_of` extended past the discrete families first, which is why
+   a Gaussian learnable currently fails at compile time with a message naming
+   that limitation rather than learning.
 
 3. **Sources are perception, targets are everywhere.** Statistics come from
    nodes whose beliefs `Engine.node_beliefs` reports. GFE composites are write
@@ -269,10 +283,17 @@ them. Four rules define the contract:
    node belief is not a plain factor belief. A planning graph with parameter
    uncertainty therefore has zero sources for `A` and writes the raw counts α
    that its novelty term differentiates; the perception graph supplies the
-   statistics and writes `E[log θ] = ψ(α) − ψ(α₀)`. A learnable may restrict
-   which instances supply statistics (`LearnableSpec.sources`) when tying and
-   evidence differ — a habit prior applies at every horizon step, but only the
-   executed control is evidence.
+   statistics and writes `E[log θ] = ψ(α) − ψ(α₀)`.
+
+   Reading is not evidence, so a learnable may restrict which instances
+   supply statistics: `LearnableSpec.sources` is `None` for every reader, a
+   tuple for exactly those, and an empty tuple for none. Habits are the case
+   that needs all three. The prior applies at every step of the horizon, so
+   every planning slice reads it, and none of them is evidence — the planning
+   window declares an empty restriction and learns nothing from what it
+   merely considered. The perception slice branches its control edge through
+   an equality node so the habit prior sits beside the clamped action, which
+   makes the node belief there a one-hot on the executed control.
 
 4. **Exactness is documented per family, because the FE ledger depends on it.**
    Dirichlet on a BP group is exact conjugacy: the node belief at a discrete
@@ -353,13 +374,16 @@ name filter, and the caller decides when.
   action. This directly fixes the hard-horizon problem the papers flag with the
   original GFE formulation.
 - **Continual learning**: driven entirely by declared learnables (§3b). The
-  agent contributes cadence, not addressing — observation and transition
-  posteriors update every tick from the perception graph's node beliefs, the
-  initial-state prior accumulates the first tick's smoothed `q(z0)` once per
-  episode and re-anchors the belief at `reset_episode()`, and habits fold the
-  policy posterior the agent acted on. `learn_a` / `learn_b` remain as the
-  older spelling of `learn=("A",)` / `learn=("B",)`. Checkpoints carry every
-  learnable's hyperparameters plus the belief; they can be taken at any tick.
+  agent contributes cadence, not addressing — observation, transition and
+  habit posteriors update every tick from the perception graph's node
+  beliefs, and the initial-state prior accumulates the first tick's smoothed
+  `q(z0)` once per episode, re-anchoring the belief at `reset_episode()`.
+  `act()` is read-only: planning an action is not evidence that it was taken.
+  `learn_a` / `learn_b` remain as the older spelling of `learn=("A",)` /
+  `learn=("B",)`. Checkpoints carry every learnable's hyperparameters, the
+  belief, and the episode cadence, so a resumed agent does not re-fire the
+  episode-start statistic; legacy `counts` / `b_counts` keys are migrated onto
+  their learnables or refused, never silently dropped.
 - Sensor/actuator adapters are plain Python callbacks mapping env observations to
   one-hot data bindings and control marginals to env actions.
 

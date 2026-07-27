@@ -204,12 +204,19 @@ class LearnTarget:
 
     `layout` names the blob → stacked-params transform. Discrete BP groups
     hold transition_mixture as [K', K, U] while the blob (and every other
-    consumer) is [U, K', K]; "as_is" everywhere else."""
+    consumer) is [U, K', K]; "as_is" everywhere else.
+
+    `blob` and `role` are what route a multi-parameter family. An MNIW
+    posterior produces a matrix, an offset and a covariance; each of the
+    gaussian_linear's three blobs fills one parameter role, and the target
+    says which. For a one-role family every target names the same role."""
 
     key: str  # params key of the stacked group
     index: int  # member row within that group
     form: str  # "expected" | "counts"
     layout: str  # "as_is" | "tm"
+    blob: str = ""  # the blob this target's factor reads
+    role: str = "statistic"  # the parameter role that blob fills
 
 
 @dataclass(frozen=True)
@@ -1102,8 +1109,17 @@ def _resolve_learnables(
         # a perception graph resolves the first while a planning graph with
         # parameter uncertainty resolves the second.
         shapes = {b: tuple(np.shape(resolved[b])) for b in sorted(blobs) if b in resolved}
+        # Which parameter ROLE each blob fills. A multi-parameter family
+        # writes its outputs by role, so a gaussian_linear's matrix, offset
+        # and cov blobs each receive their own part of one MNIW rollover.
+        roles = {
+            b: role
+            for r in readers
+            for role, b in t.factors[r].param_blobs.items()
+            if b in blobs
+        }
         try:
-            family.check(name, ftype, shapes)
+            family.check(name, ftype, shapes, roles)
         except ValueError as err:
             raise CompileError(str(err)) from None
 
@@ -1117,13 +1133,22 @@ def _resolve_learnables(
                     "families only"
                 )
             key, index = member_of[r]
-            if key in composite_keys:
-                form = "counts" if key.endswith(":counts") else "expected"
-                targets.append(LearnTarget(key, index, form, "as_is"))
-                continue
-            layout = "tm" if ftype_of_group.get(key) == "transition_mixture" else "as_is"
-            targets.append(LearnTarget(key, index, "expected", layout))
-            if not spec.sources or r in spec.sources:
+            read = sorted(blobs & set(t.factors[r].param_blobs.values()))
+            for blob in read:
+                role = roles[blob]
+                if key in composite_keys:
+                    form = "counts" if key.endswith(":counts") else "expected"
+                    targets.append(LearnTarget(key, index, form, "as_is", blob, role))
+                    continue
+                layout = (
+                    "tm" if ftype_of_group.get(key) == "transition_mixture" else "as_is"
+                )
+                targets.append(
+                    LearnTarget(key, index, "expected", layout, blob, role)
+                )
+            if key not in composite_keys and (
+                spec.sources is None or r in spec.sources
+            ):
                 sources.append(r)
         # A graph with no sources is normal, not an error: the planning
         # template reads A only through GFE composites, and learns nothing.

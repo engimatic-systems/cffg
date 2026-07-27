@@ -12,6 +12,7 @@ Three claims are load-bearing and each gets a test:
    A and B paths that already had coverage).
 """
 
+import jax
 import numpy as np
 import pytest
 
@@ -109,12 +110,26 @@ def test_perception_window_supplies_the_statistics():
     assert {tg.form for tg in plan.targets} == {"expected"}
 
 
-def test_habit_declaration_restricts_the_statistic_to_one_slice():
+def test_planning_reads_the_habit_prior_but_never_learns_from_it():
+    """Considering an action is not evidence that it was taken. Every
+    planning slice reads e, because the prior applies at every step of the
+    horizon, and none of them supplies a statistic."""
     t, arrays = corridor_builder(past=0, steps=3, learn=("e",))
     arena = compile_template(t, arrays=arrays)
     (plan,) = arena.learn_plans
-    assert plan.sources == ("e1",)  # the executed control
-    assert len(plan.targets) == 3  # the prior applies at every horizon step
+    assert plan.sources == ()
+    assert len(plan.targets) == 3
+
+
+def test_perception_supplies_the_habit_statistic():
+    """The perception slice branches its control edge through an equality
+    node so the habit prior sits beside the clamped action."""
+    t, arrays = corridor_builder(past=1, steps=1, learn=("e",))
+    arena = compile_template(t, arrays=arrays)
+    (plan,) = arena.learn_plans
+    assert plan.sources == ("e1",)
+    assert "ueq1" in t.factors  # the control equality branch
+    assert t.ports["act1"].variable == "ud1"
 
 
 def test_unknown_family_is_a_compile_error():
@@ -212,7 +227,7 @@ def test_tied_blob_accumulates_from_every_chain():
     )
     st = engine.run(st, 40, tol=1e-12).require_converged()
     learn.accumulate(engine, st)
-    added = learn.params["B"] - np.ones((U, K3, K3))
+    added = learn.params["B"]["alpha"] - np.ones((U, K3, K3))
     np.testing.assert_allclose(added.sum(), 2.0, atol=1e-9)  # one count per chain
     # Chain a moved under u=0 out of state 0, chain b under u=1 out of state
     # 1. Each chain's evidence lands in its own column of the shared array.
@@ -280,31 +295,68 @@ def test_d_recovers_the_episode_start_distribution():
     assert 0.5 * np.abs(learned - true_d).sum() < 0.12, np.round(learned, 3)
 
 
+def habit_builder(**kw):
+    d = np.zeros(KC)
+    d[0] = 1.0
+    goal = np.full(KC, 0.02)
+    goal[KC - 1] = 1.0
+    goal /= goal.sum()
+    return build_rollout(
+        "habit", d=d, A=obs_matrix(), c=goal, e=np.full(U, 0.5),
+        Bs=corridor_bs(), **kw,
+    )
+
+
+def test_habit_increment_is_the_executed_control():
+    """The statistic is what the agent did, not what it considered. One
+    observation of action u must add exactly one count to u and nothing to
+    any other — a soft policy posterior would spread mass across both."""
+    agent = RollingAgent(
+        habit_builder, horizon=3, learn=("e",), priors={"e": np.full(U, 1.0)},
+        n_sweeps=80, seed=6,
+    )
+    before = agent.learnables.params["e"]["alpha"].copy()
+    agent.observe(1, 1)
+    added = agent.learnables.params["e"]["alpha"] - before
+    np.testing.assert_allclose(added, [0.0, 1.0], atol=1e-9)
+
+
+def test_planning_alone_does_not_move_the_habit():
+    """act() is read-only: a caller may plan, discard the result and plan
+    again without teaching the agent anything."""
+    agent = RollingAgent(
+        habit_builder, horizon=3, learn=("e",), priors={"e": np.full(U, 1.0)},
+        n_sweeps=80, seed=6,
+    )
+    before = agent.learnables.params["e"]["alpha"].copy()
+    for _ in range(3):
+        agent.act()
+    np.testing.assert_array_equal(agent.learnables.params["e"]["alpha"], before)
+
+
 def test_e_recovers_the_agent_habit():
-    """Habits accumulate the policy posterior the agent acted on. On a
-    corridor whose goal is to the right, the habit must tilt right."""
+    """On a corridor whose goal is to the right, the executed controls are
+    mostly RIGHT, so that is the habit the agent acquires."""
     d = np.zeros(KC)
     d[0] = 1.0
     goal = np.full(KC, 0.02)
     goal[KC - 1] = 1.0
     goal /= goal.sum()
 
-    def builder(**kw):
-        return build_rollout(
-            "habit", d=d, A=obs_matrix(), c=goal, e=np.full(U, 0.5),
-            Bs=corridor_bs(), **kw,
-        )
-
     agent = RollingAgent(
-        builder, horizon=3, learn=("e",), priors={"e": np.full(U, 1.0)},
+        habit_builder, horizon=3, learn=("e",), priors={"e": np.full(U, 1.0)},
         n_sweeps=80, seed=6,
     )
-    z = 0
+    z, taken = 0, []
     for _ in range(24):
         u = agent.act()
+        taken.append(u)
         z = int(RNG.choice(KC, p=corridor_bs()[u, :, z]))
         agent.observe(u, int(RNG.choice(KC, p=obs_matrix()[:, z])))
 
+    # The posterior is the prior plus a tally of what was executed, exactly.
+    tally = np.array([1.0 + taken.count(u) for u in range(U)])
+    np.testing.assert_allclose(agent.learnables.params["e"]["alpha"], tally, atol=1e-6)
     habit = agent.learnables.expected("e")
     assert habit[1] > 0.7, habit  # RIGHT is the habit it acquired
     np.testing.assert_allclose(habit.sum(), 1.0, atol=1e-12)
@@ -351,7 +403,7 @@ def test_checkpoint_carries_every_learnable(tmp_path):
     other.restore(path)
     for name in ("A", "B", "d"):
         np.testing.assert_array_equal(
-            other.learnables.params[name], agent.learnables.params[name]
+            other.learnables.params[name]["alpha"], agent.learnables.params[name]["alpha"]
         )
     np.testing.assert_array_equal(other.belief, agent.belief)
 
@@ -368,8 +420,158 @@ def test_legacy_learn_flags_map_onto_the_api():
     )
     for agent in (old, new):
         agent.observe(1, 2)
-    np.testing.assert_allclose(old.counts, new.learnables.params["A"])
-    np.testing.assert_allclose(old.b_counts, new.learnables.params["B"])
+    np.testing.assert_allclose(old.counts, new.learnables.params["A"]["alpha"])
+    np.testing.assert_allclose(old.b_counts, new.learnables.params["B"]["alpha"])
+
+
+def test_restore_preserves_episode_cadence(tmp_path):
+    """The episode-start statistic must fire once per episode. If a restore
+    forgot where it was in the episode, the tick after a checkpoint would be
+    read as a second episode start and fold q(z0) twice from one episode."""
+    def make():
+        return RollingAgent(
+            corridor_builder, horizon=2, learn=("d",),
+            priors={"d": np.ones(KC)}, n_sweeps=40, seed=5,
+        )
+
+    straight = make()
+    straight.observe(1, 2)
+    before = straight.learnables.params["d"]["alpha"].copy()
+    straight.observe(0, 1)
+    uninterrupted = straight.learnables.params["d"]["alpha"] - before
+
+    resumed = make()
+    resumed.observe(1, 2)
+    path = tmp_path / "agent.npz"
+    resumed.checkpoint(path)
+    other = make()
+    other.restore(path)
+    mid = other.learnables.params["d"]["alpha"].copy()
+    other.observe(0, 1)
+    after_restore = other.learnables.params["d"]["alpha"] - mid
+
+    np.testing.assert_allclose(after_restore, uninterrupted, atol=1e-9)
+    np.testing.assert_allclose(after_restore, np.zeros(KC), atol=1e-9)
+
+
+def test_legacy_checkpoint_keys_are_migrated(tmp_path):
+    """Checkpoints written before the learnables API named their two arrays
+    `counts` and `b_counts`. Restoring one must reload them, not silently
+    keep the constructor priors."""
+    path = tmp_path / "legacy.npz"
+    counts = np.full((KC, KC), 3.0)
+    b_counts = np.full((U, KC, KC), 7.0)
+    np.savez(
+        path, belief=np.full(KC, 1 / KC), tick=np.asarray(4),
+        counts=counts, b_counts=b_counts,
+    )
+    agent = RollingAgent(
+        corridor_builder, horizon=2, learn=("A", "B"),
+        priors={"A": np.ones((KC, KC)), "B": np.ones((U, KC, KC))},
+        n_sweeps=20, seed=5,
+    )
+    agent.restore(path)
+    np.testing.assert_array_equal(agent.counts, counts)
+    np.testing.assert_array_equal(agent.b_counts, b_counts)
+    assert agent.episode_tick == 4  # no episode concept then: ticks are one episode
+
+
+def test_legacy_checkpoint_for_an_undeclared_learnable_is_refused(tmp_path):
+    path = tmp_path / "legacy.npz"
+    np.savez(
+        path, belief=np.full(KC, 1 / KC), tick=np.asarray(1),
+        counts=np.full((KC, KC), 3.0),
+    )
+    agent = RollingAgent(
+        corridor_builder, horizon=2, learn=("B",),
+        priors={"B": np.ones((U, KC, KC))}, n_sweeps=20, seed=5,
+    )
+    with pytest.raises(KeyError, match="legacy 'counts'"):
+        agent.restore(path)
+
+
+# --- numerical robustness ---------------------------------------------------
+
+
+def deterministic_bs() -> np.ndarray:
+    """left/right with no slip: exact zeros everywhere off the moved-to cell."""
+    bs = np.zeros((U, KC, KC))
+    for z in range(KC):
+        bs[0, max(z - 1, 0), z] = 1.0
+        bs[1, min(z + 1, KC - 1), z] = 1.0
+    return bs
+
+
+def test_exact_zero_statistic_leaves_counts_positive_and_writes_finite():
+    """A deterministic transition puts exact zeros through the node belief,
+    so most cells accumulate nothing and stay at their prior. E[log θ] must
+    stay finite everywhere: ψ(α) is undefined at α = 0, so a cell that
+    reached zero would be a NaN in the planner, not a small number."""
+    def builder(**kw):
+        return corridor_builder(Bs=deterministic_bs(), A=obs_matrix(acc=0.99), **kw)
+
+    agent = RollingAgent(
+        builder, horizon=2, learn=("A",), priors={"A": np.ones((KC, KC))},
+        n_sweeps=40, seed=5,
+    )
+    agent.belief = np.zeros(KC)
+    agent.belief[0] = 1.0  # exact zeros in three of four cells
+    with np.errstate(divide="raise", invalid="raise"):
+        agent.observe(1, 1)  # RIGHT from cell 0 lands in cell 1, exactly
+
+    alpha = agent.learnables.params["A"]["alpha"]
+    assert np.all(alpha > 0), alpha
+    # The statistic was a one-hot: one column moved, the rest are untouched.
+    np.testing.assert_allclose(alpha[:, 0], 1.0, atol=1e-6)
+    np.testing.assert_allclose(alpha[1, 1], 2.0, atol=1e-3)
+
+    params = agent.learnables.write(agent.filter, dict(agent.filter.init_state().params))
+    for arr in params.values():
+        assert np.all(np.isfinite(np.asarray(arr))), "expected parameters went non-finite"
+
+
+def test_float32_engine_keeps_the_learning_tick_finite():
+    """Consumers run the engine at float32. Accumulation is numpy float64
+    throughout, but the beliefs it reads and the parameters it writes cross
+    that boundary, and neither may produce a NaN or an infinity — including
+    when the belief carries exact zeros."""
+    with jax.enable_x64(False):
+        agent = RollingAgent(
+            corridor_builder, horizon=2, learn=("A", "B", "d"),
+            priors={
+                "A": np.ones((KC, KC)),
+                "B": np.ones((U, KC, KC)),
+                "d": np.ones(KC),
+            },
+            n_sweeps=40, seed=5,
+        )
+        agent.belief = np.zeros(KC, dtype=np.float32)
+        agent.belief[0] = 1.0
+        with np.errstate(divide="raise", invalid="raise"):
+            for u, x in ((1, 1), (1, 2), (0, 1)):
+                agent.observe(u, x)
+        for name in ("A", "B", "d"):
+            alpha = agent.learnables.params[name]["alpha"]
+            assert np.all(np.isfinite(alpha)) and np.all(alpha > 0), name
+        assert np.all(np.isfinite(agent.belief))
+
+
+def test_uncomfortable_count_scale_stays_finite():
+    """Counts accumulate without bound across a long run. ψ(α) − ψ(α₀) is a
+    difference of two large numbers at scale, and it must not lose its sign
+    or go non-finite when one column has seen far more evidence than another."""
+    t, arrays = corridor_builder(past=1, steps=1, learn=("B",))
+    engine = Engine(compile_template(t, arrays=arrays))
+    lopsided = np.full((U, KC, KC), 1e-4)
+    lopsided[0, 0, 0] = 1e9  # nine orders of magnitude apart in one column
+    learn = Learnables(engine, priors={"B": lopsided})
+    params = learn.write(engine, dict(engine.init_state().params))
+    for arr in params.values():
+        arr = np.asarray(arr)
+        assert np.all(np.isfinite(arr)), "E[log theta] went non-finite at scale"
+    # The dominant cell is the near-certain outcome of its column.
+    post = learn.expected("B")
+    np.testing.assert_allclose(post[0, 0, 0], 1.0, atol=1e-9)
 
 
 def test_prior_for_an_undeclared_learnable_is_refused():

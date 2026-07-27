@@ -113,3 +113,48 @@ that limitation. Wiring it up is a follow-up.
 Also still open from the 2026-07-10 evaluation note: extending member_of
 across all group families and a bulk set_params helper. Same blocker, same
 follow-up.
+
+**2026-07-27T21:58:10Z**
+
+Review round 1 (2026-07-27): four findings, all addressed.
+
+1. e-learning accumulated the soft policy posterior, not the executed
+   control, and act() mutated it. Both wrong. The fix is structural rather
+   than a clamp in the agent: when e is learnable, the perception slice
+   branches its control edge through an equality node, so the habit prior
+   sits in the same graph as the clamped action and the node belief there is
+   a one-hot on what was actually done. Habits therefore accumulate per tick
+   from the perception graph like A and B, and act() is now read-only.
+
+   This forced a semantic fix to LearnableSpec.sources, which had no way to
+   say "no instance in this window is evidence" — () meant "all readers".
+   sources is now None for all readers, a tuple for exactly those, and ()
+   for none. The planning window declares () and learns nothing from what it
+   merely considered.
+
+2. checkpoint/restore dropped episode_tick, so a restore mid-episode read the
+   next observation as an episode start and folded q(z0) twice from one
+   episode. Now persisted. A checkpoint predating the field falls back to
+   tick, which can only decline to fire the statistic, never double-fire it.
+
+3. The contract did not actually admit NIW/MNIW, despite the docstring. Fair
+   hit, and deferring it was wrong. Restructured: hyperparameters, statistics
+   and rollover outputs are keyed dicts; a Family names which engine readout
+   supplies its statistics; LearnTarget carries the blob and the parameter
+   role it fills, which is what routes a multi-parameter write. Dirichlet is
+   now the degenerate case of that contract rather than its shape. cff-6tek
+   is correspondingly narrowed to registration plus extending member_of.
+
+4. Legacy counts/b_counts checkpoint keys were silently ignored, so a
+   resumed agent looked like it had forgotten everything. Now migrated onto
+   their learnables, or refused with a message if the agent does not declare
+   them.
+
+Also added the missing robustness cases: exact-zero statistics through a
+deterministic transition, a float32 engine tick, and lopsided count scales
+nine orders of magnitude apart. Note that a sub-unit Dirichlet prior degrades
+the model itself — E[log A] near -750 makes the graph infeasible, which the
+runtime reports correctly. That is the engine's business, not this API's, so
+the tests exercise zeros in the statistic rather than in the prior.
+
+Fixed the trailing blank line in .tickets/cff-6tek.md.

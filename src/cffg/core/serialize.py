@@ -125,7 +125,7 @@ def to_dict(t: Template) -> dict[str, Any]:
         d["learnables"] = {
             name: (
                 {"family": ln.family, "blobs": list(ln.blobs), "sources": list(ln.sources)}
-                if ln.sources
+                if ln.sources is not None
                 else {"family": ln.family, "blobs": list(ln.blobs)}
             )
             for name in sorted(t.learnables)
@@ -193,7 +193,7 @@ def from_dict(d: dict[str, Any]) -> Template:
                 name,
                 spec["family"],
                 tuple(spec["blobs"]),
-                tuple(spec.get("sources", [])),
+                tuple(spec["sources"]) if "sources" in spec else None,
             )
             for name, spec in d.get("learnables", {}).items()
         },

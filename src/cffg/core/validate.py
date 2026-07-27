@@ -246,7 +246,7 @@ def _check_learnables(t: Template) -> list[str]:
                 )
             else:
                 owner[b] = name
-        for f in spec.sources:
+        for f in spec.sources or ():
             if f not in t.factors:
                 problems.append(f"learnable {name!r}: unknown source factor {f!r}")
             elif not (set(spec.blobs) & set(t.factors[f].param_blobs.values())):

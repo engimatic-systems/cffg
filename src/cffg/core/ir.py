@@ -109,17 +109,22 @@ class LearnableSpec:
     `family` keys cffg.learn.FAMILIES; the per-factor-type sufficient
     statistic comes from the factor type, not from this spec.
 
-    `sources` restricts which factor instances *supply* statistics; empty
-    means every reader does. Tying is about reading — a habit prior applies
-    at every step of the horizon, so every planning slice reads the blob —
-    while the statistic is the executed control alone. Where those differ it
-    is a property of the model, so the model declares it.
+    `sources` restricts which factor instances *supply* statistics. `None`
+    means every reader does; a tuple means exactly those, and an empty tuple
+    means none — this graph only spends the parameter, it does not learn it.
+
+    Tying is about reading, and reading is not evidence. A habit prior
+    applies at every step of the horizon, so every planning slice reads the
+    blob, but the statistic is the executed control alone. One builder emits
+    both a planning window and a perception window from the same
+    declaration, so the empty restriction is what lets the planning window
+    read a parameter it must not learn from.
     """
 
     name: str
     family: str  # "dirichlet" | ... (key into cffg.learn.FAMILIES)
     blobs: tuple[str, ...]  # every blob this posterior writes
-    sources: tuple[str, ...] = ()  # factor instances supplying stats; () = all readers
+    sources: tuple[str, ...] | None = None  # stat suppliers; None = all readers
 
 
 @dataclass(frozen=True)

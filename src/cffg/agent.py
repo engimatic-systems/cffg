@@ -17,12 +17,16 @@ Continual learning runs on declared learnables (cff-x0sv, cffg.learn): the
 model names its conjugate posteriors, and the agent only decides *cadence*,
 which is a modeling choice the API deliberately leaves open:
 
-- observation and transition posteriors update every tick, from the
-  perception graph's node beliefs, where the data is;
+- observation, transition and habit posteriors update every tick, from the
+  perception graph's node beliefs, where the data is. The habit statistic is
+  the executed control: the perception slice branches its control edge
+  through an equality node so the habit prior sits in the same graph as the
+  clamped action, which makes the node belief there a one-hot on what was
+  actually done, not on what the planner considered;
 - the initial-state prior updates once per episode — it is the belief the
-  episode starts from, so the statistic is the first tick's smoothed q(z0);
-- habits update from the planning graph, folding the policy posterior the
-  agent acted on, which is the discrete active-inference e update.
+  episode starts from, so the statistic is the first tick's smoothed q(z0).
+
+`act()` is read-only. Planning an action is not evidence that it was taken.
 
 The A path feeds the planner's learned-GFE composites (epistemic value of
 A-learning, Part II §5). The B path has no GFE channel unless the model asks
@@ -116,13 +120,6 @@ class RollingAgent:
         self.tick_learnables = tuple(
             sorted(filter_sources - set(self.episode_learnables))
         )
-        self.plan_learnables = tuple(
-            sorted(
-                {p.name for p in self.plan.arena.learn_plans if p.sources}
-                - filter_sources
-                - set(self.episode_learnables)
-            )
-        )
         self.n_ctrl = len(plan_arrays["e"])
         self.tick = 0
         self.episode_tick = 0
@@ -152,8 +149,10 @@ class RollingAgent:
         st = self.plan.run(
             st, self.n_sweeps, tol=1e-10, damp=self.damp
         ).require_converged()
-        if self.plan_learnables:
-            self.learnables.accumulate(self.plan, st, only=self.plan_learnables)
+        # Planning is read-only. Considering an action is not evidence that it
+        # was taken, so act() never touches a posterior — a caller may plan,
+        # discard the result, and plan again without changing what the agent
+        # has learned.
         q = np.asarray(self.plan.marginals(st)["u1"])
         if self.select == "map":
             return int(np.argmax(q))
@@ -193,8 +192,21 @@ class RollingAgent:
 
     # -- persistence -------------------------------------------------------
 
+    # Checkpoints before the learnables API named the two arrays it could
+    # learn. Restoring one has to map them onto their learnables, or say so:
+    # silently keeping the constructor priors would look like a resumed agent
+    # that had forgotten everything.
+    _LEGACY_KEYS = {"counts": "A", "b_counts": "B"}
+
     def checkpoint(self, path: str | Path) -> None:
-        data = {"belief": self.belief, "tick": np.asarray(self.tick)}
+        data = {
+            "belief": self.belief,
+            "tick": np.asarray(self.tick),
+            # Cadence is state. Without it, a restore mid-episode reads the
+            # next observation as an episode start and folds a second
+            # initial-state statistic from the same episode.
+            "episode_tick": np.asarray(self.episode_tick),
+        }
         for name, alpha in self.learnables.state_dict().items():
             data[f"learn:{name}"] = alpha
         np.savez(path, **data)
@@ -203,18 +215,38 @@ class RollingAgent:
         data = np.load(path)
         self.belief = data["belief"].copy()
         self.tick = int(data["tick"])
-        self.learnables.load_state_dict(
-            {k[len("learn:") :]: data[k] for k in data.files if k.startswith("learn:")}
+        # A checkpoint predating episode cadence never reset, so its ticks are
+        # one episode. Falling back to `tick` is the conservative read: it can
+        # only decline to fire the episode-start statistic, never fire it twice.
+        self.episode_tick = (
+            int(data["episode_tick"]) if "episode_tick" in data.files else self.tick
         )
+        state = {
+            k[len("learn:") :]: data[k] for k in data.files if k.startswith("learn:")
+        }
+        for old, name in self._LEGACY_KEYS.items():
+            if old not in data.files:
+                continue
+            if name not in self.learnables.params:
+                raise KeyError(
+                    f"checkpoint holds legacy {old!r} counts but this agent does "
+                    f"not learn {name!r}"
+                )
+            state[name] = data[old]
+        self.learnables.load_state_dict(state)
 
     # -- compatibility readouts -------------------------------------------
+
+    def _alpha(self, name: str) -> np.ndarray | None:
+        params = self.learnables.params.get(name)
+        return None if params is None else params["alpha"]
 
     @property
     def counts(self) -> np.ndarray | None:
         """Observation-model Dirichlet counts (the old `learn_a` array)."""
-        return self.learnables.params.get("A")
+        return self._alpha("A")
 
     @property
     def b_counts(self) -> np.ndarray | None:
         """Transition Dirichlet counts [U, K', K] (the old `learn_b` array)."""
-        return self.learnables.params.get("B")
+        return self._alpha("B")
