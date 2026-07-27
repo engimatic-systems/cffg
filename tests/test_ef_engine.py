@@ -164,7 +164,7 @@ def test_delta_on_ef_edge_rejected():
 def test_bead_on_ef_node_rejected():
     t, arrays = gamma_poisson(1)
     t.constraints.append(ConstraintSpec(ConstraintKind.MEAN_FIELD, "prior"))
-    with pytest.raises(CompileError, match="beads on EF nodes"):
+    with pytest.raises(CompileError, match="does not accept .*mean_field.* beads"):
         compile_template(t, arrays=arrays)
 
 

@@ -177,6 +177,42 @@ exhaustive regime-sequence enumeration (measured gap with headroom — never
 pretending assumed-density equals exact). Observed mixture outputs are a
 compile error in v1; emissions route through plain `gaussian_linear` nodes.
 
+### 2e. Executable factor registration (`cffg.kernels`, cff-ri8m)
+
+A `FactorKernel` declares everything the compiler, VM, ledger, and
+serialization need to run one factor type: the structural `FactorType`,
+per-role edge-family pins, parameter schema and packing, message update,
+node energy, observation conditioning (tag plus validator), applicable
+constraint modes, and optional readouts. The compiler and engine dispatch
+from the registry — a kernel-backed factor type has no type-string branch in
+either module, and `tests/test_kernels.py` proves it by registering a new
+conjugate observation factor (exponential draws of a gamma rate) from test
+code, running it against a hand-computed evidence oracle, and asserting the
+central sources never name the type.
+
+Registration is loud and demanding by design. `register_kernel` refuses a
+kernel without a `HostileInputs` declaration (the numerical-robustness
+checklist: sparse support, improper messages, float32, uncomfortable scale),
+a namespaced impl id, or a MAJOR.MINOR.PATCH version. Serialized templates
+record `(impl, version)` for external kernels, so loading a template whose
+implementation is absent fails at load time and names what to install;
+a registered kernel with the wrong identity or MAJOR version is refused too.
+
+v1 binding scope: kernels attach to the EF arena, where the message
+representation is uniform (natural parameters, products add, vacuous is
+zeros) — `gamma`, `beta`, `poisson_obs`, and `bernoulli_obs` are now
+kernels, and `equality` remains structural infrastructure. The discrete,
+Gaussian, and hybrid families still run on central paths; they migrate onto
+the contract under cff-l6i5 and cff-x0sv rather than in one rewrite.
+
+Compatibility policy (AC6, pre-1.0): the Python registration API
+(`register_kernel`, the `FactorKernel` field set) is internal-unstable and
+may change in minor releases while built-ins migrate. The serialized surface
+— factor type names, the `kernels` manifest keys, and the loud-failure
+guarantee — is stable from the first release that writes it. External
+kernels must use their own impl-id namespace (`cffg.` is reserved) and bump
+MAJOR whenever message/energy semantics or the parameter schema change.
+
 ### 3. Message rule library (`cffg.rules`)
 
 A registry keyed by `(factor_type, constraint_config, out_edge_role)`:

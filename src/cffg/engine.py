@@ -23,7 +23,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax.scipy.special import logsumexp
 
-from cffg import csp, ef, efrules, gauss, mixg
+from cffg import csp, ef, efrules, gauss, kernels, mixg
 from cffg.compiler import NEG, Arena
 from cffg.rules import (
     BP_UPDATES,
@@ -269,11 +269,11 @@ class Engine:
                 if value is None:
                     ef_mask = ef_mask.at[row].set(0.0)
                     continue
-                val = float(value)
-                if fam == "poisson" and not (val >= 0 and val == int(val)):
-                    raise ValueError(f"port {port!r}: Poisson counts are integers >= 0, got {value}")
-                if fam == "bernoulli" and val not in (0.0, 1.0):
-                    raise ValueError(f"port {port!r}: Bernoulli flips are 0 or 1, got {value}")
+                validator = kernels.observation_validator(fam)
+                try:
+                    val = float(value) if validator is None else validator(value)
+                except ValueError as err:
+                    raise ValueError(f"port {port!r}: {err}") from None
                 ef_obs = ef_obs.at[row].set(val)
                 ef_mask = ef_mask.at[row].set(1.0)
                 continue
@@ -793,6 +793,24 @@ class Engine:
             )
         return out
 
+    def kernel_readouts(self, state: State) -> dict[str, dict[str, np.ndarray]]:
+        """Factor name -> the optional readout its FactorKernel declares
+        (cff-ri8m): posterior summaries beyond the generic edge marginals,
+        computed from the same (inc, params, obs, mask) contract as the
+        message/energy callables. Kernels without a readout are skipped."""
+        out: dict[str, dict[str, np.ndarray]] = {}
+        for g in self.arena.ef_groups:
+            kern = kernels.kernel_for(g.type)
+            if kern is None or kern.readout is None:
+                continue
+            gp = {key: state.params[f"{g.name}:{key}"] for key in kern.param_keys}
+            obs = state.ef_obs[g.obs_rows] if g.obs_rows is not None else None
+            mask = state.ef_mask[g.obs_rows] if g.obs_rows is not None else None
+            vals = kern.readout(state.ef_eta[np.asarray(g.gather)], gp, obs, mask)
+            for i, member in enumerate(g.members):
+                out[member] = {key: np.asarray(v)[i] for key, v in vals.items()}
+        return out
+
     def bfe(self, state: State) -> float:
         if self.arena.semiring == "max":
             raise RuntimeError(
@@ -959,23 +977,22 @@ def _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params):
 
 
 def _ef_sweep(arena, ef_eta, ef_obs, ef_mask, params):
-    """One synchronous flooding sweep over the EF groups: prior and observed
-    messages are constants (natural-parameter increments), equality is
-    sum-minus-self — conjugate BP in its entirety (DERIVATIONS.md D2)."""
+    """One synchronous flooding sweep over the EF groups — conjugate BP in
+    its entirety (DERIVATIONS.md D2). Each non-equality group's update comes
+    from its registered FactorKernel (cffg.kernels, cff-ri8m); equality is
+    structural sum-minus-self. Groups are static, so kernel dispatch happens
+    at trace time and the jitted step is branch-free."""
     new = ef_eta
     for g in arena.ef_groups:
-        if g.type in ("gamma", "beta"):
-            out = params[g.name + ":eta"].astype(new.dtype)
-            new = new.at[g.scatter[:, 0]].set(out)
-        elif g.type == "poisson_obs":
-            x, mk = ef_obs[g.obs_rows], ef_mask[g.obs_rows]
-            new = new.at[g.scatter[:, 0]].set(efrules.poisson_likelihood_message(x, mk))
-        elif g.type == "bernoulli_obs":
-            y, mk = ef_obs[g.obs_rows], ef_mask[g.obs_rows]
-            new = new.at[g.scatter[:, 0]].set(efrules.bernoulli_likelihood_message(y, mk))
-        else:  # equality
+        if g.type == "equality":
             out = efrules.equality_messages(ef_eta[g.gather])  # [M, 3, 2]
-            new = new.at[g.scatter.reshape(-1)].set(out.reshape(-1, 2))
+        else:
+            kern = kernels.KERNELS[g.type]
+            gp = {key: params[f"{g.name}:{key}"] for key in kern.param_keys}
+            obs = ef_obs[g.obs_rows] if g.obs_rows is not None else None
+            mask = ef_mask[g.obs_rows] if g.obs_rows is not None else None
+            out = kern.message(ef_eta[g.gather], gp, obs, mask).astype(new.dtype)
+        new = new.at[g.scatter.reshape(-1)].set(out.reshape(-1, out.shape[-1]))
     return new
 
 
@@ -1216,20 +1233,17 @@ def _ef_bfe(arena, ef_eta, ef_obs, ef_mask, params):
     holds exactly (no ridge: nothing here is iterative or solved)."""
     total = jnp.asarray(0.0, dtype=ef_eta.dtype)
     for g in arena.ef_groups:
-        fam = efrules.JFAMILIES[g.family]
         inc = ef_eta[g.gather]  # [M, R, 2]
-        if g.type in ("gamma", "beta"):
-            total = total + efrules.prior_energy(
-                fam, inc[:, 0], params[g.name + ":eta"].astype(ef_eta.dtype)
+        if g.type == "equality":
+            total = total + efrules.equality_energy(
+                efrules.JFAMILIES[g.family], inc
             ).sum()
-        elif g.type == "poisson_obs":
-            x, mk = ef_obs[g.obs_rows], ef_mask[g.obs_rows]
-            total = total + efrules.poisson_obs_energy(inc[:, 0], x, mk).sum()
-        elif g.type == "bernoulli_obs":
-            y, mk = ef_obs[g.obs_rows], ef_mask[g.obs_rows]
-            total = total + efrules.bernoulli_obs_energy(inc[:, 0], y, mk).sum()
-        else:  # equality
-            total = total + efrules.equality_energy(fam, inc).sum()
+        else:  # node energy comes from the registered kernel (cff-ri8m)
+            kern = kernels.KERNELS[g.type]
+            gp = {key: params[f"{g.name}:{key}"] for key in kern.param_keys}
+            obs = ef_obs[g.obs_rows] if g.obs_rows is not None else None
+            mask = ef_mask[g.obs_rows] if g.obs_rows is not None else None
+            total = total + kern.energy(inc, gp, obs, mask).sum()
     for fam_name, pairs in arena.ef_interior:
         fam = efrules.JFAMILIES[fam_name]
         total = total + efrules.edge_entropy(
