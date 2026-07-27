@@ -45,3 +45,14 @@ Gotchas for the reviewer
 - Two runtime-status tests that codified flooding-loop semantics on tree models now pin schedule="flood" explicitly; the two-pass statuses are pinned in tests/test_schedule.py.
 - Max-product ties on chains decode inconsistently (objective +inf) under either schedule — pre-existing, noted in the max-mode test.
 - gaussian_marginals readout is Python-per-edge and dominates LGSSM end-to-end time at scale: cff-3kdk.
+
+**2026-07-27T12:40:10Z**
+
+REVIEW VERDICT (2026-07-27): request changes; do not close against the written acceptance criteria. The branch is a valuable and largely correct O(E) two-pass foundation for acyclic discrete/Gaussian BP, and AC2/AC5/AC6 are substantially met. Full pass: 1,201 passed, 4 warnings; dashboard refreshed.
+
+Blocking findings:
+1. AC1 is explicitly incomplete: loops/composites and EF directed passes are deferred to cff-1p2f, while build_schedule falls back to whole-model flooding. The criterion requires residual or colored iterative schedules and directed acyclic BP subgraphs, including mixed-model phase semantics. AC4 is only partially met by documenting whole-model flooding.
+2. AC3 is not established. The branch benchmark defaults to K=8 but compares hostile timing to the recorded K=2 absolute reference; its LGSSM is d=2/m=1 but derives references from ratios recorded on d=4/m=2. Exact-shape rerun on this branch and M2 Max/x64: original hostile K=2 T=256 kernel 0.535 ms and status-bearing run 1.103 ms versus Dynamax 0.0171 ms (31x / 64x); original LGSSM d=4/m=2 status-bearing ratios at T=16/64/256 were 28.9x/27.0x/29.6x (kernel 19.8x/22.1x/24.9x). The <=20x including-general-engine-overhead target remains unmet.
+3. The fixed-point certificate can falsely converge in float32. Its floor is 64*eps*schedule.rounds, which is 0.0039215 at T=256. Through the documented prebuilt-Schedule path, removing the outward ScanStage produced residual 0.0010006, wrong z0=[0.5,0.5] instead of [0.5005,0.4995], and RunStatus.CONVERGED. Thus a stale phase can pass unnoticed, contrary to the documented guarantee.
+
+Recommended continuation: (a) validate prebuilt schedules against an arena/structure fingerprint and use a local mixed absolute/relative dtype-scaled certificate that does not grow with global diameter; add a negative float32 T=256 missing-phase regression; (b) benchmark Dynamax live on exactly matching K/M/dimensions, without ratio-derived references; (c) JIT the exact status path as one unit (propagation + certificate + support/status + ledger) and fuse repeating scan dataflow so the full run, not only _propagate, meets 20x; (d) implement static colored loopy BP plus block-phased mixed scheduling under this ticket, or explicitly amend the ticket before closing and remove the follow-up dependency cycle. Flooding should remain an explicit safe fallback, but it is not required for most message passing.
