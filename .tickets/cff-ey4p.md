@@ -17,3 +17,9 @@ DISCOVERED during cff-hp3y Hallway rerun (2026-07-10). agent.py converts the rol
 
 Use a dtype-derived floor or explicit exact-zero log representation with its invariant documented; sparse/zero belief remains semantically zero without warnings; float32 and float64 agent act/observe paths stay finite where the model is feasible; uncomfortable state cardinality regression; no behavior change for full-support float64 beliefs.
 
+
+## Notes
+
+**2026-07-27T02:58:42Z**
+
+PR: https://github.com/engimatic-systems/cffg/pull/32 (into main, awaiting Cooper's review — do not merge from a session). Fix: _log_of floors at np.finfo(dtype).tiny and maps exact zeros to NEG; agent.py reuses it. Regression tests in tests/test_agent.py reproduce the divide-by-zero mechanism and fail on the pre-fix code.
