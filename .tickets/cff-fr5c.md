@@ -1,7 +1,7 @@
 ---
 id: cff-fr5c
 status: open
-deps: [cff-x0sv]
+deps: [cff-x0sv, cff-p8vd]
 links: [cff-iwgl]
 created: 2026-07-08T22:00:30Z
 type: feature
