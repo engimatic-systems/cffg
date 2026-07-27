@@ -12,18 +12,22 @@ Two compiled engines cover an unbounded episode:
 
 The belief d is a per-member parameter update (Arena.member_of), so ticks
 never recompile — the same property that lets a Colony vmap many agents.
-Optional continual learning, conjugate updates per tick, checkpointable:
 
-- `learn_a=True`: the observation model as Dirichlet counts, fed to the
-  planner's learned-GFE composites (epistemic value of A-learning included,
-  Part II §5).
-- `learn_b=True` (cff-cd1i): per-action transition Dirichlets. The count
-  increment is the filter slice's *node belief* q(z', z, u) at the
-  transition_mixture factor (Engine.node_beliefs) — the smoothed pairwise
-  marginal, sliced at the executed action. Planning and filtering both use
-  E[log B_u] = ψ(α) − ψ(α₀) (the mean-field-consistent point, mirroring the
-  A path's digamma form). Unlike A, there is no GFE channel for B: dynamics
-  uncertainty does not yet generate epistemic value (LIMITATIONS S1c).
+Continual learning runs on declared learnables (cff-x0sv, cffg.learn): the
+model names its conjugate posteriors, and the agent only decides *cadence*,
+which is a modeling choice the API deliberately leaves open:
+
+- observation and transition posteriors update every tick, from the
+  perception graph's node beliefs, where the data is;
+- the initial-state prior updates once per episode — it is the belief the
+  episode starts from, so the statistic is the first tick's smoothed q(z0);
+- habits update from the planning graph, folding the policy posterior the
+  agent acted on, which is the discrete active-inference e update.
+
+The A path feeds the planner's learned-GFE composites (epistemic value of
+A-learning, Part II §5). The B path has no GFE channel unless the model asks
+for one: dynamics uncertainty generates epistemic value only through the
+GFE-TM composite (LIMITATIONS S1c).
 """
 
 from __future__ import annotations
@@ -36,16 +40,9 @@ import numpy as np
 
 from cffg.compiler import _log_of, compile_template
 from cffg.engine import Engine, State, _replace
+from cffg.learn import Learnables
 
 Builder = Callable[..., tuple]  # build_rollout-style: (past, steps) -> (Template, arrays)
-
-
-def _elog(counts: np.ndarray) -> np.ndarray:
-    from jax.scipy.special import digamma
-
-    return np.asarray(digamma(jnp.asarray(counts))) - np.asarray(
-        digamma(jnp.asarray(counts.sum(axis=0, keepdims=True)))
-    )
 
 
 class RollingAgent:
@@ -54,6 +51,9 @@ class RollingAgent:
         builder: Builder,
         horizon: int,
         *,
+        learn: tuple[str, ...] = (),
+        priors: dict[str, np.ndarray] | None = None,
+        episode_learnables: tuple[str, ...] = ("d",),
         learn_a: bool = False,
         initial_counts: np.ndarray | None = None,
         learn_b: bool = False,
@@ -64,71 +64,84 @@ class RollingAgent:
         select: str = "map",
         seed: int = 0,
     ):
+        """`learn` names the learnables the builder should declare; `priors`
+        gives their initial hyperparameters. `learn_a` / `learn_b` are the
+        older spelling of `learn=("A",)` / `learn=("B",)` with the counts
+        passed separately, kept working because callers and checkpoints use
+        them.
+
+        `episode_learnables` names those whose statistic is an episode
+        quantity rather than a per-tick one — the initial-state prior, by
+        construction. They accumulate on the first tick after a reset."""
         self.horizon, self.damp, self.n_sweeps, self.select = horizon, damp, n_sweeps, select
-        self.learn_a = learn_a
         self.rng = np.random.default_rng(seed)
 
-        if epistemic_b and not learn_b:
-            raise ValueError("epistemic_b needs learn_b counts to score novelty")
-        plan_kwargs = {"learned_a": learn_a}
+        priors = dict(priors or {})
+        learn = tuple(learn)
+        if learn_a:
+            learn += ("A",) if "A" not in learn else ()
+            priors.setdefault("A", initial_counts)
+        if learn_b:
+            learn += ("B",) if "B" not in learn else ()
+            priors.setdefault("B", initial_b_counts)
+        if epistemic_b and "B" not in learn:
+            raise ValueError("epistemic_b needs B counts to score novelty")
+        self.learn = learn
+
+        plan_kwargs = {"learned_a": "A" in learn}
         if epistemic_b:
             plan_kwargs["epistemic_b"] = True
+        if learn:
+            plan_kwargs["learn"] = learn
         plan_t, plan_arrays = builder(past=0, steps=horizon, **plan_kwargs)
-        filt_t, filt_arrays = builder(past=1, steps=1, learned_a=False)
+        filt_kwargs = {"learned_a": False}
+        if learn:
+            filt_kwargs["learn"] = learn
+        filt_t, filt_arrays = builder(past=1, steps=1, **filt_kwargs)
         self.plan = Engine(compile_template(plan_t, arrays=plan_arrays))
         self.filter = Engine(compile_template(filt_t, arrays=filt_arrays))
 
         self.belief = np.asarray(plan_arrays["d"], dtype=float).copy()
-        self.counts = None if not learn_a else np.asarray(initial_counts, dtype=float).copy()
-        # b_counts[u][z', z]: per-action Dirichlet columns over z' given z.
-        self.b_counts = (
-            None if not learn_b else np.asarray(initial_b_counts, dtype=float).copy()
+        self.learnables = Learnables(self.plan, priors={
+            k: v for k, v in priors.items() if v is not None
+        })
+        # Cadence: everything the perception graph can supply statistics for,
+        # minus the episode-scale posteriors, updates per tick.
+        filter_sources = {
+            p.name for p in self.filter.arena.learn_plans if p.sources
+        }
+        self.episode_learnables = tuple(
+            n for n in episode_learnables if n in self.learnables.params
         )
-        if self.b_counts is not None and not np.all(self.b_counts > 0):
-            raise ValueError("initial_b_counts must be positive Dirichlet counts")
+        self.tick_learnables = tuple(
+            sorted(filter_sources - set(self.episode_learnables))
+        )
+        self.plan_learnables = tuple(
+            sorted(
+                {p.name for p in self.plan.arena.learn_plans if p.sources}
+                - filter_sources
+                - set(self.episode_learnables)
+            )
+        )
         self.n_ctrl = len(plan_arrays["e"])
         self.tick = 0
+        self.episode_tick = 0
 
     # -- parameter plumbing (no recompiles, ever) -------------------------
 
     def _with_params(self, engine: Engine) -> State:
         st = engine.init_state()
-        params = dict(st.params)
+        params = self.learnables.write(engine, dict(st.params))
+        # The prior slot is written LAST and wins: within an episode it holds
+        # the current belief, not the learned initial-state prior. That
+        # re-anchoring is the receding-horizon flip; the learned d is what a
+        # reset_episode() re-anchors *to*.
         key, idx = engine.arena.member_of["prior"]
         # Exact-zero belief entries stay semantically zero (NEG, the engine's
         # finite log-zero) instead of underflowing to log(0) = -inf when the
         # consumer belief is float32 (cff-ey4p).
         log_d = _log_of(np.asarray(self.belief))
         params[key] = params[key].at[idx].set(jnp.asarray(log_d))
-        if self.counts is not None:
-            for g in engine.arena.gfe_groups:
-                if g.learned:
-                    params[g.name + ":counts"] = jnp.asarray(
-                        np.broadcast_to(self.counts, (len(g.members), *self.counts.shape))
-                    )
-            elog = None
-            for g in engine.arena.groups:
-                if g.type == "matrix_cat":
-                    elog = _elog(self.counts) if elog is None else elog
-                    params[g.name] = jnp.asarray(
-                        np.broadcast_to(elog, (len(g.members), *elog.shape))
-                    )
-        if self.b_counts is not None:
-            # b_counts is [U, Z', Z]; digamma per column, then to the arena's
-            # transition_mixture layout [Z', Z, U] (compiler._stack_params).
-            elog_b = np.stack([_elog(c) for c in self.b_counts]).transpose(1, 2, 0)
-            for g in engine.arena.groups:
-                if g.type == "transition_mixture":
-                    params[g.name] = jnp.asarray(
-                        np.broadcast_to(elog_b, (len(g.members), *elog_b.shape))
-                    )
-            for g in engine.arena.gfe_tm_groups:
-                if g.learned:  # curiosity composites read the raw counts
-                    params[g.name + ":counts"] = jnp.asarray(
-                        np.broadcast_to(
-                            self.b_counts, (len(g.members), *self.b_counts.shape)
-                        )
-                    )
         return _replace(st, params=params)
 
     # -- the perception-action cycle --------------------------------------
@@ -139,6 +152,8 @@ class RollingAgent:
         st = self.plan.run(
             st, self.n_sweeps, tol=1e-10, damp=self.damp
         ).require_converged()
+        if self.plan_learnables:
+            self.learnables.accumulate(self.plan, st, only=self.plan_learnables)
         q = np.asarray(self.plan.marginals(st)["u1"])
         if self.select == "map":
             return int(np.argmax(q))
@@ -150,16 +165,15 @@ class RollingAgent:
         st = self.filter.bind_data(st, {"act1": action, "obs1": observation})
         st = self.filter.run(st, 60, tol=1e-12).require_converged()
         q_z = np.asarray(self.filter.marginals(st)["zm1"])
+        if self.tick_learnables:
+            self.learnables.accumulate(self.filter, st, only=self.tick_learnables)
+        if self.episode_tick == 0 and self.episode_learnables:
+            # q(z0) smoothed by this episode's first observation — the
+            # sufficient statistic for where episodes start.
+            self.learnables.accumulate(self.filter, st, only=self.episode_learnables)
         self.belief = q_z / q_z.sum()
-        if self.counts is not None:
-            self.counts[observation] += self.belief
-        if self.b_counts is not None:
-            # Smoothed pairwise q(z', z, u) at the filter's transition node;
-            # the executed action's slice is the Dirichlet increment. (u is
-            # data-clamped, so the other slices carry no mass.)
-            pair = self.filter.node_beliefs(st)["tm1"]
-            self.b_counts[action] += pair[:, :, action]
         self.tick += 1
+        self.episode_tick += 1
         return self.belief
 
     def step(self, env_step: Callable[[int], int]) -> tuple[int, int]:
@@ -168,21 +182,39 @@ class RollingAgent:
         self.observe(u, x)
         return u, x
 
+    def reset_episode(self) -> np.ndarray:
+        """Start a new episode: re-anchor the belief on the learned
+        initial-state prior (its posterior mean), or leave it untouched when
+        the model does not learn one."""
+        for name in self.episode_learnables:
+            self.belief = self.learnables.expected(name).copy()
+        self.episode_tick = 0
+        return self.belief
+
     # -- persistence -------------------------------------------------------
 
     def checkpoint(self, path: str | Path) -> None:
         data = {"belief": self.belief, "tick": np.asarray(self.tick)}
-        if self.counts is not None:
-            data["counts"] = self.counts
-        if self.b_counts is not None:
-            data["b_counts"] = self.b_counts
+        for name, alpha in self.learnables.state_dict().items():
+            data[f"learn:{name}"] = alpha
         np.savez(path, **data)
 
     def restore(self, path: str | Path) -> None:
         data = np.load(path)
         self.belief = data["belief"].copy()
         self.tick = int(data["tick"])
-        if "counts" in data:
-            self.counts = data["counts"].copy()
-        if "b_counts" in data:
-            self.b_counts = data["b_counts"].copy()
+        self.learnables.load_state_dict(
+            {k[len("learn:") :]: data[k] for k in data.files if k.startswith("learn:")}
+        )
+
+    # -- compatibility readouts -------------------------------------------
+
+    @property
+    def counts(self) -> np.ndarray | None:
+        """Observation-model Dirichlet counts (the old `learn_a` array)."""
+        return self.learnables.params.get("A")
+
+    @property
+    def b_counts(self) -> np.ndarray | None:
+        """Transition Dirichlet counts [U, K', K] (the old `learn_b` array)."""
+        return self.learnables.params.get("B")

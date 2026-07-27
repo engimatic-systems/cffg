@@ -1,0 +1,381 @@
+"""Declared learnables (cff-x0sv): the generic conjugate-update API.
+
+Three claims are load-bearing and each gets a test:
+
+1. Addressing is by declaration, not by node name — a model with two
+   transition nodes on separate chains learns both, and the agent code that
+   drives it never mentions either.
+2. Accumulation follows parameter tying — several factor instances sharing
+   one blob pay into one posterior, which is what makes learning transfer.
+3. The instances that are exercised are the ones that improve, and the
+   recovered parameters match the generating process (d and e alongside the
+   A and B paths that already had coverage).
+"""
+
+import numpy as np
+import pytest
+
+from cffg.agent import RollingAgent
+from cffg.compiler import CompileError, compile_template
+from cffg.core.ir import (
+    BlobRef,
+    FactorSpec,
+    LearnableSpec,
+    PortRole,
+    PortSpec,
+    Template,
+    VariableSpec,
+)
+from cffg.core.validate import ModelError, validate
+from cffg.engine import Engine, _replace
+from cffg.learn import Learnables
+from cffg.models.rollout import build_rollout
+
+RNG = np.random.default_rng(17)
+
+KC, U = 4, 2
+ACC = 0.9
+SLIP = 0.15
+
+
+def obs_matrix(k: int = KC, acc: float = ACC) -> np.ndarray:
+    a = np.full((k, k), (1 - acc) / (k - 1))
+    np.fill_diagonal(a, acc)
+    return a
+
+
+def corridor_bs() -> np.ndarray:
+    """left/right with slip: move as intended w.p. 1−SLIP, else stay."""
+    bs = np.zeros((U, KC, KC))
+    for z in range(KC):
+        left, right = max(z - 1, 0), min(z + 1, KC - 1)
+        bs[0, left, z] += 1 - SLIP
+        bs[0, z, z] += SLIP
+        bs[1, right, z] += 1 - SLIP
+        bs[1, z, z] += SLIP
+    return bs
+
+
+def corridor_builder(*, d=None, Bs=None, A=None, gfe=False, **kw):
+    return build_rollout(
+        "corridor",
+        d=np.full(KC, 1 / KC) if d is None else d,
+        A=obs_matrix() if A is None else A,
+        c=np.full(KC, 1 / KC),
+        e=np.full(U, 0.5),
+        Bs=np.full((U, KC, KC), 1 / KC) if Bs is None else Bs,
+        gfe=gfe,
+        **kw,
+    )
+
+
+# --- declaration and resolution ---------------------------------------------
+
+
+def test_plan_resolves_sources_and_targets_across_slices():
+    """One `Bs` blob, three slices, one posterior: every instance is a write
+    target and (in the perception graph) a stat source."""
+    t, arrays = corridor_builder(past=3, steps=3, learn=("B",))
+    arena = compile_template(t, arrays=arrays)
+    (plan,) = arena.learn_plans
+    assert plan.name == "B" and plan.family == "dirichlet"
+    assert plan.ftype == "transition_mixture"
+    assert plan.sources == ("tm1", "tm2", "tm3")
+    assert len(plan.targets) == 3
+    # The BP group holds transition_mixture as [K', K, U]; the blob is
+    # [U, K', K], so the write transposes.
+    assert {tg.layout for tg in plan.targets} == {"tm"}
+    assert {tg.form for tg in plan.targets} == {"expected"}
+
+
+def test_gfe_composites_are_targets_but_never_sources():
+    """A planning window with parameter uncertainty reads A only through the
+    composite: nothing there produces sufficient statistics, and the raw
+    counts are what the novelty term needs written back."""
+    t, arrays = corridor_builder(
+        past=0, steps=2, gfe=True, learned_a=True, learn=("A",)
+    )
+    arena = compile_template(t, arrays=arrays)
+    (plan,) = arena.learn_plans
+    assert plan.sources == ()
+    assert {tg.form for tg in plan.targets} == {"counts"}
+
+
+def test_perception_window_supplies_the_statistics():
+    t, arrays = corridor_builder(past=1, steps=1, learn=("A",))
+    arena = compile_template(t, arrays=arrays)
+    (plan,) = arena.learn_plans
+    assert plan.sources == ("obs1",)
+    assert {tg.form for tg in plan.targets} == {"expected"}
+
+
+def test_habit_declaration_restricts_the_statistic_to_one_slice():
+    t, arrays = corridor_builder(past=0, steps=3, learn=("e",))
+    arena = compile_template(t, arrays=arrays)
+    (plan,) = arena.learn_plans
+    assert plan.sources == ("e1",)  # the executed control
+    assert len(plan.targets) == 3  # the prior applies at every horizon step
+
+
+def test_unknown_family_is_a_compile_error():
+    t, arrays = corridor_builder(past=1, steps=1)
+    t.learnables["B"] = LearnableSpec("B", "beta", ("Bs",))
+    with pytest.raises(CompileError, match="unknown conjugate family"):
+        compile_template(t, arrays=arrays)
+
+
+def test_learnable_over_mixed_factor_types_is_refused():
+    t, arrays = corridor_builder(past=1, steps=1)
+    t.learnables["mixed"] = LearnableSpec("mixed", "dirichlet", ("d", "A"))
+    with pytest.raises(CompileError, match="mixed factor types"):
+        compile_template(t, arrays=arrays)
+
+
+def test_two_learnables_cannot_own_one_blob():
+    t, _ = corridor_builder(past=1, steps=1)
+    t.learnables["B1"] = LearnableSpec("B1", "dirichlet", ("Bs",))
+    t.learnables["B2"] = LearnableSpec("B2", "dirichlet", ("Bs",))
+    with pytest.raises(ModelError, match="already learned by"):
+        validate(t)
+
+
+def test_source_must_read_one_of_the_blobs():
+    t, _ = corridor_builder(past=1, steps=1)
+    t.learnables["B"] = LearnableSpec("B", "dirichlet", ("Bs",), sources=("obs1",))
+    with pytest.raises(ModelError, match="does not read any of its blobs"):
+        validate(t)
+
+
+# --- tying: several instances, one posterior --------------------------------
+
+
+K3 = 3
+
+
+def two_chain_template(start_a: int = 0, start_b: int = 2):
+    """Two independent chains whose transitions name the SAME `Bs` blob. The
+    tie is the point: statistics from either chain pay into one posterior,
+    which both chains then read."""
+    t = Template(name="twochain")
+    t.blobs = {b: BlobRef(b, f"{b}.npy") for b in ("da", "db", "Bs", "A")}
+
+    def pinned(z: int) -> np.ndarray:
+        d = np.full(K3, 1e-6)
+        d[z] = 1.0
+        return d / d.sum()
+
+    arrays = {
+        "da": pinned(start_a),
+        "db": pinned(start_b),
+        "Bs": np.full((U, K3, K3), 1 / K3),
+        "A": obs_matrix(K3, 0.98),
+    }
+    for c in ("a", "b"):
+        t.variables |= {
+            f"z0{c}": VariableSpec(f"z0{c}", K3),
+            f"u{c}": VariableSpec(f"u{c}", U),
+            f"z1{c}": VariableSpec(f"z1{c}", K3),
+            f"x{c}": VariableSpec(f"x{c}", K3),
+        }
+        t.factors |= {
+            f"prior{c}": FactorSpec(
+                f"prior{c}", "categorical", edges={"out": f"z0{c}"},
+                param_blobs={"statistic": f"d{c}"},
+            ),
+            f"tm{c}": FactorSpec(
+                f"tm{c}", "transition_mixture",
+                edges={"out": f"z1{c}", "in": f"z0{c}", "selector": f"u{c}"},
+                param_blobs={"matrices": "Bs"},
+            ),
+            f"obs{c}": FactorSpec(
+                f"obs{c}", "matrix_cat", edges={"out": f"x{c}", "in": f"z1{c}"},
+                param_blobs={"matrix": "A"},
+            ),
+        }
+        t.ports |= {
+            f"act{c}": PortSpec(f"act{c}", f"u{c}", PortRole.DATA),
+            f"see{c}": PortSpec(f"see{c}", f"x{c}", PortRole.DATA),
+        }
+    t.learnables["B"] = LearnableSpec("B", "dirichlet", ("Bs",))
+    return t, arrays
+
+
+def test_tied_blob_accumulates_from_every_chain():
+    t, arrays = two_chain_template(start_a=0, start_b=1)
+    engine = Engine(compile_template(t, arrays=arrays))
+    (plan,) = engine.arena.learn_plans
+    assert plan.sources == ("tma", "tmb")  # both chains, one posterior
+
+    learn = Learnables(engine, priors={"B": np.ones((U, K3, K3))})
+    st = engine.bind_data(
+        engine.init_state(), {"acta": 0, "seea": 1, "actb": 1, "seeb": 2}
+    )
+    st = engine.run(st, 40, tol=1e-12).require_converged()
+    learn.accumulate(engine, st)
+    added = learn.params["B"] - np.ones((U, K3, K3))
+    np.testing.assert_allclose(added.sum(), 2.0, atol=1e-9)  # one count per chain
+    # Chain a moved under u=0 out of state 0, chain b under u=1 out of state
+    # 1. Each chain's evidence lands in its own column of the shared array.
+    assert added[0, :, 0].sum() > 0.95
+    assert added[1, :, 1].sum() > 0.95
+
+
+def test_learning_at_one_member_transfers_to_another():
+    """The transfer property. Both chains start in state 0 and take u=0, but
+    only chain a is ever observed to land in state 1. Because the blob is
+    tied, chain b's belief about where it went sharpens too — it read a
+    parameter it never supplied evidence for."""
+    t, arrays = two_chain_template(start_a=0, start_b=0)
+    engine = Engine(compile_template(t, arrays=arrays))
+    learn = Learnables(engine, priors={"B": np.ones((U, K3, K3))})
+
+    def run(data: dict) -> object:
+        st = engine.init_state()
+        st = _replace(st, params=learn.write(engine, dict(st.params)))
+        return engine.run(engine.bind_data(st, data), 40, tol=1e-12).require_converged()
+
+    naive = np.asarray(engine.marginals(run({"acta": 0, "actb": 0}))["z1b"])
+    for _ in range(40):
+        st = run({"acta": 0, "seea": 1, "actb": 0})
+        learn.accumulate(engine, st, only=("B",))
+    taught = np.asarray(engine.marginals(run({"acta": 0, "actb": 0}))["z1b"])
+
+    post = learn.expected("B")
+    assert post[0, 1, 0] > 0.85  # u=0 out of state 0 is now sharply 0 -> 1
+    assert naive[1] < 0.4 < taught[1]  # and chain b predicts it without data
+    np.testing.assert_allclose(post[0, :, 0].sum(), 1.0)
+
+
+# --- recovery: d and e ------------------------------------------------------
+
+
+def test_d_recovers_the_episode_start_distribution():
+    """Episodes start at cell 0 or cell 3 with equal probability; the
+    initial-state prior should learn that, one statistic per episode."""
+    true_d = np.array([0.5, 0.0, 0.0, 0.5])
+    true_bs = corridor_bs()
+    a = obs_matrix(acc=0.98)
+    # The agent knows the dynamics, so the smoothed q(z0) is informative;
+    # with a flat B, no observation says anything about where it started.
+    # The sensor is sharp because a soft count converges to E[q(z0)], which
+    # keeps whatever spread the smoothing leaves — that floor is a property
+    # of the sensor, not of the update.
+    def builder(**kw):
+        return corridor_builder(Bs=true_bs, A=a, **kw)
+
+    agent = RollingAgent(
+        builder, horizon=2, learn=("d",),
+        priors={"d": np.full(KC, 0.5)}, n_sweeps=60, seed=4,
+    )
+    for _ in range(160):
+        agent.reset_episode()
+        z = int(RNG.choice(KC, p=true_d))
+        for _ in range(3):
+            u = int(RNG.integers(U))
+            x = int(RNG.choice(KC, p=a[:, z]))
+            agent.observe(u, x)
+            z = int(RNG.choice(KC, p=true_bs[u, :, z]))
+
+    learned = agent.learnables.expected("d")
+    assert 0.5 * np.abs(learned - true_d).sum() < 0.12, np.round(learned, 3)
+
+
+def test_e_recovers_the_agent_habit():
+    """Habits accumulate the policy posterior the agent acted on. On a
+    corridor whose goal is to the right, the habit must tilt right."""
+    d = np.zeros(KC)
+    d[0] = 1.0
+    goal = np.full(KC, 0.02)
+    goal[KC - 1] = 1.0
+    goal /= goal.sum()
+
+    def builder(**kw):
+        return build_rollout(
+            "habit", d=d, A=obs_matrix(), c=goal, e=np.full(U, 0.5),
+            Bs=corridor_bs(), **kw,
+        )
+
+    agent = RollingAgent(
+        builder, horizon=3, learn=("e",), priors={"e": np.full(U, 1.0)},
+        n_sweeps=80, seed=6,
+    )
+    z = 0
+    for _ in range(24):
+        u = agent.act()
+        z = int(RNG.choice(KC, p=corridor_bs()[u, :, z]))
+        agent.observe(u, int(RNG.choice(KC, p=obs_matrix()[:, z])))
+
+    habit = agent.learnables.expected("e")
+    assert habit[1] > 0.7, habit  # RIGHT is the habit it acquired
+    np.testing.assert_allclose(habit.sum(), 1.0, atol=1e-12)
+
+
+def test_d_is_not_clobbered_by_the_running_belief():
+    """Within an episode the prior slot carries the current belief; the
+    learned d only re-anchors it at a reset."""
+    agent = RollingAgent(
+        corridor_builder, horizon=2, learn=("d",),
+        priors={"d": np.array([10.0, 1.0, 1.0, 1.0])}, n_sweeps=60, seed=8,
+    )
+    for _ in range(3):
+        agent.observe(1, 3)
+    drifted = agent.belief.copy()
+    assert np.argmax(drifted) != 0  # the walk moved it off the prior's mode
+    reset = agent.reset_episode()
+    assert np.argmax(reset) == 0
+    np.testing.assert_allclose(reset, agent.learnables.expected("d"))
+
+
+# --- persistence and back-compatibility -------------------------------------
+
+
+def test_checkpoint_carries_every_learnable(tmp_path):
+    def make():
+        return RollingAgent(
+            corridor_builder, horizon=2, learn=("A", "B", "d"),
+            priors={
+                "A": np.ones((KC, KC)),
+                "B": np.ones((U, KC, KC)),
+                "d": np.ones(KC),
+            },
+            n_sweeps=40, seed=5,
+        )
+
+    agent = make()
+    agent.observe(1, 2)
+    agent.observe(0, 1)
+    path = tmp_path / "agent.npz"
+    agent.checkpoint(path)
+
+    other = make()
+    other.restore(path)
+    for name in ("A", "B", "d"):
+        np.testing.assert_array_equal(
+            other.learnables.params[name], agent.learnables.params[name]
+        )
+    np.testing.assert_array_equal(other.belief, agent.belief)
+
+
+def test_legacy_learn_flags_map_onto_the_api():
+    old = RollingAgent(
+        corridor_builder, horizon=2, learn_a=True, initial_counts=np.ones((KC, KC)),
+        learn_b=True, initial_b_counts=np.ones((U, KC, KC)), n_sweeps=40, seed=5,
+    )
+    new = RollingAgent(
+        corridor_builder, horizon=2, learn=("A", "B"),
+        priors={"A": np.ones((KC, KC)), "B": np.ones((U, KC, KC))},
+        n_sweeps=40, seed=5,
+    )
+    for agent in (old, new):
+        agent.observe(1, 2)
+    np.testing.assert_allclose(old.counts, new.learnables.params["A"])
+    np.testing.assert_allclose(old.b_counts, new.learnables.params["B"])
+
+
+def test_prior_for_an_undeclared_learnable_is_refused():
+    with pytest.raises(KeyError, match="does not declare"):
+        RollingAgent(
+            corridor_builder, horizon=2, learn=("B",),
+            priors={"B": np.ones((U, KC, KC)), "A": np.ones((KC, KC))},
+            n_sweeps=20, seed=5,
+        )
