@@ -1,8 +1,8 @@
 ---
 id: cff-2gev
 status: open
-deps: [cff-hp3y, cff-4oq8]
-links: []
+deps: [cff-hp3y, cff-4oq8, cff-x0sv]
+links: [cff-x0sv]
 created: 2026-07-10T03:34:54Z
 type: feature
 priority: 3
@@ -147,3 +147,65 @@ changes: n_half = 10 * sum(alpha_prior[u,:,z]).
 
 Drop-back threshold for the plain composite: max lambda over all columns
 below 0.05.
+
+**2026-07-27T20:14:37Z**
+
+PREREGISTRATION VOID (2026-07-27, before any run — no results exist).
+
+The protocol recorded above, and its n_half amendment, are void. Neither
+was ever executed. Voiding on reasoning alone, with nothing observed, is
+the only clean point at which to do this.
+
+WHY
+
+Two findings, both about the environment rather than the mechanism.
+
+1. Observation aliasing defeats the measurement. The corridor's 32 states
+   produce only 10 distinct observation signatures, and two of those groups
+   hold 12 mutually indistinguishable states each — three quarters of the
+   state space sits inside a 12-way tie. Counts are accumulated from the
+   smoothed pairwise belief (agent.py:161), so under that aliasing each
+   step's increment smears across dozens of columns. The novelty channel is
+   an optimistic bound that assumes z' is revealed (rules.py, S1c: "tight
+   when observations pin the state down, loose otherwise"), and this
+   environment is built so observations do not. The experiment would have
+   measured the bound's looseness, not whether annealing works.
+
+2. The model has no structure for curiosity to exploit. The flat 32-state
+   rollout treats 160 (state, action) columns as independent when the true
+   dynamics are about 5 rules. Nothing learned at one cell transfers to
+   another, so directed exploration cannot beat undirected — it pays the
+   full cost of leaving the goal and collects almost none of the benefit.
+
+Finding 2 is a limitation of that model, NOT of the engine. The IR already
+supports the structure needed: transition_mixture's selector role carries
+one chain into another's transition, factors tie parameters by shared blob
+name (build_rollout already ties Bs across every slice), and plates tie
+parameters by name across copies. A factored corridor — an orientation
+chain selecting into a cell chain, turn rules as one shared block — is
+expressible today.
+
+WHAT REPLACES IT
+
+A factored corridor, where the parameter count is small enough to learn in
+tens of episodes, sensor noise is a dial rather than a fixed confound, and
+information gained at one cell transfers to others. Only then does directed
+curiosity have something to beat undirected exploration at.
+
+That experiment cannot be driven by RollingAgent as it stands: the agent is
+hardcoded to the build_rollout node names (member_of["prior"] line 97,
+"u1" line 142, "act1"/"obs1" line 150, "zm1" line 152, "tm1" line 160) and
+to a single [U, K', K] count array. It needs the declared-learnables API.
+
+RESEQUENCED: this ticket now depends on cff-x0sv and is no longer the first
+piece of work. It resolves mid-chain instead of up front.
+
+The mechanism design survives unchanged and is still the thing to build:
+per-column lambda interpolating h between H[Bbar] and h_dirichlet, annealed
+on accumulated count mass, with drop-back to the plain composite. Only the
+environment it gets tested in has changed. The reference-weighted KL
+argument also survives — self-weighted KL grades each arm on the columns it
+chose to visit, which favours the arm that does not explore.
+
+The recorded 0.16/0.76 and 2.650/2.534 numbers stay invalid as evidence
+about the mechanism, now for a second and stronger reason.

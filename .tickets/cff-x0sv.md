@@ -2,7 +2,7 @@
 id: cff-x0sv
 status: open
 deps: [cff-cd1i, cff-ri8m]
-links: [cff-gjjk]
+links: [cff-gjjk, cff-2gev]
 created: 2026-07-08T22:00:30Z
 type: feature
 priority: 2
@@ -26,3 +26,29 @@ cff-7c5o landed the Gaussian half of what this API generalizes: Engine.gaussian_
 **2026-07-10T03:31:28Z**
 
 Evaluation finding for this API: member_of covers discrete groups only — consumers needing per-member writes into Gaussian/EF/hybrid/plate-expanded groups currently write state.params[group] arrays by member order by hand. The generic learnables API should extend member_of across all group families and offer a bulk set_params(factor_name -> arrays) helper.
+
+**2026-07-27T20:14:54Z**
+
+New consumer (2026-07-27): cff-2gev now depends on this API.
+
+The annealed-novelty experiment needs a factored corridor model — an
+orientation chain selecting into a cell chain, with turn rules as one
+shared parameter block — because the flat single-chain rollout gives
+curiosity no structure to exploit. That model is expressible in the IR
+today, but RollingAgent cannot learn it: the agent is hardcoded to the
+build_rollout node names (member_of["prior"] line 97, "u1" line 142,
+"act1"/"obs1" line 150, "zm1" line 152, "tm1" line 160) and to a single
+[U, K', K] count array bound to that one transition node.
+
+Two requirements this adds to the contract:
+
+- learnables must address a named factor or group, so a model with two
+  transition nodes on separate chains can learn both
+- accumulation must work when several factor instances share one parameter
+  blob, which is how the IR already ties parameters (build_rollout ties Bs
+  across every slice, and plates tie by name across copies). Counts from
+  every instance sharing a blob accumulate into that one block.
+
+The second is the substantive one: parameter tying is what makes learning
+transfer across states, and it is the reason the factored model is worth
+building at all.
