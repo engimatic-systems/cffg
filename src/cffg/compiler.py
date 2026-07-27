@@ -194,6 +194,46 @@ class GfeTmPlan:
 
 
 @dataclass(frozen=True)
+class LearnTarget:
+    """One place a learnable posterior writes back into stacked params.
+
+    `form` is how that consumer reads the parameter: "expected" wants the
+    family's expected natural parameter (Dirichlet: E[log θ] = ψ(α) − ψ(α₀)),
+    "counts" wants the raw hyperparameters α, which is what the GFE
+    composites differentiate for their parameter-novelty term.
+
+    `layout` names the blob → stacked-params transform. Discrete BP groups
+    hold transition_mixture as [K', K, U] while the blob (and every other
+    consumer) is [U, K', K]; "as_is" everywhere else."""
+
+    key: str  # params key of the stacked group
+    index: int  # member row within that group
+    form: str  # "expected" | "counts"
+    layout: str  # "as_is" | "tm"
+
+
+@dataclass(frozen=True)
+class LearnPlan:
+    """A declared learnable, resolved against the compiled arena (cff-x0sv).
+
+    `sources` are the factor instances whose node beliefs supply sufficient
+    statistics — every instance reading a blob of this learnable, which is how
+    tying accumulates: build_rollout's slices and a plate's copies all name
+    one blob, so they all pay into one posterior.
+
+    GFE composites are targets but never sources: the composite owns its own
+    update path, and its node belief is not a plain factor belief. Statistics
+    come from the perception graph, where the data is."""
+
+    name: str
+    family: str
+    ftype: str  # factor type of the sources — fixes the sufficient statistic
+    shapes: dict[str, tuple[int, ...]]  # blob -> array shape
+    sources: tuple[str, ...]  # factor names, sorted
+    targets: tuple[LearnTarget, ...]
+
+
+@dataclass(frozen=True)
 class GfePlan:
     """A P-substituted goal-observation composite (Part II §4): matrix_cat
     observation node facing a categorical goal node across the x edge. The
@@ -269,6 +309,8 @@ class Arena:
     # factor name -> (params key, member index): lets the runtime swap ONE
     # member's parameters (same-cardinality factors share a stacked group;
     # a whole-group write would clobber siblings).
+    learn_plans: list[LearnPlan] = field(default_factory=list)
+    # Declared learnables resolved to stat sources and write targets (cff-x0sv).
 
     @property
     def interior_slot_pairs(self) -> np.ndarray:
@@ -565,6 +607,9 @@ def compile_template(
 
     gfe_groups: list[GfePlan] = []
     log_params: dict[str, np.ndarray] = {}
+    # Params keys owned by a GFE composite: write targets for a learnable, but
+    # never stat sources (the composite owns its own update path).
+    composite_keys: set[str] = set()
     for (ko, ki, learned), pairs in sorted(gfe_buckets.items()):
         gname = f"gfe{'L' if learned else ''}:{ko}x{ki}"
         obs_names = tuple(o for o, _ in pairs)
@@ -594,10 +639,12 @@ def compile_template(
             _expect(goal_name, c, (ko,))
             _stochastic(goal_name, c[:, None])
             lc.append(_log_of(c))
-        log_params[f"{gname}:counts" if learned else f"{gname}:A"] = np.stack(la)
+        a_key = f"{gname}:counts" if learned else f"{gname}:A"
+        log_params[a_key] = np.stack(la)
         log_params[f"{gname}:c"] = np.stack(lc)
+        composite_keys.update((a_key, f"{gname}:c"))
         for i, (obs_name, goal_name) in enumerate(pairs):
-            member_of[obs_name] = (f"{gname}:counts" if learned else f"{gname}:A", i)
+            member_of[obs_name] = (a_key, i)
             member_of[goal_name] = (f"{gname}:c", i)
 
     gfe_tm_groups: list[GfeTmPlan] = []
@@ -623,7 +670,11 @@ def compile_template(
                 for u in range(ku):
                     _stochastic(f"{m}[u={u}]", arr[u])
                 stacked.append(_log_of(arr))
-        log_params[f"{gname}:counts" if learned else f"{gname}:B"] = np.stack(stacked)
+        tm_key = f"{gname}:counts" if learned else f"{gname}:B"
+        log_params[tm_key] = np.stack(stacked)
+        composite_keys.add(tm_key)
+        for i, m in enumerate(members):
+            member_of[m] = (tm_key, i)
         gfe_tm_groups.append(
             GfeTmPlan(gname, (ko, ki, ku), tuple(members), gather, scatter, learned)
         )
@@ -1000,7 +1051,87 @@ def compile_template(
         gfe_x_edges=frozenset(gfe_x_edges),
         delta_pairs=delta_pairs,
         member_of=member_of,
+        learn_plans=_resolve_learnables(t, resolved, groups, member_of, composite_keys),
     )
+
+
+def _resolve_learnables(
+    t: Template,
+    resolved: dict[str, np.ndarray],
+    groups: list[GroupPlan],
+    member_of: dict[str, tuple[str, int]],
+    composite_keys: set[str],
+) -> list[LearnPlan]:
+    """Bind each declared learnable to its stat sources and write targets
+    (cff-x0sv).
+
+    Every factor reading one of the learnable's blobs becomes a target, so a
+    posterior update reaches every instance that shares the parameter — the
+    tying the IR already expresses by blob name. Sources are the subset that
+    live in a plain discrete group, because those are the nodes whose beliefs
+    Engine.node_beliefs reports; GFE composites are write-only here."""
+    from cffg.learn import FAMILIES
+
+    plans: list[LearnPlan] = []
+    ftype_of_group = {g.name: g.type for g in groups}
+    for name in sorted(t.learnables):
+        spec = t.learnables[name]
+        if spec.family not in FAMILIES:
+            raise CompileError(
+                f"learnable {name!r}: unknown conjugate family {spec.family!r} "
+                f"(known: {sorted(FAMILIES)})"
+            )
+        blobs = set(spec.blobs)
+        readers = sorted(
+            f.name
+            for f in t.factors.values()
+            if blobs & set(f.param_blobs.values())
+        )
+        if not readers:
+            raise CompileError(f"learnable {name!r}: no factor reads blobs {sorted(blobs)}")
+        ftypes = {t.factors[r].type for r in readers}
+        if len(ftypes) > 1:
+            raise CompileError(
+                f"learnable {name!r}: blobs {sorted(blobs)} are read by mixed factor "
+                f"types {sorted(ftypes)}; one posterior needs one sufficient statistic"
+            )
+        ftype = ftypes.pop()
+        family = FAMILIES[spec.family]
+        # Only the blobs this template actually reads: one learnable spans a
+        # probability blob and a counts blob (build_rollout's A/Ac, Bs/Bc), and
+        # a perception graph resolves the first while a planning graph with
+        # parameter uncertainty resolves the second.
+        shapes = {b: tuple(np.shape(resolved[b])) for b in sorted(blobs) if b in resolved}
+        try:
+            family.check(name, ftype, shapes)
+        except ValueError as err:
+            raise CompileError(str(err)) from None
+
+        targets: list[LearnTarget] = []
+        sources: list[str] = []
+        for r in readers:
+            if r not in member_of:
+                raise CompileError(
+                    f"learnable {name!r}: factor {r!r} ({t.factors[r].type}) has no "
+                    "addressable parameter slot; member_of covers the discrete "
+                    "families only"
+                )
+            key, index = member_of[r]
+            if key in composite_keys:
+                form = "counts" if key.endswith(":counts") else "expected"
+                targets.append(LearnTarget(key, index, form, "as_is"))
+                continue
+            layout = "tm" if ftype_of_group.get(key) == "transition_mixture" else "as_is"
+            targets.append(LearnTarget(key, index, "expected", layout))
+            if not spec.sources or r in spec.sources:
+                sources.append(r)
+        # A graph with no sources is normal, not an error: the planning
+        # template reads A only through GFE composites, and learns nothing.
+        # Statistics come from the perception template, parameters flow back.
+        plans.append(
+            LearnPlan(name, spec.family, ftype, shapes, tuple(sources), tuple(targets))
+        )
+    return plans
 
 
 def _resolve_arrays(
