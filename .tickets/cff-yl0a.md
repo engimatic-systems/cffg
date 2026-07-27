@@ -23,3 +23,7 @@ A fusion pass recognizes repeating (transition, equality, emission) slice patter
 **2026-07-27T14:13:01Z**
 
 Scope update after the 2026-07-27 review round: the fused status path plus live matched-shape referencing brought every benchmark configuration inside the ticket's 20x envelope (hostile K=2 run 13-19x, ordinary K=8 7-8x, LGSSM d=4/m=2 17-19x), so slice fusion is no longer an acceptance blocker for cff-d56d. It remains the right lever if the envelope must tighten (LGSSM mid-sizes sit at ~19x with little margin) or if the stricter recorded reference figure (~2x below live) becomes the standard.
+
+**2026-07-27T15:47:43Z**
+
+BOUND AFTER cff-d56d CLOSURE (2026-07-27). This is the strict-kernel continuation, not a reopening of the scheduling P1. Keep the public matched-model/full-posterior reference and the minimal-output low-level reference as separate reported columns: the latter projects only the requested smoother output inside JIT (and precomputes HMM likelihoods), so it is an optimization ceiling rather than the same output contract. Scope stays HMM chain lowering: role-specific directed outputs plus fused transition/equality/emission scan, with generic-vs-fused marginal/FE/status/gradient parity and hostile-input regressions. Do not absorb readout vectorization (cff-3kdk) or a speculative LGSSM fast path; profile and file the latter separately only if the product-facing LGSSM envelope remains a priority after readout is fixed.

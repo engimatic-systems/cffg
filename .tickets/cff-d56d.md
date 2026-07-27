@@ -1,6 +1,6 @@
 ---
 id: cff-d56d
-status: in_progress
+status: closed
 deps: [cff-j4mu, cff-ri8m]
 links: [cff-fxmj, cff-5edo, cff-wbhu, cff-3kdk]
 created: 2026-07-10T18:05:00Z
@@ -118,3 +118,9 @@ Second review round fixed (2026-07-27, operator-approved scope: AC3 performance 
 4. Docs/docstrings no longer claim cyclic mixed islands are "exactly re-equilibrated": forest islands get the exact two-pass each outer iteration, cyclic islands advance one colored sweep and equilibrate across iterations (ARCHITECTURE, README, schedule.py, engine.py wording).
 
 Full suite: 1,207 passed; dashboard refreshed. Corrected-protocol ratios (parity-asserted): hostile K=2 run 13-23x (reference denominator 14-40 microseconds, jitter swings several x), ordinary K=8 7-8x, LGSSM d=4/m=2 15-18x; recorded honestly in LIMITATIONS S1j with the deferral note.
+
+**2026-07-27T15:47:43Z**
+
+FINAL REVIEW / CLOSURE (2026-07-27). APPROVED after PR head 4da498d plus reviewer documentation cleanup 144adcc. AC1/AC2/AC4/AC5/AC6 are met. The soundness blockers are resolved: certification is elementwise mixed absolute/relative and survives the float32 T=256 disconnected-precision exploit; schedule fingerprints seal all executable row content; benchmark models assert posterior parity and align HMM conventions; cyclic mixed-island wording is accurate. AC3 exception is explicit: the public matched-model/full-posterior reference is typically inside 20x but the 14-40 microsecond HMM denominator can straddle it, and the original minimal-output low-level comparator remains above 20x. That strict performance gap is accepted as deferred to cff-yl0a, not represented as met. Production readout remains cff-3kdk.
+
+Reviewer validation: git show --check clean; tests/test_schedule.py 22 passed; tests/test_hygiene.py 3 passed; live parity-asserting benchmark completed for every hostile/ordinary HMM and LGSSM size (this run: hostile status 11-19x, ordinary 7-8.5x, LGSSM 17-17.4x); full dashboard pass 1,207 passed, 4 third-party deprecation warnings, 0 failures, dashboard refreshed at ~/agent-share/cffg-tests.html. Tree clean at closure.
