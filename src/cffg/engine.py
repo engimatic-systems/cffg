@@ -242,11 +242,22 @@ class Engine:
         self.schedule = (
             schedule if isinstance(schedule, Schedule) else build_schedule(arena, schedule)
         )
-        self._propagate = (
-            eqx.filter_jit(_make_propagate(arena, self.schedule))
-            if self.schedule.kind == "two_pass"
-            else None
-        )
+        self._propagate = None
+        self.scan_registerized: tuple[bool, ...] = ()
+        if self.schedule.kind == "two_pass":
+            raw = _make_propagate(arena, self.schedule)
+            self.scan_registerized = raw.scan_registerized
+            self._propagate = eqx.filter_jit(raw)
+        # Discrete edge slot pairs bucketed by cardinality: the zero-support
+        # check runs per bucket instead of per edge (Python-loop-free).
+        by_card: dict[int, list[list[int]]] = {}
+        for e in arena.edges.values():
+            if not e.dim and not e.ef:
+                by_card.setdefault(e.card, []).append([e.slot0, e.slot1])
+        self._support_edge_groups = [
+            (card, np.asarray(pairs, dtype=np.int64).reshape(-1, 2))
+            for card, pairs in sorted(by_card.items())
+        ]
 
     # -- state construction ---------------------------------------------
 
@@ -589,7 +600,14 @@ class Engine:
                 return RunResult(st, RunStatus.DIVERGED, 1, (delta,), (), float("inf"))
             return RunResult(st, status, 1, (delta,), (), delta)
 
-        fe = self.bfe(st)
+        # Direct ledger call: the zero-support precondition bfe() re-checks
+        # was established two lines up, and Z=0 would have returned already.
+        fe = float(
+            self._bfe(
+                st.messages, st.g_eta, st.g_lam, st.g_obs, st.g_mask,
+                st.ef_eta, st.ef_obs, st.ef_mask, st.params,
+            )
+        )
         if not np.isfinite(fe):
             return RunResult(st, RunStatus.DIVERGED, 1, (delta,), (), float("inf"))
         return RunResult(st, status, 1, (delta,), (fe,), delta)
@@ -603,43 +621,45 @@ class Engine:
         )
 
     def _has_zero_support(self, state: State) -> bool:
-        """Whether an edge or ordinary factor belief has empty exact support."""
+        """Whether an edge or ordinary factor belief has empty exact support.
+
+        Vectorized over each edge-cardinality bucket and each group's member
+        stack (cff-d56d): the check runs on every exact-path run, so a
+        per-member Python loop would put an O(T) interpreter cost back into
+        the O(E) schedule."""
         messages = np.asarray(state.messages)
-        for edge in self.arena.edges.values():
-            if edge.dim or edge.ef:
-                continue
+        for card, pairs in self._support_edge_groups:
             logq = (
-                messages[self.arena.message_indices(edge.slot0, edge.card)]
-                + messages[self.arena.message_indices(edge.slot1, edge.card)]
+                messages[self.arena.message_indices(pairs[:, 0], card)]
+                + messages[self.arena.message_indices(pairs[:, 1], card)]
             )
-            if not np.any(np.exp(logq) > 0):
+            if not np.all(np.any(np.exp(logq) > 0, axis=-1)):
                 return True
 
         for group in self.arena.groups:
-            incoming = np.asarray(_disc_rows(self.arena, state.messages, group.gather, group.cards))
-            for member in range(len(group.members)):
-                supports = [
-                    np.exp(incoming[member, role, :card]) > 0
-                    for role, card in enumerate(group.cards)
-                ]
-                if group.type == "equality":
-                    if not np.any(np.logical_and.reduce(supports)):
-                        return True
-                    continue
-                factor_support = np.exp(np.asarray(state.params[group.name])[member]) > 0
-                for role, support in enumerate(supports):
-                    shape = [1] * len(group.cards)
-                    shape[role] = group.cards[role]
-                    factor_support &= support.reshape(shape)
-                if not np.any(factor_support):
+            supports = [  # per role [M, card]: exact support of the incoming
+                np.exp(messages[self.arena.message_indices(group.gather[:, r], card)]) > 0
+                for r, card in enumerate(group.cards)
+            ]
+            n = len(group.members)
+            if group.type == "equality":
+                joint = np.logical_and.reduce(supports)  # [M, k]
+                if not np.all(np.any(joint, axis=-1)):
                     return True
+                continue
+            factor_support = np.exp(np.asarray(state.params[group.name])) > 0
+            for role, card in enumerate(group.cards):
+                shape = [n] + [1] * len(group.cards)
+                shape[1 + role] = card
+                factor_support = factor_support & supports[role].reshape(shape)
+            if not np.all(np.any(factor_support.reshape(n, -1), axis=-1)):
+                return True
 
         for constraint in self.arena.constraint_groups:
-            incoming = np.asarray(
-                _disc_rows(self.arena, state.messages, constraint.gather, constraint.cards)
-            )
             supports = [
-                np.flatnonzero(np.exp(incoming[i, :card]) > 0).tolist()
+                np.flatnonzero(
+                    np.exp(messages[self.arena.message_indices(constraint.gather[i], card)]) > 0
+                ).tolist()
                 for i, card in enumerate(constraint.cards)
             ]
             if any(not support for support in supports):
@@ -1311,11 +1331,289 @@ def _batch_stage_fn(arena: Arena, stage, op):
     return fn
 
 
+def _scan_group_of(arena: Arena, elem):
+    return arena.groups[elem.group] if elem.kind == "disc" else arena.gauss_groups[elem.group]
+
+
+def _classify_scan(arena: Arena, stage):
+    """Registerization analysis for a ScanStage (cff-d56d).
+
+    Per (elem, role, member-column) gather, find where its slots come from
+    *within* the stage, uniformly across all steps: written by elem ``we``
+    role ``wr`` column ``wc`` in the previous step (d=1, a carried
+    register), the same step (d=0: a register when the writer runs earlier,
+    otherwise a pre-stage read), or the next step (d=-1: always a pre-stage
+    read — the write comes after every read of that slot, and each directed
+    slot is written at most once per pass). Columns whose slots the stage
+    never writes are pre-stage reads too ("static").
+
+    Returns per-elem per-role plans compressed into three shapes — whole
+    role static ("table"), whole role one aligned register ("direct"), or
+    per-column mixed ("mix") — or None when any column's dependency is
+    non-uniform, in which case the flat-carry executor stays correct."""
+    elems = stage.elems
+    writers = []
+    for ei, elem in enumerate(elems):
+        sc = _scan_group_of(arena, elem).scatter[elem.rows]  # [S, m, R]
+        for r in range(sc.shape[2]):
+            writers.append((ei, r, sc[:, :, r]))
+    all_written = {int(s) for _, _, tab in writers for s in tab.reshape(-1)}
+
+    plans = []
+    for ei, elem in enumerate(elems):
+        ga = _scan_group_of(arena, elem).gather[elem.rows]  # [S, m, R]
+        role_plans = []
+        for r in range(ga.shape[2]):
+            cols = []
+            for c in range(ga.shape[1]):
+                tab = ga[:, c, r]  # [S]
+                match = None
+                for we, wr, wt in writers:
+                    for wc in range(wt.shape[1]):
+                        col = wt[:, wc]
+                        if stage.length > 1 and np.array_equal(col[:-1], tab[1:]):
+                            match = ("r", we, wr, wc, 1)
+                        elif np.array_equal(col, tab):
+                            match = ("r", we, wr, wc, 0) if we < ei else ("s",)
+                        elif stage.length > 1 and np.array_equal(col[1:], tab[:-1]):
+                            # Written only at the *next* step — every read
+                            # precedes the write, so the pre-stage value is
+                            # correct, provided the final step's slot (outside
+                            # the matched pattern) is not written at all.
+                            if int(tab[-1]) not in all_written:
+                                match = ("s",)
+                        if match:
+                            break
+                    if match:
+                        break
+                if match is None:
+                    if {int(s) for s in tab.reshape(-1)} & all_written:
+                        return None  # non-uniform in-stage dependency
+                    match = ("s",)
+                cols.append(match)
+            if all(p == ("s",) for p in cols):
+                role_plans.append(("table",))
+                continue
+            direct = (
+                all(p[0] == "r" for p in cols)
+                and len({(p[1], p[2], p[4]) for p in cols}) == 1
+                and [p[3] for p in cols] == list(range(len(cols)))
+            )
+            if direct:
+                direct = elems[cols[0][1]].rows.shape[1] == len(cols)
+            if direct:
+                role_plans.append(("direct", cols[0][1], cols[0][2], cols[0][4]))
+            else:
+                role_plans.append(("mix", tuple(cols)))
+        plans.append(role_plans)
+    return plans
+
+
+def _registerized_scan_fn(arena: Arena, stage, plans, op):
+    """Registerized executor: the scan carries only the small message blocks
+    that cross steps; pre-stage inputs are prefetched [S, ...] tensors,
+    outputs are stacked by the scan and scattered into the flat arrays once
+    at the end. This is the executor that makes a chain cost what a
+    hand-written ``lax.scan`` smoother costs — no dynamic gather/scatter on
+    the flat arena inside the loop."""
+    elems = stage.elems
+    metas = []
+    for ei, elem in enumerate(elems):
+        g = _scan_group_of(arena, elem)
+        ga, sc = g.gather[elem.rows], g.scatter[elem.rows]  # [S, m, R]
+        metas.append((elem, g, ga, sc))
+
+    def _col_plans(plan, m):
+        if plan[0] == "mix":
+            return plan[1]
+        if plan[0] == "table":
+            return (("s",),) * m
+        _, we, wr, d = plan
+        return tuple(("r", we, wr, wc, d) for wc in range(m))
+
+    # Carried registers: (we, wr) consumed with d=1 anywhere. Their step-0
+    # value is the pre-stage message at each reader's first gather slot;
+    # unread entries default to the writer's own step-0 slots (any finite
+    # value — they are overwritten before every read).
+    reg_init_slots: dict[tuple[int, int], np.ndarray] = {}
+    for ei, (elem, g, ga, _) in enumerate(metas):
+        for r, plan in enumerate(plans[ei]):
+            for c, cp in enumerate(_col_plans(plan, ga.shape[1])):
+                if cp[0] == "r" and cp[4] == 1:
+                    key = (cp[1], cp[2])
+                    if key not in reg_init_slots:
+                        we_elem, _, _, we_sc = metas[cp[1]]
+                        reg_init_slots[key] = we_sc[0, :, cp[2]].copy()
+                    reg_init_slots[key][cp[3]] = ga[0, c, r]
+
+    def fn(messages, g_eta, g_lam, g_obs, g_mask, params):
+        xs = []
+        for ei, (elem, g, ga, _) in enumerate(metas):
+            x = {}
+            for r, plan in enumerate(plans[ei]):
+                if plan[0] == "direct":
+                    continue
+                cols = _col_plans(plan, ga.shape[1])
+                scols = [c for c, cp in enumerate(cols) if cp[0] == "s"]
+                if not scols:
+                    continue
+                slots = ga[:, scols, r]  # [S, ns]
+                if elem.kind == "disc":
+                    idx = arena.message_indices(slots, g.cards[r])
+                    x[f"s{r}"] = messages[jnp.asarray(idx)]
+                else:
+                    d = g.dims[r]
+                    x[f"se{r}"] = g_eta[jnp.asarray(arena.g_eta_indices(slots, d))]
+                    x[f"sl{r}"] = g_lam[jnp.asarray(arena.g_lam_indices(slots, d))]
+            if elem.kind == "disc":
+                logf = params.get(g.name)
+                if logf is not None:
+                    x["lf"] = logf[elem.rows]
+            else:
+                for k, v in _gauss_group_params(g, params).items():
+                    x[f"p{k}"] = v[elem.rows]
+                if g.type == "gaussian_linear_obs":
+                    orows = g.obs_rows[elem.rows]
+                    x["ov"] = g_obs[jnp.asarray(arena.g_obs_indices(orows, g.dims[0]))]
+                    x["om"] = g_mask[jnp.asarray(orows)]
+            xs.append(x)
+        xs = tuple(xs)
+
+        init = {}
+        for (we, wr), slots in reg_init_slots.items():
+            wg = metas[we][1]
+            if elems[we].kind == "disc":
+                init[f"{we}:{wr}"] = messages[
+                    jnp.asarray(arena.message_indices(slots, wg.cards[wr]))
+                ]
+            else:
+                d = wg.dims[wr]
+                init[f"{we}:{wr}:e"] = g_eta[jnp.asarray(arena.g_eta_indices(slots, d))]
+                init[f"{we}:{wr}:l"] = g_lam[jnp.asarray(arena.g_lam_indices(slots, d))]
+
+        def body(prev, x_t):
+            cur: dict = {}
+            ys = {}
+
+            def reg(cp, pair):
+                _, we, wr, wc, d = cp
+                src = prev if d == 1 else cur
+                if pair:
+                    return (
+                        src[f"{we}:{wr}:e"][wc],
+                        src[f"{we}:{wr}:l"][wc],
+                    )
+                return src[f"{we}:{wr}"][wc]
+
+            def read(ei, r, pair):
+                plan = plans[ei][r]
+                if plan[0] == "table":
+                    if pair:
+                        return x_t[ei][f"se{r}"], x_t[ei][f"sl{r}"]
+                    return x_t[ei][f"s{r}"]
+                if plan[0] == "direct":
+                    _, we, wr, d = plan
+                    src = prev if d == 1 else cur
+                    if pair:
+                        return src[f"{we}:{wr}:e"], src[f"{we}:{wr}:l"]
+                    return src[f"{we}:{wr}"]
+                cols = plan[1]
+                si = 0
+                pieces = []
+                for cp in cols:
+                    if cp[0] == "s":
+                        if pair:
+                            pieces.append((x_t[ei][f"se{r}"][si], x_t[ei][f"sl{r}"][si]))
+                        else:
+                            pieces.append(x_t[ei][f"s{r}"][si])
+                        si += 1
+                    else:
+                        pieces.append(reg(cp, pair))
+                if pair:
+                    return (
+                        jnp.stack([p[0] for p in pieces]),
+                        jnp.stack([p[1] for p in pieces]),
+                    )
+                return jnp.stack(pieces)
+
+            for ei, (elem, g, _, _) in enumerate(metas):
+                if elem.kind == "disc":
+                    k_local = max(g.cards)
+                    blocks = [
+                        jnp.pad(
+                            read(ei, r, False),
+                            ((0, 0), (0, k_local - card)),
+                            constant_values=NEG,
+                        )
+                        for r, card in enumerate(g.cards)
+                    ]
+                    inc = jnp.stack(blocks, axis=-2)
+                    out = BP_UPDATES[g.type](
+                        inc, x_t[ei].get("lf"), g.cards, k_local, op
+                    )
+                    out = jnp.maximum(out, NEG)
+                    for r, card in enumerate(g.cards):
+                        block = out[:, r, :card]
+                        cur[f"{ei}:{r}"] = block
+                        ys[f"{ei}:{r}"] = block
+                else:
+                    width = max(g.dims)
+                    eb, lb = [], []
+                    for r, d in enumerate(g.dims):
+                        e, l = read(ei, r, True)
+                        eb.append(jnp.pad(e, ((0, 0), (0, width - d))))
+                        lb.append(jnp.pad(l, ((0, 0), (0, width - d), (0, width - d))))
+                    inc_e, inc_l = jnp.stack(eb, axis=-2), jnp.stack(lb, axis=-3)
+                    par = {k[1:]: v for k, v in x_t[ei].items() if k.startswith("p")}
+                    y = mk = None
+                    if g.type == "gaussian_linear_obs":
+                        y, mk = x_t[ei]["ov"], x_t[ei]["om"]
+                    outs = _gauss_outs(g, inc_e, inc_l, par, y, mk)
+                    for r, (oe, ol) in enumerate(outs):
+                        d = g.dims[r]
+                        oe, ol = oe[..., :d], ol[..., :d, :d]
+                        cur[f"{ei}:{r}:e"], cur[f"{ei}:{r}:l"] = oe, ol
+                        ys[f"{ei}:{r}:e"], ys[f"{ei}:{r}:l"] = oe, ol
+            new_carry = {k: cur[k] for k in prev}
+            return new_carry, ys
+
+        _, ys = jax.lax.scan(body, init, xs)
+
+        for ei, (elem, g, _, sc) in enumerate(metas):
+            if elem.kind == "disc":
+                for r, card in enumerate(g.cards):
+                    idx = jnp.asarray(arena.message_indices(sc[:, :, r], card))
+                    messages = messages.at[idx].set(ys[f"{ei}:{r}"])
+            else:
+                for r, d in enumerate(g.dims):
+                    ei_idx = jnp.asarray(arena.g_eta_indices(sc[:, :, r], d))
+                    li_idx = jnp.asarray(arena.g_lam_indices(sc[:, :, r], d))
+                    g_eta = g_eta.at[ei_idx].set(ys[f"{ei}:{r}:e"])
+                    g_lam = g_lam.at[li_idx].set(ys[f"{ei}:{r}:l"])
+        return messages, g_eta, g_lam
+
+    return fn
+
+
 def _scan_stage_fn(arena: Arena, stage, op):
-    """Executor for one ScanStage: S structurally identical rounds as one
-    ``lax.scan``. All flat value indices are precomputed [S, ...] tables fed
-    through the scan inputs, so trace/compile cost is O(1) in S while the
-    executed work stays the same as the unrolled rounds."""
+    """Pick the ScanStage executor: registerized when the dependency
+    analysis succeeds (chains always do), flat-carry otherwise."""
+    plans = _classify_scan(arena, stage)
+    if plans is not None:
+        fn = _registerized_scan_fn(arena, stage, plans, op)
+        fn.registerized = True
+        return fn
+    fn = _flat_scan_fn(arena, stage, op)
+    fn.registerized = False
+    return fn
+
+
+def _flat_scan_fn(arena: Arena, stage, op):
+    """Fallback ScanStage executor: S structurally identical rounds as one
+    ``lax.scan`` over the flat arrays. All flat value indices are
+    precomputed [S, ...] tables fed through the scan inputs, so
+    trace/compile cost is O(1) in S while the executed work stays the same
+    as the unrolled rounds."""
     metas, xs = [], []
     for elem in stage.elems:
         if elem.kind == "disc":
@@ -1435,6 +1733,9 @@ def _make_propagate(arena: Arena, sched: Schedule):
             messages, g_eta, g_lam = fn(messages, g_eta, g_lam, g_obs, g_mask, params)
         return messages, g_eta, g_lam
 
+    propagate.scan_registerized = tuple(
+        fn.registerized for fn in stage_fns if hasattr(fn, "registerized")
+    )
     return propagate
 
 

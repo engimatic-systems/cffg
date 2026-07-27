@@ -166,17 +166,22 @@ def _bp_nodes_and_edges(
 def build_rounds(
     nodes: list[Node], links: list[tuple[Node, Node]]
 ) -> list[list[Node]] | None:
-    """Leaf-peel firing rounds for the two-pass schedule; None on a cycle.
+    """Depth-level firing rounds for the two-pass schedule; None on a cycle.
 
-    Correctness: a factor fires when at most one of its interior edges is
-    unresolved (its parent). Firing writes *all* its outgoing messages; only
-    the parent-directed one is final, and its inputs (the resolved child
-    edges) are final by induction. The outward pass replays the rounds in
-    reverse, when every input is final, so after inward + outward each
-    directed message holds its fixed-point value. Non-final inward writes
-    are never read before their outward rewrite."""
+    Each component is rooted at a diameter endpoint (double BFS) and its
+    nodes fire by decreasing BFS depth: when a node fires, all its children
+    fired in earlier rounds, so its parent-directed message is final by
+    induction; the outward pass replays the rounds in reverse, when every
+    input is final. Firing writes *all* of a node's outgoing messages —
+    non-final inward writes are never read before their outward rewrite,
+    because tree edges connect consecutive depths only (no two same-round
+    nodes are adjacent).
+
+    Rooting at a diameter endpoint keeps a chain a *single* strand: rounds
+    step through it monotonically, which is what lets the engine fuse the
+    round pattern into a lax.scan with register-carried messages instead of
+    per-step scatters into the flat arena."""
     adj: dict[Node, list[Node]] = {n: [] for n in nodes}
-    deg: dict[Node, int] = {n: 0 for n in nodes}
     parent: dict[Node, Node] = {}
 
     def find(n: Node) -> Node:
@@ -194,26 +199,35 @@ def build_rounds(
         parent[ra] = rb
         adj[a].append(b)
         adj[b].append(a)
-        deg[a] += 1
-        deg[b] += 1
+    for n in adj:
+        adj[n].sort()
 
-    fired: set[Node] = set()
-    current = sorted(n for n in nodes if deg[n] <= 1)
-    rounds: list[list[Node]] = []
-    while current:
-        rounds.append(current)
-        fired.update(current)
-        ready: list[Node] = []
-        for n in current:
-            for nb in adj[n]:
-                if nb in fired:
-                    continue
-                deg[nb] -= 1
-                if deg[nb] <= 1 and nb not in ready:
-                    ready.append(nb)
-        current = sorted(set(ready) - fired)
-    assert len(fired) == len(nodes)  # forests always peel completely
-    return rounds
+    def bfs_depths(start: Node, seen: set[Node]) -> dict[Node, int]:
+        depths = {start: 0}
+        frontier = [start]
+        while frontier:
+            nxt = []
+            for n in frontier:
+                for nb in adj[n]:
+                    if nb not in depths and nb not in seen:
+                        depths[nb] = depths[n] + 1
+                        nxt.append(nb)
+            frontier = nxt
+        return depths
+
+    visited: set[Node] = set()
+    by_round: dict[int, list[Node]] = {}
+    for start in sorted(nodes):
+        if start in visited:
+            continue
+        probe = bfs_depths(start, visited)
+        root = min((n for n, d in probe.items() if d == max(probe.values())))
+        depths = bfs_depths(root, visited)
+        visited.update(depths)
+        deepest = max(depths.values())
+        for n, d in depths.items():  # deepest level fires first
+            by_round.setdefault(deepest - d, []).append(n)
+    return [sorted(by_round[i]) for i in range(len(by_round))]
 
 
 def _round_stages(rnd: list[Node]) -> list[BatchStage]:
@@ -232,29 +246,53 @@ def _signature(stages: list[BatchStage]) -> tuple:
 
 
 def _compile_rounds(per_round: list[list[BatchStage]]) -> list:
-    """Fuse maximal runs of structurally identical rounds into ScanStages;
-    everything else stays unrolled batch stages."""
+    """Fuse maximal periodic runs of rounds into ScanStages; everything else
+    stays unrolled batch stages.
+
+    A run of rounds whose structure signatures repeat with period p (chains
+    give p = 2: a {transition, emission} level alternating with an
+    {equality} level) becomes one ScanStage whose scan step executes p
+    consecutive rounds; a step's elems keep the round order, so intra-step
+    reads still happen after the writes they depend on."""
     out: list = []
+    sigs = [_signature(r) for r in per_round]
     i = 0
     while i < len(per_round):
-        j = i + 1
-        sig = _signature(per_round[i])
-        while j < len(per_round) and _signature(per_round[j]) == sig:
-            j += 1
-        if j - i >= SCAN_MIN:
-            elems = tuple(
-                ScanElem(
-                    kind=st.kind,
-                    group=st.group,
-                    rows=np.stack([per_round[r][k].rows for r in range(i, j)]),
+        best = None  # (steps, period)
+        for period in (1, 2, 3, 4):
+            n = 0
+            while (
+                i + n < len(per_round)
+                and sigs[i + n] == sigs[i + (n % period)]
+            ):
+                n += 1
+            steps = n // period
+            if steps * period >= max(SCAN_MIN, 2 * period) and (
+                best is None or steps * period > best[0] * best[1]
+            ):
+                best = (steps, period)
+        if best is None:
+            out.extend(per_round[i])
+            i += 1
+            continue
+        steps, period = best
+        elems = []
+        for q in range(period):
+            for k, st in enumerate(per_round[i + q]):
+                elems.append(
+                    ScanElem(
+                        kind=st.kind,
+                        group=st.group,
+                        rows=np.stack(
+                            [
+                                per_round[i + q + s * period][k].rows
+                                for s in range(steps)
+                            ]
+                        ),
+                    )
                 )
-                for k, st in enumerate(per_round[i])
-            )
-            out.append(ScanStage(length=j - i, elems=elems))
-        else:
-            for r in range(i, j):
-                out.extend(per_round[r])
-        i = j
+        out.append(ScanStage(length=steps, elems=tuple(elems)))
+        i += steps * period
     return out
 
 
