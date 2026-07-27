@@ -27,3 +27,7 @@ PR: https://github.com/engimatic-systems/cffg/pull/33 (stacked on cff-ey4p PR #3
 **2026-07-27T04:04:28Z**
 
 Review regression added in tests/test_kernels.py: loading a serialized external kernel must fail even when its FactorType was structurally pre-registered and remains after unregister_kernel. The new test intentionally fails on the current PR head with DID NOT RAISE; it should turn green when _check_kernel_requirements checks the executable kernel manifest independently of FACTOR_TYPES.
+
+**2026-07-27T04:23:50Z**
+
+Review fix (2026-07-26): the load-time gate could be bypassed when a required external kernel's FactorType was structurally pre-registered — load passed and failure surfaced later at compile. _check_kernel_requirements now requires a registered executable kernel for every manifest entry a factor uses, naming the recorded (impl, version). Reviewer regression test_missing_implementation_fails_when_factor_type_was_pre_registered passes; full pass 1185/0 failing. Pushed to PR #33.
