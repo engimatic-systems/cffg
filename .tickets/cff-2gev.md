@@ -1,7 +1,7 @@
 ---
 id: cff-2gev
 status: open
-deps: [cff-hp3y, cff-4oq8, cff-x0sv]
+deps: [cff-hp3y, cff-4oq8, cff-x0sv, cff-cxuy]
 links: [cff-x0sv]
 created: 2026-07-10T03:34:54Z
 type: feature
@@ -209,3 +209,7 @@ chose to visit, which favours the arm that does not explore.
 
 The recorded 0.16/0.76 and 2.650/2.534 numbers stay invalid as evidence
 about the mechanism, now for a second and stronger reason.
+
+**2026-07-27T20:19:22Z**
+
+Environment for the replacement experiment is cff-cxuy (factored rollout builder), now a blocker. That ticket also makes sensor observability a declared parameter, which is what lets the aliasing be swept as a dial rather than sitting in the background as a confound.
