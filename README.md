@@ -100,6 +100,20 @@ so you can swap them per run without recompiling.
 intentionally not iterable now: use `result.state` when a fixed sweep budget is
 deliberate, or `result.require_converged()` before acting on beliefs.
 
+Schedules: the engine picks one automatically (cff-d56d). On an acyclic BP
+model over discrete, Gaussian, or EF edges — chains, trees, state-space
+models — `run` executes one exact inward/outward pass in O(E), certifies
+the fixed point with a fused verification sweep, and returns `converged`
+(even with `tol=None`; there is no sweep budget to exhaust). Loopy pure-BP
+models iterate colored Gauss–Seidel sweeps; models with iterative
+structures (mean-field beads, GFE composites, hard constraints, hybrid
+nodes) run block-phased: each sweep updates those structures, then
+refreshes the BP parts — tree-shaped parts exactly, loopy parts by one
+colored sweep — before convergence is judged. Only δ form
+constraints (and `damp > 0` on otherwise-exact models) still use plain
+flooding; `engine.schedule.kind` and `.reason` say what you got. Force
+flooding with `Engine(arena, schedule="flood")`.
+
 ## Run an agent
 
 ```python

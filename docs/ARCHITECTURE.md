@@ -238,13 +238,56 @@ A registry keyed by `(factor_type, constraint_config, out_edge_role)`:
 
 ### 4. Inference VM (`cffg.infer`)
 
-- Schedules: flooding (default) and sequential; damping as a knob. The runtime
-  records a `RunResult` with converged / budget-exhausted / diverged /
-  infeasible status, iteration count, FE and message-delta traces, and final
-  residual. Sum/GFE mode stops only when FE is stationary and messages are
-  coherent; max mode uses its message fixed-point residual and validates the
-  decoded objective. Non-finite arenas/residuals are divergence, while proven
-  empty exact support is infeasible with FE = +∞.
+- Schedules (cff-d56d, `cffg.schedule`): the engine builds a schedule from
+  the compiled arena instead of always flooding. The factor graph over the
+  schedulable arenas (discrete BP, Gaussian, EF conjugate-BP) is
+  partitioned into islands, and each model gets the strongest schedule its
+  topology admits:
+  - two_pass (everything schedulable, all islands forests): factors fire by
+    decreasing BFS depth (rooted at a diameter endpoint per component),
+    then in reverse. Each directed message is updated O(1) times, so a
+    chain costs O(E) instead of flooding's O(E × diameter). One execution
+    reaches the BP fixed point; the warm status-bearing run is a single
+    fused XLA dispatch (propagation + certification sweep + support flags +
+    FE ledger). The certification sweep re-derives every message and its
+    elementwise mixed absolute/relative change gates `converged` at a
+    dtype-derived threshold. No unrelated block or graph depth can widen
+    the certificate, so a stale message can only surface as a non-converged
+    status, never as silently wrong marginals.
+  - colored (pure BP with cycles): forest islands still run their exact
+    pass once; cyclic islands iterate greedy-colored Gauss–Seidel sweeps
+    (no two adjacent factors share a color) under the ordinary convergence
+    loop — same fixed points as flooding, information travels further per
+    sweep.
+  - mixed (iterative structures present — vmp beads, GFE composites, hard
+    constraints, hybrid mixtures, gaussian_prec): each outer iteration
+    updates the iterative phase synchronously (with its damping), then
+    refreshes the BP islands before the loop evaluates the global residual
+    and FE. Forest islands are re-equilibrated exactly (a full two-pass);
+    cyclic islands advance one colored sweep per outer iteration and
+    equilibrate across iterations, which the residual and FE stationarity
+    criteria measure. Budgets, tolerances, and statuses keep flooding-loop
+    semantics.
+  - flood: retained as an explicit option, and the fallback for δ form
+    constraints (whose per-sweep hardening is defined against flooding) and
+    models with nothing schedulable. `Schedule.reason` names what forced it.
+  Periodic runs of forest rounds compile to a single `lax.scan` whose carry
+  holds only the message blocks that cross steps (registerized; chains
+  classify automatically), so compile cost is O(1) in chain length and the
+  warm kernel has no per-step dispatch. The schedule is a pure function of
+  the arena (which is a pure function of the template), so it reconstructs
+  deterministically from a serialized bundle; `Schedule.describe()` is the
+  stable textual form, and its fingerprint (arena structure hash + content)
+  lets the engine reject stale or doctored prebuilt schedules.
+- The runtime records a `RunResult` with converged / budget-exhausted /
+  diverged / infeasible status, iteration count, FE and message-delta
+  traces, and final residual. Sum/GFE mode stops only when FE is stationary
+  and messages are coherent; max mode uses its message fixed-point residual
+  and validates the decoded objective. Non-finite arenas/residuals are
+  divergence, while proven empty exact support is infeasible with FE = +∞.
+  On a two-pass schedule there is no sweep budget: one execution either
+  certifies (converged, also with `tol=None`) or reports honestly that it
+  did not.
 - GFE nodes are stochastic (importance sampling), so FE traces get burn-in
   averaging (paper uses ~10 iterations) before any decision is read off.
 - Inference *modes* are just constraint presets on the same grounded model:

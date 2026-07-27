@@ -251,6 +251,35 @@ epistemic term push per-regime state beliefs toward wishful separation;
 excluded until derived and tested). Engine integration of the composite is
 the follow-up ticket; the spike ships formulas + experiments, not rules.
 
+**S1j. Schedules: measured envelope (cff-d56d, revised 2026-07-27 after
+review).** Two-pass schedules make tree and chain inference O(E) with
+exact marginals and FE; loopy pure BP gets colored Gauss–Seidel sweeps;
+models with iterative structures get block-phased mixed scheduling. Only δ
+form constraints and models with nothing schedulable still flood (plus any
+run with `damp>0` on an otherwise-exact model). Live matched-shape
+reference (same machine, same timing protocol, M2 Max CPU/x64,
+`uv sync --group bench` for the reference library; the benchmark asserts
+posterior parity against the reference smoother, so both engines provably
+solve the same model): hostile K=2 chains run status-bearing at 13-23x the
+reference smoother through T=256 (kernel 9-13x; flooding was
+1,400-6,500x) — the reference denominator is 14-40 µs, so a few µs of
+run-to-run jitter swings that ratio several x; ordinary K=8 chains at
+7-8x; LGSSM d=4/m=2 at 15-18x (kernel 13-17x). That straddles the
+ticket's 20x envelope with no margin; per the operator's 2026-07-27 call
+the remaining performance gap is deferred (cff-yl0a is the lever), and
+correctness/scheduling work proceeds independently. The earlier recorded
+minimal-output reference (0.0171-0.0198 ms at T=256) projected only the
+requested smoother output inside JIT (and supplied precomputed HMM
+likelihoods), allowing XLA to eliminate the rest of the posterior work; it
+is ~1.5-2x faster and remains a useful strict kernel ceiling, but it is a
+different output contract rather than machine variance. Honest residuals:
+the exact certificate is elementwise,
+`max(|new-old| / (1+|old|)) <= 64 eps`, so neither graph depth nor an
+unrelated large-magnitude block can widen it; `gaussian_marginals` readout
+is a Python-per-edge loop and dominates end-to-end LGSSM time at scale
+(cff-3kdk); slice-fused composite kernels (cff-yl0a) remain the lever if
+the envelope must tighten below ~10x.
+
 **S2. Importance-sampling noise in parameter messages.** The message to A is a
 non-conjugate log-message evaluated by importance sampling; variance grows with
 column dimensionality and makes the GFE trace stochastic (hence burn-in

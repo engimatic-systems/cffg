@@ -25,6 +25,7 @@ from jax.scipy.special import logsumexp
 
 from cffg import csp, ef, efrules, gauss, kernels, mixg
 from cffg.compiler import NEG, Arena
+from cffg.schedule import BatchStage, Schedule, _fingerprint, build_schedule
 from cffg.rules import (
     BP_UPDATES,
     NODE_ENERGIES,
@@ -225,12 +226,111 @@ def _obs_rows(arena: Arena, observations: jax.Array, rows: np.ndarray, dim: int)
 
 
 class Engine:
-    """Compiled, executable model. Construction is cheap; `step` is jitted."""
+    """Compiled, executable model. Construction is cheap; `step` is jitted.
 
-    def __init__(self, arena: Arena):
+    ``schedule`` selects the message-passing schedule (cff-d56d): "auto"
+    builds the strongest schedule the topology admits — exact two-pass for
+    acyclic BP over the discrete/Gaussian/EF arenas, colored sweeps for
+    loopy pure BP, block-phased mixed scheduling when iterative structures
+    (vmp/GFE/constraints/hybrid/prec) are present — and floods otherwise.
+    "flood" forces flooding; "two_pass" requires the exact schedule and
+    raises when the model is outside its contract. A prebuilt
+    :class:`~cffg.schedule.Schedule` is validated against this arena's
+    structure fingerprint and rejected on mismatch."""
+
+    def __init__(self, arena: Arena, schedule: str | Schedule = "auto"):
         self.arena = arena
         self._step = eqx.filter_jit(_make_step(arena))
         self._bfe = eqx.filter_jit(_make_bfe(arena))
+        if isinstance(schedule, Schedule):
+            if schedule.kind != "flood":  # flooding is always safe as given
+                # Recompute the fingerprint from the prebuilt schedule's own
+                # content (including every stage's row tables): a doctored
+                # stage list or permuted scan rows cannot ride in on a
+                # genuine stored fingerprint, and a schedule built for
+                # another arena cannot match this one's structure hash.
+                expected = build_schedule(arena, "auto")
+                if _fingerprint(arena, schedule) != expected.fingerprint:
+                    raise ValueError(
+                        "prebuilt schedule does not match this arena "
+                        "(stale, doctored, or built for another model); "
+                        "rebuild it with cffg.schedule.build_schedule"
+                    )
+            self.schedule = schedule
+        else:
+            self.schedule = build_schedule(arena, schedule)
+        self._propagate = None
+        self._prime = None
+        self._iter_step = self._step
+        self.scan_registerized: tuple[bool, ...] = ()
+        kind = self.schedule.kind
+        self._exact_unit = None
+        if kind == "two_pass":
+            raw = _make_propagate(arena, self.schedule.stages)
+            self.scan_registerized = raw.scan_registerized
+            self._propagate = eqx.filter_jit(raw)
+            self._exact_unit = eqx.filter_jit(_make_exact_unit(arena, raw))
+        elif kind in ("colored", "mixed"):
+            island = _make_propagate(arena, self.schedule.stages)
+            self.scan_registerized = island.scan_registerized
+            if self.schedule.prime_stages:
+                prime_raw = (
+                    island
+                    if self.schedule.prime_stages == self.schedule.stages
+                    else _make_propagate(arena, self.schedule.prime_stages)
+                )
+                self._prime = eqx.filter_jit(prime_raw)
+            if kind == "mixed":
+                # Reviewer-ordered outer iteration (cff-d56d, 2026-07-27):
+                # update the iterative phase synchronously, then refresh the
+                # BP islands — forest islands exactly (full two-pass),
+                # cyclic islands by one colored sweep — before the loop's
+                # residual/FE is evaluated.
+                phase_step = _make_step(arena, skip_scheduled=True)
+
+                def iter_step(
+                    messages, g_eta, g_lam, g_obs, g_mask,
+                    ef_eta, ef_obs, ef_mask, params, damp=0.0, harden=True,
+                ):
+                    messages, g_eta, g_lam, ef_eta, ir, ic = phase_step(
+                        messages, g_eta, g_lam, g_obs, g_mask,
+                        ef_eta, ef_obs, ef_mask, params, damp, harden,
+                    )
+                    messages, g_eta, g_lam, ef_eta = island(
+                        messages, g_eta, g_lam, ef_eta,
+                        g_obs, g_mask, ef_obs, ef_mask, params,
+                    )
+                    return messages, g_eta, g_lam, ef_eta, ir, ic
+            else:
+                # Colored Gauss-Seidel sweep; damping blends the sweep's
+                # result with its input (fixed points are preserved).
+                def iter_step(
+                    messages, g_eta, g_lam, g_obs, g_mask,
+                    ef_eta, ef_obs, ef_mask, params, damp=0.0, harden=True,
+                ):
+                    m2, e2, l2, f2 = island(
+                        messages, g_eta, g_lam, ef_eta,
+                        g_obs, g_mask, ef_obs, ef_mask, params,
+                    )
+                    m2 = damp * messages + (1.0 - damp) * m2
+                    e2 = damp * g_eta + (1.0 - damp) * e2
+                    l2 = damp * g_lam + (1.0 - damp) * l2
+                    f2 = damp * ef_eta + (1.0 - damp) * f2
+                    zero = jnp.asarray(0.0, dtype=m2.dtype)
+                    return m2, e2, l2, f2, zero, jnp.asarray(0)
+
+                iter_step.__doc__ = "one colored sweep over the cyclic islands"
+            self._iter_step = eqx.filter_jit(iter_step)
+        # Discrete edge slot pairs bucketed by cardinality: the zero-support
+        # check runs per bucket instead of per edge (Python-loop-free).
+        by_card: dict[int, list[list[int]]] = {}
+        for e in arena.edges.values():
+            if not e.dim and not e.ef:
+                by_card.setdefault(e.card, []).append([e.slot0, e.slot1])
+        self._support_edge_groups = [
+            (card, np.asarray(pairs, dtype=np.int64).reshape(-1, 2))
+            for card, pairs in sorted(by_card.items())
+        ]
 
     # -- state construction ---------------------------------------------
 
@@ -353,13 +453,30 @@ class Engine:
         premature pointmass locks in its own arbitrary argmax. With
         `harden_last=k` (default: k = n_iters // 2 when δ edges exist), the
         first phase runs soft to coherence, then δ edges harden for the final
-        k sweeps so decisions commit sequentially."""
+        k sweeps so decisions commit sequentially.
+
+        Two-pass schedules (cff-d56d): when the engine compiled an exact
+        directed schedule and the call keeps its contract (``damp=0``, no
+        hardening phase, at least one iteration), the run executes the
+        schedule once instead of flooding: each directed message is updated
+        O(1) times, a certification sweep measures the true fixed-point
+        residual, and the status is ``converged`` when that residual passes
+        the elementwise dtype-scaled mixed absolute/relative certificate
+        (also with ``tol=None`` — the schedule proves the fixed point, so no
+        sweep budget applies)."""
         if n_iters < 0:
             raise ValueError("n_iters must be non-negative")
         if harden_last is None:
             harden_last = n_iters // 2 if len(self.arena.delta_pairs) else 0
         if not 0 <= harden_last <= n_iters:
             raise ValueError("harden_last must be between 0 and n_iters")
+        if (
+            self._propagate is not None
+            and n_iters >= 1
+            and damp == 0.0
+            and harden_last == 0
+        ):
+            return self._run_exact(state, tol)
 
         deltas: list[float] = []
         energies: list[float] = []
@@ -383,11 +500,23 @@ class Engine:
                 state, RunStatus.INFEASIBLE, 0, (), (float("inf"),), float("inf")
             )
 
+        if self._prime is not None and n_iters >= 1:
+            # Colored/mixed priming: equilibrate the forest islands once
+            # (exact, O(E)) before the iterative loop starts counting.
+            msgs, g_eta, g_lam, ef_eta = self._prime(
+                state.messages, state.g_eta, state.g_lam, state.ef_eta,
+                state.g_obs, state.g_mask, state.ef_obs, state.ef_mask,
+                state.params,
+            )
+            state = _replace(
+                state, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta
+            )
+
         def phase(n: int, harden: bool, st: State) -> tuple[State, bool]:
             nonlocal status, residual, inner_status, inner_residual
             previous_fe: float | None = None
             for _ in range(n):
-                msgs, g_eta, g_lam, ef_eta, inner_r, inner_code = self._step(
+                msgs, g_eta, g_lam, ef_eta, inner_r, inner_code = self._iter_step(
                     st.messages, st.g_eta, st.g_lam, st.g_obs, st.g_mask,
                     st.ef_eta, st.ef_obs, st.ef_mask, st.params, damp, harden,
                 )
@@ -494,6 +623,78 @@ class Engine:
             inner_residual=inner_residual,
         )
 
+    def _run_exact(self, state: State, tol: float | None) -> RunResult:
+        """Execute the two-pass directed schedule once and certify it.
+
+        On an acyclic BP graph one inward+outward execution reaches the BP
+        fixed point, so there is no sweep loop: the run costs O(E). A
+        certification sweep (one synchronous flooding step) then re-derives
+        every directed message from the propagated state; its elementwise
+        mixed absolute/relative change is the fixed-point residual, so a
+        scheduling defect — any stale message — surfaces as a non-converged
+        status rather than as silently wrong marginals. The certification
+        sweep recomputes each message once from already-final inputs, so a
+        genuine fixed point sits at a few ulps of each entry's own
+        magnitude, independent of graph diameter and of any other block's
+        scale."""
+
+        if not self._state_is_finite(state):
+            return RunResult(
+                state, RunStatus.DIVERGED, 0, (), (), float("inf"),
+                RunStatus.DIVERGED, float("inf"),
+            )
+
+        # One dispatch: pre/post support flags, propagation, certification
+        # sweep, residual, and ledger execute as a single XLA computation
+        # (review item (c)).
+        msgs, g_eta, g_lam, ef_eta, delta_dev, rel_dev, fe_dev, pre_bad, post_bad = (
+            self._exact_unit(
+                state.messages, state.g_eta, state.g_lam, state.g_obs,
+                state.g_mask, state.ef_eta, state.ef_obs, state.ef_mask,
+                state.params,
+            )
+        )
+        if bool(pre_bad):  # proven-empty support before any propagation
+            return RunResult(
+                state, RunStatus.INFEASIBLE, 0, (), (float("inf"),), float("inf")
+            )
+        st = _replace(state, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta)
+        delta, rel = float(delta_dev), float(rel_dev)
+        if (
+            not np.isfinite(delta)
+            or not np.isfinite(rel)
+            or not self._state_is_finite(st)
+        ):
+            return RunResult(st, RunStatus.DIVERGED, 1, (delta,), (), float("inf"))
+        if bool(post_bad):
+            # The fused ledger value is discarded: Z = 0 means F = +inf, and
+            # a finite NEG-sentinel score must never leak (cff-j4mu).
+            return RunResult(
+                st, RunStatus.INFEASIBLE, 1, (), (float("inf"),), float("inf")
+            )
+
+        # Structural certificate: the elementwise mixed absolute/relative
+        # residual must sit at recomputation-rounding level. Every entry is
+        # compared against its own magnitude, so no block's scale can widen
+        # the certificate for another block. A caller-supplied tolerance is
+        # additionally honored against the raw residual, mirroring the
+        # flooding loop's message-delta criterion.
+        eps = float(np.finfo(np.asarray(st.messages).dtype).eps)
+        structural = rel <= 64.0 * eps
+        by_tol = tol is not None and delta <= max(float(tol), 64.0 * eps)
+        status = (
+            RunStatus.CONVERGED if structural or by_tol else RunStatus.BUDGET_EXHAUSTED
+        )
+        if self.arena.semiring == "max":
+            if status is RunStatus.CONVERGED and not np.isfinite(self.objective(st)):
+                return RunResult(st, RunStatus.DIVERGED, 1, (delta,), (), float("inf"))
+            return RunResult(st, status, 1, (delta,), (), delta)
+
+        fe = float(fe_dev)
+        if not np.isfinite(fe):
+            return RunResult(st, RunStatus.DIVERGED, 1, (delta,), (), float("inf"))
+        return RunResult(st, status, 1, (delta,), (fe,), delta)
+
     @staticmethod
     def _state_is_finite(state: State) -> bool:
         """All numeric runtime leaves must remain finite (NEG is finite)."""
@@ -503,43 +704,45 @@ class Engine:
         )
 
     def _has_zero_support(self, state: State) -> bool:
-        """Whether an edge or ordinary factor belief has empty exact support."""
+        """Whether an edge or ordinary factor belief has empty exact support.
+
+        Vectorized over each edge-cardinality bucket and each group's member
+        stack (cff-d56d): the check runs on every exact-path run, so a
+        per-member Python loop would put an O(T) interpreter cost back into
+        the O(E) schedule."""
         messages = np.asarray(state.messages)
-        for edge in self.arena.edges.values():
-            if edge.dim or edge.ef:
-                continue
+        for card, pairs in self._support_edge_groups:
             logq = (
-                messages[self.arena.message_indices(edge.slot0, edge.card)]
-                + messages[self.arena.message_indices(edge.slot1, edge.card)]
+                messages[self.arena.message_indices(pairs[:, 0], card)]
+                + messages[self.arena.message_indices(pairs[:, 1], card)]
             )
-            if not np.any(np.exp(logq) > 0):
+            if not np.all(np.any(np.exp(logq) > 0, axis=-1)):
                 return True
 
         for group in self.arena.groups:
-            incoming = np.asarray(_disc_rows(self.arena, state.messages, group.gather, group.cards))
-            for member in range(len(group.members)):
-                supports = [
-                    np.exp(incoming[member, role, :card]) > 0
-                    for role, card in enumerate(group.cards)
-                ]
-                if group.type == "equality":
-                    if not np.any(np.logical_and.reduce(supports)):
-                        return True
-                    continue
-                factor_support = np.exp(np.asarray(state.params[group.name])[member]) > 0
-                for role, support in enumerate(supports):
-                    shape = [1] * len(group.cards)
-                    shape[role] = group.cards[role]
-                    factor_support &= support.reshape(shape)
-                if not np.any(factor_support):
+            supports = [  # per role [M, card]: exact support of the incoming
+                np.exp(messages[self.arena.message_indices(group.gather[:, r], card)]) > 0
+                for r, card in enumerate(group.cards)
+            ]
+            n = len(group.members)
+            if group.type == "equality":
+                joint = np.logical_and.reduce(supports)  # [M, k]
+                if not np.all(np.any(joint, axis=-1)):
                     return True
+                continue
+            factor_support = np.exp(np.asarray(state.params[group.name])) > 0
+            for role, card in enumerate(group.cards):
+                shape = [n] + [1] * len(group.cards)
+                shape[1 + role] = card
+                factor_support = factor_support & supports[role].reshape(shape)
+            if not np.all(np.any(factor_support.reshape(n, -1), axis=-1)):
+                return True
 
         for constraint in self.arena.constraint_groups:
-            incoming = np.asarray(
-                _disc_rows(self.arena, state.messages, constraint.gather, constraint.cards)
-            )
             supports = [
-                np.flatnonzero(np.exp(incoming[i, :card]) > 0).tolist()
+                np.flatnonzero(
+                    np.exp(messages[self.arena.message_indices(constraint.gather[i], card)]) > 0
+                ).tolist()
                 for i, card in enumerate(constraint.cards)
             ]
             if any(not support for support in supports):
@@ -942,6 +1145,45 @@ def _prec_sweep(arena, g_eta, g_lam, ef_eta, params):
     return gauss_writes, ef_writes
 
 
+def _gauss_outs(g, inc_e, inc_l, par, y=None, mk=None):
+    """Per-role outgoing (eta, Lambda) messages for one Gaussian group.
+
+    Shared by the flooding sweep and the directed-schedule executors
+    (cff-d56d): `par` holds the group's parameter stacks already subset to
+    the members being fired, `inc_e`/`inc_l` the matching gathered rows."""
+    if g.type == "gaussian":
+        w, m = par["W"], par["m"]
+        return [gauss.prior_message(jnp.einsum("mij,mj->mi", w, m), w)]
+    if g.type == "equality":
+        d = g.dims[0]
+        to_e, to_l = gauss.equality_messages(inc_e[..., :d], inc_l[..., :d, :d])
+        return [(to_e[:, r], to_l[:, r]) for r in range(len(g.roles))]
+    do, di = g.dims  # gaussian_linear / gaussian_linear_obs; roles = (out, in)
+    a, b, w = par["A"], par["b"], par["W"]
+    e_in, l_in = inc_e[:, 1, :di], inc_l[:, 1, :di, :di]
+    outs = [gauss.linear_forward(e_in, l_in, a, b, w)]
+    if g.type == "gaussian_linear_obs":
+        outs.append(gauss.linear_observed_backward(y, mk, a, b, w))
+    else:
+        e_out, l_out = inc_e[:, 0, :do], inc_l[:, 0, :do, :do]
+        outs.append(gauss.linear_backward(e_out, l_out, a, b, w))
+    return outs
+
+
+def _gauss_group_params(g, params, rows=None):
+    """The group's parameter stacks, keyed bare and optionally row-subset."""
+    keys = {
+        "gaussian": ("W", "m"),
+        "equality": (),
+        "gaussian_linear": ("A", "b", "W"),
+        "gaussian_linear_obs": ("A", "b", "W"),
+    }[g.type]
+    return {
+        k: params[f"{g.name}:{k}"] if rows is None else params[f"{g.name}:{k}"][rows]
+        for k in keys
+    }
+
+
 def _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params):
     """One synchronous flooding sweep over the Gaussian groups; returns the
     fully rewritten flat (eta, Lambda) arrays. Dims are static per group, so
@@ -949,31 +1191,31 @@ def _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params):
     new_eta, new_lam = g_eta, g_lam
     for g in arena.gauss_groups:
         inc_e, inc_l = _gauss_rows(arena, g_eta, g_lam, g.gather, g.dims)
-        outs: list[tuple[jax.Array, jax.Array]] = []  # per role, [M, d]/[M, d, d]
-        if g.type == "gaussian":
-            (d,) = g.dims
-            w, m = params[g.name + ":W"], params[g.name + ":m"]
-            outs.append(gauss.prior_message(jnp.einsum("mij,mj->mi", w, m), w))
-        elif g.type == "equality":
-            d = g.dims[0]
-            to_e, to_l = gauss.equality_messages(inc_e[..., :d], inc_l[..., :d, :d])
-            outs = [(to_e[:, r], to_l[:, r]) for r in range(len(g.roles))]
-        else:  # gaussian_linear / gaussian_linear_obs; roles = (out, in)
-            do, di = g.dims
-            a, b, w = (params[g.name + k] for k in (":A", ":b", ":W"))
-            e_in, l_in = inc_e[:, 1, :di], inc_l[:, 1, :di, :di]
-            outs.append(gauss.linear_forward(e_in, l_in, a, b, w))
-            if g.type == "gaussian_linear_obs":
-                y, mk = _obs_rows(arena, g_obs, g.obs_rows, do), g_mask[g.obs_rows]
-                outs.append(gauss.linear_observed_backward(y, mk, a, b, w))
-            else:
-                e_out, l_out = inc_e[:, 0, :do], inc_l[:, 0, :do, :do]
-                outs.append(gauss.linear_backward(e_out, l_out, a, b, w))
+        y = mk = None
+        if g.type == "gaussian_linear_obs":
+            y, mk = _obs_rows(arena, g_obs, g.obs_rows, g.dims[0]), g_mask[g.obs_rows]
+        outs = _gauss_outs(g, inc_e, inc_l, _gauss_group_params(g, params), y, mk)
         for r, (oe, ol) in enumerate(outs):
             new_eta, new_lam = _set_gauss_block(
                 arena, new_eta, new_lam, g.scatter[:, r], g.dims[r], oe, ol
             )
     return new_eta, new_lam
+
+
+def _ef_group_out(g, inc, params, rows=None, obs=None, mask=None):
+    """Outgoing EF messages [m, R, 2] for one group from gathered ``inc``.
+
+    Shared by the flooding sweep and the directed-schedule executors
+    (cff-d56d): ``rows`` optionally subsets the group's parameter stacks to
+    the members being fired."""
+    if g.type == "equality":
+        return efrules.equality_messages(inc)
+    kern = kernels.KERNELS[g.type]
+    gp = {
+        key: params[f"{g.name}:{key}"] if rows is None else params[f"{g.name}:{key}"][rows]
+        for key in kern.param_keys
+    }
+    return kern.message(inc, gp, obs, mask)
 
 
 def _ef_sweep(arena, ef_eta, ef_obs, ef_mask, params):
@@ -984,14 +1226,9 @@ def _ef_sweep(arena, ef_eta, ef_obs, ef_mask, params):
     at trace time and the jitted step is branch-free."""
     new = ef_eta
     for g in arena.ef_groups:
-        if g.type == "equality":
-            out = efrules.equality_messages(ef_eta[g.gather])  # [M, 3, 2]
-        else:
-            kern = kernels.KERNELS[g.type]
-            gp = {key: params[f"{g.name}:{key}"] for key in kern.param_keys}
-            obs = ef_obs[g.obs_rows] if g.obs_rows is not None else None
-            mask = ef_mask[g.obs_rows] if g.obs_rows is not None else None
-            out = kern.message(ef_eta[g.gather], gp, obs, mask).astype(new.dtype)
+        obs = ef_obs[g.obs_rows] if g.obs_rows is not None else None
+        mask = ef_mask[g.obs_rows] if g.obs_rows is not None else None
+        out = _ef_group_out(g, ef_eta[g.gather], params, None, obs, mask).astype(new.dtype)
         new = new.at[g.scatter.reshape(-1)].set(out.reshape(-1, out.shape[-1]))
     return new
 
@@ -1015,8 +1252,16 @@ def _constraint_writes(arena: Arena, messages: jax.Array, op):
     return writes
 
 
-def _make_step(arena: Arena):
-    groups = arena.groups
+def _make_step(arena: Arena, skip_scheduled: bool = False):
+    """The synchronous sweep. With ``skip_scheduled=True`` (the mixed-mode
+    phase step, cff-d56d) the plain BP discrete groups, Gaussian groups, and
+    EF groups are omitted — the directed island passes own them — while
+    every iterative structure (vmp beads, GFE composites, constraints,
+    hybrid mixtures, gaussian_prec) still fires and damps exactly as in
+    flooding."""
+    groups = (
+        [g for g in arena.groups if g.mode != "bp"] if skip_scheduled else arena.groups
+    )
     op = jnp.max if arena.semiring == "max" else logsumexp
 
     def step(
@@ -1098,7 +1343,7 @@ def _make_step(arena: Arena):
         # damping of the Gaussian family (log of a Gaussian is its (eta,
         # Lambda) quadratic), so one damp knob covers both arenas.
         new_eta, new_lam = g_eta, g_lam
-        if arena.gauss_groups:
+        if arena.gauss_groups and not skip_scheduled:
             new_eta, new_lam = _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params)
         for scatter, dim, oe, ol in [*mix_gauss, *prec_gauss]:
             new_eta, new_lam = _set_gauss_block(
@@ -1111,7 +1356,7 @@ def _make_step(arena: Arena):
         # the same damp knob is log-space damping here too.
         new_ef = ef_eta
         if arena.ef_groups or arena.prec_groups:
-            if arena.ef_groups:
+            if arena.ef_groups and not skip_scheduled:
                 new_ef = _ef_sweep(arena, ef_eta, ef_obs, ef_mask, params)
             for scatter, out in prec_ef:
                 new_ef = new_ef.at[scatter].set(out)
@@ -1145,6 +1390,628 @@ def _make_step(arena: Arena):
         return new, new_eta, new_lam, new_ef, inner_residual, inner_status
 
     return step
+
+
+def _batch_stage_fn(arena: Arena, stage, op):
+    """Executor for one BatchStage: fire a member subset of one group,
+    reading the *current* arrays (sequential semantics — the whole point of
+    a directed schedule) and scattering all of its outgoing roles."""
+    if stage.kind == "disc":
+        g = arena.groups[stage.group]
+        rows = stage.rows
+        gather, scatter = g.gather[rows], g.scatter[rows]
+        k_local = max(g.cards)
+
+        def fn(messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params):
+            inc = _disc_rows(arena, messages, gather, g.cards)
+            logf = params.get(g.name)
+            if logf is not None:
+                logf = logf[rows]
+            out = BP_UPDATES[g.type](inc, logf, g.cards, k_local, op)
+            out = jnp.maximum(out, NEG)
+            messages = _set_disc_rows(arena, messages, scatter, g.cards, out)
+            return messages, g_eta, g_lam, ef_eta
+
+        return fn
+
+    if stage.kind == "ef":
+        g = arena.ef_groups[stage.group]
+        rows = stage.rows
+        gather, scatter = g.gather[rows], g.scatter[rows]
+        obs_rows = g.obs_rows[rows] if g.obs_rows is not None else None
+
+        def fn(messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params):
+            obs = ef_obs[obs_rows] if obs_rows is not None else None
+            mask = ef_mask[obs_rows] if obs_rows is not None else None
+            out = _ef_group_out(g, ef_eta[gather], params, rows, obs, mask)
+            out = out.astype(ef_eta.dtype)
+            ef_eta = ef_eta.at[scatter.reshape(-1)].set(
+                out.reshape(-1, out.shape[-1])
+            )
+            return messages, g_eta, g_lam, ef_eta
+
+        return fn
+
+    g = arena.gauss_groups[stage.group]
+    rows = stage.rows
+    gather, scatter = g.gather[rows], g.scatter[rows]
+    obs_rows = g.obs_rows[rows] if g.obs_rows is not None else None
+
+    def fn(messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params):
+        inc_e, inc_l = _gauss_rows(arena, g_eta, g_lam, gather, g.dims)
+        y = mk = None
+        if g.type == "gaussian_linear_obs":
+            y, mk = _obs_rows(arena, g_obs, obs_rows, g.dims[0]), g_mask[obs_rows]
+        outs = _gauss_outs(g, inc_e, inc_l, _gauss_group_params(g, params, rows), y, mk)
+        for r, (oe, ol) in enumerate(outs):
+            g_eta, g_lam = _set_gauss_block(
+                arena, g_eta, g_lam, scatter[:, r], g.dims[r], oe, ol
+            )
+        return messages, g_eta, g_lam, ef_eta
+
+    return fn
+
+
+def _scan_group_of(arena: Arena, elem):
+    return {
+        "disc": arena.groups,
+        "gauss": arena.gauss_groups,
+        "ef": arena.ef_groups,
+    }[elem.kind][elem.group]
+
+
+def _classify_scan(arena: Arena, stage):
+    """Registerization analysis for a ScanStage (cff-d56d).
+
+    Per (elem, role, member-column) gather, find where its slots come from
+    *within* the stage, uniformly across all steps: written by elem ``we``
+    role ``wr`` column ``wc`` in the previous step (d=1, a carried
+    register), the same step (d=0: a register when the writer runs earlier,
+    otherwise a pre-stage read), or the next step (d=-1: always a pre-stage
+    read — the write comes after every read of that slot, and each directed
+    slot is written at most once per pass). Columns whose slots the stage
+    never writes are pre-stage reads too ("static").
+
+    Returns per-elem per-role plans compressed into three shapes — whole
+    role static ("table"), whole role one aligned register ("direct"), or
+    per-column mixed ("mix") — or None when any column's dependency is
+    non-uniform, in which case the flat-carry executor stays correct."""
+    elems = stage.elems
+    # Slot numberings are independent per arena (disc/gauss/ef), so reader
+    # and writer tables only compare within the same kind.
+    writers = []
+    written_by_kind: dict[str, set[int]] = {}
+    for ei, elem in enumerate(elems):
+        sc = _scan_group_of(arena, elem).scatter[elem.rows]  # [S, m, R]
+        for r in range(sc.shape[2]):
+            writers.append((ei, r, sc[:, :, r]))
+            written_by_kind.setdefault(elem.kind, set()).update(
+                int(s) for s in sc[:, :, r].reshape(-1)
+            )
+
+    plans = []
+    for ei, elem in enumerate(elems):
+        ga = _scan_group_of(arena, elem).gather[elem.rows]  # [S, m, R]
+        all_written = written_by_kind.get(elem.kind, set())
+        role_plans = []
+        for r in range(ga.shape[2]):
+            cols = []
+            for c in range(ga.shape[1]):
+                tab = ga[:, c, r]  # [S]
+                match = None
+                for we, wr, wt in writers:
+                    if elems[we].kind != elem.kind:
+                        continue
+                    for wc in range(wt.shape[1]):
+                        col = wt[:, wc]
+                        if stage.length > 1 and np.array_equal(col[:-1], tab[1:]):
+                            match = ("r", we, wr, wc, 1)
+                        elif np.array_equal(col, tab):
+                            match = ("r", we, wr, wc, 0) if we < ei else ("s",)
+                        elif stage.length > 1 and np.array_equal(col[1:], tab[:-1]):
+                            # Written only at the *next* step — every read
+                            # precedes the write, so the pre-stage value is
+                            # correct, provided the final step's slot (outside
+                            # the matched pattern) is not written at all.
+                            if int(tab[-1]) not in all_written:
+                                match = ("s",)
+                        if match:
+                            break
+                    if match:
+                        break
+                if match is None:
+                    if {int(s) for s in tab.reshape(-1)} & all_written:
+                        return None  # non-uniform in-stage dependency
+                    match = ("s",)
+                cols.append(match)
+            if all(p == ("s",) for p in cols):
+                role_plans.append(("table",))
+                continue
+            direct = (
+                all(p[0] == "r" for p in cols)
+                and len({(p[1], p[2], p[4]) for p in cols}) == 1
+                and [p[3] for p in cols] == list(range(len(cols)))
+            )
+            if direct:
+                direct = elems[cols[0][1]].rows.shape[1] == len(cols)
+            if direct:
+                role_plans.append(("direct", cols[0][1], cols[0][2], cols[0][4]))
+            else:
+                role_plans.append(("mix", tuple(cols)))
+        plans.append(role_plans)
+    return plans
+
+
+def _registerized_scan_fn(arena: Arena, stage, plans, op):
+    """Registerized executor: the scan carries only the small message blocks
+    that cross steps; pre-stage inputs are prefetched [S, ...] tensors,
+    outputs are stacked by the scan and scattered into the flat arrays once
+    at the end. This is the executor that makes a chain cost what a
+    hand-written ``lax.scan`` smoother costs — no dynamic gather/scatter on
+    the flat arena inside the loop."""
+    elems = stage.elems
+    metas = []
+    for ei, elem in enumerate(elems):
+        g = _scan_group_of(arena, elem)
+        ga, sc = g.gather[elem.rows], g.scatter[elem.rows]  # [S, m, R]
+        metas.append((elem, g, ga, sc))
+
+    def _col_plans(plan, m):
+        if plan[0] == "mix":
+            return plan[1]
+        if plan[0] == "table":
+            return (("s",),) * m
+        _, we, wr, d = plan
+        return tuple(("r", we, wr, wc, d) for wc in range(m))
+
+    # Carried registers: (we, wr) consumed with d=1 anywhere. Their step-0
+    # value is the pre-stage message at each reader's first gather slot;
+    # unread entries default to the writer's own step-0 slots (any finite
+    # value — they are overwritten before every read).
+    reg_init_slots: dict[tuple[int, int], np.ndarray] = {}
+    for ei, (elem, g, ga, _) in enumerate(metas):
+        for r, plan in enumerate(plans[ei]):
+            for c, cp in enumerate(_col_plans(plan, ga.shape[1])):
+                if cp[0] == "r" and cp[4] == 1:
+                    key = (cp[1], cp[2])
+                    if key not in reg_init_slots:
+                        we_elem, _, _, we_sc = metas[cp[1]]
+                        reg_init_slots[key] = we_sc[0, :, cp[2]].copy()
+                    reg_init_slots[key][cp[3]] = ga[0, c, r]
+
+    def fn(messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params):
+        xs = []
+        for ei, (elem, g, ga, _) in enumerate(metas):
+            x = {}
+            for r, plan in enumerate(plans[ei]):
+                if plan[0] == "direct":
+                    continue
+                cols = _col_plans(plan, ga.shape[1])
+                scols = [c for c, cp in enumerate(cols) if cp[0] == "s"]
+                if not scols:
+                    continue
+                slots = ga[:, scols, r]  # [S, ns]
+                if elem.kind == "disc":
+                    idx = arena.message_indices(slots, g.cards[r])
+                    x[f"s{r}"] = messages[jnp.asarray(idx)]
+                elif elem.kind == "ef":
+                    x[f"s{r}"] = ef_eta[jnp.asarray(slots)]
+                else:
+                    d = g.dims[r]
+                    x[f"se{r}"] = g_eta[jnp.asarray(arena.g_eta_indices(slots, d))]
+                    x[f"sl{r}"] = g_lam[jnp.asarray(arena.g_lam_indices(slots, d))]
+            if elem.kind == "disc":
+                logf = params.get(g.name)
+                if logf is not None:
+                    x["lf"] = logf[elem.rows]
+            elif elem.kind == "ef":
+                kern = kernels.kernel_for(g.type)
+                if kern is not None:
+                    for key in kern.param_keys:
+                        x[f"p{key}"] = params[f"{g.name}:{key}"][elem.rows]
+                if g.obs_rows is not None:
+                    orows = g.obs_rows[elem.rows]
+                    x["ov"] = ef_obs[jnp.asarray(orows)]
+                    x["om"] = ef_mask[jnp.asarray(orows)]
+            else:
+                for k, v in _gauss_group_params(g, params).items():
+                    x[f"p{k}"] = v[elem.rows]
+                if g.type == "gaussian_linear_obs":
+                    orows = g.obs_rows[elem.rows]
+                    x["ov"] = g_obs[jnp.asarray(arena.g_obs_indices(orows, g.dims[0]))]
+                    x["om"] = g_mask[jnp.asarray(orows)]
+            xs.append(x)
+        xs = tuple(xs)
+
+        init = {}
+        for (we, wr), slots in reg_init_slots.items():
+            wg = metas[we][1]
+            if elems[we].kind == "disc":
+                init[f"{we}:{wr}"] = messages[
+                    jnp.asarray(arena.message_indices(slots, wg.cards[wr]))
+                ]
+            elif elems[we].kind == "ef":
+                init[f"{we}:{wr}"] = ef_eta[jnp.asarray(slots)]
+            else:
+                d = wg.dims[wr]
+                init[f"{we}:{wr}:e"] = g_eta[jnp.asarray(arena.g_eta_indices(slots, d))]
+                init[f"{we}:{wr}:l"] = g_lam[jnp.asarray(arena.g_lam_indices(slots, d))]
+
+        def body(prev, x_t):
+            cur: dict = {}
+            ys = {}
+
+            def reg(cp, pair):
+                _, we, wr, wc, d = cp
+                src = prev if d == 1 else cur
+                if pair:
+                    return (
+                        src[f"{we}:{wr}:e"][wc],
+                        src[f"{we}:{wr}:l"][wc],
+                    )
+                return src[f"{we}:{wr}"][wc]
+
+            def read(ei, r, pair):
+                plan = plans[ei][r]
+                if plan[0] == "table":
+                    if pair:
+                        return x_t[ei][f"se{r}"], x_t[ei][f"sl{r}"]
+                    return x_t[ei][f"s{r}"]
+                if plan[0] == "direct":
+                    _, we, wr, d = plan
+                    src = prev if d == 1 else cur
+                    if pair:
+                        return src[f"{we}:{wr}:e"], src[f"{we}:{wr}:l"]
+                    return src[f"{we}:{wr}"]
+                cols = plan[1]
+                si = 0
+                pieces = []
+                for cp in cols:
+                    if cp[0] == "s":
+                        if pair:
+                            pieces.append((x_t[ei][f"se{r}"][si], x_t[ei][f"sl{r}"][si]))
+                        else:
+                            pieces.append(x_t[ei][f"s{r}"][si])
+                        si += 1
+                    else:
+                        pieces.append(reg(cp, pair))
+                if pair:
+                    return (
+                        jnp.stack([p[0] for p in pieces]),
+                        jnp.stack([p[1] for p in pieces]),
+                    )
+                return jnp.stack(pieces)
+
+            for ei, (elem, g, _, _) in enumerate(metas):
+                if elem.kind == "disc":
+                    k_local = max(g.cards)
+                    blocks = [
+                        jnp.pad(
+                            read(ei, r, False),
+                            ((0, 0), (0, k_local - card)),
+                            constant_values=NEG,
+                        )
+                        for r, card in enumerate(g.cards)
+                    ]
+                    inc = jnp.stack(blocks, axis=-2)
+                    out = BP_UPDATES[g.type](
+                        inc, x_t[ei].get("lf"), g.cards, k_local, op
+                    )
+                    out = jnp.maximum(out, NEG)
+                    for r, card in enumerate(g.cards):
+                        block = out[:, r, :card]
+                        cur[f"{ei}:{r}"] = block
+                        ys[f"{ei}:{r}"] = block
+                elif elem.kind == "ef":
+                    inc = jnp.stack(
+                        [read(ei, r, False) for r in range(len(g.roles))], axis=-2
+                    )
+                    if g.type == "equality":
+                        out = efrules.equality_messages(inc)
+                    else:
+                        gp = {
+                            k[1:]: v for k, v in x_t[ei].items() if k.startswith("p")
+                        }
+                        out = kernels.KERNELS[g.type].message(
+                            inc, gp, x_t[ei].get("ov"), x_t[ei].get("om")
+                        )
+                    out = out.astype(inc.dtype)
+                    for r in range(len(g.roles)):
+                        block = out[:, r]
+                        cur[f"{ei}:{r}"] = block
+                        ys[f"{ei}:{r}"] = block
+                else:
+                    width = max(g.dims)
+                    eb, lb = [], []
+                    for r, d in enumerate(g.dims):
+                        e, l = read(ei, r, True)
+                        eb.append(jnp.pad(e, ((0, 0), (0, width - d))))
+                        lb.append(jnp.pad(l, ((0, 0), (0, width - d), (0, width - d))))
+                    inc_e, inc_l = jnp.stack(eb, axis=-2), jnp.stack(lb, axis=-3)
+                    par = {k[1:]: v for k, v in x_t[ei].items() if k.startswith("p")}
+                    y = mk = None
+                    if g.type == "gaussian_linear_obs":
+                        y, mk = x_t[ei]["ov"], x_t[ei]["om"]
+                    outs = _gauss_outs(g, inc_e, inc_l, par, y, mk)
+                    for r, (oe, ol) in enumerate(outs):
+                        d = g.dims[r]
+                        oe, ol = oe[..., :d], ol[..., :d, :d]
+                        cur[f"{ei}:{r}:e"], cur[f"{ei}:{r}:l"] = oe, ol
+                        ys[f"{ei}:{r}:e"], ys[f"{ei}:{r}:l"] = oe, ol
+            new_carry = {k: cur[k] for k in prev}
+            return new_carry, ys
+
+        _, ys = jax.lax.scan(body, init, xs)
+
+        for ei, (elem, g, _, sc) in enumerate(metas):
+            if elem.kind == "disc":
+                for r, card in enumerate(g.cards):
+                    idx = jnp.asarray(arena.message_indices(sc[:, :, r], card))
+                    messages = messages.at[idx].set(ys[f"{ei}:{r}"])
+            elif elem.kind == "ef":
+                for r in range(len(g.roles)):
+                    ef_eta = ef_eta.at[jnp.asarray(sc[:, :, r])].set(ys[f"{ei}:{r}"])
+            else:
+                for r, d in enumerate(g.dims):
+                    ei_idx = jnp.asarray(arena.g_eta_indices(sc[:, :, r], d))
+                    li_idx = jnp.asarray(arena.g_lam_indices(sc[:, :, r], d))
+                    g_eta = g_eta.at[ei_idx].set(ys[f"{ei}:{r}:e"])
+                    g_lam = g_lam.at[li_idx].set(ys[f"{ei}:{r}:l"])
+        return messages, g_eta, g_lam, ef_eta
+
+    return fn
+
+
+def _scan_stage_fn(arena: Arena, stage, op):
+    """Pick the ScanStage executor: registerized when the dependency
+    analysis succeeds (chains always do), flat-carry otherwise."""
+    plans = _classify_scan(arena, stage)
+    if plans is not None:
+        fn = _registerized_scan_fn(arena, stage, plans, op)
+        fn.registerized = True
+        return fn
+    fn = _flat_scan_fn(arena, stage, op)
+    fn.registerized = False
+    return fn
+
+
+def _flat_scan_fn(arena: Arena, stage, op):
+    """Fallback ScanStage executor: S structurally identical rounds as one
+    ``lax.scan`` over the flat arrays. All flat value indices are
+    precomputed [S, ...] tables fed through the scan inputs, so
+    trace/compile cost is O(1) in S while the executed work stays the same
+    as the unrolled rounds."""
+    metas, xs = [], []
+    for elem in stage.elems:
+        if elem.kind == "disc":
+            g = arena.groups[elem.group]
+            slots_g, slots_s = g.gather[elem.rows], g.scatter[elem.rows]  # [S, m, R]
+            x = {
+                "rows": jnp.asarray(elem.rows),
+                "gv": tuple(
+                    jnp.asarray(arena.message_indices(slots_g[:, :, r], card))
+                    for r, card in enumerate(g.cards)
+                ),
+                "sv": tuple(
+                    jnp.asarray(arena.message_indices(slots_s[:, :, r], card))
+                    for r, card in enumerate(g.cards)
+                ),
+            }
+        elif elem.kind == "ef":
+            g = arena.ef_groups[elem.group]
+            x = {
+                "rows": jnp.asarray(elem.rows),
+                "gs": jnp.asarray(g.gather[elem.rows]),  # [S, m, R] ef slots
+                "ss": jnp.asarray(g.scatter[elem.rows]),
+            }
+            if g.obs_rows is not None:
+                x["or"] = jnp.asarray(g.obs_rows[elem.rows])
+        else:
+            g = arena.gauss_groups[elem.group]
+            slots_g, slots_s = g.gather[elem.rows], g.scatter[elem.rows]
+            x = {
+                "rows": jnp.asarray(elem.rows),
+                "ge": tuple(
+                    jnp.asarray(arena.g_eta_indices(slots_g[:, :, r], d))
+                    for r, d in enumerate(g.dims)
+                ),
+                "gl": tuple(
+                    jnp.asarray(arena.g_lam_indices(slots_g[:, :, r], d))
+                    for r, d in enumerate(g.dims)
+                ),
+                "se": tuple(
+                    jnp.asarray(arena.g_eta_indices(slots_s[:, :, r], d))
+                    for r, d in enumerate(g.dims)
+                ),
+                "sl": tuple(
+                    jnp.asarray(arena.g_lam_indices(slots_s[:, :, r], d))
+                    for r, d in enumerate(g.dims)
+                ),
+            }
+            if g.type == "gaussian_linear_obs":
+                orows = g.obs_rows[elem.rows]  # [S, m]
+                x["ov"] = jnp.asarray(arena.g_obs_indices(orows, g.dims[0]))
+                x["mr"] = jnp.asarray(orows)
+        metas.append((elem.kind, g))
+        xs.append(x)
+    xs = tuple(xs)
+
+    def fn(messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params):
+        def body(carry, x_t):
+            messages, g_eta, g_lam, ef_eta = carry
+            for (kind, g), x in zip(metas, x_t):
+                if kind == "disc":
+                    k_local = max(g.cards)
+                    blocks = [
+                        jnp.pad(
+                            messages[x["gv"][r]], ((0, 0), (0, k_local - card)),
+                            constant_values=NEG,
+                        )
+                        for r, card in enumerate(g.cards)
+                    ]
+                    inc = jnp.stack(blocks, axis=-2)
+                    logf = params.get(g.name)
+                    if logf is not None:
+                        logf = logf[x["rows"]]
+                    out = BP_UPDATES[g.type](inc, logf, g.cards, k_local, op)
+                    out = jnp.maximum(out, NEG)
+                    for r, card in enumerate(g.cards):
+                        messages = messages.at[x["sv"][r]].set(out[:, r, :card])
+                elif kind == "ef":
+                    obs = ef_obs[x["or"]] if "or" in x else None
+                    mask = ef_mask[x["or"]] if "or" in x else None
+                    out = _ef_group_out(
+                        g, ef_eta[x["gs"]], params, x["rows"], obs, mask
+                    ).astype(ef_eta.dtype)
+                    ef_eta = ef_eta.at[x["ss"]].set(out)
+                else:
+                    width = max(g.dims)
+                    eb = [
+                        jnp.pad(g_eta[x["ge"][r]], ((0, 0), (0, width - d)))
+                        for r, d in enumerate(g.dims)
+                    ]
+                    lb = [
+                        jnp.pad(
+                            g_lam[x["gl"][r]],
+                            ((0, 0), (0, width - d), (0, width - d)),
+                        )
+                        for r, d in enumerate(g.dims)
+                    ]
+                    inc_e, inc_l = jnp.stack(eb, axis=-2), jnp.stack(lb, axis=-3)
+                    par = _gauss_group_params(g, params, x["rows"])
+                    y = mk = None
+                    if g.type == "gaussian_linear_obs":
+                        y, mk = g_obs[x["ov"]], g_mask[x["mr"]]
+                    outs = _gauss_outs(g, inc_e, inc_l, par, y, mk)
+                    for r, (oe, ol) in enumerate(outs):
+                        d = g.dims[r]
+                        g_eta = g_eta.at[x["se"][r]].set(oe[..., :d])
+                        g_lam = g_lam.at[x["sl"][r]].set(ol[..., :d, :d])
+            return (messages, g_eta, g_lam, ef_eta), None
+
+        (messages, g_eta, g_lam, ef_eta), _ = jax.lax.scan(
+            body, (messages, g_eta, g_lam, ef_eta), xs
+        )
+        return messages, g_eta, g_lam, ef_eta
+
+    return fn
+
+
+def _make_support_check(arena: Arena):
+    """Jitted mirror of ``Engine._has_zero_support`` for constraint-free
+    models (every two-pass model): True iff an edge or factor belief has
+    empty exact support. Semantics identical to the numpy check — exp of the
+    NEG log-zero underflows to exactly 0 in either backend."""
+    if arena.constraint_groups:  # combinatorial feasibility is host-side
+        raise ValueError("jitted support check requires a constraint-free model")
+    by_card: dict[int, list[list[int]]] = {}
+    for e in arena.edges.values():
+        if not e.dim and not e.ef:
+            by_card.setdefault(e.card, []).append([e.slot0, e.slot1])
+    edge_buckets = [
+        (card, np.asarray(pairs, dtype=np.int64).reshape(-1, 2))
+        for card, pairs in sorted(by_card.items())
+    ]
+
+    def check(messages, params):
+        bad = jnp.asarray(False)
+        for card, pairs in edge_buckets:
+            lq = (
+                messages[arena.message_indices(pairs[:, 0], card)]
+                + messages[arena.message_indices(pairs[:, 1], card)]
+            )
+            bad |= ~jnp.all(jnp.any(jnp.exp(lq) > 0, axis=-1))
+        for group in arena.groups:
+            supports = [
+                jnp.exp(messages[arena.message_indices(group.gather[:, r], card)]) > 0
+                for r, card in enumerate(group.cards)
+            ]
+            n = len(group.members)
+            if group.type == "equality":
+                joint = supports[0]
+                for s in supports[1:]:
+                    joint = joint & s
+                bad |= ~jnp.all(jnp.any(joint, axis=-1))
+                continue
+            factor_support = jnp.exp(params[group.name]) > 0
+            for role, card in enumerate(group.cards):
+                shape = [n] + [1] * len(group.cards)
+                shape[1 + role] = card
+                factor_support = factor_support & supports[role].reshape(shape)
+            bad |= ~jnp.all(jnp.any(factor_support.reshape(n, -1), axis=-1))
+        return bad
+
+    return check
+
+
+def _make_exact_unit(arena: Arena, propagate):
+    """Propagation + certification sweep + residual, support flags, and
+    ledger in one XLA computation: the warm status-bearing run is a single
+    dispatch (review continuation (c), 2026-07-27). ``propagate`` is an
+    unjitted stage pipeline from :func:`_make_propagate`."""
+    raw_step = _make_step(arena)
+    raw_bfe = _make_bfe(arena)
+    support_bad = _make_support_check(arena)
+    is_max = arena.semiring == "max"
+
+    def exact_unit(
+        messages, g_eta, g_lam, g_obs, g_mask, ef_eta, ef_obs, ef_mask, params
+    ):
+        pre_bad = support_bad(messages, params)
+        m, e, l, f = propagate(
+            messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params
+        )
+        vm, ve, vl, vf, _, _ = raw_step(
+            m, e, l, g_obs, g_mask, f, ef_obs, ef_mask, params, 0.0, False
+        )
+        delta = jnp.asarray(0.0, dtype=m.dtype)
+        rel = jnp.asarray(0.0, dtype=m.dtype)
+        for a, b in ((vm, m), (ve, e), (vl, l), (vf, f)):
+            if a.size:
+                diff = jnp.abs(a - b)
+                delta = jnp.maximum(delta, jnp.max(diff))
+                # Elementwise mixed absolute/relative residual: each entry is
+                # judged against its own magnitude (with a unit absolute
+                # floor), so a huge-precision Gaussian block cannot widen the
+                # certificate for an unrelated discrete chain (2026-07-27
+                # review, second round).
+                rel = jnp.maximum(rel, jnp.max(diff / (1.0 + jnp.abs(b))))
+        fe = (
+            jnp.asarray(jnp.nan, dtype=m.dtype)
+            if is_max
+            else raw_bfe(m, e, l, g_obs, g_mask, f, ef_obs, ef_mask, params)
+        )
+        return m, e, l, f, delta, rel, fe, pre_bad, support_bad(m, params)
+
+    return exact_unit
+
+
+def _make_propagate(arena: Arena, stages: tuple):
+    """Compile a stage list into one jittable propagation function.
+
+    Stages execute in order against the running arrays (asynchronous /
+    directed semantics), unlike `_make_step`, which gathers everything from
+    the pre-sweep arrays (synchronous flooding). Iterative structures (vmp,
+    GFE, constraints, hybrid, prec) never appear as stages — they run in the
+    restricted synchronous step of the mixed loop."""
+    op = jnp.max if arena.semiring == "max" else logsumexp
+    stage_fns = [
+        _batch_stage_fn(arena, s, op) if isinstance(s, BatchStage)
+        else _scan_stage_fn(arena, s, op)
+        for s in stages
+    ]
+
+    def propagate(messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params):
+        for fn in stage_fns:
+            messages, g_eta, g_lam, ef_eta = fn(
+                messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params
+            )
+        return messages, g_eta, g_lam, ef_eta
+
+    propagate.scan_registerized = tuple(
+        fn.registerized for fn in stage_fns if hasattr(fn, "registerized")
+    )
+    return propagate
 
 
 def _gauss_bfe(arena, g_eta, g_lam, g_obs, g_mask, params):

@@ -11,7 +11,7 @@ from cffg.core.ir import BlobRef
 from cffg.engine import Engine, InferenceError, RunResult, RunStatus, _replace
 
 
-def categorical_engine(dtype=np.float64) -> Engine:
+def categorical_engine(dtype=np.float64, schedule="auto") -> Engine:
     template = Template(
         "status_unit",
         variables={"x": VariableSpec("x", 3)},
@@ -24,7 +24,10 @@ def categorical_engine(dtype=np.float64) -> Engine:
         ports={"data": PortSpec("data", "x", PortRole.DATA)},
         blobs={"p": BlobRef("p", "p")},
     )
-    return Engine(compile_template(template, arrays={"p": np.asarray([0.2, 0.3, 0.5], dtype=dtype)}))
+    return Engine(
+        compile_template(template, arrays={"p": np.asarray([0.2, 0.3, 0.5], dtype=dtype)}),
+        schedule=schedule,
+    )
 
 
 def contradictory_exactly_zero() -> Engine:
@@ -47,7 +50,10 @@ def contradictory_exactly_zero() -> Engine:
 
 
 def test_run_result_fields_and_explicit_api_migration():
-    engine = categorical_engine()
+    # Flooding schedule: this pins the *iterative* loop's trace semantics
+    # (>= 2 FE entries, FE-stationarity residual). The two-pass schedule's
+    # single-execution semantics are pinned in test_schedule.py.
+    engine = categorical_engine(schedule="flood")
     result = engine.run(engine.init_state(), 8, tol=1e-13)
     assert isinstance(result, RunResult)
     assert result.status is RunStatus.CONVERGED
@@ -62,7 +68,11 @@ def test_run_result_fields_and_explicit_api_migration():
 
 
 def test_deliberate_budget_exhaustion_is_not_convergence():
-    engine = categorical_engine()
+    # Flooding schedule: on the two-pass path there is no sweep budget to
+    # exhaust (one execution proves the fixed point, certified by a
+    # verification sweep) — the truthfulness contract this test guards
+    # applies to the iterative loop.
+    engine = categorical_engine(schedule="flood")
     result = engine.run(engine.init_state(), 1, tol=1e-13)
     assert result.status is RunStatus.BUDGET_EXHAUSTED
     assert result.iterations == 1
