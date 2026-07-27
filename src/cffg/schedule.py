@@ -22,10 +22,12 @@ topology admits:
   information further per sweep than flooding.
 - ``mixed``: iterative structures present (mean-field beads, GFE
   composites, hard constraints, hybrid mixtures, gaussian_prec). Each outer
-  iteration updates the iterative phase synchronously, then exactly
-  re-equilibrates the BP islands (forest passes + colored sweeps) before
-  the loop evaluates the global residual and FE — so a stale island can
-  never be what the convergence signal is measured on.
+  iteration updates the iterative phase synchronously, then refreshes the
+  BP islands before the loop evaluates the global residual and FE: forest
+  islands are re-equilibrated *exactly* (a full two-pass), cyclic islands
+  advance one colored sweep — they equilibrate across outer iterations,
+  which the residual and FE stationarity criteria measure. A forest island
+  can therefore never be the stale thing convergence is judged on.
 - ``flood``: the synchronous whole-graph sweep, retained as an explicit
   option and as the fallback for δ form constraints (whose per-sweep
   hardening is defined against flooding) and models with no schedulable
@@ -99,9 +101,10 @@ class Schedule:
     pass; executing it once yields the exact BP fixed point. kind "colored":
     ``prime_stages`` is the one-shot forest pass and ``stages`` is one
     colored sweep, iterated by the engine's convergence loop. kind "mixed":
-    ``stages`` re-equilibrates the BP islands and runs after the iterative
-    phase inside every outer iteration (and once up front as priming).
-    kind "flood": no stages; the engine iterates its synchronous sweep."""
+    ``stages`` refreshes the BP islands (forest passes exactly, cyclic
+    islands by one colored sweep) after the iterative phase inside every
+    outer iteration (and once up front as priming). kind "flood": no
+    stages; the engine iterates its synchronous sweep."""
 
     kind: str  # "two_pass" | "colored" | "mixed" | "flood"
     reason: str = ""
@@ -155,11 +158,32 @@ def _arena_signature(arena: Arena) -> str:
     return h.hexdigest()
 
 
-def _fingerprint(arena: Arena, described: str) -> str:
+def _stage_digest(h, stages: tuple) -> None:
+    """Feed every stage's full row tables (shape, dtype, bytes) into the
+    digest — the textual describe() alone cannot distinguish permuted or
+    reversed scan row tables (2026-07-27 review, second round)."""
+    for s in stages:
+        if isinstance(s, ScanStage):
+            h.update(f"scan|{s.length}".encode())
+            elems = s.elems
+        else:
+            h.update(b"batch")
+            elems = (s,)
+        for e in elems:
+            rows = np.ascontiguousarray(e.rows)
+            h.update(f"|{e.kind}|{e.group}|{rows.dtype.str}|{rows.shape}|".encode())
+            h.update(rows.tobytes())
+
+
+def _fingerprint(arena: Arena, sched: "Schedule") -> str:
     h = hashlib.sha256()
     h.update(_arena_signature(arena).encode())
     h.update(b"\n")
-    h.update(described.encode())
+    h.update(sched.describe().encode())
+    h.update(b"\nprime\n")
+    _stage_digest(h, sched.prime_stages)
+    h.update(b"\niter\n")
+    _stage_digest(h, sched.stages)
     return h.hexdigest()
 
 
@@ -413,7 +437,7 @@ def build_schedule(arena: Arena, mode: str = "auto") -> Schedule:
         raise ValueError(f"schedule mode must be auto|flood|two_pass, got {mode!r}")
 
     def sealed(sched: Schedule) -> Schedule:
-        return replace(sched, fingerprint=_fingerprint(arena, sched.describe()))
+        return replace(sched, fingerprint=_fingerprint(arena, sched))
 
     if mode == "flood":
         return sealed(Schedule(kind="flood", reason="requested"))

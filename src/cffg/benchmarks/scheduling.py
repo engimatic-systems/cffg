@@ -82,9 +82,16 @@ def _median_ms(fn, reps: int, warmup: int = 5) -> float:
     return 1e3 * float(np.median(times))
 
 
-def _reference_hmm(k: int, b: np.ndarray, a: np.ndarray, obs, reps: int):
-    """Live matched-shape HMM smoother timing, or None without the bench
-    dependency group. ``obs`` is a [T] int array with -1 = missing."""
+def _reference_hmm(k: int, b: np.ndarray, a: np.ndarray, d: np.ndarray, obs, reps: int):
+    """Live matched-shape HMM smoother: (median ms, smoothed posteriors), or
+    None without the bench dependency group. ``obs`` is a [T] int array with
+    -1 = missing.
+
+    Convention alignment (2026-07-27 review, second round): the chain
+    template observes states z_1..z_T *after* the first transition, so the
+    reference model's initial distribution is B d; and our B is
+    column-stochastic p(z'|z) while the reference library's transition
+    matrix is row-stochastic — hence the transpose."""
     try:
         import jax
         import jax.numpy as jnp
@@ -104,17 +111,18 @@ def _reference_hmm(k: int, b: np.ndarray, a: np.ndarray, obs, reps: int):
     hmm = CategoricalHMM(k, 1, m_classes)
     params, _ = hmm.initialize(
         jax.random.PRNGKey(0),
-        initial_probs=jnp.full(k, 1.0 / k),
-        transition_matrix=jnp.asarray(b) + 1e-12,
+        initial_probs=jnp.asarray(b @ d),
+        transition_matrix=jnp.asarray(b.T),
         emission_probs=jnp.asarray(a.T[:, None, :]),
     )
     o = jnp.asarray(obs.reshape(-1, 1))
     smooth = jax.jit(lambda p, y: hmm.smoother(p, y))
-    jax.block_until_ready(smooth(params, o).smoothed_probs)
-    return _median_ms(
+    posterior = np.asarray(smooth(params, o).smoothed_probs)
+    ms = _median_ms(
         lambda: jax.block_until_ready(smooth(params, o).smoothed_probs),
         max(reps, 40), warmup=20,
     )
+    return ms, posterior
 
 
 def _reference_lgssm(f, q, h, r, m0, p0, ys, reps: int):
@@ -133,11 +141,12 @@ def _reference_lgssm(f, q, h, r, m0, p0, ys, reps: int):
     )
     yj = jnp.asarray(ys)
     smooth = jax.jit(lambda p, y: lg.smoother(p, y))
-    jax.block_until_ready(smooth(params, yj).smoothed_means)
-    return _median_ms(
+    means = np.asarray(smooth(params, yj).smoothed_means)
+    ms = _median_ms(
         lambda: jax.block_until_ready(smooth(params, yj).smoothed_means),
         max(reps, 40), warmup=20,
     )
+    return ms, means
 
 
 def bench_case(
@@ -201,7 +210,15 @@ def bench_case(
         out["ref_ms"] = ref_ms
         out["kernel_x"] = out["kernel_ms"] / ref_ms
         out["status_x"] = out["status_ms"] / ref_ms
-    return out
+    return out, engine, result
+
+
+def _assert_hmm_parity(engine, result, reference_probs: np.ndarray, n: int) -> None:
+    """Both engines must be solving the same model: state posteriors z_1..z_T
+    agree with the reference smoother to fixed-point precision."""
+    marg = engine.marginals(result.state)
+    ours = np.stack([marg[f"za{i}"] for i in range(1, n + 1)])
+    np.testing.assert_allclose(ours, reference_probs, atol=1e-8)
 
 
 def _print_rows(title: str, rows: list[dict]) -> None:
@@ -254,18 +271,21 @@ def main(argv: list[str] | None = None) -> None:
     for n in (32, 64, 128, 256):
         obs = np.full(n, -1)
         obs[-1] = 1
-        ref = _reference_hmm(k, np.eye(k), a_h, obs, args.reps)
-        row = bench_case(
+        d = np.full(k, 1.0 / k)
+        ref = _reference_hmm(k, np.eye(k), a_h, d, obs, args.reps)
+        row, engine, result = bench_case(
             f"hostile T={n}",
             hmm_chain(n, k),
-            {"d": np.full(k, 1.0 / k), "B": np.eye(k), "A": a_h},
+            {"d": d, "B": np.eye(k), "A": a_h},
             {f"y{n}": 1},
             reps=args.reps,
             flood_iters=3 * n + 10,
             tol=1e-12,
             readout="disc",
-            ref_ms=ref,
+            ref_ms=ref[0] if ref else None,
         )
+        if ref is not None:
+            _assert_hmm_parity(engine, result, ref[1], n)
         row["size"] = n
         rows.append(row)
     _print_rows("hostile identity-dynamics HMM K=2, only final state observed", rows)
@@ -278,18 +298,21 @@ def main(argv: list[str] | None = None) -> None:
     rows = []
     for n in (32, 64, 128, 256):
         obs = rng.integers(0, k, size=n)
-        ref = _reference_hmm(k, b_o, a_o, obs, args.reps)
-        row = bench_case(
+        d = np.full(k, 1.0 / k)
+        ref = _reference_hmm(k, b_o, a_o, d, obs, args.reps)
+        row, engine, result = bench_case(
             f"ordinary T={n}",
             hmm_chain(n, k),
-            {"d": np.full(k, 1.0 / k), "B": b_o, "A": a_o},
+            {"d": d, "B": b_o, "A": a_o},
             {f"y{i + 1}": int(obs[i]) for i in range(n)},
             reps=args.reps,
             flood_iters=3 * n + 10,
             tol=1e-12,
             readout="disc",
-            ref_ms=ref,
+            ref_ms=ref[0] if ref else None,
         )
+        if ref is not None:
+            _assert_hmm_parity(engine, result, ref[1], n)
         row["size"] = n
         rows.append(row)
     _print_rows("ordinary K=8 HMM, fully observed", rows)
@@ -307,7 +330,7 @@ def main(argv: list[str] | None = None) -> None:
         ys = rng.standard_normal((n, m))
         t, arrays = lgssm(n, f, q, h, r, m0, p0)
         ref = _reference_lgssm(f, q, h, r, m0, p0, ys, args.reps)
-        row = bench_case(
+        row, engine, result = bench_case(
             f"lgssm T={n}",
             t,
             arrays,
@@ -316,8 +339,12 @@ def main(argv: list[str] | None = None) -> None:
             flood_iters=3 * n + 10,
             tol=1e-9,
             readout="gauss",
-            ref_ms=ref,
+            ref_ms=ref[0] if ref else None,
         )
+        if ref is not None:
+            marg = engine.gaussian_marginals(result.state)
+            ours = np.stack([marg[f"x{i}"][0] for i in range(n)])
+            np.testing.assert_allclose(ours, ref[1], atol=1e-6)
         row["size"] = n
         rows.append(row)
     _print_rows("LGSSM d=4/m=2", rows)

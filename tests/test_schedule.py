@@ -462,6 +462,23 @@ def test_doctored_prebuilt_schedule_is_rejected():
     Engine(arena, schedule=sched)  # the genuine schedule is accepted
 
 
+def test_permuted_scan_rows_are_rejected_despite_identical_describe():
+    """describe() records scan dimensions, not row content — the fingerprint
+    must seal the row tables themselves (2026-07-27 review, second round)."""
+    arena = compile_template(hmm_template(T), arrays=hmm_arrays(T))
+    sched = build_schedule(arena)
+    stages = list(sched.stages)
+    i, scan = next((i, s) for i, s in enumerate(stages) if isinstance(s, ScanStage))
+    reversed_elems = tuple(
+        replace(e, rows=np.ascontiguousarray(e.rows[::-1])) for e in scan.elems
+    )
+    stages[i] = replace(scan, elems=reversed_elems)
+    tampered = replace(sched, stages=tuple(stages))
+    assert tampered.describe() == sched.describe()  # the textual form ties
+    with pytest.raises(ValueError, match="does not match this arena"):
+        Engine(arena, schedule=tampered)
+
+
 def test_float32_missing_phase_cannot_certify_at_t256():
     """The reviewer's exploit (2026-07-27): drop the outward pass on a long
     float32 chain. The stale-message residual (~1e-3) is far above the
@@ -500,7 +517,61 @@ def test_float32_genuine_two_pass_still_certifies_at_t256():
         )
         result = engine.run(state, 1, tol=None)
         assert result.status is RunStatus.CONVERGED
-        assert result.message_deltas[0] <= engine._certificate_floor(result.state)
+
+
+def mixed_scale_template(n):
+    """The f32 chain plus an *unrelated* scalar Gaussian island whose
+    precision is 1e12: any global certificate scale would be dominated by
+    the Gaussian block."""
+    from cffg.core.ir import BlobRef as BR, FactorSpec as FS, VariableSpec as VS
+
+    t = hmm_template(n)
+    t.variables["gx"] = VS("gx", dim=1)
+    t.variables["gy"] = VS("gy", dim=1)
+    t.factors["gprior"] = FS(
+        "gprior", "gaussian", edges={"out": "gx"},
+        param_blobs={"mean": "gm", "cov": "gc"},
+    )
+    t.factors["glin"] = FS(
+        "glin", "gaussian_linear", edges={"out": "gy", "in": "gx"},
+        param_blobs={"matrix": "gA", "offset": "gb", "cov": "gc"},
+    )
+    t.ports["gout"] = PortSpec("gout", "gy", PortRole.GLUE)
+    for b in ("gm", "gc", "gA", "gb"):
+        t.blobs[b] = BR(b, b)
+    arrays = dict(hmm_arrays(n))
+    arrays.update(
+        gm=np.zeros(1), gc=np.full((1, 1), 1e-12),
+        gA=np.ones((1, 1)), gb=np.zeros(1),
+    )
+    return t, arrays
+
+
+def test_float32_mixed_scales_cannot_widen_the_certificate():
+    """Second-round review exploit: a huge-precision Gaussian island must
+    not raise the certificate for a stale discrete chain — the residual
+    comparison is elementwise, not global-scale."""
+    n = 256
+    with jax.enable_x64(False):
+        t, arrays = mixed_scale_template(n)
+        arena = compile_template(t, arrays=arrays)
+        engine = Engine(arena)
+        assert engine.schedule.kind == "two_pass"
+        obs = [int(v) for v in np.random.default_rng(1).integers(0, M, size=n)]
+        state = engine.bind_data(
+            engine.init_state(), {f"chain/t{t}/sense": obs[t] for t in range(n)}
+        )
+        # The genuine schedule still certifies despite the 1e12 block.
+        assert engine.run(state, 1, tol=None).status is RunStatus.CONVERGED
+        # A missing outward pass must not.
+        inward_only = engine_mod._make_propagate(
+            arena, engine.schedule.stages[: len(engine.schedule.stages) // 2]
+        )
+        engine._exact_unit = eqx.filter_jit(
+            engine_mod._make_exact_unit(arena, inward_only)
+        )
+        result = engine.run(state, 1, tol=None)
+        assert result.status is not RunStatus.CONVERGED
 
 
 # -- EF directed passes ------------------------------------------------------

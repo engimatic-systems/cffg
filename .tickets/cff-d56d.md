@@ -104,3 +104,17 @@ Path: keep the generic schedule/fallback, but have compilation recognize exact H
 Independent design evidence: PGMax compiles a general factor-graph API into flat typed storage/wiring, runs one vectorized JAX kernel per factor family inside lax.scan, and uses algebraically specialized kernels for logical factor families. This supports static topology lowering without changing the user API, though PGMax's discrete-LBP benchmarks do not predict CFFG-vs-Dynamax ratios.
 
 Sources: installed Dynamax hidden_markov_model/inference.py (_condition_on, _predict, hmm_smoother), hidden_markov_model/models/abstractions.py (_inference_args and nested-vmap likelihoods), linear_gaussian_ssm/inference.py (Kalman/RTS), linear_gaussian_ssm/models.py (direct smoother wrapper); CFFG src/cffg/engine.py (_registerized_scan_fn, _make_exact_unit), src/cffg/rules.py (bp_matrix_cat/equality), src/cffg/gauss.py (linear_forward/backward and robustness branches); PGMax official repository fgraph/fgraph.py, infer/bp.py, factor/enum.py and factor/logical.py at commit 741d532. Confidence: high on comparator identity/mechanism and the 1.39x arithmetic; medium on achieved fusion speedup until profiled.
+
+**2026-07-27T15:34:00Z**
+
+Second review round fixed (2026-07-27, operator-approved scope: AC3 performance gap deferred, cff-yl0a remains the lever).
+
+1. Certificate: the fused unit now computes an elementwise mixed absolute/relative residual, max over entries of |v - p| / (1 + |p|), judged against 64 eps. No global scale exists to widen: the reproduced exploit (float32 T=256 chain plus an unrelated Gaussian island at precision 1e12, outward pass removed) now reports budget_exhausted, pinned as test_float32_mixed_scales_cannot_widen_the_certificate, with a companion proving the genuine schedule still certifies on the same mixed-scale model. A caller tolerance is honored against the raw residual, mirroring the flooding loop's criterion.
+
+2. Fingerprint: the digest now includes every stage's full row tables (kind, group, dtype, shape, bytes) for both stages and prime_stages. Reversing a ScanElem.rows table leaves describe() unchanged but is rejected at Engine construction; pinned as test_permuted_scan_rows_are_rejected_despite_identical_describe.
+
+3. Benchmark reference model: column-stochastic B is transposed for the reference library's row-stochastic convention, the initial distribution is B d (our chains observe states after the first transition), and the benchmark now asserts posterior parity (state marginals vs reference smoother, atol 1e-8 discrete / 1e-6 LGSSM means) for every configuration, so ratios can no longer be quoted for mismatched models. The B-transpose mattered for the ordinary K=8 case; parity passes across all configurations.
+
+4. Docs/docstrings no longer claim cyclic mixed islands are "exactly re-equilibrated": forest islands get the exact two-pass each outer iteration, cyclic islands advance one colored sweep and equilibrate across iterations (ARCHITECTURE, README, schedule.py, engine.py wording).
+
+Full suite: 1,207 passed; dashboard refreshed. Corrected-protocol ratios (parity-asserted): hostile K=2 run 13-23x (reference denominator 14-40 microseconds, jitter swings several x), ordinary K=8 7-8x, LGSSM d=4/m=2 15-18x; recorded honestly in LIMITATIONS S1j with the deferral note.

@@ -261,9 +261,12 @@ A registry keyed by `(factor_type, constraint_config, out_edge_role)`:
   - mixed (iterative structures present — vmp beads, GFE composites, hard
     constraints, hybrid mixtures, gaussian_prec): each outer iteration
     updates the iterative phase synchronously (with its damping), then
-    exactly re-equilibrates the BP islands before the loop evaluates the
-    global residual and FE — convergence is never measured on a stale
-    island. Budgets, tolerances, and statuses keep flooding-loop semantics.
+    refreshes the BP islands before the loop evaluates the global residual
+    and FE. Forest islands are re-equilibrated exactly (a full two-pass);
+    cyclic islands advance one colored sweep per outer iteration and
+    equilibrate across iterations, which the residual and FE stationarity
+    criteria measure. Budgets, tolerances, and statuses keep flooding-loop
+    semantics.
   - flood: retained as an explicit option, and the fallback for δ form
     constraints (whose per-sweep hardening is defined against flooding) and
     models with nothing schedulable. `Schedule.reason` names what forced it.

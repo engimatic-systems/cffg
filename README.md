@@ -107,8 +107,9 @@ the fixed point with a fused verification sweep, and returns `converged`
 (even with `tol=None`; there is no sweep budget to exhaust). Loopy pure-BP
 models iterate colored Gauss–Seidel sweeps; models with iterative
 structures (mean-field beads, GFE composites, hard constraints, hybrid
-nodes) run block-phased: each sweep updates those structures, then exactly
-re-equilibrates the BP parts before convergence is judged. Only δ form
+nodes) run block-phased: each sweep updates those structures, then
+refreshes the BP parts — tree-shaped parts exactly, loopy parts by one
+colored sweep — before convergence is judged. Only δ form
 constraints (and `damp > 0` on otherwise-exact models) still use plain
 flooding; `engine.schedule.kind` and `.reason` say what you got. Force
 flooding with `Engine(arena, schedule="flood")`.

@@ -258,12 +258,16 @@ models with iterative structures get block-phased mixed scheduling. Only δ
 form constraints and models with nothing schedulable still flood (plus any
 run with `damp>0` on an otherwise-exact model). Live matched-shape
 reference (same machine, same timing protocol, M2 Max CPU/x64,
-`uv sync --group bench` for the reference library): hostile K=2 chains run
-status-bearing at 13-19x the reference smoother through T=256 (kernel
-8-12x; flooding was 1,300-5,700x), ordinary K=8 chains at 7-8x, LGSSM
-d=4/m=2 at 17-19x (kernel 13-17x) — all inside the ticket's 20x envelope,
-but with little margin: treat LGSSM mid-sizes (~19x) as at-risk on other
-machines. The earlier recorded reference figure (0.0171-0.0198 ms at
+`uv sync --group bench` for the reference library; the benchmark asserts
+posterior parity against the reference smoother, so both engines provably
+solve the same model): hostile K=2 chains run status-bearing at 13-23x the
+reference smoother through T=256 (kernel 9-13x; flooding was
+1,400-6,500x) — the reference denominator is 14-40 µs, so a few µs of
+run-to-run jitter swings that ratio several x; ordinary K=8 chains at
+7-8x; LGSSM d=4/m=2 at 15-18x (kernel 13-17x). That straddles the
+ticket's 20x envelope with no margin; per the operator's 2026-07-27 call
+the remaining performance gap is deferred (cff-yl0a is the lever), and
+correctness/scheduling work proceeds independently. The earlier recorded reference figure (0.0171-0.0198 ms at
 T=256) is ~2x below what the same library measures live here; ratios
 against that stricter figure are ~2x worse. Honest residuals: the
 certificate is scale-relative (64 eps × largest live magnitude), so

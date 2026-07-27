@@ -245,11 +245,12 @@ class Engine:
         if isinstance(schedule, Schedule):
             if schedule.kind != "flood":  # flooding is always safe as given
                 # Recompute the fingerprint from the prebuilt schedule's own
-                # content: a doctored stage list cannot ride in on a genuine
-                # stored fingerprint, and a schedule built for another arena
-                # cannot match this one's structure hash.
+                # content (including every stage's row tables): a doctored
+                # stage list or permuted scan rows cannot ride in on a
+                # genuine stored fingerprint, and a schedule built for
+                # another arena cannot match this one's structure hash.
                 expected = build_schedule(arena, "auto")
-                if _fingerprint(arena, schedule.describe()) != expected.fingerprint:
+                if _fingerprint(arena, schedule) != expected.fingerprint:
                     raise ValueError(
                         "prebuilt schedule does not match this arena "
                         "(stale, doctored, or built for another model); "
@@ -281,9 +282,10 @@ class Engine:
                 self._prime = eqx.filter_jit(prime_raw)
             if kind == "mixed":
                 # Reviewer-ordered outer iteration (cff-d56d, 2026-07-27):
-                # update the iterative phase synchronously, then exactly
-                # re-equilibrate the BP islands, so the loop's residual/FE
-                # is never evaluated on a stale island.
+                # update the iterative phase synchronously, then refresh the
+                # BP islands — forest islands exactly (full two-pass),
+                # cyclic islands by one colored sweep — before the loop's
+                # residual/FE is evaluated.
                 phase_step = _make_step(arena, skip_scheduled=True)
 
                 def iter_step(
@@ -620,40 +622,20 @@ class Engine:
             inner_residual=inner_residual,
         )
 
-    @staticmethod
-    def _certificate_floor(state: State) -> float:
-        """Dtype- and scale-relative certificate for the fixed-point residual.
-
-        The certification sweep recomputes each message once from already-
-        final inputs, so its residual is a few ulps of the values involved —
-        *local* rounding, independent of graph diameter. The floor is
-        therefore 64 eps times the largest live magnitude in the state
-        (log-messages near the NEG log-zero sentinel recompute exactly and
-        are excluded from the scale). A diameter-scaled floor would grow
-        past genuine staleness signals on long float32 chains — the false-
-        convergence defect this replaces (cff-d56d review, 2026-07-27)."""
-        dtype = np.asarray(state.messages).dtype
-        scale = 1.0
-        msgs = np.asarray(state.messages)
-        live = msgs[np.abs(msgs) < 0.5 * abs(NEG)]
-        if live.size:
-            scale = max(scale, float(np.max(np.abs(live))))
-        for arr in (state.g_eta, state.g_lam, state.ef_eta):
-            a = np.asarray(arr)
-            if a.size:
-                scale = max(scale, float(np.max(np.abs(a))))
-        return 64.0 * float(np.finfo(dtype).eps) * scale
-
     def _run_exact(self, state: State, tol: float | None) -> RunResult:
         """Execute the two-pass directed schedule once and certify it.
 
         On an acyclic BP graph one inward+outward execution reaches the BP
         fixed point, so there is no sweep loop: the run costs O(E). A
         certification sweep (one synchronous flooding step) then re-derives
-        every directed message from the propagated state; its max change is
-        the true fixed-point residual, so a scheduling defect — any stale
-        message — surfaces as a non-converged status rather than as silently
-        wrong marginals."""
+        every directed message from the propagated state; its elementwise
+        mixed absolute/relative change is the fixed-point residual, so a
+        scheduling defect — any stale message — surfaces as a non-converged
+        status rather than as silently wrong marginals. The certification
+        sweep recomputes each message once from already-final inputs, so a
+        genuine fixed point sits at a few ulps of each entry's own
+        magnitude, independent of graph diameter and of any other block's
+        scale."""
 
         if not self._state_is_finite(state):
             return RunResult(
@@ -664,7 +646,7 @@ class Engine:
         # One dispatch: pre/post support flags, propagation, certification
         # sweep, residual, and ledger execute as a single XLA computation
         # (review item (c)).
-        msgs, g_eta, g_lam, ef_eta, delta_dev, fe_dev, pre_bad, post_bad = (
+        msgs, g_eta, g_lam, ef_eta, delta_dev, rel_dev, fe_dev, pre_bad, post_bad = (
             self._exact_unit(
                 state.messages, state.g_eta, state.g_lam, state.g_obs,
                 state.g_mask, state.ef_eta, state.ef_obs, state.ef_mask,
@@ -676,8 +658,12 @@ class Engine:
                 state, RunStatus.INFEASIBLE, 0, (), (float("inf"),), float("inf")
             )
         st = _replace(state, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta)
-        delta = float(delta_dev)
-        if not np.isfinite(delta) or not self._state_is_finite(st):
+        delta, rel = float(delta_dev), float(rel_dev)
+        if (
+            not np.isfinite(delta)
+            or not np.isfinite(rel)
+            or not self._state_is_finite(st)
+        ):
             return RunResult(st, RunStatus.DIVERGED, 1, (delta,), (), float("inf"))
         if bool(post_bad):
             # The fused ledger value is discarded: Z = 0 means F = +inf, and
@@ -686,10 +672,17 @@ class Engine:
                 st, RunStatus.INFEASIBLE, 1, (), (float("inf"),), float("inf")
             )
 
-        floor = self._certificate_floor(st)
-        certificate = floor if tol is None else max(float(tol), floor)
+        # Structural certificate: the elementwise mixed absolute/relative
+        # residual must sit at recomputation-rounding level. Every entry is
+        # compared against its own magnitude, so no block's scale can widen
+        # the certificate for another block. A caller-supplied tolerance is
+        # additionally honored against the raw residual, mirroring the
+        # flooding loop's message-delta criterion.
+        eps = float(np.finfo(np.asarray(st.messages).dtype).eps)
+        structural = rel <= 64.0 * eps
+        by_tol = tol is not None and delta <= max(float(tol), 64.0 * eps)
         status = (
-            RunStatus.CONVERGED if delta <= certificate else RunStatus.BUDGET_EXHAUSTED
+            RunStatus.CONVERGED if structural or by_tol else RunStatus.BUDGET_EXHAUSTED
         )
         if self.arena.semiring == "max":
             if status is RunStatus.CONVERGED and not np.isfinite(self.objective(st)):
@@ -1971,15 +1964,23 @@ def _make_exact_unit(arena: Arena, propagate):
             m, e, l, g_obs, g_mask, f, ef_obs, ef_mask, params, 0.0, False
         )
         delta = jnp.asarray(0.0, dtype=m.dtype)
+        rel = jnp.asarray(0.0, dtype=m.dtype)
         for a, b in ((vm, m), (ve, e), (vl, l), (vf, f)):
             if a.size:
-                delta = jnp.maximum(delta, jnp.max(jnp.abs(a - b)))
+                diff = jnp.abs(a - b)
+                delta = jnp.maximum(delta, jnp.max(diff))
+                # Elementwise mixed absolute/relative residual: each entry is
+                # judged against its own magnitude (with a unit absolute
+                # floor), so a huge-precision Gaussian block cannot widen the
+                # certificate for an unrelated discrete chain (2026-07-27
+                # review, second round).
+                rel = jnp.maximum(rel, jnp.max(diff / (1.0 + jnp.abs(b))))
         fe = (
             jnp.asarray(jnp.nan, dtype=m.dtype)
             if is_max
             else raw_bfe(m, e, l, g_obs, g_mask, f, ef_obs, ef_mask, params)
         )
-        return m, e, l, f, delta, fe, pre_bad, support_bad(m, params)
+        return m, e, l, f, delta, rel, fe, pre_bad, support_bad(m, params)
 
     return exact_unit
 
