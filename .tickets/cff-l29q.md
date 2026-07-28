@@ -1,6 +1,6 @@
 ---
 id: cff-l29q
-status: open
+status: closed
 deps: [cff-x0sv]
 links: []
 created: 2026-07-28T04:20:00Z
@@ -28,3 +28,9 @@ Add one plain-English and formal D6a section to DERIVATIONS.md. State factor-to-
 ## Acceptance Criteria
 
 DERIVATIONS D6a includes the plain-English explanation, formal VMP updates, FE/entropy terms, conjugate-equivalence theorem with exact assumptions, and explicit proof that general BP is not Dirichlet-closed. Named independent tests pin categorical, matrix_cat and transition_mixture fractional counts, posterior parameters and total mean-field VFE against direct algebra/enumeration. Tests cover exact-zero mass, improper/vacuous prior behavior, sparse float32 concentrations and uncomfortable category/action scale. No arena/compiler implementation and no claim that mu3 fits a Dirichlet message.
+
+## Notes
+
+**2026-07-28T15:32:56Z**
+
+Completed D6a: DERIVATIONS now specifies VMP fractional-count messages, expected-log state messages, parameter-edge entropy correction, full local VFE, the exact BP non-closure proof, equivalence assumptions, and hostile-input behavior. Added independent executable anchors in tests/test_dirichlet_vmp_derivation.py; 5 focused tests pass. Next: cff-fr5c implements this reviewed contract in compiler/runtime arenas.

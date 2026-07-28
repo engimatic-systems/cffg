@@ -686,3 +686,186 @@ exact channel log 2 ≈ 0.693, sandwich [0.540, 0.693].
 *Executable:* `test_probe_experiment_gfe_explores_and_wins`,
 `test_probe_experiment_ablation_never_explores`, plus the float32 /
 degenerate-belief / improper-covariance contract tests.
+
+## D6a — VMP Dirichlet parameter edges and their VFE ledger (cff-l29q)
+
+### D6a.1 The plain-English version
+
+A categorical table can be an uncertain variable in the graph instead of a
+fixed blob. The useful conjugacy is specifically **mean-field VMP
+conjugacy**. A likelihood node sees the current beliefs over its ordinary
+categorical edges and sends their outer product to the table as fractional
+counts. A proper Dirichlet prior plus all such counts gives another proper
+Dirichlet; in the other direction, the likelihood uses the posterior expected
+log table, not the log posterior mean.
+
+This is the same algebra used by the out-of-graph `Learnables` fold, but that
+does not make the two procedures interchangeable without conditions. They
+agree when they start from the same proper prior, integrate the same
+mean-field node beliefs exactly once, use the same parameter tying and axis
+layout, and compare at the same inference fixed point. The in-graph form can
+feed the updated expected log table back into inference during a trial;
+`Learnables` normally folds a converged trial afterwards.
+
+Ordinary sum-product BP does **not** supply this message. Marginalizing a
+latent categorical assignment gives a weighted sum of table entries, while a
+Dirichlet-shaped message is a product of powers of those entries. They agree
+only when all roles selecting a table cell are hard (or, equivalently, every
+assignment with nonzero incoming mass selects the same cell). The Part II
+`mu3(A)` planning message is also not Dirichlet-shaped and is deliberately
+absent from this contract.
+
+The free-energy ledger must retain the parameter belief. A likelihood node
+contributes its expected negative log likelihood, the prior contributes its
+cross-entropy, and the parameter belief contributes its negative entropy.
+In the node-local CFFG spelling both adjacent nodes initially contain the
+parameter negative entropy; the parameter-edge correction removes one copy.
+Dropping that correction, or dropping the parameter entropy altogether,
+changes the VFE and therefore changes both convergence and policy scores.
+
+### D6a.2 Formal VMP updates
+
+**Layout and notation.** Every conditional table normalizes over its output
+axis. Let `c` index one output cell and `j` the remaining column indices:
+
+    categorical:        θ[c]
+    matrix_cat:         A[c, i]
+    transition_mixture: B[u, c, i]     (serialized/blob parameter layout).
+
+Each column has an independent Dirichlet prior
+`p(θ_.j | α⁰_.j) = Dir(α⁰_.j)`, with every concentration finite and strictly
+positive. Define
+
+    L[c,j] := E_q[log θ[c,j]]
+            = ψ(α[c,j]) − ψ(Σ_d α[d,j]).
+
+There is no numeric floor in this definition. Positive concentrations may
+produce very negative finite expected logs, especially in float32; exact
+zero support belongs to categorical beliefs and contributes an exact zero
+count.
+
+**Factor-to-parameter message.** For
+`f(s,θ) = θ[cell(s)]`, the mean-field constraint
+`q_f(s,θ) = q(θ) ∏_r q_r(s_r)` gives
+
+    log μ_{f→θ}(θ)
+      = E_{∏q_r}[log f(s,θ)] + const
+      = Σ_{c,j} n[c,j] log θ[c,j] + const,
+
+so, under the Dirichlet natural convention
+`log Dir(θ|α) = const + Σ(α−1)log θ`, the message natural parameter is the
+fractional count `η_f = n` (not `n−1`). The three sufficient statistics are
+
+    categorical:        n[c]     = q_out(c)
+    matrix_cat:         n[c,i]   = q_out(c) q_in(i)
+    transition_mixture: n[u,c,i] = q_sel(u) q_out(c) q_in(i).
+
+For clamped variables the corresponding `q` is a one-hot vector, so
+impossible cells receive exactly zero. Shapes above are parameter layout;
+the engine's transition node-belief layout `[c,i,u]` is transposed to
+`[u,c,i]`.
+
+With likelihood nodes `a = 1…N`, the parameter marginal is
+
+    q(θ) = Dir(α),                 α = α⁰ + Σ_a n_a.             (D6a.1)
+
+The parameter-to-likelihood cavity message excludes that likelihood:
+
+    η_{θ→a} = (α⁰ − 1) + Σ_{b≠a} n_b.
+
+The VMP update *from* likelihood `a` to any structural role uses the complete
+current marginal `q(θ)` and replaces the fixed `log θ` table in the ordinary
+geometric rule by `L = E_q log θ`. For example,
+
+    log μ_{f→out}(c) = Σ_i q_in(i) L[c,i] + const,
+
+with the analogous two- or three-way contractions for the other roles.
+This use of the complete marginal is the coordinate-ascent VMP update; the
+cavity expression above defines edge-message bookkeeping, not a directive to
+discard `a` while taking `E_q log θ`.
+
+**Why BP is not closed.** Exact sum-product instead sends
+
+    μ^BP_{f→θ}(θ) = Σ_s w(s) θ[cell(s)],
+
+where `w` is the product of incoming structural messages. A Dirichlet-shaped
+message would be `C ∏_{c,j} θ[c,j]^{η[c,j]}`. The former has nonzero mixed
+curvature in `log μ = log Σ_s w(s)θ[cell(s)]`; the latter is affine in
+`log θ`. They cannot agree on an open subset when two distinct cells have
+positive weight. If all nonzero weight selects one cell `k`, the sum reduces
+to `Cθ_k`, the hard-count special case `η_k=1`. Thus a latent-state BP
+parameter edge is rejected rather than silently approximated.
+*Executable:* `test_exact_bp_parameter_message_is_not_dirichlet_closed`.
+
+### D6a.3 Parameter VFE and the complete ledger
+
+For one column define the multivariate beta function
+
+    log B(α) = Σ_c log Γ(α_c) − log Γ(Σ_c α_c)
+
+and `ℓ_c = ψ(α_c) − ψ(α_+)`. The three parameter-related terms are
+
+    Q term (negative entropy):
+      E_q log q = −log B(α) + Σ_c (α_c−1)ℓ_c
+
+    prior energy:
+      −E_q log p(θ|α⁰) = log B(α⁰) − Σ_c (α⁰_c−1)ℓ_c
+
+    likelihood energy:
+      −E_q log f = −Σ_c n_c ℓ_c.
+
+They sum over columns for matrix and transition tables. At the coordinate
+optimum `α = α⁰+n`, all expected-log terms cancel:
+
+    F_θ,prior,lik = log B(α⁰) − log B(α⁰+n).                    (D6a.2)
+
+The **complete** mean-field VFE also includes the ordinary state-belief terms
+and all other factors. For this likelihood block, with no other terms shown,
+
+    F_block = Σ_r Σ_{s_r} q_r(s_r) log q_r(s_r)
+              + E_q log q(θ) − E_q log p(θ|α⁰)
+              − E_{q(θ)∏q_r} log f(s,θ).                       (D6a.3)
+
+Zeros in `q_r` use the continuous convention `0 log 0 = 0`.
+
+In node-local CFFG form, the prior and likelihood node beliefs each contain
+the parameter marginal:
+
+    F_prior-node = E_q log q(θ) − E_q log p(θ|α⁰)
+    F_lik-node   = E_q log q(θ) + Σ_r E log q_r − E log f.
+
+The parameter-edge correction is `−E_q log q(θ)` (equivalently `−` the
+negative entropy), leaving exactly (D6a.3). Equality trees used to share one
+parameter repeat this accounting mechanically: every internal edge removes
+the one extra marginal-entropy copy introduced by its incident node terms.
+*Executable:* `test_categorical_fractional_counts_and_total_vfe`,
+`test_matrix_cat_fractional_counts_and_total_vfe`,
+`test_transition_mixture_fractional_counts_and_total_vfe`.
+
+**Conjugate-equivalence theorem.** An in-graph posterior (D6a.1) equals an
+out-of-graph `Dirichlet.fold` posterior iff:
+
+1. both start from the identical proper `α⁰`;
+2. every source likelihood carries the declared mean-field constraint;
+3. both consume the same converged structural marginals, whose product is
+   the VMP node belief, once per factor instance;
+4. blob/edge tying, source restrictions, and the output-axis layout route
+   every statistic to the same posterior column; and
+5. no update is interleaved on one side before the compared structural fixed
+   point, and no extra functional message such as `mu3` is present.
+
+Under these assumptions both sides are definitionally
+`α⁰ + Σ_a E_q[t_a]`; equality follows entrywise. Without (2), the exact BP
+node belief can carry correlations and its parameter message has the
+non-closure above. Without (3–4), a statistic is duplicated, omitted, or
+transposed. Without (5), the two algorithms are being compared at different
+coordinate-ascent iterates, not at the same posterior.
+
+**Hostile-input contract.** Missing, non-finite, zero, or negative prior
+concentrations are not vacuous messages; they make the Dirichlet base
+improper and compilation must fail loudly. Sparse *positive* concentrations
+remain valid without a literal floor. Exact-zero state mass remains an exact
+zero statistic. Expected logs must stay finite at float32, and contractions
+must operate at category/action sizes 10–100 times the tiny anchors without
+dimension-dependent guards. These cases are pinned by
+`test_dirichlet_vmp_hostile_inputs_and_scale`.
