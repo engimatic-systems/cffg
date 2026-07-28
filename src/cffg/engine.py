@@ -21,7 +21,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
-from jax.scipy.special import logsumexp
+from jax.scipy.special import digamma, logsumexp
 
 from cffg import csp, ef, efrules, gauss, kernels, mixg
 from cffg.compiler import NEG, Arena
@@ -31,6 +31,8 @@ from cffg.rules import (
     NODE_ENERGIES,
     VMP_ENERGIES,
     VMP_UPDATES,
+    dirichlet_vmp_energy,
+    dirichlet_vmp_update,
     gfe_energy,
     gfe_tm_energy,
     gfe_tm_update,
@@ -342,7 +344,7 @@ class Engine:
         # check runs per bucket instead of per edge (Python-loop-free).
         by_card: dict[int, list[list[int]]] = {}
         for e in arena.edges.values():
-            if not e.dim and not e.ef:
+            if not e.dim and not e.ef and not e.param_shape:
                 by_card.setdefault(e.card, []).append([e.slot0, e.slot1])
         self._support_edge_groups = [
             (card, np.asarray(pairs, dtype=np.int64).reshape(-1, 2))
@@ -370,8 +372,9 @@ class Engine:
         for e in self.arena.edges.values():
             if e.dim or e.ef:
                 continue  # gaussian/EF slots live in their own arenas
-            rows[self.arena.message_indices(e.slot0, e.card)] = -np.log(e.card)
-            rows[self.arena.message_indices(e.slot1, e.card)] = -np.log(e.card)
+            initial = 0.0 if e.param_shape else -np.log(e.card)
+            rows[self.arena.message_indices(e.slot0, e.card)] = initial
+            rows[self.arena.message_indices(e.slot1, e.card)] = initial
         return jnp.asarray(rows)
 
     def bind_data(self, state: State, observations: dict) -> State:
@@ -417,7 +420,12 @@ class Engine:
             card = next(
                 e.card
                 for e in self.arena.edges.values()
-                if not e.dim and not e.ef and slot in (e.slot0, e.slot1)
+                if (
+                    not e.dim
+                    and not e.ef
+                    and not e.param_shape
+                    and slot in (e.slot0, e.slot1)
+                )
             )
             row = np.full(card, NEG)
             if value is None:
@@ -813,7 +821,7 @@ class Engine:
         out: dict[str, np.ndarray] = {}
         msgs = np.asarray(state.messages)
         for e in self.arena.edges.values():
-            if e.dim or e.ef:
+            if e.dim or e.ef or e.param_shape:
                 continue  # gaussian_marginals / ef_marginals
             lq = (
                 msgs[self.arena.message_indices(e.slot0, e.card)]
@@ -867,6 +875,56 @@ class Engine:
                 q = norm_exp(lb)
             for i, name in enumerate(g.members):
                 out[name] = q[i]
+        for g in self.arena.dirichlet_groups:
+            both = np.asarray(
+                _disc_both(self.arena, state.messages, g.gather_both, g.cards)
+            )
+            q = None
+            for r, k in enumerate(g.cards):
+                lq = both[:, r, 0, :k] + both[:, r, 1, :k]
+                edge_q = norm_exp(lq).reshape(
+                    len(g.members), *([1] * r), k
+                )
+                q = edge_q if q is None else q[..., None] * edge_q
+            for i, name in enumerate(g.members):
+                out[name] = q[i]
+        return out
+
+    def dirichlet_marginals(
+        self, state: State
+    ) -> dict[str, "DirichletMarginal"]:
+        """Parameter-edge name -> proper Dirichlet posterior readout.
+
+        Concentrations are reconstructed from the two packed edge messages:
+        the prior's positive ``alpha0`` plus the likelihood's nonnegative
+        fractional counts.  Improper pre-sweep state is reported with
+        ``proper=False`` and NaN moments rather than resembling a posterior.
+        """
+        out: dict[str, DirichletMarginal] = {}
+        messages = np.asarray(state.messages)
+
+        for e in self.arena.edges.values():
+            if not e.param_shape:
+                continue
+            packed = (
+                messages[self.arena.message_indices(e.slot0, e.card)]
+                + messages[self.arena.message_indices(e.slot1, e.card)]
+            )
+            alpha = packed.reshape(e.param_shape)
+            proper = bool(np.all(np.isfinite(alpha)) and np.all(alpha > 0))
+            if proper:
+                total = alpha.sum(axis=e.param_axis, keepdims=True)
+                mean = alpha / total
+                expected_log = np.asarray(digamma(alpha) - digamma(total))
+            else:
+                mean = np.full_like(alpha, np.nan)
+                expected_log = np.full_like(alpha, np.nan)
+            out[e.name] = DirichletMarginal(
+                alpha=alpha.copy(),
+                mean=mean,
+                expected_log=expected_log,
+                proper=proper,
+            )
         return out
 
     def gaussian_marginals(self, state: State) -> dict[str, tuple[np.ndarray, np.ndarray]]:
@@ -1081,7 +1139,7 @@ class Engine:
         xhat = self.decode(state)
         slot2var = {}
         for e in self.arena.edges.values():
-            if e.dim or e.ef:
+            if e.dim or e.ef or e.param_shape:
                 continue
             slot2var[e.slot0] = e.name
             slot2var[e.slot1] = e.name
@@ -1123,6 +1181,16 @@ class EfMarginal:
     family: str
     params: tuple[float, ...]
     mean: float
+    proper: bool
+
+
+@dataclass(frozen=True)
+class DirichletMarginal:
+    """One in-graph table posterior in canonical serialized layout."""
+
+    alpha: np.ndarray
+    mean: np.ndarray
+    expected_log: np.ndarray
     proper: bool
 
 
@@ -1324,6 +1392,27 @@ def _make_step(arena: Arena, skip_scheduled: bool = False):
                 inc = _disc_rows(arena, messages, g.gather, g.cards)
                 out = BP_UPDATES[g.type](inc, logf, g.cards, k_local, op)
             new = _set_disc_rows(arena, new, g.scatter, g.cards, out)
+        for g in arena.dirichlet_groups:
+            inc2 = _disc_both(arena, messages, g.gather_both, g.cards)
+            alpha0 = params[f"{g.name}:alpha0"]
+            out, counts = dirichlet_vmp_update(
+                g.type, inc2, alpha0, g.cards, max(g.cards)
+            )
+            new = _set_disc_rows(arena, new, g.scatter, g.cards, out)
+            new = _set_disc_block(
+                arena,
+                new,
+                g.prior_scatter,
+                g.param_size,
+                alpha0.reshape((len(g.members), g.param_size)),
+            )
+            new = _set_disc_block(
+                arena,
+                new,
+                g.count_scatter,
+                g.param_size,
+                counts.reshape((len(g.members), g.param_size)),
+            )
         for scatter, cards, out in _constraint_writes(arena, messages, op):
             new = _set_disc_rows(arena, new, scatter, cards, out)
         for g in arena.gfe_groups:
@@ -1941,7 +2030,7 @@ def _make_support_check(arena: Arena):
         raise ValueError("jitted support check requires a constraint-free model")
     by_card: dict[int, list[list[int]]] = {}
     for e in arena.edges.values():
-        if not e.dim and not e.ef:
+        if not e.dim and not e.ef and not e.param_shape:
             by_card.setdefault(e.card, []).append([e.slot0, e.slot1])
     edge_buckets = [
         (card, np.asarray(pairs, dtype=np.int64).reshape(-1, 2))
@@ -2186,6 +2275,20 @@ def _make_bfe(arena: Arena):
             total = total + _ef_bfe(arena, ef_eta, ef_obs, ef_mask, params)
         if arena.prec_groups:
             total = total + _prec_bfe(arena, g_eta, g_lam, ef_eta, params)
+        for g in arena.dirichlet_groups:
+            inc = _disc_both(arena, messages, g.gather_both, g.cards)
+            packed_alpha = (
+                messages[arena.message_indices(g.prior_scatter, g.param_size)]
+                + messages[arena.message_indices(g.count_scatter, g.param_size)]
+            )
+            alpha = packed_alpha.reshape((len(g.members), *g.param_shape))
+            total = total + dirichlet_vmp_energy(
+                g.type,
+                inc,
+                alpha,
+                params[f"{g.name}:alpha0"],
+                g.cards,
+            ).sum()
         for g in groups:
             logf = params.get(g.name)
             if logf is None:

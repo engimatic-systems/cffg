@@ -53,6 +53,12 @@ class EdgeInfo:
     # numberings are independent (cff-4e5z).
     ef: str = ""  # EF family name; slots then index the natural-parameter
     # arena ef_eta [n_efslots, 2], a third independent numbering (cff-8s6a).
+    param_shape: tuple[int, ...] = ()  # Dirichlet parameter edge, packed into
+    # the flat message arena as one concentration/count value per table cell.
+    # Empty means an ordinary discrete edge.  Parameter slots are *not*
+    # categorical log messages and are excluded from discrete normalization,
+    # exact-support checks, decoding and the ordinary edge-entropy ledger.
+    param_axis: int = 0  # output/concentration axis inside param_shape
 
 
 @dataclass(frozen=True)
@@ -68,6 +74,37 @@ class GroupPlan:
     scatter: np.ndarray  # [n_members, n_roles] slot to write (own side)
     mode: str = "bp"  # "bp" (sum-product) | "vmp" (mean-field bead)
     gather_both: np.ndarray | None = None  # [M, R, 2] both slots (vmp: marginals)
+
+
+@dataclass(frozen=True)
+class DirichletGroupPlan:
+    """Mean-field categorical likelihoods with an in-graph Dirichlet table.
+
+    One member consumes a structural likelihood factor and its facing
+    ``dirichlet`` prior.  Structural edges remain categorical log messages;
+    the parameter edge's two packed slots carry the prior concentrations
+    ``alpha0`` and the likelihood's fractional counts.  Their sum is the
+    proper posterior concentration.  Packing concentrations rather than
+    ``alpha0 - 1`` avoids erasing sparse positive float32 priors by
+    cancellation at one.
+    """
+
+    name: str
+    type: str  # categorical | matrix_cat | transition_mixture
+    roles: tuple[str, ...]
+    cards: tuple[int, ...]
+    members: tuple[str, ...]  # likelihood factor names
+    priors: tuple[str, ...]  # facing dirichlet factor names
+    gather_both: np.ndarray  # [M, R, 2] both structural slots
+    scatter: np.ndarray  # [M, R] likelihood-owned structural slots
+    prior_scatter: np.ndarray  # [M] prior-owned parameter slots
+    count_scatter: np.ndarray  # [M] likelihood-owned parameter slots
+    param_shape: tuple[int, ...]  # canonical serialized layout
+    output_axis: int  # Dirichlet-normalized axis in param_shape
+
+    @property
+    def param_size(self) -> int:
+        return int(np.prod(self.param_shape))
 
 
 @dataclass(frozen=True)
@@ -269,6 +306,7 @@ class Arena:
     groups: list[GroupPlan]
     data_slots: dict[str, int]  # DATA port name -> external slot
     semiring: str = "sum"  # "sum" (sum-product / BFE) | "max" (min-sum / MAP)
+    dirichlet_groups: list[DirichletGroupPlan] = field(default_factory=list)
     constraint_groups: list[ConstraintPlan] = field(default_factory=list)
     log_params: dict[str, np.ndarray] = field(default_factory=dict)  # group -> [M, ...]
     # Gaussian arena (cff-4e5z): eta and Lambda are separate flat arrays.
@@ -325,7 +363,13 @@ class Arena:
             [
                 [e.slot0, e.slot1]
                 for e in self.edges.values()
-                if e.interior and not e.dim and not e.ef and e.name not in self.gfe_x_edges
+                if (
+                    e.interior
+                    and not e.dim
+                    and not e.ef
+                    and not e.param_shape
+                    and e.name not in self.gfe_x_edges
+                )
             ],
             dtype=np.int64,
         ).reshape(-1, 2)
@@ -339,7 +383,13 @@ class Arena:
         """
         by_card: dict[int, list[list[int]]] = {}
         for e in self.edges.values():
-            if e.interior and not e.dim and not e.ef and e.name not in self.gfe_x_edges:
+            if (
+                e.interior
+                and not e.dim
+                and not e.ef
+                and not e.param_shape
+                and e.name not in self.gfe_x_edges
+            ):
                 by_card.setdefault(e.card, []).append([e.slot0, e.slot1])
         return [
             (card, np.asarray(pairs, dtype=np.int64).reshape(-1, 2))
@@ -354,7 +404,7 @@ class Arena:
         card_of = {
             slot: e.card
             for e in self.edges.values()
-            if not e.dim and not e.ef
+            if not e.dim and not e.ef and not e.param_shape
             for slot in (e.slot0, e.slot1)
         }
         by_card: dict[int, list[np.ndarray]] = {}
@@ -437,10 +487,22 @@ def compile_template(
 
     for f in t.factors.values():
         if f.param_edges:
-            problems.append(
-                f"factor {f.name!r} has parameter edges {sorted(f.param_edges.values())}: "
-                "learned parameters are separate tickets (cff-5iuz, cff-gjjk)"
-            )
+            if f.type not in ("categorical", "matrix_cat", "transition_mixture"):
+                problems.append(
+                    f"factor {f.name!r}: Dirichlet parameter edges are supported only "
+                    "for categorical, matrix_cat and transition_mixture likelihoods"
+                )
+            if f.name not in mean_field:
+                problems.append(
+                    f"factor {f.name!r}: latent parameter edge is not Dirichlet-closed "
+                    "under exact BP; declare a mean_field constraint for VMP"
+                )
+            if f.name in psub:
+                problems.append(
+                    f"factor {f.name!r}: a P-substituted parameter edge needs the "
+                    "separate functional mu3 contract (cff-almk/cff-iwgl), not a "
+                    "Dirichlet natural message"
+                )
         if f.name in mean_field and f.type == "equality":
             problems.append(
                 f"factor {f.name!r}: mean-field bead on an equality node is ill-defined "
@@ -496,10 +558,35 @@ def compile_template(
     if problems:
         raise CompileError(f"cannot compile {t.name!r}:\n  - " + "\n  - ".join(problems))
 
+    # Parameter-edge shapes are fixed by the likelihood's structural roles.
+    # The carrier VariableSpec stays schema-1 discrete and declares the
+    # flattened size; EdgeInfo.param_shape retags it for the derived arena.
+    param_specs: dict[str, tuple[tuple[int, ...], int, str]] = {}
+    for f in t.factors.values():
+        for var in f.param_edges.values():
+            shape, axis = _dirichlet_shape(t, f.name)
+            if var in param_specs:
+                problems.append(
+                    f"parameter edge {var!r}: more than one likelihood endpoint; "
+                    "insert a supported parameter-tying structure (not available in D6a)"
+                )
+            else:
+                param_specs[var] = (shape, axis, f.name)
+            v = t.variables[var]
+            size = int(np.prod(shape))
+            if v.family != "discrete" or v.cardinality != size:
+                problems.append(
+                    f"parameter edge {var!r}: carrier cardinality must equal the "
+                    f"flattened Dirichlet table size {size} for shape {shape}, got "
+                    f"{v.family} cardinality {v.cardinality}"
+                )
+    if problems:
+        raise CompileError(f"cannot compile {t.name!r}:\n  - " + "\n  - ".join(problems))
+
     # Edge table: endpoints in deterministic order; external side is side 1.
     endpoints: dict[str, list[tuple[str, str]]] = {v: [] for v in t.variables}
     for f in sorted(t.factors.values(), key=lambda f: f.name):
-        for role, var in sorted(f.edges.items()):
+        for role, var in sorted(f.all_edges().items()):
             endpoints[var].append((f.name, role))
 
     edges: dict[str, EdgeInfo] = {}
@@ -523,7 +610,18 @@ def compile_template(
         else:
             s0, s1 = next_slot, next_slot + 1
             next_slot += 2
-        edges[vname] = EdgeInfo(vname, v.cardinality, s0, s1, len(ends) == 2, v.dim, v.ef)
+        pshape, paxis, _ = param_specs.get(vname, ((), 0, ""))
+        edges[vname] = EdgeInfo(
+            vname,
+            v.cardinality,
+            s0,
+            s1,
+            len(ends) == 2,
+            v.dim,
+            v.ef,
+            pshape,
+            paxis,
+        )
         slot_of[ends[0]] = s0
         if len(ends) == 2:
             slot_of[ends[1]] = s1
@@ -573,9 +671,116 @@ def compile_template(
 
     resolved = _resolve_arrays(t, arrays, root)
     member_of: dict[str, tuple[str, int]] = {}
+    log_params: dict[str, np.ndarray] = {}
+    consumed: set[str] = set()
+
+    # In-graph conjugate parameter paths.  A schema-1 FFG parameter edge has
+    # exactly two endpoints: one supported likelihood param role and one
+    # dirichlet prior's ``out`` role.  The prior blob is the serialized source
+    # of truth; the packed messages are derived runtime state.
+    dir_buckets: dict[
+        tuple[str, tuple[int, ...], tuple[int, ...], int],
+        list[tuple[str, str, str, np.ndarray]],
+    ] = {}
+    for var, (shape, axis, likelihood_name) in sorted(param_specs.items()):
+        ends = endpoints[var]
+        other = [(fname, role) for fname, role in ends if fname != likelihood_name]
+        if len(other) != 1:
+            problems.append(
+                f"parameter edge {var!r}: requires exactly one facing Dirichlet prior, "
+                f"got endpoints {ends}"
+            )
+            continue
+        prior_name, prior_role = other[0]
+        prior = t.factors[prior_name]
+        if prior.type != "dirichlet" or prior_role != "out":
+            problems.append(
+                f"parameter edge {var!r}: {likelihood_name!r} must face a dirichlet "
+                f"prior on role 'out', got {prior_name!r}/{prior.type}:{prior_role}"
+            )
+            continue
+        alpha0 = resolved[prior.param_blobs["counts"]]
+        if alpha0.shape != shape:
+            problems.append(
+                f"Dirichlet prior {prior_name!r}: concentration shape {alpha0.shape} "
+                f"!= likelihood table shape {shape}"
+            )
+            continue
+        if not np.all(np.isfinite(alpha0)) or not np.all(alpha0 > 0):
+            problems.append(
+                f"Dirichlet prior {prior_name!r}: concentrations must be finite and > 0"
+            )
+            continue
+        likelihood = t.factors[likelihood_name]
+        roles = FACTOR_TYPES[likelihood.type].edge_roles
+        cards = tuple(t.variables[likelihood.edges[r]].cardinality for r in roles)
+        key = (likelihood.type, cards, shape, axis)
+        dir_buckets.setdefault(key, []).append(
+            (likelihood_name, prior_name, var, alpha0)
+        )
+        consumed.update((likelihood_name, prior_name))
+
+    orphan_priors = sorted(
+        f.name
+        for f in t.factors.values()
+        if f.type == "dirichlet" and f.name not in consumed
+    )
+    if orphan_priors:
+        problems.append(
+            "dirichlet factors are parameter priors and must face a supported "
+            f"mean-field likelihood; unpaired: {orphan_priors}"
+        )
+    if problems:
+        raise CompileError(f"cannot compile {t.name!r}:\n  - " + "\n  - ".join(problems))
+
+    dirichlet_groups: list[DirichletGroupPlan] = []
+    for (ftype, cards, shape, axis), entries in sorted(dir_buckets.items()):
+        roles = FACTOR_TYPES[ftype].edge_roles
+        gname = f"dirvmp:{ftype}:{'x'.join(map(str, cards))}"
+        members = tuple(e[0] for e in entries)
+        priors = tuple(e[1] for e in entries)
+        gather_both = np.array(
+            [
+                [
+                    [slot_of[(likelihood, r)], opposite[(likelihood, r)]]
+                    for r in roles
+                ]
+                for likelihood in members
+            ],
+            dtype=np.int64,
+        )
+        scatter = gather_both[:, :, 0]
+        prior_scatter = np.array(
+            [slot_of[(prior, "out")] for prior in priors], dtype=np.int64
+        )
+        param_roles = {
+            "categorical": "statistic",
+            "matrix_cat": "matrix",
+            "transition_mixture": "matrices",
+        }
+        count_scatter = np.array(
+            [slot_of[(name, param_roles[ftype])] for name in members],
+            dtype=np.int64,
+        )
+        dirichlet_groups.append(
+            DirichletGroupPlan(
+                gname,
+                ftype,
+                roles,
+                cards,
+                members,
+                priors,
+                gather_both,
+                scatter,
+                prior_scatter,
+                count_scatter,
+                shape,
+                axis,
+            )
+        )
+        log_params[f"{gname}:alpha0"] = np.stack([e[3] for e in entries])
 
     # GFE composites: P-substituted obs factor + facing goal factor across x.
-    consumed: set[str] = set()
     gfe_x_edges: set[str] = set()
     gfe_buckets: dict[tuple[int, int], list[tuple[str, str]]] = {}  # cards -> (obs, goal)
     tm_buckets: dict[tuple, list[str]] = {}
@@ -613,7 +818,6 @@ def compile_template(
         raise CompileError(f"cannot compile {t.name!r}:\n  - " + "\n  - ".join(problems))
 
     gfe_groups: list[GfePlan] = []
-    log_params: dict[str, np.ndarray] = {}
     # Params keys owned by a GFE composite: write targets for a learnable, but
     # never stat sources (the composite owns its own update path).
     composite_keys: set[str] = set()
@@ -960,6 +1164,8 @@ def compile_template(
         rejects = []
         if any(g.mode == "vmp" for g in groups):
             rejects.append("mean-field (vmp) beads")
+        if dirichlet_groups:
+            rejects.append("Dirichlet parameter-edge VMP groups")
         if gfe_groups or gfe_tm_groups:
             rejects.append("P-substitution / GFE composites")
         if gauss_groups or mix_groups or prec_groups:
@@ -976,6 +1182,11 @@ def compile_template(
         c.target for c in t.constraints if c.kind is ConstraintKind.DELTA
     )
     for v in delta_edges:
+        if edges[v].param_shape:
+            raise CompileError(
+                f"delta constraint on Dirichlet parameter edge {v!r}: parameter "
+                "posteriors are continuous simplex distributions, not categorical states"
+            )
         if edges[v].dim:
             raise CompileError(
                 f"delta constraint on Gaussian edge {v!r}: the MAP of a Gaussian "
@@ -1036,6 +1247,7 @@ def compile_template(
         groups=groups,
         data_slots=data_slots,
         semiring=semiring,
+        dirichlet_groups=dirichlet_groups,
         constraint_groups=constraint_groups,
         log_params=log_params,
         n_gslots=next_gslot,
@@ -1159,6 +1371,21 @@ def _resolve_learnables(
     return plans
 
 
+def _dirichlet_shape(t: Template, likelihood_name: str) -> tuple[tuple[int, ...], int]:
+    """Canonical concentration layout and output axis for a D6a likelihood."""
+    f = t.factors[likelihood_name]
+    card = lambda role: t.variables[f.edges[role]].cardinality  # noqa: E731
+    if f.type == "categorical":
+        return (card("out"),), 0
+    if f.type == "matrix_cat":
+        return (card("out"), card("in")), 0
+    if f.type == "transition_mixture":
+        return (card("selector"), card("out"), card("in")), 1
+    raise CompileError(
+        f"factor {likelihood_name!r}: no Dirichlet VMP layout for {f.type!r}"
+    )
+
+
 def _resolve_arrays(
     t: Template, arrays: dict[str, np.ndarray] | None, root: str | Path | None
 ) -> dict[str, np.ndarray]:
@@ -1205,7 +1432,13 @@ def _blob_shape(t: Template, blob_name: str) -> tuple[int, ...] | None:
                 continue
             card = lambda r: t.variables[f.edges[r]].cardinality  # noqa: E731
             dim = lambda r: t.variables[f.edges[r]].dim  # noqa: E731
-            if f.type in ("categorical", "dirichlet"):
+            if f.type == "dirichlet":
+                parameter_var = f.edges["out"]
+                for likelihood in t.factors.values():
+                    if parameter_var in likelihood.param_edges.values():
+                        return _dirichlet_shape(t, likelihood.name)[0]
+                return (card("out"),)
+            if f.type == "categorical":
                 return (card("out"),)
             if f.type == "matrix_cat":
                 return (card("out"), card("in"))

@@ -213,6 +213,36 @@ guarantee — is stable from the first release that writes it. External
 kernels must use their own impl-id namespace (`cffg.` is reserved) and bump
 MAJOR whenever message/energy semantics or the parameter schema change.
 
+### 2f. In-graph Dirichlet parameter edges (cff-fr5c)
+
+`FactorSpec.param_edges` is executable for `categorical`, `matrix_cat`, and
+`transition_mixture` likelihoods under an explicit mean-field constraint.
+The parameter edge faces one `dirichlet` prior factor; its schema-1
+`VariableSpec.cardinality` is the flattened table size, while the likelihood's
+structural cardinalities recover the canonical concentration shape `[K]`,
+`[K_out,K_in]`, or `[U,K_out,K_in]`. A missing/improper prior, a shape mismatch,
+or an unconstrained latent use is a compile error. Exact BP is intentionally
+not approximated: its likelihood-to-table message is a mixture, not
+Dirichlet-closed (DERIVATIONS D6a).
+
+The derived `DirichletGroupPlan` reuses flat message storage but keeps
+parameter slots out of categorical normalization, support, decoding, and the
+ordinary edge-entropy ledger. The two parameter slots pack positive prior
+concentrations and nonnegative fractional counts, not `alpha-1`; summing them
+recovers the posterior without losing sparse float32 concentrations to
+cancellation at one. Structural messages consume `E[log theta]`. Runtime
+counts remain derived state, so JSON and `.cffgz` reconstruct the arena solely
+from template constraints, `param_edges`, and prior blobs.
+`Engine.dirichlet_marginals` exposes concentrations, means, expected logs, and
+propriety.
+
+The VFE implementation combines the prior node, likelihood node, and
+parameter-edge entropy correction algebraically before evaluating hostile
+sparse inputs. At the coordinate update this is the stable beta-function
+ratio from D6a; a literal decomposition remains tested on small models. This
+conjugate path is the proper base posterior for `mu3(A)`, not a representation
+of `mu3` itself.
+
 ### 3. Message rule library (`cffg.rules`)
 
 A registry keyed by `(factor_type, constraint_config, out_edge_role)`:

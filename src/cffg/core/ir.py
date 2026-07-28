@@ -42,6 +42,12 @@ class VariableSpec:
     and observation families (poisson, bernoulli) whose edges are
     conditioned DATA ports only — their predictives leave the family, so
     no message ever flows on them.
+
+    A schema-1 in-graph Dirichlet parameter uses a discrete carrier whose
+    ``cardinality`` is the flattened table size. The compiler recognizes the
+    variable through ``FactorSpec.param_edges`` and retags its derived
+    ``EdgeInfo`` with the full table shape; it never enters categorical
+    normalization, support, entropy, or decode paths.
     """
 
     name: str
@@ -131,10 +137,12 @@ class LearnableSpec:
 class FactorSpec:
     """A node in the FFG.
 
-    `edges` maps the factor type's roles to variable names. `params` maps a
-    parameter role to its source: an edge (learned, e.g. A under a Dirichlet
-    prior) or a blob (fixed, e.g. the T-maze B matrices). Each parameter role
-    must be bound by exactly one of the two.
+    `edges` maps the factor type's structural roles to variable names.
+    Parameter roles map to exactly one source in `param_edges` or
+    `param_blobs`: an edge (uncertain, e.g. A under a Dirichlet prior) or a
+    blob (fixed, e.g. the T-maze B matrices). A Dirichlet VMP parameter edge
+    faces a `dirichlet` prior factor and its likelihood carries a mean-field
+    constraint.
     """
 
     name: str

@@ -1,6 +1,6 @@
 ---
 id: cff-fr5c
-status: open
+status: closed
 deps: [cff-x0sv, cff-l29q]
 links: [cff-iwgl]
 created: 2026-07-08T22:00:30Z
@@ -55,3 +55,9 @@ missing/improper priors fail loudly; sparse positive float32 concentrations
 and 10-100x category/action scale remain finite. Existing non-parameter models
 and structure hashes do not regress. This ticket supplies cff-iwgl's proper
 base posterior, not its mu3 message representation.
+
+## Notes
+
+**2026-07-28T15:47:56Z**
+
+Implemented the D6a in-graph VMP path for categorical, matrix_cat, and transition_mixture param_edges. Added Dirichlet arena plans, proper alpha0+fractional-count packing, expected-log structural updates, stable complete VFE with literal node/edge decomposition anchors, posterior readouts, schedule/support/decode isolation, JSON/.cffgz coverage, and README/ARCHITECTURE updates. Acceptance tests cover Learnables equivalence, exact zeros, improper priors, float32, and a 64x48x20 table. Focused/broad validation: 153 relevant regressions + 14 hygiene/colony/estimate + final 58 focused tests passed. Next: cff-almk defines the separate functional mu3 contract.

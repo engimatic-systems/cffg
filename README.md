@@ -76,6 +76,35 @@ chain = unroll(slice_template, 10, {"tail": "head"})     # glue-port chaining
 model = compose(prior_template, chain, {"attach": "t0/head"}, name="hmm10")
 ```
 
+An uncertain categorical table can also live inside the graph. Bind the
+likelihood's parameter role through `param_edges`, face that edge with a
+`dirichlet` prior, and put a `MEAN_FIELD` bead on the likelihood. The carrier
+cardinality is the flattened table size; the prior blob retains its canonical
+shape:
+
+```python
+from cffg.core import ConstraintKind, ConstraintSpec, FactorSpec, VariableSpec
+
+variables["A_edge"] = VariableSpec("A_edge", M * K)
+factors["A_prior"] = FactorSpec(
+    "A_prior", "dirichlet",
+    edges={"out": "A_edge"},
+    param_blobs={"counts": "alpha_A"},       # alpha_A.shape == (M, K), all > 0
+)
+factors["obs"] = FactorSpec(
+    "obs", "matrix_cat",
+    edges={"out": "x", "in": "z"},
+    param_edges={"matrix": "A_edge"},
+)
+constraints.append(ConstraintSpec(ConstraintKind.MEAN_FIELD, "obs"))
+```
+
+The likelihood sends fractional state counts into the posterior and consumes
+`E[log A]` in return. After inference,
+`engine.dirichlet_marginals(state)["A_edge"]` reports `alpha`, `mean`,
+`expected_log`, and `proper`. An unconstrained latent parameter edge is
+rejected because exact sum-product is not Dirichlet-closed.
+
 ## Run inference
 
 ```python
