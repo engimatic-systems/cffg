@@ -26,7 +26,10 @@ which is a modeling choice the API deliberately leaves open:
 - the initial-state prior updates once per episode — it is the belief the
   episode starts from, so the statistic is the first tick's smoothed q(z0).
 
-`act()` is read-only. Planning an action is not evidence that it was taken.
+`act()` does not change the current trial's priors. For learned goals it stages
+the latest converged planning posterior, and only `reset_episode()` commits that
+posterior as the next trial's prior. Planning an action is not evidence that it
+was taken.
 
 The A path feeds the planner's learned-GFE composites (epistemic value of
 A-learning, Part II §5). The B path has no GFE channel unless the model asks
@@ -62,6 +65,8 @@ class RollingAgent:
         initial_counts: np.ndarray | None = None,
         learn_b: bool = False,
         initial_b_counts: np.ndarray | None = None,
+        learn_goal: bool = False,
+        initial_goal_counts: np.ndarray | None = None,
         epistemic_b: bool = False,
         damp: float = 0.5,
         n_sweeps: int = 400,
@@ -73,6 +78,9 @@ class RollingAgent:
         older spelling of `learn=("A",)` / `learn=("B",)` with the counts
         passed separately, kept working because callers and checkpoints use
         them.
+
+        `learn_goal` enables the separate Fig. 5 goal-Dirichlet coordinate;
+        its posterior is staged by planning and committed at a reset boundary.
 
         `episode_learnables` names those whose statistic is an episode
         quantity rather than a per-tick one — the initial-state prior, by
@@ -90,9 +98,19 @@ class RollingAgent:
             priors.setdefault("B", initial_b_counts)
         if epistemic_b and "B" not in learn:
             raise ValueError("epistemic_b needs B counts to score novelty")
+        if learn_goal and "A" in learn:
+            raise ValueError(
+                "learn_goal and learned A are separate composite coordinates for now"
+            )
         self.learn = learn
+        self.learn_goal = learn_goal
 
-        plan_kwargs = {"learned_a": "A" in learn}
+        plan_kwargs = {
+            "learned_a": "A" in learn,
+            "learned_c": learn_goal,
+        }
+        if learn_goal:
+            plan_kwargs["c_counts"] = initial_goal_counts
         if epistemic_b:
             plan_kwargs["epistemic_b"] = True
         if learn:
@@ -121,6 +139,12 @@ class RollingAgent:
             sorted(filter_sources - set(self.episode_learnables))
         )
         self.n_ctrl = len(plan_arrays["e"])
+        self.goal_priors = (
+            {"Cc": np.asarray(plan_arrays["Cc"], dtype=float).copy()}
+            if learn_goal
+            else {}
+        )
+        self._pending_goal_priors: dict[str, np.ndarray] | None = None
         self.tick = 0
         self.episode_tick = 0
 
@@ -139,7 +163,10 @@ class RollingAgent:
         # consumer belief is float32 (cff-ey4p).
         log_d = _log_of(np.asarray(self.belief))
         params[key] = params[key].at[idx].set(jnp.asarray(log_d))
-        return _replace(st, params=params)
+        st = _replace(st, params=params)
+        if engine is self.plan and self.goal_priors:
+            st = engine.with_goal_priors(st, self.goal_priors)
+        return st
 
     # -- the perception-action cycle --------------------------------------
 
@@ -149,10 +176,12 @@ class RollingAgent:
         st = self.plan.run(
             st, self.n_sweeps, tol=1e-10, damp=self.damp
         ).require_converged()
-        # Planning is read-only. Considering an action is not evidence that it
-        # was taken, so act() never touches a posterior — a caller may plan,
-        # discard the result, and plan again without changing what the agent
-        # has learned.
+        # Planning remains read-only within a trial. Learned goals stage one
+        # converged Fig.5 posterior, but only reset_episode's explicit trial
+        # boundary rolls it into the next prior. Replanning merely replaces
+        # the staged value; it never accumulates another sweep/trial.
+        if self.goal_priors:
+            self._pending_goal_priors = self.plan.goal_prior_updates(st)
         q = np.asarray(self.plan.marginals(st)["u1"])
         if self.select == "map":
             return int(np.argmax(q))
@@ -185,6 +214,12 @@ class RollingAgent:
         """Start a new episode: re-anchor the belief on the learned
         initial-state prior (its posterior mean), or leave it untouched when
         the model does not learn one."""
+        if self._pending_goal_priors is not None:
+            self.goal_priors = {
+                name: alpha.copy()
+                for name, alpha in self._pending_goal_priors.items()
+            }
+            self._pending_goal_priors = None
         for name in self.episode_learnables:
             self.belief = self.learnables.expected(name).copy()
         self.episode_tick = 0
@@ -209,6 +244,10 @@ class RollingAgent:
         }
         for name, alpha in self.learnables.state_dict().items():
             data[f"learn:{name}"] = alpha
+        for name, alpha in self.goal_priors.items():
+            data[f"goal:prior:{name}"] = alpha
+        for name, alpha in (self._pending_goal_priors or {}).items():
+            data[f"goal:pending:{name}"] = alpha
         np.savez(path, **data)
 
     def restore(self, path: str | Path) -> None:
@@ -234,6 +273,34 @@ class RollingAgent:
                 )
             state[name] = data[old]
         self.learnables.load_state_dict(state)
+        restored_goal = {
+            key[len("goal:prior:") :]: data[key].copy()
+            for key in data.files
+            if key.startswith("goal:prior:")
+        }
+        if self.goal_priors:
+            if set(restored_goal) != set(self.goal_priors):
+                raise KeyError(
+                    "checkpoint learned-goal priors do not match this agent: "
+                    f"have {sorted(restored_goal)}, expected {sorted(self.goal_priors)}"
+                )
+            self.goal_priors = restored_goal
+            pending = {
+                key[len("goal:pending:") :]: data[key].copy()
+                for key in data.files
+                if key.startswith("goal:pending:")
+            }
+            unknown_pending = sorted(set(pending) - set(self.goal_priors))
+            if unknown_pending:
+                raise KeyError(
+                    f"checkpoint has unknown pending goal priors {unknown_pending}"
+                )
+            self._pending_goal_priors = pending or None
+        elif restored_goal:
+            raise KeyError(
+                "checkpoint contains learned-goal priors but this agent has "
+                "learn_goal=False"
+            )
 
     # -- compatibility readouts -------------------------------------------
 
@@ -250,3 +317,9 @@ class RollingAgent:
     def b_counts(self) -> np.ndarray | None:
         """Transition Dirichlet counts [U, K', K] (the old `learn_b` array)."""
         return self._alpha("B")
+
+    @property
+    def goal_counts(self) -> np.ndarray | None:
+        """Shared goal Dirichlet prior, rolled only at episode boundaries."""
+        value = self.goal_priors.get("Cc")
+        return None if value is None else value.copy()

@@ -154,6 +154,31 @@ fresh `prepare_mu3` call. `Engine.score_mu3_epochs` refreshes particles between
 policy-scoring epochs and averages only converged post-burn-in scores; burn-in
 does not turn an unfinished or collapsed estimate into convergence.
 
+A learned goal uses the conjugate Fig. 5 `mu1(c)` path. Future slices sharing
+`Cc` add their predictive observation mass into one Dirichlet posterior:
+
+```python
+template, arrays = build_rollout(
+    "learned_goal",
+    steps=3, d=d, A=A, c=c, e=e, Bs=Bs,
+    gfe=True, learned_c=True, c_counts=alpha_c,
+)
+engine = Engine(compile_template(template, arrays=arrays))
+trial = engine.run(engine.init_state(), 200, tol=1e-8, damp=0.5)
+trial_state = trial.require_converged()
+next_prior = engine.goal_prior_updates(trial_state)  # {"Cc": alpha_c + Σ Abar zbar}
+
+# Rollover is accepted only on a fresh state: sweeps are not new trials.
+next_state = engine.with_goal_priors(engine.init_state(), next_prior)
+```
+
+`E[log c]` drives the learned-goal GFE coordinate. This generic predicted-mass
+rollover is explicit; ordinary observed categorical learning remains the D6a
+parameter-edge path. `RollingAgent(..., learn_goal=True,
+initial_goal_counts=alpha_c)` stages the latest converged planning posterior
+and commits it once at `reset_episode`; checkpoints preserve a pending
+uncommitted trial exactly.
+
 Rules of thumb: `damp=0.5` whenever the model has ≥ 2 GFE composites (their
 outer coordination can limit-cycle undamped). `result.status` is one of
 `converged`, `budget_exhausted`, `diverged`, or `infeasible`; its

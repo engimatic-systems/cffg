@@ -247,6 +247,15 @@ def _dirichlet_expected_log(alpha, output_axis):
     return digamma(alpha) - digamma(jnp.sum(alpha, axis=axis, keepdims=True))
 
 
+def dirichlet_expected_log(alpha, axis=-1):
+    """Expected log simplex probabilities under a proper Dirichlet.
+
+    Unlike :func:`_dirichlet_expected_log`, this public form has no assumed
+    leading member axis and is used by GFE goal-hyperprior coordinates.
+    """
+    return digamma(alpha) - digamma(jnp.sum(alpha, axis=axis, keepdims=True))
+
+
 def _dirichlet_logf(ftype, expected_log):
     if ftype == "transition_mixture":
         return expected_log.transpose(0, 2, 3, 1)  # [M,U,O,I] -> [M,O,I,U]
@@ -497,6 +506,11 @@ def _stats(a_param, learned):
     return _dirichlet_stats(a_param) if learned else _fixed_stats(a_param)
 
 
+def gfe_parameter_stats(a_param, learned=False):
+    """Batched ``E[A]`` and ``E[h(A)]`` for a fixed or Dirichlet matrix."""
+    return jax.vmap(lambda value: _stats(value, learned))(a_param)
+
+
 def gfe_stationary_stats(log_d, abar, hbar, logc):
     """Stationary state beliefs for a batch of GFE composites with supplied
     matrix moments.
@@ -535,7 +549,7 @@ def gfe_update(log_d, a_param, logc, k_max, learned=False, return_diagnostics=Fa
     d > 0, but bounded on zero-support states, where log z̄ − log d is a
     (−∞) − (−∞) that used to surface as ±1e30 junk and leak probability
     into downstream updates (cff-i45j)."""
-    abar, hbar = jax.vmap(lambda a: _stats(a, learned))(a_param)
+    abar, hbar = gfe_parameter_stats(a_param, learned)
     return gfe_update_stats(
         log_d, abar, hbar, logc, k_max,
         return_diagnostics=return_diagnostics,
@@ -554,9 +568,59 @@ def gfe_energy_stats(log_d, abar, hbar, logc):
     return jax.vmap(one)(abar, hbar, logc, log_d)
 
 
+def gfe_goal_structural_stats(log_d, abar, hbar, expected_log_c):
+    """GFE structural term with the goal cross-entropy removed.
+
+    The complete learned-goal ledger owns ``-qx·E[log c]`` together with the
+    Dirichlet prior/posterior terms so hostile sparse concentrations cancel
+    algebraically before evaluation. Returns the remaining per-member term
+    and each member's predictive observation mass.
+    """
+
+    def one(a_mean, h_mean, elog_c, ld):
+        zbar = _gfe_solve(a_mean, h_mean, elog_c, ld)
+        qx = a_mean @ zbar
+        rho = _gfe_rho(a_mean, h_mean, elog_c, zbar)
+        lz = _safe_log(zbar)
+        full = -(zbar * rho).sum(-1) + (zbar * lz).sum(-1)
+        return full + (qx * elog_c).sum(-1), qx
+
+    return jax.vmap(one)(abar, hbar, expected_log_c, log_d)
+
+
+def goal_dirichlet_energy(alpha, alpha0, predicted_counts):
+    """Stable shared-goal likelihood/prior/parameter-edge ledger.
+
+    This is ``KL(Dir(alpha)||Dir(alpha0)) - n·E[log c]`` combined as
+
+        log B(alpha0) - log B(alpha)
+        + (alpha - alpha0 - n)·E[log c].
+
+    At the coordinate update ``alpha = alpha0 + n`` the potentially enormous
+    expected-log terms cancel exactly instead of numerically.
+    """
+    elog = dirichlet_expected_log(alpha)
+
+    def log_beta(value):
+        return gammaln(value).sum() - gammaln(value.sum())
+
+    proper = (
+        jnp.all(jnp.isfinite(alpha))
+        & jnp.all(alpha > 0)
+        & jnp.all(jnp.isfinite(alpha0))
+        & jnp.all(alpha0 > 0)
+    )
+    value = (
+        log_beta(alpha0)
+        - log_beta(alpha)
+        + jnp.sum((alpha - alpha0 - predicted_counts) * elog)
+    )
+    return jnp.where(proper, value, jnp.inf)
+
+
 def gfe_energy(log_d, a_param, logc, learned=False):
     """Composite FE term per member: −z*ᵀ rho(z*) − H[z*]."""
-    abar, hbar = jax.vmap(lambda a: _stats(a, learned))(a_param)
+    abar, hbar = gfe_parameter_stats(a_param, learned)
     return gfe_energy_stats(log_d, abar, hbar, logc)
 
 

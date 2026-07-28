@@ -33,13 +33,17 @@ from cffg.rules import (
     VMP_UPDATES,
     dirichlet_vmp_energy,
     dirichlet_vmp_update,
+    dirichlet_expected_log,
     gfe_energy,
     gfe_energy_stats,
+    gfe_goal_structural_stats,
+    gfe_parameter_stats,
     gfe_stationary_stats,
     gfe_tm_energy,
     gfe_tm_update,
     gfe_update,
     gfe_update_stats,
+    goal_dirichlet_energy,
     mu3_importance_update,
 )
 
@@ -1294,6 +1298,99 @@ class Engine:
             )
         return out
 
+    def goal_marginals(
+        self, state: State
+    ) -> dict[str, "DirichletMarginal"]:
+        """Learned goal-factor name -> its Dirichlet posterior."""
+        parameter = self.dirichlet_marginals(state)
+        out: dict[str, DirichletMarginal] = {}
+        for group in self.arena.gfe_groups:
+            for goal, edge in zip(group.goal_members, group.goal_param_edges):
+                out[goal] = parameter[edge]
+        return out
+
+    def goal_prior_updates(self, state: State) -> dict[str, np.ndarray]:
+        """Return converged goal posteriors keyed by serialized prior blob.
+
+        This dictionary is the explicit trial-rollover/checkpoint boundary.
+        Reading it does not mutate this state or a future trial's prior.
+        """
+        parameter = self.dirichlet_marginals(state)
+        out: dict[str, np.ndarray] = {}
+        for group in self.arena.gfe_groups:
+            for tied in group.goal_tie_groups:
+                first = tied[0]
+                blob = group.goal_prior_blobs[first]
+                marginal = parameter[group.goal_param_edges[first]]
+                if not marginal.proper:
+                    raise ValueError(
+                        f"goal prior {blob!r}: posterior is improper; "
+                        "rollover requires a completed proper coordinate"
+                    )
+                alpha = marginal.alpha.copy()
+                if blob in out and not np.array_equal(out[blob], alpha):
+                    raise ValueError(
+                        f"goal prior blob {blob!r} has inconsistent posteriors "
+                        "across compiled composite groups"
+                    )
+                out[blob] = alpha
+        return out
+
+    def with_goal_priors(
+        self, state: State, priors: dict[str, np.ndarray]
+    ) -> State:
+        """Install trial priors on a fresh state without accumulating sweeps.
+
+        Counts already present on a goal parameter edge prove that the state
+        has participated in inference. Callers must start the next trial from
+        ``init_state`` rather than add a posterior to an old count message.
+        """
+        known = {
+            blob
+            for group in self.arena.gfe_groups
+            for blob in group.goal_prior_blobs
+        }
+        unknown = sorted(set(priors) - known)
+        if unknown:
+            raise KeyError(
+                f"unknown learned-goal prior blobs {unknown}; have {sorted(known)}"
+            )
+        params = dict(state.params)
+        for group in self.arena.gfe_groups:
+            if not group.goal_learned:
+                continue
+            existing = np.asarray(
+                state.messages[
+                    self.arena.message_indices(
+                        group.goal_count_scatter, group.cards[0]
+                    )
+                ]
+            )
+            if np.any(existing != 0):
+                raise ValueError(
+                    "goal priors can only be installed on a fresh inference "
+                    "state; within-trial count messages are replaced per sweep"
+                )
+            alpha0 = params[group.name + ":c_alpha0"]
+            for row, blob in enumerate(group.goal_prior_blobs):
+                if blob not in priors:
+                    continue
+                value = np.asarray(priors[blob])
+                if (
+                    value.shape != (group.cards[0],)
+                    or not np.all(np.isfinite(value))
+                    or not np.all(value > 0)
+                ):
+                    raise ValueError(
+                        f"goal prior {blob!r}: expected finite positive shape "
+                        f"{(group.cards[0],)}, got {value.shape}"
+                    )
+                alpha0 = alpha0.at[row].set(
+                    jnp.asarray(value, dtype=alpha0.dtype)
+                )
+            params[group.name + ":c_alpha0"] = alpha0
+        return _replace(state, params=params)
+
     def gaussian_marginals(self, state: State) -> dict[str, tuple[np.ndarray, np.ndarray]]:
         """Edge name -> (mean, cov). Requires a proper combined precision —
         run to coherence (and bind data) first. Improper beliefs return NaN
@@ -1788,22 +1885,52 @@ def _make_step(arena: Arena, skip_scheduled: bool = False):
             k_local = max(g.cards)
             log_d = messages[arena.message_indices(g.gather_z, ki)]
             a_key = g.name + (":counts" if g.learned else ":A")
+            if g.goal_learned:
+                c_alpha0 = params[g.name + ":c_alpha0"]
+                c_counts = messages[
+                    arena.message_indices(g.goal_count_scatter, ko)
+                ]
+                logc = dirichlet_expected_log(c_alpha0 + c_counts)
+            else:
+                logc = params[g.name + ":c"]
             if g.mu3:
                 mu2, log_qx, residuals, statuses = gfe_update_stats(
                     log_d,
                     params[g.name + ":Abar"],
                     params[g.name + ":hbar"],
-                    params[g.name + ":c"],
+                    logc,
                     k_local,
                     return_diagnostics=True,
                 )
             else:
                 mu2, log_qx, residuals, statuses = gfe_update(
-                    log_d, params[a_key], params[g.name + ":c"], k_local,
+                    log_d, params[a_key], logc, k_local,
                     learned=g.learned, return_diagnostics=True,
                 )
             new = _set_disc_block(arena, new, g.scatter_z, ki, mu2)
             new = _set_disc_block(arena, new, g.scatter_x, ko, log_qx)
+            if g.goal_learned:
+                predicted = jnp.exp(log_qx[..., :ko])
+                for tied in g.goal_tie_groups:
+                    rows = jnp.asarray(tied)
+                    combined = predicted[rows].sum(axis=0)
+                    predicted = predicted.at[rows].set(
+                        jnp.broadcast_to(combined, predicted[rows].shape)
+                    )
+                new = _set_disc_block(
+                    arena,
+                    new,
+                    g.goal_prior_scatter,
+                    ko,
+                    c_alpha0,
+                )
+                new = _set_disc_block(
+                    arena,
+                    new,
+                    g.goal_count_scatter,
+                    ko,
+                    predicted,
+                )
             inner_residual = jnp.maximum(inner_residual, jnp.max(residuals))
             inner_status = jnp.maximum(inner_status, jnp.max(statuses))
         for g in arena.gfe_tm_groups:
@@ -2688,9 +2815,31 @@ def _make_bfe(arena: Arena):
                 total = total + fn(inc, c.cards)
         for g in arena.gfe_groups:
             _, ki = g.cards
+            ko, _ = g.cards
             log_d = messages[arena.message_indices(g.gather_z, ki)]
             a_key = g.name + (":counts" if g.learned else ":A")
-            if g.mu3:
+            if g.goal_learned:
+                alpha0 = params[g.name + ":c_alpha0"]
+                current_counts = messages[
+                    arena.message_indices(g.goal_count_scatter, ko)
+                ]
+                alpha = alpha0 + current_counts
+                expected_log_c = dirichlet_expected_log(alpha)
+                abar, hbar = gfe_parameter_stats(
+                    params[a_key], learned=g.learned
+                )
+                structural, predicted = gfe_goal_structural_stats(
+                    log_d, abar, hbar, expected_log_c
+                )
+                total = total + structural.sum()
+                for tied in g.goal_tie_groups:
+                    rows = jnp.asarray(tied)
+                    total = total + goal_dirichlet_energy(
+                        alpha[rows[0]],
+                        alpha0[rows[0]],
+                        predicted[rows].sum(axis=0),
+                    )
+            elif g.mu3:
                 total = total + gfe_energy_stats(
                     log_d,
                     params[g.name + ":Abar"],
