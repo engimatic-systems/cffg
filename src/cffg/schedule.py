@@ -149,12 +149,31 @@ def _arena_signature(arena: Arena) -> str:
         f"{arena.n_gslots}|{arena.n_efslots}".encode()
     )
     for kind, groups in (
-        ("d", arena.groups), ("g", arena.gauss_groups), ("e", arena.ef_groups)
+        ("d", arena.groups),
+        ("p", arena.dirichlet_groups),
+        ("g", arena.gauss_groups),
+        ("e", arena.ef_groups),
     ):
         for g in groups:
             h.update(f"{kind}|{g.name}|{len(g.members)}".encode())
-            h.update(np.ascontiguousarray(g.gather).tobytes())
+            gather = getattr(g, "gather", None)
+            if gather is None:
+                gather = g.gather_both
+            h.update(np.ascontiguousarray(gather).tobytes())
             h.update(np.ascontiguousarray(g.scatter).tobytes())
+    for g in arena.gfe_groups:
+        h.update(
+            f"gfe|{g.name}|{len(g.members)}|{g.learned}|{g.mu3}|"
+            f"{g.param_blobs}".encode()
+        )
+        for rows in (g.gather_z, g.scatter_z, g.scatter_x):
+            h.update(np.ascontiguousarray(rows).tobytes())
+    for plan in arena.mu3_groups:
+        h.update(
+            f"mu3|{plan.name}|{plan.evaluator}|{plan.param_blob}|"
+            f"{plan.count_key}|{plan.cards}".encode()
+        )
+        h.update(np.ascontiguousarray(plan.rows).tobytes())
     return h.hexdigest()
 
 
@@ -193,6 +212,8 @@ def _iterative_structures(arena: Arena) -> list[str]:
     reasons = []
     if any(g.mode == "vmp" for g in arena.groups):
         reasons.append("mean-field (vmp) groups")
+    if arena.dirichlet_groups:
+        reasons.append("Dirichlet parameter-edge VMP groups")
     if arena.constraint_groups:
         reasons.append("hard-constraint factors")
     if arena.gfe_groups or arena.gfe_tm_groups:
@@ -239,7 +260,14 @@ def _island_nodes_and_links(
     for e in arena.edges.values():
         if not e.interior:
             continue
-        owner = gauss_owner if e.dim else ef_owner if e.ef else disc_owner
+        if e.dim:
+            owner = gauss_owner
+        elif e.ef:
+            owner = ef_owner
+        elif e.param_shape:
+            owner = {}
+        else:
+            owner = disc_owner
         a, b = owner.get(e.slot0), owner.get(e.slot1)
         if a is not None and b is not None:
             links.append((a, b))

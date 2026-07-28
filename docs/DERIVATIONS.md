@@ -686,3 +686,391 @@ exact channel log 2 ≈ 0.693, sandwich [0.540, 0.693].
 *Executable:* `test_probe_experiment_gfe_explores_and_wins`,
 `test_probe_experiment_ablation_never_explores`, plus the float32 /
 degenerate-belief / improper-covariance contract tests.
+
+## D6a — VMP Dirichlet parameter edges and their VFE ledger (cff-l29q)
+
+### D6a.1 The plain-English version
+
+A categorical table can be an uncertain variable in the graph instead of a
+fixed blob. The useful conjugacy is specifically **mean-field VMP
+conjugacy**. A likelihood node sees the current beliefs over its ordinary
+categorical edges and sends their outer product to the table as fractional
+counts. A proper Dirichlet prior plus all such counts gives another proper
+Dirichlet; in the other direction, the likelihood uses the posterior expected
+log table, not the log posterior mean.
+
+This is the same algebra used by the out-of-graph `Learnables` fold, but that
+does not make the two procedures interchangeable without conditions. They
+agree when they start from the same proper prior, integrate the same
+mean-field node beliefs exactly once, use the same parameter tying and axis
+layout, and compare at the same inference fixed point. The in-graph form can
+feed the updated expected log table back into inference during a trial;
+`Learnables` normally folds a converged trial afterwards.
+
+Ordinary sum-product BP does **not** supply this message. Marginalizing a
+latent categorical assignment gives a weighted sum of table entries, while a
+Dirichlet-shaped message is a product of powers of those entries. They agree
+only when all roles selecting a table cell are hard (or, equivalently, every
+assignment with nonzero incoming mass selects the same cell). The Part II
+`mu3(A)` planning message is also not Dirichlet-shaped and is deliberately
+absent from this contract.
+
+The free-energy ledger must retain the parameter belief. A likelihood node
+contributes its expected negative log likelihood, the prior contributes its
+cross-entropy, and the parameter belief contributes its negative entropy.
+In the node-local CFFG spelling both adjacent nodes initially contain the
+parameter negative entropy; the parameter-edge correction removes one copy.
+Dropping that correction, or dropping the parameter entropy altogether,
+changes the VFE and therefore changes both convergence and policy scores.
+
+### D6a.2 Formal VMP updates
+
+**Layout and notation.** Every conditional table normalizes over its output
+axis. Let `c` index one output cell and `j` the remaining column indices:
+
+    categorical:        θ[c]
+    matrix_cat:         A[c, i]
+    transition_mixture: B[u, c, i]     (serialized/blob parameter layout).
+
+Each column has an independent Dirichlet prior
+`p(θ_.j | α⁰_.j) = Dir(α⁰_.j)`, with every concentration finite and strictly
+positive. Define
+
+    L[c,j] := E_q[log θ[c,j]]
+            = ψ(α[c,j]) − ψ(Σ_d α[d,j]).
+
+There is no numeric floor in this definition. Positive concentrations may
+produce very negative finite expected logs, especially in float32; exact
+zero support belongs to categorical beliefs and contributes an exact zero
+count.
+
+**Factor-to-parameter message.** For
+`f(s,θ) = θ[cell(s)]`, the mean-field constraint
+`q_f(s,θ) = q(θ) ∏_r q_r(s_r)` gives
+
+    log μ_{f→θ}(θ)
+      = E_{∏q_r}[log f(s,θ)] + const
+      = Σ_{c,j} n[c,j] log θ[c,j] + const,
+
+so, under the Dirichlet natural convention
+`log Dir(θ|α) = const + Σ(α−1)log θ`, the message natural parameter is the
+fractional count `η_f = n` (not `n−1`). The three sufficient statistics are
+
+    categorical:        n[c]     = q_out(c)
+    matrix_cat:         n[c,i]   = q_out(c) q_in(i)
+    transition_mixture: n[u,c,i] = q_sel(u) q_out(c) q_in(i).
+
+For clamped variables the corresponding `q` is a one-hot vector, so
+impossible cells receive exactly zero. Shapes above are parameter layout;
+the engine's transition node-belief layout `[c,i,u]` is transposed to
+`[u,c,i]`.
+
+With likelihood nodes `a = 1…N`, the parameter marginal is
+
+    q(θ) = Dir(α),                 α = α⁰ + Σ_a n_a.             (D6a.1)
+
+The parameter-to-likelihood cavity message excludes that likelihood:
+
+    η_{θ→a} = (α⁰ − 1) + Σ_{b≠a} n_b.
+
+The VMP update *from* likelihood `a` to any structural role uses the complete
+current marginal `q(θ)` and replaces the fixed `log θ` table in the ordinary
+geometric rule by `L = E_q log θ`. For example,
+
+    log μ_{f→out}(c) = Σ_i q_in(i) L[c,i] + const,
+
+with the analogous two- or three-way contractions for the other roles.
+This use of the complete marginal is the coordinate-ascent VMP update; the
+cavity expression above defines edge-message bookkeeping, not a directive to
+discard `a` while taking `E_q log θ`.
+
+**Why BP is not closed.** Exact sum-product instead sends
+
+    μ^BP_{f→θ}(θ) = Σ_s w(s) θ[cell(s)],
+
+where `w` is the product of incoming structural messages. A Dirichlet-shaped
+message would be `C ∏_{c,j} θ[c,j]^{η[c,j]}`. The former has nonzero mixed
+curvature in `log μ = log Σ_s w(s)θ[cell(s)]`; the latter is affine in
+`log θ`. They cannot agree on an open subset when two distinct cells have
+positive weight. If all nonzero weight selects one cell `k`, the sum reduces
+to `Cθ_k`, the hard-count special case `η_k=1`. Thus a latent-state BP
+parameter edge is rejected rather than silently approximated.
+*Executable:* `test_exact_bp_parameter_message_is_not_dirichlet_closed`.
+
+### D6a.3 Parameter VFE and the complete ledger
+
+For one column define the multivariate beta function
+
+    log B(α) = Σ_c log Γ(α_c) − log Γ(Σ_c α_c)
+
+and `ℓ_c = ψ(α_c) − ψ(α_+)`. The three parameter-related terms are
+
+    Q term (negative entropy):
+      E_q log q = −log B(α) + Σ_c (α_c−1)ℓ_c
+
+    prior energy:
+      −E_q log p(θ|α⁰) = log B(α⁰) − Σ_c (α⁰_c−1)ℓ_c
+
+    likelihood energy:
+      −E_q log f = −Σ_c n_c ℓ_c.
+
+They sum over columns for matrix and transition tables. At the coordinate
+optimum `α = α⁰+n`, all expected-log terms cancel:
+
+    F_θ,prior,lik = log B(α⁰) − log B(α⁰+n).                    (D6a.2)
+
+The **complete** mean-field VFE also includes the ordinary state-belief terms
+and all other factors. For this likelihood block, with no other terms shown,
+
+    F_block = Σ_r Σ_{s_r} q_r(s_r) log q_r(s_r)
+              + E_q log q(θ) − E_q log p(θ|α⁰)
+              − E_{q(θ)∏q_r} log f(s,θ).                       (D6a.3)
+
+Zeros in `q_r` use the continuous convention `0 log 0 = 0`.
+
+In node-local CFFG form, the prior and likelihood node beliefs each contain
+the parameter marginal:
+
+    F_prior-node = E_q log q(θ) − E_q log p(θ|α⁰)
+    F_lik-node   = E_q log q(θ) + Σ_r E log q_r − E log f.
+
+The parameter-edge correction is `−E_q log q(θ)` (equivalently `−` the
+negative entropy), leaving exactly (D6a.3). Equality trees used to share one
+parameter repeat this accounting mechanically: every internal edge removes
+the one extra marginal-entropy copy introduced by its incident node terms.
+*Executable:* `test_categorical_fractional_counts_and_total_vfe`,
+`test_matrix_cat_fractional_counts_and_total_vfe`,
+`test_transition_mixture_fractional_counts_and_total_vfe`.
+
+**Conjugate-equivalence theorem.** An in-graph posterior (D6a.1) equals an
+out-of-graph `Dirichlet.fold` posterior iff:
+
+1. both start from the identical proper `α⁰`;
+2. every source likelihood carries the declared mean-field constraint;
+3. both consume the same converged structural marginals, whose product is
+   the VMP node belief, once per factor instance;
+4. blob/edge tying, source restrictions, and the output-axis layout route
+   every statistic to the same posterior column; and
+5. no update is interleaved on one side before the compared structural fixed
+   point, and no extra functional message such as `mu3` is present.
+
+Under these assumptions both sides are definitionally
+`α⁰ + Σ_a E_q[t_a]`; equality follows entrywise. Without (2), the exact BP
+node belief can carry correlations and its parameter message has the
+non-closure above. Without (3–4), a statistic is duplicated, omitted, or
+transposed. Without (5), the two algorithms are being compared at different
+coordinate-ascent iterates, not at the same posterior.
+
+**Hostile-input contract.** Missing, non-finite, zero, or negative prior
+concentrations are not vacuous messages; they make the Dirichlet base
+improper and compilation must fail loudly. Sparse *positive* concentrations
+remain valid without a literal floor. Exact-zero state mass remains an exact
+zero statistic. Expected logs must stay finite at float32, and contractions
+must operate at category/action sizes 10–100 times the tiny anchors without
+dimension-dependent guards. These cases are pinned by
+`test_dirichlet_vmp_hostile_inputs_and_scale`.
+
+## D6b — The functional `mu3(A)` message and importance sampling (cff-almk)
+
+### D6b.1 The plain-English version
+
+The planning message back to an uncertain observation matrix is a function,
+not a familiar probability distribution. Given a possible matrix `A`, a state
+belief `z`, and an observation goal `c`, it scores how well that matrix makes
+the substituted future-observation objective. The score contains predictive
+entropy and `A log A` terms, so it cannot be reduced to fractional Dirichlet
+counts. The proper Dirichlet posterior supplied by perception is instead the
+**base distribution**; the planning function tilts that base.
+
+CFFG evaluates the tilted belief with importance sampling. It draws matrices
+from the proper base posterior, evaluates every future slice's functional
+log-message on the same draw, adds those log-messages, and normalizes the
+weights in log space. Sharing a draw is what combines future slices as one
+posterior rather than pretending each slice contributed a conjugate count.
+The result supplies weighted expectations of `A`, column entropy, the
+backward-message function, and the parameter part of the free-energy ledger.
+
+Randomness is explicit and replayable. One inference attempt draws its
+particles from a caller-provided JAX key and reuses them until the conditional
+message fixed point is reached. A fresh sampling epoch splits the returned key
+and draws a new set. Reusing particles gives a falsifiable convergence test;
+averaging independent post-burn-in policy scores reduces Monte Carlo noise but
+does not turn an unconverged or collapsed inference attempt into a converged
+one.
+
+The serialized graph stores a registered evaluator identity and the graph
+sources of `A`, `z`, and `c`; particles and weights are derived runtime state.
+For the built-in observation composite the identity is
+`cffg.mu3_is.v1`. A P-substitution constraint names it through
+`parameter_message=mu3_is_v1`; `A` is the likelihood's matrix parameter
+blob/base posterior, `z` its `in` edge, and `c` the facing categorical goal
+blob. Multiple composite instances reading the same `A` blob form one
+functional-message group. This representation survives JSON and `.cffgz`
+round trips without serializing a Python closure or a sample array.
+
+### D6b.2 Functional message
+
+Let `A ∈ [0,1]^{M×K}` be column-stochastic,
+`zbar ∈ Δ^{K−1}`, and `c ∈ Δ^{M−1}`. Let
+`Abar=E_q(A)[A]` be the current matrix marginal mean and
+`pbar=Abar zbar` the current posterior-predictive observation belief. The
+P-substituted observation model is `p(x|z,A)=Cat(x|Az)`. Part II §5.2,
+Fig. 5 and Appendix C.6 define
+
+    h(A) := −diag(Aᵀ log A)
+    r(Abar,zbar,c) := log c − log(Abar zbar)
+    ξ(A;Abar,zbar,c) := Aᵀ r(Abar,zbar,c) − h(A)
+    log μ3(A;Abar,zbar,c) := zbarᵀ ξ(A;Abar,zbar,c).           (D6b.1)
+
+The overbars are essential and are easy to lose in PDF text extraction: the
+denominator is the current marginal predictive `Abar zbar`, not the
+sample-specific `Azbar`. During one coordinate update it is held fixed while
+`μ3` is evaluated as a function of `A`; the outer message iteration brings
+`Abar` to self-consistency. A scalar form is
+
+    φ(A;Abar,zbar,c) := log μ3(A;Abar,zbar,c)
+      = Σ_{x,k} zbar_k A_{xk} log A_{xk}
+        + Σ_x (Azbar)_x [log c_x − log pbar_x].                (D6b.2)
+
+Every `0 log 0` and zero-times-log-ratio term is exactly zero. If a sampled
+predictive `(Azbar)_x>0` while `c_x=0`, the score is `−∞`, correctly assigning
+zero functional weight. A positive sampled predictive with `pbar_x=0` makes
+the score `+∞` and exposes an incoherent cavity instead of being floored.
+When `(Azbar)_x=0`, that coordinate contributes zero even at a support
+boundary. No probability floor changes support.
+
+**Non-closure.** A Dirichlet natural log-message is
+`const + Σ_{x,k} η_{xk} log A_{xk}`, affine in `log A`. Equation (D6b.2)
+contains both linear `A_{xk}` and `A_{xk} log A_{xk}` terms; the effective
+coefficient of `log A_{xk}` therefore varies with `A`. Its Hessian cannot
+equal that of a Dirichlet log monomial on an open subset. A column with
+`zbar_k=0` is the vacuous exception, but there is no Dirichlet family that
+represents the general message. It must not enter the D6a concentration/count
+slots or be silently moment-matched.
+*Executable:* `test_mu3_log_density_matches_expanded_formula_and_is_not_dirichlet`.
+
+For planning slices `t=1…T` that share `A`,
+
+    Φ(A;Abar) := Σ_t φ(A; Abar,zbar_t,c_t),                    (D6b.3)
+    q*(A) := q0(A) exp Φ(A;Abar) / Z,
+    Z := E_{q0}[exp Φ(A;Abar)],   Abar=E_q*[A].                (D6b.4)
+
+where the base
+`q0(A)=∏_k Dir(A_.k|α_.k)` must be finite and strictly proper. A missing,
+vacuous, non-finite, zero, or negative base concentration is a hard error.
+The same draw `A_s` is evaluated against every slice before weights are
+normalized; normalizing slice-by-slice would define a different posterior.
+
+Equation (D6b.4) is a fixed-point definition: a coordinate update evaluates
+weights with the previous `Abar`, and repeated updates with reused particles
+must make both weights and `Abar` stationary.
+
+The Figure 5 GFE composite needs only two primitive weighted moments:
+
+    Abar       = E_q*[A]
+    hbar       = −E_q*[diag(Aᵀ log A)]
+    r_t        = log c_t − log(Abar zbar_t)
+    rhobar_t   = Abarᵀ r_t − hbar
+    Ephi_t     = zbar_tᵀ rhobar_t
+    EΦ         = Σ_t Ephi_t.                                  (D6b.5)
+
+`Abar zbar_t` is the posterior predictive observation belief. `rhobar_t`
+drives the state-side fixed point/message and gives the Figure 5 average
+energy `U_x,t=−zbar_tᵀrhobar_t`. There is no `E[log A]` in this local
+composite; it belongs to the separate Dirichlet base/prior ledger. Because
+(D6b.4) is the coordinate-optimal parameter belief for the held cavity,
+
+    KL(q* || q0) = E_q*[Φ(A;Abar)] − log Z,
+    KL(q* || q0) − E_q*[Φ(A;Abar)] = −log Z.                  (D6b.6)
+
+Thus the complete parameter ledger is one prior/posterior KL correction plus
+all slice energies, or equivalently `−log Z`; it is not just `−EΦ`.
+
+### D6b.3 Importance-sampling and status contract
+
+**Proposal and weights.** Draw `S` independent matrices
+`A_s ~ q0(A)` in canonical column order. The proposal is exactly the proper
+base, so no proposal-density subtraction remains:
+
+    ℓ_s = Φ(A_s;Abar)
+    log ŵ_s = ℓ_s − logsumexp(ℓ_1,…,ℓ_S)
+    ŵ_s = exp(log ŵ_s)
+    log Zhat = logsumexp(ℓ_1,…,ℓ_S) − log S.                  (D6b.7)
+
+`−∞` scores have exactly zero weight. NaN or `+∞` scores are divergence. If
+every score is `−∞`, normalization is undefined and the result is divergence,
+not a uniform fallback. `Abar` and `hbar` in (D6b.5) are weighted sums with
+`ŵ_s`; the resulting `Abar` is the next fixed-point iterate. The
+finite-sample ledger uses
+`KLhat = Σ_s ŵ_s ℓ_s − log Zhat` and total parameter contribution
+`−log Zhat`, preserving the identity in (D6b.6) for the empirical base
+measure.
+
+**Diagnostics and collapse.**
+
+    ESS := 1 / Σ_s ŵ_s²,        ESS fraction := ESS/S.         (D6b.8)
+
+The runtime configuration supplies a dimensionless minimum ESS fraction.
+Below it, the attempt is `budget_exhausted`: diagnostics and particles may
+be inspected, but its beliefs/score cannot be required as converged.
+Resampling weighted particles would duplicate existing information without
+improving the importance estimate, so the built-in evaluator does not hide
+collapse behind SIR. The response is to increase `S`, improve the proposal in
+a future registered evaluator, or start an independent refresh epoch; a
+refresh consumes a new split key and replaces all particles.
+
+**PRNG and reuse.** An attempt receives one explicit key. At each refresh,
+exactly
+
+    next_key, sample_key = jax.random.split(key)
+
+is performed; `jax.random.split(sample_key, K)` then assigns one subkey to
+each of the `K` columns in canonical order and each subkey draws `S`
+Dirichlet columns. `next_key` is returned. The particles and weights are reused through
+every deterministic message sweep of that attempt (common random numbers).
+Identical evaluator metadata, arrays, configuration, and input key must replay
+bitwise. Samples/weights are runtime state, not template/blob state; a runtime
+checkpoint may store them for mid-attempt replay, while a fresh reconstruction
+needs only the template, blobs, configuration, and key.
+
+**Reference-implementation boundary.** Part II requires a functional message,
+importance-sampled expectations, a stochastic GFE trace, and post-burn-in
+policy averaging; it does not prescribe the proposal, particle count, ESS
+threshold, resampling, reuse, or RNG protocol. LAIF commit `9453782`
+represents `mu3` as a Julia closure, requests 20 `LeftProposal` particles,
+and relies on RxInfer/BayesBase's global-RNG bootstrap sampler and
+linear-space weights. BayesBase reuses particles while multiplying further
+factors and resamples below ESS `S/10`, but neither ESS nor weight-collapse
+status reaches the LAIF result. Those are reference choices, not paper
+requirements. CFFG keeps the useful left/base proposal and particle reuse,
+but makes the evaluator serializable, normalization log-space, the key
+explicit, and collapse loud; it does not copy the reference's hidden
+resampling/global-RNG behavior.
+
+**Termination and policy scores.**
+
+- `converged`: with one fixed particle set, the ordinary FE/message
+  stationarity checks pass, every required expectation and FE is finite, and
+  the ESS threshold passes.
+- `budget_exhausted`: the deterministic sweep budget ends before stationarity,
+  or weights are finite but ESS collapses below the configured threshold.
+- `diverged`: the base is improper; inputs, deltas, expectations, or FE become
+  non-finite; a score is NaN/`+∞`; or all scores are `−∞`.
+
+A policy-score estimator may run independent refresh epochs, discard a
+configured burn-in prefix, and average `log Zhat`/complete FE over the
+remaining **converged** epochs. Burn-in length is estimation policy (Part II
+uses ten iterations), never a convergence criterion. Any diverged epoch makes
+the enclosing result diverged; a budget-exhausted/collapsed epoch prevents a
+converged label even if an average looks stable.
+
+**Hostile-input contract.** Proper sparse Dirichlet bases are accepted without
+floors. Boundary samples with exact-zero `A` entries use (D6b.2)'s exact
+support conventions. A goal zero yields either a zero contribution when the
+sample predictive is zero or `−∞` weight when it is positive; a zero marginal
+predictive facing positive sampled mass is incoherent and diverges. Float32
+uses dtype-derived validity checks, and matrix/state dimensions 10–100 times
+the binary oracle must remain finite.
+*Executable:* `test_mu3_importance_sampling_matches_binary_quadrature`,
+`test_mu3_replays_from_explicit_key_and_combines_slices`,
+`test_mu3_hostile_support_weight_collapse_float32_and_scale`.

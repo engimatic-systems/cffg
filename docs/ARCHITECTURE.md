@@ -213,6 +213,36 @@ guarantee — is stable from the first release that writes it. External
 kernels must use their own impl-id namespace (`cffg.` is reserved) and bump
 MAJOR whenever message/energy semantics or the parameter schema change.
 
+### 2f. In-graph Dirichlet parameter edges (cff-fr5c)
+
+`FactorSpec.param_edges` is executable for `categorical`, `matrix_cat`, and
+`transition_mixture` likelihoods under an explicit mean-field constraint.
+The parameter edge faces one `dirichlet` prior factor; its schema-1
+`VariableSpec.cardinality` is the flattened table size, while the likelihood's
+structural cardinalities recover the canonical concentration shape `[K]`,
+`[K_out,K_in]`, or `[U,K_out,K_in]`. A missing/improper prior, a shape mismatch,
+or an unconstrained latent use is a compile error. Exact BP is intentionally
+not approximated: its likelihood-to-table message is a mixture, not
+Dirichlet-closed (DERIVATIONS D6a).
+
+The derived `DirichletGroupPlan` reuses flat message storage but keeps
+parameter slots out of categorical normalization, support, decoding, and the
+ordinary edge-entropy ledger. The two parameter slots pack positive prior
+concentrations and nonnegative fractional counts, not `alpha-1`; summing them
+recovers the posterior without losing sparse float32 concentrations to
+cancellation at one. Structural messages consume `E[log theta]`. Runtime
+counts remain derived state, so JSON and `.cffgz` reconstruct the arena solely
+from template constraints, `param_edges`, and prior blobs.
+`Engine.dirichlet_marginals` exposes concentrations, means, expected logs, and
+propriety.
+
+The VFE implementation combines the prior node, likelihood node, and
+parameter-edge entropy correction algebraically before evaluating hostile
+sparse inputs. At the coordinate update this is the stable beta-function
+ratio from D6a; a literal decomposition remains tested on small models. This
+conjugate path is the proper base posterior for `mu3(A)`, not a representation
+of `mu3` itself.
+
 ### 3. Message rule library (`cffg.rules`)
 
 A registry keyed by `(factor_type, constraint_config, out_edge_role)`:
@@ -221,9 +251,12 @@ A registry keyed by `(factor_type, constraint_config, out_edge_role)`:
   (the TM node from Part I Appendix C), equality nodes, δ.
 - **GFE rules** for the P-substituted goal-observation composite (Part II Fig. 5):
   Dirichlet message to goal statistics, softmax/Newton backward state message
-  (Corollary 1 form, 20-ish Newton steps as in the paper), importance-sampled
-  log-message to A. All in log-space; every stochastic rule takes an explicit PRNG
-  key.
+  (Corollary 1 form, with a gauge-projected globalized Newton solve), and the
+  optional importance-sampled functional log-message to A. The serialized
+  `parameter_message=mu3_is_v1` constraint compiles to evaluator identity
+  `cffg.mu3_is.v1`; the proper Dirichlet base posterior comes from the
+  perception/VMP path. All weights are evaluated in log-space and sampling
+  takes an explicit PRNG key.
 - **GFE-TM rules** (cff-fk2u, beyond the papers): P-substitution on the
   transition node gives dynamics curiosity — the same Corollary-1 fixed point
   over the joint (state, action) simplex, with the downstream message in the
@@ -371,8 +404,16 @@ name filter, and the caller decides when.
   On a two-pass schedule there is no sweep budget: one execution either
   certifies (converged, also with `tol=None`) or reports honestly that it
   did not.
-- GFE nodes are stochastic (importance sampling), so FE traces get burn-in
-  averaging (paper uses ~10 iterations) before any decision is read off.
+- Ordinary and analytic learned-parameter GFE nodes are deterministic. A
+  `mu3_is_v1` node fixes its sampled A matrices for the whole inference
+  attempt, making every sweep and its FE trace deterministic conditional on
+  the explicit key. Shared-A future slices add their functional scores before
+  one normalization; the weighted `E[A]` and `E[h(A)]` feed the Fig. 5
+  composite without moment-matching back to a Dirichlet. `RunResult` exposes
+  ESS, log-normalizer, and converged/budget-exhausted/diverged stochastic
+  status. `Engine.score_mu3_epochs` refreshes independent particle sets,
+  accepts only converged epochs, and applies burn-in solely to the final
+  policy-score average.
 - Inference *modes* are just constraint presets on the same grounded model:
   filtering/smoothing (data on past), planning (goals on future, P-substitution
   on), what-if (clamp hypothetical δs), backward inference (goals only, no data).

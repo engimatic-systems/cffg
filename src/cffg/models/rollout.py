@@ -53,10 +53,13 @@ def build_rollout(
     gfe: bool = True,
     map_policy: bool = False,
     learned_a: bool = False,
+    mu3: bool = False,
     epistemic_b: bool = False,
     learn: tuple[str, ...] = (),
 ) -> tuple[Template, dict[str, np.ndarray]]:
     n_state, n_obs, n_ctrl = len(d), A.shape[0], len(e)
+    if mu3 and (not gfe or not learned_a):
+        raise ValueError("build_rollout: mu3 requires gfe=True and learned_a=True")
     assert Bs.shape == (n_ctrl, n_state, n_state), f"Bs shape {Bs.shape}"
     assert A.shape == (n_obs, n_state) and c.shape == (n_obs,)
 
@@ -137,6 +140,8 @@ def build_rollout(
                 detail = [("substituted_role", "out")]
                 if learned_a:
                     detail.append(("parameter_uncertainty", "dirichlet"))
+                if mu3:
+                    detail.append(("parameter_message", "mu3_is_v1"))
                 t.constraints.append(
                     ConstraintSpec(ConstraintKind.P_SUBSTITUTION, f"obs{k}", tuple(sorted(detail)))
                 )

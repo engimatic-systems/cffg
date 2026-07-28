@@ -45,7 +45,14 @@ class Colony:
         """Add an instance; compiles only if this structure is new."""
         key = structure_hash(template)
         if key not in self.engines:
-            self.engines[key] = Engine(compile_template(template, arrays=arrays))
+            arena = compile_template(template, arrays=arrays)
+            if arena.mu3_groups:
+                raise ValueError(
+                    "Colony does not accept mu3 evaluators: their per-instance "
+                    "explicit PRNG keys and stochastic statuses require "
+                    "Engine.prepare_mu3/run"
+                )
+            self.engines[key] = Engine(arena)
             state = self.engines[key].init_state()
         else:
             # Same structure, this instance's own parameters.

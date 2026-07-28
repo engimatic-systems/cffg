@@ -17,7 +17,7 @@ from typing import NamedTuple
 
 import jax
 import jax.numpy as jnp
-from jax.scipy.special import logsumexp
+from jax.scipy.special import digamma, gammaln, logsumexp
 
 from cffg.compiler import NEG
 
@@ -223,6 +223,127 @@ VMP_ENERGIES = {
 }
 
 
+# --- VMP likelihoods with Dirichlet parameter edges (D6a) ---------------------
+
+
+def _dirichlet_counts(ftype, inc2, cards):
+    """Structural edge marginals -> fractional counts in serialized layout."""
+    qs = tuple(_edge_q(inc2, r, card) for r, card in enumerate(cards))
+    if ftype == "categorical":
+        return qs[0][0], qs
+    if ftype == "matrix_cat":
+        return jnp.einsum("mo,mi->moi", qs[0][0], qs[1][0]), qs
+    if ftype == "transition_mixture":
+        # Runtime/node layout is [out, in, selector]; parameter layout is
+        # [selector, out, in], matching blobs and Learnables.
+        return jnp.einsum(
+            "mu,mo,mi->muoi", qs[2][0], qs[0][0], qs[1][0]
+        ), qs
+    raise KeyError(ftype)
+
+
+def _dirichlet_expected_log(alpha, output_axis):
+    axis = output_axis + 1  # leading member axis
+    return digamma(alpha) - digamma(jnp.sum(alpha, axis=axis, keepdims=True))
+
+
+def _dirichlet_logf(ftype, expected_log):
+    if ftype == "transition_mixture":
+        return expected_log.transpose(0, 2, 3, 1)  # [M,U,O,I] -> [M,O,I,U]
+    return expected_log
+
+
+def dirichlet_vmp_update(ftype, inc2, alpha0, cards, k_max):
+    """One D6a coordinate update.
+
+    The returned parameter message is a fractional count array, while
+    structural messages use E_q[log theta] under ``alpha0 + counts``.  The
+    compiler packs ``alpha0`` itself in the facing prior slot (rather than
+    alpha0-1) so sparse positive float32 concentrations cannot cancel at one.
+    """
+    counts, _ = _dirichlet_counts(ftype, inc2, cards)
+    output_axis = 1 if ftype == "transition_mixture" else 0
+    alpha = alpha0 + counts
+    expected_log = _dirichlet_expected_log(alpha, output_axis)
+    out = VMP_UPDATES[ftype](
+        inc2, _dirichlet_logf(ftype, expected_log), cards, k_max
+    )
+    return out, counts
+
+
+def _sum_nonmember(x):
+    return x.reshape((x.shape[0], -1)).sum(axis=-1)
+
+
+def _dirichlet_log_beta(alpha, output_axis):
+    axis = output_axis + 1
+    return (
+        gammaln(alpha).sum(axis=axis)
+        - gammaln(alpha.sum(axis=axis))
+    )
+
+
+def _state_negative_entropy(qs):
+    total = jnp.zeros(qs[0][0].shape[0], dtype=qs[0][0].dtype)
+    for q, lq in qs:
+        total = total + jnp.where(q > 0, q * lq, 0.0).sum(axis=-1)
+    return total
+
+
+def dirichlet_vmp_energy(ftype, inc2, alpha, alpha0, cards):
+    """Stable complete D6a likelihood/prior/parameter-edge VFE per member.
+
+    Combining the three parameter ledger terms before multiplication yields
+
+        -log B(alpha) + log B(alpha0)
+        + (alpha-alpha0-counts) dot E_q[log theta].
+
+    At a coordinate fixed point the last coefficient is exactly zero.  This
+    avoids separately forming O(1/alpha) terms that catastrophically cancel
+    for a sparse float32 Dirichlet.
+    """
+    counts, qs = _dirichlet_counts(ftype, inc2, cards)
+    output_axis = 1 if ftype == "transition_mixture" else 0
+    elog = _dirichlet_expected_log(alpha, output_axis)
+    parameter = (
+        -_sum_nonmember(_dirichlet_log_beta(alpha, output_axis))
+        + _sum_nonmember(_dirichlet_log_beta(alpha0, output_axis))
+        + _sum_nonmember((alpha - alpha0 - counts) * elog)
+    )
+    proper = (
+        jnp.isfinite(alpha).reshape((alpha.shape[0], -1)).all(axis=-1)
+        & (alpha > 0).reshape((alpha.shape[0], -1)).all(axis=-1)
+    )
+    return jnp.where(proper, _state_negative_entropy(qs) + parameter, jnp.inf)
+
+
+def dirichlet_vmp_energy_parts(ftype, inc2, alpha, alpha0, cards):
+    """Literal node/edge ledger parts for review and small direct oracles.
+
+    Returns ``(prior_node, likelihood_node, parameter_edge_correction)``.
+    The engine uses :func:`dirichlet_vmp_energy`'s algebraically combined
+    form for hostile sparse inputs; these parts expose the exact bookkeeping
+    identity from DERIVATIONS D6a.3.
+    """
+    counts, qs = _dirichlet_counts(ftype, inc2, cards)
+    output_axis = 1 if ftype == "transition_mixture" else 0
+    elog = _dirichlet_expected_log(alpha, output_axis)
+    q_neg_entropy = (
+        -_sum_nonmember(_dirichlet_log_beta(alpha, output_axis))
+        + _sum_nonmember((alpha - 1) * elog)
+    )
+    prior_energy = (
+        _sum_nonmember(_dirichlet_log_beta(alpha0, output_axis))
+        - _sum_nonmember((alpha0 - 1) * elog)
+    )
+    likelihood_energy = -_sum_nonmember(counts * elog)
+    prior_node = q_neg_entropy + prior_energy
+    likelihood_node = (
+        q_neg_entropy + _state_negative_entropy(qs) + likelihood_energy
+    )
+    return prior_node, likelihood_node, -q_neg_entropy
+
+
 # --- GFE composite (P-substituted goal-observation pair, Part II §5) ---------
 #
 # Stable backward state message via Corollary 1: solve the fixed point
@@ -376,6 +497,34 @@ def _stats(a_param, learned):
     return _dirichlet_stats(a_param) if learned else _fixed_stats(a_param)
 
 
+def gfe_stationary_stats(log_d, abar, hbar, logc):
+    """Stationary state beliefs for a batch of GFE composites with supplied
+    matrix moments.
+
+    This is the common coordinate used by both the analytic Dirichlet path
+    and the functional ``mu3`` path.  Keeping the latter in moment form is
+    intentional: its weighted particle posterior is not Dirichlet.
+    """
+
+    def one(a_mean, h_mean, lc, ld):
+        solved = _gfe_solve_result(a_mean, h_mean, lc, ld)
+        return solved.solution, solved.residual, solved.status
+
+    return jax.vmap(one)(abar, hbar, logc, log_d)
+
+
+def gfe_update_stats(
+    log_d, abar, hbar, logc, k_max, *, return_diagnostics=False
+):
+    """GFE update from arbitrary valid ``E[A]`` and ``E[h(A)]`` moments."""
+    ko, ki = abar.shape[1], abar.shape[2]
+    zbar, residual, status = gfe_stationary_stats(log_d, abar, hbar, logc)
+    rho = jax.vmap(_gfe_rho)(abar, hbar, logc, zbar)
+    qx = jnp.einsum("moi,mi->mo", abar, zbar)
+    messages = (_norm_pad(rho, ki, k_max), _norm_pad(_safe_log(qx), ko, k_max))
+    return (*messages, residual, status) if return_diagnostics else messages
+
+
 def gfe_update(log_d, a_param, logc, k_max, learned=False, return_diagnostics=False):
     """Batched over members. log_d [M,K] normalized; a_param is logA (fixed)
     or Dirichlet counts α (learned); returns (μ2, log q_x) padded to k_max.
@@ -386,30 +535,92 @@ def gfe_update(log_d, a_param, logc, k_max, learned=False, return_diagnostics=Fa
     d > 0, but bounded on zero-support states, where log z̄ − log d is a
     (−∞) − (−∞) that used to surface as ±1e30 junk and leak probability
     into downstream updates (cff-i45j)."""
-    ko, ki = a_param.shape[1], a_param.shape[2]
+    abar, hbar = jax.vmap(lambda a: _stats(a, learned))(a_param)
+    return gfe_update_stats(
+        log_d, abar, hbar, logc, k_max,
+        return_diagnostics=return_diagnostics,
+    )
 
-    def one(a_p, lc, ld):
-        abar, h = _stats(a_p, learned)
-        solved = _gfe_solve_result(abar, h, lc, ld)
-        zbar = solved.solution
-        return _gfe_rho(abar, h, lc, zbar), abar @ zbar, solved.residual, solved.status
 
-    mu2, qx, residual, status = jax.vmap(one)(a_param, logc, log_d)
-    messages = (_norm_pad(mu2, ki, k_max), _norm_pad(_safe_log(qx), ko, k_max))
-    return (*messages, residual, status) if return_diagnostics else messages
+def gfe_energy_stats(log_d, abar, hbar, logc):
+    """Composite FE term from arbitrary ``E[A]``/``E[h(A)]`` moments."""
+
+    def one(a_mean, h_mean, lc, ld):
+        zbar = _gfe_solve(a_mean, h_mean, lc, ld)
+        rho = _gfe_rho(a_mean, h_mean, lc, zbar)
+        lz = _safe_log(zbar)
+        return -(zbar * rho).sum(-1) + (zbar * lz).sum(-1)
+
+    return jax.vmap(one)(abar, hbar, logc, log_d)
 
 
 def gfe_energy(log_d, a_param, logc, learned=False):
     """Composite FE term per member: −z*ᵀ rho(z*) − H[z*]."""
+    abar, hbar = jax.vmap(lambda a: _stats(a, learned))(a_param)
+    return gfe_energy_stats(log_d, abar, hbar, logc)
 
-    def one(a_p, lc, ld):
-        abar, h = _stats(a_p, learned)
-        zbar = _gfe_solve(abar, h, lc, ld)
-        rho = _gfe_rho(abar, h, lc, zbar)
-        lz = _safe_log(zbar)
-        return -(zbar * rho).sum(-1) + (zbar * lz).sum(-1)
 
-    return jax.vmap(one)(a_param, logc, log_d)
+def mu3_log_message(particles, zbars, logcs, abar):
+    """Evaluate ``Σ_t log μ₃,t(A_s)`` for fixed Dirichlet particles.
+
+    ``abar`` is the current weighted posterior mean and is held fixed while
+    evaluating the functional, exactly as in Part II Fig. 5.  Exact goal
+    zeros remain true log-zeros; masked products avoid the undefined
+    numerical form ``0 * -inf`` without inventing support.
+    """
+    dtype = jnp.result_type(particles, zbars, logcs, abar)
+    particles = jnp.asarray(particles, dtype=dtype)
+    zbars = jnp.asarray(zbars, dtype=dtype)
+    logcs = jnp.asarray(logcs, dtype=dtype)
+    abar = jnp.asarray(abar, dtype=dtype)
+    logcs = jnp.where(logcs == jnp.asarray(NEG, dtype=dtype), -jnp.inf, logcs)
+    predictive = jnp.einsum("oi,ti->to", abar, zbars)
+    residual = logcs - _safe_log(predictive)
+
+    sample_predictive = jnp.einsum("soi,ti->sto", particles, zbars)
+    fit = jnp.sum(
+        jnp.where(sample_predictive > 0, sample_predictive * residual[None, :, :], 0.0),
+        axis=-1,
+    )
+    log_particles = jnp.where(particles > 0, jnp.log(particles), 0.0)
+    particle_h = -jnp.sum(
+        jnp.where(particles > 0, particles * log_particles, 0.0), axis=1
+    )
+    entropy = jnp.einsum("ti,si->st", zbars, particle_h)
+    return jnp.sum(fit - entropy, axis=-1)
+
+
+def mu3_importance_update(particles, zbars, logcs, abar):
+    """Self-normalized IS coordinate update for the functional μ₃ message.
+
+    Returns ``(Abar, hbar, weights, log_Z, E_phi, KL, ESS, status)`` where
+    status is 0 on a valid estimate and 2 when weights collapse or contain a
+    NaN/+inf.  Low ESS is a caller-configured inference-budget outcome.
+    """
+    logw = mu3_log_message(particles, zbars, logcs, abar)
+    bad = jnp.any(jnp.isnan(logw) | jnp.isposinf(logw))
+    finite_any = jnp.any(jnp.isfinite(logw))
+    safe = jnp.where(jnp.isfinite(logw), logw, -jnp.inf)
+    log_norm = logsumexp(safe)
+    invalid = bad | ~finite_any | ~jnp.isfinite(log_norm)
+    weights = jnp.where(invalid, jnp.zeros_like(safe), jnp.exp(safe - log_norm))
+
+    new_abar = jnp.einsum("s,soi->oi", weights, particles)
+    log_particles = jnp.where(particles > 0, jnp.log(particles), 0.0)
+    particle_h = -jnp.sum(
+        jnp.where(particles > 0, particles * log_particles, 0.0), axis=1
+    )
+    new_hbar = jnp.einsum("s,si->i", weights, particle_h)
+    expected_phi = jnp.sum(jnp.where(weights > 0, weights * safe, 0.0))
+    sample_count = jnp.asarray(particles.shape[0], dtype=particles.dtype)
+    log_z = log_norm - jnp.log(sample_count)
+    kl = expected_phi - log_z
+    ess = jnp.where(
+        invalid, jnp.asarray(0.0, dtype=particles.dtype),
+        1.0 / jnp.sum(jnp.square(weights)),
+    )
+    status = jnp.where(invalid, 2, 0)
+    return new_abar, new_hbar, weights, log_z, expected_phi, kl, ess, status
 
 
 # --- GFE-TM composite (P-substituted transition node, cff-fk2u) --------------

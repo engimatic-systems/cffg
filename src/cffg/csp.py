@@ -267,7 +267,9 @@ def decimate(engine, state, *, max_rounds=None, n_sweeps=20, damp=0.0, tol=1e-9)
 
     arena = engine.arena
     free = [
-        e.name for e in arena.edges.values() if not e.dim and not e.ef
+        e.name
+        for e in arena.edges.values()
+        if not e.dim and not e.ef and not e.param_shape
     ]
     if max_rounds is None:
         max_rounds = len(free)

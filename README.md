@@ -76,6 +76,35 @@ chain = unroll(slice_template, 10, {"tail": "head"})     # glue-port chaining
 model = compose(prior_template, chain, {"attach": "t0/head"}, name="hmm10")
 ```
 
+An uncertain categorical table can also live inside the graph. Bind the
+likelihood's parameter role through `param_edges`, face that edge with a
+`dirichlet` prior, and put a `MEAN_FIELD` bead on the likelihood. The carrier
+cardinality is the flattened table size; the prior blob retains its canonical
+shape:
+
+```python
+from cffg.core import ConstraintKind, ConstraintSpec, FactorSpec, VariableSpec
+
+variables["A_edge"] = VariableSpec("A_edge", M * K)
+factors["A_prior"] = FactorSpec(
+    "A_prior", "dirichlet",
+    edges={"out": "A_edge"},
+    param_blobs={"counts": "alpha_A"},       # alpha_A.shape == (M, K), all > 0
+)
+factors["obs"] = FactorSpec(
+    "obs", "matrix_cat",
+    edges={"out": "x", "in": "z"},
+    param_edges={"matrix": "A_edge"},
+)
+constraints.append(ConstraintSpec(ConstraintKind.MEAN_FIELD, "obs"))
+```
+
+The likelihood sends fractional state counts into the posterior and consumes
+`E[log A]` in return. After inference,
+`engine.dirichlet_marginals(state)["A_edge"]` reports `alpha`, `mean`,
+`expected_log`, and `proper`. An unconstrained latent parameter edge is
+rejected because exact sum-product is not Dirichlet-closed.
+
 ## Run inference
 
 ```python
@@ -91,6 +120,39 @@ state  = result.require_converged()                             # raises on ever
 engine.marginals(state)["u1"]   # posteriors by variable name
 engine.bfe(state)               # exact Bethe/Generalised free energy
 ```
+
+To let future planning slices send the nonconjugate Part-II `mu3(A)` message
+back toward a learned observation model, opt in when building the rollout and
+prepare one reproducible particle set after installing the current proper
+Dirichlet posterior:
+
+```python
+import jax
+
+template, arrays = build_rollout(
+    "planning_with_parameter_epistemics",
+    steps=3, d=d, A=A, c=c, e=e, Bs=Bs,
+    gfe=True, learned_a=True, mu3=True,
+)
+arrays["Ac"] = alpha_A                       # perception/VMP posterior, all > 0
+engine = Engine(
+    compile_template(template, arrays=arrays),
+    mu3_samples=4096,
+    mu3_min_ess_fraction=0.1,
+)
+state, next_key = engine.prepare_mu3(
+    engine.init_state(), jax.random.PRNGKey(7)
+)
+result = engine.run(state, 200, tol=1e-8, damp=0.5)
+result.require_converged()
+engine.mu3_diagnostics(result.state)         # weighted moments, log Z, KL, ESS
+```
+
+Particles remain fixed during that run. Reusing the same key is bitwise
+reproducible; use only `next_key` for a refresh. A changed `alpha_A` requires a
+fresh `prepare_mu3` call. `Engine.score_mu3_epochs` refreshes particles between
+policy-scoring epochs and averages only converged post-burn-in scores; burn-in
+does not turn an unfinished or collapsed estimate into convergence.
 
 Rules of thumb: `damp=0.5` whenever the model has ≥ 2 GFE composites (their
 outer coordination can limit-cycle undamped). `result.status` is one of
