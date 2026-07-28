@@ -41,7 +41,13 @@ EPIC_FILES = {
     "M0 · Foundations": ["test_hygiene.py"],
     "M1 · Core IR": ["test_ir.py", "test_serialize.py", "test_edits.py", "test_compose.py", "test_inits.py"],
     "M2 · BP Engine": ["test_engine_tree.py", "test_engine_hmm.py", "test_schedule.py"],
-    "M3 · VMP + GFE": ["test_vmp.py", "test_gfe.py"],
+    "M3 · VMP + GFE": [
+        "test_vmp.py",
+        "test_gfe.py",
+        "test_dirichlet_param_edges.py",
+        "test_mu3_derivation.py",
+        "test_mu3.py",
+    ],
     "M4 · Epistemic behavior": [
         "test_tmaze.py",
         "test_tmaze_learning.py",

@@ -1,6 +1,6 @@
 ---
 id: cff-iwgl
-status: open
+status: closed
 deps: [cff-fr5c, cff-almk]
 links: [cff-fr5c]
 created: 2026-07-06T00:26:48Z
@@ -47,3 +47,9 @@ the derived contract. Runtime results distinguish converged,
 budget-exhausted and diverged stochastic inference; non-finite FE or weights
 are divergence. The FE ledger and burn-in policy score match the D6b oracle,
 and fixed-A/perception-only behavior does not regress.
+
+## Notes
+
+**2026-07-28T16:26:17Z**
+
+Implemented the serialized cffg.mu3_is.v1 evaluator end to end. Compiler groups all future slices sharing one A-count blob; Engine.prepare_mu3 draws fixed particles from the proper Dirichlet base with an explicit key and returns next_key; deterministic outer coordinates combine slice log messages, expose weighted A/h moments, log Z, KL and ESS, and report converged/budget-exhausted/diverged outcomes without Dirichlet moment matching. The complete FE ledger adds the shared parameter KL once, and score_mu3_epochs averages only converged post-burn-in epochs. build_rollout(mu3=True) is the opt-in surface; Colony rejects mu3 until it has per-instance key threading, documented in LIMITATIONS. Production tests cover D6b binary quadrature, exact-key replay, shared slices, base-posterior injection, FE/policy-score identities, sparse/exact-zero support, improper/collapsed proposals, float32 scale and fixed-path regressions. Validation: focused regression set 110 passed; final dashboard suite 1264 passed, 0 failed, 4 third-party deprecation warnings. Dashboard refreshed at ~/agent-share/cffg-tests.html.

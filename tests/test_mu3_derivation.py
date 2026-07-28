@@ -7,6 +7,8 @@ import pytest
 from jax.scipy.special import logsumexp, xlogy
 from scipy.special import betaln, roots_legendre
 
+from cffg import rules
+
 
 MC_TOL = 1.5e-2  # preregistered binary-oracle tolerance at 2**15 particles
 
@@ -166,6 +168,13 @@ def test_mu3_log_density_matches_expanded_formula_and_is_not_dirichlet():
     r = np.log(c) - np.log(abar @ z)
     formal = z @ (a.T @ r - h)
     np.testing.assert_allclose(_mu3_log(a, abar, z, c), formal, atol=1e-14)
+    np.testing.assert_allclose(
+        rules.mu3_log_message(
+            a[None, ...], z[None, ...], np.log(c)[None, ...], abar
+        )[0],
+        formal,
+        atol=1e-14,
+    )
 
     # No constant plus fixed coefficients on log A fits the functional score
     # on an open product of binary simplexes.
@@ -202,6 +211,19 @@ def test_mu3_importance_sampling_matches_binary_quadrature():
             break
         abar = result["abar"]
     assert result is not None
+    production_abar = jnp.asarray(alpha / alpha.sum(axis=0, keepdims=True))
+    production = None
+    for _ in range(100):
+        production = rules.mu3_importance_update(
+            samples,
+            jnp.asarray(z)[None, :],
+            jnp.log(jnp.asarray(c))[None, :],
+            production_abar,
+        )
+        if float(jnp.max(jnp.abs(production[0] - production_abar))) < 1e-10:
+            break
+        production_abar = production[0]
+    assert production is not None and int(production[-1]) == 0
     np.testing.assert_allclose(result["abar"], oracle["abar"], atol=MC_TOL)
     np.testing.assert_allclose(result["hbar"], oracle["hbar"], atol=MC_TOL)
     np.testing.assert_allclose(result["rhos"][0], oracle["rho"], atol=MC_TOL)
@@ -209,6 +231,9 @@ def test_mu3_importance_sampling_matches_binary_quadrature():
         result["expected_phi"][0], oracle["expected_phi"], atol=MC_TOL
     )
     np.testing.assert_allclose(result["log_z"], oracle["log_z"], atol=MC_TOL)
+    np.testing.assert_allclose(production[0], oracle["abar"], atol=MC_TOL)
+    np.testing.assert_allclose(production[1], oracle["hbar"], atol=MC_TOL)
+    np.testing.assert_allclose(production[3], oracle["log_z"], atol=MC_TOL)
 
 
 def test_mu3_replays_from_explicit_key_and_combines_slices():
@@ -277,9 +302,15 @@ def test_mu3_hostile_support_weight_collapse_float32_and_scale():
         c = jnp.full((m,), 1 / m, dtype=jnp.float32)
         abar = alpha / alpha.sum(axis=0, keepdims=True)
         result = _importance_step(samples, abar, (z,), (c,))
+        production = rules.mu3_importance_update(
+            samples, z[None, :], jnp.log(c)[None, :], abar
+        )
         assert result["abar"].dtype == jnp.float32
         assert bool(jnp.all(jnp.isfinite(result["combined"])))
         assert bool(jnp.all(jnp.isfinite(result["weights"])))
         assert bool(jnp.all(jnp.isfinite(result["abar"])))
         assert bool(jnp.all(jnp.isfinite(result["hbar"])))
         assert np.isfinite(float(result["log_z"]))
+        assert int(production[-1]) == 0
+        for value in production[:-1]:
+            assert bool(jnp.all(jnp.isfinite(value)))

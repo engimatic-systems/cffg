@@ -282,10 +282,15 @@ the envelope must tighten below ~10x.
 
 **S2. Importance-sampling noise in parameter messages.** The message to A is a
 non-conjugate log-message evaluated by importance sampling; variance grows with
-column dimensionality and makes the GFE trace stochastic (hence burn-in
-averaging). Better estimators (Laplace approximation of the message, quadrature,
-reparameterized control variates) are incremental research that would directly
-improve learning stability.
+column dimensionality. CFFG fixes particles within an inference attempt, so its
+trace is deterministic conditional on the key; independently refreshed policy
+score epochs still vary and therefore support burn-in averaging. Low ESS is
+reported as budget exhaustion rather than silently accepted. Better estimators
+(Laplace approximation of the message, quadrature, reparameterized control
+variates) are incremental research that would directly improve learning
+stability. Colony batching does not yet accept `mu3` models because it has no
+per-instance explicit-key interface; `Colony.spawn` rejects them rather than
+running the analytic base moments as though the functional update had fired.
 
 **S3. Deep temporal / hierarchical models.** The papers say extensions are
 "straightforward — write the CFFG," which is true of the *notation*; the message

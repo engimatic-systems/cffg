@@ -497,6 +497,34 @@ def _stats(a_param, learned):
     return _dirichlet_stats(a_param) if learned else _fixed_stats(a_param)
 
 
+def gfe_stationary_stats(log_d, abar, hbar, logc):
+    """Stationary state beliefs for a batch of GFE composites with supplied
+    matrix moments.
+
+    This is the common coordinate used by both the analytic Dirichlet path
+    and the functional ``mu3`` path.  Keeping the latter in moment form is
+    intentional: its weighted particle posterior is not Dirichlet.
+    """
+
+    def one(a_mean, h_mean, lc, ld):
+        solved = _gfe_solve_result(a_mean, h_mean, lc, ld)
+        return solved.solution, solved.residual, solved.status
+
+    return jax.vmap(one)(abar, hbar, logc, log_d)
+
+
+def gfe_update_stats(
+    log_d, abar, hbar, logc, k_max, *, return_diagnostics=False
+):
+    """GFE update from arbitrary valid ``E[A]`` and ``E[h(A)]`` moments."""
+    ko, ki = abar.shape[1], abar.shape[2]
+    zbar, residual, status = gfe_stationary_stats(log_d, abar, hbar, logc)
+    rho = jax.vmap(_gfe_rho)(abar, hbar, logc, zbar)
+    qx = jnp.einsum("moi,mi->mo", abar, zbar)
+    messages = (_norm_pad(rho, ki, k_max), _norm_pad(_safe_log(qx), ko, k_max))
+    return (*messages, residual, status) if return_diagnostics else messages
+
+
 def gfe_update(log_d, a_param, logc, k_max, learned=False, return_diagnostics=False):
     """Batched over members. log_d [M,K] normalized; a_param is logA (fixed)
     or Dirichlet counts α (learned); returns (μ2, log q_x) padded to k_max.
@@ -507,30 +535,92 @@ def gfe_update(log_d, a_param, logc, k_max, learned=False, return_diagnostics=Fa
     d > 0, but bounded on zero-support states, where log z̄ − log d is a
     (−∞) − (−∞) that used to surface as ±1e30 junk and leak probability
     into downstream updates (cff-i45j)."""
-    ko, ki = a_param.shape[1], a_param.shape[2]
+    abar, hbar = jax.vmap(lambda a: _stats(a, learned))(a_param)
+    return gfe_update_stats(
+        log_d, abar, hbar, logc, k_max,
+        return_diagnostics=return_diagnostics,
+    )
 
-    def one(a_p, lc, ld):
-        abar, h = _stats(a_p, learned)
-        solved = _gfe_solve_result(abar, h, lc, ld)
-        zbar = solved.solution
-        return _gfe_rho(abar, h, lc, zbar), abar @ zbar, solved.residual, solved.status
 
-    mu2, qx, residual, status = jax.vmap(one)(a_param, logc, log_d)
-    messages = (_norm_pad(mu2, ki, k_max), _norm_pad(_safe_log(qx), ko, k_max))
-    return (*messages, residual, status) if return_diagnostics else messages
+def gfe_energy_stats(log_d, abar, hbar, logc):
+    """Composite FE term from arbitrary ``E[A]``/``E[h(A)]`` moments."""
+
+    def one(a_mean, h_mean, lc, ld):
+        zbar = _gfe_solve(a_mean, h_mean, lc, ld)
+        rho = _gfe_rho(a_mean, h_mean, lc, zbar)
+        lz = _safe_log(zbar)
+        return -(zbar * rho).sum(-1) + (zbar * lz).sum(-1)
+
+    return jax.vmap(one)(abar, hbar, logc, log_d)
 
 
 def gfe_energy(log_d, a_param, logc, learned=False):
     """Composite FE term per member: −z*ᵀ rho(z*) − H[z*]."""
+    abar, hbar = jax.vmap(lambda a: _stats(a, learned))(a_param)
+    return gfe_energy_stats(log_d, abar, hbar, logc)
 
-    def one(a_p, lc, ld):
-        abar, h = _stats(a_p, learned)
-        zbar = _gfe_solve(abar, h, lc, ld)
-        rho = _gfe_rho(abar, h, lc, zbar)
-        lz = _safe_log(zbar)
-        return -(zbar * rho).sum(-1) + (zbar * lz).sum(-1)
 
-    return jax.vmap(one)(a_param, logc, log_d)
+def mu3_log_message(particles, zbars, logcs, abar):
+    """Evaluate ``Σ_t log μ₃,t(A_s)`` for fixed Dirichlet particles.
+
+    ``abar`` is the current weighted posterior mean and is held fixed while
+    evaluating the functional, exactly as in Part II Fig. 5.  Exact goal
+    zeros remain true log-zeros; masked products avoid the undefined
+    numerical form ``0 * -inf`` without inventing support.
+    """
+    dtype = jnp.result_type(particles, zbars, logcs, abar)
+    particles = jnp.asarray(particles, dtype=dtype)
+    zbars = jnp.asarray(zbars, dtype=dtype)
+    logcs = jnp.asarray(logcs, dtype=dtype)
+    abar = jnp.asarray(abar, dtype=dtype)
+    logcs = jnp.where(logcs == jnp.asarray(NEG, dtype=dtype), -jnp.inf, logcs)
+    predictive = jnp.einsum("oi,ti->to", abar, zbars)
+    residual = logcs - _safe_log(predictive)
+
+    sample_predictive = jnp.einsum("soi,ti->sto", particles, zbars)
+    fit = jnp.sum(
+        jnp.where(sample_predictive > 0, sample_predictive * residual[None, :, :], 0.0),
+        axis=-1,
+    )
+    log_particles = jnp.where(particles > 0, jnp.log(particles), 0.0)
+    particle_h = -jnp.sum(
+        jnp.where(particles > 0, particles * log_particles, 0.0), axis=1
+    )
+    entropy = jnp.einsum("ti,si->st", zbars, particle_h)
+    return jnp.sum(fit - entropy, axis=-1)
+
+
+def mu3_importance_update(particles, zbars, logcs, abar):
+    """Self-normalized IS coordinate update for the functional μ₃ message.
+
+    Returns ``(Abar, hbar, weights, log_Z, E_phi, KL, ESS, status)`` where
+    status is 0 on a valid estimate and 2 when weights collapse or contain a
+    NaN/+inf.  Low ESS is a caller-configured inference-budget outcome.
+    """
+    logw = mu3_log_message(particles, zbars, logcs, abar)
+    bad = jnp.any(jnp.isnan(logw) | jnp.isposinf(logw))
+    finite_any = jnp.any(jnp.isfinite(logw))
+    safe = jnp.where(jnp.isfinite(logw), logw, -jnp.inf)
+    log_norm = logsumexp(safe)
+    invalid = bad | ~finite_any | ~jnp.isfinite(log_norm)
+    weights = jnp.where(invalid, jnp.zeros_like(safe), jnp.exp(safe - log_norm))
+
+    new_abar = jnp.einsum("s,soi->oi", weights, particles)
+    log_particles = jnp.where(particles > 0, jnp.log(particles), 0.0)
+    particle_h = -jnp.sum(
+        jnp.where(particles > 0, particles * log_particles, 0.0), axis=1
+    )
+    new_hbar = jnp.einsum("s,si->i", weights, particle_h)
+    expected_phi = jnp.sum(jnp.where(weights > 0, weights * safe, 0.0))
+    sample_count = jnp.asarray(particles.shape[0], dtype=particles.dtype)
+    log_z = log_norm - jnp.log(sample_count)
+    kl = expected_phi - log_z
+    ess = jnp.where(
+        invalid, jnp.asarray(0.0, dtype=particles.dtype),
+        1.0 / jnp.sum(jnp.square(weights)),
+    )
+    status = jnp.where(invalid, 2, 0)
+    return new_abar, new_hbar, weights, log_z, expected_phi, kl, ess, status
 
 
 # --- GFE-TM composite (P-substituted transition node, cff-fk2u) --------------

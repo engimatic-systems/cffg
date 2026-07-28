@@ -34,9 +34,13 @@ from cffg.rules import (
     dirichlet_vmp_energy,
     dirichlet_vmp_update,
     gfe_energy,
+    gfe_energy_stats,
+    gfe_stationary_stats,
     gfe_tm_energy,
     gfe_tm_update,
     gfe_update,
+    gfe_update_stats,
+    mu3_importance_update,
 )
 
 _TINY = 1e-12
@@ -97,6 +101,9 @@ class RunResult:
     residual: float
     inner_status: RunStatus = RunStatus.CONVERGED
     inner_residual: float = 0.0
+    mu3_ess: tuple[float, ...] = ()
+    mu3_log_normalizers: tuple[float, ...] = ()
+    mu3_statuses: tuple[RunStatus, ...] = ()
 
     @property
     def delta_trace(self) -> tuple[float, ...]:
@@ -115,6 +122,18 @@ class RunResult:
     def require_converged_with_trace(self) -> tuple[State, tuple[float, ...]]:
         """Explicit migration helper for the old ``state, deltas`` API."""
         return self.require_converged(), self.message_deltas
+
+
+@dataclass(frozen=True)
+class Mu3ScoreResult:
+    """Independent-particle-epoch policy score with explicit key threading."""
+
+    state: State
+    status: RunStatus
+    epoch_scores: tuple[float, ...]
+    policy_score: float
+    next_key: jax.Array
+    runs: tuple[RunResult, ...]
 
 
 def _replace(state: State, **kw) -> State:
@@ -257,8 +276,22 @@ class Engine:
     :class:`~cffg.schedule.Schedule` is validated against this arena's
     structure fingerprint and rejected on mismatch."""
 
-    def __init__(self, arena: Arena, schedule: str | Schedule = "auto"):
+    def __init__(
+        self,
+        arena: Arena,
+        schedule: str | Schedule = "auto",
+        *,
+        mu3_samples: int = 256,
+        mu3_min_ess_fraction: float = 0.1,
+    ):
+        if mu3_samples <= 0:
+            raise ValueError("mu3_samples must be positive")
+        if not 0.0 < mu3_min_ess_fraction <= 1.0:
+            raise ValueError("mu3_min_ess_fraction must be in (0, 1]")
         self.arena = arena
+        self.mu3_samples = int(mu3_samples)
+        self.mu3_min_ess_fraction = float(mu3_min_ess_fraction)
+        self._gfe_by_name = {g.name: g for g in arena.gfe_groups}
         self._step = eqx.filter_jit(_make_step(arena))
         self._bfe = eqx.filter_jit(_make_bfe(arena))
         if isinstance(schedule, Schedule):
@@ -355,9 +388,43 @@ class Engine:
 
     def init_state(self) -> State:
         a = self.arena
+        params = {name: jnp.asarray(p) for name, p in a.log_params.items()}
+        # Moment and particle arrays are derived runtime state. Their keys and
+        # shapes are deterministic from the compiled evaluator plan plus the
+        # Engine's runtime particle budget, keeping the template as source of
+        # truth while preserving a stable JAX pytree for every sweep.
+        for g in a.gfe_groups:
+            if not g.mu3:
+                continue
+            counts = params[g.name + ":counts"]
+            total = counts.sum(axis=1, keepdims=True)
+            abar = counts / total
+            e_alog = abar * (
+                digamma(counts + 1.0) - digamma(total + 1.0)
+            )
+            params[g.name + ":Abar"] = abar
+            params[g.name + ":hbar"] = -e_alog.sum(axis=1)
+        for plan in a.mu3_groups:
+            ko, ki = plan.cards
+            dtype = params[plan.count_key].dtype
+            prefix = plan.name
+            alpha = params[plan.count_key][int(plan.rows[0])]
+            params[prefix + ":samples"] = jnp.zeros(
+                (self.mu3_samples, ko, ki), dtype=dtype
+            )
+            params[prefix + ":weights"] = jnp.full(
+                (self.mu3_samples,), 1.0 / self.mu3_samples, dtype=dtype
+            )
+            params[prefix + ":base_alpha"] = alpha
+            params[prefix + ":log_normalizer"] = jnp.asarray(0.0, dtype=dtype)
+            params[prefix + ":expected_phi"] = jnp.asarray(0.0, dtype=dtype)
+            params[prefix + ":kl"] = jnp.asarray(0.0, dtype=dtype)
+            params[prefix + ":ess"] = jnp.asarray(self.mu3_samples, dtype=dtype)
+            params[prefix + ":status"] = jnp.asarray(0)
+            params[prefix + ":ready"] = jnp.asarray(False)
         return State(
             messages=self._uniform_messages(),
-            params={name: jnp.asarray(p) for name, p in a.log_params.items()},
+            params=params,
             g_eta=jnp.zeros(a.n_g_eta_values),  # zeros = vacuous
             g_lam=jnp.zeros(a.n_g_lam_values),
             g_obs=jnp.zeros(a.n_g_obs_values),
@@ -376,6 +443,285 @@ class Engine:
             rows[self.arena.message_indices(e.slot0, e.card)] = initial
             rows[self.arena.message_indices(e.slot1, e.card)] = initial
         return jnp.asarray(rows)
+
+    def prepare_mu3(self, state: State, key: jax.Array) -> tuple[State, jax.Array]:
+        """Draw one fixed particle set per functional parameter group.
+
+        The supplied key is split exactly once per group and the returned key
+        is the only key callers should use for a later refresh.  A proposal is
+        refused unless every Dirichlet concentration is finite and strictly
+        positive, and tied slices must expose the same base posterior.
+        """
+        if not self.arena.mu3_groups:
+            return state, key
+        params = dict(state.params)
+        next_key = key
+        for plan in self.arena.mu3_groups:
+            counts = np.asarray(params[plan.count_key])[plan.rows]
+            if not np.isfinite(counts).all() or np.any(counts <= 0):
+                raise ValueError(
+                    f"{plan.name}: mu3 proposal must be a proper Dirichlet "
+                    "with finite, strictly positive concentrations"
+                )
+            dtype = counts.dtype
+            tolerance = 64.0 * np.finfo(dtype).eps
+            if not np.allclose(counts, counts[0], rtol=tolerance, atol=0.0):
+                raise ValueError(
+                    f"{plan.name}: slices tied to blob {plan.param_blob!r} "
+                    "must share one Dirichlet base posterior"
+                )
+            alpha = jnp.asarray(counts[0])
+            next_key, sample_key = jax.random.split(next_key)
+            column_keys = jax.random.split(sample_key, plan.cards[1])
+            by_column = jax.vmap(
+                lambda column_key, concentration: jax.random.dirichlet(
+                    column_key, concentration, shape=(self.mu3_samples,)
+                )
+            )(column_keys, alpha.T)
+            particles = jnp.transpose(by_column, (1, 2, 0))
+            sample_sums = np.asarray(particles).sum(axis=1)
+            if (
+                not np.isfinite(np.asarray(particles)).all()
+                or np.any(np.asarray(particles) < 0)
+                or not np.allclose(
+                    sample_sums, 1.0,
+                    rtol=64.0 * np.finfo(dtype).eps,
+                    atol=64.0 * np.finfo(dtype).eps,
+                )
+            ):
+                raise FloatingPointError(
+                    f"{plan.name}: Dirichlet particle generation diverged "
+                    f"under dtype {dtype}"
+                )
+
+            prefix = plan.name
+            params[prefix + ":samples"] = particles
+            params[prefix + ":weights"] = jnp.full(
+                (self.mu3_samples,), 1.0 / self.mu3_samples, dtype=alpha.dtype
+            )
+            params[prefix + ":base_alpha"] = alpha
+            params[prefix + ":log_normalizer"] = jnp.asarray(0.0, dtype=alpha.dtype)
+            params[prefix + ":expected_phi"] = jnp.asarray(0.0, dtype=alpha.dtype)
+            params[prefix + ":kl"] = jnp.asarray(0.0, dtype=alpha.dtype)
+            params[prefix + ":ess"] = jnp.asarray(self.mu3_samples, dtype=alpha.dtype)
+            params[prefix + ":status"] = jnp.asarray(0)
+            params[prefix + ":ready"] = jnp.asarray(True)
+
+            gfe = self._gfe_by_name[plan.gfe_name]
+            mean = alpha / alpha.sum(axis=0, keepdims=True)
+            e_alog = mean * (
+                digamma(alpha + 1.0)
+                - digamma(alpha.sum(axis=0, keepdims=True) + 1.0)
+            )
+            entropy = -e_alog.sum(axis=0)
+            rows = jnp.asarray(plan.rows)
+            params[gfe.name + ":Abar"] = params[gfe.name + ":Abar"].at[rows].set(mean)
+            params[gfe.name + ":hbar"] = params[gfe.name + ":hbar"].at[rows].set(entropy)
+        return _replace(state, params=params), next_key
+
+    def _require_mu3_ready(self, state: State) -> None:
+        missing = [
+            plan.name
+            for plan in self.arena.mu3_groups
+            if not bool(np.asarray(state.params[plan.name + ":ready"]))
+        ]
+        if missing:
+            raise ValueError(
+                "mu3 inference requires a fixed particle set; call "
+                f"Engine.prepare_mu3(state, key) first (unprepared: {missing})"
+            )
+
+    def _update_mu3(self, state: State) -> tuple[State, float, int, float]:
+        """One deterministic coordinate update on the current fixed particles."""
+        if not self.arena.mu3_groups:
+            return state, 0.0, 0, 0.0
+        self._require_mu3_ready(state)
+        params = dict(state.params)
+        max_delta = 0.0
+        overall_code = 0
+        overall_residual = 0.0
+
+        for plan in self.arena.mu3_groups:
+            prefix = plan.name
+            counts = np.asarray(params[plan.count_key])[plan.rows]
+            base = np.asarray(params[prefix + ":base_alpha"])
+            dtype = counts.dtype
+            tolerance = 64.0 * np.finfo(dtype).eps
+            if (
+                not np.allclose(counts, counts[0], rtol=tolerance, atol=0.0)
+                or not np.allclose(counts[0], base, rtol=tolerance, atol=0.0)
+            ):
+                raise ValueError(
+                    f"{plan.name}: the Dirichlet base posterior changed after "
+                    "sampling; call prepare_mu3 with a fresh explicit key"
+                )
+
+            gfe = self._gfe_by_name[plan.gfe_name]
+            rows = jnp.asarray(plan.rows)
+            _, ki = plan.cards
+            log_d = state.messages[
+                self.arena.message_indices(gfe.gather_z[plan.rows], ki)
+            ]
+            old_abar = params[gfe.name + ":Abar"][rows]
+            old_hbar = params[gfe.name + ":hbar"][rows]
+            logc = params[gfe.name + ":c"][rows]
+            zbars, solve_residuals, solve_statuses = gfe_stationary_stats(
+                log_d, old_abar, old_hbar, logc
+            )
+            solve_code = int(np.max(np.asarray(solve_statuses)))
+            solve_residual = float(np.max(np.asarray(solve_residuals)))
+            if solve_code:
+                params[prefix + ":status"] = jnp.asarray(solve_code)
+                overall_code = max(overall_code, solve_code)
+                overall_residual = max(overall_residual, solve_residual)
+                continue
+
+            particles = params[prefix + ":samples"]
+            (
+                new_abar,
+                new_hbar,
+                weights,
+                log_z,
+                expected_phi,
+                kl,
+                ess,
+                weight_status,
+            ) = mu3_importance_update(particles, zbars, logc, old_abar[0])
+            code = int(np.asarray(weight_status))
+            ess_value = float(np.asarray(ess))
+            if code == 0 and ess_value < self.mu3_min_ess_fraction * self.mu3_samples:
+                code = 1
+            params[prefix + ":status"] = jnp.asarray(code)
+            params[prefix + ":ess"] = ess
+            if code == 2:
+                overall_code = 2
+                overall_residual = float("inf")
+                continue
+
+            old_weights = params[prefix + ":weights"]
+            repeated_abar = jnp.broadcast_to(new_abar, old_abar.shape)
+            repeated_hbar = jnp.broadcast_to(new_hbar, old_hbar.shape)
+            max_delta = max(
+                max_delta,
+                float(jnp.max(jnp.abs(weights - old_weights))),
+                float(jnp.max(jnp.abs(repeated_abar - old_abar))),
+                float(jnp.max(jnp.abs(repeated_hbar - old_hbar))),
+            )
+            params[prefix + ":weights"] = weights
+            params[prefix + ":log_normalizer"] = log_z
+            params[prefix + ":expected_phi"] = expected_phi
+            params[prefix + ":kl"] = kl
+            params[gfe.name + ":Abar"] = params[gfe.name + ":Abar"].at[rows].set(
+                repeated_abar
+            )
+            params[gfe.name + ":hbar"] = params[gfe.name + ":hbar"].at[rows].set(
+                repeated_hbar
+            )
+            overall_code = max(overall_code, code)
+            if code == 1:
+                threshold = self.mu3_min_ess_fraction * self.mu3_samples
+                overall_residual = max(
+                    overall_residual, (threshold - ess_value) / threshold
+                )
+
+        return _replace(state, params=params), max_delta, overall_code, overall_residual
+
+    def mu3_diagnostics(self, state: State) -> dict[str, dict[str, np.ndarray | float | str]]:
+        """Per-group weighted moments and stochastic diagnostics."""
+        out: dict[str, dict[str, np.ndarray | float | str]] = {}
+        for plan in self.arena.mu3_groups:
+            prefix = plan.name
+            gfe = self._gfe_by_name[plan.gfe_name]
+            row = int(plan.rows[0])
+            code = int(np.asarray(state.params[prefix + ":status"]))
+            out[plan.name] = {
+                "evaluator": plan.evaluator,
+                "members": np.asarray(plan.members),
+                "Abar": np.asarray(state.params[gfe.name + ":Abar"][row]),
+                "hbar": np.asarray(state.params[gfe.name + ":hbar"][row]),
+                "weights": np.asarray(state.params[prefix + ":weights"]),
+                "log_normalizer": float(state.params[prefix + ":log_normalizer"]),
+                "expected_phi": float(state.params[prefix + ":expected_phi"]),
+                "kl": float(state.params[prefix + ":kl"]),
+                "ess": float(state.params[prefix + ":ess"]),
+                "status": (
+                    RunStatus.CONVERGED.value if code == 0 else
+                    RunStatus.BUDGET_EXHAUSTED.value if code == 1 else
+                    RunStatus.DIVERGED.value
+                ),
+            }
+        return out
+
+    def _mu3_result_diagnostics(
+        self, state: State
+    ) -> tuple[tuple[float, ...], tuple[float, ...], tuple[RunStatus, ...]]:
+        ess: list[float] = []
+        log_normalizers: list[float] = []
+        statuses: list[RunStatus] = []
+        for plan in self.arena.mu3_groups:
+            prefix = plan.name
+            code = int(np.asarray(state.params[prefix + ":status"]))
+            ess.append(float(np.asarray(state.params[prefix + ":ess"])))
+            log_normalizers.append(
+                float(np.asarray(state.params[prefix + ":log_normalizer"]))
+            )
+            statuses.append(
+                RunStatus.CONVERGED if code == 0 else
+                RunStatus.BUDGET_EXHAUSTED if code == 1 else
+                RunStatus.DIVERGED
+            )
+        return tuple(ess), tuple(log_normalizers), tuple(statuses)
+
+    def score_mu3_epochs(
+        self,
+        state: State,
+        *,
+        key: jax.Array,
+        epochs: int,
+        burn_in: int,
+        n_iters: int,
+        tol: float,
+        damp: float = 0.0,
+    ) -> Mu3ScoreResult:
+        """Average complete FE over independently refreshed particle epochs.
+
+        Every retained epoch must itself converge. Burn-in only chooses which
+        converged epoch scores enter the mean; it never certifies convergence.
+        """
+        if not self.arena.mu3_groups:
+            raise ValueError("score_mu3_epochs requires a compiled mu3 evaluator")
+        if epochs <= 0 or not 0 <= burn_in < epochs:
+            raise ValueError("require epochs > 0 and 0 <= burn_in < epochs")
+        next_key = key
+        current = state
+        scores: list[float] = []
+        runs: list[RunResult] = []
+        for _ in range(epochs):
+            current, next_key = self.prepare_mu3(current, next_key)
+            result = self.run(
+                current, n_iters=n_iters, tol=tol, damp=damp, harden_last=0
+            )
+            runs.append(result)
+            current = result.state
+            if result.status is not RunStatus.CONVERGED or not result.free_energies:
+                return Mu3ScoreResult(
+                    current,
+                    result.status,
+                    tuple(scores),
+                    float("nan"),
+                    next_key,
+                    tuple(runs),
+                )
+            scores.append(result.free_energies[-1])
+        retained = scores[burn_in:]
+        return Mu3ScoreResult(
+            current,
+            RunStatus.CONVERGED,
+            tuple(scores),
+            float(np.mean(retained)),
+            next_key,
+            tuple(runs),
+        )
 
     def bind_data(self, state: State, observations: dict) -> State:
         """Bind DATA ports: discrete ports take an int (None = missing =
@@ -443,6 +789,10 @@ class Engine:
     # -- execution --------------------------------------------------------
 
     def step(self, state: State, damp: float = 0.0, harden: bool = True) -> State:
+        state, _, mu3_code, _ = self._update_mu3(state)
+        if mu3_code:
+            outcome = "budget exhausted" if mu3_code == 1 else "diverged"
+            raise RuntimeError(f"mu3 importance update {outcome}; use Engine.run for status")
         msgs, g_eta, g_lam, ef_eta, _, _ = self._step(
             state.messages, state.g_eta, state.g_lam, state.g_obs, state.g_mask,
             state.ef_eta, state.ef_obs, state.ef_mask, state.params, damp, harden,
@@ -491,6 +841,7 @@ class Engine:
         sweep budget applies)."""
         if n_iters < 0:
             raise ValueError("n_iters must be non-negative")
+        self._require_mu3_ready(state)
         if harden_last is None:
             harden_last = n_iters // 2 if len(self.arena.delta_pairs) else 0
         if not 0 <= harden_last <= n_iters:
@@ -541,6 +892,16 @@ class Engine:
             nonlocal status, residual, inner_status, inner_residual
             previous_fe: float | None = None
             for _ in range(n):
+                st, mu3_delta, mu3_code, mu3_residual = self._update_mu3(st)
+                if mu3_code:
+                    inner_status = (
+                        RunStatus.BUDGET_EXHAUSTED
+                        if mu3_code == 1 else RunStatus.DIVERGED
+                    )
+                    inner_residual = mu3_residual
+                    status = inner_status
+                    residual = mu3_residual
+                    return st, True
                 msgs, g_eta, g_lam, ef_eta, inner_r, inner_code = self._iter_step(
                     st.messages, st.g_eta, st.g_lam, st.g_obs, st.g_mask,
                     st.ef_eta, st.ef_obs, st.ef_mask, st.params, damp, harden,
@@ -549,12 +910,14 @@ class Engine:
                     st, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta
                 )
                 delta = max(
-                    (
+                    [
+                        mu3_delta,
+                        *(
                         float(jnp.max(jnp.abs(getattr(nxt, f) - getattr(st, f))))
                         for f in ("messages", "g_eta", "g_lam", "ef_eta")
                         if getattr(st, f).size
-                    ),
-                    default=0.0,
+                        ),
+                    ]
                 )
                 deltas.append(delta)
                 st = nxt
@@ -637,6 +1000,7 @@ class Engine:
             # usable budget result; it is a numerically failed inference.
             status = RunStatus.DIVERGED
             residual = float("inf")
+        ess, log_normalizers, mu3_statuses = self._mu3_result_diagnostics(state)
         return RunResult(
             state=state,
             status=status,
@@ -646,6 +1010,9 @@ class Engine:
             residual=residual,
             inner_status=inner_status,
             inner_residual=inner_residual,
+            mu3_ess=ess,
+            mu3_log_normalizers=log_normalizers,
+            mu3_statuses=mu3_statuses,
         )
 
     def _run_exact(self, state: State, tol: float | None) -> RunResult:
@@ -1111,6 +1478,7 @@ class Engine:
             raise RuntimeError(
                 "min-sum reports an objective value, not a free energy — call Engine.objective"
             )
+        self._require_mu3_ready(state)
         # NEG is a finite representation of log zero, so the local ledger can
         # otherwise turn log Z = -inf into a huge finite sentinel score.  Empty
         # exact edge support proves Z=0 and therefore F=+inf.
@@ -1420,10 +1788,20 @@ def _make_step(arena: Arena, skip_scheduled: bool = False):
             k_local = max(g.cards)
             log_d = messages[arena.message_indices(g.gather_z, ki)]
             a_key = g.name + (":counts" if g.learned else ":A")
-            mu2, log_qx, residuals, statuses = gfe_update(
-                log_d, params[a_key], params[g.name + ":c"], k_local,
-                learned=g.learned, return_diagnostics=True,
-            )
+            if g.mu3:
+                mu2, log_qx, residuals, statuses = gfe_update_stats(
+                    log_d,
+                    params[g.name + ":Abar"],
+                    params[g.name + ":hbar"],
+                    params[g.name + ":c"],
+                    k_local,
+                    return_diagnostics=True,
+                )
+            else:
+                mu2, log_qx, residuals, statuses = gfe_update(
+                    log_d, params[a_key], params[g.name + ":c"], k_local,
+                    learned=g.learned, return_diagnostics=True,
+                )
             new = _set_disc_block(arena, new, g.scatter_z, ki, mu2)
             new = _set_disc_block(arena, new, g.scatter_x, ko, log_qx)
             inner_residual = jnp.maximum(inner_residual, jnp.max(residuals))
@@ -2312,9 +2690,23 @@ def _make_bfe(arena: Arena):
             _, ki = g.cards
             log_d = messages[arena.message_indices(g.gather_z, ki)]
             a_key = g.name + (":counts" if g.learned else ":A")
-            total = total + gfe_energy(
-                log_d, params[a_key], params[g.name + ":c"], learned=g.learned
-            ).sum()
+            if g.mu3:
+                total = total + gfe_energy_stats(
+                    log_d,
+                    params[g.name + ":Abar"],
+                    params[g.name + ":hbar"],
+                    params[g.name + ":c"],
+                ).sum()
+            else:
+                total = total + gfe_energy(
+                    log_d, params[a_key], params[g.name + ":c"], learned=g.learned
+                ).sum()
+        # The structural terms above contain -E_q[Σ phi_t]. At the coordinate
+        # optimum q*(A) ∝ q0(A) exp(Σ phi_t), the shared parameter ledger is
+        # KL(q*||q0) = E_q[Σ phi_t] - log Z. Add it exactly once per tied
+        # particle group, leaving the complete parameter contribution -log Z.
+        for plan in arena.mu3_groups:
+            total = total + params[plan.name + ":kl"]
         for g in arena.gfe_tm_groups:
             ko, ki, ku = g.cards
             md = messages[arena.message_indices(g.gather[:, 0], ko)]

@@ -295,6 +295,29 @@ class GfePlan:
     scatter_z: np.ndarray  # [M] outgoing backward-message slot (μ 2)
     scatter_x: np.ndarray  # [M] obs-side x slot (posterior predictive q_x)
     learned: bool = False
+    mu3: bool = False
+    param_blobs: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class Mu3Plan:
+    """One serialized functional parameter-message evaluator.
+
+    Every ``row`` is a future GFE slice reading the same Dirichlet parameter
+    blob.  Their nonconjugate log messages add before normalization against
+    the proper base posterior held in ``count_key``.  Particles and weights
+    are deliberately absent: they are derived runtime state, reconstructed
+    from this evaluator identity plus an explicit PRNG key.
+    """
+
+    name: str
+    evaluator: str
+    gfe_name: str
+    rows: np.ndarray
+    members: tuple[str, ...]
+    param_blob: str
+    count_key: str
+    cards: tuple[int, int]
 
 
 @dataclass
@@ -345,6 +368,7 @@ class Arena:
     ef_interior: list[tuple[str, np.ndarray]] = field(default_factory=list)
     # [(family, [E, 2] slot pairs)] interior EF edges for the entropy ledger
     gfe_groups: list[GfePlan] = field(default_factory=list)
+    mu3_groups: list[Mu3Plan] = field(default_factory=list)
     gfe_tm_groups: list[GfeTmPlan] = field(default_factory=list)
     gfe_x_edges: frozenset[str] = frozenset()  # entropy absorbed into composite term
     delta_pairs: np.ndarray = field(
@@ -782,7 +806,7 @@ def compile_template(
 
     # GFE composites: P-substituted obs factor + facing goal factor across x.
     gfe_x_edges: set[str] = set()
-    gfe_buckets: dict[tuple[int, int], list[tuple[str, str]]] = {}  # cards -> (obs, goal)
+    gfe_buckets: dict[tuple, list[tuple[str, str]]] = {}  # cards/mode -> (obs, goal)
     tm_buckets: dict[tuple, list[str]] = {}
     for fname, detail in sorted(psub.items()):
         f = t.factors[fname]
@@ -811,7 +835,21 @@ def compile_template(
             continue
         ko, ki = (t.variables[f.edges[r]].cardinality for r in ("out", "in"))
         learned = detail.get("parameter_uncertainty") == "dirichlet"
-        gfe_buckets.setdefault((ko, ki, learned), []).append((fname, goal.name))
+        parameter_message = detail.get("parameter_message")
+        if parameter_message not in (None, "mu3_is_v1"):
+            problems.append(
+                f"p_substitution on {fname!r}: unknown parameter_message "
+                f"{parameter_message!r} (known: 'mu3_is_v1')"
+            )
+            continue
+        mu3 = parameter_message == "mu3_is_v1"
+        if mu3 and not learned:
+            problems.append(
+                f"p_substitution on {fname!r}: mu3_is_v1 requires "
+                "parameter_uncertainty='dirichlet' and a proper count-array proposal"
+            )
+            continue
+        gfe_buckets.setdefault((ko, ki, learned, mu3), []).append((fname, goal.name))
         consumed.update((fname, goal.name))
         gfe_x_edges.add(x_var)
     if problems:
@@ -821,9 +859,11 @@ def compile_template(
     # Params keys owned by a GFE composite: write targets for a learnable, but
     # never stat sources (the composite owns its own update path).
     composite_keys: set[str] = set()
-    for (ko, ki, learned), pairs in sorted(gfe_buckets.items()):
-        gname = f"gfe{'L' if learned else ''}:{ko}x{ki}"
+    mu3_groups: list[Mu3Plan] = []
+    for (ko, ki, learned, mu3), pairs in sorted(gfe_buckets.items()):
+        gname = f"gfe{'L' if learned else ''}{'M' if mu3 else ''}:{ko}x{ki}"
         obs_names = tuple(o for o, _ in pairs)
+        param_blobs = tuple(t.factors[o].param_blobs["matrix"] for o, _ in pairs)
         gfe_groups.append(
             GfePlan(
                 name=gname,
@@ -833,6 +873,8 @@ def compile_template(
                 scatter_z=np.array([slot_of[(o, "in")] for o, _ in pairs], dtype=np.int64),
                 scatter_x=np.array([slot_of[(o, "out")] for o, _ in pairs], dtype=np.int64),
                 learned=learned,
+                mu3=mu3,
+                param_blobs=param_blobs,
             )
         )
         la, lc = [], []
@@ -857,6 +899,25 @@ def compile_template(
         for i, (obs_name, goal_name) in enumerate(pairs):
             member_of[obs_name] = (a_key, i)
             member_of[goal_name] = (f"{gname}:c", i)
+        if mu3:
+            for blob in sorted(set(param_blobs)):
+                rows = np.array(
+                    [i for i, value in enumerate(param_blobs) if value == blob],
+                    dtype=np.int64,
+                )
+                members = tuple(obs_names[int(i)] for i in rows)
+                mu3_groups.append(
+                    Mu3Plan(
+                        name=f"mu3:{gname}:{blob}",
+                        evaluator="cffg.mu3_is.v1",
+                        gfe_name=gname,
+                        rows=rows,
+                        members=members,
+                        param_blob=blob,
+                        count_key=a_key,
+                        cards=(ko, ki),
+                    )
+                )
 
     gfe_tm_groups: list[GfeTmPlan] = []
     for ((ko, ki, ku), learned), members in sorted(tm_buckets.items()):
@@ -1266,6 +1327,7 @@ def compile_template(
         n_ef_obs=n_ef_obs,
         ef_interior=ef_interior,
         gfe_groups=gfe_groups,
+        mu3_groups=mu3_groups,
         gfe_tm_groups=gfe_tm_groups,
         gfe_x_edges=frozenset(gfe_x_edges),
         delta_pairs=delta_pairs,
