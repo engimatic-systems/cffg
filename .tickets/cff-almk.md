@@ -12,6 +12,13 @@ tags: [derivation, importance-sampling, gfe, parameter-edge]
 ---
 # D6b: functional mu3(A) message and importance-sampling contract
 
+## Plain English
+
+This ticket specifies how a planning graph sends a nonstandard message to an
+uncertain observation model. It defines the function being evaluated, the
+importance-sampling procedure, reproducible random-key handling, diagnostics,
+and the free-energy and convergence rules that the implementation will follow.
+
 Specify the nonconjugate Part II message log mu3(A)=z^T xi(A) before cff-iwgl implementation. The papers explicitly state that mu3 is not a standard exponential-family distribution; it therefore cannot inhabit cff-fr5c Dirichlet natural-parameter slots. Derive the functional log-density contract, its combination with the proper Dirichlet base posterior from perception/prior messages, and the expectations required by the GFE composite.
 
 ## Design

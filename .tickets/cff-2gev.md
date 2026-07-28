@@ -11,6 +11,14 @@ parent: cff-mwjo
 ---
 # GFE-TM novelty weight: anneal with accumulated count mass
 
+## Plain English
+
+This ticket gives transition curiosity a lifecycle. Unfamiliar transition
+parameters receive a stronger novelty incentive, accumulated evidence turns
+that incentive down, and a familiar model returns to the cheaper ordinary
+planning path. The preregistered experiment measures both task performance
+and whether the agent actually learns a better transition model.
+
 Corrected post-cff-hp3y Hallway rerun (L=8, H=10, 120 sweeps, seed 0,
 25 episodes): with near-uniform Dirichlet counts the dynamics-novelty channel
 dominates the goal channel — task success is 0.16 versus 0.76 for the learn-only

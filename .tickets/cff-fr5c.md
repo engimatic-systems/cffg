@@ -10,6 +10,13 @@ assignee: coopwilliams
 ---
 # Compile VMP Dirichlet param_edges: in-graph conjugate posteriors
 
+## Plain English
+
+This ticket lets uncertain categorical model parameters live inside the
+factor graph. During inference, state beliefs contribute fractional evidence
+to a Dirichlet posterior, and the posterior contributes its expectations back
+to the state inference and free-energy ledger.
+
 Out-of-graph Learnables updates deliver the conjugate posterior cheaply; this
 ticket adds the in-graph mean-field form so a parameter posterior participates
 within a trial and the constrained VFE ledger includes it. Implement the

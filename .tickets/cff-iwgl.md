@@ -11,6 +11,13 @@ parent: cff-mwjo
 ---
 # mu3 IS message: future-slice contributions to q(A)
 
+## Plain English
+
+This ticket lets simulated future observations influence the agent's
+uncertainty about its observation model `A`. It evaluates the planning
+message with reproducible importance sampling and combines contributions from
+multiple future slices into the parameter beliefs used for policy scoring.
+
 The remaining nonconjugate Part II parameter message:
 log mu3(A) = z^T xi(A), from planning slices back to q(A). It is not a
 Dirichlet or any other standard exponential-family message: cff-fr5c supplies

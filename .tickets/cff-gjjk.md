@@ -11,6 +11,13 @@ parent: cff-mwjo
 ---
 # Goal hyperprior: mu1(c) = Dir(c|Az+1) (learned goals)
 
+## Plain English
+
+This ticket lets the agent learn its preferred outcomes across trials. A
+trial's predicted observation mass updates a Dirichlet belief over the goal
+vector, and that posterior becomes the preference prior used by the next
+trial.
+
 Part II section 7.2 goal-learning variant: expose the goal vector c as a
 Dirichlet parameter edge on the observation-GFE composite. The composite
 sends mu1(c) proportional to Dir(c | A z + 1), where A z is its predicted

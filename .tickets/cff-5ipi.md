@@ -11,7 +11,14 @@ tags: [experiment, preregistration, gfe]
 ---
 # Preregister the factored-corridor annealed-novelty experiment
 
-Write the replacement protocol for cff-2gev only after the factored two-chain builder exists and before any replacement experiment is run. The previous flat Hallway comparison remains useful negative evidence but cannot choose the new protocol: its state aliasing, independent flat transition columns and count-mass scale are exactly what the replacement changes. This ticket fixes the environment, observability interventions, weight ownership, metrics and decision thresholds without implementing or executing the experiment.
+## Plain English
+
+This ticket writes down the complete test of fading transition curiosity
+before the test is run. It fixes the model, sensor conditions, metrics,
+timing method, thresholds, and interpretation of each possible outcome so
+the evidence can be judged against a stable protocol.
+
+Write the replacement protocol for cff-2gev only after cff-b47g's factored builder and two-block corridor fixture exist and before any replacement experiment is run. The previous flat Hallway comparison remains useful negative evidence but cannot choose the new protocol: its state aliasing, independent flat transition columns and count-mass scale are exactly what the replacement changes. This ticket fixes the environment, observability interventions, weight ownership, metrics and decision thresholds without implementing or executing the experiment.
 
 ## Design
 

@@ -12,6 +12,13 @@ tags: [derivation, vmp, dirichlet, free-energy]
 ---
 # D6a: VMP Dirichlet parameter-edge messages and FE contract
 
+## Plain English
+
+This ticket derives how uncertain categorical parameters participate directly
+in message passing. It shows how state beliefs become fractional Dirichlet
+counts, how those counts update the parameter posterior, and how the complete
+variational free energy accounts for that posterior.
+
 Derive the conjugate in-graph parameter path before cff-fr5c changes arenas. Scope is deliberately VMP/mean-field: for f(x,theta)=theta_x the exact sum-product message sum_x m(x) theta_x is not Dirichlet unless x is observed, whereas exp(E_q log f) is Dirichlet-shaped with fractional sufficient counts. Cover categorical, matrix_cat and transition_mixture likelihoods, the Dirichlet prior factor, parameter-edge entropy/energy corrections, and the exact conditions under which the in-graph VMP posterior equals the out-of-graph Learnables update. Exact latent-state BP and the nonconjugate Part II mu3 message are out of scope.
 
 ## Design
