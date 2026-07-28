@@ -2,7 +2,7 @@
 id: cff-mjku
 status: open
 deps: [cff-9xmq]
-links: []
+links: [cff-b47g]
 created: 2026-07-10T03:31:28Z
 type: feature
 priority: 3
