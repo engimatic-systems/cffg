@@ -11,7 +11,7 @@ from cffg.core.ir import BlobRef
 from cffg.engine import Engine, InferenceError, RunResult, RunStatus, _replace
 
 
-def categorical_engine(dtype=np.float64, schedule="auto") -> Engine:
+def categorical_engine(dtype=np.float64, schedule="auto", probabilities=None) -> Engine:
     template = Template(
         "status_unit",
         variables={"x": VariableSpec("x", 3)},
@@ -24,8 +24,12 @@ def categorical_engine(dtype=np.float64, schedule="auto") -> Engine:
         ports={"data": PortSpec("data", "x", PortRole.DATA)},
         blobs={"p": BlobRef("p", "p")},
     )
+    if probabilities is None:
+        probabilities = [0.2, 0.3, 0.5]
     return Engine(
-        compile_template(template, arrays={"p": np.asarray([0.2, 0.3, 0.5], dtype=dtype)}),
+        compile_template(
+            template, arrays={"p": np.asarray(probabilities, dtype=dtype)}
+        ),
         schedule=schedule,
     )
 
@@ -98,6 +102,20 @@ def test_contradictory_hard_constraints_are_infeasible_with_infinite_fe():
     assert result.status is RunStatus.INFEASIBLE
     assert np.isposinf(result.free_energies[-1])
     assert np.isposinf(engine.bfe(result.state))
+
+
+@pytest.mark.parametrize("schedule", ("auto", "flood"))
+def test_exact_zero_factor_support_remains_infeasible(schedule):
+    """The sparse-Dirichlet fix must not resurrect the reserved NEG sentinel.
+    Auto exercises the in-JIT exact path; flooding exercises the NumPy
+    support check."""
+    engine = categorical_engine(
+        schedule=schedule, probabilities=[1.0, 0.0, 0.0]
+    )
+    state = engine.bind_data(engine.init_state(), {"data": 1})
+    result = engine.run(state, 20, tol=1e-12)
+    assert result.status is RunStatus.INFEASIBLE
+    assert np.isposinf(result.free_energies[-1])
 
 
 def test_float32_tolerance_is_dtype_scaled():

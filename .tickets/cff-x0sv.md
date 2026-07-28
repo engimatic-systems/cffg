@@ -1,8 +1,8 @@
 ---
 id: cff-x0sv
-status: in_progress
+status: closed
 deps: [cff-cd1i, cff-ri8m]
-links: [cff-gjjk, cff-2gev]
+links: [cff-gjjk, cff-2gev, cff-6pmw]
 created: 2026-07-08T22:00:30Z
 type: feature
 priority: 2
@@ -195,3 +195,11 @@ retracts something I wrote in the round-1 note.
    This is an engine fix riding in a learnables PR. It is in scope only
    because the API is what surfaced it; if it should land separately, say so
    and I will lift it out.
+
+**2026-07-28T01:32:26Z**
+
+Review round 3 (Codex implementation, 2026-07-27): replaced delimiter-inferred learnable checkpoint keys with versioned percent-encoded (name, hyperparameter) components. Both historical formats remain readable when they have exactly one interpretation; a legacy key that could name either a scoped learnable or another learnable's parameter now fails loudly. Replaced SUPPORT_FLOOR entirely: host and JIT support checks compare each operand exactly with the reserved NEG sentinel before combining support, so every other finite log value is supported, including E[log theta] below NEG. Regressions cover nested scoped-name collisions, legacy ambiguity, alpha=1e-3 and alpha=1e-31 under exact and flooding schedules, and true NEG infeasibility. Focused verification: 98 passed.
+
+**2026-07-28T01:44:06Z**
+
+Final handoff (2026-07-27): while testing exact NEG semantics, found the remaining representational corner case: a proper Dirichlet E[log theta] can cast to exactly the reserved NEG bit pattern in float32. Dirichlet expected-parameter writes now move only that exact collision one dtype ULP toward zero; no magnitude clamp or support floor is introduced. Auto/JIT and flooding/NumPy regressions cover the collision, values below NEG, exponentiation underflow, and genuine exact-zero infeasibility. Full suite: 1243 passed, 0 failed; dashboard refreshed from the same JUnit run at ~/agent-share/cffg-tests.html. P3 follow-up cff-6pmw records the lower-context-agent navigation and duplicated-semantics improvements discovered during review.

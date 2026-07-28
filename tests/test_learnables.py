@@ -17,7 +17,7 @@ import numpy as np
 import pytest
 
 from cffg.agent import RollingAgent
-from cffg.compiler import CompileError, compile_template
+from cffg.compiler import NEG, CompileError, compile_template
 from cffg.core.ir import (
     BlobRef,
     FactorSpec,
@@ -27,7 +27,7 @@ from cffg.core.ir import (
     Template,
     VariableSpec,
 )
-from cffg.core.compose import scoped as scoped_template
+from cffg.core.compose import merge, scoped as scoped_template
 from cffg.core.validate import ModelError, validate
 from cffg.engine import Engine, RunStatus, _replace
 from cffg.learn import Learnables
@@ -470,13 +470,63 @@ def test_scoped_learnable_checkpoints_round_trip():
 
     learn = Learnables(engine, priors={"outer/B": np.full((U, K3, K3), 2.0)})
     keys = list(learn.state_dict())
-    assert keys == ["outer/B/alpha"], keys
+    assert keys == ["v2:outer%2FB:alpha"], keys
 
     other = Learnables(engine, priors={"outer/B": np.ones((U, K3, K3))})
     other.load_state_dict(learn.state_dict())
     np.testing.assert_array_equal(
         other.params["outer/B"]["alpha"], learn.params["outer/B"]["alpha"]
     )
+
+
+def test_nested_scopes_cannot_collide_in_checkpoint_keys():
+    """A delimiter heuristic is insufficient even when splitting on the last
+    slash: one learnable may be named ``scope/B`` while another is named
+    ``scope/B/alpha``, exactly the apparent old checkpoint key of the first.
+    Versioned component encoding must preserve both, while the ambiguous old
+    spelling fails loudly instead of restoring into the wrong posterior."""
+    left_t, left_arrays = two_chain_template()
+    left = scoped_template(left_t, "scope")
+
+    right_t, right_arrays = two_chain_template()
+    right_t.learnables = {
+        "alpha": LearnableSpec("alpha", "dirichlet", ("Bs",))
+    }
+    right = scoped_template(right_t, "scope/B")
+
+    model = merge(left, right, "checkpoint_collision")
+    arrays = {
+        **{f"scope/{name}": value for name, value in left_arrays.items()},
+        **{f"scope/B/{name}": value for name, value in right_arrays.items()},
+    }
+    engine = Engine(compile_template(model, arrays=arrays))
+    source = Learnables(
+        engine,
+        priors={
+            "scope/B": np.full((U, K3, K3), 2.0),
+            "scope/B/alpha": np.full((U, K3, K3), 3.0),
+        },
+    )
+    checkpoint = source.state_dict()
+    assert len(checkpoint) == 2
+
+    restored = Learnables(
+        engine,
+        priors={
+            "scope/B": np.ones((U, K3, K3)),
+            "scope/B/alpha": np.ones((U, K3, K3)),
+        },
+    )
+    restored.load_state_dict(checkpoint)
+    for name in source.params:
+        np.testing.assert_array_equal(
+            restored.params[name]["alpha"], source.params[name]["alpha"]
+        )
+
+    with pytest.raises(KeyError, match="ambiguous legacy"):
+        restored.load_state_dict(
+            {"scope/B/alpha": np.ones((U, K3, K3))}
+        )
 
 
 def test_unknown_checkpoint_key_is_refused():
@@ -589,19 +639,19 @@ def test_float32_engine_keeps_the_learning_tick_finite():
         assert np.all(np.isfinite(agent.belief))
 
 
-def test_sparse_dirichlet_prior_is_not_infeasible():
-    """A sparse Dirichlet prior is proper and common. α = 1e-3 puts
-    E[log θ] near -750 in every cell, which exp() underflows to zero — an
-    exponentiating support test then reports a perfectly good model as
-    having no support. Support belongs in log space, against the NEG
-    sentinel: a small potential is not an absent one.
+@pytest.mark.parametrize("schedule", ("auto", "flood"))
+@pytest.mark.parametrize("alpha", (1e-3, 1e-31), ids=("exp-underflow", "below-neg"))
+def test_sparse_dirichlet_prior_is_not_infeasible(schedule, alpha):
+    """Every positive Dirichlet concentration is proper. α = 1e-3 puts
+    E[log θ] near -750, where exp() underflows; α = 1e-31 puts it below the
+    finite NEG sentinel itself. Neither magnitude means exact zero.
 
-    The proof that the old failure was numerical rather than real: adding the
-    same constant to every entry of a factor changes no distribution it
-    represents, and it used to flip the verdict."""
+    The auto schedule exercises the in-JIT exact-support check and flooding
+    exercises its NumPy counterpart. Both must distinguish the one reserved
+    NEG value from every other finite log-potential without a threshold."""
     t, arrays = corridor_builder(past=1, steps=1, learn=("A",))
-    engine = Engine(compile_template(t, arrays=arrays))
-    learn = Learnables(engine, priors={"A": np.full((KC, KC), 1e-3)})
+    engine = Engine(compile_template(t, arrays=arrays), schedule=schedule)
+    learn = Learnables(engine, priors={"A": np.full((KC, KC), alpha)})
 
     st = engine.init_state()
     st = _replace(st, params=learn.write(engine, dict(st.params)))
@@ -613,6 +663,33 @@ def test_sparse_dirichlet_prior_is_not_infeasible():
     elog = np.asarray(result.state.params[engine.arena.member_of["obs1"][0]])
     assert elog.min() < -700, elog.min()
     assert np.exp(elog).max() == 0.0  # exactly why the old test was wrong
+    if alpha < 1e-30:
+        assert elog.min() < NEG  # a magnitude threshold would still be wrong
+
+
+@pytest.mark.parametrize("schedule", ("auto", "flood"))
+def test_float32_dirichlet_rollover_escapes_the_reserved_neg_value(schedule):
+    """The finite NEG bit pattern is reserved for exact zero, but a proper
+    positive Dirichlet can round to that exact E[log theta] in float32.
+    Rollover moves only that collision by one ULP, retaining support without a
+    magnitude floor."""
+    with jax.enable_x64(False):
+        t, arrays = corridor_builder(past=1, steps=1, learn=("A",))
+        engine = Engine(compile_template(t, arrays=arrays), schedule=schedule)
+        learn = Learnables(engine, priors={"A": np.full((KC, KC), 7.5e-31)})
+
+        st = engine.init_state()
+        st = _replace(st, params=learn.write(engine, dict(st.params)))
+        st = engine.bind_data(st, {"act1": 0, "obs1": 2})
+        elog = np.asarray(st.params[engine.arena.member_of["obs1"][0]])
+        assert elog.dtype == np.float32
+        assert np.all(elog != np.asarray(NEG, dtype=np.float32))
+
+        result = engine.run(st, 60, tol=1e-6)
+        assert result.status is RunStatus.CONVERGED, (
+            result.status,
+            result.residual,
+        )
 
 
 def test_uncomfortable_count_scale_stays_finite():

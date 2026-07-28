@@ -49,6 +49,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
+from urllib.parse import quote, unquote
 
 import numpy as np
 
@@ -249,6 +250,34 @@ class Dirichlet:
 
 FAMILIES: dict[str, Family] = {"dirichlet": Dirichlet()}
 
+_STATE_KEY_PREFIX = "v2:"
+
+
+def _encode_state_key(name: str, key: str) -> str:
+    """Encode a learnable/hyperparameter pair as one unambiguous npz key.
+
+    Both components are percent-encoded before the colon separator is added,
+    so names produced by nested composition (``outer/inner/B``) and arbitrary
+    family-owned hyperparameter keys cannot collide.  The version prefix lets
+    the loader retain the two historical spellings without guessing how a new
+    checkpoint was written.
+    """
+    return (
+        f"{_STATE_KEY_PREFIX}{quote(name, safe='')}:{quote(key, safe='')}"
+    )
+
+
+def _decode_state_key(flat: str) -> tuple[str, str]:
+    payload = flat.removeprefix(_STATE_KEY_PREFIX)
+    encoded_name, sep, encoded_key = payload.partition(":")
+    if (
+        not sep
+        or quote(unquote(encoded_name), safe="") != encoded_name
+        or quote(unquote(encoded_key), safe="") != encoded_key
+    ):
+        raise KeyError(f"invalid versioned learnable checkpoint key {flat!r}")
+    return unquote(encoded_name), unquote(encoded_key)
+
 
 class Learnables:
     """Hyperparameters for every learnable an engine declares, plus the two
@@ -341,6 +370,8 @@ class Learnables:
         parameters writes each one where it belongs."""
         import jax.numpy as jnp
 
+        from cffg.compiler import NEG
+
         out = dict(params)
         for plan in engine.arena.learn_plans:
             name = plan.name
@@ -355,7 +386,21 @@ class Learnables:
                 value = by_form[tgt.form][tgt.role]
                 if tgt.layout == "tm":
                     value = value.transpose(1, 2, 0)  # [U, K', K] -> [K', K, U]
-                out[tgt.key] = out[tgt.key].at[tgt.index].set(jnp.asarray(value))
+                value = jnp.asarray(value, dtype=out[tgt.key].dtype)
+                if plan.family == "dirichlet" and tgt.form == "expected":
+                    # NEG's bit pattern is reserved for exact log-zero. A
+                    # proper positive Dirichlet can produce any finite
+                    # E[log theta], including (after a dtype cast) exactly
+                    # that value. Move only this representational collision
+                    # one dtype ULP toward zero; no magnitude floor or
+                    # probability support is invented.
+                    neg = jnp.asarray(NEG, dtype=value.dtype)
+                    value = jnp.where(
+                        value == neg,
+                        jnp.nextafter(neg, jnp.asarray(0.0, dtype=value.dtype)),
+                        value,
+                    )
+                out[tgt.key] = out[tgt.key].at[tgt.index].set(value)
         return out
 
     # -- readouts and persistence -----------------------------------------
@@ -376,34 +421,51 @@ class Learnables:
         return next(iter(out.values()))
 
     def state_dict(self) -> dict[str, np.ndarray]:
-        """Flat "name/key" -> array, so a checkpoint stays a flat npz.
+        """Versioned encoded ``(name, key)`` -> array for flat npz storage.
 
-        The split is on the LAST separator, because a learnable name may
-        contain one: composing scopes a template's names with `/`, so a
-        two-deep scope gives `outer/inner/B`. Hyperparameter keys are
-        separator-free (checked below), which makes the last one the
-        boundary."""
-        out: dict[str, np.ndarray] = {}
-        for name, params in self.params.items():
-            for key, arr in params.items():
-                if "/" in key:
-                    raise ValueError(
-                        f"learnable {name!r}: hyperparameter key {key!r} contains "
-                        "'/', which is the scope separator and cannot appear here"
-                    )
-                out[f"{name}/{key}"] = arr.copy()
-        return out
+        A delimiter alone is insufficient: scoped learnable names contain
+        ``/``, and one valid learnable name can equal another learnable's
+        apparent ``name/key`` spelling. Encoding the two components
+        independently makes the boundary structural rather than inferred.
+        """
+        return {
+            _encode_state_key(name, key): arr.copy()
+            for name, params in self.params.items()
+            for key, arr in params.items()
+        }
 
     def load_state_dict(self, data: dict[str, np.ndarray]) -> None:
         for flat, arr in data.items():
-            if flat in self.params:  # a bare name: single-hyperparameter family
-                name, key = flat, next(iter(self.params[flat]))
+            if flat.startswith(_STATE_KEY_PREFIX):
+                name, key = _decode_state_key(flat)
             else:
-                name, sep, key = flat.rpartition("/")
-                if not sep or name not in self.params:
+                # Backward compatibility for both pre-v2 spellings:
+                #   "A"       — the original one-array family checkpoint
+                #   "scope/A/alpha" — the briefly shipped slash spelling.
+                # A pair of valid interpretations is refused rather than
+                # silently restoring one posterior into another.
+                candidates: list[tuple[str, str]] = []
+                if flat in self.params and len(self.params[flat]) == 1:
+                    candidates.append((flat, next(iter(self.params[flat]))))
+                legacy_name, sep, legacy_key = flat.rpartition("/")
+                if (
+                    sep
+                    and legacy_name in self.params
+                    and legacy_key in self.params[legacy_name]
+                ):
+                    candidates.append((legacy_name, legacy_key))
+                if len(candidates) > 1:
+                    raise KeyError(
+                        f"ambiguous legacy learnable checkpoint key {flat!r}; "
+                        "rewrite it with a v2 checkpoint"
+                    )
+                if not candidates:
                     raise KeyError(
                         f"no learnable for checkpoint key {flat!r} in this graph"
                     )
+                name, key = candidates[0]
+            if name not in self.params:
+                raise KeyError(f"no learnable {name!r} in this graph")
             if key not in self.params[name]:
                 raise KeyError(f"learnable {name!r} has no hyperparameter {key!r}")
             if np.shape(arr) != self.params[name][key].shape:

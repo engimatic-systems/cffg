@@ -357,12 +357,17 @@ name filter, and the caller decides when.
   and messages are coherent; max mode uses its message fixed-point residual
   and validates the decoded objective. Non-finite arenas/residuals are
   divergence, while proven empty exact support is infeasible with FE = +∞.
-  "Proven empty" is decided in log space against the `SUPPORT_FLOOR`
-  sentinel, never by exponentiating: `exp` underflows to zero below about
-  -745, and a legitimate small potential reaches that magnitude easily — a
-  sparse Dirichlet with α = 1e-3 puts E[log θ] near -750 in every cell — so
-  an exponentiating test calls a proper model infeasible. Only a NEG term
-  means no support.
+  "Proven empty" is decided in log space by exact comparison with the
+  reserved `NEG` sentinel, never by exponentiating or applying a magnitude
+  threshold. `exp` underflows below about -745, while a threshold merely
+  moves the same false-zero boundary: a proper sparse Dirichlet can produce
+  any finite negative E[log θ], including values below `NEG`. Edge support
+  intersects the two facing messages' support masks before doing log-space
+  arithmetic, so one actual `NEG` term remains distinguishable from two
+  legitimate small terms. Dirichlet rollover reserves the sentinel bit
+  pattern too: if a dtype cast makes a proper E[log θ] exactly equal `NEG`,
+  that one value moves one ULP toward zero rather than becoming false
+  zero-support.
   On a two-pass schedule there is no sweep budget: one execution either
   certifies (converged, also with `tol=None`) or reports honestly that it
   did not.

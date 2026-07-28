@@ -24,7 +24,7 @@ import numpy as np
 from jax.scipy.special import logsumexp
 
 from cffg import csp, ef, efrules, gauss, kernels, mixg
-from cffg.compiler import NEG, SUPPORT_FLOOR, Arena
+from cffg.compiler import NEG, Arena
 from cffg.schedule import BatchStage, Schedule, _fingerprint, build_schedule
 from cffg.rules import (
     BP_UPDATES,
@@ -120,6 +120,23 @@ def _replace(state: State, **kw) -> State:
         "messages", "params", "g_eta", "g_lam", "g_obs", "g_mask",
         "ef_eta", "ef_obs", "ef_mask",
     )})
+
+
+def _np_log_support(values: np.ndarray) -> np.ndarray:
+    """Exact support of log-space values under the reserved NEG sentinel.
+
+    Discrete messages are clamped to NEG after every update, and compiled
+    exact-zero factor entries are NEG. Every other finite value is supported,
+    regardless of magnitude: exponentiation underflows and a numeric
+    threshold would merely move that same false-zero boundary elsewhere.
+    """
+    values = np.asarray(values)
+    return values != np.asarray(NEG, dtype=values.dtype)
+
+
+def _jax_log_support(values: jax.Array) -> jax.Array:
+    """JAX mirror of :func:`_np_log_support` for the exact-path JIT."""
+    return values != jnp.asarray(NEG, dtype=values.dtype)
 
 
 def _disc_rows(
@@ -706,12 +723,12 @@ class Engine:
     def _has_zero_support(self, state: State) -> bool:
         """Whether an edge or ordinary factor belief has empty exact support.
 
-        Support is tested in log space against SUPPORT_FLOOR, never by
-        exponentiating. exp() underflows to zero below about -745, which is
-        an ordinary magnitude for a legitimate small potential — a sparse
-        Dirichlet with α = 1e-3 puts E[log θ] near -750 in every cell — so an
-        exponentiating test calls a proper model infeasible. Only the NEG
-        sentinel means empty support.
+        Support is tested in log space by exact comparison with the reserved
+        NEG sentinel, never by exponentiating or applying a magnitude
+        threshold. exp() underflows for legitimate small potentials, while a
+        threshold only creates another false-zero boundary. For an edge, the
+        two facing messages must each support a state; summing first would
+        lose which operand (if either) carried NEG.
 
         Vectorized over each edge-cardinality bucket and each group's member
         stack (cff-d56d): the check runs on every exact-path run, so a
@@ -719,16 +736,22 @@ class Engine:
         the O(E) schedule."""
         messages = np.asarray(state.messages)
         for card, pairs in self._support_edge_groups:
-            logq = (
-                messages[self.arena.message_indices(pairs[:, 0], card)]
-                + messages[self.arena.message_indices(pairs[:, 1], card)]
+            support = (
+                _np_log_support(
+                    messages[self.arena.message_indices(pairs[:, 0], card)]
+                )
+                & _np_log_support(
+                    messages[self.arena.message_indices(pairs[:, 1], card)]
+                )
             )
-            if not np.all(np.any(logq > SUPPORT_FLOOR, axis=-1)):
+            if not np.all(np.any(support, axis=-1)):
                 return True
 
         for group in self.arena.groups:
             supports = [  # per role [M, card]: exact support of the incoming
-                messages[self.arena.message_indices(group.gather[:, r], card)] > SUPPORT_FLOOR
+                _np_log_support(
+                    messages[self.arena.message_indices(group.gather[:, r], card)]
+                )
                 for r, card in enumerate(group.cards)
             ]
             n = len(group.members)
@@ -737,7 +760,7 @@ class Engine:
                 if not np.all(np.any(joint, axis=-1)):
                     return True
                 continue
-            factor_support = np.asarray(state.params[group.name]) > SUPPORT_FLOOR
+            factor_support = _np_log_support(state.params[group.name])
             for role, card in enumerate(group.cards):
                 shape = [n] + [1] * len(group.cards)
                 shape[1 + role] = card
@@ -748,8 +771,11 @@ class Engine:
         for constraint in self.arena.constraint_groups:
             supports = [
                 np.flatnonzero(
-                    messages[self.arena.message_indices(constraint.gather[i], card)]
-                    > SUPPORT_FLOOR
+                    _np_log_support(
+                        messages[
+                            self.arena.message_indices(constraint.gather[i], card)
+                        ]
+                    )
                 ).tolist()
                 for i, card in enumerate(constraint.cards)
             ]
@@ -1908,8 +1934,9 @@ def _flat_scan_fn(arena: Arena, stage, op):
 def _make_support_check(arena: Arena):
     """Jitted mirror of ``Engine._has_zero_support`` for constraint-free
     models (every two-pass model): True iff an edge or factor belief has
-    empty exact support. Semantics identical to the numpy check — exp of the
-    NEG log-zero underflows to exactly 0 in either backend."""
+    empty exact support. Semantics are identical to the NumPy check: NEG is
+    the one reserved zero sentinel and every other finite log value has
+    support, irrespective of magnitude."""
     if arena.constraint_groups:  # combinatorial feasibility is host-side
         raise ValueError("jitted support check requires a constraint-free model")
     by_card: dict[int, list[list[int]]] = {}
@@ -1924,14 +1951,20 @@ def _make_support_check(arena: Arena):
     def check(messages, params):
         bad = jnp.asarray(False)
         for card, pairs in edge_buckets:
-            lq = (
-                messages[arena.message_indices(pairs[:, 0], card)]
-                + messages[arena.message_indices(pairs[:, 1], card)]
+            support = (
+                _jax_log_support(
+                    messages[arena.message_indices(pairs[:, 0], card)]
+                )
+                & _jax_log_support(
+                    messages[arena.message_indices(pairs[:, 1], card)]
+                )
             )
-            bad |= ~jnp.all(jnp.any(lq > SUPPORT_FLOOR, axis=-1))
+            bad |= ~jnp.all(jnp.any(support, axis=-1))
         for group in arena.groups:
             supports = [
-                messages[arena.message_indices(group.gather[:, r], card)] > SUPPORT_FLOOR
+                _jax_log_support(
+                    messages[arena.message_indices(group.gather[:, r], card)]
+                )
                 for r, card in enumerate(group.cards)
             ]
             n = len(group.members)
@@ -1941,7 +1974,7 @@ def _make_support_check(arena: Arena):
                     joint = joint & s
                 bad |= ~jnp.all(jnp.any(joint, axis=-1))
                 continue
-            factor_support = params[group.name] > SUPPORT_FLOOR
+            factor_support = _jax_log_support(params[group.name])
             for role, card in enumerate(group.cards):
                 shape = [n] + [1] * len(group.cards)
                 shape[1 + role] = card
