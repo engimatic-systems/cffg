@@ -35,6 +35,14 @@ from cffg.core.plates import expand_plates
 from cffg.core.validate import validate
 
 NEG = -1.0e30  # log-space "zero"; finite so NEG - NEG == 0 (no inf-inf NaNs)
+# Support test threshold. A log value at or below this carries a NEG term and
+# is exactly zero; anything above it is a genuine, possibly tiny, potential.
+# The test has to be made HERE, in log space, against the sentinel — exp()
+# cannot make the distinction, because it underflows to 0 below about -745,
+# and -745 is an ordinary magnitude for E[log θ] under a sparse Dirichlet
+# (α = 1e-3 gives ψ(α) − ψ(α₀) ≈ -750 for a 4-outcome column). Exponentiating
+# reports such a model as having no support, which is false.
+SUPPORT_FLOOR = NEG / 2
 
 
 class CompileError(ValueError):

@@ -158,3 +158,40 @@ runtime reports correctly. That is the engine's business, not this API's, so
 the tests exercise zeros in the statistic rather than in the prior.
 
 Fixed the trailing blank line in .tickets/cff-6tek.md.
+
+**2026-07-28T00:58:04Z**
+
+Review round 2 (2026-07-27): two findings, both fixed. One of them
+retracts something I wrote in the round-1 note.
+
+1. Scoped learnables could not reload from a checkpoint. state_dict emits
+   "name/key" and load_state_dict split on the FIRST separator, but scoping
+   uses "/" by design, so "scope/B/alpha" parsed as learnable "scope" and
+   raised. Now: a bare name that matches a learnable is taken whole,
+   otherwise the split is on the LAST separator, and state_dict rejects a
+   hyperparameter key containing "/" so that boundary is unambiguous. Tests
+   cover a scoped round trip and an unknown key.
+
+2. RETRACTION. The round-1 note above says a sub-unit Dirichlet prior
+   "degrades the model itself" and that the resulting infeasible status is
+   "the engine's business, not this API's". That was wrong, and I should not
+   have written it off — a=1e-3 is a proper, common sparse prior.
+
+   The real cause is an engine bug the learnables work exposed. Support was
+   tested by exponentiating: exp(log_factor) > 0. exp() underflows to zero
+   below about -745, and E[log theta] under a sparse Dirichlet sits near
+   -750, so a perfectly good model was reported as having empty support. The
+   reviewer's proof is clean: adding the same constant to every entry of the
+   factor changes no distribution it represents, and it flipped the verdict
+   from infeasible to converged.
+
+   Fixed at all seven sites (four numpy, three in-jit): support is now tested
+   in log space against a SUPPORT_FLOOR sentinel derived from NEG. Only a NEG
+   term means empty support; a small potential is not an absent one. The
+   regression test asserts the a=1e-3 model converges AND that exp() of its
+   expected parameters is exactly zero, which is what made the old test
+   wrong.
+
+   This is an engine fix riding in a learnables PR. It is in scope only
+   because the API is what surfaced it; if it should land separately, say so
+   and I will lift it out.

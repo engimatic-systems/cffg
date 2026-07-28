@@ -27,8 +27,9 @@ from cffg.core.ir import (
     Template,
     VariableSpec,
 )
+from cffg.core.compose import scoped as scoped_template
 from cffg.core.validate import ModelError, validate
-from cffg.engine import Engine, _replace
+from cffg.engine import Engine, RunStatus, _replace
 from cffg.learn import Learnables
 from cffg.models.rollout import build_rollout
 
@@ -454,6 +455,38 @@ def test_restore_preserves_episode_cadence(tmp_path):
     np.testing.assert_allclose(after_restore, np.zeros(KC), atol=1e-9)
 
 
+def test_scoped_learnable_checkpoints_round_trip():
+    """Composing scopes a template's names with '/', so a scoped learnable is
+    called `scope/B` and its checkpoint key `scope/B/alpha`. Splitting that
+    on the FIRST separator reads the scope as the learnable name and loses
+    the checkpoint."""
+    t, arrays = two_chain_template()
+    scoped = scoped_template(t, "outer")
+    engine = Engine(compile_template(scoped, arrays={
+        f"outer/{k}": v for k, v in arrays.items()
+    }))
+    (plan,) = engine.arena.learn_plans
+    assert plan.name == "outer/B"
+
+    learn = Learnables(engine, priors={"outer/B": np.full((U, K3, K3), 2.0)})
+    keys = list(learn.state_dict())
+    assert keys == ["outer/B/alpha"], keys
+
+    other = Learnables(engine, priors={"outer/B": np.ones((U, K3, K3))})
+    other.load_state_dict(learn.state_dict())
+    np.testing.assert_array_equal(
+        other.params["outer/B"]["alpha"], learn.params["outer/B"]["alpha"]
+    )
+
+
+def test_unknown_checkpoint_key_is_refused():
+    t, arrays = two_chain_template()
+    engine = Engine(compile_template(t, arrays=arrays))
+    learn = Learnables(engine, priors={"B": np.ones((U, K3, K3))})
+    with pytest.raises(KeyError, match="no learnable for checkpoint key"):
+        learn.load_state_dict({"nope/alpha": np.ones((U, K3, K3))})
+
+
 def test_legacy_checkpoint_keys_are_migrated(tmp_path):
     """Checkpoints written before the learnables API named their two arrays
     `counts` and `b_counts`. Restoring one must reload them, not silently
@@ -554,6 +587,32 @@ def test_float32_engine_keeps_the_learning_tick_finite():
             alpha = agent.learnables.params[name]["alpha"]
             assert np.all(np.isfinite(alpha)) and np.all(alpha > 0), name
         assert np.all(np.isfinite(agent.belief))
+
+
+def test_sparse_dirichlet_prior_is_not_infeasible():
+    """A sparse Dirichlet prior is proper and common. α = 1e-3 puts
+    E[log θ] near -750 in every cell, which exp() underflows to zero — an
+    exponentiating support test then reports a perfectly good model as
+    having no support. Support belongs in log space, against the NEG
+    sentinel: a small potential is not an absent one.
+
+    The proof that the old failure was numerical rather than real: adding the
+    same constant to every entry of a factor changes no distribution it
+    represents, and it used to flip the verdict."""
+    t, arrays = corridor_builder(past=1, steps=1, learn=("A",))
+    engine = Engine(compile_template(t, arrays=arrays))
+    learn = Learnables(engine, priors={"A": np.full((KC, KC), 1e-3)})
+
+    st = engine.init_state()
+    st = _replace(st, params=learn.write(engine, dict(st.params)))
+    st = engine.bind_data(st, {"act1": 0, "obs1": 2})
+    result = engine.run(st, 60, tol=1e-12)
+    assert result.status is RunStatus.CONVERGED, (result.status, result.residual)
+
+    # E[log A] really is at the magnitude that underflows exp().
+    elog = np.asarray(result.state.params[engine.arena.member_of["obs1"][0]])
+    assert elog.min() < -700, elog.min()
+    assert np.exp(elog).max() == 0.0  # exactly why the old test was wrong
 
 
 def test_uncomfortable_count_scale_stays_finite():

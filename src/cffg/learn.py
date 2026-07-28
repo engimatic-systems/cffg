@@ -376,19 +376,34 @@ class Learnables:
         return next(iter(out.values()))
 
     def state_dict(self) -> dict[str, np.ndarray]:
-        """Flat name/key -> array, so a checkpoint stays a flat npz."""
-        return {
-            f"{name}/{key}": arr.copy()
-            for name, params in self.params.items()
-            for key, arr in params.items()
-        }
+        """Flat "name/key" -> array, so a checkpoint stays a flat npz.
+
+        The split is on the LAST separator, because a learnable name may
+        contain one: composing scopes a template's names with `/`, so a
+        two-deep scope gives `outer/inner/B`. Hyperparameter keys are
+        separator-free (checked below), which makes the last one the
+        boundary."""
+        out: dict[str, np.ndarray] = {}
+        for name, params in self.params.items():
+            for key, arr in params.items():
+                if "/" in key:
+                    raise ValueError(
+                        f"learnable {name!r}: hyperparameter key {key!r} contains "
+                        "'/', which is the scope separator and cannot appear here"
+                    )
+                out[f"{name}/{key}"] = arr.copy()
+        return out
 
     def load_state_dict(self, data: dict[str, np.ndarray]) -> None:
         for flat, arr in data.items():
-            name, _, key = flat.partition("/")
-            if name not in self.params:
-                raise KeyError(f"no learnable {name!r} in this graph")
-            key = key or next(iter(self.params[name]))
+            if flat in self.params:  # a bare name: single-hyperparameter family
+                name, key = flat, next(iter(self.params[flat]))
+            else:
+                name, sep, key = flat.rpartition("/")
+                if not sep or name not in self.params:
+                    raise KeyError(
+                        f"no learnable for checkpoint key {flat!r} in this graph"
+                    )
             if key not in self.params[name]:
                 raise KeyError(f"learnable {name!r} has no hyperparameter {key!r}")
             if np.shape(arr) != self.params[name][key].shape:
