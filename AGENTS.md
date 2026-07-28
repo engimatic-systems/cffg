@@ -36,7 +36,8 @@ git pull --ff-only origin "$BASE_BRANCH"
 3. **Tickets via `tk`.** All work is tracked in the `tk` ticket system (`tk --help`
    for usage). Break work into small tickets with dependency links, use epics for the
    major milestones, and close tickets in the same session as the commit that
-   resolves them. Before starting work, check `tk` for ready tickets.
+   resolves them. Every ticket begins with a brief `## Plain English` section as
+   described below. Before starting work, check `tk` for ready tickets.
 
 4. **Act autonomously.** The agent has broad access to this machine and should use
    it: run tests, install deps, create tickets, commit, and keep moving without
@@ -69,20 +70,56 @@ This project will span many context windows. The rule that makes that survivable
   and comments are the handoff.
 - **During**: atomic commits referencing the ticket ID. Discovered work becomes a
   *new ticket* (linked with a dependency), not scope drift in the current one.
-- **During implementation**, prefer focused test files for the changed
-  component. **End of session**: make one full pass and refresh the mobile test
-  dashboard with `uv run python tools/dashboard.py --run-suite`
-  (~/agent-share/cffg-tests.html; add new test files to `EPIC_FILES`). If a full
-  pass is run directly instead, preserve and reuse its result:
-  `uv run pytest -q --junitxml=/tmp/cffg-tests.xml`, then
-  `uv run python tools/dashboard.py --junitxml /tmp/cffg-tests.xml`. Never run
-  the full suite and then launch `--run-suite` again. Leave `main` green and
-  the tree clean. Update the ticket with a handoff comment — what's done,
-  what's next, any gotcha — then close it or leave it `in_progress` with that
-  comment as the resume point. A session that ends with uncommitted work or an
-  un-updated ticket has failed its landing.
+- **During implementation**, run focused test files as often as useful for the
+  changed component.
+- **Final validation for a code change** requires one passing full-suite run
+  after the final code change. One passing suite at the proposed PR head is
+  sufficient to open or update a PR. Run
+  `uv run python tools/dashboard.py --run-suite` to execute pytest exactly once
+  and refresh `~/agent-share/cffg-tests.html` (add new test files to
+  `EPIC_FILES`). If the full suite was run directly, preserve and reuse its
+  result: `uv run pytest -q --junitxml=/tmp/cffg-tests.xml`, then
+  `uv run python tools/dashboard.py --junitxml /tmp/cffg-tests.xml`. Opening a
+  PR, requesting review, or refreshing the dashboard never calls for a second
+  unchanged full-suite run. A later code change supersedes the previous result
+  and gets one fresh final run.
+- **Ticket- and documentation-only changes** do not require the full test suite.
+  Validate the artifacts they change, including `tk dep cycle` and
+  `git diff --check` for ticket-only work.
+- **End of session**: leave `main` green and the tree clean. Update the ticket
+  with a handoff comment — what's done, what's next, any gotcha — then close it
+  or leave it `in_progress` with that comment as the resume point. A session
+  that ends with uncommitted work or an un-updated ticket has failed its
+  landing.
 - **One ticket ≈ one context window.** If a ticket can't fit, split it before
   starting, not after running out of context.
+
+### Ticket and roadmap authoring
+
+- Every ticket places a `## Plain English` section immediately after its title.
+  In two to five affirmative sentences, explain what capability or outcome the
+  ticket delivers and how it delivers it at a high level. The technical
+  description, design, hostile-input plan, and acceptance criteria follow.
+- A roadmap-refinement change includes a compact ASCII dependency tree in its
+  ticket note or PR description. State the arrow direction and show the ready
+  roots, parallel work, immediate blockers, and downstream roadmap
+  feature/epic. For example:
+
+  ```text
+  Legend: prerequisite --> dependent
+
+  [x] foundation
+        |
+        +--> [ ] interface (ready)
+                  |
+                  +--> [ ] feature
+                            |
+                            +--> [ ] roadmap epic
+  ```
+
+  Build the explanation from `tk dep tree --full`, `tk ready`, and `tk blocked`,
+  then run `tk dep cycle`. The `tk` dependency records remain the source of
+  truth; the ASCII tree is their human-readable companion.
 
 ### Sub-agent research protocol
 
