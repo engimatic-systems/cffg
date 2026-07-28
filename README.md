@@ -12,8 +12,14 @@ against the authors' Julia reference on the T-maze benchmark.
 ```sh
 uv sync          # install
 uv run pytest tests/test_engine_tree.py  # focused iteration
-uv run python tools/dashboard.py --run-suite  # one full pass + dashboard
+uv run python tools/dashboard.py --run-suite  # one final full pass + dashboard
 ```
+
+Run focused tests as often as useful while changing code. One passing full
+suite after the final code change is sufficient to open or update a PR; the
+dashboard command above runs pytest exactly once and renders that result.
+Ticket- and documentation-only changes use their relevant validation instead
+of the full suite.
 
 ## The mental model
 
@@ -285,5 +291,5 @@ carries the `factor:`/`var:`/`port:` ref it depicts) instead of SVG text.
 | `docs/todo-notes/` | remaining threads, one note each, tied to `tk` tickets |
 
 Working on the code? Read `AGENTS.md` first — uv-only, atomic commits,
-tickets via `tk`, and the four-canonical-docs rule are enforced, one of them
+tickets via `tk`, and the canonical-document policy are enforced, one of them
 by a test.
