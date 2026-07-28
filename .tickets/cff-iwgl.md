@@ -2,7 +2,7 @@
 id: cff-iwgl
 status: closed
 deps: [cff-fr5c, cff-almk]
-links: [cff-fr5c]
+links: [cff-fr5c, cff-rqqc]
 created: 2026-07-06T00:26:48Z
 type: task
 priority: 3
