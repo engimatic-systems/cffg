@@ -23,6 +23,7 @@ from cffg.core.ir import (
     ConstraintSpec,
     Expose,
     FactorSpec,
+    LearnableSpec,
     PlateSpec,
     PortRole,
     PortSpec,
@@ -117,6 +118,19 @@ def to_dict(t: Template) -> dict[str, Any]:
     # Additive: templates without plates serialize byte-identically to before.
     if t.plates:
         d["plates"] = {name: _plate_to_dict(t.plates[name]) for name in sorted(t.plates)}
+    # Additive (cff-x0sv): declared learnables. Structure, not blob data — a
+    # model that learns its transitions is a different model from one that
+    # does not, so this participates in the structure hash.
+    if t.learnables:
+        d["learnables"] = {
+            name: (
+                {"family": ln.family, "blobs": list(ln.blobs), "sources": list(ln.sources)}
+                if ln.sources is not None
+                else {"family": ln.family, "blobs": list(ln.blobs)}
+            )
+            for name in sorted(t.learnables)
+            for ln in [t.learnables[name]]
+        }
     # Additive: record (impl, version) for factor types backed by *external*
     # FactorKernels (cff-ri8m), so loading without them fails loudly and
     # names what to install. Built-in (cffg.) kernels ship with the package
@@ -173,6 +187,15 @@ def from_dict(d: dict[str, Any]) -> Template:
         },
         plates={
             name: _plate_from_dict(pspec) for name, pspec in d.get("plates", {}).items()
+        },
+        learnables={
+            name: LearnableSpec(
+                name,
+                spec["family"],
+                tuple(spec["blobs"]),
+                tuple(spec["sources"]) if "sources" in spec else None,
+            )
+            for name, spec in d.get("learnables", {}).items()
         },
         schema_version=d["schema_version"],
     )

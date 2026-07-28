@@ -1,8 +1,8 @@
 ---
 id: cff-x0sv
-status: open
+status: closed
 deps: [cff-cd1i, cff-ri8m]
-links: [cff-gjjk]
+links: [cff-gjjk, cff-2gev, cff-6pmw]
 created: 2026-07-08T22:00:30Z
 type: feature
 priority: 2
@@ -26,3 +26,180 @@ cff-7c5o landed the Gaussian half of what this API generalizes: Engine.gaussian_
 **2026-07-10T03:31:28Z**
 
 Evaluation finding for this API: member_of covers discrete groups only — consumers needing per-member writes into Gaussian/EF/hybrid/plate-expanded groups currently write state.params[group] arrays by member order by hand. The generic learnables API should extend member_of across all group families and offer a bulk set_params(factor_name -> arrays) helper.
+
+**2026-07-27T20:14:54Z**
+
+New consumer (2026-07-27): cff-2gev now depends on this API.
+
+The annealed-novelty experiment needs a factored corridor model — an
+orientation chain selecting into a cell chain, with turn rules as one
+shared parameter block — because the flat single-chain rollout gives
+curiosity no structure to exploit. That model is expressible in the IR
+today, but RollingAgent cannot learn it: the agent is hardcoded to the
+build_rollout node names (member_of["prior"] line 97, "u1" line 142,
+"act1"/"obs1" line 150, "zm1" line 152, "tm1" line 160) and to a single
+[U, K', K] count array bound to that one transition node.
+
+Two requirements this adds to the contract:
+
+- learnables must address a named factor or group, so a model with two
+  transition nodes on separate chains can learn both
+- accumulation must work when several factor instances share one parameter
+  blob, which is how the IR already ties parameters (build_rollout ties Bs
+  across every slice, and plates tie by name across copies). Counts from
+  every instance sharing a blob accumulate into that one block.
+
+The second is the substantive one: parameter tying is what makes learning
+transfer across states, and it is the reason the factored model is worth
+building at all.
+
+**2026-07-27T20:52:00Z**
+
+Contract decided and implemented (branch cff-x0sv-declared-learnables).
+
+The ticket left open where the declaration lives. It lives on the Template
+as a LearnableSpec naming a conjugate family and a set of BLOBS — not a
+FactorSpec flag and not a constraint bead.
+
+Why blobs: the ticket's own second requirement is that accumulation works
+when several factor instances share one parameter blob, because that is how
+the IR ties parameters (build_rollout ties Bs across every slice, plates tie
+by name across copies). Tying is the thing that makes learning transfer, so
+the posterior has to be addressed at the thing that is tied. A FactorSpec
+flag declares per instance and would then need a separate tying story; a
+constraint bead would put a learning concern into the message-passing bead
+vocabulary, where it does not belong.
+
+A learnable spans a SET of blobs for two reasons, and both are load-bearing:
+consumption form (A read as probabilities by the rules, Ac read as raw
+counts by the GFE composite that differentiates them) and joint family (an
+MNIW over a gaussian_linear owns matrix, offset and cov together). That is
+why LearnPlan carries per-blob shapes rather than one shape — it is the hook
+cffg.conj's NIW/MNIW needs, per "design the contract to fit it".
+
+Three rules the implementation settled:
+
+- GFE composites are write targets, never stat sources. The composite owns
+  its update path and its node belief is not a plain factor belief. So a
+  planning graph with parameter uncertainty has zero sources and writes raw
+  counts; the perception graph supplies statistics and writes E[log theta].
+  A graph with no sources is normal, not an error.
+- Cadence is not part of the contract. accumulate() takes the graph, the
+  state and an optional name filter; the agent decides that a transition
+  updates per tick and an initial-state prior per episode. That is a
+  modeling choice, and hardcoding it is what the old learn_a/learn_b did.
+- LearnableSpec.sources restricts which instances supply statistics.
+  Habits forced this: the control prior is tied across every horizon step
+  (it applies at each), but only the executed control is evidence. Where
+  tying and evidence differ it is a property of the model, so the model
+  declares it — this is what keeps RollingAgent from naming "e1".
+
+Also fixed en route: build_rollout ignored the gfe flag when choosing
+between A and Ac, so learned_a with gfe=False compiled a counts array as if
+it were a conditional and failed the stochasticity check. Learning A without
+an epistemic channel now works.
+
+Delivered against acceptance: A and B re-expressed on the API with the
+existing tests unchanged; d and e added as instances with recovery tests;
+contract in ARCHITECTURE section 3b, including which updates are exact
+conjugacy (BP node beliefs) and which are mean-field (VMP groups).
+
+Not done here, deliberately: registering NIW/MNIW as families. cff-7c5o
+already landed that machinery (Engine.gaussian_node_stats + cffg.conj) and
+the contract is shaped for it, but member_of covers the discrete families
+only, so a Gaussian learnable currently raises a clear compile error naming
+that limitation. Wiring it up is a follow-up.
+
+Also still open from the 2026-07-10 evaluation note: extending member_of
+across all group families and a bulk set_params helper. Same blocker, same
+follow-up.
+
+**2026-07-27T21:58:10Z**
+
+Review round 1 (2026-07-27): four findings, all addressed.
+
+1. e-learning accumulated the soft policy posterior, not the executed
+   control, and act() mutated it. Both wrong. The fix is structural rather
+   than a clamp in the agent: when e is learnable, the perception slice
+   branches its control edge through an equality node, so the habit prior
+   sits in the same graph as the clamped action and the node belief there is
+   a one-hot on what was actually done. Habits therefore accumulate per tick
+   from the perception graph like A and B, and act() is now read-only.
+
+   This forced a semantic fix to LearnableSpec.sources, which had no way to
+   say "no instance in this window is evidence" — () meant "all readers".
+   sources is now None for all readers, a tuple for exactly those, and ()
+   for none. The planning window declares () and learns nothing from what it
+   merely considered.
+
+2. checkpoint/restore dropped episode_tick, so a restore mid-episode read the
+   next observation as an episode start and folded q(z0) twice from one
+   episode. Now persisted. A checkpoint predating the field falls back to
+   tick, which can only decline to fire the statistic, never double-fire it.
+
+3. The contract did not actually admit NIW/MNIW, despite the docstring. Fair
+   hit, and deferring it was wrong. Restructured: hyperparameters, statistics
+   and rollover outputs are keyed dicts; a Family names which engine readout
+   supplies its statistics; LearnTarget carries the blob and the parameter
+   role it fills, which is what routes a multi-parameter write. Dirichlet is
+   now the degenerate case of that contract rather than its shape. cff-6tek
+   is correspondingly narrowed to registration plus extending member_of.
+
+4. Legacy counts/b_counts checkpoint keys were silently ignored, so a
+   resumed agent looked like it had forgotten everything. Now migrated onto
+   their learnables, or refused with a message if the agent does not declare
+   them.
+
+Also added the missing robustness cases: exact-zero statistics through a
+deterministic transition, a float32 engine tick, and lopsided count scales
+nine orders of magnitude apart. Note that a sub-unit Dirichlet prior degrades
+the model itself — E[log A] near -750 makes the graph infeasible, which the
+runtime reports correctly. That is the engine's business, not this API's, so
+the tests exercise zeros in the statistic rather than in the prior.
+
+Fixed the trailing blank line in .tickets/cff-6tek.md.
+
+**2026-07-28T00:58:04Z**
+
+Review round 2 (2026-07-27): two findings, both fixed. One of them
+retracts something I wrote in the round-1 note.
+
+1. Scoped learnables could not reload from a checkpoint. state_dict emits
+   "name/key" and load_state_dict split on the FIRST separator, but scoping
+   uses "/" by design, so "scope/B/alpha" parsed as learnable "scope" and
+   raised. Now: a bare name that matches a learnable is taken whole,
+   otherwise the split is on the LAST separator, and state_dict rejects a
+   hyperparameter key containing "/" so that boundary is unambiguous. Tests
+   cover a scoped round trip and an unknown key.
+
+2. RETRACTION. The round-1 note above says a sub-unit Dirichlet prior
+   "degrades the model itself" and that the resulting infeasible status is
+   "the engine's business, not this API's". That was wrong, and I should not
+   have written it off — a=1e-3 is a proper, common sparse prior.
+
+   The real cause is an engine bug the learnables work exposed. Support was
+   tested by exponentiating: exp(log_factor) > 0. exp() underflows to zero
+   below about -745, and E[log theta] under a sparse Dirichlet sits near
+   -750, so a perfectly good model was reported as having empty support. The
+   reviewer's proof is clean: adding the same constant to every entry of the
+   factor changes no distribution it represents, and it flipped the verdict
+   from infeasible to converged.
+
+   Fixed at all seven sites (four numpy, three in-jit): support is now tested
+   in log space against a SUPPORT_FLOOR sentinel derived from NEG. Only a NEG
+   term means empty support; a small potential is not an absent one. The
+   regression test asserts the a=1e-3 model converges AND that exp() of its
+   expected parameters is exactly zero, which is what made the old test
+   wrong.
+
+   This is an engine fix riding in a learnables PR. It is in scope only
+   because the API is what surfaced it; if it should land separately, say so
+   and I will lift it out.
+
+**2026-07-28T01:32:26Z**
+
+Review round 3 (Codex implementation, 2026-07-27): replaced delimiter-inferred learnable checkpoint keys with versioned percent-encoded (name, hyperparameter) components. Both historical formats remain readable when they have exactly one interpretation; a legacy key that could name either a scoped learnable or another learnable's parameter now fails loudly. Replaced SUPPORT_FLOOR entirely: host and JIT support checks compare each operand exactly with the reserved NEG sentinel before combining support, so every other finite log value is supported, including E[log theta] below NEG. Regressions cover nested scoped-name collisions, legacy ambiguity, alpha=1e-3 and alpha=1e-31 under exact and flooding schedules, and true NEG infeasibility. Focused verification: 98 passed.
+
+**2026-07-28T01:44:06Z**
+
+Final handoff (2026-07-27): while testing exact NEG semantics, found the remaining representational corner case: a proper Dirichlet E[log theta] can cast to exactly the reserved NEG bit pattern in float32. Dirichlet expected-parameter writes now move only that exact collision one dtype ULP toward zero; no magnitude clamp or support floor is introduced. Auto/JIT and flooding/NumPy regressions cover the collision, values below NEG, exponentiation underflow, and genuine exact-zero infeasibility. Full suite: 1243 passed, 0 failed; dashboard refreshed from the same JUnit run at ~/agent-share/cffg-tests.html. P3 follow-up cff-6pmw records the lower-context-agent navigation and duplicated-semantics improvements discovered during review.

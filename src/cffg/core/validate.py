@@ -40,6 +40,7 @@ def validate(t: Template) -> None:
     problems += _check_degrees_and_ports(t)
     problems += _check_constraints(t)
     problems += _check_plates(t)
+    problems += _check_learnables(t)
 
     if problems:
         raise ModelError(t.name, problems)
@@ -220,6 +221,38 @@ def _check_plates(t: Template) -> list[str]:
                 pass
             else:  # pragma: no cover - closed vocabulary
                 problems.append(f"plate {name!r}: unknown wiring rule {rule!r}")
+    return problems
+
+
+def _check_learnables(t: Template) -> list[str]:
+    """Structural checks on declared learnables (cff-x0sv). The conjugate
+    family and per-factor-type sufficient statistic are checked at compile
+    time, where the factor types and resolved arrays are known; core stays
+    JAX-free and checks only names and disjointness."""
+    problems: list[str] = []
+    owner: dict[str, str] = {}
+    for name, spec in sorted(t.learnables.items()):
+        if spec.name != name:
+            problems.append(f"learnable {name!r}: spec name is {spec.name!r}")
+        if not spec.blobs:
+            problems.append(f"learnable {name!r}: declares no blobs")
+        for b in spec.blobs:
+            if b not in t.blobs:
+                problems.append(f"learnable {name!r}: unknown blob {b!r}")
+            elif b in owner:
+                problems.append(
+                    f"learnable {name!r}: blob {b!r} is already learned by "
+                    f"{owner[b]!r} — one posterior per blob"
+                )
+            else:
+                owner[b] = name
+        for f in spec.sources or ():
+            if f not in t.factors:
+                problems.append(f"learnable {name!r}: unknown source factor {f!r}")
+            elif not (set(spec.blobs) & set(t.factors[f].param_blobs.values())):
+                problems.append(
+                    f"learnable {name!r}: source {f!r} does not read any of its blobs"
+                )
     return problems
 
 

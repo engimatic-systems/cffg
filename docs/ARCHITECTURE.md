@@ -236,6 +236,78 @@ A registry keyed by `(factor_type, constraint_config, out_edge_role)`:
   BFE/GFE is always exactly the sum of registered local terms — the "true BFE, no
   shortcuts" requirement is enforced structurally.
 
+#### 3b. Declared learnables: the conjugate-update contract (`cffg.learn`, cff-x0sv)
+
+Parameter learning is a declaration, not agent code. A model names its
+conjugate posteriors in `Template.learnables`; the compiler resolves each one
+against the arena; `cffg.learn.Learnables` holds the hyperparameters and moves
+them. Four rules define the contract:
+
+1. **The unit of learning is a blob set, not a factor.** Blobs are how the IR
+   already ties parameters — `build_rollout` names one `Bs` on every slice's
+   transition, plates name one blob across every copy — so counts from every
+   instance sharing a blob accumulate into one posterior. Parameter tying is
+   what makes learning transfer across states, so the learnable has to be
+   addressed at the thing that is tied. A learnable spans several blobs when
+   one parameter is read in several forms (`A`/`Ac`) or when the family is
+   joint over several (MNIW over a `gaussian_linear`'s matrix, offset, and
+   covariance).
+
+2. **Factor type fixes the sufficient statistic; family fixes the update.**
+   The registry `cffg.learn.FAMILIES` maps a family name to a `Family`:
+   `check` (compile-time admissibility), `stats` (engine readout → statistic),
+   `fold` (statistic into hyperparameters), `rollover` (hyperparameters →
+   what the rules consume), `raw` (→ what a counts target consumes), `mean`
+   (→ the reporting readout). `Dirichlet` serves the discrete vocabulary:
+   `categorical` over `[K]`, `matrix_cat` over `[K_out, K_in]`,
+   `transition_mixture` over `[U, K', K]`.
+
+   Hyperparameters, statistics and rollover outputs are keyed dicts, and a
+   family names which engine readout it draws from (`cffg.learn.READOUTS`),
+   because a conjugate posterior is not always one array read off one
+   readout. An MNIW over a `gaussian_linear` carries four hyperparameters,
+   accumulates three statistics from `Engine.gaussian_node_stats`, and rolls
+   over into three blobs at different shapes — so a `LearnTarget` names both
+   the blob it writes and the parameter role that blob fills, which is what
+   routes a multi-parameter write. `Dirichlet` is the degenerate case of that
+   contract: one hyperparameter, one statistic, one role.
+
+   Registering NIW and MNIW is still open (cff-6tek). It needs
+   `Arena.member_of` extended past the discrete families first, which is why
+   a Gaussian learnable currently fails at compile time with a message naming
+   that limitation rather than learning.
+
+3. **Sources are perception, targets are everywhere.** Statistics come from
+   nodes whose beliefs `Engine.node_beliefs` reports. GFE composites are write
+   targets but never sources: the composite owns its own update path, and its
+   node belief is not a plain factor belief. A planning graph with parameter
+   uncertainty therefore has zero sources for `A` and writes the raw counts α
+   that its novelty term differentiates; the perception graph supplies the
+   statistics and writes `E[log θ] = ψ(α) − ψ(α₀)`.
+
+   Reading is not evidence, so a learnable may restrict which instances
+   supply statistics: `LearnableSpec.sources` is `None` for every reader, a
+   tuple for exactly those, and an empty tuple for none. Habits are the case
+   that needs all three. The prior applies at every step of the horizon, so
+   every planning slice reads it, and none of them is evidence — the planning
+   window declares an empty restriction and learns nothing from what it
+   merely considered. The perception slice branches its control edge through
+   an equality node so the habit prior sits beside the clamped action, which
+   makes the node belief there a one-hot on the executed control.
+
+4. **Exactness is documented per family, because the FE ledger depends on it.**
+   Dirichlet on a BP group is exact conjugacy: the node belief at a discrete
+   factor on a tree is the exact posterior over that factor's variables. On a
+   VMP (mean-field) group it is the standard mean-field conjugate update, not
+   an exact one — the belief is a product of edge marginals, so the update
+   integrates against a factorized measure. Rollover always writes
+   E[log θ], the mean-field-consistent point (Part II §5), never log E[θ].
+
+Cadence is deliberately not part of the contract. A transition posterior
+updates every tick and an initial-state prior once per episode; that is a
+modeling choice, so `accumulate` takes the graph, the state, and an optional
+name filter, and the caller decides when.
+
 ### 4. Inference VM (`cffg.infer`)
 
 - Schedules (cff-d56d, `cffg.schedule`): the engine builds a schedule from
@@ -285,6 +357,17 @@ A registry keyed by `(factor_type, constraint_config, out_edge_role)`:
   and messages are coherent; max mode uses its message fixed-point residual
   and validates the decoded objective. Non-finite arenas/residuals are
   divergence, while proven empty exact support is infeasible with FE = +∞.
+  "Proven empty" is decided in log space by exact comparison with the
+  reserved `NEG` sentinel, never by exponentiating or applying a magnitude
+  threshold. `exp` underflows below about -745, while a threshold merely
+  moves the same false-zero boundary: a proper sparse Dirichlet can produce
+  any finite negative E[log θ], including values below `NEG`. Edge support
+  intersects the two facing messages' support masks before doing log-space
+  arithmetic, so one actual `NEG` term remains distinguishable from two
+  legitimate small terms. Dirichlet rollover reserves the sentinel bit
+  pattern too: if a dtype cast makes a proper E[log θ] exactly equal `NEG`,
+  that one value moves one ULP toward zero rather than becoming false
+  zero-support.
   On a two-pass schedule there is no sweep budget: one execution either
   certifies (converged, also with `tol=None`) or reports honestly that it
   did not.
@@ -301,14 +384,17 @@ A registry keyed by `(factor_type, constraint_config, out_edge_role)`:
   re-infer, read the control marginal (or its MAP under a δ-constraint), emit
   action. This directly fixes the hard-horizon problem the papers flag with the
   original GFE formulation.
-- **Continual learning**: conjugate posteriors roll into next-trial priors
-  (`q_s(A) → p_{s+1}(A)` Dirichlet count accumulation, same for goal statistics
-  c). Transition learning (`learn_b`, cff-cd1i) follows the same pattern with
-  per-action Dirichlets, integrated against the *node belief* at the
-  transition factor (`Engine.node_beliefs`, the smoothed pairwise marginal) —
-  node beliefs are the general sufficient-statistic source the learnables API
-  (cff-x0sv) will build on. Checkpoint = serialize current parameter blobs +
-  template ref; can happen at any tick.
+- **Continual learning**: driven entirely by declared learnables (§3b). The
+  agent contributes cadence, not addressing — observation, transition and
+  habit posteriors update every tick from the perception graph's node
+  beliefs, and the initial-state prior accumulates the first tick's smoothed
+  `q(z0)` once per episode, re-anchoring the belief at `reset_episode()`.
+  `act()` is read-only: planning an action is not evidence that it was taken.
+  `learn_a` / `learn_b` remain as the older spelling of `learn=("A",)` /
+  `learn=("B",)`. Checkpoints carry every learnable's hyperparameters, the
+  belief, and the episode cadence, so a resumed agent does not re-fire the
+  episode-start statistic; legacy `counts` / `b_counts` keys are migrated onto
+  their learnables or refused, never silently dropped.
 - Sensor/actuator adapters are plain Python callbacks mapping env observations to
   one-hot data bindings and control marginals to env actions.
 

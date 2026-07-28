@@ -85,6 +85,49 @@ class BlobRef:
 
 
 @dataclass(frozen=True)
+class LearnableSpec:
+    """A declared learnable parameter: one conjugate posterior, and every blob
+    through which the model reads it (cff-x0sv).
+
+    The unit of learning is the *blob set*, not the factor, because blobs are
+    how the IR already ties parameters — build_rollout names one `Bs` blob on
+    every slice's transition, and plates tie by name across copies. Counts
+    from every factor instance reading a blob in this set accumulate into one
+    posterior, which is what makes learning transfer across states.
+
+    A learnable spans several blobs when one parameter is read in more than
+    one form. Two cases exist today:
+
+    - consumption form — the discrete groups read expected log-parameters
+      (E[log θ] = ψ(α) − ψ(α₀)) while the GFE composites read the raw counts α
+      that their novelty term differentiates. build_rollout carries both as
+      `A`/`Ac` and `Bs`/`Bc`.
+    - joint family — an MNIW over a gaussian_linear node governs its
+      `matrix`, `offset`, and `cov` blobs together, so all three name the
+      same learnable.
+
+    `family` keys cffg.learn.FAMILIES; the per-factor-type sufficient
+    statistic comes from the factor type, not from this spec.
+
+    `sources` restricts which factor instances *supply* statistics. `None`
+    means every reader does; a tuple means exactly those, and an empty tuple
+    means none — this graph only spends the parameter, it does not learn it.
+
+    Tying is about reading, and reading is not evidence. A habit prior
+    applies at every step of the horizon, so every planning slice reads the
+    blob, but the statistic is the executed control alone. One builder emits
+    both a planning window and a perception window from the same
+    declaration, so the empty restriction is what lets the planning window
+    read a parameter it must not learn from.
+    """
+
+    name: str
+    family: str  # "dirichlet" | ... (key into cffg.learn.FAMILIES)
+    blobs: tuple[str, ...]  # every blob this posterior writes
+    sources: tuple[str, ...] | None = None  # stat suppliers; None = all readers
+
+
+@dataclass(frozen=True)
 class FactorSpec:
     """A node in the FFG.
 
@@ -375,6 +418,7 @@ class Template:
     ports: dict[str, PortSpec] = field(default_factory=dict)
     blobs: dict[str, BlobRef] = field(default_factory=dict)
     plates: dict[str, PlateSpec] = field(default_factory=dict)
+    learnables: dict[str, LearnableSpec] = field(default_factory=dict)
     schema_version: str = "1"
 
     def degree(self, variable: str) -> int:

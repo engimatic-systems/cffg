@@ -31,6 +31,7 @@ from cffg.core.ir import (
     Chain,
     Expose,
     FactorSpec,
+    LearnableSpec,
     PlateSpec,
     PortRole,
     PortSpec,
@@ -66,6 +67,7 @@ def expand_plates(t: Template) -> Template:
         constraints=list(t.constraints),
         ports=dict(t.ports),
         blobs=dict(t.blobs),
+        learnables=dict(t.learnables),
         schema_version=t.schema_version,
     )
     for pname in sorted(t.plates):
@@ -121,7 +123,17 @@ def _scope_copy(
         for b in frag.blobs.values()
         if b.name in per_copy
     }
-    return variables, factors, constraints, ports, per_copy_blobs
+    per_copy_learnables = {
+        s(ln.name): LearnableSpec(
+            s(ln.name),
+            ln.family,
+            tuple(sb(b) for b in ln.blobs),
+            None if ln.sources is None else tuple(s(f) for f in ln.sources),
+        )
+        for ln in frag.learnables.values()
+        if set(ln.blobs) <= per_copy
+    }
+    return variables, factors, constraints, ports, per_copy_blobs, per_copy_learnables
 
 
 def _expand_one(out: Template, plate: str, spec: PlateSpec) -> None:
@@ -134,11 +146,38 @@ def _expand_one(out: Template, plate: str, spec: PlateSpec) -> None:
         if b.name not in per_copy:
             out.blobs[b.name] = BlobRef(b.name, b.path, b.init)
 
+    # A learnable over tied blobs stays ONE posterior for the whole plate:
+    # every copy's factor instance reads the same blob, so every copy's
+    # sufficient statistics accumulate into it. That is the transfer property
+    # plates exist for (cff-x0sv). Per-copy blobs scope, so their learnables
+    # become one posterior per copy, emitted alongside the copy below.
+    tied_learnables = [
+        ln for ln in frag.learnables.values() if not (set(ln.blobs) & per_copy)
+    ]
+    for ln in tied_learnables:
+        if ln.sources:
+            raise ComposeError(
+                f"plate {plate!r}: tied learnable {ln.name!r} restricts sources to "
+                f"{sorted(ln.sources)}, which names one copy's factor and not the "
+                "others; a shared posterior accumulates over every copy"
+            )
+        out.learnables[ln.name] = ln
+    split = [
+        ln.name
+        for ln in frag.learnables.values()
+        if (set(ln.blobs) & per_copy) and not set(ln.blobs) <= per_copy
+    ]
+    if split:
+        raise ComposeError(
+            f"plate {plate!r}: learnables {sorted(split)} mix tied and per-copy "
+            "blobs; a posterior is either shared across copies or private to one"
+        )
+
     # Materialize every copy (disjoint union into `out`; scoping makes names
     # disjoint, so a clash means the plate name collides with existing content).
     for idx in idxs:
         prefix = _prefix(plate, idx)
-        variables, factors, constraints, ports, pblobs = _scope_copy(
+        variables, factors, constraints, ports, pblobs, plearn = _scope_copy(
             frag, prefix, idx, per_copy
         )
         for kind, new in (
@@ -146,6 +185,7 @@ def _expand_one(out: Template, plate: str, spec: PlateSpec) -> None:
             ("factors", factors),
             ("ports", ports),
             ("blobs", pblobs),
+            ("learnables", plearn),
         ):
             clash = set(getattr(out, kind)) & set(new)
             if clash:
