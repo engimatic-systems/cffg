@@ -297,6 +297,18 @@ class GfePlan:
     learned: bool = False
     mu3: bool = False
     param_blobs: tuple[str, ...] = ()
+    goal_learned: bool = False
+    goal_members: tuple[str, ...] = ()
+    goal_param_edges: tuple[str, ...] = ()
+    goal_priors: tuple[str, ...] = ()
+    goal_prior_blobs: tuple[str, ...] = ()
+    goal_tie_groups: tuple[tuple[int, ...], ...] = ()
+    goal_prior_scatter: np.ndarray = field(
+        default_factory=lambda: np.zeros(0, dtype=np.int64)
+    )
+    goal_count_scatter: np.ndarray = field(
+        default_factory=lambda: np.zeros(0, dtype=np.int64)
+    )
 
 
 @dataclass(frozen=True)
@@ -698,6 +710,23 @@ def compile_template(
     log_params: dict[str, np.ndarray] = {}
     consumed: set[str] = set()
 
+    # A categorical goal facing a P-substituted observation node is absorbed
+    # into that composite. If its statistic is a parameter edge, its
+    # Dirichlet prior/update must therefore be owned by GfePlan rather than by
+    # an ordinary standalone DirichletGroupPlan.
+    gfe_goal_names: set[str] = set()
+    for obs_name in psub:
+        obs = t.factors[obs_name]
+        if obs.type != "matrix_cat" or "out" not in obs.edges:
+            continue
+        facing = [
+            factor_name
+            for factor_name, _ in endpoints[obs.edges["out"]]
+            if factor_name != obs_name
+        ]
+        if len(facing) == 1 and t.factors[facing[0]].type == "categorical":
+            gfe_goal_names.add(facing[0])
+
     # In-graph conjugate parameter paths.  A schema-1 FFG parameter edge has
     # exactly two endpoints: one supported likelihood param role and one
     # dirichlet prior's ``out`` role.  The prior blob is the serialized source
@@ -706,6 +735,7 @@ def compile_template(
         tuple[str, tuple[int, ...], tuple[int, ...], int],
         list[tuple[str, str, str, np.ndarray]],
     ] = {}
+    gfe_goal_dirichlet: dict[str, tuple[str, str, np.ndarray]] = {}
     for var, (shape, axis, likelihood_name) in sorted(param_specs.items()):
         ends = endpoints[var]
         other = [(fname, role) for fname, role in ends if fname != likelihood_name]
@@ -736,6 +766,14 @@ def compile_template(
             )
             continue
         likelihood = t.factors[likelihood_name]
+        if likelihood_name in gfe_goal_names:
+            gfe_goal_dirichlet[likelihood_name] = (
+                prior_name,
+                var,
+                alpha0,
+            )
+            consumed.update((likelihood_name, prior_name))
+            continue
         roles = FACTOR_TYPES[likelihood.type].edge_roles
         cards = tuple(t.variables[likelihood.edges[r]].cardinality for r in roles)
         key = (likelihood.type, cards, shape, axis)
@@ -827,10 +865,39 @@ def compile_template(
         x_var = f.edges["out"]
         facing = [fn for fn, _ in endpoints[x_var] if fn != fname]
         goal = t.factors[facing[0]] if facing else None
-        if goal is None or goal.type != "categorical" or "statistic" not in goal.param_blobs:
+        goal_fixed = (
+            goal is not None
+            and goal.type == "categorical"
+            and "statistic" in goal.param_blobs
+        )
+        goal_learned = (
+            goal is not None
+            and goal.type == "categorical"
+            and "statistic" in goal.param_edges
+        )
+        if not goal_fixed and not goal_learned:
             problems.append(
                 f"p_substitution on {fname!r}: edge {x_var!r} must face a categorical "
-                "goal factor with a fixed statistic blob (learned goals: cff-gjjk)"
+                "goal factor with a fixed statistic blob or Dirichlet parameter edge"
+            )
+            continue
+        declared_goal = detail.get("goal_uncertainty")
+        if declared_goal not in (None, "dirichlet"):
+            problems.append(
+                f"p_substitution on {fname!r}: unknown goal_uncertainty "
+                f"{declared_goal!r} (known: 'dirichlet')"
+            )
+            continue
+        if goal_learned != (declared_goal == "dirichlet"):
+            problems.append(
+                f"p_substitution on {fname!r}: a learned goal parameter edge and "
+                "goal_uncertainty='dirichlet' must be declared together"
+            )
+            continue
+        if goal_learned and goal.name not in gfe_goal_dirichlet:
+            problems.append(
+                f"p_substitution on {fname!r}: learned goal {goal.name!r} must "
+                "face one proper Dirichlet prior"
             )
             continue
         ko, ki = (t.variables[f.edges[r]].cardinality for r in ("out", "in"))
@@ -849,7 +916,15 @@ def compile_template(
                 "parameter_uncertainty='dirichlet' and a proper count-array proposal"
             )
             continue
-        gfe_buckets.setdefault((ko, ki, learned, mu3), []).append((fname, goal.name))
+        if goal_learned and learned:
+            problems.append(
+                f"p_substitution on {fname!r}: simultaneous learned A and learned "
+                "goal c is not yet a registered composite; land each coordinate separately"
+            )
+            continue
+        gfe_buckets.setdefault(
+            (ko, ki, learned, mu3, goal_learned), []
+        ).append((fname, goal.name))
         consumed.update((fname, goal.name))
         gfe_x_edges.add(x_var)
     if problems:
@@ -860,10 +935,43 @@ def compile_template(
     # never stat sources (the composite owns its own update path).
     composite_keys: set[str] = set()
     mu3_groups: list[Mu3Plan] = []
-    for (ko, ki, learned, mu3), pairs in sorted(gfe_buckets.items()):
-        gname = f"gfe{'L' if learned else ''}{'M' if mu3 else ''}:{ko}x{ki}"
+    for (ko, ki, learned, mu3, goal_learned), pairs in sorted(gfe_buckets.items()):
+        gname = (
+            f"gfe{'L' if learned else ''}{'M' if mu3 else ''}"
+            f"{'C' if goal_learned else ''}:{ko}x{ki}"
+        )
         obs_names = tuple(o for o, _ in pairs)
         param_blobs = tuple(t.factors[o].param_blobs["matrix"] for o, _ in pairs)
+        goal_param_edges = (
+            tuple(t.factors[g].param_edges["statistic"] for _, g in pairs)
+            if goal_learned
+            else ()
+        )
+        goal_priors = (
+            tuple(gfe_goal_dirichlet[g][0] for _, g in pairs)
+            if goal_learned
+            else ()
+        )
+        goal_prior_blobs = (
+            tuple(
+                t.factors[prior].param_blobs["counts"]
+                for prior in goal_priors
+            )
+            if goal_learned
+            else ()
+        )
+        goal_tie_groups = (
+            tuple(
+                tuple(
+                    i
+                    for i, value in enumerate(goal_prior_blobs)
+                    if value == blob
+                )
+                for blob in sorted(set(goal_prior_blobs))
+            )
+            if goal_learned
+            else ()
+        )
         gfe_groups.append(
             GfePlan(
                 name=gname,
@@ -875,12 +983,37 @@ def compile_template(
                 learned=learned,
                 mu3=mu3,
                 param_blobs=param_blobs,
+                goal_learned=goal_learned,
+                goal_members=(
+                    tuple(goal for _, goal in pairs)
+                    if goal_learned
+                    else ()
+                ),
+                goal_param_edges=goal_param_edges,
+                goal_priors=goal_priors,
+                goal_prior_blobs=goal_prior_blobs,
+                goal_tie_groups=goal_tie_groups,
+                goal_prior_scatter=(
+                    np.array(
+                        [slot_of[(prior, "out")] for prior in goal_priors],
+                        dtype=np.int64,
+                    )
+                    if goal_learned
+                    else np.zeros(0, dtype=np.int64)
+                ),
+                goal_count_scatter=(
+                    np.array(
+                        [slot_of[(goal, "statistic")] for _, goal in pairs],
+                        dtype=np.int64,
+                    )
+                    if goal_learned
+                    else np.zeros(0, dtype=np.int64)
+                ),
             )
         )
         la, lc = [], []
         for obs_name, goal_name in pairs:
             a = resolved[next(iter(t.factors[obs_name].param_blobs.values()))]
-            c = resolved[t.factors[goal_name].param_blobs["statistic"]]
             _expect(obs_name, a, (ko, ki))
             if learned:
                 if not np.all(a > 0):
@@ -889,16 +1022,23 @@ def compile_template(
             else:
                 _stochastic(obs_name, a)
                 la.append(_log_of(a))
-            _expect(goal_name, c, (ko,))
-            _stochastic(goal_name, c[:, None])
-            lc.append(_log_of(c))
+            if goal_learned:
+                c_alpha0 = gfe_goal_dirichlet[goal_name][2]
+                _expect(goal_name, c_alpha0, (ko,))
+                lc.append(c_alpha0)
+            else:
+                c = resolved[t.factors[goal_name].param_blobs["statistic"]]
+                _expect(goal_name, c, (ko,))
+                _stochastic(goal_name, c[:, None])
+                lc.append(_log_of(c))
         a_key = f"{gname}:counts" if learned else f"{gname}:A"
+        c_key = f"{gname}:c_alpha0" if goal_learned else f"{gname}:c"
         log_params[a_key] = np.stack(la)
-        log_params[f"{gname}:c"] = np.stack(lc)
-        composite_keys.update((a_key, f"{gname}:c"))
+        log_params[c_key] = np.stack(lc)
+        composite_keys.update((a_key, c_key))
         for i, (obs_name, goal_name) in enumerate(pairs):
             member_of[obs_name] = (a_key, i)
-            member_of[goal_name] = (f"{gname}:c", i)
+            member_of[goal_name] = (c_key, i)
         if mu3:
             for blob in sorted(set(param_blobs)):
                 rows = np.array(

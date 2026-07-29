@@ -53,6 +53,8 @@ def build_rollout(
     gfe: bool = True,
     map_policy: bool = False,
     learned_a: bool = False,
+    learned_c: bool = False,
+    c_counts: np.ndarray | None = None,
     mu3: bool = False,
     epistemic_b: bool = False,
     learn: tuple[str, ...] = (),
@@ -60,13 +62,19 @@ def build_rollout(
     n_state, n_obs, n_ctrl = len(d), A.shape[0], len(e)
     if mu3 and (not gfe or not learned_a):
         raise ValueError("build_rollout: mu3 requires gfe=True and learned_a=True")
+    if learned_c and not gfe:
+        raise ValueError("build_rollout: learned_c requires gfe=True")
+    if learned_c and learned_a:
+        raise ValueError(
+            "build_rollout: simultaneous learned_c and learned_a is not yet supported"
+        )
     assert Bs.shape == (n_ctrl, n_state, n_state), f"Bs shape {Bs.shape}"
     assert A.shape == (n_obs, n_state) and c.shape == (n_obs,)
 
     t = Template(name=name)
     t.blobs = {
         blob: BlobRef(blob, f"{blob}.npy")
-        for blob in ("d", "A", "Ac", "c", "e", "Bs", "Bc")
+        for blob in ("d", "A", "Ac", "c", "Cc", "e", "Bs", "Bc")
     }
     t.variables["z0"] = VariableSpec("z0", n_state)
     t.factors["prior"] = FactorSpec(
@@ -133,15 +141,39 @@ def build_rollout(
             t.factors[f"e{k}"] = FactorSpec(
                 f"e{k}", "categorical", edges={"out": u}, param_blobs={"statistic": "e"}
             )
-            t.factors[f"goal{k}"] = FactorSpec(
-                f"goal{k}", "categorical", edges={"out": x}, param_blobs={"statistic": "c"}
-            )
+            if learned_c:
+                c_edge = f"cparam{k}"
+                t.variables[c_edge] = VariableSpec(c_edge, n_obs)
+                t.factors[f"goal{k}"] = FactorSpec(
+                    f"goal{k}",
+                    "categorical",
+                    edges={"out": x},
+                    param_edges={"statistic": c_edge},
+                )
+                t.factors[f"cprior{k}"] = FactorSpec(
+                    f"cprior{k}",
+                    "dirichlet",
+                    edges={"out": c_edge},
+                    param_blobs={"counts": "Cc"},
+                )
+                t.constraints.append(
+                    ConstraintSpec(ConstraintKind.MEAN_FIELD, f"goal{k}")
+                )
+            else:
+                t.factors[f"goal{k}"] = FactorSpec(
+                    f"goal{k}",
+                    "categorical",
+                    edges={"out": x},
+                    param_blobs={"statistic": "c"},
+                )
             if gfe:
                 detail = [("substituted_role", "out")]
                 if learned_a:
                     detail.append(("parameter_uncertainty", "dirichlet"))
                 if mu3:
                     detail.append(("parameter_message", "mu3_is_v1"))
+                if learned_c:
+                    detail.append(("goal_uncertainty", "dirichlet"))
                 t.constraints.append(
                     ConstraintSpec(ConstraintKind.P_SUBSTITUTION, f"obs{k}", tuple(sorted(detail)))
                 )
@@ -187,6 +219,7 @@ def build_rollout(
         "A": A,
         "Ac": np.ones_like(A),  # placeholder counts; swapped at runtime
         "c": c,
+        "Cc": np.asarray(c if c_counts is None else c_counts),
         "e": e,
         "Bs": Bs,
         "Bc": np.ones_like(Bs),  # placeholder counts; swapped at runtime

@@ -49,6 +49,8 @@ def build_gridworld(
     start: int = 0,
     gfe: bool = True,
     learned_a: bool = False,
+    learned_c: bool = False,
+    c_counts: np.ndarray | None = None,
     learn: tuple[str, ...] = (),
 ) -> tuple[Template, dict[str, np.ndarray]]:
     d = np.full(k, 1e-3)
@@ -65,6 +67,8 @@ def build_gridworld(
         Bs=transition_stack(k),
         gfe=gfe,
         learned_a=learned_a,
+        learned_c=learned_c,
+        c_counts=c_counts,
         learn=learn,
     )
 

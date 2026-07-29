@@ -47,6 +47,7 @@ EPIC_FILES = {
         "test_dirichlet_param_edges.py",
         "test_mu3_derivation.py",
         "test_mu3.py",
+        "test_goal_hyperprior.py",
     ],
     "M4 · Epistemic behavior": [
         "test_tmaze.py",

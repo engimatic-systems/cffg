@@ -164,9 +164,17 @@ def _arena_signature(arena: Arena) -> str:
     for g in arena.gfe_groups:
         h.update(
             f"gfe|{g.name}|{len(g.members)}|{g.learned}|{g.mu3}|"
-            f"{g.param_blobs}".encode()
+            f"{g.param_blobs}|{g.goal_learned}|{g.goal_members}|"
+            f"{g.goal_param_edges}|"
+            f"{g.goal_prior_blobs}|{g.goal_tie_groups}".encode()
         )
-        for rows in (g.gather_z, g.scatter_z, g.scatter_x):
+        for rows in (
+            g.gather_z,
+            g.scatter_z,
+            g.scatter_x,
+            g.goal_prior_scatter,
+            g.goal_count_scatter,
+        ):
             h.update(np.ascontiguousarray(rows).tobytes())
     for plan in arena.mu3_groups:
         h.update(

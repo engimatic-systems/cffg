@@ -322,8 +322,12 @@ that unsupported grounding shape until recursive/index-table expansion in cff-6s
 
 **S8. Goal-specification ergonomics.** Goals are prior distributions over future
 observations; translating task intent into calibrated `c` vectors (the softmax
-utility dance) is modeler burden today. Goal hyperpriors (learned goals, Part II
-§7.2) and a small goal-DSL would soften it.
+utility dance) remains modeler burden. Goal hyperpriors now learn a Dirichlet
+preference from explicitly rolled future predictive mass, but they do not
+translate natural-language/task rewards into an initial prior; a small goal
+DSL would still soften that boundary. Learned `c` and learned `A` coordinates
+are currently compiled separately rather than as one jointly uncertain
+composite.
 
 ## The one-paragraph honest summary
 

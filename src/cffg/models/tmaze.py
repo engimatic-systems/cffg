@@ -71,6 +71,8 @@ def build_tmaze(
     gfe: bool = True,
     map_policy: bool = False,
     learned_a: bool = False,
+    learned_c: bool = False,
+    c_counts: np.ndarray | None = None,
     learn: tuple[str, ...] = (),
 ) -> tuple[Template, dict[str, np.ndarray]]:
     """Policy-inference CFFG over `steps` timesteps, plus its arrays.
@@ -89,5 +91,7 @@ def build_tmaze(
         gfe=gfe,
         map_policy=map_policy,
         learned_a=learned_a,
+        learned_c=learned_c,
+        c_counts=c_counts,
         learn=learn,
     )

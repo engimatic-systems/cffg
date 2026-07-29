@@ -1074,3 +1074,89 @@ the binary oracle must remain finite.
 *Executable:* `test_mu3_importance_sampling_matches_binary_quadrature`,
 `test_mu3_replays_from_explicit_key_and_combines_slices`,
 `test_mu3_hostile_support_weight_collapse_float32_and_scale`.
+
+## D6c — The conjugate `mu1(c)` learned-goal message (cff-gjjk)
+
+### D6c.1 The plain-English version
+
+A fixed goal vector says which future observations are desirable. A learned
+goal instead carries a proper Dirichlet belief over that vector. One future
+GFE composite predicts observation mass `n=Abar zbar`; that mass is one soft
+categorical count, so its message to the goal is an ordinary Dirichlet
+message. Composites sharing the same serialized goal prior add their soft
+counts before forming one posterior.
+
+Inference sweeps refine that one trial's prediction. They do not represent
+new trials: every sweep replaces `n`, while the incoming `alpha0` remains
+fixed. Only an explicit completed-trial boundary may carry the converged
+posterior forward as the next prior.
+
+### D6c.2 Message, state coordinate, and shared goals
+
+For future slice `t`, let
+
+    n_t := Abar_t zbar_t,                 Σ_x n_t,x = 1.
+
+Then Part II Fig. 5/App. C.3 gives
+
+    log mu1,t(c) = n_t^T log c + const,
+    mu1,t(c) proportional to Dir(c | n_t + 1).                (D6c.1)
+
+The `+1` describes the message distribution itself. Multiplication by the
+proper prior `q0(c)=Dir(alpha0)` adds natural parameters, so for every slice
+sharing that goal prior,
+
+    n := Σ_t n_t,             q(c)=Dir(alpha),  alpha=alpha0+n. (D6c.2)
+
+There is no additional `+1` in `alpha`. The GFE state coordinate consumes
+
+    ell := E_q[log c] = digamma(alpha)-digamma(Σ_x alpha_x),
+    rho_t = Abar_t^T[ell-log(Abar_t zbar_t)]-hbar_t.           (D6c.3)
+
+It is `E[log c]`, not `log E[c]`. In the serialized graph, each categorical
+goal connects its `statistic` role through a parameter edge to a Dirichlet
+prior, carries an explicit mean-field bead, and its facing P-substitution
+declares `goal_uncertainty=dirichlet`. Reusing one prior blob ties the
+composites: the compiler groups their count messages and writes `n` back to
+every derived carrier edge. The template and prior blob are source truth;
+posterior messages are runtime state.
+
+### D6c.3 Complete ledger and rollover boundary
+
+The goal-specific complete contribution is
+
+    KL[Dir(alpha)||Dir(alpha0)] - n^T ell.                    (D6c.4)
+
+Combining likelihood, prior, posterior entropy, and parameter-edge correction
+before evaluation gives the stable form
+
+    log B(alpha0)-log B(alpha)
+      +(alpha-alpha0-n)^T ell.                                (D6c.5)
+
+At the coordinate update (D6c.2), the expected-log coefficient is exactly
+zero. This is the same cancellation as D6a and is essential for sparse
+float32 priors. The remaining per-slice GFE terms—predictive entropy,
+`hbar(A)`, state entropy, and ordinary state-factor/edge terms—remain in the
+structural ledger; `-n_t^T ell` must not be counted a second time.
+
+`Engine.goal_prior_updates` reads the converged posterior keyed by serialized
+prior blob. `Engine.with_goal_priors` accepts it only on a fresh state, making
+the trial boundary explicit and refusing within-trial accumulation.
+`RollingAgent` stages the latest converged planning posterior and rolls it
+once in `reset_episode`; checkpoints preserve both current and staged values.
+
+This implements the generic unobserved Fig. 5 message. The particular Part II
+section 7.2 reference experiment instead rolls the final *observed* outcome
+message at trial completion. CFFG does not silently equate those protocols:
+observed categorical learning remains the ordinary D6a path, while predicted
+goal rollover is this explicit API.
+
+Exact-zero predicted mass contributes exactly zero count. Proper positive
+`alpha0` keeps the coordinate proper; missing/improper priors are compile
+errors. No absolute probability floor is introduced, and float32 plus
+observation cardinality tens of times larger than the tiny oracle must remain
+finite.
+
+*Executable:* `test_mu1_shared_goal_posterior_and_complete_fe_match_direct_algebra`,
+`test_sweeps_replace_mu1_and_explicit_rollover_adds_one_new_trial`,
+`test_float32_sparse_zero_mass_and_uncomfortable_observation_scale`.

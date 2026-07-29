@@ -243,6 +243,25 @@ ratio from D6a; a literal decomposition remains tested on small models. This
 conjugate path is the proper base posterior for `mu3(A)`, not a representation
 of `mu3` itself.
 
+### 2g. Learned goal parameter edges (cff-gjjk)
+
+A P-substituted goal-observation composite may replace its fixed categorical
+goal blob with a `statistic` parameter edge facing a proper Dirichlet prior.
+The mean-field bead on the goal and
+`goal_uncertainty=dirichlet` on the P-substitution make that coordinate
+explicit in serialized structure. `GfePlan` owns the parameter update because
+the categorical goal node and substituted observation edge are absorbed into
+one composite; it is not also compiled as an ordinary `DirichletGroupPlan`.
+
+Each future member emits `n_t=Abar_t zbar_t`. Members whose priors read the
+same blob form one tie group and use `alpha=alpha0+sum_t n_t`; their state
+message consumes `E[log c]`. The complete stable ledger adds the shared
+Dirichlet beta-function ratio once, not once per member. Runtime rollover is
+explicit: `goal_prior_updates` reads a converged trial, and
+`with_goal_priors` accepts it only on a fresh state. `RollingAgent` stages
+planning output and commits it once at `reset_episode`, with current/pending
+hyperparameters checkpointed separately.
+
 ### 3. Message rule library (`cffg.rules`)
 
 A registry keyed by `(factor_type, constraint_config, out_edge_role)`:
@@ -250,7 +269,8 @@ A registry keyed by `(factor_type, constraint_config, out_edge_role)`:
 - **Standard rules**: sum-product (BP) and VMP for `Cat`, `Dir`, `TransitionMixture`
   (the TM node from Part I Appendix C), equality nodes, δ.
 - **GFE rules** for the P-substituted goal-observation composite (Part II Fig. 5):
-  Dirichlet message to goal statistics, softmax/Newton backward state message
+  conjugate Dirichlet message to learned goal statistics,
+  softmax/Newton backward state message
   (Corollary 1 form, with a gauge-projected globalized Newton solve), and the
   optional importance-sampled functional log-message to A. The serialized
   `parameter_message=mu3_is_v1` constraint compiles to evaluator identity
