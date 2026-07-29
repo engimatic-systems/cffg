@@ -18,6 +18,9 @@ uv run python tools/dashboard.py --run-suite  # one final full pass + dashboard
 Run focused tests as often as useful while changing code. One passing full
 suite after the final code change is sufficient to open or update a PR; the
 dashboard command above runs pytest exactly once and renders that result.
+Before starting or waiting on the full pass, inspect
+`tools/test-suite-runtimes.json`: it records recent measured wall times and a
+conservative `suggested_wait_seconds`.
 Ticket- and documentation-only changes use their relevant validation instead
 of the full suite.
 

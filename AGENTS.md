@@ -74,10 +74,14 @@ This project will span many context windows. The rule that makes that survivable
   changed component.
 - **Final validation for a code change** requires one passing full-suite run
   after the final code change. One passing suite at the proposed PR head is
-  sufficient to open or update a PR. Run
+  sufficient to open or update a PR. Before launching or waiting on it, inspect
+  `tools/test-suite-runtimes.json`; its `latest.wall_seconds` is the
+  most recent measured wall time and `suggested_wait_seconds` includes
+  headroom from recent runs. Run
   `uv run python tools/dashboard.py --run-suite` to execute pytest exactly once
-  and refresh `~/agent-share/cffg-tests.html` (add new test files to
-  `EPIC_FILES`). If the full suite was run directly, preserve and reuse its
+  and refresh both that runtime history and `~/agent-share/cffg-tests.html`
+  (add new test files to `EPIC_FILES`). If the full suite was run directly,
+  preserve and reuse its
   result: `uv run pytest -q --junitxml=/tmp/cffg-tests.xml`, then
   `uv run python tools/dashboard.py --junitxml /tmp/cffg-tests.xml`. Opening a
   PR, requesting review, or refreshing the dashboard never calls for a second

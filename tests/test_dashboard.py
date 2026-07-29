@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -123,6 +124,7 @@ def test_load_junit_rejects_partial_and_stale_reports(dashboard, tmp_path):
 def configure_publish(dashboard, monkeypatch, tmp_path, expected_files):
     monkeypatch.setattr(dashboard, "OUT", tmp_path / "cffg-tests.html")
     monkeypatch.setattr(dashboard, "STATE", tmp_path / "state.json")
+    monkeypatch.setattr(dashboard, "RUNTIMES", tmp_path / "runtimes.json")
     monkeypatch.setattr(dashboard, "ARTIFACTS", tmp_path / "artifacts")
     monkeypatch.setattr(dashboard, "GALLERY", tmp_path / "gallery")
     monkeypatch.setattr(dashboard, "git_head", lambda: "abc123")
@@ -159,12 +161,49 @@ def test_run_suite_mode_runs_once_and_removes_its_temporary_report(
 
     def run_once():
         calls.append(True)
-        return report, 0
+        return report, 0, 123.25
 
     monkeypatch.setattr(dashboard, "run_suite", run_once)
     dashboard.main(["--run-suite"])
     assert calls == [True]
     assert not report.exists()
+    timing = dashboard.RUNTIMES.read_text()
+    assert '"wall_seconds": 123.25' in timing
+    assert '"suggested_wait_seconds": 180' in timing
+
+
+def test_runtime_history_is_bounded_and_reuse_does_not_overwrite_it(
+    dashboard, monkeypatch, tmp_path
+):
+    report = valid_report(tmp_path)
+    expected = {"test_alpha.py", "test_beta.py"}
+    configure_publish(dashboard, monkeypatch, tmp_path, expected)
+    dashboard.RUNTIMES.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "recent": [
+                    {
+                        "wall_seconds": float(index + 1),
+                        "result": "passed",
+                    }
+                    for index in range(dashboard.RUNTIME_HISTORY_LIMIT)
+                ],
+            }
+        )
+    )
+    tests = dashboard.load_junit(report)
+    state = dashboard.record_suite_runtime(
+        tests, wall_seconds=100.0, pytest_code=1
+    )
+    assert len(state["recent"]) == dashboard.RUNTIME_HISTORY_LIMIT
+    assert state["recent"][0]["wall_seconds"] == 2.0
+    assert state["latest"]["result"] == "failed"
+    assert state["latest"]["case_seconds"] == 0.375
+    before = dashboard.RUNTIMES.read_text()
+
+    dashboard.main(["--junitxml", str(report)])
+    assert dashboard.RUNTIMES.read_text() == before
 
 
 def test_failing_reused_report_renders_red_and_exits_nonzero(

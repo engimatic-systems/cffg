@@ -1,0 +1,26 @@
+{
+  "latest": {
+    "case_seconds": 351.708,
+    "commit": "e6c62a4",
+    "completed_at": "2026-07-29T18:09:35.067635+00:00",
+    "failed": 0,
+    "pytest_exit_code": 0,
+    "result": "passed",
+    "test_count": 1281,
+    "wall_seconds": 360.168
+  },
+  "recent": [
+    {
+      "case_seconds": 351.708,
+      "commit": "e6c62a4",
+      "completed_at": "2026-07-29T18:09:35.067635+00:00",
+      "failed": 0,
+      "pytest_exit_code": 0,
+      "result": "passed",
+      "test_count": 1281,
+      "wall_seconds": 360.168
+    }
+  ],
+  "schema_version": 1,
+  "suggested_wait_seconds": 480
+}
