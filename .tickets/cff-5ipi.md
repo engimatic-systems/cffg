@@ -1,6 +1,6 @@
 ---
 id: cff-5ipi
-status: open
+status: closed
 deps: [cff-b47g]
 links: []
 created: 2026-07-28T04:19:49Z
@@ -27,3 +27,9 @@ State exactly which declared transition learnable each novelty weight follows an
 ## Acceptance Criteria
 
 Before any replacement result exists, cff-2gev contains one clearly marked live protocol naming exact builder configuration and learned blocks; lambda/count equations and drop-back mask; prior and tuning rationale; observability sweep; arms, seeds, episodes and windows; independent KL and task-return metrics; timing comparison; convergence/status requirements; and pass/fail/ambiguous outcome language. Every choice is fixed or explicitly derived from builder structure. The ticket makes no implementation change and records no experiment result.
+
+## Notes
+
+**2026-07-29T18:45:11Z**
+
+Installed the LIVE, unrun cff-5ipi/v1 protocol in cff-2gev. It fixes the 8x2 factored corridor, position_transition-only uncertainty, count/weight equations, goal-policy active mask, observability interventions, paired arms/seeds/windows, independent task/KL metrics, timing isolation, hostile-input checks, invalidation rules, and locked outcome labels before any replacement result. No implementation or experiment was run. Next: cff-2gev implements this protocol without changing its locked choices. Validation: git diff --check and tk dep cycle pass; full pytest is not required for ticket-only work.
