@@ -392,6 +392,44 @@ blocks use one joint binding or explicit mean-field bindings. Multi-boundary
 checkpoints store every belief by its binding name. The legacy `belief` key and
 `RollingAgent.belief` view remain exact only for a one-block model.
 
+#### 3d. Factored rollout lowering (`cffg.models.factored`, cff-b47g)
+
+`build_factored_rollout` is a topology-generic front end over the existing IR,
+not a new graph vocabulary. `StateBlockSpec` declares each categorical prior,
+transition table, selector coupling, and optional initial/transition
+learnable. `CouplingSpec` declares an ordered Cartesian product of block
+names; `ObservationSpec` reads one block or one such product. Product
+coordinates follow NumPy/C order, with the rightmost declared component
+fastest. A product-selected transition's public tensor shape is
+`[P₁,...,Pₙ,U,K′,K]`; its stored derived blob flattens only
+`[P₁,...,Pₙ,U]` into the ordinary selector axis.
+
+Lowering uses no `FactorType` or compiler special case:
+
+1. each binary product is a deterministic, exact-zero
+   `transition_mixture` implementing `out = left * K_right + right`;
+2. products of more components form a left-deep chain of those nodes; and
+3. every logical net with more than two endpoints becomes the minimum
+   left-deep chain of ternary equality factors, keeping every materialized
+   FFG edge at degree two.
+
+One blob per block is shared by every time member, so blob identity provides
+parameter tying and `LearnableSpec.sources` names only past/data-bearing
+members. A filter statistic can therefore update the posterior once and the
+next planning window writes that update to every tied slice without manual
+accumulation.
+
+The complete host Template, never a fragment or plate, owns `AgentSpec`.
+Several block marginals are an explicit mean-field rolling boundary. Each
+binding cites a neutral boundary marker: a normalized `matrix_cat` of shape
+`[1,K]` facing a singleton categorical. That two-node branch integrates to
+one, contributes zero net FE, and changes no marginal; its degenerate VMP bead
+is the concrete Template anchor for the serialized boundary projection. It
+does not factorize extra within-window beliefs. At rollover, the runtime
+therefore carries the declared product of block marginals rather than silently
+discarding a joint correlation. Exact joint rollover remains the separate
+`BoundaryFactorization.JOINT` representation from §3c.
+
 ### 4. Inference VM (`cffg.infer`)
 
 - Schedules (cff-d56d, `cffg.schedule`): the engine builds a schedule from

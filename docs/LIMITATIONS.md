@@ -38,6 +38,15 @@ hand-built (or externally learned) discretization/featurization front-end. This 
 tabular RL's scaling wall, inherited intact. Neural hybrid nodes (S5) can push it
 back but change the free-energy semantics at the boundary.
 
+The factored rollout builder reduces a transition from a flat
+`U(K₁⋯Kₙ)²` table to the sum of its declared block-conditionals, but does not
+make Cartesian products free. A declared coupling still creates a categorical
+product edge and deterministic selector tables proportional to that product;
+a joint sensor still stores `|X|×(K₁⋯Kₙ)`. Separate block rollover is an
+explicit mean-field family and therefore cannot preserve posterior
+correlations between blocks. Use a joint `BeliefBinding` when those
+correlations are load-bearing, accepting its product-size boundary belief.
+
 **H5. Planning is finite-horizon inference; policies are factorized.** LAIF's win
 is linear-in-T policy inference, but T must be chosen, and a receding horizon is
 myopic beyond it: payoffs more than T steps out exert zero pull. Further, the

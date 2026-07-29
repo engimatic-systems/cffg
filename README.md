@@ -67,7 +67,50 @@ template, arrays = build_rollout(
 ```
 
 `cffg.models.tmaze` and `cffg.models.gridworld` are two worked instances of
-this. For custom topologies, build the `Template` by hand (see
+this. When a joint state would make every controlled transition quadratic in
+the full Cartesian cardinality, declare named blocks and only the products
+the model actually uses:
+
+```python
+from cffg.models import (
+    CouplingSpec, ObservationSpec, StateBlockSpec, build_factored_rollout,
+)
+
+template, arrays = build_factored_rollout(
+    "position-and-mode",
+    steps=3,
+    blocks=(
+        StateBlockSpec(
+            "position", d_position, B_position_by_mode_and_action,
+            selector="mode_parent",
+            transition_learnable="position_transition",
+        ),  # B shape [K_mode, U, K_pos, K_pos]
+        StateBlockSpec(
+            "mode", d_mode, B_mode,
+            transition_learnable="mode_transition",
+        ),  # B shape [U, K_mode, K_mode]
+    ),
+    couplings=(
+        CouplingSpec("mode_parent", ("mode",)),
+        CouplingSpec("joint_sensor", ("position", "mode")),
+    ),
+    actions=e,
+    observation=ObservationSpec(
+        "sensor", "joint_sensor", A_joint, c,
+    ),
+)
+```
+
+Component order is explicit and uses NumPy/C flattening (rightmost component
+fastest). The builder serializes one mean-field `BeliefBinding` per block,
+ties each declared parameter blob across time, and lowers products/fan-out to
+existing deterministic `transition_mixture`/equality nodes. It does not add a
+flat joint transition table. `build_factored_corridor` is the ready-made
+position × mode example; pass `observation_matrix=` and
+`observation_source="position" | "mode" | "state"` for identifying or
+aliased sensors.
+
+For other custom topologies, build the `Template` by hand (see
 `tests/conftest.py` for a hand-built HMM slice) and grow big models from
 small ones:
 
