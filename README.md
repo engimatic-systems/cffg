@@ -33,6 +33,7 @@ plus **constraint beads** that pick the variational objective, plus typed
 | `FactorSpec` | a distribution node: `categorical`, `matrix_cat`, `transition_mixture`, `equality`, `dirichlet` |
 | `ConstraintSpec` | a bead: `P_SUBSTITUTION` (adds the epistemic/GFE drive), `DELTA` (MAP readout), `MEAN_FIELD` (VMP) |
 | `PortSpec` | a dangling edge with a role: `data` (sensor), `goal`, `prior`, `glue` (composition) |
+| `AgentSpec` | serialized action, sensor, actuator, and rolling-boundary bindings for `RollingAgent` |
 
 The load-bearing invariant: every variable is either fully connected or
 exposed through exactly one port — so "no dangling edges" and "models
@@ -223,7 +224,15 @@ agent.checkpoint("agent.npz"); agent.restore("agent.npz")
 ```
 
 Two compiled engines cover any episode length: a planning window from the
-current belief and a one-slice filter that re-anchors it. Pass
+current beliefs and a one-slice filter that re-anchors them. `build_rollout`
+serializes the action readout, DATA ports, prior target, posterior readout, and
+episode learnable in `template.agent`; custom builders must declare the same
+interface with their own model-local names. A one-block model retains the
+`agent.belief` array. Multi-block models use `agent.beliefs[name]`, and their
+joint versus mean-field rollover is explicit in each `BeliefBinding` rather
+than inferred by the runtime.
+
+Pass
 `learn_a=True, initial_counts=...` for continual Dirichlet learning of the
 observation model (see `cffg/experiments/tmaze_learning.py` for the full
 perception–action–learning cycle reproducing Part II Fig. 9).

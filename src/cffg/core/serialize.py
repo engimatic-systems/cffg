@@ -16,7 +16,10 @@ from pathlib import Path
 from typing import Any
 
 from cffg.core.ir import (
+    AgentSpec,
+    BeliefBinding,
     BlobRef,
+    BoundaryFactorization,
     Broadcast,
     Chain,
     ConstraintKind,
@@ -131,6 +134,42 @@ def to_dict(t: Template) -> dict[str, Any]:
             for name in sorted(t.learnables)
             for ln in [t.learnables[name]]
         }
+    # Additive (cff-nhxf): the serialized model/runtime interface. These are
+    # structural names and variational-family declarations, so changing any
+    # binding changes the structure hash.
+    if t.agent is not None:
+        belief_names = [belief.name for belief in t.agent.beliefs]
+        if len(set(belief_names)) != len(belief_names):
+            raise ValueError(
+                f"agent has duplicate belief names {sorted(belief_names)!r}"
+            )
+        agent: dict[str, Any] = {
+            "action": t.agent.action,
+            "beliefs": {
+                belief.name: {
+                    "blocks": list(belief.blocks),
+                    "prior": belief.prior,
+                    "posterior": belief.posterior,
+                    "factorization": belief.factorization.value,
+                    **(
+                        {"constraints": list(belief.constraints)}
+                        if belief.constraints
+                        else {}
+                    ),
+                    **(
+                        {"episode_learnable": belief.episode_learnable}
+                        if belief.episode_learnable is not None
+                        else {}
+                    ),
+                }
+                for belief in sorted(t.agent.beliefs, key=lambda b: b.name)
+            },
+        }
+        if t.agent.action_port is not None:
+            agent["action_port"] = t.agent.action_port
+        if t.agent.observation_port is not None:
+            agent["observation_port"] = t.agent.observation_port
+        d["agent"] = agent
     # Additive: record (impl, version) for factor types backed by *external*
     # FactorKernels (cff-ri8m), so loading without them fails loudly and
     # names what to install. Built-in (cffg.) kernels ship with the package
@@ -197,6 +236,27 @@ def from_dict(d: dict[str, Any]) -> Template:
             )
             for name, spec in d.get("learnables", {}).items()
         },
+        agent=(
+            AgentSpec(
+                action=d["agent"]["action"],
+                beliefs=tuple(
+                    BeliefBinding(
+                        name=name,
+                        blocks=tuple(spec["blocks"]),
+                        prior=spec["prior"],
+                        posterior=spec["posterior"],
+                        factorization=BoundaryFactorization(spec["factorization"]),
+                        constraints=tuple(spec.get("constraints", ())),
+                        episode_learnable=spec.get("episode_learnable"),
+                    )
+                    for name, spec in sorted(d["agent"]["beliefs"].items())
+                ),
+                action_port=d["agent"].get("action_port"),
+                observation_port=d["agent"].get("observation_port"),
+            )
+            if "agent" in d
+            else None
+        ),
         schema_version=d["schema_version"],
     )
 

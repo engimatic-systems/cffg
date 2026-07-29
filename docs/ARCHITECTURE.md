@@ -64,6 +64,13 @@ A pure-Python (dataclass) representation, independent of JAX:
   is valid iff every port is terminated by data, a prior/goal, or a glue bond.
   This is the single mechanism behind unrolling, rollouts, "no dangling edges,"
   and composing templates — one invariant instead of four features.
+- **Serialized agent bindings (cff-nhxf).** A complete rolling model may carry
+  one `AgentSpec`: the planning action readout, perception action/observation
+  DATA ports, and one or more persistent `BeliefBinding`s. Each belief names
+  its stable state blocks, categorical prior factor, filtering posterior
+  variable, boundary factorization, and optional episode-scale learnable.
+  These names are model structure, round-trip through JSON/`.cffgz`, and
+  participate in the structure hash; the compiled arena remains derived.
 - **Serialization**: versioned JSON (or msgpack) schema for structure and
   constraints; all array data (A matrices, Dirichlet counts, goal statistics)
   referenced as relative file paths to `safetensors`/`.npz` blobs. Content hash
@@ -356,10 +363,34 @@ them. Four rules define the contract:
    integrates against a factorized measure. Rollover always writes
    E[log θ], the mean-field-consistent point (Part II §5), never log E[θ].
 
-Cadence is deliberately not part of the contract. A transition posterior
-updates every tick and an initial-state prior once per episode; that is a
-modeling choice, so `accumulate` takes the graph, the state, and an optional
-name filter, and the caller decides when.
+Cadence is deliberately not part of `LearnableSpec`: `accumulate` takes the
+graph, state, and optional name filter. The model/runtime interface does
+declare which boundary learnable is episode-scale, however, because that
+choice determines rollover semantics rather than only update frequency.
+
+#### 3c. Rolling boundary contract (`AgentSpec`, cff-nhxf)
+
+`RollingAgent` consumes only the serialized interface; graph-local conventions
+such as `prior`, `u1`, `act1`, `obs1`, `zm1`, `d`, and `e` have no runtime
+meaning. Planning and perception templates may use different local names as
+long as their bindings agree on logical belief names, state blocks, domains,
+factorization, and episode learnables. Core validation resolves every named
+variable, factor, port, constraint, blob owner, and learnable before
+compilation. Cross-window validation then checks action and rollover domains.
+
+A `BeliefBinding` carries either:
+
+- one categorical joint over all of its named blocks, preserving correlations
+  through filtering, checkpointing, and next-window prior injection; or
+- one marginal under `factorization=mean_field`, with the binding naming the
+  actual `MEAN_FIELD` node constraints in that Template.
+
+This makes boundary approximation part of the CFFG variational family. A
+runtime cannot silently replace a correlated `q(z₁,…,zₙ)` by a product of
+marginals. Independent blocks may remain separate joint bindings; coupled
+blocks use one joint binding or explicit mean-field bindings. Multi-boundary
+checkpoints store every belief by its binding name. The legacy `belief` key and
+`RollingAgent.belief` view remain exact only for a one-block model.
 
 ### 4. Inference VM (`cffg.infer`)
 
@@ -441,21 +472,22 @@ name filter, and the caller decides when.
 ### 5. Agent runtime (`cffg.agent`)
 
 - **Receding-horizon loop**: at each tick, bind new observation (future edge's
-  constraint flips from goal to data δ), glue one new slice at the horizon,
-  re-infer, read the control marginal (or its MAP under a δ-constraint), emit
-  action. This directly fixes the hard-horizon problem the papers flag with the
-  original GFE formulation.
+  constraint flips from goal to data δ), re-anchor each declared planning
+  prior on its latest filtering posterior, re-infer, and read the declared
+  control marginal (or its MAP under a δ-constraint). Two compiled windows
+  cover an unbounded episode without graph growth or recompilation.
 - **Continual learning**: driven entirely by declared learnables (§3b). The
-  agent contributes cadence, not addressing — observation, transition and
-  habit posteriors update every tick from the perception graph's node
-  beliefs, and the initial-state prior accumulates the first tick's smoothed
-  `q(z0)` once per episode, re-anchoring the belief at `reset_episode()`.
+  agent contributes cadence, while `AgentSpec` supplies all addressing.
+  Observation, transition and habit posteriors update every tick from the
+  perception graph's node beliefs. Each boundary's optional episode learnable
+  accumulates on the first tick and re-anchors that boundary at
+  `reset_episode()`.
   `act()` is read-only: planning an action is not evidence that it was taken.
   `learn_a` / `learn_b` remain as the older spelling of `learn=("A",)` /
   `learn=("B",)`. Checkpoints carry every learnable's hyperparameters, the
-  belief, and the episode cadence, so a resumed agent does not re-fire the
-  episode-start statistic; legacy `counts` / `b_counts` keys are migrated onto
-  their learnables or refused, never silently dropped.
+  named beliefs and episode cadence, so a resumed agent does not re-fire the
+  episode-start statistic. Legacy single `belief` and `counts` / `b_counts`
+  keys are restored/migrated exactly or refused, never silently dropped.
 - Sensor/actuator adapters are plain Python callbacks mapping env observations to
   one-hot data bindings and control marginals to env actions.
 

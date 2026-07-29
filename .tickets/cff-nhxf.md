@@ -1,6 +1,6 @@
 ---
 id: cff-nhxf
-status: open
+status: closed
 deps: [cff-x0sv]
 links: []
 created: 2026-07-28T04:19:16Z
@@ -38,3 +38,9 @@ and makes every approximation explicit.
 ## Acceptance Criteria
 
 Template AgentSpec round-trips through JSON/.cffgz and affects structure_hash. build_rollout declares bindings with no behavioral or checkpoint regression. RollingAgent contains no literal lookups for prior/u1/act1/obs1/zm1 or arrays d/e; action cardinality, binding, prior injection, posterior readout, and episode reset come from AgentSpec. A two-block synthetic model plans, observes, updates both beliefs and declared learnables, resets episode priors, and checkpoint/restores exactly; single-block belief/counts/b_counts compatibility remains. A correlated two-block fixture pins rollover semantics: a joint boundary stays joint, while separate boundary marginals require and preserve the Template's explicit mean-field constraint. Missing or inconsistent bindings fail validation with model-local errors. Exact-zero and float32 cases pass; no new factor type, compiler dispatch, or inference math.
+
+## Notes
+
+**2026-07-29T03:42:01Z**
+
+Implemented serialized AgentSpec/BeliefBinding structure with joint versus explicit mean-field rollover, canonical JSON/.cffgz/hash support, validation, composition/plate handling, and build_rollout declarations. RollingAgent now resolves action, DATA ports, all boundary priors/posteriors, action cardinality, and episode learnables exclusively from AgentSpec; named multi-block beliefs, exact checkpoints (including RNG), and the one-block belief/counts/b_counts compatibility path pass. Acceptance coverage includes a renamed two-block model, both episode learnables, correlated joint rollover, missing/irrelevant mean-field constraints, exact-zero float32, and a factored 32x4 boundary. Final proposed-head dashboard suite: 1275 passed, 0 failed, 5 new; focused affected suite 87 passed; git diff --check, compileall, and tk dep cycle passed. Next ready M3-path ticket after this lands is cff-b47g; its builder must put AgentSpec on the complete host Template (not a plate fragment) and make every separate coupled boundary cite a mean-field constraint that touches its posterior.

@@ -17,6 +17,8 @@ from __future__ import annotations
 import numpy as np
 
 from cffg.core.ir import (
+    AgentSpec,
+    BeliefBinding,
     BlobRef,
     ConstraintKind,
     ConstraintSpec,
@@ -59,6 +61,8 @@ def build_rollout(
     epistemic_b: bool = False,
     learn: tuple[str, ...] = (),
 ) -> tuple[Template, dict[str, np.ndarray]]:
+    if steps < 1:
+        raise ValueError("build_rollout: steps must be >= 1")
     n_state, n_obs, n_ctrl = len(d), A.shape[0], len(e)
     if mu3 and (not gfe or not learned_a):
         raise ValueError("build_rollout: mu3 requires gfe=True and learned_a=True")
@@ -213,6 +217,24 @@ def build_rollout(
             tuple(f"e{k}" for k in range(1, past + 1)) if lname == "e" else None
         )
         t.learnables[lname] = LearnableSpec(lname, "dirichlet", blobs, sources)
+
+    # Serialized runtime bindings (cff-nhxf). The action, DATA ports, rolling
+    # prior, posterior readout and episode-reset learnable are model structure;
+    # RollingAgent never relies on this builder's local naming convention.
+    t.agent = AgentSpec(
+        action="u1",
+        action_port="act1" if past else None,
+        observation_port="obs1" if past else None,
+        beliefs=(
+            BeliefBinding(
+                name="state",
+                blocks=("state",),
+                prior="prior",
+                posterior="zm1",
+                episode_learnable="d" if "d" in t.learnables else None,
+            ),
+        ),
+    )
 
     arrays = {
         "d": d,
