@@ -15,6 +15,8 @@ from __future__ import annotations
 import dataclasses
 
 from cffg.core.ir import (
+    AgentSpec,
+    BeliefBinding,
     BlobRef,
     ConstraintSpec,
     FactorSpec,
@@ -68,6 +70,39 @@ def scoped(template: Template, prefix: str) -> Template:
             )
             for ln in template.learnables.values()
         },
+        agent=(
+            AgentSpec(
+                action=s(template.agent.action),
+                action_port=(
+                    s(template.agent.action_port)
+                    if template.agent.action_port is not None
+                    else None
+                ),
+                observation_port=(
+                    s(template.agent.observation_port)
+                    if template.agent.observation_port is not None
+                    else None
+                ),
+                beliefs=tuple(
+                    BeliefBinding(
+                        name=s(belief.name),
+                        blocks=tuple(s(block) for block in belief.blocks),
+                        prior=s(belief.prior),
+                        posterior=s(belief.posterior),
+                        factorization=belief.factorization,
+                        constraints=tuple(s(c) for c in belief.constraints),
+                        episode_learnable=(
+                            s(belief.episode_learnable)
+                            if belief.episode_learnable is not None
+                            else None
+                        ),
+                    )
+                    for belief in template.agent.beliefs
+                ),
+            )
+            if template.agent is not None
+            else None
+        ),
         schema_version=template.schema_version,
     )
 
@@ -78,6 +113,11 @@ def merge(a: Template, b: Template, name: str) -> Template:
         clash = set(getattr(a, kind)) & set(getattr(b, kind))
         if clash:
             raise ComposeError(f"{kind} name clash: {sorted(clash)} (scope the operands)")
+    if a.agent is not None and b.agent is not None:
+        raise ComposeError(
+            "cannot merge two AgentSpec declarations; compose one complete "
+            "agent model with fragments that do not declare a runtime interface"
+        )
     return Template(
         name=name,
         variables={**a.variables, **b.variables},
@@ -86,6 +126,7 @@ def merge(a: Template, b: Template, name: str) -> Template:
         ports={**a.ports, **b.ports},
         blobs={**a.blobs, **b.blobs},
         learnables={**a.learnables, **b.learnables},
+        agent=a.agent if a.agent is not None else b.agent,
     )
 
 

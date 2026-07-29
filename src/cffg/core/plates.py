@@ -68,6 +68,7 @@ def expand_plates(t: Template) -> Template:
         ports=dict(t.ports),
         blobs=dict(t.blobs),
         learnables=dict(t.learnables),
+        agent=t.agent,
         schema_version=t.schema_version,
     )
     for pname in sorted(t.plates):

@@ -97,6 +97,8 @@ def _rewrite_blob_paths(
         ports=dict(template.ports),
         blobs=blobs,
         plates=plates,
+        learnables=dict(template.learnables),
+        agent=template.agent,
         schema_version=template.schema_version,
     )
 

@@ -39,6 +39,7 @@ GFE-TM composite (LIMITATIONS S1c).
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Callable
 
@@ -46,6 +47,8 @@ import jax.numpy as jnp
 import numpy as np
 
 from cffg.compiler import _log_of, compile_template
+from cffg.core.ir import AgentSpec, BeliefBinding, Template
+from cffg.core.validate import validate
 from cffg.engine import Engine, State, _replace
 from cffg.learn import Learnables
 
@@ -60,7 +63,7 @@ class RollingAgent:
         *,
         learn: tuple[str, ...] = (),
         priors: dict[str, np.ndarray] | None = None,
-        episode_learnables: tuple[str, ...] = ("d",),
+        episode_learnables: tuple[str, ...] | None = None,
         learn_a: bool = False,
         initial_counts: np.ndarray | None = None,
         learn_b: bool = False,
@@ -82,9 +85,10 @@ class RollingAgent:
         `learn_goal` enables the separate Fig. 5 goal-Dirichlet coordinate;
         its posterior is staged by planning and committed at a reset boundary.
 
-        `episode_learnables` names those whose statistic is an episode
-        quantity rather than a per-tick one — the initial-state prior, by
-        construction. They accumulate on the first tick after a reset."""
+        Episode-scale cadence comes from each serialized belief binding's
+        ``episode_learnable``. The old ``episode_learnables`` argument remains
+        as a compatibility assertion: when supplied it must match what the
+        model declares."""
         self.horizon, self.damp, self.n_sweeps, self.select = horizon, damp, n_sweeps, select
         self.rng = np.random.default_rng(seed)
 
@@ -120,10 +124,23 @@ class RollingAgent:
         if learn:
             filt_kwargs["learn"] = learn
         filt_t, filt_arrays = builder(past=1, steps=1, **filt_kwargs)
+        plan_spec = _require_agent_spec(plan_t, "planning")
+        filter_spec = _require_agent_spec(filt_t, "perception")
+        validate(plan_t)
+        validate(filt_t)
+        _check_window_compatibility(plan_t, plan_spec, filt_t, filter_spec)
+
         self.plan = Engine(compile_template(plan_t, arrays=plan_arrays))
         self.filter = Engine(compile_template(filt_t, arrays=filt_arrays))
+        self._plan_spec = plan_spec
+        self._filter_spec = filter_spec
+        self._plan_bindings = {b.name: b for b in plan_spec.beliefs}
+        self._filter_bindings = {b.name: b for b in filter_spec.beliefs}
+        self.beliefs = {
+            binding.name: _initial_belief(plan_t, plan_arrays, binding)
+            for binding in plan_spec.beliefs
+        }
 
-        self.belief = np.asarray(plan_arrays["d"], dtype=float).copy()
         self.learnables = Learnables(self.plan, priors={
             k: v for k, v in priors.items() if v is not None
         })
@@ -132,13 +149,28 @@ class RollingAgent:
         filter_sources = {
             p.name for p in self.filter.arena.learn_plans if p.sources
         }
-        self.episode_learnables = tuple(
-            n for n in episode_learnables if n in self.learnables.params
+        declared_episode = tuple(
+            sorted(
+                {
+                    binding.episode_learnable
+                    for binding in plan_spec.beliefs
+                    if binding.episode_learnable is not None
+                }
+            )
         )
+        if episode_learnables is not None and set(episode_learnables) != set(
+            declared_episode
+        ):
+            raise ValueError(
+                "episode_learnables does not match the Template AgentSpec: "
+                f"argument {sorted(episode_learnables)}, model "
+                f"{list(declared_episode)}"
+            )
+        self.episode_learnables = declared_episode
         self.tick_learnables = tuple(
             sorted(filter_sources - set(self.episode_learnables))
         )
-        self.n_ctrl = len(plan_arrays["e"])
+        self.n_ctrl = plan_t.variables[plan_spec.action].cardinality
         self.goal_priors = (
             {"Cc": np.asarray(plan_arrays["Cc"], dtype=float).copy()}
             if learn_goal
@@ -153,16 +185,18 @@ class RollingAgent:
     def _with_params(self, engine: Engine) -> State:
         st = engine.init_state()
         params = self.learnables.write(engine, dict(st.params))
-        # The prior slot is written LAST and wins: within an episode it holds
-        # the current belief, not the learned initial-state prior. That
-        # re-anchoring is the receding-horizon flip; the learned d is what a
-        # reset_episode() re-anchors *to*.
-        key, idx = engine.arena.member_of["prior"]
-        # Exact-zero belief entries stay semantically zero (NEG, the engine's
-        # finite log-zero) instead of underflowing to log(0) = -inf when the
-        # consumer belief is float32 (cff-ey4p).
-        log_d = _log_of(np.asarray(self.belief))
-        params[key] = params[key].at[idx].set(jnp.asarray(log_d))
+        bindings = (
+            self._plan_bindings if engine is self.plan else self._filter_bindings
+        )
+        # Boundary prior slots are written LAST and win over learnable writes:
+        # within an episode they carry the current filtered beliefs. An
+        # episode learnable only re-anchors its declared binding at reset.
+        for name, binding in bindings.items():
+            key, idx = engine.arena.member_of[binding.prior]
+            # Exact-zero entries stay semantically zero (NEG, the engine's
+            # finite log-zero) rather than passing through log(0).
+            log_belief = _log_of(np.asarray(self.beliefs[name]))
+            params[key] = params[key].at[idx].set(jnp.asarray(log_belief))
         st = _replace(st, params=params)
         if engine is self.plan and self.goal_priors:
             st = engine.with_goal_priors(st, self.goal_priors)
@@ -182,27 +216,42 @@ class RollingAgent:
         # the staged value; it never accumulates another sweep/trial.
         if self.goal_priors:
             self._pending_goal_priors = self.plan.goal_prior_updates(st)
-        q = np.asarray(self.plan.marginals(st)["u1"])
+        q = np.asarray(self.plan.marginals(st)[self._plan_spec.action])
         if self.select == "map":
             return int(np.argmax(q))
         return int(self.rng.choice(self.n_ctrl, p=q / q.sum()))
 
-    def observe(self, action: int, observation: int) -> np.ndarray:
+    def observe(
+        self, action: int, observation: int
+    ) -> np.ndarray | dict[str, np.ndarray]:
         """Fold (action, observation) into the belief; conjugate updates."""
         st = self._with_params(self.filter)
-        st = self.filter.bind_data(st, {"act1": action, "obs1": observation})
+        st = self.filter.bind_data(
+            st,
+            {
+                self._filter_spec.action_port: action,
+                self._filter_spec.observation_port: observation,
+            },
+        )
         st = self.filter.run(st, 60, tol=1e-12).require_converged()
-        q_z = np.asarray(self.filter.marginals(st)["zm1"])
+        marginals = self.filter.marginals(st)
+        next_beliefs = {
+            name: _normalize(
+                np.asarray(marginals[binding.posterior]),
+                f"filter posterior {binding.posterior!r}",
+            )
+            for name, binding in self._filter_bindings.items()
+        }
         if self.tick_learnables:
             self.learnables.accumulate(self.filter, st, only=self.tick_learnables)
         if self.episode_tick == 0 and self.episode_learnables:
             # q(z0) smoothed by this episode's first observation — the
             # sufficient statistic for where episodes start.
             self.learnables.accumulate(self.filter, st, only=self.episode_learnables)
-        self.belief = q_z / q_z.sum()
+        self.beliefs = next_beliefs
         self.tick += 1
         self.episode_tick += 1
-        return self.belief
+        return self._belief_result()
 
     def step(self, env_step: Callable[[int], int]) -> tuple[int, int]:
         u = self.act()
@@ -210,20 +259,22 @@ class RollingAgent:
         self.observe(u, x)
         return u, x
 
-    def reset_episode(self) -> np.ndarray:
-        """Start a new episode: re-anchor the belief on the learned
-        initial-state prior (its posterior mean), or leave it untouched when
-        the model does not learn one."""
+    def reset_episode(self) -> np.ndarray | dict[str, np.ndarray]:
+        """Start a new episode and re-anchor each declared learned boundary."""
         if self._pending_goal_priors is not None:
             self.goal_priors = {
                 name: alpha.copy()
                 for name, alpha in self._pending_goal_priors.items()
             }
             self._pending_goal_priors = None
-        for name in self.episode_learnables:
-            self.belief = self.learnables.expected(name).copy()
+        for name, binding in self._plan_bindings.items():
+            if binding.episode_learnable is not None:
+                self.beliefs[name] = _normalize(
+                    self.learnables.expected(binding.episode_learnable).copy(),
+                    f"episode learnable {binding.episode_learnable!r}",
+                )
         self.episode_tick = 0
-        return self.belief
+        return self._belief_result()
 
     # -- persistence -------------------------------------------------------
 
@@ -235,13 +286,20 @@ class RollingAgent:
 
     def checkpoint(self, path: str | Path) -> None:
         data = {
-            "belief": self.belief,
             "tick": np.asarray(self.tick),
             # Cadence is state. Without it, a restore mid-episode reads the
             # next observation as an episode start and folds a second
             # initial-state statistic from the same episode.
             "episode_tick": np.asarray(self.episode_tick),
+            "rng_state": np.asarray(json.dumps(self.rng.bit_generator.state)),
         }
+        if self._has_legacy_belief:
+            # Preserve the legacy checkpoint spelling byte-for-byte for the
+            # public single-boundary API.
+            data["belief"] = self.belief
+        else:
+            for name, belief in self.beliefs.items():
+                data[f"belief:{name}"] = belief
         for name, alpha in self.learnables.state_dict().items():
             data[f"learn:{name}"] = alpha
         for name, alpha in self.goal_priors.items():
@@ -252,8 +310,35 @@ class RollingAgent:
 
     def restore(self, path: str | Path) -> None:
         data = np.load(path)
-        self.belief = data["belief"].copy()
+        if "belief" in data.files:
+            if not self._has_legacy_belief:
+                raise KeyError(
+                    "legacy single-belief checkpoint cannot restore a "
+                    "multi-block agent"
+                )
+            only = next(iter(self.beliefs))
+            self.beliefs[only] = _check_belief(
+                data["belief"].copy(), f"checkpoint belief {only!r}"
+            )
+        else:
+            restored_beliefs = {
+                key[len("belief:") :]: data[key].copy()
+                for key in data.files
+                if key.startswith("belief:")
+            }
+            if set(restored_beliefs) != set(self.beliefs):
+                raise KeyError(
+                    "checkpoint boundary beliefs do not match this agent: "
+                    f"have {sorted(restored_beliefs)}, expected "
+                    f"{sorted(self.beliefs)}"
+                )
+            self.beliefs = {
+                name: _check_belief(value, f"checkpoint belief {name!r}")
+                for name, value in restored_beliefs.items()
+            }
         self.tick = int(data["tick"])
+        if "rng_state" in data.files:
+            self.rng.bit_generator.state = json.loads(str(data["rng_state"]))
         # A checkpoint predating episode cadence never reset, so its ticks are
         # one episode. Falling back to `tick` is the conservative read: it can
         # only decline to fire the episode-start statistic, never fire it twice.
@@ -304,6 +389,36 @@ class RollingAgent:
 
     # -- compatibility readouts -------------------------------------------
 
+    @property
+    def _has_legacy_belief(self) -> bool:
+        return (
+            len(self._plan_spec.beliefs) == 1
+            and len(self._plan_spec.beliefs[0].blocks) == 1
+        )
+
+    def _belief_result(self) -> np.ndarray | dict[str, np.ndarray]:
+        if self._has_legacy_belief:
+            return self.belief
+        return {name: value.copy() for name, value in self.beliefs.items()}
+
+    @property
+    def belief(self) -> np.ndarray:
+        """Compatibility view for models with exactly one state block."""
+        if not self._has_legacy_belief:
+            raise AttributeError(
+                "belief is only available for a single boundary block; use beliefs"
+            )
+        return next(iter(self.beliefs.values()))
+
+    @belief.setter
+    def belief(self, value: np.ndarray) -> None:
+        if not self._has_legacy_belief:
+            raise AttributeError(
+                "belief is only available for a single boundary block; use beliefs"
+            )
+        name = next(iter(self.beliefs))
+        self.beliefs[name] = np.asarray(value)
+
     def _alpha(self, name: str) -> np.ndarray | None:
         params = self.learnables.params.get(name)
         return None if params is None else params["alpha"]
@@ -323,3 +438,101 @@ class RollingAgent:
         """Shared goal Dirichlet prior, rolled only at episode boundaries."""
         value = self.goal_priors.get("Cc")
         return None if value is None else value.copy()
+
+
+def _require_agent_spec(template: Template, window: str) -> AgentSpec:
+    if template.agent is None:
+        raise ValueError(
+            f"{window} template {template.name!r} does not declare an AgentSpec"
+        )
+    return template.agent
+
+
+def _check_window_compatibility(
+    plan_t: Template,
+    plan: AgentSpec,
+    filter_t: Template,
+    filt: AgentSpec,
+) -> None:
+    """Cross-template checks that core validation cannot make in isolation."""
+    if filt.action_port is None or filt.observation_port is None:
+        raise ValueError(
+            f"perception template {filter_t.name!r} must declare action and "
+            "observation DATA ports"
+        )
+    plan_action = plan_t.variables[plan.action]
+    filter_action = filter_t.variables[filter_t.ports[filt.action_port].variable]
+    if plan_action.domain_key != filter_action.domain_key:
+        raise ValueError(
+            f"agent action domain mismatch: planning {plan_action.domain_key}, "
+            f"perception {filter_action.domain_key}"
+        )
+
+    plan_bindings = {b.name: b for b in plan.beliefs}
+    filter_bindings = {b.name: b for b in filt.beliefs}
+    if set(plan_bindings) != set(filter_bindings):
+        raise ValueError(
+            "planning/perception boundary names differ: "
+            f"{sorted(plan_bindings)} != {sorted(filter_bindings)}"
+        )
+    for name in sorted(plan_bindings):
+        before, after = plan_bindings[name], filter_bindings[name]
+        if (
+            before.blocks != after.blocks
+            or before.factorization is not after.factorization
+            or before.episode_learnable != after.episode_learnable
+        ):
+            raise ValueError(
+                f"boundary {name!r} differs between planning and perception: "
+                "blocks, factorization and episode learnable must agree"
+            )
+        plan_prior = plan_t.variables[plan_t.factors[before.prior].edges["out"]]
+        filter_prior = filter_t.variables[
+            filter_t.factors[after.prior].edges["out"]
+        ]
+        filter_posterior = filter_t.variables[after.posterior]
+        if not (
+            plan_prior.domain_key
+            == filter_prior.domain_key
+            == filter_posterior.domain_key
+        ):
+            raise ValueError(
+                f"boundary {name!r} changes domain across rollover: planning "
+                f"{plan_prior.domain_key}, perception prior "
+                f"{filter_prior.domain_key}, posterior "
+                f"{filter_posterior.domain_key}"
+            )
+
+
+def _initial_belief(
+    template: Template, arrays: dict[str, np.ndarray], binding: BeliefBinding
+) -> np.ndarray:
+    prior = template.factors[binding.prior]
+    blob = prior.param_blobs["statistic"]
+    if blob not in arrays:
+        raise KeyError(
+            f"agent belief {binding.name!r}: prior blob {blob!r} has no array"
+        )
+    return _normalize(
+        np.asarray(arrays[blob]).copy(),
+        f"agent belief {binding.name!r} prior {binding.prior!r}",
+    )
+
+
+def _normalize(value: np.ndarray, label: str) -> np.ndarray:
+    """Normalize a categorical boundary without changing exact-zero support."""
+    value = _check_belief(value, label)
+    return value / value.sum()
+
+
+def _check_belief(value: np.ndarray, label: str) -> np.ndarray:
+    """Validate categorical mass while preserving checkpoint bits exactly."""
+    value = np.asarray(value)
+    if value.ndim != 1:
+        raise ValueError(f"{label} must be a 1-D categorical belief, got {value.shape}")
+    if not np.all(np.isfinite(value)) or np.any(value < 0):
+        raise ValueError(f"{label} must be finite and non-negative")
+    total = value.sum()
+    if not np.isfinite(total) or total <= 0:
+        raise ValueError(f"{label} must have positive finite mass")
+    return value

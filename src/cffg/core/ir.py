@@ -133,6 +133,53 @@ class LearnableSpec:
     sources: tuple[str, ...] | None = None  # stat suppliers; None = all readers
 
 
+class BoundaryFactorization(str, Enum):
+    """Variational family carried across a receding-horizon boundary."""
+
+    JOINT = "joint"
+    MEAN_FIELD = "mean_field"
+
+
+@dataclass(frozen=True)
+class BeliefBinding:
+    """One persistent belief carried from filtering into the next window.
+
+    ``blocks`` are stable, model-local names for the state components this
+    belief represents. A joint binding may carry several components in one
+    categorical variable. A mean-field binding carries one marginal and names
+    the node constraints that make that separation part of the Template's
+    variational family rather than an approximation hidden in RollingAgent.
+
+    ``prior`` is the categorical factor whose statistic is replaced at the
+    start of every window; ``posterior`` is the filtering variable read back
+    after conditioning. ``episode_learnable`` optionally names the conjugate
+    posterior whose expectation re-anchors this binding at episode reset.
+    """
+
+    name: str
+    blocks: tuple[str, ...]
+    prior: str
+    posterior: str
+    factorization: BoundaryFactorization = BoundaryFactorization.JOINT
+    constraints: tuple[str, ...] = ()
+    episode_learnable: str | None = None
+
+
+@dataclass(frozen=True)
+class AgentSpec:
+    """Serialized bindings between a Template and the rolling agent runtime.
+
+    Planning templates declare ``action``; perception templates additionally
+    declare the DATA ports that receive the executed action and observation.
+    Both carry the boundary bindings applicable to their window.
+    """
+
+    action: str
+    beliefs: tuple[BeliefBinding, ...]
+    action_port: str | None = None
+    observation_port: str | None = None
+
+
 @dataclass(frozen=True)
 class FactorSpec:
     """A node in the FFG.
@@ -427,6 +474,7 @@ class Template:
     blobs: dict[str, BlobRef] = field(default_factory=dict)
     plates: dict[str, PlateSpec] = field(default_factory=dict)
     learnables: dict[str, LearnableSpec] = field(default_factory=dict)
+    agent: AgentSpec | None = None
     schema_version: str = "1"
 
     def degree(self, variable: str) -> int:

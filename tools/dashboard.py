@@ -54,7 +54,12 @@ EPIC_FILES = {
         "test_tmaze_learning.py",
         "test_behavioral_epistemics.py",
     ],
-    "M5 · Runtime": ["test_agent.py", "test_colony.py", "test_runtime_status.py"],
+    "M5 · Runtime": [
+        "test_agent.py",
+        "test_agent_spec.py",
+        "test_colony.py",
+        "test_runtime_status.py",
+    ],
     "M6 · Tooling": [
         "test_bundle.py",
         "test_dashboard.py",

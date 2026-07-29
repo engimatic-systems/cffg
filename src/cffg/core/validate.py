@@ -15,6 +15,7 @@ from cffg.core.ir import (
     FACTOR_TYPES,
     HYBRID_EDGE_FAMILIES,
     Broadcast,
+    BoundaryFactorization,
     Chain,
     ConstraintKind,
     Expose,
@@ -41,6 +42,7 @@ def validate(t: Template) -> None:
     problems += _check_constraints(t)
     problems += _check_plates(t)
     problems += _check_learnables(t)
+    problems += _check_agent(t)
 
     if problems:
         raise ModelError(t.name, problems)
@@ -190,6 +192,11 @@ def _check_plates(t: Template) -> list[str]:
                 f"{sorted(frag.plates)}; nested plate grounding is not "
                 "supported in phase 1"
             )
+        if frag.agent is not None:
+            problems.append(
+                f"plate {name!r}: fragment declares an AgentSpec; the runtime "
+                "interface belongs on the complete host Template"
+            )
         for b in spec.per_copy_blobs:
             if b not in frag.blobs:
                 problems.append(f"plate {name!r}: per_copy_blob {b!r} is not a fragment blob")
@@ -252,6 +259,183 @@ def _check_learnables(t: Template) -> list[str]:
             elif not (set(spec.blobs) & set(t.factors[f].param_blobs.values())):
                 problems.append(
                     f"learnable {name!r}: source {f!r} does not read any of its blobs"
+                )
+    return problems
+
+
+def _check_agent(t: Template) -> list[str]:
+    """Validate the serialized model/runtime bindings (cff-nhxf).
+
+    The runtime is intentionally name-agnostic, so every role error must be
+    caught here while the message can still use the model's own names.
+    """
+    if t.agent is None:
+        return []
+
+    spec = t.agent
+    problems: list[str] = []
+    action = t.variables.get(spec.action)
+    if action is None:
+        problems.append(f"agent action readout: unknown variable {spec.action!r}")
+    elif action.family != "discrete":
+        problems.append(
+            f"agent action readout {spec.action!r}: expected discrete variable, "
+            f"got {action.family}"
+        )
+
+    if (spec.action_port is None) != (spec.observation_port is None):
+        problems.append(
+            "agent perception bindings: action_port and observation_port must "
+            "be declared together"
+        )
+    for role, name in (
+        ("action", spec.action_port),
+        ("observation", spec.observation_port),
+    ):
+        if name is None:
+            continue
+        port = t.ports.get(name)
+        if port is None:
+            problems.append(f"agent {role} DATA port: unknown port {name!r}")
+        elif port.role is not PortRole.DATA:
+            problems.append(
+                f"agent {role} port {name!r}: expected role 'data', "
+                f"got {port.role.value!r}"
+            )
+    if (
+        action is not None
+        and spec.action_port in t.ports
+        and t.ports[spec.action_port].variable in t.variables
+    ):
+        port_var = t.variables[t.ports[spec.action_port].variable]
+        if port_var.domain_key != action.domain_key:
+            problems.append(
+                f"agent action port {spec.action_port!r}: domain "
+                f"{port_var.domain_key} != action readout {spec.action!r} "
+                f"domain {action.domain_key}"
+            )
+    if (
+        spec.action_port is not None
+        and spec.action_port == spec.observation_port
+    ):
+        problems.append("agent action and observation DATA ports must be different")
+
+    if not spec.beliefs:
+        problems.append("agent declares no boundary beliefs")
+        return problems
+
+    mean_field = {
+        c.target for c in t.constraints if c.kind is ConstraintKind.MEAN_FIELD
+    }
+    seen_names: set[str] = set()
+    seen_blocks: dict[str, str] = {}
+    for belief in spec.beliefs:
+        label = f"agent belief {belief.name!r}"
+        if not belief.name:
+            problems.append("agent belief name must not be empty")
+        elif belief.name in seen_names:
+            problems.append(f"agent belief name {belief.name!r} is duplicated")
+        seen_names.add(belief.name)
+
+        if not belief.blocks:
+            problems.append(f"{label}: declares no state blocks")
+        for block in belief.blocks:
+            if not block:
+                problems.append(f"{label}: state block names must not be empty")
+            elif block in seen_blocks:
+                problems.append(
+                    f"{label}: state block {block!r} is already carried by "
+                    f"belief {seen_blocks[block]!r}"
+                )
+            else:
+                seen_blocks[block] = belief.name
+
+        prior = t.factors.get(belief.prior)
+        prior_var = None
+        prior_blob = None
+        if prior is None:
+            problems.append(f"{label}: unknown prior factor {belief.prior!r}")
+        elif prior.type != "categorical":
+            problems.append(
+                f"{label}: prior target {belief.prior!r} must be a categorical "
+                f"factor, got {prior.type!r}"
+            )
+        else:
+            prior_name = prior.edges.get("out")
+            prior_var = t.variables.get(prior_name or "")
+            prior_blob = prior.param_blobs.get("statistic")
+            if prior_blob is None:
+                problems.append(
+                    f"{label}: prior target {belief.prior!r} must read a "
+                    "categorical statistic blob"
+                )
+
+        posterior = t.variables.get(belief.posterior)
+        if posterior is None:
+            problems.append(
+                f"{label}: unknown filter posterior variable {belief.posterior!r}"
+            )
+        elif posterior.family != "discrete":
+            problems.append(
+                f"{label}: filter posterior {belief.posterior!r} must be "
+                f"discrete, got {posterior.family}"
+            )
+        if (
+            prior_var is not None
+            and posterior is not None
+            and prior_var.domain_key != posterior.domain_key
+        ):
+            problems.append(
+                f"{label}: prior domain {prior_var.domain_key} != filter "
+                f"posterior {belief.posterior!r} domain {posterior.domain_key}"
+            )
+
+        if belief.factorization is BoundaryFactorization.JOINT:
+            if belief.constraints:
+                problems.append(
+                    f"{label}: joint boundary must not name mean-field "
+                    f"constraints {list(belief.constraints)}"
+                )
+        elif belief.factorization is BoundaryFactorization.MEAN_FIELD:
+            if len(belief.blocks) != 1:
+                problems.append(
+                    f"{label}: mean-field boundary must carry exactly one state "
+                    f"block, got {belief.blocks}"
+                )
+            if not belief.constraints:
+                problems.append(
+                    f"{label}: mean-field boundary must name at least one "
+                    "Template mean_field constraint"
+                )
+            for target in belief.constraints:
+                if target not in mean_field:
+                    problems.append(
+                        f"{label}: factorization target {target!r} is not an "
+                        "explicit Template mean_field constraint"
+                    )
+                elif belief.posterior in t.variables and belief.posterior not in (
+                    t.factors[target].all_edges().values()
+                ):
+                    problems.append(
+                        f"{label}: mean_field factor {target!r} does not touch "
+                        f"filter posterior {belief.posterior!r}"
+                    )
+        else:
+            problems.append(
+                f"{label}: unknown factorization {belief.factorization!r}"
+            )
+
+        if belief.episode_learnable is not None:
+            learnable = t.learnables.get(belief.episode_learnable)
+            if learnable is None:
+                problems.append(
+                    f"{label}: unknown episode learnable "
+                    f"{belief.episode_learnable!r}"
+                )
+            elif prior_blob is not None and prior_blob not in learnable.blobs:
+                problems.append(
+                    f"{label}: episode learnable {belief.episode_learnable!r} "
+                    f"does not own prior blob {prior_blob!r}"
                 )
     return problems
 
