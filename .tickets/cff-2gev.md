@@ -1,7 +1,7 @@
 ---
 id: cff-2gev
 status: in_progress
-deps: [cff-hp3y, cff-4oq8, cff-5ipi]
+deps: [cff-hp3y, cff-4oq8, cff-5ipi, cff-qr92]
 links: []
 created: 2026-07-10T03:34:54Z
 type: feature
