@@ -1,7 +1,7 @@
 ---
 id: cff-2gev
 status: in_progress
-deps: [cff-hp3y, cff-4oq8, cff-5ipi, cff-qr92]
+deps: [cff-hp3y, cff-4oq8, cff-5ipi, cff-qr92, cff-weff]
 links: []
 created: 2026-07-10T03:34:54Z
 type: feature
@@ -347,11 +347,15 @@ planner converged within the new budget (357--470 sweeps). The complete `v2`
 run still aborts on the first non-converged or non-finite call, and any further
 protocol change requires a visibly new version and a clean output directory.
 
-## Live preregistration: cff-5ipi/v3
+## Invalid preregistration: cff-5ipi/v3
 
-**Status:** LIVE and unrun. `cff-5ipi/v3` inherits every substantive choice
-and every comparative-arm numerical setting from `cff-5ipi/v2`. It makes only
-these two changes, locked before any environment rollout:
+**Status:** INVALID after all 16 exact-sensor known/plain reference cells and
+before any comparative cell completed. The first learn-only cell exhausted
+its outer inference budget at episode 1, step 2; its inner Newton solve
+converged, but messages and FE remained in a large limit cycle. No partial
+reference result is an experimental outcome. `cff-5ipi/v3` inherited every
+substantive choice and every comparative-arm numerical setting from
+`cff-5ipi/v2`, with only these two changes:
 
 1. it requires the cff-qr92 solver certificate at commit `443c51a`, whose
    `1024 * finfo(dtype).eps` recomputation floor is covered by a generic
@@ -366,8 +370,8 @@ and mode beliefs `[0,1]`, `[.25,.75]`, `[.5,.5]`, `[.75,.25]`, and `[1,0]`
 directly to known/plain. After cff-qr92, all 40 cases converged in 357--1,211
 sweeps with no sampled action, filter call, observation, environment step,
 task result, or arm comparison. No further protocol change is allowed under
-`cff-5ipi/v3`; any invalid call requires a new version and a clean complete
-rerun.
+`cff-5ipi/v3`; its invalid call requires cff-weff and a new version in a clean
+output directory before any complete rerun.
 
 ## Notes
 
@@ -382,3 +386,7 @@ cff-5ipi/v1 invalidation and v2 lock (2026-07-29): The first full-run call stopp
 **2026-07-30T01:12:43Z**
 
 cff-5ipi/v2 invalidation and v3 lock: The expanded pre-run boundary grid showed v2's exact-known reference could still exhaust its inner solver at 1.28e-13--1.56e-13 and its outer loop at noisy .25/.75 mode beliefs. This produced no action, observation, complete cell, or treatment result. Linked bug cff-qr92 fixed the general recomputation certificate at commit 443c51a. With known/plain alone at damp=.85 and a 2,000-sweep cap, all 40 fixed position/mode boundary beliefs converged in 357--1,211 sweeps. Source: local RunResult grid; confidence high. v3 locks those numerical changes; comparative arms and all substantive/statistical choices are unchanged.
+
+**2026-07-30T02:49:34Z**
+
+cff-5ipi/v3 invalidation (2026-07-29): The clean run at commit 19caadf completed all 16 r=1 known/plain reference cells, then aborted before completing the first comparative cell. Learn-only seed 0 failed at episode 1 step 2 after one transition update: outer RunStatus.BUDGET_EXHAUSTED after 400 sweeps, residual 1.6901, oscillating FE/messages; inner Newton remained CONVERGED. Invalid partial traces are preserved at /Users/ravd/agent-share/cffg-annealed-novelty-cff-5ipi-v3 and must not be analyzed as outcomes. An excluded-seed 999 lifecycle failed at episode 2 under damp .8 and .85, and independent frozen-state restarts from .9 through .99 failed up to 15,000 sweeps while inner solves converged. Source: locked harness RunResults and convergence-only diagnostics; confidence high. cff-weff now blocks a new protocol/clean rerun; do not weaken truthful convergence or reuse partial cells.

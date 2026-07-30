@@ -153,6 +153,16 @@ colony scale. Models containing the composite report GFE, not BFE (no
 interior, its outgoing message is the cavity `log q_w - mu_down`, and its
 ledger contribution is the direct node-local G_tm from D1 Proposition 1;
 downstream message couplings are not node energy.
+
+The preregistered factored-corridor annealing experiment is not yet an
+empirical result. Its third protocol completed the exact-model reference but
+aborted before a comparative cell completed: after one learned transition
+update, synchronous mixed-GFE outer messages and FE entered a limit cycle
+while every local Newton solve converged. Fixed damping restarts through
+0.99 did not certify that state. The mechanism identities are tested, but no
+task, model-error, or cost claim follows until cff-weff globalizes the outer
+loop and a new protocol completes from a clean directory.
+
 Do not transfer that caveat to the ordinary goal-observation composite: its
 channel is the realizable observation itself. The costly-cue sensor-quality
 tier checks that its posterior MI and sensing probability weaken together as
