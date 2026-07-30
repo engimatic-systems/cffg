@@ -53,6 +53,8 @@ from urllib.parse import quote, unquote
 
 import numpy as np
 
+from cffg import ef, efrules
+
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from cffg.compiler import LearnPlan
     from cffg.engine import Engine, State
@@ -129,11 +131,11 @@ class Family(Protocol):
 
 def _elog(counts: np.ndarray, axis: int) -> np.ndarray:
     """E[log θ] = ψ(α) − ψ(α₀) over Dirichlet columns laid out along `axis`."""
-    from jax.scipy.special import digamma
-
-    counts = np.asarray(counts)
-    total = counts.sum(axis=axis, keepdims=True)
-    return np.asarray(digamma(counts)) - np.asarray(digamma(total))
+    return np.asarray(
+        efrules.DIRICHLET.mean_stats_from_concentration(
+            np.asarray(counts), axis=axis
+        )
+    )
 
 
 @dataclass(frozen=True)
@@ -207,7 +209,9 @@ class Dirichlet:
     def fold(
         self, params: dict[str, np.ndarray], stats: dict[str, np.ndarray]
     ) -> dict[str, np.ndarray]:
-        return {"alpha": params["alpha"] + stats["n"]}
+        return {
+            "alpha": ef.DIRICHLET.posterior(params["alpha"], stats["n"])
+        }
 
     def rollover(self, params: dict[str, np.ndarray], ftype: str) -> dict[str, np.ndarray]:
         return {self._ROLE[ftype]: _elog(params["alpha"], axis=self._AXIS[ftype])}
@@ -216,8 +220,11 @@ class Dirichlet:
         return {self._ROLE[ftype]: params["alpha"]}
 
     def mean(self, params: dict[str, np.ndarray], ftype: str) -> dict[str, np.ndarray]:
-        alpha = params["alpha"]
-        return {self._ROLE[ftype]: alpha / alpha.sum(axis=self._AXIS[ftype], keepdims=True)}
+        return {
+            self._ROLE[ftype]: ef.DIRICHLET.mean_from_concentration(
+                params["alpha"], axis=self._AXIS[ftype]
+            )
+        }
 
     def validate_prior(
         self,
@@ -236,7 +243,11 @@ class Dirichlet:
             raise ValueError(
                 f"learnable {learnable!r}: prior shape {alpha.shape} != blob shape {want}"
             )
-        if not np.all(alpha > 0):
+        if not bool(
+            ef.DIRICHLET.is_proper_concentration(
+                alpha, axis=tuple(range(alpha.ndim))
+            )
+        ):
             raise ValueError(f"learnable {learnable!r}: Dirichlet counts must be > 0")
 
     # A bare array is the natural spelling for a one-parameter family, so the

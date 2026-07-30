@@ -22,10 +22,9 @@ The message contract every EF distribution satisfies (DERIVATIONS.md D2):
 This module is the pure math: each family is a table entry with
 `to_natural / from_natural / mean_stats (∇A) / log_partition / entropy / kl`,
 NumPy-only (imports no JAX — usable at compile time and in tests; the arena
-integration will mirror it in jnp). The engine-facing work — a scalar-EF
-arena family, VariableSpec domains beyond discrete/Gaussian, and the
-`poisson_obs` / `bernoulli_obs` conditioned factors — is specced in the
-cff-8s6a ticket and lands separately.
+integration mirrors it in jnp). Categorical, Dirichlet, and Gaussian retain
+their shape-specialized arenas, but use the same natural-parameter algebra
+through the family entries below.
 
 Parameterization conventions (standard ↔ natural):
 
@@ -82,7 +81,33 @@ gammaln = _vectorized(math.lgamma)
 
 
 @dataclass(frozen=True)
-class EFFamily:
+class NaturalParameterFamily:
+    """Shared message algebra for every natural-parameter representation."""
+
+    name: str
+
+    def product(self, *etas: np.ndarray) -> np.ndarray:
+        """Multiply messages by adding their natural parameters."""
+        if not etas:
+            raise ValueError("a message product needs at least one natural parameter")
+        total = np.asarray(etas[0])
+        for eta in etas[1:]:
+            total = total + np.asarray(eta)
+        return total
+
+    def product_axis(
+        self, eta: np.ndarray, axis: int, keepdims: bool = False
+    ) -> np.ndarray:
+        """Multiply a stack of messages along one axis."""
+        return np.asarray(eta).sum(axis=axis, keepdims=keepdims)
+
+    def vacuous_like(self, eta: np.ndarray) -> np.ndarray:
+        """The multiplicative identity in natural coordinates."""
+        return np.zeros_like(eta)
+
+
+@dataclass(frozen=True)
+class EFFamily(NaturalParameterFamily):
     """One exponential family: everything rules and ledgers need, closed form.
 
     All functions take/return numpy arrays with a trailing axis of size
@@ -106,6 +131,276 @@ class EFFamily:
             - self.log_partition(eta1)
             + self.log_partition(eta2)
         )
+
+
+# --- Shape-specialized families ----------------------------------------------
+
+
+@dataclass(frozen=True)
+class CategoricalFamily(NaturalParameterFamily):
+    """Categorical log-potentials with variable cardinality."""
+
+    def to_natural(self, probability: np.ndarray) -> np.ndarray:
+        with np.errstate(divide="ignore"):
+            return np.log(np.asarray(probability))
+
+    def from_natural(self, eta: np.ndarray) -> np.ndarray:
+        return self.mean_stats(eta)
+
+    def log_partition(self, eta: np.ndarray, axis: int = -1) -> np.ndarray:
+        return np.logaddexp.reduce(np.asarray(eta), axis=axis)
+
+    def normalize(self, eta: np.ndarray, axis: int = -1) -> np.ndarray:
+        eta = np.asarray(eta)
+        return eta - np.expand_dims(self.log_partition(eta, axis=axis), axis=axis)
+
+    def mean_stats(self, eta: np.ndarray, axis: int = -1) -> np.ndarray:
+        return np.exp(self.normalize(eta, axis=axis))
+
+    def mean(self, eta: np.ndarray, axis: int = -1) -> np.ndarray:
+        """Stable softmax used by host readouts."""
+        eta = np.asarray(eta)
+        shifted = eta - eta.max(axis=axis, keepdims=True)
+        probability = np.exp(shifted)
+        return probability / probability.sum(axis=axis, keepdims=True)
+
+    def entropy(self, eta: np.ndarray, axis: int = -1) -> np.ndarray:
+        log_probability = self.normalize(eta, axis=axis)
+        probability = np.exp(log_probability)
+        return -np.where(
+            probability > 0, probability * log_probability, 0.0
+        ).sum(axis=axis)
+
+    def is_proper(self, eta: np.ndarray, axis: int = -1) -> np.ndarray:
+        return np.isfinite(self.log_partition(eta, axis=axis))
+
+    def kl(
+        self, eta1: np.ndarray, eta2: np.ndarray, axis: int = -1
+    ) -> np.ndarray:
+        log_probability1 = self.normalize(eta1, axis=axis)
+        log_probability2 = self.normalize(eta2, axis=axis)
+        probability1 = np.exp(log_probability1)
+        return np.where(
+            probability1 > 0,
+            probability1 * (log_probability1 - log_probability2),
+            0.0,
+        ).sum(axis=axis)
+
+
+@dataclass(frozen=True)
+class DirichletFamily(NaturalParameterFamily):
+    """Dirichlet natural parameters over an arbitrary simplex axis."""
+
+    def to_natural(self, concentration: np.ndarray) -> np.ndarray:
+        return np.asarray(concentration) - 1.0
+
+    def from_natural(self, eta: np.ndarray) -> np.ndarray:
+        return np.asarray(eta) + 1.0
+
+    def log_partition(self, eta: np.ndarray, axis: int = -1) -> np.ndarray:
+        return self.log_partition_from_concentration(
+            self.from_natural(eta), axis=axis
+        )
+
+    def log_partition_from_concentration(
+        self, concentration: np.ndarray, axis: int = -1
+    ) -> np.ndarray:
+        concentration = np.asarray(concentration)
+        return gammaln(concentration).sum(axis=axis) - gammaln(
+            concentration.sum(axis=axis)
+        )
+
+    def mean_stats(self, eta: np.ndarray, axis: int = -1) -> np.ndarray:
+        return self.mean_stats_from_concentration(
+            self.from_natural(eta), axis=axis
+        )
+
+    def mean_stats_from_concentration(
+        self, concentration: np.ndarray, axis: int = -1
+    ) -> np.ndarray:
+        concentration = np.asarray(concentration)
+        return digamma(concentration) - digamma(
+            concentration.sum(axis=axis, keepdims=True)
+        )
+
+    def mean(self, eta: np.ndarray, axis: int = -1) -> np.ndarray:
+        return self.mean_from_concentration(self.from_natural(eta), axis=axis)
+
+    def mean_from_concentration(
+        self, concentration: np.ndarray, axis: int = -1
+    ) -> np.ndarray:
+        concentration = np.asarray(concentration)
+        return concentration / concentration.sum(axis=axis, keepdims=True)
+
+    def is_proper(self, eta: np.ndarray, axis: int = -1) -> np.ndarray:
+        return self.is_proper_concentration(self.from_natural(eta), axis=axis)
+
+    def entropy(self, eta: np.ndarray, axis: int = -1) -> np.ndarray:
+        concentration = self.from_natural(eta)
+        expected_log = self.mean_stats_from_concentration(
+            concentration, axis=axis
+        )
+        return self.log_partition_from_concentration(
+            concentration, axis=axis
+        ) - ((concentration - 1.0) * expected_log).sum(axis=axis)
+
+    def kl(
+        self, eta1: np.ndarray, eta2: np.ndarray, axis: int = -1
+    ) -> np.ndarray:
+        return (
+            ((np.asarray(eta1) - np.asarray(eta2)) * self.mean_stats(eta1, axis=axis)).sum(
+                axis=axis
+            )
+            - self.log_partition(eta1, axis=axis)
+            + self.log_partition(eta2, axis=axis)
+        )
+
+    def is_proper_concentration(
+        self, concentration: np.ndarray, axis: int = -1
+    ) -> np.ndarray:
+        concentration = np.asarray(concentration)
+        return np.isfinite(concentration).all(axis=axis) & (
+            concentration > 0
+        ).all(axis=axis)
+
+    def posterior(
+        self, prior_concentration: np.ndarray, count_message: np.ndarray
+    ) -> np.ndarray:
+        """Concentration-coordinate adapter for η_prior + sufficient counts."""
+        return self.product(prior_concentration, count_message)
+
+
+@dataclass(frozen=True)
+class GaussianFamily(NaturalParameterFamily):
+    """Gaussian information pairs ``(η, Λ)`` with variable dimension."""
+
+    def product(
+        self, *naturals: tuple[np.ndarray, np.ndarray]
+    ) -> tuple[np.ndarray, np.ndarray]:
+        if not naturals:
+            raise ValueError("a message product needs at least one information pair")
+        return (
+            super().product(*(natural[0] for natural in naturals)),
+            super().product(*(natural[1] for natural in naturals)),
+        )
+
+    def product_axis(
+        self,
+        natural: tuple[np.ndarray, np.ndarray],
+        axis: int,
+        keepdims: bool = False,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        return (
+            super().product_axis(natural[0], axis=axis, keepdims=keepdims),
+            super().product_axis(natural[1], axis=axis, keepdims=keepdims),
+        )
+
+    @staticmethod
+    def _matrix_scale(matrix: np.ndarray) -> np.ndarray:
+        matrix = np.asarray(matrix)
+        scale = np.max(np.abs(matrix), axis=(-2, -1))
+        return np.maximum(scale, np.asarray(np.finfo(matrix.dtype).tiny))
+
+    def symmetry_ok(self, matrix: np.ndarray) -> np.ndarray:
+        matrix = np.asarray(matrix)
+        dimension = matrix.shape[-1]
+        error = np.max(
+            np.abs(matrix - matrix.swapaxes(-1, -2)), axis=(-2, -1)
+        )
+        tolerance = (
+            16.0
+            * dimension
+            * np.finfo(matrix.dtype).eps
+            * self._matrix_scale(matrix)
+        )
+        return np.isfinite(matrix).all(axis=(-2, -1)) & (error <= tolerance)
+
+    def is_proper_precision(self, precision: np.ndarray) -> np.ndarray:
+        precision = np.asarray(precision)
+        symmetric = 0.5 * (precision + precision.swapaxes(-1, -2))
+        eigenvalues = np.linalg.eigvalsh(symmetric)
+        return (
+            self.symmetry_ok(precision)
+            & np.isfinite(eigenvalues).all(axis=-1)
+            & (eigenvalues[..., 0] > 0)
+        )
+
+    def is_proper(
+        self, natural: tuple[np.ndarray, np.ndarray]
+    ) -> np.ndarray:
+        eta, precision = natural
+        return self.is_proper_precision(precision) & np.isfinite(eta).all(
+            axis=-1
+        )
+
+    def to_natural(
+        self, mean: np.ndarray, covariance: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        precision = np.linalg.inv(np.asarray(covariance))
+        eta = np.einsum("...ij,...j->...i", precision, np.asarray(mean))
+        return eta, precision
+
+    def from_natural(
+        self, natural: tuple[np.ndarray, np.ndarray]
+    ) -> tuple[np.ndarray, np.ndarray]:
+        eta, precision = natural
+        covariance = np.linalg.inv(np.asarray(precision))
+        mean = np.einsum("...ij,...j->...i", covariance, np.asarray(eta))
+        return mean, covariance
+
+    def mean(
+        self, natural: tuple[np.ndarray, np.ndarray]
+    ) -> np.ndarray:
+        return self.from_natural(natural)[0]
+
+    def log_partition(
+        self, natural: tuple[np.ndarray, np.ndarray]
+    ) -> np.ndarray:
+        eta, precision = natural
+        mean, _ = self.from_natural(natural)
+        _, logdet = np.linalg.slogdet(precision)
+        dimension = precision.shape[-1]
+        return (
+            0.5 * np.sum(np.asarray(eta) * mean, axis=-1)
+            - 0.5 * logdet
+            + 0.5 * dimension * np.log(2.0 * np.pi)
+        )
+
+    def mean_stats(
+        self, natural: tuple[np.ndarray, np.ndarray]
+    ) -> tuple[np.ndarray, np.ndarray]:
+        mean, covariance = self.from_natural(natural)
+        second = covariance + np.einsum("...i,...j->...ij", mean, mean)
+        return mean, -0.5 * second
+
+    def entropy(
+        self, natural: tuple[np.ndarray, np.ndarray]
+    ) -> np.ndarray:
+        _, precision = natural
+        _, logdet = np.linalg.slogdet(precision)
+        dimension = precision.shape[-1]
+        return 0.5 * dimension * (1.0 + np.log(2.0 * np.pi)) - 0.5 * logdet
+
+    def kl(self, natural1, natural2) -> np.ndarray:
+        eta1, precision1 = natural1
+        eta2, precision2 = natural2
+        mean1, precision_stats1 = self.mean_stats(natural1)
+        natural_inner_product = (
+            ((eta1 - eta2) * mean1).sum(axis=-1)
+            + ((precision1 - precision2) * precision_stats1).sum(
+                axis=(-2, -1)
+            )
+        )
+        return (
+            natural_inner_product
+            - self.log_partition(natural1)
+            + self.log_partition(natural2)
+        )
+
+
+CATEGORICAL = CategoricalFamily(name="categorical")
+DIRICHLET = DirichletFamily(name="dirichlet")
+GAUSSIAN = GaussianFamily(name="gaussian")
 
 
 # --- Gamma --------------------------------------------------------------------
@@ -180,6 +475,10 @@ BETA = EFFamily(
 
 
 FAMILIES = {f.name: f for f in (GAMMA, BETA)}
+NATURAL_FAMILIES = {
+    family.name: family
+    for family in (CATEGORICAL, DIRICHLET, GAUSSIAN, GAMMA, BETA)
+}
 
 # Observation families (cff-8s6a): legal `VariableSpec.ef` tags for edges that
 # are *conditioned DATA ports only*. They get no EFFamily table because their

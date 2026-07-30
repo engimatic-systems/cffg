@@ -119,9 +119,11 @@ contribution.
 `FactorKernel` contract (`cffg.kernels`, ARCHITECTURE 2e) makes factor
 registration executable — but in v1 only EF-arena factors dispatch through
 it (gamma, beta, poisson_obs, bernoulli_obs, plus externally registered
-kernels). Discrete, Gaussian, and hybrid factors still run on central
-compiler/engine branches, so adding a factor in those families still means
-central surgery until they migrate onto the contract (cff-l6i5, cff-x0sv).
+kernels). Discrete and Gaussian factors now share the exponential-family
+message algebra, but they and the hybrid factors still run on central
+compiler/engine branches. Adding a factor in those arenas therefore still
+means central surgery until the executable registry gains multi-arena
+bindings (cff-209l).
 The registration API itself is internal-unstable pre-1.0; only the
 serialized `(impl, version)` manifest and its loud-failure guarantee are
 stable now.

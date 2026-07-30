@@ -14,9 +14,9 @@ surface: a new conjugate observation factor registers from user code with
 zero edits to cffg compiler/engine/validation source and round-trips through
 template JSON and .cffgz via its namespaced (impl_id, version) — see
 tests/test_kernels.py. The discrete, Gaussian, and hybrid families still run
-on their legacy central paths and migrate incrementally (cff-l6i5,
-cff-x0sv); `equality` stays structural infrastructure (family-polymorphic
-sum-minus-self), not a kernel.
+on their central paths and migrate incrementally (cff-209l); `equality`
+stays structural infrastructure (family-polymorphic sum-minus-self), not a
+kernel.
 
 Registration is refused without a `HostileInputs` declaration — the
 numerical-robustness contract's planning-time checklist made machine-checked
@@ -117,7 +117,7 @@ def register_kernel(k: FactorKernel) -> FactorKernel:
     if k.arena != "ef":
         problems.append(
             f"arena {k.arena!r} has no kernel binding yet — discrete/Gaussian/"
-            "hybrid dispatch migrates under cff-l6i5/cff-x0sv"
+            "hybrid dispatch migrates under cff-209l"
         )
     if "." not in k.impl_id or any(c.isspace() for c in k.impl_id) or not k.impl_id:
         problems.append(f"impl_id {k.impl_id!r} must be namespaced ('<namespace>.<name>')")
