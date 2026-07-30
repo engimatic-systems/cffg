@@ -1,6 +1,6 @@
 ---
 id: cff-5ipi
-status: open
+status: closed
 deps: [cff-b47g]
 links: []
 created: 2026-07-28T04:19:49Z
@@ -27,3 +27,9 @@ State exactly which declared transition learnable each novelty weight follows an
 ## Acceptance Criteria
 
 Before any replacement result exists, cff-2gev contains one clearly marked live protocol naming exact builder configuration and learned blocks; lambda/count equations and drop-back mask; prior and tuning rationale; observability sweep; arms, seeds, episodes and windows; independent KL and task-return metrics; timing comparison; convergence/status requirements; and pass/fail/ambiguous outcome language. Every choice is fixed or explicitly derived from builder structure. The ticket makes no implementation change and records no experiment result.
+
+## Notes
+
+**2026-07-30T14:03:58Z**
+
+Historical outcome (2026-07-30): preregistration PR #42 and its stacked execution PR #43 were closed unmerged by Cooper’s roadmap decision, with both remote branches retained. The v3 run completed all 16 known-transition/plain reference cells, then the first learn-only comparative cell stopped at episode 1, step 2 when the outer mixed-GFE fixed point entered a finite limit cycle after learned counts first changed. Inner Newton solves converged, but no comparative cell completed, so the run supports no empirical claim. A future curiosity study is redesigned in cff-2gev; the independent solver defect is tracked in cff-weff.

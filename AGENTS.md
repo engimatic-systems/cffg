@@ -59,6 +59,18 @@ git pull --ff-only origin "$BASE_BRANCH"
    answer and have it report back a short summary. Do not read whole papers into the
    main context window mid-task.
 
+## Coding style
+- The code should be idiomatic
+- Code should be self-explanatory. prefer code readability over comments
+- Comments should be short, to the point
+- Comments shouldn't include ticket numbers
+- Comments shouldn't include made up words and phrases not in the english dictionary, math, or science
+- New files shouldn't extend over 1000 lines of code (excluding comments and whitespaces)
+- Think twice before adding code to files where the number of lines in a file already surpass 700
+- Unit tests are nice, but don't write tests just for the sake of writing tests
+- If you need to stuff multiple features or related changes into a PR, organize them into separate commits
+
+
 ## Session protocol (context hygiene)
 
 This project will span many context windows. The rule that makes that survivable:
