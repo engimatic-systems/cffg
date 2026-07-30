@@ -679,7 +679,7 @@ def test_preregistered_factored_experiment_is_locked_and_balanced():
     assert experiment.HORIZON == 8
     assert experiment.MAX_ACTIONS == 14
     assert experiment.N_SWEEPS == 400
-    assert experiment.KNOWN_N_SWEEPS == 800
+    assert experiment.KNOWN_N_SWEEPS == 2_000
     assert experiment.KNOWN_DAMP == 0.85
     assert experiment.SEEDS == tuple(range(16))
     assert experiment.N_EPISODES == 64
@@ -718,7 +718,7 @@ def test_preregistered_factored_experiment_is_locked_and_balanced():
     assert not annealed.plain_plan.arena.gfe_tm_groups
     assert not annealed.novelty_saturated()
     known = experiment.make_agent("known_plain", 1.0)
-    assert known.n_sweeps == 800
+    assert known.n_sweeps == 2_000
     assert known.damp == 0.85
     assert annealed.n_sweeps == 400
     assert annealed.damp == 0.5

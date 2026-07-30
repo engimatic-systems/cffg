@@ -1,8 +1,8 @@
-"""Locked cff-5ipi/v2 factored-corridor experiment for cff-2gev.
+"""Locked cff-5ipi/v3 factored-corridor experiment for cff-2gev.
 
 This module intentionally exposes no protocol-tuning arguments.  The model,
 arms, seeds, windows, bootstrap, traces, timing, and outcome gates were fixed
-in ``.tickets/cff-2gev.md`` before the v2 replacement experiment was run.
+in ``.tickets/cff-2gev.md`` before the v3 replacement experiment was run.
 Changing a constant here after observing a result voids that preregistration.
 """
 
@@ -22,14 +22,14 @@ from cffg import rules
 from cffg.agent import PlanningResult, RollingAgent
 from cffg.models import TransitionNoveltySpec, build_factored_corridor
 
-PROTOCOL = "cff-5ipi/v2"
+PROTOCOL = "cff-5ipi/v3"
 LENGTH = 8
 MODES = 2
 ACTIONS = 3
 HORIZON = 8
 MAX_ACTIONS = 14
 N_SWEEPS = 400
-KNOWN_N_SWEEPS = 800
+KNOWN_N_SWEEPS = 2_000
 KNOWN_DAMP = 0.85
 N_HALF = 4.0
 SATURATION_WEIGHT = 1 / 16
@@ -823,7 +823,7 @@ def analyze(
 
 
 def run_experiment(output: Path) -> dict[str, object]:
-    # v1 requested float64 arrays but let JAX silently truncate them. v2
+    # v1 requested float64 arrays but let JAX silently truncate them. v3
     # explicitly installs and verifies the preregistered dtype before any
     # engine is constructed or compiled.
     jax.config.update("jax_enable_x64", True)
