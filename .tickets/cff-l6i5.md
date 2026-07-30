@@ -1,6 +1,6 @@
 ---
 id: cff-l6i5
-status: in_progress
+status: closed
 deps: [cff-8s6a, cff-ri8m]
 links: [cff-1o72, cff-fxmj, cff-o7hs, cff-ri8m, cff-3hgi, cff-6tek, cff-209l]
 created: 2026-07-09T17:16:15Z
@@ -45,3 +45,7 @@ Full test suite passes unchanged (zero test-file edits except imports if a modul
 **2026-07-13T03:03:27Z**
 
 Follow-up from cff-3hgi judging: conj.py _spd still uses an absolute symmetry tolerance (np.allclose atol=1e-10) in the learning-side SPD assert. It fails loudly (raises) rather than silently accepting, but it is the same absolute-tolerance family cff-3hgi removed from gauss.py/mixg.py and can spuriously reject large-unit accumulated statistics. When migrating the Gaussian family onto the EF natural-parameter abstraction, replace it with the matrix-scale/dtype-relative symmetry check (gauss._symmetry_ok pattern).
+
+**2026-07-30T16:22:30Z**
+
+Final handoff (2026-07-30): commit 419bdbe adds host/JAX natural-family entries for categorical, Dirichlet, and Gaussian algebra, then routes discrete rules/readouts, Dirichlet VMP/learning, Gaussian products/moments/entropy, and the BFE edge ledgers through them without changing arena layouts or rule signatures. The learning-side SPD assertion now uses the Gaussian dtype/dimension/matrix-scale-relative symmetry rule. Direct base-vs-head snapshots proved HMM, Kalman, and T-maze message arenas and BFEs bit-identical and their structure hashes unchanged. Focused validation passed (812 family/hostile tests; 170 engine/schedule/hybrid tests; final combined parity selection 834 tests). Required dashboard run passed 1281 tests, 0 failures, 4 existing third-party warnings in 351.30s and refreshed ~/agent-share/cffg-tests.html. git diff --check, py_compile, and tk dep cycle passed. No test files or dependencies changed. The still-central executable FactorKernel dispatch is intentionally separate and now tracked accurately by cff-209l.
