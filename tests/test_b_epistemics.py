@@ -669,3 +669,116 @@ def test_epistemic_template_renders(viz_gallery):
     svg = render_svg(t, level=4)
     ET.fromstring(svg)
     viz_gallery(svg, tag="dynamics-curiosity rollout (P-sub on TM + obs)")
+
+
+def test_preregistered_factored_experiment_is_locked_and_balanced():
+    from cffg.experiments import annealed_novelty as experiment
+
+    assert experiment.LENGTH == 8
+    assert experiment.MODES == 2
+    assert experiment.HORIZON == 8
+    assert experiment.MAX_ACTIONS == 14
+    assert experiment.N_SWEEPS == 400
+    assert experiment.SEEDS == tuple(range(16))
+    assert experiment.N_EPISODES == 64
+    assert experiment.OBSERVABILITY == (1.0, 0.75, 0.5)
+    assert experiment.ARMS == (
+        "known_plain",
+        "learn_only",
+        "unannealed",
+        "annealed",
+    )
+    assert experiment.ACTIVE_PUBLIC.shape == (2, 3, 8)
+    assert experiment.ACTIVE_PUBLIC.sum() == 14
+    np.testing.assert_array_equal(
+        experiment.DIRICHLET_PRIOR.sum(axis=1), 1.0
+    )
+
+    for index, accuracy in enumerate(experiment.OBSERVABILITY):
+        sensor = experiment.observation_matrix(accuracy)
+        np.testing.assert_allclose(sensor.sum(axis=0), 1.0)
+        for position in range(experiment.LENGTH):
+            for mode in range(experiment.MODES):
+                column = position * experiment.MODES + mode
+                assert sensor[position * 2 + mode, column] == accuracy
+        for seed in experiment.SEEDS:
+            schedule = experiment.mode_schedule(seed, index)
+            np.testing.assert_array_equal(
+                np.bincount(schedule, minlength=2), [32, 32]
+            )
+            np.testing.assert_array_equal(
+                schedule, experiment.mode_schedule(seed, index)
+            )
+
+    annealed = experiment.make_agent("annealed", 1.0)
+    assert annealed.plain_plan is not None
+    assert annealed.plan.arena.gfe_tm_groups
+    assert not annealed.plain_plan.arena.gfe_tm_groups
+    assert not annealed.novelty_saturated()
+
+
+def test_preregistered_analysis_applies_locked_primary_gates():
+    from cffg.experiments import annealed_novelty as experiment
+
+    shape = (3, 4, 16, 64)
+    metrics = {
+        "success": np.zeros(shape, dtype=bool),
+        "steps": np.full(shape, 14, dtype=np.int8),
+        "task_return": np.zeros(shape),
+        "model_kl": np.ones(shape),
+        "active_occupancy": np.zeros(shape, dtype=np.int16),
+        "outside_occupancy": np.zeros(shape, dtype=np.int16),
+        "switch_episode": np.full(shape[:-1], 65, dtype=np.int16),
+    }
+    known, learn, raw, annealed = range(4)
+    del known
+    metrics["model_kl"][:, annealed, :, :16] = 0.5
+    metrics["success"][:, learn, :, 48:64] = True
+    metrics["success"][:, annealed, :, 48:64] = True
+    metrics["success"][:, raw, :, 48:60] = True
+    metrics["task_return"][:, learn, :, 48:64] = 0.5
+    metrics["task_return"][:, annealed, :, 48:64] = 0.5
+    metrics["switch_episode"][:, annealed] = 32
+    timing = np.ones((16, 3, 25)) * 1_000_000
+    timing[:, 2] *= 4
+
+    summary = experiment.analyze(metrics, timing)
+    assert summary["outcome"] == "useful annealed transition exploration"
+    assert all(summary["levels"]["1.0"]["gates"].values())
+
+
+def test_preregistered_outcome_language_distinguishes_failure_and_uncertainty():
+    from cffg.experiments import annealed_novelty as experiment
+
+    shape = (3, 4, 16, 64)
+    metrics = {
+        "success": np.ones(shape, dtype=bool),
+        "steps": np.full(shape, 7, dtype=np.int8),
+        "task_return": np.full(shape, 0.5),
+        "model_kl": np.ones(shape),
+        "active_occupancy": np.zeros(shape, dtype=np.int16),
+        "outside_occupancy": np.zeros(shape, dtype=np.int16),
+        "switch_episode": np.full(shape[:-1], 32, dtype=np.int16),
+    }
+    timing = np.ones((16, 3, 25)) * 1_000_000
+    _, _learn, raw, annealed = range(4)
+    metrics["model_kl"][:, annealed, :, :16] = 0.5
+    metrics["success"][:, raw, :, 48:64] = False
+    metrics["task_return"][:, raw, :, 48:64] = -0.5
+
+    metrics["success"][0, annealed, :, 48:64] = False
+    metrics["task_return"][0, annealed, :, 48:64] = -0.5
+    failed = experiment.analyze(metrics, timing)
+    assert (
+        failed["outcome"]
+        == "annealing does not recover the required behavior"
+    )
+
+    metrics["success"][0, annealed, :, 48:64] = True
+    metrics["task_return"][0, annealed, :, 48:64] = 0.5
+    # The point non-inferiority difference is above -0.05, but half
+    # of one seed's late window fails, so the paired interval crosses it.
+    metrics["success"][0, annealed, 0, 48:56] = False
+    metrics["task_return"][0, annealed, 0, 48:56] = -0.5
+    ambiguous = experiment.analyze(metrics, timing)
+    assert ambiguous["outcome"] == "ambiguous at the preregistered budget"

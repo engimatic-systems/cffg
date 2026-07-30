@@ -67,6 +67,15 @@ class PlanningResult:
     planner: str  # "epistemic_b" | "plain"
 
 
+@dataclass(frozen=True)
+class ObservationResult:
+    """One status-bearing filter/update step."""
+
+    beliefs: np.ndarray | dict[str, np.ndarray]
+    run: RunResult
+    free_energy: float
+
+
 class RollingAgent:
     def __init__(
         self,
@@ -288,13 +297,25 @@ class RollingAgent:
         """Start an explicit action-sampling substream."""
         self.rng = np.random.default_rng(seed)
 
-    def plan_action(self) -> PlanningResult:
-        """Plan over the horizon and retain status, policy, FE, and dispatch."""
-        engine = (
-            self.plain_plan
-            if self.using_plain_planner
-            else self.plan
-        )
+    def plan_action(self, *, use_plain: bool | None = None) -> PlanningResult:
+        """Plan and retain status, policy, FE, and the actual dispatch.
+
+        ``use_plain=None`` applies the runtime's automatic saturation switch.
+        An explicit boolean latches one planner for callers whose protocol
+        permits switching only at a boundary, such as an episode reset.
+        """
+        if use_plain is True:
+            if self.plain_plan is None:
+                raise ValueError("this agent has no precompiled plain planner")
+            engine = self.plain_plan
+        elif use_plain is False:
+            engine = self.plan
+        else:
+            engine = (
+                self.plain_plan
+                if self.using_plain_planner
+                else self.plan
+            )
         assert engine is not None
         state0 = self._with_params(engine)
         run = engine.run(
@@ -317,17 +338,21 @@ class RollingAgent:
             q.copy(),
             run,
             float(engine.bfe(st)),
-            "plain" if engine is self.plain_plan else "epistemic_b",
+            (
+                "epistemic_b"
+                if engine.arena.gfe_tm_groups
+                else "plain"
+            ),
         )
 
     def act(self) -> int:
         """Plan over the horizon from the current belief; pick a control."""
         return self.plan_action().action
 
-    def observe(
+    def filter_observation(
         self, action: int, observation: int
-    ) -> np.ndarray | dict[str, np.ndarray]:
-        """Fold (action, observation) into the belief; conjugate updates."""
+    ) -> ObservationResult:
+        """Fold an action/observation into beliefs and declared learnables."""
         st = self._with_params(self.filter)
         st = self.filter.bind_data(
             st,
@@ -336,7 +361,8 @@ class RollingAgent:
                 self._filter_spec.observation_port: observation,
             },
         )
-        st = self.filter.run(st, 60, tol=1e-12).require_converged()
+        run = self.filter.run(st, 60, tol=1e-12)
+        st = run.require_converged()
         marginals = self.filter.marginals(st)
         next_beliefs = {
             name: _normalize(
@@ -354,7 +380,17 @@ class RollingAgent:
         self.beliefs = next_beliefs
         self.tick += 1
         self.episode_tick += 1
-        return self._belief_result()
+        return ObservationResult(
+            self._belief_result(),
+            run,
+            float(self.filter.bfe(st)),
+        )
+
+    def observe(
+        self, action: int, observation: int
+    ) -> np.ndarray | dict[str, np.ndarray]:
+        """Compatibility readout for one status-checked filter/update step."""
+        return self.filter_observation(action, observation).beliefs
 
     def step(self, env_step: Callable[[int], int]) -> tuple[int, int]:
         u = self.act()

@@ -379,6 +379,8 @@ def test_saturated_active_columns_dispatch_plain_and_keep_learning():
         active[:, None, :] * (16.0 / length)
     )
     assert agent.novelty_saturated()
+    latched = agent.plan_action(use_plain=False)
+    assert latched.planner == "epistemic_b"
     planned = agent.plan_action()
     assert planned.planner == "plain"
     assert planned.run.status.value == "converged"
