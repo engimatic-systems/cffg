@@ -30,3 +30,9 @@ Preserve exact categorical zero support, vacuous and improper Gaussian messages,
 ## Acceptance Criteria
 
 A representative test-only discrete factor and Gaussian factor register and run without central compiler/engine type branches; built-ins retain bit-comparable HMM/Kalman results and unchanged structure hashes; the full suite passes without new dependencies.
+
+## Notes
+
+**2026-07-30T16:51:43Z**
+
+Dependency audit (2026-07-30): cff-o7hs now depends on this ticket because nonlinear Gaussian nodes are new same-arena Gaussian factors and should register without adding central compiler or engine branches. cff-1o72 inherits the prerequisite through its existing dependency on cff-o7hs. Hybrid multi-arena work (including cff-k9ws and cff-izjd) is not blocked here because this ticket explicitly does not promise generic hybrid registration; cff-6tek registers learnable families rather than executable factor kernels.
