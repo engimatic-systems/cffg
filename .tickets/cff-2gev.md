@@ -317,14 +317,13 @@ transition support, vacuous initialization, float32, at least 32 positions by
 columns. Passing these tests establishes mechanism identity only; it is not
 evidence for any empirical label above.
 
-## Live preregistration: cff-5ipi/v2
+## Invalid preregistration: cff-5ipi/v2
 
-**Status:** LIVE and unrun. `cff-5ipi/v2` inherits every model, environment,
-arm, randomization, trace, metric, timing, bootstrap, gate, and outcome
-decision from `cff-5ipi/v1` except for the two numerical-execution corrections
-listed here. It was recorded after the invalid `v1` attempt and its
-convergence-only diagnosis, but before any complete cell or substantive
-treatment result.
+**Status:** INVALID during its pre-run boundary-belief feasibility check; no
+environment rollout, complete cell, or substantive treatment result occurred.
+`cff-5ipi/v2` inherited every model, environment, arm, randomization, trace,
+metric, timing, bootstrap, gate, and outcome decision from `cff-5ipi/v1`
+except for the two numerical-execution corrections listed here.
 
 The `v1` CLI silently executed JAX in its default float32 mode even though the
 serialized arrays requested float64. `v2` enables and asserts
@@ -348,6 +347,28 @@ planner converged within the new budget (357--470 sweeps). The complete `v2`
 run still aborts on the first non-converged or non-finite call, and any further
 protocol change requires a visibly new version and a clean output directory.
 
+## Live preregistration: cff-5ipi/v3
+
+**Status:** LIVE and unrun. `cff-5ipi/v3` inherits every substantive choice
+and every comparative-arm numerical setting from `cff-5ipi/v2`. It makes only
+these two changes, locked before any environment rollout:
+
+1. it requires the cff-qr92 solver certificate at commit `443c51a`, whose
+   `1024 * finfo(dtype).eps` recomputation floor is covered by a generic
+   exact-support regression; and
+2. known/plain keeps `damp=0.85` but receives at most 2,000 rather than 800
+   sweeps. This descriptive reference remains outside every primary paired
+   gate. Learn-only/plain, unannealed, and annealed/drop-back remain at the
+   original `damp=0.5`, 400-sweep cap.
+
+The fixed feasibility grid supplied each of the eight position point masses
+and mode beliefs `[0,1]`, `[.25,.75]`, `[.5,.5]`, `[.75,.25]`, and `[1,0]`
+directly to known/plain. After cff-qr92, all 40 cases converged in 357--1,211
+sweeps with no sampled action, filter call, observation, environment step,
+task result, or arm comparison. No further protocol change is allowed under
+`cff-5ipi/v3`; any invalid call requires a new version and a clean complete
+rerun.
+
 ## Notes
 
 **2026-07-28T04:21:51Z**
@@ -357,3 +378,7 @@ protocol change requires a visibly new version and a clean output directory.
 **2026-07-30T01:02:37Z**
 
 cff-5ipi/v1 invalidation and v2 lock (2026-07-29): The first full-run call stopped at known/plain, r=1, seed 0 with RunStatus.BUDGET_EXHAUSTED (400 sweeps; residual 1.5845) before any trace/cell or substantive outcome existed. Diagnosis found the CLI had not enabled the declared float64; true float64 made the comparative initial plans converge at the original 400/.5, while exact known/plain still limit-cycled. A convergence-only probe over all 16 exact boundary beliefs found known/plain converged at 800 sweeps/damp=.85 (357--470 sweeps). Source: local RunResult diagnostics from committed harness 77ec70f; confidence high. v2 is now locked to x64 enforcement and that reference-only solver exception; every substantive choice remains v1.
+
+**2026-07-30T01:12:43Z**
+
+cff-5ipi/v2 invalidation and v3 lock: The expanded pre-run boundary grid showed v2's exact-known reference could still exhaust its inner solver at 1.28e-13--1.56e-13 and its outer loop at noisy .25/.75 mode beliefs. This produced no action, observation, complete cell, or treatment result. Linked bug cff-qr92 fixed the general recomputation certificate at commit 443c51a. With known/plain alone at damp=.85 and a 2,000-sweep cap, all 40 fixed position/mode boundary beliefs converged in 357--1,211 sweeps. Source: local RunResult grid; confidence high. v3 locks those numerical changes; comparative arms and all substantive/statistical choices are unchanged.
