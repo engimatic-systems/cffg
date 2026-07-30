@@ -40,26 +40,33 @@ the numerical method used here.
 
 ## Design
 
-Implement exactly the route selected and proved by cff-wafy:
+Implement Route B, selected in `docs/DERIVATIONS.md` D7: a gauge-reduced
+trust-region Gauss--Newton/Levenberg--Marquardt solve of the coupled
+KKT/fixed-point residual. Route A is rejected because the complete supported
+P-substituted objective contains multilinear facing-belief/parameter terms;
+bounding the ordinary concave Bethe edge entropies does not leave a convex
+inner problem. The residual merit governs step acceptance but never replaces
+`Engine.bfe` or a policy score.
 
-- If cff-wafy proves a tight double-loop majorizer for the supported
-  P-substituted objective, implement its factor-local convex inner solve and
-  outer bound update, including the proof's original-GFE descent certificate.
-- Otherwise implement its gauge-reduced trust-region
-  Gauss--Newton/Levenberg--Marquardt solve of the coupled KKT/fixed-point
-  residual. The residual merit governs step acceptance but never replaces
-  `Engine.bfe` or a policy score.
+Pack categorical messages as fixed-support log ratios, whiten Gaussian
+natural coordinates from a fixed proper reference, and Fisher-scale other
+minimal EF coordinates. Freeze the D7 residual scale for one solve. Support or
+hardening changes rebuild the exact active chart and restart; no probability
+floor is permitted. Differentiate Corollary-1/D1 local stationary beliefs by
+their implicit reduced stationarity system and its adjoint rather than
+unrolling `_gfe_solve_result`.
 
 No generic "adaptive damping or backtracking" implementation satisfies this
 ticket. The production method must instantiate the selected derivation,
-including its assumptions, active-support behavior, dtype scaling, acceptance
-ratio or majorization certificate, and failure conditions.
+including its assumptions, active-support behavior, dtype scaling,
+actual/predicted-reduction acceptance ratio, and failure conditions.
 
 Put the JAX-native numerical core in a focused module with a one-way dependency
-from `engine.py`. Use factor-local operations or matrix-free JVP/VJP products;
-do not allocate a dense whole-graph Jacobian or Hessian and do not add a solver
-dependency. Preserve the existing local `_gfe_solve_result` equations and
-diagnostics.
+from `engine.py`. Use factor-local operations and matrix-free JVP/VJP products
+with truncated Steihaug CG; require a Cauchy-decrease certificate and choose
+LM regularization only as the trust-region multiplier. Do not allocate a dense
+whole-graph Jacobian or Hessian and do not add a solver dependency. Preserve
+the existing local `_gfe_solve_result` equations and diagnostics.
 
 `Engine.run` should select the proof-backed method explicitly for mixed-GFE
 plans. The existing `damp` argument remains meaningful only for non-GFE
@@ -68,8 +75,9 @@ must not be silently reinterpreted as a trust radius, regularizer, or
 majorization parameter. Migrate project-owned callers away from fixed damping
 for mixed GFE.
 
-`RunResult` must expose the accepted outer residual/merit or majorization
-certificate and a termination reason that distinguishes convergence, inner
+`RunResult` must expose the accepted outer residual/merit, merit-gradient norm,
+trust radius, accepted/rejected steps, and a termination reason that
+distinguishes root convergence, stationary non-root merit, inner
 failure, non-finite evaluation, infeasibility, detected cycle/stagnation, and
 iteration/linear-solve budget exhaustion. Public `RunStatus` may coarsen those
 reasons only if the detailed reason remains machine-readable. `CONVERGED`
@@ -124,11 +132,12 @@ Applicable row: **Runtime numerical or status invariant**.
   an undefined residual, improper belief, or non-finite ledger maps to the
   proof's truthful failure reason.
 - **Float32:** all residual scaling, stopping rules, rank tests, trust-radius
-  or bound guards, and linear-solve tolerances derive from the active dtype and
-  problem scale.
-- **Uncomfortable scale:** cover the horizon-8 factored model with 24-logit
-  GFE-TM members and retain the 32-position by 4-selector rule case without a
-  dense whole-graph derivative matrix.
+  and reduction guards, and linear-solve tolerances derive from the active
+  dtype and problem scale.
+- **Uncomfortable scale:** cover the horizon-8 factored cycle fixture (eight
+  ordinary observation-GFE composites coupled through the learned
+  non-epistemic transition), a 24-logit GFE-TM member, and the 32-position by
+  4-selector rule case without a dense whole-graph derivative matrix.
 - **Finite cycle:** reproduce the one-update mechanism independently of the
   abandoned annealing experiment and show fixed Picard damping still fails
   while the selected method reaches or truthfully rejects the same equations.

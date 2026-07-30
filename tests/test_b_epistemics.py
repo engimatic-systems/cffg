@@ -288,6 +288,61 @@ def test_two_composite_chain_matches_constrained_objective():
     direct_total, (g1, g2, w1, r, w2) = terms(q1, q2)
     np.testing.assert_allclose(w1, r, atol=2e-8)
 
+    # Independent KKT and second-order classification. The equalities are
+    # linear, so the projected Lagrangian Hessian is the projected objective
+    # Hessian. Positive curvature proves a strict constrained local minimum
+    # for this fixture; it makes no global claim for general GFE graphs.
+    marginalizer = np.repeat(np.eye(k), u, axis=1)
+    constraint_jacobian = np.vstack(
+        [
+            np.r_[np.ones(k * u), np.zeros(k * u)],
+            np.r_[np.zeros(k * u), np.ones(k * u)],
+            np.r_[a1[0], -marginalizer[0]],
+        ]
+    )
+    grad1 = (
+        a1.T @ (np.log(w1) + 1.0)
+        + h1
+        + np.log(q1)
+        + 1.0
+        - np.repeat(ld, u)
+        - np.tile(le1, k)
+    )
+    grad2 = (
+        a2.T @ (np.log(w2) + 1.0 - lc)
+        + h2
+        + np.log(q2)
+        + 1.0
+        - marginalizer.T @ (np.log(r) + 1.0)
+        - np.tile(le2, k)
+    )
+    gradient = np.r_[grad1, grad2]
+    multipliers = np.linalg.lstsq(
+        constraint_jacobian.T, -gradient, rcond=None
+    )[0]
+    assert np.linalg.norm(
+        gradient + constraint_jacobian.T @ multipliers, ord=np.inf
+    ) < 1e-6
+
+    hessian = np.zeros((2 * k * u, 2 * k * u))
+    hessian[: k * u, : k * u] = (
+        a1.T @ np.diag(1.0 / w1) @ a1 + np.diag(1.0 / q1)
+    )
+    hessian[k * u :, k * u :] = (
+        a2.T @ np.diag(1.0 / w2) @ a2
+        + np.diag(1.0 / q2)
+        - marginalizer.T @ np.diag(1.0 / r) @ marginalizer
+    )
+    _, singular_values, right = np.linalg.svd(constraint_jacobian)
+    rank_tol = (
+        np.finfo(hessian.dtype).eps
+        * max(constraint_jacobian.shape)
+        * singular_values[0]
+    )
+    tangent = right[np.sum(singular_values > rank_tol) :].T
+    projected_eigenvalues = np.linalg.eigvalsh(tangent.T @ hessian @ tangent)
+    assert projected_eigenvalues.min() > 3.0
+
     plan = engine.arena.gfe_tm_groups[0]
     bp = state.params[plan.name + ":B"]
     runtime_q = {}

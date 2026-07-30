@@ -1159,7 +1159,425 @@ Exact-zero predicted mass contributes exactly zero count. Proper positive
 errors. No absolute probability floor is introduced, and float32 plus
 observation cardinality tens of times larger than the tiny oracle must remain
 finite.
-
 *Executable:* `test_mu1_shared_goal_posterior_and_complete_fe_match_direct_algebra`,
 `test_sweeps_replace_mu1_and_explicit_rollover_adds_one_new_trial`,
 `test_float32_sparse_zero_mass_and_uncomfortable_observation_scale`.
+
+---
+
+## D7 — Mixed-GFE outer stationarity and globalization (cff-wafy)
+
+### D7.1 The plain-English version
+
+The Newton solve inside one GFE composite answers a local question: given all
+of its incoming messages, which local belief satisfies the P-substituted
+stationarity equation? A graph with several such composites asks a second,
+coupled question: are all of those local answers, the ordinary factor
+messages, and the beliefs on their shared edges mutually consistent? Repeating
+one damped sweep is only a fixed-point iteration for that second question.
+Part II proves what its fixed points mean, but deliberately does not prove
+that the iteration reaches one.
+
+This section turns the complete undamped mixed sweep into an explicit
+nonlinear residual. Categorical message scales are removed, exact zeros stay
+on a named support face, and Gaussian and exponential-family messages use
+minimal natural coordinates. On a proper fixed-support chart, a zero residual
+is exactly a stationary point of the original constrained Bethe/generalised
+free energy, subject to the assumptions below. The residual does not replace
+that free energy; it is a numerical representation of its stationarity
+equations.
+
+The familiar convergent-Bethe double loop does not cover the complete
+supported GFE objective. Its entropy bound is valid, but learned/facing
+beliefs and parameter mean fields introduce multilinear P-substitution terms
+that can remain non-convex after every concave Bethe edge entropy is bounded.
+Route A is therefore rejected for the general engine contract. Route B is a
+gauge-reduced trust-region least-squares solve of the original stationarity
+residual. Trust-region globalization guarantees progress toward a stationary
+point of the numerical merit under standard assumptions; only a zero residual
+is inference convergence. A nonzero stationary merit is a solver failure, not
+an approximate belief and never a policy score.
+
+### D7.2 The complete constrained problem
+
+Let \(\mathcal V\) contain every node-local belief and \(\mathcal E\) every
+interior edge belief represented by a sum/GFE plan. This includes ordinary
+factor beliefs, P-substituted composite beliefs, mean-field parameter beliefs,
+and Gaussian or other minimal exponential-family beliefs. Write the unchanged
+ledger assembled by `_make_bfe` as
+
+    F(b) = sum_{a in V} F_a(b_a) + sum_{e in E} H_e(b_e).       (D7.1)
+
+`F_a` is the node-local term already registered for the factor: an ordinary
+Bethe/VMP term, the direct Part-II or D1 P-substituted term, or a parameter
+prior/posterior term from D6. The positive edge entropy is the Forney
+overcounting correction. Equation (D7.1) is notation for the existing
+complete ledger, not a new objective or a replacement decomposition.
+
+Let \(h(b)=0\) collect an independent basis of:
+
+- normalization and node-to-edge marginal consistency;
+- Gaussian/EF moment consistency in the family's minimal sufficient
+  statistics;
+- P-substitution, mean-field, parameter-tying, observed-data, and active hard
+  constraints; and
+- the exact BP-island boundary conditions represented by scheduled messages.
+
+Structural zeros and forbidden hard-factor configurations are removed from
+the domain. Any remaining probability inequality is written \(b_i\geq0\).
+The complete Lagrangian is
+
+    L(b, lambda, nu) = F(b) + lambda^T h(b) - nu^T b,
+    h(b)=0, b>=0, nu>=0, nu_i b_i=0.                           (D7.2)
+
+This includes the node and edge equations whose multipliers are represented
+by messages. It also makes the support qualification explicit: removing a
+structural zero is an equality-domain choice, while setting an otherwise
+feasible probability to zero is an active inequality and needs the
+corresponding complementary multiplier.
+
+#### Fixed-support charts
+
+Choose one support stratum \(\Omega_S\). Every allowed categorical node and
+edge belief is strictly positive relative to \(S\), every required
+normalizer and entropy is finite, and every aggregate continuous-family
+belief is proper. A categorical message \(m\) with support \(S_m\) has one
+irrelevant additive scale. With a deterministic reference
+\(r_m\in S_m\), pack
+
+    c_m(m) = (m_i - m_{r_m})_{i in S_m \ {r_m}}.               (D7.3)
+
+Coordinates outside \(S_m\) are absent, not floored. Thus
+`c_m(m + kappa)=c_m(m)` exactly. Gaussian messages pack their information
+vector and the independent entries of the symmetric precision matrix; the
+aggregate edge precision, not every individual cavity, must be positive
+definite. Other EF messages pack only the natural coordinates of a minimal
+family whose aggregate parameter lies in the interior of its proper domain.
+Parameter-message and fixed-particle `mu3` coordinates that change during an
+outer sweep are part of the state too; immutable model parameters are not.
+
+For numerical scaling, the continuous blocks are first made dimensionless.
+A Gaussian block uses a fixed affine whitening from the proper initial edge
+belief. A minimal EF block uses the Fisher metric at a fixed proper reference
+belief. Categorical log ratios are already dimensionless (nats). These
+changes are invertible coordinate choices; they do not alter a belief or
+stationarity equation.
+
+Let \(C\) concatenate these reduced coordinates and let \(C^{-1}\) choose the
+canonical representative of every message class. The admissible chart
+\(\mathcal Y_S\) contains exactly the states for which every local rule,
+ledger term, and scheduled propagation is defined and proper. Marginal
+consistency need not hold away from a root.
+
+#### One complete outer map
+
+For fixed model parameters, fixed particle samples, fixed support, and a fixed
+hard-constraint phase, define \(T\) as:
+
+1. solve every Part-II/D1 local P-substituted belief to its reported
+   stationary solution;
+2. execute every other non-eliminated iterative factor/parameter update;
+3. refresh scheduled BP islands (a complete two-pass on each forest and one
+   colored sweep on each cyclic island); and
+4. put every message and auxiliary outer coordinate in its canonical gauge.
+
+There is no damping in \(T\). Damping changes the path but not a fixed point
+when it is a finite convex combination; it is not part of the equations being
+solved. A stochastic `mu3` refresh defines a new sample objective and hence a
+new \(T\); one residual solve reuses one particle set as required by D6b.
+Define
+
+    R(y) = C(T(C^-1(y))) - y.                                  (D7.4)
+
+Forest BP messages may be absent from \(y\) only when their conditional
+fixed point is unique up to gauge and the schedule reconstructs it exactly.
+Cyclic BP messages remain coordinates. A composed schedule is not allowed to
+hide a block whose intermediate equation is unsatisfied.
+
+### D7.3 Zero-set equivalence
+
+**Assumptions.**
+
+1. **Fixed relative interior.** \(\Omega_S\) is constant in a neighborhood,
+   all allowed categorical beliefs are positive on it, no positive predicted
+   mass faces an exact-zero likelihood/goal, and all normalizers are finite.
+   Structural support is nonempty.
+2. **Proper minimal continuous families.** Aggregate Gaussian precisions are
+   positive definite; aggregate EF natural parameters lie in the interior of
+   a minimal proper family; the required log partitions and moments are
+   twice continuously differentiable.
+3. **Regular constraints.** The selected equalities in (D7.2) are an
+   independent local basis (LICQ after normalization and multiplier gauges
+   are removed), and `F` and those constraints are \(C^2\) on the chart.
+4. **Complete local equations.** Every registered update used by \(T\) is
+   algebraically equivalent in both directions to its block stationarity and
+   consistency equations. Its conditional stationary belief is unique on
+   the chosen branch and depends smoothly on the incoming coordinates. For
+   the fixed-channel Part-II and D1 discrete composites this follows from the
+   positive tangent Hessian
+
+       diag(1/q) + P^T diag(1/(Pq)) P;
+
+   `_gfe_solve_result` selects that gauge-reduced solution. Ordinary positive
+   sum-product updates and proper minimal-family conditional updates have the
+   analogous unique normalized solution. A future rule that cannot establish
+   branch completeness must retain its local belief as an unknown and add its
+   direct stationarity equation instead of hiding it behind a selected solve.
+5. **Faithful scheduling.** One application of \(T\) covers every
+   non-eliminated block. An eliminated forest has a unique conditional BP
+   solution and is reconstructed by the exact directed pass. Fixed points of
+   a colored or flooding sweep are the simultaneous ordinary update
+   equations.
+6. **Determinism and exact local status.** Particles, data, active constraints,
+   and parameters are fixed during the solve. Every local inner status is
+   `converged`; an exhausted/diverged local solve leaves \(T\) undefined for
+   purposes of a convergence claim.
+
+**Theorem 1 (fixed point iff constrained stationarity on
+\(\Omega_S\)).** Under Assumptions 1–6,
+
+    R(y)=0
+
+if and only if the beliefs reconstructed from \(C^{-1}(y)\) and their message
+multipliers satisfy every local Part-II, D1, ordinary-factor, parameter, and
+edge consistency equation, and therefore the first-order KKT equations
+\(\nabla_b L=0,\ h(b)=0\) of (D7.2) relative to \(\Omega_S\).
+
+*Proof.* Because \(C\) is a bijection on message gauge classes, \(R(y)=0\)
+means \(T(m)\) and \(m\) differ only by harmless categorical scales. By
+faithful scheduling, every non-eliminated outgoing message is therefore a
+fixed point of its registered update and every eliminated forest message is
+its unique conditional BP solution. Assumption 4 converts each of those
+relations, in both directions, into the corresponding node-local
+stationarity equation and its outgoing marginal/moment consistency
+equations. The cavity messages are precisely the independent Lagrange
+multipliers for those consistencies; P-substitution and mean-field updates
+supply their declared constraint equations. Collecting all blocks gives
+\(\nabla_bL=0\) and \(h(b)=0\). Conversely, KKT stationarity gives every
+registered local relation by the Part-II/D1 and ordinary message
+derivations. Conditional uniqueness makes each update return the same belief
+and outgoing multiplier class, while exact forest elimination reconstructs
+the same island solution. Hence \(T(m)\) is gauge-equivalent to \(m\), so
+\(R(y)=0\). ∎
+
+The fixed-support qualification is material. If a zero coordinate is an
+optimizer-chosen active inequality rather than a structural zero, Theorem 1
+proves only tangent stationarity on that face. Full KKT additionally requires
+the excluded-coordinate dual inequalities and complementarity in (D7.2).
+Support changes therefore use an active-set certificate and restart with a
+new exact chart; they never add a probability floor. A hardening-phase change
+likewise creates a new active problem and restarts \(T\).
+
+The theorem is first order only. With an independent constraint Jacobian
+\(A\), let \(Z\) span its tangent/null space. A negative eigenvalue of
+\(Z^T\nabla^2_{bb}LZ\) rules out a local minimum; positive definiteness is a
+sufficient second-order condition for a strict constrained local minimum.
+Positive semidefiniteness alone is only necessary. A stationary or strict
+local point is not a global minimum of the generally non-convex GFE. Global
+optimality needs a separate convexity or comparison proof.
+
+### D7.4 Route A: why the available double-loop proof does not close
+
+For an ordinary Kikuchi objective, the non-convex entropy allocation can be
+written
+
+    F_K = sum_a (E_a(b_a) - H(b_a)) - sum_e c_e H(b_e),
+
+where every potential energy \(E_a\) is linear and the constraints are
+linear marginal consistencies. Whenever a counting number makes
+\(+|c_e|H(b_e)\) concave, KL nonnegativity supplies
+
+    H(b) <= -sum_i b_i log b_i^(old).                          (D7.5)
+
+This affine cross-entropy bound touches in value and first feasible
+variation: the omitted `+1` multiplies `sum_i delta b_i=0`. Replacing all such
+concave entropies gives the convex inner problem used by convergent
+Bethe/Kikuchi double loops. Exact zeros already require a fixed support,
+because crossing a zero of the reference belief makes (D7.5) infinite.
+
+The fixed-channel, fixed-goal P-substituted discrete term is not itself the
+obstruction. With \(\pi\) the state-side belief, \(r=P\pi\), and fixed
+conditional entropy/goal terms, its nonlinear part is
+
+    -H(pi) - H(r),
+
+whose Hessian is the positive matrix in Assumption 4. The ordinary positive
+edge entropies could still be bounded by (D7.5).
+
+The complete supported Part-II objective can vary both facing beliefs and
+parameter mean fields. With
+\(\pi(a)=q(z)q(\theta)\), \(\tau(b)=q(w)q(\phi)\),
+\(r=P\pi\), and \(C(x,b)=-\log\tilde p(x|b)\), the local form contains
+
+    G(pi,tau) = -H(pi) - H(tau) - I_pi(a;x) + r^T C tau.       (D7.6)
+
+The last term is bilinear in \(r,\tau\), while \(r\) is multiaffine in the
+actual mean-field coordinates. It need not be convex after all concave edge
+entropies are bounded. A binary counterexample makes \(x=a\) deterministic
+and uses a binary facing channel that matches \(x=b\) with probability
+\(1-\epsilon\). At \(\pi=\tau=(1/2,1/2)\), scalar simplex coordinates give
+
+    Hessian(G) = [[8, Delta_C], [Delta_C, 4]],
+    Delta_C = 2 log(epsilon/(1-epsilon)).
+
+For `epsilon=0.01`, `Delta_C^2 > 32`, so this node-local Hessian is
+indefinite. Lifting \(a,b\) into one region belief makes the energy linear
+only by retaining the non-convex independence/P-substitution constraint;
+dropping it changes the variational family. Freezing the recursive
+predictive marginal also has the wrong direction:
+
+    sum r log r - sum r log r_old = KL(r || r_old) >= 0,
+
+so the cross term is a lower bound on `-H(r)`, not the needed upper bound.
+
+Therefore the Heskes/Zoeter construction does not prove a tight convex
+majorizer for the unchanged general supported objective, and no cited result
+supplies a support-safe Gaussian/EF factor-local replacement. This is the
+precise failed assumption for Route A; it is not an impossibility theorem for
+every future quadratic or Bregman majorizer on a restricted chart. Route B is
+the selected production contract for cff-weff.
+
+### D7.5 Route B: gauge-reduced trust-region residual solve
+
+Let the dimensionless reduced coordinates be divided into natural blocks.
+At the start \(y_0\), freeze a positive diagonal residual scale \(D\). For
+block \(j\),
+
+    d_j = max(rms(R_j(y_0)), sqrt(finfo(dtype).eps) * u_j),    (D7.7)
+
+where \(u_j\) is one unit in the block's dimensionless chart. The second term
+only prevents division by zero at the dtype's resolution; it is not a model
+ridge or probability floor. Recomputing \(D\) after each step would silently
+change the merit and invalidate the standard theorem. Define
+
+    f(y) = D^-1 R(y),       phi(y) = 0.5 ||f(y)||_2^2.         (D7.8)
+
+Every `R=0` point is a global minimum of this numerical merit and, by
+Theorem 1, a stationary point of the original constrained GFE. The converse
+for stationary merit points is false:
+
+    grad phi = J_f^T f = 0
+
+allows a nonzero `f` orthogonal to the range of \(J_f\). Consequently `phi`
+never enters `_make_bfe`, a node ledger, a learned parameter, or a policy
+score. It is only step-acceptance machinery.
+
+At iteration \(k\), approximately solve the Gauss--Newton trust-region model
+
+    min_s 0.5 ||f_k + J_k s||^2
+    subject to ||S_k s|| <= Delta_k,                           (D7.9)
+
+where \(S_k\) is a uniformly positive dimensionless coordinate scaling. Use
+the standard ratio of actual to predicted merit reduction to accept/reject
+the trial and shrink or grow `Delta`. Levenberg--Marquardt is the equivalent
+normal equation
+
+    (J_k^T J_k + lambda S_k^T S_k) s = -J_k^T f_k,
+
+with `lambda` chosen as the trust-region multiplier, not by an independent
+ridge schedule. Truncated Steihaug CG needs only `Jv` and `J^T v`; it must
+return at least a uniform fraction of the Cauchy decrease. A dense global
+Jacobian, normal matrix, or Hessian is outside this contract.
+
+The local Corollary-1/D1 Newton loop must not be differentiated by unrolling
+its iteration count. Its gauge-reduced stationarity equation supplies an
+implicit JVP solve, and the transposed local system supplies the VJP. This
+keeps global products matrix-free, preserves the exact local equation, and
+batches the existing small factor-local linear solves under `vmap`.
+
+**Theorem 2 (honest globalization claim).** Suppose the initial merit
+sublevel set is compact and remains a positive distance inside one admissible
+\(\mathcal Y_S\); \(f\) is continuously differentiable there with a bounded,
+Lipschitz (uniformly continuous is sufficient for weaker forms) Jacobian; the
+trust-region scaling is uniformly bounded and positive; and every subproblem
+step achieves the required Cauchy decrease. Then the standard trust-region
+iteration from any admissible initial point drives
+`||grad phi||` to zero (or has `liminf=0` under the weaker hypotheses), and
+every accumulation point is first-order stationary for `phi`.
+
+This is globalization from an admitted start, not global minimization. It
+implies `R -> 0` only with an additional error bound, for example a uniform
+positive lower bound on the smallest singular value of \(J_f\) at limit
+points (a nonsingular square residual Jacobian is sufficient). Near a
+zero-residual root with a Lipschitz full-rank Jacobian, Gauss--Newton/LM has
+its usual fast local convergence. Without that rank/error-bound condition, a
+nonzero stationary merit, rejected-step radius collapse, or exhausted Krylov
+budget is `budget_exhausted` with a diagnostic such as
+`stationary_nonroot`; it is never `converged`.
+
+Numerical convergence requires all of:
+
+- the existing dtype-scaled componentwise fixed-point certificate for `R`;
+- a finite, stationary original `_make_bfe` ledger at the same accepted
+  state;
+- every local inner status `converged`; and
+- support/propriety and predicted-reduction checks passing.
+
+A non-finite current residual, derivative product, belief, or original FE is
+`diverged`. An empty/inconsistent structural support is `infeasible`.
+Improper/vacuous input for which a registered local rule is undefined is
+`diverged` unless the compiler can prove structural infeasibility. A finite
+trial that leaves the proper chart is rejected and shrinks the trust region;
+repeated rejection to a dtype-derived radius floor is exhaustion, not
+success. Root, gradient, rank, predicted-reduction, and radius floors use the
+active dtype, chart units, block norms, and problem dimension. A relative
+rank threshold has the form
+`finfo(dtype).eps * max(m,n) * operator_scale`; no literal numerical ridge is
+introduced.
+
+### D7.6 Runtime and test handoff
+
+The production change in cff-weff follows the
+**Runtime numerical or status invariant** row of `ARCHITECTURE.md`.
+
+- `rules._gfe_solve_result` keeps its Part-II/D1 equations and truthful local
+  status. It gains an implicit differentiation rule or exposes the reduced
+  local stationarity linearization; it is not replaced by the outer solver.
+- `_make_step` and the mixed schedule define the pure undamped \(T\).
+  `_make_bfe` remains the sole scientific objective. `Engine.run` owns the
+  trust-region controller and must not accept constant damping as its
+  convergence argument for a mixed-GFE plan.
+- `RunResult` retains the original FE trace/residual and local status, and
+  adds enough outer diagnostics to distinguish root convergence,
+  stationary-nonroot/stagnation, trust/Krylov budget exhaustion, rejected
+  improper trials, infeasibility, and divergence. `require_converged`
+  continues to reject every non-root outcome.
+- Host/JIT implementations share one residual, packing, support, and
+  acceptance kernel. Flooding and mixed schedules have different maps but
+  the same fixed-point equations under Theorem 1; both need parity tests.
+  Exact two-pass schedules are N/A because they contain no iterative GFE
+  structure. A hardening phase freezes its active constraints and restarts
+  the solve.
+- Packing shapes and support masks are static per active-set solve. A
+  single-instance controller and its `vmap` form use per-instance trust
+  radii, statuses, and Krylov masks, so cff-wbhu can consume the solver rather
+  than invent another loop. Checkpoint decoding is N/A for this change.
+- The horizon-8 cycle fixture has 24-logit GFE-TM-scale members but is caused
+  by eight ordinary observation-GFE composites coupled through a learned
+  non-epistemic transition. The frozen state is an exact 8-position by
+  2-mode corridor with beliefs `position=[1,0,...]`, `mode=[0,1]`, and one
+  conjugate increment over a `6x8x8` Dirichlet prior:
+  `alpha[5,0,0] += 1`. It contains no novelty schedule or behavioral result.
+  The existing `32x4` D1 hostile case remains the larger local-rule anchor.
+
+Executable anchors:
+
+- `test_packed_outer_residual_is_gauge_invariant_at_checked_fixed_points`
+  checks the chart, gauge invariance, and zero residual on the analytical
+  T-maze and D1 fixed points.
+- `test_two_composite_chain_matches_constrained_objective` independently
+  optimizes the complete simplex objective, checks KKT consistency and the
+  ledger, and classifies its selected point with the projected Hessian.
+- `test_one_update_corridor_has_outer_cycle_with_converged_inner_solves`
+  freezes the reusable one-update state and proves that the current defect is
+  bounded persistent outer nonstationarity, not an inner-Newton failure.
+
+References: Part II Sections 4.4--4.5 and Appendix B; Heskes, Albers, and
+Kappen, *Approximate Inference and Constrained Optimization* (2012);
+Heskes and Zoeter, *Generalized belief propagation for approximate inference
+in hybrid Bayesian networks* (2003); Yedidia, Freeman, and Weiss,
+*Constructing Free-Energy Approximations and Generalized Belief Propagation
+Algorithms* (2005); Moré, *The Levenberg--Marquardt Algorithm:
+Implementation and Theory* (1977); Conn, Gould, and Toint,
+*Trust Region Methods*; and Steihaug, *The Conjugate Gradient Method and
+Trust Regions in Large Scale Optimization* (1983).
