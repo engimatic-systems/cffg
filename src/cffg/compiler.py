@@ -20,6 +20,14 @@ Port policy at compile time:
 - PRIOR / GOAL ports: rejected; they declare that a factor is *missing*, so
   compiling would silently change the model. Compose the prior (M2) or bind
   the goal machinery (M3) first.
+
+Module map:
+- Plan dataclasses and ``Arena`` define compiled structure and addressing.
+- ``compile_template`` validates, classifies edges, groups factors, and packs
+  all runtime plans.
+- ``_resolve_learnables`` binds declarations to statistic sources and writes.
+- ``_resolve_arrays``, ``_blob_shape``, and ``_stack_*`` load and validate
+  parameter data.
 """
 
 from __future__ import annotations

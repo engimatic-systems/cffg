@@ -82,6 +82,9 @@ This project will span many context windows. The rule that makes that survivable
   and comments are the handoff.
 - **During**: atomic commits referencing the ticket ID. Discovered work becomes a
   *new ticket* (linked with a dependency), not scope drift in the current one.
+- **Before implementation**: the ticket handoff names the applicable row in the
+  `docs/ARCHITECTURE.md` change-path index and lists each duplicated execution
+  surface affected; checked pairs that do not apply are marked N/A.
 - **During implementation**, run focused test files as often as useful for the
   changed component.
 - **Final validation for a code change** requires one passing full-suite run

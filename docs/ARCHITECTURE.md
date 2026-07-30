@@ -50,6 +50,26 @@ must be organized around an **extensible rule registry**, not a universal solver
 └─────────────────────────────────────────────────────────┘
 ```
 
+### Change-path index
+
+Start here before opening the large compiler and engine modules. This is a
+contributor checklist: the authority owns a decision, while the derived surfaces
+transport or execute it. A ticket handoff names the applicable row, walks each
+surface, and marks non-applicable items explicitly; that keeps repository scans
+and review context proportional to the change.
+
+| Ticket shape | Authority | Derived surfaces that must agree | Canonical focused tests | Durable documentation |
+| --- | --- | --- | --- | --- |
+| New IR field | `src/cffg/core/ir.py` (`Template` or its spec dataclass) | `src/cffg/core/validate.py`; `src/cffg/core/serialize.py` (`to_dict`, `from_dict`, `structure_hash`); `src/cffg/core/plates.py` scoping; `src/cffg/core/compose.py` and `src/cffg/core/edits.py` when editable; `src/cffg/compiler.py` and `Arena` when executable; bundle and agent state when persisted | `tests/test_ir.py`, `tests/test_serialize.py`, `tests/test_plates.py`; add `tests/test_edit_codec.py`, `tests/test_edits.py`, `tests/test_agent_spec.py`, or `tests/test_bundle.py` only for the affected boundary | Contract in this document; public construction and migration in `README.md`; unsupported cases in `LIMITATIONS.md` |
+| New factor or rule family | `src/cffg/kernels.py:FactorKernel`, its `src/cffg/core/ir.py:FactorType`, and the family rule module; formal equations are authoritative in code docstrings and `DERIVATIONS.md` | Compiler grouping, slot addressing, parameter packing, `Arena`, and `member_of`; synchronous `_make_step`; scheduled `_batch_stage_fn` / `_scan_stage_fn`; `_make_bfe`; schedule classification, readouts, serialization manifest, estimator, and public exports as applicable | `tests/test_kernels.py`; the family rule and engine-oracle tests; `tests/test_schedule.py`; sparse-support, float32, and uncomfortable-scale cases required by the robustness contract | Derivation in `DERIVATIONS.md`; integration contract here; approximations in `LIMITATIONS.md`; public modeling API in `README.md` |
+| Runtime numerical or status invariant | `AGENTS.md` numerical contract and `src/cffg/engine.py` (`RunStatus`, `RunResult`, `Engine.run`) | Flooding, colored/mixed, and exact schedules; host `_has_zero_support` and JIT `_make_support_check`; `_make_step`, `_make_exact_unit`, `_make_propagate`, and `_make_bfe`; inner-solver status; `RollingAgent`, `Colony`, estimator, benchmark, and dashboard consumers | `tests/test_runtime_status.py`, `tests/test_schedule.py`, `tests/test_colony.py`, plus the changed rule family's hostile-input tests | Runtime contract here and in `README.md`; any accepted failure mode or approximation in `LIMITATIONS.md` |
+| Learnable or checkpoint feature | `src/cffg/core/ir.py` (`LearnableSpec`, `AgentSpec`, `BeliefBinding`) and `src/cffg/learn.py` (`Family`, `Learnables`) | Validation, JSON/hash, plate scoping, compiler `_resolve_learnables`, `Arena.learn_plans`, `member_of`, engine readouts and parameter writes, agent cadence, checkpoint encode/decode and legacy migration, and bundles | `tests/test_learnables.py`, `tests/test_agent_spec.py`, `tests/test_agent.py`, and `tests/test_bundle.py`; add the contributing factor family's statistic test | Conjugate contract here; statistics beyond the papers in `DERIVATIONS.md`; public cadence/checkpoint API in `README.md`; remaining family gaps in `LIMITATIONS.md` |
+
+Duplicated execution surfaces are deliberate review pairs: host/JIT,
+flooding/scheduled, single-instance/`vmap`, and current/legacy checkpoint
+decoding. A change that touches one side names the other in its ticket handoff,
+even when the second side is checked and found not applicable.
+
 ### 1. Core IR and serialization (`cffg.core`)
 
 A pure-Python (dataclass) representation, independent of JAX:
@@ -99,7 +119,7 @@ A pure-Python (dataclass) representation, independent of JAX:
   a GUI later is just a client of this API, and edit actions double as an
   incremental (append-only) serialization of model history.
 
-### 2. Compiler (`cffg.compile`)
+### 2. Compiler (`cffg.compiler`)
 
 Two-phase, mirroring PGMax:
 
@@ -430,7 +450,7 @@ therefore carries the declared product of block marginals rather than silently
 discarding a joint correlation. Exact joint rollover remains the separate
 `BoundaryFactorization.JOINT` representation from §3c.
 
-### 4. Inference VM (`cffg.infer`)
+### 4. Inference VM (`cffg.engine`)
 
 - Schedules (cff-d56d, `cffg.schedule`): the engine builds a schedule from
   the compiled arena instead of always flooding. The factor graph over the
