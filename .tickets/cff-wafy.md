@@ -1,6 +1,6 @@
 ---
 id: cff-wafy
-status: in_progress
+status: closed
 deps: [cff-d56d, cff-j4mu]
 links: []
 created: 2026-07-30T17:58:57Z
@@ -253,3 +253,7 @@ Research — residual/KKT and trust-region theorem (2026-07-30). Question: when 
 **2026-07-30T18:23:07Z**
 
 Research — deterministic cycle and independent oracle (2026-07-30). Question: what minimal retained state reproduces the defect without the abandoned annealing experiment, and which oracle already fits? Answer: public build_factored_corridor at length 8, modes 2, horizon 8, exact observation GFE, learned non-epistemic position transition, fixed beliefs position=[1,0,...], mode=[0,1], and Dirichlet alpha baseline 1/8 with only alpha[5,0,0]+=1 reproduces persistent bounded nonstationarity. At float64, damp=.5 and 400 sweeps: outer BUDGET_EXHAUSTED residual 1.6901208400 while inner status is CONVERGED; no novelty schedule, GFE-TM, environment, trace, or outcome analysis is involved. Horizons 1-7 eventually converge; keep horizon 8. The orbit is cycle-like rather than an exactly repeating short-period float sequence (15k-sweep tail remains bounded with FE about 36.67-59.42 and message delta 1.25-2.20). The existing two-composite K=U=2 constrained oracle in tests/test_b_epistemics.py is the smallest nondegenerate coupled D1 graph; its 5D projected Hessian eigenvalues are approximately [3.20,4.17,4.47,5.00,5.50], classifying its selected point as a strict constrained local minimum. Sources: retained branch codex/cff-2gev-annealed-novelty commits 19caadf/488a7f8 and current public builders/tests. Confidence: high.
+
+**2026-07-30T18:39:37Z**
+
+Completion handoff (2026-07-30): commit 33d347f selects Route B. DERIVATIONS D7 proves the fixed-support gauge-reduced residual/KKT equivalence under explicit support, propriety, branch-completeness, and scheduling assumptions; rejects Route A at the multilinear P-substitution curvature obstruction; and specifies matrix-free trust-region GN/LM with implicit local-solve differentiation. The reusable one-update horizon-8 corridor fixture, T-maze/D1 gauge residual checks, and independent projected-Hessian oracle are executable. Final validation: 1283 passed, 0 failed in the single dashboard-driven full-suite run; git diff --check and tk dep cycle passed. Next: cff-weff implements D7 exactly; nonzero stationary merit is failure, and solver merit never enters Engine.bfe or policy scoring.

@@ -167,3 +167,9 @@ Applicable row: **Runtime numerical or status invariant**.
    `README.md` state the solver contract and its honest boundary: numerical
    globalization does not guarantee the global minimum of a non-convex CFFG.
    The full suite, `tk dep cycle`, and `git diff --check` pass.
+
+## Notes
+
+**2026-07-30T18:39:37Z**
+
+Formalism dependency completed by cff-wafy commit 33d347f. Implement Route B from DERIVATIONS D7: fixed-support log-ratio/minimal-natural chart, frozen dtype-aware residual scale, matrix-free trust-region GN/LM with Steihaug CG, implicit JVP/VJP through local Corollary-1/D1 stationarity, active-set restarts, and root-vs-stationary-nonroot diagnostics. Reuse tests/test_outer_gfe_formalism.py::one_update_corridor_case unchanged; the production solver should change only the expected outcome, not the fixture/model/tolerance.
