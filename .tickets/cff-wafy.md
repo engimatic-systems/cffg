@@ -237,3 +237,7 @@ Ready root: cff-wafy. Immediate blocker: cff-weff waits for the proof-backed rou
 Next work: derive the complete coupled stationarity/KKT residual in DERIVATIONS; extract the one-update fixed-cycle reproducer from the retained closed experiment branch without importing its annealing mechanism or outcome claims; test whether a tight P-substituted GFE majorizer closes; and record either the double-loop proof or the precise obstruction plus trust-region residual contract. Do not implement production globalization in this ticket. Closed PRs #42/#43 are historical negative evidence only: the run stopped in learn-only before annealing activated, so it supports neither annealing nor a behavioral comparison.
 
 Branch/stack handoff: continue formalism work on agent/cff-weff-formalism and keep its PR based on main. After formalism acceptance, cut the cff-weff implementation branch from that head and base its draft PR on the formalism branch until the first PR merges.
+
+**2026-07-30T18:03:14Z**
+
+Draft PR handoff: https://github.com/engimatic-systems/cffg/pull/47 targets main from agent/cff-weff-formalism. Continue the proof, DERIVATIONS update, and deterministic reproducer on this same branch; keep the PR in draft until cff-wafy acceptance criteria are met.
