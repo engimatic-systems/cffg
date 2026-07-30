@@ -62,6 +62,50 @@ result is observed, changing a choice below voids `cff-5ipi/v1`; the change
 must be recorded as a visibly new protocol before a complete rerun. Mechanism
 unit tests are not experimental results.
 
+### What this experiment tests, in plain English
+
+We are testing whether transition curiosity can be useful briefly and then
+get out of the agent's way. The agent starts with a poor model of how movement
+works. Its persistent mode reverses left and right, so it must gather
+transition evidence while still trying to reach the end of the corridor.
+Full-strength transition curiosity previously overwhelmed that goal without
+learning a better model.
+
+The treatment gives each learned transition an evidence odometer. Curiosity
+starts at full strength, halves as observations accumulate, and disappears
+from the planning path after every task-relevant transition has enough
+evidence. Unknown transitions that are unreachable or irrelevant to the
+goal cannot hold the expensive curiosity path open forever.
+
+The factored state space makes this a more efficient and informative test.
+Position and mode are represented separately instead of learning one large
+flat transition table over their Cartesian product. Persistent mode dynamics
+are known; only position dynamics conditioned on mode and action are learned.
+Every rollout slice and episode contributes to the same named, tied parameter
+block, concentrating evidence on the uncertainty the task actually needs
+instead of diluting it across unnecessary joint-state parameters.
+
+Four arms separate the explanations: a known-model reference, ordinary
+learning without transition curiosity, curiosity that never fades, and the
+annealed/drop-back treatment. A useful-exploration claim requires the
+treatment to learn the true task-relevant transitions faster, recover normal
+goal performance, and return to approximately ordinary-planner cost.
+Independent transition-model error prevents aimless wandering from being
+called useful exploration; task success prevents lower model error from
+excusing an ineffective agent.
+
+The sensor sweep is an honesty check on the transition-curiosity bound. The
+primary condition reveals position and mode, so the priced transition
+information is realizable. Progressively hiding mode shows whether the result
+survives partial observability or depends on treating the next state as if it
+were directly revealed. Balanced modes, paired seeds, fixed early/late
+windows, and locked thresholds keep luck and post-hoc storytelling out of the
+conclusion.
+
+In one sentence: the experiment asks whether focused curiosity buys faster
+model learning early, then fades soon enough to preserve task performance and
+remove its extra computational cost.
+
 ### Model, environment, and declared uncertainty
 
 The experiment uses `build_factored_corridor` with `length=8`, `modes=2`,
