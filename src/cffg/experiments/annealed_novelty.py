@@ -1,8 +1,8 @@
-"""Locked cff-5ipi/v1 factored-corridor experiment for cff-2gev.
+"""Locked cff-5ipi/v2 factored-corridor experiment for cff-2gev.
 
 This module intentionally exposes no protocol-tuning arguments.  The model,
 arms, seeds, windows, bootstrap, traces, timing, and outcome gates were fixed
-in ``.tickets/cff-2gev.md`` before the replacement experiment was run.
+in ``.tickets/cff-2gev.md`` before the v2 replacement experiment was run.
 Changing a constant here after observing a result voids that preregistration.
 """
 
@@ -22,13 +22,15 @@ from cffg import rules
 from cffg.agent import PlanningResult, RollingAgent
 from cffg.models import TransitionNoveltySpec, build_factored_corridor
 
-PROTOCOL = "cff-5ipi/v1"
+PROTOCOL = "cff-5ipi/v2"
 LENGTH = 8
 MODES = 2
 ACTIONS = 3
 HORIZON = 8
 MAX_ACTIONS = 14
 N_SWEEPS = 400
+KNOWN_N_SWEEPS = 800
+KNOWN_DAMP = 0.85
 N_HALF = 4.0
 SATURATION_WEIGHT = 1 / 16
 SEEDS = tuple(range(16))
@@ -172,8 +174,10 @@ def make_agent(arm: str, accuracy: float) -> RollingAgent:
             else None
         ),
         epistemic_b=epistemic,
-        damp=0.5,
-        n_sweeps=N_SWEEPS,
+        damp=KNOWN_DAMP if arm == "known_plain" else 0.5,
+        n_sweeps=(
+            KNOWN_N_SWEEPS if arm == "known_plain" else N_SWEEPS
+        ),
         select="sample",
         seed=0,
     )
@@ -472,6 +476,8 @@ def _run_cell(
         arm=np.asarray(arm),
         accuracy=np.asarray(accuracy),
         master_seed=np.asarray(master_seed),
+        configured_n_sweeps=np.asarray(agent.n_sweeps),
+        configured_damp=np.asarray(agent.damp),
         mode_schedule=modes,
         status_vocabulary=np.asarray(
             ["converged", "budget_exhausted", "diverged", "infeasible"]
@@ -817,6 +823,13 @@ def analyze(
 
 
 def run_experiment(output: Path) -> dict[str, object]:
+    # v1 requested float64 arrays but let JAX silently truncate them. v2
+    # explicitly installs and verifies the preregistered dtype before any
+    # engine is constructed or compiled.
+    jax.config.update("jax_enable_x64", True)
+    if not jax.config.x64_enabled:  # pragma: no cover - JAX owns this flag
+        raise RuntimeError(f"{PROTOCOL}: JAX x64 mode could not be enabled")
+
     output = Path(output)
     if output.exists() and any(output.iterdir()):
         raise FileExistsError(
@@ -848,6 +861,10 @@ def run_experiment(output: Path) -> dict[str, object]:
     for obs_index, accuracy in enumerate(OBSERVABILITY):
         for arm_index, arm in enumerate(ARMS):
             agent = make_agent(arm, accuracy)
+            if np.dtype(agent.plan.init_state().messages.dtype) != np.float64:
+                raise RuntimeError(
+                    f"{PROTOCOL}: {arm}/r={accuracy} compiled without float64"
+                )
             for seed in SEEDS:
                 cell, snapshot = _run_cell(
                     agent,
