@@ -1,6 +1,6 @@
 ---
 id: cff-qr92
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-07-30T01:09:38Z
@@ -27,3 +27,9 @@ Exact-zero transition/observation support: retain finite messages and certify on
 
 The exact-support factored boundary-belief regression converges with finite FE/messages and `RunStatus.CONVERGED`; a zero-iteration solve remains `BUDGET_EXHAUSTED`; NaN input remains `DIVERGED`; the tolerance is derived from `jnp.finfo(dtype)` with its invariant documented; focused GFE, GFE-TM, and factored tests pass.
 
+
+## Notes
+
+**2026-07-30T01:10:39Z**
+
+Implemented a 1024*finfo(dtype).eps Newton certificate (the smallest power-of-two ULP allowance above the observed 1.70e-13 float64 plateau), documented the invariant beside the solver, and added an exact-support 8x2 factored-corridor regression that requires both inner and outer convergence plus finite FE/messages. Focused GFE/GFE-TM/factored hostile set: 21 passed. No absolute floor was introduced; zero-iteration and NaN status tests remain in tests/test_gfe.py.

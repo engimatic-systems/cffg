@@ -395,6 +395,41 @@ def test_saturated_active_columns_dispatch_plain_and_keep_learning():
     assert agent.novelty_saturated()
 
 
+def test_exact_support_factored_gfe_certifies_roundoff_stationarity():
+    """Regression for cff-qr92's gauge-fixed Newton roundoff plateau.
+
+    The hard corridor transitions and sensor put the 24-logit future-state
+    solve exactly on sparse support. Its recomputed inner residual can settle
+    just above 512 float64 ULPs even though outer messages become stationary.
+    """
+    builder = functools.partial(
+        build_factored_corridor,
+        length=8,
+        modes=2,
+        dtype=np.float64,
+    )
+    agent = RollingAgent(
+        builder,
+        horizon=8,
+        damp=0.88,
+        n_sweeps=2_000,
+        select="sample",
+        seed=0,
+    )
+    agent.beliefs = {
+        "position": np.r_[1.0, np.zeros(7)],
+        "mode": np.array([1.0, 0.0]),
+    }
+
+    planned = agent.plan_action()
+
+    assert planned.run.status.value == "converged"
+    assert planned.run.inner_status.value == "converged"
+    assert planned.run.iterations < agent.n_sweeps
+    assert np.isfinite(planned.free_energy)
+    assert np.isfinite(np.asarray(planned.run.state.messages)).all()
+
+
 def test_multiple_arbitrarily_named_learnables_ignore_inactive_columns():
     length, modes = 3, 2
     _canonical, base = build_factored_corridor(

@@ -363,6 +363,12 @@ def dirichlet_vmp_energy_parts(ftype, inc2, alpha, alpha0, cards):
 # absorbed — see cff-007q for the derivation).
 
 _N_NEWTON = 64
+# The gauge-fixed softmax/Jacobian round trip can settle a few hundred ULPs
+# above algebraic zero even when a recomputed solution no longer moves. 1024
+# ULPs is the smallest power-of-two allowance covering the exact-support
+# factored regression; deriving it from eps keeps the certificate meaningful
+# in both f32 and f64 instead of introducing an absolute residual floor.
+_GFE_SOLVE_TOL_ULPS = 1024.0
 
 
 class GfeSolveResult(NamedTuple):
@@ -453,9 +459,12 @@ def _gfe_solve_result(abar, h, logc, log_d, max_iters: int = _N_NEWTON):
     # non-increasing even when the local linear model is poor.  Step fractions
     # are dimensionless; numeric validity guards come only from finfo(dtype).
     fractions = jnp.asarray([1.0, 0.5, 0.25, 0.125, 0.0625, 0.0], dtype=dtype)
-    # A few hundred ulps are required after the softmax/Jacobian round trip;
-    # below this floor Newton can only repeat a zero-length backtracking step.
-    tol = jnp.asarray(512.0, dtype=dtype) * jnp.finfo(dtype).eps
+    # Below this dtype-scaled recomputation floor Newton can only repeat a
+    # zero-length backtracking step.
+    tol = (
+        jnp.asarray(_GFE_SOLVE_TOL_ULPS, dtype=dtype)
+        * jnp.finfo(dtype).eps
+    )
 
     v0 = center(log_d)
     u0 = v0[:-1] - v0[-1]
