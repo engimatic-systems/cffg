@@ -390,3 +390,7 @@ cff-5ipi/v2 invalidation and v3 lock: The expanded pre-run boundary grid showed 
 **2026-07-30T02:49:34Z**
 
 cff-5ipi/v3 invalidation (2026-07-29): The clean run at commit 19caadf completed all 16 r=1 known/plain reference cells, then aborted before completing the first comparative cell. Learn-only seed 0 failed at episode 1 step 2 after one transition update: outer RunStatus.BUDGET_EXHAUSTED after 400 sweeps, residual 1.6901, oscillating FE/messages; inner Newton remained CONVERGED. Invalid partial traces are preserved at /Users/ravd/agent-share/cffg-annealed-novelty-cff-5ipi-v3 and must not be analyzed as outcomes. An excluded-seed 999 lifecycle failed at episode 2 under damp .8 and .85, and independent frozen-state restarts from .9 through .99 failed up to 15,000 sweeps while inner solves converged. Source: locked harness RunResults and convergence-only diagnostics; confidence high. cff-weff now blocks a new protocol/clean rerun; do not weaken truthful convergence or reuse partial cells.
+
+**2026-07-30T02:58:04Z**
+
+Draft stacked PR opened: https://github.com/engimatic-systems/cffg/pull/43, based on PR #42. Mechanism and harness are reviewable; keep the PR draft and ticket in_progress until cff-weff lands, a visibly new protocol is committed, and one clean complete experiment run produces the locked analysis.
