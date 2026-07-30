@@ -1,7 +1,12 @@
-# CFFG Engine — Architecture Plan
+# CFFG Engine — Architecture
 
-Status: proposal, 2026-07-05. Sources: Koudahl et al. Part I (arXiv:2306.08014),
-van de Laar et al. Part II, project brief in Obsidian `agents/CFFG/0.0.md`.
+Status: living as-built record, updated 2026-07-30. Unless a section says
+otherwise, every statement before **Target design** describes behavior in the
+current repository. Tickets, not the target section, are the source of truth for
+planned work.
+
+Sources: Koudahl et al. Part I (arXiv:2306.08014), van de Laar et al. Part II,
+and the project brief in Obsidian `agents/CFFG/0.0.md`.
 
 ## What the papers give us (and what they don't)
 
@@ -26,10 +31,11 @@ The papers provide a complete recipe for a specific, powerful thing:
   learning curves in Part II §7) plus the biaslab/LAIF Julia reference code.
 
 What they do *not* give: GFE messages for arbitrary node types. Each new
-factor-type × constraint combination needs a derived update rule. So the engine
-must be organized around an **extensible rule registry**, not a universal solver.
+factor-type × constraint combination needs a derived update rule. The
+implementation therefore uses an **extensible rule registry**, not a universal
+solver.
 
-## Layered design
+## Implemented layers
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -43,21 +49,43 @@ must be organized around an **extensible rule registry**, not a universal solver
 │                    message updates: BP / VMP / GFE      │
 ├─────────────────────────────────────────────────────────┤
 │ 2. Compiler        template → grounded graph → arenas   │
-│                    (PGMax-style) → jitted step function │
+│                    groups, plans, and index tables      │
 ├─────────────────────────────────────────────────────────┤
 │ 1. Core IR         typed CFFG graph + constraints +     │
 │                    ports; serialization; edit actions   │
 └─────────────────────────────────────────────────────────┘
 ```
 
+### Change-path index
+
+Start here before opening the large compiler and engine modules. This is a
+contributor checklist: the authority owns a decision, while the derived surfaces
+transport or execute it. A ticket handoff names the applicable row, walks each
+surface, and marks non-applicable items explicitly; that keeps repository scans
+and review context proportional to the change.
+
+| Ticket shape | Authority | Derived surfaces that must agree | Canonical focused tests | Durable documentation |
+| --- | --- | --- | --- | --- |
+| New IR field | `src/cffg/core/ir.py` (`Template` or its spec dataclass) | `src/cffg/core/validate.py`; `src/cffg/core/serialize.py` (`to_dict`, `from_dict`, `structure_hash`); `src/cffg/core/plates.py` scoping; `src/cffg/core/compose.py` and `src/cffg/core/edits.py` when editable; `src/cffg/compiler.py` and `Arena` when executable; bundle and agent state when persisted | `tests/test_ir.py`, `tests/test_serialize.py`, `tests/test_plates.py`; add `tests/test_edit_codec.py`, `tests/test_edits.py`, `tests/test_agent_spec.py`, or `tests/test_bundle.py` only for the affected boundary | Contract in this document; public construction and migration in `README.md`; unsupported cases in `LIMITATIONS.md` |
+| New factor or rule family | `src/cffg/kernels.py:FactorKernel`, its `src/cffg/core/ir.py:FactorType`, and the family rule module; formal equations are authoritative in code docstrings and `DERIVATIONS.md` | Compiler grouping, slot addressing, parameter packing, `Arena`, and `member_of`; synchronous `_make_step`; scheduled `_batch_stage_fn` / `_scan_stage_fn`; `_make_bfe`; schedule classification, readouts, serialization manifest, estimator, and public exports as applicable | `tests/test_kernels.py`; the family rule and engine-oracle tests; `tests/test_schedule.py`; sparse-support, float32, and uncomfortable-scale cases required by the robustness contract | Derivation in `DERIVATIONS.md`; integration contract here; approximations in `LIMITATIONS.md`; public modeling API in `README.md` |
+| Runtime numerical or status invariant | `AGENTS.md` numerical contract and `src/cffg/engine.py` (`RunStatus`, `RunResult`, `Engine.run`) | Flooding, colored/mixed, and exact schedules; host `_has_zero_support` and JIT `_make_support_check`; `_make_step`, `_make_exact_unit`, `_make_propagate`, and `_make_bfe`; inner-solver status; `RollingAgent`, `Colony`, estimator, benchmark, and dashboard consumers | `tests/test_runtime_status.py`, `tests/test_schedule.py`, `tests/test_colony.py`, plus the changed rule family's hostile-input tests | Runtime contract here and in `README.md`; any accepted failure mode or approximation in `LIMITATIONS.md` |
+| Learnable or checkpoint feature | `src/cffg/core/ir.py` (`LearnableSpec`, `AgentSpec`, `BeliefBinding`) and `src/cffg/learn.py` (`Family`, `Learnables`) | Validation, JSON/hash, plate scoping, compiler `_resolve_learnables`, `Arena.learn_plans`, `member_of`, engine readouts and parameter writes, agent cadence, checkpoint encode/decode and legacy migration, and bundles | `tests/test_learnables.py`, `tests/test_agent_spec.py`, `tests/test_agent.py`, and `tests/test_bundle.py`; add the contributing factor family's statistic test | Conjugate contract here; statistics beyond the papers in `DERIVATIONS.md`; public cadence/checkpoint API in `README.md`; remaining family gaps in `LIMITATIONS.md` |
+
+Duplicated execution surfaces are deliberate review pairs: host/JIT,
+flooding/scheduled, single-instance/`vmap`, and current/legacy checkpoint
+decoding. A change that touches one side names the other in its ticket handoff,
+even when the second side is checked and found not applicable.
+
 ### 1. Core IR and serialization (`cffg.core`)
 
 A pure-Python (dataclass) representation, independent of JAX:
 
-- `VariableSpec` (domain: categorical cardinality now, continuous later),
-  `FactorSpec` (type + parameter refs), `ConstraintSpec` (bead types:
-  normalization, marginalization, form/δ, moment-matching, P-substitution set 𝒫),
-  `CompositeNode` (Markov-blanket grouping, e.g. the goal-observation pair).
+- `VariableSpec` supports discrete cardinalities, Gaussian dimensions, and
+  scalar exponential-family tags. `FactorSpec` holds a type plus parameter
+  references, and `ConstraintSpec` holds normalization, marginalization,
+  form/δ, moment-matching, and P-substitution beads. GFE composites are derived
+  compiler plans detected from factors and constraints; they are not a separate
+  serialized IR node.
 - **Templates with ports.** A template is a CFFG fragment whose boundary edges are
   declared **ports** with roles: `data` (sensor clamp), `goal` (goal prior),
   `prior` (parameter prior), `glue` (connects to the next unrolled slice). A model
@@ -71,49 +99,54 @@ A pure-Python (dataclass) representation, independent of JAX:
   variable, boundary factorization, and optional episode-scale learnable.
   These names are model structure, round-trip through JSON/`.cffgz`, and
   participate in the structure hash; the compiled arena remains derived.
-- **Serialization**: versioned JSON (or msgpack) schema for structure and
-  constraints; all array data (A matrices, Dirichlet counts, goal statistics)
-  referenced as relative file paths to `safetensors`/`.npz` blobs. Content hash
-  of the structural part keys the JIT cache.
+- **Serialization**: versioned JSON is the canonical structure and constraint
+  schema. Array data (A matrices, Dirichlet counts, goal statistics) stays
+  outside JSON and is referenced by relative `.npy` or `.safetensors` paths.
+  `.npz` is a ZIP container and cannot memory-map its individual arrays through
+  ordinary `np.load`, so it is reserved for `RollingAgent` runtime checkpoints,
+  whose many small state arrays benefit from one container but do not need
+  memory mapping.
+  The structural content hash ignores blob paths and groups compatible Colony
+  instances.
 - **Init templates (cff-wx28)**: a `BlobRef` may carry a canonical-initializer
   spec (`cffg.inits`: uniform/one-hot/sticky/banded/shift/seeded-random plus
   Gaussian eye/SPD), so warm-start parameters need no external file; any
   probability template takes a `strength` knob that turns it into Dirichlet
   counts (confidence-weighted priors for learn_a/learn_b). Resolution order:
-  explicit arrays > existing blob file > init spec — checkpoints override
-  warm starts on reload. Init specs, like paths, are erased from the
+  explicit arrays > existing blob file > init spec — a persisted blob overrides
+  its warm start on reload. Init specs, like paths, are erased from the
   structure hash (parameter data, not structure).
 - **Portable bundle**: the deployable unit is a ZIP (`.cffgz`) containing
   `model.json` (structure + constraints), `blobs/` (parameter arrays), and
   `manifest.json` (schema version, content hashes, provenance). Unzipping and
-  pointing the engine at `model.json` is a full restore; checkpointing writes
-  the same bundle. Plate fragments remain nested specs in `model.json`; the
-  manifest inventories every grounded tied/per-copy array, and per-copy blob
-  paths use an `{index}` marker resolved during grounding. Array-key-derived
-  subpaths prevent collisions without flattening the plate spec. Original flat
-  schema-1 manifests remain loadable. No third-party interchange format — this
-  schema is canonical.
+  pointing the engine at `model.json` is a full model restore. Bundle parameter
+  members are canonical `.npy` files; ordinary external references may also use
+  safetensors. Plate fragments remain nested specs in `model.json`; the manifest
+  inventories every grounded tied/per-copy array, and per-copy blob paths use an
+  `{index}` marker resolved during grounding. Array-key-derived subpaths prevent
+  collisions without flattening the plate spec. Original flat schema-1 manifests
+  remain loadable. No third-party interchange format — this schema is canonical.
 - **Edit actions**: the only public mutation API is transactional bundles
   (`add_slice`, `bind_data`, `set_constraint`, `compose(template, port_map)`) that
-  validate the port invariant before committing. This is the GUI-ready surface —
-  a GUI later is just a client of this API, and edit actions double as an
-  incremental (append-only) serialization of model history.
+  validate the port invariant before committing. This client-neutral API is also
+  the incremental serialization of model-edit history.
 
-### 2. Compiler (`cffg.compile`)
+### 2. Compiler (`cffg.compiler`)
 
-Two-phase, mirroring PGMax:
+Compilation has two phases, mirroring PGMax:
 
-1. **Grounding**: template + horizon + data bindings → flat grounded graph.
-   Unrolling = repeated self-composition along glue ports. Time-dependent
-   constraints applied here: past observation edges get δ (data) constraints,
-   future observation edges get P-substitution + goal prior — this is exactly how
-   the papers unify perception and planning in one model.
+1. **Grounding and validation**: plate fragments expand, the complete Template
+   validates, arrays resolve, and edges and constraints are classified. Template
+   composition, horizon construction, and past/future constraint selection have
+   already happened in model builders; observations remain runtime inputs.
 2. **Arena layout**: group factors and edges by (type, shape) into dense arrays;
    messages live in one flat log-space tensor per direction with gather/scatter
-   index maps. One MP sweep = a few vectorized segment-ops per factor group, and
-   the whole iteration loop is a `jax.lax.scan` inside `jax.jit`. Structure edits
-   trigger recompile; data/parameter edits are just new arena inputs (no
-   recompile). Static shapes throughout.
+   index maps. One synchronous sweep and the BFE ledger are jitted. Exact
+   two-pass schedules fuse propagation, certification, support checks, and the
+   ledger; periodic scheduled stages use `jax.lax.scan`. The general
+   flooding/colored/mixed convergence loop remains Python host control flow.
+   Structure edits rebuild the arena and compiled functions; observations and
+   parameters are state inputs. Static shapes throughout.
 
 ### 2b. Domain families and the Gaussian arena (cff-4e5z)
 
@@ -165,9 +198,8 @@ missing data drops the node). Conjugate BP is exact on EF subgraphs, so
 beads (mean-field, P-substitution) on EF nodes are compile errors, and the
 tree identity BFE = −log evidence is pinned to 1e-12 in
 `tests/test_ef_engine.py`. Improper beliefs (e.g. the vacuous Gamma point)
-make every ledger term +inf — loud by construction, never NaN. The
-re-expression of Cat/Dir/Gaussian onto the same abstraction is a separate
-zero-regression refactor ticket.
+make every ledger term +inf — loud by construction, never NaN.
+Cat/Dir/Gaussian currently remain on their dedicated message representations.
 
 ### 2d. Hybrid discrete-continuous nodes (cff-pksr)
 
@@ -207,10 +239,9 @@ a registered kernel with the wrong identity or MAJOR version is refused too.
 
 v1 binding scope: kernels attach to the EF arena, where the message
 representation is uniform (natural parameters, products add, vacuous is
-zeros) — `gamma`, `beta`, `poisson_obs`, and `bernoulli_obs` are now
-kernels, and `equality` remains structural infrastructure. The discrete,
-Gaussian, and hybrid families still run on central paths; they migrate onto
-the contract under cff-l6i5 and cff-x0sv rather than in one rewrite.
+zeros) — `gamma`, `beta`, `poisson_obs`, and `bernoulli_obs` are kernels,
+and `equality` remains structural infrastructure. The discrete, Gaussian, and
+hybrid families still run on central paths.
 
 Compatibility policy (AC6, pre-1.0): the Python registration API
 (`register_kernel`, the `FactorKernel` field set) is internal-unstable and
@@ -271,7 +302,10 @@ hyperparameters checkpointed separately.
 
 ### 3. Message rule library (`cffg.rules`)
 
-A registry keyed by `(factor_type, constraint_config, out_edge_role)`:
+Discrete BP and VMP use factor-type update and energy tables; `FactorKernel`
+packages the same pair for registered EF factors; specialized GFE composites
+have explicit update and ledger functions. The compiled plan selects among
+these surfaces:
 
 - **Standard rules**: sum-product (BP) and VMP for `Cat`, `Dir`, `TransitionMixture`
   (the TM node from Part I Appendix C), equality nodes, δ.
@@ -291,10 +325,10 @@ A registry keyed by `(factor_type, constraint_config, out_edge_role)`:
   cavity (so the two facing messages reconstruct q_w), while its ledger uses
   the node-local objective without the downstream Lagrange coupling. Formal
   derivation + plain-English companion in docs/DERIVATIONS.md D1.
-- Each rule ships with a **local free-energy contribution** function (average
-  energy + entropy terms with correct edge-entropy overcounting), so global
-  BFE/GFE is always exactly the sum of registered local terms — the "true BFE, no
-  shortcuts" requirement is enforced structurally.
+- Every update path has a matching **local free-energy contribution** (average
+  energy plus the appropriate entropy terms). `_make_bfe` adds those node terms
+  and the arena-derived edge-entropy corrections, so the global BFE/GFE follows
+  the constrained Bethe ledger rather than a scoring shortcut.
 
 #### 3b. Declared learnables: the conjugate-update contract (`cffg.learn`, cff-x0sv)
 
@@ -430,7 +464,7 @@ therefore carries the declared product of block marginals rather than silently
 discarding a joint correlation. Exact joint rollover remains the separate
 `BoundaryFactorization.JOINT` representation from §3c.
 
-### 4. Inference VM (`cffg.infer`)
+### 4. Inference VM (`cffg.engine`)
 
 - Schedules (cff-d56d, `cffg.schedule`): the engine builds a schedule from
   the compiled arena instead of always flooding. The factor graph over the
@@ -531,36 +565,21 @@ discarding a joint correlation. Exact joint rollover remains the separate
 
 ### 5b. Colony execution (many small graphs, one machine)
 
-A first-class use case: ~10²–10³ small CFFG instances running concurrently as
-adaptive components ("learning goo") inside a larger deterministic host system.
-This costs three design constraints, adopted from M1 onward, and one extra layer —
-not an architecture change:
+`Colony` owns an instance table of `(structure_hash, State)` pairs and caches one
+`Engine` per structure hash. Each `State` is an Equinox pytree containing
+messages, parameters, and conditioned observations; structure remains in the
+cached engine. Instances with one structure are stacked and one scheduled
+iteration is evaluated under `filter_vmap`, while different structures run as
+separate groups. Inter-instance coupling happens through host-side data binding
+and marginal reads, never by merging graphs.
 
-- **Stateless engine, state as pytree.** An instance is pure data:
-  `(structure_hash, params, messages, rng_key)`. The compiled step is a pure
-  function `state → state`. No singletons, no Python object holding arrays.
-  (JAX pushes us here anyway; we make it a contract.)
-- **Batch axis by construction.** The compiled step must be `vmap`-compatible
-  (no data-dependent Python control flow; Newton loops as `lax` primitives with
-  fixed iteration caps). Then N instances *sharing a structure* execute as one
-  batched XLA kernel — a colony of clones with different parameters, data, and
-  RNG keys is barely more expensive than one instance.
-- **Batching by structure hash.** The JIT cache is already keyed on structure;
-  the colony scheduler groups instances by that key and runs one vmapped call
-  per group per tick. A hundred goo blobs = (few unique templates) compiled
-  kernels, not a hundred compilations.
-- **`Colony` layer** above the agent runtime: owns the instance table, groups by
-  structure, ticks groups (sync round-robin first; JAX's async dispatch already
-  overlaps host code and XLA), routes host-system signals to instance data/goal
-  ports and actions back. Inter-instance coupling happens **through the host via
-  ports** (the Part II buyer/seller pattern: nested Markov blankets, exchanging
-  observations/actions), never by merging graphs at runtime.
-
-Known cost: per-instance *structure* evolution fragments the batching (each
-divergent structure = its own compile). The goo pattern should draw structures
-from a small template library and evolve parameters freely; structure variants
-get promoted to the library deliberately, not mutated ad hoc. Memory is a
-non-issue at this scale (a T-maze-sized instance's arenas are kilobytes).
+The convergence loop and per-instance status bookkeeping are currently Python
+host control flow around the vmapped iteration. The measured 32-instance CPU
+speedup is about 1.5× over sequential execution because dispatch dominates.
+Stochastic `mu3` evaluators are rejected by `Colony`: explicit PRNG preparation,
+particle state, and stochastic statuses exist on `Engine`, but Colony does not
+yet carry them per instance. Per-instance structure changes also fragment
+batching because each distinct hash owns a compiled engine.
 
 ## Test suite (three tiers, per the brief)
 
@@ -640,10 +659,8 @@ experiment harness").
 Because shapes are static post-compile, memory is computable analytically from
 arena sizes. The estimator reports exact named byte counts for every persistent
 State arena (`messages`, Gaussian eta/Lambda/observations/masks, and EF
-messages/observations/masks) plus parameters; the wider XLA/calibration audit
-remains tracked by cff-j7mm. `jax.jit(...).lower(...).compile().cost_analysis()`
-can provide FLOPs/bytes per MP sweep, with a calibration run supplying measured
-sweep time.
+messages/observations/masks) plus parameters. It does not currently provide a
+trustworthy XLA cost analysis; cff-j7mm records that limitation.
 
 ## Diagram rendering (`cffg.viz`)
 
@@ -671,59 +688,58 @@ four-stage pipeline, each stage importable on its own:
    through the optional `viz` extra (cairosvg). Golden SVGs pin the pipeline
    for the canonical models.
 
-Message-schedule overlays (Figs 23/24/27 arrows) are deferred (cff-jude);
-the scene graph anchors overlays to wires by ref when that lands.
+Message-schedule overlays (Figs 23/24/27 arrows) are not implemented; the
+current renderer stops at the typed scene graph.
 
-## Dependency policy (JAX ecosystem)
+## Dependency policy
 
-Adopt (well-established, matched to our actual needs):
+The library's direct runtime dependencies are:
 
-- **`jax`** — the engine substrate.
-- **`equinox`** — pytree containers for engine/instance state. `eqx.Module` gives
-  typed dataclass-pytrees, and `filter_jit`/`filter_vmap` cleanly separate static
-  fields (structure hash, shapes, schedule) from dynamic arrays (messages,
-  parameters) — exactly our compile boundary. Used for *state containers and
-  compiled callables*, not neural networks.
-- **`jaxtyping`** — shape/dtype annotations on message-rule signatures, runtime
-  checked in tests. Message-passing bugs are shape bugs; catch them at the rule
-  boundary.
-- **`chex`** — test assertions (pytree/shape equality, jit-vs-nojit variants).
-- **`safetensors`** — parameter blobs in the `.cffgz` bundle.
-- **`hypothesis`** — property tests (FE accounting invariants, normalization).
+- **`numpy`** for host-side compilation, serialization, and readouts;
+- **`jax`** for numerical rules and compiled execution;
+- **`equinox`** for State pytrees plus filtered JIT and `vmap`; and
+- **`safetensors`** for safe external parameter-blob loading.
 
-Explicitly not adopted (revisit only with a ticket making the case):
+Pytest and SciPy are development dependencies; SciPy is an independent
+distribution/property oracle. CairoSVG is an optional visualization dependency.
+Dynamax and simglucose are isolated to benchmark/development groups. Portable
+`.cffgz` bundles use `.npy` members even though the compiler also accepts
+external safetensors.
 
-- **`flax`/NNX** — neural-network library; nothing here is a neural net until
-  hybrid surrogate nodes (LIMITATIONS S5), and Equinox covers that day too.
-- **`numpyro`/`blackjax`** — sampling-based inference; different paradigm, and
-  leaning on it risks "shortcut" FE evaluation.
-- **`distrax`/`tfp.substrates.jax`** — heavyweight for what Cat/Dirichlet need;
-  `jax.scipy.special` (digamma, logsumexp) covers the math. Reconsidered at
-  the continuous milestone as promised (cff-8s6a, 2026-07-09) and the answer
-  held: the EF abstraction needs exactly two special functions (digamma,
-  gammaln), both in `jax.scipy.special`; everything else is one-line
-  natural-parameter algebra (`cffg/ef.py`, `cffg/efrules.py`). A framework
-  dependency would buy nothing and cost the closed-ledger discipline —
-  distrax/tfp log-probs don't decompose into our node/edge Bethe terms.
-  scipy was adopted as a *dev* dependency only (property-test oracle).
-- **`pgmax`** — read for arena-layout ideas; BP-only scope makes it a dead-end
-  dependency.
-- **`inferactively-pymdp` (1.x JAX rewrite)** — investigated (ticket cff-9n7o):
-  contains zero Bethe/CFFG/GFE machinery (fixed-form POMDP only), and drags in
-  matplotlib/seaborn/mctx/networkx as hard deps. Policy: *read-only reference +
-  selective vendoring* — small pure MIT functions (stable_xlogx-style numerics,
-  dirichlet_kl_divergence, spm_wnorm exact form, info-gain decompositions) may
-  be vendored into `cffg/vendor/` with attribution; its `calc_vfe`
-  (return_decomposition=True) and chain-VMP serve as cross-validation oracles
-  for our FE ledger in M2/M3 tests.
-- **`optax`/`jaxopt`** — first-order optimizers; our Newton solves are a few
-  lines of `jax.jacobian` + `lax.while_loop` on tiny systems.
+The engine does not directly depend on Flax/NNX, NumPyro, BlackJAX,
+Distrax/TFP, PGMax, inferactively-pymdp, Optax, or JAXopt. In particular,
+Distrax/TFP remain deliberately unadopted: the EF implementation needs only
+`jax.scipy.special` primitives, and third-party log-probability APIs do not
+provide the node/edge decomposition required by the Bethe ledger. PGMax and
+pymdp are reference material only; no source package is imported or vendored.
+`jaxtyping`, Chex, and Hypothesis are likewise not direct project dependencies.
 
 One structural rule: **`cffg.core` (IR + serialization) imports neither JAX nor
 Equinox.** Templates must be loadable, validatable, and editable on a machine
 with no accelerator stack; JAX enters at the compiler boundary.
 
-## Staging for hierarchical and sophisticated inference
+## Target design
+
+Everything above this heading describes the repository as built. This section
+preserves intended directions and the original roadmap; it is not an
+implementation claim. The `tk` dependency graph and individual tickets are the
+source of truth for readiness, scope, and status.
+
+### Near-term architectural targets
+
+- **Uniform message-family algebra (cff-l6i5).** Re-express Cat/Dir/Gaussian
+  products, moments, and energies through the natural-parameter contract while
+  preserving their arenas and rule signatures.
+- **Colony runtime (cff-wbhu, cff-rqqc).** Put the general convergence loop and
+  per-instance status carry inside one compiled scan, and give stochastic
+  evaluators explicit per-instance PRNG streams and particle state.
+- **Resource analysis (cff-j7mm).** Restore correct XLA lowering and calibrated
+  FLOP/byte reporting on top of the existing exact arena-byte estimate.
+- **Visualization clients (cff-jude).** Use the edit API as the model-editor
+  boundary and add message-schedule overlays to the scene graph's wire
+  references.
+
+### Hierarchical and sophisticated inference
 
 - **Hierarchical models: cleanly additive, plan as M7.** Templates-with-ports
   already compose vertically: a higher level places priors on a lower level's
@@ -742,24 +758,25 @@ with no accelerator stack; JAX enters at the compiler boundary.
   (LIMITATIONS H5/S4). Default posture: receding-horizon replanning first,
   shallow branch templates where contingency demonstrably pays.
 
-## Positions on open questions from the brief
+### Long-term positions from the brief
 
 - **Interchange format (brief item 8)**: decided — no ONNX. ONNX encodes directed
   computational graphs of NN operators and cannot represent factor-graph
   structure, variational constraints, or P-substitution. The canonical format is
   our own schema, and the deployable model is the self-contained `.cffgz` ZIP
   bundle described above.
-- **Existing probabilistic libraries**: borrow PGMax's arena/tensor-layout ideas
-  (by reading, not depending — its scope is BP-only and we need custom messages),
-  and use `distrax`/`tfp.substrates.jax` only for distribution math utilities.
-  The FE accounting and message rules must be ours — that's the whole point.
-- **Scheduling**: agree it's not the hard part. The hard parts are (1) GFE message
-  convergence (hence Newton/Corollary-1 form as default, damping available),
-  (2) importance-sampling noise in parameter learning, (3) growing the rule
-  registry beyond the discrete submodel (continuous/Gaussian GFE messages are
-  research work, not engineering — schedule accordingly).
+- **Existing probabilistic libraries**: borrow layout and oracle ideas without
+  adding PGMax, Distrax, or TFP as engine dependencies. FE accounting and message
+  rules remain native because the node/edge ledger decomposition is the engine's
+  defining contract.
+- **Scheduling**: preserve the current schedule abstraction while removing host
+  dispatch from general iteration and fusing common chain slices. Continuous and
+  hybrid GFE messages remain research work rather than scheduling work.
 
-## Milestones
+### Original milestone plan
+
+This is the sequence from the project brief, retained for design context rather
+than current status:
 
 - **M0** — scaffolding: uv project, tk epics, CI (pytest + ruff), this doc.
 - **M1** — core IR: graph + constraints + ports, serialization round-trip,

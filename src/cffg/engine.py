@@ -10,6 +10,20 @@ Free energy: `bfe` evaluates F = Σ_a F[q_a] + Σ_{interior edges} H[q_i]
 exactly — node terms from the rule registry, plus the Bethe edge-entropy
 correction (interior edges have degree 2, hence counting number d_i − 1 = 1).
 On tree graphs at the BP fixed point, F = −log Z.
+
+Module map:
+- ``State``, status results, and segmented gather/scatter helpers define the
+  runtime boundary.
+- ``Engine`` owns state setup, data binding, host control flow, and readouts.
+- Family sweeps and ``_make_step`` implement synchronous flooding.
+- Stage builders and ``_make_propagate`` implement scheduled JIT execution.
+- ``_make_exact_unit`` and ``_make_bfe`` certify scheduled runs and the ledger.
+
+Paired paths:
+- ``Engine.step`` calls ``_make_step``; ``Engine.run`` drives flooding or mixed
+  iterations, while ``_run_exact`` drives ``_make_exact_unit``.
+- Host ``_has_zero_support`` and JIT ``_make_support_check`` share exact-support
+  semantics; public ``Engine.bfe`` delegates to ``_make_bfe``.
 """
 
 from __future__ import annotations

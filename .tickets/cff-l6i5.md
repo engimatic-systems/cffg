@@ -11,7 +11,7 @@ parent: cff-ahps
 ---
 # Zero-regression refactor: Cat/Dir/Gaussian message families onto the EF natural-parameter abstraction
 
-Re-express the discrete (categorical/Dirichlet log-space) and Gaussian (information-form) message families as instances of the EF contract (DERIVATIONS.md D2, cffg/ef.py + cffg/efrules.py): products are natural-parameter addition, moments are grad-A, energies/entropies are A-algebra. Pure refactor of internals — the arenas, rule signatures, and every existing test stay byte-identical in behavior. DELEGATION: suitable for Opus behind the existing suite; the suite is the spec.
+Re-express the discrete (categorical/Dirichlet log-space) and Gaussian (information-form) message families as instances of the EF contract (DERIVATIONS.md D2, cffg/ef.py + cffg/efrules.py): products are natural-parameter addition, moments are grad-A, energies/entropies are A-algebra. Pure refactor of internals — the arenas, rule signatures, and every existing test stay byte-identical in behavior.
 
 ## Acceptance Criteria
 
