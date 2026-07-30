@@ -309,12 +309,14 @@ Many agents on one machine:
 from cffg.colony import Colony
 colony = Colony()
 ids = [colony.spawn(t, arrays_i) for arrays_i in per_instance_params]
-colony.run(100, damp=0.5)      # one vmapped step-loop per unique structure
+colony.run(100, damp=0.5)      # vmapped iterations, grouped by structure
 colony.marginals(ids[0])
 ```
 
 Engines are cached by structure hash — N instances of one template cost one
-compilation, and instances couple only through their ports.
+compilation, and instances couple only through their ports. Convergence and
+per-instance status are currently tracked by a Python loop around each vmapped
+iteration.
 
 ## Edit, ship, budget
 
@@ -328,10 +330,16 @@ from cffg.bundle import save_bundle, load_bundle
 save_bundle("model.cffgz", template, arrays)   # zip: model + blobs + manifest
 template, arrays, manifest = load_bundle("model.cffgz")  # hash-verified
 
+# BlobRef paths use .npy or .safetensors; .cffgz stores .npy members.
+# RollingAgent checkpoints use .npz for many small runtime arrays.
+
 from cffg.estimate import estimate
 print(estimate(engine).summary())
 # state 9.1 KiB (messages 2.8, params 6.4) · 2.76e+04 flops/sweep · 0.203 ms/sweep
 ```
+
+`.npz` is a ZIP container and does not support ordinary per-array memory
+mapping, so it is reserved for agent checkpoints rather than parameter blobs.
 
 ## Register a custom factor
 
