@@ -53,14 +53,13 @@ truthful RunStatus are tested. Report the preregistered task, model-error and
 cost outcomes without a useful-exploration claim unless its primary test
 passes; update S1c either way.
 
-## Live preregistration: cff-5ipi/v1
+## Invalid preregistration: cff-5ipi/v1
 
-**Status:** LIVE and unrun. This protocol was fixed on 2026-07-29 after the
-factored builder landed and before implementing or running the replacement
-experiment. PR #35 and its void protocol are not inputs. Once any replacement
-result is observed, changing a choice below voids `cff-5ipi/v1`; the change
-must be recorded as a visibly new protocol before a complete rerun. Mechanism
-unit tests are not experimental results.
+**Status:** INVALID after its first planner call; no cell completed and no
+task, learning, policy, or timing result was accepted. This protocol was fixed
+on 2026-07-29 after the factored builder landed and before implementing or
+running the replacement experiment. PR #35 and its void protocol are not
+inputs. Mechanism unit tests are not experimental results.
 
 ### What this experiment tests, in plain English
 
@@ -318,8 +317,43 @@ transition support, vacuous initialization, float32, at least 32 positions by
 columns. Passing these tests establishes mechanism identity only; it is not
 evidence for any empirical label above.
 
+## Live preregistration: cff-5ipi/v2
+
+**Status:** LIVE and unrun. `cff-5ipi/v2` inherits every model, environment,
+arm, randomization, trace, metric, timing, bootstrap, gate, and outcome
+decision from `cff-5ipi/v1` except for the two numerical-execution corrections
+listed here. It was recorded after the invalid `v1` attempt and its
+convergence-only diagnosis, but before any complete cell or substantive
+treatment result.
+
+The `v1` CLI silently executed JAX in its default float32 mode even though the
+serialized arrays requested float64. `v2` enables and asserts
+`jax_enable_x64` before constructing an agent. This enforces the original
+dtype choice; it does not change it.
+
+Under genuine float64, the learned comparative arms satisfy the original
+`400`-sweep, `damp=0.5` numerical contract at their initial state, but the
+exact deterministic known/plain reference limit-cycles. That arm is a
+descriptive reference and does not enter any primary paired gate. In `v2`
+only known/plain uses at most 800 sweeps and `damp=0.85`; learn-only/plain,
+unannealed, and annealed/drop-back retain at most 400 sweeps and `damp=0.5`.
+Tolerance remains `1e-10` for every planner and the filter contract is
+unchanged.
+
+This exception was selected using a convergence-only feasibility probe: no
+action was sampled or applied, no observation or task outcome was produced,
+and no treatment comparison was inspected. With each of the 16 exact
+`(position, mode)` boundary beliefs supplied directly, the known/plain
+planner converged within the new budget (357--470 sweeps). The complete `v2`
+run still aborts on the first non-converged or non-finite call, and any further
+protocol change requires a visibly new version and a clean output directory.
+
 ## Notes
 
 **2026-07-28T04:21:51Z**
 
 2026-07-27 clean-slate resequencing: PR #35 was closed unmerged and no replacement run occurred. The flat Hallway numbers remain negative evidence only. Current path is cff-x0sv -> cff-nhxf -> cff-b47g -> cff-5ipi -> cff-2gev. cff-5ipi must install one live protocol after the builder exists and before any result is observed; do not recover the void PR #35 protocol from git history.
+
+**2026-07-30T01:02:37Z**
+
+cff-5ipi/v1 invalidation and v2 lock (2026-07-29): The first full-run call stopped at known/plain, r=1, seed 0 with RunStatus.BUDGET_EXHAUSTED (400 sweeps; residual 1.5845) before any trace/cell or substantive outcome existed. Diagnosis found the CLI had not enabled the declared float64; true float64 made the comparative initial plans converge at the original 400/.5, while exact known/plain still limit-cycled. A convergence-only probe over all 16 exact boundary beliefs found known/plain converged at 800 sweeps/damp=.85 (357--470 sweeps). Source: local RunResult diagnostics from committed harness 77ec70f; confidence high. v2 is now locked to x64 enforcement and that reference-only solver exception; every substantive choice remains v1.
