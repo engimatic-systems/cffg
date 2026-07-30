@@ -1,10 +1,12 @@
-"""Generate the mobile test dashboard into ~/agent-share/cffg-tests.html.
+"""Generate the mobile test dashboard and tracked suite-runtime history.
 
 Consumes a completed full-suite JUnit report, groups tests by M-epic, diffs
 against the previous run's snapshot (NEW badges), and renders a self-contained
 dark/light HTML page served by the agent-share file browser (port 8080 over
 Tailscale). ``--run-suite`` remains the one-command standalone path; it runs
-pytest exactly once with live output and renders that report.
+pytest exactly once with live output, renders that report into
+``~/agent-share/cffg-tests.html``, and records measured wall time in
+``tools/test-suite-runtimes.json`` so the next agent can budget its wait.
 
 Tests that render diagrams record SVGs into tests/.artifacts/ (gitignored)
 via the `viz_gallery` fixture; those rows become twirl-down galleries here,
@@ -23,10 +25,12 @@ import argparse
 import datetime
 import html
 import json
+import math
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -34,8 +38,10 @@ REPO = Path(__file__).resolve().parents[1]
 SHARE = Path.home() / "agent-share"
 OUT = SHARE / "cffg-tests.html"
 STATE = SHARE / ".cffg-dashboard-state.json"
+RUNTIMES = REPO / "tools" / "test-suite-runtimes.json"
 ARTIFACTS = REPO / "tests" / ".artifacts"
 GALLERY = SHARE / "cffg-viz"
+RUNTIME_HISTORY_LIMIT = 40
 
 EPIC_FILES = {
     "M0 · Foundations": ["test_hygiene.py"],
@@ -48,6 +54,7 @@ EPIC_FILES = {
         "test_mu3_derivation.py",
         "test_mu3.py",
         "test_goal_hyperprior.py",
+        "test_factored_rollout.py",
     ],
     "M4 · Epistemic behavior": [
         "test_tmaze.py",
@@ -103,14 +110,15 @@ class DashboardError(ValueError):
     """A JUnit report cannot truthfully certify the current full suite."""
 
 
-def run_suite() -> tuple[Path, int]:
-    """Run the full suite once with live output and return its JUnit report."""
+def run_suite() -> tuple[Path, int, float]:
+    """Run the full suite once; return its JUnit report, status, and wall time."""
     with tempfile.NamedTemporaryFile(suffix=".xml", delete=False) as tmp:
         xml_path = Path(tmp.name)
+    started = time.monotonic()
     result = subprocess.run(
         ["uv", "run", "pytest", "-q", f"--junitxml={xml_path}"], cwd=REPO
     )
-    return xml_path, result.returncode
+    return xml_path, result.returncode, time.monotonic() - started
 
 
 def repository_test_files(repo: Path = REPO) -> set[str]:
@@ -246,6 +254,74 @@ def load_state() -> dict:
         return json.loads(STATE.read_text())
     return {"previous_ids": [], "history": []}
 
+
+def record_suite_runtime(
+    tests: list[dict],
+    *,
+    wall_seconds: float,
+    pytest_code: int,
+) -> dict:
+    """Persist measured wall-clock history for future agent wait budgets.
+
+    Summed JUnit testcase time omits collection, imports, JAX compilation
+    outside testcase calls, and pytest teardown.  Agents therefore wait from
+    ``wall_seconds``; ``case_seconds`` remains useful for diagnosing the gap.
+    Reused JUnit reports never call this function because their wall time is
+    unknowable after the fact.
+    """
+    if not math.isfinite(wall_seconds) or wall_seconds <= 0:
+        raise DashboardError(
+            f"suite wall time must be positive and finite, got {wall_seconds!r}"
+        )
+    if RUNTIMES.exists():
+        try:
+            runtime_state = json.loads(RUNTIMES.read_text())
+        except json.JSONDecodeError as error:
+            raise DashboardError(
+                f"malformed runtime history {RUNTIMES}: {error}"
+            ) from error
+        if (
+            runtime_state.get("schema_version") != 1
+            or not isinstance(runtime_state.get("recent"), list)
+        ):
+            raise DashboardError(
+                f"invalid runtime history schema in {RUNTIMES}"
+            )
+        recent = list(runtime_state["recent"])
+    else:
+        recent = []
+
+    failed = sum(1 for test in tests if not test["ok"])
+    record = {
+        "completed_at": datetime.datetime.now(
+            datetime.timezone.utc
+        ).isoformat(),
+        "commit": git_head(),
+        "test_count": len(tests),
+        "failed": failed,
+        "pytest_exit_code": pytest_code,
+        "result": "passed" if pytest_code == 0 and failed == 0 else "failed",
+        "wall_seconds": round(float(wall_seconds), 3),
+        "case_seconds": round(sum(test["ms"] for test in tests) / 1000, 3),
+    }
+    recent.append(record)
+    recent = recent[-RUNTIME_HISTORY_LIMIT:]
+    # Use the slowest of the latest five measurements, add 25% headroom, and
+    # round upward to a human-friendly 30-second polling boundary.
+    observed = [entry["wall_seconds"] for entry in recent[-5:]]
+    padded = max(observed) * 1.25
+    suggested_wait = max(60, math.ceil(padded / 30) * 30)
+    runtime_state = {
+        "schema_version": 1,
+        "latest": record,
+        "suggested_wait_seconds": suggested_wait,
+        "recent": recent,
+    }
+    RUNTIMES.parent.mkdir(parents=True, exist_ok=True)
+    temporary = RUNTIMES.with_name(f".{RUNTIMES.name}.tmp")
+    temporary.write_text(json.dumps(runtime_state, indent=2, sort_keys=True) + "\n")
+    temporary.replace(RUNTIMES)
+    return runtime_state
 
 def trend_svg(history: list[dict]) -> str:
     pts = [h["total"] for h in history][-40:]
@@ -460,8 +536,9 @@ def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
     generated_report = None
     pytest_code = 0
+    wall_seconds = None
     if args.run_suite:
-        generated_report, pytest_code = run_suite()
+        generated_report, pytest_code, wall_seconds = run_suite()
         xml_path = generated_report
     else:
         xml_path = args.junitxml
@@ -473,6 +550,12 @@ def main(argv: list[str] | None = None) -> None:
             newest_input=newest_test_input(exclude=xml_path),
         )
         failed = publish(tests)
+        if wall_seconds is not None:
+            record_suite_runtime(
+                tests,
+                wall_seconds=wall_seconds,
+                pytest_code=pytest_code,
+            )
     except DashboardError as error:
         sys.exit(str(error))
     finally:
