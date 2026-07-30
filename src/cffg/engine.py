@@ -1942,7 +1942,13 @@ def _make_step(arena: Arena, skip_scheduled: bool = False):
             b_key = g.name + (":counts" if g.learned else ":B")
             to_out, to_in, to_sel, residuals, statuses = gfe_tm_update(
                 mi, me, md, params[b_key], k_local,
-                learned=g.learned, return_diagnostics=True,
+                learned=g.learned,
+                novelty_weight=(
+                    params[g.novelty_key]
+                    if g.novelty_key is not None
+                    else None
+                ),
+                return_diagnostics=True,
             )
             new = _set_disc_block(arena, new, g.scatter[:, 0], ko, to_out)
             new = _set_disc_block(arena, new, g.scatter[:, 1], ki, to_in)
@@ -2863,7 +2869,16 @@ def _make_bfe(arena: Arena):
             me = messages[arena.message_indices(g.gather[:, 2], ku)]
             b_key = g.name + (":counts" if g.learned else ":B")
             total = total + gfe_tm_energy(
-                mi, me, md, params[b_key], learned=g.learned
+                mi,
+                me,
+                md,
+                params[b_key],
+                learned=g.learned,
+                novelty_weight=(
+                    params[g.novelty_key]
+                    if g.novelty_key is not None
+                    else None
+                ),
             ).sum()
         for card, pairs in arena.interior_slot_groups:
             lq = (

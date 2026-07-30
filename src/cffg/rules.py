@@ -756,24 +756,39 @@ def _tm_fixed_stats(log_b):
     return b, h
 
 
-def _tm_dirichlet_stats(counts):
+def _tm_dirichlet_stats(counts, novelty_weight=None):
     """(B̄, ĥ) under per-(action, column) Dirichlets, counts [U, K', K]:
     B̄ = α/α₀ and E[B log B] = (α/α₀)(ψ(α+1) − ψ(α₀+1)) in closed form, so
     ĥ ≤ H[B̄-column] with the gap = the parameter-novelty channel (unexplored
-    transition columns look attractive), mirroring _dirichlet_stats."""
+    transition columns look attractive), mirroring _dirichlet_stats.
+
+    ``novelty_weight`` optionally scales only that gap, column by column:
+    ``h_λ = H[B̄] - λ(H[B̄] - ĥ)``.  The endpoints are therefore exact:
+    λ=1 is the learned GFE-TM rule and λ=0 is the fixed-parameter GFE-TM
+    objective at the same posterior mean.  It is not a probability floor or
+    a temperature on B̄."""
     a0 = counts.sum(axis=1, keepdims=True)
     bbar = counts / a0
     e_blog = bbar * (
         jax.scipy.special.digamma(counts + 1.0) - jax.scipy.special.digamma(a0 + 1.0)
     )
     h = -e_blog.sum(axis=1)  # [U, K]
+    if novelty_weight is not None:
+        mean_h = -jnp.sum(
+            jnp.where(bbar > 0, bbar * _safe_log(bbar), 0.0), axis=1
+        )
+        h = mean_h - novelty_weight * (mean_h - h)
     return bbar, h
 
 
-def _tm_joint_stats(b_param, learned):
+def _tm_joint_stats(b_param, learned, novelty_weight=None):
     """Flatten [U, K', K] stats onto the joint column index j = z·U + u,
     matching (μ_in ⊕ μ_e).reshape(-1): abar [K', K·U], h [K·U]."""
-    bbar, h = _tm_dirichlet_stats(b_param) if learned else _tm_fixed_stats(b_param)
+    bbar, h = (
+        _tm_dirichlet_stats(b_param, novelty_weight)
+        if learned
+        else _tm_fixed_stats(b_param)
+    )
     kp, ku = bbar.shape[1], bbar.shape[0]
     kz = bbar.shape[2]
     abar = bbar.transpose(1, 2, 0).reshape(kp, kz * ku)
@@ -781,7 +796,14 @@ def _tm_joint_stats(b_param, learned):
 
 
 def gfe_tm_update(
-    mu_in, mu_e, mu_down, b_param, k_max, learned=False, return_diagnostics=False
+    mu_in,
+    mu_e,
+    mu_down,
+    b_param,
+    k_max,
+    learned=False,
+    novelty_weight=None,
+    return_diagnostics=False,
 ):
     """Batched over members. mu_in [M,K], mu_e [M,U], mu_down [M,K']
     normalized log-messages; b_param is log B (fixed) or Dirichlet counts α
@@ -795,8 +817,16 @@ def gfe_tm_update(
     the state as coherent (status classification is cff-j4mu)."""
     ku, kp, kz = b_param.shape[1], b_param.shape[2], b_param.shape[3]
 
-    def one(bp, mi, me, md):
-        abar, h = _tm_joint_stats(bp, learned)
+    weights = (
+        novelty_weight
+        if novelty_weight is not None
+        else jnp.ones((b_param.shape[0], b_param.shape[1], b_param.shape[3]))
+    )
+
+    def one(bp, weight, mi, me, md):
+        abar, h = _tm_joint_stats(
+            bp, learned, weight if novelty_weight is not None else None
+        )
         log_d = (mi[:, None] + me[None, :]).reshape(-1)
         solved = _gfe_solve_result(abar, h, md, log_d)
         qj = solved.solution
@@ -816,7 +846,7 @@ def gfe_tm_update(
         return to_out, to_in, to_sel, solved.residual, solved.status
 
     to_out, to_in, to_sel, residual, status = jax.vmap(one)(
-        b_param, mu_in, mu_e, mu_down
+        b_param, weights, mu_in, mu_e, mu_down
     )
     messages = (
         _norm_pad(to_out, kp, k_max),
@@ -826,7 +856,9 @@ def gfe_tm_update(
     return (*messages, residual, status) if return_diagnostics else messages
 
 
-def gfe_tm_energy(mu_in, mu_e, mu_down, b_param, learned=False):
+def gfe_tm_energy(
+    mu_in, mu_e, mu_down, b_param, learned=False, novelty_weight=None
+):
     """Node-local GFE per member.
 
     ``mu_down`` influences the stationary q̄ but its linear coupling is not
@@ -835,8 +867,16 @@ def gfe_tm_energy(mu_in, mu_e, mu_down, b_param, learned=False):
     for an interior substituted edge, whose downstream node and Bethe edge
     correction are scored separately (cff-hp3y)."""
 
-    def one(bp, mi, me, md):
-        abar, h = _tm_joint_stats(bp, learned)
+    weights = (
+        novelty_weight
+        if novelty_weight is not None
+        else jnp.ones((b_param.shape[0], b_param.shape[1], b_param.shape[3]))
+    )
+
+    def one(bp, weight, mi, me, md):
+        abar, h = _tm_joint_stats(
+            bp, learned, weight if novelty_weight is not None else None
+        )
         log_d = (mi[:, None] + me[None, :]).reshape(-1)
         qj = _gfe_solve(abar, h, md, log_d)
         qw = abar @ qj
@@ -844,4 +884,4 @@ def gfe_tm_energy(mu_in, mu_e, mu_down, b_param, learned=False):
         qj_log_qj = jnp.where(qj > 0, qj * _safe_log(qj), 0.0).sum(-1)
         return qw_log_qw + qj @ h + qj_log_qj
 
-    return jax.vmap(one)(b_param, mu_in, mu_e, mu_down)
+    return jax.vmap(one)(b_param, weights, mu_in, mu_e, mu_down)

@@ -85,6 +85,16 @@ ambiguity-*averse* — the digamma point-estimate E[log B] penalizes low-count
 columns, so plain BP actively avoids exactly the actions it most needs to
 learn. The composite corrects a bias, not just an absence.
 
+**Giving curiosity a lifecycle.** A later constraint can scale only the
+parameter-novelty gap, without changing the posterior-mean transition or the
+state-transition information channel. Each tied transition column gets an
+evidence odometer measured from its declared Dirichlet prior. The odometer
+drives a weight λ from one toward zero; once the model-declared task-relevant
+columns saturate, the rolling agent selects a separately compiled ordinary
+planner. This last switch is deliberately stronger than λ=0: it removes the
+whole transition P-substitution and its Newton cost, while leaving ordinary
+observation GFE enabled.
+
 ### D1.2 The formal derivation
 
 **Setting.** Discrete CFFG node a with factor f(z′, z, u) = p(z′|z, u, B),
@@ -137,6 +147,36 @@ Jensen (the "uncertain columns have lower expected entropy" gap). ∎
 *Executable:* `test_novelty_identity` verifies the two sides to 1e-8 for
 random α. This is the exact quantity pymdp's `spm_wnorm` B-novelty
 approximates.
+
+**Proposition 3a (column-weighted parameter novelty).** Let
+H̄(z,u) := H[B̄_u[:,z]] and let a fixed λ(z,u) ∈ [0,1] weight the
+parameter-novelty gap during one planning solve. Replacing ĥ by
+
+    ĥ_λ(z,u) := H̄(z,u) − λ(z,u)(H̄(z,u) − ĥ(z,u))
+
+gives
+
+    G_tm,λ = −H[q_w] + E_q[ĥ_λ] − H[q]
+           = G_tm,fixed − E_q[λ(z,u) I(z′;B|z,u)].
+
+Thus λ=1 is Proposition 1's learned GFE-TM objective and λ=0 is the
+fixed-parameter GFE-TM objective at B̄ exactly. Since λ is held fixed within
+the solve, Proposition 4 and its ledger remain unchanged after substituting
+ĥ_λ for ĥ. For a declared tied learnable ℓ, c=(u,z), the cff-2gev schedule is
+
+    n[ℓ,c] = Σ_z′ (α[ℓ,z′,c] − α⁰[ℓ,z′,c]),
+    λ[ℓ,c] = 2^(−n[ℓ,c]/n_half).
+
+The count mass is posterior minus the captured prior, so zero new evidence
+maps exactly to one regardless of prior concentration; planning instances
+that merely read the tied blob add nothing. At n=n_half the weight is exactly
+one half.
+*Executable:* `test_annealed_novelty_has_exact_learned_and_fixed_endpoints`
+pins both objective/message endpoints;
+`test_declared_novelty_schedule_routes_tied_counts_and_half_life` pins the
+evidence equation, half-life, serialized learnable routing, and sharing across
+future slices; `test_saturated_active_columns_dispatch_plain_and_keep_learning`
+pins the stronger ordinary-planner switch and continued posterior updates.
 
 **Proposition 4 (stationarity ⇒ fixed point and messages).** Adding the
 Lagrangian couplings of the incoming messages (μ_down enters through the

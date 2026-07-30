@@ -64,6 +64,23 @@ class StateBlockSpec:
 
 
 @dataclass(frozen=True)
+class TransitionNoveltySpec:
+    """Evidence annealing and drop-back relevance for one transition learnable.
+
+    ``active_columns`` follows the transition's public selector axes followed
+    by its old-state axis: ``[P1,...,Pn,U,K]`` for a parent-selected block or
+    ``[U,K]`` for an action-only block.  The builder stores the flattened mask
+    as a blob named by the P-substitution constraint; no large mask lives
+    inline in serialized model structure.
+    """
+
+    learnable: str
+    half_life: float
+    active_columns: np.ndarray
+    saturation_weight: float
+
+
+@dataclass(frozen=True)
 class ObservationSpec:
     """One categorical sensor over a block or declared coupling."""
 
@@ -346,6 +363,7 @@ def build_factored_rollout(
     learned_a: bool = False,
     learned_c: bool = False,
     epistemic_b: bool = False,
+    transition_novelty: Iterable[TransitionNoveltySpec] = (),
 ) -> tuple[Template, dict[str, np.ndarray]]:
     """Build a factored planning/perception window and its parameter arrays.
 
@@ -355,8 +373,10 @@ def build_factored_rollout(
 
     The three boolean compatibility arguments are accepted because
     :class:`cffg.agent.RollingAgent` supplies them to every rollout builder.
-    Their parameter-uncertainty composites remain separate tickets and are
-    rejected when enabled here.
+    Learned observation/goal composites remain separate tickets.  Dynamics
+    curiosity applies only to declared transition learnables in ``learn``.
+    An optional ``TransitionNoveltySpec`` serializes its evidence half-life,
+    active-column mask, and plain-planner saturation threshold.
     """
     if steps < 1:
         raise ValueError("factored rollout: steps must be >= 1")
@@ -364,13 +384,12 @@ def build_factored_rollout(
         raise ValueError(
             f"factored rollout: past must be between 0 and steps, got {past}"
         )
-    if learned_a or learned_c or epistemic_b:
+    if learned_a or learned_c:
         requested = [
             label
             for label, enabled in (
                 ("learned_a", learned_a),
                 ("learned_c", learned_c),
-                ("epistemic_b", epistemic_b),
             )
             if enabled
         ]
@@ -381,6 +400,7 @@ def build_factored_rollout(
 
     block_tuple = tuple(blocks)
     coupling_tuple = tuple(couplings)
+    novelty_tuple = tuple(transition_novelty)
     block_map, coupling_map = _unique_specs(block_tuple, coupling_tuple)
     _check_name("observation", observation.name)
 
@@ -508,6 +528,69 @@ def build_factored_rollout(
             f"factored rollout: unknown learnables {unknown_learn}; declared "
             f"{sorted(declared_learnables)}"
         )
+    active_learn = set(learn)
+    epistemic_blocks = {
+        block.name
+        for block in block_tuple
+        if block.transition_learnable in active_learn
+    }
+    if epistemic_b and not epistemic_blocks:
+        raise ValueError(
+            "factored rollout: epistemic_b requires at least one declared "
+            "transition learnable in learn"
+        )
+    novelty_by_learnable: dict[str, TransitionNoveltySpec] = {}
+    for spec in novelty_tuple:
+        if spec.learnable in novelty_by_learnable:
+            raise ValueError(
+                f"factored rollout: duplicate novelty spec for {spec.learnable!r}"
+            )
+        matching = [
+            block
+            for block in block_tuple
+            if block.transition_learnable == spec.learnable
+        ]
+        if not matching or matching[0].name not in epistemic_blocks:
+            raise ValueError(
+                f"factored rollout: novelty spec {spec.learnable!r} must name "
+                "an active transition learnable"
+            )
+        if not np.isfinite(spec.half_life) or spec.half_life <= 0:
+            raise ValueError(
+                f"factored rollout: novelty half_life for {spec.learnable!r} "
+                f"must be finite and > 0, got {spec.half_life!r}"
+            )
+        if (
+            not np.isfinite(spec.saturation_weight)
+            or not 0 < spec.saturation_weight <= 1
+        ):
+            raise ValueError(
+                f"factored rollout: novelty saturation_weight for "
+                f"{spec.learnable!r} must be in (0, 1], got "
+                f"{spec.saturation_weight!r}"
+            )
+        block = matching[0]
+        transition = np.asarray(block.transition)
+        public_shape = (*transition.shape[:-2], transition.shape[-1])
+        active = np.asarray(spec.active_columns)
+        if active.shape != public_shape:
+            raise ValueError(
+                f"factored rollout: active columns for {spec.learnable!r} "
+                f"have shape {active.shape}, expected {public_shape}"
+            )
+        if not np.all(np.isfinite(active)) or not np.all(
+            (active == 0) | (active == 1)
+        ):
+            raise ValueError(
+                f"factored rollout: active columns for {spec.learnable!r} "
+                "must contain only finite 0/1 values"
+            )
+        if not np.any(active):
+            raise ValueError(
+                f"factored rollout: active columns for {spec.learnable!r} "
+                "must select at least one column"
+            )
+        novelty_by_learnable[spec.learnable] = spec
 
     dtype = np.result_type(
         action_prior.dtype,
@@ -538,6 +621,25 @@ def build_factored_rollout(
             f"block/{block.name}/transition", transitions[block.name]
         )
         for block in block_tuple
+    }
+    transition_count_blobs = {
+        block.name: graph.blob(
+            f"block/{block.name}/transition_counts",
+            np.ones_like(transitions[block.name]),
+        )
+        for block in block_tuple
+        if epistemic_b and block.name in epistemic_blocks
+    }
+    novelty_mask_blobs = {
+        block.name: graph.blob(
+            f"block/{block.name}/novelty_active",
+            np.asarray(
+                novelty_by_learnable[block.transition_learnable].active_columns,
+                dtype=np.int8,
+            ).reshape(transitions[block.name].shape[0], cards[block.name]),
+        )
+        for block in block_tuple
+        if block.transition_learnable in novelty_by_learnable
     }
 
     state_nets = {
@@ -632,7 +734,16 @@ def build_factored_rollout(
                     "in": state_nets[(block.name, index - 1)],
                     "selector": selector,
                 },
-                param_blobs={"matrices": transition_blobs[block.name]},
+                param_blobs={
+                    "matrices": (
+                        transition_count_blobs[block.name]
+                        if (
+                            index > past
+                            and block.name in transition_count_blobs
+                        )
+                        else transition_blobs[block.name]
+                    )
+                },
             )
             transition_factors[block.name].append(factor_name)
 
@@ -711,9 +822,52 @@ def build_factored_rollout(
                     (("substituted_role", "out"),),
                 )
             )
+    if epistemic_b:
+        for block in block_tuple:
+            if block.name not in epistemic_blocks:
+                continue
+            spec = novelty_by_learnable.get(block.transition_learnable)
+            for index, factor_name in enumerate(
+                transition_factors[block.name], start=1
+            ):
+                if index <= past:
+                    continue
+                detail = [
+                    ("parameter_uncertainty", "dirichlet"),
+                    ("substituted_role", "out"),
+                ]
+                if spec is not None:
+                    detail.extend(
+                        [
+                            (
+                                "active_mask_blob",
+                                novelty_mask_blobs[block.name],
+                            ),
+                            (
+                                "novelty_half_life",
+                                format(float(spec.half_life), ".17g"),
+                            ),
+                            (
+                                "novelty_saturation",
+                                format(
+                                    float(spec.saturation_weight), ".17g"
+                                ),
+                            ),
+                            (
+                                "parameter_learnable",
+                                spec.learnable,
+                            ),
+                        ]
+                    )
+                template.constraints.append(
+                    ConstraintSpec(
+                        ConstraintKind.P_SUBSTITUTION,
+                        factor_name,
+                        tuple(sorted(detail)),
+                    )
+                )
 
     beliefs: list[BeliefBinding] = []
-    active_learn = set(learn)
     for block in block_tuple:
         if len(block_tuple) > 1:
             marker = boundary_markers[block.name]
@@ -799,7 +953,14 @@ def build_factored_rollout(
             template.learnables[block.transition_learnable] = LearnableSpec(
                 block.transition_learnable,
                 "dirichlet",
-                (transition_blobs[block.name],),
+                (
+                    transition_blobs[block.name],
+                    *(
+                        (transition_count_blobs[block.name],)
+                        if block.name in transition_count_blobs
+                        else ()
+                    ),
+                ),
                 sources,
             )
     if observation.learnable is not None and observation.learnable in active_learn:
@@ -860,6 +1021,7 @@ def build_factored_corridor(
     learned_a: bool = False,
     learned_c: bool = False,
     epistemic_b: bool = False,
+    transition_novelty: Iterable[TransitionNoveltySpec] = (),
 ) -> tuple[Template, dict[str, np.ndarray]]:
     """The canonical two-block corridor: position × persistent mode.
 
@@ -960,4 +1122,5 @@ def build_factored_corridor(
         learned_a=learned_a,
         learned_c=learned_c,
         epistemic_b=epistemic_b,
+        transition_novelty=transition_novelty,
     )

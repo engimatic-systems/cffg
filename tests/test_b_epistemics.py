@@ -78,6 +78,77 @@ def test_novelty_channel_prefers_unexplored_action():
     np.testing.assert_allclose(q_u2[1], 0.5, atol=0.02)  # fully explored: no preference
 
 
+def test_annealed_novelty_has_exact_learned_and_fixed_endpoints():
+    rng = np.random.default_rng(112)
+    k, u = 3, 2
+    counts = rng.uniform(0.2, 7.0, size=(1, u, k, k))
+    mu_in = norm_log(rng.dirichlet(np.ones(k)))[None]
+    mu_e = norm_log(rng.dirichlet(np.ones(u)))[None]
+    mu_down = norm_log(rng.dirichlet(np.ones(k)))[None]
+    ones = np.ones((1, u, k))
+    zeros = np.zeros((1, u, k))
+
+    learned = rules.gfe_tm_update(
+        mu_in, mu_e, mu_down, counts, k, learned=True
+    )
+    lambda_one = rules.gfe_tm_update(
+        mu_in,
+        mu_e,
+        mu_down,
+        counts,
+        k,
+        learned=True,
+        novelty_weight=ones,
+    )
+    for got, want in zip(lambda_one, learned, strict=True):
+        np.testing.assert_allclose(got, want, atol=1e-10)
+    np.testing.assert_allclose(
+        rules.gfe_tm_energy(
+            mu_in,
+            mu_e,
+            mu_down,
+            counts,
+            learned=True,
+            novelty_weight=ones,
+        ),
+        rules.gfe_tm_energy(
+            mu_in, mu_e, mu_down, counts, learned=True
+        ),
+        atol=1e-10,
+    )
+
+    mean_b = counts / counts.sum(axis=2, keepdims=True)
+    log_mean_b = np.log(mean_b)
+    fixed = rules.gfe_tm_update(
+        mu_in, mu_e, mu_down, log_mean_b, k, learned=False
+    )
+    lambda_zero = rules.gfe_tm_update(
+        mu_in,
+        mu_e,
+        mu_down,
+        counts,
+        k,
+        learned=True,
+        novelty_weight=zeros,
+    )
+    for got, want in zip(lambda_zero, fixed, strict=True):
+        np.testing.assert_allclose(got, want, atol=1e-9)
+    np.testing.assert_allclose(
+        rules.gfe_tm_energy(
+            mu_in,
+            mu_e,
+            mu_down,
+            counts,
+            learned=True,
+            novelty_weight=zeros,
+        ),
+        rules.gfe_tm_energy(
+            mu_in, mu_e, mu_down, log_mean_b, learned=False
+        ),
+        atol=1e-9,
+    )
+
+
 def test_goal_information_flows_backward_through_substituted_node():
     # P-substitution must not sever pragmatic planning: with a goal-peaked
     # downstream message, the action whose dynamics REACH the goal state wins.
@@ -386,13 +457,16 @@ def test_float32_stays_finite():
     mu_in = norm_log(rng.dirichlet(np.ones(k)))[None]
     mu_e = norm_log(rng.dirichlet(np.ones(u)))[None]
     mu_down = norm_log(rng.dirichlet(np.ones(k)))[None]
+    weights = rng.uniform(0.0, 1.0, size=(1, u, k))
     with jax.enable_x64(False):
         outs = rules.gfe_tm_update(
             jnp.asarray(mu_in, dtype=jnp.float32),
             jnp.asarray(mu_e, dtype=jnp.float32),
             jnp.asarray(mu_down, dtype=jnp.float32),
             jnp.asarray(counts, dtype=jnp.float32),
-            k_max=k, learned=True,
+            k_max=k,
+            learned=True,
+            novelty_weight=jnp.asarray(weights, dtype=jnp.float32),
         )
         assert all(bool(jnp.isfinite(o).all()) for o in outs)
         g = rules.gfe_tm_energy(
@@ -401,25 +475,42 @@ def test_float32_stays_finite():
             jnp.asarray(mu_down, dtype=jnp.float32),
             jnp.asarray(counts, dtype=jnp.float32),
             learned=True,
+            novelty_weight=jnp.asarray(weights, dtype=jnp.float32),
         )
         assert bool(jnp.isfinite(g).all())
 
 
 def test_uncomfortable_scale_stays_finite():
-    # Joint solve at K*U = 120 logits with sparse counts — an order beyond
-    # the toy fixtures.
+    # Joint solve at K*U = 128 logits (32 positions × 4 selectors) with sparse
+    # counts — an order beyond the toy fixtures.
     rng = np.random.default_rng(13)
-    k, u = 30, 4
+    k, u = 32, 4
     counts = rng.uniform(0.05, 2.0, size=(1, u, k, k))
     mu_in = norm_log(rng.dirichlet(np.full(k, 0.2)))[None]
     mu_e = norm_log(np.full(u, 1.0 / u))[None]
     mu_down = norm_log(rng.dirichlet(np.full(k, 0.2)))[None]
+    weights = np.exp2(
+        -rng.uniform(0.0, 100.0, size=(1, u, k)) / 4.0
+    )
     to_out, to_in, to_sel = rules.gfe_tm_update(
-        mu_in, mu_e, mu_down, counts, k_max=k, learned=True
+        mu_in,
+        mu_e,
+        mu_down,
+        counts,
+        k_max=k,
+        learned=True,
+        novelty_weight=weights,
     )
     for arr in (to_out, to_in, to_sel):
         assert bool(np.isfinite(np.asarray(arr)).all())
-    g = rules.gfe_tm_energy(mu_in, mu_e, mu_down, counts, learned=True)
+    g = rules.gfe_tm_energy(
+        mu_in,
+        mu_e,
+        mu_down,
+        counts,
+        learned=True,
+        novelty_weight=weights,
+    )
     assert bool(np.isfinite(np.asarray(g)).all())
     # outputs are normalized log-distributions
     np.testing.assert_allclose(

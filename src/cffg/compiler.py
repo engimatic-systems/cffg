@@ -228,6 +228,17 @@ class GfeTmPlan:
     gather: np.ndarray  # [M, 3] incoming slots: (out=μ_down, in=μ_in, sel=μ_e)
     scatter: np.ndarray  # [M, 3] outgoing slots, same role order
     learned: bool = False
+    novelty_key: str | None = None
+    half_lives: np.ndarray = field(
+        default_factory=lambda: np.zeros(0, dtype=float)
+    )  # [M], posterior-evidence half-life per scheduled member
+    active_masks: np.ndarray = field(
+        default_factory=lambda: np.zeros((0, 0, 0), dtype=bool)
+    )  # [M, U, K_in], serialized drop-back relevance
+    saturation_weights: np.ndarray = field(
+        default_factory=lambda: np.zeros(0, dtype=float)
+    )  # [M], λ threshold for each scheduled member
+    learnables: tuple[str, ...] = ()  # declared owner per scheduled member
 
 
 @dataclass(frozen=True)
@@ -237,7 +248,9 @@ class LearnTarget:
     `form` is how that consumer reads the parameter: "expected" wants the
     family's expected natural parameter (Dirichlet: E[log θ] = ψ(α) − ψ(α₀)),
     "counts" wants the raw hyperparameters α, which is what the GFE
-    composites differentiate for their parameter-novelty term.
+    composites differentiate for their parameter-novelty term, and
+    "novelty" wants a column weight derived from posterior-minus-prior
+    evidence using `half_life`.
 
     `layout` names the blob → stacked-params transform. Discrete BP groups
     hold transition_mixture as [K', K, U] while the blob (and every other
@@ -250,10 +263,11 @@ class LearnTarget:
 
     key: str  # params key of the stacked group
     index: int  # member row within that group
-    form: str  # "expected" | "counts"
+    form: str  # "expected" | "counts" | "novelty"
     layout: str  # "as_is" | "tm"
     blob: str = ""  # the blob this target's factor reads
     role: str = "statistic"  # the parameter role that blob fills
+    half_life: float = 0.0  # evidence units; used only by "novelty"
 
 
 @dataclass(frozen=True)
@@ -846,6 +860,14 @@ def compile_template(
     gfe_x_edges: set[str] = set()
     gfe_buckets: dict[tuple, list[tuple[str, str]]] = {}  # cards/mode -> (obs, goal)
     tm_buckets: dict[tuple, list[str]] = {}
+    tm_novelty: dict[
+        str, tuple[float, str, np.ndarray, float]
+    ] = {}  # factor -> (half-life, learnable, active [U,K], saturation λ)
+    learnable_for_blob = {
+        blob: name
+        for name, spec in t.learnables.items()
+        for blob in spec.blobs
+    }
     for fname, detail in sorted(psub.items()):
         f = t.factors[fname]
         if f.type == "transition_mixture" and detail.get("substituted_role") == "out":
@@ -853,7 +875,93 @@ def compile_template(
                 t.variables[f.edges[r]].cardinality for r in ("out", "in", "selector")
             )
             learned = detail.get("parameter_uncertainty") == "dirichlet"
-            tm_buckets.setdefault((cards3, learned), []).append(fname)
+            annealed = "novelty_half_life" in detail
+            schedule_keys = {
+                "parameter_learnable",
+                "active_mask_blob",
+                "novelty_saturation",
+            }
+            if not annealed and schedule_keys & set(detail):
+                problems.append(
+                    f"p_substitution on {fname!r}: novelty schedule details "
+                    "require 'novelty_half_life'"
+                )
+                continue
+            if annealed:
+                if not learned:
+                    problems.append(
+                        f"p_substitution on {fname!r}: novelty annealing requires "
+                        "parameter_uncertainty='dirichlet'"
+                    )
+                    continue
+                try:
+                    half_life = float(detail["novelty_half_life"])
+                    saturation = float(detail["novelty_saturation"])
+                except (KeyError, TypeError, ValueError):
+                    problems.append(
+                        f"p_substitution on {fname!r}: novelty_half_life and "
+                        "novelty_saturation must be finite numbers"
+                    )
+                    continue
+                if not np.isfinite(half_life) or half_life <= 0:
+                    problems.append(
+                        f"p_substitution on {fname!r}: novelty_half_life must "
+                        f"be finite and > 0, got {half_life!r}"
+                    )
+                    continue
+                if not np.isfinite(saturation) or not 0 < saturation <= 1:
+                    problems.append(
+                        f"p_substitution on {fname!r}: novelty_saturation must "
+                        f"be in (0, 1], got {saturation!r}"
+                    )
+                    continue
+                parameter_blob = f.param_blobs.get("matrices")
+                owner = learnable_for_blob.get(parameter_blob)
+                declared = detail.get("parameter_learnable")
+                if declared is None or declared != owner:
+                    problems.append(
+                        f"p_substitution on {fname!r}: parameter_learnable "
+                        f"{declared!r} does not own matrices blob "
+                        f"{parameter_blob!r} (owner {owner!r})"
+                    )
+                    continue
+                mask_blob = detail.get("active_mask_blob")
+                if mask_blob not in resolved:
+                    problems.append(
+                        f"p_substitution on {fname!r}: unknown active_mask_blob "
+                        f"{mask_blob!r}"
+                    )
+                    continue
+                active = np.asarray(resolved[mask_blob])
+                want = (cards3[2], cards3[1])
+                if active.shape != want:
+                    problems.append(
+                        f"p_substitution on {fname!r}: active mask shape "
+                        f"{active.shape} != selector/input columns {want}"
+                    )
+                    continue
+                if not np.all(np.isfinite(active)) or not np.all(
+                    (active == 0) | (active == 1)
+                ):
+                    problems.append(
+                        f"p_substitution on {fname!r}: active mask must contain "
+                        "only finite 0/1 values"
+                    )
+                    continue
+                active = active.astype(bool)
+                if not np.any(active):
+                    problems.append(
+                        f"p_substitution on {fname!r}: active mask must select "
+                        "at least one transition column"
+                    )
+                    continue
+                tm_novelty[fname] = (
+                    half_life,
+                    declared,
+                    active,
+                    saturation,
+                )
+            tm_buckets.setdefault((cards3, learned, annealed), []).append(fname)
             consumed.add(fname)
             continue
         if f.type != "matrix_cat" or detail.get("substituted_role") != "out":
@@ -1060,8 +1168,12 @@ def compile_template(
                 )
 
     gfe_tm_groups: list[GfeTmPlan] = []
-    for ((ko, ki, ku), learned), members in sorted(tm_buckets.items()):
-        gname = f"gfeTM{'L' if learned else ''}:{ko}x{ki}x{ku}"
+    novelty_targets: dict[str, LearnTarget] = {}
+    for ((ko, ki, ku), learned, annealed), members in sorted(tm_buckets.items()):
+        gname = (
+            f"gfeTM{'L' if learned else ''}{'A' if annealed else ''}:"
+            f"{ko}x{ki}x{ku}"
+        )
         gather = np.array(
             [[opposite[(m, r)] for r in ("out", "in", "selector")] for m in members],
             dtype=np.int64,
@@ -1087,8 +1199,52 @@ def compile_template(
         composite_keys.add(tm_key)
         for i, m in enumerate(members):
             member_of[m] = (tm_key, i)
+        novelty_key = f"{gname}:novelty" if annealed else None
+        if annealed:
+            log_params[novelty_key] = np.ones(
+                (len(members), ku, ki), dtype=np.result_type(*stacked)
+            )
+            for i, m in enumerate(members):
+                half_life, _learnable, _active, _saturation = tm_novelty[m]
+                novelty_targets[m] = LearnTarget(
+                    novelty_key,
+                    i,
+                    "novelty",
+                    "as_is",
+                    t.factors[m].param_blobs["matrices"],
+                    "matrices",
+                    half_life,
+                )
         gfe_tm_groups.append(
-            GfeTmPlan(gname, (ko, ki, ku), tuple(members), gather, scatter, learned)
+            GfeTmPlan(
+                gname,
+                (ko, ki, ku),
+                tuple(members),
+                gather,
+                scatter,
+                learned,
+                novelty_key,
+                (
+                    np.asarray([tm_novelty[m][0] for m in members])
+                    if annealed
+                    else np.zeros(0, dtype=float)
+                ),
+                (
+                    np.stack([tm_novelty[m][2] for m in members])
+                    if annealed
+                    else np.zeros((0, ku, ki), dtype=bool)
+                ),
+                (
+                    np.asarray([tm_novelty[m][3] for m in members])
+                    if annealed
+                    else np.zeros(0, dtype=float)
+                ),
+                (
+                    tuple(tm_novelty[m][1] for m in members)
+                    if annealed
+                    else ()
+                ),
+            )
         )
 
     # Group remaining factors by (type, cardinality signature, mode); the
@@ -1472,7 +1628,14 @@ def compile_template(
         gfe_x_edges=frozenset(gfe_x_edges),
         delta_pairs=delta_pairs,
         member_of=member_of,
-        learn_plans=_resolve_learnables(t, resolved, groups, member_of, composite_keys),
+        learn_plans=_resolve_learnables(
+            t,
+            resolved,
+            groups,
+            member_of,
+            composite_keys,
+            novelty_targets,
+        ),
     )
 
 
@@ -1482,6 +1645,7 @@ def _resolve_learnables(
     groups: list[GroupPlan],
     member_of: dict[str, tuple[str, int]],
     composite_keys: set[str],
+    novelty_targets: dict[str, LearnTarget],
 ) -> list[LearnPlan]:
     """Bind each declared learnable to its stat sources and write targets
     (cff-x0sv).
@@ -1553,6 +1717,8 @@ def _resolve_learnables(
                 if key in composite_keys:
                     form = "counts" if key.endswith(":counts") else "expected"
                     targets.append(LearnTarget(key, index, form, "as_is", blob, role))
+                    if r in novelty_targets:
+                        targets.append(novelty_targets[r])
                     continue
                 layout = (
                     "tm" if ftype_of_group.get(key) == "transition_mixture" else "as_is"
@@ -1595,6 +1761,12 @@ def _resolve_arrays(
     Files beat init specs so a continual-learning checkpoint written to the
     blob path overrides the warm start on reload (cff-wx28)."""
     needed = {b for f in t.factors.values() for b in f.param_blobs.values()}
+    needed.update(
+        detail["active_mask_blob"]
+        for constraint in t.constraints
+        for detail in [constraint.detail_dict()]
+        if "active_mask_blob" in detail
+    )
     out: dict[str, np.ndarray] = {}
     for name in sorted(needed):
         if arrays is not None and name in arrays:

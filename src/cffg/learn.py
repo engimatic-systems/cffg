@@ -116,6 +116,17 @@ class Family(Protocol):
         """Hyperparameters -> the posterior MEAN parameter, keyed by role.
         For reporting and recovery tests, not for rollover."""
 
+    def novelty(
+        self,
+        params: dict[str, np.ndarray],
+        prior: dict[str, np.ndarray],
+        ftype: str,
+        half_life: float,
+    ) -> dict[str, np.ndarray]:
+        """Posterior-minus-prior evidence -> per-column novelty weights.
+        Families without a registered parameter-novelty channel reject this
+        consumption form."""
+
     def as_params(self, prior: object) -> dict[str, np.ndarray]:
         """Normalize a caller-supplied prior into keyed hyperparameters. A
         one-parameter family may accept a bare array here."""
@@ -219,6 +230,38 @@ class Dirichlet:
         alpha = params["alpha"]
         return {self._ROLE[ftype]: alpha / alpha.sum(axis=self._AXIS[ftype], keepdims=True)}
 
+    def novelty(
+        self,
+        params: dict[str, np.ndarray],
+        prior: dict[str, np.ndarray],
+        ftype: str,
+        half_life: float,
+    ) -> dict[str, np.ndarray]:
+        """Exponential evidence annealing for transition novelty.
+
+        Count mass is summed over the output axis, leaving one weight per
+        selector/input column.  It is measured against the captured prior,
+        never raw concentration, so a vacuous zero increment maps exactly to
+        one regardless of the prior's equivalent sample size.
+        """
+        if ftype != "transition_mixture":
+            raise ValueError(
+                f"Dirichlet novelty weights require transition_mixture, got {ftype!r}"
+            )
+        if not np.isfinite(half_life) or half_life <= 0:
+            raise ValueError(
+                f"novelty half_life must be finite and > 0, got {half_life!r}"
+            )
+        evidence = np.sum(
+            params["alpha"] - prior["alpha"], axis=self._AXIS[ftype]
+        )
+        if not np.all(np.isfinite(evidence)) or np.any(evidence < 0):
+            raise ValueError(
+                "novelty evidence must be finite and non-negative; posterior "
+                "counts cannot precede their captured prior"
+            )
+        return {self._ROLE[ftype]: np.exp2(-evidence / half_life)}
+
     def validate_prior(
         self,
         learnable: str,
@@ -308,6 +351,7 @@ class Learnables:
     ):
         self.plans = {p.name: p for p in engine.arena.learn_plans}
         self.params: dict[str, dict[str, np.ndarray]] = {}
+        self.initial_params: dict[str, dict[str, np.ndarray]] = {}
         priors = priors or {}
         for name in priors:
             if name not in self.plans:
@@ -320,6 +364,9 @@ class Learnables:
             params = family.as_params(given)
             family.validate_prior(name, params, plan.shapes)
             self.params[name] = params
+            self.initial_params[name] = {
+                key: value.copy() for key, value in params.items()
+            }
 
     @staticmethod
     def _from_compiled(engine: "Engine", plan: "LearnPlan") -> np.ndarray:
@@ -378,12 +425,27 @@ class Learnables:
             if name not in self.params:
                 raise KeyError(f"engine declares {name!r}, which this Learnables lacks")
             family = FAMILIES[plan.family]
-            by_form = {
-                "expected": family.rollover(self.params[name], plan.ftype),
-                "counts": family.raw(self.params[name], plan.ftype),
-            }
+            by_form: dict[tuple[str, float], dict[str, np.ndarray]] = {}
             for tgt in plan.targets:
-                value = by_form[tgt.form][tgt.role]
+                cache_key = (tgt.form, tgt.half_life)
+                if cache_key not in by_form:
+                    if tgt.form == "expected":
+                        values = family.rollover(self.params[name], plan.ftype)
+                    elif tgt.form == "counts":
+                        values = family.raw(self.params[name], plan.ftype)
+                    elif tgt.form == "novelty":
+                        values = family.novelty(
+                            self.params[name],
+                            self.initial_params[name],
+                            plan.ftype,
+                            tgt.half_life,
+                        )
+                    else:  # pragma: no cover - compiler owns this vocabulary
+                        raise ValueError(
+                            f"learnable {name!r}: unknown target form {tgt.form!r}"
+                        )
+                    by_form[cache_key] = values
+                value = by_form[cache_key][tgt.role]
                 if tgt.layout == "tm":
                     value = value.transpose(1, 2, 0)  # [U, K', K] -> [K', K, U]
                 value = jnp.asarray(value, dtype=out[tgt.key].dtype)
@@ -404,6 +466,27 @@ class Learnables:
         return out
 
     # -- readouts and persistence -----------------------------------------
+
+    def novelty_weights(self, name: str, half_life: float) -> np.ndarray:
+        """Return the per-column novelty weights for one declared learnable.
+
+        This is the runtime/drop-back readout of the same family operation
+        used to populate compiled GFE-TM targets; callers never reconstruct
+        evidence from factor names or stacked arena rows.
+        """
+        plan = self.plans[name]
+        out = FAMILIES[plan.family].novelty(
+            self.params[name],
+            self.initial_params[name],
+            plan.ftype,
+            half_life,
+        )
+        if len(out) != 1:
+            raise ValueError(
+                f"learnable {name!r} has novelty roles {sorted(out)}; "
+                "a scalar readout is ambiguous"
+            )
+        return next(iter(out.values()))
 
     def expected(self, name: str, role: str | None = None) -> np.ndarray:
         """The posterior MEAN parameter — for reporting and recovery tests,

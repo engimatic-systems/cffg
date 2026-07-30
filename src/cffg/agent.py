@@ -39,6 +39,7 @@ GFE-TM composite (LIMITATIONS S1c).
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 from pathlib import Path
 from typing import Callable
@@ -49,10 +50,21 @@ import numpy as np
 from cffg.compiler import _log_of, compile_template
 from cffg.core.ir import AgentSpec, BeliefBinding, Template
 from cffg.core.validate import validate
-from cffg.engine import Engine, State, _replace
+from cffg.engine import Engine, RunResult, State, _replace
 from cffg.learn import Learnables
 
 Builder = Callable[..., tuple]  # build_rollout-style: (past, steps) -> (Template, arrays)
+
+
+@dataclass(frozen=True)
+class PlanningResult:
+    """One status-bearing action plan, including the policy used to sample."""
+
+    action: int
+    marginal: np.ndarray
+    run: RunResult
+    free_energy: float
+    planner: str  # "epistemic_b" | "plain"
 
 
 class RollingAgent:
@@ -100,8 +112,10 @@ class RollingAgent:
         if learn_b:
             learn += ("B",) if "B" not in learn else ()
             priors.setdefault("B", initial_b_counts)
-        if epistemic_b and "B" not in learn:
-            raise ValueError("epistemic_b needs B counts to score novelty")
+        if epistemic_b and not learn:
+            raise ValueError(
+                "epistemic_b needs a declared transition learnable to score novelty"
+            )
         if learn_goal and "A" in learn:
             raise ValueError(
                 "learn_goal and learned A are separate composite coordinates for now"
@@ -132,6 +146,39 @@ class RollingAgent:
 
         self.plan = Engine(compile_template(plan_t, arrays=plan_arrays))
         self.filter = Engine(compile_template(filt_t, arrays=filt_arrays))
+        if epistemic_b and not any(
+            plan.ftype == "transition_mixture"
+            for plan in self.plan.arena.learn_plans
+        ):
+            raise ValueError(
+                "epistemic_b needs a declared transition learnable; none of "
+                f"{sorted(learn)!r} governs a transition_mixture"
+            )
+        scheduled = [
+            group
+            for group in self.plan.arena.gfe_tm_groups
+            if group.novelty_key is not None
+        ]
+        self.plain_plan: Engine | None = None
+        if scheduled and len(scheduled) == len(self.plan.arena.gfe_tm_groups):
+            plain_kwargs = dict(plan_kwargs)
+            plain_kwargs.pop("epistemic_b", None)
+            plain_t, plain_arrays = builder(
+                past=0, steps=horizon, **plain_kwargs
+            )
+            plain_spec = _require_agent_spec(plain_t, "plain planning")
+            validate(plain_t)
+            _check_window_compatibility(
+                plain_t, plain_spec, filt_t, filter_spec
+            )
+            if plain_spec != plan_spec:
+                raise ValueError(
+                    "annealed and plain planning templates have different "
+                    "serialized AgentSpec bindings"
+                )
+            self.plain_plan = Engine(
+                compile_template(plain_t, arrays=plain_arrays)
+            )
         self._plan_spec = plan_spec
         self._filter_spec = filter_spec
         self._plan_bindings = {b.name: b for b in plan_spec.beliefs}
@@ -185,9 +232,8 @@ class RollingAgent:
     def _with_params(self, engine: Engine) -> State:
         st = engine.init_state()
         params = self.learnables.write(engine, dict(st.params))
-        bindings = (
-            self._plan_bindings if engine is self.plan else self._filter_bindings
-        )
+        planning = engine is self.plan or engine is self.plain_plan
+        bindings = self._plan_bindings if planning else self._filter_bindings
         # Boundary prior slots are written LAST and win over learnable writes:
         # within an episode they carry the current filtered beliefs. An
         # episode learnable only re-anchors its declared binding at reset.
@@ -198,28 +244,85 @@ class RollingAgent:
             log_belief = _log_of(np.asarray(self.beliefs[name]))
             params[key] = params[key].at[idx].set(jnp.asarray(log_belief))
         st = _replace(st, params=params)
-        if engine is self.plan and self.goal_priors:
+        if planning and self.goal_priors:
             st = engine.with_goal_priors(st, self.goal_priors)
         return st
 
     # -- the perception-action cycle --------------------------------------
 
-    def act(self) -> int:
-        """Plan over the horizon from the current belief; pick a control."""
-        st = self._with_params(self.plan)
-        st = self.plan.run(
-            st, self.n_sweeps, tol=1e-10, damp=self.damp
-        ).require_converged()
+    def novelty_saturated(self) -> bool:
+        """Whether every serialized active transition column is saturated.
+
+        The readout is routed by declared learnable and its compiled
+        half-life. Repeated horizon members share one posterior and therefore
+        one cached weight array. A planner containing any unannealed GFE-TM
+        group cannot drop to plain inference.
+        """
+        groups = self.plan.arena.gfe_tm_groups
+        if (
+            not groups
+            or any(group.novelty_key is None for group in groups)
+        ):
+            return False
+        weights: dict[tuple[str, float], np.ndarray] = {}
+        for group in groups:
+            for name, half_life, mask, threshold in zip(
+                group.learnables,
+                group.half_lives,
+                group.active_masks,
+                group.saturation_weights,
+                strict=True,
+            ):
+                key = (name, float(half_life))
+                if key not in weights:
+                    weights[key] = self.learnables.novelty_weights(*key)
+                if np.any(weights[key][mask] > threshold):
+                    return False
+        return True
+
+    @property
+    def using_plain_planner(self) -> bool:
+        return self.plain_plan is not None and self.novelty_saturated()
+
+    def reset_action_rng(self, seed: int) -> None:
+        """Start an explicit action-sampling substream."""
+        self.rng = np.random.default_rng(seed)
+
+    def plan_action(self) -> PlanningResult:
+        """Plan over the horizon and retain status, policy, FE, and dispatch."""
+        engine = (
+            self.plain_plan
+            if self.using_plain_planner
+            else self.plan
+        )
+        assert engine is not None
+        state0 = self._with_params(engine)
+        run = engine.run(
+            state0, self.n_sweeps, tol=1e-10, damp=self.damp
+        )
+        st = run.require_converged()
         # Planning remains read-only within a trial. Learned goals stage one
         # converged Fig.5 posterior, but only reset_episode's explicit trial
         # boundary rolls it into the next prior. Replanning merely replaces
         # the staged value; it never accumulates another sweep/trial.
         if self.goal_priors:
-            self._pending_goal_priors = self.plan.goal_prior_updates(st)
-        q = np.asarray(self.plan.marginals(st)[self._plan_spec.action])
+            self._pending_goal_priors = engine.goal_prior_updates(st)
+        q = np.asarray(engine.marginals(st)[self._plan_spec.action])
         if self.select == "map":
-            return int(np.argmax(q))
-        return int(self.rng.choice(self.n_ctrl, p=q / q.sum()))
+            action = int(np.argmax(q))
+        else:
+            action = int(self.rng.choice(self.n_ctrl, p=q / q.sum()))
+        return PlanningResult(
+            action,
+            q.copy(),
+            run,
+            float(engine.bfe(st)),
+            "plain" if engine is self.plain_plan else "epistemic_b",
+        )
+
+    def act(self) -> int:
+        """Plan over the horizon from the current belief; pick a control."""
+        return self.plan_action().action
 
     def observe(
         self, action: int, observation: int

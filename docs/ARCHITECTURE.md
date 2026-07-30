@@ -290,7 +290,10 @@ A registry keyed by `(factor_type, constraint_config, out_edge_role)`:
   goal prior's role. Its substituted interior edge emits the predictive
   cavity (so the two facing messages reconstruct q_w), while its ledger uses
   the node-local objective without the downstream Lagrange coupling. Formal
-  derivation + plain-English companion in docs/DERIVATIONS.md D1.
+  derivation + plain-English companion in docs/DERIVATIONS.md D1. An annealed
+  constraint scales only the Dirichlet parameter-novelty gap per transition
+  column. λ=1 is the learned rule and λ=0 is the fixed-parameter GFE-TM rule
+  at the same posterior mean; neither endpoint is an ordinary BP transition.
 - Each rule ships with a **local free-energy contribution** function (average
   energy + entropy terms with correct edge-entropy overcounting), so global
   BFE/GFE is always exactly the sum of registered local terms — the "true BFE, no
@@ -317,8 +320,9 @@ them. Four rules define the contract:
    The registry `cffg.learn.FAMILIES` maps a family name to a `Family`:
    `check` (compile-time admissibility), `stats` (engine readout → statistic),
    `fold` (statistic into hyperparameters), `rollover` (hyperparameters →
-   what the rules consume), `raw` (→ what a counts target consumes), `mean`
-   (→ the reporting readout). `Dirichlet` serves the discrete vocabulary:
+   what the rules consume), `raw` (→ what a counts target consumes),
+   `novelty` (posterior-minus-prior evidence → a parameter-novelty weight),
+   `mean` (→ the reporting readout). `Dirichlet` serves the discrete vocabulary:
    `categorical` over `[K]`, `matrix_cat` over `[K_out, K_in]`,
    `transition_mixture` over `[U, K', K]`.
 
@@ -418,6 +422,26 @@ parameter tying and `LearnableSpec.sources` names only past/data-bearing
 members. A filter statistic can therefore update the posterior once and the
 next planning window writes that update to every tied slice without manual
 accumulation.
+
+`TransitionNoveltySpec` is the serialized Q-side lifecycle for a declared
+transition learnable. The builder writes a separate count-consumption blob
+for future GFE-TM members, records the evidence half-life and saturation
+weight in each P-substitution bead, and stores the active-column mask as a
+referenced blob. The compiler verifies that the bead's named learnable owns
+the count blob, resolves one novelty target per tied member, and puts
+per-column λ beside the raw counts in the derived arena. `Learnables` captures
+the prior once and derives λ from posterior-minus-prior mass, so horizon
+readers never become evidence.
+
+If every GFE-TM group in a rolling agent carries that schedule, the agent also
+precompiles the corresponding ordinary-GFE planning template. At episode
+boundaries the serialized active masks and thresholds determine whether all
+scheduled columns have saturated. Selection then dispatches the ordinary
+planner; filtering and posterior accumulation continue. Unknown columns
+outside the mask cannot hold the expensive path open. This is an explicit
+objective switch—the ordinary transition removes both parameter novelty and
+the remaining transition P-substitution—not a claim that λ=0 makes the two
+graphs identical.
 
 The complete host Template, never a fragment or plate, owns `AgentSpec`.
 Several block marginals are an explicit mean-field rolling boundary. Each

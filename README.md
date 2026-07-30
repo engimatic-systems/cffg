@@ -76,7 +76,8 @@ the model actually uses:
 
 ```python
 from cffg.models import (
-    CouplingSpec, ObservationSpec, StateBlockSpec, build_factored_rollout,
+    CouplingSpec, ObservationSpec, StateBlockSpec, TransitionNoveltySpec,
+    build_factored_rollout,
 )
 
 template, arrays = build_factored_rollout(
@@ -101,6 +102,17 @@ template, arrays = build_factored_rollout(
     observation=ObservationSpec(
         "sensor", "joint_sensor", A_joint, c,
     ),
+    learn=("position_transition",),
+    epistemic_b=True,
+    transition_novelty=(
+        TransitionNoveltySpec(
+            "position_transition",
+            half_life=4,
+            # Shape [mode, action, old_position]; stored as a blob.
+            active_columns=active_position_columns,
+            saturation_weight=1 / 16,
+        ),
+    ),
 )
 ```
 
@@ -111,7 +123,10 @@ existing deterministic `transition_mixture`/equality nodes. It does not add a
 flat joint transition table. `build_factored_corridor` is the ready-made
 position × mode example; pass `observation_matrix=` and
 `observation_source="position" | "mode" | "state"` for identifying or
-aliased sensors.
+aliased sensors. A novelty schedule weights only the transition
+parameter-novelty channel from posterior-minus-prior evidence. Once every
+declared active column reaches its saturation weight, `RollingAgent` uses a
+precompiled ordinary-GFE planner while transition learning continues.
 
 For other custom topologies, build the `Template` by hand (see
 `tests/conftest.py` for a hand-built HMM slice) and grow big models from
@@ -270,7 +285,9 @@ agent.checkpoint("agent.npz"); agent.restore("agent.npz")
 ```
 
 Two compiled engines cover any episode length: a planning window from the
-current beliefs and a one-slice filter that re-anchors them. `build_rollout`
+current beliefs and a one-slice filter that re-anchors them. An annealed
+transition-novelty model adds one precompiled ordinary planning alternative
+for its saturated drop-back path. `build_rollout`
 serializes the action readout, DATA ports, prior target, posterior readout, and
 episode learnable in `template.agent`; custom builders must declare the same
 interface with their own model-local names. A one-block model retains the

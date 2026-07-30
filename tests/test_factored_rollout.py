@@ -19,6 +19,7 @@ from cffg.models.factored import (
     CouplingSpec,
     ObservationSpec,
     StateBlockSpec,
+    TransitionNoveltySpec,
     build_factored_corridor,
     build_factored_rollout,
 )
@@ -283,6 +284,204 @@ def test_tied_transition_statistic_updates_every_time_member():
     assert key1 == key2
     np.testing.assert_array_equal(
         written[key1][member1], written[key2][member2]
+    )
+
+
+def test_declared_novelty_schedule_routes_tied_counts_and_half_life():
+    length, modes = 3, 2
+    active_public = np.zeros((modes, 3, length), dtype=bool)
+    active_public[0, 2, :2] = True
+    active_public[1, 0, :2] = True
+    template, arrays = build_factored_corridor(
+        steps=2,
+        length=length,
+        modes=modes,
+        gfe=True,
+        learn=("position_transition",),
+        epistemic_b=True,
+        transition_novelty=(
+            TransitionNoveltySpec(
+                "position_transition",
+                half_life=4.0,
+                active_columns=active_public,
+                saturation_weight=1 / 16,
+            ),
+        ),
+    )
+    validate(template)
+    restored = from_json(to_json(template))
+    assert set(restored.constraints) == set(template.constraints)
+    assert structure_hash(restored) == structure_hash(template)
+
+    engine = Engine(compile_template(template, arrays=arrays))
+    prior = np.full_like(
+        arrays["block/position/transition_counts"], 1 / length
+    )
+    learnables = Learnables(
+        engine, priors={"position_transition": prior}
+    )
+    initial = learnables.write(engine, dict(engine.init_state().params))
+    (group,) = engine.arena.gfe_tm_groups
+    assert group.learnables == ("position_transition",) * 2
+    assert group.novelty_key is not None
+    np.testing.assert_array_equal(initial[group.novelty_key], 1.0)
+
+    active = active_public.reshape(modes * 3, length)
+    learnables.params["position_transition"]["alpha"] += (
+        active[:, None, :] * (4.0 / length)
+    )
+    written = learnables.write(engine, initial)
+    weights = np.asarray(written[group.novelty_key])
+    np.testing.assert_allclose(weights[:, active], 0.5, atol=1e-12)
+    np.testing.assert_allclose(weights[:, ~active], 1.0, atol=1e-12)
+
+    # Both future slices read one tied posterior; neither planning instance
+    # creates its own count mass or schedule.
+    count_key = group.name + ":counts"
+    np.testing.assert_array_equal(written[count_key][0], written[count_key][1])
+
+
+def test_saturated_active_columns_dispatch_plain_and_keep_learning():
+    length, modes = 3, 2
+    active_public = np.zeros((modes, 3, length), dtype=bool)
+    active_public[0, 2, :2] = True
+    active_public[1, 0, :2] = True
+    schedule = TransitionNoveltySpec(
+        "position_transition",
+        half_life=4.0,
+        active_columns=active_public,
+        saturation_weight=1 / 16,
+    )
+    builder = functools.partial(
+        build_factored_corridor,
+        length=length,
+        modes=modes,
+        transition_novelty=(schedule,),
+    )
+    prior = np.full((modes * 3, length, length), 1 / length)
+    agent = RollingAgent(
+        builder,
+        horizon=2,
+        learn=("position_transition",),
+        priors={"position_transition": prior},
+        epistemic_b=True,
+        n_sweeps=200,
+        select="sample",
+        seed=7,
+    )
+    assert agent.plain_plan is not None
+    assert not agent.novelty_saturated()
+    assert agent.plan.arena.gfe_tm_groups
+    assert not agent.plain_plan.arena.gfe_tm_groups
+
+    active = active_public.reshape(modes * 3, length)
+    agent.learnables.params["position_transition"]["alpha"] += (
+        active[:, None, :] * (16.0 / length)
+    )
+    assert agent.novelty_saturated()
+    planned = agent.plan_action()
+    assert planned.planner == "plain"
+    assert planned.run.status.value == "converged"
+    assert np.isfinite(planned.free_energy)
+
+    before = agent.learnables.params["position_transition"]["alpha"].sum()
+    # mode 0, action right: true next state is (position=1, mode=0), whose
+    # full-state observation index is 1*2+0.
+    agent.observe(2, 2)
+    after = agent.learnables.params["position_transition"]["alpha"].sum()
+    np.testing.assert_allclose(after - before, 1.0, atol=1e-10)
+    assert agent.novelty_saturated()
+
+
+def test_multiple_arbitrarily_named_learnables_ignore_inactive_columns():
+    length, modes = 3, 2
+    _canonical, base = build_factored_corridor(
+        steps=1, length=length, modes=modes
+    )
+    motion = base["block/position/transition"].reshape(
+        modes, 3, length, length
+    )
+    regime = base["block/mode/transition"]
+    motion_active = np.zeros((modes, 3, length), dtype=bool)
+    motion_active[0, 2, :2] = True
+    regime_active = np.zeros((3, modes), dtype=bool)
+    regime_active[1, 0] = True
+    schedules = (
+        TransitionNoveltySpec(
+            "motion_kernel", 4.0, motion_active, 1 / 16
+        ),
+        TransitionNoveltySpec(
+            "regime_kernel", 4.0, regime_active, 1 / 16
+        ),
+    )
+
+    def builder(*, past, steps, **kwargs):
+        return build_factored_rollout(
+            "arbitrary-novelty-names",
+            past=past,
+            steps=steps,
+            blocks=(
+                StateBlockSpec(
+                    "where",
+                    np.array([1.0, 0.0, 0.0]),
+                    motion,
+                    selector="regime_parent",
+                    transition_learnable="motion_kernel",
+                ),
+                StateBlockSpec(
+                    "regime",
+                    np.array([1.0, 0.0]),
+                    regime,
+                    transition_learnable="regime_kernel",
+                ),
+            ),
+            couplings=(
+                CouplingSpec("regime_parent", ("regime",)),
+                CouplingSpec("joint", ("where", "regime")),
+            ),
+            actions=np.full(3, 1 / 3),
+            observation=ObservationSpec(
+                "sensor", "joint", np.eye(length * modes),
+                np.full(length * modes, 1 / (length * modes)),
+            ),
+            transition_novelty=schedules,
+            **kwargs,
+        )
+
+    priors = {
+        "motion_kernel": np.full((modes * 3, length, length), 1 / length),
+        "regime_kernel": np.full((3, modes, modes), 1 / modes),
+    }
+    agent = RollingAgent(
+        builder,
+        horizon=1,
+        learn=tuple(priors),
+        priors=priors,
+        epistemic_b=True,
+        n_sweeps=100,
+    )
+    assert not agent.novelty_saturated()
+    for name, mask, card in (
+        ("motion_kernel", motion_active.reshape(modes * 3, length), length),
+        ("regime_kernel", regime_active, modes),
+    ):
+        agent.learnables.params[name]["alpha"] += (
+            mask[:, None, :] * (16.0 / card)
+        )
+    assert agent.novelty_saturated()
+
+    # Unselected columns retain λ=1 and still cannot hold the plain path open.
+    np.testing.assert_array_equal(
+        agent.learnables.novelty_weights("motion_kernel", 4.0)[
+            ~motion_active.reshape(modes * 3, length)
+        ],
+        1.0,
+    )
+    np.testing.assert_array_equal(
+        agent.learnables.novelty_weights("regime_kernel", 4.0)[
+            ~regime_active
+        ],
+        1.0,
     )
 
 
