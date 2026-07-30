@@ -35,7 +35,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
-from jax.scipy.special import digamma, logsumexp
+from jax.scipy.special import logsumexp
 
 from cffg import csp, ef, efrules, gauss, kernels, mixg
 from cffg.compiler import NEG, Arena
@@ -60,9 +60,6 @@ from cffg.rules import (
     goal_dirichlet_energy,
     mu3_importance_update,
 )
-
-_TINY = 1e-12
-
 
 class State(eqx.Module):
     """Pure-data instance state. The Gaussian arrays are zero-size on
@@ -415,10 +412,9 @@ class Engine:
             if not g.mu3:
                 continue
             counts = params[g.name + ":counts"]
-            total = counts.sum(axis=1, keepdims=True)
-            abar = counts / total
-            e_alog = abar * (
-                digamma(counts + 1.0) - digamma(total + 1.0)
+            abar = efrules.DIRICHLET.mean_from_concentration(counts, axis=1)
+            e_alog = efrules.DIRICHLET.expected_probability_log_probability(
+                counts, axis=1
             )
             params[g.name + ":Abar"] = abar
             params[g.name + ":hbar"] = -e_alog.sum(axis=1)
@@ -526,10 +522,9 @@ class Engine:
             params[prefix + ":ready"] = jnp.asarray(True)
 
             gfe = self._gfe_by_name[plan.gfe_name]
-            mean = alpha / alpha.sum(axis=0, keepdims=True)
-            e_alog = mean * (
-                digamma(alpha + 1.0)
-                - digamma(alpha.sum(axis=0, keepdims=True) + 1.0)
+            mean = efrules.DIRICHLET.mean_from_concentration(alpha, axis=0)
+            e_alog = efrules.DIRICHLET.expected_probability_log_probability(
+                alpha, axis=0
             )
             entropy = -e_alog.sum(axis=0)
             rows = jnp.asarray(plan.rows)
@@ -1208,13 +1203,11 @@ class Engine:
         for e in self.arena.edges.values():
             if e.dim or e.ef or e.param_shape:
                 continue  # gaussian_marginals / ef_marginals
-            lq = (
-                msgs[self.arena.message_indices(e.slot0, e.card)]
-                + msgs[self.arena.message_indices(e.slot1, e.card)]
+            lq = ef.CATEGORICAL.product(
+                msgs[self.arena.message_indices(e.slot0, e.card)],
+                msgs[self.arena.message_indices(e.slot1, e.card)],
             )
-            lq -= lq.max()
-            q = np.exp(lq)
-            out[e.name] = q / q.sum()
+            out[e.name] = ef.CATEGORICAL.mean(lq)
         return out
 
     def node_beliefs(self, state: State) -> dict[str, np.ndarray]:
@@ -1235,20 +1228,22 @@ class Engine:
         def norm_exp(lb: np.ndarray) -> np.ndarray:
             m = lb.shape[0]
             flat = lb.reshape(m, -1)
-            flat = flat - flat.max(axis=1, keepdims=True)
-            q = np.exp(flat)
-            return (q / q.sum(axis=1, keepdims=True)).reshape(lb.shape)
+            return ef.CATEGORICAL.mean(flat, axis=1).reshape(lb.shape)
 
         for g in self.arena.groups:
             inc = np.asarray(_disc_rows(self.arena, state.messages, g.gather, g.cards))
             if g.type == "equality":
                 k = g.cards[0]
-                q = norm_exp(inc[:, :, :k].sum(axis=1))
+                q = norm_exp(
+                    ef.CATEGORICAL.product_axis(inc[:, :, :k], axis=1)
+                )
             elif g.mode == "vmp":
                 both = np.asarray(_disc_both(self.arena, state.messages, g.gather_both, g.cards))
                 q = None
                 for r, k in enumerate(g.cards):
-                    lq = both[:, r, 0, :k] + both[:, r, 1, :k]
+                    lq = ef.CATEGORICAL.product(
+                        both[:, r, 0, :k], both[:, r, 1, :k]
+                    )
                     edge_q = norm_exp(lq).reshape(len(g.members), *([1] * r), k)
                     q = edge_q if q is None else q[..., None] * edge_q
             else:
@@ -1291,16 +1286,25 @@ class Engine:
         for e in self.arena.edges.values():
             if not e.param_shape:
                 continue
-            packed = (
-                messages[self.arena.message_indices(e.slot0, e.card)]
-                + messages[self.arena.message_indices(e.slot1, e.card)]
+            packed = ef.DIRICHLET.posterior(
+                messages[self.arena.message_indices(e.slot0, e.card)],
+                messages[self.arena.message_indices(e.slot1, e.card)],
             )
             alpha = packed.reshape(e.param_shape)
-            proper = bool(np.all(np.isfinite(alpha)) and np.all(alpha > 0))
+            proper = bool(
+                ef.DIRICHLET.is_proper_concentration(
+                    alpha, axis=tuple(range(alpha.ndim))
+                )
+            )
             if proper:
-                total = alpha.sum(axis=e.param_axis, keepdims=True)
-                mean = alpha / total
-                expected_log = np.asarray(digamma(alpha) - digamma(total))
+                mean = ef.DIRICHLET.mean_from_concentration(
+                    alpha, axis=e.param_axis
+                )
+                expected_log = np.asarray(
+                    efrules.DIRICHLET.mean_stats_from_concentration(
+                        alpha, axis=e.param_axis
+                    )
+                )
             else:
                 mean = np.full_like(alpha, np.nan)
                 expected_log = np.full_like(alpha, np.nan)
@@ -1416,13 +1420,15 @@ class Engine:
             if not e.dim:
                 continue
             d = e.dim
-            eta_q = (
-                eta[self.arena.g_eta_indices(e.slot0, d)]
-                + eta[self.arena.g_eta_indices(e.slot1, d)]
-            )
-            lam_q = (
-                lam[self.arena.g_lam_indices(e.slot0, d)]
-                + lam[self.arena.g_lam_indices(e.slot1, d)]
+            eta_q, lam_q = ef.GAUSSIAN.product(
+                (
+                    eta[self.arena.g_eta_indices(e.slot0, d)],
+                    lam[self.arena.g_lam_indices(e.slot0, d)],
+                ),
+                (
+                    eta[self.arena.g_eta_indices(e.slot1, d)],
+                    lam[self.arena.g_lam_indices(e.slot1, d)],
+                ),
             )
             mean, cov = gauss.moments(eta_q, lam_q)
             out[e.name] = (np.asarray(mean), np.asarray(cov))
@@ -1556,7 +1562,7 @@ class Engine:
             if not e.ef or e.ef not in ef.FAMILIES:
                 continue
             fam = ef.FAMILIES[e.ef]
-            eta_q = eta[e.slot0] + eta[e.slot1]
+            eta_q = fam.product(eta[e.slot0], eta[e.slot1])
             proper = bool(fam.is_proper(eta_q))
             out[e.name] = EfMarginal(
                 family=e.ef,
@@ -1904,7 +1910,9 @@ def _make_step(arena: Arena, skip_scheduled: bool = False):
                 c_counts = messages[
                     arena.message_indices(g.goal_count_scatter, ko)
                 ]
-                logc = dirichlet_expected_log(c_alpha0 + c_counts)
+                logc = dirichlet_expected_log(
+                    efrules.DIRICHLET.posterior(c_alpha0, c_counts)
+                )
             else:
                 logc = params[g.name + ":c"]
             if g.mu3:
@@ -2837,7 +2845,9 @@ def _make_bfe(arena: Arena):
                 current_counts = messages[
                     arena.message_indices(g.goal_count_scatter, ko)
                 ]
-                alpha = alpha0 + current_counts
+                alpha = efrules.DIRICHLET.posterior(
+                    alpha0, current_counts
+                )
                 expected_log_c = dirichlet_expected_log(alpha)
                 abar, hbar = gfe_parameter_stats(
                     params[a_key], learned=g.learned
@@ -2880,14 +2890,11 @@ def _make_bfe(arena: Arena):
                 mi, me, md, params[b_key], learned=g.learned
             ).sum()
         for card, pairs in arena.interior_slot_groups:
-            lq = (
-                messages[arena.message_indices(pairs[:, 0], card)]
-                + messages[arena.message_indices(pairs[:, 1], card)]
+            lq = efrules.CATEGORICAL.product(
+                messages[arena.message_indices(pairs[:, 0], card)],
+                messages[arena.message_indices(pairs[:, 1], card)],
             )
-            lq = lq - logsumexp(lq, axis=-1, keepdims=True)
-            q = jnp.exp(lq)
-            entropy = -jnp.where(q > _TINY, q * lq, 0.0).sum()
-            total = total + entropy
+            total = total + efrules.CATEGORICAL.entropy_total(lq)
         return total
 
     return bfe

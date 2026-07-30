@@ -17,16 +17,15 @@ from typing import NamedTuple
 
 import jax
 import jax.numpy as jnp
-from jax.scipy.special import digamma, gammaln, logsumexp
+from jax.scipy.special import gammaln, logsumexp
 
+from cffg import efrules
 from cffg.compiler import NEG
-
-_TINY = 1e-12
 
 
 def _norm_pad(x: jnp.ndarray, card: int, k_max: int) -> jnp.ndarray:
     """Normalize [M, card] log-messages and pad to k_max."""
-    x = x - logsumexp(x, axis=-1, keepdims=True)
+    x = efrules.CATEGORICAL.normalize(x)
     pad = jnp.full((*x.shape[:-1], k_max - card), NEG, dtype=x.dtype)
     return jnp.concatenate([x, pad], axis=-1)
 
@@ -71,7 +70,11 @@ def bp_equality(inc, logf, cards, k_max, op=logsumexp):
     k = cards[0]
     a, b, c = inc[:, 0, :k], inc[:, 1, :k], inc[:, 2, :k]
     return jnp.stack(
-        [_norm_pad(b + c, k, k_max), _norm_pad(a + c, k, k_max), _norm_pad(a + b, k, k_max)],
+        [
+            _norm_pad(efrules.CATEGORICAL.product(b, c), k, k_max),
+            _norm_pad(efrules.CATEGORICAL.product(a, c), k, k_max),
+            _norm_pad(efrules.CATEGORICAL.product(a, b), k, k_max),
+        ],
         axis=1,
     )
 
@@ -90,12 +93,7 @@ BP_UPDATES = {
 def _energy_from(log_belief_un: jnp.ndarray, log_f: jnp.ndarray) -> jnp.ndarray:
     """F[q_a] per member from unnormalized log-belief and log-factor, both
     [M, ...]. 0·log0 terms are excised with a where-guard."""
-    m = log_belief_un.shape[0]
-    lb = log_belief_un.reshape(m, -1)
-    lf = log_f.reshape(m, -1)
-    lb = lb - logsumexp(lb, axis=-1, keepdims=True)
-    q = jnp.exp(lb)
-    return jnp.where(q > _TINY, q * (lb - lf), 0.0).sum(axis=-1)
+    return efrules.CATEGORICAL.energy(log_belief_un, log_f)
 
 
 def energy_categorical(inc, logf, cards):
@@ -144,9 +142,10 @@ NODE_ENERGIES = {
 
 
 def _edge_q(inc2, r, card):
-    lq = inc2[:, r, 0, :card] + inc2[:, r, 1, :card]
-    lq = lq - logsumexp(lq, axis=-1, keepdims=True)
-    return jnp.exp(lq), lq
+    eta_q = efrules.CATEGORICAL.product(
+        inc2[:, r, 0, :card], inc2[:, r, 1, :card]
+    )
+    return efrules.CATEGORICAL.moments(eta_q)
 
 
 def vmp_categorical(inc2, logf, cards, k_max):
@@ -185,7 +184,7 @@ VMP_UPDATES = {
 
 
 def _neg_entropy(q, lq):
-    return jnp.where(q > _TINY, q * lq, 0.0).sum(axis=-1)
+    return efrules.CATEGORICAL.negative_entropy_from_moments(q, lq)
 
 
 def vmp_energy_categorical(inc2, logf, cards):
@@ -244,7 +243,7 @@ def _dirichlet_counts(ftype, inc2, cards):
 
 def _dirichlet_expected_log(alpha, output_axis):
     axis = output_axis + 1  # leading member axis
-    return digamma(alpha) - digamma(jnp.sum(alpha, axis=axis, keepdims=True))
+    return efrules.DIRICHLET.mean_stats_from_concentration(alpha, axis=axis)
 
 
 def dirichlet_expected_log(alpha, axis=-1):
@@ -253,7 +252,7 @@ def dirichlet_expected_log(alpha, axis=-1):
     Unlike :func:`_dirichlet_expected_log`, this public form has no assumed
     leading member axis and is used by GFE goal-hyperprior coordinates.
     """
-    return digamma(alpha) - digamma(jnp.sum(alpha, axis=axis, keepdims=True))
+    return efrules.DIRICHLET.mean_stats_from_concentration(alpha, axis=axis)
 
 
 def _dirichlet_logf(ftype, expected_log):
@@ -272,7 +271,7 @@ def dirichlet_vmp_update(ftype, inc2, alpha0, cards, k_max):
     """
     counts, _ = _dirichlet_counts(ftype, inc2, cards)
     output_axis = 1 if ftype == "transition_mixture" else 0
-    alpha = alpha0 + counts
+    alpha = efrules.DIRICHLET.posterior(alpha0, counts)
     expected_log = _dirichlet_expected_log(alpha, output_axis)
     out = VMP_UPDATES[ftype](
         inc2, _dirichlet_logf(ftype, expected_log), cards, k_max
@@ -286,16 +285,17 @@ def _sum_nonmember(x):
 
 def _dirichlet_log_beta(alpha, output_axis):
     axis = output_axis + 1
-    return (
-        gammaln(alpha).sum(axis=axis)
-        - gammaln(alpha.sum(axis=axis))
+    return efrules.DIRICHLET.log_partition_from_concentration(
+        alpha, axis=axis
     )
 
 
 def _state_negative_entropy(qs):
     total = jnp.zeros(qs[0][0].shape[0], dtype=qs[0][0].dtype)
     for q, lq in qs:
-        total = total + jnp.where(q > 0, q * lq, 0.0).sum(axis=-1)
+        total = total + efrules.CATEGORICAL.negative_entropy_from_moments(
+            q, lq, cutoff=0.0
+        )
     return total
 
 
@@ -319,9 +319,8 @@ def dirichlet_vmp_energy(ftype, inc2, alpha, alpha0, cards):
         + _sum_nonmember(_dirichlet_log_beta(alpha0, output_axis))
         + _sum_nonmember((alpha - alpha0 - counts) * elog)
     )
-    proper = (
-        jnp.isfinite(alpha).reshape((alpha.shape[0], -1)).all(axis=-1)
-        & (alpha > 0).reshape((alpha.shape[0], -1)).all(axis=-1)
+    proper = efrules.DIRICHLET.is_proper_concentration(
+        alpha, axis=tuple(range(1, alpha.ndim))
     )
     return jnp.where(proper, _state_negative_entropy(qs) + parameter, jnp.inf)
 
@@ -390,7 +389,9 @@ def _safe_log(x):
 def _fixed_stats(logA):
     """(Ā, h) for a known matrix: Ā = A, h = column entropies."""
     a = jnp.exp(logA)
-    h = -jnp.sum(jnp.where(a > _TINY, a * logA, 0.0), axis=0)  # [K]
+    h = -efrules.CATEGORICAL.negative_entropy_from_moments(
+        a, logA, axis=0
+    )
     return a, h
 
 
@@ -400,9 +401,10 @@ def _dirichlet_stats(counts):
     so h̃_z = −Σ_x E[A log A]. By Jensen h̃ ≤ H[Ā·z-column]: an *uncertain*
     column has lower expected entropy than its blurry mean suggests — the
     parameter-novelty channel that makes unexplored states attractive."""
-    a0 = counts.sum(axis=0, keepdims=True)
-    abar = counts / a0
-    e_alog = abar * (jax.scipy.special.digamma(counts + 1.0) - jax.scipy.special.digamma(a0 + 1.0))
+    abar = efrules.DIRICHLET.mean_from_concentration(counts, axis=0)
+    e_alog = efrules.DIRICHLET.expected_probability_log_probability(
+        counts, axis=0
+    )
     h = -e_alog.sum(axis=0)  # [K]
     return abar, h
 
@@ -752,7 +754,9 @@ def _tm_fixed_stats(log_b):
     b = jnp.exp(log_b)
     # Only exact zeros are omitted from 0*log(0); a fixed numeric threshold
     # would silently erase valid small probabilities in a dtype-dependent way.
-    h = -jnp.sum(jnp.where(b > 0, b * log_b, 0.0), axis=1)  # [U, K]
+    h = -efrules.CATEGORICAL.negative_entropy_from_moments(
+        b, log_b, axis=1, cutoff=0.0
+    )
     return b, h
 
 
@@ -761,10 +765,9 @@ def _tm_dirichlet_stats(counts):
     B̄ = α/α₀ and E[B log B] = (α/α₀)(ψ(α+1) − ψ(α₀+1)) in closed form, so
     ĥ ≤ H[B̄-column] with the gap = the parameter-novelty channel (unexplored
     transition columns look attractive), mirroring _dirichlet_stats."""
-    a0 = counts.sum(axis=1, keepdims=True)
-    bbar = counts / a0
-    e_blog = bbar * (
-        jax.scipy.special.digamma(counts + 1.0) - jax.scipy.special.digamma(a0 + 1.0)
+    bbar = efrules.DIRICHLET.mean_from_concentration(counts, axis=1)
+    e_blog = efrules.DIRICHLET.expected_probability_log_probability(
+        counts, axis=1
     )
     h = -e_blog.sum(axis=1)  # [U, K]
     return bbar, h

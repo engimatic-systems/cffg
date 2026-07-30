@@ -14,11 +14,13 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
+from cffg import ef
+
 
 def _spd(name: str, mat: np.ndarray) -> np.ndarray:
     """Assert SPD (exact-arithmetic guarantee per D4; a violation means the
     accumulated statistics are inconsistent, not numerical noise)."""
-    if not np.allclose(mat, mat.T, atol=1e-10):
+    if not bool(ef.GAUSSIAN.symmetry_ok(mat)):
         raise ValueError(f"{name} not symmetric")
     try:
         np.linalg.cholesky(mat)

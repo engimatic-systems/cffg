@@ -199,7 +199,16 @@ beads (mean-field, P-substitution) on EF nodes are compile errors, and the
 tree identity BFE = −log evidence is pinned to 1e-12 in
 `tests/test_ef_engine.py`. Improper beliefs (e.g. the vacuous Gamma point)
 make every ledger term +inf — loud by construction, never NaN.
-Cat/Dir/Gaussian currently remain on their dedicated message representations.
+
+Categorical, Dirichlet, and Gaussian now share this algebra through
+`NATURAL_FAMILIES` / `JNATURAL_FAMILIES`: products route through natural
+addition, moments come from log-partition gradients, and family methods own
+the corresponding entropy/energy algebra. Their shape-specialized storage is
+deliberately unchanged: categorical log vectors and Dirichlet
+concentration/count segments remain in the discrete arena, while Gaussian
+`(eta, Lambda)` pairs remain in the Gaussian arena. `rules.py`, `learn.py`,
+and `gauss.py` are adapters onto the family entries, so structure hashes,
+schedules, and serialized layouts do not move.
 
 ### 2d. Hybrid discrete-continuous nodes (cff-pksr)
 
@@ -240,8 +249,10 @@ a registered kernel with the wrong identity or MAJOR version is refused too.
 v1 binding scope: kernels attach to the EF arena, where the message
 representation is uniform (natural parameters, products add, vacuous is
 zeros) — `gamma`, `beta`, `poisson_obs`, and `bernoulli_obs` are kernels,
-and `equality` remains structural infrastructure. The discrete, Gaussian, and
-hybrid families still run on central paths.
+and `equality` remains structural infrastructure. The discrete and Gaussian
+families share the natural-family math but still dispatch through central
+compiler/engine paths; their migration onto executable registration is
+tracked by cff-209l. Hybrid families also remain central.
 
 Compatibility policy (AC6, pre-1.0): the Python registration API
 (`register_kernel`, the `FactorKernel` field set) is internal-unstable and
@@ -727,9 +738,6 @@ source of truth for readiness, scope, and status.
 
 ### Near-term architectural targets
 
-- **Uniform message-family algebra (cff-l6i5).** Re-express Cat/Dir/Gaussian
-  products, moments, and energies through the natural-parameter contract while
-  preserving their arenas and rule signatures.
 - **Colony runtime (cff-wbhu, cff-rqqc).** Put the general convergence loop and
   per-instance status carry inside one compiled scan, and give stochastic
   evaluators explicit per-instance PRNG streams and particle state.
@@ -813,9 +821,10 @@ land as docstrings; delegation guidance lives in the epic:
 - **M12 — Nonlinear factors** (cff-o7hs): Jacobian linearization and
   sigma-point moment matching; activates the reserved MOMENT_MATCHING bead
   as EP.
-- **M13 — Exponential-family abstraction** (cff-8s6a): natural parameters +
-  log-partitions as the message contract; Gamma/Beta/Poisson/Wishart as
-  table entries. Cat/Dir/Gaussian re-expressed with zero test regressions.
+- **M13 — Exponential-family abstraction** (cff-8s6a, cff-l6i5, landed):
+  natural parameters + log-partitions as the message contract;
+  Gamma/Beta/Poisson/Wishart as table entries. Cat/Dir/Gaussian re-expressed
+  with zero test regressions.
 - **M14 — Constraint/optimization factors** (cff-e8zk): min-sum semiring mode
   on the existing arenas + combinatorial hard-constraint messages
   (alldifferent, cardinality, linear inequalities); the ledger API must

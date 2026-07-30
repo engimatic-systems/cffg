@@ -77,50 +77,22 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 
-_LOG2PI = 1.8378770664093453  # log(2*pi)
+from cffg import efrules
 
-
-def _matrix_scale(mat: jnp.ndarray) -> jnp.ndarray:
-    """Per-matrix absolute scale with a dtype-derived nonzero fallback."""
-    scale = jnp.max(jnp.abs(mat), axis=(-2, -1))
-    return jnp.maximum(scale, jnp.asarray(jnp.finfo(mat.dtype).tiny, dtype=mat.dtype))
-
-
-def _symmetry_ok(mat: jnp.ndarray) -> jnp.ndarray:
-    """Numerical symmetry test relative to matrix scale and dimension."""
-    d = mat.shape[-1]
-    err = jnp.max(jnp.abs(mat - mat.swapaxes(-1, -2)), axis=(-2, -1))
-    # Invariant protected: only a genuinely symmetric precision enters a
-    # Cholesky/readout.  The d*eps allowance admits roundoff from A.T@W@A and
-    # rescales with units; it is not an eigenvalue floor.
-    tol = 16.0 * d * jnp.finfo(mat.dtype).eps * _matrix_scale(mat)
-    return jnp.isfinite(mat).all(axis=(-2, -1)) & (err <= tol)
-
-
-def _pd_ok(mat: jnp.ndarray) -> jnp.ndarray:
-    """Scale-invariant strict-PD predicate, batched and JIT-safe.
-
-    A positive scalar precision remains proper however diffuse its units are.
-    Symmetry plus a finite, strictly-positive Cholesky diagonal rejects
-    singular and indefinite matrices; sign+logdet is retained as an
-    independent guard against backend-specific borderline factorizations.
-    """
-    sym = 0.5 * (mat + mat.swapaxes(-1, -2))
-    chol = jnp.linalg.cholesky(sym)
-    diag = jnp.diagonal(chol, axis1=-2, axis2=-1)
-    sign, logdet = jnp.linalg.slogdet(sym)
-    return (
-        _symmetry_ok(mat)
-        & jnp.isfinite(chol).all(axis=(-2, -1))
-        & (diag > 0).all(axis=-1)
-        & (sign > 0)
-        & jnp.isfinite(logdet)
-    )
+_LOG2PI = efrules.LOG2PI
+GAUSSIAN = efrules.GAUSSIAN
+_matrix_scale = efrules._matrix_scale
+_symmetry_ok = efrules._symmetry_ok
+_pd_ok = efrules._pd_ok
+_safe_pd = efrules._safe_pd
+_pd_solve = efrules._pd_solve
+_pd_inverse = efrules._pd_inverse
+_pd_logdet = efrules._pd_logdet
 
 
 def is_proper_precision(mat: jnp.ndarray) -> jnp.ndarray:
     """Public propriety predicate used by Gaussian engine readouts."""
-    return _pd_ok(jnp.asarray(mat))
+    return GAUSSIAN.is_proper_precision(mat)
 
 
 def _psd_ok(mat: jnp.ndarray) -> jnp.ndarray:
@@ -129,48 +101,6 @@ def _psd_ok(mat: jnp.ndarray) -> jnp.ndarray:
     eig = jnp.linalg.eigvalsh(sym)
     tol = 16.0 * mat.shape[-1] * jnp.finfo(mat.dtype).eps * _matrix_scale(mat)
     return _symmetry_ok(mat) & jnp.isfinite(eig).all(axis=-1) & (eig[..., 0] >= -tol)
-
-
-def _safe_pd(mat: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
-    """Return `(proper, safe_matrix)` for branch-safe linear algebra.
-
-    Invalid matrices are replaced by a scale-matched identity solely so JAX
-    can evaluate untaken `where` branches without NaNs.  Accepted matrices
-    are never ridged, so proper solves have zero deliberate regularization
-    bias.
-    """
-    ok = _pd_ok(mat)
-    sym = 0.5 * (mat + mat.swapaxes(-1, -2))
-    eye = jnp.eye(mat.shape[-1], dtype=mat.dtype)
-    fallback = _matrix_scale(mat)[..., None, None] * eye
-    return ok, jnp.where(ok[..., None, None], sym, fallback)
-
-
-def _pd_solve(mat: jnp.ndarray, rhs: jnp.ndarray) -> jnp.ndarray:
-    """Unregularized solve on proper matrices; finite placeholder otherwise."""
-    _, safe = _safe_pd(mat)
-    chol = jnp.linalg.cholesky(safe)
-    vector_rhs = rhs.ndim == mat.ndim - 1
-    rhs_matrix = rhs[..., None] if vector_rhs else rhs
-    y = jax.lax.linalg.triangular_solve(
-        chol, rhs_matrix, left_side=True, lower=True
-    )
-    solved = jax.lax.linalg.triangular_solve(
-        chol, y, left_side=True, lower=True, transpose_a=True
-    )
-    return solved[..., 0] if vector_rhs else solved
-
-
-def _pd_inverse(mat: jnp.ndarray) -> jnp.ndarray:
-    eye = jnp.eye(mat.shape[-1], dtype=mat.dtype)
-    return _pd_solve(mat, jnp.broadcast_to(eye, mat.shape))
-
-
-def _pd_logdet(mat: jnp.ndarray) -> jnp.ndarray:
-    """Unregularized logdet on the safe PD branch."""
-    _, safe = _safe_pd(mat)
-    chol = jnp.linalg.cholesky(safe)
-    return 2.0 * jnp.log(jnp.diagonal(chol, axis1=-2, axis2=-1)).sum(axis=-1)
 
 
 def _psd_pinv(mat: jnp.ndarray) -> jnp.ndarray:
@@ -196,9 +126,7 @@ def _project_psd(mat: jnp.ndarray, reference: jnp.ndarray) -> jnp.ndarray:
 
 def _neg_entropy(lam_q: jnp.ndarray) -> jnp.ndarray:
     """−H[q], or +inf when Λ is nonsymmetric/non-PD/non-finite."""
-    d = lam_q.shape[-1]
-    val = 0.5 * _pd_logdet(lam_q) - 0.5 * d * (1.0 + _LOG2PI)
-    return jnp.where(_pd_ok(lam_q), val, jnp.inf)
+    return GAUSSIAN.negative_entropy_from_precision(lam_q)
 
 
 # --- BP messages -------------------------------------------------------------
@@ -302,7 +230,9 @@ def linear_observed_backward(y, mask, a, b, w):
 def equality_messages(eta, lam):
     """equality → each leg: sum of the other legs' (η, Λ).
     eta [M,R,d], lam [M,R,d,d] → same shapes."""
-    tot_e, tot_l = eta.sum(axis=1, keepdims=True), lam.sum(axis=1, keepdims=True)
+    tot_e, tot_l = GAUSSIAN.product_axis(
+        (eta, lam), axis=1, keepdims=True
+    )
     return tot_e - eta, tot_l - lam
 
 
@@ -313,8 +243,8 @@ def prior_energy(eta_i, lam_i, mean, w):
     """gaussian node: q ∝ N(m,V)·mu_in with (η_q, Λ_q) = (Wm+η_i, W+Λ_i)."""
 
     def one(ei, li, m, W):
-        lam_q = W + li
-        m_q = _pd_solve(lam_q, W @ m + ei)
+        eta_q, lam_q = GAUSSIAN.product((W @ m, W), (ei, li))
+        m_q = _pd_solve(lam_q, eta_q)
         sig_q = _pd_inverse(lam_q)
         logdet_w = _pd_logdet(W)
         d = m - m_q
@@ -378,13 +308,14 @@ def linear_observed_energy(eta_i, lam_i, y, mask, a, b, w):
 
 def equality_energy(eta, lam):
     """equality: −H[q] from the product of all legs (log f = 0 on support)."""
-    return _neg_entropy(lam.sum(axis=1))
+    natural_q = GAUSSIAN.product_axis((eta, lam), axis=1)
+    return -GAUSSIAN.entropy(natural_q)
 
 
 def edge_entropy(lam0, lam1):
     """+H[q_e] per interior edge (Bethe counting number d_e − 1 = 1)."""
-    lam_q = lam0 + lam1
-    val = -_neg_entropy(lam_q)
+    lam_q = GAUSSIAN.precision_product(lam0, lam1)
+    val = GAUSSIAN.entropy_from_precision(lam_q)
     return jnp.where(_pd_ok(lam_q), val, jnp.inf)
 
 
@@ -454,10 +385,4 @@ def moments(eta, lam):
     negative covariance previously returned for an indefinite precision.
     Use :func:`is_proper_precision` when a boolean status is needed.
     """
-    ok = _pd_ok(lam) & jnp.isfinite(eta).all(axis=-1)
-    cov = _pd_inverse(lam)
-    mean = jnp.einsum("...ij,...j->...i", cov, eta)
-    return (
-        jnp.where(ok[..., None], mean, jnp.nan),
-        jnp.where(ok[..., None, None], cov, jnp.nan),
-    )
+    return GAUSSIAN.moments((eta, lam))

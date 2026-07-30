@@ -257,8 +257,11 @@ conjugate addition, observation energies).
    (negative-binomial / Beta-Bernoulli marginals) to 1e-12. The mixed
    `gaussian_prec` node (Gaussian with a Gamma precision edge) belongs to
    cff-7c5o as the abstraction's first mixed client.
-4. Cat/Dir/Gaussian re-expression on the abstraction is a REFACTOR ticket
-   with zero-regression acceptance, deliberately not folded into this work.
+4. Cat/Dir/Gaussian re-expression landed under cff-l6i5: their dedicated
+   arenas remain intact, while `ef.py` / `efrules.py` family entries own
+   natural addition, log-partition gradients, and entropy algebra. HMM,
+   Kalman, and T-maze messages and BFE values remain bit-identical to the
+   pre-refactor implementation.
 
 ---
 
