@@ -1,6 +1,6 @@
 ---
 id: cff-weff
-status: in_progress
+status: closed
 deps: [cff-wafy]
 links: [cff-2gev, cff-wbhu]
 created: 2026-07-30T14:04:30Z
@@ -173,3 +173,7 @@ Applicable row: **Runtime numerical or status invariant**.
 **2026-07-30T18:39:37Z**
 
 Formalism dependency completed by cff-wafy commit 33d347f. Implement Route B from DERIVATIONS D7: fixed-support log-ratio/minimal-natural chart, frozen dtype-aware residual scale, matrix-free trust-region GN/LM with Steihaug CG, implicit JVP/VJP through local Corollary-1/D1 stationarity, active-set restarts, and root-vs-stationary-nonroot diagnostics. Reuse tests/test_outer_gfe_formalism.py::one_update_corridor_case unchanged; the production solver should change only the expected outcome, not the fixture/model/tolerance.
+
+**2026-07-31T06:00:01Z**
+
+Implementation complete on agent/cff-weff-implementation. Added the fixed-support gauge-reduced trust-region Gauss-Newton/Steihaug outer solve, implicit Corollary-1/D1 differentiation, exact-support restarts, certified diagnostics, and support-safe independently certified shadow-root fallback. Engine.run now defaults mixed GFE to the proof-backed solver, preserves explicit Picard diagnostics, reports truthful termination reasons, and keeps the FE ledger unchanged. Updated ARCHITECTURE, DERIVATIONS, LIMITATIONS, and README plus executable formalism and hostile-input anchors. Final affected-component run passed 38 tests. After splitting 38 long behavioral, multi-trial, and globalization regressions behind pytest.mark.slow, the final default short gate passed 1248 tests with 38 deselected in 323.296 seconds at 2991f9a. Per explicit user instruction, no further full or slow suite was launched. Dashboard wait history now distinguishes the not-slow selection and recommends 420 seconds. tk dep cycle and git diff --check pass.
