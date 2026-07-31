@@ -244,6 +244,7 @@ class Colony:
                         engine.arena.gauss_groups
                         or engine.arena.ef_groups
                         or engine.arena.prec_groups
+                        or engine.arena.recurrence_groups
                     ):
                         statuses[b] = RunStatus.DIVERGED
                         active[b] = False
@@ -259,6 +260,7 @@ class Colony:
                         engine.arena.gauss_groups
                         or engine.arena.ef_groups
                         or engine.arena.prec_groups
+                        or engine.arena.recurrence_groups
                     )
                 ):
                     statuses[b] = RunStatus.DIVERGED

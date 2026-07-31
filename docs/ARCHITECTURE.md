@@ -235,6 +235,19 @@ ledger term lower-bounds the exact substituted objective. The O(K²)
 Hershey–Olsen sandwich and H(rho) cap are computed only by
 `Engine.hybrid_gfe_diagnostics`, not during ordinary inference or scoring.
 
+`recurrence_link(out, in, drive)` is the recurrent hybrid primitive used on
+the rSLDS path. For each previous regime it stores `K - 1` source-specific
+stick logits, with `weights[K,K-1,d]` and `offsets[K,K-1]`, rather than a
+dense transition tensor over a discretized continuous state. A dedicated
+`RecurrencePlan` carries the two categorical slot tables and Gaussian slot
+table into both arenas. `cffg.recurrence` applies the exact Pólya–Gamma
+augmentation followed by its coordinate-optimal mean-field factor, which is
+the Jaakkola–Jordan lower bound on expected log transition probability
+(DERIVATIONS.md D8). Its node energy therefore upper-bounds the exact
+variational node energy at the same beliefs. Exact categorical zeros remain
+exact, improper Gaussian beliefs are loud, and one update costs
+`O(P K² d²)` for `P` factors without allocating a `K³` transition tensor.
+
 ### 2e. Executable factor registration (`cffg.kernels`, cff-ri8m)
 
 A `FactorKernel` declares everything the compiler, VM, ledger, and
@@ -350,6 +363,11 @@ these surfaces:
   `gaussian_mixture(_linear)` output facing a Gaussian goal solves the
   regime-selector fixed point, preserves D3 continuous messages, and reports
   the collapse-entropy optimistic bound plus its exact-channel sandwich.
+- **Recurrent hybrid rules** (D8): source-specific stick-breaking transitions
+  couple two categorical regimes to a Gaussian drive. Pólya–Gamma/JJ
+  coordinates send categorical log scores and Gaussian information-form
+  messages under the mixed schedule; the matching ledger term records the
+  approximation with its conservative VFE bound direction.
 - Every update path has a matching **local free-energy contribution** (average
   energy plus the appropriate entropy terms). `_make_bfe` adds those node terms
   and the arena-derived edge-entropy corrections, so the global BFE/GFE follows
@@ -513,8 +531,9 @@ discarding a joint correlation. Exact joint rollover remains the separate
     loop — same fixed points as flooding, information travels further per
     sweep.
   - mixed (iterative structures present — vmp beads, GFE composites, hard
-    constraints, hybrid mixtures, gaussian_prec): each undamped outer map
-    updates the iterative phase synchronously, then refreshes the BP islands.
+    constraints, hybrid mixtures, recurrence links, gaussian_prec): each
+    undamped outer map updates the iterative phase synchronously, then
+    refreshes the BP islands.
     Forest messages whose conditional solution is unique are eliminated from
     the outer chart and reconstructed by an exact full two-pass; cyclic BP
     messages remain coordinates and advance one colored sweep per map.
@@ -868,6 +887,10 @@ land as docstrings; delegation guidance lives in the epic:
   factors, moment-matched mixture collapse, switching-KF tier. The epistemic
   path: GFE stays on discrete regime variables while Gaussians carry
   perception (what the glucose agent needs).
+- **Recurrent stick-breaking link** (cff-k9ws, landed): consecutive regimes
+  are coupled to a Gaussian drive with source-specific logistic sticks and a
+  Pólya–Gamma/JJ VMP update, supplying the transition primitive needed by the
+  rSLDS graph without materializing a state-dependent transition tensor.
 - **M12 — Nonlinear factors** (cff-o7hs): Jacobian linearization and
   sigma-point moment matching; activates the reserved MOMENT_MATCHING bead
   as EP.

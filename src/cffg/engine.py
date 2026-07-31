@@ -37,7 +37,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax.scipy.special import logsumexp
 
-from cffg import csp, ef, efrules, gauss, hybrid_gfe, kernels, mixg
+from cffg import csp, ef, efrules, gauss, hybrid_gfe, kernels, mixg, recurrence
 from cffg.compiler import NEG, Arena
 from cffg.outer import (
     OuterArrays,
@@ -1123,7 +1123,10 @@ class Engine:
                             return st, True
                     previous_fe = fe
                 elif previous_fe is not None or not (
-                    self.arena.gauss_groups or self.arena.ef_groups or self.arena.prec_groups
+                    self.arena.gauss_groups
+                    or self.arena.ef_groups
+                    or self.arena.prec_groups
+                    or self.arena.recurrence_groups
                 ):
                     status = RunStatus.DIVERGED
                     residual = float("inf")
@@ -1143,7 +1146,12 @@ class Engine:
             and self.arena.semiring != "max"
             and not energies
             and deltas
-            and (self.arena.gauss_groups or self.arena.ef_groups or self.arena.prec_groups)
+            and (
+                self.arena.gauss_groups
+                or self.arena.ef_groups
+                or self.arena.prec_groups
+                or self.arena.recurrence_groups
+            )
         ):
             # A continuous/EF ledger that never became defined is not a
             # usable budget result; it is a numerically failed inference.
@@ -2211,6 +2219,51 @@ def _mix_sweep(arena, messages, g_eta, g_lam, params):
     return sel_writes, gauss_writes
 
 
+def _recurrence_sweep(arena, messages, g_eta, g_lam, params):
+    """One synchronous PG/JJ coordinate sweep across both arenas."""
+    discrete_writes = []
+    gaussian_writes = []
+    status = jnp.asarray(0)
+    for group in arena.recurrence_groups:
+        card = group.cards[0]
+        out_messages = messages[
+            arena.message_indices(group.d_gather_both[:, 0, :], card)
+        ]
+        in_messages = messages[
+            arena.message_indices(group.d_gather_both[:, 1, :], card)
+        ]
+        drive_eta = g_eta[
+            arena.g_eta_indices(group.drive_gather_both, group.dim)
+        ].sum(axis=1)
+        drive_precision = g_lam[
+            arena.g_lam_indices(group.drive_gather_both, group.dim)
+        ].sum(axis=1)
+        result = recurrence.update(
+            out_messages,
+            in_messages,
+            drive_eta,
+            drive_precision,
+            params[group.name + ":weights"],
+            params[group.name + ":offsets"],
+        )
+        discrete_writes.extend(
+            (
+                (group.d_scatter[:, 0], card, result.to_out),
+                (group.d_scatter[:, 1], card, result.to_in),
+            )
+        )
+        gaussian_writes.append(
+            (
+                group.drive_scatter,
+                group.dim,
+                result.drive_eta,
+                result.drive_precision,
+            )
+        )
+        status = jnp.maximum(status, jnp.max(result.status))
+    return discrete_writes, gaussian_writes, status
+
+
 def _hybrid_gfe_sweep(arena, messages, g_eta, g_lam, params):
     """One synchronous D5 composite sweep across discrete/Gaussian arenas."""
     selector_writes = []
@@ -2564,6 +2617,12 @@ def _make_step(arena: Arena, skip_scheduled: bool = False):
         )
         inner_residual = jnp.maximum(inner_residual, hybrid_residual)
         inner_status = jnp.maximum(inner_status, hybrid_status)
+        recurrence_disc, recurrence_gauss, recurrence_status = (
+            _recurrence_sweep(arena, messages, g_eta, g_lam, params)
+            if arena.recurrence_groups
+            else ([], [], jnp.asarray(0))
+        )
+        inner_status = jnp.maximum(inner_status, recurrence_status)
         # Hybrid Gaussian-mixture sweep (cff-pksr): straddles both arenas.
         # Computed here from the pre-sweep arrays so its writes fold into each
         # arena's damping phase — Gaussian writes below, selector writes with
@@ -2588,7 +2647,12 @@ def _make_step(arena: Arena, skip_scheduled: bool = False):
         new_eta, new_lam = g_eta, g_lam
         if arena.gauss_groups and not skip_scheduled:
             new_eta, new_lam = _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params)
-        for scatter, dim, oe, ol in [*hybrid_gauss, *mix_gauss, *prec_gauss]:
+        for scatter, dim, oe, ol in [
+            *recurrence_gauss,
+            *hybrid_gauss,
+            *mix_gauss,
+            *prec_gauss,
+        ]:
             new_eta, new_lam = _set_gauss_block(
                 arena, new_eta, new_lam, scatter, dim, oe, ol
             )
@@ -2596,6 +2660,7 @@ def _make_step(arena: Arena, skip_scheduled: bool = False):
             arena.gauss_groups
             or arena.hybrid_gfe_groups
             or arena.mix_groups
+            or arena.recurrence_groups
             or arena.prec_groups
         ):
             new_eta = damp * g_eta + (1.0 - damp) * new_eta
@@ -2610,7 +2675,11 @@ def _make_step(arena: Arena, skip_scheduled: bool = False):
                 new_ef = new_ef.at[scatter].set(out)
             new_ef = damp * ef_eta + (1.0 - damp) * new_ef
         # Hybrid selector writes join the discrete arena before its damping.
-        for scatter, card, rows in [*hybrid_sel, *mix_sel]:
+        for scatter, card, rows in [
+            *recurrence_disc,
+            *hybrid_sel,
+            *mix_sel,
+        ]:
             new = _set_disc_block(arena, new, scatter, card, rows)
         # Log-space damping: stabilizes the outer coordination between GFE
         # composites (their local solves are exact, but synchronous flooding
@@ -3326,6 +3395,34 @@ def _mix_bfe(arena, messages, g_eta, g_lam, params):
     return total
 
 
+def _recurrence_bfe(arena, messages, g_eta, g_lam, params):
+    """PG/JJ recurrence energies, upper-bounding the exact VMP terms."""
+    total = jnp.asarray(0.0, dtype=g_eta.dtype)
+    for group in arena.recurrence_groups:
+        card = group.cards[0]
+        out_messages = messages[
+            arena.message_indices(group.d_gather_both[:, 0, :], card)
+        ]
+        in_messages = messages[
+            arena.message_indices(group.d_gather_both[:, 1, :], card)
+        ]
+        drive_eta = g_eta[
+            arena.g_eta_indices(group.drive_gather_both, group.dim)
+        ].sum(axis=1)
+        drive_precision = g_lam[
+            arena.g_lam_indices(group.drive_gather_both, group.dim)
+        ].sum(axis=1)
+        total = total + recurrence.energy(
+            out_messages,
+            in_messages,
+            drive_eta,
+            drive_precision,
+            params[group.name + ":weights"],
+            params[group.name + ":offsets"],
+        ).sum()
+    return total
+
+
 def _hybrid_gfe_bfe(arena, messages, g_eta, g_lam, params):
     """Direct D5 G-hat terms; absorbed goals and output entropies stay out."""
     total = jnp.asarray(0.0, dtype=g_eta.dtype)
@@ -3427,10 +3524,14 @@ def _make_bfe(arena: Arena):
         # prec_groups included so the interior-edge entropy tables run even for
         # a prec-only model: _gauss_bfe owns gauss_interior (the out edges),
         # _ef_bfe owns ef_interior (the prec edges), both EdgeInfo-driven.
-        if arena.gauss_groups or arena.prec_groups:
+        if arena.gauss_groups or arena.prec_groups or arena.recurrence_groups:
             total = total + _gauss_bfe(arena, g_eta, g_lam, g_obs, g_mask, params)
         if arena.mix_groups:
             total = total + _mix_bfe(arena, messages, g_eta, g_lam, params)
+        if arena.recurrence_groups:
+            total = total + _recurrence_bfe(
+                arena, messages, g_eta, g_lam, params
+            )
         if arena.hybrid_gfe_groups:
             total = total + _hybrid_gfe_bfe(
                 arena, messages, g_eta, g_lam, params

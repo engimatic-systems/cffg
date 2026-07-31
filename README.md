@@ -155,6 +155,27 @@ The likelihood sends fractional state counts into the posterior and consumes
 `expected_log`, and `proper`. An unconstrained latent parameter edge is
 rejected because exact sum-product is not Dirichlet-closed.
 
+A recurrent switching model can make its regime transition depend on a
+Gaussian drive without discretizing that drive. Add a `recurrence_link` whose
+two categorical edges have the same `K >= 2` cardinality:
+
+```python
+factors["switch"] = FactorSpec(
+    "switch", "recurrence_link",
+    edges={"out": "z_next", "in": "z_prev", "drive": "x"},
+    param_blobs={"weights": "switch_weights", "offsets": "switch_offsets"},
+)
+arrays["switch_weights"] = weights  # [K, K - 1, d], source/stick/drive
+arrays["switch_offsets"] = offsets  # [K, K - 1]
+```
+
+For source regime `i`, stick `l` has logit
+`weights[i,l] @ x + offsets[i,l]`; destination `j < K - 1` accepts stick `j`
+after rejecting earlier sticks, and the last destination rejects them all.
+Inference uses the Pólya–Gamma/Jaakkola–Jordan mean-field coordinate, so its
+reported VFE is a documented upper bound on the exact VFE at the same beliefs.
+Exact regime zeros stay exact, while an improper Gaussian drive is divergence.
+
 ## Run inference
 
 ```python
@@ -278,9 +299,9 @@ the fixed point with a fused verification sweep, and returns `converged`
 (even with `tol=None`; there is no sweep budget to exhaust). Loopy pure-BP
 models iterate colored Gauss–Seidel sweeps; models with iterative
 structures (mean-field beads, GFE composites, hard constraints, hybrid
-nodes) run block-phased: each sweep updates those structures, then
-refreshes the BP parts — tree-shaped parts exactly, loopy parts by one
-colored sweep — before convergence is judged. Only δ form
+nodes, recurrence links) run block-phased: each sweep updates those
+structures, then refreshes the BP parts — tree-shaped parts exactly, loopy
+parts by one colored sweep — before convergence is judged. Only δ form
 constraints (and `damp > 0` on otherwise-exact models) still use plain
 flooding; `engine.schedule.kind` and `.reason` say what you got. Force
 flooding with `Engine(arena, schedule="flood")`.
