@@ -409,7 +409,7 @@ def _dirichlet_stats(counts):
     return abar, h
 
 
-def _gfe_solve_result(abar, h, logc, log_d, max_iters: int = _N_NEWTON):
+def _gfe_solve_raw(abar, h, logc, log_d, max_iters: int = _N_NEWTON):
     """Solve one composite and expose termination diagnostics.
 
     The solve is performed in a ``K-1`` dimensional gauge-fixed chart rather
@@ -490,6 +490,76 @@ def _gfe_solve_result(abar, h, logc, log_d, max_iters: int = _N_NEWTON):
     return GfeSolveResult(jax.nn.softmax(unpack(u)), status, iterations, residual)
 
 
+@jax.custom_jvp
+def _implicit_gfe_solution(abar, h, logc, log_d, solution):
+    """Attach the reduced stationary-system derivative to a solved belief."""
+    return solution
+
+
+@_implicit_gfe_solution.defjvp
+def _implicit_gfe_solution_jvp(primals, tangents):
+    abar, h, logc, log_d, solution = primals
+    d_abar, d_h, d_logc, d_log_d, _ = tangents
+    dtype = jnp.result_type(abar, h, logc, log_d)
+    if log_d.shape[0] == 1:
+        return solution, jnp.zeros_like(solution)
+
+    log_floor = jnp.log(jnp.finfo(dtype).tiny)
+
+    def center(v):
+        return v - v.mean()
+
+    def unpack(u):
+        return center(jnp.concatenate([u, jnp.zeros((1,), dtype=dtype)]))
+
+    def stationary(u, a, entropy, goal, incoming):
+        zbar = jax.nn.softmax(unpack(u))
+        qx = a @ zbar
+        rho = a.T @ (goal - _safe_log(qx)) - entropy
+        guarded_incoming = jnp.maximum(incoming, log_floor)
+        return (
+            center(unpack(u)) - center(rho + guarded_incoming)
+        )[:-1]
+
+    # The stopped root makes the derivative independent of the Newton
+    # iteration history. Its log ratios are the reduced coordinates.
+    stopped = jax.lax.stop_gradient(solution)
+    u = jnp.log(stopped[:-1]) - jnp.log(stopped[-1])
+    jacobian = jax.jacfwd(stationary, argnums=0)(
+        u, abar, h, logc, log_d
+    )
+    _, parameter_tangent = jax.jvp(
+        lambda a, entropy, goal, incoming: stationary(
+            u, a, entropy, goal, incoming
+        ),
+        (abar, h, logc, log_d),
+        (d_abar, d_h, d_logc, d_log_d),
+    )
+    du = jnp.linalg.solve(jacobian, -parameter_tangent)
+    _, dz = jax.jvp(
+        lambda reduced: jax.nn.softmax(unpack(reduced)),
+        (u,),
+        (du,),
+    )
+    return solution, dz
+
+
+def _gfe_solve_result(abar, h, logc, log_d, max_iters: int = _N_NEWTON):
+    """Solve a composite with diagnostics and an implicit root derivative.
+
+    The primal remains the globalized gauge-reduced Newton solve. The returned
+    belief differentiates through its exact reduced stationarity equation,
+    not through the dynamic Newton iteration count.
+    """
+    solved = _gfe_solve_raw(abar, h, logc, log_d, max_iters=max_iters)
+    solution = _implicit_gfe_solution(
+        abar, h, logc, log_d, jax.lax.stop_gradient(solved.solution)
+    )
+    return GfeSolveResult(
+        solution, solved.status, solved.iterations, solved.residual
+    )
+
+
 def _gfe_solve(abar, h, logc, log_d):
     """Compatibility helper returning only the stationary simplex belief.
 
@@ -534,10 +604,22 @@ def gfe_update_stats(
 ):
     """GFE update from arbitrary valid ``E[A]`` and ``E[h(A)]`` moments."""
     ko, ki = abar.shape[1], abar.shape[2]
-    zbar, residual, status = gfe_stationary_stats(log_d, abar, hbar, logc)
-    rho = jax.vmap(_gfe_rho)(abar, hbar, logc, zbar)
+    # A channel row with no structural mass contributes exactly zero to
+    # A.T @ log(c). Mask it before differentiating: a tiny learned goal prior
+    # can have an enormous trigamma while 0 * inf is still NaN in floating
+    # arithmetic, despite the mathematical product being zero.
+    outcome_support = jnp.any(abar > 0, axis=2)
+    effective_logc = jnp.where(outcome_support, logc, 0.0)
+    zbar, residual, status = gfe_stationary_stats(
+        log_d, abar, hbar, effective_logc
+    )
+    rho = jax.vmap(_gfe_rho)(abar, hbar, effective_logc, zbar)
     qx = jnp.einsum("moi,mi->mo", abar, zbar)
-    messages = (_norm_pad(rho, ki, k_max), _norm_pad(_safe_log(qx), ko, k_max))
+    # A structurally impossible predictive outcome remains exact log-zero.
+    # The dtype-scaled floor belongs only inside rho's finite residual; using
+    # it as an outgoing probability would silently enlarge the active chart.
+    log_qx = jnp.where(qx > 0, _safe_log(qx), NEG)
+    messages = (_norm_pad(rho, ki, k_max), _norm_pad(log_qx, ko, k_max))
     return (*messages, residual, status) if return_diagnostics else messages
 
 
