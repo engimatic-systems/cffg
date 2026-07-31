@@ -95,6 +95,26 @@ def test_inner_solution_uses_implicit_stationarity_derivative():
     np.testing.assert_allclose(np.asarray(tangent).sum(), 0.0, atol=1e-12)
 
 
+def test_implicit_derivative_preserves_exact_unsupported_face():
+    """Softmax underflow on an excluded state must not poison the outer JVP."""
+    import jax
+    import jax.numpy as jnp
+
+    abar = jnp.eye(3)
+    h = jnp.zeros(3)
+    logc = jnp.asarray([np.log(0.5), np.log(0.5), -1000.0])
+    logd = jnp.asarray([np.log(0.5), np.log(0.5), rules.NEG])
+    direction = jnp.asarray([0.2, -0.1, 0.3])
+
+    solve = lambda value: rules._gfe_solve(abar, h, logc, value)
+    solution, tangent = jax.jvp(solve, (logd,), (direction,))
+
+    assert solution[-1] == 0.0
+    assert np.isfinite(tangent).all()
+    assert tangent[-1] == 0.0
+    np.testing.assert_allclose(np.asarray(tangent).sum(), 0.0, atol=1e-12)
+
+
 def make_model(A, c, d, p_substitute=True) -> Template:
     t = Template(
         name="gfe_unit",

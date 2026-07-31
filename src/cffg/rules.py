@@ -522,9 +522,14 @@ def _implicit_gfe_solution_jvp(primals, tangents):
         )[:-1]
 
     # The stopped root makes the derivative independent of the Newton
-    # iteration history. Its log ratios are the reduced coordinates.
+    # iteration history. Reconstruct its finite stationary logits rather than
+    # taking log(solution): softmax may underflow an exact-unsupported state
+    # to zero even though the guarded stationarity coordinate is finite.
     stopped = jax.lax.stop_gradient(solution)
-    u = jnp.log(stopped[:-1]) - jnp.log(stopped[-1])
+    qx = abar @ stopped
+    rho = abar.T @ (logc - _safe_log(qx)) - h
+    logits = center(rho + jnp.maximum(log_d, log_floor))
+    u = logits[:-1] - logits[-1]
     jacobian = jax.jacfwd(stationary, argnums=0)(
         u, abar, h, logc, log_d
     )
