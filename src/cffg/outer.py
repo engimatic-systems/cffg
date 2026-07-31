@@ -105,8 +105,12 @@ class OuterChart:
             return jnp.zeros((0,), dtype=self.base.messages.dtype)
         return jnp.concatenate([jnp.ravel(piece) for piece in pieces])
 
-    def unpack(self, coordinates: jax.Array) -> OuterArrays:
-        arrays = self.base
+    def unpack(
+        self,
+        coordinates: jax.Array,
+        base: OuterArrays | None = None,
+    ) -> OuterArrays:
+        arrays = self.base if base is None else base
         offset = 0
         messages = arrays.messages
         for block in self.categorical:
@@ -329,13 +333,54 @@ def build_outer_chart(
     )
 
 
-def chart_arrays(chart: OuterChart, coordinates: jax.Array) -> OuterArrays:
-    arrays = chart.unpack(coordinates)
+def chart_arrays(
+    chart: OuterChart,
+    coordinates: jax.Array,
+    base: OuterArrays | None = None,
+) -> OuterArrays:
+    arrays = chart.unpack(coordinates, base)
     return arrays._replace(ef_eta=arrays.ef_eta.reshape(chart.ef_shape))
 
 
 def chart_coordinates(chart: OuterChart, arrays: OuterArrays) -> jax.Array:
     return chart.pack(arrays._replace(ef_eta=arrays.ef_eta.reshape(-1)))
+
+
+def outer_chart_signature(chart: OuterChart) -> tuple:
+    """Exact cache identity for a chart's support, dtype, and metrics."""
+    def array_key(value: np.ndarray) -> tuple:
+        return value.dtype.str, value.shape, value.tobytes()
+
+    return (
+        np.asarray(chart.base.messages).dtype.str,
+        tuple(
+            (
+                array_key(block.segment),
+                array_key(block.support),
+                block.reference,
+                array_key(block.coordinates),
+            )
+            for block in chart.categorical
+        ),
+        tuple(
+            (
+                block.field,
+                array_key(block.indices),
+                array_key(block.forward),
+                array_key(block.inverse),
+            )
+            for block in chart.vectors
+        ),
+        tuple(
+            (
+                array_key(block.indices),
+                array_key(block.lower),
+                array_key(block.whitening),
+            )
+            for block in chart.precisions
+        ),
+        chart.ef_shape,
+    )
 
 
 @dataclass(frozen=True)
@@ -346,6 +391,35 @@ class TrustStep:
     hit_boundary: bool
     linear_exhausted: bool
     finite: bool
+
+
+class OuterKernelPlan(NamedTuple):
+    trust: Callable
+    root_diagnostics: Callable
+    context: object
+    compiled: bool
+
+
+def _make_root_diagnostics(
+    residual_fn: Callable[[jax.Array], jax.Array],
+):
+    """Compile the residual merit and its matrix-free gradient at a root."""
+    @jax.jit
+    def diagnostics(coordinates, residual_scale, context=None):
+        def scaled(value):
+            residual = (
+                residual_fn(value)
+                if context is None
+                else residual_fn(value, context)
+            )
+            return residual / residual_scale
+
+        residual, pullback = jax.vjp(scaled, coordinates)
+        gradient = pullback(residual)[0]
+        merit = 0.5 * jnp.vdot(residual, residual).real
+        return merit, jnp.linalg.norm(gradient)
+
+    return diagnostics
 
 
 def _boundary_distance(point, direction, radius):
@@ -368,9 +442,15 @@ def _make_trust_kernel(
     @jax.jit
     def kernel(
         coordinates, residual_scale, radius,
-        accelerated_step, has_accelerated_step,
+        accelerated_step, has_accelerated_step, context=None,
     ):
-        scaled = lambda value: residual_fn(value) / residual_scale
+        def scaled(value):
+            residual = (
+                residual_fn(value)
+                if context is None
+                else residual_fn(value, context)
+            )
+            return residual / residual_scale
         residual, jvp = jax.linearize(scaled, coordinates)
         _, pullback = jax.vjp(scaled, coordinates)
         gradient = pullback(residual)[0]
@@ -537,6 +617,7 @@ def _make_trust_kernel(
             accelerated_predictions,
             candidates,
             candidate_predictions,
+            iterations,
         )
 
     return kernel
@@ -557,6 +638,10 @@ class OuterSolveResult:
     rejected_steps: int
     inner_residual: float
     inner_code: int
+    outer_map_evaluations: int = 0
+    trial_evaluations: int = 0
+    linear_iterations: int = 0
+    solver_compilations: int = 0
 
 
 def _finite(arrays: OuterArrays) -> bool:
@@ -588,6 +673,8 @@ def solve_outer(
     n_iters: int,
     tol: float,
     eliminated: dict[str, frozenset[int]] | None = None,
+    kernel_factory: Callable[[OuterChart], OuterKernelPlan] | None = None,
+    candidate_limit: int = 128,
     _support_restarts: int = 0,
 ) -> OuterSolveResult:
     """Globalize one fixed-support deterministic outer map."""
@@ -603,6 +690,10 @@ def solve_outer(
     merit = gradient_norm = outer_residual = float("inf")
     inner_residual = float("inf")
     inner_code = 0
+    outer_map_evaluations = 0
+    trial_evaluations = 0
+    linear_iterations = 0
+    solver_compilations = 0
 
     initial_energy = energy(current)
     if np.isfinite(initial_energy):
@@ -625,6 +716,8 @@ def solve_outer(
         coordinates = chart_coordinates(chart, current)
 
         def evaluate(value):
+            nonlocal outer_map_evaluations
+            outer_map_evaluations += 1
             mapped, local_residual, local_code = outer_map(
                 chart_arrays(chart, value)
             )
@@ -671,7 +764,6 @@ def solve_outer(
         break
 
     residual_fn = lambda value: evaluate(value)[0] - value
-    trust_kernel = _make_trust_kernel(residual_fn, chart.size)
     initial_residual = mapped_coordinates - coordinates
     residual_scale = chart.residual_scale(initial_residual)
     radius = max(float(jnp.linalg.norm(initial_residual)), 1.0)
@@ -687,6 +779,183 @@ def solve_outer(
     shadow_history_coordinates: list[np.ndarray] = []
     shadow_history_residuals: list[np.ndarray] = []
 
+    # A damped fixed-point sequence is a cheap candidate generator for the
+    # common benign case. It advances the arena arrays directly, avoiding
+    # chart dispatch on every sweep, but never certifies itself.
+    candidate_iterations = 0
+    for _ in range(min(candidate_limit, n_iters // 2)):
+        raw_residual = _array_delta(current, mapped)
+        if raw_residual <= effective_tol:
+            coordinates = chart_coordinates(chart, current)
+            mapped_coordinates = chart_coordinates(chart, mapped)
+            residual = mapped_coordinates - coordinates
+            outer_residual = float(
+                jnp.max(
+                    jnp.abs(residual) / (1.0 + jnp.abs(coordinates)),
+                    initial=0.0,
+                )
+            )
+            current_energy = energy(current)
+            mapped_energy = energy(mapped)
+            ledger_stationary = (
+                np.isfinite(current_energy)
+                and np.isfinite(mapped_energy)
+                and abs(mapped_energy - current_energy)
+                <= effective_tol * (1.0 + abs(current_energy))
+            )
+            if (
+                outer_residual <= effective_tol
+                and ledger_stationary
+                and chart.proper_reference
+            ):
+                scaled_residual = residual / residual_scale
+                merit = 0.5 * float(
+                    jnp.vdot(scaled_residual, scaled_residual).real
+                )
+                if kernel_factory is None:
+                    root_diagnostics = _make_root_diagnostics(residual_fn)
+                    root_merit, root_gradient = root_diagnostics(
+                        coordinates, residual_scale
+                    )
+                else:
+                    plan = kernel_factory(chart)
+                    solver_compilations += int(plan.compiled)
+                    root_merit, root_gradient = plan.root_diagnostics(
+                        coordinates, residual_scale, plan.context
+                    )
+                outer_map_evaluations += 1
+                merit = float(root_merit)
+                gradient_norm = float(root_gradient)
+                deltas.append(outer_residual)
+                if not energies or energies[-1] != current_energy:
+                    energies.append(current_energy)
+                if energies[-1] != mapped_energy:
+                    energies.append(mapped_energy)
+                return OuterSolveResult(
+                    mapped, OuterTerminationReason.ROOT_CONVERGED,
+                    candidate_iterations, tuple(deltas), tuple(energies),
+                    outer_residual, merit, gradient_norm, radius, accepted,
+                    rejected, inner_residual, inner_code,
+                    outer_map_evaluations, trial_evaluations,
+                    linear_iterations, solver_compilations,
+                )
+
+        next_arrays = OuterArrays(
+            *(0.5 * left + 0.5 * right
+              for left, right in zip(current, mapped))
+        )
+        deltas.append(_array_delta(current, next_arrays))
+        current = next_arrays
+        candidate_iterations += 1
+        mapped, local_residual, local_code = outer_map(current)
+        outer_map_evaluations += 1
+        inner_residual = float(local_residual)
+        inner_code = int(local_code)
+        if inner_code:
+            return OuterSolveResult(
+                current, OuterTerminationReason.INNER_FAILURE,
+                candidate_iterations, tuple(deltas), tuple(energies),
+                outer_residual, merit, gradient_norm, radius, accepted,
+                rejected, inner_residual, inner_code,
+            )
+        # ``current`` is a convex blend of the previous two already-valid
+        # states on the same exact support face, so only the fresh map output
+        # needs another finite/feasibility check here.
+        if not _finite(mapped):
+            return OuterSolveResult(
+                current, OuterTerminationReason.NONFINITE_EVALUATION,
+                candidate_iterations, tuple(deltas), tuple(energies),
+                float("inf"), float("inf"), float("inf"), radius,
+                accepted, rejected, inner_residual, inner_code,
+            )
+        if infeasible(mapped):
+            return OuterSolveResult(
+                current, OuterTerminationReason.INFEASIBLE,
+                candidate_iterations, tuple(deltas), tuple(energies),
+                float("inf"), float("inf"), float("inf"), radius,
+                accepted, rejected, inner_residual, inner_code,
+            )
+        if chart.support_changed(mapped.messages):
+            restarts += 1
+            if restarts > restart_limit:
+                return OuterSolveResult(
+                    current,
+                    OuterTerminationReason.SUPPORT_RESTART_EXHAUSTED,
+                    candidate_iterations, tuple(deltas), tuple(energies),
+                    float("inf"), float("inf"), float("inf"), radius,
+                    accepted, rejected, inner_residual, inner_code,
+                )
+            restarted = solve_outer(
+                mapped, arena, outer_map, energy, infeasible,
+                n_iters=max(n_iters - candidate_iterations, 0),
+                tol=tol,
+                eliminated=eliminated,
+                kernel_factory=kernel_factory,
+                candidate_limit=candidate_limit,
+                _support_restarts=restarts,
+            )
+            return OuterSolveResult(
+                restarted.arrays,
+                restarted.reason,
+                candidate_iterations + restarted.iterations,
+                tuple((*deltas, *restarted.message_deltas)),
+                tuple((*energies, *restarted.free_energies)),
+                restarted.outer_residual,
+                restarted.merit,
+                restarted.gradient_norm,
+                restarted.trust_radius,
+                accepted + restarted.accepted_steps,
+                rejected + restarted.rejected_steps,
+                restarted.inner_residual,
+                restarted.inner_code,
+                outer_map_evaluations + restarted.outer_map_evaluations,
+                trial_evaluations + restarted.trial_evaluations,
+                linear_iterations + restarted.linear_iterations,
+                solver_compilations + restarted.solver_compilations,
+            )
+
+    n_iters -= candidate_iterations
+    chart = build_outer_chart(arena, current, eliminated)
+    coordinates = chart_coordinates(chart, current)
+
+    def evaluate(value):
+        nonlocal outer_map_evaluations
+        outer_map_evaluations += 1
+        mapped, local_residual, local_code = outer_map(
+            chart_arrays(chart, value)
+        )
+        return chart_coordinates(chart, mapped), mapped, local_residual, local_code
+
+    residual_fn = lambda value: evaluate(value)[0] - value
+    mapped_coordinates, mapped, local_residual, local_code = evaluate(coordinates)
+    inner_residual = float(local_residual)
+    inner_code = int(local_code)
+    initial_residual = mapped_coordinates - coordinates
+    residual_scale = chart.residual_scale(initial_residual)
+    radius = max(float(jnp.linalg.norm(initial_residual)), 1.0)
+    radius_ceiling = (
+        max(
+            float(jnp.linalg.norm(coordinates)),
+            radius,
+            np.sqrt(max(chart.size, 1)),
+        )
+        / np.sqrt(eps)
+    )
+    shadow_coordinates = np.asarray(coordinates).copy()
+    shadow_history_coordinates = []
+    shadow_history_residuals = []
+    if kernel_factory is None:
+        plan = OuterKernelPlan(
+            _make_trust_kernel(residual_fn, chart.size),
+            _make_root_diagnostics(residual_fn),
+            None,
+            True,
+        )
+    else:
+        plan = kernel_factory(chart)
+    solver_compilations += int(plan.compiled)
+    trust_kernel = plan.trust
+
     for iteration in range(n_iters + 1):
         mapped_coordinates, mapped, local_residual, local_code = evaluate(
             coordinates
@@ -695,21 +964,24 @@ def solve_outer(
         inner_code = int(local_code)
         if inner_code:
             return OuterSolveResult(
-                current, OuterTerminationReason.INNER_FAILURE, iteration,
+                current, OuterTerminationReason.INNER_FAILURE,
+                candidate_iterations + iteration,
                 tuple(deltas), tuple(energies), outer_residual, merit,
                 gradient_norm, radius, accepted, rejected,
                 inner_residual, inner_code,
             )
         if not _finite(current) or not _finite(mapped):
             return OuterSolveResult(
-                current, OuterTerminationReason.NONFINITE_EVALUATION, iteration,
+                current, OuterTerminationReason.NONFINITE_EVALUATION,
+                candidate_iterations + iteration,
                 tuple(deltas), tuple(energies), float("inf"), float("inf"),
                 float("inf"), radius, accepted, rejected,
                 inner_residual, inner_code,
             )
         if infeasible(current) or infeasible(mapped):
             return OuterSolveResult(
-                current, OuterTerminationReason.INFEASIBLE, iteration,
+                current, OuterTerminationReason.INFEASIBLE,
+                candidate_iterations + iteration,
                 tuple(deltas), tuple(energies), float("inf"), float("inf"),
                 float("inf"), radius, accepted, rejected,
                 inner_residual, inner_code,
@@ -720,7 +992,8 @@ def solve_outer(
                 return OuterSolveResult(
                     current,
                     OuterTerminationReason.SUPPORT_RESTART_EXHAUSTED,
-                    iteration, tuple(deltas), tuple(energies), float("inf"),
+                    candidate_iterations + iteration,
+                    tuple(deltas), tuple(energies), float("inf"),
                     float("inf"), float("inf"), radius, accepted, rejected,
                     inner_residual, inner_code,
                 )
@@ -733,12 +1006,14 @@ def solve_outer(
                 n_iters=max(n_iters - iteration, 0),
                 tol=tol,
                 eliminated=eliminated,
+                kernel_factory=kernel_factory,
+                candidate_limit=candidate_limit,
                 _support_restarts=restarts,
             )
             return OuterSolveResult(
                 restarted.arrays,
                 restarted.reason,
-                iteration + restarted.iterations,
+                candidate_iterations + iteration + restarted.iterations,
                 tuple((*deltas, *restarted.message_deltas)),
                 tuple((*energies, *restarted.free_energies)),
                 restarted.outer_residual,
@@ -749,6 +1024,10 @@ def solve_outer(
                 rejected + restarted.rejected_steps,
                 restarted.inner_residual,
                 restarted.inner_code,
+                outer_map_evaluations + restarted.outer_map_evaluations,
+                trial_evaluations + restarted.trial_evaluations,
+                linear_iterations + restarted.linear_iterations,
+                solver_compilations + restarted.solver_compilations,
             )
         residual = mapped_coordinates - coordinates
         outer_residual = float(
@@ -780,16 +1059,22 @@ def solve_outer(
                 jnp.asarray(radius, coordinates.dtype),
                 jnp.zeros_like(coordinates),
                 jnp.asarray(False),
+                plan.context,
             )
+            outer_map_evaluations += 1
+            linear_iterations += int(root_step[10])
             gradient_norm = float(root_step[2])
             deltas.append(outer_residual)
             if not energies or energies[-1] != current_energy:
                 energies.append(current_energy)
             return OuterSolveResult(
-                mapped, OuterTerminationReason.ROOT_CONVERGED, iteration,
+                mapped, OuterTerminationReason.ROOT_CONVERGED,
+                candidate_iterations + iteration,
                 tuple(deltas), tuple(energies), outer_residual, merit,
                 gradient_norm,
                 radius, accepted, rejected, inner_residual, inner_code,
+                outer_map_evaluations, trial_evaluations,
+                linear_iterations, solver_compilations,
             )
         if iteration == n_iters:
             break
@@ -840,13 +1125,16 @@ def solve_outer(
                 jnp.asarray(radius, coordinates.dtype),
                 jnp.zeros_like(coordinates),
                 jnp.asarray(False),
+                plan.context,
             )
+            outer_map_evaluations += 1
+            linear_iterations += int(shadow_step[10])
             deltas.append(shadow_outer_residual)
             energies.append(shadow_energy)
             return OuterSolveResult(
                 shadow_mapped,
                 OuterTerminationReason.ROOT_CONVERGED,
-                iteration,
+                candidate_iterations + iteration,
                 tuple(deltas),
                 tuple(energies),
                 shadow_outer_residual,
@@ -857,6 +1145,10 @@ def solve_outer(
                 rejected,
                 float(shadow_inner),
                 int(shadow_code),
+                outer_map_evaluations,
+                trial_evaluations,
+                linear_iterations,
+                solver_compilations,
             )
         shadow_history_coordinates.append(shadow_coordinates.copy())
         shadow_history_residuals.append(shadow_residual.copy())
@@ -907,7 +1199,10 @@ def solve_outer(
             jnp.asarray(radius, coordinates.dtype),
             jnp.asarray(accelerated_step),
             jnp.asarray(has_accelerated_step),
+            plan.context,
         )
+        outer_map_evaluations += 1
+        linear_iterations += int(values[10])
         step = TrustStep(
             values[0], float(values[1]), float(values[2]), bool(values[3]),
             bool(values[4]), bool(values[5]),
@@ -921,13 +1216,15 @@ def solve_outer(
         if not step.finite:
             return OuterSolveResult(
                 current, OuterTerminationReason.NONFINITE_EVALUATION,
-                iteration, tuple(deltas), tuple(energies), outer_residual,
+                candidate_iterations + iteration,
+                tuple(deltas), tuple(energies), outer_residual,
                 merit, gradient_norm, radius, accepted, rejected,
                 inner_residual, inner_code,
             )
         if gradient_norm <= gradient_floor:
             return OuterSolveResult(
-                current, OuterTerminationReason.STATIONARY_NONROOT, iteration,
+                current, OuterTerminationReason.STATIONARY_NONROOT,
+                candidate_iterations + iteration,
                 tuple(deltas), tuple(energies), outer_residual, merit,
                 gradient_norm, radius, accepted, rejected,
                 inner_residual, inner_code,
@@ -940,12 +1237,15 @@ def solve_outer(
                 else OuterTerminationReason.STAGNATION
             )
             return OuterSolveResult(
-                current, reason, iteration, tuple(deltas), tuple(energies),
+                current, reason, candidate_iterations + iteration,
+                tuple(deltas), tuple(energies),
                 outer_residual, merit, gradient_norm, radius, accepted,
                 rejected, inner_residual, inner_code,
             )
 
         def candidate(candidate_step, prediction):
+            nonlocal trial_evaluations
+            trial_evaluations += 1
             candidate_coordinates = coordinates + candidate_step
             candidate_mapped_coordinates, candidate_mapped, candidate_inner, candidate_code = (
                 evaluate(candidate_coordinates)
@@ -1057,14 +1357,20 @@ def solve_outer(
         if radius <= radius_floor:
             return OuterSolveResult(
                 current, OuterTerminationReason.TRUST_REGION_COLLAPSED,
-                iteration + 1, tuple(deltas), tuple(energies),
+                candidate_iterations + iteration + 1,
+                tuple(deltas), tuple(energies),
                 outer_residual, merit, gradient_norm, radius, accepted,
                 rejected, inner_residual, inner_code,
+                outer_map_evaluations, trial_evaluations,
+                linear_iterations, solver_compilations,
             )
 
     return OuterSolveResult(
-        current, OuterTerminationReason.ITERATION_BUDGET, n_iters,
+        current, OuterTerminationReason.ITERATION_BUDGET,
+        candidate_iterations + n_iters,
         tuple(deltas), tuple(energies), outer_residual, merit,
         gradient_norm, radius, accepted, rejected,
         inner_residual, inner_code,
+        outer_map_evaluations, trial_evaluations,
+        linear_iterations, solver_compilations,
     )
