@@ -1,6 +1,6 @@
 ---
 id: cff-weff
-status: open
+status: in_progress
 deps: [cff-wafy]
 links: [cff-2gev, cff-wbhu]
 created: 2026-07-30T14:04:30Z
