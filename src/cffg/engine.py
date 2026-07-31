@@ -1143,18 +1143,38 @@ class Engine:
         all_energies: list[float] = []
         total_iterations = accepted = rejected = 0
         mu3_pending = False
-        phases = (
-            ((n_iters - harden_last, False), (harden_last, True))
-            if harden_last else ((n_iters, False),)
-        )
+        phases: list[tuple[int, list[tuple[int, np.ndarray]]]] = [
+            (n_iters - harden_last, [])
+        ]
+        hard_rows = [
+            (card, pairs[row : row + 1])
+            for card, pairs in self.arena.delta_slot_groups
+            for row in range(len(pairs))
+        ]
+        if harden_last:
+            if hard_rows:
+                phase_count = min(len(hard_rows), harden_last)
+                quotient, remainder = divmod(harden_last, phase_count)
+                row_groups = np.array_split(
+                    np.arange(len(hard_rows)), phase_count
+                )
+                phases.extend(
+                    (
+                        quotient + (phase < remainder),
+                        [hard_rows[int(row)] for row in rows],
+                    )
+                    for phase, rows in enumerate(row_groups)
+                )
+            else:
+                phases.append((harden_last, []))
         solved = None
-        for budget, harden in phases:
+        hard_blocks: list[tuple[np.ndarray, np.ndarray, jax.Array]] = []
+        for budget, new_hard_rows in phases:
             if budget == 0:
                 continue
-            hard_blocks: list[tuple[np.ndarray, np.ndarray, jax.Array]] = []
-            if harden:
+            if new_hard_rows:
                 projected = state.messages
-                for card, pairs in self.arena.delta_slot_groups:
+                for card, pairs in new_hard_rows:
                     i0 = self.arena.message_indices(pairs[:, 0], card)
                     i1 = self.arena.message_indices(pairs[:, 1], card)
                     choice = np.argmax(

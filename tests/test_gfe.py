@@ -113,6 +113,8 @@ def test_implicit_derivative_preserves_exact_unsupported_face():
     assert np.isfinite(tangent).all()
     assert tangent[-1] == 0.0
     np.testing.assert_allclose(np.asarray(tangent).sum(), 0.0, atol=1e-12)
+    shifted = jnp.where(logd != rules.NEG, logd + 400.0, logd)
+    np.testing.assert_allclose(solve(shifted), solution, atol=1e-14)
 
 
 def make_model(A, c, d, p_substitute=True) -> Template:

@@ -1534,7 +1534,10 @@ The cff-weff production implementation follows the
   status. Its returned solution has a custom implicit JVP through the reduced
   local stationarity system; JAX transposes that rule for the VJP. Newton
   iterations are stopped before the implicit solution is attached, so their
-  iteration count is not unrolled into the outer derivative.
+  iteration count is not unrolled into the outer derivative. On an exact
+  support face, supported incoming logits are normalized before the
+  dtype-scaled finite workspace guard is applied; the guard therefore cannot
+  turn a categorical gauge shift into a different local root or derivative.
 - `_make_step` and the mixed schedule define the pure undamped \(T\).
   `_make_bfe` remains the sole scientific objective. `Engine.run` owns the
   trust-region controller, selects it by default for every GFE plan, and
@@ -1560,10 +1563,17 @@ The cff-weff production implementation follows the
   decoding is N/A for this change.
 - Forest factor-written messages are eliminated only on exact conditional
   islands; external half-edges remain fixed, and cyclic BP messages remain in
-  the chart. Hard δ support is frozen once for its phase. Fixed-particle
-  `mu3` moments are refreshed as an exact factor-local block between
-  fixed-scale trust solves, and convergence additionally requires that block
-  to stop changing at the requested tolerance.
+  the chart. Hard δ support is frozen once for its phase; multiple δ variables
+  activate in deterministic sequence so a later decision conditions on the
+  earlier fixed support. Fixed-particle `mu3` moments are refreshed as an exact
+  factor-local block between fixed-scale trust solves, and convergence
+  additionally requires that block to stop changing at the requested
+  tolerance.
+- A bounded Anderson/Picard shadow sequence is isolated from the production
+  iterate. Its nonroot candidates enter only through the same Cauchy/model and
+  actual-reduction safeguards as a trust step. A shadow state may be selected
+  directly only after it independently passes the complete raw-root, local,
+  support, and unchanged-ledger convergence certificate.
 - The horizon-8 cycle fixture has 24-logit GFE-TM-scale members but is caused
   by eight ordinary observation-GFE composites coupled through a learned
   non-epistemic transition. The frozen state is an exact 8-position by

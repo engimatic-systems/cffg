@@ -542,30 +542,6 @@ def _make_trust_kernel(
     return kernel
 
 
-def trust_region_step(
-    residual_fn: Callable[[jax.Array], jax.Array],
-    coordinates: jax.Array,
-    residual_scale: jax.Array,
-    radius: float,
-    *,
-    max_linear_iters: int | None = None,
-) -> TrustStep:
-    """Compute one compiled matrix-free Steihaug Gauss--Newton step."""
-    values = _make_trust_kernel(
-        residual_fn, coordinates.size, max_linear_iters
-    )(
-        coordinates,
-        residual_scale,
-        jnp.asarray(radius, coordinates.dtype),
-        jnp.zeros_like(coordinates),
-        jnp.asarray(False),
-    )
-    return TrustStep(
-        values[0], float(values[1]), float(values[2]), bool(values[3]),
-        bool(values[4]), bool(values[5]),
-    )
-
-
 @dataclass(frozen=True)
 class OuterSolveResult:
     arrays: OuterArrays
@@ -827,6 +803,61 @@ def solve_outer(
         shadow_residual = (
             np.asarray(shadow_mapped_coordinates) - shadow_coordinates
         )
+        shadow_arrays = chart_arrays(
+            chart, jnp.asarray(shadow_coordinates)
+        )
+        shadow_outer_residual = float(
+            np.max(
+                np.abs(shadow_residual)
+                / (1.0 + np.abs(shadow_coordinates)),
+                initial=0.0,
+            )
+        )
+        shadow_energy = energy(shadow_arrays)
+        shadow_mapped_energy = energy(shadow_mapped)
+        shadow_root = (
+            int(shadow_code) == 0
+            and np.isfinite(float(shadow_inner))
+            and _finite(shadow_arrays)
+            and _finite(shadow_mapped)
+            and not infeasible(shadow_arrays)
+            and not infeasible(shadow_mapped)
+            and not chart.support_changed(shadow_mapped.messages)
+            and shadow_outer_residual <= effective_tol
+            and np.isfinite(shadow_energy)
+            and np.isfinite(shadow_mapped_energy)
+            and abs(shadow_mapped_energy - shadow_energy)
+            <= effective_tol * (1.0 + abs(shadow_energy))
+        )
+        if shadow_root:
+            shadow_scaled = jnp.asarray(shadow_residual) / residual_scale
+            shadow_merit = 0.5 * float(
+                jnp.vdot(shadow_scaled, shadow_scaled).real
+            )
+            shadow_step = trust_kernel(
+                jnp.asarray(shadow_coordinates),
+                residual_scale,
+                jnp.asarray(radius, coordinates.dtype),
+                jnp.zeros_like(coordinates),
+                jnp.asarray(False),
+            )
+            deltas.append(shadow_outer_residual)
+            energies.append(shadow_energy)
+            return OuterSolveResult(
+                shadow_mapped,
+                OuterTerminationReason.ROOT_CONVERGED,
+                iteration,
+                tuple(deltas),
+                tuple(energies),
+                shadow_outer_residual,
+                shadow_merit,
+                float(shadow_step[2]),
+                radius,
+                accepted + 1,
+                rejected,
+                float(shadow_inner),
+                int(shadow_code),
+            )
         shadow_history_coordinates.append(shadow_coordinates.copy())
         shadow_history_residuals.append(shadow_residual.copy())
         shadow_history_coordinates = shadow_history_coordinates[-6:]

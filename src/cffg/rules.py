@@ -409,6 +409,17 @@ def _dirichlet_stats(counts):
     return abar, h
 
 
+def _gfe_guard_incoming(log_d):
+    """Normalize one fixed support face and give excluded logits finite work space."""
+    support = log_d != NEG
+    finite = jnp.where(support, log_d, -jnp.inf)
+    normalizer = jnp.where(
+        jnp.any(support), logsumexp(finite), jnp.asarray(0.0, log_d.dtype)
+    )
+    log_floor = jnp.log(jnp.finfo(log_d.dtype).tiny)
+    return jnp.where(support, log_d - normalizer, log_floor)
+
+
 def _gfe_solve_raw(abar, h, logc, log_d, max_iters: int = _N_NEWTON):
     """Solve one composite and expose termination diagnostics.
 
@@ -423,11 +434,10 @@ def _gfe_solve_raw(abar, h, logc, log_d, max_iters: int = _N_NEWTON):
     h = jnp.asarray(h, dtype=dtype)
     logc = jnp.asarray(logc, dtype=dtype)
     log_d = jnp.asarray(log_d, dtype=dtype)
-    # Protect the Newton residual from the finite NEG sentinel.  This guard is
-    # the smallest normal value representable by the active dtype, so it
-    # scales correctly in both f32 and f64.
-    log_floor = jnp.log(jnp.finfo(dtype).tiny)
-    log_d = jnp.maximum(log_d, log_floor)
+    # Protect the Newton residual from the finite NEG sentinel. Supported
+    # entries are normalized first, so the fixed-face guard is invariant to
+    # the categorical message's arbitrary additive gauge.
+    log_d = _gfe_guard_incoming(log_d)
 
     def rho(zbar):
         qx = abar @ zbar
@@ -504,7 +514,7 @@ def _implicit_gfe_solution_jvp(primals, tangents):
     if log_d.shape[0] == 1:
         return solution, jnp.zeros_like(solution)
 
-    log_floor = jnp.log(jnp.finfo(dtype).tiny)
+    support = log_d != NEG
 
     def center(v):
         return v - v.mean()
@@ -512,11 +522,21 @@ def _implicit_gfe_solution_jvp(primals, tangents):
     def unpack(u):
         return center(jnp.concatenate([u, jnp.zeros((1,), dtype=dtype)]))
 
+    def guard(incoming):
+        finite = jnp.where(support, incoming, -jnp.inf)
+        normalizer = jnp.where(
+            jnp.any(support),
+            logsumexp(finite),
+            jnp.asarray(0.0, dtype),
+        )
+        log_floor = jnp.log(jnp.finfo(dtype).tiny)
+        return jnp.where(support, incoming - normalizer, log_floor)
+
     def stationary(u, a, entropy, goal, incoming):
         zbar = jax.nn.softmax(unpack(u))
         qx = a @ zbar
         rho = a.T @ (goal - _safe_log(qx)) - entropy
-        guarded_incoming = jnp.maximum(incoming, log_floor)
+        guarded_incoming = guard(incoming)
         return (
             center(unpack(u)) - center(rho + guarded_incoming)
         )[:-1]
@@ -528,7 +548,7 @@ def _implicit_gfe_solution_jvp(primals, tangents):
     stopped = jax.lax.stop_gradient(solution)
     qx = abar @ stopped
     rho = abar.T @ (logc - _safe_log(qx)) - h
-    logits = center(rho + jnp.maximum(log_d, log_floor))
+    logits = center(rho + guard(log_d))
     u = logits[:-1] - logits[-1]
     jacobian = jax.jacfwd(stationary, argnums=0)(
         u, abar, h, logc, log_d

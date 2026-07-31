@@ -550,10 +550,16 @@ discarding a joint correlation. Exact joint rollover remains the separate
   is dtype-derived and frozen for one trust solve; a support or hardening
   change rebuilds the chart, while a finite nonroot termination may begin a
   new solve with a newly frozen scale. Hard δ support is selected once per
-  hard phase rather than changing inside a trust model. The compiled
-  matrix-free JVP/VJP and Steihaug kernels accept per-instance coordinates,
-  scales, and radii under `vmap`; the host controller owns active-set and
-  status transitions until cff-wbhu moves that carry into a compiled scan.
+  hard phase rather than changing inside a trust model; multiple δ variables
+  activate in deterministic sequential phases so later decisions condition
+  on earlier commitments. The compiled matrix-free JVP/VJP and Steihaug
+  kernels accept per-instance coordinates, scales, and radii under `vmap`;
+  the host controller owns active-set and status transitions until cff-wbhu
+  moves that carry into a compiled scan.
+  A bounded shadow Anderson/Picard sequence may supply candidates, but a
+  nonroot shadow point still needs the trust model's Cauchy and reduction
+  safeguards. The only bypass is a shadow state that independently passes
+  the complete raw-root, support, inner-status, and FE certificate.
 - Ordinary and analytic learned-parameter GFE nodes are deterministic. A
   `mu3_is_v1` node fixes its sampled A matrices for the whole inference
   attempt, making every sweep and its FE trace deterministic conditional on
