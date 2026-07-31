@@ -42,6 +42,7 @@ RUNTIMES = REPO / "tools" / "test-suite-runtimes.json"
 ARTIFACTS = REPO / "tests" / ".artifacts"
 GALLERY = SHARE / "cffg-viz"
 RUNTIME_HISTORY_LIMIT = 40
+SUITE_SELECTION = "not slow"
 
 EPIC_FILES = {
     "M0 · Foundations": ["test_hygiene.py"],
@@ -302,14 +303,21 @@ def record_suite_runtime(
         "failed": failed,
         "pytest_exit_code": pytest_code,
         "result": "passed" if pytest_code == 0 and failed == 0 else "failed",
+        "selection": SUITE_SELECTION,
         "wall_seconds": round(float(wall_seconds), 3),
         "case_seconds": round(sum(test["ms"] for test in tests) / 1000, 3),
     }
     recent.append(record)
     recent = recent[-RUNTIME_HISTORY_LIMIT:]
-    # Use the slowest of the latest five measurements, add 25% headroom, and
-    # round upward to a human-friendly 30-second polling boundary.
-    observed = [entry["wall_seconds"] for entry in recent[-5:]]
+    # Compare like-for-like suite selections so an opt-in slow run cannot
+    # poison the default suite's wait budget.
+    comparable = [
+        entry for entry in recent
+        if entry.get("selection") == SUITE_SELECTION
+    ]
+    observed = [entry["wall_seconds"] for entry in comparable[-5:]]
+    # Use the slowest comparable measurement, add 25% headroom, and round
+    # upward to a human-friendly 30-second polling boundary.
     padded = max(observed) * 1.25
     suggested_wait = max(60, math.ceil(padded / 30) * 30)
     runtime_state = {
