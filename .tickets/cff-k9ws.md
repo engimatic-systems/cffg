@@ -1,6 +1,6 @@
 ---
 id: cff-k9ws
-status: in_progress
+status: closed
 deps: []
 links: [cff-o7hs, cff-pksr, cff-lquu]
 created: 2026-07-15T01:45:43Z
@@ -109,3 +109,7 @@ status invariant**.
 **2026-07-31T21:05:43Z**
 
 Research question -> What PG factorization and deterministic messages make the source-specific stick-breaking recurrence executable, and which way does the ledger bound point? Answer -> at-risk b[j,l]=1[j>=l], success a[j,l]=1[j=l], and kappa=a-b/2 give the exact PG augmented term exp(kappa*psi-omega*psi^2/2) PG(omega|b,0)/2^b. Mean-field q(omega)=PG(b,xi), xi^2=E[psi^2], is exactly the JJ bound; its categorical messages are expected per-destination bound scores and its Gaussian natural parameters are responsibility-weighted kappa/expected-omega sums. The global mixed schedule supplies the CAVI alternation. Because E[log p] is lower-bounded, the reported VFE is an upper bound at fixed beliefs. Sources -> Polson, Scott & Windle 2013 arXiv:1205.0310; Linderman, Johnson & Adams 2015 NeurIPS stick-breaking construction; Linderman et al. 2017 PMLR rSLDS paper and supplement; Durante & Rigon 2019 arXiv:1711.06999 PG-MF/JJ equivalence. Confidence -> high on factorization, messages, and bound direction; medium-high on runtime transient-vacuity policy, which follows this repository numerical contract.
+
+**2026-07-31T21:37:38Z**
+
+Implementation complete in 3290109. Added the source-specific recurrence_link factor, dedicated dual-arena plan, PG/JJ categorical and Gaussian coordinates, mixed/flood execution, VFE ledger term, numerical status handling, serialization, visualization, canonical derivation, public construction docs, limitations, and dashboard ownership. The bounded expected log transition is below the exact expectation, so the recurrence VFE is an upper bound at held beliefs; dense scalar quadrature pins both posterior tolerance and global bound direction. Storage is O(P K^2 d), updates are O(P K^2 d^2), and no K^3 destination tensor is allocated. Validation: 10 recurrence tests passed; 124 cross-surface focused tests passed; 38 slow tests passed in 420.81s; final dashboard suite passed 1271 tests with 0 failures and 38 slow deselections in 336.62s, refreshing the shared dashboard. Deferred by design: weight learning cff-4apw, hybrid readouts cff-lquu, and generic kernel migration cff-209l.
