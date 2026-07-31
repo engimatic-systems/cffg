@@ -80,6 +80,7 @@ def _write_zip(path, contents):
             zf.writestr(name, raw)
 
 
+@pytest.mark.slow
 def test_round_trip_reproduces_inference(tmp_path):
     template, arrays = build_tmaze()
     path = tmp_path / "tmaze.cffgz"

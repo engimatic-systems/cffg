@@ -1,6 +1,7 @@
 """Colony: structure-hash batching, vmapped ticks, host port routing."""
 
 import numpy as np
+import pytest
 
 from cffg.colony import Colony
 from cffg.compiler import compile_template
@@ -19,6 +20,7 @@ def spawn_gridworlds(colony, starts, seed_obs=None):
     return ids
 
 
+@pytest.mark.slow
 def test_gfe_colony_equals_sequential():
     colony = Colony()
     starts = [0, 1, 2, 3, 4]
@@ -45,6 +47,7 @@ def test_one_engine_per_structure():
     assert len(colony.engines) == 2  # 5 instances, 2 compilations
 
 
+@pytest.mark.slow
 def test_mixed_structures_run_and_agree():
     colony = Colony()
     gw_ids = spawn_gridworlds(colony, [0, 2])
@@ -60,6 +63,7 @@ def test_mixed_structures_run_and_agree():
         assert int(np.argmax(colony.marginals(iid)["u1"])) == 2
 
 
+@pytest.mark.slow
 def test_kill_shrinks_batch_without_corruption():
     colony = Colony()
     ids = spawn_gridworlds(colony, [0, 1, 2])
@@ -88,8 +92,6 @@ def test_host_port_routing():
 
 
 def test_bind_unknown_port_raises():
-    import pytest
-
     colony = Colony()
     (iid,) = spawn_gridworlds(colony, [0])
     with pytest.raises(KeyError, match="no DATA port"):

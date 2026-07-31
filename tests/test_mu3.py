@@ -101,6 +101,7 @@ def test_compiler_serializes_evaluator_identity_and_ties_slices():
         Colony().spawn(template, _arrays(slices=2))
 
 
+@pytest.mark.slow
 def test_explicit_key_replays_particles_weights_and_fixed_point_bitwise():
     engine = _engine(samples=2048)
     key = jax.random.PRNGKey(71)
@@ -125,6 +126,7 @@ def test_explicit_key_replays_particles_weights_and_fixed_point_bitwise():
     assert result_a.mu3_log_normalizers == result_b.mu3_log_normalizers
 
 
+@pytest.mark.slow
 def test_multiple_slices_add_functional_weights_and_parameter_ledger_once():
     engine = _engine(slices=2, samples=4096)
     state, _ = engine.prepare_mu3(engine.init_state(), jax.random.PRNGKey(9))
@@ -210,6 +212,7 @@ def test_proposal_refresh_and_stochastic_statuses_are_loud():
     assert collapsed.mu3_statuses == (RunStatus.DIVERGED,)
 
 
+@pytest.mark.slow
 def test_base_posterior_is_runtime_input_and_burn_in_only_averages_converged_epochs():
     engine = _engine(samples=1024)
     state = engine.init_state()

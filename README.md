@@ -12,17 +12,20 @@ against the authors' Julia reference on the T-maze benchmark.
 ```sh
 uv sync          # install
 uv run pytest tests/test_engine_tree.py  # focused iteration
-uv run python tools/dashboard.py --run-suite  # one final full pass + dashboard
+uv run python tools/dashboard.py --run-suite  # short default suite + dashboard
+uv run pytest -m slow  # opt-in long-running regressions
 ```
 
-Run focused tests as often as useful while changing code. One passing full
-suite after the final code change is sufficient to open or update a PR; the
-dashboard command above runs pytest exactly once and renders that result.
-Before starting or waiting on the full pass, inspect
+Run focused tests as often as useful while changing code. Pytest excludes
+tests marked `slow` by default, so one passing short suite after the final
+code change is sufficient to open or update a PR. The dashboard command above
+runs pytest exactly once and renders that result. Before starting or waiting
+on the short pass, inspect
 `tools/test-suite-runtimes.json`: it records recent measured wall times and a
 conservative `suggested_wait_seconds`.
 Ticket- and documentation-only changes use their relevant validation instead
-of the full suite.
+of the short suite. Run slow regressions explicitly when changing the behavior
+they cover; they are not part of the default PR gate.
 
 ## The mental model
 

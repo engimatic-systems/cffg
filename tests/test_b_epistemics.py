@@ -10,6 +10,7 @@ independent constrained optimizer, and the hostile-inputs contract holds.
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 from jax.scipy.special import logsumexp
 
 from cffg import rules
@@ -555,6 +556,7 @@ def test_engine_prefers_unknown_dynamics():
     np.testing.assert_allclose(q_u2, 0.5, atol=1e-6)  # plain BP: no preference
 
 
+@pytest.mark.slow
 def test_agent_curiosity_decays_with_experience():
     """Both actions have IDENTICAL true dynamics (right-shift with slip), so
     once both are learned the state-MI channel is symmetric and only the

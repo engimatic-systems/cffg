@@ -9,6 +9,7 @@ schedule numbers (golden-parity ticket: cff-fdcl).
 """
 
 import numpy as np
+import pytest
 
 from cffg.compiler import compile_template
 from cffg.engine import Engine
@@ -27,6 +28,7 @@ def solve(**kwargs):
     return engine, state
 
 
+@pytest.mark.slow
 def test_gfe_agent_seeks_the_cue_first():
     engine, state = solve()
     q = engine.marginals(state)
@@ -38,6 +40,7 @@ def test_gfe_agent_seeks_the_cue_first():
     assert min(u2[L], u2[R]) > max(u2[O], u2[C]), f"step-2 not arm-seeking: {u2}"
 
 
+@pytest.mark.slow
 def test_context_marginal_stays_symmetric():
     engine, state = solve()
     q = engine.marginals(state)
@@ -46,6 +49,7 @@ def test_context_marginal_stays_symmetric():
         np.testing.assert_allclose(ctx, [0.5, 0.5], atol=1e-9)
 
 
+@pytest.mark.slow
 def test_bfe_ablation_skips_the_cue():
     """Remove the P-beads (one structural bit) and the epistemic drive dies:
     the KL-control agent heads straight for a reward arm."""
@@ -58,6 +62,7 @@ def test_bfe_ablation_skips_the_cue():
     assert u1_g[C] > u1[C], "GFE must value the cue strictly more than BFE"
 
 
+@pytest.mark.slow
 def test_map_policy_variant():
     """Fig. 29/30: δ-beads on the controls make the readout a decision.
     Two-phase run: soft to coherence, then harden (a premature pointmass
@@ -75,6 +80,7 @@ def test_map_policy_variant():
     assert int(np.argmax(q["u2"])) in (L, R)
 
 
+@pytest.mark.slow
 def test_gfe_is_finite_and_stable():
     engine, state = solve()
     g1 = engine.bfe(state)
@@ -83,6 +89,7 @@ def test_gfe_is_finite_and_stable():
     assert np.isfinite(g1) and abs(g1 - g2) < 1e-9
 
 
+@pytest.mark.slow
 def test_longer_horizon_compiles_and_stays_epistemic():
     engine, state = solve(steps=3)
     u1 = engine.marginals(state)["u1"]

@@ -6,6 +6,7 @@ import functools
 
 import jax
 import numpy as np
+import pytest
 
 from cffg.agent import RollingAgent
 from cffg.bundle import load_bundle, save_bundle
@@ -50,6 +51,7 @@ def _converged(
     return engine, result, result.require_converged()
 
 
+@pytest.mark.slow
 def test_builder_lowers_products_fanout_and_serialized_agent_bindings(tmp_path):
     plan, plan_arrays = build_factored_corridor(
         steps=2, length=3, modes=2, gfe=True

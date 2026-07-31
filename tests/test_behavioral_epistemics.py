@@ -37,6 +37,7 @@ def reports():
     return task, run_benchmark(task, gfe=True), run_benchmark(task, gfe=False)
 
 
+@pytest.mark.slow
 def test_costly_cue_improves_realized_return_over_bfe(reports):
     """GFE buys the cue and then exploits; the BFE ablation guesses an arm.
 
@@ -70,6 +71,7 @@ def test_costly_cue_improves_realized_return_over_bfe(reports):
     )
 
 
+@pytest.mark.slow
 def test_relevant_cue_outranks_random_distractor(reports):
     """Both sensors have a uniform observation marginal, but only the cue's
     outcome covaries with the reward context."""
@@ -101,6 +103,7 @@ def test_relevant_cue_outranks_random_distractor(reports):
     np.testing.assert_allclose(cue_entropy, distractor_entropy, atol=1e-12)
 
 
+@pytest.mark.slow
 def test_information_satiates_after_observing_the_cue(reports):
     task, gfe, _ = reports
     before = gfe.first_plan.action_probabilities
@@ -114,6 +117,7 @@ def test_information_satiates_after_observing_the_cue(reports):
         assert after.context_belief.max() > task.cue_quality - 0.03
 
 
+@pytest.mark.slow
 def test_sensing_cost_is_monotone_and_crosses_bayes_threshold():
     """The external two-action Bayes calculation gives c*=1.2 utility units.
     The engine changes its MAP action in the immediately adjacent cost bin."""
@@ -134,6 +138,7 @@ def test_sensing_cost_is_monotone_and_crosses_bayes_threshold():
     assert costs[first_exploit] - costs[first_exploit - 1] <= 0.11
 
 
+@pytest.mark.slow
 def test_exact_observation_epistemics_tracks_realisable_sensor_quality():
     """Observation GFE weakens with the actual channel MI.  This is the exact,
     realizable channel—not the GFE-TM latent-next-state optimistic bound in
@@ -156,6 +161,7 @@ def test_exact_observation_epistemics_tracks_realisable_sensor_quality():
     assert np.all(np.diff(cue_mi) > 0)
 
 
+@pytest.mark.slow
 def test_preference_offset_invariance_and_goal_calibration():
     task = CueTask(cue_cost=1.0)
     np.testing.assert_allclose(

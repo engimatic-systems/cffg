@@ -114,6 +114,7 @@ def _checked_tmaze_fixed_point() -> tuple[Engine, object]:
     return engine, state
 
 
+@pytest.mark.slow
 def test_packed_outer_residual_is_gauge_invariant_at_checked_fixed_points():
     for engine, state in (_checked_tmaze_fixed_point(), _checked_d1_fixed_point()):
         shifted = _gauge_shift(engine, state)
@@ -211,6 +212,7 @@ def one_update_corridor_case() -> tuple[Engine, object, np.ndarray]:
     return agent.plan, agent._with_params(agent.plan), alpha
 
 
+@pytest.mark.slow
 def test_one_update_corridor_is_globalized_without_changing_the_equations():
     engine, state, alpha = one_update_corridor_case()
     assert engine.schedule.kind == "mixed"

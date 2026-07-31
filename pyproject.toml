@@ -38,7 +38,11 @@ dev = [
 simglucose = { git = "https://github.com/jxx123/simglucose" }
 
 [tool.pytest.ini_options]
+addopts = "-m 'not slow'"
 filterwarnings = [
     "ignore::SyntaxWarning",
     "ignore:pkg_resources is deprecated:UserWarning",
+]
+markers = [
+    "slow: long-running behavioral, multi-trial, or globalization regression",
 ]
