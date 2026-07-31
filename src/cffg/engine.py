@@ -37,7 +37,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax.scipy.special import logsumexp
 
-from cffg import csp, ef, efrules, gauss, kernels, mixg
+from cffg import csp, ef, efrules, gauss, hybrid_gfe, kernels, mixg
 from cffg.compiler import NEG, Arena
 from cffg.outer import (
     OuterArrays,
@@ -676,6 +676,74 @@ class Engine:
 
         return _replace(state, params=params), max_delta, overall_code, overall_residual
 
+    def hybrid_gfe_diagnostics(
+        self, state: State
+    ) -> dict[str, dict[str, np.ndarray | float | str]]:
+        """D5 objective channels and exact-mixture entropy bounds by factor."""
+        output: dict[str, dict[str, np.ndarray | float | str]] = {}
+        for group in self.arena.hybrid_gfe_groups:
+            incoming = state.messages[
+                self.arena.message_indices(group.s_gather, group.k_sel)
+            ]
+            inc_eta, inc_lam = _gauss_rows(
+                self.arena,
+                state.g_eta,
+                state.g_lam,
+                group.g_gather,
+                group.dims,
+            )
+            common = (
+                state.params[group.name + ":W"],
+                state.params[group.name + ":goal_m"],
+                state.params[group.name + ":goal_W"],
+            )
+            if group.type == "gaussian_mixture_linear":
+                _, di = group.dims
+                diagnostics = hybrid_gfe.linear_diagnostics(
+                    incoming,
+                    inc_eta[:, 1, :di],
+                    inc_lam[:, 1, :di, :di],
+                    state.params[group.name + ":A"],
+                    state.params[group.name + ":b"],
+                    *common,
+                )
+            else:
+                diagnostics = hybrid_gfe.prior_diagnostics(
+                    incoming,
+                    state.params[group.name + ":m"],
+                    *common,
+                )
+            for row, member in enumerate(group.members):
+                code = int(np.asarray(diagnostics.status[row]))
+                output[member] = {
+                    "goal_factor": group.goal_members[row],
+                    "rho": np.asarray(diagnostics.rho[row]),
+                    "gfe_lower_bound": float(diagnostics.total[row]),
+                    "mi_regime_surrogate": float(
+                        diagnostics.mi_regime_surrogate[row]
+                    ),
+                    "mi_regime_exact_lower": float(
+                        diagnostics.mi_regime_lower[row]
+                    ),
+                    "mi_regime_exact_upper": float(
+                        diagnostics.mi_regime_upper[row]
+                    ),
+                    "mi_state": float(diagnostics.mi_state[row]),
+                    "h_regime": float(diagnostics.h_regime[row]),
+                    "h_state": float(diagnostics.h_state[row]),
+                    "goal_risk": float(diagnostics.goal_risk[row]),
+                    "local_residual": float(diagnostics.residual[row]),
+                    "status": (
+                        RunStatus.CONVERGED.value
+                        if code == 0
+                        else RunStatus.BUDGET_EXHAUSTED.value
+                        if code == 1
+                        else RunStatus.DIVERGED.value
+                    ),
+                    "bound_direction": "reported_gfe_lower_bounds_exact",
+                }
+        return output
+
     def mu3_diagnostics(self, state: State) -> dict[str, dict[str, np.ndarray | float | str]]:
         """Per-group weighted moments and stochastic diagnostics."""
         out: dict[str, dict[str, np.ndarray | float | str]] = {}
@@ -917,7 +985,11 @@ class Engine:
             and harden_last == 0
         ):
             return self._run_exact(state, tol)
-        has_gfe = bool(self.arena.gfe_groups or self.arena.gfe_tm_groups)
+        has_gfe = bool(
+            self.arena.gfe_groups
+            or self.arena.gfe_tm_groups
+            or self.arena.hybrid_gfe_groups
+        )
         use_trust_region = has_gfe and outer_solver != "picard"
         if outer_solver == "trust_region" and not has_gfe:
             raise ValueError("outer_solver='trust_region' requires a GFE plan")
@@ -1407,6 +1479,11 @@ class Engine:
             or (
                 solved.reason is OuterTerminationReason.INNER_FAILURE
                 and solved.inner_code == 2
+            )
+            or (
+                solved.reason
+                is OuterTerminationReason.SUPPORT_RESTART_EXHAUSTED
+                and not all_energies
             )
         ):
             status = RunStatus.DIVERGED
@@ -2134,6 +2211,71 @@ def _mix_sweep(arena, messages, g_eta, g_lam, params):
     return sel_writes, gauss_writes
 
 
+def _hybrid_gfe_sweep(arena, messages, g_eta, g_lam, params):
+    """One synchronous D5 composite sweep across discrete/Gaussian arenas."""
+    selector_writes = []
+    gaussian_writes = []
+    residual = jnp.asarray(0.0, dtype=messages.dtype)
+    status = jnp.asarray(0)
+    for group in arena.hybrid_gfe_groups:
+        incoming = messages[
+            arena.message_indices(group.s_gather, group.k_sel)
+        ]
+        inc_eta, inc_lam = _gauss_rows(
+            arena, g_eta, g_lam, group.g_gather, group.dims
+        )
+        goal_mean = params[group.name + ":goal_m"]
+        goal_precision = params[group.name + ":goal_W"]
+        noise_precision = params[group.name + ":W"]
+        if group.type == "gaussian_mixture_linear":
+            do, di = group.dims
+            result = hybrid_gfe.linear_update(
+                incoming,
+                inc_eta[:, 1, :di],
+                inc_lam[:, 1, :di, :di],
+                params[group.name + ":A"],
+                params[group.name + ":b"],
+                noise_precision,
+                goal_mean,
+                goal_precision,
+            )
+            (
+                to_selector,
+                out_eta,
+                out_lam,
+                in_eta,
+                in_lam,
+                local_r,
+                local_s,
+            ) = result
+            gaussian_writes.extend(
+                (
+                    (group.g_scatter[:, 0], do, out_eta, out_lam),
+                    (group.g_scatter[:, 1], di, in_eta, in_lam),
+                )
+            )
+        else:
+            (do,) = group.dims
+            to_selector, out_eta, out_lam, local_r, local_s = (
+                hybrid_gfe.prior_update(
+                    incoming,
+                    params[group.name + ":m"],
+                    noise_precision,
+                    goal_mean,
+                    goal_precision,
+                )
+            )
+            gaussian_writes.append(
+                (group.g_scatter[:, 0], do, out_eta, out_lam)
+            )
+        selector_writes.append(
+            (group.s_scatter, group.k_sel, to_selector)
+        )
+        residual = jnp.maximum(residual, jnp.max(local_r))
+        status = jnp.maximum(status, jnp.max(local_s))
+    return selector_writes, gaussian_writes, residual, status
+
+
 def _prec_sweep(arena, g_eta, g_lam, ef_eta, params):
     """One synchronous flooding sweep over the gaussian_prec groups (cff-7c5o).
     Straddles the Gaussian and EF arenas; reads only the pre-sweep arrays and
@@ -2415,6 +2557,13 @@ def _make_step(arena: Arena, skip_scheduled: bool = False):
             new = _set_disc_block(arena, new, g.scatter[:, 2], ku, to_sel)
             inner_residual = jnp.maximum(inner_residual, jnp.max(residuals))
             inner_status = jnp.maximum(inner_status, jnp.max(statuses))
+        hybrid_sel, hybrid_gauss, hybrid_residual, hybrid_status = (
+            _hybrid_gfe_sweep(arena, messages, g_eta, g_lam, params)
+            if arena.hybrid_gfe_groups
+            else ([], [], jnp.asarray(0.0, messages.dtype), jnp.asarray(0))
+        )
+        inner_residual = jnp.maximum(inner_residual, hybrid_residual)
+        inner_status = jnp.maximum(inner_status, hybrid_status)
         # Hybrid Gaussian-mixture sweep (cff-pksr): straddles both arenas.
         # Computed here from the pre-sweep arrays so its writes fold into each
         # arena's damping phase — Gaussian writes below, selector writes with
@@ -2439,11 +2588,16 @@ def _make_step(arena: Arena, skip_scheduled: bool = False):
         new_eta, new_lam = g_eta, g_lam
         if arena.gauss_groups and not skip_scheduled:
             new_eta, new_lam = _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params)
-        for scatter, dim, oe, ol in [*mix_gauss, *prec_gauss]:
+        for scatter, dim, oe, ol in [*hybrid_gauss, *mix_gauss, *prec_gauss]:
             new_eta, new_lam = _set_gauss_block(
                 arena, new_eta, new_lam, scatter, dim, oe, ol
             )
-        if arena.gauss_groups or arena.mix_groups or arena.prec_groups:
+        if (
+            arena.gauss_groups
+            or arena.hybrid_gfe_groups
+            or arena.mix_groups
+            or arena.prec_groups
+        ):
             new_eta = damp * g_eta + (1.0 - damp) * new_eta
             new_lam = damp * g_lam + (1.0 - damp) * new_lam
         # EF sweep: natural parameters are the log-space of their family, so
@@ -2456,7 +2610,7 @@ def _make_step(arena: Arena, skip_scheduled: bool = False):
                 new_ef = new_ef.at[scatter].set(out)
             new_ef = damp * ef_eta + (1.0 - damp) * new_ef
         # Hybrid selector writes join the discrete arena before its damping.
-        for scatter, card, rows in mix_sel:
+        for scatter, card, rows in [*hybrid_sel, *mix_sel]:
             new = _set_disc_block(arena, new, scatter, card, rows)
         # Log-space damping: stabilizes the outer coordination between GFE
         # composites (their local solves are exact, but synchronous flooding
@@ -3172,6 +3326,41 @@ def _mix_bfe(arena, messages, g_eta, g_lam, params):
     return total
 
 
+def _hybrid_gfe_bfe(arena, messages, g_eta, g_lam, params):
+    """Direct D5 G-hat terms; absorbed goals and output entropies stay out."""
+    total = jnp.asarray(0.0, dtype=g_eta.dtype)
+    for group in arena.hybrid_gfe_groups:
+        incoming = messages[
+            arena.message_indices(group.s_gather, group.k_sel)
+        ]
+        inc_eta, inc_lam = _gauss_rows(
+            arena, g_eta, g_lam, group.g_gather, group.dims
+        )
+        common = (
+            params[group.name + ":W"],
+            params[group.name + ":goal_m"],
+            params[group.name + ":goal_W"],
+        )
+        if group.type == "gaussian_mixture_linear":
+            _, di = group.dims
+            values = hybrid_gfe.linear_energy(
+                incoming,
+                inc_eta[:, 1, :di],
+                inc_lam[:, 1, :di, :di],
+                params[group.name + ":A"],
+                params[group.name + ":b"],
+                *common,
+            )
+        else:
+            values = hybrid_gfe.prior_energy(
+                incoming,
+                params[group.name + ":m"],
+                *common,
+            )
+        total = total + values.sum()
+    return total
+
+
 def _prec_bfe(arena, g_eta, g_lam, ef_eta, params):
     """gaussian_prec node energies (cff-7c5o): the mean-field VFE contribution
     −H[q_x] − H[q_τ] − E_q[log f]. gauss.prec_energy supplies −E_q[log f] (with
@@ -3242,6 +3431,10 @@ def _make_bfe(arena: Arena):
             total = total + _gauss_bfe(arena, g_eta, g_lam, g_obs, g_mask, params)
         if arena.mix_groups:
             total = total + _mix_bfe(arena, messages, g_eta, g_lam, params)
+        if arena.hybrid_gfe_groups:
+            total = total + _hybrid_gfe_bfe(
+                arena, messages, g_eta, g_lam, params
+            )
         if arena.ef_groups or arena.prec_groups:
             total = total + _ef_bfe(arena, ef_eta, ef_obs, ef_mask, params)
         if arena.prec_groups:

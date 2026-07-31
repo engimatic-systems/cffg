@@ -225,6 +225,16 @@ exhaustive regime-sequence enumeration (measured gap with headroom — never
 pretending assumed-density equals exact). Observed mixture outputs are a
 compile error in v1; emissions route through plain `gaussian_linear` nodes.
 
+A P-substitution bead on the hybrid node's `out` role changes that boundary:
+when the output faces a fixed Gaussian goal, the compiler absorbs both factors
+into `HybridGfePlan`. `cffg.hybrid_gfe` solves the D5 fixed point over the
+selector with the shared gauge-reduced/backtracked simplex Newton core, writes
+the moment-matched predictive on the substituted Gaussian edge, and leaves the
+Gaussian state edge on the existing D3 BP/collapse rule. Its direct `G-hat`
+ledger term lower-bounds the exact substituted objective. The O(K²)
+Hershey–Olsen sandwich and H(rho) cap are computed only by
+`Engine.hybrid_gfe_diagnostics`, not during ordinary inference or scoring.
+
 ### 2e. Executable factor registration (`cffg.kernels`, cff-ri8m)
 
 A `FactorKernel` declares everything the compiler, VM, ledger, and
@@ -336,6 +346,10 @@ these surfaces:
   cavity (so the two facing messages reconstruct q_w), while its ledger uses
   the node-local objective without the downstream Lagrange coupling. Formal
   derivation + plain-English companion in docs/DERIVATIONS.md D1.
+- **Hybrid GFE rules** (D5): P-substitution on a
+  `gaussian_mixture(_linear)` output facing a Gaussian goal solves the
+  regime-selector fixed point, preserves D3 continuous messages, and reports
+  the collapse-entropy optimistic bound plus its exact-channel sandwich.
 - Every update path has a matching **local free-energy contribution** (average
   energy plus the appropriate entropy terms). `_make_bfe` adds those node terms
   and the arena-derived edge-entropy corrections, so the global BFE/GFE follows
@@ -812,8 +826,10 @@ source of truth for readiness, scope, and status.
   rules remain native because the node/edge ledger decomposition is the engine's
   defining contract.
 - **Scheduling**: preserve the current schedule abstraction while removing host
-  dispatch from general iteration and fusing common chain slices. Continuous and
-  hybrid GFE messages remain research work rather than scheduling work.
+  dispatch from general iteration and fusing common chain slices. Hybrid GFE
+  selector messages use the existing mixed schedule; arbitrary
+  Gaussian-only/nonlinear GFE messages remain research rather than scheduling
+  work.
 
 ### Original milestone plan
 
@@ -866,5 +882,6 @@ land as docstrings; delegation guidance lives in the epic:
 - **M15 — Neural factors** (cff-1o72): NN nodes via Equinox, FE-gradient
   training through the (implicitly differentiated) fixed point, amortized
   message initialization.
-- **Research track** (cff-dfpi): continuous/hybrid GFE epistemics — open in
-  the literature; hybrid regime-variable epistemics is the working bet.
+- **Hybrid GFE epistemics** (cff-dfpi/cff-izjd, landed): continuous curiosity
+  is channelled through discrete regime variables with a declared
+  collapse-entropy bound; arbitrary Gaussian-only/nonlinear GFE remains open.

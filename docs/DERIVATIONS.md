@@ -517,9 +517,9 @@ additive-control LGSSM and finds every epistemic/entropy term identical
 across random policies to 1e-10 — Koudahl 2021, reproduced through our own
 code path.
 
-**What this is not.** Not engine rules yet (this is the research spike; the
-composite node is a follow-up ticket), not a claim about arbitrary nonlinear
-MI or exact mixture entropies (impossible in closed form — any future
+**What this is not.** The exterior fixed-Gaussian-goal composite is executable
+in `cffg.hybrid_gfe`; this remains neither a claim about arbitrary nonlinear
+MI nor exact mixture entropies (impossible in closed form — any future
 nonlinear channel enters through declared quadrature/MC bounds per H8), and
 not contingent planning (the commit slice is mean-field, H5 as always).
 
@@ -608,7 +608,7 @@ stationary Lagrangian value (the cff-hp3y lesson: message couplings are not
 node energy). The substituted x-edge is exterior with the goal absorbed in
 v1; an interior variant must send the collapsed cavity
 collapse(q_w) ⊘ μ_down in information form (D1's cavity rule + D3's
-collapse), deferred to the implementation ticket.
+collapse), which remains a separately derived follow-up.
 *Proof.* ∂/∂ρ_s of Prop. 1 with Ĥ: the goal and entropy terms are linear or
 −Σρ log ρ in ρ; the Ĥ gradient is the chain rule through (x̄̄, P̄), which
 are linear/quadratic in ρ. Exponentiate the multiplier equation. ∎
@@ -653,8 +653,8 @@ that regime's mean. As evidence accumulates U_s → 0 and the channel
 vanishes — the same satiation law as the Dirichlet channel (D1 Prop. 5c).
 With full NIW uncertainty the predictive is Student-t: its entropy and
 E_IW[log det V] are still closed form (digamma family), so the channel stays
-exact — recorded here for the implementation ticket, not exercised by the
-spike's tests.
+exact — recorded here for a parameter-novelty follow-up, not exercised by the
+current fixed-parameter composite.
 *Proof.* Gaussian–Gaussian MI is the log-det ratio; MI = expected
 posterior-to-prior KL always. ∎
 

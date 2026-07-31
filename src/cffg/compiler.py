@@ -239,6 +239,28 @@ class GfeTmPlan:
 
 
 @dataclass(frozen=True)
+class HybridGfePlan:
+    """A D5 P-substituted Gaussian-mixture node and absorbed Gaussian goal.
+
+    The hybrid factor retains its selector and Gaussian state slots, while
+    the substituted ``out`` edge stores the collapsed predictive only. The
+    facing Gaussian prior contributes goal parameters but no ordinary BP
+    message or separate ledger term.
+    """
+
+    name: str
+    type: str
+    dims: tuple[int, ...]
+    k_sel: int
+    members: tuple[str, ...]
+    goal_members: tuple[str, ...]
+    g_gather: np.ndarray
+    g_scatter: np.ndarray
+    s_gather: np.ndarray
+    s_scatter: np.ndarray
+
+
+@dataclass(frozen=True)
 class LearnTarget:
     """One place a learnable posterior writes back into stacked params.
 
@@ -390,6 +412,7 @@ class Arena:
     gfe_groups: list[GfePlan] = field(default_factory=list)
     mu3_groups: list[Mu3Plan] = field(default_factory=list)
     gfe_tm_groups: list[GfeTmPlan] = field(default_factory=list)
+    hybrid_gfe_groups: list[HybridGfePlan] = field(default_factory=list)
     gfe_x_edges: frozenset[str] = frozenset()  # entropy absorbed into composite term
     delta_pairs: np.ndarray = field(
         default_factory=lambda: np.zeros((0, 2), dtype=np.int64)
@@ -580,10 +603,11 @@ def compile_template(
                 f"factor {f.name!r}: beads on EF nodes are undefined in M-scope — "
                 "conjugate BP is already exact on EF subgraphs (cff-8s6a)"
             )
-        if FACTOR_TYPES[f.type].family == "hybrid" and f.name in (mean_field | set(psub)):
+        if FACTOR_TYPES[f.type].family == "hybrid" and f.name in mean_field:
             problems.append(
-                f"factor {f.name!r}: hybrid beads are undefined; collapse rules are "
-                "already assumed-density (cff-pksr)"
+                f"factor {f.name!r}: hybrid beads are undefined for mean-field "
+                "constraints; "
+                "collapse rules are already assumed-density (cff-pksr)"
             )
         if f.type in kernels.conditioned_out_types():
             out_var = f.edges["out"]
@@ -854,6 +878,7 @@ def compile_template(
     gfe_x_edges: set[str] = set()
     gfe_buckets: dict[tuple, list[tuple[str, str]]] = {}  # cards/mode -> (obs, goal)
     tm_buckets: dict[tuple, list[str]] = {}
+    hybrid_gfe_buckets: dict[tuple, list[tuple[str, str]]] = {}
     for fname, detail in sorted(psub.items()):
         f = t.factors[fname]
         if f.type == "transition_mixture" and detail.get("substituted_role") == "out":
@@ -864,10 +889,62 @@ def compile_template(
             tm_buckets.setdefault((cards3, learned), []).append(fname)
             consumed.add(fname)
             continue
+        if f.type in ("gaussian_mixture", "gaussian_mixture_linear"):
+            if detail.get("substituted_role") != "out":
+                problems.append(
+                    f"p_substitution on {fname!r}: hybrid GFE supports "
+                    "substituted_role 'out' only"
+                )
+                continue
+            unsupported = sorted(set(detail) - {"substituted_role"})
+            if unsupported:
+                problems.append(
+                    f"p_substitution on {fname!r}: unsupported hybrid GFE detail "
+                    f"keys {unsupported}"
+                )
+                continue
+            x_var = f.edges["out"]
+            facing = [fn for fn, _ in endpoints[x_var] if fn != fname]
+            goal = t.factors[facing[0]] if len(facing) == 1 else None
+            if (
+                goal is None
+                or goal.type != "gaussian"
+                or goal.edges.get("out") != x_var
+            ):
+                problems.append(
+                    f"p_substitution on {fname!r}: edge {x_var!r} must face "
+                    "exactly one fixed Gaussian goal factor"
+                )
+                continue
+            roles = FACTOR_TYPES[f.type].edge_roles
+            dims = tuple(
+                t.variables[f.edges[role]].dim
+                for role in roles
+                if role != "selector"
+            )
+            if f.type == "gaussian_mixture_linear":
+                state_var = f.edges["in"]
+                state_facing = [
+                    fn for fn, _ in endpoints[state_var] if fn != fname
+                ]
+                if len(state_facing) != 1:
+                    problems.append(
+                        f"p_substitution on {fname!r}: hybrid GFE requires an "
+                        "interior Gaussian state edge with a proper facing model"
+                    )
+                    continue
+            k_sel = t.variables[f.edges["selector"]].cardinality
+            hybrid_gfe_buckets.setdefault(
+                (f.type, dims, k_sel), []
+            ).append((fname, goal.name))
+            consumed.update((fname, goal.name))
+            gfe_x_edges.add(x_var)
+            continue
         if f.type != "matrix_cat" or detail.get("substituted_role") != "out":
             problems.append(
-                f"p_substitution on {fname!r}: supported on matrix_cat and "
-                "transition_mixture nodes with substituted_role 'out' only"
+                f"p_substitution on {fname!r}: supported on matrix_cat, "
+                "transition_mixture, gaussian_mixture, and "
+                "gaussian_mixture_linear nodes with substituted_role 'out' only"
             )
             continue
         x_var = f.edges["out"]
@@ -1098,6 +1175,62 @@ def compile_template(
         gfe_tm_groups.append(
             GfeTmPlan(gname, (ko, ki, ku), tuple(members), gather, scatter, learned)
         )
+
+    hybrid_gfe_groups: list[HybridGfePlan] = []
+    for (mtype, dims, k_sel), pairs in sorted(hybrid_gfe_buckets.items()):
+        members = [member for member, _ in pairs]
+        goals = [goal for _, goal in pairs]
+        gauss_roles = tuple(
+            role
+            for role in FACTOR_TYPES[mtype].edge_roles
+            if role != "selector"
+        )
+        gname = f"gfeH:{mtype}:{'x'.join(map(str, dims))}:{k_sel}"
+        g_gather = np.array(
+            [
+                [opposite[(member, role)] for role in gauss_roles]
+                for member in members
+            ],
+            dtype=np.int64,
+        )
+        g_scatter = np.array(
+            [
+                [slot_of[(member, role)] for role in gauss_roles]
+                for member in members
+            ],
+            dtype=np.int64,
+        )
+        s_gather = np.array(
+            [opposite[(member, "selector")] for member in members],
+            dtype=np.int64,
+        )
+        s_scatter = np.array(
+            [slot_of[(member, "selector")] for member in members],
+            dtype=np.int64,
+        )
+        hybrid_gfe_groups.append(
+            HybridGfePlan(
+                gname,
+                mtype,
+                dims,
+                k_sel,
+                tuple(members),
+                tuple(goals),
+                g_gather,
+                g_scatter,
+                s_gather,
+                s_scatter,
+            )
+        )
+        for key, value in _stack_mix_params(
+            t, mtype, dims, k_sel, members, resolved
+        ).items():
+            log_params[f"{gname}:{key}"] = value
+        goal_params = _stack_gauss_params(
+            t, "gaussian", (dims[0],), goals, resolved
+        )
+        log_params[f"{gname}:goal_m"] = goal_params["m"]
+        log_params[f"{gname}:goal_W"] = goal_params["W"]
 
     # Group remaining factors by (type, cardinality signature, mode); the
     # Gaussian family (and equality nodes on Gaussian edges) go to their own
@@ -1375,7 +1508,7 @@ def compile_template(
             rejects.append("mean-field (vmp) beads")
         if dirichlet_groups:
             rejects.append("Dirichlet parameter-edge VMP groups")
-        if gfe_groups or gfe_tm_groups:
+        if gfe_groups or gfe_tm_groups or hybrid_gfe_groups:
             rejects.append("P-substitution / GFE composites")
         if gauss_groups or mix_groups or prec_groups:
             rejects.append("Gaussian/hybrid groups")
@@ -1414,7 +1547,7 @@ def compile_template(
     # Interior Gaussian edges, grouped by dim, for the Bethe entropy ledger.
     by_dim: dict[int, list[list[int]]] = {}
     for e in edges.values():
-        if e.dim and e.interior:
+        if e.dim and e.interior and e.name not in gfe_x_edges:
             by_dim.setdefault(e.dim, []).append([e.slot0, e.slot1])
     gauss_interior = [
         (d, np.array(pairs, dtype=np.int64)) for d, pairs in sorted(by_dim.items())
@@ -1477,6 +1610,7 @@ def compile_template(
         gfe_groups=gfe_groups,
         mu3_groups=mu3_groups,
         gfe_tm_groups=gfe_tm_groups,
+        hybrid_gfe_groups=hybrid_gfe_groups,
         gfe_x_edges=frozenset(gfe_x_edges),
         delta_pairs=delta_pairs,
         member_of=member_of,

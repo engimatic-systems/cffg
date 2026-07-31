@@ -1,10 +1,9 @@
 """Hybrid GFE epistemics: closed forms + decision experiments (cff-dfpi, D5).
 
 The research spike behind DERIVATIONS.md D5. Everything here is standalone
-NumPy implementing the derived formulas — no engine plumbing. The engine
-integration (a P-substituted hybrid mixture composite) is a follow-up ticket;
-these functions are its executable specification and the oracle its tests
-will be measured against.
+NumPy implementing the derived formulas rather than engine plumbing. These
+functions are the independent executable specification against which the
+P-substituted hybrid mixture composite is tested.
 
 Objects (D5.2 notation):
 
