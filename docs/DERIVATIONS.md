@@ -1165,7 +1165,7 @@ finite.
 
 ---
 
-## D7 — Mixed-GFE outer stationarity and globalization (cff-wafy)
+## D7 — Mixed-GFE outer stationarity and globalization (cff-wafy, cff-weff)
 
 ### D7.1 The plain-English version
 
@@ -1525,20 +1525,24 @@ rank threshold has the form
 `finfo(dtype).eps * max(m,n) * operator_scale`; no literal numerical ridge is
 introduced.
 
-### D7.6 Runtime and test handoff
+### D7.6 Runtime realization and executable anchors
 
-The production change in cff-weff follows the
+The cff-weff production implementation follows the
 **Runtime numerical or status invariant** row of `ARCHITECTURE.md`.
 
 - `rules._gfe_solve_result` keeps its Part-II/D1 equations and truthful local
-  status. It gains an implicit differentiation rule or exposes the reduced
-  local stationarity linearization; it is not replaced by the outer solver.
+  status. Its returned solution has a custom implicit JVP through the reduced
+  local stationarity system; JAX transposes that rule for the VJP. Newton
+  iterations are stopped before the implicit solution is attached, so their
+  iteration count is not unrolled into the outer derivative.
 - `_make_step` and the mixed schedule define the pure undamped \(T\).
   `_make_bfe` remains the sole scientific objective. `Engine.run` owns the
-  trust-region controller and must not accept constant damping as its
-  convergence argument for a mixed-GFE plan.
+  trust-region controller, selects it by default for every GFE plan, and
+  rejects nonzero `damp` unless `outer_solver="picard"` explicitly requests
+  the historical diagnostic.
 - `RunResult` retains the original FE trace/residual and local status, and
-  adds enough outer diagnostics to distinguish root convergence,
+  exposes outer residual/merit, merit-gradient norm, trust radius,
+  accepted/rejected steps, and a termination reason distinguishing root,
   stationary-nonroot/stagnation, trust/Krylov budget exhaustion, rejected
   improper trials, infeasibility, and divergence. `require_converged`
   continues to reject every non-root outcome.
@@ -1549,9 +1553,17 @@ The production change in cff-weff follows the
   structure. A hardening phase freezes its active constraints and restarts
   the solve.
 - Packing shapes and support masks are static per active-set solve. A
-  single-instance controller and its `vmap` form use per-instance trust
-  radii, statuses, and Krylov masks, so cff-wbhu can consume the solver rather
-  than invent another loop. Checkpoint decoding is N/A for this change.
+  compiled Steihaug/JVP/VJP kernel accepts per-instance coordinates, scales,
+  radii, and Krylov masks under `vmap`. The current host controller owns each
+  instance's active-set/status transitions; cff-wbhu can put that same carry
+  in `lax.scan` rather than inventing another numerical method. Checkpoint
+  decoding is N/A for this change.
+- Forest factor-written messages are eliminated only on exact conditional
+  islands; external half-edges remain fixed, and cyclic BP messages remain in
+  the chart. Hard δ support is frozen once for its phase. Fixed-particle
+  `mu3` moments are refreshed as an exact factor-local block between
+  fixed-scale trust solves, and convergence additionally requires that block
+  to stop changing at the requested tolerance.
 - The horizon-8 cycle fixture has 24-logit GFE-TM-scale members but is caused
   by eight ordinary observation-GFE composites coupled through a learned
   non-epistemic transition. The frozen state is an exact 8-position by
@@ -1568,9 +1580,13 @@ Executable anchors:
 - `test_two_composite_chain_matches_constrained_objective` independently
   optimizes the complete simplex objective, checks KKT consistency and the
   ledger, and classifies its selected point with the projected Hessian.
-- `test_one_update_corridor_has_outer_cycle_with_converged_inner_solves`
-  freezes the reusable one-update state and proves that the current defect is
-  bounded persistent outer nonstationarity, not an inner-Newton failure.
+- `test_one_update_corridor_is_globalized_without_changing_the_equations`
+  freezes the reusable one-update state, certifies its trust-region root, and
+  retains explicit Picard mode as the bounded-cycle reproducer.
+- `test_inner_solution_uses_implicit_stationarity_derivative` compares the
+  local implicit JVP with an independent central difference.
+- `test_matrix_free_trust_kernel_has_single_and_vmap_parity` checks that the
+  compiled per-instance kernel preserves steps and diagnostics under `vmap`.
 
 References: Part II Sections 4.4--4.5 and Appendix B; Heskes, Albers, and
 Kappen, *Approximate Inference and Constrained Optimization* (2012);

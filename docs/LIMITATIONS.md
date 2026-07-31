@@ -59,14 +59,15 @@ boundary executable: the open-loop second-action marginal is not treated as a
 conditional policy, while replanning after the cue chooses the indicated arm
 and improves realized return over the BFE ablation.
 
-**H6. No convergence or optimality guarantees for GFE.** The GFE is non-convex;
-Part II §4.5 documents that the naive fixed-point message diverges in cases, and
-the Newton-solved variant still finds only local stationary points — Part II
-Fig. 9's bimodal win histogram is the framework itself telling you agents
-sometimes lock into bad optima depending on initialization. Expect and monitor
-this; do not debug it as an implementation defect. The runtime can certify only
-termination mechanics (stationary, exhausted, numerically diverged, or proven
-empty support), not global optimality or correctness of a loopy Bethe fixed point.
+**H6. Globalized GFE is still non-convex.** Part II §4.5 documents that the
+naive fixed-point iteration can diverge, and its local Newton solve does not
+coordinate a whole mixed graph. CFFG now globalizes that coupled outer residual
+with a fixed-support trust-region method and reports root, nonroot stationary
+merit, exhaustion, divergence, and infeasibility separately. A certified root
+establishes first-order constrained stationarity on the active support under D7's
+assumptions; it does not prove a local minimum, a global optimum, or correctness
+of the Bethe approximation on a loopy graph. Initialization can therefore still
+select a poor stationary point, as Part II Fig. 9's bimodal win histogram warns.
 
 **H7. Conjugate continual learning has no principled forgetting.** Dirichlet
 counts accumulate forever: the posterior sharpens monotonically, so a
@@ -223,8 +224,11 @@ travel ~one slice per sweep, and a fixed 120-sweep budget leaves the H=25
 control posterior at residual 5.5 (vs 4.9e-4 at 400 sweeps). Fixes are
 mechanical, not research: depth-aware/tol-driven sweep budgets in the agent
 loop plus warm-started replanning (cff-5edo). Related measured limits:
-colony batching is dispatch-bound on CPU, 1.5× at 32 instances until the
-sweep loop is a jitted scan (cff-wbhu); the GFE-TM curiosity composite
+ordinary colony batching is dispatch-bound on CPU, 1.5× at 32 instances until
+the sweep loop is a jitted scan (cff-wbhu). Mixed-GFE colonies currently reuse
+compiled trust kernels but run one controller per instance, so they have a
+stronger host-control bottleneck until that same ticket moves the trust/status
+carry into the scan. The GFE-TM curiosity composite
 costs ~4× a plain act() in every slice and its novelty channel outcompetes
 the goal channel while counts are near-uniform. After the cff-hp3y cavity and
 ledger repair, the like-for-like 25-episode Hallway rerun scored 0.16 success

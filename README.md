@@ -161,7 +161,7 @@ from cffg.engine import Engine
 engine = Engine(compile_template(template, arrays=arrays))
 state  = engine.init_state()
 state  = engine.bind_data(state, {"obs1": 4, "obs2": None})   # clamp / missing
-result = engine.run(state, 200, tol=1e-12, damp=0.5)            # flood to stationarity
+result = engine.run(state, 200, tol=1e-12)                      # solve to stationarity
 state  = result.require_converged()                             # raises on every other status
 
 engine.marginals(state)["u1"]   # posteriors by variable name
@@ -190,7 +190,7 @@ engine = Engine(
 state, next_key = engine.prepare_mu3(
     engine.init_state(), jax.random.PRNGKey(7)
 )
-result = engine.run(state, 200, tol=1e-8, damp=0.5)
+result = engine.run(state, 200, tol=1e-8)
 result.require_converged()
 engine.mu3_diagnostics(result.state)         # weighted moments, log Z, KL, ESS
 ```
@@ -211,7 +211,7 @@ template, arrays = build_rollout(
     gfe=True, learned_c=True, c_counts=alpha_c,
 )
 engine = Engine(compile_template(template, arrays=arrays))
-trial = engine.run(engine.init_state(), 200, tol=1e-8, damp=0.5)
+trial = engine.run(engine.init_state(), 200, tol=1e-8)
 trial_state = trial.require_converged()
 next_prior = engine.goal_prior_updates(trial_state)  # {"Cc": alpha_c + Σ Abar zbar}
 
@@ -226,12 +226,16 @@ initial_goal_counts=alpha_c)` stages the latest converged planning posterior
 and commits it once at `reset_episode`; checkpoints preserve a pending
 uncommitted trial exactly.
 
-Rules of thumb: `damp=0.5` whenever the model has ≥ 2 GFE composites (their
-outer coordination can limit-cycle undamped). `result.status` is one of
-`converged`, `budget_exhausted`, `diverged`, or `infeasible`; its
-`free_energies`, `message_deltas`, `iterations`, and `residual` explain that
-classification. FE stationarity is the primary sum/GFE stopping signal and
-message delta guards coherence. On tree graphs
+Plans containing GFE composites use the fixed-support trust-region outer
+solver automatically. Caller-tuned `damp` is rejected on that path; use
+`outer_solver="picard"` only to reproduce or diagnose the historical
+fixed-point iteration. `result.status` is one of `converged`,
+`budget_exhausted`, `diverged`, or `infeasible`. Its `outer_residual`,
+`outer_merit`, `outer_gradient_norm`, `trust_radius`, accepted/rejected step
+counts, and `termination_reason` explain a GFE classification; the merit never
+enters `engine.bfe` or a policy score. Convergence requires a coupled outer
+root, successful local solves, coherent exact support, and a finite stationary
+FE ledger. On tree graphs
 `bfe` equals −log evidence exactly; with no data it is 0 for a normalized
 model — both make good sanity checks. Parameters are *inputs* (`state.params`),
 so you can swap them per run without recompiling.
@@ -309,14 +313,16 @@ Many agents on one machine:
 from cffg.colony import Colony
 colony = Colony()
 ids = [colony.spawn(t, arrays_i) for arrays_i in per_instance_params]
-colony.run(100, damp=0.5)      # vmapped iterations, grouped by structure
+colony.run(100)                # grouped by structure
 colony.marginals(ids[0])
 ```
 
 Engines are cached by structure hash — N instances of one template cost one
-compilation, and instances couple only through their ports. Convergence and
-per-instance status are currently tracked by a Python loop around each vmapped
-iteration.
+compilation, and instances couple only through their ports. Ordinary iterative
+plans use vmapped rule iterations with host status tracking. Mixed-GFE plans
+reuse the compiled matrix-free kernels but currently run one trust controller
+per instance so radii, active supports, and termination reasons remain
+independent.
 
 ## Edit, ship, budget
 
