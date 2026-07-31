@@ -1,6 +1,6 @@
 ---
 id: cff-izjd
-status: in_progress
+status: closed
 deps: [cff-dfpi, cff-lv2w]
 links: []
 created: 2026-07-13T02:48:31Z
@@ -84,3 +84,9 @@ status invariant**.
 5. The probe-versus-idle engine fixture reproduces the research oracle:
    regime epistemics selects the risk-dominated probe, while the otherwise
    identical non-epistemic ablation does not.
+
+## Notes
+
+**2026-07-31T20:47:14Z**
+
+Implemented and validated the D5 exterior hybrid-GFE composite for gaussian_mixture and gaussian_mixture_linear factors facing fixed Gaussian goals. The compiler derives HybridGfePlan groups; the runtime shares the gauge-reduced globalized simplex solve, preserves exact selector support and D3 Gaussian state messages, accounts direct G-hat, and exposes entropy-bound diagnostics. The O(K^2) Hershey-Olsen sandwich runs only on explicit diagnostics, not inference or ordinary scoring. Hostile coverage includes improper state/goal precisions, float32 K=32, forced flooding versus mixed scheduling, and vmap parity. Validation: focused 109 passed / 3 deselected in 103.78s; slow 38 passed / 1261 deselected in 414.37s; final dashboard-backed not-slow suite 1261 passed / 38 deselected in 328.46s. Remaining scope is intentionally separate: interior substituted cavities, learned Gaussian goals, and parameter novelty.
