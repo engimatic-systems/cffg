@@ -109,7 +109,7 @@ def test_mu1_shared_goal_posterior_and_complete_fe_match_direct_algebra():
         compile_template(_model(slices=2), arrays=arrays)
     )
     result = engine.run(
-        engine.init_state(), 100, tol=1e-11, damp=0.25, harden_last=0
+        engine.init_state(), 100, tol=1e-11, harden_last=0
     )
     assert result.status is RunStatus.CONVERGED
     state = result.state
@@ -150,12 +150,12 @@ def test_sweeps_replace_mu1_and_explicit_rollover_adds_one_new_trial():
     arrays = _arrays()
     engine = Engine(compile_template(_model(), arrays=arrays))
     first = engine.run(
-        engine.init_state(), 100, tol=1e-11, damp=0.25, harden_last=0
+        engine.init_state(), 100, tol=1e-11, harden_last=0
     ).require_converged()
     first_alpha = engine.goal_prior_updates(first)["Cc"]
 
     repeated = engine.run(
-        first, 30, tol=1e-11, damp=0.25, harden_last=0
+        first, 30, tol=1e-11, harden_last=0
     ).require_converged()
     np.testing.assert_allclose(
         engine.goal_prior_updates(repeated)["Cc"], first_alpha, atol=2e-6
@@ -167,7 +167,7 @@ def test_sweeps_replace_mu1_and_explicit_rollover_adds_one_new_trial():
         engine.init_state(), {"Cc": first_alpha}
     )
     second = engine.run(
-        second_start, 100, tol=1e-11, damp=0.25, harden_last=0
+        second_start, 100, tol=1e-11, harden_last=0
     ).require_converged()
     second_alpha = engine.goal_prior_updates(second)["Cc"]
     np.testing.assert_allclose(
@@ -199,7 +199,7 @@ def test_rollover_changes_next_policy_in_predicted_direction():
     )
     engine = Engine(compile_template(template, arrays=arrays))
     first = engine.run(
-        engine.init_state(), 100, tol=1e-10, damp=0.25, harden_last=0
+        engine.init_state(), 100, tol=1e-10, harden_last=0
     ).require_converged()
     first_policy = engine.marginals(first)["u1"]
     rolled = engine.goal_prior_updates(first)
@@ -209,7 +209,6 @@ def test_rollover_changes_next_policy_in_predicted_direction():
         engine.with_goal_priors(engine.init_state(), rolled),
         100,
         tol=1e-10,
-        damp=0.25,
         harden_last=0,
     ).require_converged()
     second_policy = engine.marginals(second)["u1"]
@@ -265,7 +264,7 @@ def test_float32_sparse_zero_mass_and_uncomfortable_observation_scale():
             )
         )
         result = engine.run(
-            engine.init_state(), 100, tol=1e-6, damp=0.25, harden_last=0
+            engine.init_state(), 100, tol=1e-6, harden_last=0
         )
         assert result.status is RunStatus.CONVERGED
         posterior = engine.goal_prior_updates(result.state)["Cc"]

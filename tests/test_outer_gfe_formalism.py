@@ -1,7 +1,9 @@
 """Executable anchors for the mixed-GFE outer-solver formalism."""
 
+import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 from cffg.agent import RollingAgent
 from cffg.compiler import NEG, compile_template
@@ -9,6 +11,7 @@ from cffg.engine import Engine, RunStatus, _replace
 from cffg.models import build_factored_corridor
 from cffg.models.rollout import build_rollout
 from cffg.models.tmaze import build_tmaze
+from cffg.outer import _make_trust_kernel
 
 
 def _categorical_chart(engine: Engine, state) -> np.ndarray:
@@ -97,7 +100,7 @@ def _checked_d1_fixed_point() -> tuple[Engine, object]:
     arrays["Bc"] = transition_counts
     engine = Engine(compile_template(template, arrays=arrays))
     state = engine.run(
-        engine.init_state(), 80, tol=1e-12, damp=0.5
+        engine.init_state(), 80, tol=1e-12
     ).require_converged()
     return engine, state
 
@@ -106,7 +109,7 @@ def _checked_tmaze_fixed_point() -> tuple[Engine, object]:
     template, arrays = build_tmaze()
     engine = Engine(compile_template(template, arrays=arrays))
     state = engine.run(
-        engine.init_state(), 400, tol=1e-13, damp=0.5
+        engine.init_state(), 400, tol=1e-13
     ).require_converged()
     return engine, state
 
@@ -123,6 +126,37 @@ def test_packed_outer_residual_is_gauge_invariant_at_checked_fixed_points():
         shifted_residual = _outer_residual(engine, shifted)
         np.testing.assert_allclose(shifted_residual, residual, atol=2e-10)
         assert np.max(np.abs(residual), initial=0.0) < 2e-10
+
+
+def test_matrix_free_trust_kernel_has_single_and_vmap_parity():
+    target = jnp.asarray([0.25, -0.5, 0.75])
+    kernel = _make_trust_kernel(lambda value: jnp.tanh(value) - target, 3)
+    coordinates = jnp.asarray(
+        [[1.0, -1.0, 0.2], [-0.4, 0.3, 1.5]]
+    )
+    scales = jnp.asarray([[1.0, 0.5, 2.0], [0.8, 1.2, 0.7]])
+    radii = jnp.asarray([0.35, 1.1])
+    accelerated = jnp.zeros_like(coordinates)
+    flags = jnp.zeros(2, dtype=bool)
+
+    batched = jax.vmap(kernel)(
+        coordinates, scales, radii, accelerated, flags
+    )
+    sequential = [
+        kernel(coordinates[i], scales[i], radii[i], accelerated[i], flags[i])
+        for i in range(2)
+    ]
+    for batched_value, *single_values in zip(batched, *sequential):
+        np.testing.assert_allclose(
+            batched_value,
+            np.stack(single_values),
+            rtol=1e-12,
+            atol=1e-12,
+        )
+    np.testing.assert_array_less(
+        np.linalg.norm(np.asarray(batched[0]), axis=1),
+        np.asarray(radii) + 1e-12,
+    )
 
 
 def one_update_corridor_case() -> tuple[Engine, object, np.ndarray]:
@@ -177,7 +211,7 @@ def one_update_corridor_case() -> tuple[Engine, object, np.ndarray]:
     return agent.plan, agent._with_params(agent.plan), alpha
 
 
-def test_one_update_corridor_has_outer_cycle_with_converged_inner_solves():
+def test_one_update_corridor_is_globalized_without_changing_the_equations():
     engine, state, alpha = one_update_corridor_case()
     assert engine.schedule.kind == "mixed"
     assert len(engine.arena.gfe_groups) == 1
@@ -189,14 +223,30 @@ def test_one_update_corridor_has_outer_cycle_with_converged_inner_solves():
     np.testing.assert_array_equal(changed, [[5, 0, 0]])
     np.testing.assert_allclose(alpha[5, 0, 0], 9.0 / 8.0)
 
-    result = engine.run(state, 400, tol=1e-10, damp=0.5)
-    assert result.status is RunStatus.BUDGET_EXHAUSTED
+    result = engine.run(state, 400, tol=1e-10)
+    assert result.status is RunStatus.CONVERGED
     assert result.inner_status is RunStatus.CONVERGED
     assert result.inner_residual < 1e-10
-    assert 1.5 < result.residual < 1.9
+    assert result.outer_residual < 1e-10
+    assert np.isfinite(result.outer_merit) and result.outer_merit >= 0.0
+    assert np.isfinite(result.outer_gradient_norm)
+    assert result.accepted_steps > 0
+    assert result.termination_reason.value == "root_converged"
+    assert np.isfinite(result.free_energies[-1])
 
-    energy_tail = np.asarray(result.free_energies[-128:])
-    delta_tail = np.asarray(result.message_deltas[-128:])
+    with pytest.raises(ValueError, match="damp does not apply"):
+        engine.run(state, 1, tol=1e-10, damp=0.5)
+
+    legacy = engine.run(
+        state, 400, tol=1e-10, damp=0.5, outer_solver="picard"
+    )
+    assert legacy.status is RunStatus.BUDGET_EXHAUSTED
+    assert legacy.inner_status is RunStatus.CONVERGED
+    assert 1.5 < legacy.residual < 1.9
+    assert legacy.termination_reason.value == "legacy_picard"
+
+    energy_tail = np.asarray(legacy.free_energies[-128:])
+    delta_tail = np.asarray(legacy.message_deltas[-128:])
     assert np.isfinite(energy_tail).all() and np.isfinite(delta_tail).all()
     assert np.ptp(energy_tail) > 20.0
     assert delta_tail.min() > 1.0

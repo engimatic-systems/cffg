@@ -113,8 +113,8 @@ def test_explicit_key_replays_particles_weights_and_fixed_point_bitwise():
         state_b.params[plan.name + ":samples"],
     )
 
-    result_a = engine.run(state_a, 30, tol=1e-9, damp=0.25, harden_last=0)
-    result_b = engine.run(state_b, 30, tol=1e-9, damp=0.25, harden_last=0)
+    result_a = engine.run(state_a, 30, tol=1e-9, harden_last=0)
+    result_b = engine.run(state_b, 30, tol=1e-9, harden_last=0)
     assert result_a.status is result_b.status is RunStatus.CONVERGED
     for left, right in zip(
         jax.tree_util.tree_leaves(result_a.state),
@@ -128,7 +128,7 @@ def test_explicit_key_replays_particles_weights_and_fixed_point_bitwise():
 def test_multiple_slices_add_functional_weights_and_parameter_ledger_once():
     engine = _engine(slices=2, samples=4096)
     state, _ = engine.prepare_mu3(engine.init_state(), jax.random.PRNGKey(9))
-    result = engine.run(state, 40, tol=1e-9, damp=0.25, harden_last=0)
+    result = engine.run(state, 40, tol=1e-9, harden_last=0)
     assert result.status is RunStatus.CONVERGED
     state = result.state
     plan = engine.arena.mu3_groups[0]
@@ -233,7 +233,6 @@ def test_base_posterior_is_runtime_input_and_burn_in_only_averages_converged_epo
         burn_in=1,
         n_iters=30,
         tol=1e-8,
-        damp=0.25,
     )
     assert scored.status is RunStatus.CONVERGED
     assert scored.policy_score == pytest.approx(scored.epoch_scores[1])

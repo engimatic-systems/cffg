@@ -37,7 +37,16 @@ def _converged(
     state = engine.init_state()
     if data:
         state = engine.bind_data(state, data)
-    result = engine.run(state, sweeps, tol=1e-10, damp=damp)
+    result = engine.run(
+        state,
+        sweeps,
+        tol=1e-10,
+        **(
+            {}
+            if engine.arena.gfe_groups or engine.arena.gfe_tm_groups
+            else {"damp": damp}
+        ),
+    )
     return engine, result, result.require_converged()
 
 

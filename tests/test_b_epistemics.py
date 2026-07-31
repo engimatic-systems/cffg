@@ -241,7 +241,7 @@ def test_two_composite_chain_matches_constrained_objective():
     )
     engine = Engine(compile_template(t, arrays=dict(zip(names, (d, e1, e2, c, b1, b2)))))
     state, deltas = engine.run(
-        engine.init_state(), 600, tol=1e-12, damp=0.5
+        engine.init_state(), 600, tol=1e-12
     ).require_converged_with_trace()
     assert deltas[-1] < 1e-10
 
@@ -593,7 +593,7 @@ def test_agent_curiosity_decays_with_experience():
         for _ in range(50):
             st = agent._with_params(agent.plan)
             st = agent.plan.run(
-                st, agent.n_sweeps, tol=1e-10, damp=agent.damp
+                st, agent.n_sweeps, tol=1e-10
             ).require_converged()
             q = np.asarray(agent.plan.marginals(st)["u1"])
             q1_trace.append(float(q[1] / q.sum()))

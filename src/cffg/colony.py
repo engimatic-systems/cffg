@@ -1,10 +1,11 @@
 """Colony execution: many small graphs, one machine (ARCHITECTURE §5b).
 
 An instance is pure data — (structure key, State pytree). Engines are cached
-by structure hash, so N instances of one template cost one compilation; each
-tick stacks a structure-group's states and runs one vmapped step-loop per
-unique structure. Instances couple only through the host (bind_data / read
-marginals), never by merging graphs.
+by structure hash, so N instances of one template cost one compilation.
+Ordinary iterative plans stack a structure-group's states and run one vmapped
+step-loop; mixed-GFE plans share the compiled numerical kernels but retain
+per-instance trust controllers until cff-wbhu. Instances couple only through
+the host (bind_data / read marginals), never by merging graphs.
 """
 
 from __future__ import annotations
@@ -91,6 +92,22 @@ class Colony:
         for key, iids in by_key.items():
             engine = self.engines[key]
             states = [self.instances[i].state for i in iids]
+            if engine.arena.gfe_groups or engine.arena.gfe_tm_groups:
+                if damp != 0.0:
+                    raise ValueError(
+                        "damp does not apply to mixed-GFE trust-region "
+                        "inference"
+                    )
+                for iid, state in zip(iids, states):
+                    result = engine.run(
+                        state,
+                        n_iters,
+                        tol=tol,
+                        harden_last=n_iters,
+                    )
+                    self.instances[iid].state = result.state
+                    self.last_results[iid] = result
+                continue
             if len(states) == 1:
                 result = engine.run(
                     states[0], n_iters, tol=tol, damp=damp, harden_last=n_iters

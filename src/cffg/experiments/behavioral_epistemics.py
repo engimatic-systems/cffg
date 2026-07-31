@@ -260,7 +260,12 @@ def _solve(
     state = engine.init_state()
     if data:
         state = engine.bind_data(state, data)
-    result = engine.run(state, n_sweeps, tol=1e-10, damp=0.5)
+    run_options = (
+        {}
+        if engine.arena.gfe_groups or engine.arena.gfe_tm_groups
+        else {"damp": 0.5}
+    )
+    result = engine.run(state, n_sweeps, tol=1e-10, **run_options)
     state = result.require_converged()
     marginals = engine.marginals(state)
     action = np.asarray(marginals[f"u{past + 1}"])

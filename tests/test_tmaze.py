@@ -14,14 +14,14 @@ from cffg.compiler import compile_template
 from cffg.engine import Engine
 from cffg.models.tmaze import C, L, O, R, build_tmaze
 
-N_ITERS = 400  # damp=0.5 contracts ~0.91/sweep on this model
+N_ITERS = 400
 
 
 def solve(**kwargs):
     template, arrays = build_tmaze(**kwargs)
     engine = Engine(compile_template(template, arrays=arrays))
     state, deltas = engine.run(
-        engine.init_state(), N_ITERS, tol=1e-13, damp=0.5
+        engine.init_state(), N_ITERS, tol=1e-13
     ).require_converged_with_trace()
     assert deltas[-1] < 1e-10, f"not converged: {deltas[-6:]}"
     return engine, state
@@ -65,7 +65,7 @@ def test_map_policy_variant():
     template, arrays = build_tmaze(map_policy=True)
     engine = Engine(compile_template(template, arrays=arrays))
     state, deltas = engine.run(
-        engine.init_state(), 900, tol=1e-13, damp=0.5, harden_last=450
+        engine.init_state(), 900, tol=1e-13, harden_last=450
     ).require_converged_with_trace()
     assert deltas[-1] < 1e-10, f"not converged: {deltas[-4:]}"
     q = engine.marginals(state)

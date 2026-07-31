@@ -72,6 +72,29 @@ def test_inner_newton_float32_at_uncomfortable_scale():
         np.testing.assert_allclose(np.asarray(result.solution).sum(), 1.0, atol=2e-6)
 
 
+def test_inner_solution_uses_implicit_stationarity_derivative():
+    """The outer JVP differentiates the solved equation, not Newton sweeps."""
+    import jax
+    import jax.numpy as jnp
+
+    abar = jnp.asarray(A_EPI)
+    h = -(abar * jnp.log(abar)).sum(axis=0)
+    logc = jnp.log(jnp.asarray(UNIF))
+    logd = jnp.log(jnp.asarray([0.6, 0.4]))
+    direction = jnp.asarray([0.3, -0.2])
+
+    solve = lambda value: rules._gfe_solve(abar, h, logc, value)
+    _, tangent = jax.jvp(solve, (logd,), (direction,))
+    step = 1e-5
+    finite_difference = (
+        solve(logd + step * direction)
+        - solve(logd - step * direction)
+    ) / (2.0 * step)
+
+    np.testing.assert_allclose(tangent, finite_difference, atol=1e-8)
+    np.testing.assert_allclose(np.asarray(tangent).sum(), 0.0, atol=1e-12)
+
+
 def make_model(A, c, d, p_substitute=True) -> Template:
     t = Template(
         name="gfe_unit",

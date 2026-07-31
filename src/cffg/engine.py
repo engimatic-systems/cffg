@@ -39,7 +39,18 @@ from jax.scipy.special import logsumexp
 
 from cffg import csp, ef, efrules, gauss, kernels, mixg
 from cffg.compiler import NEG, Arena
-from cffg.schedule import BatchStage, Schedule, _fingerprint, build_schedule
+from cffg.outer import (
+    OuterArrays,
+    OuterTerminationReason,
+    solve_outer,
+)
+from cffg.schedule import (
+    BatchStage,
+    Schedule,
+    _fingerprint,
+    build_schedule,
+    eliminated_slot_sets,
+)
 from cffg.rules import (
     BP_UPDATES,
     NODE_ENERGIES,
@@ -119,6 +130,13 @@ class RunResult:
     mu3_ess: tuple[float, ...] = ()
     mu3_log_normalizers: tuple[float, ...] = ()
     mu3_statuses: tuple[RunStatus, ...] = ()
+    outer_residual: float = float("nan")
+    outer_merit: float = float("nan")
+    outer_gradient_norm: float = float("nan")
+    trust_radius: float = float("nan")
+    accepted_steps: int = 0
+    rejected_steps: int = 0
+    termination_reason: OuterTerminationReason = OuterTerminationReason.NOT_RUN
 
     @property
     def delta_trace(self) -> tuple[float, ...]:
@@ -328,6 +346,8 @@ class Engine:
             self.schedule = build_schedule(arena, schedule)
         self._propagate = None
         self._prime = None
+        self._reconstruct = None
+        self._outer_eliminated: dict[str, frozenset[int]] = {}
         self._iter_step = self._step
         self.scan_registerized: tuple[bool, ...] = ()
         kind = self.schedule.kind
@@ -354,6 +374,11 @@ class Engine:
                 # cyclic islands by one colored sweep — before the loop's
                 # residual/FE is evaluated.
                 phase_step = _make_step(arena, skip_scheduled=True)
+                if self.schedule.forest_stages:
+                    self._reconstruct = eqx.filter_jit(
+                        _make_propagate(arena, self.schedule.forest_stages)
+                    )
+                self._outer_eliminated = eliminated_slot_sets(arena)
 
                 def iter_step(
                     messages, g_eta, g_lam, g_obs, g_mask,
@@ -703,6 +728,10 @@ class Engine:
         """
         if not self.arena.mu3_groups:
             raise ValueError("score_mu3_epochs requires a compiled mu3 evaluator")
+        if damp != 0.0:
+            raise ValueError(
+                "damp does not apply to mixed-GFE trust-region inference"
+            )
         if epochs <= 0 or not 0 <= burn_in < epochs:
             raise ValueError("require epochs > 0 and 0 <= burn_in < epochs")
         next_key = key
@@ -712,7 +741,10 @@ class Engine:
         for _ in range(epochs):
             current, next_key = self.prepare_mu3(current, next_key)
             result = self.run(
-                current, n_iters=n_iters, tol=tol, damp=damp, harden_last=0
+                current,
+                n_iters=n_iters,
+                tol=tol,
+                harden_last=0,
             )
             runs.append(result)
             current = result.state
@@ -820,6 +852,7 @@ class Engine:
         tol: float | None = None,
         damp: float = 0.0,
         harden_last: int | None = None,
+        outer_solver: str = "auto",
     ) -> RunResult:
         """Flood up to ``n_iters`` sweeps and return explicit termination data.
 
@@ -834,8 +867,10 @@ class Engine:
         Callers that require actionable beliefs should use
         ``result.require_converged()``.
 
-        `damp` (0..1) blends in the previous messages; use ~0.5 for models with
-        multiple GFE composites, whose outer coordination can limit-cycle.
+        Mixed-GFE plans use the proof-backed trust-region residual solver by
+        default. ``damp`` remains a Picard/flooding parameter and is rejected
+        for that path; select ``outer_solver="picard"`` explicitly to retain
+        the legacy fixed-damping iteration as a diagnostic.
 
         δ form-constraints must not fire while beliefs are still garbage — a
         premature pointmass locks in its own arbitrary argmax. With
@@ -854,6 +889,10 @@ class Engine:
         sweep budget applies)."""
         if n_iters < 0:
             raise ValueError("n_iters must be non-negative")
+        if outer_solver not in ("auto", "trust_region", "picard"):
+            raise ValueError(
+                "outer_solver must be 'auto', 'trust_region', or 'picard'"
+            )
         self._require_mu3_ready(state)
         if harden_last is None:
             harden_last = n_iters // 2 if len(self.arena.delta_pairs) else 0
@@ -866,6 +905,19 @@ class Engine:
             and harden_last == 0
         ):
             return self._run_exact(state, tol)
+        has_gfe = bool(self.arena.gfe_groups or self.arena.gfe_tm_groups)
+        use_trust_region = has_gfe and outer_solver != "picard"
+        if outer_solver == "trust_region" and not has_gfe:
+            raise ValueError("outer_solver='trust_region' requires a GFE plan")
+        if use_trust_region:
+            if damp != 0.0:
+                raise ValueError(
+                    "damp does not apply to mixed-GFE trust-region inference; "
+                    "omit it or select outer_solver='picard' explicitly"
+                )
+            return self._run_outer_trust_region(
+                state, n_iters, tol=tol, harden_last=harden_last
+            )
 
         deltas: list[float] = []
         energies: list[float] = []
@@ -1026,6 +1078,246 @@ class Engine:
             mu3_ess=ess,
             mu3_log_normalizers=log_normalizers,
             mu3_statuses=mu3_statuses,
+            termination_reason=(
+                OuterTerminationReason.LEGACY_PICARD
+                if has_gfe else OuterTerminationReason.NOT_RUN
+            ),
+        )
+
+    def _run_outer_trust_region(
+        self,
+        state: State,
+        n_iters: int,
+        *,
+        tol: float | None,
+        harden_last: int,
+    ) -> RunResult:
+        """Solve each fixed hard-constraint phase with the D7 outer method."""
+        dtype = np.asarray(state.messages).dtype
+        solver_tol = (
+            64.0 * np.finfo(dtype).eps if tol is None else float(tol)
+        )
+        if not self._state_is_finite(state):
+            return RunResult(
+                state, RunStatus.DIVERGED, 0, (), (), float("inf"),
+                RunStatus.DIVERGED, float("inf"),
+                termination_reason=OuterTerminationReason.NONFINITE_EVALUATION,
+            )
+        if self._has_zero_support(state):
+            return RunResult(
+                state, RunStatus.INFEASIBLE, 0, (), (float("inf"),),
+                float("inf"),
+                termination_reason=OuterTerminationReason.INFEASIBLE,
+            )
+
+        if self._prime is not None and n_iters >= 1:
+            msgs, g_eta, g_lam, ef_eta = self._prime(
+                state.messages, state.g_eta, state.g_lam, state.ef_eta,
+                state.g_obs, state.g_mask, state.ef_obs, state.ef_mask,
+                state.params,
+            )
+            state = _replace(
+                state, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta
+            )
+
+        if self.arena.mu3_groups:
+            state, _, mu3_code, mu3_residual = self._update_mu3(state)
+            if mu3_code:
+                status = (
+                    RunStatus.BUDGET_EXHAUSTED
+                    if mu3_code == 1 else RunStatus.DIVERGED
+                )
+                ess, log_normalizers, mu3_statuses = (
+                    self._mu3_result_diagnostics(state)
+                )
+                return RunResult(
+                    state, status, 0, (), (), mu3_residual,
+                    status, mu3_residual,
+                    mu3_ess=ess,
+                    mu3_log_normalizers=log_normalizers,
+                    mu3_statuses=mu3_statuses,
+                    termination_reason=OuterTerminationReason.INNER_FAILURE,
+                )
+
+        all_deltas: list[float] = []
+        all_energies: list[float] = []
+        total_iterations = accepted = rejected = 0
+        mu3_pending = False
+        phases = (
+            ((n_iters - harden_last, False), (harden_last, True))
+            if harden_last else ((n_iters, False),)
+        )
+        solved = None
+        for budget, harden in phases:
+            if budget == 0:
+                continue
+            hard_blocks: list[tuple[np.ndarray, np.ndarray, jax.Array]] = []
+            if harden:
+                projected = state.messages
+                for card, pairs in self.arena.delta_slot_groups:
+                    i0 = self.arena.message_indices(pairs[:, 0], card)
+                    i1 = self.arena.message_indices(pairs[:, 1], card)
+                    choice = np.argmax(
+                        np.asarray(projected[i0] + projected[i1]), axis=-1
+                    )
+                    hot = jnp.where(
+                        jnp.arange(card)[None, :] == choice[:, None],
+                        0.0,
+                        NEG,
+                    ).astype(projected.dtype)
+                    projected = projected.at[i0].set(hot).at[i1].set(hot)
+                    hard_blocks.append((i0, i1, hot))
+                state = _replace(state, messages=projected)
+            remaining = budget
+            while remaining > 0:
+                params = state.params
+
+                def reconstruct(arrays: OuterArrays) -> OuterArrays:
+                    if self._reconstruct is None:
+                        return arrays
+                    messages, g_eta, g_lam, ef_eta = self._reconstruct(
+                        arrays.messages, arrays.g_eta, arrays.g_lam,
+                        arrays.ef_eta, state.g_obs, state.g_mask,
+                        state.ef_obs, state.ef_mask, params,
+                    )
+                    return OuterArrays(messages, g_eta, g_lam, ef_eta)
+
+                def outer_map(arrays: OuterArrays):
+                    arrays = reconstruct(arrays)
+                    messages, g_eta, g_lam, ef_eta, inner_r, inner_code = (
+                        self._iter_step(
+                            arrays.messages, arrays.g_eta, arrays.g_lam,
+                            state.g_obs, state.g_mask, arrays.ef_eta,
+                            state.ef_obs, state.ef_mask, params, 0.0, False,
+                        )
+                    )
+                    for i0, i1, hot in hard_blocks:
+                        messages = (
+                            messages.at[i0].set(hot).at[i1].set(hot)
+                        )
+                    return (
+                        OuterArrays(messages, g_eta, g_lam, ef_eta),
+                        inner_r,
+                        inner_code,
+                    )
+
+                def as_state(arrays: OuterArrays) -> State:
+                    return _replace(
+                        state,
+                        messages=arrays.messages,
+                        g_eta=arrays.g_eta,
+                        g_lam=arrays.g_lam,
+                        ef_eta=arrays.ef_eta,
+                    )
+
+                solved = solve_outer(
+                    OuterArrays(
+                        state.messages, state.g_eta, state.g_lam, state.ef_eta
+                    ),
+                    self.arena,
+                    outer_map,
+                    lambda arrays: self.bfe(as_state(reconstruct(arrays))),
+                    lambda arrays: self._has_zero_support(
+                        as_state(reconstruct(arrays))
+                    ),
+                    n_iters=remaining,
+                    tol=solver_tol,
+                    eliminated=self._outer_eliminated,
+                )
+                state = as_state(reconstruct(solved.arrays))
+                consumed = max(solved.iterations, 1)
+                remaining -= consumed
+                total_iterations += consumed
+                accepted += solved.accepted_steps
+                rejected += solved.rejected_steps
+                all_deltas.extend(solved.message_deltas)
+                all_energies.extend(solved.free_energies)
+                if (
+                    solved.reason in (
+                        OuterTerminationReason.STATIONARY_NONROOT,
+                        OuterTerminationReason.STAGNATION,
+                        OuterTerminationReason.TRUST_REGION_COLLAPSED,
+                    )
+                    and remaining > 0
+                ):
+                    # D remains frozen within each trust solve. A truthful
+                    # non-root termination may start a new solve from its
+                    # accepted state with a newly frozen local scale.
+                    continue
+                if (
+                    not self.arena.mu3_groups
+                    or solved.reason is not OuterTerminationReason.ROOT_CONVERGED
+                ):
+                    break
+                state, mu3_delta, mu3_code, mu3_residual = self._update_mu3(
+                    state
+                )
+                mu3_pending = mu3_code == 0 and mu3_delta > solver_tol
+                if mu3_code or mu3_delta <= solver_tol:
+                    break
+            if solved.reason in (
+                OuterTerminationReason.NONFINITE_EVALUATION,
+                OuterTerminationReason.INFEASIBLE,
+                OuterTerminationReason.INNER_FAILURE,
+            ):
+                break
+
+        if solved is None:
+            return RunResult(
+                state, RunStatus.BUDGET_EXHAUSTED, 0, (), (), float("inf"),
+                termination_reason=OuterTerminationReason.ITERATION_BUDGET,
+            )
+        if (
+            solved.reason is OuterTerminationReason.ROOT_CONVERGED
+            and not mu3_pending
+        ):
+            status = (
+                RunStatus.CONVERGED
+                if tol is not None else RunStatus.BUDGET_EXHAUSTED
+            )
+        elif solved.reason is OuterTerminationReason.INFEASIBLE:
+            status = RunStatus.INFEASIBLE
+        elif (
+            solved.reason is OuterTerminationReason.NONFINITE_EVALUATION
+            or (
+                solved.reason is OuterTerminationReason.INNER_FAILURE
+                and solved.inner_code == 2
+            )
+        ):
+            status = RunStatus.DIVERGED
+        else:
+            status = RunStatus.BUDGET_EXHAUSTED
+        inner_status = (
+            RunStatus.CONVERGED
+            if solved.inner_code == 0 else
+            RunStatus.BUDGET_EXHAUSTED
+            if solved.inner_code == 1 else
+            RunStatus.DIVERGED
+        )
+        residual = (
+            abs(all_energies[-1] - all_energies[-2])
+            if len(all_energies) >= 2 else solved.outer_residual
+        )
+        ess, log_normalizers, mu3_statuses = self._mu3_result_diagnostics(state)
+        return RunResult(
+            state=state,
+            status=status,
+            iterations=total_iterations,
+            message_deltas=tuple(all_deltas),
+            free_energies=tuple(all_energies),
+            residual=residual,
+            inner_status=inner_status,
+            inner_residual=solved.inner_residual,
+            mu3_ess=ess,
+            mu3_log_normalizers=log_normalizers,
+            mu3_statuses=mu3_statuses,
+            outer_residual=solved.outer_residual,
+            outer_merit=solved.merit,
+            outer_gradient_norm=solved.gradient_norm,
+            trust_radius=solved.trust_radius,
+            accepted_steps=accepted,
+            rejected_steps=rejected,
+            termination_reason=solved.reason,
         )
 
     def _run_exact(self, state: State, tol: float | None) -> RunResult:
@@ -1910,8 +2202,31 @@ def _make_step(arena: Arena, skip_scheduled: bool = False):
                 c_counts = messages[
                     arena.message_indices(g.goal_count_scatter, ko)
                 ]
-                logc = dirichlet_expected_log(
-                    efrules.DIRICHLET.posterior(c_alpha0, c_counts)
+                if g.mu3:
+                    outcome_support = jnp.any(
+                        params[g.name + ":Abar"] > 0, axis=2
+                    )
+                elif g.learned:
+                    outcome_support = jnp.any(
+                        params[a_key] > 0, axis=2
+                    )
+                else:
+                    outcome_support = jnp.any(
+                        params[a_key] != NEG, axis=2
+                    )
+                c_posterior = efrules.DIRICHLET.posterior(
+                    c_alpha0, c_counts
+                )
+                # Unsupported channel rows are algebraically absent. Replace
+                # their concentration before digamma so reverse mode never
+                # forms 0 * trigamma(tiny), which is NaN in float32.
+                safe_posterior = jnp.where(
+                    outcome_support, c_posterior, 1.0
+                )
+                logc = jnp.where(
+                    outcome_support,
+                    dirichlet_expected_log(safe_posterior),
+                    0.0,
                 )
             else:
                 logc = params[g.name + ":c"]
