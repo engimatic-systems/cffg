@@ -1,6 +1,6 @@
 ---
 id: cff-4apw
-status: in_progress
+status: closed
 deps: [cff-k9ws, cff-lquu]
 links: []
 created: 2026-07-15T01:45:57Z
@@ -121,3 +121,9 @@ Legend: prerequisite --> dependent
                           +--> [ ] cff-4apw PG weight learning (ready)
                                       |
                                       +--> [ ] cff-y4nx rSLDS integration
+
+## Notes
+
+**2026-08-01T03:52:47Z**
+
+Implemented on agent/cff-4apw-pg-learning in commit 28a7e8a. Engine.recurrence_weight_stats emits soft PG omega/exposure and additive Gaussian natural statistics; conj.PGWeights validates, accumulates, reports covariance, and rolls point weights/offsets forward. D8.4 plus README/ARCHITECTURE/LIMITATIONS document the empirical-Bayes boundary. Validation stayed compact: exactly three new tests across the existing conjugacy and recurrence files; focused 20 passed, and final default suite 1283 passed / 38 deselected in 359.21s with the dashboard refreshed. cff-y4nx is now unblocked; generic LearnableSpec registration remains deliberately with cff-6tek.
