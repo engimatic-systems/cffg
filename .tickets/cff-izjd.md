@@ -1,7 +1,7 @@
 ---
 id: cff-izjd
 status: open
-deps: [cff-dfpi, cff-weff]
+deps: [cff-dfpi, cff-lv2w]
 links: []
 created: 2026-07-13T02:48:31Z
 type: feature

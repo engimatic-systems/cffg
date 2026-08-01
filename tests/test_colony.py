@@ -1,6 +1,7 @@
 """Colony: structure-hash batching, vmapped ticks, host port routing."""
 
 import numpy as np
+import pytest
 
 from cffg.colony import Colony
 from cffg.compiler import compile_template
@@ -19,17 +20,18 @@ def spawn_gridworlds(colony, starts, seed_obs=None):
     return ids
 
 
-def test_batched_equals_sequential():
+@pytest.mark.slow
+def test_gfe_colony_equals_sequential():
     colony = Colony()
     starts = [0, 1, 2, 3, 4]
     ids = spawn_gridworlds(colony, starts)
-    results = colony.run(N_ITERS, damp=0.5)
+    results = colony.run(N_ITERS)
     assert all(result.status is RunStatus.BUDGET_EXHAUSTED for result in results.values())
 
     for s, iid in zip(starts, ids):
         t, arrays = build_gridworld(k=6, start=s)
         engine = Engine(compile_template(t, arrays=arrays))
-        solo = engine.run(engine.init_state(), N_ITERS, damp=0.5).state
+        solo = engine.run(engine.init_state(), N_ITERS).state
         ref = engine.marginals(solo)
         got = colony.marginals(iid)
         for var in ("u1", "zm1"):
@@ -45,12 +47,13 @@ def test_one_engine_per_structure():
     assert len(colony.engines) == 2  # 5 instances, 2 compilations
 
 
+@pytest.mark.slow
 def test_mixed_structures_run_and_agree():
     colony = Colony()
     gw_ids = spawn_gridworlds(colony, [0, 2])
     t, arrays = build_tmaze()
     tm_id = colony.spawn(t, arrays)
-    colony.run(400, damp=0.5)
+    colony.run(400)
 
     # T-maze member reproduces the golden cue-first posture inside the colony.
     u1 = colony.marginals(tm_id)["u1"]
@@ -60,15 +63,16 @@ def test_mixed_structures_run_and_agree():
         assert int(np.argmax(colony.marginals(iid)["u1"])) == 2
 
 
+@pytest.mark.slow
 def test_kill_shrinks_batch_without_corruption():
     colony = Colony()
     ids = spawn_gridworlds(colony, [0, 1, 2])
     colony.kill(ids[1])
     assert len(colony) == 2
-    colony.run(N_ITERS, damp=0.5)
+    colony.run(N_ITERS)
     t, arrays = build_gridworld(k=6, start=2)
     engine = Engine(compile_template(t, arrays=arrays))
-    solo = engine.run(engine.init_state(), N_ITERS, damp=0.5).state
+    solo = engine.run(engine.init_state(), N_ITERS).state
     np.testing.assert_allclose(
         colony.marginals(ids[2])["u1"], engine.marginals(solo)["u1"], atol=1e-10
     )
@@ -88,8 +92,6 @@ def test_host_port_routing():
 
 
 def test_bind_unknown_port_raises():
-    import pytest
-
     colony = Colony()
     (iid,) = spawn_gridworlds(colony, [0])
     with pytest.raises(KeyError, match="no DATA port"):

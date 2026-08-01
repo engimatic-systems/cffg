@@ -18,6 +18,7 @@ def fresh(seed=1, **kwargs):
     return CorridorEnv(k=K, seed=seed), RollingAgent(builder, horizon=3, seed=seed, **kwargs)
 
 
+@pytest.mark.slow
 def test_agent_walks_to_goal_optimally():
     env, agent = fresh()
     actions = [agent.step(env.step)[0] for _ in range(K - 1)]
@@ -27,6 +28,7 @@ def test_agent_walks_to_goal_optimally():
     assert agent.act() == STAY
 
 
+@pytest.mark.slow
 def test_belief_tracks_true_position():
     env, agent = fresh(seed=3)
     hits = 0
@@ -36,6 +38,7 @@ def test_belief_tracks_true_position():
     assert hits >= 7  # noisy obs (0.9) may blur a tick, not the trajectory
 
 
+@pytest.mark.slow
 def test_two_engines_regardless_of_episode_length():
     env, agent = fresh()
     for _ in range(10):
@@ -45,6 +48,7 @@ def test_two_engines_regardless_of_episode_length():
     assert agent.tick == 10
 
 
+@pytest.mark.slow
 def test_checkpoint_roundtrip_resumes_identically(tmp_path):
     env_a, agent_a = fresh(seed=5)
     for _ in range(3):
@@ -59,12 +63,14 @@ def test_checkpoint_roundtrip_resumes_identically(tmp_path):
     assert agent_b.act() == agent_a.act()
 
 
+@pytest.mark.slow
 def test_sample_selection_supported():
     env, agent = fresh(select="sample")
     u, x = agent.step(env.step)
     assert 0 <= u < 3 and 0 <= x < K
 
 
+@pytest.mark.slow
 def test_learned_a_agent_accumulates_counts():
     env, agent = fresh(
         learn_a=True, initial_counts=np.ones((K, K)) * 0.5
@@ -101,6 +107,7 @@ def test_log_of_unchanged_for_full_support_float64():
     np.testing.assert_array_equal(_log_of(belief), np.log(belief))
 
 
+@pytest.mark.slow
 def test_sparse_float32_belief_keeps_agent_paths_finite():
     """After one observe() the belief carries the engine dtype; a one-hot
     float32 belief must feed the planner finite log-space parameters."""
@@ -118,6 +125,7 @@ def test_sparse_float32_belief_keeps_agent_paths_finite():
         np.testing.assert_allclose(agent.belief.sum(), 1.0, rtol=1e-5)
 
 
+@pytest.mark.slow
 def test_uncomfortable_cardinality_float32_tick_stays_finite():
     """K = 96 states with exact-zero belief mass, consumer-default float32."""
     big = 96

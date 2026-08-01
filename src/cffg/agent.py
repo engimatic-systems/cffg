@@ -207,8 +207,13 @@ class RollingAgent:
     def act(self) -> int:
         """Plan over the horizon from the current belief; pick a control."""
         st = self._with_params(self.plan)
+        run_options = (
+            {}
+            if self.plan.arena.gfe_groups or self.plan.arena.gfe_tm_groups
+            else {"damp": self.damp}
+        )
         st = self.plan.run(
-            st, self.n_sweeps, tol=1e-10, damp=self.damp
+            st, self.n_sweeps, tol=1e-10, **run_options
         ).require_converged()
         # Planning remains read-only within a trial. Learned goals stage one
         # converged Fig.5 posterior, but only reset_episode's explicit trial

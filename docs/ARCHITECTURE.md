@@ -499,14 +499,14 @@ discarding a joint correlation. Exact joint rollover remains the separate
     loop — same fixed points as flooding, information travels further per
     sweep.
   - mixed (iterative structures present — vmp beads, GFE composites, hard
-    constraints, hybrid mixtures, gaussian_prec): each outer iteration
-    updates the iterative phase synchronously (with its damping), then
-    refreshes the BP islands before the loop evaluates the global residual
-    and FE. Forest islands are re-equilibrated exactly (a full two-pass);
-    cyclic islands advance one colored sweep per outer iteration and
-    equilibrate across iterations, which the residual and FE stationarity
-    criteria measure. Budgets, tolerances, and statuses keep flooding-loop
-    semantics.
+    constraints, hybrid mixtures, gaussian_prec): each undamped outer map
+    updates the iterative phase synchronously, then refreshes the BP islands.
+    Forest messages whose conditional solution is unique are eliminated from
+    the outer chart and reconstructed by an exact full two-pass; cyclic BP
+    messages remain coordinates and advance one colored sweep per map.
+    Plans containing GFE composites solve the resulting fixed-point residual
+    with the D7 fixed-support, gauge-reduced trust-region method. Other mixed
+    plans retain the ordinary sweep loop and its optional damping.
   - flood: retained as an explicit option, and the fallback for δ form
     constraints (whose per-sweep hardening is defined against flooding) and
     models with nothing schedulable. `Schedule.reason` names what forced it.
@@ -520,10 +520,16 @@ discarding a joint correlation. Exact joint rollover remains the separate
   lets the engine reject stale or doctored prebuilt schedules.
 - The runtime records a `RunResult` with converged / budget-exhausted /
   diverged / infeasible status, iteration count, FE and message-delta
-  traces, and final residual. Sum/GFE mode stops only when FE is stationary
-  and messages are coherent; max mode uses its message fixed-point residual
-  and validates the decoded objective. Non-finite arenas/residuals are
-  divergence, while proven empty exact support is infeasible with FE = +∞.
+  traces, and final residual. Mixed-GFE results additionally expose the
+  accepted outer residual/merit, merit-gradient norm, trust radius,
+  accepted/rejected counts, and a machine-readable termination reason. The
+  merit is numerical step-acceptance machinery and never enters `_make_bfe`
+  or policy scoring. GFE convergence requires a root of the complete
+  undamped outer map, converged local solves, unchanged exact support, and a
+  finite stationary FE ledger; a nonzero stationary merit is exhaustion.
+  Max mode uses its message fixed-point residual and validates the decoded
+  objective. Non-finite arenas/residuals are divergence, while proven empty
+  exact support is infeasible with FE = +∞.
   "Proven empty" is decided in log space by exact comparison with the
   reserved `NEG` sentinel, never by exponentiating or applying a magnitude
   threshold. `exp` underflows below about -745, while a threshold merely
@@ -538,6 +544,22 @@ discarding a joint correlation. Exact joint rollover remains the separate
   On a two-pass schedule there is no sweep budget: one execution either
   certifies (converged, also with `tol=None`) or reports honestly that it
   did not.
+- The D7 chart packs supported categorical messages as log ratios, Gaussian
+  messages in a fixed initial whitening, and other minimal EF messages in a
+  fixed Fisher metric. Exact zeros are absent coordinates. Its residual scale
+  is dtype-derived and frozen for one trust solve; a support or hardening
+  change rebuilds the chart, while a finite nonroot termination may begin a
+  new solve with a newly frozen scale. Hard δ support is selected once per
+  hard phase rather than changing inside a trust model; multiple δ variables
+  activate in deterministic sequential phases so later decisions condition
+  on earlier commitments. The compiled matrix-free JVP/VJP and Steihaug
+  kernels accept per-instance coordinates, scales, and radii under `vmap`;
+  the host controller owns active-set and status transitions until cff-wbhu
+  moves that carry into a compiled scan.
+  A bounded shadow Anderson/Picard sequence may supply candidates, but a
+  nonroot shadow point still needs the trust model's Cauchy and reduction
+  safeguards. The only bypass is a shadow state that independently passes
+  the complete raw-root, support, inner-status, and FE certificate.
 - Ordinary and analytic learned-parameter GFE nodes are deterministic. A
   `mu3_is_v1` node fixes its sampled A matrices for the whole inference
   attempt, making every sweep and its FE trace deterministic conditional on
@@ -579,10 +601,13 @@ discarding a joint correlation. Exact joint rollover remains the separate
 `Colony` owns an instance table of `(structure_hash, State)` pairs and caches one
 `Engine` per structure hash. Each `State` is an Equinox pytree containing
 messages, parameters, and conditioned observations; structure remains in the
-cached engine. Instances with one structure are stacked and one scheduled
-iteration is evaluated under `filter_vmap`, while different structures run as
-separate groups. Inter-instance coupling happens through host-side data binding
-and marginal reads, never by merging graphs.
+cached engine. Ordinary iterative instances with one structure are stacked and
+one scheduled iteration is evaluated under `filter_vmap`, while different
+structures run as separate groups. Mixed-GFE instances reuse the same compiled
+trust kernels but currently run one host controller per instance so each keeps
+its own trust radius, active support, and termination reason. Inter-instance
+coupling happens through host-side data binding and marginal reads, never by
+merging graphs.
 
 The convergence loop and per-instance status bookkeeping are currently Python
 host control flow around the vmapped iteration. The measured 32-instance CPU

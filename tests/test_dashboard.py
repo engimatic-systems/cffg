@@ -169,6 +169,7 @@ def test_run_suite_mode_runs_once_and_removes_its_temporary_report(
     assert not report.exists()
     timing = dashboard.RUNTIMES.read_text()
     assert '"wall_seconds": 123.25' in timing
+    assert '"selection": "not slow"' in timing
     assert '"suggested_wait_seconds": 180' in timing
 
 

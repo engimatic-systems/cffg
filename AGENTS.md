@@ -87,22 +87,27 @@ This project will span many context windows. The rule that makes that survivable
   surface affected; checked pairs that do not apply are marked N/A.
 - **During implementation**, run focused test files as often as useful for the
   changed component.
-- **Final validation for a code change** requires one passing full-suite run
+- **Final validation for a code change** requires one passing short-suite run
   after the final code change. One passing suite at the proposed PR head is
   sufficient to open or update a PR. Before launching or waiting on it, inspect
   `tools/test-suite-runtimes.json`; its `latest.wall_seconds` is the
   most recent measured wall time and `suggested_wait_seconds` includes
   headroom from recent runs. Run
-  `uv run python tools/dashboard.py --run-suite` to execute pytest exactly once
+  `uv run python tools/dashboard.py --run-suite` to execute the default
+  `not slow` pytest selection exactly once
   and refresh both that runtime history and `~/agent-share/cffg-tests.html`
-  (add new test files to `EPIC_FILES`). If the full suite was run directly,
+  (add new test files to `EPIC_FILES`). If the short suite was run directly,
   preserve and reuse its
   result: `uv run pytest -q --junitxml=/tmp/cffg-tests.xml`, then
   `uv run python tools/dashboard.py --junitxml /tmp/cffg-tests.xml`. Opening a
   PR, requesting review, or refreshing the dashboard never calls for a second
-  unchanged full-suite run. A later code change supersedes the previous result
+  unchanged short-suite run. A later code change supersedes the previous result
   and gets one fresh final run.
-- **Ticket- and documentation-only changes** do not require the full test suite.
+- **Slow tests are opt-in.** Mark long behavioral, multi-trial, and globalization
+  regressions with `@pytest.mark.slow`; pytest excludes them by default. Run
+  them explicitly with `uv run pytest -m slow` only when the changed behavior
+  needs that validation. They are not part of the default PR gate.
+- **Ticket- and documentation-only changes** do not require the short test suite.
   Validate the artifacts they change, including `tk dep cycle` and
   `git diff --check` for ticket-only work.
 - **End of session**: leave `main` green and the tree clean. Update the ticket

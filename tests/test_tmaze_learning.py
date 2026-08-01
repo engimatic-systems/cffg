@@ -12,6 +12,7 @@ are not implemented, so q(A) updates come from perception only.
 """
 
 import numpy as np
+import pytest
 
 from cffg.experiments.tmaze_learning import (
     TMazeEnv,
@@ -24,6 +25,7 @@ from cffg.models.tmaze import C, N_CTX, N_OUT
 TRIALS = 30
 
 
+@pytest.mark.slow
 def test_win_rate_ramps_to_alpha():
     """Part II Fig. 9: the epistemic agent learns to exploit the maze.
     Asserted on three known-good seeds; stuck runs (a bimodal minority per
@@ -34,6 +36,7 @@ def test_win_rate_ramps_to_alpha():
         assert sum(r.wins) >= 20, f"seed {seed}: weak overall {sum(r.wins)}/30"
 
 
+@pytest.mark.slow
 def test_gfe_beats_bfe_ablation_decisively():
     """One structural bit (the P-bead) separates a ~90% agent from a 0% one."""
     g = run_learning(n_trials=30, seed=0)
@@ -42,6 +45,7 @@ def test_gfe_beats_bfe_ablation_decisively():
     assert sum(g.wins) - sum(b.wins) >= 15
 
 
+@pytest.mark.slow
 def test_cycle_learns_the_cue_mapping():
     result = run_learning(n_trials=TRIALS, seed=1)
     cue = result.counts[C * N_OUT : C * N_OUT + 2, C * N_CTX : C * N_CTX + N_CTX]
@@ -50,6 +54,7 @@ def test_cycle_learns_the_cue_mapping():
     assert cue[1, 1] > 5 * cue[1, 0], f"cue mapping not learned: {cue}"
 
 
+@pytest.mark.slow
 def test_counts_are_conserved():
     """Each observed step adds exactly one unit of pseudo-count mass."""
     result = run_learning(n_trials=TRIALS, seed=1)
@@ -57,6 +62,7 @@ def test_counts_are_conserved():
     np.testing.assert_allclose(added, 2 * TRIALS, atol=1e-6)
 
 
+@pytest.mark.slow
 def test_loop_is_deterministic():
     a = run_learning(n_trials=8, seed=3)
     b = run_learning(n_trials=8, seed=3)

@@ -103,8 +103,9 @@ class Schedule:
     colored sweep, iterated by the engine's convergence loop. kind "mixed":
     ``stages`` refreshes the BP islands (forest passes exactly, cyclic
     islands by one colored sweep) after the iterative phase inside every
-    outer iteration (and once up front as priming). kind "flood": no
-    stages; the engine iterates its synchronous sweep."""
+    outer iteration (and once up front as priming); ``forest_stages`` is the
+    conditional reconstruction used by a reduced outer chart. kind "flood":
+    no stages; the engine iterates its synchronous sweep."""
 
     kind: str  # "two_pass" | "colored" | "mixed" | "flood"
     reason: str = ""
@@ -112,6 +113,7 @@ class Schedule:
     colors: int = 0  # colors over cyclic islands (diagnostic)
     stages: tuple = field(default_factory=tuple)
     prime_stages: tuple = field(default_factory=tuple)
+    forest_stages: tuple = field(default_factory=tuple)
     fingerprint: str = ""  # sha256 over the arena structure + describe();
     # the engine rejects a prebuilt Schedule whose fingerprint does not match
     # a fresh build for its arena, so a doctored or stale schedule (a missing
@@ -137,6 +139,7 @@ class Schedule:
                     lines.append(f"  {label} scan S={s.length} elems=({elems})")
 
         emit("prime", self.prime_stages)
+        emit("forest", self.forest_stages)
         emit("iter", self.stages)
         return "\n".join(lines)
 
@@ -211,6 +214,8 @@ def _fingerprint(arena: Arena, sched: "Schedule") -> str:
     _stage_digest(h, sched.prime_stages)
     h.update(b"\niter\n")
     _stage_digest(h, sched.stages)
+    h.update(b"\nforest\n")
+    _stage_digest(h, sched.forest_stages)
     return h.hexdigest()
 
 
@@ -547,5 +552,41 @@ def build_schedule(arena: Arena, mode: str = "auto") -> Schedule:
             colors=n_colors,
             stages=island_stages,
             prime_stages=island_stages,
+            forest_stages=forest_passes,
         )
     )
+
+
+def eliminated_slot_sets(arena: Arena) -> dict[str, frozenset[int]]:
+    """Message slots reconstructed by exact conditional forest passes.
+
+    Cyclic BP-island messages deliberately remain outer coordinates. Only
+    forest factors have a unique conditional fixed point that the mixed-GFE
+    chart may eliminate.
+    """
+    nodes, links, _ = _island_nodes_and_links(arena)
+    _, cyclic = _adjacency(nodes, links)
+    slots: dict[str, set[int]] = {
+        "messages": set(),
+        "gaussian": set(),
+        "ef": set(),
+    }
+    for edge in arena.edges.values():
+        if edge.interior:
+            continue
+        key = "gaussian" if edge.dim else "ef" if edge.ef else "messages"
+        slots[key].add(edge.slot1)
+    plans = {
+        "disc": (arena.groups, "messages"),
+        "gauss": (arena.gauss_groups, "gaussian"),
+        "ef": (arena.ef_groups, "ef"),
+    }
+    for kind, group, row in nodes:
+        if (kind, group, row) in cyclic:
+            continue
+        groups, key = plans[kind]
+        slots[key].update(
+            int(slot)
+            for slot in np.asarray(groups[group].scatter[row]).reshape(-1)
+        )
+    return {key: frozenset(values) for key, values in slots.items()}

@@ -6,6 +6,7 @@ import functools
 
 import jax
 import numpy as np
+import pytest
 
 from cffg.agent import RollingAgent
 from cffg.bundle import load_bundle, save_bundle
@@ -37,10 +38,20 @@ def _converged(
     state = engine.init_state()
     if data:
         state = engine.bind_data(state, data)
-    result = engine.run(state, sweeps, tol=1e-10, damp=damp)
+    result = engine.run(
+        state,
+        sweeps,
+        tol=1e-10,
+        **(
+            {}
+            if engine.arena.gfe_groups or engine.arena.gfe_tm_groups
+            else {"damp": damp}
+        ),
+    )
     return engine, result, result.require_converged()
 
 
+@pytest.mark.slow
 def test_builder_lowers_products_fanout_and_serialized_agent_bindings(tmp_path):
     plan, plan_arrays = build_factored_corridor(
         steps=2, length=3, modes=2, gfe=True

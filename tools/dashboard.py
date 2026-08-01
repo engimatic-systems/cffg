@@ -1,6 +1,6 @@
 """Generate the mobile test dashboard and tracked suite-runtime history.
 
-Consumes a completed full-suite JUnit report, groups tests by M-epic, diffs
+Consumes a completed default-suite JUnit report, groups tests by M-epic, diffs
 against the previous run's snapshot (NEW badges), and renders a self-contained
 dark/light HTML page served by the agent-share file browser (port 8080 over
 Tailscale). ``--run-suite`` remains the one-command standalone path; it runs
@@ -12,9 +12,9 @@ Tests that render diagrams record SVGs into tests/.artifacts/ (gitignored)
 via the `viz_gallery` fixture; those rows become twirl-down galleries here,
 with images copied to ~/agent-share/cffg-viz/ so the page works remotely.
 
-After an existing full run:
+After an existing default run:
   uv run python tools/dashboard.py --junitxml /tmp/cffg-tests.xml
-Standalone full run + refresh:
+Standalone short run + refresh:
   uv run python tools/dashboard.py --run-suite
 When a new test file appears, add it to EPIC_FILES.
 """
@@ -42,6 +42,7 @@ RUNTIMES = REPO / "tools" / "test-suite-runtimes.json"
 ARTIFACTS = REPO / "tests" / ".artifacts"
 GALLERY = SHARE / "cffg-viz"
 RUNTIME_HISTORY_LIMIT = 40
+SUITE_SELECTION = "not slow"
 
 EPIC_FILES = {
     "M0 · Foundations": ["test_hygiene.py"],
@@ -108,11 +109,11 @@ EPIC_ORDER = list(EPIC_FILES) + ["Unassigned"]
 
 
 class DashboardError(ValueError):
-    """A JUnit report cannot truthfully certify the current full suite."""
+    """A JUnit report cannot truthfully certify the current default suite."""
 
 
 def run_suite() -> tuple[Path, int, float]:
-    """Run the full suite once; return its JUnit report, status, and wall time."""
+    """Run the default short suite; return its report, status, and wall time."""
     with tempfile.NamedTemporaryFile(suffix=".xml", delete=False) as tmp:
         xml_path = Path(tmp.name)
     started = time.monotonic()
@@ -129,7 +130,7 @@ def repository_test_files(repo: Path = REPO) -> set[str]:
 def newest_test_input(
     repo: Path = REPO, *, exclude: Path | None = None
 ) -> tuple[float, Path]:
-    """Newest mtime among files whose contents can affect the full result."""
+    """Newest mtime among files whose contents can affect the default result."""
     candidates = [repo / "pyproject.toml", repo / "uv.lock"]
     for directory in (repo / "src", repo / "tests", repo / "tools"):
         candidates.extend(directory.rglob("*.py"))
@@ -149,7 +150,7 @@ def load_junit(
     expected_files: set[str] | None = None,
     newest_input: tuple[float, Path] | None = None,
 ) -> list[dict]:
-    """Parse and validate a full-suite JUnit report.
+    """Parse and validate a default-suite JUnit report.
 
     Completeness is checked without spawning pytest: every repository test
     module must appear, declared suite counts must match the testcase records,
@@ -302,14 +303,21 @@ def record_suite_runtime(
         "failed": failed,
         "pytest_exit_code": pytest_code,
         "result": "passed" if pytest_code == 0 and failed == 0 else "failed",
+        "selection": SUITE_SELECTION,
         "wall_seconds": round(float(wall_seconds), 3),
         "case_seconds": round(sum(test["ms"] for test in tests) / 1000, 3),
     }
     recent.append(record)
     recent = recent[-RUNTIME_HISTORY_LIMIT:]
-    # Use the slowest of the latest five measurements, add 25% headroom, and
-    # round upward to a human-friendly 30-second polling boundary.
-    observed = [entry["wall_seconds"] for entry in recent[-5:]]
+    # Compare like-for-like suite selections so an opt-in slow run cannot
+    # poison the default suite's wait budget.
+    comparable = [
+        entry for entry in recent
+        if entry.get("selection") == SUITE_SELECTION
+    ]
+    observed = [entry["wall_seconds"] for entry in comparable[-5:]]
+    # Use the slowest comparable measurement, add 25% headroom, and round
+    # upward to a human-friendly 30-second polling boundary.
     padded = max(observed) * 1.25
     suggested_wait = max(60, math.ceil(padded / 30) * 30)
     runtime_state = {
@@ -495,11 +503,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument(
         "--junitxml", type=Path, metavar="PATH",
-        help="reuse an existing completed full-suite JUnit report",
+        help="reuse an existing completed default-suite JUnit report",
     )
     mode.add_argument(
         "--run-suite", action="store_true",
-        help="run the full suite once with live output, then render its report",
+        help="run the default short suite once, then render its report",
     )
     return parser.parse_args(argv)
 

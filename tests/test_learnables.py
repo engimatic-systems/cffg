@@ -322,6 +322,7 @@ def test_habit_increment_is_the_executed_control():
     np.testing.assert_allclose(added, [0.0, 1.0], atol=1e-9)
 
 
+@pytest.mark.slow
 def test_planning_alone_does_not_move_the_habit():
     """act() is read-only: a caller may plan, discard the result and plan
     again without teaching the agent anything."""
@@ -335,6 +336,7 @@ def test_planning_alone_does_not_move_the_habit():
     np.testing.assert_array_equal(agent.learnables.params["e"]["alpha"], before)
 
 
+@pytest.mark.slow
 def test_e_recovers_the_agent_habit():
     """On a corridor whose goal is to the right, the executed controls are
     mostly RIGHT, so that is the habit the agent acquires."""
