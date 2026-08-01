@@ -44,7 +44,12 @@ git pull --ff-only origin "$BASE_BRANCH"
    asking for permission on routine steps. Ask only for genuinely irreversible or
    scope-changing decisions.
 
-5. **GitHub auth: token from the git credential store.** `gh auth status` reports
+5. **GitHub access: use authenticated `gh` for this private repository.** The
+   official GitHub skill's app connector currently returns `404 Not Found` for
+   `engimatic-systems/cffg` on both reads and writes, including PR lookup and
+   creation. When a skill requires connector-first access, make that call once;
+   after this known repository-specific 404, do not retry it or infer that the
+   repository is absent. Fall back immediately to `gh`. `gh auth status` reports
    not-logged-in on this machine, but a PAT (user coopwilliams) lives in
    `~/.git-credentials`. Prefix `gh` commands with, in the same shell call
    (exports don't persist between calls):
