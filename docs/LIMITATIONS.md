@@ -169,15 +169,19 @@ switching-KF inference (exponential in T) stays tractable. Honest
 accounting: (1) marginals are approximate away from single-node models —
 the switching-KF tier measures the gap against exact enumeration and pins
 it with headroom rather than pretending parity; (2) selector messages and
-node energies are exact *for the beliefs the engine holds*; the one
-approximated ledger term is the interior Gaussian edge entropy, which
+node energies, including the public responsibility-weighted learning
+statistics, are exact *for the beliefs the engine holds*; the one-step public
+predictive exposes both the conditional mixture components and the same
+moment-matched Gaussian used by the forward message, not an exact multi-step
+switching posterior; (3) the approximated ledger term is the interior Gaussian
+edge entropy, which
 scores the collapsed Gaussian — the max-entropy density for its moments —
 so each +H is an over-estimate and the reported BFE *lower-bounds* the
 mixture-Bethe value at the same moments (bound direction pinned in
 `tests/test_mixg.py`). Same optimistic-bound reporting stance as S1c.
-(3) Observed mixture outputs (regime-dependent emissions with a DATA port)
+(4) Observed mixture outputs (regime-dependent emissions with a DATA port)
 are rejected at compile time in v1 — route observations through a plain
-`gaussian_linear` emission node; (4) rank-deficient per-regime backward
+`gaussian_linear` emission node; (5) rank-deficient per-regime backward
 messages have no well-defined collapse and fall back to vacuous — full-rank
 A_s per regime is the supported envelope.
 

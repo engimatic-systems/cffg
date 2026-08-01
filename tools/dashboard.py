@@ -99,6 +99,7 @@ EPIC_FILES = {
         "test_mixg.py",
         "test_swkf_reference.py",
         "test_hybrid_engine.py",
+        "test_hybrid_readouts.py",
         "test_switching_kf.py",
     ],
     "R1 · Hybrid epistemics": [

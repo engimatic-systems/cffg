@@ -225,6 +225,18 @@ exhaustive regime-sequence enumeration (measured gap with headroom — never
 pretending assumed-density equals exact). Observed mixture outputs are a
 compile error in v1; emissions route through plain `gaussian_linear` nodes.
 
+The public learning boundary reads the same D3 local belief, not separately
+reported endpoint marginals. `Engine.gaussian_node_stats` exposes each soft
+selector responsibility and responsibility-weighted component moments; for a
+linear mixture these are augmented `(Syy, Syx, Sxx)` statistics ready for one
+MNIW update. Exact selector zeros therefore produce exact zero weighted
+statistics. The separate `Engine.gaussian_mixture_predictives` boundary reads
+the factor-to-`out` cavity: selector plus Gaussian input for a linear mixture,
+but never the message facing `out`. It reports component moments and their
+moment-matched collapse. Both boundaries are derived reads of `State`, store
+nothing in the arena, and return `proper=False` with shape-preserving NaNs when
+the required local Gaussian belief is not normalized.
+
 A P-substitution bead on the hybrid node's `out` role changes that boundary:
 when the output faces a fixed Gaussian goal, the compiler absorbs both factors
 into `HybridGfePlan`. `cffg.hybrid_gfe` solves the D5 fixed point over the
@@ -247,6 +259,10 @@ the Jaakkola–Jordan lower bound on expected log transition probability
 variational node energy at the same beliefs. Exact categorical zeros remain
 exact, improper Gaussian beliefs are loud, and one update costs
 `O(P K² d²)` for `P` factors without allocating a `K³` transition tensor.
+Its `gaussian_node_stats` record is intentionally pre-PG: the two categorical
+beliefs and exact supports plus the drive mean and second moment. This is the
+stable factor-local input to recurrence learning; PG expectations and
+parameter sufficient statistics remain owned by that learning layer.
 
 ### 2e. Executable factor registration (`cffg.kernels`, cff-ri8m)
 

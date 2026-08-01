@@ -1950,11 +1950,16 @@ class Engine:
                              with x̃ = [x; 1] (offset column absorbed)
         gaussian_linear_obs: same keys with y fixed at the bound observation,
                              plus "mask" (0.0 = missing: skip the occurrence).
+        gaussian_mixture_linear: soft ``responsibility`` plus responsibility-
+                             weighted ``Syy``, ``Syx``, and ``Sxx``.
+        gaussian_mixture: soft ``responsibility``, ``weighted_mean``, and
+                             ``weighted_second``.
+        recurrence_link: categorical probabilities and continuous drive
+                             moments, including each categorical exact support.
         Every record includes ``proper``. Improper beliefs or mutated non-PD
         node precisions return ``proper=False`` with NaN sufficient statistics;
-        equality and hybrid nodes are not learnable and are skipped."""
+        equality nodes are skipped."""
         out: dict[str, dict[str, np.ndarray]] = {}
-        g_eta, g_lam = np.asarray(state.g_eta), np.asarray(state.g_lam)
         g_obs, g_mask = np.asarray(state.g_obs), np.asarray(state.g_mask)
         for g in self.arena.gauss_groups:
             if g.type == "equality":
@@ -2055,6 +2060,142 @@ class Engine:
                         "mask": np.asarray(mk),
                         "proper": np.asarray(proper),
                     }
+
+        for g in self.arena.mix_groups:
+            mu_e = state.messages[
+                self.arena.message_indices(g.s_gather, g.k_sel)
+            ]
+            inc_e, inc_l = _gauss_rows(
+                self.arena,
+                state.g_eta,
+                state.g_lam,
+                g.g_gather,
+                g.dims,
+            )
+            w = state.params[g.name + ":W"]
+            if g.type == "gaussian_mixture_linear":
+                do, di = g.dims
+                stats = mixg.mixlin_stats(
+                    inc_e[:, 0, :do],
+                    inc_l[:, 0, :do, :do],
+                    inc_e[:, 1, :di],
+                    inc_l[:, 1, :di, :di],
+                    mu_e,
+                    state.params[g.name + ":A"],
+                    state.params[g.name + ":b"],
+                    w,
+                )
+                for i, name in enumerate(g.members):
+                    out[name] = {
+                        "responsibility": np.asarray(stats.responsibility[i]),
+                        "Syy": np.asarray(stats.syy[i]),
+                        "Syx": np.asarray(stats.syx[i]),
+                        "Sxx": np.asarray(stats.sxx[i]),
+                        "proper": np.asarray(stats.proper[i]),
+                    }
+            else:
+                (do,) = g.dims
+                stats = mixg.mix_stats(
+                    inc_e[:, 0, :do],
+                    inc_l[:, 0, :do, :do],
+                    mu_e,
+                    state.params[g.name + ":m"],
+                    w,
+                )
+                for i, name in enumerate(g.members):
+                    out[name] = {
+                        "responsibility": np.asarray(stats.responsibility[i]),
+                        "weighted_mean": np.asarray(stats.weighted_mean[i]),
+                        "weighted_second": np.asarray(
+                            stats.weighted_second[i]
+                        ),
+                        "proper": np.asarray(stats.proper[i]),
+                    }
+
+        for g in self.arena.recurrence_groups:
+            card = g.cards[0]
+            out_messages = state.messages[
+                self.arena.message_indices(g.d_gather_both[:, 0, :], card)
+            ]
+            in_messages = state.messages[
+                self.arena.message_indices(g.d_gather_both[:, 1, :], card)
+            ]
+            drive_eta = state.g_eta[
+                self.arena.g_eta_indices(g.drive_gather_both, g.dim)
+            ].sum(axis=1)
+            drive_precision = state.g_lam[
+                self.arena.g_lam_indices(g.drive_gather_both, g.dim)
+            ].sum(axis=1)
+            stats = recurrence.belief(
+                out_messages,
+                in_messages,
+                drive_eta,
+                drive_precision,
+            )
+            for i, name in enumerate(g.members):
+                out[name] = {
+                    "out_probability": np.asarray(stats.out_probability[i]),
+                    "in_probability": np.asarray(stats.in_probability[i]),
+                    "drive_mean": np.asarray(stats.drive_mean[i]),
+                    "drive_second": np.asarray(stats.drive_second[i]),
+                    "out_support": np.asarray(stats.out_support[i]),
+                    "in_support": np.asarray(stats.in_support[i]),
+                    "proper": np.asarray(stats.proper[i]),
+                }
+        return out
+
+    def gaussian_mixture_predictives(
+        self, state: State
+    ) -> dict[str, dict[str, np.ndarray]]:
+        """Factor-to-output cavity predictives for Gaussian-mixture nodes.
+
+        Each record exposes selector weights, component moments, collapsed
+        moments, and ``proper``. The readout deliberately excludes the
+        output-facing message and therefore remains suitable for one-step
+        prediction after an observation has updated that edge.
+        """
+        out: dict[str, dict[str, np.ndarray]] = {}
+        for g in self.arena.mix_groups:
+            mu_e = state.messages[
+                self.arena.message_indices(g.s_gather, g.k_sel)
+            ]
+            w = state.params[g.name + ":W"]
+            if g.type == "gaussian_mixture_linear":
+                _, di = g.dims
+                inc_e, inc_l = _gauss_rows(
+                    self.arena,
+                    state.g_eta,
+                    state.g_lam,
+                    g.g_gather,
+                    g.dims,
+                )
+                predictive = mixg.mixlin_predictive(
+                    inc_e[:, 1, :di],
+                    inc_l[:, 1, :di, :di],
+                    mu_e,
+                    state.params[g.name + ":A"],
+                    state.params[g.name + ":b"],
+                    w,
+                )
+            else:
+                predictive = mixg.mix_predictive(
+                    mu_e,
+                    state.params[g.name + ":m"],
+                    w,
+                )
+            for i, name in enumerate(g.members):
+                out[name] = {
+                    "weight": np.asarray(predictive.weight[i]),
+                    "component_mean": np.asarray(
+                        predictive.component_mean[i]
+                    ),
+                    "component_covariance": np.asarray(
+                        predictive.component_covariance[i]
+                    ),
+                    "mean": np.asarray(predictive.mean[i]),
+                    "covariance": np.asarray(predictive.covariance[i]),
+                    "proper": np.asarray(predictive.proper[i]),
+                }
         return out
 
     def ef_marginals(self, state: State) -> dict[str, "EfMarginal"]:

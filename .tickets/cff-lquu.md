@@ -1,6 +1,6 @@
 ---
 id: cff-lquu
-status: in_progress
+status: closed
 deps: [cff-3hgi]
 links: [cff-o7hs, cff-pksr, cff-k9ws]
 created: 2026-07-10T03:31:09Z
@@ -162,3 +162,7 @@ is not a prerequisite.
 **2026-08-01T02:39:09Z**
 
 Planning handoff complete. Implementation should extend the existing factor-belief algebra rather than reconstructing hybrid statistics from endpoint marginals. The predictive readout is pinned as the factor-to-out cavity predictive and must exclude the out-facing message; recurrence scope is belief/moment exposure only, with PG expectations and posterior updates left to cff-4apw. The hostile contract covers exact support, vacuous/improper beliefs, float32, K=32/d=16, and evidence-leakage semantics. Next step is implementation and focused oracle tests. Ticket-only validation: tk dep tree --full cff-y4nx confirms the path cff-lquu -> cff-4apw -> cff-y4nx; tk ready/blocked agree; tk dep cycle and git diff --check pass. No short suite is required for this ticket-only PR.
+
+**2026-08-01T03:18:26Z**
+
+Implemented on agent/cff-lquu-hybrid-readouts in commit 2c367e1. Engine.gaussian_node_stats now exposes D3 responsibility-weighted mixture moments and recurrence beliefs; Engine.gaussian_mixture_predictives exposes component and collapsed factor-to-out cavity moments. Independent NumPy and Gauss-Hermite oracles, K=1 parity, soft-vs-hard MNIW recovery, exact-support/improper/float32/K=32 d=16 hostile cases, recurrence support, and output-message isolation pass. Final default suite: 1280 passed, 38 deselected in 356.59s; dashboard refreshed. README, ARCHITECTURE, and LIMITATIONS document the public boundary. cff-4apw is unblocked for PG recurrence learning.

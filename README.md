@@ -176,6 +176,33 @@ Inference uses the Pólya–Gamma/Jaakkola–Jordan mean-field coordinate, so it
 reported VFE is a documented upper bound on the exact VFE at the same beliefs.
 Exact regime zeros stay exact, while an improper Gaussian drive is divergence.
 
+Hybrid learning and forecasting use factor-local readouts rather than products
+of endpoint marginals:
+
+```python
+stats = engine.gaussian_node_stats(state)
+transition = stats["transition"]
+transition["responsibility"]   # [K], soft regime belief
+transition["Syy"]              # [K, dy, dy], already responsibility-weighted
+transition["Syx"]              # [K, dy, dx + 1], offset column included
+transition["Sxx"]              # [K, dx + 1, dx + 1]
+
+forecast = engine.gaussian_mixture_predictives(state)["transition"]
+forecast["component_mean"]       # [K, dy]
+forecast["component_covariance"] # [K, dy, dy]
+forecast["mean"], forecast["covariance"]
+```
+
+`gaussian_mixture_predictives` is a one-step factor-to-output cavity
+predictive, not the posterior output marginal: it uses the selector and input
+messages but excludes downstream evidence facing `out`. Prior-mixture
+statistics name their arrays `weighted_mean` and `weighted_second` to make the
+weighting explicit. A `recurrence_link` record from `gaussian_node_stats`
+likewise exposes its input/output probabilities, exact supports, and drive
+moments; Pólya–Gamma learning statistics remain a separate learning step.
+Every hybrid record has `proper`; consumers must reject a false value and its
+shape-preserving NaNs.
+
 ## Run inference
 
 ```python
@@ -452,11 +479,12 @@ cffg = { path = "../../cffg", editable = true }
   balanced-tree fix). Budget `run()` sweeps against your graph's diameter,
   and always pass `tol=` so coherent models exit early.
 - **Read beliefs, not messages**: `marginals`, `gaussian_marginals`,
-  `ef_marginals`, `node_beliefs`, `gaussian_node_stats` are the supported
-  readouts; learning loops mirror `cffg.agent`'s count pattern (infer →
-  accumulate stats → conjugate update → roll expected params back). Improper
-  Gaussian marginals are NaN-marked; node statistics also expose
-  `proper=False`, which learning loops must check before accumulation.
+  `ef_marginals`, `node_beliefs`, `gaussian_node_stats`, and
+  `gaussian_mixture_predictives` are the supported readouts; learning loops
+  mirror `cffg.agent`'s count pattern (infer → accumulate stats → conjugate
+  update → roll expected params back). Improper Gaussian marginals are
+  NaN-marked; node statistics and mixture predictives also expose
+  `proper=False`, which consumers must check before accumulation or use.
 - **Report framework gaps in framework terms.** When a harness needs a
   numpy workaround, that sentence is a ticket (see cff-9xmq, cff-lquu,
   cff-5edo, cff-mjku, cff-gul8 — all minted from one evaluation round).
