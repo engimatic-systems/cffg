@@ -263,6 +263,13 @@ Its `gaussian_node_stats` record is intentionally pre-PG: the two categorical
 beliefs and exact supports plus the drive mean and second moment. This is the
 stable factor-local input to recurrence learning; PG expectations and
 parameter sufficient statistics remain owned by that learning layer.
+`Engine.recurrence_weight_stats` is that derived layer: it combines the soft
+belief with the point coefficients used by inference and emits additive
+Gaussian natural statistics for augmented `[R; r]`. `conj.PGWeights`
+accumulates those statistics outside JIT and rolls its posterior mean into the
+next trial. This standalone path intentionally does not register a
+`LearnableSpec`; non-discrete `member_of`, generic cadence, and persistence
+remain cff-6tek/cff-y4nx surfaces.
 
 ### 2e. Executable factor registration (`cffg.kernels`, cff-ri8m)
 

@@ -2144,6 +2144,43 @@ class Engine:
                 }
         return out
 
+    def recurrence_weight_stats(
+        self, state: State
+    ) -> dict[str, dict[str, np.ndarray]]:
+        """Factor-local PG statistics for between-trial recurrence learning.
+
+        The result is keyed by ``recurrence_link`` factor name. ``linear``
+        and ``quadratic`` are natural-parameter increments for independent
+        Gaussian posteriors over each augmented coefficient ``[R_il; r_il]``.
+        """
+        out: dict[str, dict[str, np.ndarray]] = {}
+        beliefs = self.gaussian_node_stats(state)
+        for group in self.arena.recurrence_groups:
+            rows = [beliefs[name] for name in group.members]
+            stats = recurrence.weight_stats(
+                jnp.stack(
+                    [jnp.asarray(row["out_probability"]) for row in rows]
+                ),
+                jnp.stack(
+                    [jnp.asarray(row["in_probability"]) for row in rows]
+                ),
+                jnp.stack([jnp.asarray(row["drive_mean"]) for row in rows]),
+                jnp.stack(
+                    [jnp.asarray(row["drive_second"]) for row in rows]
+                ),
+                state.params[group.name + ":weights"],
+                state.params[group.name + ":offsets"],
+            )
+            for index, name in enumerate(group.members):
+                out[name] = {
+                    "omega": np.asarray(stats.omega[index]),
+                    "exposure": np.asarray(stats.exposure[index]),
+                    "linear": np.asarray(stats.linear[index]),
+                    "quadratic": np.asarray(stats.quadratic[index]),
+                    "proper": np.asarray(stats.proper[index]),
+                }
+        return out
+
     def gaussian_mixture_predictives(
         self, state: State
     ) -> dict[str, dict[str, np.ndarray]]:

@@ -1714,7 +1714,49 @@ globally. Since `L_rec^JJ <= E_q[log p(out | in,x)]`,
 This statement compares objectives at held beliefs; it does not claim the two
 objectives have the same optimizer.
 
-### D8.4 Numerical contract and executable anchors
+### D8.4 Between-trial Gaussian learning of recurrence weights
+
+The same augmentation makes the stick coefficients conjugate. Augment the
+drive and coefficients as
+
+    phi = [x; 1],       theta_il = [R_il; r_il],
+    h = E[phi] = [m; 1],
+    M = E[phi phi^T] = [[E[xx^T], m], [m^T, 1]].             (D8.11)
+
+For one factor belief, retain `B_l = sum_{j>=l} beta_j` and define
+`kappa_bar_l = beta_l - B_l/2`. At the point coefficients used by that
+inference state,
+
+    xi_il^2 = theta_il^T M theta_il,
+    omega_bar_il = tanh(xi_il/2) / (2 xi_il).                 (D8.12)
+
+The soft source belief `alpha_i` and soft destination belief `beta_j` then
+give the Gaussian natural-statistic increments
+
+    Delta eta_il    = alpha_i kappa_bar_l h,
+    Delta Lambda_il = alpha_i B_l omega_bar_il M.             (D8.13)
+
+No regime is selected by argmax. An impossible source contributes exactly
+zero to all of its sticks; a destination with zero mass contributes neither
+success nor at-risk mass. Given a proper Gaussian prior
+`N(theta_il; Lambda_0^-1 eta_0, Lambda_0^-1)`, independent factor occurrences
+add:
+
+    Lambda_n = Lambda_0 + sum_t Delta Lambda_t,
+    eta_n    = eta_0    + sum_t Delta eta_t,
+    E[theta] = Lambda_n^-1 eta_n.                             (D8.14)
+
+The conditional posterior in (D8.14) is exact for the fixed PG coordinates.
+`Engine.recurrence_weight_stats` evaluates (D8.11--D8.13) from the converged
+factor belief, and `conj.PGWeights` accumulates (D8.14) between trials. The
+next inference state receives the posterior mean split back into `(R,r)`.
+As in D4's NIW/MNIW loop, this is an empirical-Bayes point rollover: inference
+does not carry the coefficient covariance, and the next `xi` uses the point
+parameters actually installed in the recurrence factor. Full joint VB over
+`q(theta)q(omega)` would add coefficient uncertainty to (D8.12) and is not
+claimed here.
+
+### D8.5 Numerical contract and executable anchors
 
 Exact categorical log-zeros are masked before normalization and never relaxed.
 A wholly vacuous Gaussian drive is neutral only as a transient while a facing
@@ -1735,6 +1777,9 @@ Executable anchors in `tests/test_recurrence_link.py`:
   `test_vacuous_and_improper_drive_are_loud_after_transient_flooding`, and
   `test_float32_k32_d16_converges_without_cubic_plan_storage` pin the hostile
   input and scale contract.
+- `test_engine_weight_stats_match_independent_soft_belief_algebra` checks
+  (D8.11--D8.13), while the compact `tests/test_conj.py` PG cases check
+  (D8.14), loudness, and vectorized soft-regime recovery.
 
 References: Polson, Scott, and Windle, *Bayesian Inference for Logistic Models
 Using Pólya–Gamma Latent Variables* (2013); Linderman, Johnson, and Adams,

@@ -50,6 +50,16 @@ class RecurrenceBelief(NamedTuple):
     proper: jax.Array
 
 
+class RecurrenceWeightStats(NamedTuple):
+    """Natural-statistic increments for augmented stick coefficients."""
+
+    omega: jax.Array
+    exposure: jax.Array
+    linear: jax.Array
+    quadratic: jax.Array
+    proper: jax.Array
+
+
 def _edge_probability(messages: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
     """Product of two categorical messages without relaxing exact support."""
     support = jnp.all(messages != jnp.asarray(NEG, messages.dtype), axis=-2)
@@ -113,6 +123,123 @@ def belief(
         in_messages,
         drive_eta,
         drive_precision,
+    )
+
+
+def weight_stats(
+    out_probability,
+    in_probability,
+    drive_mean,
+    drive_second,
+    weights,
+    offsets,
+) -> RecurrenceWeightStats:
+    """Build PG Gaussian statistics for ``[weights; offset]``.
+
+    Inputs are batched factor-local mean-field beliefs. The PG coordinate is
+    evaluated at the point parameters used by inference; each returned row is
+    one between-trial natural-parameter increment.
+    """
+
+    def one(q_out, q_in, mean, second, row_weights, row_offsets):
+        card = q_out.shape[-1]
+        dimension = mean.shape[-1]
+        probability_tolerance = (
+            32.0 * card * jnp.finfo(q_out.dtype).eps
+        )
+        probability_ok = (
+            jnp.all(jnp.isfinite(q_out))
+            & jnp.all(jnp.isfinite(q_in))
+            & jnp.all(q_out >= 0)
+            & jnp.all(q_in >= 0)
+            & (jnp.abs(q_out.sum() - 1.0) <= probability_tolerance)
+            & (jnp.abs(q_in.sum() - 1.0) <= probability_tolerance)
+        )
+        covariance = second - jnp.outer(mean, mean)
+        drive_ok = (
+            jnp.all(jnp.isfinite(mean))
+            & jnp.all(jnp.isfinite(second))
+            & gauss._psd_ok(covariance)
+        )
+        parameter_ok = (
+            jnp.all(jnp.isfinite(row_weights))
+            & jnp.all(jnp.isfinite(row_offsets))
+        )
+
+        feature_mean = jnp.concatenate(
+            [mean, jnp.ones(1, dtype=mean.dtype)]
+        )
+        feature_second = jnp.zeros(
+            (dimension + 1, dimension + 1), dtype=second.dtype
+        )
+        feature_second = feature_second.at[:-1, :-1].set(second)
+        feature_second = feature_second.at[:-1, -1].set(mean)
+        feature_second = feature_second.at[-1, :-1].set(mean)
+        feature_second = feature_second.at[-1, -1].set(1.0)
+        coefficients = jnp.concatenate(
+            [row_weights, row_offsets[..., None]], axis=-1
+        )
+        raw_logit_second = jnp.einsum(
+            "ilp,pq,ilq->il", coefficients, feature_second, coefficients
+        )
+        contraction_scale = jnp.einsum(
+            "ilp,pq,ilq->il",
+            jnp.abs(coefficients),
+            jnp.abs(feature_second),
+            jnp.abs(coefficients),
+        )
+        second_scale = jnp.maximum(
+            jnp.maximum(jnp.abs(raw_logit_second), contraction_scale),
+            jnp.asarray(jnp.finfo(raw_logit_second.dtype).tiny),
+        )
+        second_tolerance = (
+            32.0
+            * (dimension + 1)
+            * jnp.finfo(raw_logit_second.dtype).eps
+            * second_scale
+        )
+        second_ok = jnp.all(raw_logit_second >= -second_tolerance)
+        xi = jnp.sqrt(jnp.maximum(raw_logit_second, 0.0))
+        omega = _pg_mean(xi)
+
+        at_risk = jnp.cumsum(q_out[::-1])[::-1][:-1]
+        kappa = q_out[:-1] - 0.5 * at_risk
+        exposure = q_in[:, None] * at_risk[None, :]
+        linear_weight = q_in[:, None] * kappa[None, :]
+        linear = linear_weight[..., None] * feature_mean[None, None, :]
+        quadratic = (
+            exposure[..., None, None]
+            * omega[..., None, None]
+            * feature_second[None, None, :, :]
+        )
+        proper = (
+            probability_ok
+            & drive_ok
+            & parameter_ok
+            & second_ok
+            & jnp.all(jnp.isfinite(omega))
+            & jnp.all(jnp.isfinite(linear))
+            & jnp.all(jnp.isfinite(quadratic))
+        )
+
+        def valid_or_nan(value):
+            return jnp.where(proper, value, jnp.full_like(value, jnp.nan))
+
+        return RecurrenceWeightStats(
+            valid_or_nan(omega),
+            valid_or_nan(exposure),
+            valid_or_nan(linear),
+            valid_or_nan(quadratic),
+            proper,
+        )
+
+    return jax.vmap(one)(
+        out_probability,
+        in_probability,
+        drive_mean,
+        drive_second,
+        weights,
+        offsets,
     )
 
 
