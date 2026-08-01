@@ -11,7 +11,12 @@ from cffg.engine import Engine, RunStatus, _replace
 from cffg.models import build_factored_corridor
 from cffg.models.rollout import build_rollout
 from cffg.models.tmaze import build_tmaze
-from cffg.outer import _make_trust_kernel
+from cffg.outer import (
+    OuterArrays,
+    _make_trust_kernel,
+    build_outer_chart,
+    outer_chart_signature,
+)
 
 
 def _categorical_chart(engine: Engine, state) -> np.ndarray:
@@ -158,6 +163,103 @@ def test_matrix_free_trust_kernel_has_single_and_vmap_parity():
         np.linalg.norm(np.asarray(batched[0]), axis=1),
         np.asarray(radii) + 1e-12,
     )
+
+
+def test_benign_candidate_path_keeps_the_full_root_certificate():
+    template, arrays = build_tmaze()
+    engine = Engine(compile_template(template, arrays=arrays))
+    state = engine.init_state()
+
+    cold = engine.run(state, 400, tol=1e-13)
+    warm = engine.run(state, 400, tol=1e-13)
+    legacy = engine.run(
+        state,
+        400,
+        tol=1e-13,
+        damp=0.5,
+        outer_solver="picard",
+    )
+
+    assert cold.status is warm.status is legacy.status is RunStatus.CONVERGED
+    assert cold.termination_reason.value == "root_converged"
+    assert cold.outer_residual < 1e-13
+    assert np.isfinite(cold.outer_gradient_norm)
+    assert cold.trial_evaluations == cold.linear_iterations == 0
+    assert cold.solver_compilations == 1
+    assert warm.solver_compilations == 0
+    assert warm.outer_map_evaluations == cold.outer_map_evaluations
+    for name, marginal in engine.marginals(legacy.state).items():
+        np.testing.assert_allclose(
+            engine.marginals(cold.state)[name], marginal, atol=2e-12
+        )
+    np.testing.assert_allclose(
+        engine.bfe(cold.state), engine.bfe(legacy.state), atol=2e-12
+    )
+
+    params = dict(state.params)
+    prior_key, prior_row = engine.arena.member_of["prior"]
+    changed_prior = np.full(8, NEG)
+    changed_prior[:2] = np.log([0.8, 0.2])
+    params[prior_key] = params[prior_key].at[prior_row].set(changed_prior)
+    changed = _replace(state, params=params)
+    reused = engine.run(changed, 400, tol=1e-13)
+
+    fresh = Engine(compile_template(template, arrays=arrays))
+    reference = fresh.run(
+        _replace(fresh.init_state(), params=params), 400, tol=1e-13
+    )
+    assert reused.status is reference.status is RunStatus.CONVERGED
+    assert reused.solver_compilations == 0
+    assert reference.solver_compilations == 1
+    for name, marginal in fresh.marginals(reference.state).items():
+        np.testing.assert_allclose(
+            engine.marginals(reused.state)[name], marginal, atol=2e-12
+        )
+    assert not np.allclose(
+        engine.marginals(reused.state)["z0"],
+        engine.marginals(cold.state)["z0"],
+    )
+
+
+def test_outer_kernel_cache_keys_exact_support_and_dtype():
+    template, arrays = build_tmaze()
+    engine = Engine(compile_template(template, arrays=arrays))
+    state = engine.init_state()
+
+    def chart(st):
+        return build_outer_chart(
+            engine.arena,
+            OuterArrays(st.messages, st.g_eta, st.g_lam, st.ef_eta),
+            engine._outer_eliminated,
+        )
+
+    full = chart(state)
+    assert engine._outer_kernel_plan(full, state, []).compiled
+    assert not engine._outer_kernel_plan(full, state, []).compiled
+
+    block = next(item for item in full.categorical if item.coordinates.size)
+    sparse = _replace(
+        state,
+        messages=state.messages.at[int(block.coordinates[-1])].set(NEG),
+    )
+    sparse_chart = chart(sparse)
+    assert full.support_changed(sparse.messages)
+    assert outer_chart_signature(sparse_chart) != outer_chart_signature(full)
+    assert engine._outer_kernel_plan(sparse_chart, sparse, []).compiled
+
+    float32 = jax.tree_util.tree_map(
+        lambda value: (
+            value.astype(jnp.float32)
+            if jnp.issubdtype(value.dtype, jnp.inexact)
+            else value
+        ),
+        sparse,
+    )
+    float32_chart = chart(float32)
+    assert outer_chart_signature(float32_chart) != outer_chart_signature(
+        sparse_chart
+    )
+    assert engine._outer_kernel_plan(float32_chart, float32, []).compiled
 
 
 def one_update_corridor_case() -> tuple[Engine, object, np.ndarray]:

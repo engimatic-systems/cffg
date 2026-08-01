@@ -235,10 +235,13 @@ solver automatically. Caller-tuned `damp` is rejected on that path; use
 fixed-point iteration. `result.status` is one of `converged`,
 `budget_exhausted`, `diverged`, or `infeasible`. Its `outer_residual`,
 `outer_merit`, `outer_gradient_norm`, `trust_radius`, accepted/rejected step
-counts, and `termination_reason` explain a GFE classification; the merit never
-enters `engine.bfe` or a policy score. Convergence requires a coupled outer
-root, successful local solves, coherent exact support, and a finite stationary
-FE ledger. On tree graphs
+counts, `outer_map_evaluations`, `trial_evaluations`, `linear_iterations`,
+`solver_compilations`, and `termination_reason` explain a GFE classification;
+the merit never enters `engine.bfe` or a policy score. Fixed chart/support,
+dtype, and hardening phases reuse derivative kernels while observations and
+parameters remain dynamic inputs. Convergence requires a coupled outer root,
+successful local solves, coherent exact support, and a finite stationary FE
+ledger. On tree graphs
 `bfe` equals −log evidence exactly; with no data it is 0 for a normalized
 model — both make good sanity checks. Parameters are *inputs* (`state.params`),
 so you can swap them per run without recompiling.

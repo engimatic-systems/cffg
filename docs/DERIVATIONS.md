@@ -1545,10 +1545,10 @@ The cff-weff production implementation follows the
   the historical diagnostic.
 - `RunResult` retains the original FE trace/residual and local status, and
   exposes outer residual/merit, merit-gradient norm, trust radius,
-  accepted/rejected steps, and a termination reason distinguishing root,
-  stationary-nonroot/stagnation, trust/Krylov budget exhaustion, rejected
-  improper trials, infeasibility, and divergence. `require_converged`
-  continues to reject every non-root outcome.
+  accepted/rejected steps, outer-map/trial/Krylov counts, solver compilations,
+  and a termination reason distinguishing root, stationary-nonroot/stagnation,
+  trust/Krylov budget exhaustion, rejected improper trials, infeasibility, and
+  divergence. `require_converged` continues to reject every non-root outcome.
 - Host/JIT implementations share one residual, packing, support, and
   acceptance kernel. Flooding and mixed schedules have different maps but
   the same fixed-point equations under Theorem 1; both need parity tests.
@@ -1557,10 +1557,22 @@ The cff-weff production implementation follows the
   the solve.
 - Packing shapes and support masks are static per active-set solve. A
   compiled Steihaug/JVP/VJP kernel accepts per-instance coordinates, scales,
-  radii, and Krylov masks under `vmap`. The current host controller owns each
-  instance's active-set/status transitions; cff-wbhu can put that same carry
-  in `lax.scan` rather than inventing another numerical method. Checkpoint
-  decoding is N/A for this change.
+  radii, Krylov masks, parameters, and observations under `vmap`. Engine-local
+  caches key those kernels by exact support, dtype, continuous chart metric,
+  and hardening phase; changed runtime values remain dynamic arguments. The
+  current host controller owns each instance's active-set/status transitions;
+  cff-wbhu can put that same carry in `lax.scan` rather than inventing another
+  numerical method. Checkpoint decoding is N/A for this change.
+- Before compiling a trust kernel, at most 128 half-damped Picard steps, and
+  never more than half the caller's budget, may propose a root on the current
+  exact support face. Mu3 plans skip this phase because their total budget
+  must cover repeated outer-root and particle-moment block alternations. For
+  other plans this is only a candidate phase: success still requires an
+  independently evaluated undamped residual, converged inner status, feasible
+  unchanged support, finite stationary `_make_bfe` ledger, and the matrix-free
+  merit-gradient diagnostic. Failure to certify transfers the remaining
+  iteration budget and latest valid state to the unchanged trust-region
+  controller.
 - Forest factor-written messages are eliminated only on exact conditional
   islands; external half-edges remain fixed, and cyclic BP messages remain in
   the chart. Hard δ support is frozen once for its phase; multiple δ variables

@@ -505,8 +505,16 @@ discarding a joint correlation. Exact joint rollover remains the separate
     the outer chart and reconstructed by an exact full two-pass; cyclic BP
     messages remain coordinates and advance one colored sweep per map.
     Plans containing GFE composites solve the resulting fixed-point residual
-    with the D7 fixed-support, gauge-reduced trust-region method. Other mixed
-    plans retain the ordinary sweep loop and its optional damping.
+    with the D7 fixed-support, gauge-reduced trust-region method. A bounded
+    damped sequence first proposes a common-case root, but can return only
+    after the same undamped residual, exact-support, inner-solver, feasibility,
+    and FE certificates pass; otherwise the trust controller takes over. Mu3
+    skips this phase so its total budget remains available for outer-root and
+    particle-moment block alternation.
+    Derivative kernels are cached by exact chart support, dtype, continuous
+    metric, and hardening phase, while parameters and observations remain
+    dynamic inputs. Other mixed plans retain the ordinary sweep loop and its
+    optional damping.
   - flood: retained as an explicit option, and the fallback for δ form
     constraints (whose per-sweep hardening is defined against flooding) and
     models with nothing schedulable. `Schedule.reason` names what forced it.
@@ -522,9 +530,10 @@ discarding a joint correlation. Exact joint rollover remains the separate
   diverged / infeasible status, iteration count, FE and message-delta
   traces, and final residual. Mixed-GFE results additionally expose the
   accepted outer residual/merit, merit-gradient norm, trust radius,
-  accepted/rejected counts, and a machine-readable termination reason. The
-  merit is numerical step-acceptance machinery and never enters `_make_bfe`
-  or policy scoring. GFE convergence requires a root of the complete
+  accepted/rejected counts, outer-map/trial/Krylov operation counts, solver
+  compilation count, and a machine-readable termination reason. The merit is
+  numerical step-acceptance machinery and never enters `_make_bfe` or policy
+  scoring. GFE convergence requires a root of the complete
   undamped outer map, converged local solves, unchanged exact support, and a
   finite stationary FE ledger; a nonzero stationary merit is exhaustion.
   Max mode uses its message fixed-point residual and validates the decoded

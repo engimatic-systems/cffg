@@ -41,7 +41,14 @@ from cffg import csp, ef, efrules, gauss, kernels, mixg
 from cffg.compiler import NEG, Arena
 from cffg.outer import (
     OuterArrays,
+    OuterChart,
+    OuterKernelPlan,
     OuterTerminationReason,
+    _make_root_diagnostics,
+    _make_trust_kernel,
+    chart_arrays,
+    chart_coordinates,
+    outer_chart_signature,
     solve_outer,
 )
 from cffg.schedule import (
@@ -137,6 +144,10 @@ class RunResult:
     accepted_steps: int = 0
     rejected_steps: int = 0
     termination_reason: OuterTerminationReason = OuterTerminationReason.NOT_RUN
+    outer_map_evaluations: int = 0
+    trial_evaluations: int = 0
+    linear_iterations: int = 0
+    solver_compilations: int = 0
 
     @property
     def delta_trace(self) -> tuple[float, ...]:
@@ -348,6 +359,7 @@ class Engine:
         self._prime = None
         self._reconstruct = None
         self._outer_eliminated: dict[str, frozenset[int]] = {}
+        self._outer_kernel_cache: dict[tuple, tuple[object, object]] = {}
         self._iter_step = self._step
         self.scan_registerized: tuple[bool, ...] = ()
         kind = self.schedule.kind
@@ -1084,6 +1096,87 @@ class Engine:
             ),
         )
 
+    def _outer_kernel_plan(
+        self,
+        chart: OuterChart,
+        state: State,
+        hard_blocks: list[tuple[np.ndarray, np.ndarray, jax.Array]],
+    ) -> OuterKernelPlan:
+        """Reuse derivative kernels while keeping every runtime value dynamic."""
+        hard_indices = tuple(
+            (
+                np.asarray(i0).dtype.str,
+                np.asarray(i0).shape,
+                np.asarray(i0).tobytes(),
+                np.asarray(i1).dtype.str,
+                np.asarray(i1).shape,
+                np.asarray(i1).tobytes(),
+            )
+            for i0, i1, _ in hard_blocks
+        )
+        key = outer_chart_signature(chart), hard_indices
+        compiled = key not in self._outer_kernel_cache
+        if compiled:
+            static_indices = tuple((i0, i1) for i0, i1, _ in hard_blocks)
+
+            def residual(value, context):
+                (
+                    base,
+                    g_obs,
+                    g_mask,
+                    ef_obs,
+                    ef_mask,
+                    params,
+                    hard_values,
+                ) = context
+                arrays = chart_arrays(chart, value, base)
+                if self._reconstruct is not None:
+                    messages, g_eta, g_lam, ef_eta = self._reconstruct(
+                        arrays.messages,
+                        arrays.g_eta,
+                        arrays.g_lam,
+                        arrays.ef_eta,
+                        g_obs,
+                        g_mask,
+                        ef_obs,
+                        ef_mask,
+                        params,
+                    )
+                    arrays = OuterArrays(messages, g_eta, g_lam, ef_eta)
+                messages, g_eta, g_lam, ef_eta, _, _ = self._iter_step(
+                    arrays.messages,
+                    arrays.g_eta,
+                    arrays.g_lam,
+                    g_obs,
+                    g_mask,
+                    arrays.ef_eta,
+                    ef_obs,
+                    ef_mask,
+                    params,
+                    0.0,
+                    False,
+                )
+                for (i0, i1), hot in zip(static_indices, hard_values):
+                    messages = messages.at[i0].set(hot).at[i1].set(hot)
+                mapped = OuterArrays(messages, g_eta, g_lam, ef_eta)
+                return chart_coordinates(chart, mapped) - value
+
+            self._outer_kernel_cache[key] = (
+                _make_trust_kernel(residual, chart.size),
+                _make_root_diagnostics(residual),
+            )
+        trust, root_diagnostics = self._outer_kernel_cache[key]
+        context = (
+            chart.base,
+            state.g_obs,
+            state.g_mask,
+            state.ef_obs,
+            state.ef_mask,
+            state.params,
+            tuple(hot for _, _, hot in hard_blocks),
+        )
+        return OuterKernelPlan(trust, root_diagnostics, context, compiled)
+
     def _run_outer_trust_region(
         self,
         state: State,
@@ -1142,6 +1235,8 @@ class Engine:
         all_deltas: list[float] = []
         all_energies: list[float] = []
         total_iterations = accepted = rejected = 0
+        outer_map_evaluations = trial_evaluations = 0
+        linear_iterations = solver_compilations = 0
         mu3_pending = False
         phases: list[tuple[int, list[tuple[int, np.ndarray]]]] = [
             (n_iters - harden_last, [])
@@ -1243,6 +1338,12 @@ class Engine:
                     n_iters=remaining,
                     tol=solver_tol,
                     eliminated=self._outer_eliminated,
+                    kernel_factory=lambda chart: self._outer_kernel_plan(
+                        chart, state, hard_blocks
+                    ),
+                    candidate_limit=(
+                        0 if self.arena.mu3_groups else 128
+                    ),
                 )
                 state = as_state(reconstruct(solved.arrays))
                 consumed = max(solved.iterations, 1)
@@ -1250,6 +1351,10 @@ class Engine:
                 total_iterations += consumed
                 accepted += solved.accepted_steps
                 rejected += solved.rejected_steps
+                outer_map_evaluations += solved.outer_map_evaluations
+                trial_evaluations += solved.trial_evaluations
+                linear_iterations += solved.linear_iterations
+                solver_compilations += solved.solver_compilations
                 all_deltas.extend(solved.message_deltas)
                 all_energies.extend(solved.free_energies)
                 if (
@@ -1338,6 +1443,10 @@ class Engine:
             accepted_steps=accepted,
             rejected_steps=rejected,
             termination_reason=solved.reason,
+            outer_map_evaluations=outer_map_evaluations,
+            trial_evaluations=trial_evaluations,
+            linear_iterations=linear_iterations,
+            solver_compilations=solver_compilations,
         )
 
     def _run_exact(self, state: State, tol: float | None) -> RunResult:
