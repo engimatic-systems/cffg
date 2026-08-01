@@ -16,20 +16,54 @@ Conventions match cffg.gauss: batched over group members ([M, ...] leading
 axis) via vmap, per-member parameter stacks carry the regime axis K
 ([M, K, ...]); dims and K are static per group. Propriety guards fall back
 to the *vacuous* message mid-flooding (never NaN); ledger terms go +inf on
-improper beliefs, the engine-wide loudness convention. Guards are
-scale-relative per the robustness contract: proper systems are solved without
-regularization, while singular message systems use the same dtype-relative
-Moore-Penrose limit as the plain Gaussian rules.
+improper beliefs, while public belief/predictive reads return shape-preserving
+NaNs with ``proper=False``. Guards are scale-relative per the robustness
+contract: proper systems are solved without regularization, while singular
+message systems use the same dtype-relative Moore-Penrose limit as the plain
+Gaussian rules.
 """
 
 from __future__ import annotations
+
+from typing import NamedTuple
 
 import jax
 import jax.numpy as jnp
 
 from cffg import gauss
+from cffg.compiler import NEG
 
 _LOG2PI = 1.8378770664093453
+
+
+class LinearMixtureStats(NamedTuple):
+    """D3 factor-belief responsibilities and weighted sufficient statistics."""
+
+    responsibility: jax.Array
+    syy: jax.Array
+    syx: jax.Array
+    sxx: jax.Array
+    proper: jax.Array
+
+
+class MixtureStats(NamedTuple):
+    """Prior-mixture factor-belief responsibilities and weighted moments."""
+
+    responsibility: jax.Array
+    weighted_mean: jax.Array
+    weighted_second: jax.Array
+    proper: jax.Array
+
+
+class MixturePredictive(NamedTuple):
+    """Component and collapsed moments of a factor-to-output cavity."""
+
+    weight: jax.Array
+    component_mean: jax.Array
+    component_covariance: jax.Array
+    mean: jax.Array
+    covariance: jax.Array
+    proper: jax.Array
 
 
 def _log_z(eta: jnp.ndarray, lam: jnp.ndarray) -> jnp.ndarray:
@@ -75,7 +109,152 @@ def _collapse(log_w: jnp.ndarray, eta: jnp.ndarray, lam: jnp.ndarray):
     return lam_out @ m_bar, lam_out
 
 
+def _exact_probability(log_message: jax.Array, log_score: jax.Array):
+    """Normalize supported selector states without reviving exact zeros."""
+    support = log_message != jnp.asarray(NEG, log_message.dtype)
+    valid = (
+        jnp.any(support)
+        & jnp.all(jnp.isfinite(log_message))
+        & jnp.all(jnp.where(support, jnp.isfinite(log_score), True))
+    )
+    supported_score = jnp.where(support, log_score, -jnp.inf)
+    normalizer = jnp.where(
+        valid,
+        jax.scipy.special.logsumexp(supported_score),
+        jnp.asarray(0.0, log_score.dtype),
+    )
+    probability = jnp.where(support, jnp.exp(supported_score - normalizer), 0.0)
+    return jnp.where(valid, probability, 0.0), valid
+
+
+def _collapsed_moments(weight, component_mean, component_covariance):
+    mean = jnp.einsum("k,ki->i", weight, component_mean)
+    centered = component_mean - mean[None]
+    covariance = jnp.einsum("k,kij->ij", weight, component_covariance)
+    covariance += jnp.einsum("k,ki,kj->ij", weight, centered, centered)
+    return mean, covariance
+
+
+def _nan_unless(proper: jax.Array, value: jax.Array) -> jax.Array:
+    return jnp.where(proper, value, jnp.full_like(value, jnp.nan))
+
+
 # --- gaussian_mixture_linear ---------------------------------------------------
+
+
+def mixlin_stats(eta_o, lam_o, eta_i, lam_i, log_mu_e, a, b, w):
+    """Read D3 factor-belief moments for ``gaussian_mixture_linear``.
+
+    Sufficient statistics are weighted by the soft regime responsibility and
+    use an augmented input ``[x, 1]``. An invalid local belief is represented
+    by shape-preserving NaNs and ``proper=False``.
+    """
+
+    def one(eo, lo, ei, li, le, A, bb, W):
+        w_ok = gauss._pd_ok(W)
+        safe_w = jnp.where(
+            w_ok[:, None, None],
+            W,
+            jnp.eye(W.shape[-1], dtype=W.dtype)[None],
+        )
+        eta_j, lam_j = _joint_blocks(eo, lo, ei, li, A, bb, safe_w)
+        joint_ok = gauss._pd_ok(lam_j)
+        safe_lam = jnp.where(
+            joint_ok[:, None, None],
+            lam_j,
+            jnp.eye(lam_j.shape[-1], dtype=lam_j.dtype)[None],
+        )
+        log_score = le + _log_z(eta_j, safe_lam) + _node_const(bb, safe_w)
+        responsibility, selector_ok = _exact_probability(le, log_score)
+        proper = selector_ok & jnp.all(w_ok) & jnp.all(joint_ok)
+
+        covariance = gauss._pd_inverse(safe_lam)
+        mean = jnp.einsum("kij,kj->ki", covariance, eta_j)
+        out_dim = bb.shape[-1]
+        out_mean = mean[:, :out_dim]
+        in_mean = mean[:, out_dim:]
+        syy = covariance[:, :out_dim, :out_dim]
+        syy += jnp.einsum("ki,kj->kij", out_mean, out_mean)
+        syx = covariance[:, :out_dim, out_dim:]
+        syx += jnp.einsum("ki,kj->kij", out_mean, in_mean)
+        syx = jnp.concatenate([syx, out_mean[..., None]], axis=-1)
+        sxx = covariance[:, out_dim:, out_dim:]
+        sxx += jnp.einsum("ki,kj->kij", in_mean, in_mean)
+        augmented_dim = in_mean.shape[-1] + 1
+        augmented = jnp.zeros(
+            (in_mean.shape[0], augmented_dim, augmented_dim), dtype=mean.dtype
+        )
+        augmented = augmented.at[:, :-1, :-1].set(sxx)
+        augmented = augmented.at[:, :-1, -1].set(in_mean)
+        augmented = augmented.at[:, -1, :-1].set(in_mean)
+        augmented = augmented.at[:, -1, -1].set(1.0)
+
+        syy *= responsibility[:, None, None]
+        syx *= responsibility[:, None, None]
+        augmented *= responsibility[:, None, None]
+        finite = (
+            jnp.all(jnp.isfinite(responsibility))
+            & jnp.all(jnp.isfinite(syy))
+            & jnp.all(jnp.isfinite(syx))
+            & jnp.all(jnp.isfinite(augmented))
+        )
+        proper &= finite
+        return LinearMixtureStats(
+            _nan_unless(proper, responsibility),
+            _nan_unless(proper, syy),
+            _nan_unless(proper, syx),
+            _nan_unless(proper, augmented),
+            proper,
+        )
+
+    return jax.vmap(one)(eta_o, lam_o, eta_i, lam_i, log_mu_e, a, b, w)
+
+
+def mixlin_predictive(eta_i, lam_i, log_mu_e, a, b, w):
+    """Read the factor-to-output cavity predictive in moment form."""
+
+    def one(ei, li, le, A, bb, W):
+        input_ok = gauss._pd_ok(li)
+        w_ok = gauss._pd_ok(W)
+        safe_input_precision = jnp.where(
+            input_ok, li, jnp.eye(li.shape[-1], dtype=li.dtype)
+        )
+        safe_w = jnp.where(
+            w_ok[:, None, None],
+            W,
+            jnp.eye(W.shape[-1], dtype=W.dtype)[None],
+        )
+        input_covariance = gauss._pd_inverse(safe_input_precision)
+        input_mean = gauss._pd_solve(safe_input_precision, ei)
+        component_mean = jnp.einsum("kij,j->ki", A, input_mean) + bb
+        component_covariance = gauss._pd_inverse(safe_w)
+        component_covariance += jnp.einsum(
+            "kij,jl,kml->kim", A, input_covariance, A
+        )
+        weight, selector_ok = _exact_probability(le, le)
+        mean, covariance = _collapsed_moments(
+            weight, component_mean, component_covariance
+        )
+        proper = (
+            input_ok
+            & selector_ok
+            & jnp.all(w_ok)
+            & jnp.all(jnp.isfinite(component_mean))
+            & jnp.all(jnp.isfinite(component_covariance))
+            & jnp.all(jnp.isfinite(covariance))
+            & jnp.all(gauss._pd_ok(component_covariance))
+            & gauss._pd_ok(covariance)
+        )
+        return MixturePredictive(
+            _nan_unless(proper, weight),
+            _nan_unless(proper, component_mean),
+            _nan_unless(proper, component_covariance),
+            _nan_unless(proper, mean),
+            _nan_unless(proper, covariance),
+            proper,
+        )
+
+    return jax.vmap(one)(eta_i, lam_i, log_mu_e, a, b, w)
 
 
 def mixlin_to_selector(eta_o, lam_o, eta_i, lam_i, a, b, w):
@@ -197,6 +376,95 @@ def mixlin_energy(eta_o, lam_o, eta_i, lam_i, log_mu_e, a, b, w):
 
 
 # --- gaussian_mixture (prior variant, f_s(y) = N(y; m_s, V_s)) -------------------
+
+
+def mix_stats(eta_o, lam_o, log_mu_e, mean, w):
+    """Read prior-mixture factor-belief responsibilities and moments."""
+
+    def one(eo, lo, le, component_mean, W):
+        w_ok = gauss._pd_ok(W)
+        safe_w = jnp.where(
+            w_ok[:, None, None],
+            W,
+            jnp.eye(W.shape[-1], dtype=W.dtype)[None],
+        )
+        eta_q = jnp.einsum("kij,kj->ki", safe_w, component_mean) + eo[None]
+        lam_q = safe_w + lo[None]
+        belief_ok = gauss._pd_ok(lam_q)
+        safe_lam = jnp.where(
+            belief_ok[:, None, None],
+            lam_q,
+            jnp.eye(lam_q.shape[-1], dtype=lam_q.dtype)[None],
+        )
+        log_score = (
+            le
+            + _log_z(eta_q, safe_lam)
+            - 0.5
+            * jnp.einsum(
+                "ki,kij,kj->k", component_mean, safe_w, component_mean
+            )
+            + 0.5 * gauss._pd_logdet(safe_w)
+            - 0.5 * component_mean.shape[-1] * _LOG2PI
+        )
+        responsibility, selector_ok = _exact_probability(le, log_score)
+        covariance = gauss._pd_inverse(safe_lam)
+        belief_mean = jnp.einsum("kij,kj->ki", covariance, eta_q)
+        second = covariance + jnp.einsum(
+            "ki,kj->kij", belief_mean, belief_mean
+        )
+        weighted_mean = responsibility[:, None] * belief_mean
+        weighted_second = responsibility[:, None, None] * second
+        proper = (
+            selector_ok
+            & jnp.all(w_ok)
+            & jnp.all(belief_ok)
+            & jnp.all(jnp.isfinite(weighted_mean))
+            & jnp.all(jnp.isfinite(weighted_second))
+        )
+        return MixtureStats(
+            _nan_unless(proper, responsibility),
+            _nan_unless(proper, weighted_mean),
+            _nan_unless(proper, weighted_second),
+            proper,
+        )
+
+    return jax.vmap(one)(eta_o, lam_o, log_mu_e, mean, w)
+
+
+def mix_predictive(log_mu_e, mean, w):
+    """Read a prior mixture's factor-to-output cavity predictive."""
+
+    def one(le, component_mean, W):
+        w_ok = gauss._pd_ok(W)
+        safe_w = jnp.where(
+            w_ok[:, None, None],
+            W,
+            jnp.eye(W.shape[-1], dtype=W.dtype)[None],
+        )
+        component_covariance = gauss._pd_inverse(safe_w)
+        weight, selector_ok = _exact_probability(le, le)
+        collapsed_mean, covariance = _collapsed_moments(
+            weight, component_mean, component_covariance
+        )
+        proper = (
+            selector_ok
+            & jnp.all(w_ok)
+            & jnp.all(jnp.isfinite(component_mean))
+            & jnp.all(jnp.isfinite(component_covariance))
+            & jnp.all(jnp.isfinite(covariance))
+            & jnp.all(gauss._pd_ok(component_covariance))
+            & gauss._pd_ok(covariance)
+        )
+        return MixturePredictive(
+            _nan_unless(proper, weight),
+            _nan_unless(proper, component_mean),
+            _nan_unless(proper, component_covariance),
+            _nan_unless(proper, collapsed_mean),
+            _nan_unless(proper, covariance),
+            proper,
+        )
+
+    return jax.vmap(one)(log_mu_e, mean, w)
 
 
 def mix_to_selector(eta_o, lam_o, mean, w):

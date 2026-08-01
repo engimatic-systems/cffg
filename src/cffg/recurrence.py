@@ -38,6 +38,18 @@ class RecurrenceUpdate(NamedTuple):
     status: jax.Array
 
 
+class RecurrenceBelief(NamedTuple):
+    """Categorical and continuous moments of a recurrence-link belief."""
+
+    out_probability: jax.Array
+    in_probability: jax.Array
+    drive_mean: jax.Array
+    drive_second: jax.Array
+    out_support: jax.Array
+    in_support: jax.Array
+    proper: jax.Array
+
+
 def _edge_probability(messages: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
     """Product of two categorical messages without relaxing exact support."""
     support = jnp.all(messages != jnp.asarray(NEG, messages.dtype), axis=-2)
@@ -51,6 +63,57 @@ def _edge_probability(messages: jax.Array) -> tuple[jax.Array, jax.Array, jax.Ar
     log_probability = jnp.where(support, log_probability - normalizer, -jnp.inf)
     probability = jnp.where(support, jnp.exp(log_probability), 0.0)
     return probability, log_probability, valid
+
+
+def belief(
+    out_messages,
+    in_messages,
+    drive_eta,
+    drive_precision,
+) -> RecurrenceBelief:
+    """Read the current three-edge belief without evaluating the PG bound."""
+
+    def one(out_m, in_m, eta, precision):
+        q_out, _, out_ok = _edge_probability(out_m)
+        q_in, _, in_ok = _edge_probability(in_m)
+        out_support = jnp.all(
+            out_m != jnp.asarray(NEG, out_m.dtype), axis=-2
+        )
+        in_support = jnp.all(
+            in_m != jnp.asarray(NEG, in_m.dtype), axis=-2
+        )
+        precision_ok = gauss._pd_ok(precision)
+        safe_precision = jnp.where(
+            precision_ok,
+            precision,
+            jnp.eye(precision.shape[-1], dtype=precision.dtype),
+        )
+        covariance = gauss._pd_inverse(safe_precision)
+        mean = gauss._pd_solve(safe_precision, eta)
+        second = covariance + jnp.outer(mean, mean)
+        proper = (
+            out_ok
+            & in_ok
+            & precision_ok
+            & jnp.all(jnp.isfinite(mean))
+            & jnp.all(jnp.isfinite(second))
+        )
+        return RecurrenceBelief(
+            jnp.where(proper, q_out, jnp.full_like(q_out, jnp.nan)),
+            jnp.where(proper, q_in, jnp.full_like(q_in, jnp.nan)),
+            jnp.where(proper, mean, jnp.full_like(mean, jnp.nan)),
+            jnp.where(proper, second, jnp.full_like(second, jnp.nan)),
+            out_support,
+            in_support,
+            proper,
+        )
+
+    return jax.vmap(one)(
+        out_messages,
+        in_messages,
+        drive_eta,
+        drive_precision,
+    )
 
 
 def _pg_mean(xi: jax.Array) -> jax.Array:
