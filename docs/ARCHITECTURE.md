@@ -767,6 +767,28 @@ independently in numpy so the engine is never graded on its own homework.
 Consumer-harness conventions live in README ("Consume the engine from an
 experiment harness").
 
+## Canonical rSLDS consumer validation (2026-07-31)
+
+A fresh consumer used CFFG commit `6c01812` as a pinned Git dependency and
+reconstructed the current stick-breaking Linderman NASCAR generator without
+editing this repository. At the canonical `T=10,000`, `K=4`, latent `d=2`,
+observed `dy=10` scale, fixed-generating-parameter inference converged in 248
+sweeps: latent-state RMSE `0.001264`, MAP regime accuracy `99.95%`, mean
+true-regime probability `0.999106`, and regime NLL `0.001223`. This validates
+the assembled recurrence, switching-dynamics, emission, mixed-schedule, and
+ledger path at scale. The separate experiment and provenance artifacts live in
+`../experiments/cffg-nascar-validation` at commit `0543683`.
+
+It does **not** validate the paper-style learned model or the rSLDS advantage
+over an SLDS. The harness supplied the generating emission, dynamics, and
+recurrence parameters; the model-specific learner does not update the shared
+emission or expose replacement-coordinate fitting of one long sequence, and
+there is no PCA/ARHMM-equivalent initializer. cff-l7y4 owns the learned
+NASCAR/matched-SLDS continuation after cff-6tek. Cold compile/setup also took
+723.14 seconds versus 30.58 seconds of inference, with 2.03 GB peak process
+RSS; cff-r6bl owns compact repeated-hybrid-slice lowering. These are explicit
+not-ready findings, not caveats hidden behind the oracle accuracy.
+
 ## Resource estimator
 
 Because shapes are static post-compile, memory is computable analytically from

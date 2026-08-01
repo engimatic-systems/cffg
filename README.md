@@ -268,6 +268,18 @@ already represent the ordinary source-specific transition baseline; multiplying
 a separate `matrix_cat` into the same transition would require a new normalized
 factor and free-energy derivation.
 
+The independent canonical-scale check uses the current stick-breaking NASCAR
+generator at `T=10,000`. With the generating parameters supplied, CFFG
+converged in 248 sweeps with `0.001264` latent-state RMSE and `99.95%` MAP
+regime accuracy. This is an inference result, not a learned-model result:
+`RSLDSLearning` currently keeps the shared emission fixed, accumulates evidence
+between trials rather than replacing coordinates while fitting one long
+sequence, and supplies no PCA/ARHMM-style initializer. Learned NASCAR versus a
+matched SLDS, including long generative rollouts, remains cff-l7y4 after the
+generic Gaussian learnables work in cff-6tek. The same run measured 723 seconds
+of cold compile/setup and 30.6 seconds of inference; cff-r6bl owns that scale
+gap.
+
 ## Run inference
 
 ```python
