@@ -269,7 +269,19 @@ Gaussian natural statistics for augmented `[R; r]`. `conj.PGWeights`
 accumulates those statistics outside JIT and rolls its posterior mean into the
 next trial. This standalone path intentionally does not register a
 `LearnableSpec`; non-discrete `member_of`, generic cadence, and persistence
-remain cff-6tek/cff-y4nx surfaces.
+remain cff-6tek surfaces.
+
+`cffg.models.rslds` is the end-to-end composition boundary. Its serialized
+template uses one `recurrence_link(z[t+1], z[t], x[t])`, a
+`gaussian_mixture_linear` dynamics node selected by `z[t+1]`, and a shared
+`gaussian_linear` emission per slice. `RSLDSLearning` owns three host-side
+posteriors: Dirichlet counts for the initial regime, one MNIW for each regime's
+dynamics, and one `PGWeights` block for the recurrent transition. It reads only
+the public factor-local statistics and installs point rollovers into a fresh
+`State.params`, so the compiled graph and all state shapes stay fixed across
+trials. This model-specific boundary does not extend `LearnableSpec`, agent
+checkpointing, or parameter uncertainty inside inference; those remain the
+generic cff-6tek path.
 
 ### 2e. Executable factor registration (`cffg.kernels`, cff-ri8m)
 

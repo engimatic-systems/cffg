@@ -22,6 +22,7 @@ from cffg.core.ir import (
 from cffg.core.serialize import from_json, to_dict, to_json
 from cffg.core.validate import ModelError
 from cffg.engine import Engine, RunStatus, _replace
+from cffg.models.rslds import rslds, vague_rslds_learning
 
 jax.config.update("jax_enable_x64", True)
 
@@ -194,6 +195,122 @@ def _run(template, arrays, *, schedule="auto", dtype=None, iterations=250):
         tol=1e-5 if dtype == jnp.float32 else 1e-9,
     )
     return engine, result
+
+
+def test_rslds_tier_matches_tiny_exact_oracle_and_rolls_all_parameters():
+    """One compact integration tier: float32 inference, exact quadrature gap,
+    finite ledger, and the three between-trial parameter writes."""
+    dtype = np.float32
+    dynamics_matrix = np.array([[[0.85]], [[-0.45]]], dtype=dtype)
+    dynamics_offset = np.array([[0.15], [-0.25]], dtype=dtype)
+    dynamics_covariance = np.array([[[0.18]], [[0.28]]], dtype=dtype)
+    recurrence_weights = np.array([[[1.1]], [[-0.9]]], dtype=dtype)
+    recurrence_offsets = np.array([[-0.1], [0.2]], dtype=dtype)
+    emission_covariance = np.array([[0.12]], dtype=dtype)
+    initial_mean = np.array([0.1], dtype=dtype)
+    initial_covariance = np.array([[0.7]], dtype=dtype)
+    initial_probability = np.array([0.55, 0.45], dtype=dtype)
+    observation = 0.35
+
+    template, arrays = rslds(
+        2,
+        dynamics_matrix,
+        dynamics_offset,
+        dynamics_covariance,
+        recurrence_weights,
+        recurrence_offsets,
+        np.ones((1, 1), dtype=dtype),
+        emission_covariance,
+        initial_mean,
+        initial_covariance,
+        initial_probability,
+    )
+    engine = Engine(compile_template(template, arrays=arrays))
+    state = engine.bind_data(
+        engine.init_state(),
+        {"y0": None, "y1": np.array([observation], dtype=dtype)},
+    )
+    state = jax.tree_util.tree_map(
+        lambda value: (
+            value.astype(jnp.float32)
+            if jnp.issubdtype(value.dtype, jnp.inexact)
+            else value
+        ),
+        state,
+    )
+    result = engine.run(state, 80, tol=1e-7)
+    assert result.status is RunStatus.CONVERGED
+    assert np.isfinite(engine.bfe(result.state))
+    assert all(value.dtype == jnp.float32 for value in result.state.params.values())
+
+    nodes, quadrature_weights = hermgauss(160)
+    points = (
+        np.sqrt(2.0 * initial_covariance[0, 0]) * nodes + initial_mean[0]
+    )
+    quadrature_weights /= np.sqrt(np.pi)
+    transition = _stick_probabilities(
+        points[:, None], recurrence_weights, recurrence_offsets
+    )
+    predicted_mean = (
+        dynamics_matrix[:, 0, 0][None, None, :] * points[:, None, None]
+        + dynamics_offset[:, 0][None, None, :]
+    )
+    predictive_variance = (
+        dynamics_covariance[:, 0, 0] + emission_covariance[0, 0]
+    )
+    likelihood = np.exp(
+        -0.5
+        * np.square(observation - predicted_mean)
+        / predictive_variance[None, None, :]
+    ) / np.sqrt(2.0 * np.pi * predictive_variance[None, None, :])
+    joint = (
+        quadrature_weights[:, None, None]
+        * initial_probability[None, :, None]
+        * transition
+        * likelihood
+    )
+    joint /= joint.sum()
+    exact_regimes = (joint.sum(axis=(0, 2)), joint.sum(axis=(0, 1)))
+    exact_x0_mean = np.sum(joint * points[:, None, None])
+    exact_x0_second = np.sum(joint * np.square(points[:, None, None]))
+    posterior_variance = 1.0 / (
+        1.0 / dynamics_covariance[:, 0, 0]
+        + 1.0 / emission_covariance[0, 0]
+    )
+    posterior_mean = posterior_variance[None, None, :] * (
+        predicted_mean / dynamics_covariance[:, 0, 0][None, None, :]
+        + observation / emission_covariance[0, 0]
+    )
+    exact_x1_mean = np.sum(joint * posterior_mean)
+    exact_x1_second = np.sum(
+        joint * (posterior_variance[None, None, :] + np.square(posterior_mean))
+    )
+
+    regimes = engine.marginals(result.state)
+    gaussian = engine.gaussian_marginals(result.state)
+    # Measured gaps are 0.058 for regimes, 0.067 for means, and 0.019 for
+    # covariances. These limits retain at least 1.7x headroom in float32.
+    np.testing.assert_allclose(regimes["z0"], exact_regimes[0], atol=0.1)
+    np.testing.assert_allclose(regimes["z1"], exact_regimes[1], atol=0.1)
+    np.testing.assert_allclose(gaussian["x0"][0], [exact_x0_mean], atol=0.12)
+    np.testing.assert_allclose(
+        gaussian["x0"][1],
+        [[exact_x0_second - exact_x0_mean**2]],
+        atol=0.05,
+    )
+    np.testing.assert_allclose(gaussian["x1"][0], [exact_x1_mean], atol=0.12)
+    np.testing.assert_allclose(
+        gaussian["x1"][1],
+        [[exact_x1_second - exact_x1_mean**2]],
+        atol=0.05,
+    )
+
+    learning = vague_rslds_learning(2, 1).update(engine, result.state)
+    learned = learning.parameter_arrays()
+    assert learning.initial_alpha.sum() == pytest.approx(3.0)
+    assert all(np.all(np.isfinite(value)) for value in learned.values())
+    installed = learning.install(engine, engine.init_state())
+    assert installed.params.keys() == result.state.params.keys()
 
 
 def test_rule_matches_independent_numpy_coordinates():
