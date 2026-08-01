@@ -420,34 +420,28 @@ def _gfe_guard_incoming(log_d):
     return jnp.where(support, log_d - normalizer, log_floor)
 
 
-def _gfe_solve_raw(abar, h, logc, log_d, max_iters: int = _N_NEWTON):
-    """Solve one composite and expose termination diagnostics.
+def _simplex_solve_raw(log_potential, log_d, max_iters: int = _N_NEWTON):
+    """Solve ``q = softmax(log_potential(q) + log_d)`` on a fixed face.
 
-    The solve is performed in a ``K-1`` dimensional gauge-fixed chart rather
-    than regularising the singular all-ones direction.  Exact-zero incoming
-    support is represented at the dtype's smallest normal log-probability
-    while Newton runs; this bounds the residual without a dtype-specific
-    literal and does not give that support mass in the engine's cavity update.
+    This is the shared Corollary-1 solver used by discrete and hybrid GFE
+    composites. It works in a ``K-1`` dimensional gauge-fixed chart rather
+    than regularising the singular all-ones direction, and globalizes every
+    Newton step with the same finite backtracking set. Exact-zero incoming
+    support gets only dtype-derived finite work space inside Newton; callers
+    retain the original support on their outgoing messages.
     """
-    dtype = jnp.result_type(abar, h, logc, log_d)
-    abar = jnp.asarray(abar, dtype=dtype)
-    h = jnp.asarray(h, dtype=dtype)
-    logc = jnp.asarray(logc, dtype=dtype)
+    dtype = jnp.result_type(log_d)
     log_d = jnp.asarray(log_d, dtype=dtype)
     # Protect the Newton residual from the finite NEG sentinel. Supported
     # entries are normalized first, so the fixed-face guard is invariant to
     # the categorical message's arbitrary additive gauge.
     log_d = _gfe_guard_incoming(log_d)
 
-    def rho(zbar):
-        qx = abar @ zbar
-        return abar.T @ (logc - _safe_log(qx)) - h
-
     def center(v):
         return v - v.mean()
 
     def resid(v):
-        return center(v) - center(rho(jax.nn.softmax(v)) + log_d)
+        return center(v) - center(log_potential(jax.nn.softmax(v)) + log_d)
 
     k = log_d.shape[0]
     # K=1 has no free coordinate and is stationary by construction.
@@ -498,6 +492,21 @@ def _gfe_solve_raw(abar, h, logc, log_d, max_iters: int = _N_NEWTON):
     finite = jnp.isfinite(residual) & jnp.all(jnp.isfinite(u))
     status = jnp.where(~finite, 2, jnp.where(residual <= tol, 0, 1))
     return GfeSolveResult(jax.nn.softmax(unpack(u)), status, iterations, residual)
+
+
+def _gfe_solve_raw(abar, h, logc, log_d, max_iters: int = _N_NEWTON):
+    """Solve one categorical GFE composite and expose diagnostics."""
+    dtype = jnp.result_type(abar, h, logc, log_d)
+    abar = jnp.asarray(abar, dtype=dtype)
+    h = jnp.asarray(h, dtype=dtype)
+    logc = jnp.asarray(logc, dtype=dtype)
+    log_d = jnp.asarray(log_d, dtype=dtype)
+
+    def rho(zbar):
+        qx = abar @ zbar
+        return abar.T @ (logc - _safe_log(qx)) - h
+
+    return _simplex_solve_raw(rho, log_d, max_iters=max_iters)
 
 
 @jax.custom_jvp

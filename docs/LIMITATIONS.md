@@ -111,8 +111,8 @@ ticket under the roadmap epic cff-ahps:
   `test_additive_lgssm_epistemics_constant_across_policies`), so a
   Gaussian-only GFE message family has nothing to express. Continuous
   epistemics live on the discrete regime/selector variables of hybrid
-  models instead — see S1h. Engine integration of the hybrid composite is
-  the follow-up ticket.
+  models instead — see S1h. The fixed-goal exterior hybrid composite is
+  executable; arbitrary interior, nonlinear, and Gaussian-only forms are not.
 The registry architecture exists precisely so each of these lands as an isolated
 contribution.
 
@@ -263,8 +263,9 @@ regime mixtures are their tractable discretization. (4) v1 scope solves the
 substituted fixed point over the regime simplex only — continuous edges keep
 their D3 BP/collapse messages (full coupled stationarity would let the
 epistemic term push per-regime state beliefs toward wishful separation;
-excluded until derived and tested). Engine integration of the composite is
-the follow-up ticket; the spike ships formulas + experiments, not rules.
+excluded until derived and tested). The engine supports only an exterior
+substituted output facing a fixed Gaussian goal. Interior predictive cavities,
+learned Gaussian goals, and Prop. 6 parameter novelty remain follow-up work.
 
 **S1j. Schedules: measured envelope (cff-d56d, revised 2026-07-27 after
 review).** Two-pass schedules make tree and chain inference O(E) with

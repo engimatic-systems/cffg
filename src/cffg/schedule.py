@@ -185,6 +185,18 @@ def _arena_signature(arena: Arena) -> str:
             f"{plan.count_key}|{plan.cards}".encode()
         )
         h.update(np.ascontiguousarray(plan.rows).tobytes())
+    for group in arena.hybrid_gfe_groups:
+        h.update(
+            f"gfhybrid|{group.name}|{group.type}|{group.dims}|"
+            f"{group.k_sel}|{group.members}|{group.goal_members}".encode()
+        )
+        for rows in (
+            group.g_gather,
+            group.g_scatter,
+            group.s_gather,
+            group.s_scatter,
+        ):
+            h.update(np.ascontiguousarray(rows).tobytes())
     return h.hexdigest()
 
 
@@ -229,7 +241,7 @@ def _iterative_structures(arena: Arena) -> list[str]:
         reasons.append("Dirichlet parameter-edge VMP groups")
     if arena.constraint_groups:
         reasons.append("hard-constraint factors")
-    if arena.gfe_groups or arena.gfe_tm_groups:
+    if arena.gfe_groups or arena.gfe_tm_groups or arena.hybrid_gfe_groups:
         reasons.append("GFE composites")
     if arena.mix_groups:
         reasons.append("hybrid mixture groups")

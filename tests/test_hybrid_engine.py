@@ -178,7 +178,7 @@ def test_data_port_on_mixture_output_rejected():
 def test_mean_field_bead_on_hybrid_rejected():
     t, arrays = mixlin_template(K=2)
     t.constraints.append(ConstraintSpec(ConstraintKind.MEAN_FIELD, "mix"))
-    with pytest.raises(CompileError, match="hybrid beads are undefined"):
+    with pytest.raises(CompileError, match="hybrid beads are undefined for mean-field"):
         compile_template(t, arrays=arrays)
 
 
@@ -190,7 +190,7 @@ def test_p_substitution_bead_on_hybrid_rejected():
             detail=(("substituted_role", "out"),),
         )
     )
-    with pytest.raises(CompileError, match="hybrid beads are undefined"):
+    with pytest.raises(CompileError, match="must face exactly one fixed Gaussian goal"):
         compile_template(t, arrays=arrays)
 
 

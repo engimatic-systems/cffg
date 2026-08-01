@@ -101,7 +101,10 @@ EPIC_FILES = {
         "test_hybrid_engine.py",
         "test_switching_kf.py",
     ],
-    "R1 · Hybrid epistemics": ["test_hybrid_epistemics.py"],
+    "R1 · Hybrid epistemics": [
+        "test_hybrid_epistemics.py",
+        "test_hybrid_gfe.py",
+    ],
     "SG · Glucose": ["test_glucose.py"],
 }
 FILE_TO_EPIC = {f: e for e, fs in EPIC_FILES.items() for f in fs}

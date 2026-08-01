@@ -171,6 +171,27 @@ engine.marginals(state)["u1"]   # posteriors by variable name
 engine.bfe(state)               # exact Bethe/Generalised free energy
 ```
 
+For hybrid regime epistemics, place a `P_SUBSTITUTION` constraint with
+`substituted_role="out"` on a `gaussian_mixture` or
+`gaussian_mixture_linear` factor whose output faces a fixed `gaussian` goal.
+The compiler derives one D5 composite; Gaussian state edges keep their D3
+messages while the selector solves the regime-information coordinate:
+
+```python
+result = engine.run(engine.init_state(), 200, tol=1e-8)
+state = result.require_converged()
+terms = engine.hybrid_gfe_diagnostics(state)["emission"]
+terms["rho"]                       # stationary regime belief
+terms["mi_regime_surrogate"]       # scored collapse surrogate
+terms["mi_regime_exact_lower"]     # diagnostic sandwich
+terms["mi_regime_exact_upper"]     # includes the H(rho) cap
+terms["bound_direction"]           # reported_gfe_lower_bounds_exact
+```
+
+The direct ledger term is the optimistic D5 `G-hat`, never its stationary
+Lagrangian. Exact selector zeros remain exact; improper state, emission, or
+goal covariances cannot return a converged result.
+
 To let future planning slices send the nonconjugate Part-II `mu3(A)` message
 back toward a learned observation model, opt in when building the rollout and
 prepare one reproducible particle set after installing the current proper
