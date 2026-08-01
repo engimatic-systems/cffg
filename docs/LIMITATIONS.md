@@ -267,6 +267,24 @@ excluded until derived and tested). The engine supports only an exterior
 substituted output facing a fixed Gaussian goal. Interior predictive cavities,
 learned Gaussian goals, and Prop. 6 parameter novelty remain follow-up work.
 
+**S1i. Recurrent logistic transitions use a declared mean-field bound.** A
+`recurrence_link` represents `p(z_t | z_{t-1}, x_t)` with `K - 1`
+source-specific stick-breaking logits for each previous regime. Its
+Pólya–Gamma auxiliary is replaced by the coordinate-optimal mean-field
+factor, equivalently the Jaakkola–Jordan lower bound on expected log
+transition probability. The reported recurrence VFE therefore upper-bounds
+the exact variational VFE at the same categorical and Gaussian beliefs; dense
+one-dimensional quadrature measures this gap in
+`tests/test_recurrence_link.py`. The factorization drops posterior
+correlations among the two regimes, Gaussian drive, and auxiliaries, so a
+strongly coupled or multimodal posterior can remain inaccurate even when the
+coordinate residual converges. v1 requires equal regime cardinalities
+`K >= 2`, a proper Gaussian drive, finite fixed
+`weights[K,K-1,d]`/`offsets[K,K-1]`, and sum-product semantics. Learning those
+weights is separate roadmap work; flooding and mixed scheduling solve the same
+coordinates but, as for mean-field VMP generally, neither guarantees monotone
+progress on every loopy graph.
+
 **S1j. Schedules: measured envelope (cff-d56d, revised 2026-07-27 after
 review).** Two-pass schedules make tree and chain inference O(E) with
 exact marginals and FE; loopy pure BP gets colored Gauss–Seidel sweeps;

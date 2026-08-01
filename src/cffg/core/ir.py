@@ -352,8 +352,8 @@ EF_EDGE_FAMILIES: dict[str, dict[str, str]] = {
     "gaussian_prec": {"prec": "gamma"},
 }
 
-# The hybrid Gaussian-mixture vocabulary (cff-pksr): a discrete selector edge
-# steers a continuous Gaussian output. `gaussian_mixture` is the mixture-of-
+# The hybrid discrete/Gaussian vocabulary: a discrete selector edge can steer
+# a continuous Gaussian output. `gaussian_mixture` is the mixture-of-
 # priors leaf N(out; m_s, V_s); `gaussian_mixture_linear` is the switching
 # conditional N(out; A_s in + b_s, V_s) — the continuous sibling of
 # transition_mixture. Messages on the Gaussian edges are moment-matched
@@ -371,6 +371,16 @@ register_factor_type(
         "gaussian_mixture_linear",
         edge_roles=("out", "in", "selector"),
         param_roles=("matrix", "offset", "cov"),
+        family="hybrid",
+    )
+)
+# `recurrence_link` couples consecutive regimes through source-specific
+# stick-breaking logits driven by a Gaussian state (DERIVATIONS.md D8).
+register_factor_type(
+    FactorType(
+        "recurrence_link",
+        edge_roles=("out", "in", "drive"),
+        param_roles=("weights", "offsets"),
         family="hybrid",
     )
 )
@@ -396,6 +406,7 @@ register_factor_type(
 HYBRID_EDGE_FAMILIES: dict[str, dict[str, str]] = {
     "gaussian_mixture": {"out": "gaussian", "selector": "discrete"},
     "gaussian_mixture_linear": {"out": "gaussian", "in": "gaussian", "selector": "discrete"},
+    "recurrence_link": {"out": "discrete", "in": "discrete", "drive": "gaussian"},
     # out is a Gaussian edge, prec an EF edge (pinned to ef=gamma above).
     "gaussian_prec": {"out": "gaussian", "prec": "ef"},
 }

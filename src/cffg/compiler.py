@@ -181,6 +181,26 @@ class MixGroupPlan:
 
 
 @dataclass(frozen=True)
+class RecurrencePlan:
+    """Source-specific stick-breaking transitions across two arenas.
+
+    Both discrete roles and the Gaussian drive read complete edge marginals,
+    because the coordinate-optimal PG/JJ bound is a variational update. The
+    factor writes its two categorical messages and one possibly singular
+    Gaussian likelihood message back to its own slots.
+    """
+
+    name: str
+    cards: tuple[int, int]  # (K_out, K_in), equal in the rSLDS v1 family
+    dim: int
+    members: tuple[str, ...]
+    d_gather_both: np.ndarray  # [M, 2 roles, 2 edge slots]
+    d_scatter: np.ndarray  # [M, 2 roles]
+    drive_gather_both: np.ndarray  # [M, 2 edge slots]
+    drive_scatter: np.ndarray  # [M]
+
+
+@dataclass(frozen=True)
 class PrecGroupPlan:
     """All gaussian_prec factors, run together (cff-7c5o). A scalar Gaussian
     node f(x; m, τ) = N(x; m, τ⁻¹) whose precision lives on an ef:gamma edge —
@@ -394,6 +414,7 @@ class Arena:
     mix_groups: list[MixGroupPlan] = field(default_factory=list)
     # Hybrid Gaussian-mixture groups (cff-pksr): each writes both the Gaussian
     # arena (out/in edges) and the discrete arena (selector edge).
+    recurrence_groups: list[RecurrencePlan] = field(default_factory=list)
     prec_groups: list["PrecGroupPlan"] = field(default_factory=list)
     # gaussian_prec groups (cff-7c5o): each writes both the Gaussian arena
     # (out edge) and the EF arena (prec edge).
@@ -608,6 +629,11 @@ def compile_template(
                 f"factor {f.name!r}: hybrid beads are undefined for mean-field "
                 "constraints; "
                 "collapse rules are already assumed-density (cff-pksr)"
+            )
+        if f.type == "recurrence_link" and f.name in psub:
+            problems.append(
+                f"factor {f.name!r}: P-substitution on recurrence_link is "
+                "unsupported; its PG/JJ coordinate defines a VFE bound"
             )
         if f.type in kernels.conditioned_out_types():
             out_var = f.edges["out"]
@@ -1241,6 +1267,7 @@ def compile_template(
     gauss_buckets: dict[tuple, list[str]] = {}
     ef_buckets: dict[tuple[str, str], list[str]] = {}
     mix_buckets: dict[tuple, list[str]] = {}
+    recurrence_buckets: dict[tuple[int, int], list[str]] = {}
     prec_members: list[str] = []
     constraint_names: list[str] = []
     for fname in sorted(t.factors):
@@ -1269,6 +1296,17 @@ def compile_template(
                     "vector precision-mean priors are cff-7c5o follow-up work"
                 )
             prec_members.append(fname)
+            continue
+        if f.type == "recurrence_link":
+            k_out = t.variables[f.edges["out"]].cardinality
+            k_in = t.variables[f.edges["in"]].cardinality
+            drive_dim = t.variables[f.edges["drive"]].dim
+            if k_out != k_in or k_out < 2:
+                raise CompileError(
+                    f"factor {fname!r}: recurrence_link requires equal out/in "
+                    f"cardinality K >= 2, got {(k_out, k_in)}"
+                )
+            recurrence_buckets.setdefault((k_out, drive_dim), []).append(fname)
             continue
         if ft.family == "hybrid":  # Gaussian-mixture nodes: their own arena pair
             dims = tuple(t.variables[f.edges[r]].dim for r in roles if r != "selector")
@@ -1347,6 +1385,60 @@ def compile_template(
         for key, arr in _stack_mix_params(t, mtype, dims, k_sel, members, resolved).items():
             log_params[f"{gname}:{key}"] = arr
         # member_of stays discrete-only, as with the Gaussian and EF families.
+
+    recurrence_groups: list[RecurrencePlan] = []
+    for (card, drive_dim), members in sorted(recurrence_buckets.items()):
+        gname = f"recurrence:{card}:{drive_dim}"
+        d_scatter = np.array(
+            [
+                [slot_of[(member, role)] for role in ("out", "in")]
+                for member in members
+            ],
+            dtype=np.int64,
+        )
+        d_gather_both = np.stack(
+            [
+                d_scatter,
+                np.array(
+                    [
+                        [opposite[(member, role)] for role in ("out", "in")]
+                        for member in members
+                    ],
+                    dtype=np.int64,
+                ),
+            ],
+            axis=-1,
+        )
+        drive_scatter = np.array(
+            [slot_of[(member, "drive")] for member in members],
+            dtype=np.int64,
+        )
+        drive_gather_both = np.stack(
+            [
+                drive_scatter,
+                np.array(
+                    [opposite[(member, "drive")] for member in members],
+                    dtype=np.int64,
+                ),
+            ],
+            axis=-1,
+        )
+        recurrence_groups.append(
+            RecurrencePlan(
+                gname,
+                (card, card),
+                drive_dim,
+                tuple(members),
+                d_gather_both,
+                d_scatter,
+                drive_gather_both,
+                drive_scatter,
+            )
+        )
+        for key, value in _stack_recurrence_params(
+            t, card, drive_dim, members, resolved
+        ).items():
+            log_params[f"{gname}:{key}"] = value
 
     prec_groups: list[PrecGroupPlan] = []
     if prec_members:
@@ -1510,7 +1602,7 @@ def compile_template(
             rejects.append("Dirichlet parameter-edge VMP groups")
         if gfe_groups or gfe_tm_groups or hybrid_gfe_groups:
             rejects.append("P-substitution / GFE composites")
-        if gauss_groups or mix_groups or prec_groups:
+        if gauss_groups or mix_groups or recurrence_groups or prec_groups:
             rejects.append("Gaussian/hybrid groups")
         if ef_groups:
             rejects.append("EF groups")
@@ -1600,6 +1692,7 @@ def compile_template(
         n_obs_rows=n_obs_rows,
         g_obs_starts=prefix(obs_lengths),
         mix_groups=mix_groups,
+        recurrence_groups=recurrence_groups,
         prec_groups=prec_groups,
         gauss_interior=gauss_interior,
         n_efslots=next_efslot,
@@ -1800,6 +1893,12 @@ def _blob_shape(t: Template, blob_name: str) -> tuple[int, ...] | None:
             if f.type == "gaussian_mixture_linear":
                 do, di, k = dim("out"), dim("in"), card("selector")
                 return {"matrix": (k, do, di), "offset": (k, do), "cov": (k, do, do)}[role]
+            if f.type == "recurrence_link":
+                k, d = card("out"), dim("drive")
+                return {
+                    "weights": (k, k - 1, d),
+                    "offsets": (k, k - 1),
+                }[role]
             if f.type in ("gamma", "beta"):
                 return ()  # scalar prior parameters
             if f.type == "gaussian_prec":
@@ -1958,6 +2057,34 @@ def _stack_prec_means(
             )
         means.append(arr.reshape(1))
     return np.stack(means)
+
+
+def _stack_recurrence_params(
+    t: Template,
+    card: int,
+    drive_dim: int,
+    members: list[str],
+    resolved: dict[str, np.ndarray],
+) -> dict[str, np.ndarray]:
+    """Stack source-specific stick weights and offsets for one plan."""
+    weights = []
+    offsets = []
+    for member in members:
+        factor = t.factors[member]
+        member_weights = resolved[factor.param_blobs["weights"]]
+        member_offsets = resolved[factor.param_blobs["offsets"]]
+        _expect(member, member_weights, (card, card - 1, drive_dim))
+        _expect(member, member_offsets, (card, card - 1))
+        if not (
+            np.all(np.isfinite(member_weights))
+            and np.all(np.isfinite(member_offsets))
+        ):
+            raise CompileError(
+                f"factor {member!r}: recurrence weights and offsets must be finite"
+            )
+        weights.append(member_weights)
+        offsets.append(member_offsets)
+    return {"weights": np.stack(weights), "offsets": np.stack(offsets)}
 
 
 def _log_of(arr: np.ndarray) -> np.ndarray:

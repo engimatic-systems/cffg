@@ -104,6 +104,7 @@ EPIC_FILES = {
     "R1 · Hybrid epistemics": [
         "test_hybrid_epistemics.py",
         "test_hybrid_gfe.py",
+        "test_recurrence_link.py",
     ],
     "SG · Glucose": ["test_glucose.py"],
 }

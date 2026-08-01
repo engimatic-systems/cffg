@@ -1619,3 +1619,125 @@ Algorithms* (2005); Moré, *The Levenberg--Marquardt Algorithm:
 Implementation and Theory* (1977); Conn, Gould, and Toint,
 *Trust Region Methods*; and Steihaug, *The Conjugate Gradient Method and
 Trust Regions in Large Scale Optimization* (1983).
+
+## D8 — Recurrent stick-breaking transitions via Pólya–Gamma VMP (cff-k9ws)
+
+### D8.1 The plain-English version
+
+An rSLDS needs a regime transition whose probabilities change with a
+continuous state. A dense transition table cannot express that dependence
+without discretizing the state. The recurrence link instead gives each
+previous regime its own sequence of logistic sticks: reject sticks until one
+is accepted, with the last regime receiving the remaining probability.
+
+Logistic factors are not conjugate to a Gaussian drive. Pólya–Gamma
+augmentation makes each stick conditionally Gaussian; replacing its auxiliary
+variable by the best independent factor gives the familiar
+Jaakkola–Jordan bound. The resulting coordinate updates are closed-form
+categorical log scores and Gaussian information parameters. Because the bound
+is below the exact expected log transition, the recurrence energy is above
+the exact variational energy at the same beliefs. This is conservative in the
+opposite direction from the optimistic hybrid-GFE approximation in D5.
+
+### D8.2 Model and bound
+
+Let previous regime `i`, destination `j`, and stick `l` range over
+`i,j in {0,...,K-1}` and `l in {0,...,K-2}`. For Gaussian drive `x`,
+
+    psi_il(x) = R_il^T x + r_il,
+    b_jl = 1[j >= l],        a_jl = 1[j = l],
+    kappa_jl = a_jl - b_jl / 2.                         (D8.1)
+
+Only sticks with `b_jl = 1` are at risk. The final destination rejects every
+stick. The conditional therefore has log probability
+
+    log p(j | i,x) = sum_l b_jl log sigma((2 a_jl - 1) psi_il). (D8.2)
+
+The exact Pólya–Gamma identity introduces an auxiliary and makes the exponent
+quadratic in `psi_il`:
+
+    exp(a_jl psi_il) / (1 + exp(psi_il))^b_jl
+      = 2^-b_jl exp(kappa_jl psi_il)
+          integral exp(-omega psi_il^2 / 2)
+                   p_PG(omega | b_jl,0) d omega.              (D8.3)
+
+Under `q(i) q(j) q(x) product_il q(omega_il)`, let
+
+    alpha_i = q(i), beta_j = q(j), q(x) = N(m,S),
+    mu_il = R_il^T m + r_il,
+    xi_il^2 = E_q[psi_il^2] = mu_il^2 + R_il^T S R_il.        (D8.4)
+
+For each at-risk Bernoulli trial the coordinate-optimal tilted auxiliary is
+`PG(1, xi_il)`. Its mean per at-risk trial is
+
+    omega_bar_il = tanh(xi_il / 2) / (2 xi_il),               (D8.5)
+
+with analytic limit `1/4` at zero. The expected at-risk mass
+`B_l = sum_{j>=l} beta_j` scales this mean in the Gaussian message. Eliminating
+the auxiliary gives the Jaakkola–Jordan stick score
+
+    s_il^+ = log sigma(xi_il) + (mu_il - xi_il) / 2,
+    s_il^- = log sigma(xi_il) + (-mu_il - xi_il) / 2.         (D8.6)
+
+Thus the expected bounded log transition for `(i,j)` is the sum of failure
+scores before `j`, plus the success score at `j` when `j < K-1`. A prefix sum
+constructs all scores in `O(K^2)` rather than materializing a
+destination-by-stick-by-source tensor.
+
+### D8.3 Coordinate messages and energy
+
+Write `T_ij` for that bounded score. The categorical messages are
+
+    log m_to_out(j) = sum_i alpha_i T_ij + constant,
+    log m_to_in(i)  = sum_j beta_j T_ij + constant.           (D8.7)
+
+With `kappa_bar_l = beta_l - B_l/2`, the Gaussian information message is
+
+    Lambda_x = sum_il alpha_i B_l omega_bar_il R_il R_il^T,
+    eta_x    = sum_il alpha_i
+                 (kappa_bar_l - B_l omega_bar_il r_il) R_il. (D8.8)
+
+These equations are one coordinate-ascent VMP block. A global mixed or flood
+sweep alternates them with the rest of the graph; no hidden per-stick
+iterative solver exists.
+
+Let `L_rec^JJ = sum_ij alpha_i beta_j T_ij`. The node contribution stored in
+the constrained Bethe ledger is
+
+    F_rec^JJ = -H[q(out)] - H[q(in)] - H[q(x)] - L_rec^JJ.    (D8.9)
+
+The ordinary interior-edge entropy corrections remove duplicate entropies
+globally. Since `L_rec^JJ <= E_q[log p(out | in,x)]`,
+
+    F_rec^JJ >= F_rec^exact.                                  (D8.10)
+
+This statement compares objectives at held beliefs; it does not claim the two
+objectives have the same optimizer.
+
+### D8.4 Numerical contract and executable anchors
+
+Exact categorical log-zeros are masked before normalization and never relaxed.
+A wholly vacuous Gaussian drive is neutral only as a transient while a facing
+prior propagates; a final vacuous or any indefinite drive is divergence. The
+Pólya–Gamma mean uses its dtype-scaled series near zero, and a dtype- and
+dimension-scaled tolerance admits only contraction roundoff in the nonnegative
+second moment. One plan stores `O(P K^2 d)` parameters and each update costs
+`O(P K^2 d^2)`; it allocates no `K^3` transition tensor.
+
+Executable anchors in `tests/test_recurrence_link.py`:
+
+- `test_rule_matches_independent_numpy_coordinates` checks (D8.4--D8.8).
+- `test_jj_expected_log_is_a_lower_bound` checks (D8.10) with
+  independent Gaussian quadrature.
+- `test_engine_tracks_dense_quadrature_and_upper_bounds_evidence` compares the
+  stationary posterior and global ledger against an exact scalar integral.
+- `test_exact_zero_support_is_preserved`,
+  `test_vacuous_and_improper_drive_are_loud_after_transient_flooding`, and
+  `test_float32_k32_d16_converges_without_cubic_plan_storage` pin the hostile
+  input and scale contract.
+
+References: Polson, Scott, and Windle, *Bayesian Inference for Logistic Models
+Using Pólya–Gamma Latent Variables* (2013); Linderman, Johnson, and Adams,
+*Dependent Multinomial Models Made Easy: Stick-Breaking with the
+Pólya–Gamma Augmentation* (2015); Durante and Rigon, *Conditionally Conjugate
+Mean-Field Variational Bayes for Logistic Models* (2019).

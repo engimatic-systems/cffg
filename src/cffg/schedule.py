@@ -21,7 +21,8 @@ topology admits:
   (Gauss–Seidel across colors, Jacobi within one), which propagates
   information further per sweep than flooding.
 - ``mixed``: iterative structures present (mean-field beads, GFE
-  composites, hard constraints, hybrid mixtures, gaussian_prec). Each outer
+  composites, hard constraints, hybrid mixtures, recurrence links,
+  gaussian_prec). Each outer
   iteration updates the iterative phase synchronously, then refreshes the
   BP islands before the loop evaluates the global residual and FE: forest
   islands are re-equilibrated *exactly* (a full two-pass), cyclic islands
@@ -197,6 +198,18 @@ def _arena_signature(arena: Arena) -> str:
             group.s_scatter,
         ):
             h.update(np.ascontiguousarray(rows).tobytes())
+    for group in arena.recurrence_groups:
+        h.update(
+            f"recurrence|{group.name}|{group.cards}|{group.dim}|"
+            f"{group.members}".encode()
+        )
+        for rows in (
+            group.d_gather_both,
+            group.d_scatter,
+            group.drive_gather_both,
+            group.drive_scatter,
+        ):
+            h.update(np.ascontiguousarray(rows).tobytes())
     return h.hexdigest()
 
 
@@ -245,6 +258,8 @@ def _iterative_structures(arena: Arena) -> list[str]:
         reasons.append("GFE composites")
     if arena.mix_groups:
         reasons.append("hybrid mixture groups")
+    if arena.recurrence_groups:
+        reasons.append("recurrence-link VMP groups")
     if arena.prec_groups:
         reasons.append("gaussian_prec VMP groups")
     return reasons
