@@ -10,8 +10,7 @@ This repository implements **Constrained Forney-style Factor Graphs (CFFGs)** an
 - *Part II: Variational Message Updates* (van de Laar, Koudahl, de Vries)
 
 Both papers live in `notes/` (PDFs plus extracted text). The project brief is in the
-Obsidian vault at `agents/CFFG/0.0.md`. Reference implementation for parity testing:
-https://github.com/biaslab/LAIF (Julia/RxInfer).
+Obsidian vault at `agents/CFFG/0.0.md`.
 
 ## Session bootstrap
 
@@ -26,12 +25,12 @@ git pull --ff-only origin "$BASE_BRANCH"
 
 ## Rules
 
-1. **Package management: `uv` only.** Use `uv init`, `uv add`, `uv run`, `uv sync`.
+1. **Package management: `uv` only.** Use `uv add`, `uv run`, `uv sync`.
    Never call `pip` directly, never hand-edit lockfiles. The venv is managed by uv.
 
 2. **Atomic git commits.** One logical change per commit — a commit should build and
    pass tests on its own. Commit early and often; keep refactors separate from
-   behavior changes. Reference ticket IDs in commit messages (e.g. `tk-42: ...`).
+   behavior changes. Reference ticket IDs in commit messages (e.g. `cff-woop: ...`).
 
 3. **Tickets via `tk`.** All work is tracked in the `tk` ticket system (`tk --help`
    for usage). Break work into small tickets with dependency links, use epics for the
@@ -63,6 +62,8 @@ git pull --ff-only origin "$BASE_BRANCH"
    active-inference derivation), spawn a sub-agent with the *specific questions* to
    answer and have it report back a short summary. Do not read whole papers into the
    main context window mid-task.
+
+7. **De-weight development costs.** When making technical decisions, do not give much weight to development cost and give more weight to quality, simplicity, correctness, scalability, and long-term maintainability.
 
 ## Coding style
 - The code should be idiomatic
