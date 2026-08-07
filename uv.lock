@@ -191,6 +191,7 @@ bench = [
 ]
 dev = [
     { name = "pytest" },
+    { name = "pyyaml" },
     { name = "scipy" },
     { name = "setuptools" },
     { name = "simglucose" },
@@ -210,6 +211,7 @@ provides-extras = ["viz"]
 bench = [{ name = "dynamax", specifier = ">=1.0.2" }]
 dev = [
     { name = "pytest", specifier = ">=9.1.1" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "scipy", specifier = ">=1.18.0" },
     { name = "setuptools", specifier = "<81" },
     { name = "simglucose", git = "https://github.com/jxx123/simglucose" },

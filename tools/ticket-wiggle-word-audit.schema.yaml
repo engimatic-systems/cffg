@@ -1,0 +1,477 @@
+---
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://github.com/engimatic-systems/cffg/blob/main/tools/ticket-wiggle-word-audit.schema.yaml
+title: CFFG ticket wiggle-word contextual audit
+description: >-
+  Schema for tools/ticket-wiggle-word-audit-v2.yaml. The audit is ordered by
+  candidate, while the query tool projects bounded candidate or ticket slices
+  so agents do not place the complete report in their context windows.
+type: object
+required:
+- schema_version
+- generated_at
+- purpose
+- provenance
+- method
+- comparison_to_v1
+- summary
+- candidates
+additionalProperties: false
+properties:
+  schema_version:
+    const: 2
+  generated_at:
+    type: string
+    format: date-time
+  purpose:
+    type: string
+    minLength: 1
+  provenance:
+    $ref: '#/$defs/provenance'
+  method:
+    $ref: '#/$defs/method'
+  comparison_to_v1:
+    $ref: '#/$defs/comparison'
+  summary:
+    $ref: '#/$defs/summary'
+  candidates:
+    type: array
+    minItems: 1
+    items:
+      $ref: '#/$defs/candidate'
+
+x-navigation:
+  authoritative_instance: tools/ticket-wiggle-word-audit-v2.yaml
+  candidate_lexicon: tools/ticket-wiggle-words-v2.yaml
+  query_tool: tools/query_ticket_wiggle_audit.py
+  context_rule: >-
+    Do not read the complete audit to refine one ticket. Produce a bounded
+    slice, and place only that slice plus the assigned ticket and necessary
+    dependency tickets in the agent context.
+  primary_partition:
+    key: candidates[].occurrences[].ticket
+    command: uv run python tools/query_ticket_wiggle_audit.py slice cff-y4nx
+    purpose: Return the contextual classifications already recorded for one ticket.
+  current_ticket_scan:
+    key: candidate regex matched against one current ticket file
+    command: uv run python tools/query_ticket_wiggle_audit.py scan cff-y4nx
+    purpose: >-
+      Re-run the frozen mechanical vocabulary after a ticket is written or
+      materially revised; this catches text that did not exist in the pinned audit corpus.
+  narrower_queries:
+    problems_only: >-
+      uv run python tools/query_ticket_wiggle_audit.py slice cff-y4nx --problems-only
+    one_candidate: >-
+      uv run python tools/query_ticket_wiggle_audit.py slice cff-y4nx --candidate end_to_end
+    audit_summary: uv run python tools/query_ticket_wiggle_audit.py summary
+    internal_validation: uv run python tools/query_ticket_wiggle_audit.py validate
+  ticket_slice_shape:
+    source: Audit and lexicon provenance used for the projection.
+    query: Selected ticket and optional candidate or problem filter.
+    summary: Counts for the bounded result.
+    candidates: >-
+      Matching candidate definitions, ticket-local usage counts, and only the
+      selected occurrence records.
+  cross_file_invariants:
+  - Candidate ids and patterns agree with tools/ticket-wiggle-words-v2.yaml.
+  - Every non-sentinel occurrence meaning is listed for its lexicon candidate.
+  - Candidate and report counts reconcile with their occurrence records.
+  - observed_meaning is present only for unlisted_meaning and pattern_false_positive.
+  - The audit's pinned corpus hash is provenance; a current-ticket scan is not a regeneration.
+
+x-refinement-workflow:
+  dependency_direction: prerequisite --> dependent
+  terminal_ticket_command: >-
+    tk query | jq -s '[.[] | select(.status != "closed")] as $open | $open |
+    map(select(.id as $id | ([ $open[] | select((.deps // []) | index($id)) ] |
+    length) == 0)) | .[] | {id, status, deps}'
+  downstream_first_pass:
+  - Derive open terminal tickets: tickets with no open or in-progress dependents.
+  - Assign exactly one active ticket to one refinement agent.
+  - Give that agent the ticket audit slice, the current-ticket scan, and only the dependency context it needs.
+  - Permit it to edit only its assigned open ticket; closed dependencies are read-only context.
+  - >-
+    Record edits, retained intentional uses, unresolved questions, and
+    requirements imposed on direct prerequisites.
+  fan_in_barrier: >-
+    Do not release a shared prerequisite for refinement until every processed
+    downstream consumer has reported its requirements. Aggregate those reports
+    into one assignment so downstream promises cannot be lost or overwritten.
+  assignment_lock: >-
+    The top-level agent owns the ready queue and records one active ticket id.
+    Neither the top-level agent nor another sub-agent edits that ticket until the
+    assignee reports completion or relinquishes it.
+  post_authoring_check:
+  - Run the current-ticket scan after creating or materially rewriting a ticket.
+  - >-
+    Review every match in context; rewrite any claim whose owner, time, layer,
+    scope, comparison, or evidence has multiple readings.
+  - Leave an intentional use unchanged when its surrounding sentence and structured fields select one meaning.
+  - >-
+    Run the scan again after refinement and report intentionally retained
+    matches grouped by candidate and intended meaning.
+  - Check ownership separately: lexical scans can measure explicit cues but cannot detect an omitted owner.
+  completion_checks:
+  - tk dep cycle
+  - git diff --check
+  - uv run python tools/query_ticket_wiggle_audit.py validate
+
+$defs:
+  non_negative_integer:
+    type: integer
+    minimum: 0
+  positive_integer:
+    type: integer
+    minimum: 1
+  percentage:
+    type: number
+    minimum: 0
+    maximum: 100
+  sha256:
+    type: string
+    pattern: '^[0-9a-f]{64}$'
+  ticket_path:
+    type: string
+    pattern: '^\.tickets/.+\.md$'
+  string_count_map:
+    type: object
+    propertyNames:
+      minLength: 1
+    additionalProperties:
+      $ref: '#/$defs/non_negative_integer'
+  artifact:
+    type: object
+    required: [path, sha256]
+    additionalProperties: false
+    properties:
+      path:
+        type: string
+        minLength: 1
+      sha256:
+        $ref: '#/$defs/sha256'
+  provenance:
+    type: object
+    required:
+    - lexicon
+    - v1_report
+    - ticket_corpus
+    - sequencing
+    - semantic_classification
+    additionalProperties: false
+    properties:
+      lexicon:
+        $ref: '#/$defs/artifact'
+      v1_report:
+        $ref: '#/$defs/artifact'
+      ticket_corpus:
+        type: object
+        required: [glob, files, git_commit, sha256]
+        additionalProperties: false
+        properties:
+          glob:
+            type: string
+          files:
+            $ref: '#/$defs/positive_integer'
+          git_commit:
+            type: string
+            pattern: '^[0-9a-f]{40}$'
+          sha256:
+            $ref: '#/$defs/sha256'
+      sequencing:
+        type: object
+        required:
+        - v2_lexicon_frozen_before_v2_count
+        - v2_mechanical_count_completed_before_context_classification
+        - mechanical_count_completed_at
+        additionalProperties: false
+        properties:
+          v2_lexicon_frozen_before_v2_count:
+            type: boolean
+          v2_mechanical_count_completed_before_context_classification:
+            type: boolean
+          mechanical_count_completed_at:
+            type: string
+            format: date-time
+      semantic_classification:
+        type: object
+        required:
+        - model
+        - partition_artifact_sha256
+        - adjudication_artifact_sha256
+        - adjudicated_records
+        - central_identifier_reclassifications
+        additionalProperties: false
+        properties:
+          model:
+            type: string
+          partition_artifact_sha256:
+            type: object
+            additionalProperties:
+              $ref: '#/$defs/sha256'
+          adjudication_artifact_sha256:
+            $ref: '#/$defs/sha256'
+          adjudicated_records:
+            $ref: '#/$defs/non_negative_integer'
+          central_identifier_reclassifications:
+            type: object
+            required: [candidate, from, to, occurrences, rule]
+            additionalProperties: false
+            properties:
+              candidate: {type: string}
+              from: {type: string}
+              to: {type: string}
+              occurrences:
+                $ref: '#/$defs/non_negative_integer'
+              rule: {type: string}
+  method:
+    type: object
+    required:
+    - phase_1
+    - phase_2
+    - ambiguity_rule
+    - ownership_limit
+    - column_convention
+    - limitations
+    additionalProperties: false
+    properties:
+      phase_1: {type: string}
+      phase_2: {type: string}
+      ambiguity_rule: {type: string}
+      ownership_limit: {type: string}
+      column_convention: {type: string}
+      limitations:
+        type: array
+        items: {type: string}
+  comparison:
+    type: object
+    required:
+    - same_ticket_corpus
+    - v1_candidates
+    - v2_candidates
+    - new_v2_candidates
+    - v1_raw_occurrences
+    - v2_raw_occurrences
+    - v1_ambiguous
+    - v2_ambiguous
+    - v1_unlisted_meaning
+    - v2_unlisted_meaning
+    - v1_pattern_false_positive
+    - v2_pattern_false_positive
+    additionalProperties: false
+    properties:
+      same_ticket_corpus: {type: boolean}
+      v1_candidates: {$ref: '#/$defs/non_negative_integer'}
+      v2_candidates: {$ref: '#/$defs/non_negative_integer'}
+      new_v2_candidates:
+        type: array
+        items: {type: string}
+      v1_raw_occurrences: {$ref: '#/$defs/non_negative_integer'}
+      v2_raw_occurrences: {$ref: '#/$defs/non_negative_integer'}
+      v1_ambiguous: {$ref: '#/$defs/non_negative_integer'}
+      v2_ambiguous: {$ref: '#/$defs/non_negative_integer'}
+      v1_unlisted_meaning: {$ref: '#/$defs/non_negative_integer'}
+      v2_unlisted_meaning: {$ref: '#/$defs/non_negative_integer'}
+      v1_pattern_false_positive: {$ref: '#/$defs/non_negative_integer'}
+      v2_pattern_false_positive: {$ref: '#/$defs/non_negative_integer'}
+  summary:
+    type: object
+    required:
+    - ticket_files
+    - candidates
+    - raw_candidate_occurrences
+    - candidate_ticket_pairs
+    - resolved_to_prelisted_meaning
+    - ambiguous
+    - unlisted_meaning
+    - pattern_false_positive
+    - ambiguity_rate_percent_excluding_pattern_false_positives
+    - tickets_with_ambiguity
+    - candidate_ticket_pairs_with_multiple_usages
+    - explicit_ownership_cue_occurrences
+    - ambiguous_by_section_class
+    - ambiguous_by_ticket_status
+    - rankings
+    additionalProperties: false
+    properties:
+      ticket_files: {$ref: '#/$defs/non_negative_integer'}
+      candidates: {$ref: '#/$defs/non_negative_integer'}
+      raw_candidate_occurrences: {$ref: '#/$defs/non_negative_integer'}
+      candidate_ticket_pairs: {$ref: '#/$defs/non_negative_integer'}
+      resolved_to_prelisted_meaning: {$ref: '#/$defs/non_negative_integer'}
+      ambiguous: {$ref: '#/$defs/non_negative_integer'}
+      unlisted_meaning: {$ref: '#/$defs/non_negative_integer'}
+      pattern_false_positive: {$ref: '#/$defs/non_negative_integer'}
+      ambiguity_rate_percent_excluding_pattern_false_positives:
+        $ref: '#/$defs/percentage'
+      tickets_with_ambiguity: {$ref: '#/$defs/non_negative_integer'}
+      candidate_ticket_pairs_with_multiple_usages: {$ref: '#/$defs/non_negative_integer'}
+      explicit_ownership_cue_occurrences:
+        $ref: '#/$defs/string_count_map'
+      ambiguous_by_section_class:
+        $ref: '#/$defs/string_count_map'
+      ambiguous_by_ticket_status:
+        $ref: '#/$defs/string_count_map'
+      rankings:
+        type: object
+        required:
+        - ambiguous_by_occurrence_count
+        - unlisted_meaning_by_occurrence_count
+        - pattern_false_positive_by_occurrence_count
+        additionalProperties: false
+        properties:
+          ambiguous_by_occurrence_count:
+            $ref: '#/$defs/ranking_list'
+          unlisted_meaning_by_occurrence_count:
+            $ref: '#/$defs/ranking_list'
+          pattern_false_positive_by_occurrence_count:
+            $ref: '#/$defs/ranking_list'
+  ranking_list:
+    type: array
+    items:
+      type: object
+      required: [id, occurrences, raw_occurrences]
+      additionalProperties: false
+      properties:
+        id: {type: string}
+        occurrences: {$ref: '#/$defs/non_negative_integer'}
+        raw_occurrences: {$ref: '#/$defs/non_negative_integer'}
+  candidate:
+    type: object
+    required: [id, category, pattern, raw_count, classification, occurrences]
+    additionalProperties: false
+    properties:
+      id:
+        type: string
+        pattern: '^[a-z][a-z0-9_]*$'
+      category:
+        type: string
+        minLength: 1
+      pattern:
+        type: string
+        minLength: 1
+      raw_count:
+        $ref: '#/$defs/raw_count'
+      classification:
+        $ref: '#/$defs/classification'
+      occurrences:
+        type: array
+        items:
+          $ref: '#/$defs/occurrence'
+  raw_count:
+    type: object
+    required: [occurrences, tickets, by_ticket]
+    additionalProperties: false
+    properties:
+      occurrences: {$ref: '#/$defs/non_negative_integer'}
+      tickets: {$ref: '#/$defs/non_negative_integer'}
+      by_ticket:
+        type: object
+        propertyNames:
+          pattern: '^\.tickets/.+\.md$'
+        additionalProperties:
+          $ref: '#/$defs/positive_integer'
+  classification:
+    type: object
+    required:
+    - usage_counts
+    - ambiguous_occurrences
+    - ambiguity_rate_percent_excluding_pattern_false_positives
+    - ambiguous_tickets
+    - tickets_with_multiple_usages
+    - observed_unlisted_or_false_positive_senses
+    additionalProperties: false
+    properties:
+      usage_counts:
+        $ref: '#/$defs/string_count_map'
+      ambiguous_occurrences:
+        $ref: '#/$defs/non_negative_integer'
+      ambiguity_rate_percent_excluding_pattern_false_positives:
+        $ref: '#/$defs/percentage'
+      ambiguous_tickets:
+        type: array
+        uniqueItems: true
+        items:
+          $ref: '#/$defs/ticket_path'
+      tickets_with_multiple_usages:
+        type: array
+        items:
+          type: object
+          required: [ticket, usages]
+          additionalProperties: false
+          properties:
+            ticket:
+              $ref: '#/$defs/ticket_path'
+            usages:
+              type: array
+              minItems: 2
+              uniqueItems: true
+              items: {type: string}
+      observed_unlisted_or_false_positive_senses:
+        type: array
+        items:
+          type: object
+          required: [classification, meaning, occurrences]
+          additionalProperties: false
+          properties:
+            classification:
+              enum: [unlisted_meaning, pattern_false_positive]
+            meaning: {type: string}
+            occurrences: {$ref: '#/$defs/positive_integer'}
+  occurrence:
+    type: object
+    required:
+    - ticket
+    - line
+    - column
+    - matched_text
+    - section
+    - meaning
+    - rationale
+    - ticket_status
+    - section_class
+    additionalProperties: false
+    properties:
+      ticket:
+        $ref: '#/$defs/ticket_path'
+      line:
+        $ref: '#/$defs/positive_integer'
+      column:
+        $ref: '#/$defs/positive_integer'
+      matched_text:
+        type: string
+        minLength: 1
+      section:
+        type: string
+      meaning:
+        type: string
+        minLength: 1
+      observed_meaning:
+        type: string
+        minLength: 1
+      rationale:
+        type: string
+        minLength: 1
+      ticket_status:
+        enum: [open, in_progress, closed]
+      section_class:
+        enum:
+        - acceptance_criteria
+        - architecture_handoff
+        - dependency_or_roadmap
+        - design_or_protocol
+        - hostile_inputs
+        - notes
+        - plain_english
+        - preamble
+        - title_or_other
+    allOf:
+    - if:
+        properties:
+          meaning:
+            enum: [unlisted_meaning, pattern_false_positive]
+        required: [meaning]
+      then:
+        required: [observed_meaning]
+      else:
+        not:
+          required: [observed_meaning]
