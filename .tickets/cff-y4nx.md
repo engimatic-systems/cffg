@@ -277,3 +277,22 @@ Legend: prerequisite --> dependent
 Final ticket-only validation: bounded current scan reviewed, `tk dep cycle` passed, and `git diff --check` passed. Retained scan candidates keep the meanings recorded in the rewrite handoff and sequencing note; close=administrative completion, complete=the enumerated acceptance review, ready=dependency readiness, and remaining=the two named open milestone tickets. Capability ownership was checked separately. Intelligible-ticket review: complete.
 
 Post-note scan addition: pass=successful short-suite execution at each named validation commit.
+
+**2026-08-08T19:36:40Z**
+
+Follow-up hardening for the renewed rSLDS milestone attack landed in fb3915d. The compact oracle now verifies every rollover array shape, exact initial-probability installation, every tied dynamics and recurrence row in a three-step engine, fixed emissions, bound-observation preservation, destination float32 dtypes and shapes, malformed builder and prior rejection, improper Gaussian-belief rejection, and rejection after inference. The assertions exposed and fixed one real defect: pristine float32 states were rejected because freshness compared their cast sentinel values with the default-dtype initializer instead of comparing in the destination dtype. Focused recurrence/rSLDS validation: 13 passed. Final repository gate at 614bf18: 1,291 passed, 38 slow tests deselected, zero failures; dashboard wall time 371.217 seconds.
+
+Legend: prerequisite --> dependent
+
+    [x] cff-y4nx rSLDS assembly and rollover hardening
+          |
+          +--> [ ] cff-r6bl cold compile reduction (ready)
+          |
+          +--> [ ] cff-l7y4 observed-only NASCAR fit
+                    ^
+                    |
+              [ ] cff-6tek generic Gaussian learning (ready)
+
+**2026-08-08T19:38:55Z**
+
+Post-hardening scan addition: land means the repository change present at named commit fb3915d; verify means the executed compact-oracle checks named in the preceding note. Other retained candidate meanings remain those recorded in the rewrite and acceptance handoffs.
