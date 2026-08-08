@@ -9,37 +9,77 @@ priority: 1
 assignee: coopwilliams
 tags: [process, tickets, ambiguity]
 ---
-# Ticket semantics: audit wiggle words and require explicit capability ownership
+# Prevent milestone surprises with intelligible tickets
 
-## Plain English
+## Background in Plain English
 
-Make ticket capability claims mechanically reviewable instead of relying on overloaded prose. Preserve a reproducible two-pass vocabulary audit and provide bounded ticket views so agents never need the complete report in context. Require future tickets to state capability ownership, implementation layer, and evidence boundaries explicitly, then apply that structure to the remaining roadmap tickets before implementation resumes.
+Milestone work has reached its later stages before revealing missing capabilities, unclear ownership, or unstated requirements. These surprises forced completed work to be revisited. The root cause was tickets that did not clearly state the intended outcome, the work that motivated it, or the work delegated to another ticket. This ticket changes how tickets are written and reviews every active roadmap ticket so gaps become visible before implementation begins.
 
-## Scope
+The repository already contains a reproducible audit of words whose meaning can shift with context. It also contains a bounded query tool so an agent can inspect one ticket without loading the complete audit. The audit identifies wording that deserves review; the intelligible-ticket structure makes the ticket's background, owned outcomes, suggested methods, and delegated work explicit.
 
-The audit is pinned to the cff-y4nx branch corpus at c855af6 so v1 and v2 remain comparable. The refinement covers every open or in-progress ticket; closed tickets remain historical evidence except where an active ticket depends on interpreting one. This ticket owns ticket-language policy and ticket rewrites, not rSLDS implementation.
+This ticket owns the ticket-writing policy, the dependency-aware rewrite campaign, and the tools that support that campaign. Each rewritten ticket continues to own the engineering outcomes stated in its acceptance criteria. Closed tickets remain historical references and are not rewritten.
 
-## Design
+## Outcomes / Acceptance Criteria
 
-Applicable architecture change path: documentation/ticket process; runtime, compiler, serialization, host/JIT, scheduling, and checkpoint surfaces are N/A because no executable model behavior changes.
+1. The version 1 and version 2 candidate lexicons and occurrence audits parse as YAML.
+2. The version 1 and version 2 audits retain their recorded corpus and lexicon hashes.
+3. Every raw audit match has a recorded classification.
+4. The version 2 report satisfies its JSON Schema.
+5. The query tool returns a bounded historical view for one ticket, one candidate, or the recorded problem classifications.
+6. The query tool scans one current ticket against the frozen version 2 lexicon without regenerating the historical audit.
+7. The machine-wide Codex and Claude installations contain byte-identical `intelligible-ticket` skill instructions.
+8. Both machine-wide skill installations pass the skill validator.
+9. `AGENTS.md` requires the `intelligible-ticket` skill when an agent writes or edits a ticket.
+10. `AGENTS.md` requires a bounded current-ticket scan after a ticket is created or materially rewritten.
+11. A repository tool identifies which active tickets are eligible for downstream-first review.
+12. The scheduler withholds a shared prerequisite until every active direct dependent has a committed review.
+13. Every ticket that is open or in progress at final validation follows the intelligible-ticket structure.
+14. Every reviewed ticket records the current-ticket scan's retained candidates and their intended meanings.
+15. Every reviewed ticket names the real ticket that owns each delegated outcome.
+16. No closed ticket is rewritten by this campaign.
+17. `cff-y4nx` distinguishes fixed-parameter oracle inference from fitting model parameters with the observations exposed to the agent by the declared experiment.
+18. `cff-y4nx` retains `cff-twzc` as a prerequisite.
+19. The final active-ticket dependency graph contains no cycle.
+20. The audit validator succeeds.
+21. The JSON Schema validator succeeds.
+22. The scheduler's automated checks succeed.
+23. The bounded slice and scan smoke commands succeed.
+24. `git diff --check` succeeds.
 
-Each remaining ticket gets a capability-ownership ledger. Every referenced capability is classified as delivered prerequisite, owned here, delegated future, external, or unowned; non-current owners name a ticket or authority, and ticket relations agree with tk dependency direction. Reserved claim words such as end-to-end, generic, learning, implemented, validation, performance, and N/A receive the structured boundary required by their measured ambiguity.
+## Methodological Suggestions
 
-The audit has a JSON Schema expressed as YAML and a query tool that projects one ticket, one candidate, or only sentinel classifications. The same tool scans a current ticket against the frozen lexicon after authoring, because the pinned contextual audit cannot contain later prose.
+- Keep the historical audit pinned to the `cff-y4nx` branch corpus at commit `c855af6` so the two audit versions remain comparable.
+- Treat the applicable architecture change path as the documentation and ticket process. Runtime, compiler, serialization, host/JIT, message scheduling, and checkpoint execution surfaces do not change.
+- Implement the scheduler as a stateless command in `tools/`. Derive the active graph from `tk`, determine completed reviews from committed ticket content, and accept active assignments from the orchestrator.
+- Start with active terminal tickets, which have no active dependents, and move toward their prerequisites.
+- Use three persistent GPT-5.6 Sol workers. Prefer giving a worker an eligible prerequisite of the ticket it most recently completed so the worker retains useful dependent context.
+- Keep a worker's context only while it improves the work. After one unacceptable draft, give that worker one specific correction; after a second unacceptable draft, retire the context and assign the ticket to a fresh GPT-5.6 Sol worker.
+- Start a replacement worker from the assigned ticket and only the dependency tickets needed to reconstruct its context. Do not repeat the failed conversation history.
+- Give each worker one ticket at a time. Permit it to read dependencies and closed historical tickets, but permit it to edit only the assigned ticket.
+- Have each worker obtain the assigned ticket's bounded historical audit slice before rewriting it, then run the current-ticket scan after rewriting it.
+- Require each worker to report the file it edited, the wording it clarified, the structural changes it made, the sources it inspected, the commands it ran, and the retained scan candidates with their intended meanings.
+- Have the orchestrator review and commit one completed ticket before assigning that worker another ticket.
+- At a shared prerequisite, give the selected worker compact reports from the other dependent branches instead of requiring it to reread every rewritten dependent.
+- Treat two workers editing one ticket and a shared prerequisite released before all active dependents are committed as scheduler failures.
+- Treat missing owners, unnamed comparison sets, mixed cold and warm performance claims, oracle-assisted validation presented as observed-only fitting, and a title broader than its acceptance evidence as wording failures.
+- Derive the final validation commands from the artifacts changed. Ticket-only commits do not require runtime pytest.
 
-Roadmap refinement proceeds from open terminal tickets, which have no open or in-progress dependents, toward their prerequisites. One agent edits one assigned ticket at a time. A shared prerequisite is not assigned until each open or in-progress direct dependent has been refined and reported its aggregated downstream requirements; the top-level agent combines those reports into the assignment.
+## Future work
 
-Numerical hostile-input cases are structurally N/A. Process-hostile cases are missing owners, list-level N/A dispositions, unnamed comparison universes, oracle-assisted validation, mixed cold/warm performance claims, a title whose scope exceeds its acceptance evidence, two agents editing one ticket, and a shared prerequisite refined before every downstream requirement arrives.
+- `cff-y4nx` owns implementation and validation of the recurrent switching state-space model tier. This ticket owns only the clarity of that ticket's claims.
+- Each other rewritten active ticket owns the engineering work in its outcomes. This ticket owns only the review and rewrite of those outcomes.
+- No additional ticket-writing work is deferred beyond the active tickets covered by this campaign.
 
-## Acceptance Criteria
+## Definitions
 
-1. V1 and v2 candidate lexicons and occurrence audits parse as YAML, retain exact corpus/lexicon hashes, and reconcile every raw match. The v2 report validates against its JSON Schema.
-2. A command returns bounded historical slices by ticket, candidate, or sentinel classification, and a second command scans one current ticket without regenerating the pinned audit.
-3. AGENTS.md requires the current-ticket scan and contextual refinement after ticket creation or material rewriting.
-4. AGENTS.md defines required capability ownership, claim-layer, N/A-disposition, and validation-boundary fields without relying on prose keywords alone.
-5. Every open or in-progress ticket is reviewed against the structure; applicable tickets are updated in place, and every delegated capability has a named accountable ticket or is explicitly unowned.
-6. cff-y4nx is narrowed or expanded unambiguously, depends on this process ticket, and distinguishes fixed-parameter oracle inference from observed-only learned fitting.
-7. tk dependency records agree with the ownership ledgers; the audit validator, schema validation, slice/scan smoke commands, tk dep cycle, and git diff --check pass. Runtime pytest is deliberately excluded because the query tool does not import or modify package runtime code.
+- **Active ticket:** A ticket whose `tk` status is `open` or `in_progress`.
+- **Current-ticket scan:** A scan of one ticket's present wording against the frozen version 2 candidate lexicon.
+- **Direct dependent:** An active ticket that names another ticket as an immediate prerequisite.
+- **Fan-in barrier:** The rule that a shared prerequisite cannot be assigned until every active direct dependent has a committed review.
+- **Historical audit slice:** The bounded audit records associated with one ticket in the pinned corpus.
+- **Intelligible-ticket structure:** The required background, outcomes, methodological suggestions, future work, and definitions sections supplied by the machine-wide skill.
+- **Oracle inference:** Inference evaluated with parameters or latent values supplied by the data-generating process rather than learned from the agent's observations.
+- **Terminal ticket:** An active ticket with no active direct dependent.
 
 ## Notes
 
@@ -58,3 +98,7 @@ Installed the Obsidian ticket-writing guidance as the machine-wide intelligible-
 **2026-08-08T03:37:28Z**
 
 Cooper reconciled the legacy Plain English rule with the intelligible-ticket skill by removing the obsolete required heading from the general tk rule. Validation: tk dep cycle and git diff --check passed; runtime pytest is N/A for this documentation-only increment.
+
+**2026-08-08T03:56:54Z**
+
+Controller rewrite prepared; the campaign remains in progress. The bounded current scan found 148 occurrences across 40 candidates, including historical Notes. Retained meanings in the rewritten policy sections: fixed=constant_parameter; expose=public_api; implement=planned_work or non_code_delivery; support=internal_component_integration; complete=execution_finished, exhaustive, or ticket_scope_complete; remaining=preserved_state; close=work_item_completion; material=scope_impact; check=automated_check or acceptance_gate; evidence=provenance_artifact; match=literal_regex_match; oracle=generating_parameter_oracle or oracle_assisted_workflow; pass=non_test_check_succeeds; reproduce=rerunnable_artifact; test=automated_execution; validate=artifact_validation or acceptance_validation; fit=estimate_parameters; infer=state_or_regime_posterior; learn=parameter_update_primitive; performance=mixed_metrics_or_phases; can=demonstrated_capability or permission; intended=semantic_purpose; explicit_owner=current_ticket_owner or named_ticket_owner; named_ticket_handoff=concrete_future_owner; all=named_class_exhaustive; every=named_class_distributive; only=ticket_scope_boundary or minimization; current=repository_at_reference; deferred=scope_exclusion; later=historical_sequence; read=future_requirement. Validation: bounded slice and scan commands, tk dep cycle, and git diff --check passed. Runtime pytest is N/A for this ticket-only rewrite.
