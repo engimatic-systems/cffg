@@ -662,7 +662,8 @@ def test_sparse_dirichlet_prior_is_not_infeasible(schedule, alpha):
     assert result.status is RunStatus.CONVERGED, (result.status, result.residual)
 
     # E[log A] really is at the magnitude that underflows exp().
-    elog = np.asarray(result.state.params[engine.arena.member_of["obs1"][0]])
+    address = engine.arena.member_of["obs1"].parameter("matrix")
+    elog = np.asarray(result.state.params[address.key])
     assert elog.min() < -700, elog.min()
     assert np.exp(elog).max() == 0.0  # exactly why the old test was wrong
     if alpha < 1e-30:
@@ -683,7 +684,8 @@ def test_float32_dirichlet_rollover_escapes_the_reserved_neg_value(schedule):
         st = engine.init_state()
         st = _replace(st, params=learn.write(engine, dict(st.params)))
         st = engine.bind_data(st, {"act1": 0, "obs1": 2})
-        elog = np.asarray(st.params[engine.arena.member_of["obs1"][0]])
+        address = engine.arena.member_of["obs1"].parameter("matrix")
+        elog = np.asarray(st.params[address.key])
         assert elog.dtype == np.float32
         assert np.all(elog != np.asarray(NEG, dtype=np.float32))
 

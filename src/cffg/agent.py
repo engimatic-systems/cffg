@@ -192,11 +192,13 @@ class RollingAgent:
         # within an episode they carry the current filtered beliefs. An
         # episode learnable only re-anchors its declared binding at reset.
         for name, binding in bindings.items():
-            key, idx = engine.arena.member_of[binding.prior]
+            address = engine.arena.member_of[binding.prior].parameter("statistic")
             # Exact-zero entries stay semantically zero (NEG, the engine's
             # finite log-zero) rather than passing through log(0).
             log_belief = _log_of(np.asarray(self.beliefs[name]))
-            params[key] = params[key].at[idx].set(jnp.asarray(log_belief))
+            params[address.key] = params[address.key].at[address.index].set(
+                jnp.asarray(log_belief)
+            )
         st = _replace(st, params=params)
         if engine is self.plan and self.goal_priors:
             st = engine.with_goal_priors(st, self.goal_priors)

@@ -15,12 +15,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import jax.numpy as jnp
 import numpy as np
 
 from cffg import conj
 from cffg.core.ir import BlobRef, FactorSpec, PortRole, PortSpec, Template, VariableSpec
 from cffg.engine import Engine, State, _replace
+from cffg.params import set_params
 
 
 def rslds(
@@ -324,61 +324,40 @@ class RSLDSLearning:
                 "rSLDS learning parameters require a fresh inference state"
             )
         values = self.parameter_arrays()
-        params = dict(state.params)
-
-        try:
-            prior_key, prior_row = engine.arena.member_of["z0_prior"]
-        except KeyError:
-            raise ValueError("engine is not an rslds model with z0_prior") from None
-        probability = values["initial_regime_probability"]
-        params[prior_key] = (
-            params[prior_key]
-            .at[prior_row]
-            .set(jnp.log(jnp.asarray(probability, dtype=params[prior_key].dtype)))
+        dynamics = sorted(
+            name
+            for name in engine.arena.writable_members
+            if name.startswith("dynamics")
         )
-
-        a = values["dynamics_matrix"]
-        b = values["dynamics_offset"]
-        w = np.linalg.inv(values["dynamics_covariance"])
-        found_dynamics = False
-        for group in engine.arena.mix_groups:
-            rows = [
-                i for i, name in enumerate(group.members) if name.startswith("dynamics")
-            ]
-            if not rows:
-                continue
-            found_dynamics = True
-            for suffix, value in (("A", a), ("b", b), ("W", w)):
-                key = f"{group.name}:{suffix}"
-                cast = jnp.asarray(value, dtype=params[key].dtype)
-                params[key] = (
-                    params[key]
-                    .at[jnp.asarray(rows)]
-                    .set(jnp.broadcast_to(cast, (len(rows),) + cast.shape))
-                )
-
-        weights = values["recurrence_weights"]
-        offsets = values["recurrence_offsets"]
-        found_recurrence = False
-        for group in engine.arena.recurrence_groups:
-            rows = [
-                i for i, name in enumerate(group.members) if name.startswith("switch")
-            ]
-            if not rows:
-                continue
-            found_recurrence = True
-            for suffix, value in (("weights", weights), ("offsets", offsets)):
-                key = f"{group.name}:{suffix}"
-                cast = jnp.asarray(value, dtype=params[key].dtype)
-                params[key] = (
-                    params[key]
-                    .at[jnp.asarray(rows)]
-                    .set(jnp.broadcast_to(cast, (len(rows),) + cast.shape))
-                )
-        if not found_dynamics or not found_recurrence:
+        recurrence = sorted(
+            name
+            for name in engine.arena.writable_members
+            if name.startswith("switch")
+        )
+        if "z0_prior" not in engine.arena.writable_members:
+            raise ValueError("engine is not an rslds model with z0_prior") from None
+        if not dynamics or not recurrence:
             raise ValueError(
                 "engine does not contain the rslds dynamics and recurrence factors"
             )
+        params = set_params(
+            engine,
+            state.params,
+            {
+                "z0_prior": {
+                    "statistic": values["initial_regime_probability"]
+                },
+                dynamics[0]: {
+                    "matrix": values["dynamics_matrix"],
+                    "offset": values["dynamics_offset"],
+                    "cov": values["dynamics_covariance"],
+                },
+                recurrence[0]: {
+                    "weights": values["recurrence_weights"],
+                    "offsets": values["recurrence_offsets"],
+                },
+            },
+        )
         return _replace(state, params=params)
 
 

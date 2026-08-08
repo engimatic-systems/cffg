@@ -289,11 +289,12 @@ def test_tied_transition_statistic_updates_every_time_member():
     assert mean[2, 1, 0] > 1 / 3
 
     written = learnables.write(engine, dict(state.params))
-    key1, member1 = engine.arena.member_of["transition/position/1"]
-    key2, member2 = engine.arena.member_of["transition/position/2"]
-    assert key1 == key2
+    address1 = engine.arena.member_of["transition/position/1"].parameter("matrices")
+    address2 = engine.arena.member_of["transition/position/2"].parameter("matrices")
+    assert address1.key == address2.key
     np.testing.assert_array_equal(
-        written[key1][member1], written[key2][member2]
+        written[address1.key][address1.index],
+        written[address2.key][address2.index],
     )
 
 

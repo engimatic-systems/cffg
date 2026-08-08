@@ -280,6 +280,43 @@ class HybridGfePlan:
     s_scatter: np.ndarray
 
 
+PARAMETER_TRANSFORMS = frozenset(
+    {"identity", "probability_to_log", "covariance_to_precision"}
+)
+
+
+@dataclass(frozen=True)
+class ParameterAddress:
+    """One serialized parameter role's row in the runtime arena."""
+
+    role: str
+    blob: str
+    key: str
+    index: int
+    transform: str
+
+    def __post_init__(self) -> None:
+        if self.transform not in PARAMETER_TRANSFORMS:
+            raise ValueError(f"unknown parameter transform {self.transform!r}")
+
+
+@dataclass(frozen=True)
+class MemberAddress:
+    """All runtime parameter rows owned by one serialized factor."""
+
+    factor_type: str
+    parameters: tuple[ParameterAddress, ...]
+
+    def parameter(self, role: str) -> ParameterAddress:
+        matches = tuple(address for address in self.parameters if address.role == role)
+        if len(matches) != 1:
+            raise KeyError(
+                f"factor type {self.factor_type!r} has parameter roles "
+                f"{sorted(address.role for address in self.parameters)}, not {role!r}"
+            )
+        return matches[0]
+
+
 @dataclass(frozen=True)
 class LearnTarget:
     """One place a learnable posterior writes back into stacked params.
@@ -304,6 +341,7 @@ class LearnTarget:
     layout: str  # "as_is" | "tm"
     blob: str = ""  # the blob this target's factor reads
     role: str = "statistic"  # the parameter role that blob fills
+    transform: str = "identity"  # serialized value -> runtime row
 
 
 @dataclass(frozen=True)
@@ -316,8 +354,8 @@ class LearnPlan:
     one blob, so they all pay into one posterior.
 
     GFE composites are targets but never sources: the composite owns its own
-    update path, and its node belief is not a plain factor belief. Statistics
-    come from the perception graph, where the data is."""
+    update path. Ordinary discrete and Gaussian factors are sources through
+    the readout selected by their conjugate family."""
 
     name: str
     family: str
@@ -438,10 +476,12 @@ class Arena:
     delta_pairs: np.ndarray = field(
         default_factory=lambda: np.zeros((0, 2), dtype=np.int64)
     )  # [n_delta_edges, 2] slot pairs projected to a pointmass each sweep
-    member_of: dict[str, tuple[str, int]] = field(default_factory=dict)
-    # factor name -> (params key, member index): lets the runtime swap ONE
-    # member's parameters (same-cardinality factors share a stacked group;
-    # a whole-group write would clobber siblings).
+    member_of: dict[str, MemberAddress] = field(default_factory=dict)
+    # Factor name -> role-bearing rows in the stacked runtime parameters.
+    # One factor can span several arrays (for example A, b and W).
+    writable_members: frozenset[str] = frozenset()
+    # Synthetic GFE members retain internal learning addresses but are not
+    # direct named-write entry points.
     learn_plans: list[LearnPlan] = field(default_factory=list)
     # Declared learnables resolved to stat sources and write targets (cff-x0sv).
 
@@ -541,6 +581,35 @@ class Arena:
     def g_obs_indices(self, rows: np.ndarray | int, dim: int) -> np.ndarray:
         """Flat conditioned-observation indices for equal-dimension rows."""
         return self._segment_indices(self.g_obs_starts, rows, dim)
+
+
+def _set_member_address(
+    member_of: dict[str, MemberAddress],
+    template: Template,
+    member: str,
+    index: int,
+    runtime: dict[str, tuple[str, str]],
+) -> None:
+    """Register the runtime row for every blob-backed role of ``member``."""
+    factor = template.factors[member]
+    if not factor.param_blobs:
+        return
+    missing = sorted(set(factor.param_blobs) - set(runtime))
+    if missing:
+        raise CompileError(
+            f"factor {member!r}: no runtime parameter address for roles {missing}"
+        )
+    parameters = tuple(
+        ParameterAddress(
+            role=role,
+            blob=blob,
+            key=runtime[role][0],
+            index=index,
+            transform=runtime[role][1],
+        )
+        for role, blob in sorted(factor.param_blobs.items())
+    )
+    member_of[member] = MemberAddress(factor.type, parameters)
 
 
 def compile_template(
@@ -764,7 +833,8 @@ def compile_template(
                     data_slots[port.name] = s1
 
     resolved = _resolve_arrays(t, arrays, root)
-    member_of: dict[str, tuple[str, int]] = {}
+    member_of: dict[str, MemberAddress] = {}
+    writable_members: set[str] = set()
     log_params: dict[str, np.ndarray] = {}
     consumed: set[str] = set()
 
@@ -1148,8 +1218,30 @@ def compile_template(
         log_params[c_key] = np.stack(lc)
         composite_keys.update((a_key, c_key))
         for i, (obs_name, goal_name) in enumerate(pairs):
-            member_of[obs_name] = (a_key, i)
-            member_of[goal_name] = (c_key, i)
+            _set_member_address(
+                member_of,
+                t,
+                obs_name,
+                i,
+                {
+                    "matrix": (
+                        a_key,
+                        "identity" if learned else "probability_to_log",
+                    )
+                },
+            )
+            _set_member_address(
+                member_of,
+                t,
+                goal_name,
+                i,
+                {
+                    "statistic": (
+                        c_key,
+                        "identity" if goal_learned else "probability_to_log",
+                    )
+                },
+            )
         if mu3:
             for blob in sorted(set(param_blobs)):
                 rows = np.array(
@@ -1197,7 +1289,18 @@ def compile_template(
         log_params[tm_key] = np.stack(stacked)
         composite_keys.add(tm_key)
         for i, m in enumerate(members):
-            member_of[m] = (tm_key, i)
+            _set_member_address(
+                member_of,
+                t,
+                m,
+                i,
+                {
+                    "matrices": (
+                        tm_key,
+                        "identity" if learned else "probability_to_log",
+                    )
+                },
+            )
         gfe_tm_groups.append(
             GfeTmPlan(gname, (ko, ki, ku), tuple(members), gather, scatter, learned)
         )
@@ -1361,8 +1464,22 @@ def compile_template(
         )
         for key, arr in _stack_gauss_params(t, base, dims, members, resolved).items():
             log_params[f"{gname}:{key}"] = arr
-        # member_of stays discrete-only: per-member Gaussian parameter updates
-        # are the learning ticket's call (cff-7c5o).
+        runtime = (
+            {
+                "mean": (f"{gname}:m", "identity"),
+                "cov": (f"{gname}:W", "covariance_to_precision"),
+            }
+            if base == "gaussian"
+            else {
+                "matrix": (f"{gname}:A", "identity"),
+                "offset": (f"{gname}:b", "identity"),
+                "cov": (f"{gname}:W", "covariance_to_precision"),
+            }
+        )
+        for index, member in enumerate(members):
+            _set_member_address(member_of, t, member, index, runtime)
+            if member in member_of:
+                writable_members.add(member)
 
     mix_groups: list[MixGroupPlan] = []
     for (mtype, dims, k_sel), members in sorted(mix_buckets.items()):
@@ -1384,7 +1501,21 @@ def compile_template(
         )
         for key, arr in _stack_mix_params(t, mtype, dims, k_sel, members, resolved).items():
             log_params[f"{gname}:{key}"] = arr
-        # member_of stays discrete-only, as with the Gaussian and EF families.
+        runtime = (
+            {
+                "mean": (f"{gname}:m", "identity"),
+                "cov": (f"{gname}:W", "covariance_to_precision"),
+            }
+            if mtype == "gaussian_mixture"
+            else {
+                "matrix": (f"{gname}:A", "identity"),
+                "offset": (f"{gname}:b", "identity"),
+                "cov": (f"{gname}:W", "covariance_to_precision"),
+            }
+        )
+        for index, member in enumerate(members):
+            _set_member_address(member_of, t, member, index, runtime)
+            writable_members.add(member)
 
     recurrence_groups: list[RecurrencePlan] = []
     for (card, drive_dim), members in sorted(recurrence_buckets.items()):
@@ -1439,6 +1570,13 @@ def compile_template(
             t, card, drive_dim, members, resolved
         ).items():
             log_params[f"{gname}:{key}"] = value
+        runtime = {
+            "weights": (f"{gname}:weights", "identity"),
+            "offsets": (f"{gname}:offsets", "identity"),
+        }
+        for index, member in enumerate(members):
+            _set_member_address(member_of, t, member, index, runtime)
+            writable_members.add(member)
 
     prec_groups: list[PrecGroupPlan] = []
     if prec_members:
@@ -1460,7 +1598,15 @@ def compile_template(
             )
         )
         log_params[f"{gname}:m"] = _stack_prec_means(t, members, resolved)
-        # member_of stays discrete-only, as with the Gaussian and EF families.
+        for index, member in enumerate(members):
+            _set_member_address(
+                member_of,
+                t,
+                member,
+                index,
+                {"mean": (f"{gname}:m", "identity")},
+            )
+            writable_members.add(member)
 
     ef_groups: list[EfGroupPlan] = []
     ef_data: dict[str, int] = {}
@@ -1512,11 +1658,23 @@ def compile_template(
         groups.append(
             GroupPlan(gname, ftype, roles, cards, tuple(members), gather, scatter, mode, both)
         )
-        for i, m in enumerate(members):
-            member_of[m] = (gname, i)
         stacked = _stack_params(t, ftype, cards, members, resolved)
         if stacked is not None:
             log_params[gname] = stacked
+            role = {
+                "categorical": "statistic",
+                "matrix_cat": "matrix",
+                "transition_mixture": "matrices",
+            }[ftype]
+            for index, member in enumerate(members):
+                _set_member_address(
+                    member_of,
+                    t,
+                    member,
+                    index,
+                    {role: (gname, "probability_to_log")},
+                )
+                writable_members.add(member)
 
     constraint_groups: list[ConstraintPlan] = []
     for fname in constraint_names:
@@ -1707,6 +1865,7 @@ def compile_template(
         gfe_x_edges=frozenset(gfe_x_edges),
         delta_pairs=delta_pairs,
         member_of=member_of,
+        writable_members=frozenset(writable_members),
         learn_plans=_resolve_learnables(t, resolved, groups, member_of, composite_keys),
     )
 
@@ -1715,7 +1874,7 @@ def _resolve_learnables(
     t: Template,
     resolved: dict[str, np.ndarray],
     groups: list[GroupPlan],
-    member_of: dict[str, tuple[str, int]],
+    member_of: dict[str, MemberAddress],
     composite_keys: set[str],
 ) -> list[LearnPlan]:
     """Bind each declared learnable to its stat sources and write targets
@@ -1778,24 +1937,53 @@ def _resolve_learnables(
             if r not in member_of:
                 raise CompileError(
                     f"learnable {name!r}: factor {r!r} ({t.factors[r].type}) has no "
-                    "addressable parameter slot; member_of covers the discrete "
-                    "families only"
+                    "addressable parameter slot"
                 )
-            key, index = member_of[r]
+            member = member_of[r]
             read = sorted(blobs & set(t.factors[r].param_blobs.values()))
             for blob in read:
                 role = roles[blob]
-                if key in composite_keys:
-                    form = "counts" if key.endswith(":counts") else "expected"
-                    targets.append(LearnTarget(key, index, form, "as_is", blob, role))
+                parameter = member.parameter(role)
+                if parameter.blob != blob:
+                    raise CompileError(
+                        f"learnable {name!r}: factor {r!r} role {role!r} reads "
+                        f"{parameter.blob!r}, not {blob!r}"
+                    )
+                if parameter.key in composite_keys:
+                    form = (
+                        "counts"
+                        if parameter.key.endswith(":counts")
+                        else "expected"
+                    )
+                    targets.append(
+                        LearnTarget(
+                            parameter.key,
+                            parameter.index,
+                            form,
+                            "as_is",
+                            blob,
+                            role,
+                            parameter.transform,
+                        )
+                    )
                     continue
                 layout = (
-                    "tm" if ftype_of_group.get(key) == "transition_mixture" else "as_is"
+                    "tm"
+                    if ftype_of_group.get(parameter.key) == "transition_mixture"
+                    else "as_is"
                 )
                 targets.append(
-                    LearnTarget(key, index, "expected", layout, blob, role)
+                    LearnTarget(
+                        parameter.key,
+                        parameter.index,
+                        "expected",
+                        layout,
+                        blob,
+                        role,
+                        parameter.transform,
+                    )
                 )
-            if key not in composite_keys and (
+            if all(p.key not in composite_keys for p in member.parameters) and (
                 spec.sources is None or r in spec.sources
             ):
                 sources.append(r)

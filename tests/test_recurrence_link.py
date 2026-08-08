@@ -349,9 +349,9 @@ def test_rslds_tier_matches_tiny_exact_oracle_and_rolls_all_parameters():
     np.testing.assert_array_equal(installed.g_obs, install_state.g_obs)
     np.testing.assert_array_equal(installed.g_mask, install_state.g_mask)
 
-    prior_key, prior_row = install_engine.arena.member_of["z0_prior"]
+    prior = install_engine.arena.member_of["z0_prior"].parameter("statistic")
     np.testing.assert_allclose(
-        np.exp(np.asarray(installed.params[prior_key][prior_row])),
+        np.exp(np.asarray(installed.params[prior.key][prior.index])),
         learned["initial_regime_probability"],
         rtol=2e-6,
     )
