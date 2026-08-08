@@ -295,3 +295,7 @@ Duplicated surfaces:
 - Versioned and legacy checkpoint decoding both remain covered.
 
 Gotcha: Learnables.accumulate and Learnables.replace intentionally require the status-bearing RunResult, not a bare State, so convergence is enforceable. Downstream cff-l7y4 now owns rSLDS outer-loop use; cff-ahps owns the excluded mixture, recurrence, precision, EF, and synthetic-GFE adapters.
+
+**2026-08-08T21:16:38Z**
+
+Publication: draft PR #58 opened at https://github.com/engimatic-systems/cffg/pull/58 with base agent/cff-y4nx-rslds and head agent/cff-6tek-gaussian-learnables. The final code validation remains the one-shot dashboard result at f471c5e; subsequent commits contain ticket and runtime-history metadata only.
