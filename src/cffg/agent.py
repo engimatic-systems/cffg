@@ -240,7 +240,8 @@ class RollingAgent:
                 self._filter_spec.observation_port: observation,
             },
         )
-        st = self.filter.run(st, 60, tol=1e-12).require_converged()
+        result = self.filter.run(st, 60, tol=1e-12)
+        st = result.require_converged()
         marginals = self.filter.marginals(st)
         next_beliefs = {
             name: _normalize(
@@ -250,11 +251,15 @@ class RollingAgent:
             for name, binding in self._filter_bindings.items()
         }
         if self.tick_learnables:
-            self.learnables.accumulate(self.filter, st, only=self.tick_learnables)
+            self.learnables.accumulate(
+                self.filter, result, only=self.tick_learnables
+            )
         if self.episode_tick == 0 and self.episode_learnables:
             # q(z0) smoothed by this episode's first observation — the
             # sufficient statistic for where episodes start.
-            self.learnables.accumulate(self.filter, st, only=self.episode_learnables)
+            self.learnables.accumulate(
+                self.filter, result, only=self.episode_learnables
+            )
         self.beliefs = next_beliefs
         self.tick += 1
         self.episode_tick += 1

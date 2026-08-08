@@ -269,7 +269,7 @@ def test_tied_transition_statistic_updates_every_time_member():
         gfe=False,
         learn=("position_transition",),
     )
-    engine, _result, state = _converged(
+    engine, result, state = _converged(
         template,
         arrays,
         data={"action1": 2, "observation1": 1},
@@ -279,7 +279,7 @@ def test_tied_transition_statistic_updates_every_time_member():
         engine, priors={"position_transition": counts}
     )
     before = learnables.params["position_transition"]["alpha"].copy()
-    learnables.accumulate(engine, state)
+    learnables.accumulate(engine, result)
     after = learnables.params["position_transition"]["alpha"]
     np.testing.assert_allclose((after - before).sum(), 1.0, atol=1e-10)
 

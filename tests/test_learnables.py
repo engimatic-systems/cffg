@@ -226,8 +226,9 @@ def test_tied_blob_accumulates_from_every_chain():
     st = engine.bind_data(
         engine.init_state(), {"acta": 0, "seea": 1, "actb": 1, "seeb": 2}
     )
-    st = engine.run(st, 40, tol=1e-12).require_converged()
-    learn.accumulate(engine, st)
+    result = engine.run(st, 40, tol=1e-12)
+    result.require_converged()
+    learn.accumulate(engine, result)
     added = learn.params["B"]["alpha"] - np.ones((U, K3, K3))
     np.testing.assert_allclose(added.sum(), 2.0, atol=1e-9)  # one count per chain
     # Chain a moved under u=0 out of state 0, chain b under u=1 out of state
@@ -248,13 +249,18 @@ def test_learning_at_one_member_transfers_to_another():
     def run(data: dict) -> object:
         st = engine.init_state()
         st = _replace(st, params=learn.write(engine, dict(st.params)))
-        return engine.run(engine.bind_data(st, data), 40, tol=1e-12).require_converged()
+        return engine.run(engine.bind_data(st, data), 40, tol=1e-12)
 
-    naive = np.asarray(engine.marginals(run({"acta": 0, "actb": 0}))["z1b"])
+    naive = np.asarray(
+        engine.marginals(run({"acta": 0, "actb": 0}).require_converged())["z1b"]
+    )
     for _ in range(40):
-        st = run({"acta": 0, "seea": 1, "actb": 0})
-        learn.accumulate(engine, st, only=("B",))
-    taught = np.asarray(engine.marginals(run({"acta": 0, "actb": 0}))["z1b"])
+        result = run({"acta": 0, "seea": 1, "actb": 0})
+        result.require_converged()
+        learn.accumulate(engine, result, only=("B",))
+    taught = np.asarray(
+        engine.marginals(run({"acta": 0, "actb": 0}).require_converged())["z1b"]
+    )
 
     post = learn.expected("B")
     assert post[0, 1, 0] > 0.85  # u=0 out of state 0 is now sharply 0 -> 1

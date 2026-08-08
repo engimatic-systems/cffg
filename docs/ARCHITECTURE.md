@@ -268,8 +268,8 @@ belief with the point coefficients used by inference and emits additive
 Gaussian natural statistics for augmented `[R; r]`. `conj.PGWeights`
 accumulates those statistics outside JIT and rolls its posterior mean into the
 next trial. This standalone path intentionally does not register a
-`LearnableSpec`; non-discrete `member_of`, generic cadence, and persistence
-remain cff-6tek surfaces.
+`LearnableSpec`; recurrence factors have role-bearing named-write addresses,
+but a generic PG family and checkpoint schema remain cff-ahps surfaces.
 
 `cffg.models.rslds` is the end-to-end composition boundary. Its serialized
 template uses one `recurrence_link(z[t+1], z[t], x[t])`, a
@@ -278,10 +278,10 @@ template uses one `recurrence_link(z[t+1], z[t], x[t])`, a
 posteriors: Dirichlet counts for the initial regime, one MNIW for each regime's
 dynamics, and one `PGWeights` block for the recurrent transition. It reads only
 the public factor-local statistics and installs point rollovers into a fresh
-`State.params`, so the compiled graph and all state shapes stay fixed across
-trials. This model-specific boundary does not extend `LearnableSpec`, agent
-checkpointing, or parameter uncertainty inside inference; those remain the
-generic cff-6tek path.
+`State.params` through `set_params`, so the compiled graph and all state shapes
+stay fixed across trials. This model-specific boundary still does not register
+per-regime MNIW or PG `LearnableSpec` families; ordinary Gaussian emissions use
+the generic NIW/MNIW contract in §3b, while broader adapters remain cff-ahps.
 
 ### 2e. Executable factor registration (`cffg.kernels`, cff-ri8m)
 
@@ -408,7 +408,7 @@ these surfaces:
   and the arena-derived edge-entropy corrections, so the global BFE/GFE follows
   the constrained Bethe ledger rather than a scoring shortcut.
 
-#### 3b. Declared learnables: the conjugate-update contract (`cffg.learn`, cff-x0sv)
+#### 3b. Declared learnables and parameter addresses (`cffg.learn`, cff-x0sv, cff-6tek)
 
 Parameter learning is a declaration, not agent code. A model names its
 conjugate posteriors in `Template.learnables`; the compiler resolves each one
@@ -425,6 +425,19 @@ them. Four rules define the contract:
    joint over several (MNIW over a `gaussian_linear`'s matrix, offset, and
    covariance).
 
+   The compiled form is `Arena.member_of[factor_name] -> MemberAddress`.
+   Each frozen member address carries the serialized factor type and one
+   frozen `ParameterAddress` per blob-backed role: `(role, blob, key, index,
+   transform)`. The transform is `identity`, `probability_to_log`, or
+   `covariance_to_precision`. This is a derived runtime index, never serialized.
+   It covers the discrete factors, Gaussian priors and linear conditionals,
+   Gaussian mixtures, recurrence links, and `gaussian_prec`. Plate expansion
+   needs no special case because every grounded factor receives an address.
+   `cffg.set_params` validates values in serialized form, fans one blob/role
+   write out to every tied runtime row, and updates each stacked array once.
+   Synthetic GFE members retain internal learning targets but are not public
+   named-write entry points.
+
 2. **Factor type fixes the sufficient statistic; family fixes the update.**
    The registry `cffg.learn.FAMILIES` maps a family name to a `Family`:
    `check` (compile-time admissibility), `stats` (engine readout → statistic),
@@ -432,7 +445,11 @@ them. Four rules define the contract:
    what the rules consume), `raw` (→ what a counts target consumes), `mean`
    (→ the reporting readout). `Dirichlet` serves the discrete vocabulary:
    `categorical` over `[K]`, `matrix_cat` over `[K_out, K_in]`,
-   `transition_mixture` over `[U, K', K]`.
+   `transition_mixture` over `[U, K', K]`. `NIW` serves only
+   `niw/gaussian`; `MNIW` serves only `mniw/gaussian_linear`, including the
+   conditioned runtime group used by observed outputs. Mixture, recurrence,
+   precision, and EF factors have named addresses but no generic conjugate
+   adapter yet.
 
    Hyperparameters, statistics and rollover outputs are keyed dicts, and a
    family names which engine readout it draws from (`cffg.learn.READOUTS`),
@@ -444,18 +461,17 @@ them. Four rules define the contract:
    routes a multi-parameter write. `Dirichlet` is the degenerate case of that
    contract: one hyperparameter, one statistic, one role.
 
-   Registering NIW and MNIW is still open (cff-6tek). It needs
-   `Arena.member_of` extended past the discrete families first, which is why
-   a Gaussian learnable currently fails at compile time with a message naming
-   that limitation rather than learning.
-
 3. **Sources are perception, targets are everywhere.** Statistics come from
-   nodes whose beliefs `Engine.node_beliefs` reports. GFE composites are write
-   targets but never sources: the composite owns its own update path, and its
-   node belief is not a plain factor belief. A planning graph with parameter
-   uncertainty therefore has zero sources for `A` and writes the raw counts α
-   that its novelty term differentiates; the perception graph supplies the
-   statistics and writes `E[log θ] = ψ(α) − ψ(α₀)`.
+   the readout named by the family: discrete families use
+   `Engine.node_beliefs`, while NIW/MNIW use
+   `Engine.gaussian_node_stats`. Every eligible tied factor contributes one
+   local record; the family pools those records and performs one posterior
+   update. A masked conditioned Gaussian-linear output contributes zero
+   evidence. GFE composites are write targets but never sources: a planning
+   graph with parameter uncertainty therefore has zero sources for `A` and
+   writes the raw counts α that its novelty term differentiates; the perception
+   graph supplies the statistics and writes
+   `E[log θ] = ψ(α) − ψ(α₀)`.
 
    Reading is not evidence, so a learnable may restrict which instances
    supply statistics: `LearnableSpec.sources` is `None` for every reader, a
@@ -475,10 +491,26 @@ them. Four rules define the contract:
    integrates against a factorized measure. Rollover always writes
    E[log θ], the mean-field-consistent point (Part II §5), never log E[θ].
 
-Cadence is deliberately not part of `LearnableSpec`: `accumulate` takes the
-graph, state, and optional name filter. The model/runtime interface does
-declare which boundary learnable is episode-scale, however, because that
-choice determines rollover semantics rather than only update frequency.
+   NIW/MNIW integrate the converged Gaussian node belief against the conjugate
+   sufficient statistics in DERIVATIONS D4. Their inference rollover writes
+   inverse expected precision, `Psi / nu`, not the posterior-mean covariance
+   used by the reporting API. The posterior remains outside JIT; inference in
+   the next run consumes point parameters rather than joint parameter
+   uncertainty.
+
+Cadence is deliberately not part of `LearnableSpec`. `Learnables` keeps a
+read-only validated copy of every initial prior. `accumulate(engine, result)`
+starts from the current posterior and adds a distinct trial;
+`replace(engine, result)` starts from that immutable prior and recomputes one
+sequence coordinate. Both require a status-bearing, converged `RunResult`,
+accept an `only` name filter, pool tied sources, validate all selected
+posteriors in temporary storage, and commit atomically. `write` is likewise
+atomic across selected role-bearing targets. Versioned checkpoints encode
+each `(learnable, hyperparameter)` pair independently and round-trip the four
+NIW/MNIW arrays; legacy Dirichlet spellings remain explicit migrations. The
+model/runtime interface still declares which boundary learnable is
+episode-scale because that choice determines rollover semantics, not merely
+update frequency.
 
 #### 3c. Rolling boundary contract (`AgentSpec`, cff-nhxf)
 
@@ -751,13 +783,12 @@ nothing committed here) — the durable engine-level findings:
   BP diameter — hence sweeps-to-convergence — is O(N) in plate size; this,
   not compile time (1.2 s for 784 leaves) and not per-sweep cost, capped
   perception throughput (cff-9xmq: balanced trees).
-- Hybrid nodes are read-opaque: no soft sufficient statistics, no
-  posterior-predictive readout — consumers fall back to hard-EM and
-  hand-assembled predictives (cff-lquu).
+- Hybrid nodes originally lacked soft sufficient statistics and predictive
+  readouts; cff-lquu resolved that consumer boundary.
 - Long rollouts re-solve cold every step and degrade past ~20 slices
   (cff-5edo); fan-out and observe-an-interior-latent need one-call helpers
-  (cff-mjku); per-member parameter writes beyond discrete groups need the
-  generic learnables API (note on cff-x0sv).
+  (cff-mjku). Role-bearing non-discrete writes are now the `set_params`
+  contract in §3b.
 
 **Method note.** The evaluation discipline that made this productive:
 every harness declares numeric pass/fail standards *before* running,
@@ -782,9 +813,10 @@ ledger path at scale. The separate experiment and provenance artifacts live in
 It does **not** validate the paper-style learned model or the rSLDS advantage
 over an SLDS. The harness supplied the generating emission, dynamics, and
 recurrence parameters; the model-specific learner does not update the shared
-emission or expose replacement-coordinate fitting of one long sequence, and
-there is no PCA/ARHMM-equivalent initializer. cff-l7y4 owns the learned
-NASCAR/matched-SLDS continuation after cff-6tek. Cold compile/setup also took
+emission or choose replacement-coordinate fitting of one long sequence. The
+generic MNIW emission and replacement operations now exist, but there is no
+PCA/ARHMM-equivalent initializer. cff-l7y4 owns the learned
+NASCAR/matched-SLDS continuation. Cold compile/setup also took
 723.14 seconds versus 30.58 seconds of inference, with 2.03 GB peak process
 RSS; cff-r6bl owns compact repeated-hybrid-slice lowering. These are explicit
 not-ready findings, not caveats hidden behind the oracle accuracy.

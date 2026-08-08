@@ -275,10 +275,76 @@ regime accuracy. This is an inference result, not a learned-model result:
 `RSLDSLearning` currently keeps the shared emission fixed, accumulates evidence
 between trials rather than replacing coordinates while fitting one long
 sequence, and supplies no PCA/ARHMM-style initializer. Learned NASCAR versus a
-matched SLDS, including long generative rollouts, remains cff-l7y4 after the
-generic Gaussian learnables work in cff-6tek. The same run measured 723 seconds
-of cold compile/setup and 30.6 seconds of inference; cff-r6bl owns that scale
-gap.
+matched SLDS, including long generative rollouts, remains cff-l7y4; the generic
+Gaussian learning and replacement operations it consumes are available now.
+The same run measured 723 seconds of cold compile/setup and 30.6 seconds of
+inference; cff-r6bl owns that scale gap.
+
+## Write named parameters and learn Gaussian factors
+
+Runtime parameter arrays are grouped by factor family and shape. Use factor
+names and serialized parameter roles instead of editing those stacked arrays by
+position:
+
+```python
+from cffg import set_params
+
+params = set_params(
+    engine,
+    engine.init_state().params,
+    {
+        "emission0": {
+            "matrix": H,
+            "offset": h,
+            "cov": R,
+        }
+    },
+)
+```
+
+`set_params` validates every requested value before changing its returned
+mapping. Probability roles keep literal zero as the runtime log-zero sentinel;
+covariances must be finite, symmetric, and positive definite and become the
+runtime precision. A write to one blob/role reaches every factor tied to that
+same serialized blob. Unequal requests through two tied factors are rejected.
+Supported named-write factors are `categorical`, `matrix_cat`,
+`transition_mixture`, `gaussian`, `gaussian_linear`, `gaussian_mixture`,
+`gaussian_mixture_linear`, `recurrence_link`, and `gaussian_prec`.
+
+Declared learning adds NIW for an ordinary `gaussian` and MNIW for
+`gaussian_linear`, including an observed emission compiled to the conditioned
+runtime rule:
+
+```python
+from cffg import conj
+from cffg.core import LearnableSpec
+from cffg.learn import Learnables
+
+template.learnables["emission"] = LearnableSpec(
+    "emission",
+    "mniw",
+    ("emission_matrix", "emission_offset", "emission_covariance"),
+)
+engine = Engine(compile_template(template, arrays=arrays))
+learnables = Learnables(
+    engine,
+    priors={"emission": conj.vague_mniw(observation_dim, state_dim)},
+)
+
+result = engine.run(bound_state, 200, tol=1e-7)
+learnables.replace(engine, result)       # same sequence: reset from fixed prior
+next_params = learnables.write(engine, engine.init_state().params)
+```
+
+Pass the status-bearing `RunResult`; learning refuses an unfinished or
+diverged run. `replace` is idempotent for unchanged one-sequence statistics.
+Use `accumulate` instead when the result is a new independent trial whose
+evidence should be added to the current posterior. Both operations pool all
+tied source factors and commit all selected posteriors atomically. Reporting
+uses `learnables.expected(name, role)`; inference rollover writes
+`psi / nu`, the inverse expected precision, rather than the posterior-mean
+covariance. Versioned checkpoints preserve every keyed NIW/MNIW
+hyperparameter.
 
 ## Run inference
 
@@ -543,8 +609,9 @@ cffg = { path = "../../cffg", editable = true }
   tolerances won't match the docs.
 - **Compile once, swap parameters through state.** Parameters are *inputs*
   to the jitted step (the colony contract): for trial loops, build the
-  Engine once for the graph *shape*, then write `state.params[...]` (see
-  `member_of` for per-factor discrete writes) and rebind observations. A
+  Engine once for the graph *shape*, then use `set_params` or
+  `Learnables.write` and rebind observations. `Arena.member_of` is the
+  derived role-bearing address map when lower-level inspection is needed. A
   loop that recompiles per trial is ~50× slower for nothing.
 - **Sliding windows are the streaming pattern**: fixed window shape,
   compile once, thread the previous posterior in as the next window's

@@ -97,9 +97,12 @@ constraints the modeler adds.
 Cat/Dirichlet/equality/δ/transition-mixture, GFE messages for the discrete
 goal-observation composite, and BP for the linear-Gaussian family (gaussian,
 gaussian_linear, Gaussian equality — cff-4e5z: Kalman-smoother parity, exact
-continuous tree identity BFE = −log p(y)). Everything else is a derivation
-ticket under the roadmap epic cff-ahps:
-- *Gaussian VMP + conjugate learning (NIW/Gamma)* — cff-7c5o.
+continuous tree identity BFE = −log p(y)). Between converged runs, declared
+NIW and MNIW learning covers `gaussian` and `gaussian_linear`. Everything else
+is a derivation or registration ticket under the roadmap epic cff-ahps:
+- *Additional conjugate adapters* — mixtures need a per-regime posterior-axis
+  contract; recurrence PG learning and precision/EF learning remain separate
+  model-specific paths rather than `LearnableSpec` families.
 - *Hybrid discrete–continuous (switching KF, mixture collapse)* — cff-pksr;
   the first place exact FE meets a necessary approximation (mixture entropy).
 - *Nonlinear continuous factors* — cff-o7hs: EP/moment-matching or sigma-point
@@ -194,7 +197,13 @@ mirror of the Dirichlet count loop. Messages built from E[W] are the VMP
 geometric-mean messages, but the x-dependent trace term that would feed
 *parameter* uncertainty into *state* inference (inflated effective noise) is
 deferred; in-loop parameter uncertainty exists today only where it is exactly
-tractable — `gaussian_prec`'s Gamma-precision edge. (2) "VMP monotonically
+tractable — `gaussian_prec`'s Gamma-precision edge. `accumulate` adds an
+independent trial to the current posterior; `replace` recomputes one sequence
+coordinate from the immutable initial prior. Neither operation turns point-
+parameter inference into full joint VB. Generic registration currently stops
+at NIW/`gaussian` and MNIW/`gaussian_linear`; per-regime mixture families,
+recurrence weights, Gamma precision, and external EF-kernel adapters remain
+outside it. (2) "VMP monotonically
 decreases free energy" holds for sequential coordinate updates; this engine
 floods (Jacobi), which converges to the same fixed point but can take
 bounded non-monotone steps on multi-node models (measured ≈4e-3 nats at
@@ -297,13 +306,14 @@ The end-to-end `cffg.models.rslds` helper preserves these same approximation
 boundaries. Its `RSLDSLearning` host loop updates the initial regime,
 per-regime dynamics, and recurrence weights between trials, but keeps the
 shared Gaussian emission fixed. Accumulating a sequence again would count it
-as new evidence; it is not the replacement-coordinate variational-EM loop
-needed to fit one long observed-only trajectory. No PCA/ARHMM-equivalent
+as new evidence. Generic MNIW emissions and reset-from-prior `replace` now
+provide the missing mechanical operations, but `RSLDSLearning` does not choose
+the outer-coordinate schedule or initialization. No PCA/ARHMM-equivalent
 initializer currently resolves the affine latent and label symmetries. The
 canonical `T=10,000` NASCAR harness therefore validates only fixed-parameter
 inference (`99.95%` MAP regime accuracy), not learned recovery or superiority
-to a matched SLDS. Those claims remain cff-l7y4 after cff-6tek; cold setup at
-that scale remains cff-r6bl.
+to a matched SLDS. Those scientific fitting claims remain cff-l7y4; cold setup
+at that scale remains cff-r6bl.
 
 **S1j. Schedules: measured envelope (cff-d56d, revised 2026-07-27 after
 review).** Two-pass schedules make tree and chain inference O(E) with
