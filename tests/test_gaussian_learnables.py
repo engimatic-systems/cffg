@@ -309,6 +309,61 @@ def test_updates_require_converged_status_and_validate_only_names():
         np.testing.assert_array_equal(learnables.state_dict()[key], value)
 
 
+def test_improper_initial_gaussian_priors_are_refused():
+    engine, _result = _converged(2)
+    valid_mniw = conj.vague_mniw(2, 2)
+    with pytest.raises(ValueError, match="improper NIW"):
+        Learnables(
+            engine,
+            priors={
+                "a_state": {
+                    "mu": np.zeros(2),
+                    "kappa": np.asarray(0.0),
+                    "psi": np.eye(2),
+                    "nu": np.asarray(4.0),
+                },
+                "z_dynamics": valid_mniw,
+            },
+        )
+    valid_niw = conj.vague_niw(2)
+    with pytest.raises(ValueError, match="positive definite"):
+        Learnables(
+            engine,
+            priors={
+                "a_state": valid_niw,
+                "z_dynamics": {
+                    "m": np.zeros((2, 3)),
+                    "lam": np.eye(3),
+                    "psi": np.zeros((2, 2)),
+                    "nu": np.asarray(4.0),
+                },
+            },
+        )
+
+
+def test_scheduled_and_flooded_gaussian_updates_match():
+    template, arrays = _learning_template(2)
+    priors = {
+        "a_state": conj.vague_niw(2),
+        "z_dynamics": conj.vague_mniw(2, 2),
+    }
+    posteriors = []
+    for schedule in ("auto", "flood"):
+        engine = Engine(compile_template(template, arrays=arrays), schedule=schedule)
+        state = engine.bind_data(
+            engine.init_state(), {"observation": np.array([0.25, -0.75])}
+        )
+        result = engine.run(state, 40, tol=1e-12)
+        result.require_converged()
+        learnables = Learnables(engine, priors=priors)
+        learnables.replace(engine, result)
+        posteriors.append(learnables.state_dict())
+    for key in posteriors[0]:
+        np.testing.assert_allclose(
+            posteriors[0][key], posteriors[1][key], rtol=1e-9, atol=1e-9
+        )
+
+
 @pytest.mark.parametrize(
     ("corrupt", "match"),
     [
@@ -441,6 +496,14 @@ def test_uncomfortable_tied_niw_scale_pools_one_vectorized_update():
 
     assert learnables.params["state"]["kappa"] == prior.kappa + count
     assert learnables.params["state"]["nu"] == prior.nu + count
+    np.testing.assert_array_equal(
+        learnables.params["state"]["mu"], np.zeros(dimension)
+    )
+    np.testing.assert_array_equal(
+        learnables.params["state"]["psi"]
+        - np.diag(np.diag(learnables.params["state"]["psi"])),
+        np.zeros((dimension, dimension)),
+    )
     address = engine.arena.member_of["prior0"].parameter("mean")
     assert written[address.key].shape == (count, dimension)
     assert np.all(np.isfinite(written[address.key]))

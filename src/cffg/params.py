@@ -54,6 +54,7 @@ def _symmetry_ok(matrices: np.ndarray) -> bool:
     error = np.max(
         np.abs(matrices - matrices.swapaxes(-1, -2)), axis=(-2, -1)
     )
+    # Admit only the roundoff that a dtype-sized matrix comparison accumulates.
     tolerance = 16.0 * matrices.shape[-1] * np.finfo(dtype).eps * scale
     return bool(np.all(error <= tolerance))
 
@@ -70,6 +71,7 @@ def _validate_probability(
     if not np.all(np.isfinite(working)) or np.any(working < 0.0):
         raise ValueError(f"{name} must contain finite nonnegative probabilities")
     totals = working.sum(axis=axis)
+    # Cover summation roundoff without relaxing the serialized simplex.
     tolerance = (
         16.0
         * working.shape[axis]

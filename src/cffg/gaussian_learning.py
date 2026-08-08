@@ -303,4 +303,3 @@ class MNIWFamily:
             psi.copy(),
             _scalar(learnable, "nu", params["nu"]),
         )
-
