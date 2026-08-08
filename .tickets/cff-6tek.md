@@ -8,126 +8,214 @@ type: feature
 priority: 2
 assignee: coopwilliams
 ---
-# Learnables across non-discrete families: member_of beyond Cat/Dir, NIW/MNIW registration
+# Register Gaussian learnables and named non-discrete parameter writes
 
 ## Background in Plain English
 
-Models can declare categorical parameters for learning, but they cannot yet use the declared-learning API for Gaussian parameters. The compiler cannot address one named factor inside several non-discrete parameter groups, even though the Gaussian statistics and posterior formulas already exist. This ticket connects those parts so callers can learn and install Gaussian and Gaussian-linear parameters by factor name instead of editing stacked runtime arrays by row number.
+The declared-learning API can update categorical parameters, but it cannot yet
+address or learn Gaussian parameters. A Gaussian-linear factor stores its
+matrix, offset, and covariance in separate runtime arrays, while the
+`cff-x0sv` `Arena.member_of` representation points to only one array row.
+Consumers therefore
+edit stacked arrays by position or maintain model-specific installers.
 
-`cff-x0sv` supplies the declared-learning contract, keyed hyperparameters and statistics, multi-blob targets, readout selection, cadence, and checkpoint format, while `cff-7c5o` supplies `Engine.gaussian_node_stats` and the posterior updates in `cffg.conj`. This ticket owns the non-discrete address map, named parameter-write API, NIW and MNIW family adapters, and an automated recovery test that crosses declaration, compilation, accumulation, and parameter installation.
+This ticket owns the multi-role runtime address, atomic parameter installation
+by factor name, and the NIW and MNIW adapters needed for ordinary Gaussian and
+Gaussian-linear factors. It also owns both learning cadences required by the
+roadmap: adding evidence from distinct trials and replacing a one-sequence
+coordinate from fixed priors. Ticket `cff-l7y4` owns when the rSLDS fitter uses
+those operations; this ticket owns their generic behavior.
 
 ## Outcomes / Acceptance Criteria
 
-1. `Arena.member_of` identifies the runtime parameter destination for each named factor instance that reads parameters through the discrete, Gaussian, hybrid Gaussian-mixture, recurrence, precision, EF, or plate-expanded compiler paths.
-   1.1. Addressing one member of a stacked group leaves every sibling member unchanged.
-   1.2. The address representation identifies each parameter role for groups that store one factor's parameters under several runtime keys.
-   1.3. Scoped names produced by plate expansion resolve to their own member addresses.
-2. Named parameter installation has the following `set_params` contract:
-   2.1. The package exports `set_params`.
-   2.2. `README.md` documents `set_params`.
-   2.3. `set_params` accepts updates keyed by factor name and parameter role.
-   2.4. `set_params` rejects an unknown factor name.
-   2.5. `set_params` rejects an unknown parameter role.
-   2.6. `set_params` rejects a non-numeric value.
-   2.7. `set_params` rejects a value with an incompatible shape.
-   2.8. `set_params` casts each accepted value to its destination array's dtype.
-   2.9. `set_params` leaves every runtime parameter member not named by the update unchanged.
-3. `Template.learnables` accepts `niw` for `gaussian` factors and `mniw` for `gaussian_linear` factors. Other factor-family pairings fail at compile time with a message that names the declaration and the unsupported pairing.
-4. The NIW and MNIW adapters satisfy the following `cffg.learn.Family` requirements:
-   4.1. Each adapter reads its sufficient statistics from `Engine.gaussian_node_stats`.
-   4.2. Each adapter adds one statistic record for each declared source during one `Learnables.accumulate` call.
-   4.3. Each adapter routes each posterior output to its declared parameter role.
-   4.4. Each adapter exposes posterior means for reporting.
-   4.5. Each adapter validates caller-supplied priors.
-5. Tied sources and empty source sets have the following behavior:
-   5.1. Several source factors that share one learnable add their statistics into one posterior.
-   5.2. A declaration with an explicit empty source set adds no statistics.
-   5.3. A declaration with an explicit empty source set writes its posterior to each target that reads the declared blobs.
-6. `Learnables.write` installs the parameters consumed by Gaussian message rules. In particular, NIW and MNIW covariance roles receive `psi / nu`, the inverse of the VMP expected precision defined by `cffg.conj`, rather than the posterior mean covariance.
-7. An end-to-end Gaussian-linear trial loop uses `Learnables.accumulate` and `Learnables.write`, without direct calls to `Engine.gaussian_node_stats` or manual edits to group rows, and recovers the seeded scalar LGSSM target within the tolerances in `tests/test_conj.py::test_trial_loop_recovers_lgssm_parameters`: matrix error below `0.05`, offset magnitude below `0.05`, and covariance error below `0.03`.
-8. Hostile inputs have the following outcomes:
-   8.1. A masked Gaussian-linear observation whose readout mask is `0` adds no evidence.
-   8.2. A literal zero in a valid moment array remains zero without a probability floor.
-   8.3. An improper prior fails before the posterior or a runtime parameter array is changed.
-   8.4. A non-finite Gaussian readout fails before the posterior or a runtime parameter array is changed.
-   8.5. A Gaussian readout marked `proper=False` fails before the posterior or a runtime parameter array is changed.
-   8.6. A statistic with an incompatible shape fails before the posterior or a runtime parameter array is changed.
-   8.7. A non-positive-definite posterior parameter fails before the posterior or a runtime parameter array is changed.
-9. Float32 execution and numerical guards have the following behavior:
-   9.1. Float32 accumulation produces finite values.
-   9.2. A write to a float32 destination leaves that destination in float32.
-   9.3. Each newly introduced floor, ridge, clamp, or tolerance derives from `finfo` for the numerical dtype.
-   9.4. The code states the invariant protected by each newly introduced floor, ridge, clamp, or tolerance.
-10. Uncomfortable-scale coverage has the following requirements:
-   10.1. The scale fixture has at least 16 continuous dimensions and 64 members.
-   10.2. The scale fixture constructs member addresses successfully.
-   10.3. The scale fixture completes NIW or MNIW accumulation successfully.
-   10.4. The scale fixture completes named parameter writes successfully.
-   10.5. The numerical path has no Python loop that processes one group member at a time.
-   10.6. The numerical path allocates no array that couples unrelated group members.
-11. Checkpoint and template persistence have the following requirements:
-   11.1. The versioned `v2:` learnable checkpoint format round-trips NIW hyperparameters with their keyed shapes intact.
-   11.2. The versioned `v2:` learnable checkpoint format round-trips MNIW hyperparameters with their keyed shapes intact.
-   11.3. Template serialization encodes the learning-family declaration.
-   11.4. Template serialization encodes each parameter blob role.
-   11.5. The structure hash reflects the serialized learning-family declaration.
-   11.6. The structure hash reflects each serialized parameter blob role.
-   11.7. Template serialization does not embed a runtime parameter array.
-   11.8. The structure hash excludes derived runtime parameter arrays.
-12. `README.md`, `docs/ARCHITECTURE.md`, and `docs/LIMITATIONS.md` describe the named-write API, Gaussian families available through runtime learning dispatch, inverse-expected-precision rollover, and each approximation or unsupported non-discrete learning family left after this ticket.
+1. The compiler replaces each `Arena.member_of` value with one frozen
+   `MemberAddress` containing the factor type and a tuple of frozen
+   `ParameterAddress` records. Each `ParameterAddress` contains `role`,
+   `blob`, `key`, `index`, and `transform` fields.
+   1.1. `role` is the serialized `FactorSpec.param_blobs` role, `blob` is the
+   referenced blob name, `key` and `index` locate one runtime row, and
+   `transform` is one of `identity`, `probability_to_log`, or
+   `covariance_to_precision`.
+   1.2. Every package consumer of the old `(key, index)` pair selects an
+   explicit role from the new address.
+2. Member addresses cover these factor types and parameter roles:
+   2.1. `categorical(statistic)`, `matrix_cat(matrix)`, and
+   `transition_mixture(matrices)` retain their pre-ticket discrete coverage.
+   2.2. `gaussian(mean, cov)` and
+   `gaussian_linear(matrix, offset, cov)` receive Gaussian coverage; a
+   conditioned `gaussian_linear_obs` runtime group uses the serialized
+   `gaussian_linear` roles.
+   2.3. `gaussian_mixture(mean, cov)`,
+   `gaussian_mixture_linear(matrix, offset, cov)`,
+   `recurrence_link(weights, offsets)`, and `gaussian_prec(mean)` receive
+   hybrid coverage for named writes.
+   2.4. Plate expansion is not a separate parameter family. Every scoped
+   plate copy of a covered factor receives its own address automatically.
+   2.5. Parameterless equality factors are N/A. Constraint parameters are
+   compile-time structure and require recompilation, so named runtime writes
+   are N/A. EF kernel parameters and direct writes to synthetic GFE composite
+   members are N/A for this ticket and remain with `cff-ahps`; the internal
+   addresses used by declared learning retain their existing behavior.
+3. The package exports
+   `set_params(engine, params, updates) -> dict[str, Array]`, where `updates`
+   maps factor names to maps from the exact roles in criterion 2 to numeric
+   arrays.
+   3.1. The returned mapping is new; neither the input mapping nor its arrays
+   are changed.
+   3.2. Probability roles validate their documented simplex axes and convert
+   probabilities to runtime log parameters while preserving literal zero as
+   the runtime negative-infinity sentinel.
+   3.3. Each `cov` value must be finite, symmetric, and positive definite and
+   is converted to the precision consumed by the Gaussian runtime.
+   3.4. Identity roles are finite and retain their serialized value.
+   3.5. Values must match the serialized blob shape. Accepted values are cast
+   to each destination dtype only after validation.
+   3.6. Updating one factor role updates every runtime row that reads the same
+   blob in the same role. An update cannot silently break template-level
+   parameter tying; callers that need separate values must edit the template
+   blob references and recompile.
+   3.7. Two requested updates that reach one tied blob with unequal values are
+   rejected.
+   3.8. Unknown factors, unsupported roles, non-numeric values, invalid
+   shapes, non-finite values, invalid probabilities, and invalid covariances
+   fail before any output array is changed.
+   3.9. Runtime members not reached through an updated blob and role retain
+   their original values and object-compatible shapes.
+4. `Template.learnables` accepts exactly these new family and factor pairs:
+   `niw` with `gaussian`, and `mniw` with `gaussian_linear`, including the
+   conditioned runtime form of that factor. Other NIW or MNIW pairings fail at
+   compile time with the declaration name and unsupported pair.
+   4.1. Generic NIW or MNIW learning for `gaussian_mixture` and
+   `gaussian_mixture_linear` is outside this ticket because it needs a
+   per-regime posterior-axis contract. `cff-y4nx` retains its model-specific
+   per-regime MNIW dynamics learner, and `cff-ahps` owns broader generic
+   registration.
+   4.2. Recurrence, precision, and EF factors receive no new learning-family
+   adapter in this ticket.
+5. The NIW and MNIW adapters read `Engine.gaussian_node_stats`, validate prior
+   and statistic keys and shapes, expose posterior means for reporting, and
+   route every rollover output through the role-bearing `LearnTarget` records.
+6. Tied sources have one statistical meaning. Every eligible factor that
+   reads a learnable's blobs contributes one factor-local statistic record,
+   all such records are pooled into one posterior update, and one rollover is
+   written to every tied target. A declaration with an explicit empty source
+   set contributes no evidence but may still write its prior rollover.
+7. `Learnables` retains an immutable validated copy of each initial prior and
+   provides two atomic update operations:
+   7.1. `accumulate` starts from the current posterior and adds one new set of
+   source statistics for distinct-trial learning.
+   7.2. `replace` starts from the immutable initial prior and recomputes the
+   posterior from the current source statistics for one-sequence coordinate
+   fitting.
+   7.3. Both operations accept the named `only` restriction and
+   require a converged source state.
+   7.4. Both operations compute and validate every selected posterior in
+   temporary storage. If one selected source or posterior is invalid, no
+   selected posterior changes.
+   7.5. Calling `replace` twice with unchanged statistics produces identical
+   hyperparameters and does not count the sequence twice.
+8. `Learnables.write` is atomic across all selected targets and returns a new
+   parameter mapping. NIW and MNIW `cov` roles receive the inverse expected
+   precision `psi / nu` defined by `cffg.conj`, rather than the posterior mean
+   covariance.
+9. Each supported family/factor pair has independent behavioral evidence:
+   9.1. Pooled `niw`/`gaussian` statistics produce the same posterior
+   hyperparameters and rollover as a direct `cffg.conj.NIW` update under the
+   test dtype's tolerance.
+   9.2. An end-to-end `mniw`/`gaussian_linear` trial loop uses
+   `Learnables.accumulate` and `Learnables.write`, without manual statistic
+   reads or row edits, and meets the seeded scalar LGSSM limits in
+   `tests/test_conj.py::test_trial_loop_recovers_lgssm_parameters`:
+   matrix error below `0.05`, offset magnitude below `0.05`, and covariance
+   error below `0.03`.
+   9.3. A tied observed-emission fixture pools soft statistics from every time
+   step and one `replace` call matches a direct pooled MNIW update.
+10. Hostile inputs have explicit outcomes for both supported pairs. An
+    improper prior, non-finite statistic, `proper=False` record, incompatible
+    statistic shape, or non-positive-definite posterior fails before posterior
+    or runtime parameters change. A masked Gaussian-linear observation adds
+    no evidence. Literal zero moment entries remain zero without a probability
+    floor.
+11. Float32 accumulation, replacement, and writes remain finite and preserve
+    float32 destinations. Every new numerical guard or tolerance derives from
+    `finfo` for the active dtype and states the invariant it protects.
+12. A fixture with at least 16 continuous dimensions and 64 tied or grouped
+    members constructs addresses, pools statistics, and installs named values
+    without an array coupling unrelated group members or a Python loop in the
+    numerical update over individual group rows.
+13. The versioned learning checkpoint round-trips NIW and MNIW keyed
+    hyperparameters. Template serialization and the structure hash include
+    family declarations and blob roles but exclude derived runtime arrays and
+    the transient member-address map.
+14. `README.md`, `docs/ARCHITECTURE.md`, and `docs/LIMITATIONS.md` document the
+    address and named-write contracts, tied-source pooling, both learning
+    cadences, inverse-expected-precision rollover, and the unsupported
+    learning families left after this ticket.
 
 ## Methodological Suggestions
 
-These are implementation suggestions. The implementer may choose another method that satisfies the outcomes.
+These suggestions are optional. The implementer may choose another method
+that satisfies the outcomes.
 
-- Use the **Learnable or checkpoint feature** row in `docs/ARCHITECTURE.md` as the change-path checklist. Treat `src/cffg/learn.py` (`Family`, `FAMILIES`, and `Learnables`) as the learning authority and `src/cffg/compiler.py` (`Arena.member_of`, group construction, and `_resolve_learnables`) as the compiled-address authority.
-- Reuse the NIW and MNIW algebra in `src/cffg/conj.py` and the statistics from `Engine.gaussian_node_stats`. Keep the family adapter responsible for translating keyed `LearnPlan` statistics and roles rather than copying the posterior formulas.
-- Evolve the member address only as far as needed to describe multi-key parameter groups. Derive the named bulk writer from that address so learnable writes and direct caller writes cannot disagree about group rows, role layout, or plate-scoped names.
-- Check validation, JSON and structure hashing, plate scoping, `_resolve_learnables`, `Arena.learn_plans`, engine readouts, parameter writes, checkpoint encoding and decoding, bundles, and package exports. Agent cadence remains caller-owned and needs no new policy. Message updates, free-energy evaluation, schedule classification, estimator behavior, and visualization are N/A because this ticket changes between-run parameter addressing and conjugate updates, not inference execution.
-- Check the duplicated execution surfaces explicitly: singleton and stacked/`vmap` groups are affected; plate-scoped and unscoped names are affected; versioned checkpoints are affected while legacy checkpoint decoding retains its pre-ticket behavior. Compare flooding and scheduled results separately with the factor-family statistic formulas after each schedule reports convergence. Host/JIT message-update pairs are N/A because this ticket writes parameters between runs.
-- Sparse categorical log-support is N/A because NIW and MNIW operate on continuous moments, not categorical log probabilities. Exercise a masked Gaussian-linear observation and a source excluded by `LearnableSpec.sources` as zero-evidence cases. Exercise vacuous input with an empty source set and improper input with `proper=False`, non-finite moments, invalid shapes, and non-positive-definite priors. Use float32 destination arrays for dtype coverage. Use 16 dimensions and 64 same-group members for the uncomfortable-scale case. NIW and MNIW updates are closed-form between-trial operations, so iterative convergence and globalization requirements do not apply.
-- Extend `tests/test_learnables.py` for compilation, family validation, tying, named writes, plate scoping, hostile inputs, float32, scale, and checkpoint behavior. Adapt the seeded recovery scenario in `tests/test_conj.py` as the independent behavioral target, and use `tests/test_bundle.py` if bundle persistence changes. Run focused tests during implementation and the repository short suite once after the final code change.
+- Use the **Learnable or checkpoint feature** change-path row. Treat
+  `src/cffg/compiler.py` as the address authority, `src/cffg/learn.py` as the
+  cadence and adapter authority, and `src/cffg/conj.py` as the posterior-
+  algebra authority.
+- Derive `set_params` and `Learnables.write` from the same address records so
+  direct writes and posterior rollovers cannot disagree about roles, row
+  layout, covariance conversion, scoped names, or tied blobs.
+- Preserve serialized blob references as the tying authority. A reverse
+  blob-and-role index may make validation and fan-out explicit without
+  embedding runtime arrays in the template.
+- Check validation, grounding, compilation, `Arena.learn_plans`, readouts,
+  checkpoint encoding, bundle behavior, package exports, and the three
+  canonical documents. Message equations, free-energy evaluation, and
+  schedule selection are N/A because updates occur between converged runs.
+- Exercise unscoped and plate-scoped names, singleton and stacked groups,
+  distinct-trial accumulation and one-sequence replacement, float32, masked
+  observations, improper statistics, and tied emissions. Compare flooding and
+  scheduled statistic readouts only after each run reports convergence.
+- Extend `tests/test_learnables.py` for contracts and use the existing seeded
+  recovery case in `tests/test_conj.py` as the MNIW behavioral target. Run
+  focused tests during implementation and the short suite once after the
+  final code change.
 
 ## Future work
 
-`cff-y4nx` owns the consumer workflow for a recurrent switching linear dynamical system that combines Dirichlet transition learning, MNIW dynamics learning, and Pólya–Gamma recurrence-weight learning. Its dependency list reported by `tk show cff-y4nx` on 2026-08-07 does not name `cff-6tek`, so that ticket must either use this declared MNIW path or state that its manual between-trial MNIW loop is intentional.
+`cff-l7y4` consumes generic MNIW emission learning and reset-from-prior
+replacement while owning rSLDS outer-loop scheduling, initialization, status,
+and scientific comparison. `cff-y4nx` retains its deliberate model-specific
+per-regime dynamics and recurrence learner.
 
-`cff-ahps` owns the broader universal-factor-library roadmap. Learning-family adapters beyond NIW and MNIW remain with the roadmap ticket or a child ticket it names; this ticket does not silently promise adapters for every non-discrete posterior family.
+`cff-ahps` owns generic learnable adapters for mixture, recurrence, precision,
+and EF families, plus named writes for EF kernel parameters and any synthetic
+GFE destinations that need a public member identity.
 
 ## Definitions
 
-- **Arena:** The compiled collection of grouped message and parameter arrays used by the runtime.
-- **`Arena.member_of`:** The compiler-produced map from a factor instance name to that instance's location in grouped runtime parameters.
-- **API (application programming interface):** A documented operation that callers may rely on.
-- **Bundle:** A saved model package that can include serialized structure and learning state.
-- **Cat/Dir:** Shorthand in the title for categorical factors with Dirichlet parameter posteriors.
-- **Checkpoint:** Serialized learning state that can be loaded in a later process or session.
-- **Conjugate posterior:** A posterior distribution in the same family as its prior, updated through sufficient statistics.
-- **Dtype:** A numeric storage type such as float32 or float64.
-- **EF (exponential family):** A probability-distribution family represented by sufficient statistics and natural parameters.
-- **`finfo`:** Numeric limits, including machine epsilon, for a floating-point dtype.
-- **Flooding and scheduled inference:** Two execution orders for message updates. Flooding updates every eligible message together; a schedule updates selected groups in a planned order.
-- **Globalization:** Damping or line-search behavior that keeps an iterative numerical solver from taking an unstable full step.
-- **Host:** Python-side execution outside JIT-compiled numerical code.
-- **JAX:** The array and compiled numerical computing library used by the runtime.
-- **JIT (just-in-time compilation):** Compilation of numerical operations before repeated execution.
-- **JSON (JavaScript Object Notation):** The text format used to serialize template structure.
-- **LGSSM (linear Gaussian state-space model):** A time-series model with linear transitions and Gaussian noise.
-- **NIW (Normal-Inverse-Wishart):** A conjugate posterior family for a Gaussian mean and covariance.
-- **MNIW (Matrix-Normal-Inverse-Wishart):** A conjugate posterior family for a linear map, offset, and covariance.
-- **Parameter blob:** A named serialized array that stores model parameters and may be shared by several factors.
-- **Parameter role:** The meaning of one parameter blob within a factor, such as matrix, offset, or covariance.
-- **Plate expansion:** Compilation of a repeated model fragment into scoped factor instances.
-- **Precision:** The inverse of a covariance matrix.
-- **Pólya–Gamma:** A probability distribution used to express logistic-regression likelihoods as conditionally Gaussian updates.
-- **Readout:** A derived statistic or belief summary obtained from runtime state without changing that state.
-- **Rollover:** Conversion of posterior hyperparameters into the parameters consumed during a later inference run. For NIW and MNIW covariance roles, this is the inverse expected precision.
-- **Scoped name:** A factor or blob name prefixed with its composed fragment or plate-copy path.
-- **Stacked group:** One runtime array whose leading rows hold several factor instances with compatible shapes.
-- **Structure hash:** A digest of serialized model structure that excludes derived runtime arrays.
-- **Sufficient statistics:** Values from a factor belief that contain the information needed for a conjugate posterior update.
-- **VMP (variational message passing):** Message passing that uses expectations under variational beliefs; its Gaussian rules consume a covariance equal to the inverse expected precision rather than the posterior mean covariance.
-- **`vmap`:** JAX's transformation for applying one array function across a batch axis.
+- **Atomic update:** An operation that changes none of its selected outputs if
+  validation of any selected input or result fails.
+- **Distinct-trial accumulation:** Adding statistics from a new independent
+  sequence to posterior evidence retained from earlier sequences.
+- **EF (exponential family):** A distribution family represented through
+  sufficient statistics and natural parameters.
+- **GFE (generalised free energy):** The active-inference objective whose
+  compiled composites may absorb parameter uncertainty.
+- **MNIW (Matrix-Normal-Inverse-Wishart):** A conjugate posterior for a linear
+  matrix, offset, and covariance.
+- **NIW (Normal-Inverse-Wishart):** A conjugate posterior for a Gaussian mean
+  and covariance.
+- **One-sequence coordinate replacement:** Recomputing a posterior coordinate
+  from fixed priors and the current statistics of one sequence instead of
+  adding that sequence again.
+- **Parameter role:** The serialized meaning of a parameter blob within one
+  factor, such as `matrix`, `offset`, or `cov`.
+- **Runtime row:** One member's slice of a stacked parameter array in a
+  compiled arena.
+- **Tied factors:** Factor instances whose parameter roles reference the same
+  serialized blob and therefore denote one shared parameter.
+- **VMP (variational message passing):** Message passing that consumes
+  expectations under variational posterior beliefs.
 
 ## Notes
 
@@ -160,22 +248,6 @@ What remains here is genuinely registration plus the map it needs:
 3. the bulk set_params(factor_name -> arrays) helper from the 2026-07-10
    evaluation note, which falls out of the same map.
 
-**2026-08-08T04:19:36Z**
-
-Dependency map used for this rewrite. Arrow direction is prerequisite --> dependent.
-
-```text
-[x] cff-x0sv declared-learning contract
-          |
-          +--> [ ] cff-6tek non-discrete learning (ready)
-```
-
-`tk dep tree cff-6tek --full`, `tk ready`, and `tk blocked` show no recorded dependent below `cff-6tek`. The Future work section names `cff-y4nx` as the consumer-workflow owner and `cff-ahps` as the roadmap owner without presenting either contextual relationship as a dependency record.
-
-Retained wiggle candidates after the bounded current scan (candidate -> intended meaning): end_to_end -> consumer_workflow in criterion 7; n_a -> a change-path surface that is structurally irrelevant for the stated reason; preserve -> compatibility or preserved_state for historical text and the legacy decoder; register and available -> runtime_family_coverage through `cffg.learn.FAMILIES`; reusable -> code_reuse of `cffg.conj`; same -> object_identity, value_equality, or shared_category as bounded by the named map, state, or group; expose -> public_api for posterior reporting; implement -> registration_exists, component_integration_exists, or planned_work as selected by the sentence; support -> probability_support; complete -> exhaustive coverage of the named protocol or execution_finished for a named scale-fixture operation; done -> implementation_complete in the preserved historical note; land -> component_landed in the preserved historical note; ready -> dependency_ready according to `tk ready` on 2026-08-07; remaining -> unfinished_required_work or residual_set; approximate -> a named mathematical approximation; close -> mathematical_form in “closed-form”; conditional_discretion -> the method permits another address representation; sufficient -> statistical_sufficiency; check -> manual_inspection of named change-path surfaces or automated_check of named behavior; converge -> runtime_status_criterion; correct -> contract_conformance in the preserved review note; estimate -> the named resource estimator; evidence -> automated test evidence; exact -> literal_zero_or_support or identifier_precision as selected by the sentence; pass -> message_passing or tests_succeed; test -> test_artifact or automated_execution; validate -> input_validation; accumulate -> raw_sum of named sufficient-statistic records; fit -> structural_compatibility in the preserved note; infer -> state_or_regime_posterior; learn -> integrated_learning_workflow or the named `cffg.learn` module; learnable -> declared_parameter_artifact or registered_parameter_family as selected by the sentence; recover -> parameter_estimation against the seeded target; rollover -> point_parameter_install in the new contract and posterior_to_prior in the preserved historical note; trial -> independent_dataset; scale -> domain_size or dtype-relative numerical magnitude; can -> demonstrated_capability; expected -> mathematical_expectation; intended -> semantic_purpose recorded by this review; may -> optional_requirement or possible sharing; explicit_owner and named_ticket_handoff -> current-ticket ownership or the concrete `cff-y4nx` and `cff-ahps` future owners named by the sentence; all -> named_class_exhaustive in the preserved note; at_least -> inclusive_lower_bound; every -> named_class_distributive; only -> hard_exclusion, current_limitation, or ticket_scope_boundary as bounded by the sentence; current -> versioned runtime checkpoint state in the new text and unpinned present time in the preserved historical note; deferred -> delegated_ticket in the preserved historical note; later -> ordering_constraint; read -> machine_access.
-
-Intelligible-ticket review: complete.
-
 **2026-08-01T05:06:38Z**
 
 NASCAR consumer finding, 2026-07-31: the independent cff-y4nx harness at /Users/ravd/projects/experiments/cffg-nascar-validation commit 0543683 could run fixed-emission oracle inference but could not express the canonical observed-only fit through packaged learning. Shared gaussian_linear emission MNIW registration is now a concrete downstream requirement of cff-l7y4, not only an API-completeness argument. Source: results.json canonical_fit_readiness and primary-agent code audit. Confidence: high.
@@ -183,3 +255,19 @@ NASCAR consumer finding, 2026-07-31: the independent cff-y4nx harness at /Users/
 **2026-08-08T17:16:27Z**
 
 Readiness audit, 2026-08-08: the rSLDS milestone is not implementation-ready. The remaining design and sequencing questions are recorded in docs/todo-notes/cff-6tek-rslds-milestone-questions.md for the refiner. cff-y4nx is substantively clear; cff-6tek still needs the structured rewrite, and cff-l7y4/cff-r6bl retain the cross-ticket questions named there.
+
+**2026-08-08T18:10:00Z**
+
+Readiness resolution, 2026-08-08. This rewrite supersedes the preceding readiness verdict: the ticket now fixes the multi-role address shape, covered and excluded factor families, atomic and tie-preserving `set_params` behavior, NIW/MNIW pairings, pooled tied statistics, and both accumulation and replacement cadences. `cff-6tek` depends only on closed `cff-x0sv`, so implementation may start without `cff-y4nx` closing.
+
+Legend: prerequisite --> dependent
+
+    [x] cff-x0sv --> [ ] cff-6tek (ready) --+
+                                                |
+    [x] cff-k9ws --> [x] cff-4apw --> [~] cff-y4nx --+--> [ ] cff-l7y4
+                                                     |
+    [ ] cff-r6bl (ready, parallel) ------------------+--> [ ] cff-ahps
+
+The `tk` records remain authoritative. The bounded current scan retained intentional terms with these meanings: canonical=project documents or literature model; end_to_end=component-chain integration test; fixed=fixed prior or constant parameter; generic=model-general protocol or registered family coverage; n_a=structurally irrelevant or delegated surface; preserve=literal-value, dtype, tying, or compatibility invariant; public=documented API; register=runtime family coverage; same=blob identity, value equality, or shared address authority; expose=reporting access; implement=planned component integration or preserved historical statement; provide=ticket deliverable; support=registered pair or probability support; done and land=preserved historical completion; ready=dependency or design readiness; remaining=preserved state or named delegated work; sufficient=mathematical statistics; check=manual inspection or automated check; converge=runtime status; correct=preserved review finding; evidence=test or provenance artifact; exact=literal role, zero, identifier, or threshold; match=tolerance comparison; oracle=generating-parameter workflow; pass=message passing or test success; test=test artifact or execution; validate=input or posterior guard; accumulate=distinct-trial evidence addition; fit=parameter estimation; infer=posterior inference; learn and learnable=declared-learning workflow or registered family; recover=parameter recovery; rollover=posterior-to-runtime conversion; trial=independent dataset; can and could=present or historical capability selected by the sentence; expected=mathematical expectation; may=permission or optional method; explicit_owner and named_ticket_handoff=the ticket, component, or named roadmap ticket in the sentence; all, any, every, and only=the locally enumerated set or explicit exclusion; at_least=inclusive lower bound; current=runtime-active posterior or statistics; deferred=named historical delegation; existing=pre-ticket compatibility artifact; read=machine statistic access. Capability ownership was checked separately. Intelligible-ticket review: complete.
+
+Post-note scan addition: integrate=the named component-chain integration test; complete=the intelligible-ticket review marker; close=ticket closure in the sequencing statement; estimate=parameter estimation. Historical slice: 29 candidates, 61 occurrences, zero classified problems.
