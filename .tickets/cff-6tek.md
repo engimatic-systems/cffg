@@ -179,3 +179,7 @@ Intelligible-ticket review: complete.
 **2026-08-01T05:06:38Z**
 
 NASCAR consumer finding, 2026-07-31: the independent cff-y4nx harness at /Users/ravd/projects/experiments/cffg-nascar-validation commit 0543683 could run fixed-emission oracle inference but could not express the canonical observed-only fit through packaged learning. Shared gaussian_linear emission MNIW registration is now a concrete downstream requirement of cff-l7y4, not only an API-completeness argument. Source: results.json canonical_fit_readiness and primary-agent code audit. Confidence: high.
+
+**2026-08-08T17:16:27Z**
+
+Readiness audit, 2026-08-08: the rSLDS milestone is not implementation-ready. The remaining design and sequencing questions are recorded in docs/todo-notes/cff-6tek-rslds-milestone-questions.md for the refiner. cff-y4nx is substantively clear; cff-6tek still needs the structured rewrite, and cff-l7y4/cff-r6bl retain the cross-ticket questions named there.
