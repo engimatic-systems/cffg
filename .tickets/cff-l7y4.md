@@ -24,9 +24,11 @@ coordinates and regime labels without access to the generating variables.
 This ticket owns the missing observed-only fitting workflow and the external
 comparison between a learned rSLDS and a matched learned SLDS. Ticket
 `cff-6tek` owns the generic Gaussian and MNIW learnable registration that this
-workflow requires. Ticket `cff-r6bl` owns cold setup optimization; this ticket
-may proceed with the measured setup cost because each fitted model compiles
-once and reuses that executable throughout fitting.
+workflow requires, including distinct-trial accumulation and reset-from-prior
+replacement. This ticket consumes replacement for one observed sequence; it
+does not redefine the generic cadence. Ticket `cff-r6bl` owns cold setup
+optimization; this ticket may proceed with the measured setup cost because
+each fitted model compiles once and reuses that executable throughout fitting.
 
 ## Outcomes / Acceptance Criteria
 
@@ -38,8 +40,9 @@ once and reuses that executable throughout fitting.
    recurrence offsets, shared emission matrix, shared emission offset, and
    shared emission covariance.
 3. Shared `gaussian_linear` emission parameters update from soft factor-local
-   MNIW statistics through the generic learning surface supplied by
-   `cff-6tek`.
+   MNIW statistics through `cff-6tek`'s generic `Learnables.replace` operation.
+   Every time-step factor tied to the shared emission blobs contributes to one
+   pooled posterior update.
 4. Each outer iteration recomputes every one-sequence variational coordinate
    from the fixed priors and the current sequence statistics rather than adding
    the same sequence to the previous iteration as new evidence.
@@ -48,10 +51,24 @@ once and reuses that executable throughout fitting.
    rebuilding the model or recompiling the executable.
 6. The outer loop reports `converged`, `budget_exhausted`, or `diverged` and
    preserves the inner `Engine` status that caused a non-converged result.
-7. A non-finite Bethe free energy, parameter-prior term, outer objective, or
-   coordinate change produces `diverged` and prevents a parameter write.
-8. The outer stopping rule names the finite objective and dtype-scaled
-   tolerance that make a convergence result falsifiable.
+7. A non-finite inner Bethe free energy, posterior hyperparameter, installed
+   point parameter, or outer fixed-point residual produces `diverged` and
+   prevents that iteration's parameter write.
+8. The first fitting release makes no scalar outer-objective convergence
+   claim. The engine's Bethe free energy remains the inner inference signal,
+   and fixed priors enter each conjugate replacement directly rather than as
+   an invented additive term on a point-parameter Bethe free energy.
+   8.1. In the fixed latent coordinates and regime-label order established by
+   initialization, the fitter computes the maximum over every posterior
+   hyperparameter and installed parameter array of
+   `max(abs(new - old)) / max(1, max(abs(new)), max(abs(old)))`.
+   8.2. The default outer tolerance is `8 * sqrt(finfo(dtype).eps)`, may be
+   tightened by the caller, and must be met on two consecutive outer
+   iterations before the fitter reports `converged`.
+   8.3. A finite residual above tolerance at the iteration limit reports
+   `budget_exhausted`. Ticket `cff-ahps` owns any future scalar variational
+   objective, which requires its own derivation and runtime terms before it
+   can replace this fixed-point rule.
 9. The documented initializer uses PCA plus an ARHMM-style method, or another
    method with recorded justification, to choose latent coordinates and break
    regime-label symmetry without generating states or regimes.
@@ -68,16 +85,34 @@ once and reuses that executable throughout fitting.
 14. Improper Gaussian, recurrence, or emission statistics terminate fitting
     before any new parameters are installed.
 15. The compact fitting case runs in float32 with dtype-derived guards and
-    finite parameters, objective values, and posterior statistics.
+    finite parameters, inner Bethe free energies, fixed-point residuals, and
+    posterior statistics.
 16. The compact suite includes a deliberately uncomfortable domain or horizon
     at least ten times larger than its smallest recovery fixture.
 17. The external experiment uses the pinned stick-breaking NASCAR generator
     with `T=10,000`, `K=4`, latent dimension `2`, and observation dimension
     `10`.
-18. The learned rSLDS and learned SLDS receive identical training observations,
-    held-out observations, initialization information, parameter budgets,
-    outer budgets, random-seed sets, and convergence rules except where their
-    model structures require a documented difference.
+18. The comparison includes two learned ordinary-SLDS controls under the same
+    observations, splits, outer budgets, seed sets, convergence rules, and
+    truth-free information boundary as the rSLDS.
+    18.1. The structure-matched control uses the same `K=4`, latent dimension
+    `d=2`, observation dimension `p=10`, shared-emission structure, and
+    per-regime dynamics structure, replacing only the state-dependent
+    transition with an ordinary transition matrix.
+    18.2. The budget-matched control keeps `d=2`, `p=10`, and the same shared
+    emission but selects its regime count `K_s >= 2` by minimizing the
+    absolute difference between the free-scalar counts below; ties select the
+    smaller `K_s`.
+    18.3. The fitted rSLDS count is
+    `(K-1) + K*(K-1)*(d+1) + K*(d*d + d + d*(d+1)/2)
+    + (p*d + p + p*(p+1)/2)`.
+    18.4. The fitted SLDS count is
+    `(K_s-1) + K_s*(K_s-1) + K_s*(d*d + d + d*(d+1)/2)
+    + (p*d + p + p*(p+1)/2)`.
+    18.5. For the canonical dimensions, the rSLDS has 160 fitted scalars, the
+    same-`K` SLDS has 136, and the closest-budget choice is `K_s=5` with 154.
+    The result reports these counts and does not describe the six-scalar
+    difference as exact equality.
 19. Neither fitting arm receives generating states, regimes, transition
     parameters, dynamics parameters, or emission parameters before fitting is
     finished.
@@ -115,6 +150,10 @@ method that satisfies the outcomes.
   `cffg.learn` after `cff-6tek` as the generic declaration and cadence owner,
   `cffg.conj` as the posterior-algebra owner, and `cffg.models.rslds` as the
   model-specific assembly and parameter-mapping owner.
+- Keep distinct-trial accumulation covered by `cff-6tek` but use only
+  reset-from-prior replacement inside this ticket's one-sequence outer loop.
+  Report inner Bethe free energy and the outer fixed-point residual as separate
+  quantities.
 - Inspect validation, serialized blob references, compiler `member_of` maps,
   `Arena.learn_plans`, engine statistic readouts, fitting cadence, parameter
   writes, and documentation. Add no checkpoint or bundle format unless the
@@ -139,7 +178,9 @@ once and reuse its executable. Lower setup cost shortens future model
 development and repeated experiments.
 
 `cff-ahps` is the downstream roadmap epic that receives the demonstrated
-observed-only rSLDS fitting capability. No other future work is identified.
+observed-only rSLDS fitting capability. It also owns any later derivation and
+implementation of a joint scalar objective over latent beliefs and conjugate
+parameter posteriors; this ticket makes no such convergence claim.
 
 ## Definitions
 
@@ -162,8 +203,10 @@ observed-only rSLDS fitting capability. No other future work is identified.
   but not generating parameters, states, or regimes.
 - **Outer coordinate:** One parameter-posterior update in a variational fitting
   loop around hidden-variable inference.
-- **Parameter budget:** The model dimensions and free parameter counts used to
-  keep two comparison arms matched.
+- **Outer fixed-point residual:** The largest scale-normalized change across
+  consecutive posterior hyperparameters and installed point parameters.
+- **Parameter budget:** The enumerated fitted free-scalar count used to select
+  and report the closest ordinary-SLDS control.
 - **PCA:** Principal component analysis, used here as a possible observation-
   based latent-state initializer.
 - **Preregistered threshold:** A numeric success boundary recorded before the
@@ -193,3 +236,9 @@ The tk dependency records are authoritative. Validation used the bounded histori
 **2026-08-08T16:16:48Z**
 
 Intelligible-ticket review: complete.
+
+**2026-08-08T18:11:00Z**
+
+Readiness resolution, 2026-08-08. The fitter now owns a falsifiable fixed-point stopping rule rather than claiming an unimplemented scalar variational objective; fixed priors enter `cff-6tek` replacement updates, and the inner engine retains Bethe free energy as its convergence signal. The scientific comparison includes a same-`K` structural SLDS and the formula-selected closest-budget `K_s=5` SLDS. `cff-6tek` supplies both learning cadences, while this ticket consumes replacement for one sequence. The prior retained-candidate classifications remain applicable; additions and changed readings are fixed_point=the defined outer residual, exact=the stated free-scalar formulas and numeric counts, match=the two enumerated comparison controls, generic=the `cffg.learn` protocol, and current=the active sequence statistics. Capability ownership was checked separately. Intelligible-ticket review: complete.
+
+Post-note scan addition: implement=the possible scalar-objective work delegated to `cff-ahps`; later=that work's ordering after this ticket's fixed-point contract.
