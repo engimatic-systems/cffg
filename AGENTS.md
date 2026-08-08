@@ -35,7 +35,8 @@ git pull --ff-only origin "$BASE_BRANCH"
 3. **Tickets via `tk`.** All work is tracked in the `tk` ticket system (`tk --help`
    for usage). Break work into small tickets with dependency links, use epics for the
    major milestones, and close tickets in the same session as the commit that
-   resolves them. Use the 'Intelligible ticket' skill to write and edit tickets. Before starting work, check `tk` for ready tickets.
+   resolves them. Write tickets using the `intelligible-ticket` skill. Before
+   starting work, check `tk` for ready tickets.
 
 4. **Act autonomously.** The agent has broad access to this machine and should use
    it: run tests, install deps, create tickets, commit, and keep moving without
@@ -125,11 +126,6 @@ This project will span many context windows. The rule that makes that survivable
 
 ### Ticket and roadmap authoring
 
-- Write tickets using the `intelligible-ticket` skill.
-- Every ticket places a `## Plain English` section immediately after its title.
-  In two to five affirmative sentences, explain what capability or outcome the
-  ticket delivers and how it delivers it at a high level. The technical
-  description, design, hostile-input plan, and acceptance criteria follow.
 - After creating or materially rewriting a ticket, run
   `uv run python tools/wiggle_words/query_ticket_wiggle_audit.py scan <ticket-id>`. Review
   every match in context and clarify any claim whose owner, time, layer, scope,
