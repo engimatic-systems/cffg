@@ -6,7 +6,7 @@ purpose: >-
   can be evidence based.
 provenance:
   lexicon:
-    path: tools/ticket-wiggle-words.yaml
+    path: tools/wiggle_words/ticket-wiggle-words.yaml
     sha256: 1e0cc92eb315119f15089b7b6bc62f2a12a8e971eb18f82759fc5c20bf9c9b6e
   ticket_corpus:
     glob: ".tickets/**/*.md"

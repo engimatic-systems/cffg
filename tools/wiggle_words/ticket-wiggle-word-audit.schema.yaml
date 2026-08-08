@@ -1,9 +1,9 @@
 ---
 $schema: https://json-schema.org/draft/2020-12/schema
-$id: https://github.com/engimatic-systems/cffg/blob/main/tools/ticket-wiggle-word-audit.schema.yaml
+$id: https://github.com/engimatic-systems/cffg/blob/main/tools/wiggle_words/ticket-wiggle-word-audit.schema.yaml
 title: CFFG ticket wiggle-word contextual audit
 description: >-
-  Schema for tools/ticket-wiggle-word-audit-v2.yaml. The audit is ordered by
+  Schema for tools/wiggle_words/ticket-wiggle-word-audit-v2.yaml. The audit is ordered by
   candidate, while the query tool projects bounded candidate or ticket slices
   so agents do not place the complete report in their context windows.
 type: object
@@ -41,30 +41,30 @@ properties:
       $ref: '#/$defs/candidate'
 
 x-navigation:
-  authoritative_instance: tools/ticket-wiggle-word-audit-v2.yaml
-  candidate_lexicon: tools/ticket-wiggle-words-v2.yaml
-  query_tool: tools/query_ticket_wiggle_audit.py
+  authoritative_instance: tools/wiggle_words/ticket-wiggle-word-audit-v2.yaml
+  candidate_lexicon: tools/wiggle_words/ticket-wiggle-words-v2.yaml
+  query_tool: tools/wiggle_words/query_ticket_wiggle_audit.py
   context_rule: >-
     Do not read the complete audit to refine one ticket. Produce a bounded
     slice, and place only that slice plus the assigned ticket and necessary
     dependency tickets in the agent context.
   primary_partition:
     key: candidates[].occurrences[].ticket
-    command: uv run python tools/query_ticket_wiggle_audit.py slice cff-y4nx
+    command: uv run python tools/wiggle_words/query_ticket_wiggle_audit.py slice cff-y4nx
     purpose: Return the contextual classifications already recorded for one ticket.
   current_ticket_scan:
     key: candidate regex matched against one current ticket file
-    command: uv run python tools/query_ticket_wiggle_audit.py scan cff-y4nx
+    command: uv run python tools/wiggle_words/query_ticket_wiggle_audit.py scan cff-y4nx
     purpose: >-
       Re-run the frozen mechanical vocabulary after a ticket is written or
       materially revised; this catches text that did not exist in the pinned audit corpus.
   narrower_queries:
     problems_only: >-
-      uv run python tools/query_ticket_wiggle_audit.py slice cff-y4nx --problems-only
+      uv run python tools/wiggle_words/query_ticket_wiggle_audit.py slice cff-y4nx --problems-only
     one_candidate: >-
-      uv run python tools/query_ticket_wiggle_audit.py slice cff-y4nx --candidate end_to_end
-    audit_summary: uv run python tools/query_ticket_wiggle_audit.py summary
-    internal_validation: uv run python tools/query_ticket_wiggle_audit.py validate
+      uv run python tools/wiggle_words/query_ticket_wiggle_audit.py slice cff-y4nx --candidate end_to_end
+    audit_summary: uv run python tools/wiggle_words/query_ticket_wiggle_audit.py summary
+    internal_validation: uv run python tools/wiggle_words/query_ticket_wiggle_audit.py validate
   ticket_slice_shape:
     source: Audit and lexicon provenance used for the projection.
     query: Selected ticket and optional candidate or problem filter.
@@ -73,7 +73,7 @@ x-navigation:
       Matching candidate definitions, ticket-local usage counts, and only the
       selected occurrence records.
   cross_file_invariants:
-  - Candidate ids and patterns agree with tools/ticket-wiggle-words-v2.yaml.
+  - Candidate ids and patterns agree with tools/wiggle_words/ticket-wiggle-words-v2.yaml.
   - Every non-sentinel occurrence meaning is listed for its lexicon candidate.
   - Candidate and report counts reconcile with their occurrence records.
   - observed_meaning is present only for unlisted_meaning and pattern_false_positive.
@@ -115,7 +115,7 @@ x-refinement-workflow:
   completion_checks:
   - tk dep cycle
   - git diff --check
-  - uv run python tools/query_ticket_wiggle_audit.py validate
+  - uv run python tools/wiggle_words/query_ticket_wiggle_audit.py validate
 
 $defs:
   non_negative_integer:

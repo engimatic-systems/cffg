@@ -15,8 +15,9 @@ from typing import Any
 import yaml
 
 
-TOOLS_DIR = Path(__file__).resolve().parent
-DEFAULT_AUDIT = TOOLS_DIR / "ticket-wiggle-word-audit-v2.yaml"
+WIGGLE_WORDS_DIR = Path(__file__).resolve().parent
+REPO = WIGGLE_WORDS_DIR.parent.parent
+DEFAULT_AUDIT = WIGGLE_WORDS_DIR / "ticket-wiggle-word-audit-v2.yaml"
 PROBLEM_MEANINGS = {"ambiguous", "unlisted_meaning", "pattern_false_positive"}
 
 
@@ -29,7 +30,7 @@ def load_yaml(path: Path) -> dict[str, Any]:
 
 
 def resolve_from_repo(path_value: str) -> Path:
-    return TOOLS_DIR.parent / path_value
+    return REPO / path_value
 
 
 def load_sources(audit_path: Path) -> tuple[dict[str, Any], dict[str, Any], Path]:
@@ -53,7 +54,7 @@ def lexicon_by_id(lexicon: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 def source_block(audit_path: Path, audit: dict[str, Any]) -> dict[str, Any]:
     return {
-        "audit": str(audit_path.relative_to(TOOLS_DIR.parent)),
+        "audit": str(audit_path.relative_to(REPO)),
         "audit_schema_version": audit["schema_version"],
         "ticket_corpus_git_commit": audit["provenance"]["ticket_corpus"]["git_commit"],
         "lexicon": audit["provenance"]["lexicon"],
@@ -132,7 +133,7 @@ def scan_ticket(
 ) -> dict[str, Any]:
     audit, lexicon, _ = load_sources(audit_path)
     ticket = normalize_ticket(ticket_value)
-    ticket_path = TOOLS_DIR.parent / ticket
+    ticket_path = REPO / ticket
     if not ticket_path.is_file():
         raise ValueError(f"ticket does not exist: {ticket}")
 

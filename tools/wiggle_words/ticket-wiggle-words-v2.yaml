@@ -6,11 +6,11 @@ purpose: >-
   technical senses, and measures explicit ownership cues without pretending to detect omitted ownership.
 provenance:
   derived_from_lexicon:
-    path: tools/ticket-wiggle-words.yaml
+    path: tools/wiggle_words/ticket-wiggle-words.yaml
     sha256: 1e0cc92eb315119f15089b7b6bc62f2a12a8e971eb18f82759fc5c20bf9c9b6e
   derived_from_audit:
-    path: tools/ticket-wiggle-word-audit.yaml
-    sha256: f83d9abfbe1a774f789fdd4128650f30cdf5a70f8083544f663bafe0d8ef814d
+    path: tools/wiggle_words/ticket-wiggle-word-audit.yaml
+    sha256: 235f2f8ff07f518fc854e62509431306acb1be744b3d5eb5973a3d8148cc2aa1
   comparison_corpus_git_commit: c855af691df24e2a59a86af82d9659d94b86c5f9
   comparison_corpus_sha256: d6107ed5db87ea877acfb94d3b8283a65eca93b332e3ca5c19e70e91ec13c239
   design_review_model: gpt-5.6-sol

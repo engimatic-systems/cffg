@@ -4,11 +4,11 @@ generated_at: '2026-08-07T08:19:10-07:00'
 purpose: Second-pass contextual audit that refines the v1 lexicon while preserving the exact ticket corpus for comparison.
 provenance:
   lexicon:
-    path: tools/ticket-wiggle-words-v2.yaml
-    sha256: 8f40d3cda7b3f87c681786a4405da491824f17054cd242ffce41b4c64cf2ae7c
+    path: tools/wiggle_words/ticket-wiggle-words-v2.yaml
+    sha256: 3b97550e175099f01534902b90946feb1e4edc1ff1348f23a779e1f347cea559
   v1_report:
-    path: tools/ticket-wiggle-word-audit.yaml
-    sha256: f83d9abfbe1a774f789fdd4128650f30cdf5a70f8083544f663bafe0d8ef814d
+    path: tools/wiggle_words/ticket-wiggle-word-audit.yaml
+    sha256: 235f2f8ff07f518fc854e62509431306acb1be744b3d5eb5973a3d8148cc2aa1
   ticket_corpus:
     glob: ".tickets/**/*.md"
     files: 118
