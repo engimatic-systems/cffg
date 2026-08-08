@@ -45,6 +45,8 @@ def test_has_review_requires_ordered_sections_and_completion_marker():
 
     assert scheduler.has_review(text)
     assert not scheduler.has_review(text.replace(scheduler.REVIEW_MARKER, "review pending"))
+    embedded = "\n\n".join(scheduler.REQUIRED_HEADINGS)
+    assert not scheduler.has_review(f"{embedded} embedded {scheduler.REVIEW_MARKER}")
     assert not scheduler.has_review(
         "\n\n".join(
             (
@@ -106,3 +108,21 @@ def test_rejects_assignment_of_reviewed_ticket():
             controller="controller",
             assigned={"left"},
         )
+
+
+def test_closed_controller_allows_a_completed_campaign_summary():
+    scheduler = load_scheduler_module()
+    tickets = graph()
+    tickets.pop("controller")
+
+    result = scheduler.schedule(tickets, set(tickets), controller="controller")
+
+    assert result["summary"] == {
+        "active": 5,
+        "reviewed": 5,
+        "remaining": 0,
+        "assigned": 0,
+        "eligible": 0,
+    }
+    assert result["eligible"] == []
+    assert result["blocked"] == []

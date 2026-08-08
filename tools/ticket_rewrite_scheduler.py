@@ -59,8 +59,11 @@ def committed_ticket_text(ticket_id: str, *, repo: Path = REPO) -> str:
 
 def has_review(text: str) -> bool:
     positions = [text.find(heading) for heading in REQUIRED_HEADINGS]
-    return all(position >= 0 for position in positions) and positions == sorted(positions) and (
-        REVIEW_MARKER in text
+    marker_is_standalone = any(line.strip() == REVIEW_MARKER for line in text.splitlines())
+    return (
+        all(position >= 0 for position in positions)
+        and positions == sorted(positions)
+        and marker_is_standalone
     )
 
 
@@ -97,13 +100,13 @@ def schedule(
 ) -> dict[str, Any]:
     assigned = assigned or set()
     active = set(tickets)
-    if controller not in active:
-        raise SchedulerError(f"controller is not active: {controller}")
     unknown_reviewed = reviewed - active
     if unknown_reviewed:
         raise SchedulerError(f"reviewed tickets are not active: {sorted(unknown_reviewed)}")
 
-    remaining = active - reviewed - {controller}
+    remaining = active - reviewed
+    if controller in active:
+        remaining.remove(controller)
     invalid_assigned = assigned - remaining
     if invalid_assigned:
         raise SchedulerError(
