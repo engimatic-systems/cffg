@@ -1,6 +1,6 @@
 ---
 id: cff-twzc
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-07T15:20:31Z
@@ -105,4 +105,43 @@ Controller rewrite prepared; the campaign remains in progress. The bounded curre
 
 **2026-08-08T04:05:28Z**
 
-Dependency scheduler increment complete. tools/ticket_rewrite_scheduler.py derives the active graph from tk, reads only committed ticket content when recognizing completed reviews, excludes active assignments, prefers a direct prerequisite of the worker last ticket, and withholds shared prerequisites behind the fan-in barrier. Focused validation: 6 tests passed. Final short suite after the final executable change: 1,288 passed, 38 deselected, zero failures; dashboard and runtime history refreshed. The live frontier contains 14 eligible tickets among 28 campaign tickets. tk dep cycle and git diff --check passed.
+Dependency scheduler increment complete. tools/ticket_rewrite_scheduler.py derives the active graph from tk, reads only committed ticket content when recognizing completed reviews, excludes active assignments, prefers a direct prerequisite of the worker last ticket, and withholds shared prerequisites behind the fan-in barrier. Focused validation: 5 scheduler tests passed. Final short suite after the final executable change: 1,288 passed, 38 deselected, zero failures; dashboard and runtime history refreshed. The live frontier contains 14 eligible tickets among 28 campaign tickets. tk dep cycle and git diff --check passed.
+
+**2026-08-08T05:51:18Z**
+
+Rewrite campaign complete. Three GPT-5.6 Sol workers rewrote the 28 non-controller tickets that were open or in progress at campaign start. The orchestrator reviewed and committed each ticket before releasing another assignment. The scheduler now reports 28 reviewed, zero remaining, zero assigned, zero eligible, and zero blocked campaign tickets. Closed tickets were read only as evidence and were not rewritten.
+
+The retained-context fail-safe was exercised as designed. A worker received at most one focused correction for a ticket draft; completed subject-area chains retained useful context, and unrelated or stale contexts were replaced with fresh Sol workers. Each ticket commit contains only its assigned `.tickets/<id>.md` file.
+
+The rewrites exposed three milestone-relevant boundaries rather than hiding them in implementation:
+
+- cff-t2g3 requires Cooper to choose the critical glucose-episode threshold and duration before final evaluation preregistration.
+- cff-o7hs does not assume that every EP step monotonically decreases an unnamed surrogate; it requires a derived merit/globalization contract and truthful solver status.
+- cff-y4nx distinguishes PR #56's fixed-parameter oracle inference from the observed-only fitting owned by cff-l7y4, without inventing a dependency on cff-6tek.
+
+The implementation dependency graph remains the source of truth. This compact companion shows its principal open chains after the rewrite. Arrow direction is prerequisite --> dependent; `[ready]` means every declared prerequisite is closed.
+
+```text
+[ready] cff-209l --> cff-o7hs --> cff-1o72 -----------+
+[ready] cff-wbhu --+--> cff-5edo --> cff-t2g3 --> cff-21ta
+                   +--> cff-9xmq --> cff-mjku --> cff-pyy9
+                   +------------------------------------------+
+[ready] cff-j7mm --> cff-6s31 -------------------------------+
+[ready] cff-9bex --+--> cff-bxk4 ----------------------------+--> cff-ahps
+                   +--> cff-x5lv
+
+[ready] cff-du6m --> cff-cynx
+[ready] cff-cj5h --> cff-gul8
+[closed] cff-twzc --> cff-y4nx
+
+[ready, independent] cff-2gev  cff-3kdk  cff-6tek  cff-g7rc
+                     cff-jude  cff-rqqc  cff-yl0a
+```
+
+Final validation succeeded. The internal audit validator reconciled 87 candidates, 4,300 occurrences, and 1,907 candidate-ticket pairs; the draft-2020-12 JSON Schema accepted the v2 audit; bounded slice and scan smoke commands passed; the six scheduler tests passed; the scheduler reported 28 active, 28 reviewed, and zero remaining after controller closure; both machine-wide skill copies were byte-identical and passed the skill validator; Python compilation and `uv lock --check` passed; and `tk dep cycle` plus `git diff --check` passed. A strict repository check found all 29 tickets structured and marked before controller closure, then all 28 remaining active tickets after closure. The 28 primary ticket rewrites and three marker-normalization follow-ups are 31 atomic one-ticket commits. The fresh dashboard-backed short suite after the final scheduler change passed 1,289 tests with 38 deselected and zero failures in 360.37 seconds; the dashboard reports 1,289 tests and zero failures.
+
+Final current-scan mapping (candidate -> intended meaning): fixed -> supplied parameter or pinned artifact; generic -> named abstraction rather than a model-specific shortcut; integrate -> components wired through the named boundary; n_a -> inspected surface that is structurally irrelevant; preserve -> semantic or historical-artifact invariance; same -> value, object, corpus, or execution identity stated by its clause; expose -> documented API access; implement -> planned code or process work; provide -> an API or prerequisite supplying a named capability; support -> internal integration, probability support, or source backing selected by its clause; work -> repository activity or a Git working tree; complete -> exhaustive result or campaign completion; deliver -> a ticket or tool supplying its named result; ready -> every declared prerequisite is closed; remaining -> state or work that continues after the named point; close -> administrative ticket completion; material -> scope-changing impact; check -> named automated or acceptance validation; estimate -> parameter estimation or a named resource calculation; evidence -> a source, test, benchmark, or provenance artifact; exact -> literal value, hash, support, or identity; match -> regex occurrence or declared equality; oracle -> generating-parameter or independent-validation reference; pass -> successful check or named algorithmic traversal; reproduce -> rerunnable artifact or result; test -> automated execution; validate -> artifact, schema, or acceptance validation; fit -> parameter estimation; infer -> state or regime posterior calculation; learn -> parameter update; performance -> separately named latency, throughput, compile, or warm phase; can -> demonstrated capability or permission; intended -> selected semantic purpose; explicit_owner -> the component or ticket named in the clause; named_ticket_handoff -> the concrete future owner; all -> the complete locally named set; every -> distribution over each member of the named set; only -> hard scope boundary or minimization; current -> repository state named by date or reference; deferred -> work assigned outside the present ticket; existing -> artifact or behavior that predates the change; later -> declared historical or dependency order; read -> machine access or a future requirement. Each occurrence is bounded by its sentence, artifact, command, ticket, status, comparison set, or metric.
+
+Final current scan after this note: 43 retained candidates and 310 occurrences. Capability ownership was checked separately: cff-twzc owns the writing policy, installed skill, audit navigation, scheduler, and campaign evidence; each rewritten ticket owns its engineering outcomes; named Future work tickets own delegated capabilities.
+
+Intelligible-ticket review: complete.
