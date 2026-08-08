@@ -1,6 +1,6 @@
 ---
 id: cff-y4nx
-status: in_progress
+status: closed
 deps: [cff-k9ws, cff-4apw, cff-twzc]
 links: [cff-l7y4]
 created: 2026-07-15T01:46:10Z
@@ -261,3 +261,19 @@ Legend: prerequisite --> dependent
     [ ] cff-r6bl (ready, parallel) ------------------+--> [ ] cff-ahps
 
 The canonical ticket heading is `## Background in Plain English`, as defined by the `intelligible-ticket` skill; `AGENTS.md` now delegates ticket structure to that skill instead of specifying a conflicting heading. The `tk` dependency records remain authoritative.
+
+**2026-08-08T18:32:00Z**
+
+Final acceptance review, 2026-08-08. The implementation, compact oracle, hostile-input guards, documentation, and pinned external result satisfy this ticket's 34 outcomes; no additional code work was found. The rebased runtime source and rSLDS tests are byte-identical to validated commit `6c01812`, whose short suite passed 1,284 tests with zero failures. The updated process base is independently covered by commit `70f7451`, whose short suite passed 1,289 tests with zero failures; only the scheduler dependency and its test differ from `6c01812`. The prior results were reused because no later rSLDS code change superseded them. `cff-y4nx` now closes, leaving `cff-6tek` and `cff-r6bl` ready in parallel and `cff-l7y4` blocked only on `cff-6tek`.
+
+Legend: prerequisite --> dependent
+
+    [x] cff-y4nx ---------------------------+
+                                               +--> [ ] cff-l7y4
+    [x] cff-x0sv --> [ ] cff-6tek (ready) --+
+
+    [ ] cff-r6bl (ready, parallel) --> [ ] cff-ahps
+
+Final ticket-only validation: bounded current scan reviewed, `tk dep cycle` passed, and `git diff --check` passed. Retained scan candidates keep the meanings recorded in the rewrite handoff and sequencing note; close=administrative completion, complete=the enumerated acceptance review, ready=dependency readiness, and remaining=the two named open milestone tickets. Capability ownership was checked separately. Intelligible-ticket review: complete.
+
+Post-note scan addition: pass=successful short-suite execution at each named validation commit.
