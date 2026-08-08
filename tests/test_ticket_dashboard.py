@@ -17,7 +17,15 @@ def load_dashboard_module():
     return module
 
 
-def ticket(ticket_id: str, title: str, priority: int, *, tags: list[str], parent: str | None = None) -> dict:
+def ticket(
+    dashboard,
+    ticket_id: str,
+    title: str,
+    priority: int,
+    *,
+    tags: list[str],
+    parent: str | None = None,
+) -> dict:
     return {
         "id": ticket_id,
         "status": "open",
@@ -29,20 +37,25 @@ def ticket(ticket_id: str, title: str, priority: int, *, tags: list[str], parent
         "assignee": "",
         "parent": parent or "",
         "tags": tags,
-        "title": title,
-        "description": "",
-        "design": "",
-        "acceptance": "",
-        "notes": [],
+        **dashboard.parse_body(f"# {title}\n"),
     }
 
 
 def test_render_exposes_priority_sort_and_tag_controls():
     dashboard = load_dashboard_module()
     tickets = {
-        "cff-parent": ticket("cff-parent", "Parent", 2, tags=[]),
-        "cff-child": ticket("cff-child", "Tagged child", 0, tags=["Frontend"], parent="cff-parent"),
-        "cff-other": ticket("cff-other", "Other", 1, tags=["backend"]),
+        "cff-parent": ticket(dashboard, "cff-parent", "Parent", 2, tags=[]),
+        "cff-child": ticket(
+            dashboard,
+            "cff-child",
+            "Tagged child",
+            0,
+            tags=["Frontend"],
+            parent="cff-parent",
+        ),
+        "cff-other": ticket(
+            dashboard, "cff-other", "Other", 1, tags=["backend"]
+        ),
     }
     dashboard.compute_relations(tickets)
 
