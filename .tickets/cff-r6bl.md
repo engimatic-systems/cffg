@@ -1,7 +1,7 @@
 ---
 id: cff-r6bl
 status: open
-deps: [cff-y4nx]
+deps: []
 links: [cff-yl0a, cff-wbhu]
 created: 2026-08-01T05:05:47Z
 type: feature
@@ -25,35 +25,51 @@ reduce cold cost without changing factor equations, free-energy accounting,
 support handling, solver status, or runtime data and parameter behavior.
 Ticket `cff-yl0a` owns exact discrete HMM slice fusion, and ticket `cff-wbhu`
 owns the linked general device-loop work. Neither is a prerequisite for this
-model-specific lowering.
+model-specific lowering. The model and benchmark harness from `cff-y4nx` are
+already present in this branch, so ticket closure is not an execution
+prerequisite.
 
 ## Outcomes / Acceptance Criteria
 
 1. A fresh-process benchmark reports separate durations for template
    construction, validation and grounding, CFFG lowering, JAX lowering and
    compilation, inference, readout, and artifact writing.
-2. The benchmark reports `T=100`, `T=1,000`, and `T=10,000` on the same machine,
-   software environment, model dimensions, schedule, dtype, observations,
-   parameters, and timing protocol used for the recorded baseline.
+2. The benchmark reports fresh generic-path and compact-lowered distributions
+   at `T=100`, `T=1,000`, and `T=10,000` in the same benchmark run. Both paths
+   use the same machine, process-isolation policy, software environment, model
+   dimensions, schedule, dtype, observations, parameters, and timing protocol.
 3. The benchmark reports timing distributions rather than one unqualified
    duration and names warmup, repetition count, aggregation statistic, and
    process-isolation policy.
-4. At `T=10,000`, template construction through executable readiness is at
-   least five times faster than the recorded `723.14`-second baseline on that
-   machine and protocol.
-5. At `T=10,000`, converged inference latency is no more than five percent
-   slower than the recorded `30.58`-second baseline under the same protocol.
+4. At `T=10,000`, the lowered-path median from template construction through
+   executable readiness is at least five times faster than the fresh generic-
+   path median. The historical `723.14` seconds is reported for orientation
+   but is not the acceptance denominator.
+5. At `T=10,000`, lowered-path median converged-inference latency is no more
+   than five percent slower than the fresh generic-path median. The historical
+   `30.58` seconds is reported for orientation but is not the acceptance
+   denominator.
 6. The benchmark records the number and duration of CFFG and JAX compilations
    so a cache hit cannot be reported as a cold compile.
-7. The compact lowered path and the generic path return matching categorical
-   marginals, Gaussian means and covariances, Bethe free energy, support
-   certificate, inner recurrence status, and final `RunStatus` under
-   criterion-specific numeric tolerances.
+7. The compact lowered path and the generic path return matching messages,
+   categorical marginals, Gaussian means and covariances, Bethe free energy,
+   support certificate, inner recurrence status, and final `RunStatus`.
+   7.1. Support certificates, inner status values, and final status values are
+   exactly equal.
+   7.2. For each finite message, marginal, mean, or covariance array, parity
+   requires
+   `max(abs(lowered - generic)) <= 64 * finfo(dtype).eps
+   * max(1, max(abs(generic)))`.
+   7.3. Bethe free-energy parity requires
+   `abs(lowered - generic) <= 64 * N * finfo(dtype).eps
+   * max(1, abs(generic))`, where `N` is the number of factor and edge terms
+   summed by the compact fixture's energy ledger.
 8. Flooding and mixed schedules preserve their documented relationship before
    and after the lowering on the compact parity fixture.
-9. With exact-zero categorical support, generic and lowered messages, Bethe
-   free energy, support certificate, and final status satisfy the tolerances
-   and status equality required by criterion 7.
+9. With exact-zero categorical support, the generic and lowered paths retain
+   the same literal support mask and negative-infinity sentinel positions.
+   Their finite messages and Bethe free energies satisfy criterion 7, and
+   their support certificates and statuses are exactly equal.
 10. An improper Gaussian belief, non-finite free energy, or failed recurrence
     coordinate remains a loud non-converged result with the original failure
     status.
@@ -72,10 +88,13 @@ model-specific lowering.
 16. The compact repeated-slice executor does not contain one separately lowered
     operation body per time step; the benchmark records the staged or scan
     representation used to establish this property.
-17. At `T=100`, `T=1,000`, and `T=10,000`, the resource estimator's named
-    persistent-state byte total equals the bytes allocated for persistent
-    `State` and parameter arrays, and no other persistent array grows with the
-    horizon.
+17. At `T=100`, `T=1,000`, and `T=10,000`, the benchmark sums `nbytes` over the
+    actual array leaves retained by `State`, runtime parameters, and the
+    compiled compact representation, reports each category separately, and
+    demonstrates that no unreported persistent array grows with the horizon.
+    The public resource estimator is N/A for this ticket; `cff-j7mm` owns its
+    non-discrete correctness and is not a prerequisite for this direct
+    measurement.
 18. Peak resident memory at `T=10,000` is no more than `2.25` GB on the baseline
     machine and protocol.
 19. No `T=10,000` case enters the default test suite; the compact parity and
@@ -99,9 +118,9 @@ method that satisfies the outcomes.
   `Engine` execution and certification as the primary implementation surfaces.
 - Inspect flooding, mixed, and exact schedule construction; host and JIT support
   checks; `_make_step`, scheduled batch or scan stages, propagation, Bethe free
-  energy, and inner-solver status. Check the resource estimator and benchmark
-  reporting. `RollingAgent` and `Colony` behavior are outside this ticket
-  because the rSLDS helper exposes no agent-facing contract.
+  energy, and inner-solver status. Check direct persistent-array accounting and
+  benchmark reporting. `RollingAgent` and `Colony` behavior are outside this
+  ticket because the rSLDS helper exposes no agent-facing contract.
 - Keep serialization, factor equations, message rules, and public parameter
   shapes unchanged. If the chosen method requires one of those changes, split
   that capability into a prerequisite ticket before implementation.
@@ -119,8 +138,10 @@ measurements or lowering ideas from this ticket, but neither ticket receives
 the rSLDS-specific acceptance work.
 
 `cff-l7y4` owns the observed-only NASCAR fit that benefits from lower setup
-cost. `cff-ahps` remains the downstream roadmap epic. No other future work is
-identified.
+cost. `cff-j7mm` independently owns correction of the public resource estimator
+for non-discrete arenas; this ticket's direct benchmark accounting neither
+implements nor validates that API. `cff-ahps` remains the downstream roadmap
+epic.
 
 ## Definitions
 
@@ -163,3 +184,15 @@ The tk dependency records are authoritative. Validation used the bounded histori
 **2026-08-08T16:16:48Z**
 
 Intelligible-ticket review: complete.
+
+**2026-08-08T18:12:00Z**
+
+Readiness resolution, 2026-08-08. Acceptance speed and regression ratios now compare fresh generic and lowered distributions from the same protocol; the historical single measurements are orientation only. Numeric parity uses explicit dtype-derived bounds, exact support/status equality, and direct persistent-array byte accounting. The public estimator is delegated to `cff-j7mm`, so `cff-r6bl` neither repairs it nor depends on it. The model, harness, and baseline artifacts are already in the branch, so the obsolete closure dependency on `cff-y4nx` was removed and this ticket may proceed in parallel.
+
+Legend: prerequisite --> dependent
+
+    [ ] cff-r6bl (ready) --> [ ] cff-ahps
+
+    Parallel linked work: [ ] cff-yl0a   [ ] cff-wbhu
+
+The prior retained-candidate classifications remain applicable; additions and changed readings are n_a=the estimator surface delegated to `cff-j7mm`, correct=public-estimator correctness, generic=the freshly measured pre-optimization path, same=the controlled benchmark configuration, exact=literal support/status equality, match and parity=the stated dtype-derived comparisons, and ready=dependency readiness after removing `cff-y4nx`. Capability ownership was checked separately. Intelligible-ticket review: complete.
