@@ -126,6 +126,7 @@ This project will span many context windows. The rule that makes that survivable
 
 ### Ticket and roadmap authoring
 
+- Write tickets using the `intelligible-ticket` skill.
 - Every ticket places a `## Plain English` section immediately after its title.
   In two to five affirmative sentences, explain what capability or outcome the
   ticket delivers and how it delivers it at a high level. The technical
