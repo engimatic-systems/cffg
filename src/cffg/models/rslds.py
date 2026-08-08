@@ -309,7 +309,10 @@ class RSLDSLearning:
         """Install rollover values into a fresh state without recompilation."""
         fresh = engine.init_state()
         if any(
-            not np.array_equal(np.asarray(value), np.asarray(expected))
+            not np.array_equal(
+                np.asarray(value),
+                np.asarray(expected, dtype=np.asarray(value).dtype),
+            )
             for value, expected in (
                 (state.messages, fresh.messages),
                 (state.g_eta, fresh.g_eta),
