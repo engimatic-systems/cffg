@@ -12,39 +12,154 @@ tags: [rslds, performance, scheduling]
 ---
 # Reduce canonical rSLDS cold compile and setup cost
 
-## Plain English
+## Background in Plain English
 
-Canonical-length rSLDS graphs will compile in a practical fraction of the current time while preserving identical inference and certification. The work will lower repeated hybrid slices through compact staged execution instead of presenting ten thousand nearly identical Python-expanded slices to compilation.
+The independent NASCAR run for `cff-y4nx` spent `723.14` seconds constructing
+and compiling a `T=10,000` rSLDS, compared with `30.58` seconds for converged
+inference. Peak resident memory was `2.03` GB. Cold setup is therefore the
+dominant cost when a consumer starts this canonical model.
 
-## Evidence and scope
+This ticket owns compact lowering for the repeated rSLDS slice made from
+`recurrence_link`, `gaussian_mixture_linear`, and `gaussian_linear`. It must
+reduce cold cost without changing factor equations, free-energy accounting,
+support handling, solver status, or runtime data and parameter behavior.
+Ticket `cff-yl0a` owns exact discrete HMM slice fusion, and ticket `cff-wbhu`
+owns the linked general device-loop work. Neither is a prerequisite for this
+model-specific lowering.
 
-The independent cff-y4nx NASCAR run at CFFG 6c01812 measured 723.14 seconds in compile/setup versus 30.58 seconds in converged inference for T=10,000, with 2.03 GB peak process RSS. That makes cold structure handling the dominant cost and a practical blocker for iterative learned fitting. cff-yl0a owns exact HMM slice fusion and explicitly excludes speculative Gaussian fast paths; this ticket owns the repeated recurrence_link plus gaussian_mixture_linear plus gaussian_linear rSLDS slice. cff-wbhu remains the linked device-loop work.
+## Outcomes / Acceptance Criteria
 
-## Architecture handoff
+1. A fresh-process benchmark reports separate durations for template
+   construction, validation and grounding, CFFG lowering, JAX lowering and
+   compilation, inference, readout, and artifact writing.
+2. The benchmark reports `T=100`, `T=1,000`, and `T=10,000` on the same machine,
+   software environment, model dimensions, schedule, dtype, observations,
+   parameters, and timing protocol used for the recorded baseline.
+3. The benchmark reports timing distributions rather than one unqualified
+   duration and names warmup, repetition count, aggregation statistic, and
+   process-isolation policy.
+4. At `T=10,000`, template construction through executable readiness is at
+   least five times faster than the recorded `723.14`-second baseline on that
+   machine and protocol.
+5. At `T=10,000`, converged inference latency is no more than five percent
+   slower than the recorded `30.58`-second baseline under the same protocol.
+6. The benchmark records the number and duration of CFFG and JAX compilations
+   so a cache hit cannot be reported as a cold compile.
+7. The compact lowered path and the generic path return matching categorical
+   marginals, Gaussian means and covariances, Bethe free energy, support
+   certificate, inner recurrence status, and final `RunStatus` under
+   criterion-specific numeric tolerances.
+8. Flooding and mixed schedules preserve their documented relationship before
+   and after the lowering on the compact parity fixture.
+9. With exact-zero categorical support, generic and lowered messages, Bethe
+   free energy, support certificate, and final status satisfy the tolerances
+   and status equality required by criterion 7.
+10. An improper Gaussian belief, non-finite free energy, or failed recurrence
+    coordinate remains a loud non-converged result with the original failure
+    status.
+11. Float32 and x64 compile to dtype-specific executables, use dtype-derived
+    numerical guards, and satisfy the compact parity criteria independently.
+12. Changing observations without changing structure reuses the compiled
+    executable and changes the posterior according to an independent compact
+    reference.
+13. Changing initial-regime, dynamics, recurrence, or emission parameters
+    without changing structure reuses the compiled executable and changes the
+    posterior according to an independent compact reference.
+14. A change to horizon, regime count, latent dimension, observation dimension,
+    dtype, or schedule cannot reuse an incompatible compiled executable.
+15. Runtime observations and learned parameters remain executable inputs and
+    are not captured as constants by lowering or compilation.
+16. The compact repeated-slice executor does not contain one separately lowered
+    operation body per time step; the benchmark records the staged or scan
+    representation used to establish this property.
+17. At `T=100`, `T=1,000`, and `T=10,000`, the resource estimator's named
+    persistent-state byte total equals the bytes allocated for persistent
+    `State` and parameter arrays, and no other persistent array grows with the
+    horizon.
+18. Peak resident memory at `T=10,000` is no more than `2.25` GB on the baseline
+    machine and protocol.
+19. No `T=10,000` case enters the default test suite; the compact parity and
+    hostile-input cases remain short-suite tests, and long timing cases stay in
+    an external benchmark.
+20. `docs/ARCHITECTURE.md` records the lowering authority, execution surfaces,
+    cache-key boundary, and parity contract.
+21. `docs/LIMITATIONS.md` records any accepted schedule, model-shape, device, or
+    benchmark boundary that remains after the optimization.
+22. Closing evidence records repository and experiment commits, commands,
+    environment, raw timing samples, aggregation, peak resident memory,
+    compilation counts, profiler artifacts, and artifact hashes.
 
-Applicable change-path row: Runtime numerical or status invariant.
+## Methodological Suggestions
 
-- Authority: compiler hybrid/recurrence plans, schedule mixed-stage construction, and Engine mixed execution/certification.
-- Derived surfaces: host/JIT, cold/warm, mixed/flood parity, parameter and observation dynamism, BFE, support checks, status, estimator, and benchmark reporting.
-- Serialization and factor equations are unchanged; this is lowering only.
-- Single/vmap is N/A until a batched rSLDS contract exists. Float32/x64 and changed parameters/observations are required cache-key controls.
-- Focused tests use a short repeated slice and parity against generic lowering. T=10,000 timings stay in an external benchmark.
-- Durable docs: ARCHITECTURE schedule/lowering ownership and the measured evaluation envelope.
+These suggestions are optional. The implementer may choose another sound
+method that satisfies the outcomes.
 
-## Hostile inputs
+- Use the **Runtime numerical or status invariant** change-path row. Treat the
+  compiler hybrid and recurrence plans, mixed-stage construction, and
+  `Engine` execution and certification as the primary implementation surfaces.
+- Inspect flooding, mixed, and exact schedule construction; host and JIT support
+  checks; `_make_step`, scheduled batch or scan stages, propagation, Bethe free
+  energy, and inner-solver status. Check the resource estimator and benchmark
+  reporting. `RollingAgent` and `Colony` behavior are outside this ticket
+  because the rSLDS helper exposes no agent-facing contract.
+- Keep serialization, factor equations, message rules, and public parameter
+  shapes unchanged. If the chosen method requires one of those changes, split
+  that capability into a prerequisite ticket before implementation.
+- Use a compact repeated rSLDS slice for executable parity and hostile-input
+  tests. Keep `T=100`, `T=1,000`, and `T=10,000` measurements in a fresh-process
+  external benchmark.
+- Treat single-instance execution as the required surface. Batched `vmap`
+  behavior is outside this ticket until a public batched rSLDS contract exists.
 
-- Exact categorical zeros and recurrence supports must produce the same messages and feasibility status as generic lowering.
-- Improper Gaussian beliefs, non-finite FE, and failed inner recurrence coordinates remain loud divergence.
-- Float32 compilation and execution use the same dtype-derived guards and cannot reuse x64 artifacts.
-- Scale cases include T=100, T=1,000, and T=10,000 with fixed parameter/state shapes; no hidden unrolling proportional to T inside one slice kernel.
-- Dynamic data and learned parameters remain runtime inputs and must not be captured as compilation constants.
+## Future work
 
-## Acceptance Criteria
+`cff-yl0a` owns general discrete HMM chain fusion, and `cff-wbhu` owns the
+linked device-loop optimization. Their broader execution changes may reuse the
+measurements or lowering ideas from this ticket, but neither ticket receives
+the rSLDS-specific acceptance work.
 
-1. A fresh-process profile separates template construction, grounding/compile, JAX compilation, inference, readout, and artifact work for T=100/1,000/10,000 on the recorded NASCAR environment.
-2. T=10,000 compile/setup improves at least 5x from the recorded 723.14-second baseline on the same machine and protocol; converged inference time regresses no more than 5%.
-3. Generic and lowered paths match marginals, Gaussian moments, BFE, message/support certificates, inner status, and final RunStatus on a compact oracle case.
-4. Changed observations and all learned dynamics/recurrence/emission parameters reuse the compiled executable and change the posterior correctly.
-5. Sparse support, improper beliefs, float32, and uncomfortable-scale runs retain truthful status and bounded memory. No test proportional to T=10,000 enters the default suite.
-6. Closing evidence records commands, commits, environment, timing distributions, peak RSS, compilation counts, tk dep cycle, and git diff --check.
+`cff-l7y4` owns the observed-only NASCAR fit that benefits from lower setup
+cost. `cff-ahps` remains the downstream roadmap epic. No other future work is
+identified.
 
+## Definitions
+
+- **Bethe free energy:** The factor-graph objective reported by the engine and
+  used as a convergence signal.
+- **Cache key:** The structural and execution attributes that determine whether
+  a compiled executable can be reused safely.
+- **Cold compile:** Construction and compilation measured in a fresh process
+  without a reusable executable from an earlier run.
+- **Generic path:** The existing execution route that lowers each factor and
+  schedule stage without the rSLDS-specific compact representation.
+- **Hostile input:** A sparse-support, improper, float32, or uncomfortable-scale
+  case required by the numerical robustness contract.
+- **Lowering:** Conversion of the compiled factor graph and schedule into JAX
+  operations before executable compilation.
+- **Peak resident memory:** The largest amount of physical memory attributed to
+  the benchmark process.
+- **rSLDS:** Recurrent switching linear dynamical system, whose regime
+  transition depends on the continuous latent state.
+- **Support certificate:** The runtime result of checking whether exact-zero
+  probability constraints remain feasible.
+- **Warm inference:** Repeated inference after the executable has already been
+  compiled.
+
+## Notes
+
+**2026-08-08T16:13:45Z**
+
+Rewrite handoff, 2026-08-08. cff-r6bl owns the measured cold rSLDS path from model construction through executable readiness, plus semantic parity, cache-key behavior, scale measurements, and memory evidence. cff-yl0a and cff-wbhu remain linked parallel work rather than prerequisites; cff-y4nx supplies the model and baseline.
+
+Legend: prerequisite --> dependent
+
+    [~] cff-twzc (ready) --> [~] cff-y4nx (blocked) --> [ ] cff-r6bl
+
+    Parallel linked work: [ ] cff-yl0a (ready)   [ ] cff-wbhu (ready)
+    Roadmap parent: cff-ahps
+
+The tk dependency records are authoritative. Validation used the bounded historical slice, two bounded scans, tk dep tree, tk ready, tk blocked, tk dep cycle, and git diff --check. Retained scan candidates and meanings: canonical=literature_standard; fixed=constant_parameter; generic=model_general existing path; preserve=semantic_invariant; public=documented_contract; reusable=compiled_artifact reuse; same=equivalent_configuration or value_equality; expose=explicit denial of an agent-facing public API; implement=planned_work or internal_component wiring; support=probability_support or runtime support check; complete=ticket-review completion marker; ready=dependency_ready; remaining=preserved_state or deliberately_excluded_work; close=acceptance_completion evidence; certify=runtime_certificate; check=automated_check or support guard; converge=runtime_status_criterion; estimate=resource_estimator; evidence=provenance_artifact; exact=literal_zero_or_support; match=tolerance_parity; parity=behavioral_parity; robust=the AGENTS.md numerical contract; sound=reasonable_judgment; test=test_artifact or automated_execution; validate=component_validation; fit=the delegated observed-only workflow; infer=fixed-parameter state inference; learn=runtime learned-parameter input; performance=the ticket category covering named cold, warm, and memory metrics; scale=domain_size; speed=cold_latency or named arena growth bound; can=theoretical safe cache reuse; may=permission for an alternative method or linked reuse; explicit_owner and named_ticket_handoff=the ticket or component named in each sentence; any=universal accepted-boundary set; only=the observed-only phase boundary; existing=predates_change. Capability ownership was checked separately. Intelligible-ticket review: complete.
+
+**2026-08-08T16:16:48Z**
+
+Intelligible-ticket review: complete.
