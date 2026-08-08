@@ -75,6 +75,7 @@ EPIC_FILES = {
         "test_estimate.py",
         "test_edit_codec.py",
         "test_ticket_dashboard.py",
+        "test_ticket_rewrite_scheduler.py",
     ],
     "M8 · Plotting": [
         "test_viz_diagram.py",
