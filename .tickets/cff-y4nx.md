@@ -247,3 +247,17 @@ Post-note scan addition: implement=component_integration_exists for the present 
 **2026-08-08T16:16:48Z**
 
 Intelligible-ticket review: complete.
+
+**2026-08-08T18:13:00Z**
+
+Milestone sequencing review, 2026-08-08. No additional `cff-y4nx` code outcome remains. Its sole open prerequisite, `cff-twzc`, is closed on this pull request's base branch at commit `70f7451`; after this branch incorporates that base, only a final acceptance review and ticket closure remain. `cff-6tek` depends only on closed `cff-x0sv` and may start immediately. `cff-r6bl` uses model and benchmark artifacts already committed in this branch, so its obsolete dependency on `cff-y4nx` closure was removed. `cff-l7y4` retains both real prerequisites because it consumes the assembled rSLDS and the Gaussian learning surface.
+
+Legend: prerequisite --> dependent
+
+    [x] cff-x0sv --> [ ] cff-6tek (ready) --+
+                                                |
+    [x] cff-k9ws --> [x] cff-4apw --> [~] cff-y4nx --+--> [ ] cff-l7y4
+                                                     |
+    [ ] cff-r6bl (ready, parallel) ------------------+--> [ ] cff-ahps
+
+The canonical ticket heading is `## Background in Plain English`, as defined by the `intelligible-ticket` skill; `AGENTS.md` now delegates ticket structure to that skill instead of specifying a conflicting heading. The `tk` dependency records remain authoritative.
