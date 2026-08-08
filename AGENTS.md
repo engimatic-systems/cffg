@@ -35,8 +35,7 @@ git pull --ff-only origin "$BASE_BRANCH"
 3. **Tickets via `tk`.** All work is tracked in the `tk` ticket system (`tk --help`
    for usage). Break work into small tickets with dependency links, use epics for the
    major milestones, and close tickets in the same session as the commit that
-   resolves them. Every ticket begins with a brief `## Plain English` section as
-   described below. Before starting work, check `tk` for ready tickets.
+   resolves them. Use the 'Intelligible ticket' skill to write and edit tickets. Before starting work, check `tk` for ready tickets.
 
 4. **Act autonomously.** The agent has broad access to this machine and should use
    it: run tests, install deps, create tickets, commit, and keep moving without

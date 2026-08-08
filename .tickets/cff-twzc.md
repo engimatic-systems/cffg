@@ -54,3 +54,7 @@ Navigation increment complete. Added the v2 JSON Schema, bounded slice/scan/summ
 **2026-08-08T03:14:16Z**
 
 Installed the Obsidian ticket-writing guidance as the machine-wide intelligible-ticket skill for Codex and Claude. Both copies validate and are byte-identical. AGENTS.md now requires the skill with one sentence. Validation: tk dep cycle and git diff --check passed; runtime pytest is N/A for this documentation-only increment.
+
+**2026-08-08T03:37:28Z**
+
+Cooper reconciled the legacy Plain English rule with the intelligible-ticket skill by removing the obsolete required heading from the general tk rule. Validation: tk dep cycle and git diff --check passed; runtime pytest is N/A for this documentation-only increment.
