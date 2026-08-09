@@ -629,6 +629,18 @@ def test_compiler_plan_params_and_serialization():
     assert "recurrence-link VMP groups" in schedule.reason
 
 
+def test_rslds_compiler_reuses_validation_incidence(monkeypatch):
+    def repeated_lookup(*_args, **_kwargs):
+        raise AssertionError("compiler must not rescan the full template per variable")
+
+    monkeypatch.setattr(Template, "degree", repeated_lookup)
+    monkeypatch.setattr(Template, "ports_of", repeated_lookup)
+    template, arrays = rslds(3, **_rslds_parameters())
+    arena = compile_template(template, arrays=arrays)
+
+    assert len(arena.recurrence_groups[0].members) == 2
+
+
 def test_compiler_rejects_invalid_shape_domain_beads_and_semiring():
     template, arrays = _template(
         weights=np.ones((2, 1, 1)), offsets=np.zeros((2, 1))

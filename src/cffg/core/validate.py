@@ -134,9 +134,17 @@ def _check_factors(t: Template) -> list[str]:
 
 def _check_degrees_and_ports(t: Template) -> list[str]:
     problems = []
+    degrees = {name: 0 for name in t.variables}
+    for factor in t.factors.values():
+        for variable in factor.all_edges().values():
+            if variable in degrees:
+                degrees[variable] += 1
+    ports_by_variable: dict[str, list] = {name: [] for name in t.variables}
     for p in t.ports.values():
         if p.variable not in t.variables:
             problems.append(f"port {p.name!r}: unknown variable {p.variable!r}")
+        else:
+            ports_by_variable[p.variable].append(p)
 
     # Deferred import: cffg.kernels imports cffg.core.ir, so a module-level
     # import here would cycle through the cffg.core package init.
@@ -149,8 +157,9 @@ def _check_degrees_and_ports(t: Template) -> list[str]:
                 f"variable {v.name!r}: unknown EF family {v.ef!r}; message families "
                 f"are {sorted(EF_FAMILIES)}, observation families {sorted(obs_families)}"
             )
-        deg = t.degree(v.name)
-        n_ports = len(t.ports_of(v.name))
+        deg = degrees[v.name]
+        ports = ports_by_variable[v.name]
+        n_ports = len(ports)
         if deg == 0:
             problems.append(f"variable {v.name!r}: unused (degree 0)")
         elif deg > 2:
@@ -165,7 +174,7 @@ def _check_degrees_and_ports(t: Template) -> list[str]:
         elif deg == 2 and n_ports != 0:
             problems.append(
                 f"variable {v.name!r}: fully connected (degree 2) but exposed by "
-                f"{[p.name for p in t.ports_of(v.name)]}"
+                f"{[p.name for p in ports]}"
             )
     return problems
 

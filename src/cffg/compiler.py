@@ -632,6 +632,15 @@ def compile_template(
     t = expand_plates(t)  # materialize plates (validates the spec first); no-op when plateless
     validate(t)
     problems: list[str] = []
+    degrees = {name: 0 for name in t.variables}
+    for factor in t.factors.values():
+        for variable in factor.all_edges().values():
+            if variable in degrees:
+                degrees[variable] += 1
+    ports_by_variable: dict[str, list] = {name: [] for name in t.variables}
+    for port in t.ports.values():
+        if port.variable in ports_by_variable:
+            ports_by_variable[port.variable].append(port)
 
     mean_field = {
         c.target for c in t.constraints if c.kind is ConstraintKind.MEAN_FIELD
@@ -706,8 +715,12 @@ def compile_template(
             )
         if f.type in kernels.conditioned_out_types():
             out_var = f.edges["out"]
-            out_ports = [p for p in t.ports_of(out_var) if p.role is PortRole.DATA]
-            if t.degree(out_var) == 2 or not out_ports:
+            out_ports = [
+                p
+                for p in ports_by_variable.get(out_var, ())
+                if p.role is PortRole.DATA
+            ]
+            if degrees.get(out_var, 0) == 2 or not out_ports:
                 problems.append(
                     f"factor {f.name!r}: {f.type} is a conditioned likelihood — its 'out' "
                     "edge must be a DATA port (unobserved predictives leave the family)"
@@ -791,7 +804,7 @@ def compile_template(
             opposite[ends[0]], opposite[ends[1]] = s1, s0
         else:  # dangling: outer side s1 is external (clamp or uniform/vacuous)
             opposite[ends[0]] = s1
-            for port in t.ports_of(vname):
+            for port in ports_by_variable[vname]:
                 if port.role is not PortRole.DATA:
                     continue
                 if v.dim:
