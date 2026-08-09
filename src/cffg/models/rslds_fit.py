@@ -352,12 +352,39 @@ def vague_rslds_fit_priors(
 
 
 @dataclass(frozen=True)
-class RSLDSFitResult:
-    """Terminal fitting status, fitted parameters, and last inner result.
+class RSLDSInferenceAttempt:
+    """Bounded evidence from one damping attempt at fixed parameters."""
 
-    ``state`` is a fresh observation-bound state carrying ``parameters``. Its
-    messages have not been run after the final parameter write;
-    ``last_inference`` retains the preceding status-bearing engine result.
+    damping: float
+    status: RunStatus
+    recurrence_status: RunStatus
+    iterations: int
+    residual: float
+    message_delta_tail: tuple[float, ...]
+    free_energy_tail: tuple[float, ...]
+    gaussian_beliefs_proper: bool
+    state_finite: bool
+
+
+@dataclass(frozen=True)
+class RSLDSFitPhase:
+    """One hidden-state solve and its optional parameter replacement."""
+
+    iteration: int
+    coordinate_replaced: bool
+    attempts: tuple[RSLDSInferenceAttempt, ...]
+    parameter_scales_before: dict[str, float]
+    parameter_scales_after: dict[str, float]
+    fixed_point_residual: float | None
+
+
+@dataclass(frozen=True)
+class RSLDSFitResult:
+    """Terminal fitting status, fitted parameters, and inner-solve evidence.
+
+    When every requested coordinate completes, ``state`` has been inferred
+    once after the final parameter write. ``last_inference`` is that terminal
+    solve, and ``phases`` distinguishes it from parameter-replacement phases.
     """
 
     engine: Engine
@@ -373,6 +400,7 @@ class RSLDSFitResult:
     model_posterior: RSLDSLearning
     emission_posterior: dict[str, np.ndarray]
     last_inference: RunResult | None
+    phases: tuple[RSLDSFitPhase, ...]
     timings: dict[str, float]
     error: str | None = None
 
@@ -569,6 +597,79 @@ def _install(
     return engine.bind_data(state, _data(observations))
 
 
+def _parameter_scales(points: dict[str, np.ndarray]) -> dict[str, float]:
+    return {
+        name: float(np.max(np.abs(np.asarray(value))))
+        for name, value in points.items()
+    }
+
+
+def _attempt_evidence(
+    engine: Engine,
+    result: RunResult,
+    damping: float,
+) -> RSLDSInferenceAttempt:
+    try:
+        statistics = engine.gaussian_node_stats(result.state)
+        gaussian_beliefs_proper = bool(statistics) and all(
+            bool(row["proper"]) for row in statistics.values()
+        )
+    except (FloatingPointError, np.linalg.LinAlgError, ValueError):
+        gaussian_beliefs_proper = False
+    state_finite = all(
+        bool(np.all(np.isfinite(np.asarray(leaf))))
+        for leaf in jax.tree_util.tree_leaves(result.state)
+    )
+    return RSLDSInferenceAttempt(
+        damping=float(damping),
+        status=result.status,
+        recurrence_status=result.inner_status,
+        iterations=result.iterations,
+        residual=float(result.residual),
+        message_delta_tail=tuple(float(value) for value in result.message_deltas[-8:]),
+        free_energy_tail=tuple(float(value) for value in result.free_energies[-8:]),
+        gaussian_beliefs_proper=gaussian_beliefs_proper,
+        state_finite=state_finite,
+    )
+
+
+def _run_inner(
+    engine: Engine,
+    state: State,
+    *,
+    max_iterations: int,
+    tolerance: float,
+    damping: float,
+    max_retries: int,
+) -> tuple[RunResult, tuple[RSLDSInferenceAttempt, ...]]:
+    """Retry a finite exhausted coordinate with progressively larger steps.
+
+    ``damping`` is the retained fraction of the old natural parameters. Each
+    retry doubles the update fraction ``1 - damping`` while it remains a
+    convex combination. The fixed points are unchanged, and every attempt
+    restarts from the same parameter-bound state.
+    """
+    attempts: list[RSLDSInferenceAttempt] = []
+    current_damping = damping
+    result: RunResult | None = None
+    for retry in range(max_retries + 1):
+        result = engine.run(
+            state,
+            max_iterations,
+            tol=tolerance,
+            damp=current_damping,
+        )
+        attempts.append(_attempt_evidence(engine, result, current_damping))
+        if result.status is not RunStatus.BUDGET_EXHAUSTED or retry == max_retries:
+            break
+        expanded_step_damping = 2.0 * current_damping - 1.0
+        if expanded_step_damping <= 0.0:
+            break
+        current_damping = expanded_step_damping
+    assert result is not None
+    return result, tuple(attempts)
+
+
 def _result(
     *,
     engine: Engine,
@@ -583,6 +684,7 @@ def _result(
     model: RSLDSLearning,
     emission: Learnables,
     last_inference: RunResult | None,
+    phases: list[RSLDSFitPhase],
     timings: dict[str, float],
     error: str | None = None,
 ) -> RSLDSFitResult:
@@ -603,6 +705,7 @@ def _result(
             for key, value in emission.params["emission"].items()
         },
         last_inference=last_inference,
+        phases=tuple(phases),
         timings=dict(timings),
         error=error,
     )
@@ -622,6 +725,7 @@ def fit_rslds(
     outer_tolerance: float | None = None,
     schedule: str = "auto",
     damp: float = 0.0,
+    max_inner_retries: int = 2,
 ) -> RSLDSFitResult:
     """Fit one rSLDS sequence without receiving generating variables.
 
@@ -629,6 +733,9 @@ def fit_rslds(
     engine, replaces all conjugate posteriors from ``priors``, and installs the
     resulting point parameters into a fresh state. Two consecutive
     fixed-point residuals at or below ``outer_tolerance`` certify convergence.
+    A finite exhausted inner solve may restart from the same state with a
+    larger convex update step, up to ``max_inner_retries`` times. The terminal
+    state is inferred once after the last parameter replacement.
     """
     observations = _validate_observations(observations)
     if max_outer_iterations <= 0 or max_inner_iterations <= 0:
@@ -637,6 +744,8 @@ def fit_rslds(
         raise ValueError("inner_tolerance must be finite and positive")
     if not np.isfinite(damp) or not 0.0 <= damp < 1.0:
         raise ValueError("damp must be finite and in [0, 1)")
+    if not isinstance(max_inner_retries, int) or max_inner_retries < 0:
+        raise ValueError("max_inner_retries must be a nonnegative integer")
     if outer_tolerance is None:
         outer_tolerance = 8.0 * np.sqrt(np.finfo(observations.dtype).eps)
     if not np.isfinite(outer_tolerance) or outer_tolerance <= 0:
@@ -702,8 +811,8 @@ def fit_rslds(
     )
     residuals: list[float] = []
     free_energies: list[float] = []
+    phases: list[RSLDSFitPhase] = []
     consecutive = 0
-    last_inference: RunResult | None = None
     timings = {
         "initialization": initialization_seconds,
         "compile": compile_seconds,
@@ -711,17 +820,32 @@ def fit_rslds(
         "coordinate": 0.0,
     }
 
+    fit_status = RunStatus.BUDGET_EXHAUSTED
+    completed_iterations = 0
     for iteration in range(1, max_outer_iterations + 1):
+        completed_iterations = iteration
+        scales_before = _parameter_scales(current_points)
         started = time.perf_counter()
-        inner = engine.run(
+        inner, attempts = _run_inner(
+            engine,
             current_state,
-            max_inner_iterations,
-            tol=inner_tolerance,
-            damp=damp,
+            max_iterations=max_inner_iterations,
+            tolerance=inner_tolerance,
+            damping=damp,
+            max_retries=max_inner_retries,
         )
         timings["inference"] += time.perf_counter() - started
-        last_inference = inner
         if inner.status is not RunStatus.CONVERGED:
+            phases.append(
+                RSLDSFitPhase(
+                    iteration=iteration,
+                    coordinate_replaced=False,
+                    attempts=attempts,
+                    parameter_scales_before=scales_before,
+                    parameter_scales_after=scales_before,
+                    fixed_point_residual=None,
+                )
+            )
             outer_status = (
                 RunStatus.BUDGET_EXHAUSTED
                 if inner.status is RunStatus.BUDGET_EXHAUSTED
@@ -740,10 +864,21 @@ def fit_rslds(
                 model=current_model,
                 emission=current_emission,
                 last_inference=inner,
+                phases=phases,
                 timings=timings,
                 error=f"inner inference {inner.status.value}",
             )
         if not inner.free_energies or not np.all(np.isfinite(inner.free_energies)):
+            phases.append(
+                RSLDSFitPhase(
+                    iteration=iteration,
+                    coordinate_replaced=False,
+                    attempts=attempts,
+                    parameter_scales_before=scales_before,
+                    parameter_scales_after=scales_before,
+                    fixed_point_residual=None,
+                )
+            )
             return _result(
                 engine=engine,
                 state=inner.state,
@@ -757,6 +892,7 @@ def fit_rslds(
                 model=current_model,
                 emission=current_emission,
                 last_inference=inner,
+                phases=phases,
                 timings=timings,
                 error="inner Bethe free energy is missing or non-finite",
             )
@@ -781,6 +917,16 @@ def fit_rslds(
             )
         except (FloatingPointError, np.linalg.LinAlgError, ValueError) as error:
             timings["coordinate"] += time.perf_counter() - started
+            phases.append(
+                RSLDSFitPhase(
+                    iteration=iteration,
+                    coordinate_replaced=False,
+                    attempts=attempts,
+                    parameter_scales_before=scales_before,
+                    parameter_scales_after=scales_before,
+                    fixed_point_residual=None,
+                )
+            )
             return _result(
                 engine=engine,
                 state=inner.state,
@@ -794,12 +940,23 @@ def fit_rslds(
                 model=current_model,
                 emission=current_emission,
                 last_inference=inner,
+                phases=phases,
                 timings=timings,
                 error=str(error),
             )
         timings["coordinate"] += time.perf_counter() - started
 
         residuals.append(residual)
+        phases.append(
+            RSLDSFitPhase(
+                iteration=iteration,
+                coordinate_replaced=True,
+                attempts=attempts,
+                parameter_scales_before=scales_before,
+                parameter_scales_after=_parameter_scales(candidate_points),
+                fixed_point_residual=residual,
+            )
+        )
         consecutive = consecutive + 1 if residual <= outer_tolerance else 0
         current_model = candidate_model
         current_emission = candidate_emission
@@ -807,36 +964,64 @@ def fit_rslds(
         current_snapshot = candidate_snapshot
         current_state = candidate_state
         if consecutive >= 2:
-            return _result(
-                engine=engine,
-                state=current_state,
-                status=RunStatus.CONVERGED,
-                inner_status=inner.status,
-                iterations=iteration,
-                residuals=residuals,
-                free_energies=free_energies,
-                points=current_points,
-                initialization=initialization,
-                model=current_model,
-                emission=current_emission,
-                last_inference=inner,
-                timings=timings,
-            )
+            fit_status = RunStatus.CONVERGED
+            break
+
+    scales_before = _parameter_scales(current_points)
+    started = time.perf_counter()
+    terminal, attempts = _run_inner(
+        engine,
+        current_state,
+        max_iterations=max_inner_iterations,
+        tolerance=inner_tolerance,
+        damping=damp,
+        max_retries=max_inner_retries,
+    )
+    timings["inference"] += time.perf_counter() - started
+    phases.append(
+        RSLDSFitPhase(
+            iteration=completed_iterations + 1,
+            coordinate_replaced=False,
+            attempts=attempts,
+            parameter_scales_before=scales_before,
+            parameter_scales_after=scales_before,
+            fixed_point_residual=None,
+        )
+    )
+    error = None
+    if terminal.status is not RunStatus.CONVERGED:
+        fit_status = (
+            RunStatus.BUDGET_EXHAUSTED
+            if terminal.status is RunStatus.BUDGET_EXHAUSTED
+            else RunStatus.DIVERGED
+        )
+        error = f"terminal inner inference {terminal.status.value}"
+    elif not terminal.free_energies or not np.all(
+        np.isfinite(terminal.free_energies)
+    ):
+        fit_status = RunStatus.DIVERGED
+        error = "terminal inner Bethe free energy is missing or non-finite"
+    else:
+        free_energies.append(float(terminal.free_energies[-1]))
 
     return _result(
         engine=engine,
-        state=current_state,
-        status=RunStatus.BUDGET_EXHAUSTED,
+        state=terminal.state,
+        status=fit_status,
         inner_status=(
-            RunStatus.CONVERGED if last_inference is None else last_inference.status
+            RunStatus.DIVERGED
+            if error and terminal.status is RunStatus.CONVERGED
+            else terminal.status
         ),
-        iterations=max_outer_iterations,
+        iterations=completed_iterations,
         residuals=residuals,
         free_energies=free_energies,
         points=current_points,
         initialization=initialization,
         model=current_model,
         emission=current_emission,
-        last_inference=last_inference,
+        last_inference=terminal,
+        phases=phases,
         timings=timings,
+        error=error,
     )

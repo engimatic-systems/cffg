@@ -333,12 +333,17 @@ accuracy. The rSLDS alone produced a bounded 10,000-step rollout, but that
 observation was not preregistered as an advantage.
 
 All fits exhausted their registered two-coordinate outer budget despite
-converged inner and final inference. An exploratory third rSLDS replacement
-made the next compact-pilot inner solve exhaust its message certificate;
-cff-garu owns that repeated-coordinate stabilization rather than this API
-weakening `converged`. These measurements do not remove the recurrence
-mean-field bound, point-posterior approximation, single-seed boundary, or
-sensitivity to the registered initializer and outer budget. The learned
+converged inner and final inference. On the compact pilot, the fixed `0.9`
+damping attempt after the third replacement remains a real finite message
+cycle: its recurrence coordinate and Gaussian beliefs are proper and its FE is
+finite, but its message certificate does not pass. The fitter now restarts a
+finite exhausted solve from the same parameter-bound state with a bounded
+convex step-expansion schedule. That pilot completes five replacements and a
+terminal solve at the unchanged tolerance. Exhausting every registered retry
+still returns `budget_exhausted`; no monotone-progress guarantee is claimed for
+arbitrary loopy mean-field graphs. This correction does not remove the
+recurrence mean-field bound, point-posterior approximation, single-seed
+boundary, or sensitivity to the initializer and outer budget. The learned
 command took 2,063 seconds and 5.16 GB peak RSS; cold setup at `T=10,000`
 remains cff-r6bl.
 

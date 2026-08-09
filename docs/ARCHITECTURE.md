@@ -290,14 +290,23 @@ iteration cannot count the same sequence as a new trial.
 
 Both cadences install point rollovers through role-bearing addresses into a
 fresh observation-bound state. The compiled engine and every runtime shape
-stay fixed. A terminal fit state intentionally has not run messages after its
-last parameter write; the result retains the preceding status-bearing inner
-`RunResult`, and consumers run final inference explicitly. Inner Bethe free
-energy remains the engine convergence signal. The outer loop reports its
-separate maximum scale-normalized change over every posterior hyperparameter
-and installed point array, requires two consecutive residuals below the
-dtype-scaled tolerance for `converged`, and otherwise propagates
-`budget_exhausted` or `diverged`. It makes no scalar outer-objective claim.
+stay fixed. A finite inner `budget_exhausted` result may trigger a bounded
+restart from that same fresh state. Each retry doubles the update fraction
+while it remains a convex natural-parameter blend; this changes the route but
+not the fixed point, support, schedule, tolerance, or FE certificate. A
+non-finite, infeasible, or diverged attempt never retries. After the last
+parameter write, the same bounded cadence runs a terminal hidden-state solve,
+so the returned state and point parameters agree.
+
+`RSLDSFitResult.phases` is the evidence boundary for this host schedule. It
+records each attempt's damping, public and recurrence status, iteration count,
+FE and message-delta tails, Gaussian-belief propriety, finite-state check, and
+parameter scales before and after replacement. Inner Bethe free energy remains
+the engine convergence signal. The outer loop reports its separate maximum
+scale-normalized change over every posterior hyperparameter and installed point
+array, requires two consecutive residuals below the dtype-scaled tolerance for
+`converged`, and otherwise propagates `budget_exhausted` or `diverged`. It
+makes no scalar outer-objective claim.
 
 The per-regime dynamics MNIWs and PG block remain model-specific rather than
 generic `LearnableSpec` families; the ordinary Gaussian emission uses §3b's
