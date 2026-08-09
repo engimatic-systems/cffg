@@ -159,8 +159,11 @@ class PCAARHMMInitializer:
 
     PCA fixes an observation-derived latent coordinate system. K-means on
     consecutive latent pairs assigns regime labels, after which regularized
-    local autoregressions initialize the switching dynamics. The explicit JAX
-    key selects the initial cluster centers and is the only random input.
+    local autoregressions initialize the switching dynamics. The emission
+    covariance uses the probabilistic-PCA isotropic residual variance, because
+    the raw PCA residual covariance is singular in the retained directions.
+    The explicit JAX key selects the initial cluster centers and is the only
+    random input.
     """
 
     kmeans_iterations: int = 100
@@ -275,6 +278,21 @@ class PCAARHMMInitializer:
             float(np.max(np.abs(_covariance(observations)))),
             float(np.finfo(observations.dtype).tiny),
         )
+        discarded_dimensions = observation_dimension - latent_dimension
+        residual_variance = float(
+            np.sum(np.square(emission_residuals))
+            / (steps * max(discarded_dimensions, 1))
+        )
+        # This dtype-scaled guard protects PPCA when no discarded axis exists.
+        variance_guard = (
+            16.0
+            * observation_dimension
+            * np.finfo(observations.dtype).eps
+            * observation_scale
+        )
+        emission_covariance = np.asarray(
+            max(residual_variance, variance_guard), dtype=observations.dtype
+        ) * np.eye(observation_dimension, dtype=observations.dtype)
         return RSLDSInitialization(
             dynamics_matrix=dynamics_matrix,
             dynamics_offset=dynamics_offset,
@@ -285,9 +303,7 @@ class PCAARHMMInitializer:
             recurrence_offsets=recurrence_offsets,
             emission_matrix=components.T,
             emission_offset=observation_mean,
-            emission_covariance=_covariance(
-                emission_residuals, reference_scale=observation_scale
-            ),
+            emission_covariance=emission_covariance,
             initial_state_mean=states[0],
             initial_state_covariance=_covariance(states),
             initial_regime_probability=initial_counts / np.sum(initial_counts),

@@ -86,6 +86,10 @@ def test_pca_arhmm_initializer_is_seeded_finite_and_dtype_scaled():
         first.initial_state_covariance,
     ):
         np.linalg.cholesky(covariance)
+    np.testing.assert_allclose(
+        first.emission_covariance,
+        np.eye(2, dtype=np.float32) * first.emission_covariance[0, 0],
+    )
 
 
 def test_fit_replaces_one_sequence_coordinates_and_reuses_one_engine(monkeypatch):
