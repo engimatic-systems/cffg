@@ -80,3 +80,7 @@ Post-handoff wiggle audit, 2026-08-09. All 35 retained candidates have one inten
 **2026-08-09T14:04:00Z**
 
 Additional candidates introduced by the classification note retain these meanings: deliver=the completed code and documentation artifacts; estimate=observed-only point-parameter estimation; parity=cff-nkbj's future literature comparison; verify=the named verification action; intended=the explicit contextual meaning map; all=the enumerated 35-candidate set in the prior note; read=the contextual interpretation of a candidate.
+
+**2026-08-09T14:04:55Z**
+
+Draft PR: https://github.com/engimatic-systems/cffg/pull/60, targeting agent/cff-l7y4-observed-only-rslds (PR #59).
