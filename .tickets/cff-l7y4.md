@@ -1,6 +1,6 @@
 ---
 id: cff-l7y4
-status: open
+status: in_progress
 deps: [cff-y4nx, cff-6tek]
 links: [cff-y4nx]
 created: 2026-08-01T05:05:47Z
@@ -242,3 +242,9 @@ Intelligible-ticket review: complete.
 Readiness resolution, 2026-08-08. The fitter now owns a falsifiable fixed-point stopping rule rather than claiming an unimplemented scalar variational objective; fixed priors enter `cff-6tek` replacement updates, and the inner engine retains Bethe free energy as its convergence signal. The scientific comparison includes a same-`K` structural SLDS and the formula-selected closest-budget `K_s=5` SLDS. `cff-6tek` supplies both learning cadences, while this ticket consumes replacement for one sequence. The prior retained-candidate classifications remain applicable; additions and changed readings are fixed_point=the defined outer residual, exact=the stated free-scalar formulas and numeric counts, match=the two enumerated comparison controls, generic=the `cffg.learn` protocol, and current=the active sequence statistics. Capability ownership was checked separately. Intelligible-ticket review: complete.
 
 Post-note scan addition: implement=the possible scalar-objective work delegated to `cff-ahps`; later=that work's ordering after this ticket's fixed-point contract.
+
+**2026-08-09T03:46:56Z**
+
+Implementation start, 2026-08-08. Applicable change-path row: Learnable or checkpoint feature. `cffg.models.rslds` owns observed-only initialization, outer cadence, model-specific posterior algebra, and point-parameter mapping. `cffg.learn` remains the generic tied-emission replacement authority; `cffg.conj` remains the MNIW and PG posterior-algebra authority. The rSLDS template will declare its shared emission learnable, so validation, JSON/hash transport, compiler learn plans, `member_of`, Gaussian statistic readout, and role-bearing writes are checked together. No new IR field, family, checkpoint schema, bundle format, or legacy migration is intended.
+
+Duplicated surfaces: the fitter is a host loop around the existing jitted `Engine.run`, and compact tests will cross that host/JIT boundary; no message-rule JIT path changes. The fitter consumes public status and works with the model mixed schedule; flooding/scheduled execution remains engine-owned and unchanged. The public contract is single-sequence and single-instance; batched `vmap` fitting is N/A. Current/legacy checkpoint decoding is N/A because the fitter adds no persistence format. External rSLDS and SLDS arms use one compiled engine per fitted model and fresh fixed-shape states across outer iterations.

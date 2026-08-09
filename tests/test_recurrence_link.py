@@ -229,7 +229,16 @@ def test_rslds_tier_matches_tiny_exact_oracle_and_rolls_all_parameters():
     observation = 0.35
 
     template, arrays = rslds(2, **parameters)
+    assert template.learnables["emission"].blobs == (
+        "emission_matrix",
+        "emission_offset",
+        "emission_covariance",
+    )
     engine = Engine(compile_template(template, arrays=arrays))
+    emission_plan = next(
+        plan for plan in engine.arena.learn_plans if plan.name == "emission"
+    )
+    assert emission_plan.sources == ("emission0", "emission1")
     state = engine.bind_data(
         engine.init_state(),
         {"y0": None, "y1": np.array([observation], dtype=dtype)},
