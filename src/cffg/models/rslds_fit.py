@@ -11,6 +11,7 @@ posteriors.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import time
 from typing import Protocol
 
 import jax
@@ -355,6 +356,7 @@ class RSLDSFitResult:
     model_posterior: RSLDSLearning
     emission_posterior: dict[str, np.ndarray]
     last_inference: RunResult | None
+    timings: dict[str, float]
     error: str | None = None
 
     def require_converged(self) -> "RSLDSFitResult":
@@ -563,6 +565,7 @@ def _result(
     model: RSLDSLearning,
     emission: Learnables,
     last_inference: RunResult | None,
+    timings: dict[str, float],
     error: str | None = None,
 ) -> RSLDSFitResult:
     return RSLDSFitResult(
@@ -581,6 +584,7 @@ def _result(
             for key, value in emission.params["emission"].items()
         },
         last_inference=last_inference,
+        timings=dict(timings),
         error=error,
     )
 
@@ -625,6 +629,7 @@ def fit_rslds(
         latent_dimension=latent_dimension,
         observation_dimension=observations.shape[1],
     )
+    started = time.perf_counter()
     initialization = _validate_initialization(
         initializer(
             observations.copy(),
@@ -636,6 +641,7 @@ def fit_rslds(
         latent_dimension=latent_dimension,
         observation_dimension=observations.shape[1],
     )
+    initialization_seconds = time.perf_counter() - started
     arrays = initialization.arrays()
     template, model_arrays = rslds(
         n_steps=observations.shape[0],
@@ -651,7 +657,9 @@ def fit_rslds(
         initial_regime_probability=arrays["initial_regime_probability"],
         emission_offset=arrays["emission_offset"],
     )
+    started = time.perf_counter()
     engine = Engine(compile_template(template, arrays=model_arrays), schedule=schedule)
+    compile_seconds = time.perf_counter() - started
     emission_prior = Learnables(engine, priors={"emission": priors.emission})
     current_model = model_prior
     current_emission = emission_prior
@@ -677,14 +685,22 @@ def fit_rslds(
     free_energies: list[float] = []
     consecutive = 0
     last_inference: RunResult | None = None
+    timings = {
+        "initialization": initialization_seconds,
+        "compile": compile_seconds,
+        "inference": 0.0,
+        "coordinate": 0.0,
+    }
 
     for iteration in range(1, max_outer_iterations + 1):
+        started = time.perf_counter()
         inner = engine.run(
             current_state,
             max_inner_iterations,
             tol=inner_tolerance,
             damp=damp,
         )
+        timings["inference"] += time.perf_counter() - started
         last_inference = inner
         if inner.status is not RunStatus.CONVERGED:
             outer_status = (
@@ -704,6 +720,7 @@ def fit_rslds(
                 model=current_model,
                 emission=current_emission,
                 last_inference=inner,
+                timings=timings,
                 error=f"inner inference {inner.status.value}",
             )
         if not inner.free_energies or not np.all(np.isfinite(inner.free_energies)):
@@ -719,10 +736,12 @@ def fit_rslds(
                 model=current_model,
                 emission=current_emission,
                 last_inference=inner,
+                timings=timings,
                 error="inner Bethe free energy is missing or non-finite",
             )
         free_energies.append(float(inner.free_energies[-1]))
 
+        started = time.perf_counter()
         try:
             candidate_model = model_prior.update(engine, inner.state)
             candidate_emission = Learnables(
@@ -740,6 +759,7 @@ def fit_rslds(
                 engine, observations, candidate_model, candidate_emission
             )
         except (FloatingPointError, np.linalg.LinAlgError, ValueError) as error:
+            timings["coordinate"] += time.perf_counter() - started
             return _result(
                 engine=engine,
                 state=inner.state,
@@ -752,8 +772,10 @@ def fit_rslds(
                 model=current_model,
                 emission=current_emission,
                 last_inference=inner,
+                timings=timings,
                 error=str(error),
             )
+        timings["coordinate"] += time.perf_counter() - started
 
         residuals.append(residual)
         consecutive = consecutive + 1 if residual <= outer_tolerance else 0
@@ -775,6 +797,7 @@ def fit_rslds(
                 model=current_model,
                 emission=current_emission,
                 last_inference=inner,
+                timings=timings,
             )
 
     return _result(
@@ -791,4 +814,5 @@ def fit_rslds(
         model=current_model,
         emission=current_emission,
         last_inference=last_inference,
+        timings=timings,
     )

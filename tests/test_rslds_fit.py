@@ -141,6 +141,13 @@ def test_fit_replaces_one_sequence_coordinates_and_reuses_one_engine(monkeypatch
         "emission_covariance",
     }
     assert all(np.all(np.isfinite(value)) for value in result.parameters.values())
+    assert set(result.timings) == {
+        "initialization",
+        "compile",
+        "inference",
+        "coordinate",
+    }
+    assert all(value >= 0.0 for value in result.timings.values())
     assert all(
         value.dtype == jnp.float32
         for value in result.state.params.values()
