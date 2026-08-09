@@ -148,6 +148,32 @@ Compilation has two phases, mirroring PGMax:
    Structure edits rebuild the arena and compiled functions; observations and
    parameters are state inputs. Static shapes throughout.
 
+Grounding derives variable degree and port incidence in linear passes over the
+factor endpoints and ports. Validation owns the port invariant; arena layout
+derives the same transient indexes for conditioned-output checks and dangling
+edge binding. Neither pass serializes those indexes or rescans the complete
+template for each variable. The incidence work is therefore `O(V + I + P)` in
+variables, factor endpoints, and ports.
+
+The repeated rSLDS slice has no private IR or rule path. Ordinary arena grouping
+lowers its `recurrence_link`, `gaussian_mixture_linear`, `gaussian_linear`, and
+equality members into a constant number of shape-batched operation bodies as
+the horizon grows. The historical cold-cost defect was quadratic host incidence
+lookup before that lowering, not one JAX operation body per slice. Removing the
+rescans leaves the grouped plans, schedule, message rules, ledger, and runtime
+statuses unchanged.
+
+Executable reuse stops at the structural boundary. Template structure selects
+the arena and auto schedule; schedule content is fingerprinted against that
+arena. Horizon, factor dimensions/cardinalities, and schedule therefore select
+different static programs, while JAX specializes those programs by input shape
+and dtype. Observations and every named parameter family live in `State` and
+remain dynamic executable inputs, so same-shape values reuse the engine without
+changing serialized model meaning. The rSLDS cold benchmark compares the
+pre-index and indexed commits in fresh processes and requires exact equality of
+support and statuses plus dtype-scaled parity of messages, marginals, Gaussian
+moments, and Bethe free energy.
+
 ### 2b. Domain families and the Gaussian arena (cff-4e5z)
 
 Variables carry a domain family: discrete (`cardinality: k`, one-hot) or
@@ -861,13 +887,23 @@ mean log likelihood and `99.6375%` regime accuracy; no comparison claim against
 it was registered. Only the rSLDS rollout passed the boundedness gate, with
 periodicity `0.517638`, but that was not a preregistered advantage claim.
 
-The result artifact pins package commit `4b82b07`, experiment-code commit
-`1350e72`, final artifact commit `f4e7b0f`, and SHA-256
+The learned-result artifact pins package commit `4b82b07`, experiment-code
+commit `1350e72`, final artifact commit `f4e7b0f`, and SHA-256
 `99d02c92315357e1d778146c7b7ca74cd20aa2390f4ad165ed17515fba29548e`.
 Whole-command time was 2,063 seconds with 5.16 GB peak RSS. Cold lowering is
-therefore still a demonstrated boundary: the earlier oracle run took 723.14
-seconds of compile/setup versus 30.58 seconds of inference, and cff-r6bl owns
-compact repeated-hybrid-slice lowering.
+measured separately by the fresh-process cff-r6bl benchmark. On the same Apple
+M2 Max CPU/x64 environment, three workers per path gave `T=10,000` median setup
+of `741.361` seconds before incidence indexing and `24.060` seconds after, a
+`30.81x` speedup. Median converged inference was `27.342` versus `27.020`
+seconds. Messages, exact support, categorical and Gaussian readouts, BFE, and
+statuses were identical at `T=100`, `1,000`, and `10,000`; both paths retained
+seven shape-batched operation bodies. Indexed peak RSS was `1.948` GiB.
+
+The evidence lives in `../experiments/cffg-nascar-validation` at commit
+`1b1b714`; `results.json` SHA-256 is
+`5432c42ba6795850898e878ebdfad39ef82f8cc7dbf83ddc6f98c8ed3d4651db`
+and the environment/profile/raw-artifact manifest SHA-256 is
+`515bd5e2dc05741953e225912f62c8d7b0136a3d1d6b9855938b117bcd7f033b`.
 
 ## Resource estimator
 
