@@ -353,6 +353,7 @@ class RSLDSFitResult:
     residuals: tuple[float, ...]
     free_energies: tuple[float, ...]
     parameters: dict[str, np.ndarray]
+    initialization: RSLDSInitialization
     model_posterior: RSLDSLearning
     emission_posterior: dict[str, np.ndarray]
     last_inference: RunResult | None
@@ -562,6 +563,7 @@ def _result(
     residuals: list[float],
     free_energies: list[float],
     points: dict[str, np.ndarray],
+    initialization: RSLDSInitialization,
     model: RSLDSLearning,
     emission: Learnables,
     last_inference: RunResult | None,
@@ -578,6 +580,7 @@ def _result(
         residuals=tuple(residuals),
         free_energies=tuple(free_energies),
         parameters={name: np.asarray(value).copy() for name, value in points.items()},
+        initialization=initialization,
         model_posterior=model,
         emission_posterior={
             key: np.asarray(value).copy()
@@ -717,6 +720,7 @@ def fit_rslds(
                 residuals=residuals,
                 free_energies=free_energies,
                 points=current_points,
+                initialization=initialization,
                 model=current_model,
                 emission=current_emission,
                 last_inference=inner,
@@ -733,6 +737,7 @@ def fit_rslds(
                 residuals=residuals,
                 free_energies=free_energies,
                 points=current_points,
+                initialization=initialization,
                 model=current_model,
                 emission=current_emission,
                 last_inference=inner,
@@ -769,6 +774,7 @@ def fit_rslds(
                 residuals=residuals,
                 free_energies=free_energies,
                 points=current_points,
+                initialization=initialization,
                 model=current_model,
                 emission=current_emission,
                 last_inference=inner,
@@ -794,6 +800,7 @@ def fit_rslds(
                 residuals=residuals,
                 free_energies=free_energies,
                 points=current_points,
+                initialization=initialization,
                 model=current_model,
                 emission=current_emission,
                 last_inference=inner,
@@ -811,6 +818,7 @@ def fit_rslds(
         residuals=residuals,
         free_energies=free_energies,
         points=current_points,
+        initialization=initialization,
         model=current_model,
         emission=current_emission,
         last_inference=last_inference,
