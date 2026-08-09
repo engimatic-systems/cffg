@@ -1,7 +1,7 @@
 ---
 id: cff-l7y4
 status: in_progress
-deps: [cff-y4nx, cff-6tek]
+deps: [cff-y4nx, cff-6tek, cff-rgty]
 links: [cff-y4nx]
 created: 2026-08-01T05:05:47Z
 type: feature

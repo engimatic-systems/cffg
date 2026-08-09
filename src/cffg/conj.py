@@ -29,6 +29,27 @@ def _spd(name: str, mat: np.ndarray) -> np.ndarray:
     return mat
 
 
+def _symmetrize_cancellation(
+    name: str,
+    matrix: np.ndarray,
+    terms: tuple[np.ndarray, ...],
+) -> np.ndarray:
+    """Accept only roundoff-sized skew from an algebraically symmetric sum."""
+    matrix = np.asarray(matrix)
+    if not np.all(np.isfinite(matrix)) or any(
+        not np.all(np.isfinite(term)) for term in terms
+    ):
+        raise ValueError(f"{name} must be finite")
+    scale = sum(float(np.max(np.abs(term), initial=0.0)) for term in terms)
+    scale = max(scale, float(np.finfo(matrix.dtype).tiny))
+    error = float(np.max(np.abs(matrix - matrix.T), initial=0.0))
+    # The bound protects symmetry through cancellation of the named terms.
+    tolerance = 16.0 * matrix.shape[-1] * np.finfo(matrix.dtype).eps * scale
+    if error > tolerance:
+        raise ValueError(f"{name} not symmetric")
+    return 0.5 * (matrix + matrix.T)
+
+
 @dataclass(frozen=True)
 class NIW:
     """Normal-inverse-Wishart over a gaussian node's (mean, cov)."""
@@ -99,8 +120,21 @@ class MNIW:
         syx = Σ E[yx̃ᵀ], sxx = Σ E[x̃x̃ᵀ] (D4.2 MNIW update)."""
         lamn = self.lam + sxx
         mn = np.linalg.solve(lamn.T, (self.m @ self.lam + syx).T).T
-        psin = self.psi + syy + self.m @ self.lam @ self.m.T - mn @ lamn @ mn.T
-        return replace(self, m=mn, lam=_spd("lam_n", lamn), psi=_spd("psi_n", psin), nu=self.nu + n)
+        prior_square = self.m @ self.lam @ self.m.T
+        posterior_square = mn @ lamn @ mn.T
+        psin = self.psi + syy + prior_square - posterior_square
+        psin = _symmetrize_cancellation(
+            "psi_n",
+            psin,
+            (self.psi, syy, prior_square, posterior_square),
+        )
+        return replace(
+            self,
+            m=mn,
+            lam=_spd("lam_n", lamn),
+            psi=_spd("psi_n", psin),
+            nu=self.nu + n,
+        )
 
     def rollover(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """(A, b, cov) for the next trial's gaussian_linear params;

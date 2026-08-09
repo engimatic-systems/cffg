@@ -2,7 +2,7 @@
 id: cff-6tek
 status: closed
 deps: [cff-x0sv]
-links: [cff-l6i5]
+links: [cff-l6i5, cff-rgty]
 created: 2026-07-27T20:52:13Z
 type: feature
 priority: 2
