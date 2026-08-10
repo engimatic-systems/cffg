@@ -1,0 +1,806 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CFFG trajectory survey — 2026-08-09</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f7f3ea;
+      --panel: #fffdf8;
+      --ink: #25231f;
+      --muted: #686158;
+      --line: #d8d0c2;
+      --good: #246b45;
+      --warn: #9a5a13;
+      --bad: #9d3434;
+      --link: #315f9f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 17px/1.58 ui-serif, Georgia, serif;
+    }
+    main { max-width: 940px; margin: 0 auto; padding: 28px 18px 80px; }
+    h1, h2, h3 { line-height: 1.2; }
+    h1 { font-size: clamp(2rem, 8vw, 3.6rem); margin: 0 0 8px; }
+    h2 { margin-top: 2.5em; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+    h3 { margin-top: 1.8em; }
+    p, li { max-width: 78ch; }
+    a { color: var(--link); }
+    code, pre { font: 0.86em/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    code { overflow-wrap: anywhere; }
+    pre {
+      overflow-x: auto;
+      padding: 14px;
+      background: color-mix(in srgb, var(--panel) 85%, var(--line));
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    table { width: 100%; border-collapse: collapse; margin: 1em 0 1.6em; font-size: 0.91em; }
+    th, td { border: 1px solid var(--line); padding: 9px; vertical-align: top; text-align: left; }
+    th { background: color-mix(in srgb, var(--panel) 72%, var(--line)); }
+    .lede { font-size: 1.18em; max-width: 65ch; }
+    .meta { color: var(--muted); margin: 0 0 30px; }
+    .callout {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-left: 6px solid var(--link);
+      border-radius: 8px;
+      padding: 16px 18px;
+      margin: 1.4em 0;
+    }
+    .good { color: var(--good); font-weight: 700; }
+    .warn { color: var(--warn); font-weight: 700; }
+    .bad { color: var(--bad); font-weight: 700; }
+    .pill {
+      display: inline-block;
+      padding: 1px 7px;
+      border: 1px solid currentColor;
+      border-radius: 999px;
+      white-space: nowrap;
+      font-size: 0.82em;
+      font-weight: 700;
+    }
+    .small { color: var(--muted); font-size: 0.9em; }
+    .toc { columns: 2; }
+    .toc li { margin-bottom: 5px; }
+    @media (max-width: 700px) {
+      body { font-size: 16px; }
+      main { padding: 20px 12px 60px; }
+      .toc { columns: 1; }
+      table { display: block; overflow-x: auto; white-space: normal; }
+      th, td { min-width: 130px; }
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1c1a17;
+        --panel: #25221e;
+        --ink: #eee8dc;
+        --muted: #b8afa2;
+        --line: #4a443c;
+        --good: #77c699;
+        --warn: #e0a25a;
+        --bad: #ef8a8a;
+        --link: #8db8ef;
+      }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>CFFG trajectory survey</h1>
+  <p class="meta">
+    9 August 2026 · branch <code>agent/cff-nkbj-reference-blocker</code> at
+    <code>e1dd6a4</code> · code head validated at <code>ca295f9</code><br>
+    Vision: Cooper's Obsidian <code>agents/CFFG/0.0.md</code> · sources:
+    Koudahl–van de Laar–de Vries Parts I and II
+  </p>
+
+  <p class="lede">
+    You should keep going, but you should not rubber-stamp the whole trajectory.
+    The discrete CFFG/LAIF core is faithful, the trust repairs since July are
+    real, and the rewritten rSLDS tickets address the mechanisms behind the
+    failed runs. The remaining risk is that a strong research engine is being
+    mistaken for a complete paper reproduction and a low-friction product.
+  </p>
+
+  <div class="callout">
+    <strong>My decision:</strong> merge the current stack after three bounded
+    fixes, finish the decision-list rSLDS confirmation, and freeze new research
+    breadth while one paper-faithfulness gate and one usability/performance
+    tranche land. Do not proceed directly into balanced-tree rSLDS, neural
+    factors, structure learning, or hierarchy.
+  </div>
+
+  <h2 id="contents">Contents</h2>
+  <ol class="toc">
+    <li><a href="#verdict">Verdict by concern</a></li>
+    <li><a href="#trajectory">What changed since July</a></li>
+    <li><a href="#paper">Faithfulness to the papers</a></li>
+    <li><a href="#vision">Alignment with the vision</a></li>
+    <li><a href="#maintainability">Maintainability</a></li>
+    <li><a href="#performance">Performance and operational envelope</a></li>
+    <li><a href="#rslds">rSLDS roadmap</a></li>
+    <li><a href="#prs">Pull-request review plan</a></li>
+    <li><a href="#course">Course correction</a></li>
+    <li><a href="#roadmap">Proposed roadmap</a></li>
+    <li><a href="#evidence">Evidence index</a></li>
+  </ol>
+
+  <h2 id="verdict">1. Verdict by concern</h2>
+  <table>
+    <thead>
+      <tr><th>Concern</th><th>Verdict</th><th>Confidence</th><th>What that means</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Paper faithfulness</td>
+        <td><span class="good">Strong core, incomplete protocol</span></td>
+        <td>High</td>
+        <td>The discrete BFE ledger, P-substituted state message, fixed-A T-maze,
+          and raw <code>mu3(A)</code> machinery are well anchored. The public
+          agent loop does not execute the complete Part II parameter-message
+          protocol.</td>
+      </tr>
+      <tr>
+        <td>Vision alignment</td>
+        <td><span class="good">Good foundations</span> / <span class="warn">weak product surface</span></td>
+        <td>High</td>
+        <td>Serialization, ports, composition, edits, rolling inference,
+          learning, checkpoints, diagrams, and tests exist. They are not yet a
+          cohesive, discoverable modeling product.</td>
+      </tr>
+      <tr>
+        <td>Maintainability</td>
+        <td><span class="warn">Manageable but at a real inflection point</span></td>
+        <td>High</td>
+        <td>Tests and the change-path index contain risk, but compiler and engine
+          semantics are still duplicated across several handwritten execution
+          surfaces. Another factor-family wave would increase drift risk.</td>
+      </tr>
+      <tr>
+        <td>Performance</td>
+        <td><span class="good">Credible fixed-window streaming</span> / <span class="warn">not general live planning</span></td>
+        <td>High</td>
+        <td>Small graphs and fixed windows are useful now. Deep planning,
+          Colony throughput, large fan-outs, Gaussian readout, and resource
+          prediction are not yet dependable product capabilities.</td>
+      </tr>
+      <tr>
+        <td>Ticket quality</td>
+        <td><span class="good">Excellent tickets</span> / <span class="warn">overextended portfolio</span></td>
+        <td>High</td>
+        <td>The rewrite made individual tickets unusually explicit. The backlog
+          still has 38 open items and no meaningful work-in-progress limit.</td>
+      </tr>
+      <tr>
+        <td>Current PR stack</td>
+        <td><span class="warn">Merge after three fixes</span></td>
+        <td>High</td>
+        <td>The science is not being laundered into success. The blockers are
+          generated repository bulk, one file-size breach, and an overstated
+          parity label.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>
+    The phrase I would use is <strong>selective confidence</strong>. You can stop
+    looking backward at the already repaired trust layer. You should not stop
+    checking whether new claims belong to the paper core, a declared
+    approximation, or an optional research extension.
+  </p>
+
+  <h2 id="trajectory">2. What changed since the July adversarial review</h2>
+  <p>
+    The July review found three trust failures: an incorrect transition-GFE
+    cavity/ledger, a runtime that could return divergence as apparent success,
+    and bundle serialization that could silently lose plate structure. It also
+    found 300–4,000× chain slowdowns caused by flooding and Python dispatch.
+  </p>
+  <p>
+    Those were not papered over. The repository now has cavity-consistent
+    transition GFE, explicit converged/exhausted/diverged/infeasible outcomes,
+    dtype-scaled numerical guards, preserved plate bundles, shape-segmented
+    arenas, topology-aware exact schedules, independent behavioral epistemics,
+    and executable scalar-EF factor registration. This is the strongest reason
+    for confidence in the project: adversarial findings have repeatedly become
+    causal fixes with regression tests.
+  </p>
+  <p>
+    Performance moved correspondingly. Current scheduled HMM comparisons are
+    roughly 15–28× a strict specialized ceiling rather than hundreds or
+    thousands of times slower. The rSLDS cold setup defect fell from a 741-second
+    median to 24 seconds with exact semantic parity. That is meaningful progress,
+    not benchmark theater.
+  </p>
+  <p>
+    The course has nevertheless widened again. The project now carries a
+    universal-factor epic, neural factors, nonlinear EP, tree rSLDS, destination
+    softmax, structure learning, hierarchy, plates, visualization, glucose, and
+    several performance branches at once. The next correction is therefore a
+    breadth freeze, not another rescue.
+  </p>
+
+  <h2 id="paper">3. Faithfulness to the two papers</h2>
+
+  <h3>What is faithful</h3>
+  <table>
+    <thead><tr><th>Paper burden</th><th>Repository status</th><th>Assessment</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Part I Eq. 8: node-local BFE plus edge-entropy overcounting corrections</td>
+        <td><code>engine._make_bfe</code> combines registered node terms and one
+          correction per interior edge; tree tests check <code>BFE = -log Z</code>.</td>
+        <td><span class="good">Faithful for named exact families</span></td>
+      </tr>
+      <tr>
+        <td>Part I Eq. 25: replace selected local F terms with local G terms</td>
+        <td>The compiler recognizes supported P-substitution composites; the
+          ledger combines their GFE with ordinary nodes and shared corrections.</td>
+        <td><span class="good">Faithful for supported composites</span></td>
+      </tr>
+      <tr>
+        <td>Part II indirect state message / Newton solve</td>
+        <td>The production solver uses the same stationary equation with a
+          stronger gauge-reduced trust/globalization layer. Independent simplex
+          minimization checks it.</td>
+        <td><span class="good">Faithful equation, sound robustness extension</span></td>
+      </tr>
+      <tr>
+        <td>Part II <code>mu3(A)</code> nonstandard functional message</td>
+        <td>The functional, importance sampling, fixed-key replay, ESS failures,
+          shared parameter KL, and quadrature anchors exist.</td>
+        <td><span class="good">Faithful machinery</span></td>
+      </tr>
+      <tr>
+        <td>Known-A direct policy inference / T-maze</td>
+        <td>Policy marginals are pinned to the authors' Julia reference and the
+          behavioral suite checks relevance, satiation, information gain,
+          return, and the BFE ablation.</td>
+        <td><span class="good">Strong independent evidence</span></td>
+      </tr>
+      <tr>
+        <td>Paper warnings about non-convexity and stochastic estimates</td>
+        <td>Limitations document local minima, Bethe approximation, optimistic
+          bounds, importance noise, and truthful exhaustion.</td>
+        <td><span class="good">Mostly candid</span>; explicitly name limit cycles too</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>The central gap</h3>
+  <div class="callout">
+    The repository implements <code>mu3(A)</code>, but <code>RollingAgent</code>
+    does not use it. The claimed Part II §7.1 T-maze learning reproduction plans
+    with analytic moments of a Dirichlet belief and updates A from perceptual
+    evidence only. Its own test says future-slice-to-A messages are absent.
+  </div>
+  <p>
+    This is not junk science. It is a principled and useful learned-A
+    approximation, and it reproduces the qualitative learning curve. It is not
+    the paper's complete unified parameter-message cycle. End behavior cannot
+    substitute for the missing message path.
+  </p>
+  <p>
+    The minimum correction is to rename the experiment and narrow the README.
+    The faithful correction is to make <code>mu3</code> a first-class agent
+    option with explicit PRNG state, refresh epochs, ESS/status propagation,
+    checkpoint restore, and one end-to-end Part II trial-loop oracle.
+  </p>
+
+  <h3>Other boundaries that must stay explicit</h3>
+  <ul>
+    <li>The implemented CFFG constraint vocabulary is a subset: delta, naive
+      mean field, selected P-substitution, and reserved moment matching. The
+      papers' general structured factorization and form-constraint language is
+      not universally executable.</li>
+    <li>The runtime uses separate compiled planning and filtering windows. That
+      is a sensible receding-window realization, but not the paper's literal
+      single model whose constraints change from P-substitution to data.</li>
+    <li>The general facing-node derivation in Part II is a derivational framework,
+      not an implemented universal GFE rule. Each supported family still needs
+      a specific derivation.</li>
+    <li>Hybrid mixture BFE and regime epistemic GFE are documented bounds.
+      <code>engine.bfe(state) # exact</code> is therefore too broad as a public
+      statement.</li>
+    <li>rSLDS is an extension built consistently with CFFG principles. It is not
+      a validation target supplied by the CFFG papers.</li>
+  </ul>
+
+  <h2 id="vision">4. Alignment with Cooper's vision</h2>
+  <table>
+    <thead><tr><th>Vision item</th><th>Current state</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>1. Canonical templates and external blobs</td>
+        <td>Versioned JSON, structure hashes, external <code>.npy</code>/safetensors,
+          and portable <code>.cffgz</code> bundles with parity tests.</td>
+        <td><span class="good">Strong</span></td>
+      </tr>
+      <tr>
+        <td>2. Unrolling, rollout, forward/backward/what-if inference</td>
+        <td>Ports, compose/unroll, rollout builders, schedules, filters, and
+          planners exist. Outside builders, “what if” remains manual constraint
+          and binding work. H&gt;20 planning is not yet dependable.</td>
+        <td><span class="good">Real</span>, <span class="warn">bounded</span></td>
+      </tr>
+      <tr>
+        <td>3. Full lifecycle, live data/actions, continual learning, save/restore</td>
+        <td><code>RollingAgent</code>, declared bindings, callbacks, conjugate
+          learnables, checkpoints, and <code>Colony</code> exist. This is not yet
+          a generic sensor/API pipeline or arbitrary online learning system.</td>
+        <td><span class="good">Good for declared models</span></td>
+      </tr>
+      <tr>
+        <td>4. Atomic edits and no dangling edges</td>
+        <td>Transactional edit bundles validate before commit; port invariants
+          are enforced. The documented high-level edit names do not match the
+          lower-level actions actually shipped.</td>
+        <td><span class="good">Sound substrate</span>, <span class="warn">incomplete SDK</span></td>
+      </tr>
+      <tr>
+        <td>5. CSP, sequential, and epistemic test tiers</td>
+        <td>All three exist with enumeration, forward-backward/Kalman, paper
+          goldens, hostile inputs, behavioral interventions, and status tests.</td>
+        <td><span class="good">Excellent</span></td>
+      </tr>
+      <tr>
+        <td>6. GUI-ready model editing</td>
+        <td>Typed scene graph, stable layout, SVG, hit-test refs, and JSON edits
+          exist. Selection-to-edit intent, Gaussian visuals, routing polish, and
+          schedule overlays are unfinished.</td>
+        <td><span class="warn">Foundation only</span></td>
+      </tr>
+      <tr>
+        <td>7. Hardware/resource estimator</td>
+        <td>Some discrete/state memory accounting and calibration exist.
+          Non-discrete accounting and XLA analysis are wrong or unavailable.</td>
+        <td><span class="bad">Not trustworthy enough yet</span></td>
+      </tr>
+      <tr>
+        <td>8. Interchange and true FE</td>
+        <td>Rejecting ONNX in favor of <code>.cffgz</code> is well reasoned. The
+          native ledger is a defining strength, provided exact and bounded
+          families are named separately.</td>
+        <td><span class="good">Sound decision</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>
+    The vision is not lost. In fact, more of it is implemented than the
+    package's version and top-level API suggest. The mismatch is that the
+    internal capabilities arrived before a stable public facade and before the
+    resource/performance envelope became dependable.
+  </p>
+
+  <h2 id="maintainability">5. Maintainability</h2>
+
+  <h3>What is healthy</h3>
+  <ul>
+    <li>The pure-Python IR is independent of JAX and is a durable source of truth.</li>
+    <li>The architecture change-path table correctly names authority, derived
+      surfaces, tests, and documentation.</li>
+    <li>The test suite uses enumeration, quadrature, independent NumPy oracles,
+      literature goldens, and hostile-input cases—not only self-parity.</li>
+    <li>Status semantics and scientific limitations are unusually honest.</li>
+    <li>The scalar exponential-family <code>FactorKernel</code> path genuinely
+      allows a custom factor without central type-string branches.</li>
+  </ul>
+
+  <h3>What is structurally risky</h3>
+  <table>
+    <thead><tr><th>Signal</th><th>Why it matters</th><th>Best seam</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>engine.py</code> 3,816 lines</td>
+        <td>Flooding, batched schedule, registerized scan, energy, and readout
+          rebuild related input/parameter semantics independently.</td>
+        <td>Per-arena group executors sharing gather, parameter subset, rule,
+          and node-energy contracts.</td>
+      </tr>
+      <tr>
+        <td><code>compiler.py</code> 2,316 lines</td>
+        <td>One long transaction performs layout, family classification,
+          composite recognition, lowering, packing, learning, and assembly.</td>
+        <td>Topology/layout, typed classification, per-arena lowering,
+          composites/learnables, final assembly.</td>
+      </tr>
+      <tr>
+        <td><code>Arena</code> as one parallel-array schema</td>
+        <td>Every new field creates a manual audit across engine and schedule
+          consumers.</td>
+        <td>Nested immutable arena views, migrated one family at a time.</td>
+      </tr>
+      <tr>
+        <td><code>rules.py</code> 966 lines</td>
+        <td>Ordinary discrete, categorical GFE, mu3 sampling, and transition GFE
+          have different math and risk owners.</td>
+        <td>Discrete, GFE, and mu3 modules behind compatibility imports.</td>
+      </tr>
+      <tr>
+        <td><code>rslds_fit.py</code> 1,027 lines</td>
+        <td>The new file exceeds the project's 1,000-line rule and mixes
+          initialization, results/diagnostics, helpers, and orchestration.</td>
+        <td>Move initialization to <code>rslds_init.py</code>; retain the linear
+          fit loop.</td>
+      </tr>
+      <tr>
+        <td>Top-level <code>cffg</code> package exports almost nothing</td>
+        <td>Users learn deep internal imports; a leftover <code>hello()</code>
+          makes the 0.1 surface look unfinished.</td>
+        <td>A small supported facade and one install-to-checkpoint example.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>
+    Do not perform a cosmetic file-splitting campaign. Characterize execution
+    parity first, extract stable state/numeric primitives, split mathematical
+    rule ownership, then unify per-arena execution contracts and compiler
+    passes. Refactoring <code>outer.py</code> or redesigning statuses can wait.
+  </p>
+
+  <h2 id="performance">6. Performance and operational envelope</h2>
+  <table>
+    <thead><tr><th>Workload</th><th>Measured result</th><th>Operational verdict</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Scheduled HMM chains</td>
+        <td>About 15–28× a strict specialized ceiling through T=256, with exact
+          posterior and fixed-point certification.</td>
+        <td>Correct and much improved; still not competitive chain throughput.</td>
+      </tr>
+      <tr>
+        <td>Gaussian readout, d=2, T=256</td>
+        <td>About 773 ms after convergence due to Python-per-edge solves.</td>
+        <td>User-visible blocker; <code>cff-3kdk</code> is a bounded win.</td>
+      </tr>
+      <tr>
+        <td>Long GFE rollout</td>
+        <td>0.61 s/action at H=5, 1.9 s at H=20, 2.47 s at H=25. H=25 success
+          fell because 120 sweeps left residual 5.5.</td>
+        <td>Useful to H≈20 under checked convergence; not a general deep planner.</td>
+      </tr>
+      <tr>
+        <td>Colony, 32 agents</td>
+        <td>1.54× sequential throughput on one CPU workload.</td>
+        <td>Dispatch-bound; not yet the many-agent runtime the vision wants.</td>
+      </tr>
+      <tr>
+        <td>Fixed-window switching stream</td>
+        <td>455 updates/s over 100,000 steps with bounded retained state.</td>
+        <td>Credible compile-once streaming result. Do not call RSS literally flat.</td>
+      </tr>
+      <tr>
+        <td>Active vision, 49 patches</td>
+        <td>5.1 batched images/s versus a 20/s target; about 70 sweeps from a
+          linear equality fan-out.</td>
+        <td>Topology, not local FLOPs, is the bottleneck.</td>
+      </tr>
+      <tr>
+        <td>Fixed-parameter rSLDS, T=10,000</td>
+        <td>24.06 s setup + 27.02 s converged inference; 1.95 GiB peak RSS.</td>
+        <td>Strong reproducible offline result, not an online-control envelope.</td>
+      </tr>
+      <tr>
+        <td>Learned rSLDS, T=10,000</td>
+        <td>2,063 s whole command; 5.16 GB peak; outer fits exhausted their
+          registered budget.</td>
+        <td>Scientific batch experiment, not credible live continual learning.</td>
+      </tr>
+      <tr>
+        <td>Resource estimator</td>
+        <td>Example LGSSM reported 1,104 bytes versus 5,088 actual; XLA cost can
+          be silently unavailable.</td>
+        <td>Do not rely on it for deployment until <code>cff-j7mm</code>.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <strong>Honest envelope today:</strong> compile once; fixed structure,
+    shape, dtype, and window; CPU; small interactive graphs; hundreds of
+    fixed-window hybrid updates per second; offline T=10,000 rSLDS inference in
+    about 51 seconds including setup. Do not promise subsecond deep planning,
+    20 Hz large-plate perception, high-throughput Colony, online rSLDS fitting,
+    accurate cross-arena resource forecasts, or accelerator scaling yet.
+  </div>
+
+  <h2 id="rslds">7. The rewritten rSLDS roadmap</h2>
+  <p>
+    The rewrite is a real correction. Earlier work separately established
+    fixed-generating-parameter inference, observed-only fitting, solver retry
+    behavior, numerical cancellation repair, and cold setup. The newest source
+    review then found that the authors' executable learner is narrower than the
+    published source-specific model and that generator/learner default trees can
+    differ. The new chain separates environment lock, a paper-equation adapter,
+    preregistration, and final evidence.
+  </p>
+
+  <pre>Legend: prerequisite --&gt; dependent
+
+cff-akmp --&gt; cff-64ri --&gt; cff-0l31 --&gt; cff-oyie --&gt; cff-nkbj
+                            ^
+        closed l7y4 + garu + r6bl
+
+Parked parallel expansion:
+cff-4sor --&gt; cff-602p --&gt; cff-lv65 --&gt; cff-4c7t --&gt; cff-9vab --&gt; cff-0f3g
+
+Independent research: cff-dlrj</pre>
+
+  <h3>What the chain can prove</h3>
+  <ul>
+    <li>same-generative-model predictive and recovery non-inferiority against
+      an independently derived Gibbs implementation;</li>
+    <li>reproducibility across frozen seeds, diagnostics, and artifact hashes;</li>
+    <li>whether the current CFFG variational fitter is empirically competitive
+      on the declared synthetic NASCAR protocol.</li>
+  </ul>
+
+  <h3>What it cannot prove</h3>
+  <ul>
+    <li>literal parity with the authors' executable learner, because that learner
+      uses a narrower parameter family;</li>
+    <li>fidelity of CFFG's local variational messages and free-energy ledger to
+      Parts I and II; that requires local equation-to-rule/energy oracles;</li>
+    <li>general rSLDS superiority, online-learning viability, or product value.</li>
+  </ul>
+
+  <p>
+    Rename the epic conclusion from “literature parity” to
+    <strong>source-specific rSLDS empirical non-inferiority against an
+    independently derived Gibbs reference</strong>. Strengthen adapter
+    independence with an equation-level provenance ledger, clean-room tiny
+    conditional oracles, frozen MCMC mixing diagnostics, and a compact direct
+    production-message/energy audit. Then finish the chain and stop. Balanced
+    trees are useful optional factor-library work, not a CFFG-paper or vision
+    critical path.
+  </p>
+
+  <h2 id="prs">8. Pull requests 55–62: review and merge plan</h2>
+  <p>
+    Dependency order is <strong>#55 → #57 → #56 → #58 → #59 → #60 → #61 →
+    #62</strong>. The numbering is misleading because #57 is intentionally the
+    base of #56. GitHub reports the stack mergeable, but none of the PRs has a
+    GitHub check rollup or review decision. Descendant heads have recorded local
+    short-suite passes.
+  </p>
+
+  <table>
+    <thead><tr><th>PR</th><th>Decision</th><th>Human focus</th><th>Time</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><a href="https://github.com/engimatic-systems/cffg/pull/55">#55 PG learning</a></td>
+        <td><span class="good pill">GO</span></td>
+        <td><code>recurrence_weight_stats</code>, <code>PGWeights</code>, D8.4;
+          verify mean-rollover is not described as full joint VB.</td>
+        <td>12 min</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/engimatic-systems/cffg/pull/57">#57 ticket semantics</a></td>
+        <td><span class="warn pill">FIX</span></td>
+        <td>Remove the two generated v1/v2 audit YAMLs from git (about 84,510
+          lines / 2.7 MB). Keep the query, schema, current compact lexicon, and
+          regeneration path. Validate the final tooling head.</td>
+        <td>5 min after cleanup</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/engimatic-systems/cffg/pull/56">#56 fixed rSLDS inference</a></td>
+        <td><span class="good pill">GO</span></td>
+        <td>Builder, learning install/rollover, compact oracle; confirm the
+          claim remains fixed-parameter inference.</td>
+        <td>8 min</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/engimatic-systems/cffg/pull/58">#58 Gaussian learnables</a></td>
+        <td><span class="good pill">GO</span></td>
+        <td><code>ParameterAddress</code>/<code>MemberAddress</code>, atomic
+          <code>set_params</code>, NIW/MNIW role transforms.</td>
+        <td>12 min</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/engimatic-systems/cffg/pull/59">#59 observed-only fitter</a></td>
+        <td><span class="good pill">GO WITH #60 REVIEWED</span></td>
+        <td>Truth-free initializer, immutable priors, replace versus accumulate,
+          outer exhaustion, terminal state/parameter agreement. This is the
+          deepest scientific review.</td>
+        <td>22 min</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/engimatic-systems/cffg/pull/60">#60 retry/globalization</a></td>
+        <td><span class="warn pill">FIX</span></td>
+        <td>Split initialization from <code>rslds_fit.py</code> so the new file is
+          below the repository's 1,000-line limit. Then inspect identical-state
+          retries, fixed-point preservation, loud nonfinite outcomes, and the
+          terminal solve.</td>
+        <td>12 min after split</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/engimatic-systems/cffg/pull/61">#61 incidence indexing</a></td>
+        <td><span class="good pill">GO</span></td>
+        <td>Degree/port indexing and benchmark manifest. This is small,
+          model-general, and unusually well evidenced.</td>
+        <td>7 min</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/engimatic-systems/cffg/pull/62">#62 roadmap split</a></td>
+        <td><span class="warn pill">FIX</span></td>
+        <td>Narrow “literature parity” wording; add adapter independence,
+          mixing, and local message/energy oracle requirements. The dependency
+          split itself is sound.</td>
+        <td>7 min</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>
+    Reserve five final minutes to check retargeted bases, the suite records, and
+    mergeability. Total human time stays under 90 minutes. Do not squash the
+    substantive scientific commits; metadata-only PR-link/handoff commits may
+    be squashed if desired.
+  </p>
+
+  <h2 id="course">9. Required course correction</h2>
+  <ol>
+    <li>
+      <strong>Correct claims before adding capability.</strong> Narrow README's
+      “exact Bethe/Generalised free energy” to the declared ledger whose exact
+      or bounded meaning depends on the factor family. Rename the Part II §7.1
+      learning experiment as a behavioral/analytic learned-A approximation.
+      Explicitly document the two-window realization and Newton limit-cycle
+      failure mode.
+    </li>
+    <li>
+      <strong>Create one paper-faithfulness and minimum-usable-release gate.</strong>
+      It should inventory every paper-defined constraint and Fig. 5 message,
+      make <code>mu3</code> first-class in the agent trial loop, add PRNG and
+      checkpoint semantics, test one literal constraint-flip model against the
+      two-window runtime, and give a newcomer one build→compile→run→inspect→
+      checkpoint path.
+    </li>
+    <li>
+      <strong>Re-scope <code>cff-ahps</code>.</strong> “Universal factor library”
+      contradicts the architecture's correct “extensible registry, not a
+      universal solver” boundary. Replace it with a finite kernel-integration
+      milestone: representative discrete, Gaussian, EF, and hybrid paths;
+      shared execution/ledger contracts; loud unsupported combinations;
+      hostile-input evidence.
+    </li>
+    <li>
+      <strong>Freeze new family breadth until central execution seams improve.</strong>
+      Do <code>cff-209l</code> and a bounded engine/compiler modularization
+      sequence before nonlinear or neural factors. Characterization tests come
+      before extraction.</li>
+    <li>
+      <strong>Prioritize visible runtime truth.</strong> Do vectorized readouts,
+      honest resource estimation, compiled loop work, long-rollout convergence,
+      and epistemic diagnostics before another model family. Split
+      <code>cff-wbhu</code> if its ordinary loop and mixed-GFE controller cannot
+      fit one reviewable PR. Separate <code>cff-5edo</code>'s status/depth gating
+      from its later warm-start speed work.</li>
+    <li>
+      <strong>Finish rSLDS confirmation, then make an evidence-based stop/go
+      decision.</strong> Do not automatically roll into balanced-tree recurrence.
+    </li>
+  </ol>
+
+  <h2 id="roadmap">10. Proposed three-horizon roadmap</h2>
+  <p>
+    The active portfolio should never exceed twelve tickets, including blocked
+    dependents. “Park” means keep the ticket as durable future memory, not that
+    the idea is bad.
+  </p>
+
+  <h3>Horizon 0 — land the current stack</h3>
+  <ul>
+    <li>#57: remove generated audit bulk and validate retained tooling.</li>
+    <li>#60: split the new fitter below 1,000 lines.</li>
+    <li>#62: narrow the claim and harden reference/oracle criteria.</li>
+    <li>Merge #55 → #57 → #56 → #58 → #59 → #60 → #61 → #62.</li>
+  </ul>
+
+  <h3>Horizon 1 — finish the scientific commitment</h3>
+  <pre>Legend: prerequisite --&gt; dependent
+
+[ ] cff-akmp (ready)
+      |
+      +--&gt; [ ] cff-64ri
+                  |
+[x] l7y4/garu/r6bl +--&gt; [ ] cff-0l31 --&gt; [ ] cff-oyie --&gt; [ ] cff-nkbj
+
+[ ] NEW: paper-faithfulness + minimum-usable-release gate (parallel)</pre>
+
+  <h3>Horizon 2 — make the existing engine trustworthy to operate</h3>
+  <pre>[ ] cff-cj5h  epistemic lint and FE/MI diagnostics
+[ ] cff-j7mm  truthful cross-arena resource estimator
+[ ] cff-3kdk  vectorized public readouts
+[ ] cff-209l  discrete/Gaussian execution contract
+[ ] cff-wbhu  compiled runtime loop (split if needed)
+      |
+      +--&gt; [ ] cff-5edo  truthful/depth-aware long rollouts, then warm start</pre>
+
+  <p>
+    Those are the twelve active items: five rSLDS phase tickets, one new release
+    gate, and six usability/maintainability tickets. They are sequential enough
+    that actual simultaneous work remains small.
+  </p>
+
+  <h3>Park until Horizons 1–2 answer what users actually need</h3>
+  <ul>
+    <li>balanced-tree rSLDS: <code>cff-4sor</code>, <code>cff-602p</code>,
+      <code>cff-lv65</code>, <code>cff-4c7t</code>, <code>cff-9vab</code>,
+      <code>cff-0f3g</code>;</li>
+    <li>new factors/research: <code>cff-o7hs</code>, <code>cff-1o72</code>,
+      <code>cff-dlrj</code>, <code>cff-du6m</code>, <code>cff-cynx</code>,
+      <code>cff-pyy9</code>, <code>cff-2gev</code>;</li>
+    <li>side project: <code>cff-t2g3</code>, <code>cff-21ta</code>;</li>
+    <li>secondary scale/polish: <code>cff-6s31</code>, <code>cff-9xmq</code>,
+      <code>cff-mjku</code>, <code>cff-rqqc</code>, <code>cff-yl0a</code>,
+      <code>cff-g7rc</code>, <code>cff-gul8</code>, and visualization tickets.</li>
+  </ul>
+  <p>
+    After Horizon 2, promote exactly one expansion based on measured demand.
+    If active vision is the chosen wedge, <code>cff-9xmq</code> likely wins. If
+    generic chains matter, promote <code>cff-yl0a</code> plus a profiled Gaussian
+    counterpart. If scientific rSLDS evidence is strong, reconsider the tree
+    chain. Do not choose all three.
+  </p>
+
+  <h2 id="evidence">11. Evidence index</h2>
+  <p class="small">
+    These are the principal anchors used for the conclusions above. Paths are
+    repository-relative unless an absolute sibling-experiment path is shown.
+  </p>
+  <ul>
+    <li>Vision: <code>/Users/ravd/Documents/01-obsidian-vaults/agents/CFFG/0.0.md</code>.</li>
+    <li>Part I: <code>notes/pt1.txt</code>, especially Eq. 8, Eq. 25, §§5–7.</li>
+    <li>Part II: <code>notes/pt2.txt</code>, especially §§3–7, Fig. 5,
+      convergence considerations, and Appendix C.</li>
+    <li>Architecture/change paths: <code>docs/ARCHITECTURE.md:13–77</code>.</li>
+    <li>Honest mathematical boundaries: <code>docs/LIMITATIONS.md</code>, H1–H9,
+      S1c–S2.</li>
+    <li>BFE ledger: <code>src/cffg/engine.py:3687–3815</code> and
+      <code>tests/test_engine_tree.py:66–91</code>.</li>
+    <li>Discrete GFE: <code>src/cffg/rules.py:367–744</code> and
+      <code>tests/test_gfe.py:152–211</code>.</li>
+    <li>mu3: <code>src/cffg/rules.py:745–867</code>,
+      <code>tests/test_mu3_derivation.py:162–220</code>, and
+      <code>tests/test_mu3.py</code>.</li>
+    <li>Agent gap: <code>src/cffg/agent.py:90–145,209–267</code> and
+      <code>tests/test_tmaze_learning.py:1–13</code>.</li>
+    <li>Public overclaims: <code>README.md:425–472,555–582</code>.</li>
+    <li>Kernel boundary: <code>src/cffg/kernels.py</code>,
+      <code>tests/test_kernels.py:133–209</code>, and
+      <code>docs/ARCHITECTURE.md:341–368</code>.</li>
+    <li>Current short-suite record: <code>tools/test-suite-runtimes.json</code>,
+      1,336 passed at <code>ca295f9</code>.</li>
+    <li>Prior adversarial baseline: <code>notes/adversarial-review-2026-07-10/</code>.</li>
+    <li>rSLDS cold evidence:
+      <code>/Users/ravd/projects/experiments/cffg-nascar-validation/artifacts/cold-lowering/results.json</code>,
+      result hash <code>5432c42b…d4651db</code>.</li>
+    <li>Learned rSLDS evidence: artifact commit <code>f4e7b0f</code>, result hash
+      <code>99d02c9…548e</code>.</li>
+    <li>Other performance artifacts:
+      <code>/Users/ravd/projects/experiments/cffg-adversarial-bench</code>,
+      <code>long-horizon-pomdp</code>, <code>active-vision</code>, and
+      <code>swkf-regimes</code>.</li>
+  </ul>
+
+  <h2>Final answer</h2>
+  <p class="lede">
+    You do not need to restart, and you do not need to distrust the whole stack.
+    The repo is an unusually strong and increasingly honest research engine.
+    You should spend your limited review time on #59/#60 and the three bounded
+    fixes, then let the rewritten decision-list validation run. After that,
+    force the project to prove paper completeness and ordinary usability before
+    rewarding it with another ambitious branch of mathematics.
+  </p>
+</main>
+</body>
+</html>
