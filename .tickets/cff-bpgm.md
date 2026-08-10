@@ -116,3 +116,7 @@ Final scan additions after the roadmap companion: ready means dependency-ready a
 **2026-08-10T03:40:54Z**
 
 Completed at commit 08c7a4a. The survey is notes/survey-2026-08-09/index.html. HTML parsing and internal-anchor checks passed. The final wiggle scan retained 30 contextually classified candidates and capability ownership was checked separately. tk dep cycle and git diff --check passed. The default short suite was not rerun because this ticket changes only ticket and survey documentation; the unchanged code head has a recorded 1,336-test passing short-suite result at ca295f9.
+
+**2026-08-10T03:41:14Z**
+
+Post-closure scan additions: complete means completion of this ticket scope at the cited commit; close means administrative ticket closure after the named validation passed. The prior scan notes classify the other 30 retained candidates.
