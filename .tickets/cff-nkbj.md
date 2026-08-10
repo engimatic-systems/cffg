@@ -167,4 +167,4 @@ Authoring handoff: all twelve new or rewritten tickets completed their current
 wiggle scan; `tk dep cycle` and `git diff --check` pass. cff-akmp is the next
 immediate ticket, and cff-4sor is the independent balanced-tree root. Gotcha:
 cff-dlrj and cff-0f3g are links, not prerequisites of the decision-list
-comparison.
+comparison. Stacked draft PR: https://github.com/engimatic-systems/cffg/pull/62
