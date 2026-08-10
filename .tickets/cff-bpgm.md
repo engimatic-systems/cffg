@@ -1,6 +1,6 @@
 ---
 id: cff-bpgm
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-10T03:33:00Z
@@ -112,3 +112,7 @@ Retained wiggle-scan candidates and intended meanings: integrate means the imple
 **2026-08-10T03:39:53Z**
 
 Final scan additions after the roadmap companion: ready means dependency-ready according to tk; remaining means the selected open backlog after parking optional work; intended means the contextual meanings assigned in the prior scan note; explicit_owner means cff-bpgm ownership of the survey artifact; named_ticket_handoff means the concrete ticket IDs in the proposed roadmap. The 30 retained candidates now have a stated contextual meaning.
+
+**2026-08-10T03:40:54Z**
+
+Completed at commit 08c7a4a. The survey is notes/survey-2026-08-09/index.html. HTML parsing and internal-anchor checks passed. The final wiggle scan retained 30 contextually classified candidates and capability ownership was checked separately. tk dep cycle and git diff --check passed. The default short suite was not rerun because this ticket changes only ticket and survey documentation; the unchanged code head has a recorded 1,336-test passing short-suite result at ca295f9.
