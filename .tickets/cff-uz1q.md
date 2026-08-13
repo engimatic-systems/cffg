@@ -56,3 +56,7 @@ Handoff 2026-08-08. Moved the query program, version 2 schema, version 1 and ver
 **2026-08-08T14:46:46Z**
 
 Post-note scan additions: implement = permission for the method author; test = automated execution in the named short suite. Both uses are bounded by the surrounding sentence.
+
+**2026-08-13T05:00:13Z**
+
+PR review correction (2026-08-12): removed both generated contextual audit snapshots from version control and ignored their canonical local paths. The checked-in query tool now scans current tickets directly from the compact version 2 lexicon, so the documented authoring check works in a clean checkout; historical slice, summary, and validation modes continue to accept a locally retained audit through --audit. The focused live-dashboard regression passed after moving its already-existing parser-derived fixture commit onto this prerequisite branch. Final default suite at code commit 1f808d5: 1,289 passed, 38 deselected, zero failures in 360.06 seconds. The current-ticket scan and dependency-cycle check passed.
