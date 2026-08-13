@@ -1,6 +1,6 @@
 ---
 id: cff-6tek
-status: open
+status: closed
 deps: [cff-x0sv]
 links: [cff-l6i5]
 created: 2026-07-27T20:52:13Z
@@ -271,3 +271,31 @@ Legend: prerequisite --> dependent
 The `tk` records remain authoritative. The bounded current scan retained intentional terms with these meanings: canonical=project documents or literature model; end_to_end=component-chain integration test; fixed=fixed prior or constant parameter; generic=model-general protocol or registered family coverage; n_a=structurally irrelevant or delegated surface; preserve=literal-value, dtype, tying, or compatibility invariant; public=documented API; register=runtime family coverage; same=blob identity, value equality, or shared address authority; expose=reporting access; implement=planned component integration or preserved historical statement; provide=ticket deliverable; support=registered pair or probability support; done and land=preserved historical completion; ready=dependency or design readiness; remaining=preserved state or named delegated work; sufficient=mathematical statistics; check=manual inspection or automated check; converge=runtime status; correct=preserved review finding; evidence=test or provenance artifact; exact=literal role, zero, identifier, or threshold; match=tolerance comparison; oracle=generating-parameter workflow; pass=message passing or test success; test=test artifact or execution; validate=input or posterior guard; accumulate=distinct-trial evidence addition; fit=parameter estimation; infer=posterior inference; learn and learnable=declared-learning workflow or registered family; recover=parameter recovery; rollover=posterior-to-runtime conversion; trial=independent dataset; can and could=present or historical capability selected by the sentence; expected=mathematical expectation; may=permission or optional method; explicit_owner and named_ticket_handoff=the ticket, component, or named roadmap ticket in the sentence; all, any, every, and only=the locally enumerated set or explicit exclusion; at_least=inclusive lower bound; current=runtime-active posterior or statistics; deferred=named historical delegation; existing=pre-ticket compatibility artifact; read=machine statistic access. Capability ownership was checked separately. Intelligible-ticket review: complete.
 
 Post-note scan addition: integrate=the named component-chain integration test; complete=the intelligible-ticket review marker; close=ticket closure in the sequencing statement; estimate=parameter estimation. Historical slice: 29 candidates, 61 occurrences, zero classified problems.
+
+**2026-08-08T21:11:17Z**
+
+Implementation handoff, 2026-08-08.
+
+Done:
+- Replaced Arena.member_of row pairs with frozen MemberAddress and ParameterAddress records for the covered discrete, Gaussian, hybrid, recurrence, precision, conditioned, and plate-expanded factors.
+- Added atomic cffg.set_params named writes with serialized-shape validation, dtype-aware probability and covariance guards, exact-zero support, tied-blob fan-out, and grouped row installation.
+- Registered NIW/gaussian and MNIW/gaussian_linear learning, including conditioned emissions; added immutable initial priors, status-bearing accumulate and replace cadences, pooled tied statistics, atomic writes, and keyed checkpoint restore.
+- Updated README, ARCHITECTURE, and LIMITATIONS. No cff-6tek todo-note remained to delete on the stacked base.
+
+Validation:
+- Focused address and Gaussian-learning contracts passed, including flooding/scheduled parity, float32, masked observations, improper and non-finite records, 16 dimensions with 64 members, plate scoping, checkpoint migration, and atomic failure cases.
+- The slow seeded LGSSM public-API recovery target passed in 4.88 seconds.
+- Final unchanged-head dashboard gate at f471c5e: 1320 passed, 39 deselected, 0 failed; pytest 374.64 seconds and recorded wall time 381.407 seconds. Dashboard refreshed at ~/agent-share/cffg-tests.html.
+- tk dep cycle and git diff --check passed.
+
+Duplicated surfaces:
+- Flooding and scheduled Gaussian statistics produce matching posteriors.
+- Host/JIT numerical update pairing is N/A because learning and named writes occur between converged runs; both schedules consume the installed arrays.
+- Single-instance and grouped-row installation share the same address/write path; the 64-member fixture checks uncoupled grouped rows.
+- Versioned and legacy checkpoint decoding both remain covered.
+
+Gotcha: Learnables.accumulate and Learnables.replace intentionally require the status-bearing RunResult, not a bare State, so convergence is enforceable. Downstream cff-l7y4 now owns rSLDS outer-loop use; cff-ahps owns the excluded mixture, recurrence, precision, EF, and synthetic-GFE adapters.
+
+**2026-08-08T21:16:38Z**
+
+Publication: draft PR #58 opened at https://github.com/engimatic-systems/cffg/pull/58 with base agent/cff-y4nx-rslds and head agent/cff-6tek-gaussian-learnables. The final code validation remains the one-shot dashboard result at f471c5e; subsequent commits contain ticket and runtime-history metadata only.

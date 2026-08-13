@@ -48,6 +48,7 @@ Exactness (per family, documented because the FE ledger depends on it):
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Protocol
 from urllib.parse import quote, unquote
 
@@ -57,7 +58,7 @@ from cffg import ef, efrules
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from cffg.compiler import LearnPlan
-    from cffg.engine import Engine, State
+    from cffg.engine import Engine, RunResult
 
 
 #: Engine readouts a family can draw sufficient statistics from. A family
@@ -104,6 +105,11 @@ class Family(Protocol):
         self, params: dict[str, np.ndarray], stats: dict[str, np.ndarray]
     ) -> dict[str, np.ndarray]:
         """Hyperparameters + statistics -> updated hyperparameters."""
+
+    def pool(
+        self, records: list[dict[str, np.ndarray]]
+    ) -> dict[str, np.ndarray]:
+        """Pool factor-local statistic records for one posterior update."""
 
     def rollover(self, params: dict[str, np.ndarray], ftype: str) -> dict[str, np.ndarray]:
         """Hyperparameters -> the values each parameter ROLE should hold,
@@ -213,6 +219,9 @@ class Dirichlet:
             "alpha": ef.DIRICHLET.posterior(params["alpha"], stats["n"])
         }
 
+    def pool(self, records: list[dict[str, np.ndarray]]) -> dict[str, np.ndarray]:
+        return {"n": np.sum(np.stack([record["n"] for record in records]), axis=0)}
+
     def rollover(self, params: dict[str, np.ndarray], ftype: str) -> dict[str, np.ndarray]:
         return {self._ROLE[ftype]: _elog(params["alpha"], axis=self._AXIS[ftype])}
 
@@ -259,7 +268,14 @@ class Dirichlet:
         return {"alpha": np.asarray(prior, dtype=float).copy()}
 
 
-FAMILIES: dict[str, Family] = {"dirichlet": Dirichlet()}
+from cffg.gaussian_learning import MNIWFamily, NIWFamily
+
+
+FAMILIES: dict[str, Family] = {
+    "dirichlet": Dirichlet(),
+    "niw": NIWFamily(),
+    "mniw": MNIWFamily(),
+}
 
 _STATE_KEY_PREFIX = "v2:"
 
@@ -319,6 +335,7 @@ class Learnables:
     ):
         self.plans = {p.name: p for p in engine.arena.learn_plans}
         self.params: dict[str, dict[str, np.ndarray]] = {}
+        initial_params: dict[str, MappingProxyType] = {}
         priors = priors or {}
         for name in priors:
             if name not in self.plans:
@@ -330,7 +347,16 @@ class Learnables:
             )
             params = family.as_params(given)
             family.validate_prior(name, params, plan.shapes)
-            self.params[name] = params
+            initial = {}
+            for key, value in params.items():
+                frozen = value.copy()
+                frozen.setflags(write=False)
+                initial[key] = frozen
+            initial_params[name] = MappingProxyType(initial)
+            self.params[name] = {
+                key: value.copy() for key, value in initial.items()
+            }
+        self.initial_params = MappingProxyType(initial_params)
 
     @staticmethod
     def _from_compiled(engine: "Engine", plan: "LearnPlan") -> np.ndarray:
@@ -347,57 +373,133 @@ class Learnables:
     # -- the two operations ------------------------------------------------
 
     def accumulate(
-        self, engine: "Engine", state: "State", only: tuple[str, ...] | None = None
+        self,
+        engine: "Engine",
+        result: "RunResult",
+        only: tuple[str, ...] | None = None,
     ) -> None:
-        """Fold the sufficient statistics of every source instance into its
-        posterior. `only` restricts to named learnables — an initial-state
-        prior updates once per episode while a transition updates every tick,
-        and that cadence belongs to the caller.
+        """Add one converged result's pooled statistics to the posterior."""
+        self._update(engine, result, only, replace=False)
 
-        The state must be converged: the node belief of an unconverged graph
-        is not a posterior, and folding it in is not a conjugate update.
-        """
+    def replace(
+        self,
+        engine: "Engine",
+        result: "RunResult",
+        only: tuple[str, ...] | None = None,
+    ) -> None:
+        """Recompute selected posteriors from immutable initial priors."""
+        self._update(engine, result, only, replace=True)
+
+    def _update(
+        self,
+        engine: "Engine",
+        result: "RunResult",
+        only: tuple[str, ...] | None,
+        *,
+        replace: bool,
+    ) -> None:
+        from cffg.engine import RunResult
+
+        if not isinstance(result, RunResult):
+            raise TypeError(
+                "learning updates require the status-bearing RunResult returned "
+                "by Engine.run"
+            )
+        state = result.require_converged()
+        plans = self._selected_plans(engine, only)
         readouts: dict[str, dict] = {}
-        for plan in engine.arena.learn_plans:
+        pending: dict[str, dict[str, np.ndarray]] = {}
+        for plan in plans:
             name = plan.name
-            if (only is not None and name not in only) or not plan.sources:
-                continue
             if name not in self.params:
                 raise KeyError(f"engine declares {name!r}, which this Learnables lacks")
             family = FAMILIES[plan.family]
-            if family.readout not in readouts:
-                readouts[family.readout] = READOUTS[family.readout](engine, state)
-            per_node = readouts[family.readout]
-            for src in plan.sources:
-                self.params[name] = family.fold(
-                    self.params[name], family.stats(plan.ftype, per_node[src])
-                )
+            base = self.initial_params[name] if replace else self.params[name]
+            candidate = {key: value.copy() for key, value in base.items()}
+            if plan.sources:
+                if family.readout not in READOUTS:
+                    raise KeyError(
+                        f"learnable {name!r}: unknown readout {family.readout!r}"
+                    )
+                if family.readout not in readouts:
+                    readouts[family.readout] = READOUTS[family.readout](engine, state)
+                per_node = readouts[family.readout]
+                records = [
+                    family.stats(plan.ftype, per_node[source])
+                    for source in plan.sources
+                ]
+                candidate = family.fold(candidate, family.pool(records))
+            family.validate_prior(name, candidate, plan.shapes)
+            pending[name] = {
+                key: np.asarray(value).copy() for key, value in candidate.items()
+            }
+        self.params.update(pending)
 
-    def write(self, engine: "Engine", params: dict) -> dict:
+    def _selected_plans(
+        self, engine: "Engine", only: tuple[str, ...] | None
+    ) -> list["LearnPlan"]:
+        plans = {plan.name: plan for plan in engine.arena.learn_plans}
+        if only is None:
+            names = tuple(plans)
+        else:
+            unknown = sorted(set(only) - set(plans))
+            if unknown:
+                raise KeyError(
+                    f"engine does not declare requested learnables {unknown}"
+                )
+            names = tuple(dict.fromkeys(only))
+        selected = [plans[name] for name in names]
+        for plan in selected:
+            original = self.plans.get(plan.name)
+            if original is None:
+                raise KeyError(
+                    f"engine declares {plan.name!r}, which this Learnables lacks"
+                )
+            if (plan.family, plan.ftype, plan.shapes) != (
+                original.family,
+                original.ftype,
+                original.shapes,
+            ):
+                raise ValueError(
+                    f"learnable {plan.name!r} has an incompatible plan in this engine"
+                )
+        return selected
+
+    def write(
+        self,
+        engine: "Engine",
+        params: dict,
+        only: tuple[str, ...] | None = None,
+    ) -> dict:
         """Return `params` with every learnable's targets in this engine
         refreshed. Expected targets get the rolled-over parameters the rules
         consume; counts targets get the raw hyperparameters. A target names
         the parameter role its blob fills, so a family with several
         parameters writes each one where it belongs."""
-        import jax.numpy as jnp
-
         from cffg.compiler import NEG
+        from cffg.params import _RuntimeWrite, _apply_runtime_writes
 
-        out = dict(params)
-        for plan in engine.arena.learn_plans:
+        writes: list[_RuntimeWrite] = []
+        for plan in self._selected_plans(engine, only):
             name = plan.name
             if name not in self.params:
                 raise KeyError(f"engine declares {name!r}, which this Learnables lacks")
             family = FAMILIES[plan.family]
-            by_form = {
-                "expected": family.rollover(self.params[name], plan.ftype),
-                "counts": family.raw(self.params[name], plan.ftype),
-            }
+            family.validate_prior(name, self.params[name], plan.shapes)
+            by_form: dict[str, dict[str, np.ndarray]] = {}
             for tgt in plan.targets:
+                if tgt.form not in by_form:
+                    by_form[tgt.form] = (
+                        family.rollover(self.params[name], plan.ftype)
+                        if tgt.form == "expected"
+                        else family.raw(self.params[name], plan.ftype)
+                    )
                 value = by_form[tgt.form][tgt.role]
                 if tgt.layout == "tm":
                     value = value.transpose(1, 2, 0)  # [U, K', K] -> [K', K, U]
-                value = jnp.asarray(value, dtype=out[tgt.key].dtype)
+                if tgt.transform == "covariance_to_precision":
+                    value = np.linalg.inv(np.asarray(value))
+                value = np.asarray(value, dtype=params[tgt.key].dtype)
                 if plan.family == "dirichlet" and tgt.form == "expected":
                     # NEG's bit pattern is reserved for exact log-zero. A
                     # proper positive Dirichlet can produce any finite
@@ -405,14 +507,18 @@ class Learnables:
                     # that value. Move only this representational collision
                     # one dtype ULP toward zero; no magnitude floor or
                     # probability support is invented.
-                    neg = jnp.asarray(NEG, dtype=value.dtype)
-                    value = jnp.where(
+                    neg = np.asarray(NEG, dtype=value.dtype)
+                    value = np.where(
                         value == neg,
-                        jnp.nextafter(neg, jnp.asarray(0.0, dtype=value.dtype)),
+                        np.nextafter(neg, np.asarray(0.0, dtype=value.dtype)),
                         value,
                     )
-                out[tgt.key] = out[tgt.key].at[tgt.index].set(value)
-        return out
+                if not np.all(np.isfinite(value)):
+                    raise ValueError(
+                        f"learnable {name!r}: rollover role {tgt.role!r} is non-finite"
+                    )
+                writes.append(_RuntimeWrite(tgt.key, tgt.index, value))
+        return _apply_runtime_writes(params, writes)
 
     # -- readouts and persistence -----------------------------------------
 
@@ -446,6 +552,12 @@ class Learnables:
         }
 
     def load_state_dict(self, data: dict[str, np.ndarray]) -> None:
+        pending = {
+            name: {key: value.copy() for key, value in params.items()}
+            for name, params in self.params.items()
+        }
+        changed: set[str] = set()
+        seen: set[tuple[str, str]] = set()
         for flat, arr in data.items():
             if flat.startswith(_STATE_KEY_PREFIX):
                 name, key = _decode_state_key(flat)
@@ -479,9 +591,19 @@ class Learnables:
                 raise KeyError(f"no learnable {name!r} in this graph")
             if key not in self.params[name]:
                 raise KeyError(f"learnable {name!r} has no hyperparameter {key!r}")
+            if (name, key) in seen:
+                raise KeyError(
+                    f"checkpoint names learnable {name!r} hyperparameter {key!r} twice"
+                )
+            seen.add((name, key))
             if np.shape(arr) != self.params[name][key].shape:
                 raise ValueError(
                     f"learnable {name!r}: checkpoint shape {np.shape(arr)} != "
                     f"{self.params[name][key].shape}"
                 )
-            self.params[name][key] = np.asarray(arr, dtype=float).copy()
+            pending[name][key] = np.asarray(arr, dtype=float).copy()
+            changed.add(name)
+        for name in changed:
+            plan = self.plans[name]
+            FAMILIES[plan.family].validate_prior(name, pending[name], plan.shapes)
+        self.params.update({name: pending[name] for name in changed})

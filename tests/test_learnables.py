@@ -226,8 +226,9 @@ def test_tied_blob_accumulates_from_every_chain():
     st = engine.bind_data(
         engine.init_state(), {"acta": 0, "seea": 1, "actb": 1, "seeb": 2}
     )
-    st = engine.run(st, 40, tol=1e-12).require_converged()
-    learn.accumulate(engine, st)
+    result = engine.run(st, 40, tol=1e-12)
+    result.require_converged()
+    learn.accumulate(engine, result)
     added = learn.params["B"]["alpha"] - np.ones((U, K3, K3))
     np.testing.assert_allclose(added.sum(), 2.0, atol=1e-9)  # one count per chain
     # Chain a moved under u=0 out of state 0, chain b under u=1 out of state
@@ -248,13 +249,18 @@ def test_learning_at_one_member_transfers_to_another():
     def run(data: dict) -> object:
         st = engine.init_state()
         st = _replace(st, params=learn.write(engine, dict(st.params)))
-        return engine.run(engine.bind_data(st, data), 40, tol=1e-12).require_converged()
+        return engine.run(engine.bind_data(st, data), 40, tol=1e-12)
 
-    naive = np.asarray(engine.marginals(run({"acta": 0, "actb": 0}))["z1b"])
+    naive = np.asarray(
+        engine.marginals(run({"acta": 0, "actb": 0}).require_converged())["z1b"]
+    )
     for _ in range(40):
-        st = run({"acta": 0, "seea": 1, "actb": 0})
-        learn.accumulate(engine, st, only=("B",))
-    taught = np.asarray(engine.marginals(run({"acta": 0, "actb": 0}))["z1b"])
+        result = run({"acta": 0, "seea": 1, "actb": 0})
+        result.require_converged()
+        learn.accumulate(engine, result, only=("B",))
+    taught = np.asarray(
+        engine.marginals(run({"acta": 0, "actb": 0}).require_converged())["z1b"]
+    )
 
     post = learn.expected("B")
     assert post[0, 1, 0] > 0.85  # u=0 out of state 0 is now sharply 0 -> 1
@@ -662,7 +668,8 @@ def test_sparse_dirichlet_prior_is_not_infeasible(schedule, alpha):
     assert result.status is RunStatus.CONVERGED, (result.status, result.residual)
 
     # E[log A] really is at the magnitude that underflows exp().
-    elog = np.asarray(result.state.params[engine.arena.member_of["obs1"][0]])
+    address = engine.arena.member_of["obs1"].parameter("matrix")
+    elog = np.asarray(result.state.params[address.key])
     assert elog.min() < -700, elog.min()
     assert np.exp(elog).max() == 0.0  # exactly why the old test was wrong
     if alpha < 1e-30:
@@ -683,7 +690,8 @@ def test_float32_dirichlet_rollover_escapes_the_reserved_neg_value(schedule):
         st = engine.init_state()
         st = _replace(st, params=learn.write(engine, dict(st.params)))
         st = engine.bind_data(st, {"act1": 0, "obs1": 2})
-        elog = np.asarray(st.params[engine.arena.member_of["obs1"][0]])
+        address = engine.arena.member_of["obs1"].parameter("matrix")
+        elog = np.asarray(st.params[address.key])
         assert elog.dtype == np.float32
         assert np.all(elog != np.asarray(NEG, dtype=np.float32))
 

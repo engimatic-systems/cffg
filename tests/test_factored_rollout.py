@@ -269,7 +269,7 @@ def test_tied_transition_statistic_updates_every_time_member():
         gfe=False,
         learn=("position_transition",),
     )
-    engine, _result, state = _converged(
+    engine, result, state = _converged(
         template,
         arrays,
         data={"action1": 2, "observation1": 1},
@@ -279,7 +279,7 @@ def test_tied_transition_statistic_updates_every_time_member():
         engine, priors={"position_transition": counts}
     )
     before = learnables.params["position_transition"]["alpha"].copy()
-    learnables.accumulate(engine, state)
+    learnables.accumulate(engine, result)
     after = learnables.params["position_transition"]["alpha"]
     np.testing.assert_allclose((after - before).sum(), 1.0, atol=1e-10)
 
@@ -289,11 +289,12 @@ def test_tied_transition_statistic_updates_every_time_member():
     assert mean[2, 1, 0] > 1 / 3
 
     written = learnables.write(engine, dict(state.params))
-    key1, member1 = engine.arena.member_of["transition/position/1"]
-    key2, member2 = engine.arena.member_of["transition/position/2"]
-    assert key1 == key2
+    address1 = engine.arena.member_of["transition/position/1"].parameter("matrices")
+    address2 = engine.arena.member_of["transition/position/2"].parameter("matrices")
+    assert address1.key == address2.key
     np.testing.assert_array_equal(
-        written[key1][member1], written[key2][member2]
+        written[address1.key][address1.index],
+        written[address2.key][address2.index],
     )
 
 

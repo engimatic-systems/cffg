@@ -192,11 +192,13 @@ class RollingAgent:
         # within an episode they carry the current filtered beliefs. An
         # episode learnable only re-anchors its declared binding at reset.
         for name, binding in bindings.items():
-            key, idx = engine.arena.member_of[binding.prior]
+            address = engine.arena.member_of[binding.prior].parameter("statistic")
             # Exact-zero entries stay semantically zero (NEG, the engine's
             # finite log-zero) rather than passing through log(0).
             log_belief = _log_of(np.asarray(self.beliefs[name]))
-            params[key] = params[key].at[idx].set(jnp.asarray(log_belief))
+            params[address.key] = params[address.key].at[address.index].set(
+                jnp.asarray(log_belief)
+            )
         st = _replace(st, params=params)
         if engine is self.plan and self.goal_priors:
             st = engine.with_goal_priors(st, self.goal_priors)
@@ -238,7 +240,8 @@ class RollingAgent:
                 self._filter_spec.observation_port: observation,
             },
         )
-        st = self.filter.run(st, 60, tol=1e-12).require_converged()
+        result = self.filter.run(st, 60, tol=1e-12)
+        st = result.require_converged()
         marginals = self.filter.marginals(st)
         next_beliefs = {
             name: _normalize(
@@ -248,11 +251,15 @@ class RollingAgent:
             for name, binding in self._filter_bindings.items()
         }
         if self.tick_learnables:
-            self.learnables.accumulate(self.filter, st, only=self.tick_learnables)
+            self.learnables.accumulate(
+                self.filter, result, only=self.tick_learnables
+            )
         if self.episode_tick == 0 and self.episode_learnables:
             # q(z0) smoothed by this episode's first observation — the
             # sufficient statistic for where episodes start.
-            self.learnables.accumulate(self.filter, st, only=self.episode_learnables)
+            self.learnables.accumulate(
+                self.filter, result, only=self.episode_learnables
+            )
         self.beliefs = next_beliefs
         self.tick += 1
         self.episode_tick += 1

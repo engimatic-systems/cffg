@@ -7,9 +7,10 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from cffg import conj, recurrence
+from cffg import conj, recurrence, set_params
 from cffg.compiler import compile_template
 from cffg.engine import Engine, _replace
+from cffg.learn import Learnables
 
 
 def _rng():
@@ -217,6 +218,7 @@ def test_stats_readout_marks_mutated_invalid_precision_improper():
     assert np.isposinf(eng.bfe(bad))
 
 
+@pytest.mark.slow
 def test_trial_loop_recovers_lgssm_parameters():
     """Acceptance (cff-7c5o): the Dirichlet-style trial loop — infer with
     current expected parameters, accumulate gaussian_node_stats, MNIW-update,
@@ -231,41 +233,34 @@ def test_trial_loop_recovers_lgssm_parameters():
         "A": np.array([[0.0]]), "boff": np.zeros(d), "Q": np.array([[1.0]]),
         "H": np.eye(d), "h0": np.zeros(d), "R": np.array([[1e-4]]),
     }
-    # Compile ONCE; parameters are step inputs (the colony contract), so the
-    # trial loop swaps them through state.params instead of recompiling.
-    import jax.numpy as jnp
+    from cffg.core import LearnableSpec
 
-    from cffg.engine import _replace
-
+    t.learnables["transition"] = LearnableSpec(
+        "transition", "mniw", ("A", "boff", "Q"), sources=("trans",)
+    )
     arrays = {**base, "P0": np.eye(d) * 1e-4}  # x0 pinned per trial via :m
     eng = Engine(compile_template(t, arrays=arrays))
-    prior_key = "gauss:gaussian:1:m"
-    tkey = "gauss:gaussian_linear:1x1"
-    a_cur, b_cur, q_cur = base["A"], base["boff"], base["Q"]
-    for _ in range(3):  # EM-style outer loop
-        syy = np.zeros((d, d))
-        syx = np.zeros((d, d + 1))
-        sxx = np.zeros((d + 1, d + 1))
-        n = 0
-        st0 = eng.init_state()
-        params = dict(st0.params)
-        params[tkey + ":A"] = jnp.asarray(a_cur)[None]
-        params[tkey + ":b"] = jnp.asarray(b_cur)[None]
-        params[tkey + ":W"] = jnp.asarray(np.linalg.inv(q_cur))[None]
-        for _ in range(400):
-            x0 = rng.normal(scale=2.0)
-            x1 = a_true * x0 + rng.normal(scale=np.sqrt(q_true))
-            params[prior_key] = jnp.asarray(np.array([[x0]]))
-            st = _replace(st0, params=dict(params))
-            st = eng.bind_data(st, {"obs": np.array([x1])})
-            st = eng.run(st, 15, tol=1e-13).require_converged()
-            s = eng.gaussian_node_stats(st)["trans"]
-            syy += s["Syy"]
-            syx += s["Syx"]
-            sxx += s["Sxx"]
-            n += 1
-        post = conj.vague_mniw(d, d).update(syy=syy, syx=syx, sxx=sxx, n=n)
-        a_cur, b_cur, q_cur = post.rollover()
+    learnables = Learnables(
+        eng, priors={"transition": conj.vague_mniw(d, d)}
+    )
+    for _ in range(400):
+        x0 = rng.normal(scale=2.0)
+        x1 = a_true * x0 + rng.normal(scale=np.sqrt(q_true))
+        state = eng.init_state()
+        params = learnables.write(eng, state.params)
+        params = set_params(eng, params, {"prior": {"mean": np.array([x0])}})
+        state = _replace(state, params=params)
+        state = eng.bind_data(state, {"obs": np.array([x1])})
+        result = eng.run(state, 15, tol=1e-13)
+        result.require_converged()
+        learnables.accumulate(eng, result)
+    posterior = conj.MNIW(
+        m=learnables.params["transition"]["m"],
+        lam=learnables.params["transition"]["lam"],
+        psi=learnables.params["transition"]["psi"],
+        nu=float(learnables.params["transition"]["nu"]),
+    )
+    a_cur, b_cur, q_cur = posterior.rollover()
     assert abs(a_cur[0, 0] - a_true) < 0.05
     assert abs(b_cur[0]) < 0.05
     assert abs(q_cur[0, 0] - q_true) < 0.03

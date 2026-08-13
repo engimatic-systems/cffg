@@ -197,10 +197,10 @@ def test_benign_candidate_path_keeps_the_full_root_certificate():
     )
 
     params = dict(state.params)
-    prior_key, prior_row = engine.arena.member_of["prior"]
+    prior = engine.arena.member_of["prior"].parameter("statistic")
     changed_prior = np.full(8, NEG)
     changed_prior[:2] = np.log([0.8, 0.2])
-    params[prior_key] = params[prior_key].at[prior_row].set(changed_prior)
+    params[prior.key] = params[prior.key].at[prior.index].set(changed_prior)
     changed = _replace(state, params=params)
     reused = engine.run(changed, 400, tol=1e-13)
 
