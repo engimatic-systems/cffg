@@ -6,3 +6,5 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 tests/.artifacts/
+tools/wiggle_words/ticket-wiggle-word-audit.yaml
+tools/wiggle_words/ticket-wiggle-word-audit-v2.yaml
