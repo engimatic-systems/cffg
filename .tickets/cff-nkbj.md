@@ -1,204 +1,183 @@
 ---
 id: cff-nkbj
-status: open
-deps: [cff-l7y4, cff-garu]
-links: [cff-r6bl]
+status: in_progress
+deps: [cff-oyie]
+links: [cff-r6bl, cff-0f3g, cff-dlrj]
 created: 2026-08-09T13:09:26Z
-type: feature
+type: epic
 priority: 1
 assignee: coopwilliams
 parent: cff-ahps
 tags: [rslds, validation, learning, statistics]
 ---
-# Confirm multi-seed learned rSLDS parity with the pinned literature reference
+# Epic: Confirm source-specific rSLDS empirical non-inferiority
 
 ## Background in Plain English
 
-Ticket cff-l7y4 proved that CFFG can fit the synthetic NASCAR rSLDS from
-observations at `T=10,000`. Its preregistered final used one seed and two
-parameter-replacement coordinates. The learned rSLDS predicted held-out
-observations better than the same-`K` learned SLDS, but it did not recover the
-latent trajectory or regime sequence better. All three model fits also
-exhausted the two-coordinate outer budget instead of reaching an outer fixed
-point.
+cff-l7y4 showed that CFFG can fit one synthetic NASCAR rSLDS from
+observations at `T=10,000`. It did not compare CFFG with an observed-only
+literature learner over multiple seeds. Later source review found that the
+pinned authors' learner and the paper do not use the same full parameter
+family: the paper has a separate continuous recurrence slope for each source
+regime, while the executable learner shares slopes across sources. The pinned
+NASCAR generator and learner also select different transition trees unless the
+learner tree is supplied explicitly.
 
-That result does not yet show that CFFG is as good as the rSLDS implementation
-used in the literature. The cff-l7y4 experiment pinned the current
-stick-breaking NASCAR generator at upstream commit `383ddac`, but it did not
-run the upstream observed-only learner as a comparison arm. The repository
-also records that the publication-era generator and later `ssm` demo use
-different offsets, noise, seeds, or transition parameterizations. Calling any
-one of them “canonical” without naming the exact model would make the result
-impossible to review.
+This epic coordinates a fair confirmatory comparison without narrowing CFFG's
+source-specific model. cff-akmp locks the legacy runtime. cff-64ri adds an
+independent paper-equation Gibbs adapter for the full model. cff-0l31 freezes
+the mapping, harness, and statistical protocol. cff-oyie runs the final seeds
+and reports the result. The split keeps environment repair, reference
+semantics, scientific choices, and confirmatory evidence independently
+reviewable.
 
-This ticket repeats learned fitting over a preregistered multi-seed sample
-after cff-garu stabilizes inference beyond the third parameter replacement. It
-compares CFFG directly with a pinned, executable literature reference and
-retains the same learned-SLDS controls. The purpose is a non-inferiority test:
-CFFG may claim literature parity only if it is not meaningfully worse on every
-registered primary metric. A larger mean on one metric cannot hide a failed
-convergence status or a material loss on another.
-
-cff-r6bl may reduce the cost of these runs, but it is parallel work rather
-than a prerequisite. The experiment may run slowly if cff-r6bl has not landed.
+The comparison can support an empirical non-inferiority conclusion for the
+registered model, metrics, seed set, and reference adapter. It cannot establish
+implementation parity with the authors' executable learner or validate CFFG's
+local variational messages and free-energy ledger against the two CFFG papers.
+Those are separate claims with separate direct evidence.
 
 ## Outcomes / Acceptance Criteria
 
-1. Before any final seed is run, the preregistration names the exact literature
-   target: paper or demo, upstream repository and commit, environment,
-   transition parameterization, generator constants, initialization method,
-   priors, fitting objective, and stopping rule.
-   1.1. It states the differences found by comparing the publication-era
-   NASCAR model, upstream commit `383ddac`, and the selected later `ssm`
-   variant.
-   1.2. If the executable reference is not parameter-equivalent to CFFG's
-   `recurrence_link`, the result uses a new factor/derivation ticket or limits
-   its claim to the common model. It does not call an approximate translation
-   exact literature parity.
-2. The external harness includes an observed-only reference-rSLDS arm pinned
-   to the selected upstream implementation. Neither the CFFG arm nor the
-   reference arm receives generating states, regimes, or parameters before
-   fitting finishes.
-3. The comparison has two registered tiers.
-   3.1. A shared-initialization tier starts both implementations from mapped
-   point parameters and priors derived without truth. It isolates fitting and
-   inference behavior from initializer differences.
-   3.2. An end-to-end tier uses each implementation's documented truth-free
-   initializer. It compares the workflows a consumer would actually run.
-4. The CFFG arm consumes the cff-garu correction and runs a longer outer loop.
-   Its iteration budget and stopping rule are selected on calibration seeds
-   and committed before final seeds run.
-   4.1. `converged`, `budget_exhausted`, and `diverged` retain their existing
-   meanings. The harness does not accept a small Bethe free-energy change in
-   place of the complete engine certificate.
-   4.2. No final seed is silently dropped. A preregistered failure policy
-   counts non-converged fits against the parity conclusion or declares the
-   result not ready.
-5. The final sample contains at least 20 data seeds that are disjoint from
-   cff-l7y4 seeds `0` and `101`, all calibration seeds, and every seed inspected
-   while repairing cff-garu. The exact seed list and stopping rule are committed
-   before the first final run.
-6. The primary non-inferiority metrics are held-out mean predictive log
-   likelihood, affine-aligned latent RMSE, and label-aligned regime accuracy.
-   Exact numeric non-inferiority margins are justified from reference
-   repeatability or a named practical tolerance on calibration data and are
-   committed before the final seed set runs.
-7. Literature parity is claimed only if all three primary metrics pass their
-   registered non-inferiority tests in both comparison tiers. The analysis uses
-   paired per-seed differences and simultaneous 95% confidence intervals or
-   another preregistered family-wise error control.
-8. The report includes every per-seed value, aggregate effect, uncertainty
-   interval, convergence status, and failed or not-ready evaluation. It does
-   not report only the mean or only successful seeds.
-9. Secondary outcomes report every fitted parameter-family error, bounded
-   long-rollout periodicity and bounded-rollout rate, outer iterations,
-   inner-solver work, wall-clock phases, and peak resident memory. Secondary
-   outcomes are not substituted for a missed primary threshold.
-10. The same-`K` and closest-free-scalar-budget learned SLDS controls from
-    cff-l7y4 run on the identical final observations, splits, and seed set.
-    SLDS superiority or inferiority remains a separate conclusion from parity
-    with the literature rSLDS.
-11. The multi-seed harness uses one canonical-scale dataset per seed with
-    `T=10,000`, `K=4`, latent dimension `2`, observation dimension `10`, and a
-    preregistered train/test split unless criterion 1 proves that the selected
-    literature target requires a different named scale. Any additional scale
-    is reported as a separate tier.
-12. The numerical robustness contract remains intact.
-    12.1. Exact-zero regime support is not floored, and improper or non-finite
-    beliefs remain loud non-converged results through inherited compact tests.
-    12.2. Compact float32 fitting remains covered with dtype-derived guards.
-    The canonical literature run may use x64 when required for like-for-like
-    reference execution, and must state that boundary.
-    12.3. The at-least-20-seed `T=10,000` final is the uncomfortable-scale
-    case; it remains outside the default short suite.
-13. A compact deterministic test verifies the reference/CFFG parameter mapping,
-    affine and label alignment, paired aggregation, confidence-interval logic,
-    and failure accounting without running the canonical-scale experiment.
-14. Final artifacts record package, experiment, generator, and reference
-    commits; environments; exact commands; seeds; data hashes; configurations;
-    statuses; raw per-seed metrics; timing and memory; preregistration and pilot
-    hashes; and a manifest hash.
-15. README.md states the supported scientific conclusion in plain language.
-    docs/ARCHITECTURE.md records the reference boundary and stabilized fitting
-    cadence. docs/LIMITATIONS.md records every missed metric, non-converged
-    seed, model mismatch, and single-benchmark limitation.
-16. If CFFG misses literature non-inferiority, the result names the failing
-    layer when evidence permits and creates or links a separate ticket for the
-    initializer, variational approximation, message schedule, parameter
-    coordinate, or factor parameterization that owns the gap.
+1. cff-akmp is closed with a reproducible decision-list legacy runtime and an
+   observed-only recurrence-only smoke artifact.
+2. cff-64ri is closed with an independent full source-specific
+   paper-equation Pólya–Gamma Gibbs adapter and its analytic and collapse
+   oracles.
+3. cff-0l31 is closed with a hashed preregistration that fixes the complete
+   final comparison before any final seed runs.
+4. cff-oyie is closed with every registered seed, failure, aggregate,
+   uncertainty interval, artifact, and supported conclusion reported.
+5. The primary conclusion compares CFFG with the independent paper-equation
+   adapter on the same full source-specific decision-list model.
+6. The unmodified pinned authors' learner is reported only as a narrower
+   recurrence-only secondary comparator. It is not described as a same-model
+   reference for source-specific learning.
+7. A source-specific empirical non-inferiority conclusion is made only if
+   every preregistered primary test passes in both comparison tiers.
+8. The conclusion states that same-model outcome non-inferiority does not
+   prove algorithm parity, authors-code parity, or CFFG-paper fidelity.
+9. README.md, docs/ARCHITECTURE.md, and docs/LIMITATIONS.md agree about the
+   model boundary, reference provenance, runtime statuses, results, and limits.
+10. Balanced-tree and destination-softmax work remains linked future work and
+   does not block this decision-list comparison.
 
 ## Methodological Suggestions
 
 These suggestions are optional. The implementer may choose another sound
 method that satisfies the outcomes.
 
-- Use the Runtime numerical or status invariant change-path row for any fitter
-  or engine change and keep the multi-seed driver in
-  `../experiments/cffg-nascar-validation`.
-- Reserve calibration seeds for choosing the post-cff-garu outer budget and
-  non-inferiority margins. Never move a calibration seed into the final set.
-- Use a paired bootstrap or paired permutation procedure over seeds. Register
-  how Monte Carlo particle-filter noise is controlled before measuring final
-  effects.
-- Run seeds sequentially unless direct memory measurements justify bounded
-  parallelism. Reuse compiled structure across seeds if a public, shape-safe
-  interface supports it; do not capture observations or learned parameters as
-  constants to gain speed.
-- Keep the shared-initialization tier as the diagnostic authority when native
-  initializers differ. Use the end-to-end tier for the consumer-facing claim.
-- Reuse cff-l7y4's parameter counts, truth-information boundary, artifact
-  schema, and bounded-rollout gate instead of inventing incompatible reports.
+- Treat the four child tickets as phase barriers. Do not move semantic adapter
+  work into environment repair or implementation changes into final execution.
+- Keep the primary same-model comparison separate from the useful but narrower
+  unmodified-upstream baseline in every artifact and conclusion.
+- Put any evidence-backed failure repair in a new ticket rather than changing
+  the frozen protocol after confirmatory execution starts.
 
 ## Future work
 
-cff-r6bl owns canonical rSLDS cold setup, repeated-slice lowering, and memory
-optimization. It may make this experiment cheaper, but this ticket does not
-wait for it or absorb its runtime implementation.
-
-If the selected literature reference uses a softmax transition rather than
-CFFG's source-specific stick-breaking recurrence, the required new factor and
-free-energy derivation become a prerequisite ticket. This ticket must not
-silently broaden `recurrence_link` semantics.
-
-Validation on real observations, other switching-system families, and other
-literature datasets remains future work after synthetic NASCAR parity. No
-unnamed dataset is part of this ticket.
+cff-0f3g owns explicit tree topology, balanced-tree inference, gate sharing,
+learning, and scale validation. cff-dlrj owns the first derivation decision for
+a destination-softmax recurrence factor. Neither ticket is a prerequisite of
+this epic. Real observations and other switching-system datasets remain
+future validation after the synthetic NASCAR comparison.
 
 ## Definitions
 
-- **Calibration seed:** A dataset seed used to choose protocol settings or
-  margins and therefore excluded from the final confirmatory sample.
-- **Canonical NASCAR model:** Only the exact literature implementation and
-  parameterization named by criterion 1; the phrase has no unqualified meaning
-  in this ticket.
-- **End-to-end tier:** A comparison in which each implementation uses its own
-  documented observation-only initializer and fitter.
-- **Family-wise error control:** A statistical rule that limits false claims
-  across several primary metrics considered together.
-- **Literature parity:** Passing every preregistered primary non-inferiority
-  test against the pinned reference implementation.
-- **Non-inferiority margin:** The largest registered loss that is small enough
-  to count as not meaningfully worse than the reference.
-- **Paired difference:** The metric difference between two implementations on
-  the same generated dataset seed.
-- **Shared-initialization tier:** A comparison that maps one truth-free starting
-  state into both implementations to isolate fitting and inference behavior.
+- **Decision-list model:** A categorical transition that tests logistic gates
+  in order and selects the first accepted destination.
+- **Empirical non-inferiority:** Passing every preregistered primary outcome
+  test against the independent implementation of the published full model,
+  within the registered margins and evidence set.
+- **Paper-equation adapter:** A separately versioned implementation of the
+  published equations that is based on pinned legacy code but was not shipped
+  unchanged by the paper's authors.
+- **Primary comparison tier:** A same-model CFFG-versus-adapter comparison
+  using either shared truth-free initialization or each workflow's native
+  truth-free initialization.
+- **Source-specific recurrence:** A transition whose continuous-state slope
+  and offset are selected by the current discrete regime.
 
 ## Notes
 
-**2026-08-09T13:11:56Z**
+**2026-08-10T03:10:00Z**
 
-Ticket authoring handoff, 2026-08-09.
+Roadmap decomposition after the reference-feasibility and CFFG-paper reviews.
 
 Legend: prerequisite --> dependent
 
-    [x] cff-l7y4 -------------------+
-                                     +--> [ ] cff-nkbj (blocked)
-    [ ] cff-garu (ready) -----------+
+    [ ] cff-akmp (ready: locked legacy runtime)
+              |
+              +--> [ ] cff-64ri (paper-equation adapter)
+                            |
+    [x] cff-l7y4 -----------+
+    [x] cff-garu -----------+--> [ ] cff-0l31 (frozen protocol)
+    [x] cff-r6bl -----------+              |
+                                           +--> [ ] cff-oyie (final evidence)
+                                                         |
+                                                         +--> [ ] cff-nkbj
 
-    Parallel linked optimization: [ ] cff-r6bl (ready)
+    Parallel linked work: [ ] cff-0f3g balanced-tree epic
+    Independent research: [ ] cff-dlrj destination-softmax derivation
     Roadmap parent, not a dependency edge: cff-ahps
 
-The tk dependency records are authoritative. `tk dep tree --full`, `tk ready`, and `tk blocked` show cff-garu as the only unresolved prerequisite; cff-l7y4 is complete. cff-r6bl is deliberately linked rather than required, so performance work may land in parallel. `tk dep cycle` and `git diff --check` pass.
+Research question: what comparison remains faithful to both the CFFG papers
+and the Linderman rSLDS paper? Answer: CFFG does not prescribe source-specific
+or tied recurrence parameters; it requires the chosen model, variational
+family, constraints, local messages, and free-energy terms to be explicit.
+The Linderman paper's full model uses source-specific recurrence slopes, but no
+audited unmodified `recurrent-slds` learner implements that full family. The
+fair primary reference is therefore an independent source-specific
+paper-equation adapter, with the narrower authors' learner retained as a
+secondary nested-model comparator. Sources: `notes/pt1.txt`, sections 1 and 5;
+`notes/pt2.txt`, sections 2.3 and 4; Linderman et al. 2017 Eq. 4 and supplement;
+`recurrent-slds@383ddac` transition, state, and NASCAR learner sources.
+Primary external sources:
+https://proceedings.mlr.press/v54/linderman17a/linderman17a.pdf#page=3 ;
+https://proceedings.mlr.press/v54/linderman17a/linderman17a-supp.pdf#page=1 ;
+https://github.com/slinderman/recurrent-slds/blob/383ddac2472cdf3248c6e871baede9ecda6f14cb/rslds/transitions.py#L19-L126 ;
+https://github.com/slinderman/recurrent-slds/blob/383ddac2472cdf3248c6e871baede9ecda6f14cb/rslds/states.py#L147-L201 ;
+https://github.com/slinderman/recurrent-slds/blob/383ddac2472cdf3248c6e871baede9ecda6f14cb/examples/nascar.py#L421-L464 .
+Confidence: high on the model and executable boundaries; medium-high on
+legacy integration until cff-akmp and cff-64ri execute their tests.
 
-The post-refinement wiggle scan retained 48 candidates. Intended meanings are: canonical=the exact named literature standard or its T=10,000 scale; end_to_end=the truth-free consumer workflow; fixed=the named outer fixed point; public=the documented shape-safe interface; register=the preregistered scientific protocol or claim; reusable=code, compiled-artifact, or prior-schema reuse; same=the named matched K, control configuration, or dataset seed; implement=the concrete CFFG or pinned reference software; support=probability support, a documented conclusion, or interface capability as stated; complete=the full engine certificate; land=closure of named cff-r6bl work; ready=the explicit not-ready evaluation state; remaining=preserved semantics or excluded future work; approximate=the named model translation or variational approximation; material and sufficient=the numeric non-inferiority margin; certify and converge=the public runtime status certificate; equivalent=parameter-equivalence or aligned representations; evidence=the named scientific or provenance artifact; exact=pinned identity, numeric protocol, or literal support; parity=the defined joint non-inferiority gate; pass=registered threshold or automated test success; robust=the AGENTS.md numerical contract; sound=bounded implementer judgment; stable=post-cff-garu repeated-coordinate execution; test, validate, and verify=the named automated, statistical, experiment, mapping, or artifact checks; fit and learn=observed-only repeated-dataset parameter estimation; infer=latent or regime posterior calculation; recover=aligned latent or regime reconstruction; scale=T, dimension, seed count, or runtime load as named; small=the named FE delta or registered practical margin; speed=runtime latency; can=the capability demonstrated by cff-l7y4; may=permission, optional method, or stated possibility; explicit_owner and named_ticket_handoff=the named ticket or component in each sentence; all, any, at_least, every, and only=the locally enumerated arms, seeds, metrics, or hard phase boundary; current=upstream commit 383ddac; existing=the status semantics that predate this ticket; later=the historical ssm variant or future ordering. Capability ownership was checked separately: cff-nkbj owns multi-seed reference parity, cff-garu owns repeated-coordinate stabilization, cff-r6bl owns cold setup, and a newly created prerequisite will own any missing transition factor or derivation. Intelligible-ticket review: complete.
+**2026-08-10T03:20:00Z**
+
+Post-rewrite wiggle audit retained clear uses with these intended meanings:
+integrate=executing the legacy adapter inside its locked environment;
+register=the preregistered seed and metric set; same=the explicitly named full
+source-specific model; implement=the named CFFG, adapter, or upstream software;
+support=a conclusion justified by the final evidence; complete=the enumerated
+protocol or artifact set; ready=tk dependency readiness; remaining and
+later=named future or historical work; close=ticket closure; evidence=the
+confirmatory or provenance record; oracle=the adapter's analytic check;
+parity and pass=the defined joint non-inferiority gate; reproduce=rerunning the
+locked runtime; sound=an alternative method satisfying the outcomes;
+test=an automated check, statistical test, or binary gate test as stated;
+validate=the named scientific or scale evaluation; fit and learn=parameter
+estimation; infer=balanced fixed-belief inference; scale=the named benchmark
+dimensions; can=the demonstrated cff-l7y4 capability; may=optional method;
+explicit_owner and named_ticket_handoff=the named cff-0f3g/cff-dlrj owners;
+any, every, and only=the locally enumerated seeds, metrics, phases, or hard
+claim boundaries; current=the mathematical source regime at time `t`; and
+reproduce=the rerunnable environment artifact. Capability ownership was
+checked separately: the epic owns the joint conclusion, while each child owns
+one phase named in the background. Intelligible-ticket review: complete.
+
+Classification-note additions: fixed=parameters held during the named
+inference comparison; check=the adapter's analytic or executable authority;
+estimate=observation-only parameter estimation; intended=the contextual
+meaning assignments in this note.
+
+The retained all quantifier means the explicitly enumerated twelve-ticket
+authoring set.
+
+Authoring handoff: all twelve new or rewritten tickets completed their current
+wiggle scan; `tk dep cycle` and `git diff --check` pass. cff-akmp is the next
+immediate ticket, and cff-4sor is the independent balanced-tree root. Gotcha:
+cff-dlrj and cff-0f3g are links, not prerequisites of the decision-list
+comparison. Stacked draft PR: https://github.com/engimatic-systems/cffg/pull/62
+
+**2026-08-13T05:19:12Z**
+
+PR merge-gate correction (2026-08-12): narrowed the epic conclusion from literature or implementation parity to source-specific empirical non-inferiority on the registered outcomes. The epic now excludes authors-code parity and CFFG-paper message/free-energy fidelity from that conclusion. cff-64ri owns adapter provenance and independent conditional oracles; cff-0l31 owns direct CFFG recurrence message/energy oracles, Gibbs mixing diagnostics, calibrated margin ceilings, and the exact paired estimand; cff-oyie owns immutable execution and bounded reporting.
