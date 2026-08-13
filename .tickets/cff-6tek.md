@@ -88,8 +88,8 @@ those operations; this ticket owns their generic behavior.
    4.1. Generic NIW or MNIW learning for `gaussian_mixture` and
    `gaussian_mixture_linear` is outside this ticket because it needs a
    per-regime posterior-axis contract. `cff-y4nx` retains its model-specific
-   per-regime MNIW dynamics learner, and `cff-ahps` owns broader generic
-   registration.
+   per-regime MNIW dynamics learner, and `cff-dqk2` owns the generic
+   `gaussian_mixture_linear` registration required to replace that path.
    4.2. Recurrence, precision, and EF factors receive no new learning-family
    adapter in this ticket.
 5. The NIW and MNIW adapters read `Engine.gaussian_node_stats`, validate prior
@@ -187,9 +187,11 @@ replacement while owning rSLDS outer-loop scheduling, initialization, status,
 and scientific comparison. `cff-y4nx` retains its deliberate model-specific
 per-regime dynamics and recurrence learner.
 
-`cff-ahps` owns generic learnable adapters for mixture, recurrence, precision,
-and EF families, plus named writes for EF kernel parameters and any synthetic
-GFE destinations that need a public member identity.
+`cff-dqk2` owns generic learnable adapters for the existing
+`gaussian_mixture_linear` and `recurrence_link` factors. `cff-11jj` adopts those
+adapters in the rSLDS workflows. Precision, EF, other hybrid families, named
+writes for EF kernel parameters, and synthetic-GFE destinations remain outside
+this ticket under their downstream roadmap owners.
 
 ## Definitions
 

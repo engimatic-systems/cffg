@@ -1,7 +1,7 @@
 ---
 id: cff-0l31
 status: open
-deps: [cff-64ri, cff-garu, cff-r6bl, cff-l7y4]
+deps: [cff-64ri, cff-garu, cff-r6bl, cff-l7y4, cff-11jj]
 links: []
 created: 2026-08-10T02:58:08Z
 type: task
@@ -20,6 +20,10 @@ reference boundaries: the narrower unmodified learner and the independent
 full source-specific paper-equation adapter. Closed tickets cff-l7y4,
 cff-garu, and cff-r6bl provide the CFFG fitting workflow, stabilized repeated
 coordinates, and practical canonical-scale setup.
+Ticket cff-11jj moves that production fitting path onto declared learnables
+before this protocol freezes, so the confirmatory result does not validate a
+model-specific learning path that the roadmap has already scheduled for
+replacement.
 
 This ticket makes the comparison executable and freezes its statistical rules
 before final seeds run. It includes calibration because calibration determines
@@ -72,7 +76,10 @@ budgets and meaningful non-inferiority margins. It excludes every final seed.
 16. A preregistration artifact records all arms, metrics, thresholds, seeds,
     commands, environments, commits, data hashes, calibration outputs, and a
     content hash before cff-oyie begins.
-17. No final seed is executed by this ticket.
+17. The CFFG arm invokes the production declared-learning path delivered by
+    cff-11jj. A compatibility-only manual `RSLDSLearning` path cannot satisfy
+    the production arm.
+18. No final seed is executed by this ticket.
 
 ## Methodological Suggestions
 

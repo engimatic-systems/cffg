@@ -154,9 +154,12 @@ learned SLDS. It depends on this ticket and on `cff-6tek`.
 cost while preserving the inference semantics and certification established
 here.
 
-`cff-ahps` remains the downstream roadmap epic. This ticket does not depend on
-`cff-6tek` because its manual `RSLDSLearning` path is deliberately
-model-specific.
+`cff-dqk2` and `cff-11jj` now own replacement of the manual
+`RSLDSLearning` path with generic declared-learning adapters and their rSLDS
+consumer. They depend on this ticket's concrete model evidence and on
+`cff-6tek`; this completed ticket did not depend on `cff-6tek` because its
+delivered path was deliberately model-specific. `cff-cfqg` is the downstream
+engine-trustworthiness epic.
 
 ## Definitions
 

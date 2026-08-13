@@ -1,8 +1,8 @@
 ---
 id: cff-ahps
 status: open
-deps: [cff-1o72, cff-3hgi, cff-44we, cff-5edo, cff-6s31, cff-9xmq, cff-bxk4, cff-d56d, cff-dfpi, cff-l6i5, cff-lquu, cff-o7hs, cff-ri8m, cff-wbhu, cff-izjd]
-links: []
+deps: [cff-1o72, cff-3hgi, cff-44we, cff-5edo, cff-6s31, cff-9xmq, cff-bxk4, cff-d56d, cff-dfpi, cff-l6i5, cff-lquu, cff-o7hs, cff-ri8m, cff-wbhu, cff-izjd, cff-cfqg]
+links: [cff-dqk2]
 created: 2026-07-08T16:48:44Z
 type: epic
 priority: 1
@@ -14,7 +14,7 @@ assignee: coopwilliams
 
 CFFG began with discrete Categorical and Dirichlet factors. Completed tickets have added Gaussian and hybrid models, conjugate exponential-family messages, hard constraints, executable factor registration, and discrete-regime epistemic scoring. This epic finishes the roadmap when the remaining prerequisites add nonlinear and neural factors, scalable plate execution, long-rollout stability, runtime throughput, and continuous-domain diagrams. The result is one serialized modeling system whose compiler, inference runtime, objective ledger, and public tools agree about every factor family they expose.
 
-The direct prerequisites already completed are cff-3hgi, cff-44we, cff-d56d, cff-dfpi, cff-izjd, cff-l6i5, cff-lquu, and cff-ri8m. The unfinished direct prerequisites are cff-1o72, cff-5edo, cff-6s31, cff-9xmq, cff-bxk4, cff-o7hs, and cff-wbhu. The dependency metadata, rather than the order of this prose, determines when this epic is ready to close.
+The direct prerequisites already completed are cff-3hgi, cff-44we, cff-d56d, cff-dfpi, cff-izjd, cff-l6i5, cff-lquu, and cff-ri8m. The unfinished direct prerequisites are cff-1o72, cff-5edo, cff-6s31, cff-9xmq, cff-bxk4, cff-o7hs, cff-wbhu, and the cff-cfqg engine-trustworthiness gate. The dependency metadata, rather than the order of this prose, determines when this epic is ready to close.
 
 ## Outcomes / Acceptance Criteria
 
@@ -69,6 +69,10 @@ These are suggested ways to reach the outcomes. An implementer may choose a diff
 - cff-9xmq follows cff-wbhu and owns balanced broadcast expansion, logarithmic message-passing diameter, and marginal agreement with chain expansion at `1e-10`.
 - cff-6s31 follows cff-j7mm and owns plate index-table grounding, namespace separation and tied/per-copy blob resolution at nesting depth two or greater, arena and free-energy agreement with materialized expansion, and analytic resource estimates.
 - cff-bxk4 follows cff-9bex and owns Gaussian-domain diagram rendering, golden SVG artifacts, and layout-stability tests.
+- cff-cfqg gates new factor breadth on trustworthy operation and extension of
+  the existing engine. Its child cff-dqk2 owns the previously unassigned
+  declared-learning adapters for switching Gaussian dynamics and recurrent
+  Pólya–Gamma weights; cff-11jj proves their production use in rSLDS fitting.
 - Arbitrary Gaussian-only or nonlinear GFE epistemics remain outside this epic. cff-dfpi and cff-izjd deliberately selected and delivered the bounded discrete-regime epistemic route. Expanding that scope requires a separate ticket and a new derivation.
 
 ## Definitions

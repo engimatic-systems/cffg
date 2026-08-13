@@ -295,7 +295,8 @@ Gaussian natural statistics for augmented `[R; r]`. `conj.PGWeights`
 accumulates those statistics outside JIT and rolls its posterior mean into the
 next trial. This standalone path intentionally does not register a
 `LearnableSpec`; recurrence factors have role-bearing named-write addresses,
-but a generic PG family and checkpoint schema remain cff-ahps surfaces.
+but the generic PG family and checkpoint schema remain open under cff-dqk2;
+cff-11jj owns adoption by the rSLDS workflows.
 
 `cffg.models.rslds` is the end-to-end composition boundary. Its serialized
 template uses one `recurrence_link(z[t+1], z[t], x[t])`, a
@@ -336,7 +337,8 @@ makes no scalar outer-objective claim.
 
 The per-regime dynamics MNIWs and PG block remain model-specific rather than
 generic `LearnableSpec` families; the ordinary Gaussian emission uses §3b's
-generic contract, while broader adapters remain cff-ahps.
+generic contract. Ticket cff-dqk2 owns the two missing family adapters, and
+cff-11jj owns the model migration and reusable-fit boundary.
 
 ### 2e. Executable factor registration (`cffg.kernels`, cff-ri8m)
 

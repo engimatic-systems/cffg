@@ -2,7 +2,7 @@
 id: cff-bpgm
 status: closed
 deps: []
-links: []
+links: [cff-cfqg]
 created: 2026-08-10T03:33:00Z
 type: task
 priority: 1
