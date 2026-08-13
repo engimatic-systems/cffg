@@ -41,6 +41,9 @@ secondary baseline.
 6. The unmodified upstream learner is reported separately as a narrower
    recurrence-only workflow baseline and is not used to claim same-model
    parameter or algorithm parity.
+   6.1. Passing the primary comparison is described as source-specific
+   empirical non-inferiority for the registered outcomes, not as authors-code
+   parity or validation of CFFG-paper message and free-energy equations.
 7. The same-`K` and closest-free-scalar-budget learned SLDS controls run on the
    identical final observations, splits, and seeds.
 8. The report includes fitted parameter-family errors, bounded long-rollout
@@ -123,3 +126,7 @@ reporting only. Intelligible-ticket review: complete.
 Classification-note additions: intended=the contextual meaning assignments in
 this note; named_ticket_handoff=the new repair ticket required by criterion 13;
 deferred=the explicitly excluded model families and datasets.
+
+**2026-08-13T05:19:12Z**
+
+PR merge-gate correction (2026-08-12): the final report may claim only source-specific empirical non-inferiority for the registered outcomes. It must explicitly deny authors-code parity and CFFG-paper message/free-energy validation.

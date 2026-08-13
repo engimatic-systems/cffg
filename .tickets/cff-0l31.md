@@ -10,7 +10,7 @@ assignee: coopwilliams
 parent: cff-nkbj
 tags: [rslds, validation, statistics]
 ---
-# Freeze the rSLDS parity harness and preregistration
+# Freeze the rSLDS comparison harness and preregistration
 
 ## Background in Plain English
 
@@ -32,6 +32,11 @@ budgets and meaningful non-inferiority margins. It excludes every final seed.
    dynamics, emissions, and priors without using generating truth.
 2. Small exact enumeration shows that mapped point parameters produce the same
    transition probabilities for multiple source states and continuous inputs.
+   2.1. Compact CFFG cases compare each recurrence-link outgoing message before
+   end-to-end normalization and its matching factor-local energy or normalizer
+   with an independent analytic, enumeration, or quadrature oracle.
+   2.2. The local oracle imports no production recurrence message or energy
+   implementation and checks the declared approximation or bound direction.
 3. The harness has two primary comparison tiers.
    3.1. A shared-initialization tier maps one truth-free starting state into
    both full source-specific implementations.
@@ -46,17 +51,24 @@ budgets and meaningful non-inferiority margins. It excludes every final seed.
    `0` and `101`, every cff-garu repair seed, and every final seed.
 7. Calibration fixes the CFFG and reference iteration budgets, stopping rules,
    particle or chain counts, initialization settings, and failure handling.
+   7.1. For each Gibbs arm, it also fixes warmup, retained draws, independent
+   chain count, stochastic-key streams, posterior-sample retention, a minimum
+   effective sample size, and a maximum split R-hat.
+   7.2. A chain that misses a registered mixing diagnostic follows the failure
+   policy instead of contributing an apparently valid outcome.
 8. The final sample contains at least 20 named data seeds and uses one
    canonical-scale dataset per seed with `T=10,000`, `K=4`, latent dimension
    `2`, and observation dimension `10` unless the preregistration gives a
    specific reference-driven reason for a separate scale tier.
 9. Primary metrics are held-out mean predictive log likelihood,
    affine-aligned latent RMSE, and label-aligned regime accuracy.
-10. Exact non-inferiority margins are justified from calibration repeatability
-    or a named practical tolerance and frozen before final execution.
-11. The primary conclusion requires every metric to pass in both primary
-    comparison tiers under paired simultaneous 95% confidence intervals or
-    another preregistered family-wise error control.
+10. Each exact non-inferiority margin is justified by calibration
+    repeatability and is no wider than a separately named domain-meaningful
+    maximum loss, with both rules frozen before final execution.
+11. The protocol states each paired estimand, effect direction, confidence
+    interval construction, and multiplicity procedure. The primary conclusion
+    requires every metric to pass in both tiers under simultaneous 95%
+    confidence intervals or another preregistered family-wise error control.
 12. The failure policy counts every non-converged, budget-exhausted, diverged,
     invalid, or missing seed against the registered conclusion or declares the
     result not ready. It never drops a failed seed silently.
@@ -70,8 +82,9 @@ budgets and meaningful non-inferiority margins. It excludes every final seed.
     float32 CFFG fitting, and treats the final `T=10,000` sample as the
     uncomfortable-scale case.
 16. A preregistration artifact records all arms, metrics, thresholds, seeds,
-    commands, environments, commits, data hashes, calibration outputs, and a
-    content hash before cff-oyie begins.
+    stochastic-key streams, commands, environments, commits, data hashes,
+    calibration outputs, retained posterior-sample locations, and a content
+    hash before cff-oyie begins.
 17. No final seed is executed by this ticket.
 
 ## Methodological Suggestions
@@ -99,6 +112,8 @@ than an undocumented protocol change.
   therefore excluded from the final evidence.
 - **End-to-end tier:** A comparison in which each implementation uses its own
   documented observation-only initializer and fitter.
+- **Effective sample size:** The approximate number of independent posterior
+  draws represented by an autocorrelated Gibbs chain.
 - **Family-wise error control:** A rule that limits false claims across the
   complete set of primary metrics.
 - **Nested-model comparator:** A baseline whose parameter family is a
@@ -107,6 +122,8 @@ than an undocumented protocol change.
   not meaningfully worse than the reference.
 - **Preregistration:** A committed protocol that fixes scientific decisions
   before confirmatory results are observed.
+- **Split R-hat:** A multi-chain diagnostic that detects chains whose sampled
+  distributions have not mixed to the same stationary target.
 
 ## Notes
 
@@ -139,3 +156,7 @@ check=the mapping, aggregation, or artifact check named locally;
 correct=harness results that satisfy those executable checks; estimate=the
 named parameter-fitting workflow; intended=the contextual assignments in this
 note; named_ticket_handoff=cff-oyie as the final-run owner.
+
+**2026-08-13T05:19:12Z**
+
+PR merge-gate correction (2026-08-12): the frozen protocol now includes a direct production recurrence-message and factor-energy audit, Gibbs key streams and retained samples, ESS and split-R-hat gates, calibration-derived margins capped by domain-meaningful loss, and the exact paired estimand, direction, and multiplicity procedure.
