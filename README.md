@@ -346,10 +346,15 @@ unregistered observation, not promoted to an advantage claim. Exact artifacts
 live in `../experiments/cffg-nascar-validation` at experiment commit `f4e7b0f`
 with results SHA-256 `99d02c92315357e1d778146c7b7ca74cd20aa2390f4ad165ed17515fba29548e`.
 
-Cold setup remains a separate concern: the learned command took 2,063 seconds
-and 5.16 GB peak RSS, while the earlier fixed-parameter run measured 723
-seconds of compile/setup and 30.6 seconds of inference. cff-r6bl owns that
-scale gap.
+Cold setup was a separate host-grounding concern rather than an rSLDS rule or
+JAX-kernel defect. Linear incidence indexes removed the per-variable template
+rescans. In three fresh CPU/x64 workers per path at `T=10,000`, median setup
+fell from `741.361` to `24.060` seconds (`30.81×`), while median converged
+inference changed from `27.342` to `27.020` seconds. Messages, exact support,
+readouts, BFE, and statuses were identical at `T=100`, `1,000`, and `10,000`;
+indexed peak RSS was `1.948` GiB. The reproducible command, every raw phase
+sample, profiles, environment, and hashed arrays live in
+`../experiments/cffg-nascar-validation` at commit `1b1b714`.
 
 ## Write named parameters and learn Gaussian factors
 

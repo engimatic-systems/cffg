@@ -344,8 +344,22 @@ still returns `budget_exhausted`; no monotone-progress guarantee is claimed for
 arbitrary loopy mean-field graphs. This correction does not remove the
 recurrence mean-field bound, point-posterior approximation, single-seed
 boundary, or sensitivity to the initializer and outer budget. The learned
-command took 2,063 seconds and 5.16 GB peak RSS; cold setup at `T=10,000`
-remains cff-r6bl.
+command took 2,063 seconds and 5.16 GB peak RSS.
+
+cff-r6bl removed the quadratic degree/port rescans from cold validation and
+grounding, but it did not create a variable-shape or rSLDS-private executor.
+The graph remains statically shaped: changing horizon, regime count, latent or
+observation dimension, dtype, or schedule selects a distinct JAX executable,
+while same-shape observations and parameters remain runtime inputs. The
+measured `30.81×` `T=10,000` setup speedup covers one rSLDS instance with
+`K=4`, latent `d=2`, observed `dy=10`, auto/mixed scheduling, x64, and the CPU
+backend on an Apple M2 Max. Other models, schedules, dtypes, devices, and
+batched execution receive no performance claim from that result. The indexed
+path still spends a `15.296`-second median in host CFFG lowering and `6.631`
+seconds across state setup and JAX readiness at that horizon; broader schedule
+fusion and device-loop work remain cff-yl0a and cff-wbhu. The 10,000-step
+timing and direct-memory cases stay in the external experiment, not the default
+test suite.
 
 **S1j. Schedules: measured envelope (cff-d56d, revised 2026-07-27 after
 review).** Two-pass schedules make tree and chain inference O(E) with

@@ -238,6 +238,17 @@
       "wall_seconds": 516.909
     },
     {
+      "case_seconds": 507.454,
+      "commit": "ca295f9",
+      "completed_at": "2026-08-09T15:29:14.725083+00:00",
+      "failed": 0,
+      "pytest_exit_code": 0,
+      "result": "passed",
+      "selection": "not slow",
+      "test_count": 1336,
+      "wall_seconds": 516.624
+    },
+    {
       "case_seconds": 354.214,
       "commit": "910b563",
       "completed_at": "2026-08-13T04:53:02.187174+00:00",

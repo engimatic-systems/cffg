@@ -22,6 +22,15 @@ def test_valid_slice_passes(hmm_slice):
     validate(hmm_slice)
 
 
+def test_validation_builds_one_incidence_index(hmm_slice, monkeypatch):
+    def repeated_lookup(*_args, **_kwargs):
+        raise AssertionError("validation must not rescan the full template per variable")
+
+    monkeypatch.setattr(type(hmm_slice), "degree", repeated_lookup)
+    monkeypatch.setattr(type(hmm_slice), "ports_of", repeated_lookup)
+    validate(hmm_slice)
+
+
 def test_degrees(hmm_slice):
     assert hmm_slice.degree("z_mid") == 2  # trans + eq
     assert hmm_slice.degree("z_in") == 1  # dangling -> port
