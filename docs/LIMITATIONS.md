@@ -302,18 +302,45 @@ not full joint VB over weights and auxiliaries. Flooding and mixed scheduling
 solve the same coordinates but, as for mean-field VMP generally, neither
 guarantees monotone progress on every loopy graph.
 
-The end-to-end `cffg.models.rslds` helper preserves these same approximation
-boundaries. Its `RSLDSLearning` host loop updates the initial regime,
-per-regime dynamics, and recurrence weights between trials, but keeps the
-shared Gaussian emission fixed. Accumulating a sequence again would count it
-as new evidence. Generic MNIW emissions and reset-from-prior `replace` now
-provide the missing mechanical operations, but `RSLDSLearning` does not choose
-the outer-coordinate schedule or initialization. No PCA/ARHMM-equivalent
-initializer currently resolves the affine latent and label symmetries. The
-canonical `T=10,000` NASCAR harness therefore validates only fixed-parameter
-inference (`99.95%` MAP regime accuracy), not learned recovery or superiority
-to a matched SLDS. Those scientific fitting claims remain cff-l7y4; cold setup
-at that scale remains cff-r6bl.
+The end-to-end `cffg.models.rslds` helpers preserve these same approximation
+boundaries. `RSLDSLearning.update` accumulates initial-regime, per-regime
+dynamics, and recurrence evidence across distinct trials; calling it again on
+one sequence would count that sequence again. `fit_rslds` is the separate
+one-sequence cadence: each outer coordinate starts from immutable priors,
+updates the tied shared emission through generic MNIW replacement, and writes
+all point estimates into a fresh state. Neither cadence carries parameter
+uncertainty into the next hidden-state solve, so both remain empirical-Bayes
+variational EM rather than joint VB.
+
+The PCA/transition-pair initializer fixes one observation-derived coordinate
+system and regime order, but those choices are not scientifically identifiable:
+another affine latent representation or label permutation can describe the
+same observed process. Recovery numbers therefore require post-fit affine and
+label alignment and do not establish uniquely recovered physical parameters.
+The outer residual is a fixed-point diagnostic over posterior
+hyperparameters and installed arrays, not a derived scalar variational
+objective. A finite outer budget stays `budget_exhausted`, even when each
+inner engine run converged and the returned point parameters are useful.
+
+The learned NASCAR comparison reports held-out prediction, aligned recovery,
+and bounded long-rollout periodicity against same-`K` and closest-budget SLDS
+controls. On the single preregistered `T=10,000` seed, the rSLDS passed only
+the held-out prediction claim against same-K SLDS (`+0.313296` versus a
+`+0.005` margin). Its aligned latent RMSE and regime accuracy were worse, so
+neither recovery advantage is claimed. No claim was registered against the
+closest-budget K=5 SLDS, which had the best held-out likelihood and regime
+accuracy. The rSLDS alone produced a bounded 10,000-step rollout, but that
+observation was not preregistered as an advantage.
+
+All fits exhausted their registered two-coordinate outer budget despite
+converged inner and final inference. An exploratory third rSLDS replacement
+made the next compact-pilot inner solve exhaust its message certificate;
+cff-garu owns that repeated-coordinate stabilization rather than this API
+weakening `converged`. These measurements do not remove the recurrence
+mean-field bound, point-posterior approximation, single-seed boundary, or
+sensitivity to the registered initializer and outer budget. The learned
+command took 2,063 seconds and 5.16 GB peak RSS; cold setup at `T=10,000`
+remains cff-r6bl.
 
 **S1j. Schedules: measured envelope (cff-d56d, revised 2026-07-27 after
 review).** Two-pass schedules make tree and chain inference O(E) with

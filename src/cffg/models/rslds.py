@@ -18,7 +18,15 @@ from dataclasses import dataclass
 import numpy as np
 
 from cffg import conj
-from cffg.core.ir import BlobRef, FactorSpec, PortRole, PortSpec, Template, VariableSpec
+from cffg.core.ir import (
+    BlobRef,
+    FactorSpec,
+    LearnableSpec,
+    PortRole,
+    PortSpec,
+    Template,
+    VariableSpec,
+)
 from cffg.engine import Engine, State, _replace
 from cffg.params import set_params
 
@@ -35,6 +43,8 @@ def rslds(
     initial_state_mean: np.ndarray,
     initial_state_covariance: np.ndarray,
     initial_regime_probability: np.ndarray,
+    *,
+    emission_offset: np.ndarray | None = None,
 ) -> tuple[Template, dict[str, np.ndarray]]:
     """Return a serialized rSLDS template and its arrays.
 
@@ -52,6 +62,11 @@ def rslds(
     offsets = np.asarray(recurrence_offsets)
     h = np.asarray(emission_matrix)
     r = np.asarray(emission_covariance)
+    emission_bias = (
+        np.zeros(h.shape[0], dtype=h.dtype)
+        if emission_offset is None and h.ndim == 2
+        else np.asarray(emission_offset)
+    )
     m0 = np.asarray(initial_state_mean)
     p0 = np.asarray(initial_state_covariance)
     pi = np.asarray(initial_regime_probability)
@@ -66,6 +81,7 @@ def rslds(
         "recurrence_weights": (regimes, regimes - 1, dimension),
         "recurrence_offsets": (regimes, regimes - 1),
         "emission_matrix": (observation_dimension, dimension),
+        "emission_offset": (observation_dimension,),
         "emission_covariance": (observation_dimension, observation_dimension),
         "initial_state_mean": (dimension,),
         "initial_state_covariance": (dimension, dimension),
@@ -77,6 +93,7 @@ def rslds(
         "recurrence_weights": weights.shape,
         "recurrence_offsets": offsets.shape,
         "emission_matrix": h.shape,
+        "emission_offset": emission_bias.shape,
         "emission_covariance": r.shape,
         "initial_state_mean": m0.shape,
         "initial_state_covariance": p0.shape,
@@ -97,7 +114,7 @@ def rslds(
         "recurrence_weights": weights,
         "recurrence_offsets": offsets,
         "emission_matrix": h,
-        "emission_offset": np.zeros(observation_dimension, dtype=h.dtype),
+        "emission_offset": emission_bias,
         "emission_covariance": r,
         "initial_state_mean": m0,
         "initial_state_covariance": p0,
@@ -208,6 +225,12 @@ def rslds(
             },
         )
         template.ports[f"y{step}"] = PortSpec(f"y{step}", f"y{step}", PortRole.DATA)
+
+    template.learnables["emission"] = LearnableSpec(
+        "emission",
+        "mniw",
+        ("emission_matrix", "emission_offset", "emission_covariance"),
+    )
 
     return template, arrays
 

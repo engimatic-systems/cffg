@@ -268,17 +268,83 @@ already represent the ordinary source-specific transition baseline; multiplying
 a separate `matrix_cat` into the same transition would require a new normalized
 factor and free-energy derivation.
 
-The independent canonical-scale check uses the current stick-breaking NASCAR
-generator at `T=10,000`. With the generating parameters supplied, CFFG
-converged in 248 sweeps with `0.001264` latent-state RMSE and `99.95%` MAP
-regime accuracy. This is an inference result, not a learned-model result:
-`RSLDSLearning` currently keeps the shared emission fixed, accumulates evidence
-between trials rather than replacing coordinates while fitting one long
-sequence, and supplies no PCA/ARHMM-style initializer. Learned NASCAR versus a
-matched SLDS, including long generative rollouts, remains cff-l7y4; the generic
-Gaussian learning and replacement operations it consumes are available now.
-The same run measured 723 seconds of cold compile/setup and 30.6 seconds of
-inference; cff-r6bl owns that scale gap.
+For one-sequence observed-only fitting, use the host-side coordinate loop. It
+chooses latent coordinates from the observations, compiles one engine, and
+estimates every rSLDS parameter family without accepting generating states,
+regimes, or parameters:
+
+```python
+import jax
+
+from cffg.models import (
+    PCAARHMMInitializer,
+    fit_rslds,
+    vague_rslds_fit_priors,
+)
+
+fit = fit_rslds(
+    observations,                         # [T, dy], floating and finite
+    regimes=K,
+    latent_dimension=d,
+    initializer=PCAARHMMInitializer(),
+    priors=vague_rslds_fit_priors(K, d, observations.shape[1]),
+    max_outer_iterations=20,
+    max_inner_iterations=500,
+    inner_tolerance=1e-5,
+    key=jax.random.key(0),
+)
+
+if fit.status.value == "diverged":
+    raise RuntimeError(fit.error)
+
+# The terminal parameter write deliberately returns a fresh bound state.
+final = fit.engine.run(fit.state, 500, tol=1e-5).require_converged()
+```
+
+`PCAARHMMInitializer` uses PCA for a reproducible observation-derived latent
+coordinate system, clusters consecutive latent pairs, and fits local
+autoregressions. The explicit key selects cluster centers. Each outer
+coordinate reruns hidden-variable inference and recomputes the initial-regime,
+per-regime dynamics, recurrence, and shared-emission posteriors from the same
+immutable priors. The shared emission is the ordinary tied
+`gaussian_linear` MNIW learnable, so every time slice contributes once through
+`Learnables.replace`.
+
+This replacement cadence is different from `RSLDSLearning.update`: `update`
+accumulates evidence from a new independent trial, while `fit_rslds` replaces
+one sequence's coordinates and never counts that sequence again as new data.
+The fit result reports `converged`, `budget_exhausted`, or `diverged`, preserves
+the last inner-engine status, and keeps the inner Bethe free-energy trace
+separate from the scale-normalized outer fixed-point residual. The default
+outer tolerance is dtype-scaled and must hold twice consecutively. A finite
+iteration limit may therefore return useful fitted parameters with
+`budget_exhausted`; it is not silently relabeled as convergence.
+
+The original canonical NASCAR check supplied the generating parameters and,
+at `T=10,000`, converged in 248 sweeps with `0.001264` latent-state RMSE and
+`99.95%` MAP regime accuracy. The preregistered observed-only comparison then
+fit 8,000 of the same 10,000 generated observations under one disjoint seed:
+
+| Fitted arm | Scalars | Held-out mean log likelihood | Aligned latent RMSE | Aligned regime accuracy | 10,000-step periodicity |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| rSLDS, K=4 | 160 | 30.550824 | 0.001583 | 86.325% | 0.517638, bounded |
+| SLDS, K=4 | 136 | 30.237528 | 0.001559 | 88.8875% | 0, unbounded |
+| SLDS, K=5 | 154 | 31.762280 | 0.002027 | 99.6375% | 0, unbounded |
+
+All arms preserved `budget_exhausted` after the registered two outer
+coordinates, with converged inner and final inference. Exactly one registered
+claim passed: rSLDS held-out prediction exceeded the same-`K` SLDS by
+`0.313296`, above the `0.005` margin. The latent- and regime-recovery margins
+missed, so no recovery advantage is claimed; no claim was registered against
+the K=5 budget-matched arm. The bounded rSLDS rollout is reported as an
+unregistered observation, not promoted to an advantage claim. Exact artifacts
+live in `../experiments/cffg-nascar-validation` at experiment commit `f4e7b0f`
+with results SHA-256 `99d02c92315357e1d778146c7b7ca74cd20aa2390f4ad165ed17515fba29548e`.
+
+Cold setup remains a separate concern: the learned command took 2,063 seconds
+and 5.16 GB peak RSS, while the earlier fixed-parameter run measured 723
+seconds of compile/setup and 30.6 seconds of inference. cff-r6bl owns that
+scale gap.
 
 ## Write named parameters and learn Gaussian factors
 

@@ -58,6 +58,67 @@ def test_mniw_recovers_regression():
     np.testing.assert_allclose(cov_hat, v_true * np.eye(2), atol=0.01)
 
 
+def _cancelling_mniw_stats(dtype):
+    syy = np.array(
+        [
+            [3672.369595544183, -576.99777485657],
+            [-576.99777485657, 283.5154306582308],
+        ],
+        dtype=dtype,
+    )
+    syx = np.array(
+        [
+            [3755.059223552873, -523.9021787776053, -488.6844571489951],
+            [-618.9871372993932, 279.8349336996165, 139.23036412270028],
+        ],
+        dtype=dtype,
+    )
+    sxx = np.array(
+        [
+            [3844.650414323935, -565.2657063690466, -510.582111824199],
+            [-565.2657063690466, 277.22146250167305, 133.21032957044474],
+            [-510.582111824199, 133.21032957044474, 90.11900695557681],
+        ],
+        dtype=dtype,
+    )
+    prior = conj.MNIW(
+        np.zeros((2, 3), dtype=dtype),
+        np.eye(3, dtype=dtype) * dtype(1e-3),
+        np.eye(2, dtype=dtype),
+        dtype(4.0),
+    )
+    return prior, syy, syx, sxx
+
+
+@pytest.mark.parametrize("dtype", (np.float64, np.float32))
+def test_mniw_symmetrizes_roundoff_after_large_statistic_cancellation(dtype):
+    prior, syy, syx, sxx = _cancelling_mniw_stats(dtype)
+    if dtype is np.float32:
+        syy[0, 1] += dtype(1e-4)
+
+    posterior = prior.update(syy, syx, sxx, dtype(90.1190069555768))
+
+    np.testing.assert_array_equal(posterior.psi, posterior.psi.T)
+    np.linalg.cholesky(posterior.psi)
+    np.testing.assert_allclose(
+        posterior.psi,
+        np.array(
+            [[1.2266, -0.0073], [-0.0073, 1.1286]], dtype=dtype
+        ),
+        rtol=5e-4,
+        atol=5e-4,
+    )
+
+
+@pytest.mark.parametrize("dtype", (np.float64, np.float32))
+def test_mniw_rejects_asymmetry_larger_than_cancellation_roundoff(dtype):
+    prior, syy, syx, sxx = _cancelling_mniw_stats(dtype)
+    syy[0, 1] += dtype(1.0)
+
+    with pytest.raises(ValueError, match="psi_n not symmetric"):
+        prior.update(syy, syx, sxx, dtype(90.1190069555768))
+
+
 def test_broken_stats_are_loud():
     with pytest.raises(ValueError, match="positive definite"):
         conj.vague_mniw(1, 1).update(

@@ -274,14 +274,34 @@ but a generic PG family and checkpoint schema remain cff-ahps surfaces.
 `cffg.models.rslds` is the end-to-end composition boundary. Its serialized
 template uses one `recurrence_link(z[t+1], z[t], x[t])`, a
 `gaussian_mixture_linear` dynamics node selected by `z[t+1]`, and a shared
-`gaussian_linear` emission per slice. `RSLDSLearning` owns three host-side
-posteriors: Dirichlet counts for the initial regime, one MNIW for each regime's
-dynamics, and one `PGWeights` block for the recurrent transition. It reads only
-the public factor-local statistics and installs point rollovers into a fresh
-`State.params` through `set_params`, so the compiled graph and all state shapes
-stay fixed across trials. This model-specific boundary still does not register
-per-regime MNIW or PG `LearnableSpec` families; ordinary Gaussian emissions use
-the generic NIW/MNIW contract in §3b, while broader adapters remain cff-ahps.
+`gaussian_linear` emission per slice. The emission blobs are tied across time
+and declared as one generic MNIW `LearnableSpec`; every slice is a statistic
+source for the same posterior.
+
+Two host cadences deliberately share that assembly. `RSLDSLearning` owns
+Dirichlet counts for the initial regime, one MNIW for each regime's dynamics,
+and one `PGWeights` block for the recurrent transition. Its `update` method
+accumulates evidence across distinct trials. `fit_rslds` instead owns a single
+observed sequence: `PCAARHMMInitializer` fixes an observation-derived PCA
+coordinate system and an initial regime order; each outer coordinate runs the
+public engine, reconstructs all four posterior families from immutable priors,
+and uses generic `Learnables.replace` for the tied emission. Thus an outer
+iteration cannot count the same sequence as a new trial.
+
+Both cadences install point rollovers through role-bearing addresses into a
+fresh observation-bound state. The compiled engine and every runtime shape
+stay fixed. A terminal fit state intentionally has not run messages after its
+last parameter write; the result retains the preceding status-bearing inner
+`RunResult`, and consumers run final inference explicitly. Inner Bethe free
+energy remains the engine convergence signal. The outer loop reports its
+separate maximum scale-normalized change over every posterior hyperparameter
+and installed point array, requires two consecutive residuals below the
+dtype-scaled tolerance for `converged`, and otherwise propagates
+`budget_exhausted` or `diverged`. It makes no scalar outer-objective claim.
+
+The per-regime dynamics MNIWs and PG block remain model-specific rather than
+generic `LearnableSpec` families; the ordinary Gaussian emission uses §3b's
+generic contract, while broader adapters remain cff-ahps.
 
 ### 2e. Executable factor registration (`cffg.kernels`, cff-ri8m)
 
@@ -447,9 +467,10 @@ them. Four rules define the contract:
    `categorical` over `[K]`, `matrix_cat` over `[K_out, K_in]`,
    `transition_mixture` over `[U, K', K]`. `NIW` serves only
    `niw/gaussian`; `MNIW` serves only `mniw/gaussian_linear`, including the
-   conditioned runtime group used by observed outputs. Mixture, recurrence,
-   precision, and EF factors have named addresses but no generic conjugate
-   adapter yet.
+   conditioned runtime group used by observed outputs. The rSLDS declares its
+   shared emission this way and pools every tied time slice. Mixture,
+   recurrence, precision, and EF factors have named addresses but no generic
+   conjugate adapter yet.
 
    Hyperparameters, statistics and rollover outputs are keyed dicts, and a
    family names which engine readout it draws from (`cffg.learn.READOUTS`),
@@ -810,16 +831,34 @@ the assembled recurrence, switching-dynamics, emission, mixed-schedule, and
 ledger path at scale. The separate experiment and provenance artifacts live in
 `../experiments/cffg-nascar-validation` at commit `0543683`.
 
-It does **not** validate the paper-style learned model or the rSLDS advantage
-over an SLDS. The harness supplied the generating emission, dynamics, and
-recurrence parameters; the model-specific learner does not update the shared
-emission or choose replacement-coordinate fitting of one long sequence. The
-generic MNIW emission and replacement operations now exist, but there is no
-PCA/ARHMM-equivalent initializer. cff-l7y4 owns the learned
-NASCAR/matched-SLDS continuation. Cold compile/setup also took
-723.14 seconds versus 30.58 seconds of inference, with 2.03 GB peak process
-RSS; cff-r6bl owns compact repeated-hybrid-slice lowering. These are explicit
-not-ready findings, not caveats hidden behind the oracle accuracy.
+That run did **not** validate the paper-style learned model or an rSLDS
+advantage over an SLDS, because it supplied generating emission, dynamics, and
+recurrence parameters. cff-l7y4 added the separate observed-only path described
+in §2d and evaluated it in the same sibling experiment. Statistical authority
+stayed phase-separated: fitting received observations, configuration, priors,
+and keys; generating states and parameters entered only the later affine/label
+alignment and diagnostics. Each rSLDS/SLDS arm compiled one engine, used the
+same 8,000/2,000 split and two-coordinate budget, and compared K=4 structure
+parity plus the formula-selected K=5 closest parameter budget.
+
+At the preregistered `T=10,000`, seed-0 final, every inner and post-write final
+inference converged; every fit truthfully retained outer
+`budget_exhausted`. The rSLDS versus same-K SLDS held-out mean log-likelihood
+margin was `+0.313296`, passing the registered `+0.005` claim. Its aligned
+latent RMSE was `0.001583` versus `0.001559`, and aligned regime accuracy was
+`86.325%` versus `88.8875%`; both registered recovery claims missed and no
+recovery advantage is asserted. The K=5 control scored `31.762280` held-out
+mean log likelihood and `99.6375%` regime accuracy; no comparison claim against
+it was registered. Only the rSLDS rollout passed the boundedness gate, with
+periodicity `0.517638`, but that was not a preregistered advantage claim.
+
+The result artifact pins package commit `4b82b07`, experiment-code commit
+`1350e72`, final artifact commit `f4e7b0f`, and SHA-256
+`99d02c92315357e1d778146c7b7ca74cd20aa2390f4ad165ed17515fba29548e`.
+Whole-command time was 2,063 seconds with 5.16 GB peak RSS. Cold lowering is
+therefore still a demonstrated boundary: the earlier oracle run took 723.14
+seconds of compile/setup versus 30.58 seconds of inference, and cff-r6bl owns
+compact repeated-hybrid-slice lowering.
 
 ## Resource estimator
 

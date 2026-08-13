@@ -1,8 +1,8 @@
 ---
 id: cff-l7y4
-status: open
-deps: [cff-y4nx, cff-6tek]
-links: [cff-y4nx]
+status: closed
+deps: [cff-y4nx, cff-6tek, cff-rgty]
+links: [cff-y4nx, cff-garu]
 created: 2026-08-01T05:05:47Z
 type: feature
 priority: 2
@@ -242,3 +242,23 @@ Intelligible-ticket review: complete.
 Readiness resolution, 2026-08-08. The fitter now owns a falsifiable fixed-point stopping rule rather than claiming an unimplemented scalar variational objective; fixed priors enter `cff-6tek` replacement updates, and the inner engine retains Bethe free energy as its convergence signal. The scientific comparison includes a same-`K` structural SLDS and the formula-selected closest-budget `K_s=5` SLDS. `cff-6tek` supplies both learning cadences, while this ticket consumes replacement for one sequence. The prior retained-candidate classifications remain applicable; additions and changed readings are fixed_point=the defined outer residual, exact=the stated free-scalar formulas and numeric counts, match=the two enumerated comparison controls, generic=the `cffg.learn` protocol, and current=the active sequence statistics. Capability ownership was checked separately. Intelligible-ticket review: complete.
 
 Post-note scan addition: implement=the possible scalar-objective work delegated to `cff-ahps`; later=that work's ordering after this ticket's fixed-point contract.
+
+**2026-08-09T03:46:56Z**
+
+Implementation start, 2026-08-08. Applicable change-path row: Learnable or checkpoint feature. `cffg.models.rslds` owns observed-only initialization, outer cadence, model-specific posterior algebra, and point-parameter mapping. `cffg.learn` remains the generic tied-emission replacement authority; `cffg.conj` remains the MNIW and PG posterior-algebra authority. The rSLDS template will declare its shared emission learnable, so validation, JSON/hash transport, compiler learn plans, `member_of`, Gaussian statistic readout, and role-bearing writes are checked together. No new IR field, family, checkpoint schema, bundle format, or legacy migration is intended.
+
+Duplicated surfaces: the fitter is a host loop around the existing jitted `Engine.run`, and compact tests will cross that host/JIT boundary; no message-rule JIT path changes. The fitter consumes public status and works with the model mixed schedule; flooding/scheduled execution remains engine-owned and unchanged. The public contract is single-sequence and single-instance; batched `vmap` fitting is N/A. Current/legacy checkpoint decoding is N/A because the fitter adds no persistence format. External rSLDS and SLDS arms use one compiled engine per fitted model and fresh fixed-shape states across outer iterations.
+
+**2026-08-09T05:26:17Z**
+
+Completion handoff, 2026-08-08. The package now exposes `PCAARHMMInitializer`, immutable `RSLDSFitPriors`, and `fit_rslds` for truth-free one-sequence fitting. The rSLDS template declares its tied shared emission as generic MNIW; each coordinate runs one compiled public Engine, replaces initial-regime, per-regime dynamics, recurrence, and emission posteriors from fixed priors, installs point arrays into a fresh fixed-shape state, and reports separate inner Bethe free energy, inner status, and outer fixed-point status. Exact-zero support, improper beliefs, non-finite free energy, float32, and a tenfold horizon are covered.
+
+The MNIW scatter path exposed a model-independent cancellation defect. cff-rgty owns and closes that prerequisite at commit 4b82b07: dtype/dimension/term-scale bounds now distinguish antisymmetric cancellation roundoff from material skew before symmetrization and SPD validation. An exploratory coordinate beyond the registered experiment budget exposed a separate repeated-replacement inner-solve boundary; open linked ticket cff-garu owns it without weakening status semantics. cff-r6bl remains the cold-setup owner. Neither is an acceptance blocker for the exact two-coordinate protocol completed here.
+
+External evidence lives on sibling branch `cff-l7y4-learned-comparison`. Pilot artifact commit 7443b0b produced results SHA-256 28b563886f73a55b95a07cfb34d1238772236eea0a130063eaee1ce21e3c17c9; preregistration was committed at 1350e72 before the disjoint final seed. Canonical artifact commit f4e7b0f records CFFG 4b82b07, experiment code 1350e72, generator 383ddac, T=10,000 with 8,000 training steps, one truth-free seed, exact commands, phase timings, 5,161,615,360-byte peak RSS, and results SHA-256 99d02c92315357e1d778146c7b7ca74cd20aa2390f4ad165ed17515fba29548e. All three outer fits truthfully reported budget_exhausted after two coordinates; every inner and final inference converged and every evaluation was ready. The rSLDS passed only the registered held-out prediction claim over same-K SLDS (+0.313296 versus +0.005). Registered latent and regime recovery claims missed; no claim was registered against the stronger K=5 control. The bounded rSLDS rollout remains an unregistered observation.
+
+Validation: focused fitter/conjugate/recurrence coverage passed before finalization; the unchanged proposed code head then passed `uv run python tools/dashboard.py --run-suite`: 1,333 passed, 39 deselected, zero failures, four dependency deprecation warnings in 403.91 seconds, with the shared dashboard refreshed. The sibling experiment passed 8 tests and its manifest hash and preregistration boundary were revalidated. `git diff --check` and `tk dep cycle` pass. README, ARCHITECTURE, and LIMITATIONS now carry the public workflow, statistical authorities, status semantics, exact scientific claims, and remaining boundaries. Intelligible-ticket completion review: complete.
+
+**2026-08-09T05:26:34Z**
+
+Final scan review, 2026-08-08. Earlier retained-candidate classifications remain applicable. New completion-note readings are: canonical=the exact preregistered final artifact; fixed=immutable priors or unchanged runtime shapes; generic=the registered MNIW protocol; public=the documented Engine contract; exact=literal support, registered command, or named protocol value; compact=the named T=240 pilot; ready=the artifact evaluation_status value; only=the sole passed claim within the enumerated registered claim set; every and all=the three named arms or enumerated parameter families; complete=finished ticket review; test=automated suite or experiment test; evidence=the named artifact, posterior evidence, or test result; stronger=the K=5 control with the reported superior metrics, not a general model ranking. Capability ownership was rechecked: cff-garu owns repeated-coordinate stabilization, cff-r6bl owns cold setup, cff-ahps owns a future scalar parameter objective, and no omitted owner remains in this ticket.
