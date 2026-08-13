@@ -284,10 +284,14 @@ correlations among the two regimes, Gaussian drive, and auxiliaries, so a
 strongly coupled or multimodal posterior can remain inaccurate even when the
 coordinate residual converges. v1 requires equal regime cardinalities
 `K >= 2`, a proper Gaussian drive, finite fixed
-`weights[K,K-1,d]`/`offsets[K,K-1]`, and sum-product semantics. Learning those
-weights is separate roadmap work; flooding and mixed scheduling solve the same
-coordinates but, as for mean-field VMP generally, neither guarantees monotone
-progress on every loopy graph.
+`weights[K,K-1,d]`/`offsets[K,K-1]`, and sum-product semantics. Between-trial
+PG learning accumulates the soft factor beliefs into independent Gaussian
+posteriors for `[weight; offset]`, but rolls only their means into the next
+inference state. Thus weight uncertainty does not enter the recurrence
+messages or the next PG coordinate; this is empirical-Bayes variational EM,
+not full joint VB over weights and auxiliaries. Flooding and mixed scheduling
+solve the same coordinates but, as for mean-field VMP generally, neither
+guarantees monotone progress on every loopy graph.
 
 **S1j. Schedules: measured envelope (cff-d56d, revised 2026-07-27 after
 review).** Two-pass schedules make tree and chain inference O(E) with

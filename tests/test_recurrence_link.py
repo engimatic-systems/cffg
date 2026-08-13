@@ -236,6 +236,87 @@ def test_rule_matches_independent_numpy_coordinates():
     assert int(result.status[0]) == 0
 
 
+def test_engine_weight_stats_match_independent_soft_belief_algebra():
+    weights = np.array(
+        [
+            [[0.5, -0.2], [0.1, 0.4]],
+            [[-0.3, 0.6], [0.7, -0.1]],
+            [[0.2, 0.3], [-0.5, 0.2]],
+        ]
+    )
+    offsets = np.array([[0.1, -0.2], [-0.3, 0.25], [0.05, 0.4]])
+    template, arrays = _template(
+        weights=weights,
+        offsets=offsets,
+        p_in=np.array([0.2, 0.5, 0.3]),
+        p_out=np.array([0.55, 0.3, 0.15]),
+        mean=np.array([0.25, -0.1]),
+        covariance=np.array([[0.8, 0.1], [0.1, 0.5]]),
+    )
+    engine, result = _run(template, arrays)
+    state = result.require_converged()
+    belief = engine.gaussian_node_stats(state)["recurrence"]
+    actual = engine.recurrence_weight_stats(state)["recurrence"]
+
+    q_out = belief["out_probability"]
+    q_in = belief["in_probability"]
+    feature_mean = np.append(belief["drive_mean"], 1.0)
+    feature_second = np.block(
+        [
+            [belief["drive_second"], belief["drive_mean"][:, None]],
+            [belief["drive_mean"][None, :], np.ones((1, 1))],
+        ]
+    )
+    coefficients = np.concatenate([weights, offsets[..., None]], axis=-1)
+    xi = np.sqrt(
+        np.einsum(
+            "ilp,pq,ilq->il", coefficients, feature_second, coefficients
+        )
+    )
+    omega = np.empty_like(xi)
+    nonzero = xi > 0
+    omega[nonzero] = np.tanh(xi[nonzero] / 2.0) / (2.0 * xi[nonzero])
+    omega[~nonzero] = 0.25
+    at_risk = np.cumsum(q_out[::-1])[::-1][:-1]
+    kappa = q_out[:-1] - 0.5 * at_risk
+    exposure = q_in[:, None] * at_risk[None]
+    linear = (
+        q_in[:, None, None] * kappa[None, :, None] * feature_mean
+    )
+    quadratic = (
+        exposure[..., None, None]
+        * omega[..., None, None]
+        * feature_second
+    )
+
+    assert bool(actual["proper"])
+    np.testing.assert_allclose(actual["omega"], omega, atol=1e-11)
+    np.testing.assert_allclose(actual["exposure"], exposure, atol=1e-11)
+    np.testing.assert_allclose(actual["linear"], linear, atol=1e-11)
+    np.testing.assert_allclose(actual["quadratic"], quadratic, atol=1e-11)
+
+    extreme = recurrence.weight_stats(
+        np.array([[0.5, 0.5]]),
+        np.array([[0.5, 0.5]]),
+        np.zeros((1, 1)),
+        np.zeros((1, 1, 1)),
+        np.zeros((1, 2, 1, 1)),
+        np.array([[[0.0], [1.0e4]]]),
+    )
+    assert extreme.omega[0, 0, 0] == pytest.approx(0.25)
+    assert np.isfinite(extreme.omega[0, 1, 0])
+    invalid = recurrence.weight_stats(
+        np.array([[0.4, 0.4]]),
+        np.array([[0.5, 0.5]]),
+        np.zeros((1, 1)),
+        np.ones((1, 1, 1)),
+        np.zeros((1, 2, 1, 1)),
+        np.zeros((1, 2, 1)),
+    )
+    assert not bool(invalid.proper[0])
+    assert np.isnan(invalid.linear[0]).all()
+
+
 def test_jj_expected_log_is_a_lower_bound():
     q_out = np.array([0.65, 0.35])
     q_in = np.array([0.4, 0.6])
@@ -416,6 +497,21 @@ def test_exact_zero_support_is_preserved():
     np.testing.assert_array_equal(
         engine.marginals(result.state)["z_in"], [1.0, 0.0]
     )
+    learning = engine.recurrence_weight_stats(result.state)["recurrence"]
+    np.testing.assert_array_equal(learning["exposure"][1], 0.0)
+    np.testing.assert_array_equal(learning["linear"][1], 0.0)
+    np.testing.assert_array_equal(learning["quadratic"][1], 0.0)
+    zero_at_risk = recurrence.weight_stats(
+        np.array([[1.0, 0.0, 0.0]]),
+        np.array([[1.0, 0.0, 0.0]]),
+        np.zeros((1, 1)),
+        np.ones((1, 1, 1)),
+        np.zeros((1, 3, 2, 1)),
+        np.zeros((1, 3, 2)),
+    )
+    np.testing.assert_array_equal(zero_at_risk.exposure[0, :, 1], 0.0)
+    np.testing.assert_array_equal(zero_at_risk.linear[0, :, 1], 0.0)
+    np.testing.assert_array_equal(zero_at_risk.quadratic[0, :, 1], 0.0)
     assert np.isfinite(engine.bfe(result.state))
 
 
@@ -428,6 +524,9 @@ def test_vacuous_and_improper_drive_are_loud_after_transient_flooding():
     engine, result = _run(template, arrays, iterations=20)
     assert result.status is RunStatus.DIVERGED
     assert not np.isfinite(engine.bfe(result.state))
+    learning = engine.recurrence_weight_stats(result.state)["recurrence"]
+    assert not bool(learning["proper"])
+    assert np.isnan(learning["quadratic"]).all()
 
     template, arrays = _template(
         weights=np.array([[[0.5]], [[-0.5]]]),
@@ -480,6 +579,16 @@ def test_float32_k32_d16_converges_without_cubic_plan_storage():
     ]
     assert np.all(np.isfinite(drive_mean))
     assert np.all(np.isfinite(drive_covariance))
+    learning = engine.recurrence_weight_stats(result.state)["recurrence"]
+    assert bool(learning["proper"])
+    assert learning["omega"].dtype == np.float32
+    assert learning["linear"].shape == (card, card - 1, dimension + 1)
+    assert learning["quadratic"].shape == (
+        card,
+        card - 1,
+        dimension + 1,
+        dimension + 1,
+    )
 
 
 def test_vmap_step_matches_sequential():

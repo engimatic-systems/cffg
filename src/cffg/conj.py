@@ -1,11 +1,11 @@
-"""Gaussian conjugate updates (cff-7c5o): DERIVATIONS.md D4 in numpy.
+"""Gaussian conjugate updates: DERIVATIONS.md D4 and D8 in NumPy.
 
 The between-trial half of continuous learning, mirroring the Dirichlet count
-loop in cffg.agent: accumulate node-belief sufficient statistics
-(`Engine.gaussian_node_stats`), fold them into NIW / MNIW posteriors, and
-roll the *expected natural parameters* (mean and E[W] = ν Ψ⁻¹ — not the
-point covariance; see D4.1.3) back into the next trial's params. NumPy-only:
-this runs between engine invocations, never inside jit.
+loop in cffg.agent: accumulate node-belief sufficient statistics, fold them
+into NIW / MNIW / Pólya–Gamma Gaussian posteriors, and roll point parameters
+back into the next trial. Gaussian covariance families use the expected
+precision E[W] = ν Ψ⁻¹, not the point covariance (see D4.1.3). NumPy-only:
+these updates run between engine invocations, never inside jit.
 """
 
 from __future__ import annotations
@@ -108,6 +108,153 @@ class MNIW:
         return self.m[:, :-1].copy(), self.m[:, -1].copy(), self.psi / self.nu
 
 
+def _numpy_symmetry_ok(matrices: np.ndarray) -> np.ndarray:
+    scale = np.max(np.abs(matrices), axis=(-2, -1))
+    scale = np.maximum(scale, np.finfo(matrices.dtype).tiny)
+    error = np.max(
+        np.abs(matrices - matrices.swapaxes(-1, -2)), axis=(-2, -1)
+    )
+    tolerance = (
+        16.0 * matrices.shape[-1] * np.finfo(matrices.dtype).eps * scale
+    )
+    return np.all(np.isfinite(matrices), axis=(-2, -1)) & (
+        error <= tolerance
+    )
+
+
+def _batched_spd(name: str, matrices: np.ndarray) -> np.ndarray:
+    matrices = np.asarray(matrices, dtype=np.float64)
+    if not np.all(np.isfinite(matrices)):
+        raise ValueError(f"{name} must be finite")
+    if matrices.ndim < 2 or matrices.shape[-1] != matrices.shape[-2]:
+        raise ValueError(f"{name} must end in square matrices")
+    if not bool(np.all(_numpy_symmetry_ok(matrices))):
+        raise ValueError(f"{name} not symmetric")
+    try:
+        np.linalg.cholesky(matrices)
+    except np.linalg.LinAlgError:
+        raise ValueError(
+            f"{name} not positive definite: broken statistics"
+        ) from None
+    return matrices
+
+
+def _batched_psd(name: str, matrices: np.ndarray) -> np.ndarray:
+    matrices = np.asarray(matrices, dtype=np.float64)
+    if not np.all(np.isfinite(matrices)):
+        raise ValueError(f"{name} must be finite")
+    if matrices.ndim < 2 or matrices.shape[-1] != matrices.shape[-2]:
+        raise ValueError(f"{name} must end in square matrices")
+    if not bool(np.all(_numpy_symmetry_ok(matrices))):
+        raise ValueError(f"{name} not symmetric")
+    symmetric = 0.5 * (matrices + matrices.swapaxes(-1, -2))
+    eigenvalues = np.linalg.eigvalsh(symmetric)
+    scale = np.max(np.abs(symmetric), axis=(-2, -1))
+    scale = np.maximum(scale, np.finfo(matrices.dtype).tiny)
+    tolerance = (
+        16.0
+        * matrices.shape[-1]
+        * np.finfo(matrices.dtype).eps
+        * scale
+    )
+    if np.any(eigenvalues[..., 0] < -tolerance):
+        raise ValueError(f"{name} not positive semidefinite: broken statistics")
+    return symmetric
+
+
+@dataclass(frozen=True)
+class PGWeights:
+    """Independent Gaussian posteriors over recurrence coefficients.
+
+    The final coefficient axis is augmented as ``[R_il; r_il]`` for source
+    regime ``i`` and stick ``l``. Parameters are stored in Gaussian natural
+    form so independent factor occurrences add without an intermediate solve.
+    """
+
+    eta: np.ndarray  # [K, K-1, d+1]
+    precision: np.ndarray  # [K, K-1, d+1, d+1]
+
+    def __post_init__(self):
+        eta = np.asarray(self.eta, dtype=np.float64)
+        precision = np.asarray(self.precision, dtype=np.float64)
+        if eta.ndim != 3:
+            raise ValueError(f"eta must have shape [K,K-1,d+1], got {eta.shape}")
+        regimes, sticks, augmented_dimension = eta.shape
+        if regimes < 2 or sticks != regimes - 1 or augmented_dimension < 2:
+            raise ValueError(
+                "eta must have K>=2, K-1 sticks, and a positive drive dimension"
+            )
+        if precision.shape != eta.shape + (augmented_dimension,):
+            raise ValueError(
+                f"precision shape {precision.shape} != {eta.shape + (augmented_dimension,)}"
+            )
+        if not np.all(np.isfinite(eta)):
+            raise ValueError("eta must be finite")
+        object.__setattr__(self, "eta", eta.copy())
+        object.__setattr__(
+            self, "precision", _batched_spd("precision", precision).copy()
+        )
+
+    @property
+    def regimes(self) -> int:
+        return self.eta.shape[0]
+
+    @property
+    def dimension(self) -> int:
+        return self.eta.shape[-1] - 1
+
+    def update(self, linear: np.ndarray, quadratic: np.ndarray) -> "PGWeights":
+        """Add one or a batch of PG natural-statistic increments."""
+        linear = np.asarray(linear, dtype=np.float64)
+        quadratic = np.asarray(quadratic, dtype=np.float64)
+        linear_tail = self.eta.shape
+        quadratic_tail = self.precision.shape
+        if (
+            linear.ndim < len(linear_tail)
+            or linear.shape[-len(linear_tail) :] != linear_tail
+        ):
+            raise ValueError(
+                f"linear must end in {linear_tail}, got {linear.shape}"
+            )
+        if (
+            quadratic.ndim < len(quadratic_tail)
+            or quadratic.shape[-len(quadratic_tail) :] != quadratic_tail
+        ):
+            raise ValueError(
+                f"quadratic must end in {quadratic_tail}, got {quadratic.shape}"
+            )
+        linear_batch = linear.shape[: -len(linear_tail)]
+        quadratic_batch = quadratic.shape[: -len(quadratic_tail)]
+        if linear_batch != quadratic_batch:
+            raise ValueError(
+                "linear and quadratic occurrence dimensions must match"
+            )
+        if not np.all(np.isfinite(linear)):
+            raise ValueError("linear statistics must be finite")
+        quadratic = _batched_psd("quadratic statistics", quadratic)
+        axes = tuple(range(len(linear_batch)))
+        linear_increment = linear.sum(axis=axes) if axes else linear
+        quadratic_increment = quadratic.sum(axis=axes) if axes else quadratic
+        return PGWeights(
+            eta=self.eta + linear_increment,
+            precision=self.precision + quadratic_increment,
+        )
+
+    def mean(self) -> np.ndarray:
+        """Posterior mean of every augmented stick coefficient."""
+        return np.linalg.solve(self.precision, self.eta[..., None])[..., 0]
+
+    def covariance(self) -> np.ndarray:
+        """Posterior covariance of every augmented stick coefficient."""
+        identity = np.eye(self.eta.shape[-1], dtype=self.precision.dtype)
+        return np.linalg.solve(self.precision, identity)
+
+    def rollover(self) -> tuple[np.ndarray, np.ndarray]:
+        """Point weights and offsets consumed by the next inference state."""
+        mean = self.mean()
+        return mean[..., :-1].copy(), mean[..., -1].copy()
+
+
 def vague_niw(d: int, scale: float = 1.0) -> NIW:
     """A weakly-informative starting prior: unit-ish scatter, minimal counts."""
     return NIW(mu=np.zeros(d), kappa=1e-3, psi=scale * np.eye(d), nu=float(d + 2))
@@ -120,3 +267,26 @@ def vague_mniw(dy: int, dx: int, scale: float = 1.0) -> MNIW:
         psi=scale * np.eye(dy),
         nu=float(dy + 2),
     )
+
+
+def vague_pg_weights(
+    regimes: int,
+    dimension: int,
+    strength: float = 1e-3,
+) -> PGWeights:
+    """Proper weak zero-mean prior for recurrence stick coefficients.
+
+    ``strength`` is prior information, not a numerical ridge; callers should
+    choose it in the units of the augmented drive features.
+    """
+    if regimes < 2 or dimension < 1:
+        raise ValueError("PG weights require regimes>=2 and dimension>=1")
+    if not np.isfinite(strength) or strength <= 0:
+        raise ValueError("PG prior strength must be finite and positive")
+    augmented_dimension = dimension + 1
+    eta = np.zeros((regimes, regimes - 1, augmented_dimension))
+    precision = np.broadcast_to(
+        strength * np.eye(augmented_dimension),
+        (regimes, regimes - 1, augmented_dimension, augmented_dimension),
+    ).copy()
+    return PGWeights(eta=eta, precision=precision)

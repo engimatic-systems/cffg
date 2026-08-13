@@ -203,6 +203,24 @@ moments; Pólya–Gamma learning statistics remain a separate learning step.
 Every hybrid record has `proper`; consumers must reject a false value and its
 shape-preserving NaNs.
 
+The between-trial recurrence update is deliberately short and remains outside
+JIT, like NIW/MNIW learning:
+
+```python
+from cffg.conj import vague_pg_weights
+
+posterior = vague_pg_weights(regimes=K, dimension=d)
+stats = engine.recurrence_weight_stats(state)["switch"]
+if not stats["proper"]:
+    raise ValueError("improper recurrence belief")
+posterior = posterior.update(stats["linear"], stats["quadratic"])
+weights, offsets = posterior.rollover()  # next trial's parameter arrays
+```
+
+`linear` and `quadratic` already contain the soft source/destination masses
+and the coordinate-optimal PG mean. The rollover is an empirical-Bayes point
+estimate; it does not claim to carry weight uncertainty inside inference.
+
 ## Run inference
 
 ```python
@@ -480,11 +498,12 @@ cffg = { path = "../../cffg", editable = true }
   and always pass `tol=` so coherent models exit early.
 - **Read beliefs, not messages**: `marginals`, `gaussian_marginals`,
   `ef_marginals`, `node_beliefs`, `gaussian_node_stats`, and
-  `gaussian_mixture_predictives` are the supported readouts; learning loops
-  mirror `cffg.agent`'s count pattern (infer → accumulate stats → conjugate
-  update → roll expected params back). Improper Gaussian marginals are
-  NaN-marked; node statistics and mixture predictives also expose
-  `proper=False`, which consumers must check before accumulation or use.
+  the specialized `gaussian_mixture_predictives` and
+  `recurrence_weight_stats` are the supported readouts; learning loops mirror
+  `cffg.agent`'s count pattern (infer → accumulate stats → conjugate update →
+  roll expected params back). Improper Gaussian marginals are NaN-marked;
+  node statistics and specialized readouts also expose `proper=False`, which
+  consumers must check before accumulation or use.
 - **Report framework gaps in framework terms.** When a harness needs a
   numpy workaround, that sentence is a ticket (see cff-9xmq, cff-lquu,
   cff-5edo, cff-mjku, cff-gul8 — all minted from one evaluation round).

@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from cffg import conj
+from cffg import conj, recurrence
 from cffg.compiler import compile_template
 from cffg.engine import Engine, _replace
 
@@ -62,6 +62,78 @@ def test_broken_stats_are_loud():
         conj.vague_mniw(1, 1).update(
             syy=np.array([[-5.0]]), syx=np.zeros((1, 2)), sxx=np.eye(2), n=1.0
         )
+
+
+def test_pg_weights_natural_update_rollover_and_loudness():
+    prior = conj.vague_pg_weights(2, 1, strength=0.2)
+    linear = np.array([[[0.3, -0.1]], [[-0.2, 0.4]]])
+    quadratic = np.array(
+        [
+            [[[0.8, 0.1], [0.1, 0.5]]],
+            [[[0.6, -0.2], [-0.2, 0.7]]],
+        ]
+    )
+    posterior = prior.update(linear, quadratic)
+    expected_precision = prior.precision + quadratic
+    expected_mean = np.linalg.solve(
+        expected_precision, linear[..., None]
+    )[..., 0]
+    weights, offsets = posterior.rollover()
+    np.testing.assert_allclose(posterior.precision, expected_precision)
+    np.testing.assert_allclose(posterior.mean(), expected_mean)
+    np.testing.assert_allclose(weights, expected_mean[..., :-1])
+    np.testing.assert_allclose(offsets, expected_mean[..., -1])
+    np.testing.assert_allclose(
+        posterior.covariance(), np.linalg.inv(expected_precision)
+    )
+    unchanged = posterior.update(
+        np.zeros((3, *linear.shape)), np.zeros((3, *quadratic.shape))
+    )
+    np.testing.assert_array_equal(unchanged.eta, posterior.eta)
+    np.testing.assert_array_equal(unchanged.precision, posterior.precision)
+
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        prior.update(linear, -quadratic)
+    with pytest.raises(ValueError, match="finite"):
+        prior.update(np.full_like(linear, np.nan), quadratic)
+    with pytest.raises(ValueError, match="positive definite"):
+        conj.PGWeights(np.zeros_like(linear), np.zeros_like(quadratic))
+
+
+def test_pg_weights_recover_soft_stick_dynamics_in_one_vectorized_batch():
+    true_weights = np.array([[[1.1]], [[-0.8]]])
+    true_offsets = np.array([[-0.25], [0.35]])
+    points_per_source = 40
+    drive = np.tile(np.linspace(-3.0, 3.0, points_per_source), 2)
+    source = np.repeat(np.arange(2), points_per_source)
+    logits = (
+        true_weights[source, 0, 0] * drive + true_offsets[source, 0]
+    )
+    success = 1.0 / (1.0 + np.exp(-logits))
+    q_in = np.eye(2)[source]
+    q_out = np.stack([success, 1.0 - success], axis=-1)
+    drive_mean = drive[:, None]
+    drive_second = np.square(drive)[:, None, None]
+    prior = conj.vague_pg_weights(2, 1)
+    weights = np.zeros_like(true_weights)
+    offsets = np.zeros_like(true_offsets)
+
+    for _ in range(8):
+        count = drive.shape[0]
+        stats = recurrence.weight_stats(
+            q_out,
+            q_in,
+            drive_mean,
+            drive_second,
+            np.broadcast_to(weights, (count, *weights.shape)),
+            np.broadcast_to(offsets, (count, *offsets.shape)),
+        )
+        posterior = prior.update(stats.linear, stats.quadratic)
+        weights, offsets = posterior.rollover()
+
+    assert np.all((q_out > 0.0) & (q_out < 1.0))
+    np.testing.assert_allclose(weights, true_weights, atol=0.01)
+    np.testing.assert_allclose(offsets, true_offsets, atol=0.005)
 
 
 # --- engine stats + trial-loop recovery (acceptance) ---------------------------
