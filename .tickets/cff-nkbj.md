@@ -9,7 +9,7 @@ priority: 1
 assignee: coopwilliams
 tags: [rslds, validation, learning, statistics]
 ---
-# Epic: Confirm full source-specific rSLDS reference parity
+# Epic: Confirm source-specific rSLDS empirical non-inferiority
 
 ## Background in Plain English
 
@@ -30,6 +30,12 @@ and reports the result. The split keeps environment repair, reference
 semantics, scientific choices, and confirmatory evidence independently
 reviewable.
 
+The comparison can support an empirical non-inferiority conclusion for the
+registered model, metrics, seed set, and reference adapter. It cannot establish
+implementation parity with the authors' executable learner or validate CFFG's
+local variational messages and free-energy ledger against the two CFFG papers.
+Those are separate claims with separate direct evidence.
+
 ## Outcomes / Acceptance Criteria
 
 1. cff-akmp is closed with a reproducible decision-list legacy runtime and an
@@ -46,11 +52,13 @@ reviewable.
 6. The unmodified pinned authors' learner is reported only as a narrower
    recurrence-only secondary comparator. It is not described as a same-model
    reference for source-specific learning.
-7. A literature-parity claim is made only if every preregistered primary
-   non-inferiority test passes in both primary comparison tiers.
-8. README.md, docs/ARCHITECTURE.md, and docs/LIMITATIONS.md agree about the
+7. A source-specific empirical non-inferiority conclusion is made only if
+   every preregistered primary test passes in both comparison tiers.
+8. The conclusion states that same-model outcome non-inferiority does not
+   prove algorithm parity, authors-code parity, or CFFG-paper fidelity.
+9. README.md, docs/ARCHITECTURE.md, and docs/LIMITATIONS.md agree about the
    model boundary, reference provenance, runtime statuses, results, and limits.
-9. Balanced-tree and destination-softmax work remains linked future work and
+10. Balanced-tree and destination-softmax work remains linked future work and
    does not block this decision-list comparison.
 
 ## Methodological Suggestions
@@ -77,8 +85,9 @@ future validation after the synthetic NASCAR comparison.
 
 - **Decision-list model:** A categorical transition that tests logistic gates
   in order and selects the first accepted destination.
-- **Literature parity:** Passing every preregistered primary non-inferiority
-  test against the independent implementation of the published full model.
+- **Empirical non-inferiority:** Passing every preregistered primary outcome
+  test against the independent implementation of the published full model,
+  within the registered margins and evidence set.
 - **Paper-equation adapter:** A separately versioned implementation of the
   published equations that is based on pinned legacy code but was not shipped
   unchanged by the paper's authors.
@@ -167,3 +176,7 @@ wiggle scan; `tk dep cycle` and `git diff --check` pass. cff-akmp is the next
 immediate ticket, and cff-4sor is the independent balanced-tree root. Gotcha:
 cff-dlrj and cff-0f3g are links, not prerequisites of the decision-list
 comparison. Stacked draft PR: https://github.com/engimatic-systems/cffg/pull/62
+
+**2026-08-13T05:19:12Z**
+
+PR merge-gate correction (2026-08-12): narrowed the epic conclusion from literature or implementation parity to source-specific empirical non-inferiority on the registered outcomes. The epic now excludes authors-code parity and CFFG-paper message/free-energy fidelity from that conclusion. cff-64ri owns adapter provenance and independent conditional oracles; cff-0l31 owns direct CFFG recurrence message/energy oracles, Gibbs mixing diagnostics, calibrated margin ceilings, and the exact paired estimand; cff-oyie owns immutable execution and bounded reporting.

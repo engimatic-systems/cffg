@@ -98,8 +98,8 @@ Legend: prerequisite --> dependent
                                                                                 +--> [ ] cff-0f3g
 
     Linked, not required: [ ] cff-dlrj destination-softmax derivation
-    Parallel, not blocked: [ ] cff-nkbj decision-list reference parity
-    Linked baseline, not a dependency edge: cff-ahps
+    Parallel, not blocked: [ ] cff-nkbj decision-list empirical comparison
+    Linked downstream integration baseline: [ ] cff-ahps
 
 The tk records are authoritative. The sequential chain follows the semantic
 coupling: topology meaning precedes serialization; serialization precedes
