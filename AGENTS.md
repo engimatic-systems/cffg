@@ -10,8 +10,7 @@ This repository implements **Constrained Forney-style Factor Graphs (CFFGs)** an
 - *Part II: Variational Message Updates* (van de Laar, Koudahl, de Vries)
 
 Both papers live in `notes/` (PDFs plus extracted text). The project brief is in the
-Obsidian vault at `agents/CFFG/0.0.md`. Reference implementation for parity testing:
-https://github.com/biaslab/LAIF (Julia/RxInfer).
+Obsidian vault at `agents/CFFG/0.0.md`.
 
 ## Session bootstrap
 
@@ -26,18 +25,17 @@ git pull --ff-only origin "$BASE_BRANCH"
 
 ## Rules
 
-1. **Package management: `uv` only.** Use `uv init`, `uv add`, `uv run`, `uv sync`.
+1. **Package management: `uv` only.** Use `uv add`, `uv run`, `uv sync`.
    Never call `pip` directly, never hand-edit lockfiles. The venv is managed by uv.
 
 2. **Atomic git commits.** One logical change per commit — a commit should build and
    pass tests on its own. Commit early and often; keep refactors separate from
-   behavior changes. Reference ticket IDs in commit messages (e.g. `tk-42: ...`).
+   behavior changes. Reference ticket IDs in commit messages (e.g. `cff-woop: ...`).
 
 3. **Tickets via `tk`.** All work is tracked in the `tk` ticket system (`tk --help`
    for usage). Break work into small tickets with dependency links, use epics for the
    major milestones, and close tickets in the same session as the commit that
-   resolves them. Every ticket begins with a brief `## Plain English` section as
-   described below. Before starting work, check `tk` for ready tickets.
+   resolves them. Use the 'Intelligible ticket' skill to write and edit tickets. Before starting work, check `tk` for ready tickets.
 
 4. **Act autonomously.** The agent has broad access to this machine and should use
    it: run tests, install deps, create tickets, commit, and keep moving without
@@ -63,6 +61,8 @@ git pull --ff-only origin "$BASE_BRANCH"
    active-inference derivation), spawn a sub-agent with the *specific questions* to
    answer and have it report back a short summary. Do not read whole papers into the
    main context window mid-task.
+
+7. **De-weight development costs.** When making technical decisions, do not give much weight to development cost and give more weight to quality, simplicity, correctness, scalability, and long-term maintainability.
 
 ## Coding style
 - The code should be idiomatic
@@ -125,10 +125,21 @@ This project will span many context windows. The rule that makes that survivable
 
 ### Ticket and roadmap authoring
 
+- Write tickets using the `intelligible-ticket` skill.
 - Every ticket places a `## Plain English` section immediately after its title.
   In two to five affirmative sentences, explain what capability or outcome the
   ticket delivers and how it delivers it at a high level. The technical
   description, design, hostile-input plan, and acceptance criteria follow.
+- After creating or materially rewriting a ticket, run
+  `uv run python tools/wiggle_words/query_ticket_wiggle_audit.py scan <ticket-id>`. Review
+  every match in context and clarify any claim whose owner, time, layer, scope,
+  comparison, or evidence has more than one reading. Clear intentional uses may
+  remain; rerun the scan after refinement and report retained matches by
+  candidate and intended meaning in the handoff. The scan cannot detect omitted
+  ownership, so check the ticket's capability owners separately. For historical
+  classifications, use
+  `uv run python tools/wiggle_words/query_ticket_wiggle_audit.py slice <ticket-id>`; never
+  load the complete audit when a ticket slice is sufficient.
 - A roadmap-refinement change includes a compact ASCII dependency tree in its
   ticket note or PR description. State the arrow direction and show the ready
   roots, parallel work, immediate blockers, and downstream roadmap

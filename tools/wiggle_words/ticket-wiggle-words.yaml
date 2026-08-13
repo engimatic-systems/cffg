@@ -1,0 +1,619 @@
+schema_version: 1
+created: "2026-08-06"
+purpose: >-
+  Candidate words and short phrases whose meaning can shift with tense, scope,
+  evidence boundary, implementation layer, or unstated comparison class in a
+  software or research ticket.
+provenance:
+  authored_before_ticket_corpus_scan: true
+  prior_conversation_context_was_not_discarded: true
+  note: >-
+    This candidate list was frozen before running a new search over the ticket
+    corpus. It is intentionally broader than the vocabulary already discussed.
+matching:
+  case_sensitive: false
+  unit: non-overlapping regex matches
+  boundaries: Patterns include their own word boundaries where appropriate.
+  corpus: ".tickets/**/*.md"
+  overlap_policy: >-
+    A span may belong to more than one candidate only when the candidate regexes
+    themselves overlap; counts remain per candidate rather than deduplicated
+    across the whole lexicon.
+
+candidates:
+  - id: read
+    category: tense
+    pattern: '\bread(?:s|ing)?\b'
+    meanings:
+      present_action: Someone reads or is reading now or habitually.
+      past_action: Someone read it previously.
+      future_requirement: Someone is expected to read it later.
+      machine_access: Software loads or retrieves data.
+      interpretation: Text or data is understood as having a meaning.
+
+  - id: should
+    category: modality
+    pattern: '\bshould(?:\s+be)?\b'
+    meanings:
+      obligation: Work is required or recommended.
+      expectation: The speaker predicts that a state already holds or will hold.
+      design_intent: The phrase states intended behavior or an invariant.
+      conditional_consequence: The result follows if an implicit condition holds.
+
+  - id: can
+    category: modality
+    pattern: '\bcan\b'
+    meanings:
+      demonstrated_capability: The capability has been exercised successfully.
+      theoretical_capability: The design or mathematics permits it.
+      permission: The actor is allowed to do it.
+      possibility: It might occur, without a capability claim.
+
+  - id: could
+    category: modality
+    pattern: '\bcould\b'
+    meanings:
+      possible_option: One possible approach or outcome is described.
+      past_capability: The capability existed previously.
+      conditional_capability: It would work only under unstated or stated conditions.
+      tentative_recommendation: The phrase weakly proposes future work.
+
+  - id: may
+    category: modality
+    pattern: '\bmay\b'
+    meanings:
+      permission: The action is allowed.
+      possibility: The outcome might occur.
+      optional_requirement: The implementation is free to choose it.
+      concession: A fact is acknowledged without making it decisive.
+
+  - id: will
+    category: modality
+    pattern: '\bwill\b'
+    meanings:
+      commitment: An actor commits to future work.
+      prediction: A future outcome is expected.
+      specification: Required runtime behavior is stated in future tense.
+      automatic_consequence: The outcome follows without a separate action.
+
+  - id: expected
+    category: modality
+    pattern: '\bexpect(?:ed|s|ing)?\b'
+    meanings:
+      normative_requirement: Behavior is required by the contract.
+      empirical_prediction: Behavior is predicted but not guaranteed.
+      test_oracle: A concrete value or result is the comparison target.
+      social_assumption: The actor is presumed to take an action.
+
+  - id: intended
+    category: modality
+    pattern: '\bintend(?:ed|s|ing)?\b'
+    meanings:
+      declared_scope: The design explicitly targets the capability.
+      aspiration: The capability is desired but not necessarily implemented.
+      actor_plan: Someone plans a future action.
+      semantic_purpose: The meaning or role of an artifact is described.
+
+  - id: done
+    category: completion
+    pattern: '\bdone\b'
+    meanings:
+      implementation_complete: Required code and integration are complete.
+      execution_complete: A command, run, or review finished.
+      no_more_work: No further work remains in the stated scope.
+      expected_state: The speaker predicts completion without confirming it.
+
+  - id: complete
+    category: completion
+    pattern: '\bcomplet(?:e|ed|es|ing|ion)\b'
+    meanings:
+      ticket_scope_complete: Every acceptance requirement is satisfied.
+      component_complete: A named implementation layer is finished.
+      execution_finished: A process terminated.
+      exhaustive: A set contains every member of an implicit or explicit universe.
+
+  - id: ready
+    category: completion
+    pattern: '\bready\b'
+    meanings:
+      dependency_ready: No declared prerequisite blocks starting work.
+      implementation_usable: The capability is available to a consumer.
+      operational_ready: Runtime state permits an action now.
+      review_ready: Evidence and presentation are sufficient for review or merge.
+
+  - id: remaining
+    category: completion
+    pattern: '\bremain(?:s|ed|ing)?\b'
+    meanings:
+      unfinished_required_work: Required work is still open.
+      deliberately_excluded_work: Work remains outside the current scope.
+      preserved_state: A property continues unchanged.
+      residual_set: Items are left after an operation or filter.
+
+  - id: support
+    category: capability
+    pattern: '\bsupport(?:s|ed|ing)?\b'
+    meanings:
+      accepts_input: A component accepts a format, dtype, shape, or case.
+      implements_workflow: A public workflow is usable end to end.
+      survives_case: Execution does not fail for the case.
+      maintains_compatibility: The project promises continuing compatibility.
+      supplies_evidence: Evidence favors a scientific or design claim.
+
+  - id: work
+    category: capability
+    pattern: '\bwork(?:s|ed|ing)?\b'
+    meanings:
+      executes: It runs without an immediate error.
+      produces_correct_result: It satisfies semantic correctness.
+      meets_acceptance: It satisfies the full ticket outcome.
+      task_labor: The word refers to implementation activity, not capability.
+
+  - id: implement
+    category: capability
+    pattern: '\bimplement(?:s|ed|ing|ation|ations)?\b'
+    meanings:
+      primitive_exists: A low-level mechanism exists in code.
+      public_integration_exists: A consumer-accessible workflow exists.
+      planned_work: The ticket asks for future implementation.
+      external_harness: An experiment or downstream consumer implements it locally.
+
+  - id: provide
+    category: capability
+    pattern: '\bprovid(?:e|es|ed|ing)\b'
+    meanings:
+      public_api: A supported public interface is exposed.
+      internal_mechanism: An internal component supplies a value or operation.
+      ticket_promise: The ticket requires a future deliverable.
+      evidence_supply: A test, paper, or experiment supplies evidence.
+
+  - id: expose
+    category: capability
+    pattern: '\bexpos(?:e|es|ed|ing|ure)\b'
+    meanings:
+      public_api: A public symbol or workflow becomes callable.
+      internal_access: Internal state is made reachable.
+      reveal_defect: A test or case reveals an existing problem.
+      risk_surface: An implementation makes a hazard possible.
+
+  - id: available
+    category: capability
+    pattern: '\bavailab(?:le|ility)\b'
+    meanings:
+      implemented_and_callable: The capability exists and can be invoked.
+      dependency_present: A package, artifact, or datum is present.
+      theoretically_obtainable: It could be produced or acquired.
+      actor_capacity: A person or resource has time or capacity.
+
+  - id: generic
+    category: boundary
+    pattern: '\bgeneric\b'
+    meanings:
+      protocol_general: The interface shape admits multiple families or types.
+      registered_coverage: Multiple concrete families work through the interface.
+      model_general: The behavior is not tied to one model construction.
+      consumer_general: Ordinary consumers can use it without bespoke glue.
+
+  - id: reusable
+    category: boundary
+    pattern: '\breus(?:e|es|ed|ing|able|ability)\b'
+    meanings:
+      code_reuse: Code is shared by more than one internal caller.
+      artifact_reuse: A compiled engine, state, or result is retained and used again.
+      public_reuse: A downstream consumer can apply the abstraction elsewhere.
+      evidence_reuse: A prior test result is accepted without rerunning unchanged code.
+
+  - id: public
+    category: boundary
+    pattern: '\bpublic\b'
+    meanings:
+      exported_symbol: The package exports the symbol.
+      documented_contract: Compatibility is promised for the documented interface.
+      consumer_workflow: A downstream user can complete the workflow through it.
+      visible_artifact: The artifact is merely visible outside an internal module.
+
+  - id: end_to_end
+    category: boundary
+    pattern: '\bend(?:-|\s+)to(?:-|\s+)end\b'
+    meanings:
+      consumer_workflow: The workflow starts from consumer-available inputs and reaches the promised output.
+      component_chain: Every internal component in a narrower path is connected.
+      oracle_assisted_workflow: The path runs only when hidden or generating values are supplied.
+      integration_test: An integration test crosses several layers without proving the full user outcome.
+
+  - id: learn
+    category: learning_semantics
+    pattern: '\blearn(?:s|ed|ing|er|ers|able|ables)?\b'
+    meanings:
+      new_evidence_accumulation: Posterior evidence accumulates across distinct trials or episodes.
+      repeated_dataset_fit: Parameters are repeatedly updated from the same fixed dataset.
+      parameter_update_primitive: Sufficient statistics or posterior algebra exists without a fitting workflow.
+      latent_inference: Hidden states are inferred while parameters remain fixed.
+      recovery_demonstrated: Unknown parameters are empirically recovered from permitted observations.
+
+  - id: fit
+    category: learning_semantics
+    pattern: '\bfit(?:s|ted|ting)?\b'
+    meanings:
+      estimate_parameters: Unknown parameters are optimized or updated from data.
+      run_inference: Latent variables are inferred with fixed parameters.
+      numerical_agreement: A result agrees with data or a reference.
+      structural_compatibility: Shapes, APIs, or concepts are compatible.
+
+  - id: infer
+    category: learning_semantics
+    pattern: '\binfer(?:s|red|ring|ence)?\b'
+    meanings:
+      latent_posterior: Hidden state or regime beliefs are computed at fixed parameters.
+      parameter_estimation: Model parameters are estimated from observations.
+      logical_deduction: A conclusion is drawn from evidence or code structure.
+      shape_or_type_derivation: Metadata is derived automatically.
+
+  - id: recover
+    category: learning_semantics
+    pattern: '\brecover(?:s|ed|ing|y)?\b'
+    meanings:
+      parameter_estimation: Unknown generating parameters are estimated from observations.
+      latent_reconstruction: Hidden states or regimes are reconstructed.
+      artifact_restoration: Saved state or data is restored.
+      error_recovery: Execution resumes safely after failure.
+      approximate_property: A qualitative behavior is reproduced without exact parameter equality.
+
+  - id: accumulate
+    category: learning_semantics
+    pattern: '\baccumulat(?:e|es|ed|ing|ion)\b'
+    meanings:
+      distinct_evidence: Statistics from genuinely new trials are added to a posterior.
+      repeated_coordinate: Statistics from the same dataset replace or are recomputed during fitting.
+      raw_sum: Values are summed without a statistical cadence claim.
+      historical_growth: State or memory grows over time.
+
+  - id: rollover
+    category: learning_semantics
+    pattern: '\broll(?:-|\s*)over\b|\brollover\b'
+    meanings:
+      posterior_to_prior: A posterior becomes the prior for a later independent trial.
+      point_parameter_install: Expected or point parameters are written into runtime arrays.
+      checkpoint_transition: Saved state is carried into another process or session.
+      generic_transition: The word refers to a non-learning state transition.
+
+  - id: trial
+    category: learning_semantics
+    pattern: '\btrials?\b'
+    meanings:
+      independent_dataset: A new episode or dataset contributes new evidence.
+      optimizer_iteration: The same dataset is revisited during fitting.
+      experiment_repetition: A replicate is run for evaluation.
+      attempt: A generic attempt is made.
+
+  - id: validate
+    category: evidence
+    pattern: '\bvalidat(?:e|es|ed|ing|ion|ions)\b'
+    meanings:
+      input_validation: Malformed inputs are accepted or rejected correctly.
+      component_test: A test exercises a local implementation claim.
+      scientific_validation: An experiment supports the scientific reason for the feature.
+      acceptance_validation: Evidence satisfies the complete ticket criteria.
+      artifact_check: Structure, provenance, or formatting is checked.
+
+  - id: verify
+    category: evidence
+    pattern: '\bverif(?:y|ies|ied|ying|ication)\b'
+    meanings:
+      performed_check: A check was actually executed and passed.
+      required_check: A future acceptance requirement names a check.
+      formal_oracle: Equality or an invariant is established against an authority.
+      inspect_only: The artifact is inspected without establishing behavior.
+
+  - id: test
+    category: evidence
+    pattern: '\btest(?:s|ed|ing|suite|suites)?\b'
+    meanings:
+      automated_test: Executable automated coverage is meant.
+      experiment: A scientific or performance experiment is meant.
+      informal_check: A manual or ad hoc check is meant.
+      evidence_claim: Passing tests are treated as proof of a broader capability.
+      test_artifact: The word names code or data rather than an executed check.
+
+  - id: pass
+    category: evidence
+    pattern: '\bpass(?:es|ed|ing)?\b'
+    meanings:
+      tests_succeed: Automated tests return success.
+      threshold_met: A metric satisfies an acceptance bound.
+      data_flow: A value is forwarded through a layer.
+      survive_without_failure: A case executes without proving correctness.
+
+  - id: reproduce
+    category: evidence
+    pattern: '\b(?:reproduc|replicat)(?:e|es|ed|ing|ion|ions|able|ibility)\b'
+    meanings:
+      exact_result: Published numeric results are recreated within stated tolerance.
+      qualitative_phenomenon: The central behavior or advantage is demonstrated.
+      rerunnable_artifact: The same command recreates an artifact.
+      benchmark_recreation: The experimental setup is rebuilt, regardless of outcome parity.
+
+  - id: match
+    category: evidence
+    pattern: '\bmatch(?:es|ed|ing)?\b'
+    meanings:
+      exact_equality: Values or structures are equal.
+      tolerance_agreement: Numeric results agree within a bound.
+      controlled_baseline: Compared models have equalized resources or assumptions.
+      identity_alignment: Labels, members, or shapes are aligned.
+      suitability: One thing is merely considered an appropriate counterpart.
+
+  - id: equivalent
+    category: evidence
+    pattern: '\bequivalen(?:t|ce)\b'
+    meanings:
+      mathematical_equivalence: Two formulations are provably the same.
+      behavioral_equivalence: Observed behavior agrees under stated tests.
+      api_substitutability: One interface can replace another.
+      approximate_analogy: The phrase means similar rather than equal.
+
+  - id: exact
+    category: evidence
+    pattern: '\bexact(?:ly|ness)?\b'
+    meanings:
+      mathematical_exactness: The claim holds without approximation in the mathematical model.
+      numerical_tolerance: A computation agrees within finite-precision tolerance.
+      exhaustive_computation: Enumeration or integration covers the whole finite domain.
+      identifier_precision: A precise version, path, seed, or target is named.
+      emphatic_specificity: The word emphasizes specificity without an equality claim.
+
+  - id: correct
+    category: evidence
+    pattern: '\bcorrect(?:s|ed|ing|ly|ness)?\b'
+    meanings:
+      mathematical_correctness: The derivation or result is sound.
+      contract_conformance: Behavior matches the specified API or semantics.
+      defect_repaired: A previously wrong implementation is fixed.
+      appropriate_choice: A design or target is judged suitable.
+
+  - id: sound
+    category: evidence
+    pattern: '\bsound(?:ness)?\b'
+    meanings:
+      formal_soundness: The algorithm or derivation cannot assert invalid conclusions under assumptions.
+      numerical_reliability: Hostile numerical cases do not silently corrupt results.
+      implementation_confidence: No known defect is observed.
+      reasonable_judgment: A proposal seems sensible.
+
+  - id: robust
+    category: evidence
+    pattern: '\brobust(?:ly|ness)?\b'
+    meanings:
+      hostile_numeric_survival: Sparse, improper, float32, or large cases are handled explicitly.
+      operational_reliability: Repeated execution is dependable.
+      broad_input_coverage: Many shapes or model variants are accepted.
+      insensitive_result: Outputs change little under perturbation.
+
+  - id: stable
+    category: evidence
+    pattern: '\bstab(?:le|ly|ility|ilize|ilizes|ilized|ilizing)\b'
+    meanings:
+      numerical_stability: Finite precision does not cause unacceptable error or divergence.
+      convergence_stability: Iterates settle or remain bounded.
+      api_stability: Compatibility is promised over versions.
+      unchanged_state: A value or shape remains constant.
+
+  - id: converge
+    category: evidence
+    pattern: '\bconverg(?:e|es|ed|ing|ence|ent)\b'
+    meanings:
+      declared_criterion_met: A specified stopping condition is satisfied.
+      accurate_solution: The returned state is close to the desired fixed point or optimum.
+      bounded_behavior: Iterates stop visibly changing without a correctness guarantee.
+      empirical_trend: A sequence appears to approach a value.
+
+  - id: all
+    category: quantifier
+    pattern: '\ball\b'
+    meanings:
+      explicit_universe: Every member of a named set is included.
+      implicit_universe: The relevant set is unstated and must be inferred.
+      named_subset: Every item just enumerated is included, but other relevant items may exist.
+      rhetorical_emphasis: The word emphasizes breadth without a literal exhaustive claim.
+
+  - id: every
+    category: quantifier
+    pattern: '\bevery\b'
+    meanings:
+      explicit_universe: Each member of a named set is included.
+      implicit_universe: The relevant set or boundary is unstated.
+      distributive_requirement: A requirement applies independently to each item.
+      rhetorical_emphasis: The word emphasizes regularity without audited exhaustiveness.
+
+  - id: any
+    category: quantifier
+    pattern: '\bany\b'
+    meanings:
+      universal: The statement applies to every possible member.
+      existential: At least one member is sufficient.
+      unrestricted_choice: The actor may choose a member freely.
+      negative_scope: In a negated sentence, no member is allowed or observed.
+
+  - id: only
+    category: quantifier
+    pattern: '\bonly\b'
+    meanings:
+      hard_exclusion: Everything outside the stated set is excluded.
+      current_limitation: The implementation presently covers a subset.
+      scope_boundary: The ticket deliberately owns a subset.
+      emphasis: The word minimizes or emphasizes without defining a formal boundary.
+
+  - id: current
+    category: temporal_scope
+    pattern: '\bcurrent(?:ly)?\b'
+    meanings:
+      present_repository_state: The claim holds at the referenced branch or commit.
+      runtime_active_value: The value installed in a state is meant.
+      latest_known_state: The most recent evidence or version is meant.
+      temporary_limitation: The condition may change later without an owner or deadline.
+
+  - id: existing
+    category: temporal_scope
+    pattern: '\bexist(?:s|ed|ing)\b'
+    meanings:
+      present_in_repository: Code or an artifact is confirmed to exist now.
+      prior_to_ticket: It existed before the proposed change.
+      conceptual_availability: A known method or abstraction exists in the field.
+      assumed_presence: Presence is asserted without a version or location.
+
+  - id: deferred
+    category: temporal_scope
+    pattern: '\bdefer(?:s|red|ring)?\b|\bfollow(?:-|\s+)up\b|\blater\b'
+    meanings:
+      owned_future_ticket: Work is excluded and assigned to a concrete dependent ticket.
+      unowned_future_intent: Work is postponed without an accountable owner.
+      ordering_constraint: Work must happen after another step.
+      incidental_future_reference: The phrase refers to time without changing scope.
+
+  - id: fixed
+    category: boundary
+    pattern: '\bfixed\b'
+    meanings:
+      constant_parameter: A model quantity is supplied and not learned.
+      defect_repaired: A bug has been corrected.
+      pinned_artifact: A version, seed, shape, or resource is held constant.
+      finite_budget: An iteration count or capacity is predetermined.
+
+  - id: canonical
+    category: boundary
+    pattern: '\bcanonical\b'
+    meanings:
+      literature_standard: The exact established model, data, and protocol are used.
+      representative_variant: A chosen variant captures the central phenomenon.
+      normalized_form: A unique internal representation is meant.
+      conventional_choice: A familiar option is used without a strict parity claim.
+
+  - id: preserve
+    category: boundary
+    pattern: '\bpreserv(?:e|es|ed|ing|ation)\b'
+    meanings:
+      byte_or_value_identity: Values remain exactly unchanged.
+      semantic_invariant: Meaning remains unchanged despite representation changes.
+      compatibility: Existing callers continue to work.
+      qualitative_property: A broad behavior remains visible.
+
+  - id: same
+    category: boundary
+    pattern: '\bsame\b'
+    meanings:
+      object_identity: The exact same object or artifact is reused.
+      value_equality: Values are equal.
+      equivalent_configuration: Relevant controls are matched while other details differ.
+      shared_category: Items merely belong to the same class or family.
+
+  - id: n_a
+    category: boundary
+    pattern: '(?<![A-Za-z0-9])N/A(?![A-Za-z0-9])'
+    meanings:
+      structurally_irrelevant: The surface provably cannot apply.
+      deliberately_excluded: The surface applies conceptually but is outside ticket scope.
+      unassessed: The author did not investigate the surface.
+      delegated_elsewhere: Another ticket or component owns the applicable work.
+
+  - id: small
+    category: magnitude
+    pattern: '\bsmall(?:er|est|ness)?\b|\blightweight\b'
+    meanings:
+      code_scope: The implementation or ticket changes little code.
+      test_count: Few tests or cases are added.
+      runtime: Wall time is short.
+      memory: Resource consumption is low.
+      model_size: Domain, horizon, or tensor dimensions are limited.
+
+  - id: scale
+    category: magnitude
+    pattern: '\bscal(?:e|es|ed|ing|able|ability)\b'
+    meanings:
+      domain_size: Cardinality, dimension, or horizon increases.
+      throughput_load: Concurrent or repeated workload increases.
+      asymptotic_behavior: Growth rate is characterized.
+      numeric_magnitude: Values span a larger numeric range.
+      organizational_scope: More models or consumers use the design.
+
+  - id: performance
+    category: magnitude
+    pattern: '\bperforman(?:ce|t)\b|\bfast(?:er|est)?\b|\bspeed(?:up)?\b'
+    meanings:
+      cold_latency: Compilation or one-shot setup time is measured.
+      steady_throughput: Repeated execution rate is measured after setup.
+      total_wall_time: End-to-end elapsed time is measured.
+      memory: Allocation or resident memory is the target.
+      algorithmic_complexity: Asymptotic work or storage is the target.
+      vague_efficiency: Improvement is claimed without a named metric or phase.
+
+  - id: sufficient
+    category: evaluation
+    pattern: '\bsufficien(?:t|cy|tly)\b|\benough\b'
+    meanings:
+      threshold_defined: A stated measurable bound is met.
+      reviewer_judgment: Adequacy is left to human judgment.
+      mathematical_sufficiency: A condition logically guarantees a result.
+      resource_capacity: Time, samples, memory, or iterations are adequate.
+
+  - id: appropriate
+    category: evaluation
+    pattern: '\bappropriate(?:ly|ness)?\b|\breasonable\b'
+    meanings:
+      rule_defined: A named rule determines the choice.
+      evidence_based_judgment: Evidence supports the choice without a formal threshold.
+      reviewer_discretion: The evaluator decides case by case.
+      conventional_choice: Community convention supplies the standard.
+
+  - id: material
+    category: evaluation
+    pattern: '\bmaterial(?:ly)?\b|\bsignificant(?:ly|ce)?\b|\bmeaningful(?:ly)?\b'
+    meanings:
+      measured_threshold: A numeric effect-size or acceptance bound is stated.
+      statistical_significance: A statistical test defines the claim.
+      practical_judgment: The effect is considered important without a fixed bound.
+      scope_impact: A change affects architecture, behavior, or risk enough to matter.
+
+  - id: approximate
+    category: evaluation
+    pattern: '\bapproximat(?:e|es|ed|ing|ion|ions|ely)\b|\bnear(?:ly)?\b|\bclose\b'
+    meanings:
+      tolerance_defined: A numeric error bound is stated.
+      asymptotic_approximation: A mathematical approximation and regime are named.
+      qualitative_similarity: The result merely looks or behaves similarly.
+      rough_quantity: A number is intentionally imprecise.
+
+  - id: conditional_discretion
+    category: evaluation
+    pattern: '\bas needed\b|\bwhere feasible\b|\bif useful\b|\bif necessary\b|\bwhen practical\b'
+    meanings:
+      rule_governed_condition: A stated observable condition decides whether to act.
+      implementer_discretion: The implementer decides without an acceptance rule.
+      resource_exception: The action may be skipped because of cost or feasibility.
+      nonbinding_suggestion: The phrase expresses preference rather than obligation.
+
+  - id: at_least
+    category: quantifier
+    pattern: '\bat least\b'
+    meanings:
+      inclusive_lower_bound: A measurable minimum is defined.
+      example_floor: The listed cases are a non-exhaustive starting set.
+      rhetorical_minimum: The phrase emphasizes that more may be required without defining how much.
+      fallback_requirement: A weaker acceptable outcome is named.
+
+  - id: up_to
+    category: quantifier
+    pattern: '\bup to\b'
+    meanings:
+      inclusive_upper_bound: A maximum including the named value is defined.
+      capacity_claim: The system is claimed to handle a maximum workload.
+      discretionary_range: Any value below the maximum may be chosen.
+      responsibility: A person or component owns the decision.
+
+  - id: without_recompile
+    category: boundary
+    pattern: '\bwithout re(?:-|\s*)compil(?:e|es|ed|ing|ation)\b'
+    meanings:
+      no_engine_recompile: The compiled CFFG Engine object is reused.
+      no_jax_retrace: No new JAX/XLA trace or executable is produced.
+      no_template_rebuild: The serialized graph template is unchanged.
+      no_consumer_setup: No compilation-like setup of any kind occurs again.
