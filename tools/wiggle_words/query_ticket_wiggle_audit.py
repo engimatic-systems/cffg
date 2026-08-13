@@ -18,6 +18,7 @@ import yaml
 WIGGLE_WORDS_DIR = Path(__file__).resolve().parent
 REPO = WIGGLE_WORDS_DIR.parent.parent
 DEFAULT_AUDIT = WIGGLE_WORDS_DIR / "ticket-wiggle-word-audit-v2.yaml"
+DEFAULT_LEXICON = WIGGLE_WORDS_DIR / "ticket-wiggle-words-v2.yaml"
 PROBLEM_MEANINGS = {"ambiguous", "unlisted_meaning", "pattern_false_positive"}
 
 
@@ -58,6 +59,16 @@ def source_block(audit_path: Path, audit: dict[str, Any]) -> dict[str, Any]:
         "audit_schema_version": audit["schema_version"],
         "ticket_corpus_git_commit": audit["provenance"]["ticket_corpus"]["git_commit"],
         "lexicon": audit["provenance"]["lexicon"],
+    }
+
+
+def lexicon_source_block(lexicon_path: Path, lexicon: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "lexicon": {
+            "path": str(lexicon_path.relative_to(REPO)),
+            "schema_version": lexicon["schema_version"],
+            "sha256": hashlib.sha256(lexicon_path.read_bytes()).hexdigest(),
+        }
     }
 
 
@@ -127,11 +138,11 @@ def headings_by_line(lines: list[str]) -> list[str]:
 
 
 def scan_ticket(
-    audit_path: Path,
+    lexicon_path: Path,
     ticket_value: str,
     candidate_id: str | None,
 ) -> dict[str, Any]:
-    audit, lexicon, _ = load_sources(audit_path)
+    lexicon = load_yaml(lexicon_path)
     ticket = normalize_ticket(ticket_value)
     ticket_path = REPO / ticket
     if not ticket_path.is_file():
@@ -169,7 +180,7 @@ def scan_ticket(
 
     return {
         "schema_version": 1,
-        "source": source_block(audit_path, audit),
+        "source": lexicon_source_block(lexicon_path, lexicon),
         "query": {"mode": "scan", "ticket": ticket, "candidate": candidate_id},
         "notice": [
             "This is a mechanical scan of the current ticket, not a contextual classification.",
@@ -298,6 +309,7 @@ def audit_summary(audit_path: Path) -> dict[str, Any]:
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
     result.add_argument("--audit", type=Path, default=DEFAULT_AUDIT)
+    result.add_argument("--lexicon", type=Path, default=DEFAULT_LEXICON)
     result.add_argument("--format", choices=("yaml", "json"), default="yaml")
     commands = result.add_subparsers(dest="command", required=True)
 
@@ -320,11 +332,12 @@ def parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = parser().parse_args()
     audit_path = args.audit.resolve()
+    lexicon_path = args.lexicon.resolve()
     try:
         if args.command == "slice":
             output = ticket_slice(audit_path, args.ticket, args.candidate, args.problems_only)
         elif args.command == "scan":
-            output = scan_ticket(audit_path, args.ticket, args.candidate)
+            output = scan_ticket(lexicon_path, args.ticket, args.candidate)
         elif args.command == "summary":
             output = audit_summary(audit_path)
         else:
