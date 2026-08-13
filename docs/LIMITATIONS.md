@@ -293,6 +293,18 @@ not full joint VB over weights and auxiliaries. Flooding and mixed scheduling
 solve the same coordinates but, as for mean-field VMP generally, neither
 guarantees monotone progress on every loopy graph.
 
+The end-to-end `cffg.models.rslds` helper preserves these same approximation
+boundaries. Its `RSLDSLearning` host loop updates the initial regime,
+per-regime dynamics, and recurrence weights between trials, but keeps the
+shared Gaussian emission fixed. Accumulating a sequence again would count it
+as new evidence; it is not the replacement-coordinate variational-EM loop
+needed to fit one long observed-only trajectory. No PCA/ARHMM-equivalent
+initializer currently resolves the affine latent and label symmetries. The
+canonical `T=10,000` NASCAR harness therefore validates only fixed-parameter
+inference (`99.95%` MAP regime accuracy), not learned recovery or superiority
+to a matched SLDS. Those claims remain cff-l7y4 after cff-6tek; cold setup at
+that scale remains cff-r6bl.
+
 **S1j. Schedules: measured envelope (cff-d56d, revised 2026-07-27 after
 review).** Two-pass schedules make tree and chain inference O(E) with
 exact marginals and FE; loopy pure BP gets colored Gauss–Seidel sweeps;

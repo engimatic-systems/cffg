@@ -2,7 +2,7 @@
 id: cff-wbhu
 status: open
 deps: [cff-j4mu, cff-d56d, cff-44we]
-links: [cff-fxmj, cff-5edo, cff-d56d, cff-yl0a, cff-rqqc, cff-weff, cff-lv2w, cff-g7rc]
+links: [cff-fxmj, cff-5edo, cff-d56d, cff-yl0a, cff-rqqc, cff-weff, cff-lv2w, cff-g7rc, cff-r6bl]
 created: 2026-07-10T03:34:54Z
 type: feature
 priority: 2

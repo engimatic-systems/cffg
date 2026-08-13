@@ -22,6 +22,7 @@ from cffg.core.ir import (
 from cffg.core.serialize import from_json, to_dict, to_json
 from cffg.core.validate import ModelError
 from cffg.engine import Engine, RunStatus, _replace
+from cffg.models.rslds import rslds, vague_rslds_learning
 
 jax.config.update("jax_enable_x64", True)
 
@@ -194,6 +195,251 @@ def _run(template, arrays, *, schedule="auto", dtype=None, iterations=250):
         tol=1e-5 if dtype == jnp.float32 else 1e-9,
     )
     return engine, result
+
+
+def _rslds_parameters(dtype=np.float32):
+    return {
+        "dynamics_matrix": np.array([[[0.85]], [[-0.45]]], dtype=dtype),
+        "dynamics_offset": np.array([[0.15], [-0.25]], dtype=dtype),
+        "dynamics_covariance": np.array([[[0.18]], [[0.28]]], dtype=dtype),
+        "recurrence_weights": np.array([[[1.1]], [[-0.9]]], dtype=dtype),
+        "recurrence_offsets": np.array([[-0.1], [0.2]], dtype=dtype),
+        "emission_matrix": np.ones((1, 1), dtype=dtype),
+        "emission_covariance": np.array([[0.12]], dtype=dtype),
+        "initial_state_mean": np.array([0.1], dtype=dtype),
+        "initial_state_covariance": np.array([[0.7]], dtype=dtype),
+        "initial_regime_probability": np.array([0.55, 0.45], dtype=dtype),
+    }
+
+
+def test_rslds_tier_matches_tiny_exact_oracle_and_rolls_all_parameters():
+    """One compact integration tier: float32 inference, exact quadrature gap,
+    finite ledger, and exact between-trial parameter installation."""
+    dtype = np.float32
+    parameters = _rslds_parameters(dtype)
+    dynamics_matrix = parameters["dynamics_matrix"]
+    dynamics_offset = parameters["dynamics_offset"]
+    dynamics_covariance = parameters["dynamics_covariance"]
+    recurrence_weights = parameters["recurrence_weights"]
+    recurrence_offsets = parameters["recurrence_offsets"]
+    emission_covariance = parameters["emission_covariance"]
+    initial_mean = parameters["initial_state_mean"]
+    initial_covariance = parameters["initial_state_covariance"]
+    initial_probability = parameters["initial_regime_probability"]
+    observation = 0.35
+
+    template, arrays = rslds(2, **parameters)
+    engine = Engine(compile_template(template, arrays=arrays))
+    state = engine.bind_data(
+        engine.init_state(),
+        {"y0": None, "y1": np.array([observation], dtype=dtype)},
+    )
+    state = jax.tree_util.tree_map(
+        lambda value: (
+            value.astype(jnp.float32)
+            if jnp.issubdtype(value.dtype, jnp.inexact)
+            else value
+        ),
+        state,
+    )
+    result = engine.run(state, 80, tol=1e-7)
+    assert result.status is RunStatus.CONVERGED
+    assert np.isfinite(engine.bfe(result.state))
+    assert all(value.dtype == jnp.float32 for value in result.state.params.values())
+
+    nodes, quadrature_weights = hermgauss(160)
+    points = (
+        np.sqrt(2.0 * initial_covariance[0, 0]) * nodes + initial_mean[0]
+    )
+    quadrature_weights /= np.sqrt(np.pi)
+    transition = _stick_probabilities(
+        points[:, None], recurrence_weights, recurrence_offsets
+    )
+    predicted_mean = (
+        dynamics_matrix[:, 0, 0][None, None, :] * points[:, None, None]
+        + dynamics_offset[:, 0][None, None, :]
+    )
+    predictive_variance = (
+        dynamics_covariance[:, 0, 0] + emission_covariance[0, 0]
+    )
+    likelihood = np.exp(
+        -0.5
+        * np.square(observation - predicted_mean)
+        / predictive_variance[None, None, :]
+    ) / np.sqrt(2.0 * np.pi * predictive_variance[None, None, :])
+    joint = (
+        quadrature_weights[:, None, None]
+        * initial_probability[None, :, None]
+        * transition
+        * likelihood
+    )
+    joint /= joint.sum()
+    exact_regimes = (joint.sum(axis=(0, 2)), joint.sum(axis=(0, 1)))
+    exact_x0_mean = np.sum(joint * points[:, None, None])
+    exact_x0_second = np.sum(joint * np.square(points[:, None, None]))
+    posterior_variance = 1.0 / (
+        1.0 / dynamics_covariance[:, 0, 0]
+        + 1.0 / emission_covariance[0, 0]
+    )
+    posterior_mean = posterior_variance[None, None, :] * (
+        predicted_mean / dynamics_covariance[:, 0, 0][None, None, :]
+        + observation / emission_covariance[0, 0]
+    )
+    exact_x1_mean = np.sum(joint * posterior_mean)
+    exact_x1_second = np.sum(
+        joint * (posterior_variance[None, None, :] + np.square(posterior_mean))
+    )
+
+    regimes = engine.marginals(result.state)
+    gaussian = engine.gaussian_marginals(result.state)
+    # Measured gaps are 0.058 for regimes, 0.067 for means, and 0.019 for
+    # covariances. These limits retain at least 1.7x headroom in float32.
+    np.testing.assert_allclose(regimes["z0"], exact_regimes[0], atol=0.1)
+    np.testing.assert_allclose(regimes["z1"], exact_regimes[1], atol=0.1)
+    np.testing.assert_allclose(gaussian["x0"][0], [exact_x0_mean], atol=0.12)
+    np.testing.assert_allclose(
+        gaussian["x0"][1],
+        [[exact_x0_second - exact_x0_mean**2]],
+        atol=0.05,
+    )
+    np.testing.assert_allclose(gaussian["x1"][0], [exact_x1_mean], atol=0.12)
+    np.testing.assert_allclose(
+        gaussian["x1"][1],
+        [[exact_x1_second - exact_x1_mean**2]],
+        atol=0.05,
+    )
+
+    learning = vague_rslds_learning(2, 1).update(engine, result.state)
+    learned = learning.parameter_arrays()
+    assert learning.initial_alpha.sum() == pytest.approx(3.0)
+    assert learned["initial_regime_probability"].shape == (2,)
+    assert learned["dynamics_matrix"].shape == (2, 1, 1)
+    assert learned["dynamics_offset"].shape == (2, 1)
+    assert learned["dynamics_covariance"].shape == (2, 1, 1)
+    assert learned["recurrence_weights"].shape == (2, 1, 1)
+    assert learned["recurrence_offsets"].shape == (2, 1)
+    assert all(np.all(np.isfinite(value)) for value in learned.values())
+
+    install_template, install_arrays = rslds(3, **parameters)
+    install_engine = Engine(compile_template(install_template, arrays=install_arrays))
+    install_state = install_engine.bind_data(
+        install_engine.init_state(),
+        {
+            "y0": None,
+            "y1": np.array([observation], dtype=dtype),
+            "y2": None,
+        },
+    )
+    install_state = jax.tree_util.tree_map(
+        lambda value: (
+            value.astype(jnp.float32)
+            if jnp.issubdtype(value.dtype, jnp.inexact)
+            else value
+        ),
+        install_state,
+    )
+    original_params = {
+        key: np.asarray(value).copy() for key, value in install_state.params.items()
+    }
+    installed = learning.install(install_engine, install_state)
+    assert installed.params.keys() == install_state.params.keys()
+    for key, value in installed.params.items():
+        assert value.shape == install_state.params[key].shape
+        assert value.dtype == install_state.params[key].dtype == jnp.float32
+    np.testing.assert_array_equal(installed.g_obs, install_state.g_obs)
+    np.testing.assert_array_equal(installed.g_mask, install_state.g_mask)
+
+    prior_key, prior_row = install_engine.arena.member_of["z0_prior"]
+    np.testing.assert_allclose(
+        np.exp(np.asarray(installed.params[prior_key][prior_row])),
+        learned["initial_regime_probability"],
+        rtol=2e-6,
+    )
+    dynamics_values = {
+        "A": learned["dynamics_matrix"],
+        "b": learned["dynamics_offset"],
+        "W": np.linalg.inv(learned["dynamics_covariance"]),
+    }
+    for group in install_engine.arena.mix_groups:
+        rows = [
+            index
+            for index, name in enumerate(group.members)
+            if name.startswith("dynamics")
+        ]
+        if rows:
+            assert len(rows) == 2
+            for suffix, expected in dynamics_values.items():
+                actual = np.asarray(installed.params[f"{group.name}:{suffix}"])[rows]
+                np.testing.assert_allclose(
+                    actual,
+                    np.broadcast_to(expected, actual.shape),
+                    rtol=2e-6,
+                )
+    recurrence_values = {
+        "weights": learned["recurrence_weights"],
+        "offsets": learned["recurrence_offsets"],
+    }
+    for group in install_engine.arena.recurrence_groups:
+        rows = [
+            index
+            for index, name in enumerate(group.members)
+            if name.startswith("switch")
+        ]
+        if rows:
+            assert len(rows) == 2
+            for suffix, expected in recurrence_values.items():
+                actual = np.asarray(installed.params[f"{group.name}:{suffix}"])[rows]
+                np.testing.assert_allclose(
+                    actual,
+                    np.broadcast_to(expected, actual.shape),
+                    rtol=2e-6,
+                )
+    for group in install_engine.arena.gauss_groups:
+        if any(name.startswith("emission") for name in group.members):
+            for suffix in ("A", "b", "W"):
+                key = f"{group.name}:{suffix}"
+                np.testing.assert_array_equal(
+                    installed.params[key], original_params[key]
+                )
+
+    with pytest.raises(ValueError, match="fresh inference state"):
+        learning.install(engine, result.state)
+    improper_state = _replace(
+        result.state,
+        g_lam=jnp.full_like(result.state.g_lam, jnp.nan),
+    )
+    with pytest.raises(ValueError, match="dynamics beliefs must all be proper"):
+        vague_rslds_learning(2, 1).update(engine, improper_state)
+
+
+def test_rslds_rejects_invalid_model_and_prior_inputs():
+    parameters = _rslds_parameters()
+    with pytest.raises(ValueError, match="at least two latent states"):
+        rslds(1, **parameters)
+
+    bad_offset = dict(parameters)
+    bad_offset["dynamics_offset"] = np.zeros((2, 2), dtype=np.float32)
+    with pytest.raises(ValueError, match="dynamics_offset must have shape"):
+        rslds(2, **bad_offset)
+
+    one_regime = dict(parameters)
+    one_regime.update(
+        dynamics_matrix=parameters["dynamics_matrix"][:1],
+        dynamics_offset=parameters["dynamics_offset"][:1],
+        dynamics_covariance=parameters["dynamics_covariance"][:1],
+        recurrence_weights=np.empty((1, 0, 1), dtype=np.float32),
+        recurrence_offsets=np.empty((1, 0), dtype=np.float32),
+        initial_regime_probability=np.ones(1, dtype=np.float32),
+    )
+    with pytest.raises(ValueError, match="at least two regimes"):
+        rslds(2, **one_regime)
+
+    with pytest.raises(ValueError, match="initial_strength"):
+        vague_rslds_learning(2, 1, initial_strength=0.0)
+    with pytest.raises(ValueError, match="positive definite"):
+        vague_rslds_learning(2, 1, dynamics_scale=0.0)
+    with pytest.raises(ValueError, match="PG prior strength"):
+        vague_rslds_learning(2, 1, recurrence_strength=0.0)
 
 
 def test_rule_matches_independent_numpy_coordinates():

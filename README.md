@@ -221,6 +221,65 @@ weights, offsets = posterior.rollover()  # next trial's parameter arrays
 and the coordinate-optimal PG mean. The rollover is an empirical-Bayes point
 estimate; it does not claim to carry weight uncertainty inside inference.
 
+### Recurrent switching state-space models
+
+The model helper assembles a complete rSLDS with state-dependent regime
+transitions, per-regime linear dynamics, and shared linear-Gaussian emissions.
+It returns an ordinary serializable `Template`; parameters remain arrays and
+can be replaced between runs without recompilation:
+
+```python
+from cffg.compiler import compile_template
+from cffg.engine import Engine
+from cffg.models import rslds, vague_rslds_learning
+
+template, arrays = rslds(
+    n_steps=T,
+    dynamics_matrix=A,                 # [K, d, d]
+    dynamics_offset=b,                 # [K, d]
+    dynamics_covariance=Q,             # [K, d, d]
+    recurrence_weights=Rz,             # [K, K - 1, d]
+    recurrence_offsets=rz,             # [K, K - 1]
+    emission_matrix=H,                 # [dy, d]
+    emission_covariance=V,             # [dy, dy]
+    initial_state_mean=m0,             # [d]
+    initial_state_covariance=P0,        # [d, d]
+    initial_regime_probability=pi,     # [K]
+)
+engine = Engine(compile_template(template, arrays=arrays))
+learning = vague_rslds_learning(K, d)
+
+state = engine.init_state()  # first trial uses the arrays supplied above
+state = engine.bind_data(
+    state, {f"y{t}": observation for t, observation in enumerate(ys)}
+)
+state = engine.run(state, 200, tol=1e-7).require_converged()
+learning = learning.update(engine, state)
+
+# A later trial reuses the compiled engine with learned point parameters.
+next_state = learning.install(engine, engine.init_state())
+```
+
+`install` accepts a fresh state and writes the current initial-regime,
+dynamics, and recurrence point parameters. `update` then folds the converged
+soft beliefs into a Dirichlet initial-regime posterior, one MNIW posterior per
+dynamics regime, and the PG recurrence posterior. The recurrence offsets
+already represent the ordinary source-specific transition baseline; multiplying
+a separate `matrix_cat` into the same transition would require a new normalized
+factor and free-energy derivation.
+
+The independent canonical-scale check uses the current stick-breaking NASCAR
+generator at `T=10,000`. With the generating parameters supplied, CFFG
+converged in 248 sweeps with `0.001264` latent-state RMSE and `99.95%` MAP
+regime accuracy. This is an inference result, not a learned-model result:
+`RSLDSLearning` currently keeps the shared emission fixed, accumulates evidence
+between trials rather than replacing coordinates while fitting one long
+sequence, and supplies no PCA/ARHMM-style initializer. Learned NASCAR versus a
+matched SLDS, including long generative rollouts, remains cff-l7y4 after the
+generic Gaussian learnables work in cff-6tek. The same run measured 723 seconds
+of cold compile/setup and 30.6 seconds of inference; cff-r6bl owns that scale
+gap.
+
 ## Run inference
 
 ```python

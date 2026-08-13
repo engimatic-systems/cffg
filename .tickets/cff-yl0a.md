@@ -2,7 +2,7 @@
 id: cff-yl0a
 status: open
 deps: [cff-d56d]
-links: [cff-wbhu]
+links: [cff-wbhu, cff-r6bl]
 created: 2026-07-27T05:44:29Z
 type: feature
 priority: 2

@@ -1,6 +1,6 @@
 ---
 id: cff-uggf
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-08T19:28:14Z
@@ -18,6 +18,8 @@ The repository test renders synthetic tickets through the live dashboard in
 but the test duplicated an older ticket dictionary without that field. This
 repair builds each synthetic ticket body through the dashboard parser so the
 renderer and its fixture share one schema.
+`tests/test_ticket_dashboard.py` owns the synthetic ticket construction used
+by this regression; the live script continues to own parsing and rendering.
 
 ## Outcomes / Acceptance Criteria
 
@@ -31,7 +33,7 @@ renderer and its fixture share one schema.
 
 ## Methodological Suggestions
 
-- Provide the loaded dashboard module to the fixture helper and parse a minimal
+- Give the loaded dashboard module to the fixture helper and parse a minimal
   Markdown title through its module-level parser.
 - Keep frontmatter fields in the fixture; `parse_body` returns the Markdown
   body fields.
@@ -47,3 +49,9 @@ No work is deferred by this fixture repair.
   regression test.
 - **Parser output:** The dictionary returned by the dashboard's `parse_body`
   function and consumed by its renderer.
+
+## Notes
+
+**2026-08-08T19:36:40Z**
+
+The live dashboard added richer body sections after the previous green suite, while this regression still hand-built the older renderer dictionary. Commit 614bf18 now derives the Markdown-body fixture fields from parse_body and keeps frontmatter fields in the fixture. Focused dashboard plus rSLDS checks: 14 passed. Final repository gate: 1,291 passed, 38 slow tests deselected, zero failures. Retained scan meanings are close for administrative ticket status, check for automated execution, pass for successful automated execution, test for an automated check or test artifact, explicit owner for the two components named in Plain English, and deferred for the explicit statement that this repair leaves no future work.

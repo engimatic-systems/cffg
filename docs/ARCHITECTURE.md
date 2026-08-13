@@ -269,7 +269,19 @@ Gaussian natural statistics for augmented `[R; r]`. `conj.PGWeights`
 accumulates those statistics outside JIT and rolls its posterior mean into the
 next trial. This standalone path intentionally does not register a
 `LearnableSpec`; non-discrete `member_of`, generic cadence, and persistence
-remain cff-6tek/cff-y4nx surfaces.
+remain cff-6tek surfaces.
+
+`cffg.models.rslds` is the end-to-end composition boundary. Its serialized
+template uses one `recurrence_link(z[t+1], z[t], x[t])`, a
+`gaussian_mixture_linear` dynamics node selected by `z[t+1]`, and a shared
+`gaussian_linear` emission per slice. `RSLDSLearning` owns three host-side
+posteriors: Dirichlet counts for the initial regime, one MNIW for each regime's
+dynamics, and one `PGWeights` block for the recurrent transition. It reads only
+the public factor-local statistics and installs point rollovers into a fresh
+`State.params`, so the compiled graph and all state shapes stay fixed across
+trials. This model-specific boundary does not extend `LearnableSpec`, agent
+checkpointing, or parameter uncertainty inside inference; those remain the
+generic cff-6tek path.
 
 ### 2e. Executable factor registration (`cffg.kernels`, cff-ri8m)
 
@@ -754,6 +766,28 @@ became the tickets above verbatim), and oracle baselines are implemented
 independently in numpy so the engine is never graded on its own homework.
 Consumer-harness conventions live in README ("Consume the engine from an
 experiment harness").
+
+## Canonical rSLDS consumer validation (2026-07-31)
+
+A fresh consumer used CFFG commit `6c01812` as a pinned Git dependency and
+reconstructed the current stick-breaking Linderman NASCAR generator without
+editing this repository. At the canonical `T=10,000`, `K=4`, latent `d=2`,
+observed `dy=10` scale, fixed-generating-parameter inference converged in 248
+sweeps: latent-state RMSE `0.001264`, MAP regime accuracy `99.95%`, mean
+true-regime probability `0.999106`, and regime NLL `0.001223`. This validates
+the assembled recurrence, switching-dynamics, emission, mixed-schedule, and
+ledger path at scale. The separate experiment and provenance artifacts live in
+`../experiments/cffg-nascar-validation` at commit `0543683`.
+
+It does **not** validate the paper-style learned model or the rSLDS advantage
+over an SLDS. The harness supplied the generating emission, dynamics, and
+recurrence parameters; the model-specific learner does not update the shared
+emission or expose replacement-coordinate fitting of one long sequence, and
+there is no PCA/ARHMM-equivalent initializer. cff-l7y4 owns the learned
+NASCAR/matched-SLDS continuation after cff-6tek. Cold compile/setup also took
+723.14 seconds versus 30.58 seconds of inference, with 2.03 GB peak process
+RSS; cff-r6bl owns compact repeated-hybrid-slice lowering. These are explicit
+not-ready findings, not caveats hidden behind the oracle accuracy.
 
 ## Resource estimator
 
