@@ -9,13 +9,17 @@ from cffg.models.factored import (
 )
 from cffg.models.rslds import RSLDSLearning, rslds, vague_rslds_learning
 from cffg.models.rslds_fit import (
-    PCAARHMMInitializer,
     RSLDSFitPriors,
+    RSLDSFitPhase,
     RSLDSFitResult,
-    RSLDSInitialization,
-    RSLDSInitializer,
+    RSLDSInferenceAttempt,
     fit_rslds,
     vague_rslds_fit_priors,
+)
+from cffg.models.rslds_init import (
+    PCAARHMMInitializer,
+    RSLDSInitialization,
+    RSLDSInitializer,
 )
 
 __all__ = [
@@ -23,8 +27,10 @@ __all__ = [
     "ObservationSpec",
     "PCAARHMMInitializer",
     "RSLDSFitPriors",
+    "RSLDSFitPhase",
     "RSLDSFitResult",
     "RSLDSInitialization",
+    "RSLDSInferenceAttempt",
     "RSLDSInitializer",
     "RSLDSLearning",
     "StateBlockSpec",

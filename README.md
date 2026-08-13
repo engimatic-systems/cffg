@@ -297,8 +297,8 @@ fit = fit_rslds(
 if fit.status.value == "diverged":
     raise RuntimeError(fit.error)
 
-# The terminal parameter write deliberately returns a fresh bound state.
-final = fit.engine.run(fit.state, 500, tol=1e-5).require_converged()
+# The fitter certifies the state once after its terminal parameter write.
+final = fit.last_inference.require_converged()
 ```
 
 `PCAARHMMInitializer` uses PCA for a reproducible observation-derived latent
@@ -314,11 +314,16 @@ This replacement cadence is different from `RSLDSLearning.update`: `update`
 accumulates evidence from a new independent trial, while `fit_rslds` replaces
 one sequence's coordinates and never counts that sequence again as new data.
 The fit result reports `converged`, `budget_exhausted`, or `diverged`, preserves
-the last inner-engine status, and keeps the inner Bethe free-energy trace
-separate from the scale-normalized outer fixed-point residual. The default
-outer tolerance is dtype-scaled and must hold twice consecutively. A finite
-iteration limit may therefore return useful fitted parameters with
-`budget_exhausted`; it is not silently relabeled as convergence.
+the terminal inner-engine status, and keeps the inner Bethe free-energy trace
+separate from the scale-normalized outer fixed-point residual. After a finite
+inner budget exhaustion, the default two retries restart from the same fresh
+state and double the convex update fraction while preserving the fixed point;
+`max_inner_retries=0` retains one fixed-damping attempt. `fit.phases` records
+each damping, status, recurrence status, energy and message-delta tail,
+Gaussian propriety check, and parameter scale. The default outer tolerance is
+dtype-scaled and must hold twice consecutively. A finite outer iteration limit
+may therefore return useful fitted parameters with `budget_exhausted`; it is
+not silently relabeled as convergence.
 
 The original canonical NASCAR check supplied the generating parameters and,
 at `T=10,000`, converged in 248 sweeps with `0.001264` latent-state RMSE and

@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import time
-from typing import Protocol
 
 import jax
 import numpy as np
@@ -22,292 +21,13 @@ from cffg.compiler import compile_template
 from cffg.engine import Engine, RunResult, RunStatus, State, _replace
 from cffg.learn import FAMILIES, Learnables
 from cffg.models.rslds import RSLDSLearning, rslds
-
-
-@dataclass(frozen=True)
-class RSLDSInitialization:
-    """Point parameters and fixed continuous-state prior for the first run."""
-
-    dynamics_matrix: np.ndarray
-    dynamics_offset: np.ndarray
-    dynamics_covariance: np.ndarray
-    recurrence_weights: np.ndarray
-    recurrence_offsets: np.ndarray
-    emission_matrix: np.ndarray
-    emission_offset: np.ndarray
-    emission_covariance: np.ndarray
-    initial_state_mean: np.ndarray
-    initial_state_covariance: np.ndarray
-    initial_regime_probability: np.ndarray
-
-    def arrays(self) -> dict[str, np.ndarray]:
-        return {
-            name: np.asarray(value).copy()
-            for name, value in vars(self).items()
-        }
-
-
-class RSLDSInitializer(Protocol):
-    """Observation-only initializer used before an rSLDS engine is compiled."""
-
-    def __call__(
-        self,
-        observations: np.ndarray,
-        *,
-        regimes: int,
-        latent_dimension: int,
-        key: jax.Array,
-    ) -> RSLDSInitialization: ...
-
-
-def _covariance(
-    rows: np.ndarray,
-    *,
-    reference_scale: float | None = None,
-) -> np.ndarray:
-    rows = np.asarray(rows)
-    dimension = rows.shape[1]
-    centered = rows - np.mean(rows, axis=0)
-    covariance = centered.T @ centered / max(rows.shape[0], 1)
-    covariance = 0.5 * (covariance + covariance.T)
-    dtype = covariance.dtype
-    if reference_scale is None:
-        reference_scale = float(np.max(np.abs(covariance)))
-    scale = max(float(reference_scale), float(np.finfo(dtype).tiny))
-    # The dtype-scaled diagonal protects invertibility of a rank-deficient sample.
-    guard = 16.0 * dimension * np.finfo(dtype).eps * scale
-    return covariance + np.asarray(guard, dtype=dtype) * np.eye(
-        dimension, dtype=dtype
-    )
-
-
-def _canonicalize_components(components: np.ndarray) -> np.ndarray:
-    components = components.copy()
-    for row in range(components.shape[0]):
-        pivot = int(np.argmax(np.abs(components[row])))
-        if components[row, pivot] < 0:
-            components[row] *= -1
-    return components
-
-
-def _repair_empty_clusters(
-    labels: np.ndarray,
-    distances: np.ndarray,
-    regimes: int,
-) -> np.ndarray:
-    labels = labels.copy()
-    counts = np.bincount(labels, minlength=regimes)
-    for empty in np.flatnonzero(counts == 0):
-        assigned_distance = distances[np.arange(labels.size), labels]
-        candidates = np.argsort(assigned_distance)[::-1]
-        moved = next(index for index in candidates if counts[labels[index]] > 1)
-        source = labels[moved]
-        labels[moved] = empty
-        counts[source] -= 1
-        counts[empty] += 1
-    return labels
-
-
-def _transition_kmeans(
-    states: np.ndarray,
-    regimes: int,
-    key: jax.Array,
-    iterations: int,
-) -> np.ndarray:
-    features = np.concatenate((states[:-1], states[1:]), axis=1)
-    centered = features - np.mean(features, axis=0)
-    scale = np.std(centered, axis=0)
-    dtype = features.dtype
-    threshold = np.sqrt(np.finfo(dtype).eps) * max(
-        float(np.max(np.abs(centered))), float(np.finfo(dtype).tiny)
-    )
-    # Constant coordinates carry no clustering information and use unit scale.
-    scale = np.where(scale > threshold, scale, np.asarray(1.0, dtype=dtype))
-    normalized = centered / scale
-    try:
-        indices = np.asarray(
-            jax.random.choice(
-                key,
-                normalized.shape[0],
-                shape=(regimes,),
-                replace=False,
-            )
-        )
-    except (TypeError, ValueError) as error:
-        raise ValueError("key must be an explicit JAX PRNG key") from error
-    centers = normalized[indices].copy()
-    previous = None
-    for _ in range(iterations):
-        distances = np.sum(
-            np.square(normalized[:, None, :] - centers[None, :, :]), axis=2
-        )
-        labels = _repair_empty_clusters(
-            np.argmin(distances, axis=1), distances, regimes
-        )
-        if previous is not None and np.array_equal(labels, previous):
-            break
-        previous = labels.copy()
-        centers = np.stack(
-            [np.mean(normalized[labels == regime], axis=0) for regime in range(regimes)]
-        )
-    return labels
-
-
-@dataclass(frozen=True)
-class PCAARHMMInitializer:
-    """PCA coordinates plus transition-pair clustering and local AR fits.
-
-    PCA fixes an observation-derived latent coordinate system. K-means on
-    consecutive latent pairs assigns regime labels, after which regularized
-    local autoregressions initialize the switching dynamics. The emission
-    covariance uses the probabilistic-PCA isotropic residual variance, because
-    the raw PCA residual covariance is singular in the retained directions.
-    The explicit JAX key selects the initial cluster centers and is the only
-    random input.
-    """
-
-    kmeans_iterations: int = 100
-    regression_prior_strength: float = 1.0
-    transition_pseudocount: float = 1.0
-
-    def __post_init__(self) -> None:
-        if self.kmeans_iterations <= 0:
-            raise ValueError("kmeans_iterations must be positive")
-        if (
-            not np.isfinite(self.regression_prior_strength)
-            or self.regression_prior_strength <= 0
-        ):
-            raise ValueError("regression_prior_strength must be finite and positive")
-        if (
-            not np.isfinite(self.transition_pseudocount)
-            or self.transition_pseudocount <= 0
-        ):
-            raise ValueError("transition_pseudocount must be finite and positive")
-
-    def __call__(
-        self,
-        observations: np.ndarray,
-        *,
-        regimes: int,
-        latent_dimension: int,
-        key: jax.Array,
-    ) -> RSLDSInitialization:
-        observations = _validate_observations(observations)
-        steps, observation_dimension = observations.shape
-        if regimes < 2:
-            raise ValueError("regimes must be at least two")
-        if not 1 <= latent_dimension <= min(steps, observation_dimension):
-            raise ValueError(
-                "latent_dimension must be positive and no larger than the data rank"
-            )
-        if steps - 1 < regimes:
-            raise ValueError("initializer needs at least one transition per regime")
-
-        observation_mean = np.mean(observations, axis=0)
-        centered = observations - observation_mean
-        _, _, right = np.linalg.svd(centered, full_matrices=False)
-        components = _canonicalize_components(right[:latent_dimension])
-        states = centered @ components.T
-        labels_tail = _transition_kmeans(
-            states, regimes, key, self.kmeans_iterations
-        )
-        labels = np.concatenate((labels_tail[:1], labels_tail))
-
-        dimension = latent_dimension
-        augmented_identity = np.concatenate(
-            (
-                np.eye(dimension, dtype=states.dtype),
-                np.zeros((dimension, 1), dtype=states.dtype),
-            ),
-            axis=1,
-        )
-        dynamics_matrix = np.empty((regimes, dimension, dimension), dtype=states.dtype)
-        dynamics_offset = np.empty((regimes, dimension), dtype=states.dtype)
-        dynamics_covariance = np.empty(
-            (regimes, dimension, dimension), dtype=states.dtype
-        )
-        state_scale = max(
-            float(np.max(np.abs(_covariance(states)))),
-            float(np.finfo(states.dtype).tiny),
-        )
-        for regime in range(regimes):
-            selected = labels_tail == regime
-            design = np.concatenate(
-                (
-                    states[:-1][selected],
-                    np.ones((int(np.sum(selected)), 1), dtype=states.dtype),
-                ),
-                axis=1,
-            )
-            targets = states[1:][selected]
-            strength = np.asarray(self.regression_prior_strength, dtype=states.dtype)
-            precision = design.T @ design + strength * np.eye(
-                dimension + 1, dtype=states.dtype
-            )
-            natural = targets.T @ design + strength * augmented_identity
-            coefficients = np.linalg.solve(precision.T, natural.T).T
-            dynamics_matrix[regime] = coefficients[:, :-1]
-            dynamics_offset[regime] = coefficients[:, -1]
-            residuals = targets - design @ coefficients.T
-            dynamics_covariance[regime] = _covariance(
-                residuals, reference_scale=state_scale
-            )
-
-        counts = np.full(
-            (regimes, regimes),
-            self.transition_pseudocount,
-            dtype=states.dtype,
-        )
-        np.add.at(counts, (labels[:-1], labels[1:]), 1.0)
-        transition = counts / np.sum(counts, axis=1, keepdims=True)
-        recurrence_offsets = np.empty((regimes, regimes - 1), dtype=states.dtype)
-        for source in range(regimes):
-            for stick in range(regimes - 1):
-                remaining = np.sum(transition[source, stick:])
-                accept = transition[source, stick] / remaining
-                recurrence_offsets[source, stick] = np.log(accept) - np.log1p(-accept)
-
-        initial_counts = np.full(
-            regimes, self.transition_pseudocount, dtype=states.dtype
-        )
-        initial_counts[labels[0]] += 1.0
-        emission_residuals = observations - (
-            states @ components + observation_mean
-        )
-        observation_scale = max(
-            float(np.max(np.abs(_covariance(observations)))),
-            float(np.finfo(observations.dtype).tiny),
-        )
-        discarded_dimensions = observation_dimension - latent_dimension
-        residual_variance = float(
-            np.sum(np.square(emission_residuals))
-            / (steps * max(discarded_dimensions, 1))
-        )
-        # This dtype-scaled guard protects PPCA when no discarded axis exists.
-        variance_guard = (
-            16.0
-            * observation_dimension
-            * np.finfo(observations.dtype).eps
-            * observation_scale
-        )
-        emission_covariance = np.asarray(
-            max(residual_variance, variance_guard), dtype=observations.dtype
-        ) * np.eye(observation_dimension, dtype=observations.dtype)
-        return RSLDSInitialization(
-            dynamics_matrix=dynamics_matrix,
-            dynamics_offset=dynamics_offset,
-            dynamics_covariance=dynamics_covariance,
-            recurrence_weights=np.zeros(
-                (regimes, regimes - 1, dimension), dtype=states.dtype
-            ),
-            recurrence_offsets=recurrence_offsets,
-            emission_matrix=components.T,
-            emission_offset=observation_mean,
-            emission_covariance=emission_covariance,
-            initial_state_mean=states[0],
-            initial_state_covariance=_covariance(states),
-            initial_regime_probability=initial_counts / np.sum(initial_counts),
-        )
+from cffg.models.rslds_init import (
+    PCAARHMMInitializer,
+    RSLDSInitialization,
+    RSLDSInitializer,
+    _validate_initialization,
+    _validate_observations,
+)
 
 
 @dataclass(frozen=True)
@@ -352,12 +72,39 @@ def vague_rslds_fit_priors(
 
 
 @dataclass(frozen=True)
-class RSLDSFitResult:
-    """Terminal fitting status, fitted parameters, and last inner result.
+class RSLDSInferenceAttempt:
+    """Bounded evidence from one damping attempt at fixed parameters."""
 
-    ``state`` is a fresh observation-bound state carrying ``parameters``. Its
-    messages have not been run after the final parameter write;
-    ``last_inference`` retains the preceding status-bearing engine result.
+    damping: float
+    status: RunStatus
+    recurrence_status: RunStatus
+    iterations: int
+    residual: float
+    message_delta_tail: tuple[float, ...]
+    free_energy_tail: tuple[float, ...]
+    gaussian_beliefs_proper: bool
+    state_finite: bool
+
+
+@dataclass(frozen=True)
+class RSLDSFitPhase:
+    """One hidden-state solve and its optional parameter replacement."""
+
+    iteration: int
+    coordinate_replaced: bool
+    attempts: tuple[RSLDSInferenceAttempt, ...]
+    parameter_scales_before: dict[str, float]
+    parameter_scales_after: dict[str, float]
+    fixed_point_residual: float | None
+
+
+@dataclass(frozen=True)
+class RSLDSFitResult:
+    """Terminal fitting status, fitted parameters, and inner-solve evidence.
+
+    When every requested coordinate completes, ``state`` has been inferred
+    once after the final parameter write. ``last_inference`` is that terminal
+    solve, and ``phases`` distinguishes it from parameter-replacement phases.
     """
 
     engine: Engine
@@ -373,6 +120,7 @@ class RSLDSFitResult:
     model_posterior: RSLDSLearning
     emission_posterior: dict[str, np.ndarray]
     last_inference: RunResult | None
+    phases: tuple[RSLDSFitPhase, ...]
     timings: dict[str, float]
     error: str | None = None
 
@@ -383,17 +131,6 @@ class RSLDSFitResult:
                 f"iterations (residual={self.residual!r})"
             )
         return self
-
-
-def _validate_observations(observations: np.ndarray) -> np.ndarray:
-    observations = np.asarray(observations)
-    if observations.ndim != 2 or observations.shape[0] < 2 or observations.shape[1] < 1:
-        raise ValueError("observations must have shape [T,p] with T>=2 and p>=1")
-    if not np.issubdtype(observations.dtype, np.inexact):
-        raise TypeError("observations must use a floating dtype")
-    if not np.all(np.isfinite(observations)):
-        raise ValueError("observations must be finite")
-    return observations
 
 
 def _validate_priors(
@@ -412,50 +149,6 @@ def _validate_priors(
     ):
         raise ValueError("emission prior does not match observation and latent dimensions")
     return model
-
-
-def _validate_initialization(
-    initialization: RSLDSInitialization,
-    *,
-    regimes: int,
-    latent_dimension: int,
-    observation_dimension: int,
-) -> RSLDSInitialization:
-    if not isinstance(initialization, RSLDSInitialization):
-        raise TypeError("initializer must return RSLDSInitialization")
-    arrays = initialization.arrays()
-    expected = {
-        "dynamics_matrix": (regimes, latent_dimension, latent_dimension),
-        "dynamics_offset": (regimes, latent_dimension),
-        "dynamics_covariance": (regimes, latent_dimension, latent_dimension),
-        "recurrence_weights": (regimes, regimes - 1, latent_dimension),
-        "recurrence_offsets": (regimes, regimes - 1),
-        "emission_matrix": (observation_dimension, latent_dimension),
-        "emission_offset": (observation_dimension,),
-        "emission_covariance": (observation_dimension, observation_dimension),
-        "initial_state_mean": (latent_dimension,),
-        "initial_state_covariance": (latent_dimension, latent_dimension),
-        "initial_regime_probability": (regimes,),
-    }
-    actual = {name: value.shape for name, value in arrays.items()}
-    if actual != expected:
-        raise ValueError(f"initializer shapes {actual} != {expected}")
-    if any(not np.all(np.isfinite(value)) for value in arrays.values()):
-        raise ValueError("initializer parameters must be finite")
-    for name in (
-        "dynamics_covariance",
-        "emission_covariance",
-        "initial_state_covariance",
-    ):
-        try:
-            np.linalg.cholesky(arrays[name])
-        except np.linalg.LinAlgError:
-            raise ValueError(f"initializer {name} must be positive definite") from None
-    probability = arrays["initial_regime_probability"]
-    if np.any(probability < 0) or np.sum(probability) <= 0:
-        raise ValueError("initial regime probabilities must be nonnegative with positive mass")
-    arrays["initial_regime_probability"] = probability / np.sum(probability)
-    return RSLDSInitialization(**arrays)
 
 
 def _emission_points(learning: Learnables) -> dict[str, np.ndarray]:
@@ -569,6 +262,79 @@ def _install(
     return engine.bind_data(state, _data(observations))
 
 
+def _parameter_scales(points: dict[str, np.ndarray]) -> dict[str, float]:
+    return {
+        name: float(np.max(np.abs(np.asarray(value))))
+        for name, value in points.items()
+    }
+
+
+def _attempt_evidence(
+    engine: Engine,
+    result: RunResult,
+    damping: float,
+) -> RSLDSInferenceAttempt:
+    try:
+        statistics = engine.gaussian_node_stats(result.state)
+        gaussian_beliefs_proper = bool(statistics) and all(
+            bool(row["proper"]) for row in statistics.values()
+        )
+    except (FloatingPointError, np.linalg.LinAlgError, ValueError):
+        gaussian_beliefs_proper = False
+    state_finite = all(
+        bool(np.all(np.isfinite(np.asarray(leaf))))
+        for leaf in jax.tree_util.tree_leaves(result.state)
+    )
+    return RSLDSInferenceAttempt(
+        damping=float(damping),
+        status=result.status,
+        recurrence_status=result.inner_status,
+        iterations=result.iterations,
+        residual=float(result.residual),
+        message_delta_tail=tuple(float(value) for value in result.message_deltas[-8:]),
+        free_energy_tail=tuple(float(value) for value in result.free_energies[-8:]),
+        gaussian_beliefs_proper=gaussian_beliefs_proper,
+        state_finite=state_finite,
+    )
+
+
+def _run_inner(
+    engine: Engine,
+    state: State,
+    *,
+    max_iterations: int,
+    tolerance: float,
+    damping: float,
+    max_retries: int,
+) -> tuple[RunResult, tuple[RSLDSInferenceAttempt, ...]]:
+    """Retry a finite exhausted coordinate with progressively larger steps.
+
+    ``damping`` is the retained fraction of the old natural parameters. Each
+    retry doubles the update fraction ``1 - damping`` while it remains a
+    convex combination. The fixed points are unchanged, and every attempt
+    restarts from the same parameter-bound state.
+    """
+    attempts: list[RSLDSInferenceAttempt] = []
+    current_damping = damping
+    result: RunResult | None = None
+    for retry in range(max_retries + 1):
+        result = engine.run(
+            state,
+            max_iterations,
+            tol=tolerance,
+            damp=current_damping,
+        )
+        attempts.append(_attempt_evidence(engine, result, current_damping))
+        if result.status is not RunStatus.BUDGET_EXHAUSTED or retry == max_retries:
+            break
+        expanded_step_damping = 2.0 * current_damping - 1.0
+        if expanded_step_damping <= 0.0:
+            break
+        current_damping = expanded_step_damping
+    assert result is not None
+    return result, tuple(attempts)
+
+
 def _result(
     *,
     engine: Engine,
@@ -583,6 +349,7 @@ def _result(
     model: RSLDSLearning,
     emission: Learnables,
     last_inference: RunResult | None,
+    phases: list[RSLDSFitPhase],
     timings: dict[str, float],
     error: str | None = None,
 ) -> RSLDSFitResult:
@@ -603,6 +370,7 @@ def _result(
             for key, value in emission.params["emission"].items()
         },
         last_inference=last_inference,
+        phases=tuple(phases),
         timings=dict(timings),
         error=error,
     )
@@ -622,6 +390,7 @@ def fit_rslds(
     outer_tolerance: float | None = None,
     schedule: str = "auto",
     damp: float = 0.0,
+    max_inner_retries: int = 2,
 ) -> RSLDSFitResult:
     """Fit one rSLDS sequence without receiving generating variables.
 
@@ -629,6 +398,9 @@ def fit_rslds(
     engine, replaces all conjugate posteriors from ``priors``, and installs the
     resulting point parameters into a fresh state. Two consecutive
     fixed-point residuals at or below ``outer_tolerance`` certify convergence.
+    A finite exhausted inner solve may restart from the same state with a
+    larger convex update step, up to ``max_inner_retries`` times. The terminal
+    state is inferred once after the last parameter replacement.
     """
     observations = _validate_observations(observations)
     if max_outer_iterations <= 0 or max_inner_iterations <= 0:
@@ -637,6 +409,8 @@ def fit_rslds(
         raise ValueError("inner_tolerance must be finite and positive")
     if not np.isfinite(damp) or not 0.0 <= damp < 1.0:
         raise ValueError("damp must be finite and in [0, 1)")
+    if not isinstance(max_inner_retries, int) or max_inner_retries < 0:
+        raise ValueError("max_inner_retries must be a nonnegative integer")
     if outer_tolerance is None:
         outer_tolerance = 8.0 * np.sqrt(np.finfo(observations.dtype).eps)
     if not np.isfinite(outer_tolerance) or outer_tolerance <= 0:
@@ -702,8 +476,8 @@ def fit_rslds(
     )
     residuals: list[float] = []
     free_energies: list[float] = []
+    phases: list[RSLDSFitPhase] = []
     consecutive = 0
-    last_inference: RunResult | None = None
     timings = {
         "initialization": initialization_seconds,
         "compile": compile_seconds,
@@ -711,17 +485,32 @@ def fit_rslds(
         "coordinate": 0.0,
     }
 
+    fit_status = RunStatus.BUDGET_EXHAUSTED
+    completed_iterations = 0
     for iteration in range(1, max_outer_iterations + 1):
+        completed_iterations = iteration
+        scales_before = _parameter_scales(current_points)
         started = time.perf_counter()
-        inner = engine.run(
+        inner, attempts = _run_inner(
+            engine,
             current_state,
-            max_inner_iterations,
-            tol=inner_tolerance,
-            damp=damp,
+            max_iterations=max_inner_iterations,
+            tolerance=inner_tolerance,
+            damping=damp,
+            max_retries=max_inner_retries,
         )
         timings["inference"] += time.perf_counter() - started
-        last_inference = inner
         if inner.status is not RunStatus.CONVERGED:
+            phases.append(
+                RSLDSFitPhase(
+                    iteration=iteration,
+                    coordinate_replaced=False,
+                    attempts=attempts,
+                    parameter_scales_before=scales_before,
+                    parameter_scales_after=scales_before,
+                    fixed_point_residual=None,
+                )
+            )
             outer_status = (
                 RunStatus.BUDGET_EXHAUSTED
                 if inner.status is RunStatus.BUDGET_EXHAUSTED
@@ -740,10 +529,21 @@ def fit_rslds(
                 model=current_model,
                 emission=current_emission,
                 last_inference=inner,
+                phases=phases,
                 timings=timings,
                 error=f"inner inference {inner.status.value}",
             )
         if not inner.free_energies or not np.all(np.isfinite(inner.free_energies)):
+            phases.append(
+                RSLDSFitPhase(
+                    iteration=iteration,
+                    coordinate_replaced=False,
+                    attempts=attempts,
+                    parameter_scales_before=scales_before,
+                    parameter_scales_after=scales_before,
+                    fixed_point_residual=None,
+                )
+            )
             return _result(
                 engine=engine,
                 state=inner.state,
@@ -757,6 +557,7 @@ def fit_rslds(
                 model=current_model,
                 emission=current_emission,
                 last_inference=inner,
+                phases=phases,
                 timings=timings,
                 error="inner Bethe free energy is missing or non-finite",
             )
@@ -781,6 +582,16 @@ def fit_rslds(
             )
         except (FloatingPointError, np.linalg.LinAlgError, ValueError) as error:
             timings["coordinate"] += time.perf_counter() - started
+            phases.append(
+                RSLDSFitPhase(
+                    iteration=iteration,
+                    coordinate_replaced=False,
+                    attempts=attempts,
+                    parameter_scales_before=scales_before,
+                    parameter_scales_after=scales_before,
+                    fixed_point_residual=None,
+                )
+            )
             return _result(
                 engine=engine,
                 state=inner.state,
@@ -794,12 +605,23 @@ def fit_rslds(
                 model=current_model,
                 emission=current_emission,
                 last_inference=inner,
+                phases=phases,
                 timings=timings,
                 error=str(error),
             )
         timings["coordinate"] += time.perf_counter() - started
 
         residuals.append(residual)
+        phases.append(
+            RSLDSFitPhase(
+                iteration=iteration,
+                coordinate_replaced=True,
+                attempts=attempts,
+                parameter_scales_before=scales_before,
+                parameter_scales_after=_parameter_scales(candidate_points),
+                fixed_point_residual=residual,
+            )
+        )
         consecutive = consecutive + 1 if residual <= outer_tolerance else 0
         current_model = candidate_model
         current_emission = candidate_emission
@@ -807,36 +629,64 @@ def fit_rslds(
         current_snapshot = candidate_snapshot
         current_state = candidate_state
         if consecutive >= 2:
-            return _result(
-                engine=engine,
-                state=current_state,
-                status=RunStatus.CONVERGED,
-                inner_status=inner.status,
-                iterations=iteration,
-                residuals=residuals,
-                free_energies=free_energies,
-                points=current_points,
-                initialization=initialization,
-                model=current_model,
-                emission=current_emission,
-                last_inference=inner,
-                timings=timings,
-            )
+            fit_status = RunStatus.CONVERGED
+            break
+
+    scales_before = _parameter_scales(current_points)
+    started = time.perf_counter()
+    terminal, attempts = _run_inner(
+        engine,
+        current_state,
+        max_iterations=max_inner_iterations,
+        tolerance=inner_tolerance,
+        damping=damp,
+        max_retries=max_inner_retries,
+    )
+    timings["inference"] += time.perf_counter() - started
+    phases.append(
+        RSLDSFitPhase(
+            iteration=completed_iterations + 1,
+            coordinate_replaced=False,
+            attempts=attempts,
+            parameter_scales_before=scales_before,
+            parameter_scales_after=scales_before,
+            fixed_point_residual=None,
+        )
+    )
+    error = None
+    if terminal.status is not RunStatus.CONVERGED:
+        fit_status = (
+            RunStatus.BUDGET_EXHAUSTED
+            if terminal.status is RunStatus.BUDGET_EXHAUSTED
+            else RunStatus.DIVERGED
+        )
+        error = f"terminal inner inference {terminal.status.value}"
+    elif not terminal.free_energies or not np.all(
+        np.isfinite(terminal.free_energies)
+    ):
+        fit_status = RunStatus.DIVERGED
+        error = "terminal inner Bethe free energy is missing or non-finite"
+    else:
+        free_energies.append(float(terminal.free_energies[-1]))
 
     return _result(
         engine=engine,
-        state=current_state,
-        status=RunStatus.BUDGET_EXHAUSTED,
+        state=terminal.state,
+        status=fit_status,
         inner_status=(
-            RunStatus.CONVERGED if last_inference is None else last_inference.status
+            RunStatus.DIVERGED
+            if error and terminal.status is RunStatus.CONVERGED
+            else terminal.status
         ),
-        iterations=max_outer_iterations,
+        iterations=completed_iterations,
         residuals=residuals,
         free_energies=free_energies,
         points=current_points,
         initialization=initialization,
         model=current_model,
         emission=current_emission,
-        last_inference=last_inference,
+        last_inference=terminal,
+        phases=phases,
         timings=timings,
+        error=error,
     )

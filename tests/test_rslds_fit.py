@@ -33,6 +33,66 @@ def _observations(steps: int, dtype=np.float32) -> np.ndarray:
     )
 
 
+def _nascar_observations(steps: int = 240, seed: int = 101) -> np.ndarray:
+    """Pinned compact Linderman NASCAR pilot observations."""
+    rng = np.random.RandomState(seed)
+    rotation = []
+    for angle in (np.pi / 24.0, np.pi / 48.0):
+        matrix = np.array(
+            [[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]]
+        )
+        basis = np.linalg.qr(rng.randn(2, 2))[0]
+        rotation.append(basis @ matrix @ basis.T)
+    centers = (np.array([2.0, 0.0]), np.array([-2.0, 0.0]))
+    dynamics_matrix = np.stack((*rotation, np.eye(2), np.eye(2)))
+    dynamics_offset = np.stack(
+        (
+            *(
+                -(matrix - np.eye(2)) @ center
+                for matrix, center in zip(rotation, centers)
+            ),
+            np.array([0.1, 0.0]),
+            np.array([-0.35, 0.0]),
+        )
+    )
+    stick_weights = 100.0 * np.array(
+        [[1.0, 0.0], [-1.0, 0.0], [0.0, 1.0]]
+    )
+    stick_offsets = 100.0 * np.array([-2.0, -2.0, 0.0]) + np.array(
+        [-1.4985019321609645, -0.9990012881073119, -2.161965419040482e-12]
+    )
+    emission = rng.randn(10, 2)
+    regimes = np.empty(steps, dtype=np.int32)
+    states = np.empty((steps, 2))
+    observations = np.empty((steps, 10))
+    regimes[0] = rng.choice(4, p=np.full(4, 0.25))
+    states[0] = rng.multivariate_normal(np.array([0.0, 1.0]), 1e-3 * np.eye(2))
+    observations[0] = rng.multivariate_normal(
+        emission @ states[0], 1e-5 * np.eye(10)
+    )
+    for step in range(1, steps):
+        logits = stick_weights @ states[step - 1] + stick_offsets
+        accepts = np.exp(-np.logaddexp(0.0, -logits))
+        probabilities = np.empty(4)
+        remaining = 1.0
+        for stick, probability in enumerate(accepts):
+            probabilities[stick] = remaining * probability
+            remaining *= 1.0 - probability
+        probabilities[-1] = remaining
+        probabilities /= probabilities.sum()
+        regimes[step] = rng.choice(4, p=probabilities)
+        regime = regimes[step]
+        states[step] = rng.multivariate_normal(
+            dynamics_matrix[regime] @ states[step - 1]
+            + dynamics_offset[regime],
+            1e-4 * np.eye(2),
+        )
+        observations[step] = rng.multivariate_normal(
+            emission @ states[step], 1e-5 * np.eye(10)
+        )
+    return observations
+
+
 def _fit(
     observations: np.ndarray,
     *,
@@ -121,7 +181,12 @@ def test_fit_replaces_one_sequence_coordinates_and_reuses_one_engine(monkeypatch
     assert result.iterations == 2
     assert len(result.residuals) == 2
     assert len(set(engine_ids)) == 1
-    assert len(engine_ids) == 2
+    assert len(engine_ids) == 3
+    assert [phase.coordinate_replaced for phase in result.phases] == [
+        True,
+        True,
+        False,
+    ]
     assert result.model_posterior.initial_alpha.sum() == pytest.approx(
         priors.initial_alpha.sum() + 1.0
     )
@@ -182,13 +247,20 @@ class _ZeroSupportInitializer:
         )
 
 
-def test_exact_zero_initial_regime_support_is_not_floored():
-    result = _fit(
-        _observations(8), outer_iterations=1, initializer=_ZeroSupportInitializer()
-    )
+def test_exact_zero_initial_regime_support_is_not_floored(monkeypatch):
+    inner_results = []
+    original_run = Engine.run
 
-    assert result.last_inference is not None
-    marginal = result.engine.marginals(result.last_inference.state)["z0"]
+    def tracked_run(self, *args, **kwargs):
+        result = original_run(self, *args, **kwargs)
+        inner_results.append((self, result))
+        return result
+
+    monkeypatch.setattr(Engine, "run", tracked_run)
+    _fit(_observations(8), outer_iterations=1, initializer=_ZeroSupportInitializer())
+
+    engine, first = inner_results[0]
+    marginal = engine.marginals(first.state)["z0"]
     assert marginal[1] == 0.0
 
 
@@ -288,7 +360,54 @@ def test_float32_fitter_survives_tenfold_horizon():
 
     assert result.inner_status is RunStatus.CONVERGED
     assert result.status is RunStatus.BUDGET_EXHAUSTED
-    assert len(result.free_energies) == 1
-    assert np.isfinite(result.free_energies[0])
+    assert len(result.free_energies) == 2
+    assert np.all(np.isfinite(result.free_energies))
     assert np.isfinite(result.residual)
     assert all(np.all(np.isfinite(value)) for value in result.parameters.values())
+
+
+def test_repeated_nascar_coordinates_globalize_the_finite_cycle():
+    observations = _nascar_observations()
+    key = jax.random.split(
+        jax.random.fold_in(jax.random.key(9001), 101), 3
+    )[0]
+    result = fit_rslds(
+        observations,
+        regimes=4,
+        latent_dimension=2,
+        initializer=PCAARHMMInitializer(),
+        priors=vague_rslds_fit_priors(4, 2, 10),
+        max_outer_iterations=5,
+        max_inner_iterations=2_000,
+        inner_tolerance=1e-4,
+        key=key,
+        damp=0.9,
+        max_inner_retries=2,
+    )
+
+    assert result.status is RunStatus.BUDGET_EXHAUSTED
+    assert result.inner_status is RunStatus.CONVERGED
+    assert sum(phase.coordinate_replaced for phase in result.phases) == 5
+    fourth = result.phases[3]
+    assert [attempt.damping for attempt in fourth.attempts] == pytest.approx(
+        [0.9, 0.8, 0.6]
+    )
+    assert [attempt.status for attempt in fourth.attempts] == [
+        RunStatus.BUDGET_EXHAUSTED,
+        RunStatus.BUDGET_EXHAUSTED,
+        RunStatus.CONVERGED,
+    ]
+    exhausted = fourth.attempts[0]
+    assert exhausted.recurrence_status is RunStatus.CONVERGED
+    assert exhausted.gaussian_beliefs_proper
+    assert exhausted.state_finite
+    assert exhausted.message_delta_tail[-1] > 1e-2
+    assert np.all(np.isfinite(exhausted.free_energy_tail))
+    assert all(np.isfinite(tuple(fourth.parameter_scales_before.values())))
+    assert all(np.isfinite(tuple(fourth.parameter_scales_after.values())))
+    terminal = result.phases[-1]
+    assert not terminal.coordinate_replaced
+    assert terminal.attempts[-1].status is RunStatus.CONVERGED
+    assert terminal.attempts[-1].recurrence_status is RunStatus.CONVERGED
+    assert result.last_inference is not None
+    assert result.last_inference.status is RunStatus.CONVERGED

@@ -1,14 +1,14 @@
 {
   "latest": {
-    "case_seconds": 358.522,
-    "commit": "1f808d5",
-    "completed_at": "2026-08-13T05:00:05.320295+00:00",
+    "case_seconds": 508.31,
+    "commit": "a961905",
+    "completed_at": "2026-08-13T05:16:15.862087+00:00",
     "failed": 0,
     "pytest_exit_code": 0,
     "result": "passed",
     "selection": "not slow",
-    "test_count": 1289,
-    "wall_seconds": 366.389
+    "test_count": 1334,
+    "wall_seconds": 517.425
   },
   "recent": [
     {
@@ -227,6 +227,17 @@
       "wall_seconds": 411.215
     },
     {
+      "case_seconds": 508.018,
+      "commit": "db995e3",
+      "completed_at": "2026-08-09T14:02:44.822974+00:00",
+      "failed": 0,
+      "pytest_exit_code": 0,
+      "result": "passed",
+      "selection": "not slow",
+      "test_count": 1334,
+      "wall_seconds": 516.909
+    },
+    {
       "case_seconds": 354.214,
       "commit": "910b563",
       "completed_at": "2026-08-13T04:53:02.187174+00:00",
@@ -247,8 +258,19 @@
       "selection": "not slow",
       "test_count": 1289,
       "wall_seconds": 366.389
+    },
+    {
+      "case_seconds": 508.31,
+      "commit": "a961905",
+      "completed_at": "2026-08-13T05:16:15.862087+00:00",
+      "failed": 0,
+      "pytest_exit_code": 0,
+      "result": "passed",
+      "selection": "not slow",
+      "test_count": 1334,
+      "wall_seconds": 517.425
     }
   ],
   "schema_version": 1,
-  "suggested_wait_seconds": 540
+  "suggested_wait_seconds": 660
 }
