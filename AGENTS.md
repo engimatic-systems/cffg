@@ -130,8 +130,7 @@ This project will span many context windows. The rule that makes that survivable
   `uv run python tools/wiggle_words/query_ticket_wiggle_audit.py scan <ticket-id>`. Review
   every match in context and clarify any claim whose owner, time, layer, scope,
   comparison, or evidence has more than one reading. Clear intentional uses may
-  remain; rerun the scan after refinement and report retained matches by
-  candidate and intended meaning in the handoff. The scan cannot detect omitted
+  remain; rerun the scan after refinement. The scan cannot detect omitted
   ownership, so check the ticket's capability owners separately. For historical
   classifications, use
   `uv run python tools/wiggle_words/query_ticket_wiggle_audit.py slice <ticket-id>`; never
