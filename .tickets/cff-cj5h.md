@@ -7,6 +7,7 @@ created: 2026-07-06T00:37:22Z
 type: task
 priority: 2
 assignee: coopwilliams
+parent: cff-cfqg
 ---
 # Ergonomics: epistemic lint, MI-term diagnostic, MAP tie-breaking
 

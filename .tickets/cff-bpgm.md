@@ -2,7 +2,7 @@
 id: cff-bpgm
 status: closed
 deps: []
-links: [cff-cfqg]
+links: [cff-cfqg, cff-uy48]
 created: 2026-08-10T03:33:00Z
 type: task
 priority: 1
@@ -120,3 +120,7 @@ Completed at commit 08c7a4a. The survey is notes/survey-2026-08-09/index.html. H
 **2026-08-10T03:41:14Z**
 
 Post-closure scan additions: complete means completion of this ticket scope at the cited commit; close means administrative ticket closure after the named validation passed. The prior scan notes classify the other 30 retained candidates.
+
+**2026-08-13T04:40:34Z**
+
+Course-correction follow-up, 2026-08-12: cff-uy48 now owns the separate paper-faithfulness and minimum-usable-release gate recommended by the survey. cff-cfqg remains the parallel engine-trustworthiness gate. cff-ahps now waits for both and closes on a finite extensible-kernel integration baseline.

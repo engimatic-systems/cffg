@@ -1,7 +1,7 @@
 ---
 id: cff-602p
 status: open
-deps: [cff-4sor]
+deps: [cff-4sor, cff-cfqg]
 links: []
 created: 2026-08-10T02:58:17Z
 type: feature

@@ -7,6 +7,7 @@ created: 2026-07-10T18:05:50Z
 type: bug
 priority: 2
 assignee: coopwilliams
+parent: cff-cfqg
 tags: [adversarial-reviewer, performance, estimator]
 ---
 # Resource estimator ignores non-discrete arenas and its XLA analysis no longer calls step correctly

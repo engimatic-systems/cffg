@@ -2,12 +2,11 @@
 id: cff-0f3g
 status: open
 deps: [cff-9vab]
-links: [cff-dlrj, cff-nkbj]
+links: [cff-dlrj, cff-nkbj, cff-ahps]
 created: 2026-08-10T02:58:08Z
 type: epic
 priority: 2
 assignee: coopwilliams
-parent: cff-ahps
 tags: [rslds, hybrid, factor-family]
 ---
 # Epic: Tree-structured recurrent transitions
@@ -61,8 +60,8 @@ method that satisfies the outcomes.
 
 cff-dlrj investigates destination-softmax recurrence as a separate factor
 family. cff-nkbj remains the decision-list literature-comparison epic and does
-not depend on this work. This epic is grouped under cff-ahps but does not
-become a cff-ahps closure dependency unless that roadmap is explicitly
+not depend on this work. This epic is linked from cff-ahps but does not
+become a cff-ahps closure dependency unless that baseline is explicitly
 expanded in a later ticket change.
 
 ## Definitions
@@ -100,7 +99,7 @@ Legend: prerequisite --> dependent
 
     Linked, not required: [ ] cff-dlrj destination-softmax derivation
     Parallel, not blocked: [ ] cff-nkbj decision-list reference parity
-    Roadmap parent, not a dependency edge: cff-ahps
+    Linked baseline, not a dependency edge: cff-ahps
 
 The tk records are authoritative. The sequential chain follows the semantic
 coupling: topology meaning precedes serialization; serialization precedes

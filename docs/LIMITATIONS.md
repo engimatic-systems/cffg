@@ -99,7 +99,9 @@ goal-observation composite, and BP for the linear-Gaussian family (gaussian,
 gaussian_linear, Gaussian equality — cff-4e5z: Kalman-smoother parity, exact
 continuous tree identity BFE = −log p(y)). Between converged runs, declared
 NIW and MNIW learning covers `gaussian` and `gaussian_linear`. Everything else
-is a derivation or registration ticket under the roadmap epic cff-ahps:
+requires a separately selected derivation or registration ticket. Epic
+cff-ahps records the finite integrated baseline; it does not promise that
+every item below will be implemented:
 - *Additional conjugate adapters* — mixtures need a per-regime posterior-axis
   contract; recurrence PG learning and precision/EF learning remain separate
   model-specific paths rather than `LearnableSpec` families.

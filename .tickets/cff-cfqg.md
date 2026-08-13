@@ -1,8 +1,8 @@
 ---
 id: cff-cfqg
 status: open
-deps: [cff-3kdk, cff-cj5h, cff-j7mm, cff-209l, cff-5edo, cff-11jj]
-links: [cff-bpgm]
+deps: [cff-3kdk, cff-cj5h, cff-j7mm, cff-209l, cff-5edo, cff-11jj, cff-ws3c]
+links: [cff-bpgm, cff-uy48]
 created: 2026-08-13T03:59:30Z
 type: epic
 priority: 1
@@ -23,9 +23,10 @@ useful solver coordination inside a model-specific module.
 
 This epic is the release gate for those existing-engine problems. It connects
 the six operational tickets already selected by the 2026-08-09 trajectory
-survey with two narrow learning and fitting tickets. It does not add a new
-factor family or claim that CFFG is a universal solver. It also does not replace
-the separate paper-faithfulness and rSLDS scientific-evidence work.
+survey with two narrow learning and fitting tickets and a bounded
+compiler/engine modularization sequence. It does not add a new factor family
+or claim that CFFG is a universal solver. It also does not replace the separate
+paper-faithfulness and rSLDS scientific-evidence work.
 
 ## Outcomes / Acceptance Criteria
 
@@ -47,6 +48,11 @@ the separate paper-faithfulness and rSLDS scientific-evidence work.
    moved out of an rSLDS module only when a second model fixture proves the
    same contract. Model-specific initialization and diagnostics remain
    model-specific.
+6.1. Compiler planning and lowering have typed one-way owners after
+     characterization tests pin the existing arena and address contracts.
+6.2. Engine execution, schedule control, objective assembly, and readouts have
+     focused owners after characterization tests pin the existing numerical
+     and status contracts.
 7. Single-engine and colony loops preserve per-instance termination status and
    meet the throughput evidence required by `cff-wbhu` before long-rollout
    planning relies on them.
@@ -79,8 +85,9 @@ that satisfies the numbered outcomes with equivalent evidence.
 - Keep model recipes in `cffg.models`, factor semantics in registered rule or
   learning families, and generally reusable runtime policy outside model
   modules only after two consumers establish the common contract.
-- Treat `cff-ahps` as downstream breadth. It must not close by counting a
-  model-specific rSLDS learner as generic learning support.
+- Treat `cff-ahps` as the downstream finite integration baseline. It must not
+  close by counting a model-specific rSLDS learner as generic learning support
+  or by adding another family instead of satisfying a missing surface.
 - Use this compact dependency view when the roadmap changes:
 
   ```text
@@ -90,7 +97,12 @@ that satisfies the numbered outcomes with equivalent evidence.
   [ ] cff-cj5h (ready) ------------------------------------+
   [ ] cff-j7mm (ready) ------------------------------------+
   [ ] cff-209l (ready) ------------------------------------+
-  [ ] cff-wbhu (ready) --> [ ] cff-5edo -------------------+
+  [ ] cff-wjqg (ready) --> [ ] cff-xdip --> [ ] cff-8whp   |
+                                              --> [ ] cff-5edo
+  [ ] cff-wjqg --> [ ] cff-0fw2 --> [ ] cff-wbhu ----------+
+  [ ] cff-209l --> [ ] cff-edoz ----------------------------+
+  [ ] cff-wbhu + cff-cj5h + cff-3kdk + cff-edoz            |
+                                --> [ ] cff-ws3c ------------+
   [x] 6tek + 4apw + lquu --> [ ] cff-dqk2 (ready)          |
                                 --> [ ] cff-11jj -----------+
                                                                |
@@ -110,11 +122,16 @@ that satisfies the numbered outcomes with equivalent evidence.
   `gaussian_mixture_linear` and `recurrence_link` factors.
 - `cff-11jj` consumes those adapters in both rSLDS learning cadences and
   separates only proven reusable fitting coordination from model policy.
-- `cff-3kdk`, `cff-cj5h`, `cff-j7mm`, `cff-209l`, `cff-wbhu`, and `cff-5edo`
-  retain their existing acceptance criteria. This epic supplies their common
-  trustworthiness gate; it does not absorb their implementation scope.
-- The separate paper-faithfulness and minimum-usable-release gate recommended
-  by `cff-bpgm` is not created by this ticket.
+- `cff-3kdk`, `cff-cj5h`, `cff-j7mm`, and `cff-209l` retain their existing
+  acceptance criteria. The `cff-wbhu` and `cff-5edo` milestones delegate their
+  former bundled criteria to dependency-ordered child tickets. This epic
+  supplies their common trustworthiness gate; it does not absorb their
+  implementation scope.
+- `cff-edoz` owns typed compiler planning and lowering boundaries after
+  `cff-209l`. `cff-ws3c` owns the engine execution, objective, and readout
+  extraction after the affected public contracts are characterized.
+- `cff-uy48` is the separate paper-faithfulness and minimum-usable-release gate
+  recommended by `cff-bpgm`; it remains parallel to this epic.
 - Nonlinear, neural, balanced-tree recurrence, structure-learning, and new
   model-family work remain downstream or parked under their existing tickets.
 
@@ -141,18 +158,20 @@ that satisfies the numbered outcomes with equivalent evidence.
 
 ## Notes
 
-**2026-08-13T04:07:32Z**
+**2026-08-13T04:37:28Z**
 
-Roadmap and ambiguity handoff, 2026-08-12. The dependency records are authoritative; this compact companion was derived from `tk dep tree --full`, `tk ready`, and `tk blocked` before `tk dep cycle` reported no cycle.
+Roadmap refinement, 2026-08-12. Legend: prerequisite --> dependent.
 
-Legend: prerequisite --> dependent
+[ ] 209l (ready) --> [ ] edoz --+
+[ ] wjqg (ready) --> [ ] 0fw2 --> [ ] wbhu --+--> [ ] ws3c --> [ ] cfqg
+[ ] 3kdk (ready) ----------------------------+
+[ ] cj5h (ready) ----------------------------+
+[ ] wjqg --> [ ] xdip --> [ ] 8whp --> [ ] 5edo --> [ ] cfqg
+[ ] dqk2 (ready) --> [ ] 11jj ---------------------------> [ ] cfqg
+[ ] j7mm (ready) ----------------------------------------> [ ] cfqg
 
-[ ] 3kdk (ready) -----------------------+
-[ ] cj5h (ready) -----------------------+
-[ ] j7mm (ready) -----------------------+
-[ ] 209l (ready) -----------------------+--> [ ] cfqg engine trust --> [ ] ahps breadth
-[ ] wbhu (ready) --> [ ] 5edo ----------+
-[ ] dqk2 (ready) --> [ ] 11jj ----------+
+Immediate blockers are shown by the first open prerequisite on each path. New family implementation waits downstream of cfqg.
 
-Scientific consumer: [ ] akmp --> [ ] 64ri --+--> [ ] 0l31 --> [ ] oyie --> [~] nkbj
-                     [ ] dqk2 --> [ ] 11jj --+
+**2026-08-13T04:40:34Z**
+
+Authoring handoff, 2026-08-12: cff-edoz and cff-ws3c add the characterization-first compiler/engine modularization sequence. cff-wbhu and cff-5edo now delegate their bundled ordinary/mixed-controller and status/warm-start work to ordered children. Ticket scans were reviewed; dependency-cycle and diff-hygiene checks passed. No pytest run was required for ticket/document-only changes.

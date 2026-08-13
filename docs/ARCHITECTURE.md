@@ -1046,13 +1046,16 @@ than current status:
   spike.
 - **M8** — plotting facility: paper-faithful CFFG diagrams (landed, cff-ql2n).
 
-### Factor-library roadmap (epic cff-ahps)
+### Extensible-kernel baseline and optional factor-library roadmap (epic cff-ahps)
 
-The long game is a general factor-graph engine: all useful probability
-distributions (continuous, discrete, hybrid), constraint-satisfaction factors
-for optimization under uncertainty, and neural-network factors with backprop.
-Ordered by dependency, one ticket each — derivations happen at top level and
-land as docstrings; delegation guidance lives in the epic:
+The long game is a general factor-graph engine with a deliberately extensible
+vocabulary. Epic cff-ahps closes on a finite integrated baseline for
+representative discrete, Gaussian, exponential-family, and hybrid paths; it
+does not close by claiming all useful distributions or a universal solver.
+Additional nonlinear, neural, plate, and topology work remains optional and is
+selected from measured demand. Existing and possible extensions are listed
+below in dependency order; each still needs its own derivation and executable
+contract:
 
 - **M9 — Gaussian core** (cff-4e5z, landed): domain families, information-form
   arena, linear-Gaussian BP, Kalman parity (§2b above).

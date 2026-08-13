@@ -7,6 +7,7 @@ created: 2026-07-27T05:44:29Z
 type: task
 priority: 2
 assignee: coopwilliams
+parent: cff-cfqg
 tags: [performance]
 ---
 # Vectorize categorical and Gaussian engine readouts

@@ -7,7 +7,6 @@ created: 2026-08-09T13:09:26Z
 type: epic
 priority: 1
 assignee: coopwilliams
-parent: cff-ahps
 tags: [rslds, validation, learning, statistics]
 ---
 # Epic: Confirm full source-specific rSLDS reference parity
@@ -110,7 +109,7 @@ Legend: prerequisite --> dependent
 
     Parallel linked work: [ ] cff-0f3g balanced-tree epic
     Independent research: [ ] cff-dlrj destination-softmax derivation
-    Roadmap parent, not a dependency edge: cff-ahps
+    Linked engine/release baselines: cff-cfqg and cff-uy48
 
 Research question: what comparison remains faithful to both the CFFG papers
 and the Linderman rSLDS paper? Answer: CFFG does not prescribe source-specific

@@ -2,12 +2,11 @@
 id: cff-dlrj
 status: open
 deps: []
-links: [cff-0f3g, cff-nkbj]
+links: [cff-0f3g, cff-nkbj, cff-ahps]
 created: 2026-08-10T02:58:08Z
 type: task
 priority: 3
 assignee: coopwilliams
-parent: cff-ahps
 tags: [rslds, hybrid, derivation]
 ---
 # Derive a destination-softmax recurrence VMP and free-energy contract
@@ -81,9 +80,9 @@ method that satisfies the outcomes.
 ## Future work
 
 If the derivation supports implementation, create separate fixed-inference,
-learning, and integration tickets under cff-ahps. cff-nkbj continues with the
-decision-list paper-equation reference, and cff-0f3g continues with binary-tree
-topologies regardless of this ticket's result.
+learning, and integration tickets after the cff-cfqg breadth gate. cff-nkbj
+continues with the decision-list paper-equation reference, and cff-0f3g
+continues with binary-tree topologies regardless of this ticket's result.
 
 ## Definitions
 

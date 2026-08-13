@@ -1,13 +1,12 @@
 ---
 id: cff-o7hs
 status: open
-deps: [cff-4e5z, cff-ri8m, cff-209l]
-links: [cff-1o72, cff-fxmj, cff-ri8m, cff-l6i5, cff-pksr, cff-lquu, cff-k9ws, cff-209l]
+deps: [cff-4e5z, cff-ri8m, cff-209l, cff-cfqg]
+links: [cff-1o72, cff-fxmj, cff-ri8m, cff-l6i5, cff-pksr, cff-lquu, cff-k9ws, cff-209l, cff-ahps]
 created: 2026-07-08T16:49:34Z
 type: feature
 priority: 2
 assignee: coopwilliams
-parent: cff-ahps
 ---
 # Nonlinear Gaussian factors: linearization + sigma-point moment matching (EP)
 
@@ -145,7 +144,10 @@ These suggestions are optional. Another method is acceptable if it satisfies the
 ## Future work
 
 - cff-1o72 builds deterministic neural factors, free-energy-gradient training, and amortized message initialization on this ticket's nonlinear Gaussian and surrogate-ledger contracts.
-- cff-ahps uses this ticket and cff-1o72 to close the nonlinear and neural branches of the universal factor-library roadmap after its other prerequisites are satisfied.
+- cff-ahps no longer requires this ticket for closure. The engine-trustworthiness
+  gate `cff-cfqg` is the immediate prerequisite that freezes new family breadth;
+  after it closes, this ticket remains an evidence-selected nonlinear extension
+  and `cff-1o72` remains its downstream neural extension.
 - Continuous-to-discrete nonlinear links use declared hybrid subclasses with proved variational bounds. cff-k9ws delivered the recurrent stick-breaking link; this ticket does not replace or generalize it.
 - Nonlinear or Gaussian-only GFE messages remain excluded. cff-dfpi and cff-izjd delivered the bounded discrete-regime epistemic route; expanding that scope requires a separate ticket and a new derivation.
 

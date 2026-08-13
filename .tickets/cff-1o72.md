@@ -2,12 +2,11 @@
 id: cff-1o72
 status: open
 deps: [cff-o7hs]
-links: [cff-fxmj, cff-o7hs, cff-ri8m, cff-l6i5, cff-209l]
+links: [cff-fxmj, cff-o7hs, cff-ri8m, cff-l6i5, cff-209l, cff-ahps]
 created: 2026-07-08T16:50:10Z
 type: feature
 priority: 2
 assignee: coopwilliams
-parent: cff-ahps
 ---
 # Neural factors: NN nodes with backprop, Laplace messages, amortized recognition
 
@@ -62,7 +61,9 @@ These suggestions are optional. Another method is acceptable if it satisfies the
 
 ## Future work
 
-- cff-ahps uses this ticket to close the neural-factor branch of the universal factor-library roadmap after every other epic prerequisite is satisfied.
+- cff-ahps no longer requires neural factors for closure. This ticket remains
+  an optional extension after cff-o7hs and inherits the engine-trustworthiness
+  gate through that prerequisite.
 - Arbitrary Gaussian-only or nonlinear GFE messages remain excluded. cff-dfpi and cff-izjd selected the bounded discrete-regime epistemic route; expanding nonlinear GFE requires a separate ticket and a new derivation.
 - Neural structure search, architecture selection, and automatic network growth are not part of this ticket. No downstream ticket for that work is identified.
 

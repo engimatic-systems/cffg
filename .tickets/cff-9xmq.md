@@ -1,13 +1,12 @@
 ---
 id: cff-9xmq
 status: open
-deps: [cff-wbhu]
-links: [cff-6s31]
+deps: [cff-wjqg]
+links: [cff-6s31, cff-ahps]
 created: 2026-07-10T03:30:52Z
 type: feature
 priority: 2
 assignee: coopwilliams
-parent: cff-ahps
 ---
 # Plate Broadcast: balanced equality tree — O(log N) BP diameter on hub fan-outs
 
@@ -350,19 +349,20 @@ ticket is not credited with a faster equality kernel.
   sweep count and the sequential and batched throughput measurements.
 - `docs/ARCHITECTURE.md` records the 784-leaf compilation measurement and names
   linear Broadcast diameter as the perception bottleneck.
-- cff-wbhu owns the compiled sweep loop and is the immediate ready prerequisite.
+- cff-wjqg owns the ordinary compiled sweep loop and is the immediate ready prerequisite.
 - cff-9xmq owns balanced topology, semantic parity, propagation diameter, and
   the corresponding performance evidence.
 - cff-mjku owns the public non-plate fan-out operations that consume this plan.
 - cff-6s31 owns compact plate lowering and is linked rather than prerequisite.
-- cff-ahps is the downstream factor-library roadmap epic.
+- cff-ahps no longer requires balanced broadcast topology for closure. This
+  ticket remains an optional scaling extension selected from measured demand.
 
 Legend: `-->` means prerequisite to dependent; `~~~>` means linked interface
 coordination without a dependency edge.
 
 ```text
 [x] cff-j4mu --+
-[x] cff-d56d --+--> [ ] cff-wbhu (ready)
+[x] cff-d56d --+--> [ ] cff-wjqg (ready)
 [x] cff-44we --+             |
                              +--> [ ] cff-9xmq (blocked)
                                          |
@@ -370,7 +370,7 @@ coordination without a dependency edge.
                                          |           |
                                          |           +--> [ ] cff-pyy9
                                          |
-                                         +--> [ ] cff-ahps (roadmap epic)
+                                         +--> [ ] optional scaling consumers
 
 [ ] cff-9xmq ~~~> [ ] cff-6s31 (linked compact lowering contract)
 ```
@@ -382,7 +382,7 @@ non-plate fan-out and observation-branch operations; this ticket supplies no
 public edit API. cff-6s31 owns compact index-plan lowering, recursive plate
 execution, and compact resource accounting; this ticket supplies only a
 materialization-independent topology description and analytic tree counts.
-cff-ahps owns the broader universal-factor-library roadmap and consumes the
+cff-ahps records the finite extensible-kernel baseline and links the
 delivered Broadcast performance. No ticket currently owns a higher-arity
 equality kernel because the minimal ternary tree meets this ticket's contract.
 

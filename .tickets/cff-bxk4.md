@@ -2,12 +2,11 @@
 id: cff-bxk4
 status: open
 deps: [cff-4e5z, cff-9bex]
-links: [cff-9bex, cff-x5lv]
+links: [cff-9bex, cff-x5lv, cff-ahps]
 created: 2026-07-08T16:50:10Z
 type: task
 priority: 3
 assignee: coopwilliams
-parent: cff-ahps
 ---
 # viz: Gaussian/continuous domain rendering
 
@@ -17,7 +16,7 @@ Commit `bae4d87` proves that Gaussian templates reach the SVG backend and gives 
 
 Part I §5.2 and Figure 8 put `N` inside a bead to denote a Gaussian *form constraint*. They do not prescribe a numeric dimension caption. This ticket therefore keeps form constraints separate and adopts `ℝᵈ` as the repository's dimension caption, with the positive integer `d` taken from `VariableSpec.dim`; it does not infer a domain from a neighbouring factor or parameter array.
 
-The closed prerequisite cff-4e5z supplies validated Gaussian variables and the LGSSM builder. The open prerequisite cff-9bex supplies routes that keep high-degree structural and parameter wires out of factor interiors. The linked cff-x5lv owns general label extent, terminal overhang staggering, and collision bounds; this ticket owns the Gaussian domain text and continuous-terminal semantics that those facilities place. Completion unblocks the Gaussian-visualization branch of roadmap epic cff-ahps.
+The closed prerequisite cff-4e5z supplies validated Gaussian variables and the LGSSM builder. The open prerequisite cff-9bex supplies routes that keep high-degree structural and parameter wires out of factor interiors. The linked cff-x5lv owns general label extent, terminal overhang staggering, and collision bounds; this ticket owns the Gaussian domain text and continuous-terminal semantics that those facilities place. This optional visualization work is linked from cff-ahps but is not a closure requirement.
 
 ## Outcomes / Acceptance Criteria
 
@@ -177,7 +176,8 @@ The closed prerequisite cff-4e5z supplies validated Gaussian variables and the L
 - cff-x5lv owns general label extent, terminal-wire staggering, and collision bounds. This ticket supplies the Gaussian caption and terminal domain data that its layout policy consumes.
 - Scalar exponential-family domain notation or family-specific terminal marks are outside this ticket. Create a separate ticket if those variables need exported domain captions.
 - Interactive styling, hover text, and renderer-specific color encodings are outside this monochrome SVG contract. The typed scene data should permit those future consumers without SVG parsing.
-- Closing cff-bxk4 removes one direct blocker from cff-ahps; the epic remains governed by its other dependency records.
+- Closing cff-bxk4 completes its optional Gaussian-visualization scope and does
+  not change the dependency state of cff-ahps.
 
 ## Definitions
 

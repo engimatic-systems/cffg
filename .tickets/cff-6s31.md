@@ -2,12 +2,11 @@
 id: cff-6s31
 status: open
 deps: [cff-cpxj, cff-d56d, cff-j7mm]
-links: [cff-9xmq]
+links: [cff-9xmq, cff-ahps]
 created: 2026-07-09T22:04:18Z
 type: feature
 priority: 3
 assignee: coopwilliams
-parent: cff-ahps
 ---
 # Plates phase 2: index-table expansion — compile without materializing copies
 
@@ -189,7 +188,8 @@ These suggestions are optional. Another method is acceptable if it satisfies the
 ## Future work
 
 - cff-9xmq owns replacement of the phase-1 linear `Broadcast` equality chain with a balanced tree after its cff-wbhu prerequisite.
-- cff-ahps consumes compact plate compilation as part of the universal-factor-library roadmap.
+- cff-ahps no longer requires compact plate lowering for closure. This ticket
+  remains an optional scaling extension after its estimator prerequisite.
 - Unrolling remains a separate mechanism under the decision recorded in cff-cpxj; no migration ticket is identified.
 - No other future work is identified.
 

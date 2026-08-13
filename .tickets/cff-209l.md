@@ -7,7 +7,7 @@ created: 2026-07-30T16:09:57Z
 type: chore
 priority: 2
 assignee: coopwilliams
-parent: cff-ahps
+parent: cff-cfqg
 ---
 # Bind discrete and Gaussian arenas to the FactorKernel execution contract
 
@@ -195,7 +195,9 @@ These suggestions are optional. Another method is acceptable if it satisfies the
 
 - cff-o7hs uses the Gaussian same-arena kernel binding to add nonlinear Gaussian factors without central compiler or engine branches.
 - cff-1o72 inherits this prerequisite through cff-o7hs and uses the same binding for neural Gaussian factors.
-- cff-ahps uses this ticket to complete the executable-registration foundation for its nonlinear and neural roadmap branches.
+- cff-cfqg uses this ticket as the executable-registration foundation for the
+  compiler and engine modularization sequence. Optional nonlinear and neural
+  work remains downstream through cff-o7hs and cff-1o72.
 - cff-6tek owns `member_of`, named parameter writes, and learnable-family registration outside the discrete arena. This ticket preserves those surfaces but does not expand them.
 - A unified public registration path for hybrid or other multi-arena factors remains outside this ticket. No downstream ticket for that generalization is identified.
 

@@ -1,7 +1,7 @@
 ---
 id: cff-cynx
 status: open
-deps: [cff-izjd, cff-du6m]
+deps: [cff-izjd, cff-du6m, cff-cfqg]
 links: []
 created: 2026-07-13T03:51:42Z
 type: epic
