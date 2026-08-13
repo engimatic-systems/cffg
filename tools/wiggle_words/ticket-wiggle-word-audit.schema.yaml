@@ -3,7 +3,7 @@ $schema: https://json-schema.org/draft/2020-12/schema
 $id: https://github.com/engimatic-systems/cffg/blob/main/tools/wiggle_words/ticket-wiggle-word-audit.schema.yaml
 title: CFFG ticket wiggle-word contextual audit
 description: >-
-  Schema for tools/wiggle_words/ticket-wiggle-word-audit-v2.yaml. The audit is ordered by
+  Schema for a locally retained tools/wiggle_words/ticket-wiggle-word-audit-v2.yaml. The audit is ordered by
   candidate, while the query tool projects bounded candidate or ticket slices
   so agents do not place the complete report in their context windows.
 type: object
@@ -41,7 +41,8 @@ properties:
       $ref: '#/$defs/candidate'
 
 x-navigation:
-  authoritative_instance: tools/wiggle_words/ticket-wiggle-word-audit-v2.yaml
+  local_instance: tools/wiggle_words/ticket-wiggle-word-audit-v2.yaml
+  repository_policy: Audit instances are generated artifacts and are ignored by Git.
   candidate_lexicon: tools/wiggle_words/ticket-wiggle-words-v2.yaml
   query_tool: tools/wiggle_words/query_ticket_wiggle_audit.py
   context_rule: >-

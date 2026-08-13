@@ -84,3 +84,11 @@ Additional candidates introduced by the classification note retain these meaning
 **2026-08-09T14:04:55Z**
 
 Draft PR: https://github.com/engimatic-systems/cffg/pull/60, targeting agent/cff-l7y4-observed-only-rslds (PR #59).
+
+**2026-08-13T05:07:28Z**
+
+PR review correction (2026-08-12): split the observation-only initialization responsibility out of rslds_fit.py into rslds_init.py. The new module owns observation validation, initialization protocol/result types, PCA/transition clustering/local AR construction, and initialization shape/propriety validation; rslds_fit.py remains the host coordinate-loop and status/result owner. The files are 350 and 692 lines respectively, both below the 1,000-line limit. cffg.models exports are unchanged, and the former direct rslds_fit imports remain compatible. The 10 focused fitter tests passed in 130.67 seconds; final short-suite validation is pending on the committed refactor.
+
+**2026-08-13T05:16:22Z**
+
+Final PR-review validation (2026-08-12): the default not-slow suite at code commit a961905 passed 1,334 tests with 39 deselected and zero failures in 509.97 seconds; the shared test dashboard was refreshed. No code changed after that run.
