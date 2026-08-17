@@ -1,6 +1,6 @@
 ---
 id: cff-s6rs
-status: open
+status: in_progress
 deps: [cff-9o39]
 links: []
 created: 2026-08-17T20:52:04Z
@@ -46,3 +46,29 @@ cff-huxt converts the complete calibration artifact into the immutable preregist
 - **Calibration-only:** Uses only the registered non-final seeds and may affect protocol choices.
 - **Domain cap:** A substantive maximum acceptable loss that calibration variability cannot relax.
 - **Whole-run projection:** A declared calculation from measured work to every registered final family/seed/arm coordinate plus headroom.
+
+## Notes
+
+### 2026-08-17 — implementation handoff
+
+`docs/ARCHITECTURE.md` change-path row: N/A. This ticket measures the sibling validation experiment. It does not change CFFG compiler, engine, learning, factor ownership, or public API behavior.
+
+Duplicated execution surfaces checked before calibration:
+
+- `canonical_homogeneous` and `source_heterogeneous` generator dispatch, descriptors, design gates, and data identities;
+- both calibration seeds, both inference tiers, four independent reference chains, and both protocol-declared learned controls;
+- candidate-horizon execution, coverage and occupancy audits, diagnostic summaries, resource measurements, and whole-run projections;
+- paired non-inferiority outcomes, absolute family-specific outcomes, threshold inputs, and fixed-sequence claim records;
+- raw attempt payloads, retained reference samples, coordinate checkpoints, aggregate recomputation, manifests, commands, environment provenance, and source revisions;
+- the immutable family registry, balanced evaluation grid, primary-effect definitions, claim ordering, and final-seed map, which this ticket must not alter.
+
+Hostile-input decisions:
+
+- Sparse source/gate exposure, one-sided binary outcomes, rank deficiency, or insufficient source-row contrast makes a heterogeneous candidate ineligible before fitted scores are considered.
+- Any non-finite metric, incomplete chain, diagnostic failure, convergence failure, budget exhaustion, missing arm, or corrupted checkpoint remains in the raw artifact and cannot support scale or margin selection.
+- Calibration runs in explicit float64. The existing float32 generator and functional-score regressions remain the consumer-survival evidence; this ticket does not weaken them.
+- Candidate horizons span at least three declared domain sizes per family. Scale selection must use measured complete coordinates rather than extrapolation alone.
+- Margin rules are bounded by the cff-i00o domain caps. Calibration variability cannot relax those caps, and final-seed data cannot enter the rule.
+- cff-s6rs may increase calibration budgets and rerun failed calibration coordinates under append-only attempts, but it cannot generate or fit a registered final seed.
+
+cff-huxt owns the immutable replacement freeze after calibration is complete. cff-oyie remains the only final-execution owner.
