@@ -1,6 +1,6 @@
 ---
 id: cff-akmp
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-10T02:58:08Z
@@ -110,3 +110,7 @@ Classification-note additions: check=the named normalization or provenance
 verification; estimate=external observed-only parameter estimation;
 intended=the contextual meaning assignments in this note; current=the term
 identified here as replaced by the pinned Python/platform boundary.
+
+**2026-08-17T17:01:01Z**
+
+Completed the source-specific reference runtime in sibling repo /Users/ravd/projects/experiments/cffg-nascar-validation on branch cff-akmp-reference-runtime. Implementation head before the artifact is 0d1e6fe; proposed branch head with the committed smoke artifact is e560be5. The isolated Python 3.11 uv project pins recurrent-slds 383ddac and all dependency/native-source commits and hashes, applies recorded build/API patches, forces decision_list(4) into generator and learner, keeps the fit boundary observed-only, and records a hashed successful artifact at artifacts/reference-smoke. Validation: 8 reference-runtime tests passed; bootstrap identity verified; artifact manifest verified; git diff 1b1b714 --check passed. The only warnings are upstream legacy deprecations and the explicitly recorded serial Polya-Gamma fallback. No CFFG inference source changed. Next: cff-64ri can build the paper-equation source adapter against this runtime and artifact contract.
