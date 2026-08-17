@@ -1,6 +1,6 @@
 ---
 id: cff-9o39
-status: open
+status: in_progress
 deps: [cff-i00o]
 links: []
 created: 2026-08-17T20:52:04Z
@@ -50,3 +50,29 @@ cff-s6rs uses the runner for measured dual calibration and scale selection. cff-
 - **Attempt ledger:** An append-only record that labels each execution attempt completed, failed, or interrupted while preserving its payload.
 - **Durable coordinate:** The smallest unit whose completed result can be reused after process interruption.
 - **Family-aware aggregate:** A result that retains separate decisions and evidence for each named dataset family.
+
+## Notes
+
+### 2026-08-17 — implementation handoff
+
+`docs/ARCHITECTURE.md` change-path row: N/A. This ticket changes orchestration and artifact durability in the sibling validation experiment. It does not modify CFFG compiler, engine, learning, or model ownership.
+
+Duplicated execution surfaces checked before implementation:
+
+- dataset-family dispatch and family-qualified truth/evaluation records;
+- CFFG tiers, independent reference chains, and both protocol-declared SLDS controls;
+- calibration and final family/seed/replicate loops;
+- raw attempt rows, secondary outcomes, absolute functional outcomes, aggregation, and report recomputation;
+- checkpoint path, identity, immutable payload manifest, attempt ledger, interruption, resume, and tamper detection;
+- historical one-family runner and committed preregistration artifacts, which remain available through compatibility entry points until the replacement freeze.
+
+Hostile-input decisions:
+
+- One arm exception becomes an explicit not-ready arm record; it cannot abort later arms or family coordinates.
+- Missing, duplicate, corrupt, cross-family, or wrong-registration checkpoints stop resume before new work.
+- Interrupted attempts retain terminal ledger state and immutable payloads; a later attempt receives a new directory.
+- Non-finite or malformed functional probability tensors remain invalid metrics and make their family not-ready.
+- Calibration uses the same append-only coordinate checkpoint machinery as final execution, so a long second family does not discard completed first-family work.
+- Compact float32 execution remains a focused regression; the family-aware final path remains registered as float64.
+
+cff-9o39 will validate compact calibration fixtures only. cff-s6rs owns measured calibration seeds and cff-oyie remains the only owner of final-seed execution.
