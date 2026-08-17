@@ -1,6 +1,6 @@
 ---
 id: cff-8xve
-status: open
+status: in_progress
 deps: [cff-ah4t]
 links: []
 created: 2026-08-17T20:46:52Z
@@ -42,7 +42,7 @@ These suggestions are optional. The implementer may choose another sound method 
 
 ## Future work
 
-cff-i00o integrates both families into calibration, statistical registration, restartable execution, reporting, and the replacement freeze. cff-oyie owns final seeds. cff-nkbj owns the eventual claim ladder.
+cff-i00o defines the dual-family statistical protocol. cff-9o39 builds family-aware execution, cff-s6rs performs measured calibration, and cff-huxt writes the replacement freeze. cff-oyie owns final seeds. cff-nkbj owns the eventual claim ladder.
 
 ## Definitions
 
@@ -51,3 +51,51 @@ cff-i00o integrates both families into calibration, statistical registration, re
 - **Classic benchmark:** The unchanged source-homogeneous NASCAR generator used by the original demonstration.
 - **Source regime:** The current discrete regime `z[t]` from which a transition starts.
 - **Source-heterogeneous:** At least one recurrence slope or offset differs across current discrete regimes and changes transition probabilities on shared states.
+
+## Notes
+
+### 2026-08-17 — implementation handoff and refined dependency path
+
+`docs/ARCHITECTURE.md` change-path row: N/A. This ticket changes only the sibling validation experiment's declared dataset generator and calibration evidence; it does not change a CFFG engine owner or execution surface.
+
+Duplicated execution surfaces checked before implementation:
+
+- canonical constructor and a full parameter/trajectory golden;
+- explicit heterogeneous constructor and family dispatch;
+- shared source-row/destination-regime conventions consumed by CFFG and the reference adapter;
+- calibration-only coverage, outcome-balance, rank, float32/float64, and long-rollout checks;
+- final-seed generation and fitting: N/A and forbidden by this ticket.
+
+Hostile-input decisions:
+
+- Sparse, zero, one-sided, or rank-deficient gate support fails calibration before fitting.
+- Improper or vacuous incoming messages are N/A because this ticket only generates datasets.
+- Float32 transition probabilities and generated values must remain finite and normalized.
+- A calibration-only `T=10,000` rollout exercises a larger domain than inference fixtures.
+- Every stochastic operation starts from an explicit legacy-compatible `RandomState` seed; no numeric floor, ridge, or clamp is introduced.
+
+Legend: prerequisite --> dependent
+
+```text
+[x] cff-ah4t scale and coverage audit
+      |
+      +--> [ ] cff-8xve heterogeneous generator (ready/in progress)
+              |
+              +--> [ ] cff-i00o protocol and claims
+                      |
+                      +--> [ ] cff-9o39 family-aware execution
+                              |
+                              +--> [ ] cff-s6rs measured calibration
+                                      |
+                                      +--> [ ] cff-huxt replacement freeze
+                                              |
+                                              +--> [ ] cff-oyie final run
+                                                      |
+                                                      +--> [ ] cff-nkbj evidence epic
+```
+
+### 2026-08-17 — calibration-only generator research
+
+- Question: Can a fixed heterogeneous generator exercise each source/gate cell without changing the classic generator? Answer: yes. Keep the canonical dynamics and emission arrays, rotate the three recurrence normals by `(-12, -4, 4, 12)` degrees across sources, and choose source offsets from fixed anchor transition probabilities. Sources: `src/cffg_nascar_validation/nascar.py`, `.reference-sources/rslds/examples/nascar.py`, and the cff-ah4t occupancy artifact. Confidence: high.
+- Question: Does the proposed design satisfy the ticket's coverage gates? Answer: on calibration seeds 3101 and 3102 at `T=1,600` with the 80% training split, the minimum cell has 45 exposures, nine successes and nine failures, and augmented design rank three. At `T=10,000`, both rollouts are finite and bounded; float32 transition probabilities remain finite and normalized on the checked state grid. Source: calibration-only construction audit performed before implementation; the committed artifact must reproduce these measurements. Confidence: high.
+- Question: What recovery outcome is defensible? Answer: use aligned transition probabilities on both realized states and a shared source-by-state grid, plus source-function contrasts. Raw recurrence coefficient error is not automatically label invariant because relabeling destinations changes the sequential gate order. Sources: `reference/adapter-provenance.json`, `paper_adapter.py`, and `docs/DERIVATIONS.md` source/destination convention. Confidence: high.
