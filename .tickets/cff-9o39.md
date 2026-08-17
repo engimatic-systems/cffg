@@ -1,6 +1,6 @@
 ---
 id: cff-9o39
-status: in_progress
+status: closed
 deps: [cff-i00o]
 links: []
 created: 2026-08-17T20:52:04Z
@@ -76,3 +76,11 @@ Hostile-input decisions:
 - Compact float32 execution remains a focused regression; the family-aware final path remains registered as float64.
 
 cff-9o39 will validate compact calibration fixtures only. cff-s6rs owns measured calibration seeds and cff-oyie remains the only owner of final-seed execution.
+
+### 2026-08-17 — completion handoff
+
+The sibling validation experiment now executes both registered dataset families through family/seed/replicate checkpoints with append-only attempt ledgers. The implementation isolates CFFG, reference-adapter, and control failures so every later arm and coordinate still receives an explicit result. Resume validates family, protocol, registration, generator, payload, and manifest identities before starting new work. Aggregation retains separate classic and heterogeneous evidence and computes the gated joint decision without erasing a valid family when another family fails.
+
+The experiment commits are `da656a1` (coordinate checkpoints), `5790ee6` (arm isolation), `985ba7b` (dual runner), `c3c4e19` (registered float64 CLI), and `d6604be` (documentation). The final short suite passed 77 tests in 24.68 seconds. A real compact smoke run exercised both families, both inference tiers, both controls, and all eight reference chains. Every planned arm ran; the deliberately tiny budgets and retained draws correctly produced not-ready scientific rows instead of false success. No registered final seed was generated or fit.
+
+cff-s6rs is now the ready downstream task. It owns measured calibration on seeds 3101 and 3102, family-specific scale and budget selection, calibrated decision margins, and the replacement calibration artifacts.
