@@ -1,6 +1,6 @@
 ---
 id: cff-dqk2
-status: in_progress
+status: closed
 deps: [cff-6tek, cff-lquu, cff-4apw]
 links: [cff-ahps]
 created: 2026-08-13T03:59:30Z
@@ -170,3 +170,7 @@ input contracts.
 **2026-08-13T04:07:32Z**
 
 Planning and ambiguity handoff, 2026-08-12. Applicable change path: Learnable or checkpoint feature. cffg.learn owns family and cadence behavior; cffg.conj owns posterior algebra; Engine.gaussian_node_stats and Engine.recurrence_weight_stats own source records; compiler addresses and set_params own writes. Inference messages, schedules, objective terms, structure hashes, and model-specific fit cadence are explicit N/A surfaces except for parity checks. Flooding and scheduled statistic readouts are compared; learning remains host-side, so a second JIT learning implementation is N/A; current and legacy checkpoint behavior is required; single-instance/vmap learning is N/A unless the implementation adds a batched public contract.
+
+**2026-08-17T16:04:41Z**
+
+Completion handoff, 2026-08-17. Commits ee8ea4e, 7948e4f, 955d459, and 3fa8292 register component_mniw/gaussian_mixture_linear and pg_weights/recurrence_link through the existing Learnables runtime. The adapters derive axes and roles from serialized blobs, pool tied and plate-expanded neutral sources, preserve zero component responsibility exactly, roll point values through compiled parameter addresses, and reject invalid statistics, posterior precision, shapes, and partial legacy multi-array checkpoints before mutation. Versioned checkpoints round-trip both families exactly. Declarations leave messages, schedules, and BFE unchanged. Learning remains host-side, so a second JIT path and single-instance/vmap learning contract are N/A; flooding and mixed source statistics agree. Focused validation passed 83 tests across hybrid learning, legacy learning, Gaussian learning, and plates. Final dashboard gate at 3fa8292 passed 1,353 tests with 39 slow tests deselected and zero failures; pytest 541.55 seconds and dashboard wall 549.543 seconds. cff-11jj is the next consumer and owns rSLDS declaration migration and fit-coordinator boundaries.
