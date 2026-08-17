@@ -1,6 +1,6 @@
 ---
 id: cff-ah4t
-status: in_progress
+status: closed
 deps: [cff-0l31, cff-3vhn]
 links: []
 created: 2026-08-17T18:24:08Z
@@ -10,43 +10,43 @@ assignee: coopwilliams
 parent: cff-nkbj
 tags: [rslds, validation, statistics, performance]
 ---
-# Refreeze a feasible source-specific reference scale
+# Measure rSLDS scale and audit source-gate coverage
 
 ## Background in Plain English
 
-The cff-0l31 freeze selected T=10,000 before its simple linear runtime extrapolation was checked against complete fits. Direct calibration-only measurements now project 4.69 hours at T=80, 5.02 hours at T=160, and 7.37 hours at T=400 for all 24 seeds, both tiers, four reference chains, both CFFG fits, both controls, and 25% headroom. Runtime alone therefore does not justify weakening the experiment.
+The cff-0l31 freeze selected T=10,000 before its simple linear runtime extrapolation was checked against complete fits. This ticket measured the complete comparison at three smaller calibration horizons and added a restart-safe execution path. The measurements show that runtime alone does not justify weakening the experiment.
 
-The same audit exposed a more important coverage boundary. Fitting sees only the 80% training split; several source/gate cells have one-sided binary outcomes even at T=3,200, and the NASCAR truth repeats identical recurrence rows across source regimes. The existing generator can measure transition-probability error on realized source/state support, but it cannot demonstrate recovery of distinct source-specific gate coefficients. No final seed has run. This ticket must resolve that evidence scope, measure the chosen design, and freeze the replacement protocol while retaining the 24-seed paired design, calibrated sampling budget, and strict diagnostics.
+The coverage audit found a more important boundary. Fitting sees only the 80% training split. Several source/gate cells have one-sided binary outcomes even at T=3,200, and the canonical NASCAR truth repeats identical recurrence rows across source regimes. That dataset can test the classic demonstration and transition behavior on visited states, but it cannot demonstrate recovery of distinct source-specific gates. Cooper chose to retain exact canonical NASCAR and add a separately named source-heterogeneous extension. cff-8xve owns that generator; cff-i00o owns the dual-family runner and replacement freeze. No final seed ran in this ticket.
 
 ## Outcomes / Acceptance Criteria
 
-1. A committed benchmark on calibration seeds measures complete-chain wall time and peak memory at no fewer than three candidate training horizons. It records the command, iteration count, environment, and exact extrapolation rule.
-2. The chosen primary comparison scale has enough transitions per source regime and decision-list gate to support the registered recovery and predictive metrics. The ticket states that evidence with observed calibration occupancy rather than relying only on total T.
-3. The replacement preregistration names one exact data horizon and train/held-out split for both primary tiers and both learned SLDS controls. All arms use identical observations, splits, and data seeds.
-4. The final design retains seeds 2001 through 2024, both primary tiers, all six simultaneous primary effects, the calibrated margins, four independent chains, ESS and split R-hat gates, strict failure handling, and retained posterior samples.
-5. Canonical T=10,000 survival remains a separate CFFG robustness claim. If the primary reference comparison uses a smaller tier, README and final reports state that limit prominently and do not call the comparison canonical-scale parity.
-6. The chosen scale has a measured whole-run projection and a checkpoint/restart plan that preserves append-only raw seed artifacts without inspecting aggregate effects early.
-7. A new immutable preregistration and manifest replace the cff-0l31 freeze before cff-oyie begins. They preserve the old freeze as superseded provenance and record why it was not executed.
-8. No final seed is generated or fit by this ticket.
+1. A committed benchmark on calibration seeds measures complete reference chains, both CFFG tiers, and both learned controls at no fewer than three horizons. It records wall time, peak memory, command, iteration count, environment, and its exact whole-run projection rule.
+2. A separately manifested correction counts only fitting-time transitions and records each source/gate's exposure count, binary successes, binary failures, and augmented-state design rank.
+3. The audit states which claims the tied-source canonical generator can and cannot support. It distinguishes classic benchmark outcome evidence from distinct source-specific coefficient recovery.
+4. Final execution writes each completed seed once, hashes its result and raw attempt manifest, preserves interrupted attempts, and resumes only missing registered seeds with matching protocol and preregistration hashes.
+5. The roadmap retains exact canonical NASCAR and assigns the source-heterogeneous extension and dual-family immutable freeze to named downstream tickets before cff-oyie.
+6. No final seed is generated or fit by this ticket.
 
 ## Methodological Suggestions
 
 These suggestions are optional. The implementer may choose another sound method that satisfies the outcomes.
 
-- Benchmark candidate training horizons such as 64, 128, 320, and 640 using only seeds 3101 and 3102.
-- Prefer more observations when regime/gate occupancy and total runtime remain acceptable; development cost alone is not a reason to weaken evidence.
-- Use per-seed append-only execution so an interrupted multi-hour run can resume without replacing completed seeds.
+- Measure whole workflows rather than extrapolating every cost linearly from T=64.
+- Count only the training split when judging fitting coverage.
+- Report gate outcomes and affine-design rank in addition to total exposure.
+- Keep completed seed artifacts append-only and place a retry in a new attempt directory.
 
 ## Future work
 
-cff-3vhn owns the missing secondary report surfaces. cff-oyie owns final execution of the replacement frozen protocol. cff-nkbj owns the scoped conclusion and must name any non-canonical comparison limit.
+cff-8xve owns the source-heterogeneous NASCAR extension and its calibration-only coverage proof. cff-i00o owns dual-family runner integration, calibration, claim registration, and the replacement immutable freeze. cff-oyie owns final execution. cff-nkbj owns the scoped claim ladder.
 
 ## Definitions
 
-- **Candidate horizon:** A calibration-only sequence length measured before the final scale is frozen.
+- **Augmented-state design rank:** The rank of the gate's continuous-state columns plus its intercept column. Rank three is required to locate a two-dimensional affine gate without relying only on its prior.
 - **Checkpoint/restart plan:** A deterministic way to retain completed seed artifacts and resume only missing registered seeds.
-- **Gate occupancy:** The number of observed transitions assigned to each source regime and decision-list decision gate after fitting-time truth boundaries end.
-- **Reference-driven scale tier:** A comparison scale selected because the independent reference implementation cannot practically execute the canonical horizon.
+- **Gate exposure:** A transition that reaches one decision-list gate and therefore contributes one binary observation for that source/gate pair.
+- **Source-heterogeneous:** The recurrence slope or offset changes with the current discrete regime.
+- **Source-homogeneous:** The recurrence slope and offset are tied across current discrete regimes.
 - **Whole-run projection:** A stated calculation from measured per-chain and per-fit time to the complete registered seed, tier, chain, and control set.
 
 ## Notes
@@ -68,3 +68,22 @@ Research question: what does that coverage identify, and is any current scale en
 Decision required: (A, recommended) add a prerequisite that redesigns calibration and final generation with genuinely different source rows, state coverage around every boundary, and per-source/gate full-rank designs with at least five successes, five failures, and 20 total training exposures; then repeat calibration and scale measurement. This preserves the epic's source-specific evidence intent. (B) retain the tied-source NASCAR generator, freeze T=3,200 after a direct whole-run measurement, and narrow the epic/final claim to same-model non-inferiority and transition probabilities on realized support, explicitly excluding source-specific coefficient recovery and evidence for source heterogeneity. cff-ah4t cannot honestly satisfy acceptance criterion 2 until that scientific scope is chosen.
 
 Implementation already landed on the stacked experiment branch: measured low-scale benchmark and manifest (73e0873); append-only per-seed checkpoints with provenance and per-attempt manifests (34c6a8c); start-time benchmark provenance (065f4a2); corrected training-coverage diagnostics (dc9ec66); and the manifested occupancy correction (4717a79). The preregistration test file passes 23 tests at the checkpoint commit, and focused scale tests pass after the audit correction. The replacement freeze is intentionally not written before this decision.
+
+**2026-08-17T20:50:00Z**
+
+Cooper selected dual evidence. Exact source-homogeneous NASCAR remains the faithful classic benchmark. A separately named source-heterogeneous extension will exercise distinct current-regime gate rows. Passing the classic family may support preregistered empirical non-inferiority on that benchmark; passing the extension may support broader source-specific capability evidence. Neither result alone implies authors-code, inference-algorithm, message-equation, or free-energy parity. The implementation continues in cff-8xve and cff-i00o; this measurement and audit ticket is complete without a final seed.
+
+Legend: prerequisite --> dependent
+
+    [x] cff-ah4t: measured scale and coverage audit
+          |
+          +--> [ ] cff-8xve: heterogeneous generator (ready)
+                    |
+                    +--> [ ] cff-i00o: dual-family integration and freeze
+                              |
+                              +--> [ ] cff-oyie: immutable final execution
+                                        |
+                                        +--> [ ] cff-nkbj: scoped claim ladder
+
+    Preserved parallel evidence inside cff-i00o/cff-oyie:
+    exact canonical_homogeneous + source_heterogeneous extension
