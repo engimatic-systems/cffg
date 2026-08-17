@@ -72,3 +72,13 @@ Hostile-input decisions:
 - cff-s6rs may increase calibration budgets and rerun failed calibration coordinates under append-only attempts, but it cannot generate or fit a registered final seed.
 
 cff-huxt owns the immutable replacement freeze after calibration is complete. cff-oyie remains the only final-execution owner.
+
+### 2026-08-17 — classic-scale research
+
+Question → What scale did Linderman et al. use, and what does that permit this project to claim?
+
+Answer → Section 5.1 and the pinned Figure-3 example use one 10,000-step trajectory with four regimes, a two-dimensional latent state, ten-dimensional observations, and 1,000 Gibbs iterations. They fit the complete trajectory; neither source declares a NASCAR train/test split. Therefore 10,000 total steps with an 8,000/2,000 split would not reproduce the paper's fitting scale. cff-s6rs will instead calibrate a 12,500-step canonical trajectory with 10,000 training steps and a registered 2,500-step held-out predictive extension. Passing that protocol may support empirical non-inferiority on the exact canonical generator at the paper's training scale plus the named extension. It may not be called an exact Figure-3 run because the held-out extension and independent implementation differ from the paper workflow.
+
+Source → Linderman et al., Section 5.1, PMLR PDF page 5; pinned `rslds/examples/nascar.py` at commit `383ddac2472cdf3248c6e871baede9ecda6f14cb`, lines 31–52, 167–174, and 579–622.
+
+Confidence → High for dimensions, trajectory length, Gibbs count, and absence of a declared split; medium-high that the paper used exactly one sequence because its wording is singular and the released Figure-3 script creates one.
