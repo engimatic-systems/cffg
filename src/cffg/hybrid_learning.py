@@ -220,3 +220,104 @@ class ComponentMNIWFamily:
             conj.MNIW(m[index], lam[index], psi[index], float(nu[index]))
             for index in range(components)
         )
+
+
+class PGWeightsFamily:
+    """Gaussian natural-parameter learning for recurrent stick weights."""
+
+    name = "pg_weights"
+    readout = "recurrence_weight_stats"
+    _PARAMS = {"eta", "precision"}
+
+    def check(self, learnable, ftype, shapes, roles) -> None:
+        if ftype != "recurrence_link":
+            raise ValueError(
+                f"learnable {learnable!r}: Pólya–Gamma weights do not support "
+                f"factor type {ftype!r}; supported pair is "
+                "pg_weights/recurrence_link"
+            )
+        if set(roles.values()) != {"weights", "offsets"}:
+            raise ValueError(
+                f"learnable {learnable!r}: pg_weights/recurrence_link requires "
+                f"weights and offsets roles, got {sorted(roles.values())}"
+            )
+        by_role = {role: shapes[blob] for blob, role in roles.items()}
+        weights_shape = by_role["weights"]
+        if len(weights_shape) != 3:
+            raise ValueError(
+                f"learnable {learnable!r}: recurrence weights must have shape "
+                f"[K,K-1,d], got {weights_shape}"
+            )
+        regimes, sticks, dimension = weights_shape
+        if (
+            regimes < 2
+            or sticks != regimes - 1
+            or dimension < 1
+            or by_role["offsets"] != (regimes, sticks)
+        ):
+            raise ValueError(
+                f"learnable {learnable!r}: incompatible Pólya–Gamma blob "
+                f"shapes {by_role}"
+            )
+
+    def stats(self, ftype, readout) -> dict[str, np.ndarray]:
+        _proper(readout, ftype)
+        return {
+            "linear": _finite_stat(readout, "linear", ftype),
+            "quadratic": _finite_stat(readout, "quadratic", ftype),
+        }
+
+    def pool(self, records) -> dict[str, np.ndarray]:
+        return {
+            key: np.sum(np.stack([record[key] for record in records]), axis=0)
+            for key in ("linear", "quadratic")
+        }
+
+    def fold(self, params, stats) -> dict[str, np.ndarray]:
+        posterior = self._posterior("posterior", params).update(
+            np.asarray(stats["linear"]), np.asarray(stats["quadratic"])
+        )
+        return self.as_params(posterior)
+
+    def rollover(self, params, ftype) -> dict[str, np.ndarray]:
+        weights, offsets = self._posterior("posterior", params).rollover()
+        return {"weights": weights, "offsets": offsets}
+
+    def raw(self, params, ftype) -> dict[str, np.ndarray]:
+        raise ValueError("Pólya–Gamma weights have no raw-count runtime target")
+
+    def mean(self, params, ftype) -> dict[str, np.ndarray]:
+        weights, offsets = self._posterior("posterior", params).rollover()
+        return {"weights": weights, "offsets": offsets}
+
+    def as_params(self, prior) -> dict[str, np.ndarray]:
+        if isinstance(prior, conj.PGWeights):
+            return {
+                "eta": np.asarray(prior.eta).copy(),
+                "precision": np.asarray(prior.precision).copy(),
+            }
+        if not isinstance(prior, Mapping):
+            raise TypeError(
+                "a Pólya–Gamma weight prior must be cffg.conj.PGWeights or a "
+                "parameter mapping"
+            )
+        return _copy_params(prior)
+
+    def validate_prior(self, learnable, params, shapes) -> None:
+        posterior = self._posterior(learnable, params)
+        required = {
+            (posterior.regimes, posterior.regimes - 1, posterior.dimension),
+            (posterior.regimes, posterior.regimes - 1),
+        }
+        if not required <= set(shapes.values()):
+            raise ValueError(
+                f"learnable {learnable!r}: Pólya–Gamma prior shape "
+                f"{posterior.eta.shape} does not match blobs "
+                f"{sorted(shapes.values())}"
+            )
+
+    def _posterior(self, learnable, params) -> conj.PGWeights:
+        _require_keys(learnable, params, self._PARAMS, "Pólya–Gamma")
+        eta = np.asarray(params["eta"])
+        precision = np.asarray(params["precision"])
+        return conj.PGWeights(eta.copy(), precision.copy())
