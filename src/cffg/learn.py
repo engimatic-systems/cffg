@@ -338,8 +338,21 @@ class Learnables:
         self,
         engine: "Engine",
         priors: dict[str, object] | None = None,
+        *,
+        only: tuple[str, ...] | None = None,
     ):
-        self.plans = {p.name: p for p in engine.arena.learn_plans}
+        engine_plans = {p.name: p for p in engine.arena.learn_plans}
+        if only is None:
+            names = tuple(engine_plans)
+        else:
+            unknown = sorted(set(only) - set(engine_plans))
+            if unknown:
+                raise KeyError(
+                    f"engine does not declare requested learnables {unknown}"
+                )
+            names = tuple(dict.fromkeys(only))
+        self.plans = {name: engine_plans[name] for name in names}
+        self._restricted = only is not None
         self.params: dict[str, dict[str, np.ndarray]] = {}
         initial_params: dict[str, MappingProxyType] = {}
         priors = priors or {}
@@ -446,7 +459,11 @@ class Learnables:
     ) -> list["LearnPlan"]:
         plans = {plan.name: plan for plan in engine.arena.learn_plans}
         if only is None:
-            names = tuple(plans)
+            names = (
+                tuple(name for name in plans if name in self.plans)
+                if self._restricted
+                else tuple(plans)
+            )
         else:
             unknown = sorted(set(only) - set(plans))
             if unknown:
@@ -535,6 +552,22 @@ class Learnables:
         argument."""
         plan = self.plans[name]
         out = FAMILIES[plan.family].mean(self.params[name], plan.ftype)
+        if role is not None:
+            return out[role]
+        if len(out) != 1:
+            raise ValueError(
+                f"learnable {name!r} has roles {sorted(out)}; name one"
+            )
+        return next(iter(out.values()))
+
+    def rollover(self, name: str, role: str | None = None) -> np.ndarray:
+        """The point parameter consumed by the next inference run.
+
+        This differs from :meth:`expected` when a conjugate family reports a
+        posterior mean but inference consumes an expected natural parameter.
+        """
+        plan = self.plans[name]
+        out = FAMILIES[plan.family].rollover(self.params[name], plan.ftype)
         if role is not None:
             return out[role]
         if len(out) != 1:

@@ -7,8 +7,8 @@ conditionals without accounting for their state-dependent normalizer.
 
 Learning is an explicit between-trial variational-EM boundary. Inference uses
 point parameters, factor-local soft statistics update NumPy conjugate
-posteriors, and :class:`RSLDSLearning` installs their rollover values into a
-fresh state without recompiling the graph.
+posteriors, and :class:`RSLDSLearning` delegates their declared updates and
+writes to :class:`cffg.learn.Learnables` without recompiling the graph.
 """
 
 from __future__ import annotations
@@ -27,8 +27,19 @@ from cffg.core.ir import (
     Template,
     VariableSpec,
 )
-from cffg.engine import Engine, State, _replace
-from cffg.params import set_params
+from cffg.engine import Engine, RunResult, State, _replace
+from cffg.learn import Learnables
+
+
+INITIAL_REGIME_LEARNABLE = "initial_regime"
+DYNAMICS_LEARNABLE = "dynamics"
+RECURRENCE_LEARNABLE = "recurrence"
+EMISSION_LEARNABLE = "emission"
+RSLDS_MODEL_LEARNABLES = (
+    INITIAL_REGIME_LEARNABLE,
+    DYNAMICS_LEARNABLE,
+    RECURRENCE_LEARNABLE,
+)
 
 
 def rslds(
@@ -226,8 +237,26 @@ def rslds(
         )
         template.ports[f"y{step}"] = PortSpec(f"y{step}", f"y{step}", PortRole.DATA)
 
-    template.learnables["emission"] = LearnableSpec(
-        "emission",
+    template.learnables[INITIAL_REGIME_LEARNABLE] = LearnableSpec(
+        INITIAL_REGIME_LEARNABLE,
+        "dirichlet",
+        ("initial_regime_probability",),
+        ("z0_prior",),
+    )
+    template.learnables[DYNAMICS_LEARNABLE] = LearnableSpec(
+        DYNAMICS_LEARNABLE,
+        "component_mniw",
+        ("dynamics_matrix", "dynamics_offset", "dynamics_covariance"),
+        tuple(f"dynamics{step}" for step in range(1, n_steps)),
+    )
+    template.learnables[RECURRENCE_LEARNABLE] = LearnableSpec(
+        RECURRENCE_LEARNABLE,
+        "pg_weights",
+        ("recurrence_weights", "recurrence_offsets"),
+        tuple(f"switch{step}" for step in range(1, n_steps)),
+    )
+    template.learnables[EMISSION_LEARNABLE] = LearnableSpec(
+        EMISSION_LEARNABLE,
         "mniw",
         ("emission_matrix", "emission_offset", "emission_covariance"),
     )
@@ -237,7 +266,13 @@ def rslds(
 
 @dataclass(frozen=True)
 class RSLDSLearning:
-    """Three conjugate posteriors at the rSLDS between-trial boundary."""
+    """Compatibility facade for the three-family between-trial boundary.
+
+    The historical API keeps the tied emission fixed. Statistics,
+    hyperparameter state, checkpoint encoding, and runtime writes delegate to
+    a restricted :class:`Learnables` instance over the serialized rSLDS
+    declarations.
+    """
 
     initial_alpha: np.ndarray
     dynamics: tuple[conj.MNIW, ...]
@@ -268,52 +303,44 @@ class RSLDSLearning:
     def dimension(self) -> int:
         return self.recurrence.dimension
 
-    def update(self, engine: Engine, state: State) -> RSLDSLearning:
-        """Fold one converged sequence's soft factor-local statistics."""
-        regime = engine.marginals(state).get("z0")
-        if regime is None or regime.shape != self.initial_alpha.shape:
-            raise ValueError("engine is not an rslds model with a z0 marginal")
-        if not np.all(np.isfinite(regime)) or np.any(regime < 0) or regime.sum() <= 0:
-            raise ValueError("rSLDS initial-regime belief must be proper")
-        mixture = engine.gaussian_node_stats(state)
-        dynamics_rows = [
-            mixture[name] for name in sorted(mixture) if name.startswith("dynamics")
-        ]
-        if not dynamics_rows or any(not bool(row["proper"]) for row in dynamics_rows):
-            raise ValueError("rSLDS dynamics beliefs must all be proper")
+    def _runtime(self, engine: Engine) -> Learnables:
+        return Learnables(
+            engine,
+            priors={
+                INITIAL_REGIME_LEARNABLE: self.initial_alpha,
+                DYNAMICS_LEARNABLE: self.dynamics,
+                RECURRENCE_LEARNABLE: self.recurrence,
+            },
+            only=RSLDS_MODEL_LEARNABLES,
+        )
 
-        updated_dynamics = []
-        for index, posterior in enumerate(self.dynamics):
-            updated_dynamics.append(
-                posterior.update(
-                    syy=np.sum([row["Syy"][index] for row in dynamics_rows], axis=0),
-                    syx=np.sum([row["Syx"][index] for row in dynamics_rows], axis=0),
-                    sxx=np.sum([row["Sxx"][index] for row in dynamics_rows], axis=0),
-                    n=float(
-                        np.sum([row["responsibility"][index] for row in dynamics_rows])
-                    ),
+    @classmethod
+    def _from_runtime(cls, learning: Learnables) -> RSLDSLearning:
+        dynamics = learning.params[DYNAMICS_LEARNABLE]
+        return cls(
+            initial_alpha=np.asarray(
+                learning.params[INITIAL_REGIME_LEARNABLE]["alpha"]
+            ),
+            dynamics=tuple(
+                conj.MNIW(
+                    dynamics["m"][index],
+                    dynamics["lam"][index],
+                    dynamics["psi"][index],
+                    float(dynamics["nu"][index]),
                 )
-            )
+                for index in range(dynamics["m"].shape[0])
+            ),
+            recurrence=conj.PGWeights(
+                learning.params[RECURRENCE_LEARNABLE]["eta"],
+                learning.params[RECURRENCE_LEARNABLE]["precision"],
+            ),
+        )
 
-        recurrence_rows = engine.recurrence_weight_stats(state)
-        recurrence_rows = [
-            recurrence_rows[name]
-            for name in sorted(recurrence_rows)
-            if name.startswith("switch")
-        ]
-        if not recurrence_rows or any(
-            not bool(row["proper"]) for row in recurrence_rows
-        ):
-            raise ValueError("rSLDS recurrence beliefs must all be proper")
-        recurrence = self.recurrence.update(
-            np.stack([row["linear"] for row in recurrence_rows]),
-            np.stack([row["quadratic"] for row in recurrence_rows]),
-        )
-        return RSLDSLearning(
-            initial_alpha=self.initial_alpha + np.asarray(regime),
-            dynamics=tuple(updated_dynamics),
-            recurrence=recurrence,
-        )
+    def update(self, engine: Engine, result: RunResult) -> RSLDSLearning:
+        """Accumulate one distinct, converged sequence through Learnables."""
+        learning = self._runtime(engine)
+        learning.accumulate(engine, result)
+        return self._from_runtime(learning)
 
     def parameter_arrays(self) -> dict[str, np.ndarray]:
         """Point parameters matching the blob names returned by :func:`rslds`."""
@@ -346,42 +373,20 @@ class RSLDSLearning:
             raise ValueError(
                 "rSLDS learning parameters require a fresh inference state"
             )
-        values = self.parameter_arrays()
-        dynamics = sorted(
-            name
-            for name in engine.arena.writable_members
-            if name.startswith("dynamics")
-        )
-        recurrence = sorted(
-            name
-            for name in engine.arena.writable_members
-            if name.startswith("switch")
-        )
-        if "z0_prior" not in engine.arena.writable_members:
-            raise ValueError("engine is not an rslds model with z0_prior") from None
-        if not dynamics or not recurrence:
-            raise ValueError(
-                "engine does not contain the rslds dynamics and recurrence factors"
-            )
-        params = set_params(
-            engine,
-            state.params,
-            {
-                "z0_prior": {
-                    "statistic": values["initial_regime_probability"]
-                },
-                dynamics[0]: {
-                    "matrix": values["dynamics_matrix"],
-                    "offset": values["dynamics_offset"],
-                    "cov": values["dynamics_covariance"],
-                },
-                recurrence[0]: {
-                    "weights": values["recurrence_weights"],
-                    "offsets": values["recurrence_offsets"],
-                },
-            },
-        )
+        params = self._runtime(engine).write(engine, state.params)
         return _replace(state, params=params)
+
+    def state_dict(self, engine: Engine) -> dict[str, np.ndarray]:
+        """Return the generic versioned checkpoint representation."""
+        return self._runtime(engine).state_dict()
+
+    def load_state_dict(
+        self, engine: Engine, data: dict[str, np.ndarray]
+    ) -> RSLDSLearning:
+        """Return a facade restored through the generic checkpoint loader."""
+        learning = self._runtime(engine)
+        learning.load_state_dict(data)
+        return self._from_runtime(learning)
 
 
 def vague_rslds_learning(

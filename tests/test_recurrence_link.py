@@ -1,5 +1,7 @@
 """PG/JJ recurrence-link rules, engine integration, and hostile inputs."""
 
+import dataclasses
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
@@ -229,6 +231,15 @@ def test_rslds_tier_matches_tiny_exact_oracle_and_rolls_all_parameters():
     observation = 0.35
 
     template, arrays = rslds(2, **parameters)
+    assert set(template.learnables) == {
+        "initial_regime",
+        "dynamics",
+        "recurrence",
+        "emission",
+    }
+    assert template.learnables["initial_regime"].sources == ("z0_prior",)
+    assert template.learnables["dynamics"].sources == ("dynamics1",)
+    assert template.learnables["recurrence"].sources == ("switch1",)
     assert template.learnables["emission"].blobs == (
         "emission_matrix",
         "emission_offset",
@@ -318,7 +329,9 @@ def test_rslds_tier_matches_tiny_exact_oracle_and_rolls_all_parameters():
         atol=0.05,
     )
 
-    learning = vague_rslds_learning(2, 1).update(engine, result.state)
+    with pytest.raises(TypeError, match="status-bearing RunResult"):
+        vague_rslds_learning(2, 1).update(engine, result.state)
+    learning = vague_rslds_learning(2, 1).update(engine, result)
     learned = learning.parameter_arrays()
     assert learning.initial_alpha.sum() == pytest.approx(3.0)
     assert learned["initial_regime_probability"].shape == (2,)
@@ -328,6 +341,13 @@ def test_rslds_tier_matches_tiny_exact_oracle_and_rolls_all_parameters():
     assert learned["recurrence_weights"].shape == (2, 1, 1)
     assert learned["recurrence_offsets"].shape == (2, 1)
     assert all(np.all(np.isfinite(value)) for value in learned.values())
+    restored_learning = vague_rslds_learning(2, 1).load_state_dict(
+        engine, learning.state_dict(engine)
+    )
+    for name, value in learning.parameter_arrays().items():
+        np.testing.assert_array_equal(
+            restored_learning.parameter_arrays()[name], value
+        )
 
     install_template, install_arrays = rslds(3, **parameters)
     install_engine = Engine(compile_template(install_template, arrays=install_arrays))
@@ -359,9 +379,12 @@ def test_rslds_tier_matches_tiny_exact_oracle_and_rolls_all_parameters():
     np.testing.assert_array_equal(installed.g_mask, install_state.g_mask)
 
     prior = install_engine.arena.member_of["z0_prior"].parameter("statistic")
+    expected_initial = learning._runtime(install_engine).rollover(
+        "initial_regime"
+    )
     np.testing.assert_allclose(
-        np.exp(np.asarray(installed.params[prior.key][prior.index])),
-        learned["initial_regime_probability"],
+        np.asarray(installed.params[prior.key][prior.index]),
+        expected_initial,
         rtol=2e-6,
     )
     dynamics_values = {
@@ -417,8 +440,9 @@ def test_rslds_tier_matches_tiny_exact_oracle_and_rolls_all_parameters():
         result.state,
         g_lam=jnp.full_like(result.state.g_lam, jnp.nan),
     )
-    with pytest.raises(ValueError, match="dynamics beliefs must all be proper"):
-        vague_rslds_learning(2, 1).update(engine, improper_state)
+    improper_result = dataclasses.replace(result, state=improper_state)
+    with pytest.raises(ValueError, match="statistic is improper"):
+        vague_rslds_learning(2, 1).update(engine, improper_result)
 
 
 def test_rslds_rejects_invalid_model_and_prior_inputs():
