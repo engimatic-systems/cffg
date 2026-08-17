@@ -24,7 +24,9 @@ from cffg.core.ir import (
 from cffg.core.serialize import from_json, to_dict, to_json
 from cffg.core.validate import ModelError
 from cffg.engine import Engine, RunStatus, _replace
+from cffg.learn import Learnables
 from cffg.models.rslds import rslds, vague_rslds_learning
+from cffg.models.rslds_fit import vague_rslds_fit_priors
 
 jax.config.update("jax_enable_x64", True)
 
@@ -473,6 +475,57 @@ def test_rslds_rejects_invalid_model_and_prior_inputs():
         vague_rslds_learning(2, 1, dynamics_scale=0.0)
     with pytest.raises(ValueError, match="PG prior strength"):
         vague_rslds_learning(2, 1, recurrence_strength=0.0)
+
+
+def test_declared_rslds_learning_is_independent_of_every_factor_name():
+    parameters = _rslds_parameters(np.float64)
+    template, arrays = rslds(3, **parameters)
+    renamed = {
+        name: f"opaque_node_{index}"
+        for index, name in enumerate(reversed(tuple(template.factors)))
+    }
+    renamed_template = dataclasses.replace(
+        template,
+        factors={
+            renamed[name]: dataclasses.replace(factor, name=renamed[name])
+            for name, factor in template.factors.items()
+        },
+        constraints=[
+            dataclasses.replace(
+                constraint,
+                target=renamed.get(constraint.target, constraint.target),
+            )
+            for constraint in template.constraints
+        ],
+        learnables={
+            name: dataclasses.replace(
+                spec,
+                sources=(
+                    tuple(renamed[source] for source in spec.sources)
+                    if spec.sources is not None
+                    else None
+                ),
+            )
+            for name, spec in template.learnables.items()
+        },
+    )
+    priors = vague_rslds_fit_priors(2, 1, 1).learning_priors()
+    learned = []
+    for candidate in (template, renamed_template):
+        engine = Engine(compile_template(candidate, arrays=arrays))
+        state = engine.bind_data(
+            engine.init_state(),
+            {"y0": None, "y1": np.array([0.2]), "y2": np.array([-0.1])},
+        )
+        result = engine.run(state, 100, tol=1e-9)
+        assert result.status is RunStatus.CONVERGED
+        learning = Learnables(engine, priors=priors)
+        learning.replace(engine, result)
+        learned.append(learning.state_dict())
+
+    assert learned[0].keys() == learned[1].keys()
+    for name in learned[0]:
+        np.testing.assert_allclose(learned[0][name], learned[1][name], atol=1e-10)
 
 
 def test_rule_matches_independent_numpy_coordinates():

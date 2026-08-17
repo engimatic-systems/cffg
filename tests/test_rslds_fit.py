@@ -16,6 +16,7 @@ from cffg.models import (
     fit_rslds,
     vague_rslds_fit_priors,
 )
+from cffg.models.rslds_fit import _run_inner
 
 
 def _observations(steps: int, dtype=np.float32) -> np.ndarray:
@@ -267,9 +268,9 @@ def test_exact_zero_initial_regime_support_is_not_floored(monkeypatch):
 @pytest.mark.parametrize(
     ("kind", "message"),
     (
-        ("dynamics", "dynamics beliefs must all be proper"),
+        ("dynamics", "gaussian_mixture_linear statistic is improper"),
         ("emission", "gaussian_linear statistic is improper"),
-        ("recurrence", "recurrence beliefs must all be proper"),
+        ("recurrence", "recurrence_link statistic is improper"),
     ),
 )
 def test_improper_statistics_diverge_before_parameter_write(
@@ -347,6 +348,23 @@ def test_inner_budget_status_is_preserved():
     assert result.status is RunStatus.BUDGET_EXHAUSTED
     assert result.inner_status is RunStatus.BUDGET_EXHAUSTED
     assert result.error == "inner inference budget_exhausted"
+
+
+def test_deterministic_retry_rejects_mu3_engines_before_running():
+    engine = object.__new__(Engine)
+    engine.arena = dataclasses.make_dataclass("Arena", [("mu3_groups", tuple)])(
+        (object(),)
+    )
+
+    with pytest.raises(ValueError, match="do not support stochastic mu3"):
+        _run_inner(
+            engine,
+            object(),
+            max_iterations=1,
+            tolerance=1e-5,
+            damping=0.0,
+            max_retries=0,
+        )
 
 
 def test_float32_fitter_survives_tenfold_horizon():
