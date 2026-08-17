@@ -1,6 +1,6 @@
 ---
 id: cff-3vhn
-status: in_progress
+status: closed
 deps: [cff-0l31]
 links: []
 created: 2026-08-17T18:23:46Z
@@ -55,3 +55,13 @@ A separate prerequisite owns any reference-driven scale or runtime correction. c
 **2026-08-17T18:24:26Z**
 
 Pre-implementation handoff: docs/ARCHITECTURE.md change-path index is N/A because this implementation remains in the sibling experiment harness and consumes unchanged CFFG public fitting results. Duplicated execution surfaces: both primary rSLDS tiers; same-K and closest-budget SLDS controls; unmodified recurrence-only baseline; raw per-seed secondary rows; aggregate recomputation; manifest validation. CFFG compiler, VM, schedule, kernel, ledger, serialization, production learning, and canonical docs are N/A. Legend: prerequisite --> dependent. [x] cff-0l31 --> [ ] cff-3vhn (ready/in progress) --> [ ] cff-ah4t --> [ ] cff-oyie --> [ ] cff-nkbj. cff-3vhn owns reporting completeness only; cff-ah4t owns scale selection and replacement freeze.
+
+**2026-08-17T18:35:59Z**
+
+Completed in sibling experiment repository branch cff-3vhn-secondary-outcomes at fc84a28. New secondary.py evaluates alignment-aware parameter-family errors, transition-probability RMSE, generating-truth recovery after fitting, 10,000-step rollout periodicity, boundedness, exact rSLDS inner work from retained phases, and explicit matched-SLDS inner-trace unavailability. Paper-adapter secondary outcomes are computed within each retained chain before aggregation so label-switched parameters are never averaged across chains. artifact_reporting.py validates raw-row aggregate recomputation and hashes every final output payload. The final report now includes the hash-verified pinned unmodified recurrence-only smoke as a narrow baseline with same_model_or_update_parity_claim=false, full registration provenance, seed peak RSS, CFFG phase timings, reference chain timings, primary/secondary bounded-rollout rates, and aggregate parameter errors.
+
+The preregistration schema now fixes 10,000 rollout steps, variance-growth and amplitude-ratio bounds of 100, and disjoint rollout streams for each primary/control arm. The original cff-0l31 freeze is deliberately invalid under the recorded phase rule and remains committed only as superseded provenance; no final seed ran.
+
+Validation: uv run pytest -q reported 30 passed in 24.00 seconds. A calibration-seed T=80 integration exercised both primary tiers and both SLDS controls; all four arms were ready with secondary outputs and no metric error. Exact generating-parameter alignment recovered every family below 1e-10 in compact tests. Raw aggregate mutation, manifest mutation, unmodified baseline hashes, truth-free fitter signatures, float32 fitting, and inner-work availability are covered. git diff --check passed.
+
+Next: cff-ah4t benchmarks and freezes the reference-driven execution scale, incorporating this code. It must not execute a final seed.
