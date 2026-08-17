@@ -1,6 +1,6 @@
 ---
 id: cff-i00o
-status: in_progress
+status: closed
 deps: [cff-8xve]
 links: []
 created: 2026-08-17T20:46:52Z
@@ -76,3 +76,17 @@ Hostile-input decisions:
 - Empty effect families, incomplete seeds, failed arms, and absent absolute outcomes produce explicit not-ready decisions rather than vacuous success.
 
 The statistical design is fixed from cff-0l31 calibration rules, cff-3vhn reporting contracts, cff-ah4t coverage findings, and cff-8xve's calibration-only generator artifact. No final seed is generated or fit here.
+
+### 2026-08-17 — completed
+
+Implemented in experiment commits `a89ee08`, `429dd0a`, `b5e25bb`, `bb71c90`, `75c12be`, and `563b72f` on `cff-i00o-dual-protocol`.
+
+- Schema version 3 names exactly `canonical_homogeneous` and `source_heterogeneous` in generator, scale, split, calibration/final seed, grid, primary-effect, identity, and stochastic-stream records.
+- All declared streams are unique across family, data seed, tier, replicate, chain, control, and purpose. Data identities hash family, generator version/design/provenance, scale, and balanced-grid identity.
+- Each family has six paired non-inferiority effects and four absolute effects in one ten-effect Bonferroni family. The classic absolute effects cover worst-source transition error and bounded periodicity; the extension covers worst-source transition error and worst source-contrast error.
+- The frozen balanced grid samples at and around every declared gate and evaluates every source at every grid state. Exact and affine-transformed oracles score zero; a source-pooled heterogeneous model fails both functional recovery outcomes.
+- Fixed-sequence evaluation preserves separate family results and descriptive evidence. Missing, invalid, failed-arm, convergence, mixing, coverage, or provenance evidence is not-ready. A completed interval miss is a failed claim.
+- Registered thresholds must be finite, follow their calibration rule, and remain within substantive domain caps. Raw recurrence coefficients are explicitly secondary because affine coordinates, regime labels, and decision-list order do not define a unique direct comparison.
+- Final validation: `64 passed in 24.37s`. No registered final seed was generated or fit.
+
+Next: cff-9o39 is ready to apply this pure contract to family-qualified runners, controls, raw rows, aggregation, and append-only attempt checkpoints.
