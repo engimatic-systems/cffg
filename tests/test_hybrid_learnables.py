@@ -7,10 +7,11 @@ import numpy as np
 import pytest
 
 from cffg import conj
-from cffg.compiler import compile_template
+from cffg.compiler import CompileError, compile_template
 from cffg.core import BlobRef, FactorSpec, LearnableSpec, Template, VariableSpec
 from cffg.engine import Engine
 from cffg.learn import Learnables
+from cffg.core.serialize import from_json, structure_hash, to_json
 
 
 def _blob(name: str) -> BlobRef:
@@ -288,7 +289,7 @@ def test_pg_replace_is_idempotent_accumulate_adds_and_sources_are_explicit():
     template, arrays, _sources, engine, result = _run_recurrence()
     prior = conj.vague_pg_weights(3, 2)
     replacement = Learnables(engine, priors={"neutral_recurrence": prior})
-    replacement.replace(engine, result)
+    replacement.replace(engine, result, only=("neutral_recurrence",))
     first = replacement.state_dict()
     replacement.replace(engine, result)
     for key, value in first.items():
@@ -377,3 +378,115 @@ def test_pg_float32_k32_d16_updates_and_writes_without_dense_transition():
                 assert np.all(np.isfinite(written[target.key]))
         group = engine.arena.recurrence_groups[0]
         assert group.d_gather_both.size + group.drive_gather_both.size < 2 * 32**2
+
+
+@pytest.mark.parametrize(
+    ("builder", "priors"),
+    [
+        (
+            _mixture_template,
+            lambda: {
+                "neutral_dynamics": tuple(conj.vague_mniw(2, 2) for _ in range(3))
+            },
+        ),
+        (
+            _recurrence_template,
+            lambda: {"neutral_recurrence": conj.vague_pg_weights(3, 2)},
+        ),
+    ],
+)
+def test_hybrid_declarations_serialize_and_checkpoints_round_trip(builder, priors):
+    template, arrays, _sources = builder()
+    restored_template = from_json(to_json(template))
+    assert restored_template.learnables == template.learnables
+    assert structure_hash(restored_template) == structure_hash(template)
+    engine = Engine(compile_template(restored_template, arrays=arrays))
+    result = engine.run(engine.init_state(), 100, tol=1e-7)
+    result.require_converged()
+    source = Learnables(engine, priors=priors())
+    source.replace(engine, result)
+    restored = Learnables(engine, priors=priors())
+    restored.load_state_dict(source.state_dict())
+    for name in source.params:
+        for key in source.params[name]:
+            np.testing.assert_array_equal(
+                restored.params[name][key], source.params[name][key]
+            )
+
+
+@pytest.mark.parametrize(
+    ("builder", "family", "match"),
+    [
+        (_mixture_template, "mniw", "mniw/gaussian_linear"),
+        (_recurrence_template, "component_mniw", "gaussian_mixture_linear"),
+    ],
+)
+def test_hybrid_learning_rejects_incompatible_family_pair(builder, family, match):
+    template, arrays, _sources = builder()
+    name, spec = next(iter(template.learnables.items()))
+    template.learnables[name] = dataclasses.replace(spec, family=family)
+    with pytest.raises(CompileError, match=match):
+        compile_template(template, arrays=arrays)
+
+
+@pytest.mark.parametrize("builder", (_mixture_template, _recurrence_template))
+def test_hybrid_learning_declaration_does_not_change_inference_or_ledger(builder):
+    template, arrays, _sources = builder()
+    undeclared = dataclasses.replace(template, learnables={})
+    results = []
+    for candidate in (undeclared, template):
+        engine = Engine(compile_template(candidate, arrays=arrays))
+        result = engine.run(engine.init_state(), 100, tol=1e-7)
+        result.require_converged()
+        results.append((engine, result))
+    left_engine, left = results[0]
+    right_engine, right = results[1]
+    np.testing.assert_array_equal(left.state.messages, right.state.messages)
+    np.testing.assert_array_equal(left.state.g_eta, right.state.g_eta)
+    np.testing.assert_array_equal(left.state.g_lam, right.state.g_lam)
+    assert left_engine.bfe(left.state) == right_engine.bfe(right.state)
+
+
+@pytest.mark.parametrize(
+    ("builder", "priors", "legacy"),
+    [
+        (
+            _mixture_template,
+            lambda: {
+                "neutral_dynamics": tuple(conj.vague_mniw(2, 2) for _ in range(3))
+            },
+            {
+                "neutral_dynamics/m",
+                "neutral_dynamics/lam",
+                "neutral_dynamics/psi",
+                "neutral_dynamics/nu",
+            },
+        ),
+        (
+            _recurrence_template,
+            lambda: {"neutral_recurrence": conj.vague_pg_weights(3, 2)},
+            {"neutral_recurrence/eta", "neutral_recurrence/precision"},
+        ),
+    ],
+)
+def test_hybrid_legacy_checkpoint_requires_complete_posterior(
+    builder, priors, legacy
+):
+    template, arrays, _sources = builder()
+    engine = Engine(compile_template(template, arrays=arrays))
+    learnables = Learnables(engine, priors=priors())
+    versioned = learnables.state_dict()
+    legacy_checkpoint = {
+        legacy_key: versioned[
+            "v2:"
+            + legacy_key.rsplit("/", 1)[0]
+            + ":"
+            + legacy_key.rsplit("/", 1)[1]
+        ]
+        for legacy_key in legacy
+    }
+    partial = dict(legacy_checkpoint)
+    partial.pop(next(iter(partial)))
+    with pytest.raises(KeyError, match="incompletely names"):
+        learnables.load_state_dict(partial)
+    learnables.load_state_dict(legacy_checkpoint)
