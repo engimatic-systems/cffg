@@ -253,17 +253,24 @@ state = engine.init_state()  # first trial uses the arrays supplied above
 state = engine.bind_data(
     state, {f"y{t}": observation for t, observation in enumerate(ys)}
 )
-state = engine.run(state, 200, tol=1e-7).require_converged()
-learning = learning.update(engine, state)
+result = engine.run(state, 200, tol=1e-7)
+result.require_converged()
+learning = learning.update(engine, result)
 
 # A later trial reuses the compiled engine with learned point parameters.
 next_state = learning.install(engine, engine.init_state())
 ```
 
-`install` accepts a fresh state and writes the current initial-regime,
-dynamics, and recurrence point parameters. `update` then folds the converged
-soft beliefs into a Dirichlet initial-regime posterior, one MNIW posterior per
-dynamics regime, and the PG recurrence posterior. The recurrence offsets
+The template declares all four fitted families: the initial-regime
+Dirichlet, component-MNIW dynamics, PG recurrence block, and tied emission
+MNIW. `RSLDSLearning` is the compatibility facade for the historical
+distinct-trial API: `install` accepts a fresh state and writes the current
+initial-regime, dynamics, and recurrence point parameters, while `update`
+accumulates a status-bearing result into those three posteriors. Its generic
+checkpoint is available through `state_dict(engine)` and
+`load_state_dict(engine, data)`. The facade deliberately leaves emission
+fixed; use `Learnables` directly when a distinct-trial application also
+learns emission. The recurrence offsets
 already represent the ordinary source-specific transition baseline; multiplying
 a separate `matrix_cat` into the same transition would require a new normalized
 factor and free-energy derivation.
@@ -306,9 +313,12 @@ coordinate system, clusters consecutive latent pairs, and fits local
 autoregressions. The explicit key selects cluster centers. Each outer
 coordinate reruns hidden-variable inference and recomputes the initial-regime,
 per-regime dynamics, recurrence, and shared-emission posteriors from the same
-immutable priors. The shared emission is the ordinary tied
-`gaussian_linear` MNIW learnable, so every time slice contributes once through
-`Learnables.replace`.
+immutable priors. One `Learnables.replace` validates all four candidate
+posteriors before committing them, and one atomic write installs every point
+value. The shared emission is the ordinary tied `gaussian_linear` MNIW
+learnable, so every time slice contributes once. The continuous
+initial-state mean and covariance are fixed initializer outputs, not fitted
+posteriors.
 
 This replacement cadence is different from `RSLDSLearning.update`: `update`
 accumulates evidence from a new independent trial, while `fit_rslds` replaces
@@ -324,6 +334,12 @@ Gaussian propriety check, and parameter scale. The default outer tolerance is
 dtype-scaled and must hold twice consecutively. A finite outer iteration limit
 may therefore return useful fitted parameters with `budget_exhausted`; it is
 not silently relabeled as convergence.
+
+Functional `mu3` engines are unsupported by this fitter and are rejected
+before inference because the retry policy has no explicit key and fixed-sample
+reuse contract. Fit coordination remains rSLDS-owned until another production
+model proves that its retry, snapshot, and terminal-solve policy has the same
+interface; only the declared-learning transaction is currently shared.
 
 The original canonical NASCAR check supplied the generating parameters and,
 at `T=10,000`, converged in 248 sweeps with `0.001264` latent-state RMSE and
