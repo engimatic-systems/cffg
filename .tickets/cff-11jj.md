@@ -1,6 +1,6 @@
 ---
 id: cff-11jj
-status: in_progress
+status: closed
 deps: [cff-dqk2, cff-garu]
 links: [cff-nkbj]
 created: 2026-08-13T03:59:30Z
@@ -193,3 +193,15 @@ a separate mathematical and runtime contract.
 **2026-08-13T04:07:32Z**
 
 Planning and ambiguity handoff, 2026-08-12. Applicable change paths: Learnable or checkpoint feature and Runtime numerical or status invariant. The duplicated surfaces are explicit in the outcomes: flooding/scheduled statistics, direct/shared host coordination, current/legacy checkpoints, deterministic/stochastic retry, compact/10x-horizon behavior, and rSLDS/non-switching-Gaussian consumers. Single-instance/vmap fitting remains N/A unless this ticket adds a batched contract.
+
+**2026-08-17T16:36:36Z**
+
+Implementation handoff, 2026-08-17.
+
+Delivered: the serialized rSLDS declares initial-regime Dirichlet, component-MNIW dynamics, PG recurrence, and tied-emission MNIW learnables. RSLDSLearning is now a compatibility facade over a restricted Learnables runtime for distinct-trial accumulation, writes, and versioned checkpoints. fit_rslds uses one Learnables transaction to replace all four families from immutable priors and write them atomically. Factor names and registry lookup no longer participate in model learning or reporting.
+
+Fit-policy decision: no shared fitting module was extracted. Learnables is already proven by ordinary non-switching Gaussian and rSLDS fixtures, but retry evidence still inspects recurrence status and Gaussian propriety, and no second production fitter proves the full retry/snapshot/terminal-solve interface. The responsibility table in docs/ARCHITECTURE.md records the reusable and model-specific owners. Functional mu3 engines are rejected before this deterministic cadence runs because no key and particle-reuse contract exists.
+
+Validation: focused rSLDS/hybrid suite passed 44 tests; factor-renaming and generic checkpoint regression passed; final default dashboard suite passed 1356 tests with 39 deselected and no failures in 545.73 seconds. Flooding/scheduled statistics, current/legacy checkpoints, exact-zero support, unused/improper beliefs, non-finite FE, float32, tenfold horizon, retry evidence, and terminal certification remain covered. Source files remain within the line-count rule.
+
+Next: cff-0l31 can freeze the confirmatory protocol against this declared-learning production path. The branch is agent/cff-11jj-declared-rslds, based on agent/cff-dqk2-hybrid-learnables.
