@@ -1,6 +1,6 @@
 ---
 id: cff-i00o
-status: open
+status: in_progress
 deps: [cff-8xve]
 links: []
 created: 2026-08-17T20:46:52Z
@@ -51,3 +51,28 @@ cff-9o39 applies this schema to family-aware runners, controls, aggregation, and
 - **Balanced source-by-state grid:** One frozen set of continuous states evaluated under every source regime so source effects cannot be confused with different visited states.
 - **Fixed-sequence gatekeeping:** A multiplicity rule in which the second claim family is tested only after the first family passes.
 - **Source contrast:** The difference between transition probabilities under two current source regimes at the same continuous state.
+
+## Notes
+
+### 2026-08-17 — implementation handoff
+
+`docs/ARCHITECTURE.md` change-path row: N/A. This ticket changes the sibling validation experiment's protocol schema and statistical evaluation contract, not a CFFG engine owner. CFFG's consumer-facing evidence documentation is deferred to the final evidence ticket after results exist.
+
+Duplicated execution surfaces checked before implementation:
+
+- family descriptors, scales, seed sets, data identities, and stochastic stream preimages;
+- classic paired effects and absolute adequacy outcomes;
+- heterogeneous paired effects, shared-grid worst-source error, and source-contrast recovery;
+- calibration validation and final preregistration validation;
+- fixed-sequence family decisions, partial-family failures, and descriptive-result retention;
+- runner, checkpoints, raw rows, and reports: explicitly delegated to cff-9o39 after the pure protocol contract lands.
+
+Hostile-input decisions:
+
+- Missing, non-finite, wrongly shaped, unnormalized, or source-collapsed transition tensors are invalid metrics and cannot enter a claim interval.
+- Sparse, one-sided, or rank-deficient heterogeneous generator coverage makes that family ineligible before fitting.
+- Float32 functional scoring uses dtype-scaled normalization checks and must remain finite; final execution remains registered as float64.
+- The balanced grid evaluates every source at every frozen state, so a naturally unoccupied source/state pair cannot disappear from the worst-source outcome.
+- Empty effect families, incomplete seeds, failed arms, and absent absolute outcomes produce explicit not-ready decisions rather than vacuous success.
+
+The statistical design is fixed from cff-0l31 calibration rules, cff-3vhn reporting contracts, cff-ah4t coverage findings, and cff-8xve's calibration-only generator artifact. No final seed is generated or fit here.
