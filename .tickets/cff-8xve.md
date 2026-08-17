@@ -1,6 +1,6 @@
 ---
 id: cff-8xve
-status: in_progress
+status: closed
 deps: [cff-ah4t]
 links: []
 created: 2026-08-17T20:46:52Z
@@ -99,3 +99,17 @@ Legend: prerequisite --> dependent
 - Question: Can a fixed heterogeneous generator exercise each source/gate cell without changing the classic generator? Answer: yes. Keep the canonical dynamics and emission arrays, rotate the three recurrence normals by `(-12, -4, 4, 12)` degrees across sources, and choose source offsets from fixed anchor transition probabilities. Sources: `src/cffg_nascar_validation/nascar.py`, `.reference-sources/rslds/examples/nascar.py`, and the cff-ah4t occupancy artifact. Confidence: high.
 - Question: Does the proposed design satisfy the ticket's coverage gates? Answer: on calibration seeds 3101 and 3102 at `T=1,600` with the 80% training split, the minimum cell has 45 exposures, nine successes and nine failures, and augmented design rank three. At `T=10,000`, both rollouts are finite and bounded; float32 transition probabilities remain finite and normalized on the checked state grid. Source: calibration-only construction audit performed before implementation; the committed artifact must reproduce these measurements. Confidence: high.
 - Question: What recovery outcome is defensible? Answer: use aligned transition probabilities on both realized states and a shared source-by-state grid, plus source-function contrasts. Raw recurrence coefficient error is not automatically label invariant because relabeling destinations changes the sequential gate order. Sources: `reference/adapter-provenance.json`, `paper_adapter.py`, and `docs/DERIVATIONS.md` source/destination convention. Confidence: high.
+
+### 2026-08-17 — completed
+
+Implemented in experiment commits `1de5478`, `a021473`, `cec2d57`, and `ab9d976` on `cff-8xve-heterogeneous-nascar`.
+
+- The canonical family is protected by a complete rounded parameter/trajectory hash and remains unchanged through explicit family dispatch.
+- The separately versioned heterogeneous family keeps the classic dynamics, emissions, noise, and legacy RNG stream while supplying four fixed recurrence source rows.
+- The independent mapping matches the generator's source-conditioned probabilities; existing observation-only fit boundaries accept no generating truth.
+- The calibration-only artifact at `artifacts/rslds-source-heterogeneous-design` is eligible on seeds 3101 and 3102 at `T=1,600`, with minimum exposures `52/45`, minimum binary outcomes `9/9`, rank three in every cell, worst design conditions `1.362/1.478`, and worst Fisher conditions `9.532/9.121`.
+- Both `T=10,000` rollouts are finite and bounded, visit all four regimes, and have periodicity `0.830/0.797`. The minimum pairwise shared-grid source-surface distance is `0.307` mean total variation.
+- Artifact result SHA-256: `049967b2c6b66b8db36c523d9c65da106ef00a967fc4ccaee8dec12a0827d977`.
+- Final validation: `46 passed in 24.17s`. No registered final seed was generated or fit.
+
+Next: cff-i00o is ready to define the family-aware schema, absolute functional recovery outcomes, and fixed-sequence claim gatekeeping before execution code is generalized.
