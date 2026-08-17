@@ -1,6 +1,6 @@
 ---
 id: cff-64ri
-status: open
+status: closed
 deps: [cff-akmp]
 links: []
 created: 2026-08-10T02:58:08Z
@@ -145,3 +145,7 @@ deferred=the optional future reference variants.
 **2026-08-13T05:19:12Z**
 
 PR merge-gate correction (2026-08-12): separate versioning is no longer treated as sufficient independence. The adapter must map every added surface to exact paper equations, reused legacy primitives, adapter code, and a direct oracle that shares neither the adapter nor legacy state-update helper.
+
+**2026-08-17T17:12:36Z**
+
+Research question: which published equations own each source-specific adapter surface? Answer: Linderman et al. main Eq. (4) owns source-selected affine logits; main Eq. (6) owns the sequential categorical likelihood; main Eq. (7) owns the Polya-Gamma augmented conditional and conjugate coefficient statistics; supplement Eq. (3) anchors the resulting Gaussian information potential in x. Sources: https://proceedings.mlr.press/v54/linderman17a/linderman17a.pdf and https://proceedings.mlr.press/v54/linderman17a/linderman17a-supp.pdf. Confidence: high; the machine-readable ledger maps these equations to adapter symbols, exact reused legacy primitives, and NumPy-only direct oracles. Completed implementation in sibling repo /Users/ravd/projects/experiments/cffg-nascar-validation on branch cff-64ri-source-specific-reference. Adapter implementation commit d85c498; proposed branch head with hashed artifact 75666fe. Validation: 23 tests passed, including K=2/3/4 enumeration, K=32 normalization, every-source/gate oracle checks, source isolation, tied upstream collapse, hostile numeric inputs, zero inactive gate support, failure-status capture, and observed-only Gibbs fitting. Artifact manifest verified; git diff e560be5 --check passed. No CFFG inference code was imported or changed. Next: cff-0l31 can freeze the cross-implementation mapping and preregistration against this artifact.
