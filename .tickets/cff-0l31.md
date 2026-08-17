@@ -1,6 +1,6 @@
 ---
 id: cff-0l31
-status: open
+status: closed
 deps: [cff-64ri, cff-garu, cff-r6bl, cff-l7y4, cff-11jj, cff-v8a1]
 links: []
 created: 2026-08-10T02:58:08Z
@@ -167,3 +167,21 @@ note; named_ticket_handoff=cff-oyie as the final-run owner.
 **2026-08-13T05:19:12Z**
 
 PR merge-gate correction (2026-08-12): the frozen protocol now includes a direct production recurrence-message and factor-energy audit, Gibbs key streams and retained samples, ESS and split-R-hat gates, calibration-derived margins capped by domain-meaningful loss, and the exact paired estimand, direction, and multiplicity procedure.
+
+**2026-08-17T17:24:25Z**
+
+Pre-implementation handoff: docs/ARCHITECTURE.md change-path index row is N/A because implementation is confined to the sibling experiment harness and consumes, but does not alter, the CFFG production API. Duplicated execution surfaces audited: primary CFFG native initializer/fitter; primary CFFG mapped shared initializer; primary paper-adapter native Gibbs initializer/fitter; primary paper-adapter mapped shared initializer; secondary pinned unmodified recurrence-only learner; same-K SLDS; closest-budget SLDS; mapping/oracle tests; calibration; paired aggregation; manifest/preregistration validation. CFFG compiler, VM, schedule, kernel, ledger, serialization, canonical docs, and production learning implementation are N/A. Legend: prerequisite --> dependent. [x] cff-11jj + [x] cff-64ri + [x] cff-v8a1 + [x] cff-l7y4/cff-garu/cff-r6bl --> [ ] cff-0l31 (ready/in progress) --> [ ] cff-oyie --> [ ] cff-nkbj epic. Parallel controls and oracle work live inside cff-0l31 and converge before the immutable preregistration artifact is hashed.
+
+**2026-08-17T18:21:27Z**
+
+Completed in the sibling experiment repository on branch cff-0l31-rslds-preregistration at artifact head 3af4709. The immutable preregistration is artifacts/rslds-preregistration/preregistration.json with content SHA-256 0ca693cc7eb7821da161a763e0262e1495ff19d6fe92cf6445b7f01a3cf97e4c. Its manifest hashes 118 calibration and registration payloads. The registration names experiment code 0b93627 and CFFG declared-learning commit cd4dbd3; calibration ran from experiment commit 13c70f4.
+
+Implementation evidence: the isolated paper adapter now exposes generic shared and native observation-only Gibbs chains, full-covariance shared emissions, exact CFFG prior mapping, retained per-draw parameters and latents, and loud per-chain statuses. The modern harness implements both primary tiers, both registered SLDS controls, independent NumPy recurrence messages/energy/quadrature, mapping and transition enumeration, split R-hat/ESS, paired Bonferroni lower intervals, strict failure accounting, exact stream registration, calibration derivation, and tamper-evident freeze validation. The native legacy initializer uses only observation SVD, clustering, and regularized regression. The primary CFFG arm calls fit_rslds through declared LearnableSpec plans; the manual compatibility path is forbidden by validation.
+
+Calibration used only seeds 3101 and 3102 with two replicates, 32/32 successful isolated chains, eight ready primary rows, ready same-K and closest-budget controls, unique stochastic streams, and no metric errors. Wall time was 500.095 seconds with peak RSS 3,460,907,008 bytes. A pilot defect was caught before freeze: cross-chain parameter averaging was invalid under label switching and produced pathological predictions. The fixed score evaluates one within-chain posterior point summary per chain and combines the likelihoods as an equal mixture. Diagnostics now use label-order-invariant summaries. Measured concurrent chain execution doubled wall time, so the frozen protocol uses sequential isolated subprocesses.
+
+Frozen final protocol: seeds 2001 through 2024; T=10,000 with 8,000 training observations; K=4, d=2, p=10; CFFG maximum 10 outer iterations, 1,000 inner iterations, tolerance 1e-4, damping 0.9, 512 particles; four reference chains, 100 warmup, 336 retained draws, thin 1, ESS at least 50 and split R-hat at most 1.05. Non-inferiority margins are 0.10 held-out mean predictive log likelihood, 0.0025 affine-aligned latent RMSE, and 0.02 label-aligned regime accuracy in both tiers. The simultaneous family is all six tier/metric effects. Any failed primary or control arm makes the complete result not ready. The registered secondary comparator remains outcome-only and makes no same-model claim. Phase boundary final_seed_executed=false; no final dataset or artifact exists.
+
+Validation at the proposed experiment head: 24 modern tests passed in 21.10 seconds; 35 isolated Python 3.11 legacy tests passed; the freeze reproduced the identical content hash; manifest and preregistration validators passed; git diff --check passed. The two superseded generated calibration attempts were removed after their findings were distilled here.
+
+Next: cff-oyie alone may run uv run cffg-rslds-confirmatory --phase final --preregistration artifacts/rslds-preregistration/preregistration.json --output artifacts/rslds-confirmatory. Do not change code, protocol, lockfiles, hashes, seeds, budgets, or thresholds after this freeze; a defect requires a new prerequisite ticket and new preregistration.
