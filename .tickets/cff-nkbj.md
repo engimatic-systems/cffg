@@ -1,7 +1,7 @@
 ---
 id: cff-nkbj
 status: in_progress
-deps: [cff-oyie]
+deps: [cff-oyie, cff-ora6]
 links: [cff-r6bl, cff-0f3g, cff-dlrj, cff-11jj]
 created: 2026-08-09T13:09:26Z
 type: epic
@@ -77,19 +77,15 @@ Duplicated surfaces checked across the epic:
 Legend: prerequisite --> dependent
 
 ```text
-[x] cff-8xve + cff-i00o + cff-9o39
-                    |
-                    +--> [ ] cff-x5z2 recurrence statistics (in progress)
-                                  |
-                                  +--> [ ] cff-266l readiness semantics
-                                                |
-                                                +--> [ ] cff-s6rs calibration
-                                                              |
-                                                              +--> [ ] cff-huxt 3+3 freeze
-                                                                            |
-                                                                            +--> [ ] cff-oyie 3+3 run
-                                                                                          |
-                                                                                          +--> [ ] cff-nkbj audit
+[x] dual-family harness --> [x] cff-x5z2 --> [x] cff-266l
+                                                   |
+                                                   +--> [ ] cff-s6rs (in progress)
+                                                                 |
+                                                                 +--> [ ] cff-huxt
+                                                                           |
+                                                                           +--> [ ] cff-oyie
+                                                                                     |
+[x] factor-semantics audit --> [ ] cff-ora6 (ready) ------------------------+--> [ ] cff-nkbj
 
 Linked future work: cff-0f3g balanced tree; cff-dlrj destination softmax
 ```
@@ -109,3 +105,30 @@ Answer → The architecture audit may establish that the CFFG graph has the clas
 Source → Linderman et al. 2017 section 5.1; the pinned Figure 3 example; cff-i00o's registered claim schema; and cff-s6rs's calibration boundary.
 
 Confidence → High for the claim separation and exclusions; final support depends on the preregistered results.
+
+### 2026-08-18 — probabilistic-architecture audit
+
+Question → Does the implemented graph represent the classic NASCAR rSLDS
+probability model, and what evidence is still missing?
+
+Answer → Yes for the source-homogeneous, shared-emission NASCAR subclass.
+The graph has a categorical initial regime, a tied Gaussian initial latent
+state, a normalized source-indexed decision-list recurrence, destination-indexed
+linear-Gaussian dynamics, and a shared linear-Gaussian emission. Equality nodes
+only split graph degree and add no probability term. CFFG and the independent
+adapter use different inference algorithms: variational Pólya–Gamma/JJ bounds
+and Gaussian moment collapse versus Pólya–Gamma Gibbs sampling. Existing direct
+oracles strongly cover recurrence and destination dynamics. Initial-regime,
+initial-Gaussian, and emission conversions still need direct cross-mapping
+assertions before the final claim; cff-ora6 owns that bounded gap. Both fit
+interfaces are truth-clean: generating states, regimes, and parameters first
+enter after fitting, during evaluation.
+
+Source → Linderman et al. 2017 equations and Section 5.1; pinned
+`recurrent-slds` NASCAR source; CFFG `models/rslds.py`, `recurrence.py`,
+`mixg.py`, and `gauss.py`; sibling experiment `paper_adapter.py`,
+`comparison_adapter.py`, `rslds_mapping.py`, and their executable tests.
+
+Confidence → High for the local NASCAR factorization, transition and dynamics
+mapping, and truth boundary; medium-high for complete adapter mapping until
+cff-ora6 adds the missing direct assertions.
