@@ -85,7 +85,9 @@ A pure-Python (dataclass) representation, independent of JAX:
   references, and `ConstraintSpec` holds normalization, marginalization,
   form/δ, moment-matching, and P-substitution beads. GFE composites are derived
   compiler plans detected from factors and constraints; they are not a separate
-  serialized IR node.
+  serialized IR node. `MOMENT_MATCHING` is reserved serialization syntax: until
+  a factor-specific projection and ledger rule is registered, compilation names
+  the target factor and rejects the bead before arena construction.
 - **Templates with ports.** A template is a CFFG fragment whose boundary edges are
   declared **ports** with roles: `data` (sensor clamp), `goal` (goal prior),
   `prior` (parameter prior), `glue` (connects to the next unrolled slice). A model
