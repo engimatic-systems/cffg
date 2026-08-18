@@ -1,6 +1,6 @@
 ---
 id: cff-in0q
-status: open
+status: closed
 deps: [cff-epdp, cff-iwgl]
 links: []
 created: 2026-08-13T04:26:16Z
@@ -128,3 +128,17 @@ ticket.
   prior used by the next trial.
 - **Weight collapse:** A sampling failure in which no finite normalized set of
   importance weights remains.
+
+## Notes
+
+**2026-08-18T20:47:02Z**
+
+Implementation handoff, 2026-08-18. Applicable change paths: Learnable or checkpoint feature and Runtime numerical or status invariant. Authorities: serialized ConstraintSpec evaluator metadata, AgentSpec/Learnables for declared model state, Engine.prepare_mu3/_update_mu3 for stochastic evaluation, and RollingAgent for single-agent cadence. Required surfaces: validation and JSON/hash are applicable only if persisted agent schema changes; compiler/Arena evaluator discovery is applicable; current and legacy checkpoint decode are both applicable; direct Engine versus RollingAgent is applicable. Host/JAX execution shares Engine mu3 rules; flooding/trust-region status propagation is applicable while scheduled stages are structurally inapplicable for GFE; single instance is applicable and Colony/vmap is deferred to cff-rqqc. Hostile inputs are the ticket's exact-zero goal/likelihood, improper base, low ESS, all-nonfinite weights, float32, and ten shared slices.
+
+**2026-08-18T21:13:35Z**
+
+Research distillation, 2026-08-18. Question: where must RollingAgent own functional mu3 state, and what can be reused? Answer: serialized arena.mu3_groups is the sole stochastic-mode authority; plan-only forwarding avoids the learned_a=False filter guard; Engine State already owns particles, weights, base_alpha, log-normalizer, ESS, readiness and moments, so the agent needs only epoch/key/result/invalidation lifecycle and exact input/base checks. Source: src/cffg/{agent.py,engine.py,learn.py,models/rollout.py,compiler.py}; confidence: high, confirmed by direct two-plan oracle. Question: what is the smallest independent oracle? Answer: a binary one-step rollout compared agent-for-agent with direct Learnables.write/accumulate plus Engine.prepare_mu3/run across observation, reset and the second plan; Gauss-Legendre product-Beta quadrature separately checks Abar, hbar, expected phi, log Z and the one-time KL ledger slot in both plans. Source: notes/pt2.txt Fig. 5/App. C.6, tests/test_mu3_derivation.py, tests/test_agent_mu3.py; confidence: high.
+
+**2026-08-18T21:39:00Z**
+
+Implementation complete, 2026-08-18. RollingAgent now selects functional mode only from serialized evaluator metadata, owns a typed explicit-key/fixed-particle planning runtime, invalidates epochs on posterior or solver configuration changes, gates actions on ordinary and stochastic convergence, and checkpoints prepared epochs for bitwise continuation. Learned observation-model compatibility now follows semantic parameter role and shape across the perception/planning windows. Public wrappers expose functional mode where supported, and the user/design/derivation/limitation documents distinguish functional and analytic paths. Verification: focused lifecycle, corruption, ESS, exact-zero, float32, and direct-orchestration tests passed; opt-in slow quadrature and ten-slice float32 tests each passed; the final not-slow suite passed 1,381 tests with zero failures and 41 deselected in 967.23 seconds. The remaining bounded limitation is finite-sample importance-estimator quality, including low-ESS rejection; multi-instance Colony ownership remains cff-rqqc.

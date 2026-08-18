@@ -39,17 +39,26 @@ GFE-TM composite (LIMITATIONS S1c).
 
 from __future__ import annotations
 
+import inspect
 import json
 from pathlib import Path
 from typing import Callable
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 
+from cffg._agent_mu3 import (
+    PlanningRuntime,
+    checkpoint_runtime,
+    functional,
+    prepared_inputs_match,
+    restore_runtime,
+)
 from cffg.compiler import _log_of, compile_template
 from cffg.core.ir import AgentSpec, BeliefBinding, Template
 from cffg.core.validate import validate
-from cffg.engine import Engine, State, _replace
+from cffg.engine import Engine, InferenceError, RunResult, RunStatus, State, _replace
 from cffg.learn import Learnables
 
 Builder = Callable[..., tuple]  # build_rollout-style: (past, steps) -> (Template, arrays)
@@ -71,6 +80,11 @@ class RollingAgent:
         learn_goal: bool = False,
         initial_goal_counts: np.ndarray | None = None,
         epistemic_b: bool = False,
+        mu3: bool = False,
+        mu3_key: jax.Array | None = None,
+        mu3_samples: int = 256,
+        mu3_min_ess_fraction: float = 0.1,
+        mu3_refresh: str = "trial",
         damp: float = 0.5,
         n_sweeps: int = 400,
         select: str = "map",
@@ -117,10 +131,21 @@ class RollingAgent:
             plan_kwargs["c_counts"] = initial_goal_counts
         if epistemic_b:
             plan_kwargs["epistemic_b"] = True
+        builder_accepts_mu3 = _accepts_keyword(builder, "mu3")
+        if mu3 and not builder_accepts_mu3:
+            raise ValueError(
+                "mu3=True requires a rollout builder that accepts the mu3 keyword"
+            )
+        if mu3:
+            plan_kwargs["mu3"] = True
         if learn:
             plan_kwargs["learn"] = learn
         plan_t, plan_arrays = builder(past=0, steps=horizon, **plan_kwargs)
+        # A builder may be a partial with mu3=True. Perception never owns the
+        # functional planning message, so override it explicitly here.
         filt_kwargs = {"learned_a": False}
+        if builder_accepts_mu3:
+            filt_kwargs["mu3"] = False
         if learn:
             filt_kwargs["learn"] = learn
         filt_t, filt_arrays = builder(past=1, steps=1, **filt_kwargs)
@@ -130,8 +155,20 @@ class RollingAgent:
         validate(filt_t)
         _check_window_compatibility(plan_t, plan_spec, filt_t, filter_spec)
 
-        self.plan = Engine(compile_template(plan_t, arrays=plan_arrays))
+        self.plan = Engine(
+            compile_template(plan_t, arrays=plan_arrays),
+            mu3_samples=mu3_samples,
+            mu3_min_ess_fraction=mu3_min_ess_fraction,
+        )
         self.filter = Engine(compile_template(filt_t, arrays=filt_arrays))
+        if self.filter.arena.mu3_groups:
+            raise ValueError("perception graph must not declare a mu3 evaluator")
+        if mu3 and not functional(self.plan):
+            raise ValueError(
+                "mu3=True requested functional planning, but the serialized "
+                "planning constraints declare no evaluator"
+            )
+        self._planning = PlanningRuntime(mu3_key, refresh_policy=mu3_refresh)
         self._plan_spec = plan_spec
         self._filter_spec = filter_spec
         self._plan_bindings = {b.name: b for b in plan_spec.beliefs}
@@ -177,6 +214,7 @@ class RollingAgent:
             else {}
         )
         self._pending_goal_priors: dict[str, np.ndarray] | None = None
+        self._last_filter_result: RunResult | None = None
         self.tick = 0
         self.episode_tick = 0
 
@@ -214,9 +252,16 @@ class RollingAgent:
             if self.plan.arena.gfe_groups or self.plan.arena.gfe_tm_groups
             else {"damp": self.damp}
         )
-        st = self.plan.run(
-            st, self.n_sweeps, tol=1e-10, **run_options
-        ).require_converged()
+        result = self._planning.run(
+            self.plan,
+            st,
+            self.n_sweeps,
+            tol=1e-10,
+            run_options=run_options,
+        )
+        st = result.require_converged()
+        if any(status is not RunStatus.CONVERGED for status in result.mu3_statuses):
+            raise InferenceError(result)
         # Planning remains read-only within a trial. Learned goals stage one
         # converged Fig.5 posterior, but only reset_episode's explicit trial
         # boundary rolls it into the next prior. Replanning merely replaces
@@ -263,6 +308,8 @@ class RollingAgent:
         self.beliefs = next_beliefs
         self.tick += 1
         self.episode_tick += 1
+        self._last_filter_result = result
+        self._planning.invalidate()
         return self._belief_result()
 
     def step(self, env_step: Callable[[int], int]) -> tuple[int, int]:
@@ -286,6 +333,7 @@ class RollingAgent:
                     f"episode learnable {binding.episode_learnable!r}",
                 )
         self.episode_tick = 0
+        self._planning.invalidate()
         return self._belief_result()
 
     # -- persistence -------------------------------------------------------
@@ -295,9 +343,14 @@ class RollingAgent:
     # silently keeping the constructor priors would look like a resumed agent
     # that had forgotten everything.
     _LEGACY_KEYS = {"counts": "A", "b_counts": "B"}
+    _CHECKPOINT_VERSION = 1
 
     def checkpoint(self, path: str | Path) -> None:
         data = {
+            "agent:version": np.asarray(self._CHECKPOINT_VERSION),
+            "agent:mode": np.asarray(
+                "functional_mu3" if self.functional_mu3 else "analytic"
+            ),
             "tick": np.asarray(self.tick),
             # Cadence is state. Without it, a restore mid-episode reads the
             # next observation as an episode start and folds a second
@@ -318,86 +371,175 @@ class RollingAgent:
             data[f"goal:prior:{name}"] = alpha
         for name, alpha in (self._pending_goal_priors or {}).items():
             data[f"goal:pending:{name}"] = alpha
+        if self.functional_mu3:
+            run_options = (
+                {}
+                if self.plan.arena.gfe_groups or self.plan.arena.gfe_tm_groups
+                else {"damp": self.damp}
+            )
+            checkpoint_runtime(
+                data,
+                self.plan,
+                self._planning,
+                n_iters=self.n_sweeps,
+                tol=1e-10,
+                run_options=run_options,
+            )
         np.savez(path, **data)
 
     def restore(self, path: str | Path) -> None:
-        data = np.load(path)
-        if "belief" in data.files:
-            if not self._has_legacy_belief:
-                raise KeyError(
-                    "legacy single-belief checkpoint cannot restore a "
-                    "multi-block agent"
+        with np.load(path) as data:
+            if (
+                "agent:version" in data.files
+                and int(data["agent:version"]) != self._CHECKPOINT_VERSION
+            ):
+                raise ValueError(
+                    f"unsupported RollingAgent checkpoint version "
+                    f"{int(data['agent:version'])}"
                 )
-            only = next(iter(self.beliefs))
-            self.beliefs[only] = _check_belief(
-                data["belief"].copy(), f"checkpoint belief {only!r}"
+            checkpoint_mode = (
+                str(data["agent:mode"]) if "agent:mode" in data.files else None
             )
-        else:
-            restored_beliefs = {
-                key[len("belief:") :]: data[key].copy()
+            expected_mode = "functional_mu3" if self.functional_mu3 else "analytic"
+            if checkpoint_mode is not None and checkpoint_mode != expected_mode:
+                raise ValueError(
+                    f"{checkpoint_mode} checkpoint cannot restore a {expected_mode} agent"
+                )
+            staged_runtime = (
+                restore_runtime(data, self.plan)
+                if self.functional_mu3
+                else PlanningRuntime(None, self._planning.refresh_policy)
+            )
+
+            if "belief" in data.files:
+                if not self._has_legacy_belief:
+                    raise KeyError(
+                        "legacy single-belief checkpoint cannot restore a multi-block agent"
+                    )
+                only = next(iter(self.beliefs))
+                staged_beliefs = {
+                    only: _check_belief(
+                        data["belief"].copy(), f"checkpoint belief {only!r}"
+                    )
+                }
+            else:
+                restored_beliefs = {
+                    key[len("belief:") :]: data[key].copy()
+                    for key in data.files
+                    if key.startswith("belief:")
+                }
+                if set(restored_beliefs) != set(self.beliefs):
+                    raise KeyError(
+                        "checkpoint boundary beliefs do not match this agent: "
+                        f"have {sorted(restored_beliefs)}, expected "
+                        f"{sorted(self.beliefs)}"
+                    )
+                staged_beliefs = {
+                    name: _check_belief(value, f"checkpoint belief {name!r}")
+                    for name, value in restored_beliefs.items()
+                }
+
+            staged_tick = int(data["tick"])
+            staged_episode_tick = (
+                int(data["episode_tick"])
+                if "episode_tick" in data.files
+                else staged_tick
+            )
+            staged_rng = self.rng.bit_generator.state
+            if "rng_state" in data.files:
+                probe_rng = np.random.default_rng()
+                probe_rng.bit_generator.state = json.loads(str(data["rng_state"]))
+                staged_rng = probe_rng.bit_generator.state
+
+            state = {
+                key[len("learn:") :]: data[key]
                 for key in data.files
-                if key.startswith("belief:")
+                if key.startswith("learn:")
             }
-            if set(restored_beliefs) != set(self.beliefs):
-                raise KeyError(
-                    "checkpoint boundary beliefs do not match this agent: "
-                    f"have {sorted(restored_beliefs)}, expected "
-                    f"{sorted(self.beliefs)}"
-                )
-            self.beliefs = {
-                name: _check_belief(value, f"checkpoint belief {name!r}")
-                for name, value in restored_beliefs.items()
+            for old, name in self._LEGACY_KEYS.items():
+                if old not in data.files:
+                    continue
+                if name not in self.learnables.params:
+                    raise KeyError(
+                        f"checkpoint holds legacy {old!r} counts but this agent "
+                        f"does not learn {name!r}"
+                    )
+                state[name] = data[old]
+            probe_learnables = Learnables(
+                self.plan,
+                priors={
+                    name: {key: value.copy() for key, value in params.items()}
+                    for name, params in self.learnables.params.items()
+                },
+            )
+            probe_learnables.load_state_dict(state)
+
+            restored_goal = {
+                key[len("goal:prior:") :]: data[key].copy()
+                for key in data.files
+                if key.startswith("goal:prior:")
             }
-        self.tick = int(data["tick"])
-        if "rng_state" in data.files:
-            self.rng.bit_generator.state = json.loads(str(data["rng_state"]))
-        # A checkpoint predating episode cadence never reset, so its ticks are
-        # one episode. Falling back to `tick` is the conservative read: it can
-        # only decline to fire the episode-start statistic, never fire it twice.
-        self.episode_tick = (
-            int(data["episode_tick"]) if "episode_tick" in data.files else self.tick
-        )
-        state = {
-            k[len("learn:") :]: data[k] for k in data.files if k.startswith("learn:")
-        }
-        for old, name in self._LEGACY_KEYS.items():
-            if old not in data.files:
-                continue
-            if name not in self.learnables.params:
-                raise KeyError(
-                    f"checkpoint holds legacy {old!r} counts but this agent does "
-                    f"not learn {name!r}"
-                )
-            state[name] = data[old]
-        self.learnables.load_state_dict(state)
-        restored_goal = {
-            key[len("goal:prior:") :]: data[key].copy()
-            for key in data.files
-            if key.startswith("goal:prior:")
-        }
-        if self.goal_priors:
-            if set(restored_goal) != set(self.goal_priors):
-                raise KeyError(
-                    "checkpoint learned-goal priors do not match this agent: "
-                    f"have {sorted(restored_goal)}, expected {sorted(self.goal_priors)}"
-                )
-            self.goal_priors = restored_goal
             pending = {
                 key[len("goal:pending:") :]: data[key].copy()
                 for key in data.files
                 if key.startswith("goal:pending:")
             }
-            unknown_pending = sorted(set(pending) - set(self.goal_priors))
-            if unknown_pending:
+            if self.goal_priors:
+                if set(restored_goal) != set(self.goal_priors):
+                    raise KeyError(
+                        "checkpoint learned-goal priors do not match this agent: "
+                        f"have {sorted(restored_goal)}, expected {sorted(self.goal_priors)}"
+                    )
+                unknown_pending = sorted(set(pending) - set(self.goal_priors))
+                if unknown_pending:
+                    raise KeyError(
+                        f"checkpoint has unknown pending goal priors {unknown_pending}"
+                    )
+            elif restored_goal:
                 raise KeyError(
-                    f"checkpoint has unknown pending goal priors {unknown_pending}"
+                    "checkpoint contains learned-goal priors but this agent has "
+                    "learn_goal=False"
                 )
+            if (
+                self.functional_mu3
+                and staged_runtime.result is not None
+                and not staged_runtime.run_required
+            ):
+                expected = self.plan.init_state()
+                params = probe_learnables.write(self.plan, dict(expected.params))
+                for name, binding in self._plan_bindings.items():
+                    address = self.plan.arena.member_of[binding.prior].parameter(
+                        "statistic"
+                    )
+                    params[address.key] = params[address.key].at[address.index].set(
+                        jnp.asarray(_log_of(staged_beliefs[name]))
+                    )
+                expected = _replace(expected, params=params)
+                if restored_goal:
+                    expected = self.plan.with_goal_priors(expected, restored_goal)
+                if not prepared_inputs_match(
+                    self.plan, expected, staged_runtime.result.state
+                ):
+                    raise ValueError(
+                        "functional checkpoint planning state is stale for its "
+                        "beliefs or learnable posterior"
+                    )
+
+        # Commit only after every checkpoint component and stochastic state
+        # has validated, so a failed restore leaves the live agent untouched.
+        self.beliefs = staged_beliefs
+        self.tick = staged_tick
+        self.episode_tick = staged_episode_tick
+        self.rng.bit_generator.state = staged_rng
+        self.learnables.params = {
+            name: {key: value.copy() for key, value in params.items()}
+            for name, params in probe_learnables.params.items()
+        }
+        if self.goal_priors:
+            self.goal_priors = restored_goal
             self._pending_goal_priors = pending or None
-        elif restored_goal:
-            raise KeyError(
-                "checkpoint contains learned-goal priors but this agent has "
-                "learn_goal=False"
-            )
+        self._planning = staged_runtime
+        self._last_filter_result = None
 
     # -- compatibility readouts -------------------------------------------
 
@@ -451,6 +593,39 @@ class RollingAgent:
         value = self.goal_priors.get("Cc")
         return None if value is None else value.copy()
 
+    @property
+    def functional_mu3(self) -> bool:
+        """Whether serialized planning constraints select a functional evaluator."""
+        return functional(self.plan)
+
+    @property
+    def last_plan_result(self) -> RunResult | None:
+        return self._planning.result
+
+    @property
+    def last_filter_result(self) -> RunResult | None:
+        return self._last_filter_result
+
+    @property
+    def planning_key_cursor(self) -> jax.Array | None:
+        return self._planning.key_cursor
+
+    @property
+    def planning_epoch(self) -> int:
+        return self._planning.epoch
+
+    @property
+    def planning_diagnostics(self) -> dict:
+        if not self.functional_mu3 or self.last_plan_result is None:
+            return {}
+        return self.plan.mu3_diagnostics(self.last_plan_result.state)
+
+    def refresh_mu3(self) -> None:
+        """Declare the next act as an independent fixed-particle epoch."""
+        if not self.functional_mu3:
+            raise ValueError("this planning graph has no functional mu3 evaluator")
+        self._planning.refresh()
+
 
 def _require_agent_spec(template: Template, window: str) -> AgentSpec:
     if template.agent is None:
@@ -458,6 +633,18 @@ def _require_agent_spec(template: Template, window: str) -> AgentSpec:
             f"{window} template {template.name!r} does not declare an AgentSpec"
         )
     return template.agent
+
+
+def _accepts_keyword(builder: Builder, name: str) -> bool:
+    """Keep older strict builders compatible while supporting plan-only mu3."""
+    try:
+        parameters = inspect.signature(builder).parameters
+    except (TypeError, ValueError):
+        return False
+    return name in parameters or any(
+        parameter.kind is inspect.Parameter.VAR_KEYWORD
+        for parameter in parameters.values()
+    )
 
 
 def _check_window_compatibility(
