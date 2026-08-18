@@ -20,13 +20,13 @@ fits returned `diverged`. The failed candidate update was atomic, so the last
 accepted parameters remained usable for diagnosis, but the coordinate did not
 satisfy the calibration convergence contract.
 
-The error comes from the declared Pólya–Gamma recurrence learning path. One or
-more recurrence factors failed a propriety check while converting a discrete
-transition belief and Gaussian drive belief into parameter statistics. The
-seed-3101 replicate-0 error payload does not say which factor or predicate
-failed. The leading
-explanation is numerical cancellation when a small covariance is reconstructed
-as a second moment minus the outer product of a large mean.
+The error comes from the declared Pólya–Gamma recurrence learning path. A
+deterministic replay identified `switch447` as the only failing factor. Its
+Gaussian drive was proper and positive definite. Reconstructing its covariance
+as a second moment minus the outer product of its mean introduced a symmetry
+error of `1.1102230246251565e-16`, above the dtype-scaled tolerance
+`3.966749545204547e-17`, so the derived learning readout rejected a valid
+belief.
 
 This ticket fixes the numerical invariant before cff-s6rs can select margins or
 budgets. It does not relax a true impropriety, change the recurrence prior to
@@ -120,17 +120,14 @@ Hostile-input decisions:
 
 Research finding — Question: what caused the calibration divergence? Answer:
 `fit_rslds` completed inner inference, then `Learnables._update` called
-`Engine.recurrence_weight_stats`; `PGWeightsFamily.stats` rejected at least one
-factor through `PGWeightsFamily._proper`. The candidate posterior was never
-committed. Scoring the last accepted state is useful for diagnosis but cannot
-set calibration margins because the registered outer rule was not met. The
-strongest hypothesis from the code-path audit is cancellation in
-`second - mean @ mean.T`; factor-local diagnostics must prove the exact failed
-predicate before the final repair is chosen. Source:
+`Engine.recurrence_weight_stats`; `PGWeightsFamily.stats` rejected `switch447`
+after covariance reconstruction introduced roundoff-scale asymmetry. The
+candidate posterior was never committed. Scoring the last accepted state is
+useful for diagnosis but cannot set calibration margins because the registered
+outer rule was not met. Source:
 `src/cffg/models/rslds_fit.py`, `src/cffg/learn.py`, `src/cffg/engine.py`,
 `src/cffg/recurrence.py`, `src/cffg/gaussian_learning.py`, and calibration-only
-source-heterogeneous seed 3101 replicate 0. Confidence: high on the code path
-and claim boundary; medium-high on cancellation as the exact predicate.
+source-heterogeneous seed 3101 replicate 0. Confidence: high.
 
 ### 2026-08-18 — deterministic cancellation regression
 
@@ -159,4 +156,30 @@ its runtime state; the artifact did not retain per-factor flags.
 Source → `src/cffg/recurrence.py:78-233,405-446`,
 `src/cffg/gauss.py:98-103`, `src/cffg/compiler.py:1913-1917`, and
 `src/cffg/learn.py:446-450`. Confidence → high for the deterministic regression
-and upstream/readout boundary; production factor identity remains unmeasured.
+and upstream/readout boundary.
+
+### 2026-08-18 — exact production replay
+
+Question → Which production factor and propriety predicate failed?
+
+Answer → The replay reproduced the archived fit bit-for-bit and failed only at
+`switch447`, sorted learnable-source index 666, on outer readout call 11. The
+upstream belief was proper. Its directly inverted covariance was
+`[[0.0055827036792674015, 0.00026013456494927695],
+[0.000260134564949277, 0.005557219631225886]]`, with minimum eigenvalue
+`0.005309515209585554`. Reconstructing it from the second moment produced
+`[[0.005582703679267276, 0.0002601345649492215],
+[0.0002601345649493325, 0.005557219631225879]]`. That matrix remained positive
+definite, but its symmetry error `1.1102230246251565e-16` exceeded the
+dtype-scaled symmetry tolerance `3.966749545204547e-17`. Probabilities,
+parameters, logit second moments, and all derived outputs were finite and
+passed their own predicates.
+
+The replay took `341.66625862475485` seconds. Its status, inner status,
+iteration counts, error, residual history, and free-energy history matched the
+archived calibration coordinate exactly. The repair must preserve the directly
+computed covariance instead of relaxing the project-wide PSD predicate.
+
+Source → calibration-only source-heterogeneous seed 3101 replicate 0;
+`src/cffg/recurrence.py:78-233`; `src/cffg/gauss.py:98-103`; and
+`src/cffg/engine.py:2147-2174`. Confidence → high.
