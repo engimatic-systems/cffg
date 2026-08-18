@@ -53,9 +53,12 @@ or generate a final dataset.
    produce byte-identical registration content and content hashes.
 7. The generated manifest covers every file written by the dual freeze and
    validates from its artifact directory.
-8. The registration names `cff-oyie` as the only final owner, records the exact
-   content-hash-qualified final command, and preserves append-only
-   family/seed/replicate checkpoint paths and retained posterior locations.
+8. The registration names `cff-oyie` as the only final owner, preserves
+   append-only family/seed/replicate checkpoint paths and retained posterior
+   locations, and points to a manifested `final-command.txt`.
+   8.1. `final-command.txt` contains the exact final command with the completed
+   registration file's SHA-256. Keeping that command outside the registration
+   avoids asking a file to contain its own final hash.
 9. Focused tests reject tampered calibration, source-design, mapping, lock,
    registration, and manifest inputs, and prove that neither a final generator
    nor a fitting arm is called.
@@ -96,6 +99,8 @@ command. No other future work is deferred here.
   and hashes.
 - **Registration document:** The metadata artifact that fixes the experiment
   protocol and provenance. It is not a compiler or runtime dispatch registry.
+- **Resolved final command:** A manifested command file written only after the
+  registration bytes and their SHA-256 are fixed.
 - **Schema v4:** The immutable measured calibration contract.
 - **Schema v5:** The final-only fixed-dataset protocol derived from schema v4.
 
@@ -114,7 +119,7 @@ Duplicated execution surfaces checked before implementation:
   controls, diagnostics, primary effects, and independent decisions;
 - calibration, scale, source-design, adapter, mapping, lock, historical-freeze,
   registration, and manifest provenance;
-- final checkpoint and retained-posterior path templates;
+- final command, checkpoint, and retained-posterior path templates;
 - CFFG compiler, VM, schedule, kernels, ledger, factors, and serialization,
   which are N/A because this command performs no inference.
 
