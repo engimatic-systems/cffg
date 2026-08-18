@@ -1,6 +1,6 @@
 ---
 id: cff-9cx5
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-18T17:08:12Z
@@ -138,3 +138,24 @@ Legend: prerequisite --> dependent
                                                    |
                                                    +--> [ ] cff-oyie final run
 ```
+
+**2026-08-18T17:34:03Z**
+
+Implementation complete in the sibling experiment repository on branch cff-9cx5-final-execution.
+
+Commits:
+- 260bb55 cff-9cx5: prepare fixed-dataset final execution
+- 47dd1a7 cff-9cx5: document fixed-dataset final boundary
+
+Evidence:
+- Schema v4 calibration output remains free of final-only report fields.
+- Schema v5 is an exact derivation of the embedded validated v4 contract, freezes six family-qualified identities and manifests, and rejects collisions with calibration streams.
+- Final decisions record every effect on each of three named datasets and compute no interval, alpha, unlock, or joint pass.
+- Final preflight checks the registration hash, authorized experiment and locked CFFG commits, tracked worktree state, runtime dataset and stream identities, heterogeneous training coverage, and unmodified baseline before claim reporting.
+- Append-only final interruption/resume and independent family failure are covered by synthetic tests.
+- Focused validation: 55 passed in 2.38 seconds.
+- Final modern suite: 126 passed in 55.00 seconds.
+- git diff --check passed; both implementation commits are clean.
+- No final seed was generated or fit.
+
+Next: cff-huxt must consume the completed cff-s6rs schema-v4 artifact, derive and hash the immutable schema-v5 registration at an authorized code commit, and still stop before every final seed.
