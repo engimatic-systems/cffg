@@ -9,137 +9,98 @@ priority: 1
 assignee: coopwilliams
 tags: [rslds, validation, learning, statistics]
 ---
-# Epic: Confirm source-specific rSLDS empirical non-inferiority
+# Epic: Establish classic rSLDS evidence and source-heterogeneous recovery
 
 ## Background in Plain English
 
-cff-l7y4 showed that CFFG can fit one synthetic NASCAR rSLDS from
-observations at `T=10,000`. It did not compare CFFG with an observed-only
-literature learner over multiple seeds. Later source review found that the
-pinned authors' learner and the paper do not use the same full parameter
-family: the paper has a separate continuous recurrence slope for each source
-regime, while the executable learner shares slopes across sources. The pinned
-NASCAR generator and learner also select different transition trees unless the
-learner tree is supplied explicitly.
+cff-l7y4 showed that CFFG could fit one synthetic NASCAR rSLDS from observations. It did not provide a multi-seed comparison with an independent implementation, and the classic NASCAR generator ties its recurrence gates across source regimes. That classic dataset therefore cannot show that a learner recovers distinct source-specific gates.
 
-This epic coordinates a fair confirmatory comparison without narrowing CFFG's
-source-specific model. cff-akmp locks the legacy runtime. cff-64ri adds an
-independent paper-equation Gibbs adapter for the full model. cff-0l31 freezes
-the mapping, harness, and statistical protocol. cff-oyie runs the final seeds
-and reports the result. The split keeps environment repair, reference
-semantics, scientific choices, and confirmatory evidence independently
-reviewable.
+This epic uses two separate dataset families. The classic family preserves Linderman's source-homogeneous NASCAR generator and fits 10,000 training steps, the scale reported in the paper, with a separate 2,500-step held-out extension. The heterogeneous family keeps the NASCAR dynamics but gives each source regime distinct transition gates and checks recovery on the same frozen state grid for every source.
 
-The comparison can support an empirical non-inferiority conclusion for the
-registered model, metrics, seed set, and reference adapter. It cannot establish
-implementation parity with the authors' executable learner or validate CFFG's
-local variational messages and free-energy ledger against the two CFFG papers.
-Those are separate claims with separate direct evidence.
+The two families answer different questions. A passing classic result can support empirical non-inferiority and absolute adequacy on the exact canonical generator at the declared training scale and held-out extension. A passing heterogeneous result can add evidence that CFFG recovers source-dependent transition functions. The classic claim is tested first, and only a passing classic claim unlocks the heterogeneous confirmatory claim.
+
+Neither result establishes parity with the authors' executable code, identity between inference algorithms, validation of CFFG message or free-energy equations, or universal rSLDS performance.
 
 ## Outcomes / Acceptance Criteria
 
-1. cff-akmp is closed with a reproducible decision-list legacy runtime and an
-   observed-only recurrence-only smoke artifact.
-2. cff-64ri is closed with an independent full source-specific
-   paper-equation Pólya–Gamma Gibbs adapter and its analytic and collapse
-   oracles.
-3. cff-0l31 is closed with a hashed preregistration that fixes the complete
-   final comparison before any final seed runs.
-4. cff-oyie is closed with every registered seed, failure, aggregate,
-   uncertainty interval, artifact, and supported conclusion reported.
-5. The primary conclusion compares CFFG with the independent paper-equation
-   adapter on the same full source-specific decision-list model.
-6. The unmodified pinned authors' learner is reported only as a narrower
-   recurrence-only secondary comparator. It is not described as a same-model
-   reference for source-specific learning.
-7. A source-specific empirical non-inferiority conclusion is made only if
-   every preregistered primary test passes in both comparison tiers.
-8. The conclusion states that same-model outcome non-inferiority does not
-   prove algorithm parity, authors-code parity, or CFFG-paper fidelity.
-9. README.md, docs/ARCHITECTURE.md, and docs/LIMITATIONS.md agree about the
-   model boundary, reference provenance, runtime statuses, results, and limits.
-10. Balanced-tree and destination-softmax work remains linked future work and
-   does not block this decision-list comparison.
+1. The declared-learning foundation through cff-dqk2 and cff-11jj is closed, and the comparison uses only the serialized `LearnableSpec` fitting path rather than a manual parameter-update compatibility path.
+2. The independent paper-equation adapter, destination-regime dynamics correction, locked legacy environment, numerical oracles, restartable dual runner, family generators, source-design audit, secondary outcomes, and scale benchmark are closed and recorded in their owning tickets.
+3. The classic generator's parameter arrays, legacy `RandomState` stream, and golden trajectory hash match the pinned canonical fixtures. The heterogeneous generator has distinct source rows, common-state source dependence, full-rank source/gate designs, registered exposure and binary-outcome gates, deterministic streams, and bounded long rollouts.
+4. cff-s6rs closes with complete calibration-only evidence for both families, family-specific scales and splits, fixed optimization and Gibbs budgets, fixed paired and absolute thresholds, whole-run projections, complete manifests, and no generated or fitted final seed.
+5. cff-huxt closes with one immutable dual-family preregistration that reconstructs from cff-s6rs, records the superseded one-family freeze without executing it, authorizes only cff-oyie to run final seeds, and validates from a clean checkout.
+6. cff-oyie closes with every registered final family, seed, tier, Gibbs chain, learned control, failure, aggregate, interval, decision, retained posterior, attempt ledger, provenance record, and manifest reported and independently recomputable.
+7. The classic conclusion, if every registered classic effect and coordinate passes, states that CFFG was empirically non-inferior to the independent paper-equation adapter and met its registered absolute adequacy gates on the exact source-homogeneous canonical generator with 10,000 fitted steps and a separate 2,500-step held-out extension.
+8. The classic conclusion does not call the registered workflow an exact Figure 3 replay because the paper did not use the held-out extension.
+9. The heterogeneous conclusion, if the classic claim is unlocked and every registered heterogeneous effect and coordinate passes, states that CFFG was empirically non-inferior to the independent adapter and met the registered shared-grid worst-source transition and source-contrast recovery gates on the local source-heterogeneous extension.
+10. A failed classic result locks the joint and heterogeneous confirmatory claims but preserves descriptive heterogeneous results. A failed heterogeneous result does not erase a passed classic result. The epic closes with an honest complete report and creates repair tickets for failed evidence layers rather than changing the frozen protocol.
+11. The pinned unmodified authors' learner remains a separately labeled recurrence-only secondary baseline. It is not described as a same-model reference for source-specific learning.
+12. The final wording explicitly excludes authors-code parity, inference-algorithm identity, message-equation parity, free-energy validation, and universal rSLDS-family parity.
+13. README.md, docs/ARCHITECTURE.md, and docs/LIMITATIONS.md agree with the final artifact about both family boundaries, scales, reference provenance, runtime statuses, results, missed gates, identifiability limits, and claim exclusions.
+14. Every branch in the stacked roadmap has atomic commits, an updated ticket handoff, the validation required by AGENTS.md for its change type, a clean worktree, and a PR body that follows the structure used by PR #63.
+15. Balanced-tree, explicit gate-sharing, destination-softmax, real-observation, and other switching-system work remains linked future work and does not block this decision-list evidence result.
 
 ## Methodological Suggestions
 
-These suggestions are optional. The implementer may choose another sound
-method that satisfies the outcomes.
+These suggestions are optional. The implementer may choose another sound method that satisfies the outcomes.
 
-- Treat the four child tickets as phase barriers. Do not move semantic adapter
-  work into environment repair or implementation changes into final execution.
-- Keep the primary same-model comparison separate from the useful but narrower
-  unmodified-upstream baseline in every artifact and conclusion.
-- Put any evidence-backed failure repair in a new ticket rather than changing
-  the frozen protocol after confirmatory execution starts.
+- Treat calibration, freeze, and final execution as irreversible phase barriers. Never inspect a final seed before the replacement freeze.
+- Keep classic and heterogeneous effects, failures, and claims separate in raw records and reports.
+- Keep the independent same-model adapter separate from the narrower unmodified-upstream baseline.
+- Put any evidence-backed repair in a new prerequisite ticket rather than changing the frozen protocol after final execution begins.
 
 ## Future work
 
-cff-0f3g owns explicit tree topology, balanced-tree inference, gate sharing,
-learning, and scale validation. cff-dlrj owns the first derivation decision for
-a destination-softmax recurrence factor. Neither ticket is a prerequisite of
-this epic. Real observations and other switching-system datasets remain
-future validation after the synthetic NASCAR comparison.
+cff-0f3g owns explicit tree topology, balanced-tree inference, gate sharing, learning, and scale validation. cff-dlrj owns the destination-softmax recurrence derivation. Real observations and other switching-system datasets remain future validation after this synthetic two-family comparison. None of that work is a prerequisite for closing this epic.
 
 ## Definitions
 
-- **Decision-list model:** A categorical transition that tests logistic gates
-  in order and selects the first accepted destination.
-- **Empirical non-inferiority:** Passing every preregistered primary outcome
-  test against the independent implementation of the published full model,
-  within the registered margins and evidence set.
-- **Paper-equation adapter:** A separately versioned implementation of the
-  published equations that is based on pinned legacy code but was not shipped
-  unchanged by the paper's authors.
-- **Primary comparison tier:** A same-model CFFG-versus-adapter comparison
-  using either shared truth-free initialization or each workflow's native
-  truth-free initialization.
-- **Source-specific recurrence:** A transition whose continuous-state slope
-  and offset are selected by the current discrete regime.
+- **Absolute adequacy gate:** A registered ceiling or floor that CFFG must meet against generating truth or bounded behavior, independent of agreement with the reference adapter.
+- **Classic family:** The source-homogeneous canonical NASCAR generator fitted for 10,000 training steps with a separate 2,500-step held-out extension.
+- **Empirical non-inferiority:** Every registered paired effect's simultaneous lower confidence bound meets its frozen margin against the independent adapter.
+- **Fixed-sequence gatekeeping:** The classic claim is tested first, and only a passing classic claim unlocks the heterogeneous confirmatory claim.
+- **Heterogeneous family:** The local NASCAR extension whose transition gates differ by source regime.
+- **Paper-equation adapter:** A separately versioned implementation of the published equations based on pinned legacy code, not the authors' unmodified executable learner.
+- **Source contrast:** The difference between two source regimes' transition-probability functions evaluated on the same frozen state grid.
 
 ## Notes
 
-**2026-08-10T03:10:00Z**
+Pre-implementation handoff: this epic coordinates child work and owns the final claim audit. `docs/ARCHITECTURE.md` has no engine change-path row for the sibling validation harness. The final evidence landing updates the existing rSLDS consumer-validation section plus README.md and docs/LIMITATIONS.md; docs/DERIVATIONS.md is N/A unless a new mathematical message or free-energy derivation is introduced.
 
-Roadmap decomposition after the reference-feasibility and CFFG-paper reviews.
+Duplicated surfaces checked across the epic:
+
+- both dataset families, primary tiers, four reference chains, learned controls, and the narrow unmodified baseline;
+- calibration, scale selection, immutable freeze, final generation, append-only resume, aggregation, manifests, and final documentation;
+- paired outcomes, family-specific absolute outcomes, fixed-sequence gatekeeping, failed-family retention, and explicit excluded claims;
+- compiler, VM, schedule, kernels, ledger, serialization, and core factor equations, which are N/A after cff-11jj unless a separately owned engine defect is discovered.
 
 Legend: prerequisite --> dependent
 
-    [ ] cff-akmp (ready: locked legacy runtime)
-              |
-              +--> [ ] cff-64ri (paper-equation adapter)
-                            |
-    [x] cff-l7y4 -----------+
-    [x] cff-garu -----------+--> [ ] cff-0l31 (frozen protocol)
-    [x] cff-r6bl -----------+              |
-                                           +--> [ ] cff-oyie (final evidence)
-                                                         |
-                                                         +--> [ ] cff-nkbj
+```text
+[x] cff-8xve + cff-i00o + cff-9o39
+                    |
+                    +--> [ ] cff-s6rs calibration (in progress)
+                                  |
+                                  +--> [ ] cff-huxt freeze
+                                                |
+                                                +--> [ ] cff-oyie final execution
+                                                              |
+                                                              +--> [ ] cff-nkbj audit
 
-    Parallel linked work: [ ] cff-0f3g balanced-tree epic
-    Independent research: [ ] cff-dlrj destination-softmax derivation
-    Linked engine/release baselines: cff-cfqg and cff-uy48
+Linked future work: cff-0f3g balanced tree; cff-dlrj destination softmax
+```
 
-Research question: what comparison remains faithful to both the CFFG papers
-and the Linderman rSLDS paper? Answer: CFFG does not prescribe source-specific
-or tied recurrence parameters; it requires the chosen model, variational
-family, constraints, local messages, and free-energy terms to be explicit.
-The Linderman paper's full model uses source-specific recurrence slopes, but no
-audited unmodified `recurrent-slds` learner implements that full family. The
-fair primary reference is therefore an independent source-specific
-paper-equation adapter, with the narrower authors' learner retained as a
-secondary nested-model comparator. Sources: `notes/pt1.txt`, sections 1 and 5;
-`notes/pt2.txt`, sections 2.3 and 4; Linderman et al. 2017 Eq. 4 and supplement;
-`recurrent-slds@383ddac` transition, state, and NASCAR learner sources.
-Primary external sources:
-https://proceedings.mlr.press/v54/linderman17a/linderman17a.pdf#page=3 ;
-https://proceedings.mlr.press/v54/linderman17a/linderman17a-supp.pdf#page=1 ;
-https://github.com/slinderman/recurrent-slds/blob/383ddac2472cdf3248c6e871baede9ecda6f14cb/rslds/transitions.py#L19-L126 ;
-https://github.com/slinderman/recurrent-slds/blob/383ddac2472cdf3248c6e871baede9ecda6f14cb/rslds/states.py#L147-L201 ;
-https://github.com/slinderman/recurrent-slds/blob/383ddac2472cdf3248c6e871baede9ecda6f14cb/examples/nascar.py#L421-L464 .
-Confidence: high on the model and executable boundaries; medium-high on
-legacy integration until cff-akmp and cff-64ri execute their tests.
+Research question → Does classic NASCAR test distinct source gates?
 
-**2026-08-13T05:19:12Z**
+Answer → No. Its recurrence weights and offsets are broadcast across all four source regimes, and source regime is confounded with naturally occupied state support. The classic family therefore uses held-out on-support transition adequacy and makes no source-row recovery claim.
 
-PR merge-gate correction (2026-08-12): narrowed the epic conclusion from literature or implementation parity to source-specific empirical non-inferiority on the registered outcomes. The epic now excludes authors-code parity and CFFG-paper message/free-energy fidelity from that conclusion. cff-64ri owns adapter provenance and independent conditional oracles; cff-0l31 owns direct CFFG recurrence message/energy oracles, Gibbs mixing diagnostics, calibrated margin ceilings, and the exact paired estimand; cff-oyie owns immutable execution and bounded reporting.
+Source → `src/cffg_nascar_validation/nascar.py`, the pinned `recurrent-slds` NASCAR example, and the calibration-only seed-3101 counterfactual-grid audit recorded in cff-s6rs.
+
+Confidence → High.
+
+Research question → What may both passing families support?
+
+Answer → The classic family may support bounded empirical non-inferiority and adequacy on the exact canonical generator at the declared paper training scale plus held-out extension. The heterogeneous family may add broader evidence for source-dependent transition-function recovery. Together they do not establish authors-code parity, algorithm identity, CFFG-paper fidelity, or universal rSLDS performance.
+
+Source → Linderman et al. 2017 section 5.1; the pinned Figure 3 example; cff-i00o's registered claim schema; and cff-s6rs's calibration boundary.
+
+Confidence → High for the claim separation and exclusions; final support depends on the preregistered results.
