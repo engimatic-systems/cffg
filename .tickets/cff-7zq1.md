@@ -1,6 +1,6 @@
 ---
 id: cff-7zq1
-status: in_progress
+status: closed
 deps: [cff-9cx5]
 links: []
 created: 2026-08-18T17:46:33Z
@@ -140,7 +140,7 @@ Legend: prerequisite --> dependent
 ```text
 [x] cff-9cx5 schema-v5 runner
           |
-          +--> [ ] cff-7zq1 deterministic freeze builder (ready)
+          +--> [x] cff-7zq1 deterministic freeze builder
                          |
 [ ] cff-s6rs calibration +--> [ ] cff-huxt measured immutable freeze
                                           |
@@ -148,3 +148,25 @@ Legend: prerequisite --> dependent
                                                        |
                                                        +--> [ ] cff-nkbj
 ```
+
+**2026-08-18T18:16:04Z**
+
+Implementation handoff — 2026-08-18
+
+Done:
+- Added `dual_freeze.py` and the `cffg-rslds-freeze-dual` command on sibling experiment branch `cff-7zq1-dual-freeze`, commit `bd61513`.
+- The builder validates the complete manifested schema-v4 calibration and scale chain, the fixed source-design artifact, both lockfiles, adapter provenance, mapping version, generator and grid identities, and the historical one-family freeze before writing.
+- It derives schema v5 only through `derive_final_dual_protocol`, writes through an isolated staging directory, refuses existing output, and atomically publishes `preregistration.json`, `final-command.txt`, and `manifest.json`.
+- `final-command.txt` carries the completed registration file SHA-256 outside the registration, avoiding an impossible self-hash. Final execution must use a clean checkout of the authorized experiment commit with the byte-identical registration at the recorded relative path.
+- Synthetic fixtures use calibration seeds only. Tests cover deterministic reconstruction, no final generation or fitting, calibration/scale/source-design/lock/adapter/mapping/historical/registration/manifest tampering, and no-overwrite behavior.
+- Updated the experiment README in place. The historical freeze module and artifacts were not changed.
+
+Validation:
+- Focused and adjacent checks: 60 effective passes; two legacy-reference checks initially lacked the ignored source cache and both passed after the worktree was connected to the pinned cache.
+- Final experiment suite at `bd61513`: 139 passed in 77.88 seconds.
+- CLI help, Python compilation, `git diff --check`, and manifest reconstruction passed.
+- No registered final seed was generated or fit.
+
+Next:
+- `cff-huxt` remains blocked only by the live `cff-s6rs` calibration. Once that manifested artifact validates, run this command from the clean authorized code commit, commit the real registration and hashes, and stop before final execution.
+- The sibling experiment repository has no Git remote; its local branch and commit are the source handoff for the CFFG PR chain.
