@@ -1,6 +1,6 @@
 ---
 id: cff-iqqk
-status: open
+status: closed
 deps: [cff-epdp]
 links: []
 created: 2026-08-13T04:26:16Z
@@ -97,3 +97,17 @@ oracles before this result is generalized to those families.
 - **Window transformation:** Replacing the growing literal trial history with
   fixed-size planning and filtering templates plus an explicit boundary
   belief.
+
+## Notes
+
+**2026-08-18T21:41:29Z**
+
+Implementation handoff, 2026-08-18. This ticket is a test-only oracle plus in-place architecture and limitations corrections; no production IR field or runtime mutation state is planned. Authority is the paper-literal immutable snapshot and independent two-state enumeration, compared with build_rollout and RollingAgent. Applicable change-path row: Runtime numerical or status invariant as exercised evidence only. Required surfaces: host Engine and public RollingAgent are applicable; JIT behavior is reached through Engine; exact filtering and mixed GFE planning schedules are both applicable; literal-zero infeasibility and float32 are applicable; flooding, Colony/vmap, learnables, checkpoints, current/legacy decode, compiler schema changes, and serialization migration are N/A. The bounded claim is fixed-A discrete joint-boundary models with registered matrix-categorical GFE and exact filtering; continuous, hybrid, hierarchical, and mean-field boundary generalization remain outside this ticket.
+
+**2026-08-18T21:48:27Z**
+
+Research distillation, 2026-08-18. Question: what exactly flips, and what scalar comparison is valid? Answer: Part I Eqs. 14-16 and 44-45 define past DATA versus future model/P-substitution slices; Part I Eq. 30 and Fig. 10 define known-data delta, while Eq. 32 and Fig. 13 define the P-substitution bead. Part II Sec. 3.3, Eqs. 4-9, and Fig. 5 give the filter/planning split and binary fixed-A local objective. A horizon-one rolling plan can be compared with the future slice of a past=1, steps=2 literal mixed history after exact filtering. Their common future action and state marginals agree, but whole-graph free energies differ by the retained past slice: F_mixed - F_rolled = -log p(x1 | u1, d0). Source: notes/pt1.txt lines 531-729, 1034-1167, 1808-1928; notes/pt2.txt lines 630-872 and 1098-1170; src/cffg/models/rollout.py; confidence: high, independently enumerated and executed. Question: what hostile boundary is truthful? Answer: normalized uniform is the vacuous categorical prior; exact zeros must survive rollover, while zero evidence returns RunStatus.INFEASIBLE and InferenceError without mutating belief or cadence. Source: Engine support checks and the new test_constraint_flip.py; confidence: high.
+
+**2026-08-18T22:07:09Z**
+
+Implementation complete, 2026-08-18. The test-only oracle now records an exact one-slice planning-to-DATA flip, independently enumerates the first plan and filter, compares the rolled second plan with a paper-shaped past=1, steps=2 mixed history, and checks the derived F_mixed - F_rolled = -log evidence offset. Exact-zero support survives rollover; contradictory data and empty planning support return INFEASIBLE without mutating agent state. The float32 path either matches dtype/support-conditioned references through filtering and replanning or exposes budget exhaustion, and a compile spy remains at exactly two structures through 16 ticks. Documentation limits the equivalence claim to fixed-A binary discrete joint boundaries. Verification: 4 oracle tests and 26 focused GFE/agent tests passed; final not-slow suite passed 1,373 tests with zero failures and 39 deselected in 688.09 seconds. No production runtime code changed.

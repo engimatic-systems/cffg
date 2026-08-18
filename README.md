@@ -632,10 +632,12 @@ joint versus mean-field rollover is explicit in each `BeliefBinding` rather
 than inferred by the runtime.
 
 These are two immutable templates, not the paper's one growing trial graph
-whose future planning bead is replaced by a data bead. `cff-iqqk` owns the
-exact enumerated boundary under which the two-window transformation is
-equivalent; until that oracle lands, this is a named fixed-memory realization,
-not a literal-graph claim.
+whose future planning bead is replaced by a data bead. An independent two-step
+enumerator establishes that this window transformation preserves both action
+posteriors, the intervening filter posterior, exact-zero support, and the local
+objective ledger for a fixed-A binary discrete model with one joint boundary.
+That is the validated equivalence boundary, not a literal-graph claim or a
+general result for other boundary families.
 
 Pass
 `learn_a=True, initial_counts=...` for continual Dirichlet learning of the
