@@ -101,32 +101,6 @@ work. Failed layers receive their own tickets under criterion 13.
 
 ## Notes
 
-**2026-08-10T03:20:00Z**
-
-Wiggle-audit retained candidates and intended meanings: canonical=the scale
-frozen by cff-0l31; fixed=scientific choices frozen before execution;
-register=each preregistered arm, seed, metric, rule, or aggregate;
-reusable=reuse the unchanged dashboard result; same=the full model, same-`K`
-control, or named same-model tier; implement=implementation repair excluded
-from this phase; support=literal probability support or a conclusion justified
-by results; complete=the full comparison, manifest, seed set, or declared
-artifact set; ready=the explicit not-ready result; remaining=the useful legacy
-baseline or deferred work; close=epic closure after acceptance; converge=the
-engine's named non-converged statuses; evidence=confirmatory artifacts or a
-failure-linked diagnosis; exact=commands or literal zero; parity and pass=the
-registered threshold decision; sound=another method satisfying outcomes;
-test and validate=the slow experiment, artifact integrity, or aggregate
-recomputation as stated; fit and learn=observed-only fitted parameters;
-scale=the frozen canonical case; could=the not-ready possibility; may=optional
-method; explicit_owner=new repair tickets own any diagnosed failure; all, any,
-every, and only=the registered metric/seed/artifact universe and hard scope
-boundaries. Capability owner: cff-oyie owns immutable final execution and
-reporting only. Intelligible-ticket review: complete.
-
-Classification-note additions: intended=the contextual meaning assignments in
-this note; named_ticket_handoff=the new repair ticket required by criterion 13;
-deferred=the explicitly excluded model families and datasets.
-
 **2026-08-13T05:19:12Z**
 
 PR merge-gate correction (2026-08-12): the final report may claim only source-specific empirical non-inferiority for the registered outcomes. It must explicitly deny authors-code parity and CFFG-paper message/free-energy validation.
