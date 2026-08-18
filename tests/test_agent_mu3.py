@@ -371,7 +371,21 @@ def test_functional_checkpoint_configuration_mismatch_is_atomic(
 
 @pytest.mark.parametrize(
     "corruption",
-    ("extra_array", "missing_key", "extra_metadata", "missing_state"),
+    (
+        "extra_array",
+        "missing_key",
+        "unclaimed_key",
+        "null_cache",
+        "nonfinite_state",
+        "nonfinite_trace",
+        "nonfinite_outer",
+        "invalid_outer",
+        "invalid_weights",
+        "invalid_counter",
+        "invalid_cache",
+        "extra_metadata",
+        "missing_state",
+    ),
 )
 def test_functional_checkpoint_runtime_schema_corruption_is_atomic(
     tmp_path, corruption
@@ -386,6 +400,44 @@ def test_functional_checkpoint_runtime_schema_corruption_is_atomic(
         arrays["mu3:future"] = np.asarray(1)
     elif corruption == "missing_key":
         del arrays["mu3:key"]
+    elif corruption == "unclaimed_key":
+        metadata = json.loads(str(arrays["mu3:metadata"]))
+        metadata["has_key"] = False
+        del metadata["key_impl"]
+        del metadata["typed_key"]
+        arrays["mu3:metadata"] = np.asarray(json.dumps(metadata))
+        del arrays["mu3:key"]
+    elif corruption == "null_cache":
+        metadata = json.loads(str(arrays["mu3:metadata"]))
+        metadata["cache_config"] = None
+        arrays["mu3:metadata"] = np.asarray(json.dumps(metadata))
+    elif corruption == "nonfinite_state":
+        arrays["mu3:state:messages"] = np.full_like(
+            arrays["mu3:state:messages"], np.nan
+        )
+    elif corruption == "nonfinite_trace":
+        metadata = json.loads(str(arrays["mu3:metadata"]))
+        metadata["result"]["message_deltas"][0] = float("nan")
+        arrays["mu3:metadata"] = np.asarray(json.dumps(metadata))
+    elif corruption == "nonfinite_outer":
+        metadata = json.loads(str(arrays["mu3:metadata"]))
+        metadata["result"]["outer_merit"] = float("nan")
+        arrays["mu3:metadata"] = np.asarray(json.dumps(metadata))
+    elif corruption == "invalid_outer":
+        metadata = json.loads(str(arrays["mu3:metadata"]))
+        metadata["result"]["trust_radius"] = -1.0
+        arrays["mu3:metadata"] = np.asarray(json.dumps(metadata))
+    elif corruption == "invalid_weights":
+        weight_field = next(name for name in arrays if name.endswith(":weights"))
+        arrays[weight_field] = np.full_like(arrays[weight_field], -1.0)
+    elif corruption == "invalid_counter":
+        metadata = json.loads(str(arrays["mu3:metadata"]))
+        metadata["result"]["iterations"] = -1
+        arrays["mu3:metadata"] = np.asarray(json.dumps(metadata))
+    elif corruption == "invalid_cache":
+        metadata = json.loads(str(arrays["mu3:metadata"]))
+        metadata["cache_config"]["tol"] = float("nan")
+        arrays["mu3:metadata"] = np.asarray(json.dumps(metadata))
     elif corruption == "extra_metadata":
         metadata = json.loads(str(arrays["mu3:metadata"]))
         metadata["future"] = True
@@ -405,6 +457,30 @@ def test_functional_checkpoint_runtime_schema_corruption_is_atomic(
     with pytest.raises((KeyError, ValueError), match="functional checkpoint"):
         target.restore(path)
     assert_used_agent_unchanged(target, snapshot)
+
+
+def test_functional_checkpoint_cannot_promote_exhaustion_to_convergence(tmp_path):
+    source = make_agent(n_sweeps=0)
+    with pytest.raises(InferenceError) as exhausted:
+        source.act()
+    assert exhausted.value.result.status is RunStatus.BUDGET_EXHAUSTED
+    good = tmp_path / "functional-exhausted.npz"
+    source.checkpoint(good)
+    arrays = checkpoint_arrays(good)
+    metadata = json.loads(str(arrays["mu3:metadata"]))
+    metadata["result"]["status"] = RunStatus.CONVERGED.value
+    arrays["mu3:metadata"] = np.asarray(json.dumps(metadata))
+    corrupt = tmp_path / "functional-promoted.npz"
+    write_checkpoint(corrupt, arrays)
+
+    target = make_agent(n_sweeps=0)
+    target.observe(0, 1)
+    snapshot = used_agent_snapshot(target)
+    with pytest.raises(ValueError, match="solver diagnostics"):
+        target.restore(corrupt)
+    assert_used_agent_unchanged(target, snapshot)
+    with pytest.raises(InferenceError):
+        target.act()
 
 
 def test_sampling_failure_returns_no_action_and_preserves_diagnostics():
