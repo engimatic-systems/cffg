@@ -18,7 +18,15 @@ cff-s6rs produces the complete calibration evidence for both dataset families. T
 
 This ticket validates the complete calibration artifact and writes one replacement preregistration and manifest for a lean, fixed demonstration. It freezes exactly three untouched final datasets for the classic family and three for the source-heterogeneous extension. The registered scope is a bounded demonstration over those six datasets, not a population-wide statistical claim.
 
-The classic family uses the exact canonical generator and fits 10,000 training steps, matching the paper's training scale. Its separate 2,500-step held-out extension means it is not an exact replay of the Figure 3 workflow. The classic run owns the task-performance half of the parity claim. cff-nkbj audits the factor semantics, parameter mappings, and numerical oracles that own the probabilistic-architecture half. The heterogeneous run is an independent extension result, not a prerequisite for classic parity. This ticket does not fit or generate final data.
+The classic family uses the local generator that reproduces the pinned NASCAR
+parameter construction and legacy random stream. It fits 10,000 training steps,
+matching the paper's training scale. Its separate 2,500-step held-out extension
+means it is not an exact replay of the Figure 3 workflow or an execution of the
+unmodified authors' generator. The classic run owns the task-performance half
+of the parity claim. cff-nkbj audits the factor semantics, parameter mappings,
+and numerical oracles that own the probabilistic-architecture half. The
+heterogeneous run is an independent extension result, not a prerequisite for
+classic parity. This ticket does not fit or generate final data.
 
 ## Outcomes / Acceptance Criteria
 
@@ -27,7 +35,11 @@ The classic family uses the exact canonical generator and fits 10,000 training s
 3. The freeze records and verifies CFFG, experiment, canonical generator, heterogeneous generator, upstream paper adapter, legacy environment, mapping, locks, calibration, evaluation-grid, and source commit hashes.
 4. The cff-0l31 preregistration remains byte-for-byte available and is recorded as superseded without execution, with the coverage and report reasons stated.
 5. Final commands name cff-oyie as the only authorized owner, use append-only family-qualified resume semantics, and permit no seed, threshold, budget, arm, decision rule, or claim changes after the new content hash.
-6. README explains the exact canonical generator at the paper's 10,000-step training scale, the registered 2,500-step held-out extension, why this is not an exact Figure 3 replay, the two-part parity definition, the separate heterogeneous capability result, and exclusions in plain language.
+6. README explains the local canonical generator's correspondence to the pinned
+   NASCAR construction, the paper's 10,000-step training scale, the registered
+   2,500-step held-out extension, why this is not an exact Figure 3 replay or
+   authors-code execution, the two-part parity definition, the separate
+   heterogeneous capability result, and exclusions in plain language.
 7. The new preregistration and manifest validate from a clean checkout, and their content hash is recorded in the ticket and PR body.
 8. Before the content hash is written, the family-aware final command validates the whole dual preregistration and is complete for per-final heterogeneous eligibility checks, the narrow unmodified baseline, family-separated claims and failures, append-only resume, retained posterior samples, raw aggregate recomputation, and explicit not-ready records.
 9. Focused tests reject a tampered registration, changed calibration input, missing or non-finite payload, incomplete coordinate, mismatched family stream, and corrupted checkpoint. They also prove interrupted resume and one-family failure retention without generating a final seed.
@@ -50,6 +62,8 @@ cff-oyie executes the frozen final protocol without changing code or scientific 
 ## Definitions
 
 - **Immutable preregistration:** A content-hashed document whose scientific choices cannot change after final execution starts.
+- **Fixed-dataset decision:** A pass only when each named final dataset meets
+  each registered rule; it makes no claim about an unobserved population.
 - **Probabilistic-architecture parity:** The CFFG factor types and their composition represent the same probability distributions and dependencies as the classic rSLDS formulation under the documented mapping.
 - **Replacement freeze:** The dual-family preregistration that supersedes but does not delete cff-0l31.
 - **Task parity:** On all three fixed classic final datasets, CFFG meets the registered NASCAR adequacy rules and performs within the frozen practical tolerances of the independent paper-equation adapter.
@@ -77,11 +91,11 @@ Legend: prerequisite --> dependent
 ```text
 [x] cff-9o39 runner
       |
-      +--> [ ] cff-x5z2 recurrence statistics (in progress)
+      +--> [x] cff-x5z2 recurrence statistics
                   |
-                  +--> [ ] cff-266l readiness semantics
+                  +--> [x] cff-266l readiness semantics
                               |
-                              +--> [ ] cff-s6rs calibration
+                              +--> [ ] cff-s6rs calibration (in progress)
                                           |
                                           +--> [ ] cff-huxt 3+3 freeze
                                                       |
@@ -90,4 +104,9 @@ Legend: prerequisite --> dependent
                                                                   +--> [ ] cff-nkbj audit
 ```
 
-cff-x5z2 is the active root. No final seed may be generated until cff-huxt closes with the committed replacement hash.
+cff-s6rs is the active root. No final seed may be generated until cff-huxt
+closes with the committed replacement hash.
+
+**2026-08-18T17:04:27Z**
+
+Freeze audit — Question → How can the lean fixed-dataset decision change without invalidating the calibration now running at experiment commit 248f9d3? Answer → Preserve schema v4 as the immutable calibration contract and add a separately versioned schema-v5 final protocol. The v4 validator and interval-shaped not-ready aggregate remain only to recompute the calibration artifact byte-for-byte. Freeze validates that complete v4 artifact, copies its generator, scale, thresholds, budgets, and 3+3 seed map without tuning, then replaces the final decision policy with an explicit fixed-dataset rule. For each family, every registered effect must have exactly three finite values in final-seed order, and every individual value must meet its direction and threshold; no confidence interval, alpha level, population inference, family unlock, or joint decision enters the final pass. `claim_evaluation` dispatches by schema so v4 calibration recomputation cannot drift and v5 final execution cannot silently fall back to Bonferroni intervals. The rewritten dual freeze also records the old one-family freeze hash, both family identities and streams, all calibration and source-design manifests, mapping version, exact authorized experiment and CFFG commits, and a final-command preflight that rejects code changed after the registration hash. Source → read-only audit of `freeze.py`, `dual_protocol.py`, `dual_calibration.py`, `claim_evaluation.py`, `dual_execution.py`, and checkpoint identity at experiment commit 61cec3f. Confidence → high for the version-boundary and decision semantics; exact content hashes remain pending the completed cff-s6rs artifact.
