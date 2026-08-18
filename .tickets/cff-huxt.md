@@ -1,7 +1,7 @@
 ---
 id: cff-huxt
 status: open
-deps: [cff-s6rs]
+deps: [cff-s6rs, cff-9cx5]
 links: []
 created: 2026-08-17T20:52:04Z
 type: task
@@ -94,18 +94,18 @@ Legend: prerequisite --> dependent
       +--> [x] cff-x5z2 recurrence statistics
                   |
                   +--> [x] cff-266l readiness semantics
-                              |
-                              +--> [ ] cff-s6rs calibration (in progress)
-                                          |
-                                          +--> [ ] cff-huxt 3+3 freeze
-                                                      |
-                                                      +--> [ ] cff-oyie 3+3 run
-                                                                  |
-                                                                  +--> [ ] cff-nkbj audit
+                              +--> [ ] cff-s6rs calibration (in progress) --+
+                                                                          |
+[x] architecture mapping --> [ ] cff-9cx5 v5 runner (ready) --------------+--> [ ] cff-huxt
+                                                                                     |
+                                                                                     +--> [ ] cff-oyie
+                                                                                               |
+                                                                                               +--> [ ] cff-nkbj
 ```
 
-cff-s6rs is the active root. No final seed may be generated until cff-huxt
-closes with the committed replacement hash.
+cff-s6rs and cff-9cx5 are the parallel active roots. No final seed may be
+generated until both feed cff-huxt and cff-huxt closes with the committed
+replacement hash.
 
 **2026-08-18T17:04:27Z**
 
