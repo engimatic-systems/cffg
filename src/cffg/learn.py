@@ -608,7 +608,13 @@ class Learnables:
             for key, arr in params.items()
         }
 
-    def load_state_dict(self, data: dict[str, np.ndarray]) -> None:
+    def load_state_dict(
+        self,
+        data: dict[str, np.ndarray],
+        *,
+        exact: bool = False,
+    ) -> None:
+        """Restore hyperparameters, optionally requiring the complete state."""
         pending = {
             name: {key: value.copy() for key, value in params.items()}
             for name, params in self.params.items()
@@ -655,6 +661,11 @@ class Learnables:
                     f"checkpoint names learnable {name!r} hyperparameter {key!r} twice"
                 )
             seen.add((name, key))
+            if np.iscomplexobj(arr):
+                raise ValueError(
+                    f"learnable {name!r}: checkpoint hyperparameter {key!r} "
+                    "must be real"
+                )
             if np.shape(arr) != self.params[name][key].shape:
                 raise ValueError(
                     f"learnable {name!r}: checkpoint shape {np.shape(arr)} != "
@@ -671,6 +682,18 @@ class Learnables:
                     f"legacy checkpoint incompletely names learnable {name!r}; "
                     f"missing hyperparameters {missing}. Rewrite it with a v2 "
                     "checkpoint"
+                )
+        if exact:
+            expected = {
+                (name, key)
+                for name, params in self.params.items()
+                for key in params
+            }
+            missing = sorted(expected - seen)
+            if missing:
+                labels = [f"{name}/{key}" for name, key in missing]
+                raise KeyError(
+                    f"checkpoint is missing learnable hyperparameters {labels}"
                 )
         for name in changed:
             plan = self.plans[name]

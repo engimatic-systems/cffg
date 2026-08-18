@@ -34,6 +34,25 @@ _RESULT_FIELDS = (
     "linear_iterations",
     "solver_compilations",
 )
+_RESULT_METADATA_FIELDS = set(_RESULT_FIELDS) | {
+    "status",
+    "inner_status",
+    "mu3_statuses",
+    "termination_reason",
+}
+_RUNTIME_METADATA_FIELDS = {
+    "epoch",
+    "run_required",
+    "refresh_required",
+    "refresh_policy",
+    "samples",
+    "min_ess_fraction",
+    "schedule_fingerprint",
+    "evaluators",
+    "has_result",
+    "cache_config",
+    "has_key",
+}
 
 
 @dataclass
@@ -184,7 +203,13 @@ def checkpoint_runtime(
 
 
 def restore_runtime(
-    data: Mapping[str, np.ndarray], engine: Engine
+    data: Mapping[str, np.ndarray],
+    engine: Engine,
+    *,
+    n_iters: int,
+    tol: float,
+    run_options: dict,
+    refresh_policy: str,
 ) -> PlanningRuntime:
     """Validate and reconstruct a stochastic epoch without drawing particles."""
     if "mu3:metadata" not in data:
@@ -192,12 +217,20 @@ def restore_runtime(
             "legacy checkpoint cannot restore a functional mu3 agent: "
             "the checkpoint has no key or prepared planning epoch"
         )
-    metadata = json.loads(str(data["mu3:metadata"]))
+    metadata = _json_object(data["mu3:metadata"], "mu3:metadata")
+    metadata_fields = set(_RUNTIME_METADATA_FIELDS)
+    if metadata.get("has_key") is True:
+        metadata_fields |= {"key_impl", "typed_key"}
+    if metadata.get("has_result") is True:
+        metadata_fields.add("result")
+    if set(metadata) != metadata_fields:
+        raise KeyError("functional checkpoint runtime metadata has unknown or missing fields")
     expected = {
         "samples": engine.mu3_samples,
         "min_ess_fraction": engine.mu3_min_ess_fraction,
         "schedule_fingerprint": engine.schedule.fingerprint,
         "evaluators": _evaluator_identity(engine),
+        "refresh_policy": refresh_policy,
     }
     for name, value in expected.items():
         if metadata.get(name) != value:
@@ -206,19 +239,80 @@ def restore_runtime(
                 f"{metadata.get(name)!r} != {value!r}"
             )
 
+    for name in ("has_key", "has_result", "run_required", "refresh_required"):
+        if not isinstance(metadata[name], bool):
+            raise ValueError(f"functional checkpoint {name} must be boolean")
+    if (
+        isinstance(metadata["epoch"], bool)
+        or not isinstance(metadata["epoch"], int)
+        or metadata["epoch"] < 0
+    ):
+        raise ValueError("functional checkpoint epoch must be a non-negative integer")
+    if metadata["refresh_required"] and not metadata["run_required"]:
+        raise ValueError("functional checkpoint cannot require refresh without a run")
+
+    expected_mu3_fields = {"mu3:metadata"}
     key = None
-    if metadata.get("has_key"):
+    if metadata["has_key"]:
         if "mu3:key" not in data:
             raise KeyError("functional checkpoint is missing its JAX key cursor")
+        if not isinstance(metadata["key_impl"], str) or not isinstance(
+            metadata["typed_key"], bool
+        ):
+            raise ValueError("functional checkpoint JAX key metadata is invalid")
+        expected_mu3_fields.add("mu3:key")
         key_data = jnp.asarray(data["mu3:key"])
-        wrapped = jax.random.wrap_key_data(key_data, impl=metadata["key_impl"])
+        try:
+            wrapped = jax.random.wrap_key_data(key_data, impl=metadata["key_impl"])
+        except (TypeError, ValueError) as error:
+            raise ValueError("functional checkpoint JAX key is invalid") from error
         key = wrapped if metadata.get("typed_key") else jax.random.key_data(wrapped)
 
     result = None
-    if metadata.get("has_result"):
+    if metadata["has_result"]:
+        expected_state = engine.init_state()
+        expected_mu3_fields |= {
+            "mu3:state:metadata",
+            *(f"mu3:state:{name}" for name in _STATE_FIELDS if name != "params"),
+            *(f"mu3:state:param:{key}" for key in expected_state.params),
+        }
         state = _load_state(data, engine)
         result = _load_result(state, metadata.get("result", {}))
+    actual_mu3_fields = {key for key in data if key.startswith("mu3:")}
+    if actual_mu3_fields != expected_mu3_fields:
+        raise KeyError(
+            "functional checkpoint field inventory does not match its metadata"
+        )
+
+    cache_config = metadata["cache_config"]
+    if result is None and cache_config is not None:
+        raise ValueError("functional checkpoint without a result has cached run state")
+    if cache_config is not None:
+        _validate_cache_config(cache_config)
+        if (
+            cache_config["samples"] != engine.mu3_samples
+            or cache_config["schedule_fingerprint"] != engine.schedule.fingerprint
+        ):
+            raise ValueError(
+                "functional checkpoint cached state has incompatible structure"
+            )
+    if result is not None:
         _validate_prepared_state(engine, result)
+        threshold = cache_config["min_ess_fraction"] * cache_config["samples"]
+        if any(
+            status is RunStatus.CONVERGED and ess < threshold
+            for status, ess in zip(result.mu3_statuses, result.mu3_ess, strict=True)
+        ):
+            raise ValueError(
+                "functional checkpoint marks insufficient effective sample size "
+                "converged"
+            )
+    current_config = _run_config(engine, n_iters, tol, run_options)
+    if result is not None and not metadata["run_required"]:
+        if cache_config != current_config:
+            raise ValueError(
+                "functional checkpoint reusable result has stale runtime configuration"
+            )
     runtime = PlanningRuntime(
         key_cursor=key,
         refresh_policy=metadata["refresh_policy"],
@@ -226,7 +320,7 @@ def restore_runtime(
         result=result,
         run_required=bool(metadata["run_required"]),
         refresh_required=bool(metadata["refresh_required"]),
-        cache_config=metadata.get("cache_config"),
+        cache_config=cache_config,
     )
     if result is None and not runtime.run_required:
         raise ValueError("functional checkpoint has no result but marks planning reusable")
@@ -297,9 +391,11 @@ def _store_state(data: dict[str, np.ndarray], state: State) -> None:
 def _load_state(data: Mapping[str, np.ndarray], engine: Engine) -> State:
     if "mu3:state:metadata" not in data:
         raise KeyError("functional checkpoint is missing planning-state metadata")
-    metadata = json.loads(str(data["mu3:state:metadata"]))
+    metadata = _json_object(
+        data["mu3:state:metadata"], "mu3:state:metadata"
+    )
     expected = engine.init_state()
-    if set(metadata.get("params", ())) != set(expected.params):
+    if set(metadata) != {"params"} or metadata["params"] != sorted(expected.params):
         raise ValueError("functional checkpoint parameter layout does not match this plan")
     restored: dict[str, object] = {}
     for name in _STATE_FIELDS:
@@ -345,9 +441,12 @@ def _result_metadata(result: RunResult) -> dict:
 
 
 def _load_result(state: State, metadata: dict) -> RunResult:
-    missing = sorted(set(_RESULT_FIELDS) - set(metadata))
-    if missing:
-        raise KeyError(f"functional checkpoint result is missing {missing}")
+    if not isinstance(metadata, dict):
+        raise ValueError("functional checkpoint result metadata must be an object")
+    if set(metadata) != _RESULT_METADATA_FIELDS:
+        raise KeyError(
+            "functional checkpoint result metadata has unknown or missing fields"
+        )
     values = {name: metadata[name] for name in _RESULT_FIELDS}
     for name in ("message_deltas", "free_energies", "mu3_ess", "mu3_log_normalizers"):
         values[name] = tuple(values[name])
@@ -359,6 +458,53 @@ def _load_result(state: State, metadata: dict) -> RunResult:
         termination_reason=OuterTerminationReason(metadata["termination_reason"]),
         **values,
     )
+
+
+def _validate_cache_config(config: object) -> None:
+    expected_fields = {
+        "n_iters",
+        "tol",
+        "run_options",
+        "samples",
+        "min_ess_fraction",
+        "schedule_fingerprint",
+    }
+    if not isinstance(config, dict) or set(config) != expected_fields:
+        raise ValueError(
+            "functional checkpoint cached runtime configuration is invalid"
+        )
+    integer_fields = ("n_iters", "samples")
+    if any(
+        isinstance(config[name], bool) or not isinstance(config[name], int)
+        for name in integer_fields
+    ):
+        raise ValueError(
+            "functional checkpoint cached runtime configuration is invalid"
+        )
+    if (
+        isinstance(config["tol"], bool)
+        or not isinstance(config["tol"], (int, float))
+        or isinstance(config["min_ess_fraction"], bool)
+        or not isinstance(config["min_ess_fraction"], (int, float))
+        or not isinstance(config["run_options"], dict)
+        or not isinstance(config["schedule_fingerprint"], str)
+    ):
+        raise ValueError(
+            "functional checkpoint cached runtime configuration is invalid"
+        )
+
+
+def _json_object(value: object, label: str) -> dict:
+    scalar = np.asarray(value)
+    if scalar.shape != () or not isinstance(scalar.item(), (str, np.str_)):
+        raise ValueError(f"functional checkpoint {label} must be a JSON string")
+    try:
+        decoded = json.loads(str(scalar.item()))
+    except json.JSONDecodeError as error:
+        raise ValueError(f"functional checkpoint {label} is not valid JSON") from error
+    if not isinstance(decoded, dict):
+        raise ValueError(f"functional checkpoint {label} must decode to an object")
+    return decoded
 
 
 def _validate_prepared_state(engine: Engine, result: RunResult) -> None:

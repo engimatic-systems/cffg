@@ -1,6 +1,6 @@
 ---
 id: cff-u3m3
-status: open
+status: closed
 deps: [cff-epdp]
 links: []
 created: 2026-08-13T04:26:16Z
@@ -54,8 +54,8 @@ It does not freeze every pre-1.0 Python object or redesign the modeling API.
 7. The example fails loudly on a nonconverged result instead of inspecting or
    acting on it.
 8. Checkpoint restoration either reproduces the documented continuation or
-   raises a specific version, structure, or shape error. It cannot silently
-   discard a known field.
+   raises a specific version, structure, static-parameter, runtime-configuration,
+   field, or shape error. It cannot silently discard a known field.
 9. The public facade policy states which names are supported before 1.0 and
    which deeper extension interfaces remain internal-unstable.
 10. README and architecture descriptions of edit operations, bundle APIs, and
@@ -82,10 +82,11 @@ that satisfies the numbered outcomes with equivalent evidence.
 
 ## Future work
 
-GUI selection-to-edit workflows, a general sensor transport, arbitrary online
-optimization, and a frozen external-kernel Python API remain outside this
-minimum path. Their existing tickets and documented limitations remain the
-owners.
+An interactive GUI, a general sensor transport, arbitrary online optimization,
+and a frozen external-kernel Python API remain outside this minimum path.
+`cff-209l` owns external-kernel execution contracts, but not a frozen public
+Python surface. The GUI, transport, optimizer, and API freeze have no assigned
+implementation ticket.
 
 ## Definitions
 
@@ -97,3 +98,21 @@ owners.
   to import directly.
 - **Scaffold function:** Placeholder code created by a project template and not
   part of the intended product.
+
+## Notes
+
+**2026-08-18T22:09:19Z**
+
+Implementation handoff, 2026-08-18. Applicable change path: Learnable or checkpoint feature. Authority remains AgentSpec/BeliefBinding and Learnables; this ticket adds a versioned RollingAgent envelope without changing serialized model IR. Required surfaces: current and legacy checkpoint decoding are both applicable; belief, learnable, goal, cadence, NumPy RNG, version, logical/physical field inventory, plan/filter structure and static-parameter hashes, runtime solver/action/JAX-precision configuration, and shape validation are applicable. Compiler/Arena execution changes, host/JIT rule pairs, flooding/scheduled pairs, Colony/vmap, and functional mu3 state are outside this sibling ticket; cff-in0q owns functional evaluator checkpoint state and cff-uy48 must integrate both envelope contracts. The facade re-exports canonical owners only. New IR fields, compose/edit codecs, and bundle schema migration do not apply. The plate schema is unchanged, while grounded parameters from every plate copy participate in the static-parameter digest. Existing structure_hash is reused and the digest follows the bundle's content-hashing boundary. Hostile checkpoint cases include unknown, missing, or duplicate fields; wrong structure, static parameters including plated or tied-reader data, configuration, belief/learnable/goal shape or value; malformed RNG/cadence; ambiguous or incomplete legacy spellings; and atomic restore into an already-used agent.
+
+**2026-08-18T22:09:19Z**
+
+Research distillation, 2026-08-18. Question: what is the smallest complete public path? Answer: a deterministic two-cell gridworld perception template saved and loaded as .cffgz compiles to exact tree BP in float32; bind STAY and observation 0, require CONVERGED, inspect the state posterior, and name Engine.bfe as exact BFE = -log evidence for this tree only. A horizon-one B-learning RollingAgent then demonstrates environment step, fresh restore, learned state/cadence/NumPy RNG continuation. Source: src/cffg/models/{gridworld,rollout}.py, bundle.py, compiler.py, engine.py, agent.py; confidence: high, executed in a fresh JAX_ENABLE_X64=0 process. Question: what facade/envelope gap remains? Answer: re-export CorridorEnv, Engine, RollingAgent, RunStatus, build_gridworld, compile_template, load_bundle, save_bundle, and existing set_params from their canonical modules; remove hello. The epdp checkpoint lacks version, structure binding, expected belief shape, unknown-field rejection, and atomic staging. Source: src/cffg/__init__.py and agent.py plus tests/test_agent*.py; confidence: high.
+
+**2026-08-18T22:45:40Z**
+
+Audit distillation, 2026-08-18. Question: which state outside beliefs and learned counts changes an exact RollingAgent continuation? Answer: plan/filter static parameter values, horizon, sweep budget, damping, action-selection mode, construction-time JAX precision, cadence, and the NumPy bit-generator state all affect continuation and are now envelope-bound. Grounded plate-copy parameters and blobs tied between a checkpoint-replaced reader and a static reader remain in the static digest. Legacy migration requires one unambiguous normalized belief, every declared learnable hyperparameter, and RNG state for stochastic selection. Duplicate physical NPZ members, complex learnable arrays, invalid goal/count state, and malformed or overflowing RNG state fail before mutation. Source: adversarial GPT-5.6-sol reproductions against src/cffg/agent.py and src/cffg/learn.py, encoded in tests/test_public_api.py; confidence: high, independently re-audited clean after the fixes.
+
+**2026-08-18T22:56:56Z**
+
+Completion handoff, 2026-08-18. The supported pre-1.0 facade and executable README path cover bundle build/load, compilation, DATA binding, converged exact-tree BFE inspection, rolling action/environment interaction, versioned checkpoint, fresh restore, and deterministic continuation in float32 and x64. The versioned envelope is bound to compact structure, grounded static parameters, solver/action settings, construction-time JAX precision, normalized beliefs, complete learnables, learned-goal state, cadence, and RNG; restore validates atomically and legacy migration is explicit. Two independent GPT-5.6-sol audits report no remaining actionable findings. Final default not-slow suite: 1376 passed, 39 deselected, 0 failed in 639.74 seconds; dashboard refreshed at /Users/ravd/agent-share/cffg-tests.html. Next: cff-uy48 integrates this sibling with cff-in0q functional mu3 checkpoint/runtime state, including mu3 configuration in the envelope.
