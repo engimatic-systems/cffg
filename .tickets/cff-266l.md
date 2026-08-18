@@ -1,6 +1,6 @@
 ---
 id: cff-266l
-status: open
+status: in_progress
 deps: [cff-9o39, cff-x5z2]
 links: []
 created: 2026-08-18T14:10:56Z
@@ -123,9 +123,9 @@ Legend: prerequisite --> dependent
 
 [x] cff-11jj declared rSLDS learning
       |
-      +--> [ ] cff-x5z2 numerical recurrence fix (ready)
+      +--> [x] cff-x5z2 numerical recurrence fix
                |
-               +--> [ ] cff-266l honest calibration readiness
+               +--> [x] cff-266l honest calibration readiness
                         |
                         +--> [~] cff-s6rs replacement calibration
                                  |
@@ -136,6 +136,22 @@ Legend: prerequisite --> dependent
                                                    +--> [~] cff-nkbj evidence epic
 ```
 
-`cff-x5z2` is the ready root. `cff-s6rs` remains in progress but is immediately
-blocked by the two repairs. The freeze, final run, and evidence epic remain
-downstream; the ticket dependency records are authoritative.
+`cff-s6rs` is now the active ready root. The freeze, final run, and evidence
+epic remain downstream; the ticket dependency records are authoritative.
+
+Implementation handoff (2026-08-18): experiment commits `9f4b1c8` and
+`450ce2f` centralize phase-specific fit eligibility, prevent not-ready tiers
+from exporting primary effects, attach explicit failure reasons, and qualify
+coordinate checkpoints with the experiment and CFFG commits. The experiment
+now executes the repaired CFFG commit
+`a686faaddbfe0d980b99517d02ab1664f2333a12`; the declared revision and installed
+dependency match. The focused checkpoint, isolation, and dual-runner tests pass
+with 32 tests. The complete experiment suite passes with 109 tests in 47.72
+seconds.
+
+The invalid calibration artifact remains outside the replacement output root:
+302 files with manifest SHA-256
+`7c400a268deda7beed08a49da2a6a06a652c735f02f224eacb17b61cf2ad4426`.
+No final seed or replacement preregistration was generated. Resume work in
+`cff-s6rs` by producing a fresh code-qualified calibration artifact rather
+than resuming the invalid checkpoint.
