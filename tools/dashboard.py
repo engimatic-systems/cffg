@@ -112,6 +112,7 @@ EPIC_FILES = {
     "R1 · Hybrid epistemics": [
         "test_hybrid_epistemics.py",
         "test_hybrid_gfe.py",
+        "test_recurrence_learning_numerics.py",
         "test_recurrence_link.py",
         "test_rslds_fit.py",
     ],

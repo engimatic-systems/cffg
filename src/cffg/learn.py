@@ -443,10 +443,16 @@ class Learnables:
                 if family.readout not in readouts:
                     readouts[family.readout] = READOUTS[family.readout](engine, state)
                 per_node = readouts[family.readout]
-                records = [
-                    family.stats(plan.ftype, per_node[source])
-                    for source in plan.sources
-                ]
+                records = []
+                for source in plan.sources:
+                    try:
+                        records.append(
+                            family.stats(plan.ftype, per_node[source])
+                        )
+                    except ValueError as exc:
+                        raise ValueError(
+                            f"learnable {name!r}, source {source!r}: {exc}"
+                        ) from exc
                 candidate = family.fold(candidate, family.pool(records))
             family.validate_prior(name, candidate, plan.shapes)
             pending[name] = {

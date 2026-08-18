@@ -284,13 +284,22 @@ def test_improper_statistics_diverge_before_parameter_write(
         latent_dimension=1,
         key=jax.random.key(7),
     )
+    injected_sources = []
     if kind == "recurrence":
         original_readout = Engine.recurrence_weight_stats
 
         def improper_readout(self, state):
             rows = original_readout(self, state)
             name = next(name for name in rows if name.startswith("switch"))
-            rows[name] = {**rows[name], "proper": np.asarray(False)}
+            injected_sources.append(name)
+            rows[name] = {
+                **rows[name],
+                "proper": np.asarray(False),
+                "drive_ok": np.asarray(False),
+                "drive_min_eigenvalue": np.asarray(0.5),
+                "drive_symmetry_error": np.asarray(0.25),
+                "drive_tolerance": np.asarray(0.01),
+            }
             return rows
 
         monkeypatch.setattr(Engine, "recurrence_weight_stats", improper_readout)
@@ -309,6 +318,12 @@ def test_improper_statistics_diverge_before_parameter_write(
     assert result.status is RunStatus.DIVERGED
     assert result.inner_status is RunStatus.CONVERGED
     assert message in result.error
+    if kind == "recurrence":
+        assert f"source {injected_sources[0]!r}" in result.error
+        assert "drive_ok=false" in result.error
+        assert "min_eigenvalue=0.5" in result.error
+        assert "symmetry_error=0.25" in result.error
+        assert "tolerance=0.01" in result.error
     for name, value in result.parameters.items():
         np.testing.assert_array_equal(value, initialized.arrays()[name])
 
