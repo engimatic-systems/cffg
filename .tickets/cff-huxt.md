@@ -16,7 +16,7 @@ tags: [rslds, validation, preregistration]
 
 cff-s6rs produces the complete calibration evidence for both dataset families. The scientific choices must become immutable before cff-oyie generates a final seed. The first cff-0l31 freeze remains useful provenance, but it covered only canonical NASCAR and omitted later report and dual-family requirements.
 
-This ticket validates the complete calibration artifact and writes one replacement preregistration and manifest. It does not fit or generate final data.
+This ticket validates the complete calibration artifact and writes one replacement preregistration and manifest. The classic family uses the exact canonical generator and fits 10,000 training steps, matching the paper's training scale. Its separate 2,500-step held-out extension means it is not an exact replay of the Figure 3 workflow. This ticket does not fit or generate final data.
 
 ## Outcomes / Acceptance Criteria
 
@@ -25,7 +25,7 @@ This ticket validates the complete calibration artifact and writes one replaceme
 3. The freeze records and verifies CFFG, experiment, canonical generator, heterogeneous generator, upstream paper adapter, legacy environment, mapping, locks, calibration, evaluation-grid, and source commit hashes.
 4. The cff-0l31 preregistration remains byte-for-byte available and is recorded as superseded without execution, with the coverage and report reasons stated.
 5. Final commands name cff-oyie as the only authorized owner, use append-only family-qualified resume semantics, and permit no seed, threshold, budget, arm, or claim changes after the new content hash.
-6. README explains exact classic benchmark reproduction, heterogeneous capability evidence, fixed-sequence claim wording, and exclusions in plain language.
+6. README explains the exact canonical generator at the paper's 10,000-step training scale, the registered 2,500-step held-out extension, why this is not an exact Figure 3 replay, the heterogeneous capability evidence, fixed-sequence claim wording, and exclusions in plain language.
 7. The new preregistration and manifest validate from a clean checkout, and their content hash is recorded in the ticket and PR body.
 8. No registered final seed is generated or fit by this ticket.
 
