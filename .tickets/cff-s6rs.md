@@ -22,12 +22,21 @@ This ticket performs that measured calibration on seeds 3101 and 3102 only. It p
 
 1. Calibration runs exactly the two registered calibration seeds for both families, both primary tiers, four independent reference chains, and both learned SLDS controls with family-qualified streams and append-only checkpoints.
 2. At least three candidate horizons per family have complete-chain, CFFG, control, wall-time, peak-memory, coverage, and whole-run projection evidence. Failed candidate coordinates remain in the artifact.
-3. The selected homogeneous scale is justified as a faithful classic benchmark scale; the selected heterogeneous scale satisfies every cff-8xve exposure, outcome, rank, distinctness, and long-rollout eligibility gate.
+3. The selected homogeneous scale fits 10,000 canonical training steps and adds
+   a declared 2,500-step held-out extension. The selected heterogeneous scale
+   satisfies every cff-8xve exposure, outcome, rank, distinctness, and
+   long-rollout eligibility gate.
 4. Calibration fixes family-specific or shared optimization budgets, Gibbs warmup/draws/thinning, ESS and split-R-hat thresholds, particles, tolerances, and stopping rules from an explicit rule with domain caps.
-5. Calibration fixes paired non-inferiority margins and absolute adequacy/recovery margins for every cff-i00o primary effect without using a final seed.
+5. Calibration fixes paired practical-tolerance margins and absolute
+   adequacy or recovery margins for every cff-i00o primary effect without using
+   a final seed.
 6. The balanced source-by-state evaluation grid, generator descriptors, scales, splits, data identities, and stochastic coordinates are serialized and hashed in the artifact.
 7. Raw family/seed/replicate rows recompute every calibration summary, projection, margin input, and eligibility decision. A complete manifest covers all attempts, retained reference samples, and environment provenance.
 8. No registered final seed is generated or fit by this ticket.
+9. The selected protocol reserves exactly three untouched final seed IDs for
+   each family, uses different IDs across families, and records the classic and
+   heterogeneous results as independent bounded demonstrations rather than a
+   population-wide or gated joint claim.
 
 ## Methodological Suggestions
 
@@ -60,7 +69,9 @@ Duplicated execution surfaces checked before calibration:
 - candidate-horizon execution, coverage and occupancy audits, diagnostic summaries, resource measurements, and whole-run projections;
 - paired non-inferiority outcomes, absolute family-specific outcomes, threshold inputs, and fixed-sequence claim records;
 - raw attempt payloads, retained reference samples, coordinate checkpoints, aggregate recomputation, manifests, commands, environment provenance, and source revisions;
-- the immutable family registry, balanced evaluation grid, primary-effect definitions, claim ordering, and final-seed map, which this ticket must not alter.
+- the immutable family registry, balanced evaluation grid, and primary-effect
+  definitions; and the lean 3+3 final-seed map and independent claim roles
+  agreed before this replacement calibration.
 
 Hostile-input decisions:
 
@@ -72,6 +83,21 @@ Hostile-input decisions:
 - cff-s6rs may increase calibration budgets and rerun failed calibration coordinates under append-only attempts, but it cannot generate or fit a registered final seed.
 
 cff-huxt owns the immutable replacement freeze after calibration is complete. cff-oyie remains the only final-execution owner.
+
+### 2026-08-18 — lean final boundary
+
+Question → What final scope should this calibration project and serialize?
+
+Answer → The replacement protocol reserves three untouched classic final seed
+IDs and three different untouched heterogeneous final seed IDs. Each family is
+a fixed-dataset engineering demonstration. The classic result owns task parity;
+the heterogeneous result is a separately reported capability extension and is
+not unlocked by the classic result. Calibration still runs two seeds with two
+replicates per seed because those rows tune budgets and practical tolerances;
+no reserved final seed is generated here.
+
+Source → Cooper's parity and developer-time decision, reflected in cff-huxt,
+cff-oyie, and cff-nkbj. Confidence → high.
 
 ### 2026-08-17 — classic-scale research
 
