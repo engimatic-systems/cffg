@@ -769,9 +769,14 @@ discarding a joint correlation. Exact joint rollover remains the separate
   one normalization; the weighted `E[A]` and `E[h(A)]` feed the Fig. 5
   composite without moment-matching back to a Dirichlet. `RunResult` exposes
   ESS, log-normalizer, and converged/budget-exhausted/diverged stochastic
-  status. `Engine.score_mu3_epochs` refreshes independent particle sets,
-  accepts only converged epochs, and applies burn-in solely to the final
-  policy-score average.
+  status. Exact-zero sampled mass is inert, goal-excluded positive mass has
+  zero weight, and positive sampled mass over a zero marginal predictive is an
+  incoherent cavity reported as divergence; the independent D6b formula and
+  Engine propagation are pinned in `test_mu3_hostile_support_weight_collapse_float32_and_scale`
+  and `test_incoherent_predictive_support_diverges_through_engine`.
+  `Engine.score_mu3_epochs` refreshes independent particle sets, accepts only
+  converged epochs, and applies burn-in solely to the final policy-score
+  average.
 - Inference *modes* are just constraint presets on the same grounded model:
   filtering/smoothing (data on past), planning (goals on future, P-substitution
   on), what-if (clamp hypothetical δs), backward inference (goals only, no data).

@@ -747,8 +747,9 @@ def mu3_log_message(particles, zbars, logcs, abar):
 
     ``abar`` is the current weighted posterior mean and is held fixed while
     evaluating the functional, exactly as in Part II Fig. 5.  Exact goal
-    zeros remain true log-zeros; masked products avoid the undefined
-    numerical form ``0 * -inf`` without inventing support.
+    zeros remain true log-zeros. Zero sampled mass is inert; positive sampled
+    mass over a zero marginal predictive remains non-finite so the caller can
+    report the incoherent cavity as divergence.
     """
     dtype = jnp.result_type(particles, zbars, logcs, abar)
     particles = jnp.asarray(particles, dtype=dtype)
@@ -757,13 +758,22 @@ def mu3_log_message(particles, zbars, logcs, abar):
     abar = jnp.asarray(abar, dtype=dtype)
     logcs = jnp.where(logcs == jnp.asarray(NEG, dtype=dtype), -jnp.inf, logcs)
     predictive = jnp.einsum("oi,ti->to", abar, zbars)
-    residual = logcs - _safe_log(predictive)
+    # A zero marginal predictive is a support statement, not a small positive
+    # denominator.  Preserve it until the sampled mass below determines
+    # whether the coordinate is inert or the cavity is incoherent.
+    residual = logcs - jnp.log(jnp.where(predictive == 0, 1.0, predictive))
 
     sample_predictive = jnp.einsum("soi,ti->sto", particles, zbars)
-    fit = jnp.sum(
-        jnp.where(sample_predictive > 0, sample_predictive * residual[None, :, :], 0.0),
-        axis=-1,
+    active = sample_predictive > 0
+    fit_terms = jnp.where(active, sample_predictive, 0.0) * jnp.where(
+        active, residual[None, :, :], 0.0
     )
+    zero_marginal = active & (predictive == 0)[None, :, :]
+    zero_goal = jnp.isneginf(logcs)[None, :, :]
+    fit_terms = jnp.where(zero_marginal & ~zero_goal, jnp.inf, fit_terms)
+    fit_terms = jnp.where(zero_marginal & zero_goal, jnp.nan, fit_terms)
+    fit_terms = jnp.where(sample_predictive < 0, jnp.nan, fit_terms)
+    fit = jnp.sum(fit_terms, axis=-1)
     log_particles = jnp.where(particles > 0, jnp.log(particles), 0.0)
     particle_h = -jnp.sum(
         jnp.where(particles > 0, particles * log_particles, 0.0), axis=1
