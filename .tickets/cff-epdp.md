@@ -1,6 +1,6 @@
 ---
 id: cff-epdp
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-13T04:26:16Z
@@ -119,3 +119,17 @@ gets a separate dependency of `cff-uy48`; it is not silently absorbed here.
   for the named factor and constraint combination.
 - **Vacuous message:** A neutral incoming message that contributes no
   information.
+
+## Notes
+
+**2026-08-18T20:22:12Z**
+
+Implementation handoff, 2026-08-18. Applicable change path: documentation/evidence inventory; the New factor or rule family row is N/A unless the inventory exposes missing advertised behavior. Checked duplicated execution pairs: host/JIT N/A, flooding/scheduled N/A, single-instance/vmap N/A, current/legacy checkpoint N/A. This ticket will trace existing IR, compiler, rule, ledger, and direct-test authorities without changing runtime semantics. Any silent or missing non-executable guard becomes a separate implementation ticket and a dependency of cff-uy48.
+
+**2026-08-18T20:33:32Z**
+
+Research distillation, 2026-08-18. Question: Which paper constraint constructions belong in the release ledger? Answer: default normalization/marginalization, joint/naive/structured factorization, edge/node form constraints, known-data and optimized delta forms, moment matching, P-substitution, and the trial-time planning-to-data change are distinct rows. Source: notes/pt1.txt sections 2.1 and 5.1-5.5, equations 9 and 26-32, figures 4-13; notes/pt2.txt sections 2.3-4.1 and 6.3, figures 3, 4, and 7. Confidence: high. Question: What are all Figure 5 updates? Answer: conjugate mu1(c), direct categorical mu2(z), indirect stationary/root-solved mu2(z), and functional mu3(A), with Ux=-zbar*rho and the parameter contribution -log Z. Source: notes/pt2.txt Figure 5 and Appendix C.2-C.6; docs/DERIVATIONS.md D6b-D6c. Confidence: high. Question: Which repository owners and gaps correspond? Answer: compiler plans and rules/engine ledger owners are now named in ARCHITECTURE; raw mu1/mu2 assertions were missing, moment matching was silently ignored, and incoherent mu3 support was floored. Source: targeted traces in src/cffg/{core,compiler,rules,engine}.py and tests/test_{gfe,goal_hyperprior,mu3,mu3_derivation}.py. Confidence: high. The two runtime gaps were repaired and closed under c1-a2cb and c1-2h8y, both dependencies of cff-uy48.
+
+**2026-08-18T20:45:56Z**
+
+Completed 2026-08-18. ARCHITECTURE now contains the source-ordered constraint and Figure 5 ledgers with exact/named-approximation/syntax-only/unsupported boundaries, production/ledger owners, direct authorities, and the literal-versus-two-window and analytic-versus-functional distinctions. README and LIMITATIONS use the same bounded claims. Direct raw mu1/mu2 and isolated energy assertions were added. Discovered silent moment-matching execution and incoherent mu3 support were repaired in closed dependencies c1-a2cb and c1-2h8y. Validation: focused Figure 5 selection 31 passed, 3 slow deselected; final default short suite 1369 passed, 39 deselected, 0 failed in 709.29 seconds; dashboard refreshed at /Users/ravd/agent-share/cffg-tests.html. No slow behavioral run was required because production behavior beyond the focused mu3 support regression did not change.

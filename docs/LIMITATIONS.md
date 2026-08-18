@@ -15,12 +15,15 @@ certificate telling you which happened. Damping and good schedules mitigate;
 nothing eliminates. Every interesting agent model (loops through time, shared
 parameters) is loopy.
 
-**H2. The posterior family is bounded by the constraint vocabulary.** Mean-field
-and structured factorizations discard posterior correlations across beads by
-construction. Strongly correlated or multimodal joint posteriors (explaining-away
-between factorized variables, symmetric modes) cannot be represented, only
-projected onto the chosen family. Richer constraints widen the family but the
-principle stands: you choose the approximation when you draw the beads.
+**H2. The posterior family is bounded by the constraint vocabulary.** The
+papers' mean-field and structured factorizations discard posterior correlations
+across beads by construction. This runtime executes registered naive
+mean-field combinations; arbitrary structured mean-field partitions and
+general edge/node form constraints are unsupported, not implicit. Strongly
+correlated or multimodal joint posteriors (explaining-away between factorized
+variables, symmetric modes) cannot be represented, only projected onto the
+chosen executable family. Richer constraints widen the mathematical family,
+but each needs its own syntax, update, and ledger before the runtime can use it.
 
 **H3. No structure learning inside the objective.** Continual learning updates
 *parameters* (conjugate posterior → next prior). The graph topology, state-space
@@ -431,6 +434,17 @@ variates) are incremental research that would directly improve learning
 stability. Colony batching does not yet accept `mu3` models because it has no
 per-instance explicit-key interface; `Colony.spawn` rejects them rather than
 running the analytic base moments as though the functional update had fired.
+`RollingAgent` also does not yet own functional-message keys, refresh epochs,
+statuses, or checkpoint state. Its `learn_a` workflow uses analytic Dirichlet
+moments and perceptual count updates; it is a named approximation to the full
+Part II parameter-message trial cycle, not evidence that `mu3(A)` ran.
+
+The agent's fixed-memory trial loop likewise uses separate immutable planning
+and filtering templates. It does not mutate the paper's literal graph when an
+observation changes from a planning constraint to data. The enumerated
+equivalence boundary, exact-zero rollover, and any boundary-ledger offset are
+release-gate work in `cff-iqqk`; until then, only the two-window behavior is
+claimed.
 
 **S3. Deep temporal / hierarchical models.** The papers say extensions are
 "straightforward — write the CFFG," which is true of the *notation*; the message
@@ -471,9 +485,12 @@ composite.
 
 ## The one-paragraph honest summary
 
-Completed, this is a *transparent, compositional, continually-learning
-discrete world-model engine* with principled curiosity — exact free-energy
-accounting, models you can read, edit, checkpoint, and glue. It will not do
+The bounded release target is a *transparent, compositional,
+continually-learning discrete world-model engine* with principled curiosity,
+source-anchored local ledgers, and models you can read, edit, checkpoint, and
+glue. Exact claims apply only to the registered factor/constraint combinations
+named in `docs/ARCHITECTURE.md`; other rows are named approximations, guarded
+syntax, or unsupported. It will not do
 representation learning, will not scale past modest discrete state spaces without
 hand-factored structure, will not plan contingently beyond its horizon, and
 inherits every classical caveat of loopy variational inference. Its natural
