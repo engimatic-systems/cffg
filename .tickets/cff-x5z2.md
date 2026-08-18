@@ -1,6 +1,6 @@
 ---
 id: cff-x5z2
-status: in_progress
+status: closed
 deps: [cff-11jj]
 links: []
 created: 2026-08-18T14:09:40Z
@@ -149,9 +149,9 @@ The converged fit's finite Bethe free energy rules out invalid categorical
 edges, non-PD drive precision, non-finite coordinate outputs, and materially
 negative stable logit second at that state because recurrence energy returns
 `+inf` for those conditions. `weight_stats` then performs the extra covariance
-subtraction. The exact first production factor and measured values still
-require an instrumented calibration-only replay after the live run releases
-its runtime state; the artifact did not retain per-factor flags.
+subtraction. At this stage the exact production factor and measured values
+still required an instrumented calibration-only replay because the artifact did
+not retain per-factor flags; that replay is recorded below.
 
 Source → `src/cffg/recurrence.py:78-233,405-446`,
 `src/cffg/gauss.py:98-103`, `src/cffg/compiler.py:1913-1917`, and
@@ -210,3 +210,7 @@ cff-s6rs owns replacement budget calibration.
 Source → current cff-x5z2 tree and the preserved calibration-only
 source-heterogeneous seed 3101 replicate 0 protocol and streams. Confidence →
 high.
+
+**2026-08-18T16:08:43Z**
+
+Completed direct-covariance recurrence statistics, stable logit moments, factor/predicate diagnostics, hostile regressions, and documentation. The exact seed-3101 replicate-0 replay now has zero improper recurrence factors; it ends honestly outer budget_exhausted / inner converged because only the final residual satisfies the two-consecutive rule. Focused validation: 75 passed, 1 deselected. Final short suite: 1,366 passed, 39 deselected, 0 failed in 563.79 seconds. Next: cff-266l must keep this coordinate not-ready under phase-specific status semantics, then cff-s6rs recalibrates the outer budget on every code-changed coordinate. No final seed or replacement freeze was generated.
