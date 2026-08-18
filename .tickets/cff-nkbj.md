@@ -140,43 +140,6 @@ https://github.com/slinderman/recurrent-slds/blob/383ddac2472cdf3248c6e871baede9
 Confidence: high on the model and executable boundaries; medium-high on
 legacy integration until cff-akmp and cff-64ri execute their tests.
 
-**2026-08-10T03:20:00Z**
-
-Post-rewrite wiggle audit retained clear uses with these intended meanings:
-integrate=executing the legacy adapter inside its locked environment;
-register=the preregistered seed and metric set; same=the explicitly named full
-source-specific model; implement=the named CFFG, adapter, or upstream software;
-support=a conclusion justified by the final evidence; complete=the enumerated
-protocol or artifact set; ready=tk dependency readiness; remaining and
-later=named future or historical work; close=ticket closure; evidence=the
-confirmatory or provenance record; oracle=the adapter's analytic check;
-parity and pass=the defined joint non-inferiority gate; reproduce=rerunning the
-locked runtime; sound=an alternative method satisfying the outcomes;
-test=an automated check, statistical test, or binary gate test as stated;
-validate=the named scientific or scale evaluation; fit and learn=parameter
-estimation; infer=balanced fixed-belief inference; scale=the named benchmark
-dimensions; can=the demonstrated cff-l7y4 capability; may=optional method;
-explicit_owner and named_ticket_handoff=the named cff-0f3g/cff-dlrj owners;
-any, every, and only=the locally enumerated seeds, metrics, phases, or hard
-claim boundaries; current=the mathematical source regime at time `t`; and
-reproduce=the rerunnable environment artifact. Capability ownership was
-checked separately: the epic owns the joint conclusion, while each child owns
-one phase named in the background. Intelligible-ticket review: complete.
-
-Classification-note additions: fixed=parameters held during the named
-inference comparison; check=the adapter's analytic or executable authority;
-estimate=observation-only parameter estimation; intended=the contextual
-meaning assignments in this note.
-
-The retained all quantifier means the explicitly enumerated twelve-ticket
-authoring set.
-
-Authoring handoff: all twelve new or rewritten tickets completed their current
-wiggle scan; `tk dep cycle` and `git diff --check` pass. cff-akmp is the next
-immediate ticket, and cff-4sor is the independent balanced-tree root. Gotcha:
-cff-dlrj and cff-0f3g are links, not prerequisites of the decision-list
-comparison. Stacked draft PR: https://github.com/engimatic-systems/cffg/pull/62
-
 **2026-08-13T05:19:12Z**
 
 PR merge-gate correction (2026-08-12): narrowed the epic conclusion from literature or implementation parity to source-specific empirical non-inferiority on the registered outcomes. The epic now excludes authors-code parity and CFFG-paper message/free-energy fidelity from that conclusion. cff-64ri owns adapter provenance and independent conditional oracles; cff-0l31 owns direct CFFG recurrence message/energy oracles, Gibbs mixing diagnostics, calibrated margin ceilings, and the exact paired estimand; cff-oyie owns immutable execution and bounded reporting.
