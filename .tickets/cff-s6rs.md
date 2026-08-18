@@ -90,3 +90,42 @@ Calibration correction — Question → Does the classic tied-source generator s
 **2026-08-18T04:53:06Z**
 
 Calibration checkpoint correction — Question → Did the corrected classic primary work, and why was the first corrected coordinate still not ready? Answer → Both CFFG tiers converged in eight outer iterations and the new held-out on-support transition RMSE was 0.09185 shared and 0.09150 native over all 2,500 held-out states and all four occupied sources. The paired effects and bounded rollouts were also available. The coordinate was not ready only because the optional secondary scorer required the five-regime matched-budget SLDS control to have a four-label permutation. That control itself converged in eleven iterations and its primary metrics were valid. Mismatched-K controls now omit that truth-specific optional score, while K=4 primary arms retain it. Calibration resume now archives validated not-ready checkpoints and retries them as new append-only attempts; attempt 1 and its ledger snapshot remain immutable while attempt 2 runs. Source → calibration-only canonical seed 3101 replicate 0 checkpoint; experiment commits fd94b1d and 1af3d2f. Confidence → High. Focused regression result: 34 passed. No final seed was generated or fit.
+
+### 2026-08-18 — superseded dual-run result
+
+Question → Did the first complete dual-family calibration execution satisfy
+the registered readiness contract?
+
+Answer → No. The process completed all eight calibration coordinates and then
+exited nonzero with `selected calibration has a not-ready coordinate`. All four
+paper-scale classic coordinates were ready; both CFFG tiers converged on every
+classic coordinate. The heterogeneous coordinates exposed four distinct
+outcomes:
+
+- seed 3101 replicate 0: both CFFG tiers diverged after converged inner solves
+  with `recurrence_link statistic is improper`, but the calibration shortcut
+  mislabeled both tiers and the coordinate ready;
+- seed 3101 replicate 1: both tiers reached outer `budget_exhausted` with
+  converged inner solves;
+- seed 3102 replicate 0: the shared tier converged, while the native tier
+  diverged on the same recurrence-statistic error and was mislabeled ready;
+- seed 3102 replicate 1: the shared tier converged, while the native tier's
+  terminal inner solve exhausted its budget and correctly made the coordinate
+  not ready.
+
+The run consumed `37440.1058` wall seconds: `31205.3830` for the classic family
+and `6231.6985` for the heterogeneous family, with peak RSS `15937110016`
+bytes. The complete 1.6 GB payload was renamed, not deleted, to the local
+`artifacts/rslds-dual-calibration-invalid-recurrence` directory. Its root and
+execution manifests validate; nine append-only attempt manifests validate;
+all eight coordinate checkpoints reload against the protocol identity; and
+raw aggregate recomputation passes. `invalid.json` excludes every effect from
+threshold, budget, registration, and claim derivation. No final seed was
+generated or fit, and no immutable protocol was written.
+
+Source → experiment execution at commit
+`1af3d2fadacd14f2d77bafba9d6d084869325ad8`, CFFG worktree commit at launch
+`94458b9aebb699624ac8a58933d851b1eb397966`, and the manifested invalid artifact
+above. Confidence → high. cff-x5z2 owns the numerical recurrence repair;
+cff-266l owns readiness and code-qualified checkpoint identity; this ticket
+will rerun the complete calibration under one coherent repaired revision.
