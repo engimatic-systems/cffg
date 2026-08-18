@@ -329,3 +329,97 @@ def test_mu3_hostile_support_weight_collapse_float32_and_scale():
         assert int(production[-1]) == 0
         for value in production[:-1]:
             assert bool(jnp.all(jnp.isfinite(value)))
+
+
+@pytest.mark.slow
+def test_rolling_agent_two_plans_match_binary_quadrature_and_parameter_ledger():
+    """The trial lifecycle's two functional plans retain the D6b oracle."""
+    from cffg.agent import RollingAgent
+    from cffg.engine import _replace
+    from cffg.models.rollout import build_rollout
+
+    alpha0 = np.array([[2.2, 1.5], [1.8, 2.5]])
+
+    def builder(*, past, steps, **kwargs):
+        return build_rollout(
+            "binary-mu3-quadrature-agent",
+            past=past,
+            steps=steps,
+            d=np.array([0.6, 0.4]),
+            A=np.array([[0.85, 0.20], [0.15, 0.80]]),
+            c=np.array([0.75, 0.25]),
+            e=np.array([0.5, 0.5]),
+            Bs=np.array(
+                [
+                    [[0.90, 0.10], [0.10, 0.90]],
+                    [[0.20, 0.80], [0.80, 0.20]],
+                ]
+            ),
+            gfe=True,
+            **kwargs,
+        )
+
+    agent = RollingAgent(
+        builder,
+        horizon=1,
+        learn_a=True,
+        initial_counts=alpha0,
+        mu3=True,
+        mu3_key=jax.random.PRNGKey(19),
+        mu3_samples=2**15,
+        mu3_min_ess_fraction=0.01,
+        n_sweeps=100,
+    )
+
+    def check_plan():
+        result = agent.last_plan_result
+        plan = agent.plan.arena.mu3_groups[0]
+        group = agent.plan.arena.gfe_groups[0]
+        state = result.state
+        rows = jnp.asarray(plan.rows)
+        log_d = state.messages[
+            agent.plan.arena.message_indices(group.gather_z[plan.rows], 2)
+        ]
+        zbar, _, statuses = rules.gfe_stationary_stats(
+            log_d,
+            state.params[group.name + ":Abar"][rows],
+            state.params[group.name + ":hbar"][rows],
+            state.params[group.name + ":c"][rows],
+        )
+        assert int(jnp.max(statuses)) == 0
+        base = np.asarray(state.params[plan.name + ":base_alpha"])
+        goal = np.exp(np.asarray(state.params[group.name + ":c"])[0])
+        oracle = _binary_grid(base, np.asarray(zbar[0]), goal)
+        diagnostics = agent.planning_diagnostics[plan.name]
+        np.testing.assert_allclose(diagnostics["Abar"], oracle["abar"], atol=MC_TOL)
+        np.testing.assert_allclose(diagnostics["hbar"], oracle["hbar"], atol=MC_TOL)
+        assert diagnostics["expected_phi"] == pytest.approx(
+            oracle["expected_phi"], abs=MC_TOL
+        )
+        assert diagnostics["log_normalizer"] == pytest.approx(
+            oracle["log_z"], abs=MC_TOL
+        )
+
+        without_kl = dict(state.params)
+        without_kl[plan.name + ":kl"] = jnp.asarray(
+            0.0, dtype=state.messages.dtype
+        )
+        kl_slot = agent.plan.bfe(state) - agent.plan.bfe(
+            _replace(state, params=without_kl)
+        )
+        assert kl_slot == pytest.approx(
+            oracle["expected_phi"] - oracle["log_z"], abs=2 * MC_TOL
+        )
+        assert -oracle["expected_phi"] + kl_slot == pytest.approx(
+            -oracle["log_z"], abs=2 * MC_TOL
+        )
+        return base
+
+    action = agent.act()
+    base1 = check_plan()
+    agent.observe(action, 1)
+    agent.reset_episode()
+    agent.act()
+    base2 = check_plan()
+    np.testing.assert_array_equal(base2, agent.counts)
+    assert not np.array_equal(base1, base2)

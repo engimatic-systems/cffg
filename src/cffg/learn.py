@@ -484,11 +484,23 @@ class Learnables:
                 raise KeyError(
                     f"engine declares {plan.name!r}, which this Learnables lacks"
                 )
-            if (plan.family, plan.ftype, plan.shapes) != (
-                original.family,
-                original.ftype,
-                original.shapes,
-            ):
+            if (plan.family, plan.ftype) != (original.family, original.ftype):
+                raise ValueError(
+                    f"learnable {plan.name!r} has an incompatible plan in this engine"
+                )
+            # Different windows may read different blobs owned by the same
+            # posterior (for example analytic ``A`` in perception and raw
+            # counts ``Ac`` in a GFE plan). Blob identity is structural to
+            # each graph; parameter roles and shapes are the cross-window
+            # contract.
+            role_shapes = {
+                (target.role, plan.shapes[target.blob]) for target in plan.targets
+            }
+            original_role_shapes = {
+                (target.role, original.shapes[target.blob])
+                for target in original.targets
+            }
+            if role_shapes != original_role_shapes:
                 raise ValueError(
                     f"learnable {plan.name!r} has an incompatible plan in this engine"
                 )

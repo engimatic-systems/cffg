@@ -434,10 +434,14 @@ variates) are incremental research that would directly improve learning
 stability. Colony batching does not yet accept `mu3` models because it has no
 per-instance explicit-key interface; `Colony.spawn` rejects them rather than
 running the analytic base moments as though the functional update had fired.
-`RollingAgent` also does not yet own functional-message keys, refresh epochs,
-statuses, or checkpoint state. Its `learn_a` workflow uses analytic Dirichlet
-moments and perceptual count updates; it is a named approximation to the full
-Part II parameter-message trial cycle, not evidence that `mu3(A)` ran.
+`RollingAgent` supports one functional evaluator lifecycle with explicit keys,
+fixed epochs, loud status, posterior rollover, and exact checkpoint replay.
+Its default `learn_a` workflow remains an analytic Dirichlet-moment
+approximation; only a planning template whose serialized constraints compile
+to `cffg.mu3_is.v1` is evidence that `mu3(A)` ran. The agent does not average
+multiple refreshed policy-score epochs automatically: callers may explicitly
+refresh, while `Engine.score_mu3_epochs` remains the averaging API. Arbitrary
+stochastic factor families and batched per-agent keys remain future work.
 
 The agent's fixed-memory trial loop likewise uses separate immutable planning
 and filtering templates. It does not mutate the paper's literal graph when an
