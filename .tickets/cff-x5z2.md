@@ -131,3 +131,32 @@ predicate before the final repair is chosen. Source:
 `src/cffg/recurrence.py`, `src/cffg/gaussian_learning.py`, and calibration-only
 source-heterogeneous seed 3101 replicate 0. Confidence: high on the code path
 and claim boundary; medium-high on cancellation as the exact predicate.
+
+### 2026-08-18 — deterministic cancellation regression
+
+Question → Can the suspected covariance cancellation be isolated without
+rerunning the 1,600-step calibration coordinate?
+
+Answer → Yes. With `mean = [1e8, 3e7]` and true covariance
+`[[0.25, 0.5], [0.5, 1.5]]`, the true minimum eigenvalue is
+`0.0746094703208939`.
+After forming the second moment and reconstructing covariance through
+`second - outer(mean, mean)`, float64 produces `[[0, 0.5], [0.5, 1.5]]`, whose
+minimum eigenvalue is `-0.1513878188659973`; the dtype-scaled PSD tolerance is
+`1.0658141036401503e-14`. Uniform categorical probabilities and zero recurrence
+coefficients make every other `weight_stats` predicate benign. Broadcasting
+that row to 1,279 factors gives the uncomfortable-scale regression without
+building a trajectory graph.
+
+The converged fit's finite Bethe free energy rules out invalid categorical
+edges, non-PD drive precision, non-finite coordinate outputs, and materially
+negative stable logit second at that state because recurrence energy returns
+`+inf` for those conditions. `weight_stats` then performs the extra covariance
+subtraction. The exact first production factor and measured values still
+require an instrumented calibration-only replay after the live run releases
+its runtime state; the artifact did not retain per-factor flags.
+
+Source → `src/cffg/recurrence.py:78-233,405-446`,
+`src/cffg/gauss.py:98-103`, `src/cffg/compiler.py:1913-1917`, and
+`src/cffg/learn.py:446-450`. Confidence → high for the deterministic regression
+and upstream/readout boundary; production factor identity remains unmeasured.
