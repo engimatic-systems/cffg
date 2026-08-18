@@ -183,3 +183,30 @@ computed covariance instead of relaxing the project-wide PSD predicate.
 Source → calibration-only source-heterogeneous seed 3101 replicate 0;
 `src/cffg/recurrence.py:78-233`; `src/cffg/gauss.py:98-103`; and
 `src/cffg/engine.py:2147-2174`. Confidence → high.
+
+### 2026-08-18 — repaired production replay
+
+Question → Does the direct-covariance repair clear the production failure
+without hiding a different improper recurrence factor?
+
+Answer → Yes. The same calibration-only seed, replicate, initialization, fit
+stream, and float64 protocol completed 12 recurrence readouts with zero
+improper factors. `switch447` was proper on every call. At the former failure
+point its direct covariance had minimum eigenvalue
+`0.0053095152095479665`, symmetry error `5.421010862427522e-20`, and tolerance
+`3.966749545169498e-17`; every probability, parameter, logit-second, and
+finite-output predicate also passed.
+
+The repaired fit ended `budget_exhausted` with converged inner inference,
+`error=null`, and residual `0.075837147196035`. This is the honest current
+status: the outer rule requires two consecutive residuals at or below `0.1`,
+and only the final iteration qualified. Through the former failure boundary,
+the maximum free-energy change from the archived run was
+`6.51925802230835e-09` and the maximum residual change was
+`6.1420868391337535e-12`. Total replay wall time was
+`383.3034685831517` seconds. cff-266l owns phase-specific readiness, and
+cff-s6rs owns replacement budget calibration.
+
+Source → current cff-x5z2 tree and the preserved calibration-only
+source-heterogeneous seed 3101 replicate 0 protocol and streams. Confidence →
+high.
