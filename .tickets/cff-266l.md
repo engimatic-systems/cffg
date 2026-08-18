@@ -1,6 +1,6 @@
 ---
 id: cff-266l
-status: in_progress
+status: closed
 deps: [cff-9o39, cff-x5z2]
 links: []
 created: 2026-08-18T14:10:56Z
