@@ -66,6 +66,7 @@ EPIC_FILES = {
     "M5 · Runtime": [
         "test_agent.py",
         "test_agent_spec.py",
+        "test_public_api.py",
         "test_colony.py",
         "test_runtime_status.py",
     ],

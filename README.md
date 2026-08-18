@@ -29,6 +29,113 @@ Ticket- and documentation-only changes use their relevant validation instead
 of the short suite. Run slow regressions explicitly when changing the behavior
 they cover; they are not part of the default PR gate.
 
+## Quickstart: build, run, checkpoint, continue
+
+This is the supported pre-1.0 newcomer path. It uses a two-cell deterministic
+corridor so the standalone inference graph is a tree: its reported value is
+exact Bethe free energy, `-log p(observation | action)`. That statement is
+specific to this registered tree construction. For other models, `Engine.bfe`
+may instead be a Bethe approximation, a ledger containing the exact local
+fixed-A Figure 5 discrete GFE composite under its stated assumptions, or a
+declared bound; local exactness does not make loopy inference globally exact.
+
+<!-- public-quickstart:start -->
+```python
+from functools import partial
+from pathlib import Path
+
+import numpy as np
+
+from cffg import (
+    CorridorEnv,
+    Engine,
+    RollingAgent,
+    RunStatus,
+    build_gridworld,
+    compile_template,
+    load_bundle,
+    save_bundle,
+)
+
+# Build and serialize one perception template with its parameter arrays.
+template, arrays = build_gridworld(past=1, steps=1, k=2, acc=1.0)
+model_path = Path("corridor.cffgz")
+save_bundle(model_path, template, arrays)
+template, arrays, manifest = load_bundle(model_path)
+assert manifest["structure_hash"]
+
+# Compile, bind DATA ports, run, and refuse every unfinished status.
+engine = Engine(compile_template(template, arrays=arrays))
+state = engine.bind_data(
+    engine.init_state(),
+    {"act1": 1, "obs1": 0},  # action 1 is STAY; sensor is deterministic
+)
+result = engine.run(state, 20, tol=1e-6)
+assert result.status is RunStatus.CONVERGED
+state = result.require_converged()
+state_posterior = engine.marginals(state)["zm1"]
+exact_bethe_free_energy = engine.bfe(state)
+np.testing.assert_allclose(state_posterior, [1.0, 0.0], atol=2e-6)
+np.testing.assert_allclose(
+    exact_bethe_free_energy, -np.log(arrays["d"][0]), rtol=2e-6
+)
+assert state.messages.dtype in (np.dtype(np.float32), np.dtype(np.float64))
+
+# Use the corresponding rolling model and checkpoint after one real step.
+builder = partial(build_gridworld, k=2, acc=1.0)
+initial_b_counts = np.ones((3, 2, 2))
+
+
+def make_agent():
+    return RollingAgent(
+        builder,
+        horizon=1,
+        learn_b=True,
+        initial_b_counts=initial_b_counts,
+        n_sweeps=100,
+        select="sample",
+        seed=7,
+    )
+
+
+environment = CorridorEnv(k=2, acc=1.0, seed=11)
+agent = make_agent()
+agent.step(environment.step)
+checkpoint_path = Path("agent.npz")
+agent.checkpoint(checkpoint_path)
+
+# Restore into a fresh agent with the same declaration.
+resumed = make_agent()
+resumed.restore(checkpoint_path)
+np.testing.assert_array_equal(resumed.belief, agent.belief)
+np.testing.assert_array_equal(resumed.b_counts, agent.b_counts)
+assert resumed.tick == agent.tick
+assert resumed.episode_tick == agent.episode_tick
+
+# Environment state is external to the agent checkpoint. Two equivalent
+# environments isolate the restored agent's belief, learning, cadence, and RNG.
+control_environment = CorridorEnv(
+    k=2, acc=1.0, start=environment.pos, seed=13
+)
+resumed_environment = CorridorEnv(
+    k=2, acc=1.0, start=environment.pos, seed=13
+)
+assert resumed.step(resumed_environment.step) == agent.step(control_environment.step)
+np.testing.assert_array_equal(resumed.belief, agent.belief)
+np.testing.assert_array_equal(resumed.b_counts, agent.b_counts)
+assert resumed.tick == agent.tick
+assert resumed.episode_tick == agent.episode_tick
+```
+<!-- public-quickstart:end -->
+
+The supported top-level names are `CorridorEnv`, `Engine`, `RollingAgent`,
+`RunStatus`, `build_gridworld`, `compile_template`, `load_bundle`,
+`save_bundle`, and the compatibility helper `set_params`. Their canonical
+implementations remain in the focused modules; `cffg` only re-exports them.
+Before 1.0, deeper rule tables, compiled arenas, group plans, kernel
+registration objects, and private helpers remain internal-unstable. Model JSON
+and `.cffgz` schemas retain their own explicit version contracts.
+
 ## The mental model
 
 A model is a **Template**: a factor graph (square factors, edges = variables)
@@ -467,9 +574,9 @@ and leaves that component at its prior. `pg_weights` stores `eta` and
 `precision` with source-regime, stick, and augmented `[drive; offset]` axes,
 then rolls posterior means into separate weights and offsets. Both families
 remain host-side empirical-Bayes updates and reject improper or non-finite
-statistics before mutation. Versioned checkpoints preserve every keyed
-hyperparameter. A legacy multi-array checkpoint must name a complete posterior
-or restoration fails with a migration error.
+statistics before mutation. Versioned learnable state dictionaries preserve
+every keyed hyperparameter. A legacy multi-array checkpoint must name a
+complete posterior or restoration fails with a migration error.
 
 ## Run inference
 
@@ -484,7 +591,7 @@ result = engine.run(state, 200, tol=1e-12)                      # solve to stati
 state  = result.require_converged()                             # raises on every other status
 
 engine.marginals(state)["u1"]   # posteriors by variable name
-engine.bfe(state)               # exact Bethe/Generalised free energy
+engine.bfe(state)               # model-declared BFE, GFE, approximation, or bound
 ```
 
 For hybrid regime epistemics, place a `P_SUBSTITUTION` constraint with
@@ -684,7 +791,9 @@ independent.
 ## Edit, ship, budget
 
 ```python
-from cffg.core.edits import apply_edits, check_edits, bundle_from_json, AddFactor
+from cffg.core.edits import (
+    AddFactor, apply_edits, bundle_from_json, bundle_to_json, check_edits,
+)
 new_t   = apply_edits(t, actions)     # all-or-nothing; original untouched
 problems = check_edits(t, actions)    # dry-run: [] means applicable
 # actions round-trip through JSON (bundle_to_json / bundle_from_json)
@@ -694,7 +803,7 @@ save_bundle("model.cffgz", template, arrays)   # zip: model + blobs + manifest
 template, arrays, manifest = load_bundle("model.cffgz")  # hash-verified
 
 # BlobRef paths use .npy or .safetensors; .cffgz stores .npy members.
-# RollingAgent checkpoints use .npz for many small runtime arrays.
+# RollingAgent checkpoints use a versioned, structure-bound .npz envelope.
 
 from cffg.estimate import estimate
 print(estimate(engine).summary())
@@ -703,6 +812,17 @@ print(estimate(engine).summary())
 
 `.npz` is a ZIP container and does not support ordinary per-array memory
 mapping, so it is reserved for agent checkpoints rather than parameter blobs.
+The agent envelope is versioned and records an exact field manifest plus the
+planning and filtering structure and static-parameter hashes. It also records
+the horizon, solver budget, damping, and action-selection mode that determine
+continuation, including the JAX x64 execution setting captured when the agent
+is constructed.
+Restore rejects duplicate archive members and validates belief and learnable
+shapes, learned-goal state, cadence, runtime configuration, and NumPy action RNG
+before one atomic commit. An unknown version, field, structure,
+parameterization, configuration, or shape raises a specific error; legacy
+unversioned analytic checkpoints retain an explicit, completeness-checked
+migration path.
 
 ## Register a custom factor
 

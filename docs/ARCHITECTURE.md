@@ -1,6 +1,6 @@
 # CFFG Engine — Architecture
 
-Status: living as-built record, updated 2026-08-17. Unless a section says
+Status: living as-built record, updated 2026-08-18. Unless a section says
 otherwise, every statement before **Target design** describes behavior in the
 current repository. Tickets, not the target section, are the source of truth for
 planned work.
@@ -158,7 +158,13 @@ A pure-Python (dataclass) representation, independent of JAX:
   `.npz` is a ZIP container and cannot memory-map its individual arrays through
   ordinary `np.load`, so it is reserved for `RollingAgent` runtime checkpoints,
   whose many small state arrays benefit from one container but do not need
-  memory mapping.
+  memory mapping. The agent envelope records its version, exact field manifest,
+  planning/filtering structure and static-parameter hashes, runtime
+  planning/action configuration and construction-time JAX execution precision,
+  named belief shapes, cadence, NumPy RNG, learnables, and learned-goal state.
+  Restore rejects duplicate physical members and validates all fields into
+  temporary values before committing; legacy unversioned analytic checkpoints
+  retain an explicit migration path.
   The structural content hash ignores blob paths and groups compatible Colony
   instances.
 - **Init templates (cff-wx28)**: a `BlobRef` may carry a canonical-initializer
@@ -171,18 +177,31 @@ A pure-Python (dataclass) representation, independent of JAX:
   structure hash (parameter data, not structure).
 - **Portable bundle**: the deployable unit is a ZIP (`.cffgz`) containing
   `model.json` (structure + constraints), `blobs/` (parameter arrays), and
-  `manifest.json` (schema version, content hashes, provenance). Unzipping and
-  pointing the engine at `model.json` is a full model restore. Bundle parameter
+  `manifest.json` (schema version, content hashes, provenance). The supported
+  restore path is `load_bundle` → `compile_template` → `Engine`; an extracted
+  model may instead use the serialized loader and `compile_template(...,
+  root=extracted_directory)`. Bundle parameter
   members are canonical `.npy` files; ordinary external references may also use
   safetensors. Plate fragments remain nested specs in `model.json`; the manifest
   inventories every grounded tied/per-copy array, and per-copy blob paths use an
   `{index}` marker resolved during grounding. Array-key-derived subpaths prevent
   collisions without flattening the plate spec. Original flat schema-1 manifests
   remain loadable. No third-party interchange format — this schema is canonical.
-- **Edit actions**: the only public mutation API is transactional bundles
-  (`add_slice`, `bind_data`, `set_constraint`, `compose(template, port_map)`) that
-  validate the port invariant before committing. This client-neutral API is also
-  the incremental serialization of model-edit history.
+- **Edit actions**: `check_edits` validates a sequence of typed actions and
+  `apply_edits` commits it atomically to a copy. `AddVariable`, `AddFactor`,
+  `RemoveFactor`, `RemoveVariable`, `ReplaceFactor`, `AddConstraint`,
+  `RemoveConstraint`, `DeclarePort`, `RemovePort`, `AddBlob`,
+  `RebindBlobPath`, and `SetPlateDims` are the executable action vocabulary;
+  `bundle_to_json` / `bundle_from_json` serialize the sequence. `compose`
+  remains the separate complete-template composition operation. No public
+  `add_slice` or template-level `bind_data` function is advertised.
+- **Supported facade**: top-level `cffg` re-exports only `CorridorEnv`, `Engine`,
+  `RollingAgent`, `RunStatus`, `build_gridworld`, `compile_template`,
+  `load_bundle`, `save_bundle`, and the existing `set_params` compatibility
+  helper. Their focused modules remain canonical owners. Before 1.0, rule
+  tables, compiled arenas/group plans, kernel registration objects, and private
+  helpers are internal-unstable; serialized schemas retain their explicit
+  version contracts.
 
 ### 2. Compiler (`cffg.compiler`)
 
@@ -852,8 +871,15 @@ discarding a joint correlation. Exact joint rollover remains the separate
   `learn_a` / `learn_b` remain as the older spelling of `learn=("A",)` /
   `learn=("B",)`. Checkpoints carry every learnable's hyperparameters, the
   named beliefs and episode cadence, so a resumed agent does not re-fire the
-  episode-start statistic. Legacy single `belief` and `counts` / `b_counts`
-  keys are restored/migrated exactly or refused, never silently dropped.
+  episode-start statistic. The versioned envelope also binds the payload to
+  both serialized window structure hashes, the non-checkpointed static
+  parameter values, and the horizon, solver, damping, action-selection, and JAX
+  precision configuration; it inventories every logical and physical field, checks
+  normalized beliefs and learned-state shapes, restores the NumPy action RNG,
+  and commits only after complete validation. Unknown versions, structures,
+  parameterizations, configurations, shapes, fields, and duplicate archive
+  members fail specifically. Legacy single `belief` and `counts` / `b_counts`
+  spellings are complete and unambiguous or refused, never silently dropped.
 - Sensor/actuator adapters are plain Python callbacks mapping env observations to
   one-hot data bindings and control marginals to env actions.
 
