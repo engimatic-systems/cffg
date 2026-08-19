@@ -1,6 +1,6 @@
 ---
 id: cff-s6rs
-status: in_progress
+status: closed
 deps: [cff-9o39, cff-266l, cff-sqa8]
 links: []
 created: 2026-08-17T20:52:04Z
@@ -173,3 +173,7 @@ Replacement command now active at experiment commit 840c4a7:
 uv run cffg-rslds-dual-calibration --scale-results artifacts/rslds-dual-scale-benchmark/results.json --output artifacts/rslds-dual-calibration
 
 No registered final seed was generated, fit, or inspected.
+
+**2026-08-19T15:24:23Z**
+
+Replacement calibration completed and validated. All eight family/seed/replicate coordinates are ready under experiment execution revision 840c4a7; the manifested artifact is committed in the experiment repository at 3555759, and its measured protocol documentation is committed at a26755f. The classic family selected 12,500 total / 10,000 training steps; the heterogeneous family selected 1,600 total / 1,280 training steps. The derived final budget is 4,000 inner iterations, 16 outer iterations, 384 particles, and four sequential adapter chains with 400 warmup plus 1,600 draws. Domain-capped thresholds for all twenty primary effects, the balanced grids, family-qualified streams and identities, selected protocol hash, raw execution hash, retained samples, attempt ledgers, manifests, and environment provenance are present and recompute successfully. The whole final-run projection with 25% headroom is 21.87 hours (17.39 classic, 4.48 heterogeneous). Several heterogeneous calibration recovery errors exceeded the 0.15 domain cap; readiness therefore freezes a deliberately difficult falsifiable final test and does not imply it will pass. The artifact validator passes, all eight coordinate records have empty failure lists, and final_seed_executed is false; only calibration seeds 3101/3102 exist. Superseded invalid recurrence and inner-budget executions remain preserved locally and excluded from derivation. cff-huxt may now freeze the immutable replacement registration; cff-oyie remains the sole owner of final-seed execution.
