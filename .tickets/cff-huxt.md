@@ -1,6 +1,6 @@
 ---
 id: cff-huxt
-status: in_progress
+status: closed
 deps: [cff-s6rs, cff-9cx5, cff-7zq1]
 links: []
 created: 2026-08-17T20:52:04Z
@@ -94,18 +94,17 @@ Legend: prerequisite --> dependent
       +--> [x] cff-x5z2 recurrence statistics
                   |
                   +--> [x] cff-266l readiness semantics
-                              +--> [ ] cff-s6rs calibration (in progress) --+
-                                                                          |
-[x] architecture mapping --> [ ] cff-9cx5 v5 runner (ready) --------------+--> [ ] cff-huxt
-                                                                                     |
-                                                                                     +--> [ ] cff-oyie
-                                                                                               |
-                                                                                               +--> [ ] cff-nkbj
+                              +--> [x] cff-s6rs calibration --------+
+                                                                    |
+[x] cff-9cx5 v5 runner --> [x] cff-7zq1 freeze builder -------------+--> [x] cff-huxt freeze
+                                                                               |
+                                                                               +--> [ ] cff-oyie final run (ready)
+                                                                                         |
+                                                                                         +--> [ ] cff-nkbj
 ```
 
-cff-s6rs and cff-9cx5 are the parallel active roots. No final seed may be
-generated until both feed cff-huxt and cff-huxt closes with the committed
-replacement hash.
+The immutable freeze is complete. `cff-oyie` is the only ready owner permitted
+to generate a registered final seed.
 
 **2026-08-18T17:04:27Z**
 
@@ -118,3 +117,7 @@ Final-run audit — Question → Is the family-aware command already complete en
 **2026-08-18T17:06:15Z**
 
 Superseded-freeze identity captured before replacement work: `artifacts/rslds-preregistration/preregistration.json` SHA-256 `308772928c21e7958cd1b7e47d5989d7bc434e93aa55596a246d5bcf989511f7`; canonical JSON content SHA-256 `0ca693cc7eb7821da161a763e0262e1495ff19d6fe92cf6445b7f01a3cf97e4c`; manifest SHA-256 `f7ca80e1dc22637097661aa10368cf8ba5a0e4345137617d4f13137e02c18e50`. Its phase boundary still says `final_seed_executed: false`. The replacement must record these bytes as superseded and must not rewrite them.
+
+**2026-08-19T15:30:55Z**
+
+Measured replacement freeze completed on experiment code commit c3be541 and committed as experiment artifact commit 99d81b5. The schema-v5 registration SHA-256 is 24a72073e98ed14b70d403211c9ac346c6da7c1c9e7e94142944a83ca11be477; its canonical content SHA-256 is e41fa0796995a6c4558c49eaf5207ee6e4862acde71a4d8250fe958a105ec690; the manifest SHA-256 is 487bb0831295293fe2c8bd39f92f44dedf8accdb81fe86afaafef0099386fafa; and final-command.txt SHA-256 is a529e1b436d67f57574b06a08ddfa3db0b9bb8c3f4d70d9b1db01cfc6abe023. Artifact validation reconstructs the registration, manifest, command hash, complete calibration/scale/source-design provenance, both lockfiles, mapping and adapter identities, the superseded unexecuted freeze, all 3+3 final identities and streams, and the independent fixed-dataset decisions. The freeze records experiment commit c3be541 and CFFG commit a686faa as the only authorized execution revisions. No final seed directory exists and phase_boundary.final_seed_executed is false. cff-oyie must run the exact manifested command from the authorized experiment code commit with these byte-identical registration files present.
