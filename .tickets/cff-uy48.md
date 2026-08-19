@@ -1,6 +1,6 @@
 ---
 id: cff-uy48
-status: open
+status: closed
 deps: [cff-epdp, cff-in0q, cff-iqqk, cff-u3m3, c1-a2cb, c1-2h8y]
 links: [cff-cfqg, cff-bpgm]
 created: 2026-08-13T04:26:16Z
@@ -128,3 +128,11 @@ Immediate blocker: the three implementation/evidence children wait for epdp. Dow
 **2026-08-13T04:40:34Z**
 
 Authoring handoff, 2026-08-12: the complete survey paragraph is assigned across cff-epdp, cff-in0q, cff-iqqk, and cff-u3m3. cff-epdp is the ready root. The ticket scan was reviewed after refinement; dependency-cycle and diff-hygiene checks passed. No pytest run was required because this change modifies only tickets and documentation.
+
+**2026-08-18T22:58:29Z**
+
+Integration handoff, 2026-08-18. Applicable change paths: Learnable or checkpoint feature and the RollingAgent trial-time planning/data boundary. This gate merges the three already-reviewed sibling heads without new serialized IR. Required duplicated surfaces: ordinary and functional-mu3 planning, filter rollover, action selection, status propagation, plan-result cache identity, PRNG ownership, current/versioned/legacy checkpoint decoding, grounded static-parameter and plate digests, float32/x64 execution, exact-zero support, literal mixed-history comparison, README/ARCHITECTURE/LIMITATIONS claims, and dashboard registration. Host/JIT rule pairs, flooding/scheduled pairs, and Colony/vmap are unchanged by this integration. The merge must retain cff-in0q functional evaluator state/config, cff-iqqk independent literal-oracle evidence, and cff-u3m3 atomic public checkpoint/facade contracts; any overlap is resolved to the stricter combined invariant.
+
+**2026-08-19T00:09:35Z**
+
+Completion handoff, 2026-08-18. The integration contains cff-in0q at aca4ba3, cff-iqqk at 9e21b9f, cff-u3m3 at 9cc1be7, and final cached-runtime hardening at 7cd3d85. Independent read-only audits found no remaining actionable checkpoint, functional-mu3 lifecycle, constraint-flip, documentation, or merge gaps. The final default not-slow dashboard run against code commit 7cd3d85 passed 1,411 tests, deselected 41, failed 0, and recorded 1,247.018 seconds of runner wall time; it refreshed /Users/ravd/agent-share/cffg-tests.html. The permitted release statement is bounded to the registered fixed-A discrete paper core and the documented minimum public workflow. Functional mu3(A) remains finite-sample importance sampling; the literal/two-window equivalence is limited to the tested fixed-A binary discrete joint-boundary construction; this is not a universal solver claim.
