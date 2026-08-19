@@ -1,7 +1,7 @@
 ---
 id: cff-s6rs
 status: in_progress
-deps: [cff-9o39, cff-266l]
+deps: [cff-9o39, cff-266l, cff-sqa8]
 links: []
 created: 2026-08-17T20:52:04Z
 type: task
