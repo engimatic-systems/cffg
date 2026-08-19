@@ -1,6 +1,6 @@
 ---
 id: cff-sqa8
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-19T04:09:10Z
@@ -88,3 +88,32 @@ Legend: prerequisite --> dependent
   vector leaves the finite numerical domain before the requested horizon ends.
 - **Secondary outcome:** Descriptive evidence that supplements the registered
   primary comparison but does not replace it.
+
+## Notes
+
+**2026-08-19T04:18:41Z**
+
+Implementation handoff, 2026-08-18.
+
+Architecture change-path row: N/A. The change is confined to the sibling NASCAR validation experiment. It does not change CFFG factor, compiler, engine, learning, objective-ledger, or serialization behavior.
+
+Duplicated execution surfaces checked:
+- direct generative rollout and secondary-evaluation conversion;
+- CFFG, paper-adapter, and learned-SLDS secondary callers;
+- shared-initialization and native tiers;
+- protocol-declared variance-growth and amplitude bounds;
+- finite float64, finite float32, malformed-parameter, and dynamically unbounded trajectories;
+- existing source-design and scale callers retain the default periodicity values and artifact shape.
+
+Result:
+- experiment commit 83c6c3f detects the first non-finite generated state or transition vector with structured step/reason data;
+- only that dedicated divergence becomes bounded=false, score=0 secondary evidence; malformed inputs and unexpected errors remain loud;
+- the archived failing reference chain now records exact divergence at step 1704 and serializes without NaN or infinity;
+- focused validation passed 51 tests, protocol validation passed 23 tests, and the complete short suite passed at the final code head;
+- no registered final seed was generated, fit, or inspected.
+
+Question → Was the NaN exception evidence that the reference primary calculation was invalid?
+
+Answer → No. The primary predictive and recovery metrics were finite. One posterior-mean secondary rollout was dynamically unstable and left finite state space. The correct secondary result is an unbounded rollout, while primary readiness remains governed by its own finite metrics.
+
+Source → archived calibration-only source_heterogeneous seed 3102 replicate 1, native tier, reference chain 1; experiment commit 83c6c3f. Confidence → high.
