@@ -155,3 +155,21 @@ Source → experiment execution at commit
 above. Confidence → high. cff-x5z2 owns the numerical recurrence repair;
 cff-266l owns readiness and code-qualified checkpoint identity; this ticket
 will rerun the complete calibration under one coherent repaired revision.
+
+**2026-08-19T04:20:18Z**
+
+Calibration correction, 2026-08-18.
+
+Question → Why does the replacement selected protocol use a 4,000-iteration CFFG inner ceiling?
+
+Answer → The complete code-qualified run at experiment commit 248f9d3 finished all eight calibration coordinates, but source_heterogeneous seed 3102 replicate 1 native_end_to_end was not ready. Its CFFG outer fit reached residual 0.082034 after nine iterations, then terminal hidden-state inference exhausted the 2,000-iteration inner ceiling. A calibration-only replay changed only that ceiling to 4,000 and reused the exact dataset, replicate, tier, initializer stream, fit stream, tolerances, damping, priors, and outer budget. It converged in nine outer iterations with residual 0.079813, converged terminal inference, 10,791 total inner iterations, zero retries, and 403.750 seconds wall time. The protocol therefore doubles the exhausted ceiling once and requires a complete coherent rerun under the revised experiment revision.
+
+The same failed coordinate exposed a separate secondary-scoring defect: reference chain 1 left finite latent state space at rollout step 1,704. cff-sqa8 now records that as bounded=false, score=0 evidence while retaining finite primary metrics. The 1.4 GB not-ready execution is manifested locally as artifacts/rslds-dual-calibration-invalid-inner-budget and excluded from every threshold, budget, registration, and claim calculation except that the named probe justifies the replacement inner ceiling.
+
+Source → invalid execution commit 248f9d3; CFFG commit a686faa; calibration-only probe under the same code and streams; scorer repair 83c6c3f; budget derivation 840c4a7. Confidence → high.
+
+Replacement command now active at experiment commit 840c4a7:
+
+uv run cffg-rslds-dual-calibration --scale-results artifacts/rslds-dual-scale-benchmark/results.json --output artifacts/rslds-dual-calibration
+
+No registered final seed was generated, fit, or inspected.
