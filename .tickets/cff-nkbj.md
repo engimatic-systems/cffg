@@ -1,6 +1,6 @@
 ---
 id: cff-nkbj
-status: in_progress
+status: closed
 deps: [cff-oyie, cff-ora6]
 links: [cff-r6bl, cff-0f3g, cff-dlrj, cff-11jj]
 created: 2026-08-09T13:09:26Z
@@ -133,3 +133,20 @@ Confidence → High for the local NASCAR factorization, all five mapped joint
 terms, the transition and dynamics equations, and the truth boundary after
 cff-ora6 experiment commit `61cec3f` passed both modern and isolated legacy
 test suites.
+
+**2026-08-20T15:56:39Z**
+
+Final evidence audit: the epic reaches only the first half of the requested parity target. cff-ora6 establishes probabilistic-architecture parity for the source-homogeneous, shared-emission classic NASCAR subclass through a five-term mapping and independent oracles. cff-oyie does not establish classic task parity: all six classic CFFG tiers converged, but all six adapter tiers failed the frozen mixing gate, so no paired or formal absolute decision was eligible. The independent heterogeneous claim is also not_ready because seed 2102 failed prefit coverage, seed 2103 exhausted both CFFG outer budgets, every fitted adapter tier failed mixing, and the one converged seed had descriptive source-function errors above 0.150.
+
+README.md, docs/ARCHITECTURE.md, and docs/LIMITATIONS.md now agree on both family boundaries, 10,000+2,500 and 1,280+320 scales, reference provenance, runtime statuses, descriptive misses, affine/label identifiability, and excluded claims. The documentation commit is fd04c98. The complete local experiment commit is 6c0437a; results SHA-256 is eaf4bdccb6b2d9ecf35f59a91fa1012873bba697c8fe499781b28c1f787697c4 and manifest SHA-256 is b71c41ad46cd2e210a9e204743d8fd58f1a76a69305afae8601c7e307b64a56a. Manifest, raw aggregate, final provenance, and canonical-document consistency checks pass.
+
+Repair owners are cff-l5ag adapter mixing, cff-q1au heterogeneous coverage, cff-qulu outer convergence, cff-0oqo source-function recovery, cff-3v7q classic periodicity, and cff-wea9 source preflight. Balanced trees and destination-softmax remain cff-0f3g and cff-dlrj.
+
+Stack audit: all 19 prerequisite and child tickets through cff-oyie and cff-ora6 are closed; all 20 existing branch heads equal their origin revisions; every draft PR uses the four PR #63 headings; checked worktrees are clean; tk dep cycle and git diff --check pass. The final cff-nkbj PR body is staged in the agent-share directory with the same heading contract. No short suite is required for this documentation-and-ticket-only convergence branch; owning code branches retain their recorded final tests.
+
+Legend: prerequisite --> dependent
+
+[x] cff-dqk2 --> [x] cff-11jj --> [x] dual harness --> [x] cff-oyie --+
+[x] cff-ora6 architecture mapping ----------------------------------------+--> [x] cff-nkbj
+                                                                                |
+                                                                                +--> [ ] repair tickets above
