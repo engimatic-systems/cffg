@@ -1,8 +1,8 @@
 ---
 id: cff-oyie
-status: in_progress
+status: closed
 deps: [cff-huxt]
-links: [cff-wea9]
+links: [cff-wea9, cff-l5ag, cff-q1au, cff-qulu, cff-0oqo, cff-3v7q]
 created: 2026-08-10T02:58:08Z
 type: task
 priority: 1
@@ -101,3 +101,21 @@ Legend: prerequisite --> dependent
 ```
 
 cff-x5z2 is the active root. cff-oyie remains blocked until calibration and the replacement freeze are complete.
+
+**2026-08-20T15:48:53Z**
+
+Final handoff: the only authorized schema-v5 command completed all six fixed coordinates without seed replacement or scientific changes. The local experiment evidence commit is 6c0437a. results.json SHA-256 is eaf4bdccb6b2d9ecf35f59a91fa1012873bba697c8fe499781b28c1f787697c4; manifest SHA-256 is b71c41ad46cd2e210a9e204743d8fd58f1a76a69305afae8601c7e307b64a56a. The manifest, raw dual aggregate recomputation, and final provenance validator all pass. Execution wall time was 51,254.918 seconds with 13,230,833,664-byte peak RSS. The interrupted seed-2001 attempt remains append-only evidence of the missing legacy-source preflight defect tracked by cff-wea9.
+
+Both family conclusions are not_ready and remain independent. All six classic CFFG tiers and controls converged, but all six classic adapter arms failed the frozen mixing eligibility rule, so no paired effects or formal absolute decisions were issued. Heterogeneous seed 2101 had converged CFFG tiers but ineligible adapter mixing and budget-exhausted controls; seed 2102 stopped before fitting because source 3 gate 2 had four successes instead of five; seed 2103 had budget-exhausted CFFG tiers and controls plus ineligible adapter mixing. Descriptively, classic native seed 2001 periodicity was 0.4058 against its 0.4110 floor. Heterogeneous seed 2101 transition and contrast errors were 0.1946/0.2498 shared and 0.3761/0.3736 native against 0.150 ceilings. The experiment README reports these boundaries and does not claim task parity or source recovery.
+
+Evidence-backed repairs: cff-l5ag owns adapter mixing; cff-q1au owns final-path source/gate coverage; cff-qulu owns outer convergence; cff-0oqo owns source-function recovery after q1au and qulu; cff-3v7q owns classic periodicity robustness; cff-wea9 owns early legacy-source preflight.
+
+Legend: prerequisite --> dependent
+
+[x] cff-huxt immutable freeze --> [x] cff-oyie frozen execution --> [ ] cff-nkbj evidence audit
+                                              |
+                                              +--> [ ] cff-l5ag adapter mixing
+                                              +--> [ ] cff-q1au coverage --+
+                                              +--> [ ] cff-qulu convergence+--> [ ] cff-0oqo recovery
+                                              +--> [ ] cff-3v7q periodicity
+                                              +--> [ ] cff-wea9 preflight
