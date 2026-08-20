@@ -1,0 +1,1132 @@
+{
+ "data_seed": 4201,
+ "status": "RunStatus.CONVERGED",
+ "iterations": 22,
+ "residual": 0.026976789214017947,
+ "rows": [
+  {
+   "iter": 1,
+   "residual": 1.0,
+   "free_energy": -43861.24514420257,
+   "top_families": [
+    [
+     "posterior/dynamics/0/m",
+     1.0
+    ],
+    [
+     "posterior/emission/lam",
+     1.0
+    ],
+    [
+     "posterior/dynamics/0/lam",
+     1.0
+    ]
+   ]
+  },
+  {
+   "iter": 2,
+   "residual": 0.5858188295939751,
+   "free_energy": -26755.292019869168,
+   "top_families": [
+    [
+     "posterior/dynamics/2/lam",
+     0.58582
+    ],
+    [
+     "posterior/dynamics/2/psi",
+     0.56588
+    ],
+    [
+     "posterior/dynamics/0/psi",
+     0.47931
+    ]
+   ]
+  },
+  {
+   "iter": 3,
+   "residual": 0.5831931875744252,
+   "free_energy": -27027.544018661418,
+   "top_families": [
+    [
+     "posterior/dynamics/0/psi",
+     0.58319
+    ],
+    [
+     "posterior/emission/psi",
+     0.27279
+    ],
+    [
+     "posterior/dynamics/2/psi",
+     0.2267
+    ]
+   ]
+  },
+  {
+   "iter": 4,
+   "residual": 0.49172300506448013,
+   "free_energy": -27239.707050305184,
+   "top_families": [
+    [
+     "posterior/dynamics/0/psi",
+     0.49172
+    ],
+    [
+     "posterior/dynamics/3/psi",
+     0.36383
+    ],
+    [
+     "posterior/emission/psi",
+     0.22795
+    ]
+   ]
+  },
+  {
+   "iter": 5,
+   "residual": 0.523639097854727,
+   "free_energy": -27379.01627829497,
+   "top_families": [
+    [
+     "posterior/dynamics/3/psi",
+     0.52364
+    ],
+    [
+     "posterior/dynamics/0/psi",
+     0.26598
+    ],
+    [
+     "posterior/dynamics/2/psi",
+     0.23061
+    ]
+   ]
+  },
+  {
+   "iter": 6,
+   "residual": 0.3909254203798461,
+   "free_energy": -27456.48970546705,
+   "top_families": [
+    [
+     "posterior/dynamics/3/psi",
+     0.39093
+    ],
+    [
+     "posterior/dynamics/2/psi",
+     0.30238
+    ],
+    [
+     "posterior/initial/alpha",
+     0.18132
+    ]
+   ]
+  },
+  {
+   "iter": 7,
+   "residual": 0.31599991783654385,
+   "free_energy": -27485.125079053956,
+   "top_families": [
+    [
+     "posterior/dynamics/2/psi",
+     0.316
+    ],
+    [
+     "point/transition_matrix",
+     0.14969
+    ],
+    [
+     "posterior/dynamics/1/lam",
+     0.14584
+    ]
+   ]
+  },
+  {
+   "iter": 8,
+   "residual": 0.23918630954506595,
+   "free_energy": -27489.887962034623,
+   "top_families": [
+    [
+     "posterior/dynamics/2/psi",
+     0.23919
+    ],
+    [
+     "posterior/dynamics/1/nu",
+     0.1012
+    ],
+    [
+     "posterior/dynamics/2/lam",
+     0.09865
+    ]
+   ]
+  },
+  {
+   "iter": 9,
+   "residual": 0.17878109279258173,
+   "free_energy": -27473.605971069683,
+   "top_families": [
+    [
+     "posterior/dynamics/2/psi",
+     0.17878
+    ],
+    [
+     "posterior/dynamics/1/psi",
+     0.098
+    ],
+    [
+     "posterior/dynamics/1/nu",
+     0.07891
+    ]
+   ]
+  },
+  {
+   "iter": 10,
+   "residual": 0.13062182622090707,
+   "free_energy": -27449.253485776968,
+   "top_families": [
+    [
+     "posterior/dynamics/2/psi",
+     0.13062
+    ],
+    [
+     "posterior/dynamics/1/psi",
+     0.11
+    ],
+    [
+     "posterior/dynamics/1/nu",
+     0.0677
+    ]
+   ]
+  },
+  {
+   "iter": 11,
+   "residual": 0.13064152053951922,
+   "free_energy": -27424.037930624916,
+   "top_families": [
+    [
+     "posterior/dynamics/1/psi",
+     0.13064
+    ],
+    [
+     "posterior/dynamics/2/psi",
+     0.07957
+    ],
+    [
+     "posterior/dynamics/1/nu",
+     0.06263
+    ]
+   ]
+  },
+  {
+   "iter": 12,
+   "residual": 0.15834041463283424,
+   "free_energy": -27399.502719601438,
+   "top_families": [
+    [
+     "posterior/dynamics/1/psi",
+     0.15834
+    ],
+    [
+     "point/dynamics_offset",
+     0.07018
+    ],
+    [
+     "posterior/dynamics/1/m",
+     0.06965
+    ]
+   ]
+  },
+  {
+   "iter": 13,
+   "residual": 0.1946913347794214,
+   "free_energy": -27375.77932548791,
+   "top_families": [
+    [
+     "posterior/dynamics/1/psi",
+     0.19469
+    ],
+    [
+     "point/dynamics_offset",
+     0.07846
+    ],
+    [
+     "posterior/dynamics/1/m",
+     0.07802
+    ]
+   ]
+  },
+  {
+   "iter": 14,
+   "residual": 0.2409563956768395,
+   "free_energy": -27352.75946470619,
+   "top_families": [
+    [
+     "posterior/dynamics/1/psi",
+     0.24096
+    ],
+    [
+     "point/dynamics_offset",
+     0.0805
+    ],
+    [
+     "posterior/dynamics/1/m",
+     0.0802
+    ]
+   ]
+  },
+  {
+   "iter": 15,
+   "residual": 0.30475110130101163,
+   "free_energy": -27331.342882570883,
+   "top_families": [
+    [
+     "posterior/dynamics/1/psi",
+     0.30475
+    ],
+    [
+     "point/dynamics_offset",
+     0.07124
+    ],
+    [
+     "posterior/dynamics/1/m",
+     0.07111
+    ]
+   ]
+  },
+  {
+   "iter": 16,
+   "residual": 0.3971059941131518,
+   "free_energy": -27313.683667501708,
+   "top_families": [
+    [
+     "posterior/dynamics/1/psi",
+     0.39711
+    ],
+    [
+     "posterior/dynamics/2/psi",
+     0.07643
+    ],
+    [
+     "point/dynamics_offset",
+     0.05144
+    ]
+   ]
+  },
+  {
+   "iter": 17,
+   "residual": 0.40233822889319887,
+   "free_energy": -27301.48153171198,
+   "top_families": [
+    [
+     "posterior/dynamics/1/psi",
+     0.40234
+    ],
+    [
+     "posterior/dynamics/2/psi",
+     0.05509
+    ],
+    [
+     "posterior/dynamics/1/nu",
+     0.03852
+    ]
+   ]
+  },
+  {
+   "iter": 18,
+   "residual": 0.2913415672921215,
+   "free_energy": -27290.820679694723,
+   "top_families": [
+    [
+     "posterior/dynamics/1/psi",
+     0.29134
+    ],
+    [
+     "posterior/emission/psi",
+     0.03471
+    ],
+    [
+     "posterior/dynamics/1/nu",
+     0.02617
+    ]
+   ]
+  },
+  {
+   "iter": 19,
+   "residual": 0.18401504085122503,
+   "free_energy": -27277.827984537915,
+   "top_families": [
+    [
+     "posterior/dynamics/1/psi",
+     0.18402
+    ],
+    [
+     "posterior/emission/psi",
+     0.03188
+    ],
+    [
+     "posterior/dynamics/1/lam",
+     0.0177
+    ]
+   ]
+  },
+  {
+   "iter": 20,
+   "residual": 0.10435195956226301,
+   "free_energy": -27263.806303531772,
+   "top_families": [
+    [
+     "posterior/dynamics/1/psi",
+     0.10435
+    ],
+    [
+     "posterior/emission/psi",
+     0.02905
+    ],
+    [
+     "posterior/dynamics/0/psi",
+     0.0114
+    ]
+   ]
+  },
+  {
+   "iter": 21,
+   "residual": 0.054831610020484284,
+   "free_energy": -27250.154706138113,
+   "top_families": [
+    [
+     "posterior/dynamics/1/psi",
+     0.05483
+    ],
+    [
+     "posterior/emission/psi",
+     0.02637
+    ],
+    [
+     "posterior/dynamics/0/psi",
+     0.01061
+    ]
+   ]
+  },
+  {
+   "iter": 22,
+   "residual": 0.026976789214017947,
+   "free_energy": -27237.516883223303,
+   "top_families": [
+    [
+     "posterior/dynamics/1/psi",
+     0.02698
+    ],
+    [
+     "posterior/emission/psi",
+     0.02388
+    ],
+    [
+     "posterior/dynamics/0/psi",
+     0.00968
+    ]
+   ]
+  }
+ ],
+ "residual_detail": [
+  {
+   "posterior/emission/m": 0.6955555534669094,
+   "posterior/emission/lam": 0.9999999832600944,
+   "posterior/emission/psi": 0.013624784913024999,
+   "posterior/emission/nu": 0.9907120743034056,
+   "posterior/initial/alpha": 0.472711414622827,
+   "posterior/transition/alpha": 0.9972039785658018,
+   "posterior/dynamics/0/m": 1.0,
+   "posterior/dynamics/0/lam": 0.999999961467287,
+   "posterior/dynamics/0/psi": 0.9731920859711437,
+   "posterior/dynamics/0/nu": 0.9882526363529405,
+   "posterior/dynamics/1/m": 0.9900084062291725,
+   "posterior/dynamics/1/lam": 0.999999811755482,
+   "posterior/dynamics/1/psi": 0.9815421713586506,
+   "posterior/dynamics/1/nu": 0.9826112252541842,
+   "posterior/dynamics/2/m": 0.9957652015563626,
+   "posterior/dynamics/2/lam": 0.9999998881748937,
+   "posterior/dynamics/2/psi": 0.9770312829290051,
+   "posterior/dynamics/2/nu": 0.9893164972090156,
+   "posterior/dynamics/3/m": 0.988031068320476,
+   "posterior/dynamics/3/lam": 0.9999999487651512,
+   "posterior/dynamics/3/psi": 0.9712025048074708,
+   "posterior/dynamics/3/nu": 0.9885732429076844,
+   "point/initial_regime_probability": 0.02070106285927148,
+   "point/transition_matrix": 0.015792381154947965,
+   "point/dynamics_matrix": 0.03296943448723143,
+   "point/dynamics_offset": 0.12063367672253217,
+   "point/dynamics_covariance": 0.06228472295603402,
+   "point/emission_matrix": 4.83492268443797e-08,
+   "point/emission_offset": 3.817678440043437e-07,
+   "point/emission_covariance": 0.0007746374566556054
+  },
+  {
+   "posterior/emission/m": 8.786987190423368e-06,
+   "posterior/emission/lam": 1.5827525029782687e-05,
+   "posterior/emission/psi": 0.366895165651761,
+   "posterior/emission/nu": 0.0,
+   "posterior/initial/alpha": 0.016839209025634003,
+   "posterior/transition/alpha": 0.37295367197516177,
+   "posterior/dynamics/0/m": 0.06886974075299312,
+   "posterior/dynamics/0/lam": 0.01543236950497111,
+   "posterior/dynamics/0/psi": 0.47931234342526047,
+   "posterior/dynamics/0/nu": 0.013915942720028539,
+   "posterior/dynamics/1/m": 0.1286852233159138,
+   "posterior/dynamics/1/lam": 0.2744670287382981,
+   "posterior/dynamics/1/psi": 0.3941802252357819,
+   "posterior/dynamics/1/nu": 0.29771145408549465,
+   "posterior/dynamics/2/m": 0.07695837245754542,
+   "posterior/dynamics/2/lam": 0.5858188295939751,
+   "posterior/dynamics/2/psi": 0.5658812782537426,
+   "posterior/dynamics/2/nu": 0.3636222429082173,
+   "posterior/dynamics/3/m": 0.05995603985212812,
+   "posterior/dynamics/3/lam": 0.15677741520759494,
+   "posterior/dynamics/3/psi": 0.213851178831984,
+   "posterior/dynamics/3/nu": 0.11022998983349568,
+   "point/initial_regime_probability": 0.0063870940857135294,
+   "point/transition_matrix": 0.039536828668992885,
+   "point/dynamics_matrix": 0.03079156500921346,
+   "point/dynamics_offset": 0.1286852233159138,
+   "point/dynamics_covariance": 0.05170427851248523,
+   "point/emission_matrix": 3.908783306527663e-06,
+   "point/emission_offset": 8.786987190423368e-06,
+   "point/emission_covariance": 0.00045450660522860316
+  },
+  {
+   "posterior/emission/m": 3.724450199499296e-05,
+   "posterior/emission/lam": 1.751833683816434e-05,
+   "posterior/emission/psi": 0.27278981432774435,
+   "posterior/emission/nu": 0.0,
+   "posterior/initial/alpha": 0.0700734624722783,
+   "posterior/transition/alpha": 0.09981070536309784,
+   "posterior/dynamics/0/m": 0.04370849930418797,
+   "posterior/dynamics/0/lam": 0.011995591593001233,
+   "posterior/dynamics/0/psi": 0.5831931875744252,
+   "posterior/dynamics/0/nu": 0.013823769155445009,
+   "posterior/dynamics/1/m": 0.09596692846013465,
+   "posterior/dynamics/1/lam": 0.1433192466649481,
+   "posterior/dynamics/1/psi": 0.08077947978104381,
+   "posterior/dynamics/1/nu": 0.05185072074924133,
+   "posterior/dynamics/2/m": 0.06492370380077192,
+   "posterior/dynamics/2/lam": 0.1784001208329145,
+   "posterior/dynamics/2/psi": 0.2267019658653132,
+   "posterior/dynamics/2/nu": 0.13246605748895054,
+   "posterior/dynamics/3/m": 0.053525595685537705,
+   "posterior/dynamics/3/lam": 0.03519203040317989,
+   "posterior/dynamics/3/psi": 0.14057263793707367,
+   "posterior/dynamics/3/nu": 0.022226383736167473,
+   "point/initial_regime_probability": 0.026198416247418865,
+   "point/transition_matrix": 0.06980197904510077,
+   "point/dynamics_matrix": 0.020913612254441653,
+   "point/dynamics_offset": 0.09602473417338367,
+   "point/dynamics_covariance": 0.03406927398188997,
+   "point/emission_matrix": 6.166701419785259e-06,
+   "point/emission_offset": 3.724450199499296e-05,
+   "point/emission_covariance": 0.0004646932956285934
+  },
+  {
+   "posterior/emission/m": 8.224063923489844e-05,
+   "posterior/emission/lam": 3.3377653016333216e-05,
+   "posterior/emission/psi": 0.2279531665617934,
+   "posterior/emission/nu": 0.0,
+   "posterior/initial/alpha": 0.12354034820993949,
+   "posterior/transition/alpha": 0.13104850416596558,
+   "posterior/dynamics/0/m": 0.03410171634848818,
+   "posterior/dynamics/0/lam": 0.01699281143243899,
+   "posterior/dynamics/0/psi": 0.49172300506448013,
+   "posterior/dynamics/0/nu": 0.0581045672840261,
+   "posterior/dynamics/1/m": 0.018514427325426283,
+   "posterior/dynamics/1/lam": 0.10179916416705326,
+   "posterior/dynamics/1/psi": 0.040708854266193195,
+   "posterior/dynamics/1/nu": 0.053750120469411446,
+   "posterior/dynamics/2/m": 0.07101023576292549,
+   "posterior/dynamics/2/lam": 0.07885024075689247,
+   "posterior/dynamics/2/psi": 0.061714988617522115,
+   "posterior/dynamics/2/nu": 0.010785411811765122,
+   "posterior/dynamics/3/m": 0.0446690255309945,
+   "posterior/dynamics/3/lam": 0.0695831850880013,
+   "posterior/dynamics/3/psi": 0.3638327540752608,
+   "posterior/dynamics/3/nu": 0.10657036021592073,
+   "point/initial_regime_probability": 0.04295155813851709,
+   "point/transition_matrix": 0.09088537125308283,
+   "point/dynamics_matrix": 0.015225485733442299,
+   "point/dynamics_offset": 0.07220922756685233,
+   "point/dynamics_covariance": 0.027686631647703935,
+   "point/emission_matrix": 9.062290815320395e-06,
+   "point/emission_offset": 8.224063923489844e-05,
+   "point/emission_covariance": 0.0005029678666563795
+  },
+  {
+   "posterior/emission/m": 0.00015081067863087494,
+   "posterior/emission/lam": 6.005669845432943e-05,
+   "posterior/emission/psi": 0.19101274263552415,
+   "posterior/emission/nu": 0.0,
+   "posterior/initial/alpha": 0.10596284761207261,
+   "posterior/transition/alpha": 0.12010562397669884,
+   "posterior/dynamics/0/m": 0.014627650679752352,
+   "posterior/dynamics/0/lam": 0.022807053568255277,
+   "posterior/dynamics/0/psi": 0.265983045669136,
+   "posterior/dynamics/0/nu": 0.08409001227420956,
+   "posterior/dynamics/1/m": 0.017738573448757722,
+   "posterior/dynamics/1/lam": 0.03414547805927749,
+   "posterior/dynamics/1/psi": 0.026843922620199096,
+   "posterior/dynamics/1/nu": 0.009682676092400025,
+   "posterior/dynamics/2/m": 0.07975544842077735,
+   "posterior/dynamics/2/lam": 0.1480100725846177,
+   "posterior/dynamics/2/psi": 0.2306144237343174,
+   "posterior/dynamics/2/nu": 0.10587540036138998,
+   "posterior/dynamics/3/m": 0.04781195972779273,
+   "posterior/dynamics/3/lam": 0.02233576263749121,
+   "posterior/dynamics/3/psi": 0.523639097854727,
+   "posterior/dynamics/3/nu": 0.0407057496884723,
+   "point/initial_regime_probability": 0.032289078506387014,
+   "point/transition_matrix": 0.10985132300293055,
+   "point/dynamics_matrix": 0.011448311119620665,
+   "point/dynamics_offset": 0.08107209734329446,
+   "point/dynamics_covariance": 0.0344667612424607,
+   "point/emission_matrix": 3.856291936410461e-05,
+   "point/emission_offset": 0.00015081067863087494,
+   "point/emission_covariance": 0.0005209730645864491
+  },
+  {
+   "posterior/emission/m": 0.0001118780215126347,
+   "posterior/emission/lam": 8.220146667085088e-05,
+   "posterior/emission/psi": 0.1622020138995505,
+   "posterior/emission/nu": 0.0,
+   "posterior/initial/alpha": 0.18132488002773825,
+   "posterior/transition/alpha": 0.12057018040056934,
+   "posterior/dynamics/0/m": 0.005671537464639931,
+   "posterior/dynamics/0/lam": 0.009139462749311296,
+   "posterior/dynamics/0/psi": 0.05344278099025205,
+   "posterior/dynamics/0/nu": 0.06429820122175169,
+   "posterior/dynamics/1/m": 0.022761785828398884,
+   "posterior/dynamics/1/lam": 0.15767066083748338,
+   "posterior/dynamics/1/psi": 0.06213373954625913,
+   "posterior/dynamics/1/nu": 0.10743758093495132,
+   "posterior/dynamics/2/m": 0.057036490763362084,
+   "posterior/dynamics/2/lam": 0.10545220155890098,
+   "posterior/dynamics/2/psi": 0.30237638728061267,
+   "posterior/dynamics/2/nu": 0.0818796179721465,
+   "posterior/dynamics/3/m": 0.029280656117356148,
+   "posterior/dynamics/3/lam": 0.06510489645240716,
+   "posterior/dynamics/3/psi": 0.3909254203798461,
+   "posterior/dynamics/3/nu": 0.07456418869787182,
+   "point/initial_regime_probability": 0.05422043775943994,
+   "point/transition_matrix": 0.15587326998745543,
+   "point/dynamics_matrix": 0.0029817323982242834,
+   "point/dynamics_offset": 0.05789867855247223,
+   "point/dynamics_covariance": 0.02223182757036926,
+   "point/emission_matrix": 3.497496254101229e-05,
+   "point/emission_offset": 0.0001118780215126347,
+   "point/emission_covariance": 0.0005280436928000475
+  },
+  {
+   "posterior/emission/m": 5.055937165737712e-05,
+   "posterior/emission/lam": 8.230333095443167e-05,
+   "posterior/emission/psi": 0.13393964495339386,
+   "posterior/emission/nu": 0.0,
+   "posterior/initial/alpha": 0.03209812305985785,
+   "posterior/transition/alpha": 0.09907245570972886,
+   "posterior/dynamics/0/m": 0.002416319044308158,
+   "posterior/dynamics/0/lam": 0.009814076545516984,
+   "posterior/dynamics/0/psi": 0.04929213178390626,
+   "posterior/dynamics/0/nu": 0.02760327711089883,
+   "posterior/dynamics/1/m": 0.05040933227548554,
+   "posterior/dynamics/1/lam": 0.14584047872051,
+   "posterior/dynamics/1/psi": 0.08803816310950205,
+   "posterior/dynamics/1/nu": 0.13166736804392135,
+   "posterior/dynamics/2/m": 0.04357176047414454,
+   "posterior/dynamics/2/lam": 0.06890333475118672,
+   "posterior/dynamics/2/psi": 0.31599991783654385,
+   "posterior/dynamics/2/nu": 0.03639523387721612,
+   "posterior/dynamics/3/m": 0.005568110658634559,
+   "posterior/dynamics/3/lam": 0.050866771965829866,
+   "posterior/dynamics/3/psi": 0.13363319968896645,
+   "posterior/dynamics/3/nu": 0.09164255138061693,
+   "point/initial_regime_probability": 0.009916397485202733,
+   "point/transition_matrix": 0.1496915518069188,
+   "point/dynamics_matrix": 0.0045713628627937816,
+   "point/dynamics_offset": 0.050888848814185095,
+   "point/dynamics_covariance": 0.02040984045088532,
+   "point/emission_matrix": 2.0707395252950178e-05,
+   "point/emission_offset": 5.055937165737712e-05,
+   "point/emission_covariance": 0.0005034711645619228
+  },
+  {
+   "posterior/emission/m": 7.554074788884702e-05,
+   "posterior/emission/lam": 7.415991535976706e-05,
+   "posterior/emission/psi": 0.09253295065511127,
+   "posterior/emission/nu": 0.0,
+   "posterior/initial/alpha": 0.029515847455687146,
+   "posterior/transition/alpha": 0.06734214293972153,
+   "posterior/dynamics/0/m": 0.000907290608068438,
+   "posterior/dynamics/0/lam": 0.01777980476068052,
+   "posterior/dynamics/0/psi": 0.0463422260618207,
+   "posterior/dynamics/0/nu": 0.0036832326538809705,
+   "posterior/dynamics/1/m": 0.05159630226106991,
+   "posterior/dynamics/1/lam": 0.0900677971183749,
+   "posterior/dynamics/1/psi": 0.09542835295075067,
+   "posterior/dynamics/1/nu": 0.10119947033149859,
+   "posterior/dynamics/2/m": 0.02799091610938028,
+   "posterior/dynamics/2/lam": 0.09864712209453987,
+   "posterior/dynamics/2/psi": 0.23918630954506595,
+   "posterior/dynamics/2/nu": 0.018031465622358456,
+   "posterior/dynamics/3/m": 0.003411456165199451,
+   "posterior/dynamics/3/lam": 0.029699255622032444,
+   "posterior/dynamics/3/psi": 0.048834697877682146,
+   "posterior/dynamics/3/nu": 0.055870383243782754,
+   "point/initial_regime_probability": 0.009118628990778754,
+   "point/transition_matrix": 0.09112684786605724,
+   "point/dynamics_matrix": 0.004459642450164546,
+   "point/dynamics_offset": 0.052111401917267375,
+   "point/dynamics_covariance": 0.012627243552670767,
+   "point/emission_matrix": 4.478138233310336e-05,
+   "point/emission_offset": 7.554074788884702e-05,
+   "point/emission_covariance": 0.0003832931035768544
+  },
+  {
+   "posterior/emission/m": 8.091427793199824e-05,
+   "posterior/emission/lam": 9.33435943697014e-05,
+   "posterior/emission/psi": 0.0754663935572519,
+   "posterior/emission/nu": 0.0,
+   "posterior/initial/alpha": 0.034670580448332225,
+   "posterior/transition/alpha": 0.04934601011351712,
+   "posterior/dynamics/0/m": 0.0004281425660179784,
+   "posterior/dynamics/0/lam": 0.020083046543158175,
+   "posterior/dynamics/0/psi": 0.036174910935255114,
+   "posterior/dynamics/0/nu": 0.007393555750297601,
+   "posterior/dynamics/1/m": 0.04843210858066719,
+   "posterior/dynamics/1/lam": 0.06928654789463376,
+   "posterior/dynamics/1/psi": 0.09800350356308321,
+   "posterior/dynamics/1/nu": 0.07890522562452572,
+   "posterior/dynamics/2/m": 0.016046261425504735,
+   "posterior/dynamics/2/lam": 0.07197501750751184,
+   "posterior/dynamics/2/psi": 0.17878109279258173,
+   "posterior/dynamics/2/nu": 0.025099298187132104,
+   "posterior/dynamics/3/m": 0.006572430159433121,
+   "posterior/dynamics/3/lam": 0.026804868966332423,
+   "posterior/dynamics/3/psi": 0.037833221385545734,
+   "posterior/dynamics/3/nu": 0.042209285461092864,
+   "point/initial_regime_probability": 0.010449211839211325,
+   "point/transition_matrix": 0.03734556705783759,
+   "point/dynamics_matrix": 0.004229851210496299,
+   "point/dynamics_offset": 0.048915619246850006,
+   "point/dynamics_covariance": 0.0074376778079798325,
+   "point/emission_matrix": 8.091427793199824e-05,
+   "point/emission_offset": 7.132638556428539e-05,
+   "point/emission_covariance": 0.0003337654120584739
+  },
+  {
+   "posterior/emission/m": 0.00011081414956110036,
+   "posterior/emission/lam": 0.00012010682320590215,
+   "posterior/emission/psi": 0.0649177121834621,
+   "posterior/emission/nu": 0.0,
+   "posterior/initial/alpha": 0.021453415399284585,
+   "posterior/transition/alpha": 0.03822805396356616,
+   "posterior/dynamics/0/m": 0.0005218000091765184,
+   "posterior/dynamics/0/lam": 0.014455919016274311,
+   "posterior/dynamics/0/psi": 0.030278465294111177,
+   "posterior/dynamics/0/nu": 0.007291936105964137,
+   "posterior/dynamics/1/m": 0.05213026561388928,
+   "posterior/dynamics/1/lam": 0.06271288867571126,
+   "posterior/dynamics/1/psi": 0.11000244077065469,
+   "posterior/dynamics/1/nu": 0.06770324204087132,
+   "posterior/dynamics/2/m": 0.008469749591840282,
+   "posterior/dynamics/2/lam": 0.05005582079205621,
+   "posterior/dynamics/2/psi": 0.13062182622090707,
+   "posterior/dynamics/2/nu": 0.021916424752736644,
+   "posterior/dynamics/3/m": 0.006210527371715332,
+   "posterior/dynamics/3/lam": 0.020589999457257393,
+   "posterior/dynamics/3/psi": 0.03871413549425103,
+   "posterior/dynamics/3/nu": 0.03261930286662314,
+   "point/initial_regime_probability": 0.006274829046815422,
+   "point/transition_matrix": 0.018968893761817457,
+   "point/dynamics_matrix": 0.006554133836452523,
+   "point/dynamics_offset": 0.05264449748951411,
+   "point/dynamics_covariance": 0.011433125259695448,
+   "point/emission_matrix": 0.00011081414956110036,
+   "point/emission_offset": 6.157574069914906e-05,
+   "point/emission_covariance": 0.0003007019521190568
+  },
+  {
+   "posterior/emission/m": 0.0001343096029188806,
+   "posterior/emission/lam": 0.00013903761053015557,
+   "posterior/emission/psi": 0.05655973905448684,
+   "posterior/emission/nu": 0.0,
+   "posterior/initial/alpha": 0.008550103526123343,
+   "posterior/transition/alpha": 0.030847895079070698,
+   "posterior/dynamics/0/m": 0.0007521161763152856,
+   "posterior/dynamics/0/lam": 0.006651674958888017,
+   "posterior/dynamics/0/psi": 0.030270352660823552,
+   "posterior/dynamics/0/nu": 0.003731951613776754,
+   "posterior/dynamics/1/m": 0.05998164279344507,
+   "posterior/dynamics/1/lam": 0.05790183297251208,
+   "posterior/dynamics/1/psi": 0.13064152053951922,
+   "posterior/dynamics/1/nu": 0.06263310306879853,
+   "posterior/dynamics/2/m": 0.003976887788970985,
+   "posterior/dynamics/2/lam": 0.0373366102669295,
+   "posterior/dynamics/2/psi": 0.07956736836618022,
+   "posterior/dynamics/2/nu": 0.021100840009195317,
+   "posterior/dynamics/3/m": 0.004814311838381299,
+   "posterior/dynamics/3/lam": 0.012465054812212622,
+   "posterior/dynamics/3/psi": 0.03722158569347409,
+   "posterior/dynamics/3/nu": 0.024155275778678466,
+   "point/initial_regime_probability": 0.0024841349205236285,
+   "point/transition_matrix": 0.01634827483358081,
+   "point/dynamics_matrix": 0.009085830595669015,
+   "point/dynamics_offset": 0.06052236052687254,
+   "point/dynamics_covariance": 0.017453185046328562,
+   "point/emission_matrix": 0.0001343096029188806,
+   "point/emission_offset": 6.565928857801828e-05,
+   "point/emission_covariance": 0.00027110974580819413
+  },
+  {
+   "posterior/emission/m": 0.00015125026477080805,
+   "posterior/emission/lam": 0.0001538730869553483,
+   "posterior/emission/psi": 0.05019516531239417,
+   "posterior/emission/nu": 0.0,
+   "posterior/initial/alpha": 0.002359240053664976,
+   "posterior/transition/alpha": 0.025289337879991807,
+   "posterior/dynamics/0/m": 0.0009654677807181665,
+   "posterior/dynamics/0/lam": 0.0022633436918867026,
+   "posterior/dynamics/0/psi": 0.028077679863342572,
+   "posterior/dynamics/0/nu": 0.0016403254256590087,
+   "posterior/dynamics/1/m": 0.06965483084161567,
+   "posterior/dynamics/1/lam": 0.05515372568987297,
+   "posterior/dynamics/1/psi": 0.15834041463283424,
+   "posterior/dynamics/1/nu": 0.05921667587083489,
+   "posterior/dynamics/2/m": 0.0031197924071101825,
+   "posterior/dynamics/2/lam": 0.028319710964367494,
+   "posterior/dynamics/2/psi": 0.03984918136565811,
+   "posterior/dynamics/2/nu": 0.019481432567127914,
+   "posterior/dynamics/3/m": 0.0033833994839199528,
+   "posterior/dynamics/3/lam": 0.008249698764844075,
+   "posterior/dynamics/3/psi": 0.03673155793959776,
+   "posterior/dynamics/3/nu": 0.019103268284731197,
+   "point/initial_regime_probability": 0.0006863892158079921,
+   "point/transition_matrix": 0.013843740852748004,
+   "point/dynamics_matrix": 0.011543752772123007,
+   "point/dynamics_offset": 0.07018295244604988,
+   "point/dynamics_covariance": 0.023507096079184664,
+   "point/emission_matrix": 0.00015125026477080805,
+   "point/emission_offset": 7.91629805895755e-05,
+   "point/emission_covariance": 0.0002472194254137215
+  },
+  {
+   "posterior/emission/m": 0.00016279454467943433,
+   "posterior/emission/lam": 0.0001662149154011189,
+   "posterior/emission/psi": 0.04555376144017862,
+   "posterior/emission/nu": 0.0,
+   "posterior/initial/alpha": 0.002823279857773986,
+   "posterior/transition/alpha": 0.020813103278648926,
+   "posterior/dynamics/0/m": 0.0010966740716591356,
+   "posterior/dynamics/0/lam": 0.0014612351050228155,
+   "posterior/dynamics/0/psi": 0.024882490697720177,
+   "posterior/dynamics/0/nu": 0.001133177092843543,
+   "posterior/dynamics/1/m": 0.07801548774510718,
+   "posterior/dynamics/1/lam": 0.05371152081825255,
+   "posterior/dynamics/1/psi": 0.1946913347794214,
+   "posterior/dynamics/1/nu": 0.05477157116632029,
+   "posterior/dynamics/2/m": 0.0025922874525036144,
+   "posterior/dynamics/2/lam": 0.021737561512693446,
+   "posterior/dynamics/2/psi": 0.03132940035534683,
+   "posterior/dynamics/2/nu": 0.01662430961679613,
+   "posterior/dynamics/3/m": 0.0022147098313359923,
+   "posterior/dynamics/3/lam": 0.007089451613985056,
+   "posterior/dynamics/3/psi": 0.03625286207311426,
+   "posterior/dynamics/3/nu": 0.016118189505298853,
+   "point/initial_regime_probability": 0.0008213953660940465,
+   "point/transition_matrix": 0.011856587688804987,
+   "point/dynamics_matrix": 0.01321205755441932,
+   "point/dynamics_offset": 0.07846337947498105,
+   "point/dynamics_covariance": 0.02954609360938587,
+   "point/emission_matrix": 0.00016279454467943433,
+   "point/emission_offset": 9.22587101013228e-05,
+   "point/emission_covariance": 0.00022963107844997405
+  },
+  {
+   "posterior/emission/m": 0.00017060470456004007,
+   "posterior/emission/lam": 0.00017638572060708248,
+   "posterior/emission/psi": 0.04240474212102472,
+   "posterior/emission/nu": 0.0,
+   "posterior/initial/alpha": 0.0036011475888068608,
+   "posterior/transition/alpha": 0.017698508330967443,
+   "posterior/dynamics/0/m": 0.0011386003418074248,
+   "posterior/dynamics/0/lam": 0.0011470640446705157,
+   "posterior/dynamics/0/psi": 0.021580978690728947,
+   "posterior/dynamics/0/nu": 0.0015562439161754785,
+   "posterior/dynamics/1/m": 0.08020105708623902,
+   "posterior/dynamics/1/lam": 0.04955196712778298,
+   "posterior/dynamics/1/psi": 0.2409563956768395,
+   "posterior/dynamics/1/nu": 0.049043468176244505,
+   "posterior/dynamics/2/m": 0.002454771540924366,
+   "posterior/dynamics/2/lam": 0.0167882940435093,
+   "posterior/dynamics/2/psi": 0.038523784993529646,
+   "posterior/dynamics/2/nu": 0.01417304782693616,
+   "posterior/dynamics/3/m": 0.0019340841604196855,
+   "posterior/dynamics/3/lam": 0.006832614768659932,
+   "posterior/dynamics/3/psi": 0.03399610561367554,
+   "posterior/dynamics/3/nu": 0.013842808820466092,
+   "point/initial_regime_probability": 0.0010461675563047668,
+   "point/transition_matrix": 0.011296625811071603,
+   "point/dynamics_matrix": 0.012764297697403934,
+   "point/dynamics_offset": 0.08049698259885663,
+   "point/dynamics_covariance": 0.03431839300962655,
+   "point/emission_matrix": 0.00017060470456004007,
+   "point/emission_offset": 9.717340767179117e-05,
+   "point/emission_covariance": 0.00021841908933916462
+  },
+  {
+   "posterior/emission/m": 0.0001765400689431318,
+   "posterior/emission/lam": 0.00018473958257330636,
+   "posterior/emission/psi": 0.04041722621253848,
+   "posterior/emission/nu": 0.0,
+   "posterior/initial/alpha": 0.0034397262103301675,
+   "posterior/transition/alpha": 0.016806965441777,
+   "posterior/dynamics/0/m": 0.001110332236222058,
+   "posterior/dynamics/0/lam": 0.002046788309710694,
+   "posterior/dynamics/0/psi": 0.018513804189579226,
+   "posterior/dynamics/0/nu": 0.0024898289461338366,
+   "posterior/dynamics/1/m": 0.07111301812033843,
+   "posterior/dynamics/1/lam": 0.040280368838226596,
+   "posterior/dynamics/1/psi": 0.30475110130101163,
+   "posterior/dynamics/1/nu": 0.045102403411818655,
+   "posterior/dynamics/2/m": 0.0032868129044381577,
+   "posterior/dynamics/2/lam": 0.013545963812477213,
+   "posterior/dynamics/2/psi": 0.05530632633288362,
+   "posterior/dynamics/2/nu": 0.015265898924684487,
+   "posterior/dynamics/3/m": 0.001727801433087222,
+   "posterior/dynamics/3/lam": 0.006243545952711163,
+   "posterior/dynamics/3/psi": 0.027644754861740187,
+   "posterior/dynamics/3/nu": 0.011748324822903115,
+   "point/initial_regime_probability": 0.0009971256995675026,
+   "point/transition_matrix": 0.013129690166114538,
+   "point/dynamics_matrix": 0.008462333634155068,
+   "point/dynamics_offset": 0.07123514127112252,
+   "point/dynamics_covariance": 0.0369078534143477,
+   "point/emission_matrix": 0.0001765400689431318,
+   "point/emission_offset": 9.944810416218086e-05,
+   "point/emission_covariance": 0.0002127889818160384
+  },
+  {
+   "posterior/emission/m": 0.00018095803013817857,
+   "posterior/emission/lam": 0.00019025616101744732,
+   "posterior/emission/psi": 0.03884710058377429,
+   "posterior/emission/nu": 0.0,
+   "posterior/initial/alpha": 0.00344594967442766,
+   "posterior/transition/alpha": 0.01883995299113398,
+   "posterior/dynamics/0/m": 0.0010301059614975508,
+   "posterior/dynamics/0/lam": 0.0031107204574913282,
+   "posterior/dynamics/0/psi": 0.01615072706962467,
+   "posterior/dynamics/0/nu": 0.0034094059790901647,
+   "posterior/dynamics/1/m": 0.051417513405109895,
+   "posterior/dynamics/1/lam": 0.029179131809755017,
+   "posterior/dynamics/1/psi": 0.3971059941131518,
+   "posterior/dynamics/1/nu": 0.045144091347591925,
+   "posterior/dynamics/2/m": 0.004738548572175928,
+   "posterior/dynamics/2/lam": 0.018329305427541007,
+   "posterior/dynamics/2/psi": 0.07643253831220956,
+   "posterior/dynamics/2/nu": 0.018014551949277206,
+   "posterior/dynamics/3/m": 0.0012046745983399234,
+   "posterior/dynamics/3/lam": 0.005719909638917418,
+   "posterior/dynamics/3/psi": 0.017788866722335955,
+   "posterior/dynamics/3/nu": 0.01055122483333698,
+   "point/initial_regime_probability": 0.0009968354593441475,
+   "point/transition_matrix": 0.021539252406319265,
+   "point/dynamics_matrix": 0.004451227007600979,
+   "point/dynamics_offset": 0.05143717826528149,
+   "point/dynamics_covariance": 0.03642761724855728,
+   "point/emission_matrix": 0.00018095803013817857,
+   "point/emission_offset": 0.00010341336761504616,
+   "point/emission_covariance": 0.0002099114288428511
+  },
+  {
+   "posterior/emission/m": 0.0001875272749537471,
+   "posterior/emission/lam": 0.00019133555819658368,
+   "posterior/emission/psi": 0.037028535789305615,
+   "posterior/emission/nu": 0.0,
+   "posterior/initial/alpha": 0.003996646721811527,
+   "posterior/transition/alpha": 0.017407811496872164,
+   "posterior/dynamics/0/m": 0.0009616126864076599,
+   "posterior/dynamics/0/lam": 0.004286809682725587,
+   "posterior/dynamics/0/psi": 0.01404124334271836,
+   "posterior/dynamics/0/nu": 0.004138913553434237,
+   "posterior/dynamics/1/m": 0.031812409653285814,
+   "posterior/dynamics/1/lam": 0.029787089868106867,
+   "posterior/dynamics/1/psi": 0.40233822889319887,
+   "posterior/dynamics/1/nu": 0.03852063411638103,
+   "posterior/dynamics/2/m": 0.003209204138408416,
+   "posterior/dynamics/2/lam": 0.010124545294726991,
+   "posterior/dynamics/2/psi": 0.05508924271242807,
+   "posterior/dynamics/2/nu": 0.009189877082930677,
+   "posterior/dynamics/3/m": 0.0007453090150407203,
+   "posterior/dynamics/3/lam": 0.006500560690112922,
+   "posterior/dynamics/3/psi": 0.009504121966503737,
+   "posterior/dynamics/3/nu": 0.011619891556892078,
+   "point/initial_regime_probability": 0.0011586455981995591,
+   "point/transition_matrix": 0.025306353911773827,
+   "point/dynamics_matrix": 0.003354255034989915,
+   "point/dynamics_offset": 0.03183207709783731,
+   "point/dynamics_covariance": 0.02361129481176727,
+   "point/emission_matrix": 0.0001875272749537471,
+   "point/emission_offset": 0.00010254736844877987,
+   "point/emission_covariance": 0.0002077784949418883
+  },
+  {
+   "posterior/emission/m": 0.00019557111154216988,
+   "posterior/emission/lam": 0.000192324647883281,
+   "posterior/emission/psi": 0.034713165378772795,
+   "posterior/emission/nu": 0.0,
+   "posterior/initial/alpha": 0.004044944982218455,
+   "posterior/transition/alpha": 0.012067955554291247,
+   "posterior/dynamics/0/m": 0.0008103579607915282,
+   "posterior/dynamics/0/lam": 0.005114727285495171,
+   "posterior/dynamics/0/psi": 0.012597512941012324,
+   "posterior/dynamics/0/nu": 0.004650278396818431,
+   "posterior/dynamics/1/m": 0.01645645164631624,
+   "posterior/dynamics/1/lam": 0.026109359830639584,
+   "posterior/dynamics/1/psi": 0.2913415672921215,
+   "posterior/dynamics/1/nu": 0.026174470899800618,
+   "posterior/dynamics/2/m": 0.0010560187794565355,
+   "posterior/dynamics/2/lam": 0.002371842853985835,
+   "posterior/dynamics/2/psi": 0.025757524537522326,
+   "posterior/dynamics/2/nu": 0.0008965793987110835,
+   "posterior/dynamics/3/m": 0.0013809977966731802,
+   "posterior/dynamics/3/lam": 0.006268783861138168,
+   "posterior/dynamics/3/psi": 0.009371310118507451,
+   "posterior/dynamics/3/nu": 0.011630194455767863,
+   "point/initial_regime_probability": 0.001176421036762354,
+   "point/transition_matrix": 0.02001952366100823,
+   "point/dynamics_matrix": 0.0025696905377502774,
+   "point/dynamics_offset": 0.016473244310046264,
+   "point/dynamics_covariance": 0.010561608392636094,
+   "point/emission_matrix": 0.00019557111154216988,
+   "point/emission_offset": 0.00010614148507659404,
+   "point/emission_covariance": 0.000201791045893112
+  },
+  {
+   "posterior/emission/m": 0.00020006291486213135,
+   "posterior/emission/lam": 0.0001938586920512114,
+   "posterior/emission/psi": 0.03188033556167889,
+   "posterior/emission/nu": 0.0,
+   "posterior/initial/alpha": 0.002370322367372601,
+   "posterior/transition/alpha": 0.008212012481725095,
+   "posterior/dynamics/0/m": 0.0006362593555914351,
+   "posterior/dynamics/0/lam": 0.0048384743681177764,
+   "posterior/dynamics/0/psi": 0.012018238655613517,
+   "posterior/dynamics/0/nu": 0.004374664545488944,
+   "posterior/dynamics/1/m": 0.007933487926114789,
+   "posterior/dynamics/1/lam": 0.017697104624680608,
+   "posterior/dynamics/1/psi": 0.18401504085122503,
+   "posterior/dynamics/1/nu": 0.014705135108361253,
+   "posterior/dynamics/2/m": 0.0009660210775438395,
+   "posterior/dynamics/2/lam": 0.0017910729252171762,
+   "posterior/dynamics/2/psi": 0.014009653602602333,
+   "posterior/dynamics/2/nu": 0.003975536351479344,
+   "posterior/dynamics/3/m": 0.001447844075806175,
+   "posterior/dynamics/3/lam": 0.004934660473535171,
+   "posterior/dynamics/3/psi": 0.0085684502985233,
+   "posterior/dynamics/3/nu": 0.009027445670763327,
+   "point/initial_regime_probability": 0.0006905015782445179,
+   "point/transition_matrix": 0.012271270522477895,
+   "point/dynamics_matrix": 0.002252150196558764,
+   "point/dynamics_offset": 0.00794475653419413,
+   "point/dynamics_covariance": 0.004850243422749343,
+   "point/emission_matrix": 0.00020006291486213135,
+   "point/emission_offset": 0.00011676788195302823,
+   "point/emission_covariance": 0.00019142626086632916
+  },
+  {
+   "posterior/emission/m": 0.00020286368412686384,
+   "posterior/emission/lam": 0.00019548566401130006,
+   "posterior/emission/psi": 0.029053245249140946,
+   "posterior/emission/nu": 0.0,
+   "posterior/initial/alpha": 0.0008210385681218941,
+   "posterior/transition/alpha": 0.00633583772553762,
+   "posterior/dynamics/0/m": 0.0006143232231279146,
+   "posterior/dynamics/0/lam": 0.0041224262539275,
+   "posterior/dynamics/0/psi": 0.011400816006303523,
+   "posterior/dynamics/0/nu": 0.003769813870284104,
+   "posterior/dynamics/1/m": 0.004130528163931063,
+   "posterior/dynamics/1/lam": 0.010472308962329369,
+   "posterior/dynamics/1/psi": 0.10435195956226301,
+   "posterior/dynamics/1/nu": 0.008292643258140274,
+   "posterior/dynamics/2/m": 0.0011239981052736986,
+   "posterior/dynamics/2/lam": 0.0021505194383478524,
+   "posterior/dynamics/2/psi": 0.009286625828583648,
+   "posterior/dynamics/2/nu": 0.004955551188455217,
+   "posterior/dynamics/3/m": 0.0012710720013026588,
+   "posterior/dynamics/3/lam": 0.00396841396559309,
+   "posterior/dynamics/3/psi": 0.007688108680140698,
+   "posterior/dynamics/3/nu": 0.00701741769358085,
+   "point/initial_regime_probability": 0.0002392740428218687,
+   "point/transition_matrix": 0.007131279521076506,
+   "point/dynamics_matrix": 0.0016388490131034978,
+   "point/dynamics_offset": 0.00413758543014231,
+   "point/dynamics_covariance": 0.002264223415541746,
+   "point/emission_matrix": 0.00020286368412686384,
+   "point/emission_offset": 0.00012704780839045693,
+   "point/emission_covariance": 0.00017967095160601777
+  },
+  {
+   "posterior/emission/m": 0.00020525294297679686,
+   "posterior/emission/lam": 0.00019715718420499384,
+   "posterior/emission/psi": 0.026371977030105898,
+   "posterior/emission/nu": 0.0,
+   "posterior/initial/alpha": 0.00030366232829860137,
+   "posterior/transition/alpha": 0.005215081231175798,
+   "posterior/dynamics/0/m": 0.0006028225920753152,
+   "posterior/dynamics/0/lam": 0.003409354423397882,
+   "posterior/dynamics/0/psi": 0.01060545764712046,
+   "posterior/dynamics/0/nu": 0.003163657222995688,
+   "posterior/dynamics/1/m": 0.00227982548736455,
+   "posterior/dynamics/1/lam": 0.006277442795660201,
+   "posterior/dynamics/1/psi": 0.054831610020484284,
+   "posterior/dynamics/1/nu": 0.005056733367692798,
+   "posterior/dynamics/2/m": 0.0012356954664876267,
+   "posterior/dynamics/2/lam": 0.002714693706161132,
+   "posterior/dynamics/2/psi": 0.006890163732306688,
+   "posterior/dynamics/2/nu": 0.005506091566559117,
+   "posterior/dynamics/3/m": 0.0010523175491364057,
+   "posterior/dynamics/3/lam": 0.0033570487461361846,
+   "posterior/dynamics/3/psi": 0.00708646450040134,
+   "posterior/dynamics/3/nu": 0.005797961857990364,
+   "point/initial_regime_probability": 8.849585849657338e-05,
+   "point/transition_matrix": 0.0050878409876852215,
+   "point/dynamics_matrix": 0.001137625209868446,
+   "point/dynamics_offset": 0.002284136024900296,
+   "point/dynamics_covariance": 0.001056158360876698,
+   "point/emission_matrix": 0.00020525294297679686,
+   "point/emission_offset": 0.00013523901231027313,
+   "point/emission_covariance": 0.00016750695401126971
+  },
+  {
+   "posterior/emission/m": 0.00020768661866621407,
+   "posterior/emission/lam": 0.00019879490784711974,
+   "posterior/emission/psi": 0.02388486577658934,
+   "posterior/emission/nu": 0.0,
+   "posterior/initial/alpha": 0.0006883907992327111,
+   "posterior/transition/alpha": 0.004521103112926563,
+   "posterior/dynamics/0/m": 0.0005548137141331196,
+   "posterior/dynamics/0/lam": 0.002809671523011228,
+   "posterior/dynamics/0/psi": 0.009684247589528823,
+   "posterior/dynamics/0/nu": 0.002652898209160893,
+   "posterior/dynamics/1/m": 0.001284543015933026,
+   "posterior/dynamics/1/lam": 0.003894506529969995,
+   "posterior/dynamics/1/psi": 0.026976789214017947,
+   "posterior/dynamics/1/nu": 0.003332341612182793,
+   "posterior/dynamics/2/m": 0.001266340600659909,
+   "posterior/dynamics/2/lam": 0.0029753965269359813,
+   "posterior/dynamics/2/psi": 0.005452654521302448,
+   "posterior/dynamics/2/nu": 0.0059037160578704045,
+   "posterior/dynamics/3/m": 0.0008588143626075534,
+   "posterior/dynamics/3/lam": 0.0029625573938902782,
+   "posterior/dynamics/3/psi": 0.006638047748001179,
+   "posterior/dynamics/3/nu": 0.005035427857588169,
+   "point/initial_regime_probability": 0.00020055578204891678,
+   "point/transition_matrix": 0.003991119665395171,
+   "point/dynamics_matrix": 0.0007717417642991733,
+   "point/dynamics_offset": 0.0012871118136351667,
+   "point/dynamics_covariance": 0.00047578072537154265,
+   "point/emission_matrix": 0.00020768661866621407,
+   "point/emission_offset": 0.00014158748998421844,
+   "point/emission_covariance": 0.00015542179172982167
+  }
+ ]
+}

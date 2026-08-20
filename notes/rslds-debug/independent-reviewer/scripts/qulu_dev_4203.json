@@ -1,0 +1,503 @@
+{
+ "data_seed": 4203,
+ "max_outer": 48,
+ "status": "RunStatus.CONVERGED",
+ "iterations": 12,
+ "residual": 0.0919766177201897,
+ "rows": [
+  {
+   "iter": 1,
+   "residual": 1.0,
+   "free_energy": -43601.49416681646,
+   "top_families": [
+    [
+     "posterior/v2:dynamics:m",
+     1.0
+    ],
+    [
+     "posterior/v2:emission:m",
+     1.0
+    ],
+    [
+     "posterior/v2:recurrence:eta",
+     1.0
+    ]
+   ]
+  },
+  {
+   "iter": 2,
+   "residual": 0.46881432823674496,
+   "free_energy": -26826.268978966113,
+   "top_families": [
+    [
+     "posterior/v2:initial_regime:alpha",
+     0.46881
+    ],
+    [
+     "point/recurrence_offsets",
+     0.36046
+    ],
+    [
+     "posterior/v2:emission:psi",
+     0.2884
+    ]
+   ]
+  },
+  {
+   "iter": 3,
+   "residual": 0.39335767387609283,
+   "free_energy": -27219.634730875176,
+   "top_families": [
+    [
+     "posterior/v2:dynamics:psi",
+     0.39336
+    ],
+    [
+     "posterior/v2:emission:psi",
+     0.22341
+    ],
+    [
+     "point/recurrence_offsets",
+     0.14534
+    ]
+   ]
+  },
+  {
+   "iter": 4,
+   "residual": 0.2884504652133247,
+   "free_energy": -27395.935072036827,
+   "top_families": [
+    [
+     "posterior/v2:dynamics:psi",
+     0.28845
+    ],
+    [
+     "posterior/v2:emission:psi",
+     0.1854
+    ],
+    [
+     "point/recurrence_weights",
+     0.16295
+    ]
+   ]
+  },
+  {
+   "iter": 5,
+   "residual": 0.19430512926021246,
+   "free_energy": -27561.215131801684,
+   "top_families": [
+    [
+     "point/recurrence_offsets",
+     0.19431
+    ],
+    [
+     "posterior/v2:dynamics:psi",
+     0.18638
+    ],
+    [
+     "posterior/v2:emission:psi",
+     0.17221
+    ]
+   ]
+  },
+  {
+   "iter": 6,
+   "residual": 0.238710803428754,
+   "free_energy": -27709.942691778782,
+   "top_families": [
+    [
+     "point/recurrence_offsets",
+     0.23871
+    ],
+    [
+     "posterior/v2:emission:psi",
+     0.15672
+    ],
+    [
+     "posterior/v2:dynamics:psi",
+     0.15559
+    ]
+   ]
+  },
+  {
+   "iter": 7,
+   "residual": 0.19194289942482895,
+   "free_energy": -27813.386957733146,
+   "top_families": [
+    [
+     "point/recurrence_offsets",
+     0.19194
+    ],
+    [
+     "posterior/v2:emission:psi",
+     0.12264
+    ],
+    [
+     "posterior/v2:dynamics:psi",
+     0.11713
+    ]
+   ]
+  },
+  {
+   "iter": 8,
+   "residual": 0.1357195691586803,
+   "free_energy": -27851.590663856325,
+   "top_families": [
+    [
+     "point/recurrence_offsets",
+     0.13572
+    ],
+    [
+     "posterior/v2:emission:psi",
+     0.09622
+    ],
+    [
+     "posterior/v2:dynamics:psi",
+     0.08301
+    ]
+   ]
+  },
+  {
+   "iter": 9,
+   "residual": 0.09843196306928198,
+   "free_energy": -27856.198769796032,
+   "top_families": [
+    [
+     "point/recurrence_offsets",
+     0.09843
+    ],
+    [
+     "point/recurrence_weights",
+     0.08419
+    ],
+    [
+     "posterior/v2:emission:psi",
+     0.07522
+    ]
+   ]
+  },
+  {
+   "iter": 10,
+   "residual": 0.3382766926944549,
+   "free_energy": -27851.262815412272,
+   "top_families": [
+    [
+     "posterior/v2:initial_regime:alpha",
+     0.33828
+    ],
+    [
+     "point/initial_regime_probability",
+     0.10912
+    ],
+    [
+     "posterior/v2:dynamics:psi",
+     0.09931
+    ]
+   ]
+  },
+  {
+   "iter": 11,
+   "residual": 0.08835757618341189,
+   "free_energy": -27854.530849355047,
+   "top_families": [
+    [
+     "posterior/v2:initial_regime:alpha",
+     0.08836
+    ],
+    [
+     "point/recurrence_offsets",
+     0.06471
+    ],
+    [
+     "posterior/v2:dynamics:psi",
+     0.05834
+    ]
+   ]
+  },
+  {
+   "iter": 12,
+   "residual": 0.0919766177201897,
+   "free_energy": -27858.826011567784,
+   "top_families": [
+    [
+     "point/recurrence_offsets",
+     0.09198
+    ],
+    [
+     "point/recurrence_weights",
+     0.04794
+    ],
+    [
+     "posterior/v2:recurrence:precision",
+     0.04458
+    ]
+   ]
+  }
+ ],
+ "residual_detail": [
+  {
+   "posterior/v2:dynamics:m": 1.0,
+   "posterior/v2:dynamics:lam": 0.9999999741462023,
+   "posterior/v2:dynamics:psi": 0.9805495409915664,
+   "posterior/v2:dynamics:nu": 0.9928131775916235,
+   "posterior/v2:emission:m": 1.0,
+   "posterior/v2:emission:lam": 0.9999999879884718,
+   "posterior/v2:emission:psi": 0.013677844414639796,
+   "posterior/v2:emission:nu": 0.9907120743034056,
+   "posterior/v2:initial_regime:alpha": 0.4924020772075914,
+   "posterior/v2:recurrence:eta": 1.0,
+   "posterior/v2:recurrence:precision": 0.9999998253328768,
+   "point/initial_regime_probability": 0.005987355307217002,
+   "point/dynamics_matrix": 0.06344888266056975,
+   "point/dynamics_offset": 0.3791414710913734,
+   "point/dynamics_covariance": 0.057788414858072665,
+   "point/recurrence_weights": 0.27793641470954694,
+   "point/recurrence_offsets": 0.4600463126871452,
+   "point/emission_matrix": 7.745402264003332e-08,
+   "point/emission_offset": 8.440820711620258e-07,
+   "point/emission_covariance": 0.0007748056559670663
+  },
+  {
+   "posterior/v2:dynamics:m": 0.16502588261256537,
+   "posterior/v2:dynamics:lam": 0.05936761655525863,
+   "posterior/v2:dynamics:psi": 0.2302481205670543,
+   "posterior/v2:dynamics:nu": 0.20523119311988047,
+   "posterior/v2:emission:m": 1.1112919567659257e-05,
+   "posterior/v2:emission:lam": 1.3341532967706086e-05,
+   "posterior/v2:emission:psi": 0.2884040248979069,
+   "posterior/v2:emission:nu": 0.0,
+   "posterior/v2:initial_regime:alpha": 0.46881432823674496,
+   "posterior/v2:recurrence:eta": 0.14981855813096648,
+   "posterior/v2:recurrence:precision": 0.06696110474035333,
+   "point/initial_regime_probability": 0.18471877333843034,
+   "point/dynamics_matrix": 0.03169565499216469,
+   "point/dynamics_offset": 0.17173923188795964,
+   "point/dynamics_covariance": 0.057695800608218606,
+   "point/recurrence_weights": 0.17622868280239162,
+   "point/recurrence_offsets": 0.36046044598549454,
+   "point/emission_matrix": 2.5603545139585293e-06,
+   "point/emission_offset": 1.1112919567659257e-05,
+   "point/emission_covariance": 0.00031804350550339994
+  },
+  {
+   "posterior/v2:dynamics:m": 0.06315107862021536,
+   "posterior/v2:dynamics:lam": 0.03629111009011266,
+   "posterior/v2:dynamics:psi": 0.39335767387609283,
+   "posterior/v2:dynamics:nu": 0.03655650871903479,
+   "posterior/v2:emission:m": 1.934203325729164e-05,
+   "posterior/v2:emission:lam": 2.2532896532397458e-05,
+   "posterior/v2:emission:psi": 0.22340995391520993,
+   "posterior/v2:emission:nu": 0.0,
+   "posterior/v2:initial_regime:alpha": 0.01538622083826374,
+   "posterior/v2:recurrence:eta": 0.07362246135098204,
+   "posterior/v2:recurrence:precision": 0.07373201034997448,
+   "point/initial_regime_probability": 0.005753474380841561,
+   "point/dynamics_matrix": 0.012407351913766821,
+   "point/dynamics_offset": 0.06613056366689096,
+   "point/dynamics_covariance": 0.03810501040819155,
+   "point/recurrence_weights": 0.11953515496299646,
+   "point/recurrence_offsets": 0.1453400685857195,
+   "point/emission_matrix": 4.1039613392634955e-06,
+   "point/emission_offset": 1.934203325729164e-05,
+   "point/emission_covariance": 0.00031724582390568507
+  },
+  {
+   "posterior/v2:dynamics:m": 0.04548907153621136,
+   "posterior/v2:dynamics:lam": 0.027846076609446758,
+   "posterior/v2:dynamics:psi": 0.2884504652133247,
+   "posterior/v2:dynamics:nu": 0.022630043594122795,
+   "posterior/v2:emission:m": 4.746767211903419e-05,
+   "posterior/v2:emission:lam": 2.5846062561881673e-05,
+   "posterior/v2:emission:psi": 0.18540131550549505,
+   "posterior/v2:emission:nu": 0.0,
+   "posterior/v2:initial_regime:alpha": 0.05414929026320413,
+   "posterior/v2:recurrence:eta": 0.07793243101193674,
+   "posterior/v2:recurrence:precision": 0.04956006443332605,
+   "point/initial_regime_probability": 0.019937633026508028,
+   "point/dynamics_matrix": 0.008141283412343835,
+   "point/dynamics_offset": 0.047970594324862725,
+   "point/dynamics_covariance": 0.030486194433861958,
+   "point/recurrence_weights": 0.16294930546713726,
+   "point/recurrence_offsets": 0.15585478068641204,
+   "point/emission_matrix": 6.681885529769005e-06,
+   "point/emission_offset": 4.746767211903419e-05,
+   "point/emission_covariance": 0.0003231934137733299
+  },
+  {
+   "posterior/v2:dynamics:m": 0.06181031636405344,
+   "posterior/v2:dynamics:lam": 0.01667400364751052,
+   "posterior/v2:dynamics:psi": 0.1863816342361594,
+   "posterior/v2:dynamics:nu": 0.03639854942035919,
+   "posterior/v2:emission:m": 4.7637542393051755e-05,
+   "posterior/v2:emission:lam": 3.0157194014968207e-05,
+   "posterior/v2:emission:psi": 0.17220980984668002,
+   "posterior/v2:emission:nu": 0.0,
+   "posterior/v2:initial_regime:alpha": 0.062082282708584256,
+   "posterior/v2:recurrence:eta": 0.07952277999350725,
+   "posterior/v2:recurrence:precision": 0.06560016644461156,
+   "point/initial_regime_probability": 0.02162076720200995,
+   "point/dynamics_matrix": 0.014103238340749783,
+   "point/dynamics_offset": 0.06538880592690022,
+   "point/dynamics_covariance": 0.010196567438361047,
+   "point/recurrence_weights": 0.11645714595767453,
+   "point/recurrence_offsets": 0.19430512926021246,
+   "point/emission_matrix": 1.36467727872569e-05,
+   "point/emission_offset": 4.7637542393051755e-05,
+   "point/emission_covariance": 0.00036207022053911684
+  },
+  {
+   "posterior/v2:dynamics:m": 0.07840797185955119,
+   "posterior/v2:dynamics:lam": 0.016660547206529566,
+   "posterior/v2:dynamics:psi": 0.15558978499468407,
+   "posterior/v2:dynamics:nu": 0.02586861125886883,
+   "posterior/v2:emission:m": 5.265936644177996e-05,
+   "posterior/v2:emission:lam": 2.8153704613199042e-05,
+   "posterior/v2:emission:psi": 0.15672301058238566,
+   "posterior/v2:emission:nu": 0.0,
+   "posterior/v2:initial_regime:alpha": 0.06438160163661019,
+   "posterior/v2:recurrence:eta": 0.04875942273266252,
+   "posterior/v2:recurrence:precision": 0.043232491108386215,
+   "point/initial_regime_probability": 0.02102954807325147,
+   "point/dynamics_matrix": 0.02055085008886792,
+   "point/dynamics_offset": 0.08336656277337451,
+   "point/dynamics_covariance": 0.02476391853221066,
+   "point/recurrence_weights": 0.10787611871817454,
+   "point/recurrence_offsets": 0.238710803428754,
+   "point/emission_matrix": 1.4610824908251052e-05,
+   "point/emission_offset": 5.265936644177996e-05,
+   "point/emission_covariance": 0.000388589702687295
+  },
+  {
+   "posterior/v2:dynamics:m": 0.07195744316224527,
+   "posterior/v2:dynamics:lam": 0.022116076956070426,
+   "posterior/v2:dynamics:psi": 0.1171252140618492,
+   "posterior/v2:dynamics:nu": 0.028288485433623816,
+   "posterior/v2:emission:m": 5.688759417701441e-05,
+   "posterior/v2:emission:lam": 1.9922260455523373e-05,
+   "posterior/v2:emission:psi": 0.12264163482113621,
+   "posterior/v2:emission:nu": 0.0,
+   "posterior/v2:initial_regime:alpha": 0.05477068482680836,
+   "posterior/v2:recurrence:eta": 0.053300510748306856,
+   "posterior/v2:recurrence:precision": 0.05022833999371042,
+   "point/initial_regime_probability": 0.016738444157790022,
+   "point/dynamics_matrix": 0.017540657057553043,
+   "point/dynamics_offset": 0.07704116886364254,
+   "point/dynamics_covariance": 0.028964232929595206,
+   "point/recurrence_weights": 0.07951107596635582,
+   "point/recurrence_offsets": 0.19194289942482895,
+   "point/emission_matrix": 1.9489513498616162e-05,
+   "point/emission_offset": 5.688759417701441e-05,
+   "point/emission_covariance": 0.00034627327321216364
+  },
+  {
+   "posterior/v2:dynamics:m": 0.05958779226651083,
+   "posterior/v2:dynamics:lam": 0.020717778848082256,
+   "posterior/v2:dynamics:psi": 0.08301459151724977,
+   "posterior/v2:dynamics:nu": 0.03585319247888134,
+   "posterior/v2:emission:m": 3.767734273228574e-05,
+   "posterior/v2:emission:lam": 2.664605709552655e-05,
+   "posterior/v2:emission:psi": 0.09622242577572789,
+   "posterior/v2:emission:nu": 0.0,
+   "posterior/v2:initial_regime:alpha": 0.03441481428954027,
+   "posterior/v2:recurrence:eta": 0.05766713269545636,
+   "posterior/v2:recurrence:precision": 0.03796135994984821,
+   "point/initial_regime_probability": 0.010053773732085464,
+   "point/dynamics_matrix": 0.012265606847788517,
+   "point/dynamics_offset": 0.06383386767128924,
+   "point/dynamics_covariance": 0.017761203775023694,
+   "point/recurrence_weights": 0.08201236782302498,
+   "point/recurrence_offsets": 0.1357195691586803,
+   "point/emission_matrix": 3.473622682026445e-05,
+   "point/emission_offset": 3.767734273228574e-05,
+   "point/emission_covariance": 0.0003006047104421269
+  },
+  {
+   "posterior/v2:dynamics:m": 0.03317634183895526,
+   "posterior/v2:dynamics:lam": 0.018141243442272224,
+   "posterior/v2:dynamics:psi": 0.053170124915039974,
+   "posterior/v2:dynamics:nu": 0.025597302410564002,
+   "posterior/v2:emission:m": 3.802877654235019e-05,
+   "posterior/v2:emission:lam": 3.654622028146658e-05,
+   "posterior/v2:emission:psi": 0.0752236691238097,
+   "posterior/v2:emission:nu": 0.0,
+   "posterior/v2:initial_regime:alpha": 0.045460219654745435,
+   "posterior/v2:recurrence:eta": 0.03471787269682273,
+   "posterior/v2:recurrence:precision": 0.025303471948372826,
+   "point/initial_regime_probability": 0.012908359808846415,
+   "point/dynamics_matrix": 0.006391200325441038,
+   "point/dynamics_offset": 0.035540404069568876,
+   "point/dynamics_covariance": 0.006556349566329153,
+   "point/recurrence_weights": 0.08418572583398047,
+   "point/recurrence_offsets": 0.09843196306928198,
+   "point/emission_matrix": 3.9682841924681966e-05,
+   "point/emission_offset": 2.7057693433121933e-05,
+   "point/emission_covariance": 0.0002541190876706842
+  },
+  {
+   "posterior/v2:dynamics:m": 0.046158768970683085,
+   "posterior/v2:dynamics:lam": 0.01291900434496588,
+   "posterior/v2:dynamics:psi": 0.0993083457803546,
+   "posterior/v2:dynamics:nu": 0.044639237248274476,
+   "posterior/v2:emission:m": 3.730542638457009e-05,
+   "posterior/v2:emission:lam": 3.992980711863486e-05,
+   "posterior/v2:emission:psi": 0.060142777963417014,
+   "posterior/v2:emission:nu": 0.0,
+   "posterior/v2:initial_regime:alpha": 0.3382766926944549,
+   "posterior/v2:recurrence:eta": 0.03282033783765818,
+   "posterior/v2:recurrence:precision": 0.03061495334618058,
+   "point/initial_regime_probability": 0.10911519490879976,
+   "point/dynamics_matrix": 0.007290651579072931,
+   "point/dynamics_offset": 0.049355680536709134,
+   "point/dynamics_covariance": 0.0015782274513634897,
+   "point/recurrence_weights": 0.06675998568096482,
+   "point/recurrence_offsets": 0.08144881762119074,
+   "point/emission_matrix": 3.892876014777169e-05,
+   "point/emission_offset": 1.8766774093853314e-05,
+   "point/emission_covariance": 0.00021617445648980686
+  },
+  {
+   "posterior/v2:dynamics:m": 0.02481257635216171,
+   "posterior/v2:dynamics:lam": 0.010319726746510997,
+   "posterior/v2:dynamics:psi": 0.05834270988531328,
+   "posterior/v2:dynamics:nu": 0.02713173760529388,
+   "posterior/v2:emission:m": 3.6079604013192217e-05,
+   "posterior/v2:emission:lam": 3.5589304227484914e-05,
+   "posterior/v2:emission:psi": 0.04470973304953571,
+   "posterior/v2:emission:nu": 0.0,
+   "posterior/v2:initial_regime:alpha": 0.08835757618341189,
+   "posterior/v2:recurrence:eta": 0.024650798959182686,
+   "posterior/v2:recurrence:precision": 0.03915584379184976,
+   "point/initial_regime_probability": 0.031263127629766185,
+   "point/dynamics_matrix": 0.008745788736572429,
+   "point/dynamics_offset": 0.02642176978439359,
+   "point/dynamics_covariance": 0.005450786812698484,
+   "point/recurrence_weights": 0.054847607485040285,
+   "point/recurrence_offsets": 0.06470741522620584,
+   "point/emission_matrix": 3.3682205585583436e-05,
+   "point/emission_offset": 3.6079604013192217e-05,
+   "point/emission_covariance": 0.00016822386838814905
+  },
+  {
+   "posterior/v2:dynamics:m": 0.027239314386903406,
+   "posterior/v2:dynamics:lam": 0.009201973821982646,
+   "posterior/v2:dynamics:psi": 0.03581091724784911,
+   "posterior/v2:dynamics:nu": 0.022280069575490936,
+   "posterior/v2:emission:m": 4.6916755187778735e-05,
+   "posterior/v2:emission:lam": 3.21353309712754e-05,
+   "posterior/v2:emission:psi": 0.03201674305554384,
+   "posterior/v2:emission:nu": 0.0,
+   "posterior/v2:initial_regime:alpha": 0.018246973923208988,
+   "posterior/v2:recurrence:eta": 0.02461096475862154,
+   "posterior/v2:recurrence:precision": 0.0445825803608205,
+   "point/initial_regime_probability": 0.00657623361259968,
+   "point/dynamics_matrix": 0.00972935907024106,
+   "point/dynamics_offset": 0.028913328864937138,
+   "point/dynamics_covariance": 0.011629888110676966,
+   "point/recurrence_weights": 0.04793650241976333,
+   "point/recurrence_offsets": 0.0919766177201897,
+   "point/emission_matrix": 2.883826954169777e-05,
+   "point/emission_offset": 4.6916755187778735e-05,
+   "point/emission_covariance": 0.00012444998367194685
+  }
+ ]
+}

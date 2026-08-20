@@ -1,0 +1,158 @@
+[
+ {
+  "tier": "shared_initialization",
+  "chain": 0,
+  "loglik_per_step": 26.530355583172035,
+  "n_draws": 80,
+  "worst_src_rmse_mean": 0.49653245519641126,
+  "worst_src_rmse_sd": 0.04508212941779479,
+  "worst_src_rmse_q05": 0.42579482732613916,
+  "worst_src_rmse_min": 0.3815438632485188,
+  "frac_draws_below_cap": 0.0,
+  "worst_contrast_mean": 0.5055850248984323,
+  "worst_contrast_q05": 0.4476527770500143,
+  "frac_contrast_below_cap": 0.0,
+  "per_source_mean": [
+   0.08797220127951702,
+   0.10396819838998546,
+   0.19316269338397246,
+   0.4965324551964113
+  ],
+  "per_source_sd": [
+   0.009298270704995372,
+   0.01386894154561734,
+   0.011487508757637965,
+   0.04508212941779479
+  ]
+ },
+ {
+  "tier": "shared_initialization",
+  "chain": 1,
+  "loglik_per_step": 26.52876587596645,
+  "n_draws": 80,
+  "worst_src_rmse_mean": 0.4875881408815933,
+  "worst_src_rmse_sd": 0.04900506307203083,
+  "worst_src_rmse_q05": 0.41898147044696465,
+  "worst_src_rmse_min": 0.38255421373139764,
+  "frac_draws_below_cap": 0.0,
+  "worst_contrast_mean": 0.5016002773710893,
+  "worst_contrast_q05": 0.4370111549812091,
+  "frac_contrast_below_cap": 0.0,
+  "per_source_mean": [
+   0.08657350941282235,
+   0.10504858169997007,
+   0.1946826517484226,
+   0.4875881408815933
+  ],
+  "per_source_sd": [
+   0.00861973604345142,
+   0.015057776941011902,
+   0.011743632071694524,
+   0.04900506307203083
+  ]
+ },
+ {
+  "tier": "shared_initialization",
+  "chain": 2,
+  "loglik_per_step": 27.01125354812484,
+  "n_draws": 80,
+  "worst_src_rmse_mean": 0.12015844235639853,
+  "worst_src_rmse_sd": 0.024021733273874506,
+  "worst_src_rmse_q05": 0.08379355048174154,
+  "worst_src_rmse_min": 0.0700569501461425,
+  "frac_draws_below_cap": 0.875,
+  "worst_contrast_mean": 0.15181638932771543,
+  "worst_contrast_q05": 0.10728719631055354,
+  "frac_contrast_below_cap": 0.4625,
+  "per_source_mean": [
+   0.0375139340613236,
+   0.053694617658910315,
+   0.09962694946852442,
+   0.10828985390770066
+  ],
+  "per_source_sd": [
+   0.007441609401743167,
+   0.018863498557999955,
+   0.025111709325296678,
+   0.028491540737280725
+  ]
+ },
+ {
+  "tier": "shared_initialization",
+  "chain": 3,
+  "loglik_per_step": 27.01687387790413,
+  "n_draws": 80,
+  "worst_src_rmse_mean": 0.11972006153293487,
+  "worst_src_rmse_sd": 0.022471570152485867,
+  "worst_src_rmse_q05": 0.08603890125419487,
+  "worst_src_rmse_min": 0.06168038959254536,
+  "frac_draws_below_cap": 0.9,
+  "worst_contrast_mean": 0.15053325568195786,
+  "worst_contrast_q05": 0.10494364769914111,
+  "frac_contrast_below_cap": 0.475,
+  "per_source_mean": [
+   0.03892631083340721,
+   0.05437307406940382,
+   0.09756644605635512,
+   0.1096394597109297
+  ],
+  "per_source_sd": [
+   0.009171312103474435,
+   0.0208247442207987,
+   0.02509334265383609,
+   0.025543380716509467
+  ]
+ },
+ {
+  "tier": "native_end_to_end",
+  "chain": 1,
+  "loglik_per_step": 26.994493313279133,
+  "n_draws": 80,
+  "worst_src_rmse_mean": 0.15130094699413804,
+  "worst_src_rmse_sd": 0.017762441966516714,
+  "worst_src_rmse_q05": 0.12378014846989586,
+  "worst_src_rmse_min": 0.1137591609452964,
+  "frac_draws_below_cap": 0.5375,
+  "worst_contrast_mean": 0.18529418304857423,
+  "worst_contrast_q05": 0.1509581849533197,
+  "frac_contrast_below_cap": 0.05,
+  "per_source_mean": [
+   0.06169374753388148,
+   0.11056289835010732,
+   0.10820563744534675,
+   0.148459841478936
+  ],
+  "per_source_sd": [
+   0.009908264264451506,
+   0.023633582216187214,
+   0.024335964381448666,
+   0.01920598053704791
+  ]
+ },
+ {
+  "tier": "native_end_to_end",
+  "chain": 3,
+  "loglik_per_step": 26.70267300123349,
+  "n_draws": 80,
+  "worst_src_rmse_mean": 0.20172359240365356,
+  "worst_src_rmse_sd": 0.02028018694219116,
+  "worst_src_rmse_q05": 0.17343341622673977,
+  "worst_src_rmse_min": 0.1486253432110373,
+  "frac_draws_below_cap": 0.0125,
+  "worst_contrast_mean": 0.2871959988115135,
+  "worst_contrast_q05": 0.23303541680820875,
+  "frac_contrast_below_cap": 0.0,
+  "per_source_mean": [
+   0.04742829276933855,
+   0.10627926981077462,
+   0.19717842321130366,
+   0.17427484674714072
+  ],
+  "per_source_sd": [
+   0.007117000034770203,
+   0.02294069166999111,
+   0.025394638684140266,
+   0.014556986444634183
+  ]
+ }
+]
