@@ -85,7 +85,7 @@ Legend: prerequisite --> dependent
                                                                            |
                                                                            +--> [ ] cff-oyie
                                                                                      |
-[x] factor-semantics audit --> [ ] cff-ora6 (ready) ------------------------+--> [ ] cff-nkbj
+[x] factor-semantics audit --> [x] cff-ora6 --------------------------------+--> [ ] cff-nkbj
 
 Linked future work: cff-0f3g balanced tree; cff-dlrj destination softmax
 ```
@@ -118,17 +118,18 @@ linear-Gaussian dynamics, and a shared linear-Gaussian emission. Equality nodes
 only split graph degree and add no probability term. CFFG and the independent
 adapter use different inference algorithms: variational Pólya–Gamma/JJ bounds
 and Gaussian moment collapse versus Pólya–Gamma Gibbs sampling. Existing direct
-oracles strongly cover recurrence and destination dynamics. Initial-regime,
-initial-Gaussian, and emission conversions still need direct cross-mapping
-assertions before the final claim; cff-ora6 owns that bounded gap. Both fit
-interfaces are truth-clean: generating states, regimes, and parameters first
-enter after fitting, during evaluation.
+oracles strongly cover recurrence and destination dynamics. The audit found
+that initial-regime, initial-Gaussian, and emission conversions needed direct
+cross-mapping assertions; cff-ora6 added them and a versioned five-term
+architecture table. Both fit interfaces are truth-clean: generating states,
+regimes, and parameters first enter after fitting, during evaluation.
 
 Source → Linderman et al. 2017 equations and Section 5.1; pinned
 `recurrent-slds` NASCAR source; CFFG `models/rslds.py`, `recurrence.py`,
 `mixg.py`, and `gauss.py`; sibling experiment `paper_adapter.py`,
 `comparison_adapter.py`, `rslds_mapping.py`, and their executable tests.
 
-Confidence → High for the local NASCAR factorization, transition and dynamics
-mapping, and truth boundary; medium-high for complete adapter mapping until
-cff-ora6 adds the missing direct assertions.
+Confidence → High for the local NASCAR factorization, all five mapped joint
+terms, the transition and dynamics equations, and the truth boundary after
+cff-ora6 experiment commit `61cec3f` passed both modern and isolated legacy
+test suites.

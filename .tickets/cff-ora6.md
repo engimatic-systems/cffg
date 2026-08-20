@@ -1,6 +1,6 @@
 ---
 id: cff-ora6
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-18T16:50:22Z
@@ -116,3 +116,7 @@ Legend: prerequisite --> dependent
                                    |
                                    +--> [ ] cff-nkbj final parity audit
 ```
+
+**2026-08-18T17:00:24Z**
+
+Implementation handoff: experiment commit 61cec3f bumps the serialized architecture mapping to version 2, adds the five-term joint correspondence table, checks every initialization and prior array, preserves exact categorical zero support, and adds independent categorical, Gaussian-density, and emission-information oracles in the isolated reference runtime. The adapter provenance ledger now covers main-paper Eqs. 1-4 and the tied initial and emission surfaces. README wording distinguishes local generator correspondence from authors-code identity. Validation: modern experiment suite 110 passed in 68.32 seconds; isolated legacy suite 38 passed in 0.92 seconds; JSON and diff checks passed. No fit, generator, calibration artifact, or final seed was executed by this ticket.
