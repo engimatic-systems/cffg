@@ -889,7 +889,7 @@ independently in numpy so the engine is never graded on its own homework.
 Consumer-harness conventions live in README ("Consume the engine from an
 experiment harness").
 
-## Canonical rSLDS consumer validation (2026-07-31)
+## Canonical rSLDS consumer validation (updated 2026-08-20)
 
 A fresh consumer used CFFG commit `6c01812` as a pinned Git dependency and
 reconstructed the current stick-breaking Linderman NASCAR generator without
@@ -939,6 +939,56 @@ The evidence lives in `../experiments/cffg-nascar-validation` at commit
 `5432c42ba6795850898e878ebdfad39ef82f8cc7dbf83ddc6f98c8ed3d4651db`
 and the environment/profile/raw-artifact manifest SHA-256 is
 `515bd5e2dc05741953e225912f62c8d7b0136a3d1d6b9855938b117bcd7f033b`.
+
+### Classic architecture and dual-family task boundary
+
+The final parity audit separates probability-model architecture from fitted
+task performance. For the source-homogeneous, shared-emission NASCAR subclass,
+the version-2 mapping record and independent oracles cover the complete joint:
+
+| Joint term | CFFG owner | Independent adapter owner | Executable evidence |
+| --- | --- | --- | --- |
+| `p(z1)` | categorical prior factor | initial `pi_0` | exact categorical mapping, including literal zero support |
+| `p(x1)` | tied Gaussian prior factors | one Gaussian repeated across regimes | parameter mapping and independent Gaussian-density oracle |
+| `p(z[t+1] | z[t], x[t])` | `recurrence_link` | source-indexed decision-list transition | independent coordinate and finite-enumeration oracles |
+| `p(x[t+1] | x[t], z[t+1])` | destination-conditioned Gaussian mixture | destination-indexed adapter dynamics | independent quadrature and destination-dynamics oracles |
+| `p(y[t] | x[t])` | tied `gaussian_linear` emission | shared full-covariance emission | parameter mapping and independent information-form likelihood oracle |
+
+Forney equality nodes only split graph degree and contribute no probability
+term. Static interface tests keep the fit boundary truth-clean: both learners
+receive observations and declared priors before fitting, while generating
+states, regimes, and parameters enter only post-fit alignment and scoring.
+This proves the bounded probabilistic architecture, not identity of code or
+inference. CFFG uses variational Pólya--Gamma/Jaakkola--Jordan updates and
+Gaussian moment collapse; the adapter uses Pólya--Gamma Gibbs sampling.
+
+The experiment keeps two generators and claims separate. The classic family
+ties recurrence rows, initial Gaussian laws, and emissions across regimes. It
+uses 10,000 training observations plus a 2,500-observation held-out extension
+and cannot identify distinct source rows. The local heterogeneous family keeps
+the NASCAR dynamics and emission but rotates each source's gates; its
+1,280/320 split and common-state evaluation grid test source-function recovery
+outside the original demonstration.
+
+The immutable final execution completed every one of the three classic and
+three heterogeneous coordinates in 51,254.918 seconds. Both family decisions
+are `not_ready`. All classic CFFG tiers converged, but all paper-adapter tiers
+failed the registered mixing gate, so task parity was not evaluated. In the
+heterogeneous family, seed 2102 failed prefit source/gate coverage, seed 2103
+exhausted both CFFG outer budgets, and every fitted adapter tier failed mixing.
+Descriptive seed-2101 source-function errors also exceeded the registered
+0.150 ceilings. Neither family failure alters the other, and no joint claim is
+registered.
+
+The complete local evidence is experiment commit `6c0437a`, with results
+SHA-256 `eaf4bdccb6b2d9ecf35f59a91fa1012873bba697c8fe499781b28c1f787697c4`
+and manifest SHA-256
+`b71c41ad46cd2e210a9e204743d8fd58f1a76a69305afae8601c7e307b64a56a`.
+cff-l5ag owns adapter mixing, cff-q1au owns robust heterogeneous coverage,
+cff-qulu owns outer convergence, cff-0oqo owns source-function recovery, and
+cff-3v7q owns classic periodicity robustness. These experiment repairs do not
+change compiler, VM, schedule, kernel, ledger, serialization, or factor
+ownership.
 
 ## Resource estimator
 

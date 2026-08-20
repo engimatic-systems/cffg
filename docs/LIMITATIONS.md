@@ -342,15 +342,57 @@ hyperparameters and installed arrays, not a derived scalar variational
 objective. A finite outer budget stays `budget_exhausted`, even when each
 inner engine run converged and the returned point parameters are useful.
 
-The learned NASCAR comparison reports held-out prediction, aligned recovery,
-and bounded long-rollout periodicity against same-`K` and closest-budget SLDS
-controls. On the single preregistered `T=10,000` seed, the rSLDS passed only
+The earlier learned NASCAR comparison reports held-out prediction, aligned
+recovery, and bounded long-rollout periodicity against two SLDS controls:
+same-`K` and closest-budget. On the single preregistered `T=10,000` seed, the
+rSLDS passed only
 the held-out prediction claim against same-K SLDS (`+0.313296` versus a
 `+0.005` margin). Its aligned latent RMSE and regime accuracy were worse, so
 neither recovery advantage is claimed. No claim was registered against the
 closest-budget K=5 SLDS, which had the best held-out likelihood and regime
 accuracy. The rSLDS alone produced a bounded 10,000-step rollout, but that
 observation was not preregistered as an advantage.
+
+The later dual-family final run does not establish classic task parity. The
+classic generator has tied recurrence rows, tied initial Gaussian laws, and a
+shared emission. Its six CFFG fits converged, but all six independent-adapter
+tiers failed the registered mixing check: maximum split R-hat was 1.666--2.143
+against a 1.05 ceiling and minimum effective sample size was 5.359--7.110
+against a minimum of 50. The frozen policy therefore withheld paired effects
+and formal absolute decisions. This is a reference-inference failure, not
+evidence against the term-by-term probabilistic-architecture mapping.
+
+The classic scale is 10,000 training observations plus a separately registered
+2,500-observation held-out extension. The paper did not use that split, so this
+is not an exact Figure 3 replay. Descriptively, every classic CFFG held-out
+on-support transition error was below its tier ceiling. Native seed 2001 had a
+bounded periodicity score of 0.4058 against a 0.4110 floor, so even the
+available CFFG-only evidence contains one narrow adequacy miss.
+
+The source-heterogeneous family is a local generator extension, not a claim
+about Linderman's original experiment. One final dataset was rejected before
+fitting because source 3, gate 2 produced four successes where the frozen
+eligibility rule required five. On another, both CFFG tiers and both SLDS
+controls exhausted the sixteen-update outer budget. Every heterogeneous
+adapter tier that ran also failed mixing. On the one dataset with converged
+CFFG tiers, shared/native worst-source transition errors were 0.1946/0.3761
+and source-contrast errors were 0.2498/0.3736, above the 0.150 ceilings. Source-
+dependent recovery is therefore not established.
+
+Affine latent coordinates, regime labels, and decision-list order remain
+non-identifiable. Functional probabilities after affine and label alignment
+are the defensible comparison; raw recurrence coefficients do not support a
+canonical recovery claim. The two family decisions are independent, and the
+final evidence makes no joint, population-wide, authors-code, message-equation,
+inference-algorithm, or universal rSLDS-family claim.
+
+The full local artifact is experiment commit `6c0437a`; its results and
+manifest SHA-256 values are
+`eaf4bdccb6b2d9ecf35f59a91fa1012873bba697c8fe499781b28c1f787697c4` and
+`b71c41ad46cd2e210a9e204743d8fd58f1a76a69305afae8601c7e307b64a56a`.
+Follow-up ownership is explicit: cff-l5ag covers adapter mixing, cff-q1au
+covers source/gate eligibility, cff-qulu covers outer convergence, cff-0oqo
+covers source-function error, and cff-3v7q covers classic periodicity.
 
 All fits exhausted their registered two-coordinate outer budget despite
 converged inner and final inference. On the compact pilot, the fixed `0.9`

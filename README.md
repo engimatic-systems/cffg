@@ -363,6 +363,53 @@ unregistered observation, not promoted to an advantage claim. Exact artifacts
 live in `../experiments/cffg-nascar-validation` at experiment commit `f4e7b0f`
 with results SHA-256 `99d02c92315357e1d778146c7b7ca74cd20aa2390f4ad165ed17515fba29548e`.
 
+#### Two-family rSLDS evidence audit
+
+The parity target has two independent parts. Probabilistic-architecture parity
+asks whether CFFG's factor types and graph composition represent the classic
+rSLDS distributions and dependencies. Task parity asks whether the fitted CFFG
+model performs roughly as well as the independent paper-equation adapter on
+the classic NASCAR task.
+
+The architecture half is established for the source-homogeneous,
+shared-emission NASCAR subclass. Executable cross-mapping oracles cover the
+initial categorical regime, tied initial Gaussian, source-indexed
+decision-list recurrence, destination-indexed linear-Gaussian dynamics, and
+shared linear-Gaussian emission. Both fit interfaces receive observations and
+declared priors, but not generating states, regimes, or parameters. This is a
+probability-model correspondence; CFFG uses variational Pólya--Gamma/
+Jaakkola--Jordan inference and the adapter uses Pólya--Gamma Gibbs sampling.
+
+The immutable 3+3 final run did not establish either empirical claim:
+
+| Evidence layer | Final result |
+| --- | --- |
+| Classic task parity | `not_ready`: all six CFFG tiers converged, but all six adapter tiers failed the registered mixing gate, so no paired effects or formal absolute decisions were issued. |
+| Heterogeneous source recovery | `not_ready`: one seed failed the prefit source/gate outcome rule, another exhausted both CFFG outer budgets, and every fitted adapter tier failed mixing. |
+| Joint claim | Not registered; the two family decisions are independent. |
+
+The classic family used 10,000 training steps plus a separate 2,500-step
+held-out extension. It is therefore paper-scale training, not an exact replay
+of Figure 3. The local heterogeneous extension used 1,280 training and 320
+held-out steps with different gates for every source regime; it is not part of
+the original NASCAR demonstration.
+
+Available CFFG-only values are descriptive. All six classic held-out
+on-support transition errors were below their registered ceilings, but native
+seed 2001 periodicity was `0.4058` against a `0.4110` floor. On the one
+converged heterogeneous seed, shared/native worst-source transition errors were
+`0.1946`/`0.3761` and source-contrast errors were `0.2498`/`0.3736`, all above
+the `0.150` ceilings. These values do not override the frozen `not_ready`
+decisions.
+
+The complete local experiment artifact is commit `6c0437a`; `results.json` is
+SHA-256 `eaf4bdccb6b2d9ecf35f59a91fa1012873bba697c8fe499781b28c1f787697c4`
+and its manifest is
+`b71c41ad46cd2e210a9e204743d8fd58f1a76a69305afae8601c7e307b64a56a`.
+The result supports neither authors-code identity, inference-algorithm
+identity, nor universal rSLDS-family performance. cff-l5ag, cff-q1au,
+cff-qulu, cff-0oqo, and cff-3v7q own the observed evidence gaps.
+
 Cold setup was a separate host-grounding concern rather than an rSLDS rule or
 JAX-kernel defect. Linear incidence indexes removed the per-variable template
 rescans. In three fresh CPU/x64 workers per path at `T=10,000`, median setup
