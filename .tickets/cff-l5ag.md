@@ -1,7 +1,7 @@
 ---
 id: cff-l5ag
 status: open
-deps: []
+deps: [cff-8w4c]
 links: [cff-oyie]
 created: 2026-08-20T15:41:17Z
 type: bug
@@ -98,3 +98,16 @@ Legend: prerequisite --> dependent
 **2026-08-21T01:23:37Z**
 
 Independent-review synthesis: make raw recurrence coefficients secondary and require mixing of label/decision-list-invariant quantities that actually support the parity claim. A moderate shared recurrence prior is the leading development pilot, not a registered fix; it must apply identically to CFFG and the adapter, preserve classic NASCAR adequacy, and still needs explicit heterogeneous mode handling. Deterministic label initialization is hygiene, not a substitute for sampling genuine modes. Unified plan: notes/rslds-debug/synthesis/plan.md.
+
+**2026-08-21T03:21:43Z**
+
+Roadmap refinement split. Legend: prerequisite --> dependent
+
+[ ] cff-jq9p claim-bearing diagnostics (ready) --+
+                                                  +--> [ ] cff-8w4c shared-prior study
+[ ] cff-888k component-collapse evidence (ready) -+                 |
+                                                                    +--> [ ] cff-l5ag adapter decision
+                                                                                 |
+                                                                                 +--> [ ] cff-nkbj parity epic
+
+The diagnostic and collapse tickets can proceed in parallel. Their shared study is the immediate blocker for the adapter decision. Ticket dependency records remain the source of truth.
