@@ -108,3 +108,7 @@ Legend: prerequisite --> dependent
   |                           +--> [ ] cff-3v7q decision
   |
   +--> [ ] fresh parity freeze (downstream)
+
+**2026-08-21T19:07:17Z**
+
+Replicate-0 development replay completed in sibling experiment commit 8280cb8: six converged classic fits (seeds 5000-5002 x both tiers) crossed with four declared 10,000-step rollout streams, 24/24 completed and bounded. The artifact is honestly partial (`aggregate.complete=false`, 3/6 fit checkpoints per tier). Native seed5000 failed the 0.4109805203 floor on streams 2 and 3 with scores 0.397873035 and 0.407945616; the other 22 cells passed. Native rollout-stream RMS variation 0.081256 was 3.47 times its between-fit-cell SD 0.023425. Therefore the unchanged baseline already fails the every-declared-cell robustness rule; six replicate-1 fits remain necessary only to complete the registered fit-versus-rollout variation decomposition. Artifact: `artifacts/rslds-classic-periodicity-replay-development-replicate-0`; no fit, adapter, calibration seed, or final seed ran for this replay. cff-8w4c screening will evaluate every candidate classic seed5000 fit across all four streams so a shared-prior remedy cannot trade away periodic adequacy.
