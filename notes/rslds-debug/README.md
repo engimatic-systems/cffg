@@ -89,3 +89,6 @@ conclusion as agreement, compatible difference, or contradiction. Resolve
 contradictions with a discriminating test rather than by averaging confidence.
 The resulting decisions belong in the affected `tk` tickets and, if they change
 the architecture, in `docs/ARCHITECTURE.md` with the implementation.
+
+The completed comparison and unified repair plan are in
+[`synthesis/plan.md`](synthesis/plan.md).

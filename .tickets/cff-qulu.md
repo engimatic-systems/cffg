@@ -97,3 +97,7 @@ Legend: prerequisite --> dependent
                               |
                               +--> [ ] fresh comparison run
 ```
+
+**2026-08-21T01:23:37Z**
+
+Independent-review synthesis: instrument and justify the convergence certificate before using it as a globalization merit. The initial-regime Dirichlet can dominate the raw maximum despite other families being stable, but it must not simply be excluded without showing belief and claim-bearing functional stability. Repair the SLDS stale-terminal-state contract, observe full-step tails on new development seeds, then implement a shared safeguarded natural/statistic-coordinate outer coordinator. Preserve 1,280 as a deterministic failure regression; validate the future protocol at the chosen heterogeneous scale. Unified plan: notes/rslds-debug/synthesis/plan.md.

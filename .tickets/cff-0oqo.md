@@ -97,3 +97,7 @@ Legend: prerequisite --> dependent
                                                 |
                                                 +--> [ ] fresh extension run
 ```
+
+**2026-08-21T01:23:37Z**
+
+Independent-review synthesis: keep 0.15 as the capability ceiling and increase information or improve inference rather than loosening it to match the failed calibration. After robust coverage and certified outer convergence, reevaluate both tiers on fresh 5,120-step training paths with on-support and common-state-grid metrics together. Similarity to the adapter collapse mode is currently correlational; compare occupancy, gate norms, likelihood, and transition surfaces directly before choosing a restart, prior, or recurrence update repair. Unified plan: notes/rslds-debug/synthesis/plan.md.

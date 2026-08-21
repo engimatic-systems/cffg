@@ -94,3 +94,7 @@ Legend: prerequisite --> dependent
                   |
                   +--> [ ] fresh comparison freeze and run
 ```
+
+**2026-08-21T01:23:37Z**
+
+Independent-review synthesis: make raw recurrence coefficients secondary and require mixing of label/decision-list-invariant quantities that actually support the parity claim. A moderate shared recurrence prior is the leading development pilot, not a registered fix; it must apply identically to CFFG and the adapter, preserve classic NASCAR adequacy, and still needs explicit heterogeneous mode handling. Deterministic label initialization is hygiene, not a substitute for sampling genuine modes. Unified plan: notes/rslds-debug/synthesis/plan.md.

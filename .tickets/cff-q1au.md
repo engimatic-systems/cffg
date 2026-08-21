@@ -95,3 +95,7 @@ Legend: prerequisite --> dependent
                   |
                   +--> [ ] fresh heterogeneous freeze and run
 ```
+
+**2026-08-21T01:23:37Z**
+
+Independent-review synthesis: use 6,400 total / 5,120 training steps as the conservative heterogeneous candidate. The 4,800 / 3,840 result is the smallest measured coverage-only candidate, while 5,120 training steps adds margin for the separately observed recovery-identifiability problem. Reproduce the reliability evidence as a manifested experiment artifact and benchmark resources; improved recovery and outer contraction remain hypotheses to test. Unified plan: notes/rslds-debug/synthesis/plan.md.
