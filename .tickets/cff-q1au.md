@@ -1,6 +1,6 @@
 ---
 id: cff-q1au
-status: open
+status: closed
 deps: []
 links: [cff-oyie]
 created: 2026-08-20T15:41:17Z
@@ -99,3 +99,7 @@ Legend: prerequisite --> dependent
 **2026-08-21T01:23:37Z**
 
 Independent-review synthesis: use 6,400 total / 5,120 training steps as the conservative heterogeneous candidate. The 4,800 / 3,840 result is the smallest measured coverage-only candidate, while 5,120 training steps adds margin for the separately observed recovery-identifiability problem. Reproduce the reliability evidence as a manifested experiment artifact and benchmark resources; improved recovery and outer contraction remain hypotheses to test. Unified plan: notes/rslds-debug/synthesis/plan.md.
+
+**2026-08-21T03:06:34Z**
+
+Completed the coverage-design scope in the experiment repair branch. Commit 254b890 adds the fixed development-seed reliability audit; commit 48b89be preserves its manifested artifact. Results: 1,280 training passed 456/500 (exact one-sided 95% lower bound 0.888296), 2,560 passed 297/300 (0.974359), and 5,120 passed 300/300 (0.990064), selecting 6,400 total / 5,120 training steps. The rarest selected-scale cell retained at least 180 exposures, 11 successes, and 166 failures. Focused source/generator tests passed 21/21; artifact validation and manifest validation passed; no calibration or final seed ran. Full-fit resource benchmarking remains deliberately gated until cff-qulu and cff-l5ag stop changing solver and chain costs, and is required before a new freeze rather than part of generator-coverage selection.
