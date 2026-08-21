@@ -188,6 +188,20 @@ def test_fit_replaces_one_sequence_coordinates_and_reuses_one_engine(monkeypatch
         True,
         False,
     ]
+    for phase, legacy_residual in zip(result.phases[:-1], result.residuals):
+        assert phase.fixed_point_residual == legacy_residual
+        assert phase.runtime_residual is not None
+        assert np.isfinite(phase.runtime_residual.maximum)
+        assert set(phase.runtime_residual.per_family) == {
+            "initial",
+            "dynamics",
+            "recurrence",
+            "emission",
+        }
+        assert phase.functional_transition_residual is not None
+        assert np.isfinite(phase.functional_transition_residual.maximum)
+    assert result.phases[-1].runtime_residual is None
+    assert result.phases[-1].functional_transition_residual is None
     assert result.model_posterior.initial_alpha.sum() == pytest.approx(
         priors.initial_alpha.sum() + 1.0
     )

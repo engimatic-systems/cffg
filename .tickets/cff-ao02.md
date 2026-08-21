@@ -1,6 +1,6 @@
 ---
 id: cff-ao02
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-21T03:07:46Z
@@ -75,3 +75,7 @@ VM, schedule, kernel, ledger, serialization, and `RunStatus` changes are N/A.
 Duplicated surfaces: initial regime, dynamics, recurrence, emission, legacy
 snapshot, canonical runtime snapshot, functional probe, float32, and float64
 must stay aligned. A non-finite block fails loudly.
+
+**2026-08-21T03:19:14Z**
+
+Implemented a reusable named coordinate-residual primitive and rSLDS-specific canonical runtime/transition views. fit_rslds now records legacy, installed-runtime, and truth-free observation-probe residuals side by side while leaving the legacy status authority and all accepted steps unchanged. Architecture ownership is documented. Focused validation: 22 passed in 134.36s across tests/test_coordinate_fit.py and tests/test_rslds_fit.py; git diff --check passed. No registered final seed was inspected or run.
