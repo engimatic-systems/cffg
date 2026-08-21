@@ -1,6 +1,6 @@
 ---
 id: cff-tlh3
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-21T04:33:20Z
@@ -87,3 +87,7 @@ Duplicated surfaces: three development seeds, two rSLDS tiers, two controls,
 runtime and legacy residuals, append-only attempts, resume, manifests, float32,
 and x64 must stay aligned. Exact-zero support and improper beliefs retain the
 fitters' existing loud-failure contracts.
+
+**2026-08-21T08:30:27Z**
+
+Completed selected-scale development evidence in the sibling experiment. All 12 declared source-heterogeneous arms (3 seeds x shared/native rSLDS x same-K/K=5 SLDS) returned converged outer and inner statuses; none were censored, divergent, or failed. Convergence map counts were 6-15, yielding a registered budget of 19 from `max(8, ceil(1.25*15), 15+4)`. Total learned-arm wall time was 12,718.911434 seconds and peak recorded process RSS was 5,531,402,240 bytes. No adapter, calibration seed, or final seed ran. Evidence commit 57e2e8e; historical validator boundary fix 7dbf84d; manifests and all checkpoints validate.
