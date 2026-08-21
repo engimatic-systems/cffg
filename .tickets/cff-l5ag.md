@@ -129,3 +129,21 @@ telemetry paths were empty. Shared used 7,324.17 seconds and peaked at
 cff-l5ag blocked on cff-2wb6. That ticket must acquire uncensored classic inner
 convergence measurements under a preregistered diagnostic bound before
 cff-8w4c resumes. This result does not reopen cff-qulu.
+
+**2026-08-21T14:54:11Z**
+
+Correction to the 2026-08-21T14:37:31Z pilot note: cff-2wb6 schema v1
+classified individual damping attempts instead of each complete registered
+retry sequence. Under the corrected schema v2 classifier, the shared rSLDS
+terminal hidden-state solve succeeded because its damping-0.8 retry converged
+in 4,488 iterations after the damping-0.9 attempt exhausted 8,000. The shared
+arm is therefore inner-converged, not right-censored; all 14 hidden-state solves
+succeeded, the maximum successful attempt was 6,315 iterations, and the
+per-attempt cap remains 8,000 because one rejected retry consumed that cap.
+Outer convergence remains 13 maps. The immutable original artifact still
+validates. Experiment commits c55ba69 and c937c2b add the classifier and a
+pinned no-fit reclassification artifact with zero inner or outer censor rows.
+No family budget is derived from the two-arm pilot, and no expansion, adapter,
+data generation, or fit ran. The pilot now permits the separately authorized
+cff-2wb6 expansion; cff-l5ag remains downstream of that declared cohort rather
+than blocked on an inner-classifier decision.
