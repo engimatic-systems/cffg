@@ -1,7 +1,7 @@
 ---
 id: cff-qulu
 status: in_progress
-deps: [cff-0xjq]
+deps: [cff-0xjq, cff-tlh3]
 links: [cff-oyie]
 created: 2026-08-20T15:41:17Z
 type: bug
@@ -118,3 +118,19 @@ evidence showed contraction rather than a cycle. This ticket now owns the
 installed-parameter certificate, censored-budget policy, and replication at the
 selected scale. Globalization is conditional future work, not an acceptance
 requirement.
+
+**2026-08-21T04:33:51Z**
+
+Selected-scale validation split. Legend: prerequisite --> dependent
+
+[x] cff-0xjq 1,280-step certificate decision
+      |
+      +--> [x] runtime certificate + censored-budget code
+                  |
+                  +--> [ ] cff-tlh3 5,120-step development cohort (ready/in progress)
+                              |
+                              +--> [ ] cff-qulu budget decision
+                                          |
+                                          +--> [ ] cff-0oqo source recovery
+
+The focused cohort replaces an obsolete three-horizon/reference-chain rerun. Dependency records remain the source of truth.
