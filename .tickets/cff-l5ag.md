@@ -111,3 +111,21 @@ Roadmap refinement split. Legend: prerequisite --> dependent
                                                                                  +--> [ ] cff-nkbj parity epic
 
 The diagnostic and collapse tickets can proceed in parallel. Their shared study is the immediate blocker for the adapter decision. Ticket dependency records remain the source of truth.
+
+**2026-08-21T14:37:31Z**
+
+Classic-scale cff-2wb6 pilot stopped after the declared seed-5000 same-K and
+shared-initialization arms. Experiment artifact commit 40f992e (runner code
+8307549; CFFG 7405d60) validates as `pilot_complete_interpretable`. Same-K
+converged in 2 outer maps with maximum completed inner attempt 183. Shared
+rSLDS reached the unchanged outer certificate in 13 maps; its runtime residual
+tail was 0.228316, 0.141905, 0.097744, 0.072032. The first terminal-inference
+attempt exhausted the 8,000-inner ceiling at damping 0.9, then a damping-0.8
+retry converged in 4,488 iterations and returned coherent state. Under the
+declared attempt-ownership rule, shared inner work is right-censored, so no
+classic family budget was derived and no expansion or adapter ran. Non-finite
+telemetry paths were empty. Shared used 7,324.17 seconds and peaked at
+5,779,226,624 bytes RSS. Its periodicity fit checkpoint is retained. This keeps
+cff-l5ag blocked on cff-2wb6. That ticket must acquire uncensored classic inner
+convergence measurements under a preregistered diagnostic bound before
+cff-8w4c resumes. This result does not reopen cff-qulu.
