@@ -101,3 +101,13 @@ Legend: prerequisite --> dependent
 **2026-08-21T01:23:37Z**
 
 Independent-review synthesis: keep 0.15 as the capability ceiling and increase information or improve inference rather than loosening it to match the failed calibration. After robust coverage and certified outer convergence, reevaluate both tiers on fresh 5,120-step training paths with on-support and common-state-grid metrics together. Similarity to the adapter collapse mode is currently correlational; compare occupancy, gate norms, likelihood, and transition surfaces directly before choosing a restart, prior, or recurrence update repair. Unified plan: notes/rslds-debug/synthesis/plan.md.
+
+**2026-08-21T08:41:33Z**
+
+Research handoff (question -> answer -> source -> confidence). What must a prospective diagnostic retain? Point recurrence weights/offsets, terminal posterior means and regime probabilities, pooled recurrence exposure/linear/quadratic readout, fit/stream/config identities, and no generating truth trajectory; regenerate permitted development truth from seed after verifying the observation digest. Source: sibling experiment `confirmatory.py` fit callback, `secondary.py`, `functional_recovery.py`, and CFFG recurrence readout/learning paths. Confidence: high.
+
+What is missing now? Current coordinate JSON keeps aggregate functional errors plus affine/permutation alignment, but discards fitted parameters, posterior beliefs, full source x grid x destination tensors, and grid-origin metadata; old heterogeneous fits cannot be rescored. Confidence: high.
+
+How should gate error be attributed? After destination-label alignment, derive truth-order conditional stick acceptance `p(g)/sum_{j>=g}p(j)` using dtype-scaled remaining-mass guards; raw learned gate-row comparison is invalid because decision-list order is non-identifiable. Preserve source, truth gate, grid point, signed boundary region, and all deduplicated grid-origin memberships. Confidence: high.
+
+Primary falsifiers: known affine/permutation must remove synthetic alignment error; low exposure/conditioning may explain weak cells, while persistent error in well-covered cells falsifies coverage; recomputing recurrence posterior from retained sufficient statistics plus prior must match installed parameters, otherwise rollover/replacement owns the defect. If it matches but surfaces remain wrong, inference/statistics/identification owns the next diagnosis. Confidence: medium-high.
