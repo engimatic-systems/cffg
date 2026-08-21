@@ -1,6 +1,6 @@
 ---
 id: cff-jq9p
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-21T03:20:06Z
@@ -86,3 +86,7 @@ claim projections, checkpoint resume, and aggregate recomputation must stay
 aligned. Exact-zero support, nearly deterministic gates, label-switched chains,
 non-finite draws, and one stuck chain must fail loudly. The isolated reference
 runtime is float64-only, so float32 is N/A.
+
+**2026-08-21T04:08:51Z**
+
+Implemented and integrated in experiment commit e4db972 (source fb13bff). Claim-bearing paper-adapter mixing now uses six named label/affine/decision-list-invariant quantities with per-variable R-hat/ESS/stuck-chain status, deterministic schema/version/digest, and aggregate/checkpoint validation. The legacy 43 raw parameters remain versioned secondary debugging evidence and never control eligibility. All K=4 label permutations, affine reexpression, decision-list reexpression, genuine transition changes, stuck chains, and non-finite draws are covered. Combined integration validation contributed to 61 focused passes, 13 protocol passes, and 47 surrounding passes; two unavailable-vendored-source tests were deselected and no chain or final seed ran.
