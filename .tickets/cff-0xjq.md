@@ -1,6 +1,6 @@
 ---
 id: cff-0xjq
-status: in_progress
+status: closed
 deps: [cff-ao02, cff-7194]
 links: []
 created: 2026-08-21T03:07:56Z
@@ -86,3 +86,7 @@ Legend: prerequisite --> dependent
                                                                   |
                                                                   +--> [ ] cff-0oqo
 ```
+
+**2026-08-21T03:57:59Z**
+
+Completed in experiment commits 682b361, cc8d5b1, and f652a5c. A development-only, final-seed-rejecting replay ran source_heterogeneous seed 3101 replicate 1 at Ttrain=1280 with cap 40. Same-K SLDS and shared-init rSLDS both converged at outer iteration 15; total wall 629.696s, peak RSS 1.974 GB. Legacy, canonical runtime, and truth-free functional residuals all crossed the existing two-consecutive <=0.1 gate at iteration 15. Update vectors showed no overall or per-family two-cycle; recurrence offsets dominated 12/15 runtime maps. Decision: canonical runtime-map maximum is the principled certificate; retain legacy/functional views as diagnostics; do not add globalization based on this evidence. The prior cap 12 stopped slow healthy contraction and censored exhaustion must not set later budgets. Manifested evidence is artifacts/rslds-outer-certificate-development. Focused gate: 39 passed in 20.69s. No final seed was run.
