@@ -90,3 +90,9 @@ Code-only study implementation completed in the sibling experiment and integrate
 
 Future eligible command:
 uv run python -m cffg_nascar_validation.prior_study --protocol artifacts/rslds-dual-calibration/selected-protocol.json --scale-budget artifacts/rslds-selected-scale-outer-development/results.json --output artifacts/rslds-shared-prior-development
+
+**2026-08-21T08:50:59Z**
+
+Funneling corrected in experiment commit ed876ec before execution. The immutable/resumable stages are: `funnel` runs only baseline 0.001/canonical/seed5000 and treats a completed scientific miss as valid evidence; `screen --resume` evaluates all four strengths on both families at seed5000; `expand --resume` runs seeds5001/5002 for every candidate passing the predeclared two-family eligibility, claim-mixing, occupancy, and absolute-adequacy gates. No ranking or winner field exists. If none pass, the study ends `complete_no_eligible_candidates` without expansion. Orchestration/schema/provenance/checkpoint failures stop every stage. Validation: 120 passed, 3 environment-deselected; no fit/chain/dataset ran.
+
+The funnel produces the two baseline classic seed5000 periodicity checkpoints. Baseline seeds5001/5002 are not run through the expensive adapter study if the baseline fails screening; cff-3v7q will obtain those four CFFG-only checkpoints through its separate development-fit path.
