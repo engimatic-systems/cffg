@@ -66,3 +66,25 @@ Legend: prerequisite --> dependent
 ```
 
 
+
+## Notes
+
+**2026-08-21T14:56:53Z**
+
+Classifier correction landed in experiment commits c55ba69, c937c2b, and
+5990dcf. Schema v2 treats one ordered registered damping-retry sequence as the
+hidden-state-solve evidence unit. A capped rejected attempt followed by a
+converged retry is successful, retains the retry trace/count, and retains the
+8,000 per-attempt cap; only a sequence with no successful attempt is censored
+or failed. The original schema-v1 pilot remains byte-identical and validates.
+The new pinned no-fit artifact
+`artifacts/rslds-classic-scale-convergence-development-reclassified` validates
+with both pilot arms inner- and outer-converged, zero censor rows, shared
+maximum successful inner attempt 6,315, one rejected 8,000-iteration attempt,
+and one 4,488-iteration successful retry. It derives no family budget because
+only two arms are present. No fit, data generation, adapter, final seed, or
+expansion ran. The new output is the authorized resume base only while
+execution-equivalence checks pass. Next, after separate expansion
+authorization, use `cffg-rslds-classic-scale-convergence run` with that output
+plus `--resume --expand`; stop on the first true hidden-solve censor, outer
+censor, or divergence.
