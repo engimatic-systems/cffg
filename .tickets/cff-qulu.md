@@ -1,6 +1,6 @@
 ---
 id: cff-qulu
-status: in_progress
+status: closed
 deps: [cff-0xjq, cff-tlh3]
 links: [cff-oyie]
 created: 2026-08-20T15:41:17Z
@@ -134,3 +134,7 @@ Selected-scale validation split. Legend: prerequisite --> dependent
                                           +--> [ ] cff-0oqo source recovery
 
 The focused cohort replaces an obsolete three-horizon/reference-chain rerun. Dependency records remain the source of truth.
+
+**2026-08-21T08:30:46Z**
+
+Completed without adding an outer globalizer. CFFG commit 7405d60 makes the canonical installed-parameter runtime maximum the rSLDS certificate while retaining legacy and functional diagnostics. Experiment commits fd319ce, 98af82d, and 7dbf84d give matched SLDS coherent terminal state/runtime semantics, reject censored convergence times, and preserve historical validation. The complete selected-scale artifact at experiment commit 57e2e8e has 12/12 converged arms, zero censored rows, unchanged 0.1/two-hit rule, maximum 15 maps, and derived budget 19. Focused hostile-input/runtime/integration tests passed; cff-oyie is unchanged; no final seed ran. This unblocks cff-0oqo.
