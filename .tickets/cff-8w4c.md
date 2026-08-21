@@ -83,3 +83,10 @@ implementations, baseline and candidate priors, calibration and future final
 protocols, isolated and modern runtimes, checkpoints, manifests, and aggregate
 recomputation must stay aligned. Exact-zero support, nearly deterministic
 gates, non-finite draws, and one failed coordinate must remain explicit.
+
+**2026-08-21T06:51:44Z**
+
+Code-only study implementation completed in the sibling experiment and integrated on `rslds-repair-integration`: d00b776 adds the declared four-strength/two-family/three-seed study, 4ae9a9c binds it to the real cff-tlh3 authority, and 7bb020d reuses the six baseline classic CFFG fits as cff-3v7q replicate-0 checkpoints. Candidate strength reaches both CFFG and adapter tiers from one prior object with byte-identity digests. The command rejects the current pilot artifact and permits execution only after cff-tlh3 reports `complete_converged`, all 12 arms converged, no censoring/final seeds, and a derived budget. Code validation passed (106 prior-study tests plus 64 checkpoint/integration tests); no study fit, chain, or dataset ran yet.
+
+Future eligible command:
+uv run python -m cffg_nascar_validation.prior_study --protocol artifacts/rslds-dual-calibration/selected-protocol.json --scale-budget artifacts/rslds-selected-scale-outer-development/results.json --output artifacts/rslds-shared-prior-development
