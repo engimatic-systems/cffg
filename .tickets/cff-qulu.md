@@ -1,7 +1,7 @@
 ---
 id: cff-qulu
 status: open
-deps: []
+deps: [cff-0xjq]
 links: [cff-oyie]
 created: 2026-08-20T15:41:17Z
 type: bug
