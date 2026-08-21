@@ -1,6 +1,6 @@
 ---
 id: cff-2wb6
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-21T12:11:58Z
@@ -58,7 +58,7 @@ Legend: prerequisite --> dependent
 ```text
 [x] heterogeneous selected-scale budget (cff-tlh3)
       |
-      +--> [ ] classic family convergence measurement (this ticket)
+      +--> [x] classic family convergence measurement (this ticket)
                   |
                   +--> [ ] cff-8w4c staged prior screen
                   |
@@ -88,3 +88,7 @@ execution-equivalence checks pass. Next, after separate expansion
 authorization, use `cffg-rslds-classic-scale-convergence run` with that output
 plus `--resume --expand`; stop on the first true hidden-solve censor, outer
 censor, or divergence.
+
+**2026-08-21T18:58:37Z**
+
+Full declared schema-v2 expansion completed and validates at experiment artifact commit 6e3edc3 (run-control guard 6026d52; pinned imported execution identity c55ba69; CFFG 7405d60). All 12 development arms converged under the unchanged 0.1/two-hit certificate. Each table cell is outer maps / maximum successful inner iterations / wall seconds: seed 5000: same-K 2/183/205.2, shared 13/6315/7324.2, native 10/5809/3524.4, K=5 12/225/1026.6; seed 5001: same-K 4/222/365.2, shared 5/4771/1517.6, native 5/4771/1518.9, K=5 7/240/630.4; seed 5002: same-K 6/221/521.3, shared 11/2154/2525.8, native 8/1153/1665.1, K=5 10/223/866.7. No arm was inner- or outer-right-censored, divergent, non-finite, or checkpoint-failed. The only rejected retry was the retained seed-5000 shared 8000-iteration damping-0.9 attempt; its later registered damping-0.8 retry converged in 4488, so the solve and arm are converged. The cohort therefore derives classic family budgets: inner 8000 iterations per attempt, retaining the diagnostic cap because a rejected capped retry occurred; outer 17 completed maps from max observed 13 using max(8, ceil(1.25*max), max+4). Aggregate arm wall was 21691.37 seconds, including imported pilot work; peak RSS was 7772733440 bytes. Six converged CFFG periodicity checkpoints are retained. Artifact: artifacts/rslds-classic-scale-convergence-development-reclassified. No adapters, calibration seeds, or final seeds ran. cff-8w4c may now use the measured classic budgets, and cff-3v7q may reuse the retained checkpoints.

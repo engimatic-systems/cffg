@@ -147,3 +147,7 @@ No family budget is derived from the two-arm pilot, and no expansion, adapter,
 data generation, or fit ran. The pilot now permits the separately authorized
 cff-2wb6 expansion; cff-l5ag remains downstream of that declared cohort rather
 than blocked on an inner-classifier decision.
+
+**2026-08-21T18:58:37Z**
+
+Classic-scale convergence blocker resolved by the completed cff-2wb6 schema-v2 cohort at experiment commit 6e3edc3. All 12 declared development arms converged with zero inner/outer censor rows and zero non-finite paths. Maximum completed outer convergence time was 13 maps; maximum successful inner attempt was 6315 iterations. The registered rule selects outer budget 17 and retains inner cap 8000 because seed-5000 shared had one rejected capped attempt followed by a successful retry. The full artifact validates and retains six CFFG periodicity checkpoints. This clears cff-8w4c to conduct its staged classic prior screen under family-valid budgets. It does not run an adapter, repair mixing, or change the cff-l5ag claim; cff-l5ag remains downstream of cff-8w4c.
