@@ -120,6 +120,7 @@ class RSLDSFitPhase:
     parameter_scales_before: dict[str, float]
     parameter_scales_after: dict[str, float]
     fixed_point_residual: float | None
+    legacy_fixed_point_residual: float | None = None
     runtime_residual: CoordinateResidual | None = None
     functional_transition_residual: CoordinateResidual | None = None
 
@@ -373,7 +374,9 @@ def fit_rslds(
     Every outer coordinate reruns hidden-state inference with one compiled
     engine, replaces all conjugate posteriors from ``priors``, and installs the
     resulting point parameters into a fresh state. Two consecutive
-    fixed-point residuals at or below ``outer_tolerance`` certify convergence.
+    installed-runtime-map residuals at or below ``outer_tolerance`` certify
+    convergence. The historical mixed-snapshot residual and a truth-free
+    transition-function residual remain phase diagnostics.
     A finite exhausted inner solve may restart from the same state with a
     larger convex update step, up to ``max_inner_retries`` times. The terminal
     state is inferred once after the last parameter replacement.
@@ -545,17 +548,18 @@ def fit_rslds(
             candidate_learning.replace(engine, inner)
             candidate_points = _point_parameters(candidate_learning)
             candidate_snapshot = legacy_snapshot(candidate_learning, candidate_points)
-            residual = legacy_fixed_point_residual(
+            legacy_residual = legacy_fixed_point_residual(
                 current_snapshot, candidate_snapshot
             )
-            if not np.isfinite(residual):
-                raise ValueError("outer fixed-point residual is non-finite")
+            if not np.isfinite(legacy_residual):
+                raise ValueError("legacy outer fixed-point residual is non-finite")
             candidate_runtime_blocks = learned_runtime_blocks(
                 candidate_learning, candidate_points
             )
             runtime_residual = coordinate_residual(
                 current_runtime_blocks, candidate_runtime_blocks
             )
+            residual = runtime_residual.maximum
             functional_residual = transition_residual(
                 current_points, candidate_points, probe_states
             )
@@ -599,6 +603,7 @@ def fit_rslds(
                 parameter_scales_before=scales_before,
                 parameter_scales_after=_parameter_scales(candidate_points),
                 fixed_point_residual=residual,
+                legacy_fixed_point_residual=legacy_residual,
                 runtime_residual=runtime_residual,
                 functional_transition_residual=functional_residual,
             )
