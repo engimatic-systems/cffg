@@ -1,6 +1,6 @@
 ---
 id: cff-888k
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-21T03:20:06Z
@@ -82,3 +82,7 @@ initialization tiers, raw checkpoints, result aggregation, calibration, and
 future final execution must stay aligned. A large classic trajectory is the
 uncomfortable-scale input. The reference runtime is float64-only, so float32
 is N/A.
+
+**2026-08-21T04:08:51Z**
+
+Implemented and integrated in experiment commit 65454da (source 95bb83a). Every retained adapter chain now reports label-invariant occupancy, persistent/transient classification, missing labels, occupancy runs, and labeled transition/gate exposures under a fixed 25%-of-draws rule with a two-draw minimum. Persistent collapse prevents eligibility; partial not-ready chains retain available occupancy evidence. Protocol, calibration, checkpoint, aggregate, and future-freeze validation carry the rule without altering cff-oyie. Combined integration validation: 61 focused passes, 13 protocol passes, and 47 surrounding passes; no chain, fit, or final seed ran.
