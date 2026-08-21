@@ -1,6 +1,6 @@
 ---
 id: cff-3v7q
-status: open
+status: in_progress
 deps: []
 links: [cff-oyie]
 created: 2026-08-20T15:41:17Z
@@ -90,3 +90,21 @@ Legend: prerequisite --> dependent
                   |
                   +--> [ ] fresh classic parity run
 ```
+
+**2026-08-21T06:31:13Z**
+
+Safe prerequisite landed in the sibling experiment as commit 8604da9 and was integrated as fdde5d4. The frozen seed-2001 native score is 0.4058051268 against floor 0.4109805203, a 0.0051753935 miss. Exact retrospective decomposition is impossible because cff-oyie retained no native CFFG parameter arrays or initial-state law. The new development-only diagnostic registers 3 data seeds x 2 tiers x 2 fit replicates = 12 fits, each crossed with 4 rollout streams, and hardens constant/nonfinite/unbounded/float32/10,000-step scoring without changing frozen evidence. Shared-prior baseline classic coordinates will durably provide the six replicate-0 checkpoints through integration commit 7bb020d; six declared replicate-1 development fits remain before replay. No fit, chain, calibration seed, or final seed ran for this ticket.
+
+Legend: prerequisite --> dependent
+
+[ x ] score/checkpoint/replay prerequisite (8604da9)
+  |
+  +--> [ ] six baseline replicate-0 checkpoints from cff-8w4c
+  |       |
+  |       +--> [ ] six replicate-1 classic development fits
+  |                 |
+  |                 +--> [ ] 12-fit x 4-rollout decomposition
+  |                           |
+  |                           +--> [ ] cff-3v7q decision
+  |
+  +--> [ ] fresh parity freeze (downstream)
