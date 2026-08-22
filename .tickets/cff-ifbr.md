@@ -1,6 +1,6 @@
 ---
 id: cff-ifbr
-status: open
+status: in_progress
 deps: [cff-fbmr]
 links: []
 created: 2026-08-22T15:57:08Z
