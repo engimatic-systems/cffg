@@ -1,6 +1,6 @@
 ---
 id: cff-ngxx
-status: open
+status: in_progress
 deps: [cff-xwtz]
 links: []
 created: 2026-08-22T19:52:31Z
@@ -67,3 +67,7 @@ Legend: prerequisite --> dependent
                               +--> [ ] cff-0oqo bounded recovery
 ```
 
+
+**2026-08-22T19:54:11Z**
+
+Implementation start from the authenticated cff-xwtz checkpoint. The first phase is diagnostic-only: enumerate the predeclared learned/generating initial, dynamics, and recurrence block substitutions with generating continuous states held only inside post-fit evaluation. No fitting or production change begins until a single block or smallest block interaction restores both frozen recovery caps and its local learning statistics are independently audited.
