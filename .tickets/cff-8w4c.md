@@ -1,6 +1,6 @@
 ---
 id: cff-8w4c
-status: in_progress
+status: closed
 deps: [cff-jq9p, cff-888k, cff-2wb6]
 links: []
 created: 2026-08-21T03:20:06Z
@@ -104,3 +104,7 @@ Corrected x64 funnel attempt 0003 completed and validates under experiment code 
 **2026-08-22T13:57:16Z**
 
 2026-08-22 screen handoff: The registered seed5000 screen completed all four declared recurrence strengths (0.001, 0.1, 0.3, 1.0) across canonical-homogeneous and source-heterogeneous families, both tiers, both implementations, and matched controls. The screen stage validates from manifests and coordinate checkpoints at experiment artifact commit 96b560d (execution authority df48ab0; CFFG 7405d60; JAX x64). Wall time was 50,803.60 seconds. All CFFG fits and controls converged and all adapter chains completed, but expansion_eligible_strengths is empty. Baseline 0.001 and 0.1 missed native classic periodicity and failed claim mixing; 0.3 had one unbounded shared classic rollout and failed claim mixing; 1.0 passed all eight classic periodicity cells but both classic adapter tiers still failed claim mixing. On heterogeneous 1.0, shared mixing passed (R-hat 1.02021, ESS 220.727) with no collapse, while native mixing failed and chain 3 had a persistent 58-draw empty-component run against threshold 50. Both heterogeneous 1.0 recovery pairs exceeded the <=0.150 ceilings (shared probability/contrast RMSE 0.275405/0.224425; native 0.171525/0.240256). The registered status is complete_no_expansion_eligible_candidates. No expand stage, calibration seed, or final seed ran. Artifact: artifacts/rslds-shared-prior-development/stages/screen/results.json. cff-8w4c stays in progress at the requested decision boundary; cff-l5ag must decide the next sampler/inference repair because shared recurrence strength alone is insufficient.
+
+**2026-08-22T14:00:11Z**
+
+Completed negative-result handoff. The manifested screen at experiment commit 96b560d evaluated all four declared strengths across both families and tiers under x64, retained both implementations, controls, claim/raw mixing, occupancy, adequacy, recovery, checkpoints, and runtime identities, and selected no candidate. The registered expansion set is empty, so no expansion, calibration, or final seed ran. Shared recurrence strength alone is falsified as the repair: prior 1.0 passed all eight classic periodicity cells and heterogeneous shared claim mixing, but classic mixing failed in both tiers, heterogeneous native mixing collapsed/failed, and both heterogeneous recovery outcomes exceeded 0.150. Downstream work remains cff-l5ag for the adapter sampler and cff-0oqo for CFFG recovery.
