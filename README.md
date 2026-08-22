@@ -233,6 +233,21 @@ zero natural statistics, so an unexposed source/stick retains its prior. The
 rollover is an empirical-Bayes point estimate; it does not claim to carry
 weight uncertainty inside inference.
 
+`cffg.structured_hybrid` is the independently callable D10 authority for a
+whole recurrent switching chain. `categorical_coordinate` returns one
+log-space path belief, `gaussian_coordinate` returns block-Gaussian means,
+marginal covariances, and oriented adjacent-time moments, and
+`structured_hybrid_sweep` records the previous, post-categorical,
+fixed-auxiliary post-Gaussian, and auxiliary-reoptimized objectives. Its
+learning-statistic calls return values without installing parameters.
+Conditioned drives and `K=1` use explicit D9 and Gaussian-only reductions.
+Numerical failure is loud through `proper=False`, positive-infinity objective
+or residual values, and `SWEEP_DIVERGED`.
+
+This module is a pure mathematical authority, not current `Engine` behavior.
+Production rSLDS models still use the D3/D9 path below until the compiler,
+runtime energy owner, learning source, and persistence identity are integrated.
+
 ### Recurrent switching state-space models
 
 The model helper assembles a complete rSLDS with state-dependent regime

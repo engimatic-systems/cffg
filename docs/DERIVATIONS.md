@@ -2113,8 +2113,8 @@ caps. Replacing either dynamics alone or recurrence alone restores both caps;
 replacing the initial regime distribution does not. Independent NumPy
 calculations reproduce all 5,119 occurrences in each D3 and D9 factor-local
 statistic family and their conjugate natural-parameter updates. The remaining
-owner is therefore the
-boundary between switching dynamics and recurrence, not either local rule.
+owner is therefore the boundary between switching dynamics and recurrence,
+not either local rule.
 
 The smallest reusable variational repair is a named connected-component
 coordinate with one categorical path belief `q_Z` and one Gaussian trajectory
@@ -2129,8 +2129,8 @@ This choice is deliberately smaller than a conditional Gaussian mixture on
 every path prefix. Such a mixture grows exponentially unless it is projected
 after every step, returning to an expectation-propagation objective without a
 global evidence bound. The selected family is less expressive but has exact
-coordinate updates, a single auditable free energy, block-tridiagonal Gaussian
-work, and `O(T K^2)` categorical work.
+coordinates for the expanded PG/JJ bound, a single auditable free energy,
+block-tridiagonal Gaussian work, and `O(T K^2)` categorical work.
 
 ### D10.2 Family and expected dynamics evidence
 
@@ -2191,13 +2191,16 @@ all `m_t`, `M_t`, and lag moments `C_t` in `O(T d^3)` time and `O(T d^2)`
 storage. A non-positive-definite block, non-finite moment, or infeasible
 literal support is divergence, never a vacuous success.
 
-The inference coordinate alternates D9's analytic auxiliary update, (D10.3),
-and (D10.4) until the one objective in D10.5 meets a dtype-scaled certificate.
-Flooding may propose a damped joint update, but status requires the installed
-coordinate's free energy and both categorical and Gaussian residuals. A fixed
-drive reduces the categorical side to D9 exact smoothing. `K=1` removes the
-categorical coordinate and reduces the Gaussian side to an ordinary linear
-Gaussian chain.
+The inference coordinate updates the analytic PG/JJ auxiliary, then (D10.3),
+then (D10.4) while the auxiliary is fixed. The Gaussian step is an exact
+coordinate of that expanded bound; it is not an exact minimizer of the
+nonquadratic objective obtained by eliminating the auxiliary. Reoptimizing the
+auxiliary after (D10.4) gives the collapsed objective at a complete sweep
+boundary. Status compares those boundary values and both categorical and
+Gaussian residuals. A fixed drive is a conditioned-variable branch that
+reduces directly to D9 exact smoothing; it is not represented by a singular
+`q_X`. `K=1` bypasses the D9 functions, removes the categorical coordinate,
+and reduces the Gaussian side to an ordinary linear Gaussian chain.
 
 ### D10.4 Shared learning statistics
 
@@ -2218,35 +2221,60 @@ exact zero statistics and retains the applicable prior coordinate.
 
 ### D10.5 Free energy, bound, and ownership
 
-After eliminating the coordinate-optimal PG auxiliaries into `ell_t`, the
-component variational free energy is
+For a fixed auxiliary `xi_til`, let
 
-    F_H^JJ = -H[q_Z] - H[q_X]
+    omega_til = tanh(xi_til/2) / (2 xi_til),
+    c_til = log sigma(xi_til) - xi_til/2
+            + omega_til xi_til^2/2 - omega_til E[psi_til^2]/2.
+
+Replacing D9.2's optimized common score by `c_til` gives the decision-list
+table `ell_t^xi(i,j;q_X)`. It is quadratic in the moments of `q_X`. The
+expanded component objective is
+
+    F_H^(JJ,xi) = -H[q_Z] - H[q_X]
              - E[log p(z_0)] - E[log p(x_0)]
+             - sum_tk gamma_t(k) u_t(k)
              - sum_t E[log p(y_t|x_t)]
              - sum_(t=1)^N sum_k gamma_t(k) d_t(k)
-             - sum_(t=0)^(N-1) sum_ij rho_t(i,j) ell_t(i,j). (D10.6)
+             - sum_(t=0)^(N-1) sum_ij
+                   rho_t(i,j) ell_t^xi(i,j;q_X).             (D10.6)
 
-Terms in (D10.6) use one `q_Z`, one `q_X`, and immutable installed
-parameters. Each coordinate in D10.3--D10.4 is the stationary coordinate of
-this objective. Because D9's expected log transition is a lower bound,
+The explicit unary term is the same `u_t` used by (D10.3). Omitting it would
+make that categorical update nonstationary for (D10.6). For fixed `xi`,
+(D10.3) and (D10.4) are exact coordinates of (D10.6). A complete
+`xi -> q_Z -> q_X` sweep cannot increase the expanded objective. Reoptimizing
+`xi_til^2=E[psi_til^2]` gives the collapsed boundary value
 
-    F_H^JJ(q_Z,q_X) >= F_H^exact(q_Z,q_X) >= -log p(y),       (D10.7)
+    F_H^JJ(q_Z,q_X) = min_xi F_H^(JJ,xi)(q_Z,q_X).            (D10.7)
 
-for every feasible `q_Z q_X`; minimizing preserves both inequalities. This
-conservative direction differs from D3's optimistic
-collapsed-mixture Bethe ledger. Production must therefore give a detected
-structured hybrid component one energy owner: it suppresses the internal D3
-dynamics and D9 recurrence node/edge accounting that (D10.6) replaces. Unary
-attachments provide potentials to the component and retain only boundary
-terms proven not to duplicate its two global entropies.
+Only a joint fixed point is stationary for this collapsed objective. Because
+the optimized JJ expected log transition remains a lower bound,
+
+    F_H^JJ(q_Z,q_X) >= F_H^exact(q_Z,q_X) >= -log p(y),       (D10.8)
+
+for every feasible `q_Z q_X`; minimizing preserves both inequalities. Except
+in a tight fixed-drive or K=1 reduction, no equality with exact evidence is
+claimed.
+
+This conservative direction differs from D3's optimistic collapsed-mixture
+Bethe ledger. Production must give a detected structured hybrid component one
+energy owner. For the first supported rSLDS topology, that owner consumes and
+replaces the ordinary energy contributions of the regime-independent
+Gaussian `x_0` prior, shared `gaussian_linear` emissions, D3 dynamics, D9
+recurrence, and their internal categorical/Gaussian separator corrections.
+Observed values and normalization constants enter (D10.6), but no replaced
+node or edge term remains in the ordinary ledger.
 
 The compiler may derive a `StructuredHybridPlan` without changing serialized
-factor spelling. Eligibility is explicit: one acyclic D9 recurrence chain,
-destination-selected `gaussian_mixture_linear` dynamics with matching
-cardinality and Gaussian state chain, supported Gaussian initial/emission
-attachments, ordinary BFE, and no recurrence or component-owned
-P-substitution. An ineligible graph keeps current D3/D9 behavior rather than
+factor spelling. It follows equality closures to map each `z_t` to the D9
+source/destination and destination-selected D3 factor, and each `x_t` to the
+dynamics, recurrence drive, initial, and emission roles. Initial production
+eligibility is narrower than the pure mathematics: one acyclic D9 recurrence
+chain, matching destination-selected `gaussian_mixture_linear` dynamics, one
+regime-independent Gaussian `x_0` prior, shared `gaussian_linear` emissions,
+no extra categorical unary attachment, ordinary BFE, and no component-owned
+P-substitution. Selected initial-state laws, regime-specific emissions, or
+extra attachments require additional terms and are rejected rather than
 silently claiming D10. Current checkpoints remain D9 and cannot resume a D10
 component; runtime state and learning checkpoints require a new executable,
 belief, statistic, and objective identity.
@@ -2269,14 +2297,24 @@ Two smaller-looking changes do not meet the evidence:
 Before production dispatch, a pure authority must establish:
 
 - K=2/K=3 D10.3 and D10.4 coordinates against independent NumPy algebra,
-  including lag moments and one complete evaluation of D10.6;
-- coordinate stationarity and non-increasing finite `F_H^JJ`, with exact
-  agreement to direct finite-state/Gaussian integration where a tiny case is
-  analytically enumerable;
-- D9 fixed-drive and K=1 Gaussian reductions;
+  including oriented lag moments and one complete evaluation of D10.6;
+- non-increasing finite expanded-bound coordinate sweeps and collapsed-bound
+  stationarity only at a joint fixed point;
+- independent `F_H^JJ` agreement plus
+  `F_H^JJ >= F_H^exact >= -log p(y)` on a tiny integrated case, without an
+  uncertain-drive equality claim;
+- conditioned fixed-drive D9 and explicit K=1 Gaussian bypasses;
 - bit-consistent inference and learning masses for D10.5 and D9.14;
 - exact-zero support, float32 guards, improper/non-finite failure, K=8 and
   T>=100 without path enumeration; and
 - the unchanged source-heterogeneous seed-5000/native 0.150 caps. Failure of
   either cap leaves the new semantic unqualified and preserves current D9
   production behavior.
+
+The pure authority is executable in
+`tests/test_structured_hybrid_coordinates.py` and
+`tests/test_structured_hybrid_objective.py`. The first test file checks K=2
+and K=3 path enumeration, the K=3/D=2 noncommuting dense Gaussian oracle,
+lag orientation, fixed-drive D9, K=1, and JIT. The second checks every expanded
+sweep boundary, the conservative integrated bound, shared learning
+statistics, literal zeros, float32, invalid inputs, and K=8/T=100 storage.

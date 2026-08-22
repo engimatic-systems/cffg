@@ -342,15 +342,17 @@ Replacing either learned dynamics alone or learned recurrence alone restored
 both caps; changing only the initial-regime distribution did not. Independent
 oracles reproduced all 5,119 occurrences in each D3 and D9 factor-local
 statistic family and their posterior natural parameters. Current production
-therefore remains honest D3
-assumed-density plus D9 structured categorical inference, with the bound
+therefore remains honest D3 assumed-density plus D9 structured categorical
+inference, with the bound
 directions and local guarantees in S1d/S1i, but it does not claim stationarity
 for one full recurrent-switching variational free energy. D10 derives the
-planned structured-mean-field component that would make the categorical path,
+structured-mean-field component that would make the categorical path,
 Gaussian trajectory, both learning readouts, and one conservative objective
-share a coordinate. That design is not production behavior until its pure
-authority, compiler/engine dispatch, persistence identity, and unchanged
-development recovery gates pass.
+share a coordinate. Its pure authority and independent oracles now exist,
+including the required distinction between fixed-auxiliary expanded sweeps
+and collapsed sweep-boundary values. Production behavior is still unchanged:
+compiler/engine dispatch, energy suppression, persistence identity, and the
+unchanged development recovery gates remain downstream.
 
 The end-to-end `cffg.models.rslds` helpers preserve these same approximation
 boundaries. `RSLDSLearning.update` accumulates initial-regime, per-regime

@@ -39,11 +39,14 @@ and must not read generating states or parameters.
    cross moments that agree with an independent NumPy authority within a
    tolerance derived from the active floating dtype.
 4. One objective authority evaluates every term in D10.6 from the returned
-   beliefs. Exact coordinate updates are stationary for that objective, and a
-   completed finite coordinate does not increase it beyond a dtype-scaled
-   tolerance.
-5. D10 reduces to the existing D9 exact categorical smoother when drives are
-   fixed and to an ordinary linear Gaussian chain when K=1.
+   beliefs, including arbitrary categorical unary evidence. The analytic
+   auxiliary, categorical, and fixed-auxiliary Gaussian updates are exact
+   coordinates of the expanded PG/JJ bound. A complete finite sweep does not
+   increase that bound beyond a dtype-scaled tolerance; only a joint fixed
+   point claims stationarity for the auxiliary-eliminated objective.
+5. A conditioned drive reduces directly to the existing D9 exact categorical
+   smoother without constructing a singular Gaussian belief. K=1 bypasses D9
+   and reduces to an ordinary linear Gaussian chain.
 6. The returned singleton, pair, Gaussian, and lag moments independently reproduce
    the D10.5 component-MNIW increments and D9.14 PG increments. This ticket
    returns the values through the module API but does not install learned
@@ -53,8 +56,9 @@ and must not read generating states or parameters.
    return a loud divergent or invalid status. Float32 guards come from the
    dtype. K=8 and T>=100 run without regime-path enumeration or cubic work in
    T.
-8. The authority states the conservative bound in D10.7 and does not reuse
-   D3's optimistic collapsed-mixture ledger label.
+8. The authority states the conservative bound in D10.8 and does not reuse
+   D3's optimistic collapsed-mixture ledger label or claim uncertain-drive
+   equality with exact evidence.
 
 ## Methodological Suggestions — HOW
 

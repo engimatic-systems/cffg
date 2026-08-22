@@ -352,20 +352,33 @@ constructs all four posteriors from immutable priors, calls
 cannot count the same sequence as a new trial or expose a partly replaced
 coordinate.
 
-The D10 structured hybrid boundary is derived but not yet dispatched in
-production. For an explicitly eligible recurrent switching component it will
-replace the combination of D3 mixture collapse and D9 recurrence sweeps with
-one structured-mean-field coordinate over a categorical path and a Gaussian
-Markov trajectory. The serialized `recurrence_link` and
-`gaussian_mixture_linear` factors remain the source of truth; a compiler-owned
-`StructuredHybridPlan` is derived metadata, not a new model spelling. D10.3
-adds expected dynamics evidence to the existing D9 chain, D10.4 performs one
-block-tridiagonal Gaussian solve from the same singleton/pair beliefs, and
-D10.5 supplies component-MNIW and PG learning from those beliefs. One
-component energy owns D10.6 and suppresses duplicated internal D3/D9 ledger
-terms. Until that compiler, engine, learning, and persistence path lands,
-ordinary models continue to execute the documented D3 and D9 semantics and
-must not claim D10's joint certificate or conservative bound.
+The pure `cffg.structured_hybrid` D10 authority exists, but it is not yet
+dispatched in production. It exposes exact log-space categorical and
+block-tridiagonal Gaussian coordinates, explicit fixed/optimized PG
+auxiliaries, expanded and collapsed objective checkpoints, lag moments, and
+learning statistics. A complete auxiliary, categorical, Gaussian, auxiliary
+sweep is monotone for the expanded bound; only its joint fixed point is
+stationary for the collapsed bound.
+
+For an explicitly eligible recurrent switching component, later production
+dispatch will replace D3 mixture collapse and D9 recurrence sweeps with that
+coordinate. Serialized `recurrence_link` and `gaussian_mixture_linear`
+factors remain the source of truth; a compiler-owned `StructuredHybridPlan`
+is derived metadata. The plan follows equality closures to map each regime
+and Gaussian time index. Initial eligibility is the exact `models.rslds`
+boundary: an acyclic recurrence chain, matching destination-selected
+dynamics, a regime-independent Gaussian initial state, shared Gaussian-linear
+emissions, no extra categorical unary attachment, ordinary BFE, and no
+component P-substitution. Selected initial laws, regime-specific emissions,
+and extra attachments remain on D3/D9.
+
+The D10 energy owner must replace the ordinary initial, emission, D3, D9, and
+internal separator ledger terms whose potentials it consumes; retaining any
+of those terms would double count. Conditioned drives bypass the Gaussian
+coordinate and reduce to D9. `K=1` bypasses D9 and reduces to the Gaussian
+chain. Until compiler, engine, learning, and persistence integration lands,
+ordinary models continue to execute documented D3/D9 semantics and must not
+claim D10's joint certificate or conservative bound.
 
 Both cadences install point rollovers through role-bearing addresses into a
 fresh observation-bound state. The compiled engine and every runtime shape
