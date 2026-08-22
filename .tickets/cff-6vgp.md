@@ -1,6 +1,6 @@
 ---
 id: cff-6vgp
-status: open
+status: in_progress
 deps: [cff-yr0d]
 links: []
 created: 2026-08-22T15:57:07Z
