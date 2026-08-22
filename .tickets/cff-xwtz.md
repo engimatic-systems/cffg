@@ -1,6 +1,6 @@
 ---
 id: cff-xwtz
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-22T19:11:04Z
@@ -121,3 +121,11 @@ Legend: prerequisite --> dependent
 **2026-08-22T19:13:52Z**
 
 Implementation start from authenticated cff-h0hx seed-5000/native D9 checkpoint. The diagnostic reuses the converged fit and must not rerun fitting. It independently reconstructs categorical-chain evidence and reruns categorical smoothing under inferred versus generating continuous-state diagnostic inputs, while keeping learned parameters fixed. The decision must name the first owner that disagrees and preserve the no-fit truth boundary.
+
+**2026-08-22T19:53:12Z**
+
+Completed from the authenticated cff-h0hx seed-5000/native D9 checkpoint without fitting. Experiment implementation commits ca22520..e87c907 and manifested artifact commit aeb0365; results SHA-256 d486ad5c480d9833934200bb04114bb89f29d6edf3129d75ce1a10ebba04f412; manifest SHA-256 db9986e23f2f378f834e6e0cb2deeca3193897c00bc02b1a1807973500647865. Runtime CFFG identity remained 76fe090 / cffg.recurrence.d9-structured-pair/1.0.0. No fit, outer map, adapter, SLDS control, calibration seed, or final seed ran.
+
+After registered fixed-parameter reconstruction and a no-learning dtype-scaled refinement, the independent dynamics-selector Gaussian integral matches production to 4.64e-11. Independent log-space forward/backward matches CFFG singleton, pair, destination message, and source message to 5.59e-10, 5.50e-10, 3.58e-10, and 1.40e-9 respectively, all below 5.96e-8. The fresh fixed-point reconstruction does not reproduce the retained terminal categorical boundary within 0.01 (largest 0.031735 at z0 regime3 / switch1 pair[3,3]), although drive mean/covariance reproduce within 1.21e-4 / 4.36e-6; this localized alternate-fixed-point evidence is retained and does not alter the exact conditional-message result.
+
+Actual categorical re-smoothing with generating continuous states but learned parameters still fails: regime accuracy 0.910547, M-step budget exhausted at 160 coordinates, worst-source 0.202719, worst contrast 0.309087. Fully inferred is 0.899805 and 0.203602/0.312650. Full generating dynamics+recurrence authority reaches regime accuracy 0.997656, converges in 131 M-step coordinates, and passes at 0.033182/0.039697. The owner is an internally correct but biased coupled variational fit, not categorical message combination or the local D3 selector integral. Falsifier: learned parameters with generating states pass both 0.150 caps, or a local message/statistic oracle finds an explanatory algebra mismatch. cff-ngxx owns the cross-parameter localization and repair; D9 remains in place. Focused final validation: 65 passed in 19.08s; authenticated replay validator passed.

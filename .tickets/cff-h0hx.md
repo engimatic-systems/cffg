@@ -1,7 +1,7 @@
 ---
 id: cff-h0hx
 status: in_progress
-deps: [cff-ifbr, cff-63dd, cff-xwtz]
+deps: [cff-ifbr, cff-63dd, cff-xwtz, cff-ngxx]
 links: []
 created: 2026-08-22T15:57:08Z
 type: task
@@ -97,3 +97,7 @@ Implementation start after cff-ifbr and cff-63dd integration. The experiment mus
 **2026-08-22T19:11:56Z**
 
 Authenticated D9 pilot falsifier. Experiment code commits be10f86 and 5669f6c; immutable artifact commit 2802507. Root results SHA-256 eb30d3a3096ba190318850733bb868a29350548d8e712bd527dd45acdaaca1bb; manifest SHA-256 81f2a6627ad7f426473039b02bf05fd1abdd77047211586ca3f16397323e73d7. Only source_heterogeneous seed 5000, native_end_to_end, replicate 0 ran. No shared tier, expansion, adapter, control, calibration seed, or final seed ran. The D9 fit converged in 9 outer maps with 5,647 total inner iterations, no retries, coherent certified/returned coordinate/8, final runtime residual 0.0626068, fit wall 731.30 seconds, full arm wall 776.27 seconds, and peak RSS 4,582,457,344 bytes. The unchanged gate failed: worst-source RMSE 0.204837 and worst source-contrast RMSE 0.318117 versus 0.150. Pair-derived pooled exposure/linear/quadratic agree within 2.51e-12/1.10e-11/4.37e-11; posterior consistency, affine alignment, exhaustive labels, and coverage checks do not explain the miss. Truth-joint plus inferred-continuous clamping passes at 0.033130/0.038246, while inferred-joint plus truth-continuous fails at 0.203728/0.312649. This localizes the next question to categorical responsibilities. Keep D9: reverting would restore the proven singleton-product defect. cff-xwtz owns the no-refit continuous-clamped categorical smoothing oracle. Leave this ticket in progress; rerun no additional coordinate until that mechanism is resolved.
+
+**2026-08-22T19:53:12Z**
+
+cff-xwtz completed its no-refit diagnosis. Exact categorical messages and the D3 dynamics-selector integral agree with independent authorities, but generating-state smoothing under learned parameters still fails 0.202719/0.309087 while the full generating authority passes 0.033182/0.039697. Do not rerun the h0hx fit yet. New dependency cff-ngxx owns the coupled variational learning repair; current D9 remains valid and historical evidence remains immutable.
