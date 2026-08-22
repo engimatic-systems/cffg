@@ -386,3 +386,34 @@ def test_d9_checkpoint_cannot_resume_d10_learning():
     _template, _arrays, engine, restored = _runtime()
     with pytest.raises(ValueError, match="unknown learning checkpoint version"):
         restored.load_state_dict(checkpoint)
+
+
+def test_restricted_learning_rejects_d9_d10_statistic_authority_mismatch():
+    _template, _arrays, d10_engine, d10_learning = _runtime()
+    _template, _arrays, d9_engine, d9_learning = _legacy_runtime()
+    d10_result = d10_engine.run(d10_engine.init_state(), 200, tol=1e-8)
+    d9_result = d9_engine.run(d9_engine.init_state(), 200, tol=1e-8)
+    d10_result.require_converged()
+    d9_result.require_converged()
+
+    with pytest.raises(ValueError, match="statistic authority"):
+        d10_learning.replace(d9_engine, d9_result, only=("recurrence",))
+    with pytest.raises(ValueError, match="statistic authority"):
+        d9_learning.replace(d10_engine, d10_result, only=("recurrence",))
+
+
+def test_restricted_d10_checkpoint_rejects_observation_domain_change():
+    _template, arrays, _engine, source = _runtime()
+    changed = dict(arrays)
+    changed["emission_matrix"] = np.asarray([[1.0], [0.5]])
+    changed["emission_offset"] = np.zeros(2)
+    changed["emission_covariance"] = np.eye(2)
+    template, changed = rslds(3, **changed)
+    engine = Engine(compile_template(template, arrays=changed))
+    restored = Learnables(
+        engine,
+        priors={"recurrence": _recurrence_prior()},
+        only=("recurrence",),
+    )
+    with pytest.raises(ValueError, match="topology identity"):
+        restored.load_state_dict(source.state_dict())

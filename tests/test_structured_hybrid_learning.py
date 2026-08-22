@@ -8,12 +8,17 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
+from cffg import conj
 from cffg.compiler import compile_template
 from cffg.core.compose import scoped
 from cffg.engine import Engine, RunStatus, _replace
 from cffg.learn import FAMILIES, Learnables
 from cffg.models.rslds import RSLDSLearning, rslds
-from cffg.models.rslds_fit import _run_inner, vague_rslds_fit_priors
+from cffg.models.rslds_fit import (
+    _attempt_evidence,
+    _run_inner,
+    vague_rslds_fit_priors,
+)
 from cffg.structured_hybrid_runtime import runtime_key
 
 
@@ -269,6 +274,41 @@ def test_exact_zero_d10_source_and_component_mass_retains_prior_bits():
         )
 
 
+def test_all_masked_d10_emissions_retain_asymmetric_prior_bits():
+    template, arrays = _model()
+    engine = Engine(compile_template(template, arrays=arrays))
+    result = engine.run(engine.init_state(), 80, tol=2e-5)
+    result.require_converged()
+    priors = vague_rslds_fit_priors(3, 2, 2).learning_priors()
+    priors["emission"] = conj.MNIW(
+        np.asarray([[0.3, -0.2, 0.1], [-0.4, 0.25, 0.15]], dtype=np.float32),
+        np.asarray(
+            [[1.7, 0.2, -0.1], [0.2, 1.4, 0.15], [-0.1, 0.15, 1.2]],
+            dtype=np.float32,
+        ),
+        np.asarray([[1.8, 0.35], [0.35, 1.3]], dtype=np.float32),
+        6.0,
+    )
+    learning = Learnables(engine, priors=priors)
+    before = {key: value.copy() for key, value in learning.params["emission"].items()}
+
+    stats = engine.learning_readout(result.state, "gaussian_node_stats")
+    plan = engine.arena.structured_hybrid_plans[0]
+    assert all(stats[name]["mask"] == 0.0 for name in plan.topology.emission_members)
+    learning.replace(engine, result, only=("emission",))
+    for key, value in before.items():
+        np.testing.assert_array_equal(learning.params["emission"][key], value)
+
+    invalid = {
+        "Syy": np.zeros((2, 2)),
+        "Syx": np.ones((2, 3)),
+        "Sxx": np.zeros((3, 3)),
+        "n": np.asarray(0.0),
+    }
+    with pytest.raises(ValueError, match="zero-occurrence.*nonzero"):
+        FAMILIES["mniw"].fold(before, invalid)
+
+
 def test_d10_retry_boundary_rejects_damping_and_install_rebuilds_coordinate():
     engine, result, _observations = _converged()
     priors = vague_rslds_fit_priors(3, 2, 2)
@@ -283,6 +323,9 @@ def test_d10_retry_boundary_rejects_damping_and_install_rebuilds_coordinate():
     assert int(installed.params[runtime_key(plan, "status")]) == 0
     with pytest.raises(ValueError, match="do not accept damping"):
         engine.run(installed, 1, damp=0.5)
+    exhausted = engine.run(installed, 0, tol=1e-8)
+    assert exhausted.status is RunStatus.BUDGET_EXHAUSTED
+    assert _attempt_evidence(engine, exhausted, 0.0).gaussian_beliefs_proper
     _bounded, attempts = _run_inner(
         engine,
         installed,

@@ -237,6 +237,12 @@ class MNIWFamily:
             or float(n) < 0.0
         ):
             raise ValueError("MNIW statistics and occurrence count must be finite")
+        if float(n) == 0.0:
+            if any(np.any(value != 0.0) for value in (syy, syx, sxx)):
+                raise ValueError(
+                    "zero-occurrence MNIW update has nonzero statistics"
+                )
+            return _copy_params(params)
         return self.as_params(prior.update(syy, syx, sxx, float(n)))
 
     def rollover(self, params, ftype) -> dict[str, np.ndarray]:

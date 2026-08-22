@@ -52,6 +52,20 @@ _D10_STATISTICS = {
 }
 
 
+def learning_statistic_identity(
+    identity: Mapping[str, object] | None,
+    family: str,
+    factor_type: str,
+) -> str | None:
+    """Return the statistic authority for one learnable plan."""
+    key = (family, factor_type)
+    if identity is not None:
+        return _D10_STATISTICS.get(key)
+    if key == ("pg_weights", "recurrence_link"):
+        return RECURRENCE_STATISTIC_IDENTITY
+    return None
+
+
 def _recurrence_plans(plans: Mapping[str, object]) -> list[object]:
     return sorted(
         (
@@ -142,6 +156,13 @@ def d10_checkpoint_identity(engine) -> dict | None:
             "state_edges": [list(row) for row in topology.state_edges],
             "observation_edges": list(topology.observation_edges),
             "observation_rows": np.asarray(plan.observation_rows).tolist(),
+            "observation_dimensions": [
+                int(
+                    engine.arena.g_obs_starts[row + 1]
+                    - engine.arena.g_obs_starts[row]
+                )
+                for row in np.asarray(plan.observation_rows)
+            ],
         },
     }
 

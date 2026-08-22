@@ -140,13 +140,16 @@ class RSLDSFitPhase:
 class RSLDSFitResult:
     """Terminal fitting status, fitted parameters, and inner-solve evidence.
 
-    ``state``, ``parameters``, and the learned posteriors all belong to
-    ``returned_coordinate``. A converged result returns the already evaluated
+    ``state`` and ``parameters`` belong to ``returned_coordinate``. Learned
+    posteriors belong to that coordinate when they are non-``None``. They are
+    unavailable when fitting fails before the first learned proposal is
+    installed, because initializer point parameters do not carry conjugate
+    evidence. A converged result returns the already evaluated
     ``certified_coordinate``; an exhausted result performs a terminal solve at
-    its last installed coordinate. ``model_posterior`` carries the current D10
-    structured-pair statistic identity and may be checkpointed for resume;
-    point ``parameters`` alone are a model initialization, not a resumable
-    posterior.
+    its last installed coordinate. A non-``None`` ``model_posterior`` carries
+    the current D10 structured-pair statistic identity and may be checkpointed
+    for resume; point ``parameters`` alone are a model initialization, not a
+    resumable posterior.
     """
 
     engine: Engine
@@ -159,8 +162,8 @@ class RSLDSFitResult:
     free_energies: tuple[float, ...]
     parameters: dict[str, np.ndarray]
     initialization: RSLDSInitialization
-    model_posterior: RSLDSLearning
-    emission_posterior: dict[str, np.ndarray]
+    model_posterior: RSLDSLearning | None
+    emission_posterior: dict[str, np.ndarray] | None
     last_inference: RunResult | None
     phases: tuple[RSLDSFitPhase, ...]
     timings: dict[str, float]
@@ -266,12 +269,18 @@ def _attempt_evidence(
     damping: float,
 ) -> RSLDSInferenceAttempt:
     try:
-        statistics = engine.learning_readout(
-            result.state, "gaussian_node_stats"
-        )
-        gaussian_beliefs_proper = bool(statistics) and all(
-            bool(row["proper"]) for row in statistics.values()
-        )
+        if getattr(engine.arena, "structured_hybrid_plans", ()):
+            beliefs = engine.structured_hybrid_beliefs(result.state)
+            gaussian_beliefs_proper = bool(beliefs) and all(
+                bool(row["proper"]) for row in beliefs.values()
+            )
+        else:
+            statistics = engine.learning_readout(
+                result.state, "gaussian_node_stats"
+            )
+            gaussian_beliefs_proper = bool(statistics) and all(
+                bool(row["proper"]) for row in statistics.values()
+            )
     except (FloatingPointError, np.linalg.LinAlgError, ValueError):
         gaussian_beliefs_proper = False
     state_finite = all(
@@ -347,7 +356,7 @@ def _result(
     free_energies: list[float],
     points: dict[str, np.ndarray],
     initialization: RSLDSInitialization,
-    learning: Learnables,
+    learning: Learnables | None,
     last_inference: RunResult | None,
     phases: list[RSLDSFitPhase],
     timings: dict[str, float],
@@ -366,11 +375,17 @@ def _result(
         free_energies=tuple(free_energies),
         parameters={name: np.asarray(value).copy() for name, value in points.items()},
         initialization=initialization,
-        model_posterior=RSLDSLearning._from_runtime(learning),
-        emission_posterior={
-            key: np.asarray(value).copy()
-            for key, value in learning.params[EMISSION_LEARNABLE].items()
-        },
+        model_posterior=(
+            None if learning is None else RSLDSLearning._from_runtime(learning)
+        ),
+        emission_posterior=(
+            None
+            if learning is None
+            else {
+                key: np.asarray(value).copy()
+                for key, value in learning.params[EMISSION_LEARNABLE].items()
+            }
+        ),
         last_inference=last_inference,
         phases=tuple(phases),
         timings=dict(timings),
@@ -461,7 +476,8 @@ def fit_rslds(
     started = time.perf_counter()
     engine = Engine(compile_template(template, arrays=model_arrays), schedule=schedule)
     compile_seconds = time.perf_counter() - started
-    current_learning = Learnables(engine, priors=priors.learning_priors())
+    prior_learning = Learnables(engine, priors=priors.learning_priors())
+    current_learning: Learnables | None = None
     current_points = {
         name: arrays[name]
         for name in (
@@ -476,7 +492,7 @@ def fit_rslds(
             "emission_covariance",
         )
     }
-    current_snapshot = legacy_snapshot(current_learning, current_points)
+    current_snapshot = legacy_snapshot(prior_learning, current_points)
     current_runtime_blocks = initial_runtime_blocks(current_points)
     probe_states = observation_probe_states(observations, initialization)
     current_state = engine.bind_data(

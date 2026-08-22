@@ -205,6 +205,8 @@ def test_fit_replaces_one_sequence_coordinates_and_reuses_one_engine(monkeypatch
 
     assert result.status is RunStatus.CONVERGED
     assert result.inner_status is RunStatus.CONVERGED
+    assert result.model_posterior is not None
+    assert result.emission_posterior is not None
     assert (
         result.model_posterior.recurrence_statistic_identity
         == D10_RECURRENCE_STATISTIC_IDENTITY
@@ -407,6 +409,8 @@ def test_nonfinite_proposed_coordinate_diverges_without_installing_it(monkeypatc
     assert result.phases[-1].proposed_coordinate == "coordinate/1"
     assert result.phases[-1].installed_coordinate == "coordinate/0"
     assert not result.phases[-1].coordinate_replaced
+    assert result.model_posterior is None
+    assert result.emission_posterior is None
     assert all(np.all(np.isfinite(value)) for value in result.parameters.values())
 
 
@@ -540,6 +544,9 @@ def test_inner_budget_status_is_preserved():
     assert result.status is RunStatus.BUDGET_EXHAUSTED
     assert result.inner_status is RunStatus.BUDGET_EXHAUSTED
     assert result.error == "inner inference budget_exhausted"
+    assert result.returned_coordinate == "coordinate/0"
+    assert result.model_posterior is None
+    assert result.emission_posterior is None
 
 
 def test_deterministic_retry_rejects_mu3_engines_before_running():

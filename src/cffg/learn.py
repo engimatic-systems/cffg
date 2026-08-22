@@ -62,6 +62,7 @@ from cffg.learning_checkpoint import (
     checkpoint_context,
     d10_checkpoint_identity,
     encode_manifest,
+    learning_statistic_identity,
 )
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -473,6 +474,7 @@ class Learnables:
     def _selected_plans(
         self, engine: "Engine", only: tuple[str, ...] | None
     ) -> list["LearnPlan"]:
+        engine_identity = d10_checkpoint_identity(engine)
         plans = {plan.name: plan for plan in engine.arena.learn_plans}
         if only is None:
             names = (
@@ -501,6 +503,21 @@ class Learnables:
             ):
                 raise ValueError(
                     f"learnable {plan.name!r} has an incompatible plan in this engine"
+                )
+            expected_authority = learning_statistic_identity(
+                self._checkpoint_identity,
+                original.family,
+                original.ftype,
+            )
+            actual_authority = learning_statistic_identity(
+                engine_identity,
+                plan.family,
+                plan.ftype,
+            )
+            if expected_authority != actual_authority:
+                raise ValueError(
+                    f"learnable {plan.name!r} has statistic authority "
+                    f"{actual_authority!r}, expected {expected_authority!r}"
                 )
         return selected
 
