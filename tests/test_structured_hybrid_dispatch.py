@@ -477,6 +477,21 @@ def test_status_distinguishes_budget_convergence_and_divergence():
     assert failed.iterations == 0
 
 
+def test_rebinding_nonfinite_observation_as_missing_restores_d10_state():
+    template, arrays = _model(4)
+    engine = Engine(compile_template(template, arrays=arrays))
+    observations = _observations(4)
+    observations["y0"] = np.asarray([np.nan])
+    invalid = engine.bind_data(engine.init_state(), observations)
+    assert engine.run(invalid, 2, tol=1e-8).status is RunStatus.DIVERGED
+
+    missing = engine.bind_data(invalid, {"y0": None})
+    result = engine.run(missing, 40, tol=1e-8)
+    assert result.status is RunStatus.CONVERGED
+    assert np.isfinite(engine.bfe(result.state))
+    assert bool(_only_belief(engine, result.state)["proper"])
+
+
 def test_exact_zero_support_and_float32_remain_literal():
     template, arrays = _model(4, dtype=np.float32)
     arrays["initial_regime_probability"] = np.array([1.0, 0.0], np.float32)

@@ -904,6 +904,7 @@ class Engine:
             if port in self.arena.ef_data:
                 row, fam = self.arena.ef_data[port]
                 if value is None:
+                    ef_obs = ef_obs.at[row].set(0.0)
                     ef_mask = ef_mask.at[row].set(0.0)
                     continue
                 validator = kernels.observation_validator(fam)
@@ -916,7 +917,9 @@ class Engine:
                 continue
             if port in self.arena.gauss_data:
                 row, dim = self.arena.gauss_data[port]
+                idx = self.arena.g_obs_indices(row, dim)
                 if value is None:
+                    g_obs = g_obs.at[idx].set(jnp.zeros(dim, dtype=g_obs.dtype))
                     g_mask = g_mask.at[row].set(0.0)
                 else:
                     val = np.asarray(value, dtype=np.float64).reshape(-1)
@@ -924,7 +927,6 @@ class Engine:
                         raise ValueError(
                             f"port {port!r}: observation has dim {val.shape[0]}, edge has {dim}"
                         )
-                    idx = self.arena.g_obs_indices(row, dim)
                     g_obs = g_obs.at[idx].set(jnp.asarray(val, dtype=g_obs.dtype))
                     g_mask = g_mask.at[row].set(1.0)
                 continue
