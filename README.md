@@ -244,8 +244,8 @@ Conditioned drives and `K=1` use explicit D9 and Gaussian-only reductions.
 Numerical failure is loud through `proper=False`, positive-infinity objective
 or residual values, and `SWEEP_DIVERGED`.
 
-The compiler now dispatches this authority for the exact fixed-parameter,
-tied-boundary rSLDS topology: one acyclic recurrence chain, matching
+The compiler dispatches this authority for the exact fixed-parameter or
+four-family learned tied-boundary rSLDS topology: one acyclic recurrence chain, matching
 destination-selected dynamics, one regime-independent Gaussian initial law,
 and one shared conditioned emission per state. The installed coordinate is
 available from `engine.structured_hybrid_beliefs(state)` with source-row /
@@ -254,10 +254,10 @@ objective, separate categorical/Gaussian/objective residuals, literal support,
 and propriety. Flood and mixed schedules use the same unfused component step;
 `Engine.run` reports converged, budget-exhausted, or diverged from that state.
 
-The standard `rslds(...)` helper declares learnables, whose statistic and
-checkpoint migration belongs to the next integration step. Such graphs retain
-D3/D9 without a D10 claim. For fixed-parameter inference, remove the declared
-learning consumers before compiling:
+The standard `rslds(...)` helper declares exactly the initial-regime,
+component-dynamics, recurrence, and shared-emission learnables, so it uses the
+same D10 coordinate for inference and all four statistic families. Removing
+the declarations remains a supported model-only fixed-parameter spelling:
 
 ```python
 from dataclasses import replace
@@ -268,15 +268,17 @@ result = engine.run(engine.bind_data(engine.init_state(), observations), 100, to
 belief = next(iter(engine.structured_hybrid_beliefs(result.state).values()))
 ```
 
-`cffg.params.set_params` invalidates this derived trajectory coordinate after
-any point-parameter write. Call `engine.reset_structured_hybrid` on the updated
-state, or bind the next data (which performs the reset), before the next step,
-run, free-energy call, or belief readout. These entry points reject a stale
-coordinate explicitly. An empty update leaves the coordinate valid.
+`cffg.params.set_params` and `Learnables.write` invalidate this derived
+trajectory coordinate after any point-parameter write. Call
+`engine.reset_structured_hybrid` on the updated state, or bind the next data
+(which performs the reset), before the next step, run, free-energy call, or
+belief/readout. `RSLDSLearning.install` performs that reset itself. These entry
+points reject a stale coordinate explicitly. An empty update leaves it valid.
 
 Extra attachments, untied boundary laws, loops, and component GFE or
 P-substitution retain D3/D9 or fail at their existing compile-time boundary.
-Serialized factor spelling and persistence formats are unchanged.
+Serialized factor spelling is unchanged. Learned runtime persistence uses the
+versioned D10 manifest described below.
 
 ### Recurrent switching state-space models
 
@@ -332,18 +334,18 @@ already represent the ordinary source-specific transition baseline; multiplying
 a separate `matrix_cat` into the same transition would require a new normalized
 factor and free-energy derivation.
 
-Recurrence checkpoints include a scalar manifest naming
-`cffg.recurrence.d9-structured-pair/1.0.0`, the contributing factor sources,
-parameter blobs, hyperparameter dtypes, and shapes. A pre-manifest `v2:` or
-slash-key checkpoint may contain D8 singleton-product statistics and is
-therefore rejected for recurrence, even though its array keys and shapes still
-fit. `vague_rslds_learning` and direct `RSLDSLearning(...)` construction define
-fresh priors; `update` and `load_state_dict` return objects explicitly marked
-with the D9 identity. To carry an old posterior forward as a prior, construct a
-new prior deliberately and rerun inference; do not relabel the old checkpoint
-as a D9 posterior. That is a new D9 run, not checkpoint resume; CFFG provides
-no D8-posterior migration. Per-array digests bind the manifest to the exact
-persisted values.
+D10 learned checkpoints include a scalar schema-2 manifest naming the D10
+executable, JJ-BFE objective, installed singleton/pair/Gaussian-lag coordinate,
+and separate initial, component-MNIW, PG-pair, and emission-MNIW statistics.
+It also binds ordered component topology, source ownership, parameter blobs,
+hyperparameter dtypes/shapes, and exact-value digests. A D8, D9, pre-manifest,
+unknown, incomplete, or tampered posterior is rejected before mutation even
+when its template hash and arrays still fit. Model-only bundles contain no
+posterior and remain loadable; recompilation selects current semantics.
+`vague_rslds_learning` and direct `RSLDSLearning(...)` construction define
+fresh priors. Carrying a historical posterior forward requires declaring it as
+a new prior and rerunning inference; historical statistics are never relabeled
+as D10 resume state.
 
 For one-sequence observed-only fitting, use the host-side coordinate loop. It
 chooses latent coordinates from the observations, compiles one engine, and
@@ -399,10 +401,11 @@ separate from the scale-normalized outer fixed-point residual. That residual
 compares the normalized initial-regime potential and every dynamics,
 recurrence, and emission value installed into the next solve. The historical
 posterior/reporting snapshot and a truth-free transition-function residual
-remain available in `fit.phases` as diagnostics. After a finite
-inner budget exhaustion, the default two retries restart from the same fresh
-state and double the convex update fraction while preserving the fixed point;
-`max_inner_retries=0` retains one fixed-damping attempt. `fit.phases` records
+remain available in `fit.phases` as diagnostics. The D10 coordinate accepts no
+damping. A finite D10 inner budget exhaustion is one right-censored attempt:
+repeating the identical deterministic coordinate cannot globalize it, so
+`max_inner_retries` does not duplicate the run. Legacy D3/D9 fits retain the
+bounded convex-damping retry schedule. `fit.phases` records
 each damping, status, recurrence status, energy and message-delta tail,
 Gaussian propriety check, and parameter scale. The default outer tolerance is
 dtype-scaled and must hold twice consecutively. A finite outer iteration limit

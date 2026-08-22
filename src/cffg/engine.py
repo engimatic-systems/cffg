@@ -2192,6 +2192,35 @@ class Engine:
             }
         return out
 
+    def learning_readout(
+        self, state: State, name: str
+    ) -> dict[str, object]:
+        """Read one statistic family from the installed inference coordinate."""
+        if self.arena.structured_hybrid_plans:
+            self._require_structured_fresh(state)
+            if len(self.arena.structured_hybrid_plans) != 1:
+                raise ValueError("D10 learning requires one whole-template component")
+            readouts = hybrid_runtime.component_learning_readouts(
+                self.arena,
+                self.arena.structured_hybrid_plans[0],
+                state.g_obs,
+                state.g_mask,
+                state.params,
+            )
+            try:
+                return readouts[name]
+            except KeyError:
+                raise KeyError(f"D10 has no learning readout {name!r}") from None
+        legacy = {
+            "node_beliefs": self.node_beliefs,
+            "gaussian_node_stats": self.gaussian_node_stats,
+            "recurrence_weight_stats": self.recurrence_weight_stats,
+        }
+        try:
+            return legacy[name](state)
+        except KeyError:
+            raise KeyError(f"engine has no learning readout {name!r}") from None
+
     def recurrence_pair_beliefs(
         self, state: State
     ) -> dict[str, dict[str, np.ndarray]]:

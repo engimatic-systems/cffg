@@ -13,6 +13,10 @@ from cffg.engine import Engine, RunStatus
 from cffg.learn import Learnables
 from cffg.learning_checkpoint import (
     CHECKPOINT_MANIFEST_KEY,
+    D10_CHECKPOINT_VERSION,
+    D10_EXECUTABLE_IDENTITY,
+    D10_OBJECTIVE_IDENTITY,
+    D10_RECURRENCE_STATISTIC_IDENTITY,
     RECURRENCE_CHECKPOINT_VERSION,
     RECURRENCE_PRIOR_IDENTITY,
     RECURRENCE_STATISTIC_IDENTITY,
@@ -60,6 +64,21 @@ def _runtime(dtype=np.float64):
     return template, arrays, engine, learning
 
 
+def _legacy_runtime(dtype=np.float64):
+    template, arrays = _model(dtype)
+    template = dataclasses.replace(
+        template,
+        learnables={"recurrence": template.learnables["recurrence"]},
+    )
+    engine = Engine(compile_template(template, arrays=arrays))
+    learning = Learnables(
+        engine,
+        priors={"recurrence": _recurrence_prior(dtype)},
+    )
+    assert not engine.arena.structured_hybrid_plans
+    return template, arrays, engine, learning
+
+
 def _copy(checkpoint):
     return {name: np.asarray(value).copy() for name, value in checkpoint.items()}
 
@@ -82,8 +101,8 @@ def test_current_checkpoint_round_trips_identity_ownership_dtype_and_values(dtyp
     checkpoint = source.state_dict()
     document = _manifest(checkpoint)
 
-    assert document["checkpoint_version"] == RECURRENCE_CHECKPOINT_VERSION
-    assert document["statistic_identity"] == RECURRENCE_STATISTIC_IDENTITY
+    assert document["checkpoint_version"] == D10_CHECKPOINT_VERSION
+    assert document["executable_identity"] == D10_EXECUTABLE_IDENTITY
     assert len(document["learnables"]) == 1
     descriptor = document["learnables"][0]
     assert descriptor["name"] == "recurrence"
@@ -123,6 +142,31 @@ def test_current_checkpoint_round_trips_identity_ownership_dtype_and_values(dtyp
     )
 
 
+def test_full_d10_manifest_names_all_statistic_owners_and_component_topology():
+    _template, _arrays, engine, _source = _runtime()
+    learning = Learnables(
+        engine,
+        priors=vague_rslds_fit_priors(2, 1, 1).learning_priors(),
+    )
+    document = _manifest(learning.state_dict())
+    assert document["objective_identity"] == D10_OBJECTIVE_IDENTITY
+    assert document["component"]["recurrence_members"] == [
+        "switch1",
+        "switch2",
+    ]
+    assert document["component"]["observation_rows"] == [0, 1, 2]
+    assert {row["name"] for row in document["learnables"]} == {
+        "initial_regime",
+        "dynamics",
+        "recurrence",
+        "emission",
+    }
+    identities = {
+        row["statistic_identity"] for row in document["learnables"]
+    }
+    assert len(identities) == 4
+
+
 def test_unidentified_v2_and_slash_recurrence_state_are_rejected():
     _template, _arrays, engine, source = _runtime()
     versioned_without_identity = source.hyperparameter_snapshot()
@@ -137,12 +181,19 @@ def test_unidentified_v2_and_slash_recurrence_state_are_rejected():
             only=("recurrence",),
         )
         before = _copy(restored.hyperparameter_snapshot())
-        with pytest.raises(ValueError, match="no statistic identity"):
+        with pytest.raises(ValueError, match="no .*statistic identity"):
             restored.load_state_dict(checkpoint)
         for key, value in before.items():
             np.testing.assert_array_equal(
                 restored.hyperparameter_snapshot()[key], value
             )
+    restored = Learnables(
+        engine,
+        priors={"recurrence": _recurrence_prior()},
+        only=("recurrence",),
+    )
+    with pytest.raises(ValueError, match="no executable/statistic identity"):
+        restored.load_state_dict({})
 
 
 @pytest.mark.parametrize(
@@ -150,16 +201,27 @@ def test_unidentified_v2_and_slash_recurrence_state_are_rejected():
     (
         (
             lambda value: {**value, "checkpoint_version": "99.0.0"},
-            "unknown recurrence checkpoint version",
+            "unknown learning checkpoint version",
         ),
         (
             lambda value: {
                 **value,
-                "statistic_identity": (
+                "executable_identity": (
                     "cffg.recurrence.d8-singleton-product/1.0.0"
                 ),
             },
-            "statistic identity",
+            "executable",
+        ),
+        (
+            lambda value: {**value, "objective_identity": "unknown"},
+            "objective",
+        ),
+        (
+            lambda value: {
+                **value,
+                "component": {**value["component"], "cardinality": 7},
+            },
+            "topology",
         ),
         (
             lambda value: {
@@ -250,13 +312,13 @@ def test_structure_hash_cannot_identify_recurrence_statistic_semantics():
     template_identity = structure_hash(template)
     checkpoint = source.state_dict()
     legacy = _manifest(checkpoint)
-    legacy["statistic_identity"] = (
+    legacy["executable_identity"] = (
         "cffg.recurrence.d8-singleton-product/1.0.0"
     )
 
     assert structure_hash(template) == template_identity
-    assert RECURRENCE_STATISTIC_IDENTITY not in to_json(template)
-    with pytest.raises(ValueError, match="statistic identity"):
+    assert D10_EXECUTABLE_IDENTITY not in to_json(template)
+    with pytest.raises(ValueError, match="executable"):
         Learnables(
             engine,
             priors={"recurrence": _recurrence_prior()},
@@ -275,9 +337,9 @@ def test_model_only_bundle_stays_loadable_and_runs_current_pair_semantics(tmp_pa
     engine = Engine(compile_template(restored, arrays=restored_arrays))
     result = engine.run(engine.init_state(), 200, tol=1e-8)
     assert result.status is RunStatus.CONVERGED
-    pairs = engine.recurrence_pair_beliefs(result.state)
-    assert set(pairs) == {"switch1", "switch2"}
-    assert all(bool(pair["proper"]) for pair in pairs.values())
+    beliefs = engine.structured_hybrid_beliefs(result.state)
+    assert len(beliefs) == 1
+    assert bool(next(iter(beliefs.values()))["proper"])
 
 
 def test_rslds_facade_marks_priors_and_restores_only_structured_state():
@@ -288,7 +350,7 @@ def test_rslds_facade_marks_priors_and_restores_only_structured_state():
     restored = vague_rslds_learning(2, 1).load_state_dict(engine, checkpoint)
     assert (
         restored.recurrence_statistic_identity
-        == RECURRENCE_STATISTIC_IDENTITY
+        == D10_RECURRENCE_STATISTIC_IDENTITY
     )
     for name, value in prior.parameter_arrays().items():
         np.testing.assert_array_equal(restored.parameter_arrays()[name], value)
@@ -312,3 +374,15 @@ def test_fit_legacy_numeric_snapshot_excludes_checkpoint_manifest():
     assert CHECKPOINT_MANIFEST_KEY in checkpoint
     assert all(np.issubdtype(value.dtype, np.number) for value in snapshot.values())
     assert not any(CHECKPOINT_MANIFEST_KEY in key for key in snapshot)
+
+
+def test_d9_checkpoint_cannot_resume_d10_learning():
+    _template, _arrays, _legacy_engine, source = _legacy_runtime()
+    checkpoint = source.state_dict()
+    document = _manifest(checkpoint)
+    assert document["checkpoint_version"] == RECURRENCE_CHECKPOINT_VERSION
+    assert document["statistic_identity"] == RECURRENCE_STATISTIC_IDENTITY
+
+    _template, _arrays, engine, restored = _runtime()
+    with pytest.raises(ValueError, match="unknown learning checkpoint version"):
+        restored.load_state_dict(checkpoint)

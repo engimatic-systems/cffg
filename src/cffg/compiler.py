@@ -394,6 +394,35 @@ class LearnPlan:
     targets: tuple[LearnTarget, ...]
 
 
+def _d10_learning_reason(
+    topology: StructuredHybridTopology,
+    plans: list[LearnPlan],
+) -> str | None:
+    """Return why declared learning cannot share the D10 coordinate."""
+    if not plans:
+        return None
+    expected = {
+        ("dirichlet", "categorical"): {topology.initial_regime_member},
+        ("component_mniw", "gaussian_mixture_linear"): set(
+            topology.dynamics_members
+        ),
+        ("pg_weights", "recurrence_link"): set(topology.recurrence_members),
+        ("mniw", "gaussian_linear"): set(topology.emission_members),
+    }
+    actual: dict[tuple[str, str], set[str]] = {}
+    for plan in plans:
+        key = (plan.family, plan.ftype)
+        if key in actual:
+            return "D10 requires one posterior owner per learned factor family"
+        actual[key] = set(plan.sources)
+    if actual != expected:
+        return (
+            "declared learning does not exactly own the D10 initial, dynamics, "
+            "recurrence, and emission sources"
+        )
+    return None
+
+
 @dataclass(frozen=True)
 class GfePlan:
     """A P-substituted goal-observation composite (Part II §4): matrix_cat
@@ -1830,14 +1859,26 @@ def compile_template(
             )
         )
 
+    learn_plans = _resolve_learnables(
+        t, resolved, groups, member_of, composite_keys
+    )
     structured_hybrid_plans: tuple[StructuredHybridPlan, ...] = ()
     structured_hybrid_reason = (
         "min-sum does not define a D10 free-energy component"
         if structured_hybrid is None
         else structured_hybrid.reason
     )
-    if structured_hybrid is not None and structured_hybrid.topology is not None:
-        topology = structured_hybrid.topology
+    topology = (
+        structured_hybrid.topology
+        if structured_hybrid is not None
+        else None
+    )
+    if topology is not None:
+        learning_reason = _d10_learning_reason(topology, learn_plans)
+        if learning_reason is not None:
+            structured_hybrid_reason = learning_reason
+            topology = None
+    if topology is not None:
         observation_row_by_member = {
             member: int(group.obs_rows[index])
             for group in gauss_groups
@@ -1981,7 +2022,7 @@ def compile_template(
         delta_pairs=delta_pairs,
         member_of=member_of,
         writable_members=frozenset(writable_members),
-        learn_plans=_resolve_learnables(t, resolved, groups, member_of, composite_keys),
+        learn_plans=learn_plans,
     )
 
 

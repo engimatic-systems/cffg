@@ -192,6 +192,22 @@ def _apply_runtime_writes(
     return out
 
 
+def _invalidate_structured_hybrid(params, plans, *, changed: bool):
+    """Mark derived D10 beliefs stale after any successful point write."""
+    out = dict(params)
+    if not changed:
+        return out
+    for plan in plans:
+        prefix = f"d10:{plan.name}:"
+        out[prefix + "status"] = jnp.asarray(
+            SWEEP_STALE, dtype=out[prefix + "status"].dtype
+        )
+        out[prefix + "run_status"] = jnp.asarray(
+            SWEEP_STALE, dtype=out[prefix + "run_status"].dtype
+        )
+    return out
+
+
 def set_params(
     engine: "Engine",
     params: Mapping[str, object],
@@ -264,12 +280,6 @@ def set_params(
                 )
             )
     out = _apply_runtime_writes(params, writes)
-    for plan in engine.arena.structured_hybrid_plans if writes else ():
-        prefix = f"d10:{plan.name}:"
-        out[prefix + "status"] = jnp.asarray(
-            SWEEP_STALE, dtype=out[prefix + "status"].dtype
-        )
-        out[prefix + "run_status"] = jnp.asarray(
-            SWEEP_STALE, dtype=out[prefix + "run_status"].dtype
-        )
-    return out
+    return _invalidate_structured_hybrid(
+        out, engine.arena.structured_hybrid_plans, changed=bool(writes)
+    )

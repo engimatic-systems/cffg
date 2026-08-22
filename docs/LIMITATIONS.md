@@ -314,9 +314,10 @@ posteriors for `[weight; offset]`. It rolls only posterior means into the next
 inference state. Thus weight uncertainty does not enter recurrence messages or
 the next PG coordinate; this is empirical-Bayes variational EM, not full joint
 VB over weights and auxiliaries. The pair is derived from the current state
-rather than independently serialized. Learned recurrence checkpoints identify
-the D9 structured-pair statistic, factor/source ownership, dtype, shapes, and
-exact-value digests.
+rather than independently serialized. Non-D10 recurrence checkpoints identify
+the D9 structured-pair statistic. Eligible whole-rSLDS learned checkpoints
+instead bind the D10 executable, objective, all four statistic families,
+topology/source ownership, dtype, shapes, and exact-value digests.
 Pre-manifest D8 and early unidentified D9 posterior arrays share the same keys
 and shapes, so both are conservatively rejected instead of silently resumed.
 Model-only bundles contain no posterior state and continue to load under the
@@ -350,13 +351,16 @@ structured-mean-field component that would make the categorical path,
 Gaussian trajectory, both learning readouts, and one conservative objective
 share a coordinate. Its pure authority and independent oracles now exist,
 including the required distinction between fixed-auxiliary expanded sweeps
-and collapsed sweep-boundary values. Production fixed-parameter inference now
-dispatches D10 only for the exact tied-boundary whole-template topology. Its
+and collapsed sweep-boundary values. Production fixed-parameter and exactly
+four-family learned inference now dispatch D10 only for the exact tied-boundary
+whole-template topology. Its
 installed trajectory state and single objective owner replace D3/D9 and all
-consumed separator terms. The standard rSLDS helper still declares learning
-consumers, so it deliberately retains D3/D9 until the learning readouts and
-persistence identity migrate. That migration and the unchanged development
-recovery gates remain downstream.
+consumed separator terms. The standard rSLDS helper's initial, dynamics,
+recurrence, and emission learning consumers read that same installed
+coordinate. Schema-2 learned checkpoints bind D10 executable, objective,
+statistic, and topology identity and reject historical D8/D9 resume state. The
+unchanged development recovery gates remain downstream; this engine result
+does not itself establish recovery.
 
 The end-to-end `cffg.models.rslds` helpers preserve these same approximation
 boundaries. `RSLDSLearning.update` accumulates initial-regime, per-regime

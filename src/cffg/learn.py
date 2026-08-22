@@ -57,7 +57,10 @@ import numpy as np
 from cffg import ef, efrules
 from cffg.learning_checkpoint import (
     CHECKPOINT_MANIFEST_KEY,
+    D10_RECURRENCE_STATISTIC_IDENTITY,
+    RECURRENCE_STATISTIC_IDENTITY,
     checkpoint_context,
+    d10_checkpoint_identity,
     encode_manifest,
 )
 
@@ -73,11 +76,12 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 #: sufficient statistics of the same nodes, which is a different readout of
 #: the same object, not a different object.
 READOUTS = {
-    "node_beliefs": lambda engine, state: engine.node_beliefs(state),
-    "gaussian_node_stats": lambda engine, state: engine.gaussian_node_stats(state),
-    "recurrence_weight_stats": lambda engine, state: engine.recurrence_weight_stats(
-        state
-    ),
+    name: lambda engine, state, name=name: engine.learning_readout(state, name)
+    for name in (
+        "node_beliefs",
+        "gaussian_node_stats",
+        "recurrence_weight_stats",
+    )
 }
 
 
@@ -357,6 +361,7 @@ class Learnables:
                 )
             names = tuple(dict.fromkeys(only))
         self.plans = {name: engine_plans[name] for name in names}
+        self._checkpoint_identity = d10_checkpoint_identity(engine)
         self._restricted = only is not None
         self.params: dict[str, dict[str, np.ndarray]] = {}
         initial_params: dict[str, MappingProxyType] = {}
@@ -511,7 +516,11 @@ class Learnables:
         the parameter role its blob fills, so a family with several
         parameters writes each one where it belongs."""
         from cffg.compiler import NEG
-        from cffg.params import _RuntimeWrite, _apply_runtime_writes
+        from cffg.params import (
+            _RuntimeWrite,
+            _apply_runtime_writes,
+            _invalidate_structured_hybrid,
+        )
 
         writes: list[_RuntimeWrite] = []
         for plan in self._selected_plans(engine, only):
@@ -552,7 +561,10 @@ class Learnables:
                         f"learnable {name!r}: rollover role {tgt.role!r} is non-finite"
                     )
                 writes.append(_RuntimeWrite(tgt.key, tgt.index, value))
-        return _apply_runtime_writes(params, writes)
+        out = _apply_runtime_writes(params, writes)
+        return _invalidate_structured_hybrid(
+            out, engine.arena.structured_hybrid_plans, changed=bool(writes)
+        )
 
     # -- readouts and persistence -----------------------------------------
 
@@ -596,24 +608,28 @@ class Learnables:
         }
 
     def state_dict(self) -> dict[str, np.ndarray]:
-        """Versioned hyperparameters plus required recurrence identity.
+        """Versioned hyperparameters plus required statistic identity.
 
         A delimiter alone is insufficient: scoped learnable names contain
         ``/``, and one valid learnable name can equal another learnable's
         apparent ``name/key`` spelling. Encoding the two components
         independently makes the boundary structural rather than inferred.
-        A recurrence manifest additionally binds D9 statistic semantics,
-        source ownership, shapes, and dtypes because those facts are absent
-        from the unchanged template structure hash.
+        The manifest binds D9 recurrence or D10 component semantics, source
+        ownership, shapes, and dtypes because those facts are absent from the
+        unchanged template structure hash.
         """
         data = self.hyperparameter_snapshot()
-        manifest = encode_manifest(self.plans, self.params)
+        manifest = encode_manifest(
+            self.plans, self.params, self._checkpoint_identity
+        )
         if manifest is not None:
             data[CHECKPOINT_MANIFEST_KEY] = manifest
         return data
 
     def load_state_dict(self, data: dict[str, np.ndarray]) -> None:
-        recurrence = checkpoint_context(data, self.plans, self.params)
+        recurrence = checkpoint_context(
+            data, self.plans, self.params, self._checkpoint_identity
+        )
         pending = {
             name: {key: value.copy() for key, value in params.items()}
             for name, params in self.params.items()
@@ -685,3 +701,12 @@ class Learnables:
             plan = self.plans[name]
             FAMILIES[plan.family].validate_prior(name, pending[name], plan.shapes)
         self.params.update({name: pending[name] for name in changed})
+
+    @property
+    def recurrence_statistic_identity(self) -> str:
+        """Versioned recurrence statistic used by this runtime."""
+        return (
+            D10_RECURRENCE_STATISTIC_IDENTITY
+            if self._checkpoint_identity is not None
+            else RECURRENCE_STATISTIC_IDENTITY
+        )

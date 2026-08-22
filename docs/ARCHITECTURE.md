@@ -343,7 +343,7 @@ initial-regime, dynamics, and recurrence boundary; its distinct-trial
 `update`, checkpoint, and installation operations delegate to a restricted
 runtime and leave the historical fixed emission unchanged. A freshly
 constructed facade labels its recurrence block as an unlearned prior;
-`update`, fitted posteriors, and checkpoint restore carry the current D9
+`update`, fitted posteriors, and checkpoint restore carry the current D10
 structured-pair statistic identity. `fit_rslds` owns a
 single observed sequence: `PCAARHMMInitializer` fixes an observation-derived
 PCA coordinate system and an initial regime order; each outer coordinate
@@ -359,7 +359,8 @@ learning statistics. A complete auxiliary, categorical, Gaussian, auxiliary
 sweep is monotone for the expanded bound; only its joint fixed point is
 stationary for the collapsed bound.
 
-For an explicitly eligible fixed-parameter recurrent switching component,
+For an explicitly eligible fixed-parameter or exactly four-family learned
+recurrent switching component,
 production dispatch replaces D3 mixture collapse and D9 recurrence sweeps with
 that coordinate. Serialized `recurrence_link` and `gaussian_mixture_linear`
 factors remain the source of truth; a compiler-owned `StructuredHybridPlan`
@@ -369,10 +370,11 @@ and Gaussian time index. Initial eligibility is the exact `models.rslds`
 boundary: an acyclic recurrence chain, matching destination-selected
 dynamics, a regime-independent Gaussian initial state, shared Gaussian-linear
 emissions, no extra categorical unary attachment, ordinary BFE, and no
-component P-substitution. A declared learnable is also a boundary until
-cff-6rav migrates its statistic and executable identity. Selected initial
-laws, regime-specific emissions, extra attachments, and learning-enabled
-models remain on D3/D9.
+component P-substitution. Learned dispatch additionally requires one owner
+each for the initial categorical, tied component dynamics, recurrence, and
+tied emission sources. Partial, extra, or differently owned declarations
+remain on D3/D9. Selected initial laws, regime-specific emissions, and extra
+attachments remain outside D10.
 
 The current whole-template eligibility makes objective ownership exact: the
 runtime BFE entry point bypasses every ordinary initial, emission, D3, D9,
@@ -383,16 +385,19 @@ installed singleton, pair, Gaussian marginal/lag, support, objective, residual,
 and status state and never rematerializes a D3/D9 belief. The independently
 callable authority supplies the conditioned-drive D9 and `K=1` Gaussian-chain
 reductions. This first production classifier is narrower: it dispatches only
-latent-drive `K>=2` components, while those reductions and every other
-unsupported or learning-enabled model retain the existing engine path and must
+latent-drive `K>=2` components, while those reductions and all other
+unsupported models retain the existing engine path and must
 not claim D10's joint certificate or conservative bound.
 
-Both cadences install point rollovers through role-bearing addresses into a
-fresh observation-bound state. The compiled engine and every runtime shape
-stay fixed. A finite inner `budget_exhausted` result may trigger a bounded
-restart from that same fresh state. Each retry doubles the update fraction
-while it remains a convex natural-parameter blend; this changes the route but
-not the fixed point, support, schedule, tolerance, or FE certificate. A
+Both cadences read one installed D10 coordinate: `gamma[0]` for the initial
+posterior, `gamma[1:]` and oriented `E[x_t x_{t-1}^T]` for component MNIW,
+source-row/destination-column pairs with the same Gaussian moments for PG
+weights, and each emission observation with its matching Gaussian marginal.
+They install point rollovers through role-bearing addresses into a fresh
+observation-bound state. The compiled engine and every runtime shape stay
+fixed. D10 rejects damping, and an exhausted deterministic coordinate is not
+repeated as a nominal retry. The legacy D3/D9 path retains its bounded
+convex-damping retry schedule. A
 non-finite, infeasible, or diverged attempt never retries. After the last
 parameter write on an exhausted cadence, the same bounded schedule runs a
 terminal hidden-state solve, so the returned state and point parameters agree.
@@ -618,7 +623,8 @@ them. Four rules define the contract:
    family names which engine readout it draws from (`cffg.learn.READOUTS`),
    because a conjugate posterior is not always one array read off one
    readout. An MNIW over a `gaussian_linear` carries four hyperparameters,
-   accumulates three statistics from `Engine.gaussian_node_stats`, and rolls
+   accumulates three statistics from the engine's coordinate-routed
+   `gaussian_node_stats` learning view, and rolls
    over into three blobs at different shapes. Component MNIW uses the same
    statistic names with leading selector axes and occurrence counts equal to
    soft responsibilities. PG weights instead draw additive `linear` and
@@ -628,10 +634,9 @@ them. Four rules define the contract:
    that contract: one hyperparameter, one statistic, one role.
 
 3. **Sources are perception, targets are everywhere.** Statistics come from
-   the readout named by the family: discrete families use
-   `Engine.node_beliefs`, while NIW/MNIW and component MNIW use
-   `Engine.gaussian_node_stats`; PG weights use
-   `Engine.recurrence_weight_stats`. Every eligible tied factor contributes
+   the readout named by the family. `Engine.learning_readout` routes ordinary
+   graphs to their factor-local message beliefs and a D10 graph to its one
+   installed singleton/pair/Gaussian-lag coordinate. Every eligible tied factor contributes
    one local record; the family pools those records and performs one posterior
    update. A masked conditioned Gaussian-linear output contributes zero
    evidence. An exactly unsupported mixture component likewise contributes
@@ -678,13 +683,14 @@ accept an `only` name filter, pool tied sources, validate all selected
 posteriors in temporary storage, and commit atomically. `write` is likewise
 atomic across selected role-bearing targets. Versioned checkpoints encode
 each `(learnable, hyperparameter)` pair independently and round-trip the NIW,
-MNIW, component-MNIW, and PG arrays. Because D8 and D9 recurrence use
-identical IR and array shapes, a recurrence checkpoint also stores a canonical
-manifest with the D9 statistic identity, factor sources, parameter-blob
-ownership, hyperparameter dtype/shape, and exact-value digests. Missing,
-legacy, tampered, or mismatched
-recurrence identity is rejected before mutation. Legacy spellings for
-unchanged families remain explicit migrations; a multi-array posterior must
+MNIW, component-MNIW, and PG arrays. Because D8, D9, and D10 use identical IR
+and parameter shapes, a D10 learning checkpoint stores a schema-2 manifest
+with executable, objective, installed-coordinate, per-family statistic,
+ordered topology, factor-source, and blob ownership identities plus
+hyperparameter dtype/shape/value digests. Missing, D8/D9, unknown, tampered,
+or mismatched state is rejected before mutation. Non-D10 recurrence graphs
+retain their explicit D9 schema-1 boundary. Legacy spellings for unchanged
+non-D10 families remain explicit migrations; a multi-array posterior must
 be complete rather than silently combining restored and prior
 hyperparameters. The
 model/runtime interface still declares which boundary learnable is

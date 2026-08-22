@@ -112,11 +112,6 @@ def classify_structured_hybrid(template: Template) -> StructuredHybridClassifica
         return _fail("no recurrence_link component")
     if template.constraints:
         return _fail("component constraints are outside ordinary D10 BFE")
-    if template.learnables:
-        return _fail(
-            "declared recurrence learning retains D3/D9 until its D10 migration"
-        )
-
     root_of, closure_members = _closures(template)
     if not _equality_closures_are_trees(template, root_of, closure_members):
         return _fail("equality closure is cyclic or repeats a variable")

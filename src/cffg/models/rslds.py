@@ -30,6 +30,7 @@ from cffg.core.ir import (
 from cffg.engine import Engine, RunResult, State, _replace
 from cffg.learn import Learnables
 from cffg.learning_checkpoint import (
+    D10_RECURRENCE_STATISTIC_IDENTITY,
     RECURRENCE_PRIOR_IDENTITY,
     RECURRENCE_STATISTIC_IDENTITY,
 )
@@ -276,8 +277,8 @@ class RSLDSLearning:
     hyperparameter state, checkpoint encoding, and runtime writes delegate to
     a restricted :class:`Learnables` instance over the serialized rSLDS
     declarations. Direct construction declares the supplied recurrence block
-    as a fresh prior; updates and restored checkpoints carry the D9 statistic
-    identity explicitly.
+    as a fresh prior; updates and restored checkpoints carry the engine's
+    D9 or D10 statistic identity explicitly.
     """
 
     initial_alpha: np.ndarray
@@ -299,6 +300,7 @@ class RSLDSLearning:
         if self.recurrence_statistic_identity not in {
             RECURRENCE_PRIOR_IDENTITY,
             RECURRENCE_STATISTIC_IDENTITY,
+            D10_RECURRENCE_STATISTIC_IDENTITY,
         }:
             raise ValueError(
                 "rSLDS recurrence state has an unknown or legacy statistic "
@@ -319,7 +321,7 @@ class RSLDSLearning:
         return self.recurrence.dimension
 
     def _runtime(self, engine: Engine) -> Learnables:
-        return Learnables(
+        learning = Learnables(
             engine,
             priors={
                 INITIAL_REGIME_LEARNABLE: self.initial_alpha,
@@ -328,6 +330,15 @@ class RSLDSLearning:
             },
             only=RSLDS_MODEL_LEARNABLES,
         )
+        if self.recurrence_statistic_identity not in {
+            RECURRENCE_PRIOR_IDENTITY,
+            learning.recurrence_statistic_identity,
+        }:
+            raise ValueError(
+                "rSLDS recurrence checkpoint identity does not match this "
+                "engine's executable statistic semantics"
+            )
+        return learning
 
     @classmethod
     def _from_runtime(cls, learning: Learnables) -> RSLDSLearning:
@@ -349,7 +360,9 @@ class RSLDSLearning:
                 learning.params[RECURRENCE_LEARNABLE]["eta"],
                 learning.params[RECURRENCE_LEARNABLE]["precision"],
             ),
-            recurrence_statistic_identity=RECURRENCE_STATISTIC_IDENTITY,
+            recurrence_statistic_identity=(
+                learning.recurrence_statistic_identity
+            ),
         )
 
     def update(self, engine: Engine, result: RunResult) -> RSLDSLearning:
@@ -390,7 +403,7 @@ class RSLDSLearning:
                 "rSLDS learning parameters require a fresh inference state"
             )
         params = self._runtime(engine).write(engine, state.params)
-        return _replace(state, params=params)
+        return engine.reset_structured_hybrid(_replace(state, params=params))
 
     def state_dict(self, engine: Engine) -> dict[str, np.ndarray]:
         """Return hyperparameters plus the structured-statistic manifest."""

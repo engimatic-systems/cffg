@@ -6,8 +6,10 @@ from functools import reduce
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 
 from cffg import gauss
+from cffg._structured_hybrid_objective import recurrence_statistics
 from cffg._structured_hybrid_types import (
     CategoricalTrajectory,
     GaussianTrajectory,
@@ -419,6 +421,219 @@ def component_objective(
     return jnp.where(input_ok & belief_ok, objective, jnp.inf)
 
 
+def component_learning_readouts(
+    arena: Arena,
+    plan: StructuredHybridPlan,
+    g_obs,
+    g_mask,
+    params,
+) -> dict[str, dict[str, dict[str, np.ndarray]]]:
+    """Return factor-local D10 statistics from one installed coordinate."""
+    belief = unpack_belief(params, plan)
+    categorical, gaussian = belief
+    prefix = lambda field: _key(plan, field)
+    runtime_ok = bool(
+        int(np.asarray(params[prefix("status")])) == SWEEP_FINITE
+        and int(np.asarray(params[prefix("run_status")])) == 0
+        and bool(np.asarray(categorical.proper))
+        and bool(np.asarray(gaussian.proper))
+    )
+    topology = plan.topology
+    singleton = np.asarray(categorical.singleton)
+    pair = np.asarray(categorical.pair)
+    mean = np.asarray(gaussian.mean)
+    covariance = np.asarray(gaussian.covariance)
+    lag_covariance = np.asarray(gaussian.lag_covariance)
+    second = np.asarray(gaussian.second_moment)
+    lag_second = np.asarray(gaussian.lag_second_moment)
+    dtype = np.result_type(singleton, mean)
+    dimension = topology.dimension
+    scale = max(
+        1.0,
+        *(float(np.max(np.abs(value), initial=0.0)) for value in (
+            singleton, pair, mean, covariance, lag_covariance, second,
+            lag_second,
+        )),
+    )
+    tolerance = (
+        4096.0
+        * max(topology.cardinality, dimension)
+        * np.finfo(dtype).eps
+        * scale
+    )
+    coordinate_ok = (
+        singleton.shape == (len(topology.state_edges), topology.cardinality)
+        and pair.shape == (
+            len(topology.recurrence_members),
+            topology.cardinality,
+            topology.cardinality,
+        )
+        and mean.shape == (len(topology.state_edges), dimension)
+        and covariance.shape == (len(topology.state_edges), dimension, dimension)
+        and second.shape == (len(topology.state_edges), dimension, dimension)
+        and lag_covariance.shape == (
+            len(topology.recurrence_members), dimension, dimension
+        )
+        and lag_second.shape == (
+            len(topology.recurrence_members), dimension, dimension
+        )
+        and all(
+            np.all(np.isfinite(value))
+            for value in (
+                singleton,
+                pair,
+                mean,
+                covariance,
+                lag_covariance,
+                second,
+                lag_second,
+            )
+        )
+        and np.all(singleton >= 0.0)
+        and np.all(pair >= 0.0)
+        and np.allclose(
+            singleton.sum(axis=1), 1.0, atol=tolerance, rtol=0.0
+        )
+        and np.allclose(
+            pair.sum(axis=(1, 2)), 1.0, atol=tolerance, rtol=0.0
+        )
+        and np.allclose(
+            pair.sum(axis=2), singleton[:-1], atol=tolerance, rtol=0.0
+        )
+        and np.allclose(
+            pair.sum(axis=1), singleton[1:], atol=tolerance, rtol=0.0
+        )
+        and np.allclose(
+            covariance,
+            covariance.swapaxes(1, 2),
+            atol=tolerance,
+            rtol=0.0,
+        )
+        and np.allclose(
+            second,
+            covariance + np.einsum("ti,tj->tij", mean, mean),
+            atol=tolerance,
+            rtol=0.0,
+        )
+        and np.allclose(
+            lag_second,
+            lag_covariance + np.einsum("ti,tj->tij", mean[1:], mean[:-1]),
+            atol=tolerance,
+            rtol=0.0,
+        )
+        and np.all(np.linalg.eigvalsh(covariance) >= -tolerance)
+    )
+    if not runtime_ok or not coordinate_ok:
+        raise ValueError(
+            "D10 learning requires one proper, consistent, converged installed "
+            "coordinate"
+        )
+    objective = component_objective(arena, plan, g_obs, g_mask, params)
+    if not np.isfinite(np.asarray(objective)):
+        raise ValueError(
+            "D10 learning requires one proper, consistent, converged installed "
+            "coordinate"
+        )
+    feature_second = np.zeros(
+        (len(mean) - 1, dimension + 1, dimension + 1), dtype=dtype
+    )
+    feature_second[:, :-1, :-1] = second[:-1]
+    feature_second[:, :-1, -1] = mean[:-1]
+    feature_second[:, -1, :-1] = mean[:-1]
+    feature_second[:, -1, -1] = 1.0
+    feature_mean = np.concatenate(
+        [mean[:-1], np.ones((len(mean) - 1, 1), dtype=dtype)], axis=1
+    )
+
+    gaussian_rows: dict[str, dict[str, np.ndarray]] = {}
+    for index, name in enumerate(topology.dynamics_members):
+        responsibility = singleton[index + 1]
+        cross = np.concatenate(
+            [lag_second[index], mean[index + 1, :, None]], axis=1
+        )
+        gaussian_rows[name] = {
+            "responsibility": responsibility.copy(),
+            "Syy": responsibility[:, None, None] * second[index + 1],
+            "Syx": responsibility[:, None, None] * cross,
+            "Sxx": responsibility[:, None, None] * feature_second[index],
+            "proper": np.asarray(True),
+        }
+
+    emission_address = arena.member_of[
+        topology.emission_members[0]
+    ].parameter("matrix")
+    observation_dimension = np.asarray(
+        params[emission_address.key][emission_address.index]
+    ).shape[0]
+    observations = np.asarray(g_obs)[
+        arena.g_obs_indices(plan.observation_rows, observation_dimension)
+    ]
+    masks = np.asarray(g_mask)[plan.observation_rows]
+    for index, name in enumerate(topology.emission_members):
+        augmented_second = np.block(
+            [
+                [second[index], mean[index, :, None]],
+                [mean[index, None, :], np.ones((1, 1), dtype=dtype)],
+            ]
+        )
+        observation = observations[index]
+        gaussian_rows[name] = {
+            "Syy": np.outer(observation, observation),
+            "Syx": np.concatenate(
+                [np.outer(observation, mean[index]), observation[:, None]],
+                axis=1,
+            ),
+            "Sxx": augmented_second,
+            "mask": np.asarray(masks[index]),
+            "proper": np.asarray(True),
+        }
+
+    weights, weights_ok = _parameter_rows(
+        arena, params, topology.recurrence_members, "weights"
+    )
+    offsets, offsets_ok = _parameter_rows(
+        arena, params, topology.recurrence_members, "offsets"
+    )
+    recurrence = recurrence_statistics(
+        categorical.pair, gaussian, weights, offsets
+    )
+    recurrence_ok = bool(
+        np.asarray(recurrence.proper & weights_ok & offsets_ok)
+    )
+    recurrence_rows: dict[str, dict[str, np.ndarray]] = {}
+    for index, name in enumerate(topology.recurrence_members):
+        exposure = np.asarray(recurrence.exposure[index])
+        omega = np.asarray(recurrence.omega[index])
+        signed = np.asarray(recurrence.signed_success[index])
+        recurrence_rows[name] = {
+            "omega": omega,
+            "exposure": exposure,
+            "signed_success": signed,
+            "linear": signed[..., None] * feature_mean[index],
+            "quadratic": (
+                exposure[..., None, None]
+                * omega[..., None, None]
+                * feature_second[index]
+            ),
+            "proper": np.asarray(recurrence_ok),
+            "probability_ok": np.asarray(recurrence_ok),
+            "drive_ok": np.asarray(recurrence_ok),
+            "parameter_ok": np.asarray(
+                bool(np.asarray(weights_ok & offsets_ok))
+            ),
+            "second_ok": np.asarray(recurrence_ok),
+            "finite_output_ok": np.asarray(recurrence_ok),
+        }
+
+    return {
+        "node_beliefs": {
+            topology.initial_regime_member: singleton[0].copy()
+        },
+        "gaussian_node_stats": gaussian_rows,
+        "recurrence_weight_stats": recurrence_rows,
+    }
+
+
 def make_step(arena: Arena):
     if len(arena.structured_hybrid_plans) != 1:
         raise ValueError("D10 runtime requires exactly one whole-template component")
@@ -432,6 +647,7 @@ def make_step(arena: Arena):
 
 __all__ = [
     "component_model",
+    "component_learning_readouts",
     "component_objective",
     "component_step",
     "initialize_runtime",

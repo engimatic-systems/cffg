@@ -143,7 +143,7 @@ class RSLDSFitResult:
     ``state``, ``parameters``, and the learned posteriors all belong to
     ``returned_coordinate``. A converged result returns the already evaluated
     ``certified_coordinate``; an exhausted result performs a terminal solve at
-    its last installed coordinate. ``model_posterior`` carries the current D9
+    its last installed coordinate. ``model_posterior`` carries the current D10
     structured-pair statistic identity and may be checkpointed for resume;
     point ``parameters`` alone are a model initialization, not a resumable
     posterior.
@@ -266,7 +266,9 @@ def _attempt_evidence(
     damping: float,
 ) -> RSLDSInferenceAttempt:
     try:
-        statistics = engine.gaussian_node_stats(result.state)
+        statistics = engine.learning_readout(
+            result.state, "gaussian_node_stats"
+        )
         gaussian_beliefs_proper = bool(statistics) and all(
             bool(row["proper"]) for row in statistics.values()
         )
@@ -309,10 +311,14 @@ def _run_inner(
         raise ValueError(
             "deterministic fitting retries do not support stochastic mu3 updates"
         )
+    structured = bool(getattr(engine.arena, "structured_hybrid_plans", ()))
+    if structured and damping != 0.0:
+        raise ValueError("D10 rSLDS fitting does not accept damping")
+    retry_budget = 0 if structured else max_retries
     attempts: list[RSLDSInferenceAttempt] = []
     current_damping = damping
     result: RunResult | None = None
-    for retry in range(max_retries + 1):
+    for retry in range(retry_budget + 1):
         result = engine.run(
             state,
             max_iterations,
@@ -320,7 +326,7 @@ def _run_inner(
             damp=current_damping,
         )
         attempts.append(_attempt_evidence(engine, result, current_damping))
-        if result.status is not RunStatus.BUDGET_EXHAUSTED or retry == max_retries:
+        if result.status is not RunStatus.BUDGET_EXHAUSTED or retry == retry_budget:
             break
         expanded_step_damping = 2.0 * current_damping - 1.0
         if expanded_step_damping <= 0.0:
@@ -399,9 +405,10 @@ def fit_rslds(
     last coordinate actually evaluated. Its unchecked proposal is not installed
     or returned. The historical mixed-snapshot residual and a truth-free
     transition-function residual remain phase diagnostics.
-    A finite exhausted inner solve may restart from the same state with a
-    larger convex update step, up to ``max_inner_retries`` times. The terminal
-    state is inferred once after the last parameter replacement.
+    D10 accepts no damping, and a finite exhausted deterministic coordinate is
+    recorded once rather than repeated as a nominal retry. The legacy path may
+    restart with a larger convex update step up to ``max_inner_retries`` times.
+    The terminal state is inferred once after the last parameter replacement.
     """
     observations = _validate_observations(observations)
     if max_outer_iterations <= 0 or max_inner_iterations <= 0:

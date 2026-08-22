@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from cffg.engine import Engine, RunResult, RunStatus
-from cffg.learning_checkpoint import RECURRENCE_STATISTIC_IDENTITY
+from cffg.learning_checkpoint import D10_RECURRENCE_STATISTIC_IDENTITY
 from cffg.models import (
     PCAARHMMInitializer,
     RSLDSInitialization,
@@ -207,7 +207,7 @@ def test_fit_replaces_one_sequence_coordinates_and_reuses_one_engine(monkeypatch
     assert result.inner_status is RunStatus.CONVERGED
     assert (
         result.model_posterior.recurrence_statistic_identity
-        == RECURRENCE_STATISTIC_IDENTITY
+        == D10_RECURRENCE_STATISTIC_IDENTITY
     )
     assert result.iterations == 2
     assert len(result.residuals) == 2
@@ -271,7 +271,14 @@ def test_fit_replaces_one_sequence_coordinates_and_reuses_one_engine(monkeypatch
     for name, value in result.emission_posterior.items():
         np.testing.assert_array_equal(value, candidate_emissions[0][name])
     for name, value in result.state.params.items():
+        if name.startswith("d10:"):
+            continue
         np.testing.assert_array_equal(value, run_parameter_snapshots[-1][name])
+    assert result.last_inference is not None
+    for name, value in result.state.params.items():
+        np.testing.assert_array_equal(
+            value, result.last_inference.state.params[name]
+        )
     assert result.last_inference is not None
     for value, expected in zip(
         jax.tree_util.tree_leaves(result.state),
@@ -433,7 +440,9 @@ def test_exact_zero_initial_regime_support_is_not_floored(monkeypatch):
     _fit(_observations(8), outer_iterations=1, initializer=_ZeroSupportInitializer())
 
     engine, first = inner_results[0]
-    marginal = engine.marginals(first.state)["z0"]
+    marginal = next(
+        iter(engine.structured_hybrid_beliefs(first.state).values())
+    )["singleton_probability"][0]
     assert marginal[1] == 0.0
 
 
@@ -457,34 +466,30 @@ def test_improper_statistics_diverge_before_parameter_write(
         key=jax.random.key(7),
     )
     injected_sources = []
-    if kind == "recurrence":
-        original_readout = Engine.recurrence_weight_stats
+    original_readout = Engine.learning_readout
 
-        def improper_readout(self, state):
-            rows = original_readout(self, state)
+    def improper_readout(self, state, readout_name):
+        rows = original_readout(self, state, readout_name)
+        if kind == "recurrence":
+            if readout_name != "recurrence_weight_stats":
+                return rows
             name = next(name for name in rows if name.startswith("switch"))
-            injected_sources.append(name)
-            rows[name] = {
-                **rows[name],
-                "proper": np.asarray(False),
-                "drive_ok": np.asarray(False),
-                "drive_min_eigenvalue": np.asarray(0.5),
-                "drive_symmetry_error": np.asarray(0.25),
-                "drive_tolerance": np.asarray(0.01),
-            }
-            return rows
-
-        monkeypatch.setattr(Engine, "recurrence_weight_stats", improper_readout)
-    else:
-        original_readout = Engine.gaussian_node_stats
-
-        def improper_readout(self, state):
-            rows = original_readout(self, state)
+        else:
+            if readout_name != "gaussian_node_stats":
+                return rows
             name = next(name for name in rows if name.startswith(kind))
-            rows[name] = {**rows[name], "proper": np.asarray(False)}
-            return rows
+        injected_sources.append(name)
+        rows[name] = {
+            **rows[name],
+            "proper": np.asarray(False),
+            "drive_ok": np.asarray(False),
+            "drive_min_eigenvalue": np.asarray(0.5),
+            "drive_symmetry_error": np.asarray(0.25),
+            "drive_tolerance": np.asarray(0.01),
+        }
+        return rows
 
-        monkeypatch.setattr(Engine, "gaussian_node_stats", improper_readout)
+    monkeypatch.setattr(Engine, "learning_readout", improper_readout)
     result = _fit(observations, outer_iterations=1, initializer=initializer)
 
     assert result.status is RunStatus.DIVERGED
@@ -578,8 +583,9 @@ def test_inner_retry_schedule_retries_finite_exhaustion():
                 residual=0.25,
             )
 
-        def gaussian_node_stats(self, state):
+        def learning_readout(self, state, name):
             del state
+            assert name == "gaussian_node_stats"
             return {"drive": {"proper": True}}
 
     engine = FakeEngine()
@@ -606,7 +612,7 @@ def test_float32_fitter_survives_tenfold_horizon():
         outer_iterations=1,
         inner_iterations=200,
         inner_tolerance=0.1,
-        damp=0.9,
+        damp=0.0,
     )
 
     assert result.inner_status is RunStatus.CONVERGED
@@ -617,6 +623,7 @@ def test_float32_fitter_survives_tenfold_horizon():
     assert all(np.all(np.isfinite(value)) for value in result.parameters.values())
 
 
+@pytest.mark.slow
 def test_structured_nascar_coordinates_avoid_the_legacy_finite_cycle():
     observations = _nascar_observations()
     key = jax.random.split(
@@ -632,7 +639,7 @@ def test_structured_nascar_coordinates_avoid_the_legacy_finite_cycle():
         max_inner_iterations=2_000,
         inner_tolerance=1e-4,
         key=key,
-        damp=0.9,
+        damp=0.0,
         max_inner_retries=2,
     )
 
@@ -640,7 +647,7 @@ def test_structured_nascar_coordinates_avoid_the_legacy_finite_cycle():
     assert result.inner_status is RunStatus.CONVERGED
     assert sum(phase.coordinate_replaced for phase in result.phases) == 5
     fourth = result.phases[3]
-    assert [attempt.damping for attempt in fourth.attempts] == [0.9]
+    assert [attempt.damping for attempt in fourth.attempts] == [0.0]
     completed = fourth.attempts[0]
     assert completed.status is RunStatus.CONVERGED
     assert completed.recurrence_status is RunStatus.CONVERGED

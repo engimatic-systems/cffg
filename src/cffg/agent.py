@@ -202,7 +202,7 @@ class RollingAgent:
         st = _replace(st, params=params)
         if engine is self.plan and self.goal_priors:
             st = engine.with_goal_priors(st, self.goal_priors)
-        return st
+        return engine.reset_structured_hybrid(st)
 
     # -- the perception-action cycle --------------------------------------
 

@@ -2273,13 +2273,13 @@ eligibility is narrower than the pure mathematics: one acyclic D9 recurrence
 chain, matching destination-selected `gaussian_mixture_linear` dynamics, one
 regime-independent Gaussian `x_0` prior, shared `gaussian_linear` emissions,
 no extra categorical unary attachment, ordinary BFE, and no component-owned
-P-substitution. The first production dispatch additionally requires no
-declared learnables: its fixed-parameter inference state is derived and is not
-a resumable learning checkpoint. Selected initial-state laws, regime-specific
-emissions, extra attachments, or learning consumers require additional terms
-and retain D3/D9 rather than silently claiming D10. Current checkpoints remain
-D9 and cannot resume a D10 learning component; cff-6rav owns the new
-executable, belief, statistic, and objective identity.
+P-substitution. Production learned dispatch requires the exact initial-regime,
+tied-dynamics, recurrence, and tied-emission owners. All four read the same
+installed D10 coordinate. Selected initial-state laws, regime-specific
+emissions, extra attachments, or partial/different learning ownership retain
+D3/D9 rather than silently claiming D10. A schema-2 manifest binds D10
+executable, objective, coordinate, per-family statistic, topology, and exact
+hyperparameter values; D8/D9 checkpoints cannot resume it.
 
 ### D10.6 Rejected alternatives and executable falsifiers
 
@@ -2310,8 +2310,8 @@ The pure and production authorities establish:
 - exact-zero support, float32 guards, improper/non-finite failure, K=8 and
   T>=100 without path enumeration; and
 - the unchanged source-heterogeneous seed-5000/native 0.150 caps. Failure of
-  either cap leaves the new semantic unqualified and preserves current D9
-  production behavior.
+  either cap leaves the downstream recovery claim unqualified; it does not
+  relabel or silently revert the D10 executable semantics.
 
 The pure authority is executable in
 `tests/test_structured_hybrid_coordinates.py` and
