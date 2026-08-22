@@ -217,6 +217,65 @@ def test_scoped_tied_sources_and_atomic_write_use_d10_then_mark_it_stale():
     assert int(unchanged[runtime_key(plan, "status")]) == 0
 
 
+def test_arbitrary_factor_renaming_retains_all_four_d10_posteriors():
+    template, arrays = _model()
+    names = tuple(template.factors)
+    renamed = {
+        name: f"permuted_{len(names) - index:03d}"
+        for index, name in enumerate(names)
+    }
+    renamed_template = dataclasses.replace(
+        template,
+        factors={
+            renamed[name]: dataclasses.replace(factor, name=renamed[name])
+            for name, factor in template.factors.items()
+        },
+        learnables={
+            name: dataclasses.replace(
+                declaration,
+                sources=(
+                    None
+                    if declaration.sources is None
+                    else tuple(renamed[source] for source in declaration.sources)
+                ),
+            )
+            for name, declaration in template.learnables.items()
+        },
+    )
+    observations = np.linspace(-0.4, 0.5, 10).reshape(5, 2)
+    priors = vague_rslds_fit_priors(3, 2, 2).learning_priors()
+
+    posteriors = []
+    for candidate in (template, renamed_template):
+        engine = Engine(compile_template(candidate, arrays=arrays))
+        assert len(engine.arena.structured_hybrid_plans) == 1
+        state = engine.bind_data(
+            engine.init_state(),
+            {f"y{index}": row for index, row in enumerate(observations)},
+        )
+        result = engine.run(state, 80, tol=2e-5)
+        result.require_converged()
+        learning = Learnables(engine, priors=priors)
+        learning.replace(engine, result)
+        posteriors.append(learning.params)
+
+    assert set(posteriors[0]) == {
+        "initial_regime",
+        "dynamics",
+        "recurrence",
+        "emission",
+    }
+    for name, values in posteriors[0].items():
+        for key, value in values.items():
+            tolerance = 64.0 * np.finfo(np.result_type(value)).eps
+            np.testing.assert_allclose(
+                posteriors[1][name][key],
+                value,
+                atol=tolerance,
+                rtol=tolerance,
+            )
+
+
 def test_d10_learning_rejects_inconsistent_or_nonfinite_installed_moments():
     engine, result, _observations = _converged()
     plan = engine.arena.structured_hybrid_plans[0]
