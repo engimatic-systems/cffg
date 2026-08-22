@@ -1,7 +1,7 @@
 ---
 id: cff-lo4d
 status: in_progress
-deps: [cff-upih]
+deps: [cff-upih, cff-ohz3]
 links: []
 created: 2026-08-22T15:41:25Z
 type: task
@@ -119,3 +119,7 @@ Legend: prerequisite --> dependent
                               |
                               +--> [ ] fresh calibration and freeze
 ```
+
+**2026-08-22T16:51:18Z**
+
+Integrated experiment commits 902bdd0 through d006a5b. The schema-v2 fixed-adapter gate completed all 16 attempt-0001 chains with healthy occupancy and preserved common family initializer digests. Three cells passed. Classic/shared-stream missed only held-out on-support transition RMSE mixing: R-hat 1.0686320354 exceeds 1.05 while ESS 50.4851298 passes 50; all other authoritative variables and cells pass. Status is complete_scientific_miss and later_calibration_authorized=false. The registered next owner is cff-ohz3, which must preregister a common 400-draw policy before any sampling; thresholds and target stay unchanged. Modern focused tests (38 integrated) and 24 legacy oracle tests pass; 23 manifests, 16 chain checkpoints, stages, aggregate, and content digests validate. No CFFG/control fit, calibration seed, or final seed ran.
