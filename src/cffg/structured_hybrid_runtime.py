@@ -448,26 +448,14 @@ def component_learning_readouts(
     lag_second = np.asarray(gaussian.lag_second_moment)
     dtype = np.result_type(singleton, mean)
     dimension = topology.dimension
-    gaussian_scale = max(
-        1.0,
-        *(float(np.max(np.abs(value), initial=0.0)) for value in (
-            mean, covariance, lag_covariance, second, lag_second,
-        )),
-    )
     # Probability normalization error grows with categorical additions, never
     # with the unrelated scale of continuous moments.
     probability_tolerance = (
         64.0 * max(1, topology.cardinality) * np.finfo(dtype).eps
     )
-    # Cached moment identities use at most dimension-sized contractions. The
-    # PSD check additionally needs headroom for a dimension-sized eigensolve.
-    moment_tolerance = (
-        64.0 * max(1, dimension) * np.finfo(dtype).eps * gaussian_scale
-    )
-    psd_tolerance = (
-        64.0 * max(1, dimension) ** 2 * np.finfo(dtype).eps * gaussian_scale
-    )
-    coordinate_ok = (
+    moment_factor = 64.0 * max(1, dimension) * np.finfo(dtype).eps
+    psd_factor = 64.0 * max(1, dimension) ** 2 * np.finfo(dtype).eps
+    shapes_ok = (
         singleton.shape == (len(topology.state_edges), topology.cardinality)
         and pair.shape == (
             len(topology.recurrence_members),
@@ -483,64 +471,90 @@ def component_learning_readouts(
         and lag_second.shape == (
             len(topology.recurrence_members), dimension, dimension
         )
-        and all(
-            np.all(np.isfinite(value))
-            for value in (
-                singleton,
-                pair,
-                mean,
-                covariance,
-                lag_covariance,
-                second,
-                lag_second,
+    )
+    finite_ok = shapes_ok and all(
+        np.all(np.isfinite(value))
+        for value in (
+            singleton,
+            pair,
+            mean,
+            covariance,
+            lag_covariance,
+            second,
+            lag_second,
+        )
+    )
+    probability_ok = False
+    gaussian_ok = False
+    if finite_ok:
+        probability_ok = bool(
+            np.all(singleton >= 0.0)
+            and np.all(pair >= 0.0)
+            and np.allclose(
+                singleton.sum(axis=1),
+                1.0,
+                atol=probability_tolerance,
+                rtol=0.0,
+            )
+            and np.allclose(
+                pair.sum(axis=(1, 2)),
+                1.0,
+                atol=probability_tolerance,
+                rtol=0.0,
+            )
+            and np.allclose(
+                pair.sum(axis=2),
+                singleton[:-1],
+                atol=probability_tolerance,
+                rtol=0.0,
+            )
+            and np.allclose(
+                pair.sum(axis=1),
+                singleton[1:],
+                atol=probability_tolerance,
+                rtol=0.0,
             )
         )
-        and np.all(singleton >= 0.0)
-        and np.all(pair >= 0.0)
-        and np.allclose(
-            singleton.sum(axis=1),
+
+        def locally_consistent(actual, expected, *terms):
+            local_scale = np.maximum(1.0, np.maximum(np.abs(actual), np.abs(expected)))
+            for term in terms:
+                local_scale = np.maximum(local_scale, np.abs(term))
+            return bool(
+                np.all(np.abs(actual - expected) <= moment_factor * local_scale)
+            )
+
+        mean_outer = np.einsum("ti,tj->tij", mean, mean)
+        lag_outer = np.einsum("ti,tj->tij", mean[1:], mean[:-1])
+        expected_second = covariance + mean_outer
+        expected_lag = lag_covariance + lag_outer
+        covariance_scales = np.maximum(
             1.0,
-            atol=probability_tolerance,
-            rtol=0.0,
+            np.max(np.abs(covariance), axis=(1, 2)),
         )
-        and np.allclose(
-            pair.sum(axis=(1, 2)),
-            1.0,
-            atol=probability_tolerance,
-            rtol=0.0,
+        gaussian_ok = bool(
+            locally_consistent(
+                covariance,
+                covariance.swapaxes(1, 2),
+            )
+            and locally_consistent(
+                second,
+                expected_second,
+                covariance,
+                mean_outer,
+            )
+            and locally_consistent(
+                lag_second,
+                expected_lag,
+                lag_covariance,
+                lag_outer,
+            )
+            and np.all(
+                np.linalg.eigvalsh(covariance)
+                >= -psd_factor * covariance_scales[:, None]
+            )
         )
-        and np.allclose(
-            pair.sum(axis=2),
-            singleton[:-1],
-            atol=probability_tolerance,
-            rtol=0.0,
-        )
-        and np.allclose(
-            pair.sum(axis=1),
-            singleton[1:],
-            atol=probability_tolerance,
-            rtol=0.0,
-        )
-        and np.allclose(
-            covariance,
-            covariance.swapaxes(1, 2),
-            atol=moment_tolerance,
-            rtol=0.0,
-        )
-        and np.allclose(
-            second,
-            covariance + np.einsum("ti,tj->tij", mean, mean),
-            atol=moment_tolerance,
-            rtol=0.0,
-        )
-        and np.allclose(
-            lag_second,
-            lag_covariance + np.einsum("ti,tj->tij", mean[1:], mean[:-1]),
-            atol=moment_tolerance,
-            rtol=0.0,
-        )
-        and np.all(np.linalg.eigvalsh(covariance) >= -psd_tolerance)
-    )
+    coordinate_ok = finite_ok and probability_ok and gaussian_ok
     if not runtime_ok or not coordinate_ok:
         raise ValueError(
             "D10 learning requires one proper, consistent, converged installed "

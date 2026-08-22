@@ -241,6 +241,7 @@ def test_float32_coordinate_guards_reject_probability_and_moment_mismatches():
         params = dict(result.state.params)
         pair_key = runtime_key(plan, "cat_pair")
         mean_key = runtime_key(plan, "gaussian_mean")
+        second_key = runtime_key(plan, "gaussian_second_moment")
         assert params[pair_key].dtype == jnp.float32
         assert params[mean_key].dtype == jnp.float32
         engine.learning_readout(result.state, "gaussian_node_stats")
@@ -253,7 +254,21 @@ def test_float32_coordinate_guards_reject_probability_and_moment_mismatches():
             )
 
         params = dict(result.state.params)
-        second_key = runtime_key(plan, "gaussian_second_moment")
+        covariance_key = runtime_key(plan, "gaussian_covariance")
+        params[covariance_key] = params[covariance_key].at[-1, 0, 0].add(
+            np.float32(1.0e8)
+        )
+        params[second_key] = params[second_key].at[-1, 0, 0].add(
+            np.float32(1.0e8)
+        )
+        params[second_key] = params[second_key].at[0, 0, 0].add(np.float32(1.0))
+        with pytest.raises(ValueError, match="proper, consistent"):
+            engine.learning_readout(
+                _replace(result.state, params=params),
+                "gaussian_node_stats",
+            )
+
+        params = dict(result.state.params)
         params[second_key] = params[second_key].at[0, 0, 0].add(
             np.float32(5.0e-4)
         )
