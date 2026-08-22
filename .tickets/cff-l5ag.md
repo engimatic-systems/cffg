@@ -1,6 +1,6 @@
 ---
 id: cff-l5ag
-status: open
+status: closed
 deps: [cff-8w4c, cff-upih, cff-lo4d]
 links: [cff-oyie]
 created: 2026-08-20T15:41:17Z
@@ -151,3 +151,19 @@ than blocked on an inner-classifier decision.
 **2026-08-21T18:58:37Z**
 
 Classic-scale convergence blocker resolved by the completed cff-2wb6 schema-v2 cohort at experiment commit 6e3edc3. All 12 declared development arms converged with zero inner/outer censor rows and zero non-finite paths. Maximum completed outer convergence time was 13 maps; maximum successful inner attempt was 6315 iterations. The registered rule selects outer budget 17 and retains inner cap 8000 because seed-5000 shared had one rejected capped attempt followed by a successful retry. The full artifact validates and retains six CFFG periodicity checkpoints. This clears cff-8w4c to conduct its staged classic prior screen under family-valid budgets. It does not run an adapter, repair mixing, or change the cff-l5ag claim; cff-l5ag remains downstream of cff-8w4c.
+
+**2026-08-22T18:18:17Z**
+
+Adapter eligibility is restored without changing the paper-equation target. cff-upih isolated the failure to the legacy native initializer; cff-lo4d bound the deterministic observation-only policy and truthful prospective tier/cohort semantics; cff-ohz3 authenticated a common 400-retained-draw horizon. All four development cells now pass family-authoritative mixing and occupancy with all chains retained and no restart/drop. Historical cff-oyie and 200-draw miss artifacts remain unchanged. Any new CFFG-versus-adapter comparison must consume these prospective policy/tier identities in a newly calibrated and frozen protocol with fresh final seeds; this completed gate is not itself paired non-inferiority evidence.
+
+Legend: prerequisite --> dependent
+
+[x] family-qualified diagnostics + collapse evidence
+      |
+[x] observation-only initializer diagnosis
+      |
+[x] cff-lo4d fixed-policy gate
+      |
+[x] cff-ohz3 retained-draw requalification
+      |
+      +--> [ ] fresh dual-family calibration and freeze

@@ -1,6 +1,6 @@
 ---
 id: cff-ohz3
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-22T16:50:40Z
@@ -116,3 +116,17 @@ Legend: prerequisite --> dependent
                               |
                               +--> [ ] fresh calibration and freeze
 ```
+
+**2026-08-22T18:18:17Z**
+
+Completed and integrated on the active experiment branch through commit 8e2e210. The registered 400-draw extension completed all 16 attempt-0001 chains. All 208 named first-200 prefix comparisons were byte-identical and value-identical to the immutable cff-lo4d execution before added draws entered any decision. All four family/stream cells passed the unchanged family-qualified gates: classic/shared R-hat 1.0470401 and ESS 142.1712; classic/native 1.0313709 and 128.6865; heterogeneous/shared 1.0086379 and 447.6614; heterogeneous/native 1.0028601 and 491.5127. No chain was stuck or persistently collapsed. The authenticated result is complete_authorized and permits later calibration only. Integrated focused validation passed 53 tests; completed resume validation returned complete_authorized; git diff --check passed. No CFFG/control fit, calibration seed, or final seed ran.
+
+Legend: prerequisite --> dependent
+
+[x] cff-upih fixed observation-only policy
+      |
+[x] cff-lo4d 200-draw gate: narrow registered miss
+      |
+      +--> [x] cff-ohz3 authenticated 400-draw extension
+                  |
+                  +--> [ ] fresh calibration and freeze
