@@ -1,6 +1,6 @@
 ---
 id: cff-upih
-status: in_progress
+status: closed
 deps: [cff-w42g]
 links: []
 created: 2026-08-22T14:26:39Z
@@ -111,3 +111,7 @@ Legend: prerequisite --> dependent
                               |
                               +--> [ ] fresh comparison freeze
 ```
+
+**2026-08-22T15:39:45Z**
+
+Completed and integrated in experiment commits 0ae2e5d, 59ea758, a7fb89b, 09c7046, and 821efdb. The preregistered same-seed crossing ran exactly eight one-attempt chains: mapped observation-only initialization passed all six heterogeneous v2 variables with worst split R-hat 1.008492, minimum ESS 233.517, 4/4 accurate chains, and no persistent collapse; native initialization failed all six with worst R-hat 39.0881, minimum ESS 4.0636, 1/4 accurate chains, and persistent retained collapse in chain 3. This isolates initialization, so warmup doubling was correctly not invoked. The staged pca_arhmm_mapped_decision_list_v1 policy is generated once from observations and fixed seed 1500020200, is byte-identical to the passing mapped arm (named-array SHA-256 3561214f4cc4ee7824b8a1df65257b7b5df48f6f1101b4f9a5dfdb840f727856), and uses no truth or chain selection/restart/drop. Integrated validation: 24 main-runtime tests plus 9 legacy-runtime tests pass; four manifests, eight chain checkpoints, crossed content, fixed policy content, and initializer arrays validate. No CFFG/control fit, calibration seed, or final seed ran.
