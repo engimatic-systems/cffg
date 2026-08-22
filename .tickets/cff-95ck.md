@@ -106,3 +106,7 @@ Legend: prerequisite --> dependent
 [ ] cff-95ck terminal coordinate (ready) -----+               |
                                                               +--> [ ] fresh extension run
 ```
+
+**2026-08-22T15:19:02Z**
+
+Core repair integrated at CFFG commit 13276f0. On the second qualifying runtime map, fit_rslds now returns the evaluated certified coordinate and discards the unchecked proposal; exhausted runs still terminal-solve the last installed coordinate. Phase evidence names evaluated/proposed/installed/certified/returned identities. Focused root validation passed 32 tests. cff-95ck remains in progress and depends on cff-9skg for the matched SLDS contract and development budget replay.

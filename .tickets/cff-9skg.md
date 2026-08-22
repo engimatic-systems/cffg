@@ -104,3 +104,7 @@ Legend: prerequisite --> dependent
                   |
                   +--> [ ] fresh calibration and freeze
 ```
+
+**2026-08-22T15:19:02Z**
+
+Experiment code integrated at commits 5c457b4 and 3bb5cd9. fit_slds now returns the certified evaluated coordinate, evidence serializes all coordinate roles, and map-count consumers count certified non-installed maps while excluding terminal inference. Immutable schema-1 parsing remains pinned and explicit. Root integration validation passed the affected 12-file selection and uv lock check. No fit, data, chain, calibration seed, or final seed ran. The ticket remains in progress until a development-only convergence cohort remeasures SLDS/rSLDS map budgets before freeze.
