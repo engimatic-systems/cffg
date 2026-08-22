@@ -19,13 +19,16 @@ families. That is too broad for the classic family. Its trajectories identify
 transition behavior on each source regime's occupied part of the track, but
 they do not identify every source at every counterfactual grid state.
 
-At recurrence strengths 0.3 and 1.0, the classic adapter chains mixed on
-likelihood, aligned latent recovery, aligned regime accuracy, and held-out
-on-support transition recovery. Only the two balanced-grid variables failed.
-The largest chain disagreements occurred at grid states with no nearby
-same-source training observation. Those grid variables are required for the
-source-heterogeneous extension, but they do not support the bounded classic
-parity claim.
+Under the completed screen's historical development thresholds of R-hat at
+most 1.2 and effective sample size at least 10, the classic 0.3 and 1.0 chains
+passed likelihood, aligned latent recovery, aligned regime accuracy, and
+held-out on-support transition recovery; their balanced-grid variables failed.
+The largest grid disagreements occurred at states with no nearby same-source
+training observation. Those grid variables are required for the source-
+heterogeneous extension, but they do not support the bounded classic parity
+claim. Under this ticket's prospective R-hat 1.05 and effective-sample-size 50
+thresholds, some on-support variables still fail. Correcting family scope does
+not by itself repair adapter mixing.
 
 The diagnostic schema must name its authority by dataset family. This is a
 prospective protocol correction. It must not relabel the completed screen or
