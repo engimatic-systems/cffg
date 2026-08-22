@@ -1,6 +1,6 @@
 ---
 id: cff-xwtz
-status: open
+status: in_progress
 deps: []
 links: []
 created: 2026-08-22T19:11:04Z
@@ -117,3 +117,7 @@ Legend: prerequisite --> dependent
                               |
                               +--> [ ] cff-0oqo bounded recovery
 ```
+
+**2026-08-22T19:13:52Z**
+
+Implementation start from authenticated cff-h0hx seed-5000/native D9 checkpoint. The diagnostic reuses the converged fit and must not rerun fitting. It independently reconstructs categorical-chain evidence and reruns categorical smoothing under inferred versus generating continuous-state diagnostic inputs, while keeping learned parameters fixed. The decision must name the first owner that disagrees and preserve the no-fit truth boundary.
