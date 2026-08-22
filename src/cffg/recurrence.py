@@ -26,6 +26,17 @@ import jax.numpy as jnp
 
 from cffg import gauss
 from cffg.compiler import NEG
+from cffg.structured_recurrence import (
+    StructuredGaussianMessage,
+    StructuredPairBelief,
+    StructuredPairPotential,
+    structured_gaussian_message,
+    structured_node_energy,
+    structured_pair_belief,
+    structured_pair_energy,
+    structured_pair_potential,
+    structured_separator_energy,
+)
 
 
 class RecurrenceUpdate(NamedTuple):
