@@ -1,7 +1,7 @@
 ---
 id: cff-h0hx
 status: in_progress
-deps: [cff-ifbr, cff-63dd]
+deps: [cff-ifbr, cff-63dd, cff-xwtz]
 links: []
 created: 2026-08-22T15:57:08Z
 type: task
@@ -93,3 +93,7 @@ compact/pilot, and pass/falsifier reporting must agree.
 **2026-08-22T18:28:59Z**
 
 Implementation start after cff-ifbr and cff-63dd integration. The experiment must pin active CFFG descendant 76fe090, bind `cffg.recurrence.d9-structured-pair/1.0.0` plus pair-belief/checkpoint identities before data generation, preserve historical D8 artifacts as read-only, and funnel fresh development evidence through one declared seed/tier before expansion. No adapter, calibration, or final seed is authorized.
+
+**2026-08-22T19:11:56Z**
+
+Authenticated D9 pilot falsifier. Experiment code commits be10f86 and 5669f6c; immutable artifact commit 2802507. Root results SHA-256 eb30d3a3096ba190318850733bb868a29350548d8e712bd527dd45acdaaca1bb; manifest SHA-256 81f2a6627ad7f426473039b02bf05fd1abdd77047211586ca3f16397323e73d7. Only source_heterogeneous seed 5000, native_end_to_end, replicate 0 ran. No shared tier, expansion, adapter, control, calibration seed, or final seed ran. The D9 fit converged in 9 outer maps with 5,647 total inner iterations, no retries, coherent certified/returned coordinate/8, final runtime residual 0.0626068, fit wall 731.30 seconds, full arm wall 776.27 seconds, and peak RSS 4,582,457,344 bytes. The unchanged gate failed: worst-source RMSE 0.204837 and worst source-contrast RMSE 0.318117 versus 0.150. Pair-derived pooled exposure/linear/quadratic agree within 2.51e-12/1.10e-11/4.37e-11; posterior consistency, affine alignment, exhaustive labels, and coverage checks do not explain the miss. Truth-joint plus inferred-continuous clamping passes at 0.033130/0.038246, while inferred-joint plus truth-continuous fails at 0.203728/0.312649. This localizes the next question to categorical responsibilities. Keep D9: reverting would restore the proven singleton-product defect. cff-xwtz owns the no-refit continuous-clamped categorical smoothing oracle. Leave this ticket in progress; rerun no additional coordinate until that mechanism is resolved.
