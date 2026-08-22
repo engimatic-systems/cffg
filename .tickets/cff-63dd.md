@@ -1,6 +1,6 @@
 ---
 id: cff-63dd
-status: in_progress
+status: closed
 deps: [cff-ifbr]
 links: []
 created: 2026-08-22T15:57:08Z
@@ -86,3 +86,31 @@ BFE, GFE, scheduling, visualization, and plate expansion are N/A.
 Duplicated surfaces: current/legacy, encode/decode, bundle/checkpoint,
 model-only/runtime-state, direct/facade learnables, tamper/round-trip, and
 float32/x64 arrays must agree.
+
+**2026-08-22T18:27:40Z**
+
+Completed by ba67d3f.
+
+Persistence boundary:
+
+- Learnables.state_dict emits a scalar cffg.recurrence.d9-structured-pair/1.0.0 manifest only when it owns recurrence_link PG weights. The manifest binds checkpoint version, exact factor and source ownership, target parameter blobs, hyperparameter names, shapes, canonical dtypes, and SHA-256 digests of exact C-order values.
+- Learnables.load_state_dict validates the entire manifest and payload before committing any values. Current f32 and f64 checkpoints round-trip their original dtype and values. Missing identity, D8 identity, unknown versions, incomplete members, wrong factor/source/shape/dtype, non-finite values, and digest tampering fail atomically.
+- Pre-manifest recurrence v2 and slash-key checkpoints are rejected because D8 and early D9 arrays cannot be distinguished. No migration relabels them. Legacy migrations for non-recurrence families are unchanged.
+- Model-only cffgz bundles and point-parameter files remain loadable. They rerun current D9 inference and are initializations, not resumable recurrence posteriors. The unchanged recurrence_link IR spelling and structure hash cannot prove D8 versus D9 statistic provenance.
+- RSLDSLearning marks direct or factory construction as an unlearned prior and marks update, fit output, and validated checkpoint restore as current D9. Numeric fit residual snapshots intentionally exclude the scalar checkpoint manifest.
+- RollingAgent already namespaces and round-trips all Learnables.state_dict members. No shipped agent builder owns a recurrence learnable, so no separate agent schema was added.
+
+Validation:
+
+- Focused affected selection: 128 passed, 4 deselected in 138.66 seconds.
+- Final exact-head default suite through tools/dashboard.py --run-suite at ba67d3f: 1474 passed, 39 deselected, 0 failed in 584.20 seconds pytest time and 592.714 seconds dashboard wall time.
+- git diff --check, Python compilation, and dependency-cycle validation passed.
+
+cff-h0hx handoff:
+
+1. Pin ba67d3f or its integrated descendant and record cffg.recurrence.d9-structured-pair/1.0.0 in every new claim-bearing heterogeneous fit, factor-belief, ladder, and result manifest.
+2. Bump and validate custom experiment schemas before generation or replay. Reject missing, D8, unknown, tampered, wrong-source or stick-shape, non-finite, or marginal-inconsistent pair evidence instead of inferring semantics from the CFFG commit or unchanged template hash alone.
+3. The heterogeneous fit checkpoint can reconstruct a coefficient posterior from retained prior plus recurrence linear and quadratic evidence. It therefore must bind that evidence to D9, source ownership, dtype, shape, and value digests. The recurrence factor-belief checkpoint must likewise bind its pair beliefs and pair-derived at-risk and signed masses to D9.
+4. Historical artifacts remain immutable read-only evidence under their recorded CFFG commits. Do not feed their recurrence arrays or sufficient statistics into current Learnables.load_state_dict or present them as D9.
+5. Existing periodicity parameters.npz and other point-only checkpoints may initialize a fresh D9 inference run, but cannot resume learned posterior statistics. If a consumer starts persisting the generic Learnables state, it must retain the full state_dict including the scalar manifest key; filtering to numeric v2 keys is unsafe.
+6. Fresh cff-h0hx evidence must use current pair beliefs and statistics and rerun the registered development gates. No historical artifact is rewritten by this ticket.
