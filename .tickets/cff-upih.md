@@ -42,9 +42,11 @@ randomness before code changes.
 4. Under that fixed policy, every declared heterogeneous chain has no persistent
    component collapse and meets split R-hat at most 1.05 and effective sample
    size at least 50 on every variable authorized by `cff-w42g`.
-5. The paper Eq. 2, 4, 6, and 7 conditionals, the original recurrence prior,
-   the full source-specific parameterization, and the retained-draw target stay
-   unchanged and pass their independent density and transition oracles.
+5. The paper Eq. 2, 4, 6, and 7 conditionals, the crossed study's fixed
+   recurrence prior of 1.0, the full source-specific parameterization, and the
+   retained-draw target stay unchanged and pass their independent density and
+   transition oracles. The report states that this prior differs from the
+   weak-prior cff-oyie target.
 6. Generating states and parameters never enter sampling, initialization,
    warmup selection, or chain acceptance.
 7. The isolated Python 3.11 runtime, pinned sources, seeds, initializer state,
