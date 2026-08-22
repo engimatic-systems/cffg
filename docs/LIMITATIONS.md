@@ -334,26 +334,26 @@ overflows the dtype remain loud failures. Factor-local diagnostics report the
 failed predicate and dtype-scaled tolerance, but they do not repair or relax an
 invalid belief.
 
-**S1j. Learning-enabled D3 and D9 do not yet share one production rSLDS coordinate.** The
-source-heterogeneous D9 development fit exposed a coupled approximation
-limit, not a local message or learning-readout defect. On the authenticated
-seed-5000/native checkpoint, the all-learned post-fit smoother scored 0.203
-worst-source and 0.309 source-contrast error against unchanged 0.150 caps.
-Replacing either learned dynamics alone or learned recurrence alone restored
-both caps; changing only the initial-regime distribution did not. Independent
-oracles reproduced all 5,119 occurrences in each D3 and D9 factor-local
-statistic family and their posterior natural parameters. Current production
-therefore remains honest D3 assumed-density plus D9 structured categorical
-inference, with the bound
-directions and local guarantees in S1d/S1i, but it does not claim stationarity
-for one full recurrent-switching variational free energy. D10 derives the
-structured-mean-field component that would make the categorical path,
-Gaussian trajectory, both learning readouts, and one conservative objective
-share a coordinate. Its pure authority and independent oracles now exist,
-including the required distinction between fixed-auxiliary expanded sweeps
-and collapsed sweep-boundary values. Production fixed-parameter and exactly
-four-family learned inference now dispatch D10 only for the exact tied-boundary
-whole-template topology. Its
+**S1j. Pre-D10 learning combined D3 and D9 without one stationary rSLDS
+coordinate.** The source-heterogeneous D9 development fit exposed that
+historical coupled approximation limit, not a local message or learning-readout
+defect. On the authenticated seed-5000/native checkpoint, the all-learned
+post-fit smoother scored 0.203 worst-source and 0.309 source-contrast error
+against unchanged 0.150 caps. Replacing either learned dynamics alone or
+learned recurrence alone restored both caps; changing only the initial-regime
+distribution did not. Independent oracles reproduced all 5,119 occurrences in
+each D3 and D9 factor-local statistic family and their posterior natural
+parameters. Those results described honest D3 assumed-density plus D9
+structured categorical inference, with the bound directions and local
+guarantees in S1d/S1i, but not stationarity for one full recurrent-switching
+variational free energy.
+
+D10 now makes the categorical path, Gaussian trajectory, both learning
+readouts, and one conservative objective share a structured-mean-field
+coordinate. Its pure authority and independent oracles distinguish
+fixed-auxiliary expanded sweeps from collapsed sweep-boundary values.
+Production fixed-parameter and exactly four-family learned inference dispatch
+D10 only for the exact tied-boundary whole-template topology. Its
 installed trajectory state and single objective owner replace D3/D9 and all
 consumed separator terms. The standard rSLDS helper's initial, dynamics,
 recurrence, and emission learning consumers read that same installed
