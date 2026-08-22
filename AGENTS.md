@@ -176,15 +176,22 @@ companion and executable-test anchors — added 2026-07-09 at Cooper's request
 for cff-fk2u), `docs/READING.md` (curated external reading list — added
 2026-07-12 at Cooper's request; keep it cream-of-the-crop short, verified
 links only), `README.md` (the user guide).
-**Update in place; do not create new markdown files** — with one sanctioned
-exception: `docs/todo-notes/` holds one note per *remaining* under-explained
-work thread (per Cooper, 2026-07-05). Each note names its `tk` ticket; when
-the work lands, **delete the note in the same commit** — todo-notes describe
-the future only, never the present (the present belongs to README/
-ARCHITECTURE/docstrings). Everything else lives in tickets (state,
-decisions-in-progress, research findings), code docstrings (durable
-knowledge), or tests (executable claims). If a decision changes the
-architecture, edit ARCHITECTURE.md in the same commit as the change.
+**Update in place; do not create new markdown files** — with two sanctioned
+exceptions:
+
+- `docs/todo-notes/` holds one note per *remaining* under-explained work thread
+  (per Cooper, 2026-07-05). Each note names its `tk` ticket; when the work
+  lands, **delete the note in the same commit** — todo-notes describe the
+  future only, never the present (the present belongs to README/
+  ARCHITECTURE/docstrings).
+- `notes/rslds-debug/` holds the closed-scope Codex, independent-reviewer, and
+  synthesis audit Cooper requested on 2026-08-20. It preserves that review
+  record; it is not a general home for project or session state.
+
+Everything else lives in tickets (state, decisions-in-progress, research
+findings), code docstrings (durable knowledge), or tests (executable claims).
+If a decision changes the architecture, edit ARCHITECTURE.md in the same
+commit as the change.
 
 ## Technical invariants
 

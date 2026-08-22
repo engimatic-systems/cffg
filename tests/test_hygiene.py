@@ -30,12 +30,23 @@ EXEMPT_DIRS = {
     "node_modules",
 }
 
+EXEMPT_MARKDOWN_ROOTS = {
+    Path("notes/rslds-debug"),  # Cooper's preserved multi-review audit (2026-08-20)
+}
+
+
+def _is_exempt_markdown(path: Path) -> bool:
+    relative = path.relative_to(REPO)
+    if set(relative.parts[:-1]) & EXEMPT_DIRS:
+        return True
+    return any(relative.is_relative_to(root) for root in EXEMPT_MARKDOWN_ROOTS)
+
 
 def test_no_contraband_markdown():
     found = {
         str(p.relative_to(REPO))
         for p in REPO.rglob("*.md")
-        if not (set(p.relative_to(REPO).parts[:-1]) & EXEMPT_DIRS)
+        if not _is_exempt_markdown(p)
     }
     contraband = sorted(found - CANONICAL_DOCS)
     assert not contraband, (
@@ -48,6 +59,13 @@ def test_no_contraband_markdown():
         "amend AGENTS.md and this allowlist in the same commit and be ready "
         "to defend that in review."
     )
+
+
+def test_markdown_exceptions_are_path_specific():
+    assert _is_exempt_markdown(REPO / "notes/rslds-debug/codex/review.md")
+    assert not _is_exempt_markdown(REPO / "notes/rslds-debug-copy/review.md")
+    assert not _is_exempt_markdown(REPO / "other/rslds-debug/review.md")
+    assert not _is_exempt_markdown(REPO / "docs/unregistered.md")
 
 
 def test_canonical_docs_exist():
