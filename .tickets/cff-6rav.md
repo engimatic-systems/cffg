@@ -1,6 +1,6 @@
 ---
 id: cff-6rav
-status: open
+status: in_progress
 deps: [cff-e10u]
 links: []
 created: 2026-08-22T20:21:34Z
@@ -96,3 +96,9 @@ legacy decoding, learning sources, readouts, atomic writes, fit-result
 construction, and model consumers apply. New IR spelling, compiler topology,
 synchronous/scheduled numerical dispatch, and GFE are N/A here because
 cff-e10u owns them.
+
+## Notes
+
+**2026-08-22T22:24:02Z**
+
+Implementation start after fixed-parameter D10 dispatch passed the full suite and independent review. Learned D10 eligibility must land atomically with D10-owned readouts for all four learned families, fit evidence, parameter-write invalidation/rebuild, retry semantics, and versioned persistence. Until that complete boundary passes, learned templates remain on D3/D9.
