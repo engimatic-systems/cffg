@@ -1,0 +1,2059 @@
+{
+  "cases": [
+    {
+      "cardinality": 2,
+      "cffg_iterations": 27,
+      "cffg_status": "converged",
+      "drive_clamp_error": 6.661338147750939e-15,
+      "dtype": "float64",
+      "enumerator_vs_forward_backward": 2.220446049250313e-16,
+      "factor_local_joint_error": 0.018467018183774025,
+      "learning_readout_error": 5.551115123125783e-17,
+      "learning_structured_responsibility_error": 0.06071487400308323,
+      "local_coordinate_message_error": 2.3314683517128287e-15,
+      "parameters": {
+        "drives": [
+          [
+            -0.7
+          ],
+          [
+            0.25
+          ],
+          [
+            0.8
+          ],
+          [
+            -0.35
+          ]
+        ],
+        "evidence": [
+          [
+            0.9,
+            0.1
+          ],
+          [
+            0.12,
+            0.88
+          ],
+          [
+            0.82,
+            0.18
+          ],
+          [
+            0.15,
+            0.85
+          ],
+          [
+            0.7,
+            0.3
+          ]
+        ],
+        "initial": [
+          0.62,
+          0.38
+        ],
+        "offsets": [
+          [
+            -0.2
+          ],
+          [
+            0.35
+          ]
+        ],
+        "weights": [
+          [
+            [
+              1.35
+            ]
+          ],
+          [
+            [
+              -1.1
+            ]
+          ]
+        ]
+      },
+      "product_joint_correlated_gap": 0.04576431088458599,
+      "product_joint_error": 0.06338588833926295,
+      "singleton_error": 0.03487330080041151,
+      "sum_product_message_error": 0.042691904819596505,
+      "surfaces": {
+        "cffg_factor_local": [
+          [
+            [
+              0.04090091721314413,
+              0.9298635381868829
+            ],
+            [
+              0.008699687657992757,
+              0.020535856941980284
+            ]
+          ],
+          [
+            [
+              0.03348442424539997,
+              0.010896169317697529
+            ],
+            [
+              0.7097603767821736,
+              0.245859029654729
+            ]
+          ],
+          [
+            [
+              0.16236711365804024,
+              0.5712531439945545
+            ],
+            [
+              0.01728535076996109,
+              0.2490943915774441
+            ]
+          ],
+          [
+            [
+              0.10021162750003973,
+              0.08414036064864945
+            ],
+            [
+              0.6766042545786881,
+              0.1390437572726228
+            ]
+          ]
+        ],
+        "cffg_product_consecutive": [
+          [
+            [
+              0.04330875602867625,
+              0.932853895826754
+            ],
+            [
+              0.0010575756951994933,
+              0.022779772449370208
+            ]
+          ],
+          [
+            [
+              0.03297538084000826,
+              0.011390950883867481
+            ],
+            [
+              0.7102769810013598,
+              0.24535668727476442
+            ]
+          ],
+          [
+            [
+              0.1227902721749109,
+              0.6204620896664572
+            ],
+            [
+              0.04241643079567172,
+              0.21433120736296016
+            ]
+          ],
+          [
+            [
+              0.1311893095461161,
+              0.03401739342446654
+            ],
+            [
+              0.6629026200620681,
+              0.17189067696734933
+            ]
+          ]
+        ],
+        "cffg_singleton": [
+          [
+            0.9761626518554303,
+            0.0238373481445697
+          ],
+          [
+            0.044366331723875746,
+            0.9556336682761243
+          ],
+          [
+            0.7432523618413681,
+            0.2567476381586319
+          ],
+          [
+            0.16520670297058263,
+            0.8347932970294174
+          ],
+          [
+            0.7940919296081842,
+            0.20590807039181586
+          ]
+        ],
+        "cffg_to_in": [
+          [
+            0.7360625233116802,
+            0.2639374766883198
+          ],
+          [
+            0.5033861509780659,
+            0.49661384902193406
+          ],
+          [
+            0.37024208800349,
+            0.62975791199651
+          ],
+          [
+            0.4005025744865338,
+            0.5994974255134662
+          ]
+        ],
+        "cffg_to_out": [
+          [
+            0.2514284364484832,
+            0.7485715635515168
+          ],
+          [
+            0.5194334294626569,
+            0.48056657053734314
+          ],
+          [
+            0.6266766655598257,
+            0.37332333444017435
+          ],
+          [
+            0.623039982246432,
+            0.37696001775356797
+          ]
+        ],
+        "exact_consecutive": [
+          [
+            [
+              0.04090106021279382,
+              0.9298633685180915
+            ],
+            [
+              0.008699718074236957,
+              0.02053585319487782
+            ]
+          ],
+          [
+            [
+              0.037163041839861743,
+              0.012437736447169036
+            ],
+            [
+              0.7007472913291467,
+              0.24965193038382255
+            ]
+          ],
+          [
+            [
+              0.18083413184181427,
+              0.5570762013271943
+            ],
+            [
+              0.019245871929179793,
+              0.2428437949018118
+            ]
+          ],
+          [
+            [
+              0.10876119649945835,
+              0.0913188072715357
+            ],
+            [
+              0.6635573984207508,
+              0.1363625978082552
+            ]
+          ]
+        ],
+        "exact_singleton": [
+          [
+            0.9707644287308853,
+            0.029235571269114767
+          ],
+          [
+            0.04960077828703077,
+            0.9503992217129692
+          ],
+          [
+            0.7379103331690084,
+            0.2620896668309916
+          ],
+          [
+            0.20008000377099402,
+            0.7999199962290059
+          ],
+          [
+            0.7723185949202092,
+            0.22768140507979093
+          ]
+        ],
+        "exact_sum_product_to_in": [
+          [
+            0.6933706184920838,
+            0.3066293815079163
+          ],
+          [
+            0.50338707061232,
+            0.49661292938768004
+          ],
+          [
+            0.3637168857230929,
+            0.6362831142769071
+          ],
+          [
+            0.4327792513704872,
+            0.5672207486295128
+          ]
+        ],
+        "exact_sum_product_to_out": [
+          [
+            0.2740851434506951,
+            0.7259148565493049
+          ],
+          [
+            0.5195040924954443,
+            0.4804959075045557
+          ],
+          [
+            0.6500655635449358,
+            0.3499344364550643
+          ],
+          [
+            0.5924618625050804,
+            0.4075381374949197
+          ]
+        ],
+        "independent_coordinate_to_in": [
+          [
+            0.7360625233116802,
+            0.2639374766883198
+          ],
+          [
+            0.5033861509780658,
+            0.4966138490219341
+          ],
+          [
+            0.37024208800349095,
+            0.629757911996509
+          ],
+          [
+            0.40050257448653176,
+            0.5994974255134683
+          ]
+        ],
+        "independent_coordinate_to_out": [
+          [
+            0.2514284364484831,
+            0.7485715635515169
+          ],
+          [
+            0.5194334294626569,
+            0.48056657053734314
+          ],
+          [
+            0.6266766655598234,
+            0.3733233344401767
+          ],
+          [
+            0.6230399822464309,
+            0.3769600177535692
+          ]
+        ]
+      },
+      "template": {
+        "blobs": {
+          "observation_covariance": {
+            "path": "blobs/observation_covariance.npy"
+          },
+          "observation_matrix": {
+            "path": "blobs/observation_matrix.npy"
+          },
+          "observation_offset": {
+            "path": "blobs/observation_offset.npy"
+          },
+          "offsets": {
+            "path": "blobs/offsets.npy"
+          },
+          "state_probability_0": {
+            "path": "blobs/state_probability_0.npy"
+          },
+          "state_probability_1": {
+            "path": "blobs/state_probability_1.npy"
+          },
+          "state_probability_2": {
+            "path": "blobs/state_probability_2.npy"
+          },
+          "state_probability_3": {
+            "path": "blobs/state_probability_3.npy"
+          },
+          "state_probability_4": {
+            "path": "blobs/state_probability_4.npy"
+          },
+          "weights": {
+            "path": "blobs/weights.npy"
+          }
+        },
+        "constraints": [],
+        "factors": {
+          "equal1": {
+            "edges": {
+              "a": "z1_left",
+              "b": "z1_right",
+              "c": "z1_observed"
+            },
+            "param_blobs": {},
+            "param_edges": {},
+            "type": "equality"
+          },
+          "equal2": {
+            "edges": {
+              "a": "z2_left",
+              "b": "z2_right",
+              "c": "z2_observed"
+            },
+            "param_blobs": {},
+            "param_edges": {},
+            "type": "equality"
+          },
+          "equal3": {
+            "edges": {
+              "a": "z3_left",
+              "b": "z3_right",
+              "c": "z3_observed"
+            },
+            "param_blobs": {},
+            "param_edges": {},
+            "type": "equality"
+          },
+          "observe_drive0": {
+            "edges": {
+              "in": "drive0",
+              "out": "observed_drive0"
+            },
+            "param_blobs": {
+              "cov": "observation_covariance",
+              "matrix": "observation_matrix",
+              "offset": "observation_offset"
+            },
+            "param_edges": {},
+            "type": "gaussian_linear"
+          },
+          "observe_drive1": {
+            "edges": {
+              "in": "drive1",
+              "out": "observed_drive1"
+            },
+            "param_blobs": {
+              "cov": "observation_covariance",
+              "matrix": "observation_matrix",
+              "offset": "observation_offset"
+            },
+            "param_edges": {},
+            "type": "gaussian_linear"
+          },
+          "observe_drive2": {
+            "edges": {
+              "in": "drive2",
+              "out": "observed_drive2"
+            },
+            "param_blobs": {
+              "cov": "observation_covariance",
+              "matrix": "observation_matrix",
+              "offset": "observation_offset"
+            },
+            "param_edges": {},
+            "type": "gaussian_linear"
+          },
+          "observe_drive3": {
+            "edges": {
+              "in": "drive3",
+              "out": "observed_drive3"
+            },
+            "param_blobs": {
+              "cov": "observation_covariance",
+              "matrix": "observation_matrix",
+              "offset": "observation_offset"
+            },
+            "param_edges": {},
+            "type": "gaussian_linear"
+          },
+          "state0": {
+            "edges": {
+              "out": "z0"
+            },
+            "param_blobs": {
+              "statistic": "state_probability_0"
+            },
+            "param_edges": {},
+            "type": "categorical"
+          },
+          "state1": {
+            "edges": {
+              "out": "z1_observed"
+            },
+            "param_blobs": {
+              "statistic": "state_probability_1"
+            },
+            "param_edges": {},
+            "type": "categorical"
+          },
+          "state2": {
+            "edges": {
+              "out": "z2_observed"
+            },
+            "param_blobs": {
+              "statistic": "state_probability_2"
+            },
+            "param_edges": {},
+            "type": "categorical"
+          },
+          "state3": {
+            "edges": {
+              "out": "z3_observed"
+            },
+            "param_blobs": {
+              "statistic": "state_probability_3"
+            },
+            "param_edges": {},
+            "type": "categorical"
+          },
+          "state4": {
+            "edges": {
+              "out": "z4"
+            },
+            "param_blobs": {
+              "statistic": "state_probability_4"
+            },
+            "param_edges": {},
+            "type": "categorical"
+          },
+          "switch0": {
+            "edges": {
+              "drive": "drive0",
+              "in": "z0",
+              "out": "z1_left"
+            },
+            "param_blobs": {
+              "offsets": "offsets",
+              "weights": "weights"
+            },
+            "param_edges": {},
+            "type": "recurrence_link"
+          },
+          "switch1": {
+            "edges": {
+              "drive": "drive1",
+              "in": "z1_right",
+              "out": "z2_left"
+            },
+            "param_blobs": {
+              "offsets": "offsets",
+              "weights": "weights"
+            },
+            "param_edges": {},
+            "type": "recurrence_link"
+          },
+          "switch2": {
+            "edges": {
+              "drive": "drive2",
+              "in": "z2_right",
+              "out": "z3_left"
+            },
+            "param_blobs": {
+              "offsets": "offsets",
+              "weights": "weights"
+            },
+            "param_edges": {},
+            "type": "recurrence_link"
+          },
+          "switch3": {
+            "edges": {
+              "drive": "drive3",
+              "in": "z3_right",
+              "out": "z4"
+            },
+            "param_blobs": {
+              "offsets": "offsets",
+              "weights": "weights"
+            },
+            "param_edges": {},
+            "type": "recurrence_link"
+          }
+        },
+        "name": "recurrence-smoothing-k2-t5",
+        "ports": {
+          "drive0": {
+            "role": "data",
+            "variable": "observed_drive0"
+          },
+          "drive1": {
+            "role": "data",
+            "variable": "observed_drive1"
+          },
+          "drive2": {
+            "role": "data",
+            "variable": "observed_drive2"
+          },
+          "drive3": {
+            "role": "data",
+            "variable": "observed_drive3"
+          }
+        },
+        "schema_version": "1",
+        "variables": {
+          "drive0": {
+            "dim": 1
+          },
+          "drive1": {
+            "dim": 1
+          },
+          "drive2": {
+            "dim": 1
+          },
+          "drive3": {
+            "dim": 1
+          },
+          "observed_drive0": {
+            "dim": 1
+          },
+          "observed_drive1": {
+            "dim": 1
+          },
+          "observed_drive2": {
+            "dim": 1
+          },
+          "observed_drive3": {
+            "dim": 1
+          },
+          "z0": {
+            "cardinality": 2
+          },
+          "z1_left": {
+            "cardinality": 2
+          },
+          "z1_observed": {
+            "cardinality": 2
+          },
+          "z1_right": {
+            "cardinality": 2
+          },
+          "z2_left": {
+            "cardinality": 2
+          },
+          "z2_observed": {
+            "cardinality": 2
+          },
+          "z2_right": {
+            "cardinality": 2
+          },
+          "z3_left": {
+            "cardinality": 2
+          },
+          "z3_observed": {
+            "cardinality": 2
+          },
+          "z3_right": {
+            "cardinality": 2
+          },
+          "z4": {
+            "cardinality": 2
+          }
+        }
+      },
+      "time": 5,
+      "tolerance": 4.547473508864641e-13
+    },
+    {
+      "cardinality": 3,
+      "cffg_iterations": 16,
+      "cffg_status": "converged",
+      "drive_clamp_error": 6.2727600891321345e-15,
+      "dtype": "float64",
+      "enumerator_vs_forward_backward": 2.220446049250313e-16,
+      "factor_local_joint_error": 0.006839467961397228,
+      "learning_readout_error": 1.1102230246251565e-16,
+      "learning_structured_responsibility_error": 0.014237070623753123,
+      "local_coordinate_message_error": 8.604228440844963e-16,
+      "parameters": {
+        "drives": [
+          [
+            -0.4
+          ],
+          [
+            0.65
+          ],
+          [
+            0.15
+          ]
+        ],
+        "evidence": [
+          [
+            0.8,
+            0.15,
+            0.05
+          ],
+          [
+            0.08,
+            0.84,
+            0.08
+          ],
+          [
+            0.1,
+            0.15,
+            0.75
+          ],
+          [
+            0.72,
+            0.18,
+            0.1
+          ]
+        ],
+        "initial": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "offsets": [
+          [
+            -0.3,
+            0.15
+          ],
+          [
+            0.25,
+            -0.45
+          ],
+          [
+            -0.1,
+            0.4
+          ]
+        ],
+        "weights": [
+          [
+            [
+              1.0
+            ],
+            [
+              -0.7
+            ]
+          ],
+          [
+            [
+              -1.2
+            ],
+            [
+              0.8
+            ]
+          ],
+          [
+            [
+              0.55
+            ],
+            [
+              1.1
+            ]
+          ]
+        ]
+      },
+      "product_joint_correlated_gap": 0.012264169215057796,
+      "product_joint_error": 0.010772329105802711,
+      "singleton_error": 0.014237070623753345,
+      "sum_product_message_error": 0.031139519676674415,
+      "surfaces": {
+        "cffg_factor_local": [
+          [
+            [
+              0.05413985589942252,
+              0.8621404635314537,
+              0.026577783350558496
+            ],
+            [
+              0.012386702266388333,
+              0.024656900807057944,
+              0.002523670171432698
+            ],
+            [
+              0.0017159798870184614,
+              0.015113199197851144,
+              0.000745444888816681
+            ]
+          ],
+          [
+            [
+              0.013495025463005158,
+              0.006416261898255423,
+              0.043569653124117744
+            ],
+            [
+              0.10110921998489027,
+              0.14134261421087607,
+              0.6596517343083187
+            ],
+            [
+              0.009990807888009209,
+              0.009247010166576131,
+              0.015177672955951434
+            ]
+          ],
+          [
+            [
+              0.09842007831569947,
+              0.01461502612109903,
+              0.007762182315942045
+            ],
+            [
+              0.13423024041403875,
+              0.013086272995089365,
+              0.010112549253636416
+            ],
+            [
+              0.594817597572632,
+              0.096489081584241,
+              0.03046697142762189
+            ]
+          ]
+        ],
+        "cffg_product_consecutive": [
+          [
+            [
+              0.058593726734348955,
+              0.8639699886921439,
+              0.027905987939803284
+            ],
+            [
+              0.0019732627851300863,
+              0.029095944586096,
+              0.0009397908368853076
+            ],
+            [
+              0.001080137713326454,
+              0.015926731750645722,
+              0.0005144289616202996
+            ]
+          ],
+          [
+            [
+              0.007447233385032574,
+              0.009623776736055275,
+              0.044576117111717654
+            ],
+            [
+              0.10981015378362143,
+              0.1419034893534286,
+              0.6572790218918356
+            ],
+            [
+              0.00354683712080374,
+              0.004583442844475728,
+              0.021229927773029424
+            ]
+          ],
+          [
+            [
+              0.10020731319917892,
+              0.0148537781493964,
+              0.005743132940882416
+            ],
+            [
+              0.1294941033387051,
+              0.019194973113637957,
+              0.007421632481616549
+            ],
+            [
+              0.5998003147846335,
+              0.08890868865070094,
+              0.0343760633412482
+            ]
+          ]
+        ],
+        "cffg_singleton": [
+          [
+            0.9504697033662961,
+            0.03200899820811139,
+            0.017521298425592476
+          ],
+          [
+            0.0616471272328055,
+            0.9089926650288856,
+            0.029360207738308892
+          ],
+          [
+            0.12080422428945774,
+            0.15611070893395962,
+            0.7230850667765827
+          ],
+          [
+            0.8295017313225175,
+            0.12295743991373528,
+            0.04754082876374716
+          ]
+        ],
+        "cffg_to_in": [
+          [
+            0.49098413279479786,
+            0.14697678347806795,
+            0.3620390837271342
+          ],
+          [
+            0.3494592241942924,
+            0.4343901080684597,
+            0.21615066773724798
+          ],
+          [
+            0.3203919975039964,
+            0.3396192707232201,
+            0.3399887317727835
+          ]
+        ],
+        "cffg_to_out": [
+          [
+            0.3448605979700761,
+            0.38959950363376156,
+            0.2655398983961624
+          ],
+          [
+            0.3898919929097913,
+            0.3168786412975527,
+            0.29322936579265596
+          ],
+          [
+            0.49861086658389214,
+            0.2956373126338292,
+            0.20575182078227866
+          ]
+        ],
+        "exact_consecutive": [
+          [
+            [
+              0.05570849234024215,
+              0.8553009955700565,
+              0.031188394535445238
+            ],
+            [
+              0.012745591890932797,
+              0.02446129453379917,
+              0.002961466723759864
+            ],
+            [
+              0.0017656983160348045,
+              0.014993304301276579,
+              0.0008747617884528006
+            ]
+          ],
+          [
+            [
+              0.014932761634766208,
+              0.007160208387825675,
+              0.04812681252461788
+            ],
+            [
+              0.10028083737552203,
+              0.14137657832281944,
+              0.6530981787067909
+            ],
+            [
+              0.010152308080141463,
+              0.009476384427979481,
+              0.015395930539536968
+            ]
+          ],
+          [
+            [
+              0.10214238022758293,
+              0.015167774509474569,
+              0.00805575235337221
+            ],
+            [
+              0.13472827438449142,
+              0.013134826945958142,
+              0.010150069808175016
+            ],
+            [
+              0.5905712056860113,
+              0.09580024780585437,
+              0.030249468279080084
+            ]
+          ]
+        ],
+        "exact_singleton": [
+          [
+            0.942197882445744,
+            0.04016835314849185,
+            0.01763376440576419
+          ],
+          [
+            0.07021978254720974,
+            0.8947555944051323,
+            0.0350246230476579
+          ],
+          [
+            0.12536590709042972,
+            0.1580131711386246,
+            0.7166209217709456
+          ],
+          [
+            0.8274418602980856,
+            0.1241028492612871,
+            0.04845529044062732
+          ]
+        ],
+        "exact_sum_product_to_in": [
+          [
+            0.4700177859450876,
+            0.17811630315474236,
+            0.35186591090017
+          ],
+          [
+            0.344371405455662,
+            0.41271204201638617,
+            0.2429165525279518
+          ],
+          [
+            0.3196597768637294,
+            0.34172426021103375,
+            0.3386159629252369
+          ]
+        ],
+        "exact_sum_product_to_out": [
+          [
+            0.3676876612691212,
+            0.3723185217577846,
+            0.25999381697309415
+          ],
+          [
+            0.39911879537583306,
+            0.31371619769266623,
+            0.28716500693150077
+          ],
+          [
+            0.49466512421871683,
+            0.2967669599099847,
+            0.20856791587129841
+          ]
+        ],
+        "independent_coordinate_to_in": [
+          [
+            0.4909841327947985,
+            0.14697678347806747,
+            0.36203908372713406
+          ],
+          [
+            0.3494592241942924,
+            0.4343901080684605,
+            0.21615066773724712
+          ],
+          [
+            0.3203919975039964,
+            0.33961927072322007,
+            0.3399887317727836
+          ]
+        ],
+        "independent_coordinate_to_out": [
+          [
+            0.3448605979700755,
+            0.3895995036337623,
+            0.2655398983961623
+          ],
+          [
+            0.3898919929097907,
+            0.31687864129755294,
+            0.29322936579265635
+          ],
+          [
+            0.49861086658389225,
+            0.2956373126338295,
+            0.20575182078227833
+          ]
+        ]
+      },
+      "template": {
+        "blobs": {
+          "observation_covariance": {
+            "path": "blobs/observation_covariance.npy"
+          },
+          "observation_matrix": {
+            "path": "blobs/observation_matrix.npy"
+          },
+          "observation_offset": {
+            "path": "blobs/observation_offset.npy"
+          },
+          "offsets": {
+            "path": "blobs/offsets.npy"
+          },
+          "state_probability_0": {
+            "path": "blobs/state_probability_0.npy"
+          },
+          "state_probability_1": {
+            "path": "blobs/state_probability_1.npy"
+          },
+          "state_probability_2": {
+            "path": "blobs/state_probability_2.npy"
+          },
+          "state_probability_3": {
+            "path": "blobs/state_probability_3.npy"
+          },
+          "weights": {
+            "path": "blobs/weights.npy"
+          }
+        },
+        "constraints": [],
+        "factors": {
+          "equal1": {
+            "edges": {
+              "a": "z1_left",
+              "b": "z1_right",
+              "c": "z1_observed"
+            },
+            "param_blobs": {},
+            "param_edges": {},
+            "type": "equality"
+          },
+          "equal2": {
+            "edges": {
+              "a": "z2_left",
+              "b": "z2_right",
+              "c": "z2_observed"
+            },
+            "param_blobs": {},
+            "param_edges": {},
+            "type": "equality"
+          },
+          "observe_drive0": {
+            "edges": {
+              "in": "drive0",
+              "out": "observed_drive0"
+            },
+            "param_blobs": {
+              "cov": "observation_covariance",
+              "matrix": "observation_matrix",
+              "offset": "observation_offset"
+            },
+            "param_edges": {},
+            "type": "gaussian_linear"
+          },
+          "observe_drive1": {
+            "edges": {
+              "in": "drive1",
+              "out": "observed_drive1"
+            },
+            "param_blobs": {
+              "cov": "observation_covariance",
+              "matrix": "observation_matrix",
+              "offset": "observation_offset"
+            },
+            "param_edges": {},
+            "type": "gaussian_linear"
+          },
+          "observe_drive2": {
+            "edges": {
+              "in": "drive2",
+              "out": "observed_drive2"
+            },
+            "param_blobs": {
+              "cov": "observation_covariance",
+              "matrix": "observation_matrix",
+              "offset": "observation_offset"
+            },
+            "param_edges": {},
+            "type": "gaussian_linear"
+          },
+          "state0": {
+            "edges": {
+              "out": "z0"
+            },
+            "param_blobs": {
+              "statistic": "state_probability_0"
+            },
+            "param_edges": {},
+            "type": "categorical"
+          },
+          "state1": {
+            "edges": {
+              "out": "z1_observed"
+            },
+            "param_blobs": {
+              "statistic": "state_probability_1"
+            },
+            "param_edges": {},
+            "type": "categorical"
+          },
+          "state2": {
+            "edges": {
+              "out": "z2_observed"
+            },
+            "param_blobs": {
+              "statistic": "state_probability_2"
+            },
+            "param_edges": {},
+            "type": "categorical"
+          },
+          "state3": {
+            "edges": {
+              "out": "z3"
+            },
+            "param_blobs": {
+              "statistic": "state_probability_3"
+            },
+            "param_edges": {},
+            "type": "categorical"
+          },
+          "switch0": {
+            "edges": {
+              "drive": "drive0",
+              "in": "z0",
+              "out": "z1_left"
+            },
+            "param_blobs": {
+              "offsets": "offsets",
+              "weights": "weights"
+            },
+            "param_edges": {},
+            "type": "recurrence_link"
+          },
+          "switch1": {
+            "edges": {
+              "drive": "drive1",
+              "in": "z1_right",
+              "out": "z2_left"
+            },
+            "param_blobs": {
+              "offsets": "offsets",
+              "weights": "weights"
+            },
+            "param_edges": {},
+            "type": "recurrence_link"
+          },
+          "switch2": {
+            "edges": {
+              "drive": "drive2",
+              "in": "z2_right",
+              "out": "z3"
+            },
+            "param_blobs": {
+              "offsets": "offsets",
+              "weights": "weights"
+            },
+            "param_edges": {},
+            "type": "recurrence_link"
+          }
+        },
+        "name": "recurrence-smoothing-k3-t4",
+        "ports": {
+          "drive0": {
+            "role": "data",
+            "variable": "observed_drive0"
+          },
+          "drive1": {
+            "role": "data",
+            "variable": "observed_drive1"
+          },
+          "drive2": {
+            "role": "data",
+            "variable": "observed_drive2"
+          }
+        },
+        "schema_version": "1",
+        "variables": {
+          "drive0": {
+            "dim": 1
+          },
+          "drive1": {
+            "dim": 1
+          },
+          "drive2": {
+            "dim": 1
+          },
+          "observed_drive0": {
+            "dim": 1
+          },
+          "observed_drive1": {
+            "dim": 1
+          },
+          "observed_drive2": {
+            "dim": 1
+          },
+          "z0": {
+            "cardinality": 3
+          },
+          "z1_left": {
+            "cardinality": 3
+          },
+          "z1_observed": {
+            "cardinality": 3
+          },
+          "z1_right": {
+            "cardinality": 3
+          },
+          "z2_left": {
+            "cardinality": 3
+          },
+          "z2_observed": {
+            "cardinality": 3
+          },
+          "z2_right": {
+            "cardinality": 3
+          },
+          "z3": {
+            "cardinality": 3
+          }
+        }
+      },
+      "time": 4,
+      "tolerance": 6.821210263296962e-13
+    },
+    {
+      "cardinality": 2,
+      "cffg_iterations": 10,
+      "cffg_status": "converged",
+      "drive_clamp_error": 3.7550926208496094e-06,
+      "dtype": "float32",
+      "enumerator_vs_forward_backward": 5.960464477539063e-08,
+      "factor_local_joint_error": 0.01846759021282196,
+      "learning_readout_error": 5.960464477539063e-08,
+      "learning_structured_responsibility_error": 0.06071573495864868,
+      "local_coordinate_message_error": 1.1026859283447266e-06,
+      "parameters": {
+        "drives": [
+          [
+            -0.699999988079071
+          ],
+          [
+            0.25
+          ],
+          [
+            0.800000011920929
+          ],
+          [
+            -0.3499999940395355
+          ]
+        ],
+        "evidence": [
+          [
+            0.8999999761581421,
+            0.10000000149011612
+          ],
+          [
+            0.11999999731779099,
+            0.8799999952316284
+          ],
+          [
+            0.8199999928474426,
+            0.18000000715255737
+          ],
+          [
+            0.15000000596046448,
+            0.8500000238418579
+          ],
+          [
+            0.699999988079071,
+            0.30000001192092896
+          ]
+        ],
+        "initial": [
+          0.6200000047683716,
+          0.3799999952316284
+        ],
+        "offsets": [
+          [
+            -0.20000000298023224
+          ],
+          [
+            0.3499999940395355
+          ]
+        ],
+        "weights": [
+          [
+            [
+              1.350000023841858
+            ]
+          ],
+          [
+            [
+              -1.100000023841858
+            ]
+          ]
+        ]
+      },
+      "product_joint_correlated_gap": 0.045764341950416565,
+      "product_joint_error": 0.06338763236999512,
+      "singleton_error": 0.03487373888492584,
+      "sum_product_message_error": 0.04269218444824219,
+      "surfaces": {
+        "cffg_factor_local": [
+          [
+            [
+              0.04090076684951782,
+              0.9298637509346008
+            ],
+            [
+              0.00869967695325613,
+              0.020535822957754135
+            ]
+          ],
+          [
+            [
+              0.03348436951637268,
+              0.010896100662648678
+            ],
+            [
+              0.7097621560096741,
+              0.24585747718811035
+            ]
+          ],
+          [
+            [
+              0.16236655414104462,
+              0.5712547302246094
+            ],
+            [
+              0.017285335808992386,
+              0.24909338355064392
+            ]
+          ],
+          [
+            [
+              0.10021145641803741,
+              0.08414021879434586
+            ],
+            [
+              0.6766045093536377,
+              0.13904379308223724
+            ]
+          ]
+        ],
+        "cffg_product_consecutive": [
+          [
+            [
+              0.04330859333276749,
+              0.9328540563583374
+            ],
+            [
+              0.0010575699852779508,
+              0.022779736667871475
+            ]
+          ],
+          [
+            [
+              0.03297533467411995,
+              0.011390834115445614
+            ],
+            [
+              0.7102787494659424,
+              0.24535512924194336
+            ]
+          ],
+          [
+            [
+              0.12279025465250015,
+              0.6204637885093689
+            ],
+            [
+              0.042416051030159,
+              0.21432991325855255
+            ]
+          ],
+          [
+            [
+              0.13118888437747955,
+              0.034017421305179596
+            ],
+            [
+              0.6629024147987366,
+              0.17189131677150726
+            ]
+          ]
+        ],
+        "cffg_singleton": [
+          [
+            0.9761626720428467,
+            0.02383730746805668
+          ],
+          [
+            0.04436616599559784,
+            0.955633819103241
+          ],
+          [
+            0.7432540655136108,
+            0.25674596428871155
+          ],
+          [
+            0.16520629823207855,
+            0.8347936868667603
+          ],
+          [
+            0.7940912842750549,
+            0.20590874552726746
+          ]
+        ],
+        "cffg_to_in": [
+          [
+            0.7360628247261047,
+            0.26393720507621765
+          ],
+          [
+            0.5033857822418213,
+            0.4966142177581787
+          ],
+          [
+            0.37024375796318054,
+            0.6297562122344971
+          ],
+          [
+            0.40050235390663147,
+            0.5994976758956909
+          ]
+        ],
+        "cffg_to_out": [
+          [
+            0.2514280080795288,
+            0.7485719919204712
+          ],
+          [
+            0.5194337964057922,
+            0.480566143989563
+          ],
+          [
+            0.6266762018203735,
+            0.37332379817962646
+          ],
+          [
+            0.6230390071868896,
+            0.37696096301078796
+          ]
+        ],
+        "exact_consecutive": [
+          [
+            [
+              0.0409010648727417,
+              0.9298633337020874
+            ],
+            [
+              0.008699719794094563,
+              0.020535850897431374
+            ]
+          ],
+          [
+            [
+              0.03716304525732994,
+              0.012437737546861172
+            ],
+            [
+              0.7007473111152649,
+              0.2496519386768341
+            ]
+          ],
+          [
+            [
+              0.18083414435386658,
+              0.5570761561393738
+            ],
+            [
+              0.019245874136686325,
+              0.24284379184246063
+            ]
+          ],
+          [
+            [
+              0.10876119136810303,
+              0.09131881594657898
+            ],
+            [
+              0.6635574102401733,
+              0.13636259734630585
+            ]
+          ]
+        ],
+        "exact_singleton": [
+          [
+            0.9707643985748291,
+            0.02923557348549366
+          ],
+          [
+            0.049600787460803986,
+            0.9503992199897766
+          ],
+          [
+            0.7379103302955627,
+            0.26208966970443726
+          ],
+          [
+            0.2000800371170044,
+            0.7999200224876404
+          ],
+          [
+            0.7723185420036316,
+            0.22768142819404602
+          ]
+        ],
+        "exact_sum_product_to_in": [
+          [
+            0.6933706402778625,
+            0.30662938952445984
+          ],
+          [
+            0.5033870935440063,
+            0.49661290645599365
+          ],
+          [
+            0.3637169301509857,
+            0.6362831592559814
+          ],
+          [
+            0.4327792525291443,
+            0.5672206878662109
+          ]
+        ],
+        "exact_sum_product_to_out": [
+          [
+            0.2740851640701294,
+            0.7259148359298706
+          ],
+          [
+            0.5195040702819824,
+            0.4804958999156952
+          ],
+          [
+            0.6500656008720398,
+            0.349934458732605
+          ],
+          [
+            0.5924618244171143,
+            0.40753814578056335
+          ]
+        ],
+        "independent_coordinate_to_in": [
+          [
+            0.7360628247261047,
+            0.26393720507621765
+          ],
+          [
+            0.5033857822418213,
+            0.4966142177581787
+          ],
+          [
+            0.3702426552772522,
+            0.629757285118103
+          ],
+          [
+            0.40050265192985535,
+            0.5994973182678223
+          ]
+        ],
+        "independent_coordinate_to_out": [
+          [
+            0.2514280080795288,
+            0.7485719919204712
+          ],
+          [
+            0.5194337964057922,
+            0.480566143989563
+          ],
+          [
+            0.6266765594482422,
+            0.3733234405517578
+          ],
+          [
+            0.6230400800704956,
+            0.376959890127182
+          ]
+        ]
+      },
+      "template": {
+        "blobs": {
+          "observation_covariance": {
+            "path": "blobs/observation_covariance.npy"
+          },
+          "observation_matrix": {
+            "path": "blobs/observation_matrix.npy"
+          },
+          "observation_offset": {
+            "path": "blobs/observation_offset.npy"
+          },
+          "offsets": {
+            "path": "blobs/offsets.npy"
+          },
+          "state_probability_0": {
+            "path": "blobs/state_probability_0.npy"
+          },
+          "state_probability_1": {
+            "path": "blobs/state_probability_1.npy"
+          },
+          "state_probability_2": {
+            "path": "blobs/state_probability_2.npy"
+          },
+          "state_probability_3": {
+            "path": "blobs/state_probability_3.npy"
+          },
+          "state_probability_4": {
+            "path": "blobs/state_probability_4.npy"
+          },
+          "weights": {
+            "path": "blobs/weights.npy"
+          }
+        },
+        "constraints": [],
+        "factors": {
+          "equal1": {
+            "edges": {
+              "a": "z1_left",
+              "b": "z1_right",
+              "c": "z1_observed"
+            },
+            "param_blobs": {},
+            "param_edges": {},
+            "type": "equality"
+          },
+          "equal2": {
+            "edges": {
+              "a": "z2_left",
+              "b": "z2_right",
+              "c": "z2_observed"
+            },
+            "param_blobs": {},
+            "param_edges": {},
+            "type": "equality"
+          },
+          "equal3": {
+            "edges": {
+              "a": "z3_left",
+              "b": "z3_right",
+              "c": "z3_observed"
+            },
+            "param_blobs": {},
+            "param_edges": {},
+            "type": "equality"
+          },
+          "observe_drive0": {
+            "edges": {
+              "in": "drive0",
+              "out": "observed_drive0"
+            },
+            "param_blobs": {
+              "cov": "observation_covariance",
+              "matrix": "observation_matrix",
+              "offset": "observation_offset"
+            },
+            "param_edges": {},
+            "type": "gaussian_linear"
+          },
+          "observe_drive1": {
+            "edges": {
+              "in": "drive1",
+              "out": "observed_drive1"
+            },
+            "param_blobs": {
+              "cov": "observation_covariance",
+              "matrix": "observation_matrix",
+              "offset": "observation_offset"
+            },
+            "param_edges": {},
+            "type": "gaussian_linear"
+          },
+          "observe_drive2": {
+            "edges": {
+              "in": "drive2",
+              "out": "observed_drive2"
+            },
+            "param_blobs": {
+              "cov": "observation_covariance",
+              "matrix": "observation_matrix",
+              "offset": "observation_offset"
+            },
+            "param_edges": {},
+            "type": "gaussian_linear"
+          },
+          "observe_drive3": {
+            "edges": {
+              "in": "drive3",
+              "out": "observed_drive3"
+            },
+            "param_blobs": {
+              "cov": "observation_covariance",
+              "matrix": "observation_matrix",
+              "offset": "observation_offset"
+            },
+            "param_edges": {},
+            "type": "gaussian_linear"
+          },
+          "state0": {
+            "edges": {
+              "out": "z0"
+            },
+            "param_blobs": {
+              "statistic": "state_probability_0"
+            },
+            "param_edges": {},
+            "type": "categorical"
+          },
+          "state1": {
+            "edges": {
+              "out": "z1_observed"
+            },
+            "param_blobs": {
+              "statistic": "state_probability_1"
+            },
+            "param_edges": {},
+            "type": "categorical"
+          },
+          "state2": {
+            "edges": {
+              "out": "z2_observed"
+            },
+            "param_blobs": {
+              "statistic": "state_probability_2"
+            },
+            "param_edges": {},
+            "type": "categorical"
+          },
+          "state3": {
+            "edges": {
+              "out": "z3_observed"
+            },
+            "param_blobs": {
+              "statistic": "state_probability_3"
+            },
+            "param_edges": {},
+            "type": "categorical"
+          },
+          "state4": {
+            "edges": {
+              "out": "z4"
+            },
+            "param_blobs": {
+              "statistic": "state_probability_4"
+            },
+            "param_edges": {},
+            "type": "categorical"
+          },
+          "switch0": {
+            "edges": {
+              "drive": "drive0",
+              "in": "z0",
+              "out": "z1_left"
+            },
+            "param_blobs": {
+              "offsets": "offsets",
+              "weights": "weights"
+            },
+            "param_edges": {},
+            "type": "recurrence_link"
+          },
+          "switch1": {
+            "edges": {
+              "drive": "drive1",
+              "in": "z1_right",
+              "out": "z2_left"
+            },
+            "param_blobs": {
+              "offsets": "offsets",
+              "weights": "weights"
+            },
+            "param_edges": {},
+            "type": "recurrence_link"
+          },
+          "switch2": {
+            "edges": {
+              "drive": "drive2",
+              "in": "z2_right",
+              "out": "z3_left"
+            },
+            "param_blobs": {
+              "offsets": "offsets",
+              "weights": "weights"
+            },
+            "param_edges": {},
+            "type": "recurrence_link"
+          },
+          "switch3": {
+            "edges": {
+              "drive": "drive3",
+              "in": "z3_right",
+              "out": "z4"
+            },
+            "param_blobs": {
+              "offsets": "offsets",
+              "weights": "weights"
+            },
+            "param_edges": {},
+            "type": "recurrence_link"
+          }
+        },
+        "name": "recurrence-smoothing-k2-t5",
+        "ports": {
+          "drive0": {
+            "role": "data",
+            "variable": "observed_drive0"
+          },
+          "drive1": {
+            "role": "data",
+            "variable": "observed_drive1"
+          },
+          "drive2": {
+            "role": "data",
+            "variable": "observed_drive2"
+          },
+          "drive3": {
+            "role": "data",
+            "variable": "observed_drive3"
+          }
+        },
+        "schema_version": "1",
+        "variables": {
+          "drive0": {
+            "dim": 1
+          },
+          "drive1": {
+            "dim": 1
+          },
+          "drive2": {
+            "dim": 1
+          },
+          "drive3": {
+            "dim": 1
+          },
+          "observed_drive0": {
+            "dim": 1
+          },
+          "observed_drive1": {
+            "dim": 1
+          },
+          "observed_drive2": {
+            "dim": 1
+          },
+          "observed_drive3": {
+            "dim": 1
+          },
+          "z0": {
+            "cardinality": 2
+          },
+          "z1_left": {
+            "cardinality": 2
+          },
+          "z1_observed": {
+            "cardinality": 2
+          },
+          "z1_right": {
+            "cardinality": 2
+          },
+          "z2_left": {
+            "cardinality": 2
+          },
+          "z2_observed": {
+            "cardinality": 2
+          },
+          "z2_right": {
+            "cardinality": 2
+          },
+          "z3_left": {
+            "cardinality": 2
+          },
+          "z3_observed": {
+            "cardinality": 2
+          },
+          "z3_right": {
+            "cardinality": 2
+          },
+          "z4": {
+            "cardinality": 2
+          }
+        }
+      },
+      "time": 5,
+      "tolerance": 0.000244140625
+    }
+  ],
+  "code_identity": "3869b2188c9e742271400ab5b7af1ec0d40e0888",
+  "hostile_inputs": {
+    "exact_zero_and_deterministic_support": [
+      [
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0
+      ],
+      [
+        0.0,
+        1.0
+      ]
+    ],
+    "nonfinite_or_improper_rejections": [
+      "initial must be finite",
+      "recurrence parameters and drive must be finite",
+      "uncertain drive moments must be finite with nonnegative variance"
+    ],
+    "scale_case": {
+      "algorithm": "forward_backward_O(T*K^2)",
+      "cardinality": 8,
+      "pair_sum_error": 2.220446049250313e-16,
+      "path_enumeration_used": false,
+      "singleton_sum_error": 2.220446049250313e-16,
+      "time": 100
+    },
+    "vacuous_message_status": 0,
+    "vacuous_message_to_out": [
+      -0.6931471805599453,
+      -0.6931471805599453
+    ]
+  },
+  "numerical_mode": {
+    "jax_enable_x64": true
+  },
+  "oracle_sha256": "e0d99378c4f3c1799546a5986d729927fb4db05dde8bfb6ba40981d1d2b70a70",
+  "ownership": {
+    "decision": "variational_family_limitation",
+    "falsifiers": {
+      "learning_readout": "learning_readout_error exceeds the named dtype tolerance",
+      "local_message": "local_coordinate_message_error exceeds the named dtype tolerance",
+      "variational_family": "both implementation checks pass while exact pair/product and smoothing gaps exceed tolerance"
+    },
+    "production_change": "A structured consecutive-regime belief would change the recurrence fixed point and BFE; it requires a new derived region/counting-number treatment. Preserving the current mean-field fixed point and BFE cannot make product responsibilities equal the exact pair posterior."
+  },
+  "replay_command": "uv run python tools/recurrence_smoothing_diagnostic.py --output artifacts/cff-nbo9-exact-smoothing.json",
+  "schema_version": 1,
+  "ticket": "cff-nbo9",
+  "tolerance_rule": "1024 * K * finfo(dtype).eps",
+  "uncertain_drive": {
+    "categorical_factorization_pair_error": 0.09027929516094449,
+    "categorical_factorization_singleton_error": 0.05685254081432137,
+    "covariances": [
+      [
+        [
+          0.9
+        ]
+      ],
+      [
+        [
+          0.55
+        ]
+      ],
+      [
+        [
+          1.1
+        ]
+      ],
+      [
+        [
+          0.7
+        ]
+      ]
+    ],
+    "dtype": "float64",
+    "mean_field_iterations": 17,
+    "means": [
+      [
+        -0.5499999999999999
+      ],
+      [
+        0.15
+      ],
+      [
+        1.0
+      ],
+      [
+        -0.3
+      ]
+    ],
+    "pg_jj_pair_error": 0.06245870274571985,
+    "pg_jj_singleton_error": 0.03229326180075634,
+    "quadrature_order": 80,
+    "tolerance": 4.547473508864641e-13
+  }
+}
