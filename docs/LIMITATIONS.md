@@ -287,27 +287,34 @@ excluded until derived and tested). The engine supports only an exterior
 substituted output facing a fixed Gaussian goal. Interior predictive cavities,
 learned Gaussian goals, and Prop. 6 parameter novelty remain follow-up work.
 
-**S1i. Recurrent logistic transitions use a declared mean-field bound.** A
+**S1i. Recurrent logistic transitions use a structured categorical belief and
+a declared JJ bound.** A
 `recurrence_link` represents `p(z_t | z_{t-1}, x_t)` with `K - 1`
 source-specific stick-breaking logits for each previous regime. Its
 Pólya–Gamma auxiliary is replaced by the coordinate-optimal mean-field
 factor, equivalently the Jaakkola–Jordan lower bound on expected log
 transition probability. The reported recurrence VFE therefore upper-bounds
-the exact variational VFE at the same categorical and Gaussian beliefs; dense
+the exact-transition variational VFE at the same Gaussian belief; dense
 one-dimensional quadrature measures this gap in
-`tests/test_recurrence_link.py`. The factorization drops posterior
-correlations among the two regimes, Gaussian drive, and auxiliaries, so a
-strongly coupled or multimodal posterior can remain inaccurate even when the
-coordinate residual converges. v1 requires equal regime cardinalities
+`tests/test_recurrence_link.py`. D9 preserves the source/destination pair and
+uses it for categorical and Gaussian messages plus the pair-region entropy.
+On a compiler-classified acyclic ordinary categorical component, this is exact
+sum-product for the bounded transition tables. On a categorical loop, the
+same time-local rules are Bethe pseudomarginals and do not define one exact
+path posterior. The remaining factorization separates the categorical path
+from the Gaussian drive and PG auxiliaries, so a strongly coupled or
+multimodal joint posterior can remain inaccurate even when the coordinate
+residual converges. v1 requires equal regime cardinalities
 `K >= 2`, a proper Gaussian drive, finite fixed
 `weights[K,K-1,d]`/`offsets[K,K-1]`, and sum-product semantics. Between-trial
-PG learning accumulates the soft factor beliefs into independent Gaussian
-posteriors for `[weight; offset]`, but rolls only their means into the next
-inference state. Thus weight uncertainty does not enter the recurrence
-messages or the next PG coordinate; this is empirical-Bayes variational EM,
-not full joint VB over weights and auxiliaries. Flooding and mixed scheduling
-solve the same coordinates but, as for mean-field VMP generally, neither
-guarantees monotone progress on every loopy graph.
+PG learning still accumulates the historical product of endpoint singletons
+into independent Gaussian posteriors for `[weight; offset]`; cff-ifbr owns the
+pair-derived public readout. It rolls only posterior means into the next
+inference state. Thus weight uncertainty does not enter recurrence messages or
+the next PG coordinate; this is empirical-Bayes variational EM, not full joint
+VB over weights and auxiliaries. Flooding and mixed scheduling solve the same
+coordinates, but neither guarantees monotone progress on every loopy hybrid
+graph.
 
 The recurrence learning readout carries the Gaussian covariance computed
 directly from precision; it does not reconstruct covariance as
@@ -397,18 +404,20 @@ covers source/gate eligibility, cff-qulu covers outer convergence, cff-0oqo
 covers source-function error, and cff-3v7q covers classic periodicity.
 
 All fits exhausted their registered two-coordinate outer budget despite
-converged inner and final inference. On the compact pilot, the fixed `0.9`
-damping attempt after the third replacement remains a real finite message
-cycle: its recurrence coordinate and Gaussian beliefs are proper and its FE is
-finite, but its message certificate does not pass. The fitter now restarts a
-finite exhausted solve from the same parameter-bound state with a bounded
-convex step-expansion schedule. That pilot completes five replacements and a
-terminal solve at the unchanged tolerance. Exhausting every registered retry
-still returns `budget_exhausted`; no monotone-progress guarantee is claimed for
-arbitrary loopy mean-field graphs. This correction does not remove the
-recurrence mean-field bound, point-posterior approximation, single-seed
-boundary, or sensitivity to the initializer and outer budget. The learned
-command took 2,063 seconds and 5.16 GB peak RSS.
+converged inner and final inference. Under the former independent categorical
+coordinate, the compact pilot's fixed `0.9` damping attempt after the third
+replacement entered a real finite message cycle despite proper recurrence and
+Gaussian beliefs and finite FE. The D9 structured recurrence path converges on
+the first registered damping attempt for that pinned fixture. The fitter still
+restarts any finite exhausted solve from the same parameter-bound state with a
+bounded convex step-expansion schedule; a synthetic status-bearing regression
+preserves that mechanism independently of the superseded fixture. Exhausting
+every registered retry returns `budget_exhausted`; no monotone-progress
+guarantee is claimed for arbitrary loopy hybrid graphs. This correction does
+not remove the recurrence JJ/point-posterior bound, point-parameter
+approximation, single-seed boundary, or sensitivity to the initializer and
+outer budget. The historical learned command took 2,063 seconds and 5.16 GB
+peak RSS.
 
 The retry loop is deterministic-only. A graph with a functional `mu3` update
 is rejected before fitting because this API does not accept an explicit key or

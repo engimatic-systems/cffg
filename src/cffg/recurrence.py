@@ -30,11 +30,14 @@ from cffg.structured_recurrence import (
     StructuredGaussianMessage,
     StructuredPairBelief,
     StructuredPairPotential,
+    StructuredRecurrenceUpdate as StructuredRecurrenceUpdate,
     structured_gaussian_message,
     structured_node_energy,
     structured_pair_belief,
     structured_pair_energy,
     structured_pair_potential,
+    structured_recurrence_energy as structured_recurrence_energy,
+    structured_recurrence_update as structured_recurrence_update,
     structured_separator_energy,
 )
 

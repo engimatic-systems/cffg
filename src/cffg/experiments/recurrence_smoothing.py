@@ -532,6 +532,10 @@ def diagnose_case(card: int, *, dtype=np.float64):
             _max_error(cffg["messages"].to_out, cffg["coordinate_messages"].to_out),
             _max_error(cffg["messages"].to_in, cffg["coordinate_messages"].to_in),
         ),
+        "independent_coordinate_message_error": max(
+            _max_error(cffg["messages"].to_out, cffg["coordinate_messages"].to_out),
+            _max_error(cffg["messages"].to_in, cffg["coordinate_messages"].to_in),
+        ),
         "sum_product_message_error": max(
             _max_error(cffg["messages"].to_out, exact_messages.to_out),
             _max_error(cffg["messages"].to_in, exact_messages.to_in),
@@ -657,18 +661,19 @@ def diagnose_hostile_inputs():
 
 def diagnostic_report(repo: Path) -> dict:
     cases = [diagnose_case(2), diagnose_case(3), diagnose_case(2, dtype=np.float32)]
-    local_failed = any(
-        case["local_coordinate_message_error"] > case["tolerance"] for case in cases
+    structured_message_failed = any(
+        case["sum_product_message_error"] > case["tolerance"] for case in cases
     )
-    readout_failed = any(
-        case["learning_readout_error"] > case["tolerance"] for case in cases
+    structured_readout_failed = any(
+        case["learning_structured_responsibility_error"] > case["tolerance"]
+        for case in cases
     )
-    if local_failed:
+    if structured_message_failed:
         ownership = "local_categorical_message_defect"
-    elif readout_failed:
+    elif structured_readout_failed:
         ownership = "learning_readout_defect"
     else:
-        ownership = "variational_family_limitation"
+        ownership = "structured_recurrence_complete"
     code_identity = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=repo, check=True, text=True, capture_output=True
     ).stdout.strip()
@@ -687,14 +692,14 @@ def diagnostic_report(repo: Path) -> dict:
         "ownership": {
             "decision": ownership,
             "falsifiers": {
-                "local_message": "local_coordinate_message_error exceeds the named dtype tolerance",
-                "learning_readout": "learning_readout_error exceeds the named dtype tolerance",
-                "variational_family": "both implementation checks pass while exact pair/product and smoothing gaps exceed tolerance",
+                "local_message": "sum_product_message_error exceeds the named dtype tolerance",
+                "learning_readout": "learning_structured_responsibility_error exceeds the named dtype tolerance",
+                "structured_complete": "both structured message and structured learning errors stay within tolerance",
             },
             "production_change": (
-                "A structured consecutive-regime belief would change the recurrence fixed point and BFE; "
-                "it requires a new derived region/counting-number treatment. Preserving the current "
-                "mean-field fixed point and BFE cannot make product responsibilities equal the exact pair posterior."
+                "Production inference and BFE now use the structured consecutive-regime pair. "
+                "The public learning readout remains the independent singleton product until "
+                "cff-ifbr installs the pair-derived statistics."
             ),
         },
     }

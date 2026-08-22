@@ -1,9 +1,8 @@
-"""Pure oracle for the structured categorical recurrence objective.
+"""Independent oracle for the structured categorical recurrence objective.
 
-The production recurrence factor still uses an edge-factorized categorical
-belief.  This module specifies the proposed structured coordinate without
-changing engine behavior: arbitrary log pair potentials are smoothed exactly
-on a chain, and their junction-tree free energy is checked independently.
+Production uses the D9 structured pair coordinate. This NumPy authority stays
+independent of that JAX implementation: it smooths arbitrary log pair
+potentials exactly on a chain and checks their junction-tree free energy.
 """
 
 from __future__ import annotations

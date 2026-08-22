@@ -2084,3 +2084,7 @@ authority is anchored in `tests/test_structured_recurrence_rule.py`:
 - `test_pair_masses_and_gaussian_message_use_joint_responsibility` checks that
   the Gaussian message reads the pair directly, while the hostile-input,
   transform, and K=8 tests pin the public rule's status and scaling boundary.
+- `tests/test_structured_recurrence_engine.py` applies the same identities to
+  compiled flooding and mixed schedules. It checks compiler acyclicity,
+  factor-local pairs, Gaussian writes, the pair/separator BFE ledger,
+  fixed-drive `-log Z`, loop claim boundaries, and `O(T K^2)` batch storage.
