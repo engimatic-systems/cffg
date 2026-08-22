@@ -32,10 +32,10 @@ def test_enumerator_and_engine_comparison_issues_variational_ownership(card):
     assert result["sum_product_message_error"] <= tolerance
     assert result["singleton_error"] <= tolerance
     assert result["factor_local_joint_error"] <= tolerance
-    assert result["learning_readout_error"] <= tolerance
+    assert result["learning_readout_error"] > 100 * tolerance
     assert result["product_joint_correlated_gap"] > 100 * tolerance
     assert result["product_joint_error"] > 100 * tolerance
-    assert result["learning_structured_responsibility_error"] > 100 * tolerance
+    assert result["learning_structured_responsibility_error"] <= tolerance
 
 
 def test_uncertain_drive_separates_jj_and_categorical_factorization():
@@ -62,7 +62,7 @@ def test_exact_zeros_deterministic_and_vacuous_evidence_preserve_support():
 def test_dtype_tolerance_and_engine_readout(dtype):
     result = diagnose_case(2, dtype=dtype)
     assert result["sum_product_message_error"] <= result["tolerance"]
-    assert result["learning_readout_error"] <= result["tolerance"]
+    assert result["learning_structured_responsibility_error"] <= result["tolerance"]
     assert result["drive_clamp_error"] <= result["tolerance"]
     assert result["tolerance"] == probability_tolerance(dtype, 2)
 
@@ -146,6 +146,6 @@ def test_mean_field_rejects_nonfinite_and_report_is_manifested(tmp_path):
     document = json.loads(output.read_text())
     assert document["schema_version"] == 1
     assert document["ticket"] == "cff-nbo9"
-    assert document["ownership"]["decision"] == "learning_readout_defect"
+    assert document["ownership"]["decision"] == "structured_recurrence_complete"
     assert len(document["oracle_sha256"]) == 64
     assert document["replay_command"].startswith("uv run python")

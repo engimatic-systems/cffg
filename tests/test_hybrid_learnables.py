@@ -17,6 +17,7 @@ from cffg.core import (
     VariableSpec,
 )
 from cffg.engine import Engine
+from cffg.experiments.recurrence_smoothing import recurrence_statistics
 from cffg.learn import Learnables
 from cffg.core.serialize import from_json, structure_hash, to_json
 
@@ -195,7 +196,12 @@ def _recurrence_template(
 ):
     template = Template(name="neutral_recurrence_learning")
     arrays = {
-        "weights": np.zeros((regimes, regimes - 1, dimension), dtype=dtype),
+        "weights": (
+            np.arange(regimes * (regimes - 1) * dimension, dtype=dtype)
+            .reshape(regimes, regimes - 1, dimension)
+            - 0.5 * (regimes * (regimes - 1) * dimension - 1)
+        )
+        * np.asarray(0.11, dtype=dtype),
         "offsets": np.broadcast_to(
             -np.log(np.arange(regimes - 1, 0, -1, dtype=dtype)),
             (regimes, regimes - 1),
@@ -207,6 +213,8 @@ def _recurrence_template(
     }
     arrays["in_probability"] /= arrays["in_probability"].sum()
     arrays["out_probability"] /= arrays["out_probability"].sum()
+    arrays["in_probability"][-1] = 0.0
+    arrays["in_probability"] /= arrays["in_probability"].sum()
     template.blobs = {name: _blob(name) for name in arrays}
     sources = ("branch/alpha", "branch/beta")
     for source in sources:
@@ -260,13 +268,53 @@ def _run_recurrence(regimes=3, dimension=2, dtype=np.float64, schedule="auto"):
 
 
 def test_pg_weights_pool_tied_sources_and_match_direct_oracle():
-    _template, _arrays, sources, engine, result = _run_recurrence()
+    template, arrays, sources, engine, result = _run_recurrence()
     prior = conj.vague_pg_weights(3, 2)
     learnables = Learnables(engine, priors={"neutral_recurrence": prior})
     rows = engine.recurrence_weight_stats(result.state)
+    beliefs = engine.recurrence_pair_beliefs(result.state)
+    independent = []
+    product_gap = []
+    for source in sources:
+        belief = beliefs[source]
+        expected = recurrence_statistics(
+            belief["pair_probability"],
+            belief["drive_mean"],
+            belief["drive_covariance"],
+            arrays["weights"],
+            arrays["offsets"],
+        )
+        product = recurrence_statistics(
+            np.outer(
+                belief["source_probability"],
+                belief["destination_probability"],
+            ),
+            belief["drive_mean"],
+            belief["drive_covariance"],
+            arrays["weights"],
+            arrays["offsets"],
+        )
+        for key in (
+            "omega",
+            "exposure",
+            "signed_success",
+            "linear",
+            "quadratic",
+        ):
+            np.testing.assert_allclose(rows[source][key], expected[key])
+        independent.append(expected)
+        product_gap.append(
+            np.max(np.abs(expected["linear"] - product["linear"]))
+        )
+        np.testing.assert_array_equal(
+            belief["pair_probability"][-1], np.zeros(3)
+        )
+        np.testing.assert_array_equal(rows[source]["linear"][-1], 0.0)
+        np.testing.assert_array_equal(rows[source]["quadratic"][-1], 0.0)
+    assert max(product_gap) > 1e-4
     direct = prior.update(
-        np.stack([rows[source]["linear"] for source in sources]),
-        np.stack([rows[source]["quadratic"] for source in sources]),
+        np.stack([row["linear"] for row in independent]),
+        np.stack([row["quadratic"] for row in independent]),
     )
 
     learnables.replace(engine, result)
@@ -274,6 +322,13 @@ def test_pg_weights_pool_tied_sources_and_match_direct_oracle():
     np.testing.assert_allclose(learnables.params["neutral_recurrence"]["eta"], direct.eta)
     np.testing.assert_allclose(
         learnables.params["neutral_recurrence"]["precision"], direct.precision
+    )
+    np.testing.assert_array_equal(
+        learnables.params["neutral_recurrence"]["eta"][-1], prior.eta[-1]
+    )
+    np.testing.assert_array_equal(
+        learnables.params["neutral_recurrence"]["precision"][-1],
+        prior.precision[-1],
     )
     np.testing.assert_allclose(
         learnables.expected("neutral_recurrence", "weights"), direct.rollover()[0]
@@ -290,6 +345,46 @@ def test_pg_weights_pool_tied_sources_and_match_direct_oracle():
         np.testing.assert_allclose(
             written[offset_target.key][offset_target.index], offsets
         )
+
+    restricted = dataclasses.replace(
+        template,
+        learnables={
+            "neutral_recurrence": dataclasses.replace(
+                template.learnables["neutral_recurrence"],
+                sources=(sources[1],),
+            )
+        },
+    )
+    restricted_engine = Engine(compile_template(restricted, arrays=arrays))
+    restricted_result = restricted_engine.run(
+        restricted_engine.init_state(), 100, tol=1e-7
+    )
+    restricted_result.require_converged()
+    restricted_learning = Learnables(
+        restricted_engine, priors={"neutral_recurrence": prior}
+    )
+    restricted_learning.replace(restricted_engine, restricted_result)
+    restricted_belief = restricted_engine.recurrence_pair_beliefs(
+        restricted_result.state
+    )[sources[1]]
+    restricted_stats = recurrence_statistics(
+        restricted_belief["pair_probability"],
+        restricted_belief["drive_mean"],
+        restricted_belief["drive_covariance"],
+        arrays["weights"],
+        arrays["offsets"],
+    )
+    restricted_direct = prior.update(
+        restricted_stats["linear"], restricted_stats["quadratic"]
+    )
+    np.testing.assert_allclose(
+        restricted_learning.params["neutral_recurrence"]["eta"],
+        restricted_direct.eta,
+    )
+    np.testing.assert_allclose(
+        restricted_learning.params["neutral_recurrence"]["precision"],
+        restricted_direct.precision,
+    )
 
 
 def test_pg_replace_is_idempotent_accumulate_adds_and_sources_are_explicit():

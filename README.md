@@ -204,10 +204,12 @@ forecast["mean"], forecast["covariance"]
 predictive, not the posterior output marginal: it uses the selector and input
 messages but excludes downstream evidence facing `out`. Prior-mixture
 statistics name their arrays `weighted_mean` and `weighted_second` to make the
-weighting explicit. A `recurrence_link` record from `gaussian_node_stats`
-likewise exposes its input/output probabilities, exact supports, drive mean,
-direct covariance, and second moment; Pólya–Gamma learning statistics remain a
-separate learning step.
+weighting explicit. `recurrence_pair_beliefs` exposes a `recurrence_link`'s
+normalized `[source, destination]` pair, its two marginals, literal support,
+direct Gaussian drive moments, and the at-risk/signed-success masses shared by
+inference and learning. `gaussian_node_stats` includes that same record, with
+`in_probability`/`out_probability` compatibility aliases. The pair is derived
+from current factor cavities; it is not independently persisted.
 Every hybrid record has `proper`; consumers must reject a false value and its
 shape-preserving NaNs.
 
@@ -225,11 +227,11 @@ posterior = posterior.update(stats["linear"], stats["quadratic"])
 weights, offsets = posterior.rollover()  # next trial's parameter arrays
 ```
 
-`linear` and `quadratic` currently retain the historical product of endpoint
-singletons and the coordinate-optimal PG mean. Inference and the BFE already
-use the structured pair; the pair-derived public learning readout is deferred
-to cff-ifbr. The rollover is an empirical-Bayes point estimate; it does not
-claim to carry weight uncertainty inside inference.
+`linear` and `quadratic` use the same structured pair and coordinate-optimal PG
+mean as the Gaussian drive message. Exact-zero pair exposure contributes exact
+zero natural statistics, so an unexposed source/stick retains its prior. The
+rollover is an empirical-Bayes point estimate; it does not claim to carry
+weight uncertainty inside inference.
 
 ### Recurrent switching state-space models
 

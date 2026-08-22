@@ -230,7 +230,7 @@ class ComponentMNIWFamily:
 
 
 class PGWeightsFamily:
-    """Gaussian natural-parameter learning for recurrent stick weights."""
+    """Pair-derived Gaussian learning for recurrent stick weights."""
 
     name = "pg_weights"
     readout = "recurrence_weight_stats"
