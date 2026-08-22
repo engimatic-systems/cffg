@@ -1,6 +1,6 @@
 ---
 id: cff-bmax
-status: open
+status: in_progress
 deps: []
 links: []
 created: 2026-08-22T20:21:34Z
@@ -95,3 +95,9 @@ Architecture handoff: use the **New derived component coordinate** row in
 plans, engine dispatch, host/JIT pairing, flooding/scheduled pairing,
 single/`vmap` pairing, learning installation, persistence, and model consumers
 are N/A in this ticket and belong to cff-e10u or cff-6rav.
+
+## Notes
+
+**2026-08-22T20:28:40Z**
+
+Implementation start after cff-ngxx cross-block and local-stat audits. The pure D10 authority must land and pass independent categorical, block-Gaussian, objective, learning-statistic, exact-support, float32, and K=8/T>=100 oracles before any compiler or engine dispatch changes. No NASCAR coordinate is in scope.
