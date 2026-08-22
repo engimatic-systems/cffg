@@ -1,6 +1,6 @@
 ---
 id: cff-h0hx
-status: open
+status: in_progress
 deps: [cff-ifbr, cff-63dd]
 links: []
 created: 2026-08-22T15:57:08Z
@@ -89,3 +89,7 @@ budgets are N/A.
 Duplicated surfaces: shared/native initialization, classic/heterogeneous,
 pair/singleton consistency, both tiers, source/gate/region, checkpoint/replay,
 compact/pilot, and pass/falsifier reporting must agree.
+
+**2026-08-22T18:28:59Z**
+
+Implementation start after cff-ifbr and cff-63dd integration. The experiment must pin active CFFG descendant 76fe090, bind `cffg.recurrence.d9-structured-pair/1.0.0` plus pair-belief/checkpoint identities before data generation, preserve historical D8 artifacts as read-only, and funnel fresh development evidence through one declared seed/tier before expansion. No adapter, calibration, or final seed is authorized.
