@@ -144,11 +144,15 @@ def test_current_checkpoint_round_trips_identity_ownership_dtype_and_values(dtyp
 
 def test_full_d10_manifest_names_all_statistic_owners_and_component_topology():
     _template, _arrays, engine, _source = _runtime()
+    priors = vague_rslds_fit_priors(2, 1, 1).learning_priors()
     learning = Learnables(
-        engine,
-        priors=vague_rslds_fit_priors(2, 1, 1).learning_priors(),
+        engine, priors=priors,
     )
-    document = _manifest(learning.state_dict())
+    result = engine.run(engine.init_state(), 200, tol=1e-8)
+    result.require_converged()
+    learning.replace(engine, result)
+    checkpoint = learning.state_dict()
+    document = _manifest(checkpoint)
     assert document["objective_identity"] == D10_OBJECTIVE_IDENTITY
     assert document["component"]["recurrence_members"] == [
         "switch1",
@@ -165,6 +169,12 @@ def test_full_d10_manifest_names_all_statistic_owners_and_component_topology():
         row["statistic_identity"] for row in document["learnables"]
     }
     assert len(identities) == 4
+
+    restored = Learnables(engine, priors=priors)
+    restored.load_state_dict(checkpoint)
+    for name, values in learning.params.items():
+        for key, value in values.items():
+            np.testing.assert_array_equal(restored.params[name][key], value)
 
 
 def test_unidentified_v2_and_slash_recurrence_state_are_rejected():

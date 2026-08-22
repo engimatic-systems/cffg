@@ -239,13 +239,14 @@ def test_compiler_derives_only_the_exact_inference_boundary():
     assert learned_arena.structured_hybrid_reason == (
         "eligible tied-boundary recurrent switching chain"
     )
-    partial = dataclasses.replace(
-        learned,
-        learnables={"recurrence": learned.learnables["recurrence"]},
-    )
-    partial_arena = compile_template(partial, arrays=arrays)
-    assert not partial_arena.structured_hybrid_plans
-    assert "does not exactly own" in partial_arena.structured_hybrid_reason
+    for name, declaration in learned.learnables.items():
+        partial = dataclasses.replace(
+            learned,
+            learnables={name: declaration},
+        )
+        partial_arena = compile_template(partial, arrays=arrays)
+        assert not partial_arena.structured_hybrid_plans
+        assert "does not exactly own" in partial_arena.structured_hybrid_reason
 
     renamed = dataclasses.replace(
         template,

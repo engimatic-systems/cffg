@@ -412,7 +412,7 @@ class RSLDSLearning:
     def load_state_dict(
         self, engine: Engine, data: dict[str, np.ndarray]
     ) -> RSLDSLearning:
-        """Restore only a checkpoint identified as current structured D9."""
+        """Restore only a checkpoint identified as current D9 or D10."""
         learning = self._runtime(engine)
         learning.load_state_dict(data)
         return self._from_runtime(learning)
