@@ -32,11 +32,12 @@ freeze can rely on it.
 ## Outcomes / Acceptance Criteria — WHAT
 
 1. The prospective comparison protocol names the fixed observation-only
-   adapter initialization policy and records its policy, manifest, named-array,
-   data, seed, and numerical-runtime identities.
-2. Every declared adapter chain receives the identical staged initialization
-   arrays; no chain is selected, restarted, dropped, or initialized using
-   generating states or parameters.
+   adapter initialization policy and records its policy, manifest, family-
+   specific named-array, data, seed, and numerical-runtime identities.
+2. Within each family/dataset coordinate, every declared adapter chain receives
+   the identical staged initialization arrays generated once from that
+   coordinate's observations; no chain is selected, restarted, dropped, or
+   initialized using generating states or parameters.
 3. Tier names and report text accurately distinguish the two CFFG initialization
    streams without claiming that the reference adapter still performs native
    per-chain initialization.
@@ -80,8 +81,8 @@ heterogeneous CFFG recurrence recovery.
 ## Definitions
 
 - **Fixed observation-only initializer:** One deterministic set of starting
-  arrays computed from observations and a registered seed, then supplied
-  unchanged to every declared Gibbs chain.
+  arrays computed per family/dataset coordinate from its observations and a
+  registered seed, then supplied unchanged to every chain in that coordinate.
 - **Family-authoritative variable:** A mixing diagnostic whose estimand is
   identified by the named dataset family and allowed to control eligibility.
 - **Development gate:** A preregistered non-final experiment that decides
