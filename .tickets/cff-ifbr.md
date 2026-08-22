@@ -1,6 +1,6 @@
 ---
 id: cff-ifbr
-status: in_progress
+status: closed
 deps: [cff-fbmr]
 links: []
 created: 2026-08-22T15:57:08Z
@@ -84,3 +84,35 @@ except for parity checks against cff-fbmr state.
 
 Duplicated surfaces: inference/learning, direct/pooled rows, renamed/explicit
 sources, single/batch, exact-zero/dense support, and float32/x64 must agree.
+
+**2026-08-22T17:49:37Z**
+
+Implemented by 303492e.
+
+Public API: `Engine.recurrence_pair_beliefs(state)[factor]` returns
+`pair_probability[K,K]` with source rows and destination columns;
+source/destination marginals; literal pair/row/column support; direct drive
+mean/covariance/second moment; `omega`, `exposure`, `signed_success`; and scalar
+`proper`. `gaussian_node_stats` carries the same fields plus the existing
+in/out aliases. `recurrence_weight_stats` derives `exposure`,
+`signed_success`, `linear`, and `quadratic` from `pair_probability` only.
+
+Replaced production singleton-product paths in `gaussian_node_stats`,
+`recurrence_weight_stats`, `Learnables` `pg_weights` pooling, and the
+recurrence-smoothing ownership diagnostic. Independent K=2/K=3 NumPy checks
+match pair and natural parameters; inference/public/learning exposure and
+signed-success agree bit-for-bit. Renamed explicit sources, tied pooling
+without double counting, restricted source filtering, immutable replacement,
+accumulation, exact-zero prior retention, direct covariance diagnostics,
+float32, and JIT K=8/T=100 are covered.
+
+Validation: combined affected selection 112 passed in 239.83s; follow-up
+source-filter selection 5 passed in 23.75s; earlier focused
+compatibility/oracle selections 39 passed. `git diff --check` and `py_compile`
+pass. The default short suite was intentionally deferred until the full
+structured-recurrence core stack is integrated, as authorized in the ticket
+handoff.
+
+Deferred boundary remains cff-63dd: the pair is deterministically
+rematerialized from current engine state and is not yet independently
+persisted or migration-versioned.
