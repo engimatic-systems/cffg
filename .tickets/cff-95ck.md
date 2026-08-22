@@ -1,7 +1,7 @@
 ---
 id: cff-95ck
 status: in_progress
-deps: []
+deps: [cff-9skg]
 links: []
 created: 2026-08-22T14:26:39Z
 type: bug
