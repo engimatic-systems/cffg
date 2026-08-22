@@ -380,11 +380,12 @@ equality, and internal-separator ledger term and returns D10.6 once. Flood and
 mixed schedules call the same unfused trajectory coordinate; vectorized colony
 runs vmap that coordinate. `Engine.structured_hybrid_beliefs` reads only the
 installed singleton, pair, Gaussian marginal/lag, support, objective, residual,
-and status state and never rematerializes a D3/D9 belief. Conditioned drives
-bypass the Gaussian coordinate and reduce to D9. `K=1` bypasses D9 and reduces
-to the Gaussian chain. Unsupported and learning-enabled models continue to
-execute documented D3/D9 semantics and must not claim D10's joint certificate
-or conservative bound.
+and status state and never rematerializes a D3/D9 belief. The independently
+callable authority supplies the conditioned-drive D9 and `K=1` Gaussian-chain
+reductions. This first production classifier is narrower: it dispatches only
+latent-drive `K>=2` components, while those reductions and every other
+unsupported or learning-enabled model retain the existing engine path and must
+not claim D10's joint certificate or conservative bound.
 
 Both cadences install point rollovers through role-bearing addresses into a
 fresh observation-bound state. The compiled engine and every runtime shape

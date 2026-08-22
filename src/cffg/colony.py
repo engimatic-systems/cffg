@@ -125,6 +125,8 @@ class Colony:
                     raise ValueError(
                         "D10 structured coordinates do not accept damping"
                     )
+                for state in states:
+                    engine._require_structured_fresh(state)
 
                 def structured_one(st: State):
                     params, cat_r, gauss_r, objective_r, objective, code = (
@@ -142,7 +144,10 @@ class Colony:
                 step_v = eqx.filter_vmap(structured_one)
                 count = len(states)
                 active = np.asarray(
-                    [engine._state_is_finite(state) for state in states],
+                    [
+                        engine._structured_state_is_runnable(state)
+                        for state in states
+                    ],
                     dtype=bool,
                 )
                 statuses = [RunStatus.BUDGET_EXHAUSTED] * count

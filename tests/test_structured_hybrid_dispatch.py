@@ -8,12 +8,20 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
+from cffg._structured_hybrid_types import StructuredHybridModel
 from cffg.colony import Colony
 from cffg.compiler import compile_template
+from cffg.core.ir import VariableSpec
 from cffg.engine import Engine, RunStatus, _replace
 from cffg.models.rslds import rslds
 from cffg.params import set_params
+from cffg.structured_hybrid import (
+    structured_hybrid_initial,
+    structured_hybrid_sweep,
+)
+from cffg.structured_hybrid_runtime import component_model
 from cffg.structured_hybrid_topology import classify_structured_hybrid
 
 
@@ -94,6 +102,119 @@ def _only_belief(engine, state):
     return next(iter(engine.structured_hybrid_beliefs(state).values()))
 
 
+def _manual_model(arrays, observations, steps, card):
+    dtype = np.result_type(*arrays.values(), np.float32)
+    pi = np.asarray(arrays["initial_regime_probability"], dtype=dtype)
+    log_initial = np.full(card, -np.inf, dtype=dtype)
+    positive = pi > 0
+    log_initial[positive] = np.log(pi[positive])
+    emission = np.asarray(arrays["emission_matrix"], dtype=dtype)
+    emission_offset = np.asarray(arrays["emission_offset"], dtype=dtype)
+    emission_precision = np.linalg.inv(arrays["emission_covariance"]).astype(dtype)
+    dimension = emission.shape[1]
+    gaussian_eta = np.zeros((steps, dimension), dtype=dtype)
+    gaussian_precision = np.zeros((steps, dimension, dimension), dtype=dtype)
+    gaussian_constant = np.zeros(steps, dtype=dtype)
+    for step in range(steps):
+        value = observations[f"y{step}"]
+        if value is None:
+            continue
+        centered = np.asarray(value, dtype=dtype) - emission_offset
+        gaussian_eta[step] = emission.T @ emission_precision @ centered
+        gaussian_precision[step] = emission.T @ emission_precision @ emission
+        gaussian_constant[step] = (
+            0.5 * np.linalg.slogdet(emission_precision)[1]
+            - 0.5 * emission.shape[0] * np.log(dtype.type(2.0 * np.pi))
+            - 0.5 * centered @ emission_precision @ centered
+        )
+    initial_mean = np.asarray(arrays["initial_state_mean"], dtype=dtype)
+    initial_precision = np.linalg.inv(
+        arrays["initial_state_covariance"]
+    ).astype(dtype)
+    gaussian_eta[0] += initial_precision @ initial_mean
+    gaussian_precision[0] += initial_precision
+    gaussian_constant[0] += (
+        0.5 * np.linalg.slogdet(initial_precision)[1]
+        - 0.5 * dimension * np.log(dtype.type(2.0 * np.pi))
+        - 0.5 * initial_mean @ initial_precision @ initial_mean
+    )
+    return StructuredHybridModel(
+        log_initial,
+        np.zeros((steps, card), dtype=dtype),
+        gaussian_eta,
+        gaussian_precision,
+        gaussian_constant,
+        np.asarray(arrays["dynamics_matrix"], dtype=dtype),
+        np.asarray(arrays["dynamics_offset"], dtype=dtype),
+        np.asarray(arrays["dynamics_covariance"], dtype=dtype),
+        np.asarray(arrays["recurrence_weights"], dtype=dtype),
+        np.asarray(arrays["recurrence_offsets"], dtype=dtype),
+    )
+
+
+def _cyclic_equality_model():
+    template, arrays = _model(4)
+    variables = dict(template.variables)
+    for name in ("x0_ring1", "x0_ring2", "x0_ring3"):
+        variables[name] = VariableSpec(name, dim=1)
+    factors = {
+        name: factor
+        for name, factor in template.factors.items()
+        if name not in ("x0_split", "x0_rest_split")
+    }
+    prototype = template.factors["x0_split"]
+    rings = (
+        ("x0", "x0_rest", "x0_ring1"),
+        ("x0_switch", "x0_ring1", "x0_ring2"),
+        ("x0_dynamics", "x0_ring2", "x0_ring3"),
+        ("x0_emission", "x0_ring3", "x0_rest"),
+    )
+    for index, edges in enumerate(rings):
+        name = f"ring{index}"
+        factors[name] = dataclasses.replace(
+            prototype,
+            name=name,
+            edges=dict(zip(("a", "b", "c"), edges)),
+        )
+    return (
+        dataclasses.replace(template, variables=variables, factors=factors),
+        arrays,
+    )
+
+
+def _collapsed_state_model():
+    template, arrays = _model(2)
+    variables = dict(template.variables)
+    variables["x0_merge"] = VariableSpec("x0_merge", dim=1)
+    variables.pop("y1")
+    factors = {
+        name: factor
+        for name, factor in template.factors.items()
+        if name not in ("x0_split", "x0_rest_split", "emission1")
+    }
+    prototype = template.factors["x0_split"]
+    trees = (
+        ("x0", "x0_switch", "x0_rest"),
+        ("x0_rest", "x0_dynamics", "x0_merge"),
+        ("x0_merge", "x0_emission", "x1"),
+    )
+    for index, edges in enumerate(trees):
+        name = f"merged{index}"
+        factors[name] = dataclasses.replace(
+            prototype,
+            name=name,
+            edges=dict(zip(("a", "b", "c"), edges)),
+        )
+    ports = dict(template.ports)
+    ports.pop("y1")
+    return dataclasses.replace(
+        template,
+        variables=variables,
+        factors=factors,
+        ports=ports,
+    ), arrays
+
+
 def test_compiler_derives_only_the_exact_inference_boundary():
     template, arrays = _model(4, 3, 2, 2)
     arena = compile_template(template, arrays=arrays)
@@ -116,6 +237,18 @@ def test_compiler_derives_only_the_exact_inference_boundary():
     learned_arena = compile_template(learned, arrays=arrays)
     assert not learned_arena.structured_hybrid_plans
     assert "learning retains D3/D9" in learned_arena.structured_hybrid_reason
+
+    renamed = dataclasses.replace(
+        template,
+        factors={
+            f"renamed_{len(template.factors) - index:02d}": dataclasses.replace(
+                factor,
+                name=f"renamed_{len(template.factors) - index:02d}",
+            )
+            for index, factor in enumerate(template.factors.values())
+        },
+    )
+    assert classify_structured_hybrid(renamed).topology is not None
 
 
 def test_topology_rejects_self_loop_parallel_untied_and_extra_attachment():
@@ -177,6 +310,20 @@ def test_topology_rejects_self_loop_parallel_untied_and_extra_attachment():
     )
     assert "initial law" in classify_structured_hybrid(extra).reason
 
+    equality_cycle, cycle_arrays = _cyclic_equality_model()
+    rejected = classify_structured_hybrid(equality_cycle)
+    assert rejected.topology is None
+    assert "equality closure is cyclic" in rejected.reason
+    cycle_arena = compile_template(equality_cycle, arrays=cycle_arrays)
+    assert not cycle_arena.structured_hybrid_plans
+
+    collapsed, collapsed_arrays = _collapsed_state_model()
+    rejected = classify_structured_hybrid(collapsed)
+    assert rejected.topology is None
+    assert "input and output share one closure" in rejected.reason
+    collapsed_arena = compile_template(collapsed, arrays=collapsed_arrays)
+    assert not collapsed_arena.structured_hybrid_plans
+
 
 def test_flood_and_scheduled_dispatch_install_the_same_k2_coordinate():
     flood_engine, flood = _run("flood")
@@ -195,13 +342,69 @@ def test_flood_and_scheduled_dispatch_install_the_same_k2_coordinate():
         "gaussian_lag_second_moment",
     ):
         np.testing.assert_allclose(left[key], right[key], rtol=0, atol=0)
-    assert float(left["objective"]) == flood_engine.bfe(flood.state)
-    assert float(right["objective"]) == scheduled_engine.bfe(scheduled.state)
+    np.testing.assert_allclose(
+        float(left["objective"]), flood_engine.bfe(flood.state), rtol=1e-14
+    )
+    np.testing.assert_allclose(
+        float(right["objective"]), scheduled_engine.bfe(scheduled.state), rtol=1e-14
+    )
+
+
+@pytest.mark.parametrize(
+    ("card", "dimension", "observation_dimension"),
+    ((2, 1, 1), (3, 2, 2)),
+)
+def test_production_extraction_and_dispatch_match_the_pure_authority(
+    card, dimension, observation_dimension
+):
+    steps = 4
+    template, arrays = _model(
+        steps, card, dimension, observation_dimension
+    )
+    observations = _observations(steps, observation_dimension)
+    if card == 3:
+        observations["y2"] = None
+    engine = Engine(compile_template(template, arrays=arrays), schedule="auto")
+    state = engine.bind_data(engine.init_state(), observations)
+    expected_model = _manual_model(arrays, observations, steps, card)
+    actual_model, model_ok = component_model(
+        engine.arena,
+        engine.arena.structured_hybrid_plans[0],
+        state.g_obs,
+        state.g_mask,
+        state.params,
+    )
+    assert bool(model_ok)
+    for actual, expected in zip(actual_model, expected_model, strict=True):
+        np.testing.assert_allclose(actual, expected, rtol=3e-14, atol=3e-14)
+
+    result = engine.run(state, 40, tol=1e-8)
+    expected_belief = structured_hybrid_initial(expected_model)
+    expected_sweep = None
+    for _ in range(result.iterations):
+        expected_sweep = structured_hybrid_sweep(expected_belief, expected_model)
+        expected_belief = expected_sweep.belief
+    assert expected_sweep is not None
+    actual = _only_belief(engine, result.state)
+    expected = expected_sweep.belief
+    for key, value in (
+        ("singleton_probability", expected.categorical.singleton),
+        ("pair_probability", expected.categorical.pair),
+        ("gaussian_mean", expected.gaussian.mean),
+        ("gaussian_covariance", expected.gaussian.covariance),
+        ("gaussian_lag_covariance", expected.gaussian.lag_covariance),
+    ):
+        np.testing.assert_allclose(actual[key], value, rtol=3e-13, atol=3e-13)
+    np.testing.assert_allclose(
+        actual["objective"], expected_sweep.objective, rtol=3e-13, atol=3e-13
+    )
 
 
 def test_bfe_evaluates_the_installed_coordinate_under_current_parameters():
     engine, result = _run("auto")
     original = engine.bfe(result.state)
+    unchanged = set_params(engine, result.state.params, {})
+    assert engine.bfe(_replace(result.state, params=unchanged)) == original
     offsets = np.full((2, 1), 1.75)
     params = set_params(
         engine,
@@ -209,8 +412,29 @@ def test_bfe_evaluates_the_installed_coordinate_under_current_parameters():
         {"switch1": {"offsets": offsets}},
     )
     changed = _replace(result.state, params=params)
-    assert np.isfinite(engine.bfe(changed))
-    assert engine.bfe(changed) != original
+    for action in (
+        lambda: engine.bfe(changed),
+        lambda: engine.structured_hybrid_beliefs(changed),
+        lambda: engine.step(changed),
+        lambda: engine.run(changed, 1, tol=1e-8),
+    ):
+        with pytest.raises(RuntimeError, match="reset_structured_hybrid"):
+            action()
+
+    refreshed = engine.reset_structured_hybrid(changed)
+    assert np.isfinite(engine.bfe(refreshed))
+    assert engine.bfe(refreshed) != original
+    assert bool(_only_belief(engine, refreshed)["proper"])
+
+    plan = engine.arena.structured_hybrid_plans[0]
+    address = engine.arena.member_of[
+        plan.topology.dynamics_members[0]
+    ].parameter("cov")
+    bad_params = dict(result.state.params)
+    bad_params[address.key] = bad_params[address.key].at[0, 0, 0].set(jnp.nan)
+    nonfinite = _replace(result.state, params=bad_params)
+    assert np.isinf(engine.bfe(nonfinite))
+    assert not bool(_only_belief(engine, nonfinite)["proper"])
 
 
 def test_k3_readout_has_consistent_source_and_destination_axes():
@@ -327,12 +551,69 @@ def test_colony_vectorization_matches_sequential_status_and_coordinate():
         changed,
         observations={name: -value for name, value in _observations(4).items()},
     )
+    starts = {
+        iid: colony.instances[iid].state
+        for iid in (first, second)
+    }
+    engine = colony.engines[colony.instances[first].key]
+    expected = {
+        iid: engine.run(state, 40, tol=1e-8)
+        for iid, state in starts.items()
+    }
     results = colony.run(40, tol=1e-8)
     for instance in (first, second):
         assert results[instance].status is RunStatus.CONVERGED
-        engine = colony.engines[colony.instances[instance].key]
+        assert results[instance].status is expected[instance].status
+        assert results[instance].iterations == expected[instance].iterations
         belief = _only_belief(engine, results[instance].state)
+        sequential = _only_belief(engine, expected[instance].state)
+        for key in (
+            "singleton_probability",
+            "pair_probability",
+            "gaussian_mean",
+            "gaussian_covariance",
+            "gaussian_lag_covariance",
+            "objective",
+        ):
+            np.testing.assert_allclose(
+                belief[key], sequential[key], rtol=3e-14, atol=3e-14
+            )
         assert bool(belief["proper"])
+
+
+def test_colony_mixed_batch_preserves_divergence_across_zero_budget_run():
+    template, arrays = _model(4)
+    colony = Colony()
+    instances = [
+        colony.spawn(template, arrays, observations=_observations(4))
+        for _ in range(2)
+    ]
+    engine = colony.engines[colony.instances[instances[0]].key]
+    plan = engine.arena.structured_hybrid_plans[0]
+    address = engine.arena.member_of[
+        plan.topology.dynamics_members[0]
+    ].parameter("cov")
+    state = colony.instances[instances[0]].state
+    params = dict(state.params)
+    params[address.key] = params[address.key].at[:, 0, 0].set(-1.0)
+    colony.instances[instances[0]].state = _replace(state, params=params)
+
+    first = colony.run(1, tol=1e-8)
+    assert first[instances[0]].status is RunStatus.DIVERGED
+    assert first[instances[1]].status is RunStatus.BUDGET_EXHAUSTED
+    assert all(result.iterations == 1 for result in first.values())
+
+    repeated = colony.run(0, tol=1e-8)
+    assert repeated[instances[0]].status is RunStatus.DIVERGED
+    assert repeated[instances[1]].status is RunStatus.BUDGET_EXHAUSTED
+    assert all(result.iterations == 0 for result in repeated.values())
+    for iid in instances:
+        state = repeated[iid].state
+        assert engine.run(state, 0, tol=1e-8).status is repeated[iid].status
+    assert (
+        _only_belief(engine, repeated[instances[0]].state)["status"]
+        == RunStatus.DIVERGED.value
+    )
 
 
 def test_k8_t100_uses_only_polynomial_trajectory_storage():

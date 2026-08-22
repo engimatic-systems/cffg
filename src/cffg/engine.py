@@ -59,6 +59,7 @@ from cffg.schedule import (
     eliminated_slot_sets,
 )
 from cffg import structured_hybrid_runtime as hybrid_runtime
+from cffg._structured_hybrid_types import SWEEP_STALE
 from cffg.structured_hybrid import SWEEP_FINITE
 from cffg.rules import (
     BP_UPDATES,
@@ -509,6 +510,27 @@ class Engine:
         params[key] = jnp.asarray(code, dtype=params[key].dtype)
         return _replace(state, params=params)
 
+    def _structured_state_is_runnable(self, state: State) -> bool:
+        if not self.arena.structured_hybrid_plans:
+            return False
+        plan = self.arena.structured_hybrid_plans[0]
+        status = state.params[hybrid_runtime.runtime_key(plan, "status")]
+        return (
+            self._state_is_finite(state)
+            and int(np.asarray(status)) == SWEEP_FINITE
+        )
+
+    def _require_structured_fresh(self, state: State) -> None:
+        if not self.arena.structured_hybrid_plans:
+            return
+        plan = self.arena.structured_hybrid_plans[0]
+        status = state.params[hybrid_runtime.runtime_key(plan, "status")]
+        if int(np.asarray(status)) == SWEEP_STALE:
+            raise RuntimeError(
+                "D10 state is stale after a point-parameter write; call "
+                "Engine.reset_structured_hybrid or bind_data before use"
+            )
+
     def _uniform_messages(self) -> jax.Array:
         rows = np.empty(self.arena.n_message_values)
         for e in self.arena.edges.values():
@@ -940,6 +962,7 @@ class Engine:
 
     def step(self, state: State, damp: float = 0.0, harden: bool = True) -> State:
         if self._structured_step is not None:
+            self._require_structured_fresh(state)
             if damp != 0.0:
                 raise ValueError("D10 structured coordinates do not accept damping")
             params, _, _, _, _, status = self._structured_step(
@@ -973,14 +996,11 @@ class Engine:
         damp: float,
     ) -> RunResult:
         """Run the installed whole-template D10 coordinate to stationarity."""
+        self._require_structured_fresh(state)
         if damp != 0.0:
             raise ValueError("D10 structured coordinates do not accept damping")
         plan = self.arena.structured_hybrid_plans[0]
-        status_key = hybrid_runtime.runtime_key(plan, "status")
-        if (
-            not self._state_is_finite(state)
-            or int(np.asarray(state.params[status_key])) != SWEEP_FINITE
-        ):
+        if not self._structured_state_is_runnable(state):
             state = self._set_structured_run_status(state, 2)
             return RunResult(
                 state,
@@ -2094,14 +2114,28 @@ class Engine:
         learning consumers migrate to it under the versioned follow-up.
         """
         out: dict[str, dict[str, object]] = {}
+        self._require_structured_fresh(state)
         for plan in self.arena.structured_hybrid_plans:
             belief = hybrid_runtime.unpack_belief(state.params, plan)
             prefix = lambda field: hybrid_runtime.runtime_key(plan, field)
             code = int(np.asarray(state.params[prefix("status")]))
             run_code = int(np.asarray(state.params[prefix("run_status")]))
+            current_objective = float(
+                hybrid_runtime.component_objective(
+                    self.arena,
+                    plan,
+                    state.g_obs,
+                    state.g_mask,
+                    state.params,
+                )
+            )
+            current_finite = np.isfinite(current_objective)
+            if not current_finite:
+                run_code = 2
             proper = bool(
                 code == SWEEP_FINITE
                 and run_code != 2
+                and current_finite
                 and np.asarray(belief.categorical.proper)
                 and np.asarray(belief.gaussian.proper)
             )
@@ -2140,7 +2174,7 @@ class Engine:
                 "gaussian_lag_second_moment": np.asarray(
                     belief.gaussian.lag_second_moment
                 ),
-                "objective": np.asarray(state.params[prefix("objective")]),
+                "objective": np.asarray(current_objective),
                 "categorical_residual": np.asarray(
                     state.params[prefix("categorical_residual")]
                 ),
@@ -2594,6 +2628,7 @@ class Engine:
                 "min-sum reports an objective value, not a free energy — call Engine.objective"
             )
         self._require_mu3_ready(state)
+        self._require_structured_fresh(state)
         # NEG is a finite representation of log zero, so the local ledger can
         # otherwise turn log Z = -inf into a huge finite sentinel score.  Empty
         # exact edge support proves Z=0 and therefore F=+inf.

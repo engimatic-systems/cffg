@@ -268,6 +268,12 @@ result = engine.run(engine.bind_data(engine.init_state(), observations), 100, to
 belief = next(iter(engine.structured_hybrid_beliefs(result.state).values()))
 ```
 
+`cffg.params.set_params` invalidates this derived trajectory coordinate after
+any point-parameter write. Call `engine.reset_structured_hybrid` on the updated
+state, or bind the next data (which performs the reset), before the next step,
+run, free-energy call, or belief readout. These entry points reject a stale
+coordinate explicitly. An empty update leaves the coordinate valid.
+
 Extra attachments, untied boundary laws, loops, and component GFE or
 P-substitution retain D3/D9 or fail at their existing compile-time boundary.
 Serialized factor spelling and persistence formats are unchanged.

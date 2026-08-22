@@ -65,6 +65,28 @@ def _closures(template: Template) -> tuple[dict[str, str], dict[str, tuple[str, 
     }
 
 
+def _equality_closures_are_trees(
+    template: Template,
+    root_of: dict[str, str],
+    closure_members: dict[str, tuple[str, ...]],
+) -> bool:
+    """Prove each variable/equality incidence component is a tree."""
+    factors_by_root: dict[str, list[tuple[str, ...]]] = defaultdict(list)
+    for factor in template.factors.values():
+        if factor.type != "equality":
+            continue
+        variables = tuple(factor.edges.values())
+        if len(set(variables)) != len(variables):
+            return False
+        factors_by_root[root_of[variables[0]]].append(variables)
+    for root, variables in closure_members.items():
+        factors = factors_by_root[root]
+        incidences = sum(len(edges) for edges in factors)
+        if incidences != len(variables) + len(factors) - 1:
+            return False
+    return True
+
+
 def _same_blobs(template: Template, names: tuple[str, ...]) -> bool:
     return bool(names) and all(
         template.factors[name].param_blobs
@@ -96,6 +118,8 @@ def classify_structured_hybrid(template: Template) -> StructuredHybridClassifica
         )
 
     root_of, closure_members = _closures(template)
+    if not _equality_closures_are_trees(template, root_of, closure_members):
+        return _fail("equality closure is cyclic or repeats a variable")
     source_of = {
         name: root_of[template.factors[name].edges["in"]] for name in recurrence
     }
@@ -173,11 +197,15 @@ def classify_structured_hybrid(template: Template) -> StructuredHybridClassifica
         dynamics_name = candidates[0]
         dynamics.append(dynamics_name)
         next_state = root_of[template.factors[dynamics_name].edges["out"]]
+        if next_state == drive_of[recurrence_name]:
+            return _fail("Gaussian dynamics input and output share one closure")
         if index + 1 < len(ordered) and next_state != drive_of[ordered[index + 1]]:
             return _fail("Gaussian dynamics and recurrence time order disagree")
         state_roots.append(next_state)
     if set(dynamics) != set(mixture_names):
         return _fail("unowned switching dynamics node")
+    if len(set(state_roots)) != len(state_roots):
+        return _fail("Gaussian trajectory reuses a state closure")
 
     attachments: dict[str, list[str]] = defaultdict(list)
     for name, factor in template.factors.items():
@@ -219,6 +247,10 @@ def classify_structured_hybrid(template: Template) -> StructuredHybridClassifica
         emission, observation = candidates[0]
         emissions.append(emission)
         observations.append(observation)
+    if len(set(emissions)) != len(emissions):
+        return _fail("Gaussian trajectory reuses an emission owner")
+    if len(set(observations)) != len(observations):
+        return _fail("Gaussian trajectory reuses an observation boundary")
 
     ordered_recurrence = tuple(ordered)
     ordered_dynamics = tuple(dynamics)

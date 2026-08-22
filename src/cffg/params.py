@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING
 import jax.numpy as jnp
 import numpy as np
 
+from cffg._structured_hybrid_types import SWEEP_STALE
+
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from cffg.compiler import MemberAddress, ParameterAddress
     from cffg.engine import Engine
@@ -261,4 +263,13 @@ def set_params(
                     _transform(member.factor_type, address, value),
                 )
             )
-    return _apply_runtime_writes(params, writes)
+    out = _apply_runtime_writes(params, writes)
+    for plan in engine.arena.structured_hybrid_plans if writes else ():
+        prefix = f"d10:{plan.name}:"
+        out[prefix + "status"] = jnp.asarray(
+            SWEEP_STALE, dtype=out[prefix + "status"].dtype
+        )
+        out[prefix + "run_status"] = jnp.asarray(
+            SWEEP_STALE, dtype=out[prefix + "run_status"].dtype
+        )
+    return out

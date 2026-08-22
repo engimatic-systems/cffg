@@ -10,6 +10,7 @@ import jax.numpy as jnp
 
 SWEEP_FINITE = 0
 SWEEP_DIVERGED = 2
+SWEEP_STALE = 3
 LOG2PI = jnp.log(2.0 * jnp.pi)
 
 
