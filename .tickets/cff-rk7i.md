@@ -1,6 +1,6 @@
 ---
 id: cff-rk7i
-status: in_progress
+status: closed
 deps: [cff-lqz8]
 links: []
 created: 2026-08-22T14:46:11Z
@@ -114,3 +114,7 @@ Legend: prerequisite --> dependent
                               |
                               +--> [ ] fresh extension run
 ```
+
+**2026-08-22T15:16:40Z**
+
+Completed and localized the production miss. Experiment commits 5e294a4, 7dcb1c6, and 04b49ae add the truth-free factor checkpoint, fixed-parameter replay, clamping ladder, and manifested evidence. Truth joint regime transitions plus inferred continuous moments pass at worst-source 0.033070 and contrast 0.038139; inferred joint plus truth continuous states remains at 0.188651 and 0.282905. Full truth reproduces cff-lqz8 within 6.66e-15. The inferred categorical transition responsibilities are therefore sufficient to explain the miss; inferred continuous moments are adequate. The prospective coupled local joint differs materially from the marginal product but does not rescue recovery, so the next ticket must compare recurrence categorical updates and global pairwise smoothing against exact enumeration. One fixed-parameter terminal inference ran; no outer fit, adapter, control, calibration seed, or final seed ran.
