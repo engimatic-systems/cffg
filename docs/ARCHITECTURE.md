@@ -125,7 +125,11 @@ A pure-Python (dataclass) representation, independent of JAX:
   inventories every grounded tied/per-copy array, and per-copy blob paths use an
   `{index}` marker resolved during grounding. Array-key-derived subpaths prevent
   collisions without flattening the plate spec. Original flat schema-1 manifests
-  remain loadable. No third-party interchange format — this schema is canonical.
+  remain loadable. These are model-only bundles and rerun under current built-in
+  factor semantics. A structure hash cannot distinguish D8 from D9 when the
+  `recurrence_link` IR spelling is unchanged; resumable recurrence posterior
+  state therefore owns a separate statistic manifest. No third-party
+  interchange format — this schema is canonical.
 - **Edit actions**: the only public mutation API is transactional bundles
   (`add_slice`, `bind_data`, `set_constraint`, `compose(template, port_map)`) that
   validate the port invariant before committing. This client-neutral API is also
@@ -336,7 +340,10 @@ Two host cadences deliberately share that assembly through `Learnables`.
 `RSLDSLearning` remains a compatibility facade for the historical
 initial-regime, dynamics, and recurrence boundary; its distinct-trial
 `update`, checkpoint, and installation operations delegate to a restricted
-runtime and leave the historical fixed emission unchanged. `fit_rslds` owns a
+runtime and leave the historical fixed emission unchanged. A freshly
+constructed facade labels its recurrence block as an unlearned prior;
+`update`, fitted posteriors, and checkpoint restore carry the current D9
+structured-pair statistic identity. `fit_rslds` owns a
 single observed sequence: `PCAARHMMInitializer` fixes an observation-derived
 PCA coordinate system and an initial regime order; each outer coordinate
 constructs all four posteriors from immutable priors, calls
@@ -635,12 +642,23 @@ accept an `only` name filter, pool tied sources, validate all selected
 posteriors in temporary storage, and commit atomically. `write` is likewise
 atomic across selected role-bearing targets. Versioned checkpoints encode
 each `(learnable, hyperparameter)` pair independently and round-trip the NIW,
-MNIW, component-MNIW, and PG arrays. Legacy spellings remain explicit
-migrations; a multi-array posterior must be complete rather than silently
-combining restored and prior hyperparameters. The
+MNIW, component-MNIW, and PG arrays. Because D8 and D9 recurrence use
+identical IR and array shapes, a recurrence checkpoint also stores a canonical
+manifest with the D9 statistic identity, factor sources, parameter-blob
+ownership, hyperparameter dtype/shape, and exact-value digests. Missing,
+legacy, tampered, or mismatched
+recurrence identity is rejected before mutation. Legacy spellings for
+unchanged families remain explicit migrations; a multi-array posterior must
+be complete rather than silently combining restored and prior
+hyperparameters. The
 model/runtime interface still declares which boundary learnable is
 episode-scale because that choice determines rollover semantics, not merely
 update frequency.
+
+`RollingAgent.checkpoint` namespaces every entry from `Learnables.state_dict`,
+so a recurrence manifest would flow through that container unchanged. No
+shipped rolling-agent builder currently declares a recurrence learnable; the
+agent schema is therefore not broadened with a second identity field.
 
 #### 3c. Rolling boundary contract (`AgentSpec`, cff-nhxf)
 

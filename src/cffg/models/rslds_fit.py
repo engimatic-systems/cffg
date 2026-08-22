@@ -143,7 +143,10 @@ class RSLDSFitResult:
     ``state``, ``parameters``, and the learned posteriors all belong to
     ``returned_coordinate``. A converged result returns the already evaluated
     ``certified_coordinate``; an exhausted result performs a terminal solve at
-    its last installed coordinate.
+    its last installed coordinate. ``model_posterior`` carries the current D9
+    structured-pair statistic identity and may be checkpointed for resume;
+    point ``parameters`` alone are a model initialization, not a resumable
+    posterior.
     """
 
     engine: Engine

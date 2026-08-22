@@ -287,6 +287,19 @@ already represent the ordinary source-specific transition baseline; multiplying
 a separate `matrix_cat` into the same transition would require a new normalized
 factor and free-energy derivation.
 
+Recurrence checkpoints include a scalar manifest naming
+`cffg.recurrence.d9-structured-pair/1.0.0`, the contributing factor sources,
+parameter blobs, hyperparameter dtypes, and shapes. A pre-manifest `v2:` or
+slash-key checkpoint may contain D8 singleton-product statistics and is
+therefore rejected for recurrence, even though its array keys and shapes still
+fit. `vague_rslds_learning` and direct `RSLDSLearning(...)` construction define
+fresh priors; `update` and `load_state_dict` return objects explicitly marked
+with the D9 identity. To carry an old posterior forward as a prior, construct a
+new prior deliberately and rerun inference; do not relabel the old checkpoint
+as a D9 posterior. That is a new D9 run, not checkpoint resume; CFFG provides
+no D8-posterior migration. Per-array digests bind the manifest to the exact
+persisted values.
+
 For one-sequence observed-only fitting, use the host-side coordinate loop. It
 chooses latent coordinates from the observations, compiles one engine, and
 estimates every rSLDS parameter family without accepting generating states,
@@ -522,8 +535,10 @@ and leaves that component at its prior. `pg_weights` stores `eta` and
 then rolls posterior means into separate weights and offsets. Both families
 remain host-side empirical-Bayes updates and reject improper or non-finite
 statistics before mutation. Versioned checkpoints preserve every keyed
-hyperparameter. A legacy multi-array checkpoint must name a complete posterior
-or restoration fails with a migration error.
+hyperparameter. Legacy multi-array checkpoints for unchanged families must
+name a complete posterior. Recurrence is stricter: its current checkpoint must
+also carry the structured-pair statistic manifest; unidentified D8/D9 state is
+never guessed from compatible array shapes.
 
 ## Run inference
 
@@ -747,6 +762,12 @@ from cffg.estimate import estimate
 print(estimate(engine).summary())
 # state 9.1 KiB (messages 2.8, params 6.4) · 2.76e+04 flops/sweep · 0.203 ms/sweep
 ```
+
+A `.cffgz` bundle is model-only: it contains the template and point-parameter
+blobs, not a learned posterior or resumable inference state. Existing bundles
+therefore remain loadable and execute with the current documented recurrence
+semantics. The recurrence statistic manifest belongs only to checkpoints that
+can resume learning.
 
 `.npz` is a ZIP container and does not support ordinary per-array memory
 mapping, so it is reserved for agent checkpoints rather than parameter blobs.

@@ -24,7 +24,7 @@ def legacy_snapshot(
     return {
         **{
             f"posterior/{name}": np.asarray(value)
-            for name, value in learning.state_dict().items()
+            for name, value in learning.hyperparameter_snapshot().items()
         },
         **{f"point/{name}": np.asarray(value) for name, value in points.items()},
     }

@@ -29,6 +29,10 @@ from cffg.core.ir import (
 )
 from cffg.engine import Engine, RunResult, State, _replace
 from cffg.learn import Learnables
+from cffg.learning_checkpoint import (
+    RECURRENCE_PRIOR_IDENTITY,
+    RECURRENCE_STATISTIC_IDENTITY,
+)
 
 
 INITIAL_REGIME_LEARNABLE = "initial_regime"
@@ -271,12 +275,15 @@ class RSLDSLearning:
     The historical API keeps the tied emission fixed. Statistics,
     hyperparameter state, checkpoint encoding, and runtime writes delegate to
     a restricted :class:`Learnables` instance over the serialized rSLDS
-    declarations.
+    declarations. Direct construction declares the supplied recurrence block
+    as a fresh prior; updates and restored checkpoints carry the D9 statistic
+    identity explicitly.
     """
 
     initial_alpha: np.ndarray
     dynamics: tuple[conj.MNIW, ...]
     recurrence: conj.PGWeights
+    recurrence_statistic_identity: str = RECURRENCE_PRIOR_IDENTITY
 
     def __post_init__(self):
         alpha = np.asarray(self.initial_alpha, dtype=np.float64)
@@ -289,6 +296,14 @@ class RSLDSLearning:
             raise ValueError("initial_alpha must be finite and positive")
         if self.recurrence.regimes != regimes:
             raise ValueError("recurrence and dynamics regime counts must match")
+        if self.recurrence_statistic_identity not in {
+            RECURRENCE_PRIOR_IDENTITY,
+            RECURRENCE_STATISTIC_IDENTITY,
+        }:
+            raise ValueError(
+                "rSLDS recurrence state has an unknown or legacy statistic "
+                "identity"
+            )
         dimensions = {posterior.m.shape[1] - 1 for posterior in self.dynamics}
         output_dimensions = {posterior.m.shape[0] for posterior in self.dynamics}
         if dimensions != {self.recurrence.dimension} or output_dimensions != dimensions:
@@ -334,6 +349,7 @@ class RSLDSLearning:
                 learning.params[RECURRENCE_LEARNABLE]["eta"],
                 learning.params[RECURRENCE_LEARNABLE]["precision"],
             ),
+            recurrence_statistic_identity=RECURRENCE_STATISTIC_IDENTITY,
         )
 
     def update(self, engine: Engine, result: RunResult) -> RSLDSLearning:
@@ -377,13 +393,13 @@ class RSLDSLearning:
         return _replace(state, params=params)
 
     def state_dict(self, engine: Engine) -> dict[str, np.ndarray]:
-        """Return the generic versioned checkpoint representation."""
+        """Return hyperparameters plus the structured-statistic manifest."""
         return self._runtime(engine).state_dict()
 
     def load_state_dict(
         self, engine: Engine, data: dict[str, np.ndarray]
     ) -> RSLDSLearning:
-        """Return a facade restored through the generic checkpoint loader."""
+        """Restore only a checkpoint identified as current structured D9."""
         learning = self._runtime(engine)
         learning.load_state_dict(data)
         return self._from_runtime(learning)
