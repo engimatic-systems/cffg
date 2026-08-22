@@ -1,6 +1,6 @@
 ---
 id: cff-yr0d
-status: in_progress
+status: closed
 deps: [cff-nbo9]
 links: []
 created: 2026-08-22T15:45:12Z
@@ -138,3 +138,23 @@ Legend: prerequisite --> dependent
                                           |
                                           +--> [ ] fresh calibration and freeze
 ```
+
+**2026-08-22T16:00:32Z**
+
+Derivation outcome: select time-local hybrid sum-product recurrence factors with factor-local pair regions. On an acyclic categorical recurrence component, their fixed point is one globally consistent path belief; ordinary categorical edge corrections give the exact junction-tree entropy. A monolithic chain region would duplicate the same belief and counting-number ownership. Recurrence-owned P-substitution remains a compile-time rejection. Commit 94eb574 contains D9 and the executable oracle; 45 focused recurrence tests passed.
+
+Legend: prerequisite --> dependent
+
+[x] cff-yr0d derivation
+      |
+      +--> [ ] cff-6vgp rule + node energy (ready after integration)
+                  |
+                  +--> [ ] cff-fbmr compiler/engine/schedule
+                              |
+                              +--> [ ] cff-ifbr pair readout + learning
+                                          |
+                                          +--> [ ] cff-63dd persistence semantics
+                                                      |
+                                                      +--> [ ] cff-h0hx development recovery gate
+                                                                  |
+                                                                  +--> [ ] cff-0oqo recovery capability
