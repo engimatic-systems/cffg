@@ -58,10 +58,13 @@ class Colony:
         else:
             # Same structure, this instance's own parameters.
             arena = compile_template(template, arrays=arrays)
+            params = dict(self.engines[key].init_state().params)
+            params.update({k: jnp.asarray(v) for k, v in arena.log_params.items()})
             state = _replace(
                 self.engines[key].init_state(),
-                params={k: jnp.asarray(v) for k, v in arena.log_params.items()},
+                params=params,
             )
+            state = self.engines[key].reset_structured_hybrid(state)
         if observations:
             state = self.engines[key].bind_data(state, observations)
         iid = self._next_id
@@ -116,6 +119,132 @@ class Colony:
                 self.last_results[iids[0]] = result
                 continue
             batched = jax.tree_util.tree_map(lambda *xs: jnp.stack(xs), *states)
+
+            if engine._structured_step is not None:
+                if damp != 0.0:
+                    raise ValueError(
+                        "D10 structured coordinates do not accept damping"
+                    )
+
+                def structured_one(st: State):
+                    params, cat_r, gauss_r, objective_r, objective, code = (
+                        engine._structured_step(st.g_obs, st.g_mask, st.params)
+                    )
+                    return (
+                        _replace(st, params=params),
+                        cat_r,
+                        gauss_r,
+                        objective_r,
+                        objective,
+                        code,
+                    )
+
+                step_v = eqx.filter_vmap(structured_one)
+                count = len(states)
+                active = np.asarray(
+                    [engine._state_is_finite(state) for state in states],
+                    dtype=bool,
+                )
+                statuses = [RunStatus.BUDGET_EXHAUSTED] * count
+                deltas: list[list[float]] = [[] for _ in range(count)]
+                energies: list[list[float]] = [[] for _ in range(count)]
+                residuals = [float("inf")] * count
+                dtype = np.asarray(states[0].messages).dtype
+                effective_tol = (
+                    None
+                    if tol is None
+                    else max(float(tol), 64.0 * np.finfo(dtype).eps)
+                )
+                for index in np.flatnonzero(~active):
+                    statuses[index] = RunStatus.DIVERGED
+
+                for _ in range(n_iters):
+                    if not active.any():
+                        break
+                    candidate, cat_r, gauss_r, objective_r, objective, code = (
+                        step_v(batched)
+                    )
+
+                    def freeze(old, new):
+                        mask = jnp.asarray(active).reshape(
+                            (count,) + (1,) * (old.ndim - 1)
+                        )
+                        return jnp.where(mask, new, old)
+
+                    batched = jax.tree_util.tree_map(freeze, batched, candidate)
+                    arrays = tuple(
+                        np.asarray(value)
+                        for value in (
+                            cat_r,
+                            gauss_r,
+                            objective_r,
+                            objective,
+                            code,
+                        )
+                    )
+                    for index in np.flatnonzero(active):
+                        categorical = float(arrays[0][index])
+                        gaussian = float(arrays[1][index])
+                        objective_delta = float(arrays[2][index])
+                        value = float(arrays[3][index])
+                        residual = max(categorical, gaussian, objective_delta)
+                        deltas[index].append(max(categorical, gaussian))
+                        residuals[index] = residual
+                        state = jax.tree_util.tree_map(
+                            lambda leaf: leaf[index], batched
+                        )
+                        if (
+                            int(arrays[4][index]) != 0
+                            or not np.isfinite(residual)
+                            or not np.isfinite(value)
+                            or not engine._state_is_finite(state)
+                        ):
+                            statuses[index] = RunStatus.DIVERGED
+                            residuals[index] = float("inf")
+                            active[index] = False
+                            continue
+                        energies[index].append(value)
+                        if effective_tol is not None and (
+                            categorical <= effective_tol
+                            and gaussian <= effective_tol
+                            and objective_delta <= effective_tol
+                        ):
+                            statuses[index] = RunStatus.CONVERGED
+                            active[index] = False
+
+                for index, iid in enumerate(iids):
+                    state = jax.tree_util.tree_map(
+                        lambda leaf: leaf[index], batched
+                    )
+                    state = engine._set_structured_run_status(
+                        state,
+                        0
+                        if statuses[index] is RunStatus.CONVERGED
+                        else 2
+                        if statuses[index] is RunStatus.DIVERGED
+                        else 1,
+                    )
+                    result = RunResult(
+                        state=state,
+                        status=statuses[index],
+                        iterations=len(deltas[index]),
+                        message_deltas=tuple(deltas[index]),
+                        free_energies=tuple(energies[index]),
+                        residual=residuals[index],
+                        inner_status=(
+                            RunStatus.DIVERGED
+                            if statuses[index] is RunStatus.DIVERGED
+                            else RunStatus.CONVERGED
+                        ),
+                        inner_residual=(
+                            float("inf")
+                            if statuses[index] is RunStatus.DIVERGED
+                            else 0.0
+                        ),
+                    )
+                    self.instances[iid].state = state
+                    self.last_results[iid] = result
+                continue
 
             # The batch runs the engine's *scheduled* iteration (cff-d56d) —
             # the same function the sequential path loops — so vmapped and

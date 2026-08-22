@@ -2265,7 +2265,7 @@ recurrence, and their internal categorical/Gaussian separator corrections.
 Observed values and normalization constants enter (D10.6), but no replaced
 node or edge term remains in the ordinary ledger.
 
-The compiler may derive a `StructuredHybridPlan` without changing serialized
+The compiler derives a `StructuredHybridPlan` without changing serialized
 factor spelling. It follows equality closures to map each `z_t` to the D9
 source/destination and destination-selected D3 factor, and each `x_t` to the
 dynamics, recurrence drive, initial, and emission roles. Initial production
@@ -2273,11 +2273,13 @@ eligibility is narrower than the pure mathematics: one acyclic D9 recurrence
 chain, matching destination-selected `gaussian_mixture_linear` dynamics, one
 regime-independent Gaussian `x_0` prior, shared `gaussian_linear` emissions,
 no extra categorical unary attachment, ordinary BFE, and no component-owned
-P-substitution. Selected initial-state laws, regime-specific emissions, or
-extra attachments require additional terms and are rejected rather than
-silently claiming D10. Current checkpoints remain D9 and cannot resume a D10
-component; runtime state and learning checkpoints require a new executable,
-belief, statistic, and objective identity.
+P-substitution. The first production dispatch additionally requires no
+declared learnables: its fixed-parameter inference state is derived and is not
+a resumable learning checkpoint. Selected initial-state laws, regime-specific
+emissions, extra attachments, or learning consumers require additional terms
+and retain D3/D9 rather than silently claiming D10. Current checkpoints remain
+D9 and cannot resume a D10 learning component; cff-6rav owns the new
+executable, belief, statistic, and objective identity.
 
 ### D10.6 Rejected alternatives and executable falsifiers
 
@@ -2294,7 +2296,7 @@ Two smaller-looking changes do not meet the evidence:
    exponentially. It remains future work only if D10 cannot restore the
    registered recovery caps.
 
-Before production dispatch, a pure authority must establish:
+The pure and production authorities establish:
 
 - K=2/K=3 D10.3 and D10.4 coordinates against independent NumPy algebra,
   including oriented lag moments and one complete evaluation of D10.6;
@@ -2313,7 +2315,10 @@ Before production dispatch, a pure authority must establish:
 
 The pure authority is executable in
 `tests/test_structured_hybrid_coordinates.py` and
-`tests/test_structured_hybrid_objective.py`. The first test file checks K=2
+`tests/test_structured_hybrid_objective.py`. Production topology, dispatch,
+status, objective ownership, schedule/vmap parity, and hostile-scale behavior
+are executable in `tests/test_structured_hybrid_dispatch.py`. The first pure
+test file checks K=2
 and K=3 path enumeration, the K=3/D=2 noncommuting dense Gaussian oracle,
 lag orientation, fixed-drive D9, K=1, and JIT. The second checks every expanded
 sweep boundary, the conservative integrated bound, shared learning

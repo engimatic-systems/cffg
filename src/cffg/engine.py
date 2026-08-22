@@ -58,6 +58,8 @@ from cffg.schedule import (
     build_schedule,
     eliminated_slot_sets,
 )
+from cffg import structured_hybrid_runtime as hybrid_runtime
+from cffg.structured_hybrid import SWEEP_FINITE
 from cffg.rules import (
     BP_UPDATES,
     NODE_ENERGIES,
@@ -338,6 +340,11 @@ class Engine:
         self._gfe_by_name = {g.name: g for g in arena.gfe_groups}
         self._step = eqx.filter_jit(_make_step(arena))
         self._bfe = eqx.filter_jit(_make_bfe(arena))
+        self._structured_step = (
+            eqx.filter_jit(hybrid_runtime.make_step(arena))
+            if arena.structured_hybrid_plans
+            else None
+        )
         if isinstance(schedule, Schedule):
             if schedule.kind != "flood":  # flooding is always safe as given
                 # Recompute the fingerprint from the prebuilt schedule's own
@@ -473,7 +480,7 @@ class Engine:
             params[prefix + ":ess"] = jnp.asarray(self.mu3_samples, dtype=dtype)
             params[prefix + ":status"] = jnp.asarray(0)
             params[prefix + ":ready"] = jnp.asarray(False)
-        return State(
+        state = State(
             messages=self._uniform_messages(),
             params=params,
             g_eta=jnp.zeros(a.n_g_eta_values),  # zeros = vacuous
@@ -484,6 +491,23 @@ class Engine:
             ef_obs=jnp.zeros(a.n_ef_obs),
             ef_mask=jnp.zeros(a.n_ef_obs),
         )
+        return self.reset_structured_hybrid(state)
+
+    def reset_structured_hybrid(self, state: State) -> State:
+        """Rebuild derived D10 state after data or point-parameter changes."""
+        if not self.arena.structured_hybrid_plans:
+            return state
+        params = hybrid_runtime.initialize_runtime(
+            self.arena, state.g_obs, state.g_mask, state.params
+        )
+        return _replace(state, params=params)
+
+    def _set_structured_run_status(self, state: State, code: int) -> State:
+        plan = self.arena.structured_hybrid_plans[0]
+        params = dict(state.params)
+        key = hybrid_runtime.runtime_key(plan, "run_status")
+        params[key] = jnp.asarray(code, dtype=params[key].dtype)
+        return _replace(state, params=params)
 
     def _uniform_messages(self) -> jax.Array:
         rows = np.empty(self.arena.n_message_values)
@@ -907,13 +931,25 @@ class Engine:
                 row[value] = 0.0
             idx = self.arena.message_indices(slot, card)
             msgs = msgs.at[idx].set(jnp.asarray(row, dtype=msgs.dtype))
-        return _replace(
+        bound = _replace(
             state, messages=msgs, g_obs=g_obs, g_mask=g_mask, ef_obs=ef_obs, ef_mask=ef_mask
         )
+        return self.reset_structured_hybrid(bound)
 
     # -- execution --------------------------------------------------------
 
     def step(self, state: State, damp: float = 0.0, harden: bool = True) -> State:
+        if self._structured_step is not None:
+            if damp != 0.0:
+                raise ValueError("D10 structured coordinates do not accept damping")
+            params, _, _, _, _, status = self._structured_step(
+                state.g_obs, state.g_mask, state.params
+            )
+            if int(status) != SWEEP_FINITE:
+                raise RuntimeError(
+                    "structured hybrid inference diverged; use Engine.run for status"
+                )
+            return _replace(state, params=params)
         state, _, mu3_code, _ = self._update_mu3(state)
         if mu3_code:
             outcome = "budget exhausted" if mu3_code == 1 else "diverged"
@@ -927,6 +963,102 @@ class Engine:
                 "factor-local inference diverged; use Engine.run for status"
             )
         return _replace(state, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta)
+
+    def _run_structured_hybrid(
+        self,
+        state: State,
+        n_iters: int,
+        *,
+        tol: float | None,
+        damp: float,
+    ) -> RunResult:
+        """Run the installed whole-template D10 coordinate to stationarity."""
+        if damp != 0.0:
+            raise ValueError("D10 structured coordinates do not accept damping")
+        plan = self.arena.structured_hybrid_plans[0]
+        status_key = hybrid_runtime.runtime_key(plan, "status")
+        if (
+            not self._state_is_finite(state)
+            or int(np.asarray(state.params[status_key])) != SWEEP_FINITE
+        ):
+            state = self._set_structured_run_status(state, 2)
+            return RunResult(
+                state,
+                RunStatus.DIVERGED,
+                0,
+                (),
+                (),
+                float("inf"),
+                RunStatus.DIVERGED,
+                float("inf"),
+            )
+        dtype = np.asarray(
+            state.params[hybrid_runtime.runtime_key(plan, "gaussian_mean")]
+        ).dtype
+        effective_tol = (
+            None
+            if tol is None
+            else max(float(tol), 64.0 * np.finfo(dtype).eps)
+        )
+        deltas: list[float] = []
+        energies: list[float] = []
+        residual = float("inf")
+        status = RunStatus.BUDGET_EXHAUSTED
+        current = state
+        for _ in range(n_iters):
+            params, cat_r, gauss_r, objective_r, objective, code = (
+                self._structured_step(
+                    current.g_obs, current.g_mask, current.params
+                )
+            )
+            current = _replace(current, params=params)
+            categorical_residual = float(cat_r)
+            gaussian_residual = float(gauss_r)
+            objective_residual = float(objective_r)
+            residual = max(
+                categorical_residual,
+                gaussian_residual,
+                objective_residual,
+            )
+            deltas.append(max(categorical_residual, gaussian_residual))
+            if (
+                int(code) != SWEEP_FINITE
+                or not np.isfinite(residual)
+                or not np.isfinite(float(objective))
+                or not self._state_is_finite(current)
+            ):
+                current = self._set_structured_run_status(current, 2)
+                return RunResult(
+                    current,
+                    RunStatus.DIVERGED,
+                    len(deltas),
+                    tuple(deltas),
+                    tuple(energies),
+                    float("inf"),
+                    RunStatus.DIVERGED,
+                    float("inf"),
+                )
+            energies.append(float(objective))
+            if effective_tol is not None and (
+                categorical_residual <= effective_tol
+                and gaussian_residual <= effective_tol
+                and objective_residual <= effective_tol
+            ):
+                status = RunStatus.CONVERGED
+                break
+        current = self._set_structured_run_status(
+            current, 0 if status is RunStatus.CONVERGED else 1
+        )
+        return RunResult(
+            current,
+            status,
+            len(deltas),
+            tuple(deltas),
+            tuple(energies),
+            residual,
+            RunStatus.CONVERGED,
+            0.0,
+        )
 
     def run(
         self,
@@ -976,6 +1108,14 @@ class Engine:
         if outer_solver not in ("auto", "trust_region", "picard"):
             raise ValueError(
                 "outer_solver must be 'auto', 'trust_region', or 'picard'"
+            )
+        if self._structured_step is not None:
+            if outer_solver == "trust_region":
+                raise ValueError(
+                    "outer_solver='trust_region' does not apply to a D10 BFE coordinate"
+                )
+            return self._run_structured_hybrid(
+                state, n_iters, tol=tol, damp=damp
             )
         self._require_mu3_ready(state)
         if harden_last is None:
@@ -1944,6 +2084,78 @@ class Engine:
             out[e.name] = (np.asarray(mean), np.asarray(cov))
         return out
 
+    def structured_hybrid_beliefs(
+        self, state: State
+    ) -> dict[str, dict[str, object]]:
+        """Return the authoritative installed D10 trajectory coordinate.
+
+        Pair rows are source regimes and columns are destination regimes.
+        This readout is independent of the retained D3/D9 message arrays;
+        learning consumers migrate to it under the versioned follow-up.
+        """
+        out: dict[str, dict[str, object]] = {}
+        for plan in self.arena.structured_hybrid_plans:
+            belief = hybrid_runtime.unpack_belief(state.params, plan)
+            prefix = lambda field: hybrid_runtime.runtime_key(plan, field)
+            code = int(np.asarray(state.params[prefix("status")]))
+            run_code = int(np.asarray(state.params[prefix("run_status")]))
+            proper = bool(
+                code == SWEEP_FINITE
+                and run_code != 2
+                and np.asarray(belief.categorical.proper)
+                and np.asarray(belief.gaussian.proper)
+            )
+            pair = np.asarray(belief.categorical.pair)
+            out[plan.name] = {
+                "status": (
+                    RunStatus.DIVERGED.value
+                    if run_code == 2
+                    else RunStatus.BUDGET_EXHAUSTED.value
+                    if run_code == 1
+                    else RunStatus.CONVERGED.value
+                ),
+                "proper": np.asarray(proper),
+                "singleton_probability": np.asarray(
+                    belief.categorical.singleton
+                ),
+                "pair_probability": pair,
+                "source_probability": pair.sum(axis=2),
+                "destination_probability": pair.sum(axis=1),
+                "singleton_support": np.asarray(
+                    state.params[prefix("cat_support")]
+                ),
+                "pair_support": np.asarray(
+                    state.params[prefix("pair_support")]
+                ),
+                "gaussian_mean": np.asarray(belief.gaussian.mean),
+                "gaussian_covariance": np.asarray(
+                    belief.gaussian.covariance
+                ),
+                "gaussian_lag_covariance": np.asarray(
+                    belief.gaussian.lag_covariance
+                ),
+                "gaussian_second_moment": np.asarray(
+                    belief.gaussian.second_moment
+                ),
+                "gaussian_lag_second_moment": np.asarray(
+                    belief.gaussian.lag_second_moment
+                ),
+                "objective": np.asarray(state.params[prefix("objective")]),
+                "categorical_residual": np.asarray(
+                    state.params[prefix("categorical_residual")]
+                ),
+                "gaussian_residual": np.asarray(
+                    state.params[prefix("gaussian_residual")]
+                ),
+                "objective_residual": np.asarray(
+                    state.params[prefix("objective_residual")]
+                ),
+                "recurrence_members": plan.topology.recurrence_members,
+                "regime_edges": plan.topology.regime_edges,
+                "state_edges": plan.topology.state_edges,
+            }
+        return out
+
     def recurrence_pair_beliefs(
         self, state: State
     ) -> dict[str, dict[str, np.ndarray]]:
@@ -2385,7 +2597,7 @@ class Engine:
         # NEG is a finite representation of log zero, so the local ledger can
         # otherwise turn log Z = -inf into a huge finite sentinel score.  Empty
         # exact edge support proves Z=0 and therefore F=+inf.
-        if self._has_zero_support(state):
+        if not self.arena.structured_hybrid_plans and self._has_zero_support(state):
             return float("inf")
         return float(
             self._bfe(
@@ -3799,6 +4011,32 @@ def _ef_bfe(arena, ef_eta, ef_obs, ef_mask, params):
 
 
 def _make_bfe(arena: Arena):
+    if arena.structured_hybrid_plans:
+        plan = arena.structured_hybrid_plans[0]
+        objective_key = hybrid_runtime.runtime_key(plan, "objective")
+        status_key = hybrid_runtime.runtime_key(plan, "status")
+
+        def structured_bfe(
+            messages,
+            g_eta,
+            g_lam,
+            g_obs,
+            g_mask,
+            ef_eta,
+            ef_obs,
+            ef_mask,
+            params,
+        ):
+            del messages, g_eta, g_lam, g_obs, g_mask
+            del ef_eta, ef_obs, ef_mask
+            objective = params[objective_key]
+            proper = (params[status_key] == SWEEP_FINITE) & jnp.isfinite(
+                objective
+            )
+            return jnp.where(proper, objective, jnp.inf)
+
+        return structured_bfe
+
     groups = arena.groups
 
     def bfe(

@@ -157,6 +157,45 @@ def _belief_residual(
     return jnp.max(jnp.stack(values))
 
 
+def structured_hybrid_evaluate(
+    belief: StructuredHybridBelief,
+    model: StructuredHybridModel,
+) -> tuple[jax.Array, jax.Array]:
+    """Evaluate the collapsed D10 objective at an installed belief."""
+    model = model_arrays(model)
+    model_shape(model)
+    dynamics, dynamics_ok = expected_dynamics_log_potential(
+        belief.gaussian.mean,
+        belief.gaussian.covariance,
+        belief.gaussian.lag_covariance,
+        model.dynamics_matrix,
+        model.dynamics_offset,
+        model.dynamics_covariance,
+    )
+    auxiliary = _sequence_auxiliary(
+        belief.gaussian, model.recurrence_weights, model.recurrence_offsets
+    )
+    objective = structured_hybrid_objective(
+        belief.categorical,
+        belief.gaussian,
+        model.log_initial,
+        model.log_unary,
+        model.gaussian_eta,
+        model.gaussian_precision,
+        model.gaussian_log_constant,
+        dynamics,
+        auxiliary.log_potential,
+    )
+    proper = (
+        belief.categorical.proper
+        & belief.gaussian.proper
+        & dynamics_ok
+        & jnp.all(auxiliary.proper)
+        & jnp.isfinite(objective)
+    )
+    return jnp.where(proper, objective, jnp.inf), proper
+
+
 def structured_hybrid_sweep(
     belief: StructuredHybridBelief,
     model: StructuredHybridModel,
@@ -341,6 +380,7 @@ __all__ = [
     "recurrence_auxiliary",
     "recurrence_statistics",
     "structured_hybrid_initial",
+    "structured_hybrid_evaluate",
     "structured_hybrid_objective",
     "structured_hybrid_sweep",
 ]

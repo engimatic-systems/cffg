@@ -218,6 +218,17 @@ def _arena_signature(arena: Arena) -> str:
                 f"{component.categorical_factors}|{component.acyclic}"
             ).encode()
         )
+    for plan in arena.structured_hybrid_plans:
+        topology = plan.topology
+        h.update(
+            (
+                f"structured-hybrid|{plan.name}|{topology.recurrence_members}|"
+                f"{topology.dynamics_members}|{topology.emission_members}|"
+                f"{topology.regime_edges}|{topology.state_edges}|"
+                f"{topology.cardinality}|{topology.dimension}"
+            ).encode()
+        )
+        h.update(np.ascontiguousarray(plan.observation_rows).tobytes())
     return h.hexdigest()
 
 

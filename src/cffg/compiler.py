@@ -42,6 +42,10 @@ from cffg.core.ir import FACTOR_TYPES, ConstraintKind, PortRole, Template
 from cffg.core.plates import expand_plates
 from cffg.core.validate import validate
 from cffg.recurrence_topology import classify_recurrence_components
+from cffg.structured_hybrid_topology import (
+    StructuredHybridTopology,
+    classify_structured_hybrid,
+)
 
 NEG = -1.0e30  # reserved log-space zero sentinel; all other finite values have support
 
@@ -334,6 +338,15 @@ class MemberAddress:
 
 
 @dataclass(frozen=True)
+class StructuredHybridPlan:
+    """Derived runtime ownership for one whole-template D10 coordinate."""
+
+    name: str
+    topology: StructuredHybridTopology
+    observation_rows: np.ndarray
+
+
+@dataclass(frozen=True)
 class LearnTarget:
     """One place a learnable posterior writes back into stacked params.
 
@@ -470,6 +483,8 @@ class Arena:
     # arena (out/in edges) and the discrete arena (selector edge).
     recurrence_groups: list[RecurrencePlan] = field(default_factory=list)
     recurrence_components: tuple[RecurrenceComponentPlan, ...] = ()
+    structured_hybrid_plans: tuple[StructuredHybridPlan, ...] = ()
+    structured_hybrid_reason: str = "no recurrence_link component"
     prec_groups: list["PrecGroupPlan"] = field(default_factory=list)
     # gaussian_prec groups (cff-7c5o): each writes both the Gaussian arena
     # (out edge) and the EF arena (prec edge).
@@ -667,6 +682,11 @@ def compile_template(
         for c in t.constraints
         if c.kind is ConstraintKind.P_SUBSTITUTION
     }
+    structured_hybrid = (
+        classify_structured_hybrid(t)
+        if semiring == "sum"
+        else None
+    )
 
     for f in t.factors.values():
         if f.param_edges:
@@ -1810,6 +1830,40 @@ def compile_template(
             )
         )
 
+    structured_hybrid_plans: tuple[StructuredHybridPlan, ...] = ()
+    structured_hybrid_reason = (
+        "min-sum does not define a D10 free-energy component"
+        if structured_hybrid is None
+        else structured_hybrid.reason
+    )
+    if structured_hybrid is not None and structured_hybrid.topology is not None:
+        topology = structured_hybrid.topology
+        observation_row_by_member = {
+            member: int(group.obs_rows[index])
+            for group in gauss_groups
+            if group.type == "gaussian_linear_obs"
+            for index, member in enumerate(group.members)
+        }
+        try:
+            observation_rows = np.asarray(
+                [observation_row_by_member[name] for name in topology.emission_members],
+                dtype=np.int64,
+            )
+        except KeyError as err:
+            raise CompileError(
+                f"D10 emission {err.args[0]!r} did not compile as conditioned data"
+            ) from None
+        structured_hybrid_plans = (
+            StructuredHybridPlan(
+                name=(
+                    f"structured-hybrid:{len(topology.state_edges)}:"
+                    f"{topology.cardinality}:{topology.dimension}"
+                ),
+                topology=topology,
+                observation_rows=observation_rows,
+            ),
+        )
+
     if semiring == "max":
         rejects = []
         if any(g.mode == "vmp" for g in groups):
@@ -1910,6 +1964,8 @@ def compile_template(
         mix_groups=mix_groups,
         recurrence_groups=recurrence_groups,
         recurrence_components=recurrence_components,
+        structured_hybrid_plans=structured_hybrid_plans,
+        structured_hybrid_reason=structured_hybrid_reason,
         prec_groups=prec_groups,
         gauss_interior=gauss_interior,
         n_efslots=next_efslot,

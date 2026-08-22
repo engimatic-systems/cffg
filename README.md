@@ -244,9 +244,33 @@ Conditioned drives and `K=1` use explicit D9 and Gaussian-only reductions.
 Numerical failure is loud through `proper=False`, positive-infinity objective
 or residual values, and `SWEEP_DIVERGED`.
 
-This module is a pure mathematical authority, not current `Engine` behavior.
-Production rSLDS models still use the D3/D9 path below until the compiler,
-runtime energy owner, learning source, and persistence identity are integrated.
+The compiler now dispatches this authority for the exact fixed-parameter,
+tied-boundary rSLDS topology: one acyclic recurrence chain, matching
+destination-selected dynamics, one regime-independent Gaussian initial law,
+and one shared conditioned emission per state. The installed coordinate is
+available from `engine.structured_hybrid_beliefs(state)` with source-row /
+destination-column pairs, Gaussian marginal and lag moments, the component
+objective, separate categorical/Gaussian/objective residuals, literal support,
+and propriety. Flood and mixed schedules use the same unfused component step;
+`Engine.run` reports converged, budget-exhausted, or diverged from that state.
+
+The standard `rslds(...)` helper declares learnables, whose statistic and
+checkpoint migration belongs to the next integration step. Such graphs retain
+D3/D9 without a D10 claim. For fixed-parameter inference, remove the declared
+learning consumers before compiling:
+
+```python
+from dataclasses import replace
+
+fixed_template = replace(template, learnables={})
+engine = Engine(compile_template(fixed_template, arrays=arrays))
+result = engine.run(engine.bind_data(engine.init_state(), observations), 100, tol=1e-6)
+belief = next(iter(engine.structured_hybrid_beliefs(result.state).values()))
+```
+
+Extra attachments, untied boundary laws, loops, and component GFE or
+P-substitution retain D3/D9 or fail at their existing compile-time boundary.
+Serialized factor spelling and persistence formats are unchanged.
 
 ### Recurrent switching state-space models
 

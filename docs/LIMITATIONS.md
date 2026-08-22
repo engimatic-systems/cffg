@@ -333,7 +333,7 @@ overflows the dtype remain loud failures. Factor-local diagnostics report the
 failed predicate and dtype-scaled tolerance, but they do not repair or relax an
 invalid belief.
 
-**S1j. D3 and D9 do not yet share one production rSLDS coordinate.** The
+**S1j. Learning-enabled D3 and D9 do not yet share one production rSLDS coordinate.** The
 source-heterogeneous D9 development fit exposed a coupled approximation
 limit, not a local message or learning-readout defect. On the authenticated
 seed-5000/native checkpoint, the all-learned post-fit smoother scored 0.203
@@ -350,9 +350,13 @@ structured-mean-field component that would make the categorical path,
 Gaussian trajectory, both learning readouts, and one conservative objective
 share a coordinate. Its pure authority and independent oracles now exist,
 including the required distinction between fixed-auxiliary expanded sweeps
-and collapsed sweep-boundary values. Production behavior is still unchanged:
-compiler/engine dispatch, energy suppression, persistence identity, and the
-unchanged development recovery gates remain downstream.
+and collapsed sweep-boundary values. Production fixed-parameter inference now
+dispatches D10 only for the exact tied-boundary whole-template topology. Its
+installed trajectory state and single objective owner replace D3/D9 and all
+consumed separator terms. The standard rSLDS helper still declares learning
+consumers, so it deliberately retains D3/D9 until the learning readouts and
+persistence identity migrate. That migration and the unchanged development
+recovery gates remain downstream.
 
 The end-to-end `cffg.models.rslds` helpers preserve these same approximation
 boundaries. `RSLDSLearning.update` accumulates initial-regime, per-regime

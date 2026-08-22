@@ -120,6 +120,7 @@ EPIC_FILES = {
         "test_structured_recurrence_engine.py",
         "test_structured_recurrence_learning.py",
         "test_structured_hybrid_coordinates.py",
+        "test_structured_hybrid_dispatch.py",
         "test_structured_hybrid_objective.py",
         "test_rslds_fit.py",
     ],
