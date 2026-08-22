@@ -1,6 +1,6 @@
 ---
 id: cff-e10u
-status: open
+status: in_progress
 deps: [cff-bmax]
 links: []
 created: 2026-08-22T20:21:34Z
@@ -94,3 +94,9 @@ synchronous/scheduled dispatch, host/JIT, single/`vmap`, objective replacement,
 status, and documented readout all apply. Serialized IR changes are N/A.
 Learning installation, checkpoint migration, and experiment consumers are N/A
 and belong to cff-6rav or cff-ngxx.
+
+## Notes
+
+**2026-08-22T21:10:05Z**
+
+Implementation start after the pure D10 authority passed the full short suite. Production eligibility is deliberately narrow: the exact acyclic recurrence/equality/destination-dynamics/Gaussian chain with tied x0 and shared emission only. The engine must install and score one authoritative component coordinate, suppress every replaced local energy owner exactly once, and retain D3/D9 fallback for unsupported graphs.
