@@ -1,6 +1,6 @@
 ---
 id: cff-e10u
-status: in_progress
+status: closed
 deps: [cff-bmax]
 links: []
 created: 2026-08-22T20:21:34Z
@@ -100,3 +100,33 @@ and belong to cff-6rav or cff-ngxx.
 **2026-08-22T21:10:05Z**
 
 Implementation start after the pure D10 authority passed the full short suite. Production eligibility is deliberately narrow: the exact acyclic recurrence/equality/destination-dynamics/Gaussian chain with tied x0 and shared emission only. The engine must install and score one authoritative component coordinate, suppress every replaced local energy owner exactly once, and retain D3/D9 fallback for unsupported graphs.
+
+**2026-08-22T22:23:20Z**
+
+**Why**
+
+Fixed-parameter recurrent switching graphs needed one production owner for the D10 categorical-path and Gaussian-trajectory coordinate, rather than separate D3 and D9 updates and ledgers.
+
+**What landed**
+
+- The compiler derives a name-independent D10 plan only for the proven whole-template tied-boundary topology. Equality incidence cycles, state-root reuse, dynamics self-closures, duplicate emission or observation ownership, constraints, extra attachments, and declared learning retain the documented fallback.
+- Engine and Colony install and execute one unfused D10 coordinate with source-row/destination-column pairs, Gaussian marginal and lag moments, literal support, separate residuals, and converged/budget-exhausted/diverged status. The D10 objective replaces all owned initial, emission, dynamics, recurrence, equality, and separator ledger terms exactly once.
+- Public point-parameter writes mark derived D10 state stale. Step, run, BFE, readout, and Colony require reset or rebinding consistently. Missing DATA rebinding clears stored payloads as well as masks.
+- Serialized IR, recurrence learning, and persistence formats remain unchanged.
+
+**How verified**
+
+Independent read-only review cleared exact head 5d0b209 after cycle, duplicate-time, objective freshness, stale-state, Colony divergence, independent K2/K3 extraction, and nonfinite-to-missing regressions. Focused affected selection passed 99 tests with 3 deselected before the final missing-data fix; the exact post-fix recovery selection passed 3 tests. The final not-slow suite at 5d0b209 passed 1505 tests with 39 deselected and zero failures in 689.562 seconds. Dependency-cycle and diff checks pass.
+
+**Future work — cff-6rav**
+
+- Atomically replace every generic D3/D9 learning readout and fit_rslds _attempt_evidence consumer when learning-enabled D10 dispatch is activated.
+- Make every Learnables.write, RSLDSLearning.install, fit installation, and direct replacement invalidate or rebuild the D10 coordinate before inference or readout.
+- Preserve source identity and C_t = E[x_t x_(t-1)^T] orientation; recurrence uses source-row/destination-column rho and x_(t-1), dynamics uses destination gamma_t and lag second moments, initial uses gamma_0, and emission uses y with q_X.
+- Preserve exact-zero exposure as exact prior retention and atomic four-family installation.
+- Replace legacy damping and retry evidence with D10-compatible coordinate semantics; nonzero D10 damping remains rejected until derived.
+- Version the executable, belief, statistic, and objective identity and reject D8/D9 resumable learning state before enabling learned dispatch.
+
+**Definitions**
+
+D10 plan means compiler-derived runtime metadata; it is not serialized model structure. A stale coordinate is a valid parameter update paired with derived beliefs from an older parameter point, not numerical divergence.
