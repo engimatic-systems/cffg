@@ -17,7 +17,8 @@ from cffg.models import (
     vague_rslds_fit_priors,
 )
 from cffg.models.coordinate_fit import CoordinateResidual
-from cffg.models.rslds_fit import _run_inner
+from cffg.models.rslds import EMISSION_LEARNABLE, RSLDSLearning
+from cffg.models.rslds_fit import _point_parameters, _run_inner
 
 
 def _observations(steps: int, dtype=np.float32) -> np.ndarray:
@@ -103,6 +104,7 @@ def _fit(
     inner_tolerance: float = 1e-5,
     damp: float = 0.0,
     initializer=PCAARHMMInitializer(),
+    outer_tolerance: float = 2.0,
 ):
     return fit_rslds(
         observations,
@@ -113,7 +115,7 @@ def _fit(
         max_outer_iterations=outer_iterations,
         max_inner_iterations=inner_iterations,
         inner_tolerance=inner_tolerance,
-        outer_tolerance=2.0,
+        outer_tolerance=outer_tolerance,
         key=jax.random.key(7),
         damp=damp,
     )
@@ -157,13 +159,35 @@ def test_pca_arhmm_initializer_is_seeded_finite_and_dtype_scaled():
 def test_fit_replaces_one_sequence_coordinates_and_reuses_one_engine(monkeypatch):
     observations = _observations(8)
     engine_ids = []
+    run_parameter_snapshots = []
+    candidate_points = []
+    candidate_models = []
+    candidate_emissions = []
     original_run = Engine.run
 
     def tracked_run(self, *args, **kwargs):
         engine_ids.append(id(self))
+        run_parameter_snapshots.append(
+            {name: np.asarray(value).copy() for name, value in args[0].params.items()}
+        )
         return original_run(self, *args, **kwargs)
 
+    def tracked_points(learning):
+        points = _point_parameters(learning)
+        candidate_points.append(
+            {name: np.asarray(value).copy() for name, value in points.items()}
+        )
+        candidate_models.append(RSLDSLearning._from_runtime(learning))
+        candidate_emissions.append(
+            {
+                name: np.asarray(value).copy()
+                for name, value in learning.params[EMISSION_LEARNABLE].items()
+            }
+        )
+        return points
+
     monkeypatch.setattr(Engine, "run", tracked_run)
+    monkeypatch.setattr("cffg.models.rslds_fit._point_parameters", tracked_points)
     priors = vague_rslds_fit_priors(2, 1, 2)
     result = fit_rslds(
         observations,
@@ -183,13 +207,33 @@ def test_fit_replaces_one_sequence_coordinates_and_reuses_one_engine(monkeypatch
     assert result.iterations == 2
     assert len(result.residuals) == 2
     assert len(set(engine_ids)) == 1
-    assert len(engine_ids) == 3
+    assert len(engine_ids) == 2
     assert [phase.coordinate_replaced for phase in result.phases] == [
-        True,
         True,
         False,
     ]
-    for phase, selected_residual in zip(result.phases[:-1], result.residuals):
+    assert [
+        (
+            phase.evaluated_coordinate,
+            phase.proposed_coordinate,
+            phase.installed_coordinate,
+            phase.certified_coordinate,
+            phase.returned_coordinate,
+        )
+        for phase in result.phases
+    ] == [
+        ("coordinate/0", "coordinate/1", "coordinate/1", None, None),
+        (
+            "coordinate/1",
+            "coordinate/2",
+            "coordinate/1",
+            "coordinate/1",
+            "coordinate/1",
+        ),
+    ]
+    assert result.returned_coordinate == "coordinate/1"
+    assert result.certified_coordinate == result.returned_coordinate
+    for phase, selected_residual in zip(result.phases, result.residuals):
         assert phase.fixed_point_residual == selected_residual
         assert phase.runtime_residual is not None
         assert phase.runtime_residual.maximum == selected_residual
@@ -203,9 +247,32 @@ def test_fit_replaces_one_sequence_coordinates_and_reuses_one_engine(monkeypatch
         }
         assert phase.functional_transition_residual is not None
         assert np.isfinite(phase.functional_transition_residual.maximum)
-    assert result.phases[-1].runtime_residual is None
-    assert result.phases[-1].legacy_fixed_point_residual is None
-    assert result.phases[-1].functional_transition_residual is None
+        assert phase.proposed_parameter_scales is not None
+    assert (
+        result.phases[-1].parameter_scales_after
+        == result.phases[-1].parameter_scales_before
+    )
+    assert len(candidate_points) == 2
+    for name, value in result.parameters.items():
+        np.testing.assert_array_equal(value, candidate_points[0][name])
+    assert any(
+        not np.array_equal(candidate_points[0][name], candidate_points[1][name])
+        for name in candidate_points[0]
+    )
+    for name, value in result.model_posterior.state_dict(result.engine).items():
+        np.testing.assert_array_equal(
+            value, candidate_models[0].state_dict(result.engine)[name]
+        )
+    for name, value in result.emission_posterior.items():
+        np.testing.assert_array_equal(value, candidate_emissions[0][name])
+    for name, value in result.state.params.items():
+        np.testing.assert_array_equal(value, run_parameter_snapshots[-1][name])
+    assert result.last_inference is not None
+    for value, expected in zip(
+        jax.tree_util.tree_leaves(result.state),
+        jax.tree_util.tree_leaves(result.last_inference.state),
+    ):
+        np.testing.assert_array_equal(value, expected)
     assert result.model_posterior.initial_alpha.sum() == pytest.approx(
         priors.initial_alpha.sum() + 1.0
     )
@@ -263,10 +330,72 @@ def test_fit_uses_runtime_map_residual_as_its_outer_certificate(monkeypatch):
 
     assert result.status is RunStatus.BUDGET_EXHAUSTED
     assert result.residuals == (3.0, 3.0)
+    assert result.returned_coordinate == "coordinate/2"
+    assert result.certified_coordinate is None
+    assert result.phases[-1].evaluated_coordinate == result.returned_coordinate
+    assert result.phases[-1].installed_coordinate == result.returned_coordinate
+    assert result.phases[-1].returned_coordinate == result.returned_coordinate
+    assert result.phases[-1].proposed_coordinate is None
     for phase in result.phases[:-1]:
         assert phase.fixed_point_residual == 3.0
         assert phase.legacy_fixed_point_residual is not None
         assert phase.runtime_residual is forced
+
+
+def test_rebound_resets_the_two_hit_rule_before_certifying(monkeypatch):
+    residuals = iter((0.05, 0.2, 0.05, 0.05))
+
+    def forced_residual(*_):
+        value = next(residuals)
+        return CoordinateResidual(
+            maximum=value,
+            root_mean_square=value,
+            per_family={"forced": value},
+            per_array={"forced/value": value},
+            vector=(value,),
+        )
+
+    monkeypatch.setattr("cffg.models.rslds_fit.coordinate_residual", forced_residual)
+
+    result = _fit(
+        _observations(8),
+        outer_iterations=4,
+        outer_tolerance=0.1,
+    )
+
+    assert result.status is RunStatus.CONVERGED
+    assert result.residuals == pytest.approx((0.05, 0.2, 0.05, 0.05))
+    assert [phase.coordinate_replaced for phase in result.phases] == [
+        True,
+        True,
+        True,
+        False,
+    ]
+    assert result.certified_coordinate == "coordinate/3"
+    assert result.returned_coordinate == "coordinate/3"
+    assert result.phases[-1].proposed_coordinate == "coordinate/4"
+    assert result.phases[-1].installed_coordinate == "coordinate/3"
+
+
+def test_nonfinite_proposed_coordinate_diverges_without_installing_it(monkeypatch):
+    def nonfinite_points(learning):
+        points = _point_parameters(learning)
+        points["recurrence_offsets"][0, 0] = np.nan
+        return points
+
+    monkeypatch.setattr("cffg.models.rslds_fit._point_parameters", nonfinite_points)
+
+    result = _fit(_observations(8), outer_iterations=1)
+
+    assert result.status is RunStatus.DIVERGED
+    assert "non-finite" in result.error
+    assert result.certified_coordinate is None
+    assert result.returned_coordinate == "coordinate/0"
+    assert result.phases[-1].evaluated_coordinate == "coordinate/0"
+    assert result.phases[-1].proposed_coordinate == "coordinate/1"
+    assert result.phases[-1].installed_coordinate == "coordinate/0"
+    assert not result.phases[-1].coordinate_replaced
+    assert all(np.all(np.isfinite(value)) for value in result.parameters.values())
 
 
 @dataclasses.dataclass(frozen=True)
