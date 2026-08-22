@@ -1,7 +1,7 @@
 ---
 id: cff-l5ag
 status: open
-deps: [cff-8w4c, cff-upih]
+deps: [cff-8w4c, cff-upih, cff-lo4d]
 links: [cff-oyie]
 created: 2026-08-20T15:41:17Z
 type: bug
