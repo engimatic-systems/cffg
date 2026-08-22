@@ -1,6 +1,6 @@
 ---
 id: cff-nbo9
-status: in_progress
+status: closed
 deps: [cff-rk7i]
 links: []
 created: 2026-08-22T15:16:47Z
@@ -112,3 +112,7 @@ Legend: prerequisite --> dependent
                               |
                               +--> [ ] cff-0oqo recovery evidence
 ```
+
+**2026-08-22T15:45:08Z**
+
+Completed and integrated in commits 4dbfcdf, 83440b0, and d8582d9. The independent K=2/K=3 exact enumerator and forward-backward authority agree to 2.22e-16. CFFG categorical coordinate messages and recurrence learning readout match independent mean-field algebra within dtype-scaled tolerances (f64 maxima 2.33e-15 and 1.11e-16; f32 1.10e-6 and 5.96e-8), while exact-smoothed singleton, consecutive-pair, product-pair, and learning-statistic gaps are material. The uncertain-drive oracle separately identifies JJ/PG approximation and categorical-factorization error. Exact zeros, deterministic/vacuous support, non-finite rejection, f32, and K=8/T=100 pass. Ownership is variational_family_limitation: preserving the existing mean-field fixed point and BFE cannot recover the required pair responsibilities. The next owner must derive structured consecutive-regime beliefs and their region/counting-number/BFE contract. Focused recurrence tests pass and the manifested artifact replays semantically exactly. No NASCAR data, fit, adapter, control, calibration seed, or final seed ran.
