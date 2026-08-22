@@ -1,7 +1,7 @@
 ---
 id: cff-ngxx
 status: in_progress
-deps: [cff-xwtz]
+deps: [cff-xwtz, cff-6rav]
 links: []
 created: 2026-08-22T19:52:31Z
 type: bug
@@ -71,3 +71,31 @@ Legend: prerequisite --> dependent
 **2026-08-22T19:54:11Z**
 
 Implementation start from the authenticated cff-xwtz checkpoint. The first phase is diagnostic-only: enumerate the predeclared learned/generating initial, dynamics, and recurrence block substitutions with generating continuous states held only inside post-fit evaluation. No fitting or production change begins until a single block or smallest block interaction restores both frozen recovery caps and its local learning statistics are independently audited.
+
+**2026-08-22T20:23:24Z**
+
+Diagnostic handoff (2026-08-22): authenticated post-fit evidence is committed in experiment branch agent/cff-ngxx-cross-parameter at 1799f4d. No fit, adapter, control, calibration seed, or final seed ran.
+
+The complete learned/generating initial x dynamics x recurrence cube used source_heterogeneous seed5000/native/replicate0 and the existing D9 checkpoint. All-learned failed: worst-source 0.202719, worst contrast 0.309087, M-step budget_exhausted at 160. Initial-only substitution was unchanged and failed. Two one-block substitutions independently restored both 0.150 caps: generating recurrence with learned dynamics scored 0.038173/0.043341 and converged at 145 coordinates; generating dynamics with learned recurrence scored 0.032903/0.040220 and converged at 134. Full generating scored 0.033182/0.039697. The minimal owner is therefore the dynamics-recurrence boundary; neither block alone is uniquely selected.
+
+Independent local audit then reconstructed fixed-parameter beliefs without fitting. D3 responsibility/Syy/Syx/Sxx and component-MNIW posterior hyperparameters all met dtype-scaled tolerances across 5,119 dynamics factors. D9 exposure/linear/quadratic and PG eta/precision/posterior mean all met tolerance across 5,119 recurrence factors. Largest normalized local differences were 4.64e-11 for D3 factor statistics and 3.35e-16 for D9 factor statistics. This falsifies a bounded local algebra/readout repair and selects the internally correct but coupled-objective-biased classification. D9 remains in place.
+
+Artifacts: cross results sha256 5faa01c9b6eb052b8fa088096cc4c9c0d34ed80c014f3160907d9b9d7b87ab76, manifest 28932488884ce5c59fbebeea2b52828bc6c5b0e4f9589d77831286da6f6aaf90; local audit results 153fa4ed93326270cead6ea9c8f87cb03739d96b5189389695f52350ab187816, manifest a73b646d27dc208d65fef644206de511f7c587a9bf690d0556302b7912ea399f. Cross wall/RSS 15.42s/634,814,464 bytes; local reconstruction/audit 103.78s/2,005,106,688 bytes.
+
+DERIVATIONS.md D10 now derives the smallest reusable repair: one q_Z categorical chain and one q_X Gaussian Markov trajectory, with expected dynamics unaries, pair-derived recurrence terms, singleton-weighted dynamics learning, one conservative objective, and explicit D3/D9 ledger suppression. Production behavior is intentionally unchanged.
+
+Legend: prerequisite --> dependent
+
+[x] cff-ngxx authenticated diagnosis (this handoff)
+      |
+      +--> [ ] cff-bmax pure D10 coordinate authority (ready)
+                  |
+                  +--> [ ] cff-e10u compiler/engine dispatch
+                              |
+                              +--> [ ] cff-6rav learning/persistence identity
+                                          |
+                                          +--> [ ] cff-ngxx seed5000/native pilot
+                                                      |
+                                                      +--> [ ] cff-h0hx requalification
+
+cff-ngxx now depends on cff-6rav and remains in_progress. Resume here only after the three implementation tickets land; then run the already registered development pilot and stop on the first status/cap failure.

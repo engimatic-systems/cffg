@@ -101,3 +101,7 @@ Authenticated D9 pilot falsifier. Experiment code commits be10f86 and 5669f6c; i
 **2026-08-22T19:53:12Z**
 
 cff-xwtz completed its no-refit diagnosis. Exact categorical messages and the D3 dynamics-selector integral agree with independent authorities, but generating-state smoothing under learned parameters still fails 0.202719/0.309087 while the full generating authority passes 0.033182/0.039697. Do not rerun the h0hx fit yet. New dependency cff-ngxx owns the coupled variational learning repair; current D9 remains valid and historical evidence remains immutable.
+
+**2026-08-22T20:26:50Z**
+
+cff-ngxx diagnostic checkpoint (2026-08-22): the authenticated 2^3 post-fit oracle found that substituting either generating dynamics alone or generating recurrence alone restores both unchanged 0.150 caps, while substituting initial regimes alone does not. Independent audits reproduced all 5,119 D3 and 5,119 D9 local natural-statistic occurrences at dtype-scaled tolerance. This rules out a bounded local algebra patch and identifies the shared dynamics-recurrence variational coordinate as the remaining owner. D9 stays in place. cff-bmax --> cff-e10u --> cff-6rav now implement the derived D10 structured-hybrid coordinate before cff-ngxx resumes its registered seed-5000/native pilot. cff-h0hx remains in_progress and blocked on that requalification; no new fit, expansion, adapter, control, calibration seed, or final seed ran.

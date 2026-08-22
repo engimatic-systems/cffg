@@ -68,6 +68,7 @@ and review context proportional to the change.
 | --- | --- | --- | --- | --- |
 | New IR field | `src/cffg/core/ir.py` (`Template` or its spec dataclass) | `src/cffg/core/validate.py`; `src/cffg/core/serialize.py` (`to_dict`, `from_dict`, `structure_hash`); `src/cffg/core/plates.py` scoping; `src/cffg/core/compose.py` and `src/cffg/core/edits.py` when editable; `src/cffg/compiler.py` and `Arena` when executable; bundle and agent state when persisted | `tests/test_ir.py`, `tests/test_serialize.py`, `tests/test_plates.py`; add `tests/test_edit_codec.py`, `tests/test_edits.py`, `tests/test_agent_spec.py`, or `tests/test_bundle.py` only for the affected boundary | Contract in this document; public construction and migration in `README.md`; unsupported cases in `LIMITATIONS.md` |
 | New factor or rule family | `src/cffg/kernels.py:FactorKernel`, its `src/cffg/core/ir.py:FactorType`, and the family rule module; formal equations are authoritative in code docstrings and `DERIVATIONS.md` | Compiler grouping, slot addressing, parameter packing, `Arena`, and `member_of`; synchronous `_make_step`; scheduled `_batch_stage_fn` / `_scan_stage_fn`; `_make_bfe`; schedule classification, readouts, serialization manifest, estimator, and public exports as applicable | `tests/test_kernels.py`; the family rule and engine-oracle tests; `tests/test_schedule.py`; sparse-support, float32, and uncomfortable-scale cases required by the robustness contract | Derivation in `DERIVATIONS.md`; integration contract here; approximations in `LIMITATIONS.md`; public modeling API in `README.md` |
+| New derived component coordinate | The focused component rule module and its complete objective in `DERIVATIONS.md`; serialized factors remain the model authority | Compiler topology classification and derived plan; `Arena` state ownership; synchronous `_make_step`; scheduled `_batch_stage_fn` / `_scan_stage_fn`; `_make_bfe` suppression and replacement; status, readouts, learning sources, executable identity, checkpoint restore, and model consumers | Independent component-coordinate and objective oracles; `tests/test_schedule.py`; contributing rule/readout tests; persistence and model-fit tests; sparse-support, float32, and uncomfortable-scale cases | Eligibility and ownership here; equations and bound in `DERIVATIONS.md`; public behavior in `README.md`; fallback and approximation boundary in `LIMITATIONS.md` |
 | Runtime numerical or status invariant | `AGENTS.md` numerical contract and `src/cffg/engine.py` (`RunStatus`, `RunResult`, `Engine.run`) | Flooding, colored/mixed, and exact schedules; host `_has_zero_support` and JIT `_make_support_check`; `_make_step`, `_make_exact_unit`, `_make_propagate`, and `_make_bfe`; inner-solver status; `RollingAgent`, `Colony`, estimator, benchmark, and dashboard consumers | `tests/test_runtime_status.py`, `tests/test_schedule.py`, `tests/test_colony.py`, plus the changed rule family's hostile-input tests | Runtime contract here and in `README.md`; any accepted failure mode or approximation in `LIMITATIONS.md` |
 | Learnable or checkpoint feature | `src/cffg/core/ir.py` (`LearnableSpec`, `AgentSpec`, `BeliefBinding`) and `src/cffg/learn.py` (`Family`, `Learnables`) | Validation, JSON/hash, plate scoping, compiler `_resolve_learnables`, `Arena.learn_plans`, `member_of`, engine readouts and parameter writes, agent cadence, checkpoint encode/decode and legacy migration, and bundles | `tests/test_learnables.py`, `tests/test_agent_spec.py`, `tests/test_agent.py`, and `tests/test_bundle.py`; add the contributing factor family's statistic test | Conjugate contract here; statistics beyond the papers in `DERIVATIONS.md`; public cadence/checkpoint API in `README.md`; remaining family gaps in `LIMITATIONS.md` |
 
@@ -350,6 +351,21 @@ constructs all four posteriors from immutable priors, calls
 `Learnables.replace`, and writes them atomically. Thus an outer iteration
 cannot count the same sequence as a new trial or expose a partly replaced
 coordinate.
+
+The D10 structured hybrid boundary is derived but not yet dispatched in
+production. For an explicitly eligible recurrent switching component it will
+replace the combination of D3 mixture collapse and D9 recurrence sweeps with
+one structured-mean-field coordinate over a categorical path and a Gaussian
+Markov trajectory. The serialized `recurrence_link` and
+`gaussian_mixture_linear` factors remain the source of truth; a compiler-owned
+`StructuredHybridPlan` is derived metadata, not a new model spelling. D10.3
+adds expected dynamics evidence to the existing D9 chain, D10.4 performs one
+block-tridiagonal Gaussian solve from the same singleton/pair beliefs, and
+D10.5 supplies component-MNIW and PG learning from those beliefs. One
+component energy owns D10.6 and suppresses duplicated internal D3/D9 ledger
+terms. Until that compiler, engine, learning, and persistence path lands,
+ordinary models continue to execute the documented D3 and D9 semantics and
+must not claim D10's joint certificate or conservative bound.
 
 Both cadences install point rollovers through role-bearing addresses into a
 fresh observation-bound state. The compiled engine and every runtime shape

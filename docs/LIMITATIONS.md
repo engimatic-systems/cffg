@@ -333,6 +333,25 @@ overflows the dtype remain loud failures. Factor-local diagnostics report the
 failed predicate and dtype-scaled tolerance, but they do not repair or relax an
 invalid belief.
 
+**S1j. D3 and D9 do not yet share one production rSLDS coordinate.** The
+source-heterogeneous D9 development fit exposed a coupled approximation
+limit, not a local message or learning-readout defect. On the authenticated
+seed-5000/native checkpoint, the all-learned post-fit smoother scored 0.203
+worst-source and 0.309 source-contrast error against unchanged 0.150 caps.
+Replacing either learned dynamics alone or learned recurrence alone restored
+both caps; changing only the initial-regime distribution did not. Independent
+oracles reproduced all 5,119 occurrences in each D3 and D9 factor-local
+statistic family and their posterior natural parameters. Current production
+therefore remains honest D3
+assumed-density plus D9 structured categorical inference, with the bound
+directions and local guarantees in S1d/S1i, but it does not claim stationarity
+for one full recurrent-switching variational free energy. D10 derives the
+planned structured-mean-field component that would make the categorical path,
+Gaussian trajectory, both learning readouts, and one conservative objective
+share a coordinate. That design is not production behavior until its pure
+authority, compiler/engine dispatch, persistence identity, and unchanged
+development recovery gates pass.
+
 The end-to-end `cffg.models.rslds` helpers preserve these same approximation
 boundaries. `RSLDSLearning.update` accumulates initial-regime, per-regime
 dynamics, and recurrence evidence across distinct trials; calling it again on

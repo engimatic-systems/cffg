@@ -2091,3 +2091,192 @@ authority is anchored in `tests/test_structured_recurrence_rule.py`:
   compiled flooding and mixed schedules. It checks compiler acyclicity,
   factor-local pairs, Gaussian writes, the pair/separator BFE ledger,
   fixed-drive `-log Z`, loop claim boundaries, and `O(T K^2)` batch storage.
+
+---
+
+## D10 — One structured mean-field objective for recurrent switching chains (cff-ngxx)
+
+### D10.1 The plain-English version
+
+The current rSLDS path combines two sound local approximations that do not
+come from one complete variational coordinate. D3 moment-matches each
+switching-dynamics Gaussian mixture. D9 keeps an exact categorical chain for
+its bounded transition tables. Each local message and learning readout is
+correct for the belief it sees, but the dynamics responsibility and the D9
+pair can still teach two parameter blocks from different approximations to
+the same hidden path.
+
+The source-heterogeneous development diagnostic makes that distinction
+falsifiable. With the generating continuous path held only inside post-fit
+analysis, the all-learned dynamics/recurrence arm misses both 0.150 recovery
+caps. Replacing either dynamics alone or recurrence alone restores both caps;
+replacing the initial regime distribution does not. Independent NumPy
+calculations reproduce all 5,119 occurrences in each D3 and D9 factor-local
+statistic family and their conjugate natural-parameter updates. The remaining
+owner is therefore the
+boundary between switching dynamics and recurrence, not either local rule.
+
+The smallest reusable variational repair is a named connected-component
+coordinate with one categorical path belief `q_Z` and one Gaussian trajectory
+belief `q_X`. It keeps D9's source/destination pairs. It replaces D3 collapse
+inside that component with the exact structured-mean-field coordinate for the
+same `q_Z q_X` objective. The categorical update sees both recurrence scores
+and expected dynamics evidence. The Gaussian update sees both pair-derived
+recurrence terms and singleton-weighted dynamics terms. Learning reads those
+same two beliefs. No generating value enters inference.
+
+This choice is deliberately smaller than a conditional Gaussian mixture on
+every path prefix. Such a mixture grows exponentially unless it is projected
+after every step, returning to an expectation-propagation objective without a
+global evidence bound. The selected family is less expressive but has exact
+coordinate updates, a single auditable free energy, block-tridiagonal Gaussian
+work, and `O(T K^2)` categorical work.
+
+### D10.2 Family and expected dynamics evidence
+
+For states `t=0,...,N`, let dynamics factor `t` use destination regime `z_t`
+for `t>=1`, and recurrence factor `t` connect `z_t` to `z_{t+1}` with drive
+`x_t`. Parameters stay fixed during one inference coordinate. The selected
+family is
+
+    q_Z(z_0:N) q_X(x_0:N) product_til q(omega_til),           (D10.1)
+
+where `q_Z` is one structured categorical chain, `q_X` is one Gaussian Markov
+trajectory, and the PG/JJ auxiliaries have the D9 coordinate-optimal form.
+This is the factorization already named abstractly in D9.1. D10 makes the
+whole connected switching component, including dynamics, stationary for it.
+
+Write `B_k=[A_k b_k]`, `W_k=Q_k^-1`, and
+`x_tilde=[x_t;1]`. From `q_X`, define
+
+    M_t = E[x_t x_t^T],
+    C_t = E[x_t x_tilde_(t-1)^T],
+    H_(t-1) = E[x_tilde_(t-1) x_tilde_(t-1)^T].
+
+The exact expected log dynamics under regime `k` is the categorical unary
+
+    d_t(k) = 1/2 log det W_k - d/2 log(2 pi)
+             - 1/2 tr W_k [M_t - C_t B_k^T - B_k C_t^T
+                            + B_k H_(t-1) B_k^T].             (D10.2)
+
+Let `ell_t(i,j)` be D9.3's bounded recurrence pair potential and let `u_t`
+collect ordinary categorical unary evidence. The categorical coordinate is
+
+    log q_Z(z_0:N) = const + log pi(z_0)
+        + sum_(t=1)^N d_t(z_t)
+        + sum_(t=0)^(N-1) ell_t(z_t,z_(t+1))
+        + sum_t u_t(z_t).                                    (D10.3)
+
+Thus D9.7--D9.11 remain the exact log-space update for the bounded table, now
+with `d_t` in the destination unary. The result supplies singleton masses
+`gamma_t(k)` and the same source-row/destination-column pairs `rho_t(i,j)`.
+Exact log zeros remain exact.
+
+### D10.3 Gaussian trajectory coordinate
+
+For fixed `gamma`, the expected dynamics term is Gaussian. Factor `t` adds
+the following canonical blocks over `[x_t; x_(t-1)]`:
+
+    Lambda_yy = sum_k gamma_t(k) W_k,
+    Lambda_yx = -sum_k gamma_t(k) W_k A_k,
+    Lambda_xx = sum_k gamma_t(k) A_k^T W_k A_k,
+    eta_y     = sum_k gamma_t(k) W_k b_k,
+    eta_x     = -sum_k gamma_t(k) A_k^T W_k b_k.              (D10.4)
+
+D9.12--D9.13 add the recurrence unary precision and information vector on
+`x_t`, using `rho_t` from the same categorical coordinate. Initial-state and
+emission factors add their ordinary Gaussian canonical terms. The assembled
+precision is block tridiagonal, so one Gaussian forward/backward solve gives
+all `m_t`, `M_t`, and lag moments `C_t` in `O(T d^3)` time and `O(T d^2)`
+storage. A non-positive-definite block, non-finite moment, or infeasible
+literal support is divergence, never a vacuous success.
+
+The inference coordinate alternates D9's analytic auxiliary update, (D10.3),
+and (D10.4) until the one objective in D10.5 meets a dtype-scaled certificate.
+Flooding may propose a damped joint update, but status requires the installed
+coordinate's free energy and both categorical and Gaussian residuals. A fixed
+drive reduces the categorical side to D9 exact smoothing. `K=1` removes the
+categorical coordinate and reduces the Gaussian side to an ordinary linear
+Gaussian chain.
+
+### D10.4 Shared learning statistics
+
+Dynamics learning no longer reads a separate D3 labelled-mixture belief
+inside this component. Its component-MNIW increments are
+
+    n_k   = sum_(t=1)^N gamma_t(k),
+    Syy_k = sum_t gamma_t(k) M_t,
+    Syx_k = sum_t gamma_t(k) C_t,
+    Sxx_k = sum_t gamma_t(k) H_(t-1).                         (D10.5)
+
+Recurrence learning remains exactly D9.12--D9.14, using `rho_t` and the
+moments of the same `q_X`. Initial-regime learning reads `gamma_0`; emission
+learning reads `q_X`. Every posterior replacement still starts from its
+immutable prior. A diagnostic must reproduce (D10.5) and D9.14 independently
+before a point rollover is installed. Zero singleton or pair mass contributes
+exact zero statistics and retains the applicable prior coordinate.
+
+### D10.5 Free energy, bound, and ownership
+
+After eliminating the coordinate-optimal PG auxiliaries into `ell_t`, the
+component variational free energy is
+
+    F_H^JJ = -H[q_Z] - H[q_X]
+             - E[log p(z_0)] - E[log p(x_0)]
+             - sum_t E[log p(y_t|x_t)]
+             - sum_(t=1)^N sum_k gamma_t(k) d_t(k)
+             - sum_(t=0)^(N-1) sum_ij rho_t(i,j) ell_t(i,j). (D10.6)
+
+Terms in (D10.6) use one `q_Z`, one `q_X`, and immutable installed
+parameters. Each coordinate in D10.3--D10.4 is the stationary coordinate of
+this objective. Because D9's expected log transition is a lower bound,
+
+    F_H^JJ(q_Z,q_X) >= F_H^exact(q_Z,q_X) >= -log p(y),       (D10.7)
+
+for every feasible `q_Z q_X`; minimizing preserves both inequalities. This
+conservative direction differs from D3's optimistic
+collapsed-mixture Bethe ledger. Production must therefore give a detected
+structured hybrid component one energy owner: it suppresses the internal D3
+dynamics and D9 recurrence node/edge accounting that (D10.6) replaces. Unary
+attachments provide potentials to the component and retain only boundary
+terms proven not to duplicate its two global entropies.
+
+The compiler may derive a `StructuredHybridPlan` without changing serialized
+factor spelling. Eligibility is explicit: one acyclic D9 recurrence chain,
+destination-selected `gaussian_mixture_linear` dynamics with matching
+cardinality and Gaussian state chain, supported Gaussian initial/emission
+attachments, ordinary BFE, and no recurrence or component-owned
+P-substitution. An ineligible graph keeps current D3/D9 behavior rather than
+silently claiming D10. Current checkpoints remain D9 and cannot resume a D10
+component; runtime state and learning checkpoints require a new executable,
+belief, statistic, and objective identity.
+
+### D10.6 Rejected alternatives and executable falsifiers
+
+Two smaller-looking changes do not meet the evidence:
+
+1. Tightening one local D3 or D9 formula is rejected because independent
+   factor-local statistics and conjugate updates agree at dtype-scaled
+   tolerance. A failing independent natural-parameter oracle would falsify
+   this decision and return ownership to that bounded algebra defect.
+2. Keeping one Gaussian per `(z_t,x_t)` separator is more expressive, but
+   recurrence messages mix source-conditioned Gaussians for each destination.
+   Collapsing those mixtures is expectation propagation, not coordinate
+   descent on (D10.6); retaining them exactly grows path mixtures
+   exponentially. It remains future work only if D10 cannot restore the
+   registered recovery caps.
+
+Before production dispatch, a pure authority must establish:
+
+- K=2/K=3 D10.3 and D10.4 coordinates against independent NumPy algebra,
+  including lag moments and one complete evaluation of D10.6;
+- coordinate stationarity and non-increasing finite `F_H^JJ`, with exact
+  agreement to direct finite-state/Gaussian integration where a tiny case is
+  analytically enumerable;
+- D9 fixed-drive and K=1 Gaussian reductions;
+- bit-consistent inference and learning masses for D10.5 and D9.14;
+- exact-zero support, float32 guards, improper/non-finite failure, K=8 and
+  T>=100 without path enumeration; and
+- the unchanged source-heterogeneous seed-5000/native 0.150 caps. Failure of
+  either cap leaves the new semantic unqualified and preserves current D9
+  production behavior.
