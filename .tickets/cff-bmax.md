@@ -1,6 +1,6 @@
 ---
 id: cff-bmax
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-22T20:21:34Z
@@ -105,3 +105,13 @@ are N/A in this ticket and belong to cff-e10u or cff-6rav.
 **2026-08-22T20:28:40Z**
 
 Implementation start after cff-ngxx cross-block and local-stat audits. The pure D10 authority must land and pass independent categorical, block-Gaussian, objective, learning-statistic, exact-support, float32, and K=8/T>=100 oracles before any compiler or engine dispatch changes. No NASCAR coordinate is in scope.
+
+**2026-08-22T21:09:30Z**
+
+Closure handoff (2026-08-22). Commit c2827d0 exports the pure `cffg.structured_hybrid` authority without compiler or Engine dispatch. Public entry points are `categorical_coordinate`, `conditioned_categorical_coordinate`, `recurrence_auxiliary` (optimized or fixed xi), `gaussian_coordinate`, `expected_dynamics_log_potential`, `structured_hybrid_objective`, `dynamics_statistics`, `recurrence_statistics`, `structured_hybrid_initial`, and `structured_hybrid_sweep`. Pair rows are sources, columns are destinations; lag covariance and second moments are oriented current-by-previous. Numeric shape errors raise ValueError; improper/non-finite algebra returns shape-preserving NaNs/positive infinity and `SWEEP_DIVERGED`.
+
+Independent evidence covers K2/K3 path enumeration, implicit last-stick axes, K3/d2 nonsymmetric dynamics with noncommuting precisions against one dense Gaussian solve, oriented lag moments and D10.2, conditioned D9 and K1 bypasses, explicit categorical-unary objective ownership, fixed-xi expanded sweep monotonicity, auxiliary-reoptimized collapsed boundary values, independent F_JJ >= F_exact(q) >= -log evidence integration, MNIW/PG statistics, literal-zero/empty/improper/nonfinite/float32 inputs, and K8/T100 polynomial storage. Focused authority plus hygiene/dashboard selection: 28 passed. Required unchanged-head dashboard suite: 1491 passed, 39 slow tests deselected, zero failed, four existing dependency warnings, 612.07 seconds; ~/agent-share/cffg-tests.html refreshed.
+
+Reviewer corrections are incorporated in DERIVATIONS D10 and ARCHITECTURE: arbitrary u_t is scored; qX is exact only for fixed PG auxiliary; collapsed stationarity is claimed only at a joint fixed point; initial/emission/unary ledger ownership is explicit; initial dispatch eligibility is tied regime-independent x0/shared emission with equality-closure mapping; conditioned fixed drive is not a singular Gaussian and K1 bypasses D9.
+
+cff-e10u handoff: derive StructuredHybridPlan only for that documented topology, dispatch these coordinates through synchronous/scheduled host/JIT paths, persist the installed singleton/pair/Gaussian/lag state, and give D10 one energy owner that suppresses the replaced initial, emission, D3, D9, and internal separator terms. Retain D3/D9 for every ineligible graph. cff-6rav remains the owner of learning installation and persistence identity. No fit, adapter, control, NASCAR data, calibration seed, or final seed ran.
