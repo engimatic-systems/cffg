@@ -459,11 +459,13 @@ def component_learning_readouts(
     probability_tolerance = (
         64.0 * max(1, topology.cardinality) * np.finfo(dtype).eps
     )
+    # Cached moment identities use at most dimension-sized contractions. The
+    # PSD check additionally needs headroom for a dimension-sized eigensolve.
     moment_tolerance = (
-        4096.0
-        * max(1, dimension)
-        * np.finfo(dtype).eps
-        * gaussian_scale
+        64.0 * max(1, dimension) * np.finfo(dtype).eps * gaussian_scale
+    )
+    psd_tolerance = (
+        64.0 * max(1, dimension) ** 2 * np.finfo(dtype).eps * gaussian_scale
     )
     coordinate_ok = (
         singleton.shape == (len(topology.state_edges), topology.cardinality)
@@ -537,7 +539,7 @@ def component_learning_readouts(
             atol=moment_tolerance,
             rtol=0.0,
         )
-        and np.all(np.linalg.eigvalsh(covariance) >= -moment_tolerance)
+        and np.all(np.linalg.eigvalsh(covariance) >= -psd_tolerance)
     )
     if not runtime_ok or not coordinate_ok:
         raise ValueError(
