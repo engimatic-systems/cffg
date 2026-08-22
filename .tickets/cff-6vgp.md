@@ -1,6 +1,6 @@
 ---
 id: cff-6vgp
-status: in_progress
+status: closed
 deps: [cff-yr0d]
 links: []
 created: 2026-08-22T15:57:07Z
@@ -88,3 +88,7 @@ except for regression checks that production dispatch did not change.
 Duplicated surfaces: source/out roles, pair/messages/energy, fixed/uncertain
 drives, float32/x64, exact-zero/dense support, and host/JAX calculations must
 agree.
+
+**2026-08-22T16:15:50Z**
+
+Implemented in CFFG commit e3a94cb. Public authority is re-exported from cffg.recurrence: structured_pair_potential -> StructuredPairPotential(log_potential, omega, proper); structured_pair_belief -> StructuredPairBelief(to_out, to_in, probability, source_probability, destination_probability, proper); structured_gaussian_message -> StructuredGaussianMessage(eta, precision, exposure, signed_success, proper); structured_pair_energy; structured_separator_energy; and structured_node_energy. Inputs use source rows and destination columns. Shape failures raise exact ValueError boundaries documented in the public docstrings. Under jit/vmap, numeric failures return proper=False with NaN result arrays; energy failures return +inf. Literal -inf categorical support stays exact zero. Production engine/compiler dispatch remains unchanged; cff-fbmr should wire these authorities without recreating singleton products. Validation: 52 focused tests passed across the new rule/oracle/current recurrence suites in 61.71s, including K2/K3 fixed-drive enumeration, uncertain-drive JJ direction, pair marginal consistency, pair-derived Gaussian masses, separator/-logZ energy, exact zero/empty/improper/nonfinite/f32/K8, jit/vmap, and the existing recurrence P-substitution rejection.
