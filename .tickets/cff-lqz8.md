@@ -1,6 +1,6 @@
 ---
 id: cff-lqz8
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-22T14:26:39Z
@@ -104,3 +104,7 @@ Legend: prerequisite --> dependent
 [ ] cff-95ck terminal coordinate (ready) -----+               |
                                                               +--> [ ] fresh extension run
 ```
+
+**2026-08-22T14:46:01Z**
+
+Completed passing discriminator. Experiment commits 5c1e8cb and ec2d7bc add and preserve a replay-valid truth-clamped recurrence oracle. On authorized heterogeneous development seed5000, the unchanged PG/JJ recurrence coordinate converged in 131 of 160 maps and passed the 0.150 functional ceilings: worst-source RMSE 0.033226 and worst contrast RMSE 0.038553. Independent NumPy reproduction matched exposure/linear statistics exactly and precision, eta, omega, and posterior means within 4.17e-16 to 3.22e-15. This falsifies finite-data design, identifiability, prior mapping, and recurrence-update algebra as the common failure under exact latent beliefs. The next owner is a separate soft-statistic clamping-ladder ticket; no fit, chain, adapter, control, calibration seed, or final seed ran.
