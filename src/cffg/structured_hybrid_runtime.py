@@ -448,18 +448,22 @@ def component_learning_readouts(
     lag_second = np.asarray(gaussian.lag_second_moment)
     dtype = np.result_type(singleton, mean)
     dimension = topology.dimension
-    scale = max(
+    gaussian_scale = max(
         1.0,
         *(float(np.max(np.abs(value), initial=0.0)) for value in (
-            singleton, pair, mean, covariance, lag_covariance, second,
-            lag_second,
+            mean, covariance, lag_covariance, second, lag_second,
         )),
     )
-    tolerance = (
+    # Probability normalization error grows with categorical additions, never
+    # with the unrelated scale of continuous moments.
+    probability_tolerance = (
+        64.0 * max(1, topology.cardinality) * np.finfo(dtype).eps
+    )
+    moment_tolerance = (
         4096.0
-        * max(topology.cardinality, dimension)
+        * max(1, dimension)
         * np.finfo(dtype).eps
-        * scale
+        * gaussian_scale
     )
     coordinate_ok = (
         singleton.shape == (len(topology.state_edges), topology.cardinality)
@@ -492,36 +496,48 @@ def component_learning_readouts(
         and np.all(singleton >= 0.0)
         and np.all(pair >= 0.0)
         and np.allclose(
-            singleton.sum(axis=1), 1.0, atol=tolerance, rtol=0.0
+            singleton.sum(axis=1),
+            1.0,
+            atol=probability_tolerance,
+            rtol=0.0,
         )
         and np.allclose(
-            pair.sum(axis=(1, 2)), 1.0, atol=tolerance, rtol=0.0
+            pair.sum(axis=(1, 2)),
+            1.0,
+            atol=probability_tolerance,
+            rtol=0.0,
         )
         and np.allclose(
-            pair.sum(axis=2), singleton[:-1], atol=tolerance, rtol=0.0
+            pair.sum(axis=2),
+            singleton[:-1],
+            atol=probability_tolerance,
+            rtol=0.0,
         )
         and np.allclose(
-            pair.sum(axis=1), singleton[1:], atol=tolerance, rtol=0.0
+            pair.sum(axis=1),
+            singleton[1:],
+            atol=probability_tolerance,
+            rtol=0.0,
         )
         and np.allclose(
             covariance,
             covariance.swapaxes(1, 2),
-            atol=tolerance,
+            atol=moment_tolerance,
             rtol=0.0,
         )
         and np.allclose(
             second,
             covariance + np.einsum("ti,tj->tij", mean, mean),
-            atol=tolerance,
+            atol=moment_tolerance,
             rtol=0.0,
         )
         and np.allclose(
             lag_second,
             lag_covariance + np.einsum("ti,tj->tij", mean[1:], mean[:-1]),
-            atol=tolerance,
+            atol=moment_tolerance,
             rtol=0.0,
         )
-        and np.all(np.linalg.eigvalsh(covariance) >= -tolerance)
+        and np.all(np.linalg.eigvalsh(covariance) >= -moment_tolerance)
     )
     if not runtime_ok or not coordinate_ok:
         raise ValueError(

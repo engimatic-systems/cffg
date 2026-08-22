@@ -233,6 +233,20 @@ def test_d10_learning_rejects_inconsistent_or_nonfinite_installed_moments():
             engine.learning_readout(changed, "gaussian_node_stats")
 
 
+def test_float32_pair_consistency_is_independent_of_gaussian_moment_scale():
+    engine, result, _observations = _converged(np.float32)
+    plan = engine.arena.structured_hybrid_plans[0]
+    params = dict(result.state.params)
+    key = runtime_key(plan, "cat_pair")
+    params[key] = params[key].at[0, 0, 0].add(np.float32(1.0e-3))
+
+    with pytest.raises(ValueError, match="proper, consistent"):
+        engine.learning_readout(
+            _replace(result.state, params=params),
+            "gaussian_node_stats",
+        )
+
+
 def test_exact_zero_d10_source_and_component_mass_retains_prior_bits():
     engine, result, _observations = _converged()
     plan = engine.arena.structured_hybrid_plans[0]
