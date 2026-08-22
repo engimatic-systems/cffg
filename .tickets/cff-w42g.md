@@ -1,6 +1,6 @@
 ---
 id: cff-w42g
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-22T14:26:39Z
@@ -111,3 +111,7 @@ Legend: prerequisite --> dependent
                               |
                               +--> [ ] cff-nkbj parity epic
 ```
+
+**2026-08-22T14:51:12Z**
+
+Completed prospective schema correction. Experiment commits 2b9927c and 19cc1b4 add the version-2 family-qualified authority and a manifested old-versus-new projection without running data, fits, or chains. Classic authority is exactly the first four on-support variables; heterogeneous authority retains all six; raw and classic balanced-grid variables remain secondary. Thresholds remain R-hat at most 1.05 and ESS at least 50. Historical schema/version/digests/artifacts/decisions remain unchanged. Under the prospective thresholds, only classic prior-0.3 native passes the four authoritative variables; other classic tiers still have on-support failures, so family scoping alone does not repair mixing. Focused integration: 106 tests passed and projection replay validated.
