@@ -13,6 +13,7 @@ from cffg.colony import Colony
 from cffg.compiler import compile_template
 from cffg.engine import Engine, RunStatus, _replace
 from cffg.models.rslds import rslds
+from cffg.params import set_params
 from cffg.structured_hybrid_topology import classify_structured_hybrid
 
 
@@ -196,6 +197,20 @@ def test_flood_and_scheduled_dispatch_install_the_same_k2_coordinate():
         np.testing.assert_allclose(left[key], right[key], rtol=0, atol=0)
     assert float(left["objective"]) == flood_engine.bfe(flood.state)
     assert float(right["objective"]) == scheduled_engine.bfe(scheduled.state)
+
+
+def test_bfe_evaluates_the_installed_coordinate_under_current_parameters():
+    engine, result = _run("auto")
+    original = engine.bfe(result.state)
+    offsets = np.full((2, 1), 1.75)
+    params = set_params(
+        engine,
+        result.state.params,
+        {"switch1": {"offsets": offsets}},
+    )
+    changed = _replace(result.state, params=params)
+    assert np.isfinite(engine.bfe(changed))
+    assert engine.bfe(changed) != original
 
 
 def test_k3_readout_has_consistent_source_and_destination_axes():

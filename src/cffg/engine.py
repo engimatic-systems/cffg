@@ -4013,7 +4013,6 @@ def _ef_bfe(arena, ef_eta, ef_obs, ef_mask, params):
 def _make_bfe(arena: Arena):
     if arena.structured_hybrid_plans:
         plan = arena.structured_hybrid_plans[0]
-        objective_key = hybrid_runtime.runtime_key(plan, "objective")
         status_key = hybrid_runtime.runtime_key(plan, "status")
 
         def structured_bfe(
@@ -4027,9 +4026,11 @@ def _make_bfe(arena: Arena):
             ef_mask,
             params,
         ):
-            del messages, g_eta, g_lam, g_obs, g_mask
+            del messages, g_eta, g_lam
             del ef_eta, ef_obs, ef_mask
-            objective = params[objective_key]
+            objective = hybrid_runtime.component_objective(
+                arena, plan, g_obs, g_mask, params
+            )
             proper = (params[status_key] == SWEEP_FINITE) & jnp.isfinite(
                 objective
             )

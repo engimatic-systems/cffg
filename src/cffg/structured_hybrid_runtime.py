@@ -404,6 +404,21 @@ def component_step(arena: Arena, plan: StructuredHybridPlan, g_obs, g_mask, para
     )
 
 
+def component_objective(
+    arena: Arena,
+    plan: StructuredHybridPlan,
+    g_obs,
+    g_mask,
+    params,
+):
+    """Evaluate the installed coordinate under the current model and data."""
+    model, input_ok = component_model(arena, plan, g_obs, g_mask, params)
+    objective, belief_ok = structured_hybrid_evaluate(
+        unpack_belief(params, plan), model
+    )
+    return jnp.where(input_ok & belief_ok, objective, jnp.inf)
+
+
 def make_step(arena: Arena):
     if len(arena.structured_hybrid_plans) != 1:
         raise ValueError("D10 runtime requires exactly one whole-template component")
@@ -417,6 +432,7 @@ def make_step(arena: Arena):
 
 __all__ = [
     "component_model",
+    "component_objective",
     "component_step",
     "initialize_runtime",
     "make_step",
