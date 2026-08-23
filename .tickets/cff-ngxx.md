@@ -1,7 +1,7 @@
 ---
 id: cff-ngxx
 status: in_progress
-deps: [cff-xwtz, cff-6rav]
+deps: [cff-xwtz, cff-6rav, cff-xq4y]
 links: []
 created: 2026-08-22T19:52:31Z
 type: bug
