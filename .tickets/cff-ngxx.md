@@ -99,3 +99,7 @@ Legend: prerequisite --> dependent
                                                       +--> [ ] cff-h0hx requalification
 
 cff-ngxx now depends on cff-6rav and remains in_progress. Resume here only after the three implementation tickets land; then run the already registered development pilot and stop on the first status/cap failure.
+
+**2026-08-23T00:26:28Z**
+
+Core D10 authority, dispatch, four-family learning, fit coherence, and schema-v2 persistence are integrated through active CFFG commit 4b9f9e3. The remaining acceptance gate is a fresh prospective seed-5000/native D10 pilot under the unchanged 0.150 caps. The experiment must pin that integrated descendant, require exact four-family D10 dispatch and schema-v2 topology/observation/statistic identities before generation, use damp=0 and D10 work semantics, and reject every D9 checkpoint rather than importing or relabeling it.
