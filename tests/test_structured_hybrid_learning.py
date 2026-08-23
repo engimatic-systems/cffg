@@ -426,6 +426,8 @@ def test_d10_retry_boundary_rejects_damping_and_install_rebuilds_coordinate():
     installed = learning.install(engine, fresh)
     plan = engine.arena.structured_hybrid_plans[0]
     assert int(installed.params[runtime_key(plan, "status")]) == 0
+    with pytest.raises(ValueError, match="fresh inference state"):
+        learning.install(engine, result.state)
     with pytest.raises(ValueError, match="do not accept damping"):
         engine.run(installed, 1, damp=0.5)
     exhausted = engine.run(installed, 0, tol=1e-8)

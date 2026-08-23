@@ -387,7 +387,7 @@ class RSLDSLearning:
     def install(self, engine: Engine, state: State) -> State:
         """Install rollover values into a fresh state without recompilation."""
         fresh = engine.init_state()
-        if any(
+        legacy_changed = any(
             not np.array_equal(
                 np.asarray(value),
                 np.asarray(expected, dtype=np.asarray(value).dtype),
@@ -398,7 +398,30 @@ class RSLDSLearning:
                 (state.g_lam, fresh.g_lam),
                 (state.ef_eta, fresh.ef_eta),
             )
-        ):
+        )
+        structured_fresh = engine.reset_structured_hybrid(state)
+
+        def matches_fresh(value, expected):
+            actual = np.asarray(value)
+            reference = np.asarray(expected, dtype=actual.dtype)
+            if not np.issubdtype(actual.dtype, np.inexact):
+                return np.array_equal(actual, reference)
+            # A caller may cast a reset coordinate; accept only local rounding.
+            tolerance = 128.0 * np.finfo(actual.dtype).eps
+            return np.allclose(
+                actual,
+                reference,
+                atol=tolerance,
+                rtol=tolerance,
+            )
+
+        structured_changed = any(
+            not matches_fresh(state.params[key], structured_fresh.params[key])
+            for plan in engine.arena.structured_hybrid_plans
+            for key in state.params
+            if key.startswith(f"d10:{plan.name}:")
+        )
+        if legacy_changed or structured_changed:
             raise ValueError(
                 "rSLDS learning parameters require a fresh inference state"
             )
