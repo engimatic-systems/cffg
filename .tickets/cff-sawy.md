@@ -1,6 +1,6 @@
 ---
 id: cff-sawy
-status: in_progress
+status: closed
 deps: [cff-x3a8]
 links: []
 created: 2026-08-24T13:53:16Z
@@ -120,3 +120,9 @@ Legend: prerequisite --> dependent
                               |
                               +--> [ ] cff-3v7q classic decision
 ```
+
+## Notes
+
+**2026-08-24T15:31:35Z**
+
+Implemented and independently cleared the fail-closed D10 proposal gate. The caller supplies every numerical Foster setting; mode metrics use the documented deterministic identity specialization. A K=5,d=2 oracle proves recurrence-aware usefulness: the common arbitrary-switching certificate is violated while the identity-metric recurrence certificate is satisfied. The fitter stages the exact destination-runtime dtype and natural-parameter semantics before residuals, hashing, certification, and commit. Rejected proposals preserve the installed coordinate, retain evaluated/rejected work separately, and never enter accepted residual hits. Initial rejection reports inner_status=None because no solve ran. Canonical evidence rejects type/signed-zero/D8-D9/topology/point/policy tampering. RSLDSFitResult now exposes a defensively copied complete four-family learning_checkpoint after first acceptance; restore_stability_gated_learning reconstructs its runtime point and requires matching accepted evidence before exposing a pending state. Generic persistence remains ungated. Independent Nash and Rawls reviews both cleared exact code HEAD 09891ae. Focused affected tests: 67 passed, 1 deselected in 152.09s; changed-edge public restore tests: 3 passed. Final not-slow suite at exact code HEAD 09891ae: 1563 passed, 40 deselected, 5 warnings in 762.09s pytest / 770.473s dashboard wall; recorded by c080424. No NASCAR, experiment, adapter, control, calibration, or final-seed execution occurred. Downstream cff-i4o0 may now register the prospective development cohort; certificate failure remains evidence that this sufficient gate is conservative, not proof of model instability.
