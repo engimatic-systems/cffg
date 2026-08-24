@@ -478,6 +478,29 @@ fusion and device-loop work remain cff-yl0a and cff-wbhu. The 10,000-step
 timing and direct-memory cases stay in the external experiment, not the default
 test suite.
 
+**S1k. Joint switching stability is certifiable only on a conservative
+boundary.** `cffg.switching_stability` can prove a global second-moment Foster
+bound when every noncontractive destination is exponentially suppressed on
+every closed coordinate orthant and a bounded interval cover handles the
+compact interior. The proof is recurrence-aware and retains some systems that
+an arbitrary-switching common quadratic rejects. It is still conservative:
+coordinate orthants can miss stabilizing geometry that needs a finer
+polyhedral cone partition, and the interval compact bound can be very loose.
+Failure is `violated` evidence for this sufficient certificate, not proof that
+the rSLDS is unstable. Exceeding the declared cone or compact-box ceilings is
+`infeasible`, not a weakened computation.
+
+A finite or posterior-weighted drift grid remains descriptive only. It cannot
+control behavior outside its points and cannot be promoted to a global
+certificate. The current code exposes no production constraint, projection,
+prior, objective term, or rollout claim from the new authority. The selected
+future operation is a hard gate on the undamped outer proposal: it preserves
+the rSLDS probability family and fixed-point D10 free energy at accepted
+points, but changes the learning algorithm by rejecting an unconstrained
+conjugate update. Until a separate reviewed consumer owns that atomic
+pre-install and persistence boundary, the verifier does not make learned fits
+more stable and does not repair the outstanding classic periodicity evidence.
+
 **S1j. Schedules: measured envelope (cff-d56d, revised 2026-07-27 after
 review).** Two-pass schedules make tree and chain inference O(E) with
 exact marginals and FE; loopy pure BP gets colored Gauss–Seidel sweeps;

@@ -71,6 +71,7 @@ and review context proportional to the change.
 | New derived component coordinate | The focused component rule module and its complete objective in `DERIVATIONS.md`; serialized factors remain the model authority | Compiler topology classification and derived plan; `Arena` state ownership; synchronous `_make_step`; scheduled `_batch_stage_fn` / `_scan_stage_fn`; `_make_bfe` suppression and replacement; status, readouts, learning sources, executable identity, checkpoint restore, and model consumers | Independent component-coordinate and objective oracles; `tests/test_schedule.py`; contributing rule/readout tests; persistence and model-fit tests; sparse-support, float32, and uncomfortable-scale cases | Eligibility and ownership here; equations and bound in `DERIVATIONS.md`; public behavior in `README.md`; fallback and approximation boundary in `LIMITATIONS.md` |
 | Runtime numerical or status invariant | `AGENTS.md` numerical contract and `src/cffg/engine.py` (`RunStatus`, `RunResult`, `Engine.run`) | Flooding, colored/mixed, and exact schedules; host `_has_zero_support` and JIT `_make_support_check`; `_make_step`, `_make_exact_unit`, `_make_propagate`, and `_make_bfe`; inner-solver status; `RollingAgent`, `Colony`, estimator, benchmark, and dashboard consumers | `tests/test_runtime_status.py`, `tests/test_schedule.py`, `tests/test_colony.py`, plus the changed rule family's hostile-input tests | Runtime contract here and in `README.md`; any accepted failure mode or approximation in `LIMITATIONS.md` |
 | Learnable or checkpoint feature | `src/cffg/core/ir.py` (`LearnableSpec`, `AgentSpec`, `BeliefBinding`) and `src/cffg/learn.py` (`Family`, `Learnables`) | Validation, JSON/hash, plate scoping, compiler `_resolve_learnables`, `Arena.learn_plans`, `member_of`, engine readouts and parameter writes, agent cadence, checkpoint encode/decode and legacy migration, and bundles | `tests/test_learnables.py`, `tests/test_agent_spec.py`, `tests/test_agent.py`, and `tests/test_bundle.py`; add the contributing factor family's statistic test | Conjugate contract here; statistics beyond the papers in `DERIVATIONS.md`; public cadence/checkpoint API in `README.md`; remaining family gaps in `LIMITATIONS.md` |
+| Pure point-parameter verifier | Its focused pure module and complete derivation | Public export, host consumers, local dtype/status guards, and any future pre-install gate; compiler, engine scheduling, BFE ownership, and persistence are N/A until a consumer is explicitly wired | Independent algebra/proof falsifiers plus sparse, float32, non-finite, and uncomfortable-scale cases | Claim hierarchy and proof in `DERIVATIONS.md`; ownership and non-integration here; conservative or unsupported cases in `LIMITATIONS.md` |
 
 Duplicated execution surfaces are deliberate review pairs: host/JIT,
 flooding/scheduled, single-instance/`vmap`, and current/legacy checkpoint
@@ -445,6 +446,27 @@ No shared fitting framework is introduced on that last row merely from one
 client. Ordinary non-switching Gaussian models already prove the shared
 declared-learning operations directly; they do not yet prove rSLDS phase or
 retry policy as a reusable abstraction.
+
+`cffg.switching_stability` is a pure host-side point-parameter authority, not
+an inference component. It owns the exact source-row/destination-column
+quadratic drift, the arbitrary-switching common-quadratic baseline, and the
+recurrence-aware global certificate derived in D11. The global certificate
+covers all closed coordinate orthants, treating every gate-tie face
+conservatively, and a deterministic interval subdivision of the compact
+interior. Its evidence separates `satisfied`, `violated`, `infeasible`, and
+`diverged`. A separate finite-probe result is explicitly descriptive and
+cannot substitute for the global certificate.
+
+The selected future integration boundary is a hard outer gate on an undamped
+four-family point proposal before installation. That gate has no D10 objective
+or BFE contribution: accepted point parameters retain the same rSLDS family,
+D10 fixed point, and D10 free-energy semantics. Rejection changes the outer
+learning operation by withholding its unconstrained conjugate proposal. This
+repository currently exposes only the pure verifier; no `Engine` state,
+schedule, `Learnables.write`, `RSLDSLearning.install`, `fit_rslds` status,
+checkpoint schema, or experiment consumer owns the gate or persists its
+evidence. Those derived surfaces are deliberately N/A until a reviewed
+consumer ticket makes the pre-install boundary atomic.
 
 ### 2e. Executable factor registration (`cffg.kernels`, cff-ri8m)
 

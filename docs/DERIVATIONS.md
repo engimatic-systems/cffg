@@ -2323,3 +2323,144 @@ and K=3 path enumeration, the K=3/D=2 noncommuting dense Gaussian oracle,
 lag orientation, fixed-drive D9, K=1, and JIT. The second checks every expanded
 sweep boundary, the conservative integrated bound, shared learning
 statistics, literal zeros, float32, invalid inputs, and K=8/T=100 storage.
+
+## D11. Joint recurrence-and-dynamics stability
+
+### D11.1 Plain-English contract and exact drift
+
+A stable dynamics matrix is not by itself a stability argument for a switching
+system. Switching can amplify two individually stable matrices, and an
+unstable destination can still be harmless if the recurrent gate suppresses
+it rapidly enough in every tail direction. The authority must therefore read
+the recurrence and dynamics point parameters together.
+
+Let recurrence row `i` mean source regime, let destination `j` select affine
+dynamics `(A_j,b_j,Q_j)`, and let
+
+    V_i(x) = x^T P_i x,              P_i positive definite.
+
+For one declared state and source, the exact identity is
+
+    E[V_z'(x') | x,z=i]
+      = sum_j p_ij(x) [(A_j x+b_j)^T P_j (A_j x+b_j)
+                       + tr(P_j Q_j)],                    (D11.1)
+
+    Delta_i(x) = E[V_z'(x') | x,z=i] - V_i(x).           (D11.2)
+
+The trace and affine terms are part of the identity, not later corrections.
+`one_step_quadratic_drift` implements (D11.1)--(D11.2), and the dense K=2/K=3
+loop oracle in `tests/test_switching_stability.py` independently evaluates
+every destination term. A finite probe may report
+`Delta_i(x)+lambda V_i(x)-C`, but that is only descriptive evidence.
+
+### D11.2 Common-quadratic baseline
+
+For one common `P`, define
+
+    alpha_j = ||P^(1/2) A_j P^(-1/2)||_2^2.
+
+If `alpha=max_j alpha_j<1`, choose `lambda=sqrt(alpha)` (or zero when
+`alpha=0`). Young's inequality gives, for every switching sequence,
+
+    E[V(x') | x,j] <= lambda V(x) + beta_j,                (D11.3)
+
+where for `alpha_j>0`
+
+    eta_j = lambda/alpha_j - 1,
+    beta_j = (1+1/eta_j) b_j^T P b_j + tr(P Q_j),
+
+and the zero-contraction case uses `beta_j=b_j^T P b_j+tr(PQ_j)`. Thus
+`beta=max_j beta_j` and `beta/(1-lambda)` bound the second moment. This is a
+real sufficient certificate under arbitrary switching.
+
+It is rejected as the selected intervention because it discards the recurrent
+law. The executable shear falsifier has two matrices with spectral radius
+`0.5` but an alternating product with spectral radius above one. Conversely,
+the K=3 scalar falsifier contains an `A_3=1.2` destination whose recurrence
+probability decays in both tails; the common test rejects it while D11.3
+certifies the joint system.
+
+### D11.3 Recurrence-aware global certificate
+
+The selected verifier proves a Foster inequality
+
+    E[V_z'(x') | x,z=i] <= lambda V_i(x) + C,  0<lambda<1, (D11.4)
+
+over a compact cover and every tail direction. It does not infer a proof from
+a grid.
+
+For each closed coordinate orthant `s in {-1,+1}^d`, write
+`x=s elementwise*y`, `y>=0`, and `r=||x||_1`. A stick event with affine logit
+`g_il(x)=R_il x+r_il` supplies an exponential destination bound when either
+
+    destination j's accept event:  s elementwise R_ij <= -a 1,
+        p_ij(x) <= exp(r_ij-a r),
+
+or one earlier reject event `l<j` satisfies
+
+    s elementwise R_il >= a 1,
+        p_ij(x) <= exp(-r_il-a r),                         (D11.5)
+
+for some dtype-resolved `a>0`. Requiring every signed coefficient to have the
+strict sign makes (D11.5) valid on coordinate faces too; a gate tie is never
+silently called suppression.
+
+For source `i` and a destination not using (D11.5), the verifier requires
+
+    A_j^T P_j A_j <= alpha_ij P_i,   alpha_ij < lambda.    (D11.6)
+
+Young's inequality absorbs its affine cross term into a finite constant.
+For a suppressed destination, spectral and eigenvalue bounds give
+
+    (A_jx+b_j)^T P_j(A_jx+b_j)+tr(P_jQ_j)
+        <= q2_j r^2 + q1_j r + q0_j.                       (D11.7)
+
+Each nonnegative monomial of (D11.7) is bounded separately under
+`min(1,exp(c-a r))` on `r>=R`. Its maximum occurs at the radius, the
+exponential crossover, or `r=n/a` for power `n`; summing those monomial bounds
+is conservative for the polynomial. Summing the suppressed-mode bounds with
+the largest unsuppressed affine bound proves (D11.4) on that source/orthant
+tail. All `2^d` closed orthants are required.
+
+The remaining `[-R,R]^d` box contains the `L1` ball missed by the tails. A
+declared axis-aligned subdivision uses interval logit bounds, stick-event
+probability upper bounds, affine image intervals, and a destination
+eigenvalue bound to produce a finite upper bound on (D11.1). Ignoring the
+nonpositive `-lambda V_i` term is conservative. The compact boxes and closed
+orthant tails cover all states, so their maximum additive bound proves
+(D11.4). Subdivision can tighten `C`; it cannot turn an uncovered tail into a
+certificate.
+
+`recurrence_stability_certificate` owns this proof. It returns `satisfied`,
+`violated`, `infeasible`, or `diverged`, plus the orthants, mode contractions,
+suppressed destinations, decay witnesses, tail bounds, compact bound, and box
+count. It also returns `C/(1-lambda)`, the implied bound in the declared
+Lyapunov scale. `evaluate_recurrence_drift` is a separately labelled
+`descriptive_finite_probe` view of the exact identity and a declared `(lambda,
+C)`; its score never promotes a global claim.
+
+### D11.4 Selected intervention and ownership
+
+The selected future intervention is an **outer hard acceptance gate** on the
+undamped proposed point parameters. A proposal is installable only when the
+global recurrence-aware certificate is `satisfied`. `violated` rejects the
+proposal; `infeasible` and `diverged` fail the outer operation loudly. The
+gate never certifies a damped point in place of the undamped map and has no
+hidden objective contribution.
+
+This operation preserves the rSLDS probability family and does not alter the
+D10 inner coordinate, fixed point, or free-energy value at a fixed accepted
+point. It does change the outer learning algorithm: the unconstrained
+conjugate proposal is conditionally rejected. No production parameter writer,
+fit status, checkpoint, or persistence schema implements that gate in this
+ticket. A future consumer must own the pre-install check and record the
+certificate settings and evidence beside the attempted coordinate.
+
+The authority is pure and truth-free: it reads point parameters, Lyapunov
+matrices, `lambda`, `R`, subdivision count, and a declared tail-cone ceiling.
+It never reads inferred or generating paths, labels, rollouts, or experiment
+outcomes. K=2/K=3 exact identities, affine/noise terms, both candidate
+falsifiers, literal zeros, empty support, non-finite/improper inputs, true
+float32 near-unit separation, K=8, a hundred compact boxes, JIT-compatible
+probe algebra, and a probe-score derivative are executable in
+`tests/test_switching_stability.py`.
