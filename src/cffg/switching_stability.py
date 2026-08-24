@@ -2,9 +2,9 @@
 
 Rows of a recurrence block are source regimes.  Columns of every returned
 transition table are destination regimes, and destination ``j`` selects
-``(A[j], b[j], Q[j])``.  Finite-probe evidence is deliberately not a global
-stability certificate; :func:`common_quadratic_certificate` owns that stronger,
-more conservative claim.
+``(A[j], b[j], Q[j])``. Finite-probe evidence is not a global certificate;
+the common-quadratic and recurrence-aware authorities own distinct sufficient
+global claims.
 """
 
 from __future__ import annotations
@@ -50,7 +50,7 @@ class CommonQuadraticEvidence:
     proof_tolerance: float | None = None
     foster_rate: float | None = None
     additive_bound: float | None = None
-    moment_bound: float | None = None
+    asymptotic_lyapunov_envelope: float | None = None
 
 
 @dataclass(frozen=True)
@@ -86,7 +86,7 @@ class RecurrenceCertificateEvidence:
     tail_additive_bound: np.ndarray | None = None
     compact_additive_bound: float | None = None
     additive_bound: float | None = None
-    lyapunov_moment_bound: float | None = None
+    asymptotic_lyapunov_envelope: float | None = None
     compact_box_count: int | None = None
 
 
@@ -205,7 +205,9 @@ def recurrence_drift_residuals(
         dynamics_covariance,
         lyapunov_matrix,
     )
-    residual = drift + jnp.asarray(foster_rate, states.dtype) * current
+    residual = drift + (
+        1.0 - jnp.asarray(foster_rate, states.dtype)
+    ) * current
     residual = residual - jnp.asarray(additive_bound, states.dtype)
     return probability, current, expected, drift, residual
 
@@ -261,6 +263,61 @@ def _dtype_tolerance(dtype: np.dtype[Any], *values: Any, count: int) -> float:
     if not np.isfinite(tolerance):
         raise ValueError("stability tolerance is not finite")
     return tolerance
+
+
+def _proof_guard(
+    dtype: np.dtype[Any],
+    *,
+    count: int,
+    scale: Any,
+) -> np.ndarray:
+    declared = np.dtype(dtype)
+    scale_array = np.asarray(scale, dtype=np.float64)
+    return (
+        64.0
+        * max(1, count)
+        * float(np.finfo(declared).eps)
+        * np.maximum(1.0, np.abs(scale_array))
+    )
+
+
+def _outward_upper(
+    value: Any,
+    dtype: np.dtype[Any],
+    *,
+    count: int,
+    scale: Any | None = None,
+) -> np.ndarray:
+    upper = np.asarray(value, dtype=np.float64)
+    local_scale = np.abs(upper) if scale is None else scale
+    guarded = upper + _proof_guard(dtype, count=count, scale=local_scale)
+    return np.nextafter(guarded, np.inf)
+
+
+def _outward_positive_difference_lower(
+    left: float,
+    right: float,
+    dtype: np.dtype[Any],
+) -> float:
+    guard = float(
+        _proof_guard(dtype, count=2, scale=abs(left) + abs(right))
+    )
+    return float(np.nextafter(left - right - guard, -np.inf))
+
+
+def _covariance_upper(covariance: np.ndarray) -> np.ndarray:
+    dimension = covariance.shape[-1]
+    upper = covariance.astype(np.float64).copy()
+    for index in range(covariance.shape[0]):
+        guard = float(
+            _proof_guard(
+                covariance.dtype,
+                count=dimension**3,
+                scale=np.sum(np.abs(upper[index])),
+            )
+        )
+        upper[index] = upper[index] + guard * np.eye(dimension)
+    return upper
 
 
 def _invalid_status(arrays: tuple[np.ndarray, ...]) -> tuple[StabilityStatus, str] | None:
@@ -325,6 +382,11 @@ def _validate_model(
                 )
     except ValueError as error:
         return None, (StabilityStatus.INFEASIBLE, str(error))
+    except np.linalg.LinAlgError as error:
+        return None, (
+            StabilityStatus.DIVERGED,
+            "matrix validation failed: " + str(error),
+        )
     arrays = (matrix, offset, covariance_symmetric, metric_symmetric)
     return arrays, None
 
@@ -382,11 +444,20 @@ def evaluate_one_step_drift(
             StabilityStatus.INFEASIBLE,
             "transition support is empty or probability is improper",
         )
-    values = tuple(
-        np.asarray(value)
-        for value in one_step_quadratic_drift(
-            state, source, probability, matrix, offset, covariance, metric
-        )
+    destination_mean = np.einsum("kde,ne->nkd", matrix, state)
+    destination_mean = destination_mean + offset[None, :, :]
+    destination_value = np.einsum(
+        "nkd,kde,nke->nk", destination_mean, metric, destination_mean
+    ) + np.einsum("kde,ked->k", metric, covariance)[None, :]
+    current_value = np.einsum(
+        "nd,nde,ne->n", state, metric[source], state
+    )
+    expected_next_value = np.sum(probability * destination_value, axis=-1)
+    values = (
+        current_value,
+        destination_value,
+        expected_next_value,
+        expected_next_value - current_value,
     )
     invalid = _invalid_status(values)
     if invalid is not None:
@@ -418,15 +489,15 @@ def common_quadratic_certificate(
     if error is not None:
         return CommonQuadraticEvidence(*error)
     matrix, offset, covariance, metric = model
+    covariance_upper = _covariance_upper(covariance)
     common = metric[0]
-    root = np.linalg.cholesky(common)
-    transformed = np.stack(
-        [
-            np.linalg.solve(root, (root.T @ value).T).T
-            for value in matrix
-        ]
-    )
-    contraction = np.square(np.linalg.svd(transformed, compute_uv=False)[:, 0])
+    try:
+        contraction = _mode_contractions(matrix, metric)[0]
+    except np.linalg.LinAlgError as exception:
+        return CommonQuadraticEvidence(
+            StabilityStatus.DIVERGED,
+            "common contraction decomposition failed: " + str(exception),
+        )
     maximum = float(np.max(contraction))
     try:
         tolerance = _dtype_tolerance(
@@ -446,14 +517,91 @@ def common_quadratic_certificate(
         foster_rate = 0.0
         offset_multiplier = 1.0
     else:
-        foster_rate = float(np.sqrt(maximum))
-        young_factor = foster_rate / maximum - 1.0
-        offset_multiplier = 1.0 + 1.0 / young_factor
-    offset_energy = np.einsum("kd,de,ke->k", offset, common, offset)
-    noise_energy = np.einsum("de,ked->k", common, covariance)
-    additive = float(np.max(offset_multiplier * offset_energy + noise_energy))
-    moment_bound = additive / (1.0 - foster_rate)
-    if not np.all(np.isfinite((foster_rate, additive, moment_bound))):
+        foster_rate = float(
+            _outward_upper(
+                np.sqrt(maximum),
+                matrix.dtype,
+                count=matrix.shape[-1],
+                scale=maximum,
+            )
+        )
+        if foster_rate >= 1.0:
+            return CommonQuadraticEvidence(
+                StabilityStatus.VIOLATED,
+                "outward-rounded common contraction has no strict rate below one",
+                contraction,
+                maximum,
+                tolerance,
+            )
+        contraction_gap = _outward_positive_difference_lower(
+            foster_rate, maximum, matrix.dtype
+        )
+        if contraction_gap <= 0.0:
+            return CommonQuadraticEvidence(
+                StabilityStatus.VIOLATED,
+                "outward-rounded common contraction has no positive Young gap",
+                contraction,
+                maximum,
+                tolerance,
+            )
+        offset_multiplier = float(
+            _outward_upper(
+                foster_rate / contraction_gap,
+                matrix.dtype,
+                count=2,
+                scale=foster_rate / contraction_gap,
+            )
+        )
+    proof_offset = offset.astype(np.float64)
+    proof_common = common.astype(np.float64)
+    proof_covariance = covariance_upper
+    offset_terms = np.einsum(
+        "kd,de,ke->k", proof_offset, proof_common, proof_offset
+    )
+    noise_terms = np.einsum("de,ked->k", proof_common, proof_covariance)
+    additive_terms = offset_multiplier * offset_terms + noise_terms
+    additive_scale = (
+        abs(offset_multiplier)
+        * np.einsum(
+            "kd,de,ke->k",
+            np.abs(proof_offset),
+            np.abs(proof_common),
+            np.abs(proof_offset),
+        )
+        + np.einsum("de,ked->k", np.abs(proof_common), np.abs(proof_covariance))
+    )
+    additive = float(
+        np.max(
+            _outward_upper(
+                additive_terms,
+                matrix.dtype,
+                count=matrix.shape[-1] ** 3,
+                scale=additive_scale,
+            )
+        )
+    )
+    envelope_denominator = _outward_positive_difference_lower(
+        1.0, foster_rate, matrix.dtype
+    )
+    if envelope_denominator <= 0.0:
+        return CommonQuadraticEvidence(
+            StabilityStatus.VIOLATED,
+            "outward-rounded rate has no positive asymptotic denominator",
+            contraction,
+            maximum,
+            tolerance,
+            foster_rate,
+            additive,
+        )
+    asymptotic_envelope = float(
+        _outward_upper(
+            additive / envelope_denominator,
+            matrix.dtype,
+            count=2,
+            scale=additive / envelope_denominator,
+        )
+    )
+    if not np.all(np.isfinite((foster_rate, additive, asymptotic_envelope))):
         return CommonQuadraticEvidence(
             StabilityStatus.DIVERGED, "common Foster bound is non-finite"
         )
@@ -465,7 +613,7 @@ def common_quadratic_certificate(
         tolerance,
         foster_rate,
         additive,
-        moment_bound,
+        asymptotic_envelope,
     )
 
 
@@ -474,215 +622,33 @@ def _mode_contractions(
     lyapunov_matrix: np.ndarray,
 ) -> np.ndarray:
     regimes = dynamics_matrix.shape[0]
-    roots = np.linalg.cholesky(lyapunov_matrix)
-    contraction = np.empty((regimes, regimes), dtype=dynamics_matrix.dtype)
+    declared_dtype = dynamics_matrix.dtype
+    proof_matrix = dynamics_matrix.astype(np.float64)
+    proof_metric = lyapunov_matrix.astype(np.float64)
+    roots = np.linalg.cholesky(proof_metric)
+    contraction = np.empty((regimes, regimes), dtype=np.float64)
     for source in range(regimes):
         for destination in range(regimes):
-            numerator = roots[destination].T @ dynamics_matrix[destination]
+            numerator = roots[destination].T @ proof_matrix[destination]
             transformed = np.linalg.solve(roots[source], numerator.T).T
             singular = np.linalg.svd(transformed, compute_uv=False)[0]
-            contraction[source, destination] = singular * singular
+            raw = singular * singular
+            condition = float(np.linalg.cond(roots[source]))
+            scale = (
+                float(np.sum(np.abs(transformed))) ** 2
+                * max(1.0, condition)
+            )
+            contraction[source, destination] = (
+                0.0
+                if np.all(transformed == 0.0)
+                else _outward_upper(
+                    raw,
+                    declared_dtype,
+                    count=dynamics_matrix.shape[-1] ** 3,
+                    scale=scale,
+                )
+            )
     return contraction
-
-
-def _orthant_signs(dimension: int, dtype: np.dtype[Any]) -> np.ndarray:
-    count = 1 << dimension
-    bits = np.arange(count, dtype=np.uint64)[:, None]
-    axes = np.arange(dimension, dtype=np.uint64)[None, :]
-    positive = ((bits >> axes) & 1).astype(bool)
-    return np.where(positive, 1.0, -1.0).astype(dtype)
-
-
-def _suppression_events(
-    destination: int,
-    signed_weight: np.ndarray,
-    recurrence_offset: np.ndarray,
-    tolerance: float,
-) -> tuple[tuple[float, float], ...]:
-    events: list[tuple[float, float]] = []
-    if destination < signed_weight.shape[0]:
-        accept = signed_weight[destination]
-        rate = float(np.min(-accept))
-        if rate > tolerance:
-            events.append((rate, float(recurrence_offset[destination])))
-    for gate in range(destination):
-        reject = signed_weight[gate]
-        rate = float(np.min(reject))
-        if rate > tolerance:
-            events.append((rate, float(-recurrence_offset[gate])))
-    return tuple(events)
-
-
-def _exponential_polynomial_supremum(
-    intercept: float,
-    decay_rate: float,
-    radius: float,
-    coefficients: tuple[float, float, float],
-) -> float:
-    quadratic, linear, constant = coefficients
-    transition = intercept / decay_rate
-
-    def monomial(power: int) -> float:
-        saturated = transition**power if transition >= radius else 0.0
-        exponential_start = max(radius, transition)
-        stationary = 0.0 if power == 0 else power / decay_rate
-        point = max(exponential_start, stationary)
-        exponent = min(0.0, intercept - decay_rate * point)
-        exponential = np.exp(exponent) * point**power
-        return max(float(saturated), float(exponential))
-
-    return quadratic * monomial(2) + linear * monomial(1) + constant * monomial(0)
-
-
-def _destination_polynomial_bounds(
-    dynamics_matrix: np.ndarray,
-    dynamics_offset: np.ndarray,
-    dynamics_covariance: np.ndarray,
-    lyapunov_matrix: np.ndarray,
-) -> np.ndarray:
-    regimes = dynamics_matrix.shape[0]
-    coefficients = np.empty((regimes, 3), dtype=np.float64)
-    for destination in range(regimes):
-        metric_maximum = float(np.max(np.linalg.eigvalsh(lyapunov_matrix[destination])))
-        matrix_norm = float(np.linalg.svd(dynamics_matrix[destination], compute_uv=False)[0])
-        offset_norm = float(np.linalg.norm(dynamics_offset[destination]))
-        noise = float(
-            np.trace(lyapunov_matrix[destination] @ dynamics_covariance[destination])
-        )
-        coefficients[destination] = (
-            metric_maximum * matrix_norm**2,
-            2.0 * metric_maximum * matrix_norm * offset_norm,
-            metric_maximum * offset_norm**2 + noise,
-        )
-    return coefficients
-
-
-def _safe_mode_additive_bounds(
-    contraction: np.ndarray,
-    foster_rate: float,
-    dynamics_offset: np.ndarray,
-    dynamics_covariance: np.ndarray,
-    lyapunov_matrix: np.ndarray,
-    tolerance: float,
-) -> tuple[np.ndarray, np.ndarray]:
-    safe = contraction + tolerance < foster_rate
-    regimes = contraction.shape[0]
-    additive = np.full((regimes, regimes), np.inf, dtype=np.float64)
-    for source in range(regimes):
-        for destination in range(regimes):
-            alpha = float(contraction[source, destination])
-            if not safe[source, destination]:
-                continue
-            offset_energy = float(
-                dynamics_offset[destination]
-                @ lyapunov_matrix[destination]
-                @ dynamics_offset[destination]
-            )
-            noise = float(
-                np.trace(
-                    lyapunov_matrix[destination]
-                    @ dynamics_covariance[destination]
-                )
-            )
-            if alpha == 0.0:
-                additive[source, destination] = offset_energy + noise
-            else:
-                young_factor = foster_rate / alpha - 1.0
-                additive[source, destination] = (
-                    (1.0 + 1.0 / young_factor) * offset_energy + noise
-                )
-    return safe, additive
-
-
-def _sigmoid(value: np.ndarray) -> np.ndarray:
-    positive = value >= 0.0
-    output = np.empty_like(value)
-    output[positive] = 1.0 / (1.0 + np.exp(-value[positive]))
-    exponential = np.exp(value[~positive])
-    output[~positive] = exponential / (1.0 + exponential)
-    return output
-
-
-def _compact_probability_upper(
-    lower: np.ndarray,
-    upper: np.ndarray,
-    weights: np.ndarray,
-    offsets: np.ndarray,
-) -> np.ndarray:
-    positive = weights >= 0.0
-    logit_lower = np.sum(np.where(positive, weights * lower, weights * upper), axis=-1)
-    logit_upper = np.sum(np.where(positive, weights * upper, weights * lower), axis=-1)
-    logit_lower = logit_lower + offsets
-    logit_upper = logit_upper + offsets
-    accept_upper = _sigmoid(logit_upper)
-    reject_upper = _sigmoid(-logit_lower)
-    prefix = np.concatenate(
-        (np.ones((weights.shape[0], 1), dtype=weights.dtype), np.cumprod(reject_upper, axis=-1)),
-        axis=-1,
-    )
-    return np.concatenate(
-        (accept_upper * prefix[:, :-1], prefix[:, -1:]), axis=-1
-    )
-
-
-def _compact_additive_bound(
-    radius: float,
-    splits: int,
-    dynamics_matrix: np.ndarray,
-    dynamics_offset: np.ndarray,
-    dynamics_covariance: np.ndarray,
-    recurrence_weights: np.ndarray,
-    recurrence_offsets: np.ndarray,
-    lyapunov_matrix: np.ndarray,
-) -> tuple[float, int]:
-    dimension = dynamics_matrix.shape[-1]
-    edges = np.linspace(-radius, radius, splits + 1, dtype=dynamics_matrix.dtype)
-    maximum = 0.0
-    box_count = splits**dimension
-    for flat_index in range(box_count):
-        coordinate = np.unravel_index(flat_index, (splits,) * dimension)
-        lower = np.asarray([edges[index] for index in coordinate])
-        upper = np.asarray([edges[index + 1] for index in coordinate])
-        probability_upper = _compact_probability_upper(
-            lower, upper, recurrence_weights, recurrence_offsets
-        )
-        destination_upper = np.empty(dynamics_matrix.shape[0], dtype=np.float64)
-        for destination in range(dynamics_matrix.shape[0]):
-            row_positive = dynamics_matrix[destination] >= 0.0
-            mean_lower = np.sum(
-                np.where(
-                    row_positive,
-                    dynamics_matrix[destination] * lower,
-                    dynamics_matrix[destination] * upper,
-                ),
-                axis=-1,
-            ) + dynamics_offset[destination]
-            mean_upper = np.sum(
-                np.where(
-                    row_positive,
-                    dynamics_matrix[destination] * upper,
-                    dynamics_matrix[destination] * lower,
-                ),
-                axis=-1,
-            ) + dynamics_offset[destination]
-            maximum_absolute = np.maximum(np.abs(mean_lower), np.abs(mean_upper))
-            metric_maximum = float(
-                np.max(np.linalg.eigvalsh(lyapunov_matrix[destination]))
-            )
-            noise = float(
-                np.trace(
-                    lyapunov_matrix[destination]
-                    @ dynamics_covariance[destination]
-                )
-            )
-            destination_upper[destination] = (
-                metric_maximum * float(maximum_absolute @ maximum_absolute) + noise
-            )
-        maximum = max(
-            maximum,
-            float(np.max(probability_upper @ destination_upper)),
-        )
-    return maximum, box_count
 
 
 def recurrence_stability_certificate(
@@ -698,179 +664,23 @@ def recurrence_stability_certificate(
     compact_splits: int,
     maximum_tail_cones: int = 4096,
 ) -> RecurrenceCertificateEvidence:
-    """Certify a global recurrence-aware Foster bound.
+    """Certify a global recurrence-aware Foster bound."""
+    from cffg.switching_stability_certificate import (
+        recurrence_stability_certificate as certify,
+    )
 
-    Closed coordinate orthants cover every tail direction, including their tie
-    faces.  A destination that is not quadratically contractive must have one
-    stick event whose probability decays exponentially throughout the entire
-    orthant.  A deterministic interval cover bounds the remaining compact box.
-    """
-    model, error = _validate_model(
+    return certify(
         dynamics_matrix,
         dynamics_offset,
         dynamics_covariance,
+        recurrence_weights,
+        recurrence_offsets,
         lyapunov_matrix,
+        foster_rate=foster_rate,
+        tail_radius=tail_radius,
+        compact_splits=compact_splits,
+        maximum_tail_cones=maximum_tail_cones,
     )
-    if error is not None:
-        return RecurrenceCertificateEvidence(*error)
-    matrix, offset, covariance, metric = model
-    weights = np.asarray(recurrence_weights)
-    recurrence_offset = np.asarray(recurrence_offsets)
-    regimes, dimension, _ = matrix.shape
-    if not np.all(np.isfinite((foster_rate, tail_radius))):
-        return RecurrenceCertificateEvidence(
-            StabilityStatus.DIVERGED, "certificate settings are non-finite"
-        )
-    if (
-        weights.shape != (regimes, regimes - 1, dimension)
-        or recurrence_offset.shape != (regimes, regimes - 1)
-        or weights.dtype != matrix.dtype
-        or recurrence_offset.dtype != matrix.dtype
-        or not 0.0 < foster_rate < 1.0
-        or tail_radius <= 0.0
-        or isinstance(compact_splits, bool)
-        or not isinstance(compact_splits, int)
-        or compact_splits < 1
-        or isinstance(maximum_tail_cones, bool)
-        or not isinstance(maximum_tail_cones, int)
-        or maximum_tail_cones < 1
-        or (1 << dimension) > maximum_tail_cones
-        or compact_splits**dimension > 1_000_000
-    ):
-        return RecurrenceCertificateEvidence(
-            StabilityStatus.INFEASIBLE,
-            "recurrence shapes, dtypes, or certificate settings are infeasible",
-        )
-    invalid = _invalid_status((weights, recurrence_offset))
-    if invalid is not None:
-        return RecurrenceCertificateEvidence(*invalid)
-    try:
-        recurrence_tolerance = _dtype_tolerance(
-            matrix.dtype,
-            weights,
-            recurrence_offset,
-            count=max(1, dimension),
-        )
-        contraction = _mode_contractions(matrix, metric)
-        contraction_tolerance = _dtype_tolerance(
-            matrix.dtype, contraction, count=dimension**3
-        )
-    except (ValueError, np.linalg.LinAlgError) as exception:
-        return RecurrenceCertificateEvidence(
-            StabilityStatus.INFEASIBLE, str(exception)
-        )
-    signs = _orthant_signs(dimension, matrix.dtype)
-    safe, safe_additive = _safe_mode_additive_bounds(
-        contraction,
-        foster_rate,
-        offset,
-        covariance,
-        metric,
-        contraction_tolerance,
-    )
-    shape = (signs.shape[0], regimes, regimes)
-    suppressed = np.zeros(shape, dtype=bool)
-    decay_rate = np.zeros(shape, dtype=matrix.dtype)
-    decay_intercept = np.zeros(shape, dtype=matrix.dtype)
-    tail_additive = np.zeros((signs.shape[0], regimes), dtype=np.float64)
-    polynomial = _destination_polynomial_bounds(matrix, offset, covariance, metric)
-    uncovered: list[tuple[int, int, int]] = []
-    for cone, sign in enumerate(signs):
-        for source in range(regimes):
-            safe_bound = 0.0
-            suppressed_bound = 0.0
-            for destination in range(regimes):
-                if safe[source, destination]:
-                    safe_bound = max(
-                        safe_bound, float(safe_additive[source, destination])
-                    )
-                    continue
-                events = _suppression_events(
-                    destination,
-                    weights[source] * sign[None, :],
-                    recurrence_offset[source],
-                    recurrence_tolerance,
-                )
-                if not events:
-                    uncovered.append((cone, source, destination))
-                    continue
-                candidates = [
-                    (
-                        _exponential_polynomial_supremum(
-                            intercept,
-                            rate,
-                            tail_radius,
-                            tuple(float(value) for value in polynomial[destination]),
-                        ),
-                        rate,
-                        intercept,
-                    )
-                    for rate, intercept in events
-                ]
-                bound, rate, intercept = min(candidates)
-                suppressed[cone, source, destination] = True
-                decay_rate[cone, source, destination] = rate
-                decay_intercept[cone, source, destination] = intercept
-                suppressed_bound += bound
-            tail_additive[cone, source] = safe_bound + suppressed_bound
-    if uncovered:
-        return RecurrenceCertificateEvidence(
-            StabilityStatus.VIOLATED,
-            f"{len(uncovered)} tail source/cone destinations are neither "
-            "contractive nor exponentially suppressed",
-            foster_rate,
-            tail_radius,
-            signs,
-            np.broadcast_to(contraction, shape).copy(),
-            suppressed,
-            decay_rate,
-            decay_intercept,
-            tail_additive,
-        )
-    try:
-        compact_additive, box_count = _compact_additive_bound(
-            tail_radius,
-            compact_splits,
-            matrix,
-            offset,
-            covariance,
-            weights,
-            recurrence_offset,
-            metric,
-        )
-    except (FloatingPointError, ValueError, np.linalg.LinAlgError) as exception:
-        return RecurrenceCertificateEvidence(
-            StabilityStatus.DIVERGED, f"compact verification failed: {exception}"
-        )
-    additive = max(float(np.max(tail_additive)), compact_additive)
-    moment_bound = additive / (1.0 - foster_rate)
-    if (
-        not np.all(np.isfinite(tail_additive))
-        or not np.isfinite(compact_additive)
-        or not np.isfinite(additive)
-        or not np.isfinite(moment_bound)
-    ):
-        return RecurrenceCertificateEvidence(
-            StabilityStatus.DIVERGED, "certificate evidence is non-finite"
-        )
-    return RecurrenceCertificateEvidence(
-        StabilityStatus.SATISFIED,
-        "global Foster bound certified by all orthant tails and compact cover",
-        foster_rate,
-        tail_radius,
-        signs,
-        np.broadcast_to(contraction, shape).copy(),
-        suppressed,
-        decay_rate,
-        decay_intercept,
-        tail_additive,
-        compact_additive,
-        additive,
-        moment_bound,
-        box_count,
-    )
-
-
 def evaluate_recurrence_drift(
     states: Any,
     source_regime: Any,

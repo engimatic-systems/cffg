@@ -2351,7 +2351,8 @@ The trace and affine terms are part of the identity, not later corrections.
 `one_step_quadratic_drift` implements (D11.1)--(D11.2), and the dense K=2/K=3
 loop oracle in `tests/test_switching_stability.py` independently evaluates
 every destination term. A finite probe may report
-`Delta_i(x)+lambda V_i(x)-C`, but that is only descriptive evidence.
+`Delta_i(x)+(1-lambda)V_i(x)-C`, equivalently
+`E[V_z'(x')]-lambda V_i(x)-C`, but that is only descriptive evidence.
 
 ### D11.2 Common-quadratic baseline
 
@@ -2370,12 +2371,13 @@ where for `alpha_j>0`
     beta_j = (1+1/eta_j) b_j^T P b_j + tr(P Q_j),
 
 and the zero-contraction case uses `beta_j=b_j^T P b_j+tr(PQ_j)`. Thus
-`beta=max_j beta_j` and `beta/(1-lambda)` bound the second moment. This is a
-real sufficient certificate under arbitrary switching.
+`beta=max_j beta_j` gives the asymptotic Lyapunov-scale envelope
+`beta/(1-lambda)` under arbitrary switching. The finite-time bound also
+contains `lambda^t E[V_0]`; no initial belief is supplied here.
 
-It is rejected as the selected intervention because it discards the recurrent
-law. The executable shear falsifier has two matrices with spectral radius
-`0.5` but an alternating product with spectral radius above one. Conversely,
+It is rejected as the selected eligibility test because it discards the
+recurrent law. The executable shear falsifier has two matrices with spectral
+radius `0.5` but an alternating product with spectral radius above one. Conversely,
 the K=3 scalar falsifier contains an `A_3=1.2` destination whose recurrence
 probability decays in both tails; the common test rejects it while D11.3
 certifies the joint system.
@@ -2434,15 +2436,20 @@ certificate.
 `recurrence_stability_certificate` owns this proof. It returns `satisfied`,
 `violated`, `infeasible`, or `diverged`, plus the orthants, mode contractions,
 suppressed destinations, decay witnesses, tail bounds, compact bound, and box
-count. It also returns `C/(1-lambda)`, the implied bound in the declared
-Lyapunov scale. `evaluate_recurrence_drift` is a separately labelled
+count. Outward local guards and directed `nextafter` bounds cover the declared
+dtype's reductions, eigensolves, singular values, logistic/product envelopes,
+affine intervals, exponentials, and positive sums. It also returns
+`C/(1-lambda)`, the asymptotic envelope in the declared Lyapunov scale:
+`E[V_t] <= lambda^t E[V_0] + C(1-lambda^t)/(1-lambda)`. Without an initial
+belief it is not a bound on `sup_t E[V_t]` or the complete second moment.
+`evaluate_recurrence_drift` is a separately labelled
 `descriptive_finite_probe` view of the exact identity and a declared `(lambda,
 C)`; its score never promotes a global claim.
 
-### D11.4 Selected intervention and ownership
+### D11.4 Selected eligibility boundary and ownership
 
-The selected future intervention is an **outer hard acceptance gate** on the
-undamped proposed point parameters. A proposal is installable only when the
+The selected compatible boundary is an **outer safety/eligibility gate** on
+the undamped proposed point parameters. A proposal is installable only when the
 global recurrence-aware certificate is `satisfied`. `violated` rejects the
 proposal; `infeasible` and `diverged` fail the outer operation loudly. The
 gate never certifies a damped point in place of the undamped map and has no
@@ -2454,7 +2461,9 @@ point. It does change the outer learning algorithm: the unconstrained
 conjugate proposal is conditionally rejected. No production parameter writer,
 fit status, checkpoint, or persistence schema implements that gate in this
 ticket. A future consumer must own the pre-install check and record the
-certificate settings and evidence beside the attempted coordinate.
+certificate settings and evidence beside the attempted coordinate. A
+reject-only gate does not find a feasible replacement and does not ensure
+outer convergence, so it is not called a stability repair or learning solver.
 
 The authority is pure and truth-free: it reads point parameters, Lyapunov
 matrices, `lambda`, `R`, subdivision count, and a declared tail-cone ceiling.

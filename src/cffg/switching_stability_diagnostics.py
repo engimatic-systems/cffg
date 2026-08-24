@@ -12,9 +12,37 @@ from cffg.switching_stability import (
     _dtype_tolerance,
     _invalid_status,
     _validate_model,
-    recurrence_drift_merit,
-    recurrence_drift_residuals,
+    evaluate_one_step_drift,
 )
+
+
+def _sigmoid(value: np.ndarray) -> np.ndarray:
+    positive = value >= 0.0
+    result = np.empty_like(value)
+    result[positive] = 1.0 / (1.0 + np.exp(-value[positive]))
+    exponential = np.exp(value[~positive])
+    result[~positive] = exponential / (1.0 + exponential)
+    return result
+
+
+def _transition_probabilities(
+    states: np.ndarray,
+    weights: np.ndarray,
+    offsets: np.ndarray,
+) -> np.ndarray:
+    logits = np.einsum("nd,ild->nil", states, weights) + offsets[None, :, :]
+    accept = _sigmoid(logits)
+    reject = 1.0 - accept
+    prefix = np.concatenate(
+        (
+            np.ones((*accept.shape[:-1], 1), dtype=accept.dtype),
+            np.cumprod(reject, axis=-1),
+        ),
+        axis=-1,
+    )
+    return np.concatenate(
+        (accept * prefix[..., :-1], prefix[..., -1:]), axis=-1
+    )
 
 
 def evaluate_recurrence_drift(
@@ -75,22 +103,26 @@ def evaluate_recurrence_drift(
     invalid = _invalid_status((state, weights, recurrence_offset))
     if invalid is not None:
         return RecurrenceDriftEvidence(*invalid, scope="descriptive_finite_probe")
-    probability, current, expected, drift, residual = recurrence_drift_residuals(
+    all_probability = _transition_probabilities(state, weights, recurrence_offset)
+    probability = all_probability[np.arange(state.shape[0]), source]
+    one_step = evaluate_one_step_drift(
         state,
         source,
+        probability,
         matrix,
         offset,
         covariance,
-        weights,
-        recurrence_offset,
         metric,
-        foster_rate,
-        additive_bound,
     )
-    arrays = tuple(
-        np.asarray(value)
-        for value in (probability, current, expected, drift, residual)
-    )
+    if one_step.status is not StabilityStatus.SATISFIED:
+        return RecurrenceDriftEvidence(
+            one_step.status, one_step.reason, "descriptive_finite_probe"
+        )
+    current = one_step.current_value
+    expected = one_step.expected_next_value
+    drift = one_step.drift
+    residual = expected - foster_rate * current - additive_bound
+    arrays = (probability, current, expected, drift, residual)
     invalid = _invalid_status(arrays)
     if invalid is not None:
         return RecurrenceDriftEvidence(*invalid, scope="descriptive_finite_probe")
@@ -114,20 +146,10 @@ def evaluate_recurrence_drift(
             str(exception),
             "descriptive_finite_probe",
         )
-    merit = float(
-        recurrence_drift_merit(
-            state,
-            source,
-            matrix,
-            offset,
-            covariance,
-            weights,
-            recurrence_offset,
-            metric,
-            foster_rate,
-            additive_bound,
-        )
+    scale = (
+        1.0 + np.abs(current) + np.abs(expected) + abs(float(additive_bound))
     )
+    merit = float(np.mean(np.square(np.maximum(residual, 0.0) / scale)))
     if not np.isfinite(merit):
         return RecurrenceDriftEvidence(
             StabilityStatus.DIVERGED,

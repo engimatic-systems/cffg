@@ -494,10 +494,12 @@ A finite or posterior-weighted drift grid remains descriptive only. It cannot
 control behavior outside its points and cannot be promoted to a global
 certificate. The current code exposes no production constraint, projection,
 prior, objective term, or rollout claim from the new authority. The selected
-future operation is a hard gate on the undamped outer proposal: it preserves
+future compatibility boundary is a safety/eligibility gate on the undamped
+outer proposal: it preserves
 the rSLDS probability family and fixed-point D10 free energy at accepted
 points, but changes the learning algorithm by rejecting an unconstrained
-conjugate update. Until a separate reviewed consumer owns that atomic
+conjugate update. It neither finds a feasible replacement nor guarantees
+outer convergence. Until a separate reviewed consumer owns that atomic
 pre-install and persistence boundary, the verifier does not make learned fits
 more stable and does not repair the outstanding classic periodicity evidence.
 

@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import itertools
+import os
+import subprocess
+import sys
+import textwrap
 
 import jax
 import jax.numpy as jnp
@@ -13,6 +17,7 @@ from cffg.switching_stability import (
     evaluate_one_step_drift,
     evaluate_recurrence_drift,
     recurrence_drift_merit,
+    recurrence_drift_residuals,
     recurrence_stability_certificate,
     recurrent_transition_probabilities,
 )
@@ -163,7 +168,7 @@ def test_recurrence_certificate_retains_tail_stabilization_and_tie_faces() -> No
     assert evidence.exponentially_suppressed is not None
     assert np.all(evidence.exponentially_suppressed[:, :, 2])
     assert evidence.additive_bound is not None and evidence.additive_bound > 0.0
-    assert evidence.lyapunov_moment_bound == 2.0 * evidence.additive_bound
+    assert evidence.asymptotic_lyapunov_envelope > 2.0 * evidence.additive_bound
     assert evidence.compact_box_count == 8
     assert evidence.tail_additive_bound is not None
     assert evidence.compact_additive_bound is not None
@@ -266,7 +271,7 @@ def test_finite_probe_score_is_explicitly_descriptive_and_differentiable() -> No
             changed,
             recurrence_offset,
             metric,
-            0.8,
+            0.2,
             0.0,
         )
 
@@ -345,6 +350,146 @@ def test_float32_near_unit_boundary_uses_dtype_guard() -> None:
         )
         assert stable_result.status is StabilityStatus.SATISFIED
         assert unstable_result.status is StabilityStatus.VIOLATED
+
+
+def test_float32_certificate_bounds_exact_affine_value_outward() -> None:
+    dtype = np.dtype(np.float32)
+    matrix = np.zeros((1, 1, 1), dtype=dtype)
+    offset = np.asarray([[0.94792676]], dtype=dtype)
+    covariance = np.zeros((1, 1, 1), dtype=dtype)
+    weights = np.zeros((1, 0, 1), dtype=dtype)
+    recurrence_offset = np.zeros((1, 0), dtype=dtype)
+    metric = np.ones((1, 1, 1), dtype=dtype)
+    evidence = recurrence_stability_certificate(
+        matrix,
+        offset,
+        covariance,
+        weights,
+        recurrence_offset,
+        metric,
+        foster_rate=0.5,
+        tail_radius=1.0,
+        compact_splits=1,
+    )
+    exact = float(np.float64(offset[0, 0]) ** 2)
+    assert evidence.status is StabilityStatus.SATISFIED
+    assert evidence.additive_bound is not None
+    assert evidence.additive_bound > exact
+    common = common_quadratic_certificate(
+        matrix, offset, covariance, metric[0]
+    )
+    assert common.status is StabilityStatus.SATISFIED
+    assert common.additive_bound is not None
+    assert common.additive_bound > exact
+
+
+def test_underflowed_finite_stick_probability_keeps_positive_bound() -> None:
+    dtype = np.dtype(np.float64)
+    matrix = np.zeros((3, 1, 1), dtype=dtype)
+    offset = np.asarray([[0.0], [0.0], [1.0]], dtype=dtype)
+    covariance = np.zeros((3, 1, 1), dtype=dtype)
+    weights = np.zeros((3, 2, 1), dtype=dtype)
+    recurrence_offset = np.full((3, 2), 500.0, dtype=dtype)
+    metric = np.ones((3, 1, 1), dtype=dtype)
+    evidence = recurrence_stability_certificate(
+        matrix,
+        offset,
+        covariance,
+        weights,
+        recurrence_offset,
+        metric,
+        foster_rate=0.5,
+        tail_radius=1.0,
+        compact_splits=1,
+    )
+    assert evidence.status is StabilityStatus.SATISFIED
+    assert evidence.compact_additive_bound is not None
+    assert evidence.compact_additive_bound > 0.0
+
+
+def test_descriptive_residual_uses_expected_minus_rate_times_value() -> None:
+    dtype = np.dtype(np.float64)
+    matrix = np.asarray([[[0.8]]], dtype=dtype)
+    offset = np.zeros((1, 1), dtype=dtype)
+    covariance = np.zeros((1, 1, 1), dtype=dtype)
+    weights = np.zeros((1, 0, 1), dtype=dtype)
+    recurrence_offset = np.zeros((1, 0), dtype=dtype)
+    metric = np.ones((1, 1, 1), dtype=dtype)
+    evidence = evaluate_recurrence_drift(
+        np.asarray([[10.0]], dtype=dtype),
+        np.asarray([0], dtype=np.int32),
+        matrix,
+        offset,
+        covariance,
+        weights,
+        recurrence_offset,
+        metric,
+        foster_rate=0.2,
+        additive_bound=0.0,
+    )
+    assert evidence.status is StabilityStatus.VIOLATED
+    np.testing.assert_allclose(evidence.residual, [44.0])
+    pure_residual = recurrence_drift_residuals(
+        np.asarray([[10.0]], dtype=dtype),
+        np.asarray([0], dtype=np.int32),
+        matrix,
+        offset,
+        covariance,
+        weights,
+        recurrence_offset,
+        metric,
+        0.2,
+        0.0,
+    )[-1]
+    np.testing.assert_allclose(pure_residual, [44.0])
+
+
+def test_host_evidence_preserves_float64_when_jax_x64_is_disabled() -> None:
+    script = textwrap.dedent(
+        """
+        import numpy as np
+        from cffg.switching_stability import evaluate_one_step_drift, evaluate_recurrence_drift
+
+        dtype = np.dtype(np.float64)
+        matrix = np.asarray([[[1.0000000001]]], dtype=dtype)
+        offset = np.asarray([[0.0000000003]], dtype=dtype)
+        covariance = np.asarray([[[0.0000000007]]], dtype=dtype)
+        metric = np.ones((1, 1, 1), dtype=dtype)
+        state = np.asarray([[123456789.125]], dtype=dtype)
+        source = np.asarray([0], dtype=np.int32)
+        probability = np.ones((1, 1), dtype=dtype)
+        result = evaluate_one_step_drift(
+            state, source, probability, matrix, offset, covariance, metric
+        )
+        mean = matrix[0] @ state[0] + offset[0]
+        expected = mean @ metric[0] @ mean + np.trace(metric[0] @ covariance[0])
+        assert result.expected_next_value.dtype == np.float64
+        assert result.expected_next_value[0] == expected
+        diagnostic = evaluate_recurrence_drift(
+            state,
+            source,
+            matrix,
+            offset,
+            covariance,
+            np.zeros((1, 0, 1), dtype=dtype),
+            np.zeros((1, 0), dtype=dtype),
+            metric,
+            foster_rate=0.5,
+            additive_bound=0.0,
+        )
+        assert diagnostic.expected_next_value.dtype == np.float64
+        assert diagnostic.expected_next_value[0] == expected
+        """
+    )
+    environment = dict(os.environ)
+    environment["JAX_ENABLE_X64"] = "0"
+    subprocess.run(
+        [sys.executable, "-c", script],
+        check=True,
+        env=environment,
+        capture_output=True,
+        text=True,
+    )
 
 
 def test_k8_hundred_box_certificate_and_jit_are_polynomial() -> None:

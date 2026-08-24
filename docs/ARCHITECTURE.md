@@ -457,16 +457,18 @@ interior. Its evidence separates `satisfied`, `violated`, `infeasible`, and
 `diverged`. A separate finite-probe result is explicitly descriptive and
 cannot substitute for the global certificate.
 
-The selected future integration boundary is a hard outer gate on an undamped
-four-family point proposal before installation. That gate has no D10 objective
-or BFE contribution: accepted point parameters retain the same rSLDS family,
+The selected compatible future boundary is a safety/eligibility gate on an
+undamped four-family point proposal before installation. That gate has no D10
+objective or BFE contribution: accepted point parameters retain the same rSLDS family,
 D10 fixed point, and D10 free-energy semantics. Rejection changes the outer
 learning operation by withholding its unconstrained conjugate proposal. This
 repository currently exposes only the pure verifier; no `Engine` state,
 schedule, `Learnables.write`, `RSLDSLearning.install`, `fit_rslds` status,
 checkpoint schema, or experiment consumer owns the gate or persists its
 evidence. Those derived surfaces are deliberately N/A until a reviewed
-consumer ticket makes the pre-install boundary atomic.
+consumer ticket makes the pre-install boundary atomic. Rejecting a proposal
+does not construct a feasible replacement or guarantee outer convergence, so
+this boundary is not a production stability repair.
 
 ### 2e. Executable factor registration (`cffg.kernels`, cff-ri8m)
 
