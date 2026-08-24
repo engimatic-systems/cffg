@@ -14,7 +14,9 @@ from cffg.models.rslds_fit import (
     RSLDSFitResult,
     RSLDSFitWork,
     RSLDSInferenceAttempt,
+    RSLDSStabilityRestore,
     fit_rslds,
+    restore_stability_gated_learning,
     vague_rslds_fit_priors,
 )
 from cffg.models.rslds_init import (
@@ -28,6 +30,7 @@ from cffg.models.rslds_stability import (
     RSLDSStabilityPolicy,
     encode_stability_evidence,
     evaluate_rslds_stability,
+    runtime_rslds_point,
     validate_stability_evidence,
 )
 
@@ -46,13 +49,16 @@ __all__ = [
     "RSLDSStabilityEvidence",
     "RSLDSStabilityOutcome",
     "RSLDSStabilityPolicy",
+    "RSLDSStabilityRestore",
     "StateBlockSpec",
     "build_factored_corridor",
     "build_factored_rollout",
     "encode_stability_evidence",
     "evaluate_rslds_stability",
     "fit_rslds",
+    "restore_stability_gated_learning",
     "rslds",
+    "runtime_rslds_point",
     "vague_rslds_fit_priors",
     "vague_rslds_learning",
     "validate_stability_evidence",

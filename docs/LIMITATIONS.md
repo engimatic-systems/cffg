@@ -500,7 +500,12 @@ the rSLDS probability family and fixed-point D10 free energy at accepted
 points, but changes the learning algorithm by rejecting an unconstrained
 conjugate update. It neither finds a feasible replacement nor guarantees
 outer convergence. Identity mode metrics make the registered policy simple
-and deterministic but also inherit the certificate's conservatism. The gate
+and deterministic but also inherit the certificate's conservatism. Recurrence
+dependence remains material: the executable multidimensional oracle certifies
+a K=5 model that the arbitrary-switching common-quadratic baseline rejects.
+The fitter certifies the exact staged runtime point; a generic learning
+checkpoint restore is not stability-certified unless it passes the dedicated
+gated restore boundary with matching accepted evidence. The gate
 does not make an uncertified initializer feasible, and no current experiment
 establishes that it repairs the outstanding classic periodicity evidence.
 

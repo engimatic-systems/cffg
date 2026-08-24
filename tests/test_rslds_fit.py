@@ -10,16 +10,18 @@ import numpy as np
 import pytest
 
 from cffg.engine import Engine, RunResult, RunStatus
+from cffg.learn import Learnables
 from cffg.learning_checkpoint import D10_RECURRENCE_STATISTIC_IDENTITY
 from cffg.models import (
     PCAARHMMInitializer,
     RSLDSInitialization,
     fit_rslds,
+    runtime_rslds_point,
     vague_rslds_fit_priors,
 )
 from cffg.models.coordinate_fit import CoordinateResidual
 from cffg.models.rslds import EMISSION_LEARNABLE, RSLDSLearning
-from cffg.models.rslds_fit import _point_parameters, _run_inner
+from cffg.models.rslds_fit import _run_inner
 
 
 def _observations(steps: int, dtype=np.float32) -> np.ndarray:
@@ -165,6 +167,9 @@ def test_fit_replaces_one_sequence_coordinates_and_reuses_one_engine(monkeypatch
     candidate_models = []
     candidate_emissions = []
     original_run = Engine.run
+    original_runtime_point = runtime_rslds_point
+    original_replace = Learnables.replace
+    runtime_point_calls = 0
 
     def tracked_run(self, *args, **kwargs):
         engine_ids.append(id(self))
@@ -173,11 +178,18 @@ def test_fit_replaces_one_sequence_coordinates_and_reuses_one_engine(monkeypatch
         )
         return original_run(self, *args, **kwargs)
 
-    def tracked_points(learning):
-        points = _point_parameters(learning)
-        candidate_points.append(
-            {name: np.asarray(value).copy() for name, value in points.items()}
-        )
+    def tracked_points(engine, state):
+        nonlocal runtime_point_calls
+        points = original_runtime_point(engine, state)
+        runtime_point_calls += 1
+        if runtime_point_calls > 1:
+            candidate_points.append(
+                {name: np.asarray(value).copy() for name, value in points.items()}
+            )
+        return points
+
+    def tracked_replace(learning, engine, result, only=None):
+        original_replace(learning, engine, result, only)
         candidate_models.append(RSLDSLearning._from_runtime(learning))
         candidate_emissions.append(
             {
@@ -185,10 +197,12 @@ def test_fit_replaces_one_sequence_coordinates_and_reuses_one_engine(monkeypatch
                 for name, value in learning.params[EMISSION_LEARNABLE].items()
             }
         )
-        return points
 
     monkeypatch.setattr(Engine, "run", tracked_run)
-    monkeypatch.setattr("cffg.models.rslds_fit._point_parameters", tracked_points)
+    monkeypatch.setattr(
+        "cffg.models.rslds_fit.runtime_rslds_point", tracked_points
+    )
+    monkeypatch.setattr(Learnables, "replace", tracked_replace)
     priors = vague_rslds_fit_priors(2, 1, 2)
     result = fit_rslds(
         observations,
@@ -392,12 +406,20 @@ def test_rebound_resets_the_two_hit_rule_before_certifying(monkeypatch):
 
 
 def test_nonfinite_proposed_coordinate_diverges_without_installing_it(monkeypatch):
-    def nonfinite_points(learning):
-        points = _point_parameters(learning)
-        points["recurrence_offsets"][0, 0] = np.nan
+    original_runtime_point = runtime_rslds_point
+    calls = 0
+
+    def nonfinite_points(engine, state):
+        nonlocal calls
+        points = original_runtime_point(engine, state)
+        calls += 1
+        if calls > 1:
+            points["recurrence_offsets"][0, 0] = np.nan
         return points
 
-    monkeypatch.setattr("cffg.models.rslds_fit._point_parameters", nonfinite_points)
+    monkeypatch.setattr(
+        "cffg.models.rslds_fit.runtime_rslds_point", nonfinite_points
+    )
 
     result = _fit(_observations(8), outer_iterations=1)
 
@@ -463,12 +485,6 @@ def test_improper_statistics_diverge_before_parameter_write(
 ):
     observations = _observations(8)
     initializer = PCAARHMMInitializer()
-    initialized = initializer(
-        observations,
-        regimes=2,
-        latent_dimension=1,
-        key=jax.random.key(7),
-    )
     injected_sources = []
     original_readout = Engine.learning_readout
 
@@ -505,19 +521,14 @@ def test_improper_statistics_diverge_before_parameter_write(
         assert "min_eigenvalue=0.5" in result.error
         assert "symmetry_error=0.25" in result.error
         assert "tolerance=0.01" in result.error
+    installed = runtime_rslds_point(result.engine, result.state)
     for name, value in result.parameters.items():
-        np.testing.assert_array_equal(value, initialized.arrays()[name])
+        np.testing.assert_array_equal(value, installed[name])
 
 
 def test_nonfinite_inner_free_energy_diverges_before_parameter_write(monkeypatch):
     observations = _observations(8)
     initializer = PCAARHMMInitializer()
-    initialized = initializer(
-        observations,
-        regimes=2,
-        latent_dimension=1,
-        key=jax.random.key(7),
-    )
     original_run = Engine.run
 
     def nonfinite_run(self, *args, **kwargs):
@@ -534,8 +545,9 @@ def test_nonfinite_inner_free_energy_diverges_before_parameter_write(monkeypatch
     assert result.status is RunStatus.DIVERGED
     assert result.inner_status is RunStatus.DIVERGED
     assert result.error == "inner Bethe free energy is missing or non-finite"
+    installed = runtime_rslds_point(result.engine, result.state)
     for name, value in result.parameters.items():
-        np.testing.assert_array_equal(value, initialized.arrays()[name])
+        np.testing.assert_array_equal(value, installed[name])
 
 
 def test_inner_budget_status_is_preserved():

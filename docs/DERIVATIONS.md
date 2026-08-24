@@ -2468,9 +2468,17 @@ point. It does change the outer learning algorithm: the unconstrained
 conjugate proposal is conditionally rejected. No production parameter writer,
 objective term, or engine schedule implements the gate. The observed-only
 fitter is the reviewed host consumer: it verifies the initializer and checks a
-complete proposal immediately before the existing four-family atomic write.
+complete proposal after the posterior replacement, then materializes the exact
+destination-runtime dtype and parameterization in a fresh immutable state
+before certificate evaluation. Conjugate posterior summaries need not equal
+the natural parameters consumed by inference, and a destination cast can
+change a near-boundary certificate. Acceptance commits that staged state;
+rejection leaves the current state untouched.
 Its separate evidence codec records the certificate settings and bounds beside
 the attempted coordinate without changing generic learning persistence. A
+gated resume reconstructs the complete pending runtime point and authenticates
+accepted proposal evidence before exposing it. Generic learning restore alone
+carries no stability claim. A
 reject-only gate does not find a feasible replacement and does not ensure
 outer convergence, so it is not called a stability repair or learning solver.
 

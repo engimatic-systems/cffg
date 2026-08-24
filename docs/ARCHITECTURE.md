@@ -441,7 +441,7 @@ The fit boundary remains deliberately small and model-owned:
 | Named coordinate residual and certification decision | `cffg.models.coordinate_fit` | Reusable evidence and identity primitives: they compare model-owned named blocks, apply the consecutive-hit rule, and keep an unchecked proposal distinct from its evaluated parent. |
 | Runtime and transition-function coordinate views | `cffg.models.rslds_coordinate` | rSLDS-specific: it projects learned values into installed semantics and evaluates a truth-free observation-derived transition probe. |
 | Status-gated run, identical-state retry, runtime-map certificate, terminal solve | `cffg.models.rslds_fit` | The model-owned loop supplies rSLDS parameter views and returns the coordinate selected by the shared decision primitive. The remaining retry and terminal-solve policy stays here until a non-switching production fitter proves the same interface and parity. |
-| Optional Foster proposal eligibility and its checkpoint evidence | `cffg.models.rslds_stability` and `cffg.models.rslds_fit` | rSLDS-specific: an explicit truth-free policy fixes identity mode metrics and all numerical proof settings; the fitter verifies the initializer and each proposal eligible for installation. Generic learning and engine state remain unchanged. |
+| Optional Foster proposal eligibility and its checkpoint evidence | `cffg.models.rslds_stability` and `cffg.models.rslds_fit` | rSLDS-specific: an explicit truth-free policy fixes deterministic identity mode metrics and all numerical proof settings; the fitter stages the exact destination-runtime point before verifying the initializer or an installable proposal. Its gated restore wrapper requires matching accepted evidence; generic learning persistence remains ungated and unchanged. |
 
 No shared fitting framework is introduced on that last row merely from one
 client. Ordinary non-switching Gaussian models already prove the shared
@@ -466,21 +466,29 @@ learning operation by withholding its unconstrained conjugate proposal.
 `RSLDSStabilityPolicy` has no numerical defaults: a caller explicitly fixes
 the Foster rate, tail radius, compact subdivision, and tail-cone ceiling;
 per-mode identity Lyapunov matrices are derived solely from the declared model
-dimension. `fit_rslds` verifies the initializer before the first D10 solve and
-checks a complete proposal after all four posterior replacements but before
-the existing atomic point write. A certificate rejection terminates that host
-cadence with `certificate_rejected`, preserves the installed coordinate, and
-cannot enter its accepted residual history or convergence-hit count.
+dimension. This is conservative but not equivalent to arbitrary switching: a
+multidimensional K=5 oracle with one expansive destination is rejected by the
+common-quadratic baseline and certified when recurrence suppresses that
+destination in every tail cone. `fit_rslds` stages the initializer and each
+complete four-posterior proposal in the exact destination dtype and runtime
+parameterization before residuals, hashes, or proof. A certificate rejection
+terminates that host cadence with `certificate_rejected`, preserves the
+installed coordinate, and cannot enter its accepted residual history or
+convergence-hit count.
 
 The gate evidence codec binds the exact ordered nine-array point, dtype, proof
 settings and bounds, ownership/outcome, D10 executable/objective/coordinate
 identity, component topology, and all four factor/source statistic owners. A
 resume consumer must validate it against the current engine and point before
 mutation; missing, reordered, noncanonical, D8/D9, or differently configured
-evidence fails closed. This host record is deliberately separate from generic
-`Learnables` persistence. Rejecting a proposal does not construct a feasible
-replacement or guarantee outer convergence, so this boundary is not a
-production stability repair.
+evidence fails closed. `restore_stability_gated_learning` is the only boundary
+that may call a learning checkpoint stability-certified: it reconstructs the
+pending four-family point in a fresh state and validates accepted proposal
+evidence before returning that transaction. Generic `Learnables` and
+`RSLDSLearning` restore remain intentionally ungated. This host record is
+deliberately separate from generic persistence. Rejecting a proposal does not
+construct a feasible replacement or guarantee outer convergence, so this
+boundary is not a production stability repair.
 
 ### 2e. Executable factor registration (`cffg.kernels`, cff-ri8m)
 

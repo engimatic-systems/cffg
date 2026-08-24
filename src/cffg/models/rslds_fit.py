@@ -38,7 +38,6 @@ from cffg.models.rslds_coordinate import (
     initial_runtime_blocks,
     legacy_fixed_point_residual,
     legacy_snapshot,
-    learned_runtime_blocks,
     observation_probe_states,
     transition_residual,
 )
@@ -54,6 +53,8 @@ from cffg.models.rslds_stability import (
     RSLDSStabilityOutcome,
     RSLDSStabilityPolicy,
     evaluate_rslds_stability,
+    runtime_rslds_point,
+    validate_stability_evidence,
 )
 from cffg.switching_stability import StabilityStatus
 
@@ -155,6 +156,16 @@ class RSLDSFitWork:
 
 
 @dataclass(frozen=True)
+class RSLDSStabilityRestore:
+    """Validated pending learning and its exact fresh runtime point."""
+
+    learning: Learnables
+    state: State
+    parameters: dict[str, np.ndarray]
+    evidence: RSLDSStabilityEvidence
+
+
+@dataclass(frozen=True)
 class RSLDSFitResult:
     """Terminal fitting status, fitted parameters, and inner-solve evidence.
 
@@ -167,13 +178,14 @@ class RSLDSFitResult:
     its last installed coordinate. A non-``None`` ``model_posterior`` carries
     the current D10 structured-pair statistic identity and may be checkpointed
     for resume; point ``parameters`` alone are a model initialization, not a
-    resumable posterior.
+    resumable posterior. ``inner_status`` is ``None`` only when an initializer
+    certificate stops the gated cadence before the first engine run.
     """
 
     engine: Engine
     state: State
     status: RunStatus
-    inner_status: RunStatus
+    inner_status: RunStatus | None
     iterations: int
     residual: float
     residuals: tuple[float, ...]
@@ -221,38 +233,6 @@ def _validate_priors(
     return model
 
 
-def _point_parameters(learning: Learnables) -> dict[str, np.ndarray]:
-    return {
-        "initial_regime_probability": np.asarray(
-            learning.expected(INITIAL_REGIME_LEARNABLE)
-        ).copy(),
-        "dynamics_matrix": np.asarray(
-            learning.rollover(DYNAMICS_LEARNABLE, "matrix")
-        ).copy(),
-        "dynamics_offset": np.asarray(
-            learning.rollover(DYNAMICS_LEARNABLE, "offset")
-        ).copy(),
-        "dynamics_covariance": np.asarray(
-            learning.rollover(DYNAMICS_LEARNABLE, "cov")
-        ).copy(),
-        "recurrence_weights": np.asarray(
-            learning.rollover(RECURRENCE_LEARNABLE, "weights")
-        ).copy(),
-        "recurrence_offsets": np.asarray(
-            learning.rollover(RECURRENCE_LEARNABLE, "offsets")
-        ).copy(),
-        "emission_matrix": np.asarray(
-            learning.rollover(EMISSION_LEARNABLE, "matrix")
-        ).copy(),
-        "emission_offset": np.asarray(
-            learning.rollover(EMISSION_LEARNABLE, "offset")
-        ).copy(),
-        "emission_covariance": np.asarray(
-            learning.rollover(EMISSION_LEARNABLE, "cov")
-        ).copy(),
-    }
-
-
 def _data(observations: np.ndarray) -> dict[str, np.ndarray]:
     return {f"y{step}": row for step, row in enumerate(observations)}
 
@@ -277,6 +257,48 @@ def _install(
     params = learning.write(engine, state.params)
     state = _replace(state, params=params)
     return engine.bind_data(state, _data(observations))
+
+
+def restore_stability_gated_learning(
+    observations: np.ndarray,
+    *,
+    engine: Engine,
+    priors: RSLDSFitPriors,
+    learning_checkpoint: dict[str, np.ndarray],
+    stability_checkpoint: object,
+    stability_policy: RSLDSStabilityPolicy,
+    coordinate: str,
+) -> RSLDSStabilityRestore:
+    """Restore a complete D10 posterior only with matching accepted evidence.
+
+    Pending checkpoint values and their fresh runtime state are local until
+    the stability record authenticates the exact cast/transformed point. The
+    caller receives the transaction only after that fail-closed check.
+    """
+    observations = _validate_observations(observations)
+    pending = Learnables(engine, priors=priors.learning_priors())
+    pending.load_state_dict(learning_checkpoint)
+    state = _install(engine, observations, pending)
+    points = runtime_rslds_point(engine, state)
+    evidence = validate_stability_evidence(
+        stability_checkpoint,
+        engine=engine,
+        points=points,
+        policy=stability_policy,
+        owner="proposal",
+        coordinate=coordinate,
+    )
+    if (
+        not evidence.accepted
+        or evidence.outcome is not RSLDSStabilityOutcome.PROPOSAL_ACCEPTED
+    ):
+        raise ValueError("stability-gated resume requires accepted proposal evidence")
+    return RSLDSStabilityRestore(
+        learning=pending,
+        state=state,
+        parameters=points,
+        evidence=evidence,
+    )
 
 
 def _parameter_scales(points: dict[str, np.ndarray]) -> dict[str, float]:
@@ -373,7 +395,7 @@ def _result(
     engine: Engine,
     state: State,
     status: RunStatus,
-    inner_status: RunStatus,
+    inner_status: RunStatus | None,
     iterations: int,
     residuals: list[float],
     evaluated_residuals: list[float],
@@ -518,26 +540,13 @@ def fit_rslds(
     compile_seconds = time.perf_counter() - started
     prior_learning = Learnables(engine, priors=priors.learning_priors())
     current_learning: Learnables | None = None
-    current_points = {
-        name: arrays[name]
-        for name in (
-            "initial_regime_probability",
-            "dynamics_matrix",
-            "dynamics_offset",
-            "dynamics_covariance",
-            "recurrence_weights",
-            "recurrence_offsets",
-            "emission_matrix",
-            "emission_offset",
-            "emission_covariance",
-        )
-    }
-    current_snapshot = legacy_snapshot(prior_learning, current_points)
-    current_runtime_blocks = initial_runtime_blocks(current_points)
-    probe_states = observation_probe_states(observations, initialization)
     current_state = engine.bind_data(
         _cast_state(engine.init_state(), observations.dtype), _data(observations)
     )
+    current_points = runtime_rslds_point(engine, current_state)
+    current_snapshot = legacy_snapshot(prior_learning, current_points)
+    current_runtime_blocks = initial_runtime_blocks(current_points)
+    probe_states = observation_probe_states(observations, initialization)
     residuals: list[float] = []
     evaluated_residuals: list[float] = []
     rejected_residuals: list[float] = []
@@ -579,7 +588,7 @@ def fit_rslds(
                 engine=engine,
                 state=current_state,
                 status=status,
-                inner_status=status,
+                inner_status=None,
                 iterations=0,
                 residuals=residuals,
                 evaluated_residuals=evaluated_residuals,
@@ -707,16 +716,15 @@ def fit_rslds(
                 engine, priors=priors.learning_priors()
             )
             candidate_learning.replace(engine, inner)
-            candidate_points = _point_parameters(candidate_learning)
+            candidate_state = _install(engine, observations, candidate_learning)
+            candidate_points = runtime_rslds_point(engine, candidate_state)
             candidate_snapshot = legacy_snapshot(candidate_learning, candidate_points)
             legacy_residual = legacy_fixed_point_residual(
                 current_snapshot, candidate_snapshot
             )
             if not np.isfinite(legacy_residual):
                 raise ValueError("legacy outer fixed-point residual is non-finite")
-            candidate_runtime_blocks = learned_runtime_blocks(
-                candidate_learning, candidate_points
-            )
+            candidate_runtime_blocks = initial_runtime_blocks(candidate_points)
             runtime_residual = coordinate_residual(
                 current_runtime_blocks, candidate_runtime_blocks
             )
@@ -804,11 +812,6 @@ def fit_rslds(
                             f"{stability_evidence.certificate.reason}"
                         ),
                     )
-            candidate_state = (
-                _install(engine, observations, candidate_learning)
-                if decision.installs_proposal
-                else None
-            )
             if decision.installs_proposal:
                 work["accepted_proposals"] += 1
         except (

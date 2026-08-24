@@ -7,8 +7,11 @@ from enum import Enum
 import json
 from typing import Any, Mapping
 
+import jax
+import jax.numpy as jnp
 import numpy as np
 
+from cffg import gauss
 from cffg.learning_checkpoint import (
     D10_COORDINATE_IDENTITY,
     D10_DYNAMICS_STATISTIC_IDENTITY,
@@ -26,6 +29,7 @@ from cffg.switching_stability import (
     StabilityStatus,
     recurrence_stability_certificate,
 )
+from cffg.structured_hybrid_runtime import component_model
 
 
 RSLDS_STABILITY_GATE_IDENTITY = "cffg.rslds.foster-proposal-gate/1.0.0"
@@ -367,6 +371,60 @@ def evaluate_rslds_stability(
     )
 
 
+def runtime_rslds_point(engine, state) -> dict[str, np.ndarray]:
+    """Materialize the exact D10 point consumed by one staged runtime state."""
+    identity, _ = _d10_authority(engine)
+    plan = engine.arena.structured_hybrid_plans[0]
+    model, input_ok = component_model(
+        engine.arena,
+        plan,
+        state.g_obs,
+        state.g_mask,
+        state.params,
+    )
+    if not bool(np.asarray(input_ok)):
+        raise ValueError("staged D10 runtime point is improper or non-finite")
+
+    log_initial = np.asarray(model.log_initial)
+    initial_probability = np.asarray(jax.nn.softmax(model.log_initial))
+    initial_probability = np.where(np.isfinite(log_initial), initial_probability, 0.0)
+
+    topology = plan.topology
+
+    def emission(role: str) -> np.ndarray:
+        rows = [
+            np.asarray(
+                state.params[
+                    engine.arena.member_of[name].parameter(role).key
+                ][engine.arena.member_of[name].parameter(role).index]
+            )
+            for name in topology.emission_members
+        ]
+        if any(not np.array_equal(rows[0], row) for row in rows[1:]):
+            raise ValueError("staged D10 emission parameters are not tied")
+        return rows[0].copy()
+
+    emission_precision = emission("cov")
+    emission_covariance = np.asarray(
+        gauss._pd_inverse(jnp.asarray(emission_precision))
+    )
+    point = {
+        "initial_regime_probability": initial_probability.copy(),
+        "dynamics_matrix": np.asarray(model.dynamics_matrix).copy(),
+        "dynamics_offset": np.asarray(model.dynamics_offset).copy(),
+        "dynamics_covariance": np.asarray(model.dynamics_covariance).copy(),
+        "recurrence_weights": np.asarray(model.recurrence_weights).copy(),
+        "recurrence_offsets": np.asarray(model.recurrence_offsets).copy(),
+        "emission_matrix": emission("matrix"),
+        "emission_offset": emission("offset"),
+        "emission_covariance": emission_covariance.copy(),
+    }
+    error = _complete_point_error(point, identity)
+    if error is not None:
+        raise ValueError(error[1])
+    return point
+
+
 def _array_document(value: Any) -> dict[str, object]:
     array = np.asarray(value)
     if array.dtype.kind not in "bif" or not np.all(np.isfinite(array)):
@@ -459,7 +517,12 @@ def validate_stability_evidence(
         owner=owner,
         coordinate=coordinate,
     )
-    if document != stability_evidence_document(expected):
+    expected_raw = json.dumps(
+        stability_evidence_document(expected),
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    if raw != expected_raw:
         raise ValueError(
             "stability gate checkpoint does not match the current D10 point, "
             "policy, ownership, or certificate"
@@ -477,6 +540,7 @@ __all__ = [
     "RSLDSStabilityPolicy",
     "encode_stability_evidence",
     "evaluate_rslds_stability",
+    "runtime_rslds_point",
     "stability_evidence_document",
     "validate_stability_evidence",
 ]

@@ -400,11 +400,14 @@ learnable, so every time slice contributes once. The continuous
 initial-state mean and covariance are fixed initializer outputs, not fitted
 posteriors.
 
-The optional stability policy derives one identity Lyapunov matrix per regime
-from the model dimension and invokes the recurrence-aware global Foster
-authority. It verifies the initializer before the first hidden-state solve and
-each complete proposal that would otherwise be installed. A satisfied proposal
-uses the unchanged atomic four-family write. A violated proposal returns
+The optional stability policy deterministically derives one identity Lyapunov
+matrix per regime from the model dimension and invokes the recurrence-aware
+global Foster authority. Identity metrics are a conservative specialization,
+but recurrence gating still certifies multidimensional systems that the
+arbitrary-switching common-quadratic baseline rejects. The fitter stages the
+initializer and every complete proposal in the destination runtime dtype and
+parameterization before hashing or certifying it. A satisfied proposal commits
+that already staged four-family state. A violated proposal returns
 `gate_termination.value == "certificate_rejected"`, keeps the current point
 byte-identical, and remains visible in `evaluated_residuals`,
 `rejected_residuals`, `stability_phases`, and `work`; it is absent from the
@@ -414,16 +417,21 @@ projection or stability solver.
 
 `encode_stability_evidence` writes one canonical scalar JSON record.
 `validate_stability_evidence` recomputes and authenticates that record against
-the exact current engine, ordered point arrays, policy, owner, and coordinate
-before a resume consumer mutates state. It rejects noncanonical or tampered
-records and D8/D9 or differently owned D10 engines. This host evidence is kept
-beside, not inside, the generic `Learnables` checkpoint.
+the exact current engine, ordered point arrays, policy, owner, and coordinate.
+`restore_stability_gated_learning` is the fail-closed resume boundary: it stages
+a complete four-family `Learnables` checkpoint locally, reconstructs its exact
+runtime point, requires matching accepted proposal evidence, and only then
+exposes the pending state. Generic `Learnables` restore remains ungated and
+must not be described as stability-certified. The codec rejects noncanonical
+or type-changed records and D8/D9 or differently owned D10 engines. Host gate
+evidence stays beside, not inside, generic learning persistence.
 
 This replacement cadence is different from `RSLDSLearning.update`: `update`
 accumulates evidence from a new independent trial, while `fit_rslds` replaces
 one sequence's coordinates and never counts that sequence again as new data.
 The fit result reports `converged`, `budget_exhausted`, or `diverged`, preserves
-the terminal inner-engine status, and keeps the inner Bethe free-energy trace
+the terminal inner-engine status (`None` when an initializer certificate stops
+the cadence before an inner run), and keeps the inner Bethe free-energy trace
 separate from the scale-normalized outer fixed-point residual. That residual
 compares the normalized initial-regime potential and every dynamics,
 recurrence, and emission value installed into the next solve. The historical

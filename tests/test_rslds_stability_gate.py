@@ -20,13 +20,19 @@ from cffg.models import (
     encode_stability_evidence,
     evaluate_rslds_stability,
     fit_rslds,
+    restore_stability_gated_learning,
+    runtime_rslds_point,
     validate_stability_evidence,
     vague_rslds_fit_priors,
 )
 from cffg.models.coordinate_fit import CoordinateResidual
 from cffg.models.rslds import rslds
+from cffg.models.rslds_fit import _install
 from cffg.models.rslds_stability import POINT_FIELDS
-from cffg.switching_stability import StabilityStatus
+from cffg.switching_stability import (
+    StabilityStatus,
+    common_quadratic_certificate,
+)
 
 
 POLICY = RSLDSStabilityPolicy(
@@ -98,12 +104,15 @@ def _point(
 
 
 def _engine(points: dict[str, np.ndarray], steps: int = 3) -> Engine:
+    dimension = points["dynamics_matrix"].shape[-1]
     template, arrays = rslds(
         n_steps=steps,
         **points,
-        initial_state_mean=np.zeros(1, dtype=points["dynamics_matrix"].dtype),
+        initial_state_mean=np.zeros(
+            dimension, dtype=points["dynamics_matrix"].dtype
+        ),
         initial_state_covariance=np.eye(
-            1, dtype=points["dynamics_matrix"].dtype
+            dimension, dtype=points["dynamics_matrix"].dtype
         ),
     )
     return Engine(compile_template(template, arrays=arrays))
@@ -163,6 +172,57 @@ def test_truth_free_policy_certifies_initializer_and_nontrivial_proposal():
     assert initializer.dtype == np.dtype(np.float64).str
     assert [row["name"] for row in initializer.point_identity] == list(POINT_FIELDS)
     assert len(initializer.statistic_ownership) == 4
+
+
+def test_identity_metric_retains_multidimensional_recurrence_advantage():
+    regimes = 5
+    dimension = 2
+    dtype = np.dtype(np.float64)
+    matrix = np.stack(
+        [np.eye(dimension, dtype=dtype) * value for value in (0.4,) * 4 + (1.2,)]
+    )
+    gate_weights = np.asarray(
+        ((-2.0, -2.0), (2.0, -2.0), (-2.0, 2.0), (2.0, 2.0)),
+        dtype=dtype,
+    )
+    point = {
+        "initial_regime_probability": np.full(regimes, 1.0 / regimes, dtype=dtype),
+        "dynamics_matrix": matrix,
+        "dynamics_offset": np.zeros((regimes, dimension), dtype=dtype),
+        "dynamics_covariance": np.broadcast_to(
+            np.eye(dimension, dtype=dtype) * 0.01,
+            (regimes, dimension, dimension),
+        ).copy(),
+        "recurrence_weights": np.broadcast_to(
+            gate_weights,
+            (regimes, regimes - 1, dimension),
+        ).copy(),
+        "recurrence_offsets": np.full((regimes, regimes - 1), 4.0, dtype=dtype),
+        "emission_matrix": np.eye(dimension, dtype=dtype),
+        "emission_offset": np.zeros(dimension, dtype=dtype),
+        "emission_covariance": np.eye(dimension, dtype=dtype) * 0.1,
+    }
+    policy = RSLDSStabilityPolicy(0.5, 4.0, 2, 8)
+
+    common = common_quadratic_certificate(
+        matrix,
+        point["dynamics_offset"],
+        point["dynamics_covariance"],
+        np.eye(dimension, dtype=dtype),
+    )
+    recurrence = evaluate_rslds_stability(
+        _engine(point),
+        point,
+        policy,
+        owner="proposal",
+        coordinate="coordinate/1",
+    )
+
+    assert common.status is StabilityStatus.VIOLATED
+    assert recurrence.certificate.status is StabilityStatus.SATISFIED
+    assert recurrence.outcome is RSLDSStabilityOutcome.PROPOSAL_ACCEPTED
+    assert recurrence.certificate.compact_box_count == 4
+    assert np.any(recurrence.certificate.exponentially_suppressed)
 
 
 def test_unverified_contraction_ceiling_is_rejected_not_safe():
@@ -309,6 +369,43 @@ def test_checkpoint_rejects_reorder_tamper_d9_point_and_policy_mismatch():
         )
 
 
+def test_checkpoint_rejects_json_type_and_signed_zero_tampering():
+    point = _point()
+    engine = _engine(point)
+    evidence = evaluate_rslds_stability(
+        engine, point, POLICY, owner="initializer", coordinate="coordinate/0"
+    )
+    checkpoint = encode_stability_evidence(evidence)
+
+    mutations = []
+    accepted = json.loads(checkpoint.item())
+    accepted["accepted"] = 1
+    mutations.append(accepted)
+    integer = json.loads(checkpoint.item())
+    integer["policy"]["compact_splits"] = 2.0
+    mutations.append(integer)
+    shape = json.loads(checkpoint.item())
+    shape["point_identity"][0]["shape"][0] = 2.0
+    mutations.append(shape)
+    signed_zero = json.loads(checkpoint.item())
+    signed_zero["certificate"]["decay_rate"]["values"][0][0][0] = -0.0
+    mutations.append(signed_zero)
+
+    for mutation in mutations:
+        encoded = np.asarray(
+            json.dumps(mutation, sort_keys=True, separators=(",", ":"))
+        )
+        with pytest.raises(ValueError, match="does not match"):
+            validate_stability_evidence(
+                encoded,
+                engine=engine,
+                points=point,
+                policy=POLICY,
+                owner="initializer",
+                coordinate="coordinate/0",
+            )
+
+
 @pytest.mark.parametrize(
     ("mutation", "status"),
     (
@@ -383,34 +480,82 @@ def test_gated_fit_certifies_both_initializer_tiers_and_accepts_progress(tier):
     )
 
 
-def test_current_certified_rejected_proposal_is_terminal_and_atomic(monkeypatch):
-    observations = _observations()
-    initializer = PCAARHMMInitializer()
-    initialized = initializer(
-        observations,
-        regimes=2,
-        latent_dimension=1,
-        key=jax.random.key(7),
-    )
-    original_points = __import__(
-        "cffg.models.rslds_fit", fromlist=["_point_parameters"]
-    )._point_parameters
-    writes = []
-    original_write = Learnables.write
+def test_float32_gate_certifies_and_returns_the_exact_installed_runtime_point():
+    with jax.enable_x64(False):
+        result = _fit(PCAARHMMInitializer(), dtype=np.float32)
+        returned = runtime_rslds_point(result.engine, result.state)
 
-    def unstable_points(learning):
-        points = original_points(learning)
-        points["dynamics_matrix"][:] = np.asarray(
-            [[[1.1]], [[0.5]]], dtype=points["dynamics_matrix"].dtype
+    assert result.gate_termination is None
+    assert result.stability_phases[-1].outcome is (
+        RSLDSStabilityOutcome.PROPOSAL_ACCEPTED
+    )
+    assert all(
+        evidence.dtype == np.dtype(np.float32).str
+        for evidence in result.stability_phases
+    )
+    for name, value in result.parameters.items():
+        assert value.dtype == np.float32
+        np.testing.assert_array_equal(value, returned[name])
+    restored = validate_stability_evidence(
+        encode_stability_evidence(result.stability_phases[-1]),
+        engine=result.engine,
+        points=result.parameters,
+        policy=POLICY,
+        owner="proposal",
+        coordinate="coordinate/1",
+    )
+    assert restored.accepted
+
+
+def test_float32_installed_rounding_can_flip_a_boundary_certificate():
+    coefficient = np.sqrt(0.8) - 1e-9
+    policy = dataclasses.replace(POLICY, foster_rate=0.8)
+    point64 = _point((coefficient, coefficient), dtype=np.float64)
+    engine64 = _engine(point64)
+    runtime64 = runtime_rslds_point(engine64, engine64.init_state())
+    evidence64 = evaluate_rslds_stability(
+        engine64,
+        runtime64,
+        policy,
+        owner="proposal",
+        coordinate="coordinate/1",
+    )
+    with jax.enable_x64(False):
+        point32 = _point((coefficient, coefficient), dtype=np.float32)
+        engine32 = _engine(point32)
+        runtime32 = runtime_rslds_point(engine32, engine32.init_state())
+        evidence32 = evaluate_rslds_stability(
+            engine32,
+            runtime32,
+            policy,
+            owner="proposal",
+            coordinate="coordinate/1",
         )
+
+    assert evidence64.certificate.status is StabilityStatus.SATISFIED
+    assert evidence32.certificate.status is StabilityStatus.VIOLATED
+    assert runtime64["dynamics_matrix"].dtype == np.float64
+    assert runtime32["dynamics_matrix"].dtype == np.float32
+    assert float(runtime32["dynamics_matrix"][0, 0, 0]) != coefficient
+
+
+def test_current_certified_rejected_proposal_is_terminal_and_atomic(monkeypatch):
+    initializer = PCAARHMMInitializer()
+    runtime_calls = []
+    original_runtime_point = runtime_rslds_point
+
+    def unstable_candidate(engine, state):
+        points = original_runtime_point(engine, state)
+        if runtime_calls:
+            points["dynamics_matrix"][:] = np.asarray(
+                [[[1.1]], [[0.5]]], dtype=points["dynamics_matrix"].dtype
+            )
+        runtime_calls.append(True)
         return points
 
-    def tracked_write(self, engine, params, only=None):
-        writes.append(True)
-        return original_write(self, engine, params, only)
-
-    monkeypatch.setattr("cffg.models.rslds_fit._point_parameters", unstable_points)
-    monkeypatch.setattr(Learnables, "write", tracked_write)
+    monkeypatch.setattr(
+        "cffg.models.rslds_fit.runtime_rslds_point", unstable_candidate
+    )
 
     result = _fit(initializer)
 
@@ -427,20 +572,23 @@ def test_current_certified_rejected_proposal_is_terminal_and_atomic(monkeypatch)
     assert len(result.free_energies) == 1
     assert not result.phases[-1].coordinate_replaced
     assert result.phases[-1].stability_evidence is result.stability_phases[-1]
-    assert writes == []
+    initial_runtime = original_runtime_point(result.engine, result.state)
     for name, value in result.parameters.items():
-        np.testing.assert_array_equal(value, initialized.arrays()[name])
+        np.testing.assert_array_equal(value, initial_runtime[name])
 
 
 def test_rejection_after_one_hit_cannot_count_as_progress_or_convergence(monkeypatch):
     initializer = PCAARHMMInitializer()
-    original_points = __import__(
-        "cffg.models.rslds_fit", fromlist=["_point_parameters"]
-    )._point_parameters
+    original_runtime_point = runtime_rslds_point
+    runtime_calls = 0
     proposed = []
 
-    def candidate_sequence(learning):
-        points = original_points(learning)
+    def candidate_sequence(engine, state):
+        nonlocal runtime_calls
+        points = original_runtime_point(engine, state)
+        runtime_calls += 1
+        if runtime_calls == 1:
+            return points
         if proposed:
             points["dynamics_matrix"][:] = np.asarray(
                 [[[1.1]], [[0.5]]], dtype=points["dynamics_matrix"].dtype
@@ -460,7 +608,9 @@ def test_rejection_after_one_hit_cannot_count_as_progress_or_convergence(monkeyp
             vector=(value,),
         )
 
-    monkeypatch.setattr("cffg.models.rslds_fit._point_parameters", candidate_sequence)
+    monkeypatch.setattr(
+        "cffg.models.rslds_fit.runtime_rslds_point", candidate_sequence
+    )
     monkeypatch.setattr("cffg.models.rslds_fit.coordinate_residual", residual_sequence)
 
     result = _fit(initializer, outer_iterations=2, outer_tolerance=0.1)
@@ -500,6 +650,7 @@ def test_uncertified_initializer_stops_before_inner_solve(monkeypatch):
     result = _fit(_FixedInitializer(unstable))
 
     assert result.status is RunStatus.BUDGET_EXHAUSTED
+    assert result.inner_status is None
     assert result.gate_termination is (
         RSLDSStabilityOutcome.INITIAL_CERTIFICATE_REJECTED
     )
@@ -510,6 +661,71 @@ def test_uncertified_initializer_stops_before_inner_solve(monkeypatch):
     assert result.work.d10_map_evaluations == 0
     assert result.work.accepted_proposals == 0
     assert runs == []
+
+
+def test_gated_restore_authenticates_before_exposing_a_pending_write():
+    observations = np.linspace(-0.2, 0.2, 3, dtype=np.float64)[:, None]
+    point = _point()
+    engine = _engine(point)
+    priors = vague_rslds_fit_priors(2, 1, 1)
+    learning = Learnables(engine, priors=priors.learning_priors())
+    current = engine.bind_data(
+        engine.init_state(),
+        {f"y{step}": row for step, row in enumerate(observations)},
+    )
+    inference = engine.run(current, 200, tol=1e-5)
+    assert inference.status is RunStatus.CONVERGED
+    learning.replace(engine, inference)
+    staged = _install(engine, observations, learning)
+    staged_point = runtime_rslds_point(engine, staged)
+    evidence = evaluate_rslds_stability(
+        engine,
+        staged_point,
+        POLICY,
+        owner="proposal",
+        coordinate="coordinate/1",
+    )
+    assert evidence.accepted
+    learning_checkpoint = learning.state_dict()
+    checkpoint_snapshot = {
+        name: value.copy() for name, value in learning_checkpoint.items()
+    }
+
+    restored = restore_stability_gated_learning(
+        observations,
+        engine=engine,
+        priors=priors,
+        learning_checkpoint=learning_checkpoint,
+        stability_checkpoint=encode_stability_evidence(evidence),
+        stability_policy=POLICY,
+        coordinate="coordinate/1",
+    )
+
+    for name, value in restored.parameters.items():
+        np.testing.assert_array_equal(value, staged_point[name])
+    for name, value in checkpoint_snapshot.items():
+        np.testing.assert_array_equal(learning_checkpoint[name], value)
+
+    with pytest.raises(ValueError, match="checkpoint"):
+        restore_stability_gated_learning(
+            observations,
+            engine=engine,
+            priors=priors,
+            learning_checkpoint=learning_checkpoint,
+            stability_checkpoint=None,
+            stability_policy=POLICY,
+            coordinate="coordinate/1",
+        )
+    with pytest.raises(ValueError, match="does not match"):
+        restore_stability_gated_learning(
+            observations,
+            engine=engine,
+            priors=priors,
+            learning_checkpoint=learning_checkpoint,
+            stability_checkpoint=encode_stability_evidence(evidence),
+            stability_policy=dataclasses.replace(POLICY, tail_radius=3.0),
+            coordinate="coordinate/1",
+        )
 
 
 def test_default_fit_remains_ungated():
