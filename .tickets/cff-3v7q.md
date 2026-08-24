@@ -1,7 +1,7 @@
 ---
 id: cff-3v7q
 status: in_progress
-deps: [cff-2wb6, cff-45ia, cff-fely]
+deps: [cff-2wb6, cff-45ia, cff-fely, cff-x3a8]
 links: [cff-oyie]
 created: 2026-08-20T15:41:17Z
 type: task
@@ -116,3 +116,7 @@ Replicate-0 development replay completed in sibling experiment commit 8280cb8: s
 **2026-08-24T11:29:08Z**
 
 The prospective current-D10 cohort completed under experiment commit b9c7461 and independently revalidated. All 24 fits and terminal solves converged; all 96 rollouts completed 10,000 steps; transition RMSE, predictive preservation, regime accuracy, and paired identities passed. Prior 1.0 nevertheless passed only 43/48 rollout cells versus 45/48 for prior 0.001. Its five unbounded cells affected 3/12 fit pairs across both initialization tiers and two data seeds; four were material boundary exceedances. The candidate failure set did not overlap the baseline failures, so the stronger prior moved rather than eliminated long-horizon instability. cff-45ia is closed as a completed scientific miss; no prior is selected and no freeze is authorized. Read-only retained evidence shows all fits have slightly expansive dynamics but cannot recover rollout regime paths. New child cff-fely owns an authenticated no-fit 2-by-2 recurrence/non-recurrence block-swap diagnostic. Legend: prerequisite --> dependent. [x] cff-45ia complete miss --> [ ] cff-fely mechanism attribution --> [ ] prospective stabilization candidate --> [ ] cff-3v7q decision.
+
+**2026-08-24T12:44:23Z**
+
+cff-fely completed at experiment HEAD 18e61be and independently revalidated: 192/192 rollouts, exact reproduction of all 96 original cells, results/manifest SHA-256 6cf8d86c.../a93fa1a5.... Registered outcome is interaction_or_ambiguous: 4/8 miss cells satisfy the full recurrence-donor rule, 0/8 the non-recurrence rule, and 4/8 neither; 39/40 passing controls retain four passing corners, while one hybrid introduces a new miss. Recurrence is descriptively dominant but not a universal repair owner. Robust classic long-rollout adequacy remains unmet; no prior is selected and no freeze is authorized. Child cff-x3a8 now owns a prospective, derivation-first joint switching-dynamics stability intervention; it may create a fresh development cohort only after a mathematically explicit authority and hostile oracles pass. Legend: prerequisite --> dependent. [x] cff-45ia cohort miss --> [x] cff-fely block attribution --> [ ] cff-x3a8 joint stability derivation --> [ ] fresh prospective cohort --> [ ] cff-3v7q decision.
