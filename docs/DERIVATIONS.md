@@ -2411,7 +2411,13 @@ For source `i` and a destination not using (D11.5), the verifier requires
 
     A_j^T P_j A_j <= alpha_ij P_i,   alpha_ij < lambda.    (D11.6)
 
-Young's inequality absorbs its affine cross term into a finite constant.
+An approximate generalized eigenvalue is not accepted as proof. The verifier
+forms `alpha_ij P_i-A_j^T P_j A_j` with outward elementwise error intervals
+and requires every Gershgorin lower bound to be nonnegative. It searches only
+strict candidates below `lambda`; failure of this sufficient PSD check leaves
+the mode unverified. Evidence records the verified upper value, or `lambda` as
+the finite unverified sentinel. Young's inequality then absorbs the verified
+mode's affine cross term into a finite constant.
 For a suppressed destination, spectral and eigenvalue bounds give
 
     (A_jx+b_j)^T P_j(A_jx+b_j)+tr(P_jQ_j)
@@ -2438,7 +2444,8 @@ certificate.
 suppressed destinations, decay witnesses, tail bounds, compact bound, and box
 count. Outward local guards and directed `nextafter` bounds cover the declared
 dtype's reductions, eigensolves, singular values, logistic/product envelopes,
-affine intervals, exponentials, and positive sums. It also returns
+affine intervals, explicit matrix-inequality residuals, exponentials, and
+positive sums. It also returns
 `C/(1-lambda)`, the asymptotic envelope in the declared Lyapunov scale:
 `E[V_t] <= lambda^t E[V_0] + C(1-lambda^t)/(1-lambda)`. Without an initial
 belief it is not a bound on `sup_t E[V_t]` or the complete second moment.

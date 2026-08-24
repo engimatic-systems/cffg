@@ -486,6 +486,8 @@ compact interior. The proof is recurrence-aware and retains some systems that
 an arbitrary-switching common quadratic rejects. It is still conservative:
 coordinate orthants can miss stabilizing geometry that needs a finer
 polyhedral cone partition, and the interval compact bound can be very loose.
+The mode-quadratic matrix inequality uses an outward Gershgorin PSD witness;
+a valid but non-diagonally-dominant residual can therefore remain unverified.
 Failure is `violated` evidence for this sufficient certificate, not proof that
 the rSLDS is unstable. Exceeding the declared cone or compact-box ceilings is
 `infeasible`, not a weakened computation.

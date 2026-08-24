@@ -174,7 +174,8 @@ def test_recurrence_certificate_retains_tail_stabilization_and_tie_faces() -> No
     assert evidence.compact_additive_bound is not None
     assert evidence.decay_rate is not None
     assert evidence.decay_intercept is not None
-    np.testing.assert_allclose(evidence.mode_contraction[0, 0], matrix[:, 0, 0] ** 2)
+    assert np.all(evidence.mode_contraction[0, 0, :2] < 0.5)
+    assert evidence.mode_contraction[0, 0, 2] == 0.5
     for cone, sign in enumerate((-1.0, 1.0)):
         for magnitude in np.linspace(4.0, 100.0, 193):
             state = np.asarray([sign * magnitude])
@@ -405,6 +406,59 @@ def test_underflowed_finite_stick_probability_keeps_positive_bound() -> None:
     assert evidence.status is StabilityStatus.SATISFIED
     assert evidence.compact_additive_bound is not None
     assert evidence.compact_additive_bound > 0.0
+
+
+def test_ill_conditioned_metric_requires_verified_matrix_inequality() -> None:
+    source_metric = np.asarray(
+        [
+            [0.6442435453630332, 0.47874189248554033],
+            [0.47874189248554033, 0.3557564546382765],
+        ]
+    )
+    destination_metric = np.asarray(
+        [
+            [0.9948577149958107, -0.07152511383506864],
+            [-0.07152511383506864, 0.005142285005263679],
+        ]
+    )
+    matrix = np.asarray(
+        [
+            np.zeros((2, 2)),
+            [
+                [1.2433191057540423e-6, -5.5546725013935428e-8],
+                [-2.6004415162469168e-7, 2.4241433323312407e-7],
+            ],
+        ]
+    )
+    offset = np.zeros((2, 2))
+    covariance = np.zeros((2, 2, 2))
+    weights = np.zeros((2, 1, 2))
+    recurrence_offset = np.full((2, 1), -20.0)
+    metric = np.stack((source_metric, destination_metric))
+    foster_rate = 0.4999928568145363
+    evidence = recurrence_stability_certificate(
+        matrix,
+        offset,
+        covariance,
+        weights,
+        recurrence_offset,
+        metric,
+        foster_rate=foster_rate,
+        tail_radius=1.0,
+        compact_splits=1,
+    )
+    assert evidence.status is StabilityStatus.VIOLATED
+    direction = np.asarray([0.74310701, -1.0]) * 1e5
+    probability = _numpy_stick(direction, weights, recurrence_offset)[0]
+    next_value = sum(
+        probability[destination]
+        * (matrix[destination] @ direction)
+        @ metric[destination]
+        @ (matrix[destination] @ direction)
+        for destination in range(2)
+    )
+    current = direction @ source_metric @ direction
+    assert next_value > foster_rate * current
 
 
 def test_descriptive_residual_uses_expected_minus_rate_times_value() -> None:

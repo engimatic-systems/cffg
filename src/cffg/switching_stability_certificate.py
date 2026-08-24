@@ -202,6 +202,7 @@ def _destination_polynomial_bounds(
 
 def _safe_mode_additive_bounds(
     contraction: np.ndarray,
+    contraction_verified: np.ndarray,
     foster_rate: float,
     dynamics_offset: np.ndarray,
     dynamics_covariance: np.ndarray,
@@ -216,6 +217,8 @@ def _safe_mode_additive_bounds(
     proof_metric = lyapunov_matrix.astype(np.float64)
     for source in range(regimes):
         for destination in range(regimes):
+            if not contraction_verified[source, destination]:
+                continue
             alpha = float(contraction[source, destination])
             tolerance = _dtype_tolerance(
                 declared_dtype,
@@ -519,7 +522,9 @@ def recurrence_stability_certificate(
     if invalid is not None:
         return RecurrenceCertificateEvidence(*invalid)
     try:
-        contraction = _mode_contractions(matrix, metric)
+        contraction, contraction_verified = _mode_contractions(
+            matrix, metric, ceiling=foster_rate
+        )
     except ValueError as exception:
         return RecurrenceCertificateEvidence(
             StabilityStatus.INFEASIBLE, str(exception)
@@ -532,6 +537,7 @@ def recurrence_stability_certificate(
     signs = _orthant_signs(dimension, matrix.dtype)
     safe, safe_additive = _safe_mode_additive_bounds(
         contraction,
+        contraction_verified,
         foster_rate,
         offset,
         covariance_upper,

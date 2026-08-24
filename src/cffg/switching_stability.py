@@ -492,7 +492,10 @@ def common_quadratic_certificate(
     covariance_upper = _covariance_upper(covariance)
     common = metric[0]
     try:
-        contraction = _mode_contractions(matrix, metric)[0]
+        contraction_matrix, verified = _mode_contractions(
+            matrix, metric, ceiling=1.0
+        )
+        contraction = contraction_matrix[0]
     except np.linalg.LinAlgError as exception:
         return CommonQuadraticEvidence(
             StabilityStatus.DIVERGED,
@@ -505,10 +508,10 @@ def common_quadratic_certificate(
         )
     except ValueError as exception:
         return CommonQuadraticEvidence(StabilityStatus.INFEASIBLE, str(exception))
-    if maximum + tolerance >= 1.0:
+    if not np.all(verified[0]) or maximum + tolerance >= 1.0:
         return CommonQuadraticEvidence(
             StabilityStatus.VIOLATED,
-            "at least one mode lacks strict common contraction",
+            "at least one mode lacks a verified strict common contraction",
             contraction,
             maximum,
             tolerance,
@@ -617,16 +620,118 @@ def common_quadratic_certificate(
     )
 
 
+def _matrix_inequality_verified(
+    alpha: float,
+    source_metric: np.ndarray,
+    destination_metric: np.ndarray,
+    dynamics_matrix: np.ndarray,
+) -> bool:
+    dtype = dynamics_matrix.dtype
+    dimension = dynamics_matrix.shape[0]
+    source = source_metric.astype(np.float64)
+    destination = destination_metric.astype(np.float64)
+    matrix = dynamics_matrix.astype(np.float64)
+    transformed = matrix.T @ destination @ matrix
+    lower_diagonal = np.empty(dimension, dtype=np.float64)
+    upper_off_diagonal = np.empty((dimension, dimension), dtype=np.float64)
+    for row in range(dimension):
+        for column in range(dimension):
+            terms = (
+                matrix[:, row, None]
+                * destination
+                * matrix[None, :, column]
+            )
+            product = alpha * source[row, column]
+            raw = product - transformed[row, column]
+            error = float(
+                _proof_guard(
+                    dtype,
+                    count=2 * dimension**2 + 2,
+                    scale=(
+                        abs(product)
+                        + float(np.sum(np.abs(terms)))
+                        + abs(raw)
+                    ),
+                )
+            )
+            if row == column:
+                lower_diagonal[row] = np.nextafter(raw - error, -np.inf)
+            else:
+                upper_off_diagonal[row, column] = np.nextafter(
+                    abs(raw) + error, np.inf
+                )
+    for row in range(dimension):
+        radius = float(
+            np.sum(
+                [
+                    upper_off_diagonal[row, column]
+                    for column in range(dimension)
+                    if column != row
+                ]
+            )
+        )
+        radius = float(
+            _outward_upper(
+                radius,
+                dtype,
+                count=max(1, dimension - 1),
+                scale=radius,
+            )
+        )
+        if lower_diagonal[row] < radius:
+            return False
+    return True
+
+
+def _certified_contraction(
+    candidate: float,
+    ceiling: float,
+    source_metric: np.ndarray,
+    destination_metric: np.ndarray,
+    dynamics_matrix: np.ndarray,
+) -> float | None:
+    dtype = dynamics_matrix.dtype
+    if np.all(dynamics_matrix == 0.0):
+        return 0.0
+    ceiling_gap = _outward_positive_difference_lower(ceiling, candidate, dtype)
+    if ceiling_gap <= 0.0:
+        return None
+    candidates = [candidate]
+    candidates.extend(
+        candidate + (ceiling - candidate) * (1.0 - 2.0**-step)
+        for step in range(1, 25)
+    )
+    for value in candidates:
+        upper = float(
+            _outward_upper(
+                value,
+                dtype,
+                count=3,
+                scale=max(abs(candidate), abs(ceiling)),
+            )
+        )
+        if _outward_positive_difference_lower(ceiling, upper, dtype) <= 0.0:
+            continue
+        if _matrix_inequality_verified(
+            upper, source_metric, destination_metric, dynamics_matrix
+        ):
+            return upper
+    return None
+
+
 def _mode_contractions(
     dynamics_matrix: np.ndarray,
     lyapunov_matrix: np.ndarray,
-) -> np.ndarray:
+    *,
+    ceiling: float,
+) -> tuple[np.ndarray, np.ndarray]:
     regimes = dynamics_matrix.shape[0]
     declared_dtype = dynamics_matrix.dtype
     proof_matrix = dynamics_matrix.astype(np.float64)
     proof_metric = lyapunov_matrix.astype(np.float64)
     roots = np.linalg.cholesky(proof_metric)
     contraction = np.empty((regimes, regimes), dtype=np.float64)
+    verified = np.zeros((regimes, regimes), dtype=bool)
     for source in range(regimes):
         for destination in range(regimes):
             numerator = roots[destination].T @ proof_matrix[destination]
@@ -638,7 +743,7 @@ def _mode_contractions(
                 float(np.sum(np.abs(transformed))) ** 2
                 * max(1.0, condition)
             )
-            contraction[source, destination] = (
+            candidate = (
                 0.0
                 if np.all(transformed == 0.0)
                 else _outward_upper(
@@ -648,7 +753,18 @@ def _mode_contractions(
                     scale=scale,
                 )
             )
-    return contraction
+            certified = _certified_contraction(
+                float(candidate),
+                ceiling,
+                lyapunov_matrix[source],
+                lyapunov_matrix[destination],
+                dynamics_matrix[destination],
+            )
+            verified[source, destination] = certified is not None
+            contraction[source, destination] = (
+                float(certified) if certified is not None else float(ceiling)
+            )
+    return contraction, verified
 
 
 def recurrence_stability_certificate(
