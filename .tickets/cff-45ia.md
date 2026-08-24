@@ -1,6 +1,6 @@
 ---
 id: cff-45ia
-status: in_progress
+status: closed
 deps: [cff-9w2d]
 links: []
 created: 2026-08-24T06:00:41Z
@@ -88,3 +88,7 @@ The fit returned far enough to enter post-fit recovery metrics. `aligned_seconda
 Experiment artifact commit e019bf4 preserves the immutable partial result. Its registration, root manifest, attempt manifest, and append-only ledger authenticate against the registered plan and execution identity. The ledger is exactly started then failed; the root aggregate contains zero completed arms. The settled-artifact validator correctly rejects it as an unsettled failed attempt rather than silently promoting or rerunning it. Results SHA-256 is 5a4417ba261700319ce0780676c47a3a10072547795f8149f9c49d126e9ecfd4; root manifest SHA-256 is 75315b5b1c904d441582f2c815c6fc6312199d3caf16ac7c64687135c6512fe0.
 
 Resume handoff: before any new registration or fit, retain the coherent fit/status/work and terminal-belief finiteness evidence before derived metrics. The metric boundary must distinguish a non-finite terminal posterior from an ill-conditioned but finite alignment and fail with a named diagnostic. Because that repair changes registered execution code and the failed attempt has no reusable fit checkpoint, it cannot resume or relabel this artifact. cff-45ia remains in progress and cff-3v7q remains blocked from selecting prior 1.0 prospectively.
+
+**2026-08-24T11:20:35Z**
+
+Completed the exact prospective cohort under experiment commits 2cc38c5 (reviewed runner), cf58a7d (immutable registration), c9b138f (passing four-arm funnel), and b9c7461 (complete cohort), with CFFG 4b9f9e3. The manifested result is status complete_fail: all 24/24 D10 fits and terminal solves converged and every transition-RMSE, paired-identity, predictive-preservation, and regime-accuracy gate passed, but recurrence prior 1.0 had five unbounded rollout cells across three of twelve fit pairs (seed5000/fit1/shared; seed5002/fit0/native; seed5002/fit1/shared). Failures were amplitude or variance-growth boundary violations, not fit divergence. The .001 baseline also missed three of 48 rollout cells. Therefore prior 1.0 is not selected and cff-3v7q remains blocked from classic freeze. The artifact validates after commit; results SHA-256 08e2ecbac6f00b501fb7d883a59b7ee0f4a82afa7c0d3b730762579cf23841f7 and manifest SHA-256 857429cff80ede7dc07811e60e32c88fd6c7a1acf15eb46b0de2d093e2396f. Total recorded arm wall was 7,990.622 s and peak RSS 20,428,144,640 bytes. No adapter, heterogeneous dataset, calibration seed, final seed, historical checkpoint import, or SLDS control ran. Independent interpretation is being attached to cff-3v7q; no adaptive rerun or threshold change is authorized.
