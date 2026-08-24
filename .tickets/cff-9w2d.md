@@ -1,6 +1,6 @@
 ---
 id: cff-9w2d
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-24T07:21:35Z
@@ -76,3 +76,7 @@ Legend: prerequisite --> dependent
                                           |
                                           +--> [ ] cff-3v7q periodicity decision
 ```
+
+**2026-08-24T08:44:55Z**
+
+Implemented in experiment commits c2d44bf and cd11cf8. The shared terminal-belief authority now selects D10 structured beliefs only for a converged outer fit and proper converged component, preserves the no-D10 legacy path, and covers the primary oracle plus all rSLDS metric consumers. The paired classic runner now writes an authenticated schema-v2 fit-complete checkpoint before alignment/metrics/rollouts and can resume post-fit without refitting. Alignment uses scaled finite/rank-aware classifications. The immutable cff-45ia failure is linked but cannot be imported or resumed. Validation: 203 affected tests passed; independent audit CLEAR at source head e326347, including outer-status, legacy-readout prohibition, exact identity, and authenticated RSS falsifiers. No scientific fit, data generation, rollout, calibration, or final seed ran. cff-45ia may now create a fresh registration/output for its four-arm funnel.
