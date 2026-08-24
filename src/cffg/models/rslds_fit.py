@@ -177,8 +177,10 @@ class RSLDSFitResult:
     ``certified_coordinate``; an exhausted result performs a terminal solve at
     its last installed coordinate. A non-``None`` ``model_posterior`` carries
     the current D10 structured-pair statistic identity and may be checkpointed
-    for resume; point ``parameters`` alone are a model initialization, not a
-    resumable posterior. ``inner_status`` is ``None`` only when an initializer
+    for model-only use. ``learning_checkpoint`` is the complete four-family
+    resume payload; point ``parameters`` alone are a model initialization, not
+    a resumable posterior. Both posterior forms are absent before the first
+    accepted proposal. ``inner_status`` is ``None`` only when an initializer
     certificate stops the gated cadence before the first engine run.
     """
 
@@ -196,6 +198,7 @@ class RSLDSFitResult:
     initialization: RSLDSInitialization
     model_posterior: RSLDSLearning | None
     emission_posterior: dict[str, np.ndarray] | None
+    learning_checkpoint: dict[str, np.ndarray] | None
     last_inference: RunResult | None
     phases: tuple[RSLDSFitPhase, ...]
     timings: dict[str, float]
@@ -436,6 +439,14 @@ def _result(
             else {
                 key: np.asarray(value).copy()
                 for key, value in learning.params[EMISSION_LEARNABLE].items()
+            }
+        ),
+        learning_checkpoint=(
+            None
+            if learning is None
+            else {
+                name: np.asarray(value).copy()
+                for name, value in learning.state_dict().items()
             }
         ),
         last_inference=last_inference,

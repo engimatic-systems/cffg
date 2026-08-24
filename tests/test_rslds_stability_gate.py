@@ -11,7 +11,6 @@ import pytest
 
 from cffg.compiler import compile_template
 from cffg.engine import Engine, RunStatus
-from cffg.learn import Learnables
 from cffg.models import (
     PCAARHMMInitializer,
     RSLDSInitialization,
@@ -27,7 +26,6 @@ from cffg.models import (
 )
 from cffg.models.coordinate_fit import CoordinateResidual
 from cffg.models.rslds import rslds
-from cffg.models.rslds_fit import _install
 from cffg.models.rslds_stability import POINT_FIELDS
 from cffg.switching_stability import (
     StabilityStatus,
@@ -471,6 +469,7 @@ def test_gated_fit_certifies_both_initializer_tiers_and_accepts_progress(tier):
     assert result.work.certificate_attempts == 2
     assert result.work.accepted_proposals == 1
     assert result.work.rejected_proposals == 0
+    assert result.learning_checkpoint is not None
     assert result.residuals == result.evaluated_residuals
     assert result.rejected_residuals == ()
     assert result.phases[0].stability_evidence is result.stability_phases[1]
@@ -627,6 +626,21 @@ def test_rejection_after_one_hit_cannot_count_as_progress_or_convergence(monkeyp
     assert result.work.rejected_proposals == 1
     for name, value in result.parameters.items():
         np.testing.assert_array_equal(value, proposed[0][name])
+    assert result.learning_checkpoint is not None
+    monkeypatch.setattr(
+        "cffg.models.rslds_fit.runtime_rslds_point", original_runtime_point
+    )
+    restored = restore_stability_gated_learning(
+        _observations(),
+        engine=result.engine,
+        priors=vague_rslds_fit_priors(2, 1, 2),
+        learning_checkpoint=result.learning_checkpoint,
+        stability_checkpoint=encode_stability_evidence(result.stability_phases[1]),
+        stability_policy=POLICY,
+        coordinate="coordinate/1",
+    )
+    for name, value in restored.parameters.items():
+        np.testing.assert_array_equal(value, result.parameters[name])
 
 
 def test_uncertified_initializer_stops_before_inner_solve(monkeypatch):
@@ -660,40 +674,24 @@ def test_uncertified_initializer_stops_before_inner_solve(monkeypatch):
     assert result.work.certificate_attempts == 1
     assert result.work.d10_map_evaluations == 0
     assert result.work.accepted_proposals == 0
+    assert result.learning_checkpoint is None
     assert runs == []
 
 
 def test_gated_restore_authenticates_before_exposing_a_pending_write():
-    observations = np.linspace(-0.2, 0.2, 3, dtype=np.float64)[:, None]
-    point = _point()
-    engine = _engine(point)
-    priors = vague_rslds_fit_priors(2, 1, 1)
-    learning = Learnables(engine, priors=priors.learning_priors())
-    current = engine.bind_data(
-        engine.init_state(),
-        {f"y{step}": row for step, row in enumerate(observations)},
-    )
-    inference = engine.run(current, 200, tol=1e-5)
-    assert inference.status is RunStatus.CONVERGED
-    learning.replace(engine, inference)
-    staged = _install(engine, observations, learning)
-    staged_point = runtime_rslds_point(engine, staged)
-    evidence = evaluate_rslds_stability(
-        engine,
-        staged_point,
-        POLICY,
-        owner="proposal",
-        coordinate="coordinate/1",
-    )
-    assert evidence.accepted
-    learning_checkpoint = learning.state_dict()
+    observations = _observations()
+    priors = vague_rslds_fit_priors(2, 1, observations.shape[1])
+    result = _fit(PCAARHMMInitializer())
+    assert result.learning_checkpoint is not None
+    evidence = result.stability_phases[-1]
+    learning_checkpoint = result.learning_checkpoint
     checkpoint_snapshot = {
         name: value.copy() for name, value in learning_checkpoint.items()
     }
 
     restored = restore_stability_gated_learning(
         observations,
-        engine=engine,
+        engine=result.engine,
         priors=priors,
         learning_checkpoint=learning_checkpoint,
         stability_checkpoint=encode_stability_evidence(evidence),
@@ -702,14 +700,14 @@ def test_gated_restore_authenticates_before_exposing_a_pending_write():
     )
 
     for name, value in restored.parameters.items():
-        np.testing.assert_array_equal(value, staged_point[name])
+        np.testing.assert_array_equal(value, result.parameters[name])
     for name, value in checkpoint_snapshot.items():
         np.testing.assert_array_equal(learning_checkpoint[name], value)
 
     with pytest.raises(ValueError, match="checkpoint"):
         restore_stability_gated_learning(
             observations,
-            engine=engine,
+            engine=result.engine,
             priors=priors,
             learning_checkpoint=learning_checkpoint,
             stability_checkpoint=None,
@@ -719,7 +717,7 @@ def test_gated_restore_authenticates_before_exposing_a_pending_write():
     with pytest.raises(ValueError, match="does not match"):
         restore_stability_gated_learning(
             observations,
-            engine=engine,
+            engine=result.engine,
             priors=priors,
             learning_checkpoint=learning_checkpoint,
             stability_checkpoint=encode_stability_evidence(evidence),

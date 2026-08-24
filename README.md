@@ -419,9 +419,10 @@ projection or stability solver.
 `validate_stability_evidence` recomputes and authenticates that record against
 the exact current engine, ordered point arrays, policy, owner, and coordinate.
 `restore_stability_gated_learning` is the fail-closed resume boundary: it stages
-a complete four-family `Learnables` checkpoint locally, reconstructs its exact
-runtime point, requires matching accepted proposal evidence, and only then
-exposes the pending state. Generic `Learnables` restore remains ungated and
+a result's complete four-family `learning_checkpoint` locally, reconstructs
+its exact runtime point, requires matching accepted proposal evidence, and only
+then exposes the pending state. The checkpoint is `None` before the first
+accepted proposal. Generic `Learnables` restore remains ungated and
 must not be described as stability-certified. The codec rejects noncanonical
 or type-changed records and D8/D9 or differently owned D10 engines. Host gate
 evidence stays beside, not inside, generic learning persistence.
