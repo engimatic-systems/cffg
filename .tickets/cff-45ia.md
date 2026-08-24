@@ -78,3 +78,13 @@ Legend: prerequisite --> dependent
                                           |
                                           +--> [ ] classic parity evidence
 ```
+
+**2026-08-24T07:14:15Z**
+
+The registered D10 funnel stopped on its first declared arm before producing scientific gate evidence. Execution used experiment commit 3ab57172, immutable registration commit f12a2ea, and CFFG 4b9f9e3. The only attempted coordinate was seed 5000, fit replicate 0, shared-initialization tier, prior strength 0.001. It ran from 2026-08-24T06:59:37Z to 07:10:48Z (671 seconds). The last live sample was 7,315,840 KiB RSS; exact peak RSS was not serialized because the arm record was never reached.
+
+The fit returned far enough to enter post-fit recovery metrics. `aligned_secondary` then raised `LinAlgError: SVD did not converge in Linear Least Squares`, with LAPACK DLASCL illegal-value warnings. No fit checkpoint, phase-work record, rollout, paired score, or funnel gate was written, so this is an infrastructure/diagnostic stop rather than evidence that either prior passed or failed. Expansion is not authorized and no rerun occurred.
+
+Experiment artifact commit e019bf4 preserves the immutable partial result. Its registration, root manifest, attempt manifest, and append-only ledger authenticate against the registered plan and execution identity. The ledger is exactly started then failed; the root aggregate contains zero completed arms. The settled-artifact validator correctly rejects it as an unsettled failed attempt rather than silently promoting or rerunning it. Results SHA-256 is 5a4417ba261700319ce0780676c47a3a10072547795f8149f9c49d126e9ecfd4; root manifest SHA-256 is 75315b5b1c904d441582f2c815c6fc6312199d3caf16ac7c64687135c6512fe0.
+
+Resume handoff: before any new registration or fit, retain the coherent fit/status/work and terminal-belief finiteness evidence before derived metrics. The metric boundary must distinguish a non-finite terminal posterior from an ill-conditioned but finite alignment and fail with a named diagnostic. Because that repair changes registered execution code and the failed attempt has no reusable fit checkpoint, it cannot resume or relabel this artifact. cff-45ia remains in progress and cff-3v7q remains blocked from selecting prior 1.0 prospectively.
