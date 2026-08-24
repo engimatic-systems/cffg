@@ -134,3 +134,7 @@ Downstream handoff for cff-ngxx then cff-h0hx:
 - Do not relabel, import, or resume the historical D9 h0hx seed-5000 checkpoint; it remains immutable evidence and a fresh registered D10 development fit is required.
 - Prospective experiment checkpoints must retain authenticated D10 singleton/pair beliefs, Gaussian mean/covariance/lag moments, pair-derived recurrence masses, all four learned posterior families, observation/config/stream/code identities, and coherent phase_work coordinate roles.
 - Reject missing/D8/D9/product-marginal or topology-mismatched evidence before generation. Run only the already registered seed-5000/native development pilot first, preserve a falsifier and stop on status/cap failure, and run no adapter, control, calibration, or final seed under this handoff.
+
+**2026-08-24T14:05:40Z**
+
+Four-family D10 learning and persistence are published for review in draft PR #93: https://github.com/engimatic-systems/cffg/pull/93. Final core gate recorded 1,520 passed; scientific recovery remains a separate failed development gate.

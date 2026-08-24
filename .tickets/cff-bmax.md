@@ -115,3 +115,7 @@ Independent evidence covers K2/K3 path enumeration, implicit last-stick axes, K3
 Reviewer corrections are incorporated in DERIVATIONS D10 and ARCHITECTURE: arbitrary u_t is scored; qX is exact only for fixed PG auxiliary; collapsed stationarity is claimed only at a joint fixed point; initial/emission/unary ledger ownership is explicit; initial dispatch eligibility is tied regime-independent x0/shared emission with equality-closure mapping; conditioned fixed drive is not a singular Gaussian and K1 bypasses D9.
 
 cff-e10u handoff: derive StructuredHybridPlan only for that documented topology, dispatch these coordinates through synchronous/scheduled host/JIT paths, persist the installed singleton/pair/Gaussian/lag state, and give D10 one energy owner that suppresses the replaced initial, emission, D3, D9, and internal separator terms. Retain D3/D9 for every ineligible graph. cff-6rav remains the owner of learning installation and persistence identity. No fit, adapter, control, NASCAR data, calibration seed, or final seed ran.
+
+**2026-08-24T14:05:40Z**
+
+Integrated D10 core is published for review in draft PR #93: https://github.com/engimatic-systems/cffg/pull/93. The PR is chained on #92 and excludes scientific requalification, stability gating, calibration, and final evidence.

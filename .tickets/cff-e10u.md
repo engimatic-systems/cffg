@@ -130,3 +130,7 @@ Independent read-only review cleared exact head 5d0b209 after cycle, duplicate-t
 **Definitions**
 
 D10 plan means compiler-derived runtime metadata; it is not serialized model structure. A stale coordinate is a valid parameter update paired with derived beliefs from an older parameter point, not numerical divergence.
+
+**2026-08-24T14:05:40Z**
+
+Compiler/engine D10 integration is published for review in draft PR #93: https://github.com/engimatic-systems/cffg/pull/93, chained on #92.
