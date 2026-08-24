@@ -1,7 +1,7 @@
 ---
 id: cff-45ia
 status: in_progress
-deps: []
+deps: [cff-9w2d]
 links: []
 created: 2026-08-24T06:00:41Z
 type: task
