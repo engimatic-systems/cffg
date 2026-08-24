@@ -1,6 +1,6 @@
 ---
 id: cff-fely
-status: in_progress
+status: closed
 deps: [cff-45ia]
 links: []
 created: 2026-08-24T11:26:41Z
@@ -164,3 +164,7 @@ Legend: prerequisite --> dependent
                               |
                               +--> [ ] cff-3v7q classic periodicity decision
 ```
+
+**2026-08-24T12:42:19Z**
+
+Completed acceptance-complete no-fit diagnosis in sibling experiment commit 18e61be24b0b3c8ca1e031b7d165c1a8166463fa. The manifested artifact validates after commit: results SHA-256 6cf8d86c446bcb92f2df72864e6300e749a867cbf5194e182be156f731235f48, manifest SHA-256 a93fa1a599516792d1cfa7a56c995587acdf7745dc5fbe6d6439bf88a0de6d3b, plan SHA-256 3c28ec7289cc85ab4d611fe6b12d4183fc2f443489e1049f0bd2cb3114affa73. All 192 registered 10,000-step rollouts completed; all 96 originals reproduced exactly before 96 hybrids were interpreted. Registered verdict: interaction_or_ambiguous. Of 8 original miss cells, 4 satisfy the full recurrence-donor rule, 0 the non-recurrence rule, and 4 neither; the boundedness/gate Boolean follows recurrence in 5/8. Of 40 passing controls, 39 keep all four corners passing; one hybrid introduces a new periodicity miss. Full five-metric recurrence proximity holds 16/40 controls, non-recurrence 0/40, threshold-only 0/48. Both independent reviewers authenticated the artifact and agreed the verdict must not be upgraded to recurrence ownership. This establishes strong partial recurrence influence plus genuine joint recurrence/non-recurrence behavior, not a universal one-block repair. No fit, data generation, adapter, control, heterogeneous coordinate, calibration seed, or final seed ran.
