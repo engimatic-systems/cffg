@@ -1,7 +1,7 @@
 ---
 id: cff-3v7q
 status: in_progress
-deps: [cff-2wb6, cff-45ia]
+deps: [cff-2wb6, cff-45ia, cff-fely]
 links: [cff-oyie]
 created: 2026-08-20T15:41:17Z
 type: task
@@ -112,3 +112,7 @@ Legend: prerequisite --> dependent
 **2026-08-21T19:07:17Z**
 
 Replicate-0 development replay completed in sibling experiment commit 8280cb8: six converged classic fits (seeds 5000-5002 x both tiers) crossed with four declared 10,000-step rollout streams, 24/24 completed and bounded. The artifact is honestly partial (`aggregate.complete=false`, 3/6 fit checkpoints per tier). Native seed5000 failed the 0.4109805203 floor on streams 2 and 3 with scores 0.397873035 and 0.407945616; the other 22 cells passed. Native rollout-stream RMS variation 0.081256 was 3.47 times its between-fit-cell SD 0.023425. Therefore the unchanged baseline already fails the every-declared-cell robustness rule; six replicate-1 fits remain necessary only to complete the registered fit-versus-rollout variation decomposition. Artifact: `artifacts/rslds-classic-periodicity-replay-development-replicate-0`; no fit, adapter, calibration seed, or final seed ran for this replay. cff-8w4c screening will evaluate every candidate classic seed5000 fit across all four streams so a shared-prior remedy cannot trade away periodic adequacy.
+
+**2026-08-24T11:29:08Z**
+
+The prospective current-D10 cohort completed under experiment commit b9c7461 and independently revalidated. All 24 fits and terminal solves converged; all 96 rollouts completed 10,000 steps; transition RMSE, predictive preservation, regime accuracy, and paired identities passed. Prior 1.0 nevertheless passed only 43/48 rollout cells versus 45/48 for prior 0.001. Its five unbounded cells affected 3/12 fit pairs across both initialization tiers and two data seeds; four were material boundary exceedances. The candidate failure set did not overlap the baseline failures, so the stronger prior moved rather than eliminated long-horizon instability. cff-45ia is closed as a completed scientific miss; no prior is selected and no freeze is authorized. Read-only retained evidence shows all fits have slightly expansive dynamics but cannot recover rollout regime paths. New child cff-fely owns an authenticated no-fit 2-by-2 recurrence/non-recurrence block-swap diagnostic. Legend: prerequisite --> dependent. [x] cff-45ia complete miss --> [ ] cff-fely mechanism attribution --> [ ] prospective stabilization candidate --> [ ] cff-3v7q decision.
