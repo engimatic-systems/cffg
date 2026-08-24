@@ -494,16 +494,15 @@ the rSLDS is unstable. Exceeding the declared cone or compact-box ceilings is
 
 A finite or posterior-weighted drift grid remains descriptive only. It cannot
 control behavior outside its points and cannot be promoted to a global
-certificate. The current code exposes no production constraint, projection,
-prior, objective term, or rollout claim from the new authority. The selected
-future compatibility boundary is a safety/eligibility gate on the undamped
-outer proposal: it preserves
+certificate. The optional observed-only fitter gate is a safety/eligibility
+check on the undamped outer proposal: it preserves
 the rSLDS probability family and fixed-point D10 free energy at accepted
 points, but changes the learning algorithm by rejecting an unconstrained
 conjugate update. It neither finds a feasible replacement nor guarantees
-outer convergence. Until a separate reviewed consumer owns that atomic
-pre-install and persistence boundary, the verifier does not make learned fits
-more stable and does not repair the outstanding classic periodicity evidence.
+outer convergence. Identity mode metrics make the registered policy simple
+and deterministic but also inherit the certificate's conservatism. The gate
+does not make an uncertified initializer feasible, and no current experiment
+establishes that it repairs the outstanding classic periodicity evidence.
 
 **S1j. Schedules: measured envelope (cff-d56d, revised 2026-07-27 after
 review).** Two-pass schedules make tree and chain inference O(E) with

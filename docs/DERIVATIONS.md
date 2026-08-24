@@ -2466,9 +2466,11 @@ This operation preserves the rSLDS probability family and does not alter the
 D10 inner coordinate, fixed point, or free-energy value at a fixed accepted
 point. It does change the outer learning algorithm: the unconstrained
 conjugate proposal is conditionally rejected. No production parameter writer,
-fit status, checkpoint, or persistence schema implements that gate in this
-ticket. A future consumer must own the pre-install check and record the
-certificate settings and evidence beside the attempted coordinate. A
+objective term, or engine schedule implements the gate. The observed-only
+fitter is the reviewed host consumer: it verifies the initializer and checks a
+complete proposal immediately before the existing four-family atomic write.
+Its separate evidence codec records the certificate settings and bounds beside
+the attempted coordinate without changing generic learning persistence. A
 reject-only gate does not find a feasible replacement and does not ensure
 outer convergence, so it is not called a stability repair or learning solver.
 

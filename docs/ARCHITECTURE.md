@@ -441,6 +441,7 @@ The fit boundary remains deliberately small and model-owned:
 | Named coordinate residual and certification decision | `cffg.models.coordinate_fit` | Reusable evidence and identity primitives: they compare model-owned named blocks, apply the consecutive-hit rule, and keep an unchecked proposal distinct from its evaluated parent. |
 | Runtime and transition-function coordinate views | `cffg.models.rslds_coordinate` | rSLDS-specific: it projects learned values into installed semantics and evaluates a truth-free observation-derived transition probe. |
 | Status-gated run, identical-state retry, runtime-map certificate, terminal solve | `cffg.models.rslds_fit` | The model-owned loop supplies rSLDS parameter views and returns the coordinate selected by the shared decision primitive. The remaining retry and terminal-solve policy stays here until a non-switching production fitter proves the same interface and parity. |
+| Optional Foster proposal eligibility and its checkpoint evidence | `cffg.models.rslds_stability` and `cffg.models.rslds_fit` | rSLDS-specific: an explicit truth-free policy fixes identity mode metrics and all numerical proof settings; the fitter verifies the initializer and each proposal eligible for installation. Generic learning and engine state remain unchanged. |
 
 No shared fitting framework is introduced on that last row merely from one
 client. Ordinary non-switching Gaussian models already prove the shared
@@ -457,18 +458,29 @@ interior. Its evidence separates `satisfied`, `violated`, `infeasible`, and
 `diverged`. A separate finite-probe result is explicitly descriptive and
 cannot substitute for the global certificate.
 
-The selected compatible future boundary is a safety/eligibility gate on an
+The optional compatible boundary is a safety/eligibility gate on an
 undamped four-family point proposal before installation. That gate has no D10
 objective or BFE contribution: accepted point parameters retain the same rSLDS family,
 D10 fixed point, and D10 free-energy semantics. Rejection changes the outer
-learning operation by withholding its unconstrained conjugate proposal. This
-repository currently exposes only the pure verifier; no `Engine` state,
-schedule, `Learnables.write`, `RSLDSLearning.install`, `fit_rslds` status,
-checkpoint schema, or experiment consumer owns the gate or persists its
-evidence. Those derived surfaces are deliberately N/A until a reviewed
-consumer ticket makes the pre-install boundary atomic. Rejecting a proposal
-does not construct a feasible replacement or guarantee outer convergence, so
-this boundary is not a production stability repair.
+learning operation by withholding its unconstrained conjugate proposal.
+`RSLDSStabilityPolicy` has no numerical defaults: a caller explicitly fixes
+the Foster rate, tail radius, compact subdivision, and tail-cone ceiling;
+per-mode identity Lyapunov matrices are derived solely from the declared model
+dimension. `fit_rslds` verifies the initializer before the first D10 solve and
+checks a complete proposal after all four posterior replacements but before
+the existing atomic point write. A certificate rejection terminates that host
+cadence with `certificate_rejected`, preserves the installed coordinate, and
+cannot enter its accepted residual history or convergence-hit count.
+
+The gate evidence codec binds the exact ordered nine-array point, dtype, proof
+settings and bounds, ownership/outcome, D10 executable/objective/coordinate
+identity, component topology, and all four factor/source statistic owners. A
+resume consumer must validate it against the current engine and point before
+mutation; missing, reordered, noncanonical, D8/D9, or differently configured
+evidence fails closed. This host record is deliberately separate from generic
+`Learnables` persistence. Rejecting a proposal does not construct a feasible
+replacement or guarantee outer convergence, so this boundary is not a
+production stability repair.
 
 ### 2e. Executable factor registration (`cffg.kernels`, cff-ri8m)
 

@@ -49,6 +49,13 @@ from cffg.models.rslds_init import (
     _validate_initialization,
     _validate_observations,
 )
+from cffg.models.rslds_stability import (
+    RSLDSStabilityEvidence,
+    RSLDSStabilityOutcome,
+    RSLDSStabilityPolicy,
+    evaluate_rslds_stability,
+)
+from cffg.switching_stability import StabilityStatus
 
 
 @dataclass(frozen=True)
@@ -134,6 +141,17 @@ class RSLDSFitPhase:
     legacy_fixed_point_residual: float | None = None
     runtime_residual: CoordinateResidual | None = None
     functional_transition_residual: CoordinateResidual | None = None
+    stability_evidence: RSLDSStabilityEvidence | None = None
+
+
+@dataclass(frozen=True)
+class RSLDSFitWork:
+    """Outer-map and eligibility-gate work owned by the host fitter."""
+
+    d10_map_evaluations: int
+    certificate_attempts: int
+    accepted_proposals: int
+    rejected_proposals: int
 
 
 @dataclass(frozen=True)
@@ -159,6 +177,8 @@ class RSLDSFitResult:
     iterations: int
     residual: float
     residuals: tuple[float, ...]
+    evaluated_residuals: tuple[float, ...]
+    rejected_residuals: tuple[float, ...]
     free_energies: tuple[float, ...]
     parameters: dict[str, np.ndarray]
     initialization: RSLDSInitialization
@@ -167,8 +187,11 @@ class RSLDSFitResult:
     last_inference: RunResult | None
     phases: tuple[RSLDSFitPhase, ...]
     timings: dict[str, float]
+    work: RSLDSFitWork
+    stability_phases: tuple[RSLDSStabilityEvidence, ...]
     returned_coordinate: str
     certified_coordinate: str | None
+    gate_termination: RSLDSStabilityOutcome | None = None
     error: str | None = None
 
     def require_converged(self) -> "RSLDSFitResult":
@@ -353,6 +376,8 @@ def _result(
     inner_status: RunStatus,
     iterations: int,
     residuals: list[float],
+    evaluated_residuals: list[float],
+    rejected_residuals: list[float],
     free_energies: list[float],
     points: dict[str, np.ndarray],
     initialization: RSLDSInitialization,
@@ -360,8 +385,11 @@ def _result(
     last_inference: RunResult | None,
     phases: list[RSLDSFitPhase],
     timings: dict[str, float],
+    work: dict[str, int],
+    stability_phases: list[RSLDSStabilityEvidence],
     returned_coordinate: str,
     certified_coordinate: str | None,
+    gate_termination: RSLDSStabilityOutcome | None = None,
     error: str | None = None,
 ) -> RSLDSFitResult:
     return RSLDSFitResult(
@@ -372,6 +400,8 @@ def _result(
         iterations=iterations,
         residual=float(residuals[-1]) if residuals else float("inf"),
         residuals=tuple(residuals),
+        evaluated_residuals=tuple(evaluated_residuals),
+        rejected_residuals=tuple(rejected_residuals),
         free_energies=tuple(free_energies),
         parameters={name: np.asarray(value).copy() for name, value in points.items()},
         initialization=initialization,
@@ -389,8 +419,11 @@ def _result(
         last_inference=last_inference,
         phases=tuple(phases),
         timings=dict(timings),
+        work=RSLDSFitWork(**work),
+        stability_phases=tuple(stability_phases),
         returned_coordinate=returned_coordinate,
         certified_coordinate=certified_coordinate,
+        gate_termination=gate_termination,
         error=error,
     )
 
@@ -410,6 +443,7 @@ def fit_rslds(
     schedule: str = "auto",
     damp: float = 0.0,
     max_inner_retries: int = 2,
+    stability_policy: RSLDSStabilityPolicy | None = None,
 ) -> RSLDSFitResult:
     """Fit one rSLDS sequence without receiving generating variables.
 
@@ -424,6 +458,12 @@ def fit_rslds(
     recorded once rather than repeated as a nominal retry. The legacy path may
     restart with a larger convex update step up to ``max_inner_retries`` times.
     The terminal state is inferred once after the last parameter replacement.
+
+    ``stability_policy`` is opt-in and has no fitted numerical defaults. It
+    verifies the initializer before inference and each complete proposal that
+    would otherwise be installed. A violated proposal terminates with a
+    fit-owned ``certificate_rejected`` reason, retains the installed point,
+    and stays outside the accepted residual and convergence-hit histories.
     """
     observations = _validate_observations(observations)
     if max_outer_iterations <= 0 or max_inner_iterations <= 0:
@@ -499,8 +539,17 @@ def fit_rslds(
         _cast_state(engine.init_state(), observations.dtype), _data(observations)
     )
     residuals: list[float] = []
+    evaluated_residuals: list[float] = []
+    rejected_residuals: list[float] = []
     free_energies: list[float] = []
     phases: list[RSLDSFitPhase] = []
+    stability_phases: list[RSLDSStabilityEvidence] = []
+    work = {
+        "d10_map_evaluations": 0,
+        "certificate_attempts": 0,
+        "accepted_proposals": 0,
+        "rejected_proposals": 0,
+    }
     consecutive = 0
     coordinate_index = 0
     timings = {
@@ -509,6 +558,49 @@ def fit_rslds(
         "inference": 0.0,
         "coordinate": 0.0,
     }
+
+    if stability_policy is not None:
+        initial_stability = evaluate_rslds_stability(
+            engine,
+            current_points,
+            stability_policy,
+            owner="initializer",
+            coordinate=coordinate_identity(0),
+        )
+        stability_phases.append(initial_stability)
+        work["certificate_attempts"] += 1
+        if not initial_stability.accepted:
+            status = (
+                RunStatus.BUDGET_EXHAUSTED
+                if initial_stability.certificate.status is StabilityStatus.VIOLATED
+                else RunStatus.DIVERGED
+            )
+            return _result(
+                engine=engine,
+                state=current_state,
+                status=status,
+                inner_status=status,
+                iterations=0,
+                residuals=residuals,
+                evaluated_residuals=evaluated_residuals,
+                rejected_residuals=rejected_residuals,
+                free_energies=free_energies,
+                points=current_points,
+                initialization=initialization,
+                learning=current_learning,
+                last_inference=None,
+                phases=phases,
+                timings=timings,
+                work=work,
+                stability_phases=stability_phases,
+                returned_coordinate=coordinate_identity(0),
+                certified_coordinate=None,
+                gate_termination=initial_stability.outcome,
+                error=(
+                    f"initializer stability {initial_stability.outcome.value}: "
+                    f"{initial_stability.certificate.reason}"
+                ),
+            )
 
     completed_iterations = 0
     for iteration in range(1, max_outer_iterations + 1):
@@ -553,6 +645,8 @@ def fit_rslds(
                 inner_status=inner.status,
                 iterations=iteration,
                 residuals=residuals,
+                evaluated_residuals=evaluated_residuals,
+                rejected_residuals=rejected_residuals,
                 free_energies=free_energies,
                 points=current_points,
                 initialization=initialization,
@@ -560,6 +654,8 @@ def fit_rslds(
                 last_inference=inner,
                 phases=phases,
                 timings=timings,
+                work=work,
+                stability_phases=stability_phases,
                 returned_coordinate=coordinate,
                 certified_coordinate=None,
                 error=f"inner inference {inner.status.value}",
@@ -587,6 +683,8 @@ def fit_rslds(
                 inner_status=RunStatus.DIVERGED,
                 iterations=iteration,
                 residuals=residuals,
+                evaluated_residuals=evaluated_residuals,
+                rejected_residuals=rejected_residuals,
                 free_energies=free_energies,
                 points=current_points,
                 initialization=initialization,
@@ -594,6 +692,8 @@ def fit_rslds(
                 last_inference=inner,
                 phases=phases,
                 timings=timings,
+                work=work,
+                stability_phases=stability_phases,
                 returned_coordinate=coordinate,
                 certified_coordinate=None,
                 error="inner Bethe free energy is missing or non-finite",
@@ -631,11 +731,86 @@ def fit_rslds(
                 tolerance=outer_tolerance,
                 previous_hits=consecutive,
             )
+            work["d10_map_evaluations"] += 1
+            evaluated_residuals.append(residual)
+            stability_evidence = None
+            if decision.installs_proposal and stability_policy is not None:
+                stability_evidence = evaluate_rslds_stability(
+                    engine,
+                    candidate_points,
+                    stability_policy,
+                    owner="proposal",
+                    coordinate=proposed_coordinate,
+                )
+                stability_phases.append(stability_evidence)
+                work["certificate_attempts"] += 1
+                if not stability_evidence.accepted:
+                    if (
+                        stability_evidence.certificate.status
+                        is StabilityStatus.VIOLATED
+                    ):
+                        work["rejected_proposals"] += 1
+                        rejected_residuals.append(residual)
+                    timings["coordinate"] += time.perf_counter() - started
+                    phases.append(
+                        RSLDSFitPhase(
+                            iteration=iteration,
+                            evaluated_coordinate=coordinate,
+                            proposed_coordinate=proposed_coordinate,
+                            installed_coordinate=coordinate,
+                            certified_coordinate=None,
+                            returned_coordinate=coordinate,
+                            coordinate_replaced=False,
+                            attempts=attempts,
+                            parameter_scales_before=scales_before,
+                            parameter_scales_after=scales_before,
+                            fixed_point_residual=residual,
+                            proposed_parameter_scales=candidate_scales,
+                            legacy_fixed_point_residual=legacy_residual,
+                            runtime_residual=runtime_residual,
+                            functional_transition_residual=functional_residual,
+                            stability_evidence=stability_evidence,
+                        )
+                    )
+                    gate_status = (
+                        RunStatus.BUDGET_EXHAUSTED
+                        if stability_evidence.certificate.status
+                        is StabilityStatus.VIOLATED
+                        else RunStatus.DIVERGED
+                    )
+                    return _result(
+                        engine=engine,
+                        state=inner.state,
+                        status=gate_status,
+                        inner_status=inner.status,
+                        iterations=iteration,
+                        residuals=residuals,
+                        evaluated_residuals=evaluated_residuals,
+                        rejected_residuals=rejected_residuals,
+                        free_energies=free_energies,
+                        points=current_points,
+                        initialization=initialization,
+                        learning=current_learning,
+                        last_inference=inner,
+                        phases=phases,
+                        timings=timings,
+                        work=work,
+                        stability_phases=stability_phases,
+                        returned_coordinate=coordinate,
+                        certified_coordinate=None,
+                        gate_termination=stability_evidence.outcome,
+                        error=(
+                            f"proposal stability {stability_evidence.outcome.value}: "
+                            f"{stability_evidence.certificate.reason}"
+                        ),
+                    )
             candidate_state = (
                 _install(engine, observations, candidate_learning)
                 if decision.installs_proposal
                 else None
             )
+            if decision.installs_proposal:
+                work["accepted_proposals"] += 1
         except (
             FloatingPointError,
             np.linalg.LinAlgError,
@@ -665,6 +840,8 @@ def fit_rslds(
                 inner_status=inner.status,
                 iterations=iteration,
                 residuals=residuals,
+                evaluated_residuals=evaluated_residuals,
+                rejected_residuals=rejected_residuals,
                 free_energies=free_energies,
                 points=current_points,
                 initialization=initialization,
@@ -672,6 +849,8 @@ def fit_rslds(
                 last_inference=inner,
                 phases=phases,
                 timings=timings,
+                work=work,
+                stability_phases=stability_phases,
                 returned_coordinate=coordinate,
                 certified_coordinate=None,
                 error=str(error),
@@ -698,6 +877,7 @@ def fit_rslds(
                 legacy_fixed_point_residual=legacy_residual,
                 runtime_residual=runtime_residual,
                 functional_transition_residual=functional_residual,
+                stability_evidence=stability_evidence,
             )
         )
         consecutive = decision.consecutive_hits
@@ -709,6 +889,8 @@ def fit_rslds(
                 inner_status=inner.status,
                 iterations=iteration,
                 residuals=residuals,
+                evaluated_residuals=evaluated_residuals,
+                rejected_residuals=rejected_residuals,
                 free_energies=free_energies,
                 points=current_points,
                 initialization=initialization,
@@ -716,6 +898,8 @@ def fit_rslds(
                 last_inference=inner,
                 phases=phases,
                 timings=timings,
+                work=work,
+                stability_phases=stability_phases,
                 returned_coordinate=decision.certified,
                 certified_coordinate=decision.certified,
             )
@@ -782,6 +966,8 @@ def fit_rslds(
         ),
         iterations=completed_iterations,
         residuals=residuals,
+        evaluated_residuals=evaluated_residuals,
+        rejected_residuals=rejected_residuals,
         free_energies=free_energies,
         points=current_points,
         initialization=initialization,
@@ -789,6 +975,8 @@ def fit_rslds(
         last_inference=terminal,
         phases=phases,
         timings=timings,
+        work=work,
+        stability_phases=stability_phases,
         returned_coordinate=coordinate,
         certified_coordinate=None,
         error=error,

@@ -357,6 +357,7 @@ import jax
 
 from cffg.models import (
     PCAARHMMInitializer,
+    RSLDSStabilityPolicy,
     fit_rslds,
     vague_rslds_fit_priors,
 )
@@ -371,6 +372,13 @@ fit = fit_rslds(
     max_inner_iterations=500,
     inner_tolerance=1e-5,
     key=jax.random.key(0),
+    # Optional: every proof setting is explicit; there are no fitted defaults.
+    stability_policy=RSLDSStabilityPolicy(
+        foster_rate=registered_foster_rate,
+        tail_radius=registered_tail_radius,
+        compact_splits=registered_compact_splits,
+        maximum_tail_cones=registered_tail_cone_ceiling,
+    ),
 )
 
 if fit.status.value == "diverged":
@@ -391,6 +399,25 @@ value. The shared emission is the ordinary tied `gaussian_linear` MNIW
 learnable, so every time slice contributes once. The continuous
 initial-state mean and covariance are fixed initializer outputs, not fitted
 posteriors.
+
+The optional stability policy derives one identity Lyapunov matrix per regime
+from the model dimension and invokes the recurrence-aware global Foster
+authority. It verifies the initializer before the first hidden-state solve and
+each complete proposal that would otherwise be installed. A satisfied proposal
+uses the unchanged atomic four-family write. A violated proposal returns
+`gate_termination.value == "certificate_rejected"`, keeps the current point
+byte-identical, and remains visible in `evaluated_residuals`,
+`rejected_residuals`, `stability_phases`, and `work`; it is absent from the
+accepted `residuals` history and cannot certify convergence. Infeasible or
+diverged proof attempts fail loudly. This is an eligibility gate, not a
+projection or stability solver.
+
+`encode_stability_evidence` writes one canonical scalar JSON record.
+`validate_stability_evidence` recomputes and authenticates that record against
+the exact current engine, ordered point arrays, policy, owner, and coordinate
+before a resume consumer mutates state. It rejects noncanonical or tampered
+records and D8/D9 or differently owned D10 engines. This host evidence is kept
+beside, not inside, the generic `Learnables` checkpoint.
 
 This replacement cadence is different from `RSLDSLearning.update`: `update`
 accumulates evidence from a new independent trial, while `fit_rslds` replaces
