@@ -1,6 +1,6 @@
 ---
 id: cff-qg1d
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-30T16:00:47Z
@@ -84,3 +84,9 @@ rSLDS model and fitter. No other hybrid family is added here.
   stick-breaking logistic coefficients after augmentation.
 - **Tied statistics:** Sufficient statistics pooled from factors that share the
   same serialized parameter blobs.
+
+## Notes
+
+**2026-08-30T16:06:49Z**
+
+Ported PR #64 as four new atomic commits on main d805135. Retained production code, test coverage, canonical documentation, and the required EPIC_FILES registration. Excluded the old cff-dqk2 ticket state and tools/test-suite-runtimes.json. Focused validation: uv run pytest -q tests/test_hybrid_learnables.py -> 17 passed.
