@@ -918,10 +918,14 @@ class Engine:
         if mu3_code:
             outcome = "budget exhausted" if mu3_code == 1 else "diverged"
             raise RuntimeError(f"mu3 importance update {outcome}; use Engine.run for status")
-        msgs, g_eta, g_lam, ef_eta, _, _ = self._step(
+        msgs, g_eta, g_lam, ef_eta, _, inner_code = self._step(
             state.messages, state.g_eta, state.g_lam, state.g_obs, state.g_mask,
             state.ef_eta, state.ef_obs, state.ef_mask, state.params, damp, harden,
         )
+        if int(inner_code):
+            raise RuntimeError(
+                "factor-local inference diverged; use Engine.run for status"
+            )
         return _replace(state, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta)
 
     def run(
@@ -2435,27 +2439,33 @@ def _mix_sweep(arena, messages, g_eta, g_lam, params):
 
 
 def _recurrence_sweep(arena, messages, g_eta, g_lam, params):
-    """One synchronous PG/JJ coordinate sweep across both arenas."""
+    """One synchronous D9 coordinate sweep across both arenas."""
     discrete_writes = []
     gaussian_writes = []
     status = jnp.asarray(0)
     for group in arena.recurrence_groups:
         card = group.cards[0]
-        out_messages = messages[
-            arena.message_indices(group.d_gather_both[:, 0, :], card)
+        out_cavity = messages[
+            arena.message_indices(group.d_gather_both[:, 0, 1], card)
         ]
-        in_messages = messages[
-            arena.message_indices(group.d_gather_both[:, 1, :], card)
+        in_cavity = messages[
+            arena.message_indices(group.d_gather_both[:, 1, 1], card)
         ]
+        out_cavity = jnp.where(
+            _jax_log_support(out_cavity), out_cavity, -jnp.inf
+        )
+        in_cavity = jnp.where(
+            _jax_log_support(in_cavity), in_cavity, -jnp.inf
+        )
         drive_eta = g_eta[
             arena.g_eta_indices(group.drive_gather_both, group.dim)
         ].sum(axis=1)
         drive_precision = g_lam[
             arena.g_lam_indices(group.drive_gather_both, group.dim)
         ].sum(axis=1)
-        result = recurrence.update(
-            out_messages,
-            in_messages,
+        result = recurrence.structured_recurrence_update(
+            out_cavity,
+            in_cavity,
             drive_eta,
             drive_precision,
             params[group.name + ":weights"],
@@ -3611,25 +3621,31 @@ def _mix_bfe(arena, messages, g_eta, g_lam, params):
 
 
 def _recurrence_bfe(arena, messages, g_eta, g_lam, params):
-    """PG/JJ recurrence energies, upper-bounding the exact VMP terms."""
+    """D9 pair-region energies, upper-bounding exact transition terms."""
     total = jnp.asarray(0.0, dtype=g_eta.dtype)
     for group in arena.recurrence_groups:
         card = group.cards[0]
-        out_messages = messages[
-            arena.message_indices(group.d_gather_both[:, 0, :], card)
+        out_cavity = messages[
+            arena.message_indices(group.d_gather_both[:, 0, 1], card)
         ]
-        in_messages = messages[
-            arena.message_indices(group.d_gather_both[:, 1, :], card)
+        in_cavity = messages[
+            arena.message_indices(group.d_gather_both[:, 1, 1], card)
         ]
+        out_cavity = jnp.where(
+            _jax_log_support(out_cavity), out_cavity, -jnp.inf
+        )
+        in_cavity = jnp.where(
+            _jax_log_support(in_cavity), in_cavity, -jnp.inf
+        )
         drive_eta = g_eta[
             arena.g_eta_indices(group.drive_gather_both, group.dim)
         ].sum(axis=1)
         drive_precision = g_lam[
             arena.g_lam_indices(group.drive_gather_both, group.dim)
         ].sum(axis=1)
-        total = total + recurrence.energy(
-            out_messages,
-            in_messages,
+        total = total + recurrence.structured_recurrence_energy(
+            out_cavity,
+            in_cavity,
             drive_eta,
             drive_precision,
             params[group.name + ":weights"],

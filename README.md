@@ -172,9 +172,16 @@ arrays["switch_offsets"] = offsets  # [K, K - 1]
 For source regime `i`, stick `l` has logit
 `weights[i,l] @ x + offsets[i,l]`; destination `j < K - 1` accepts stick `j`
 after rejecting earlier sticks, and the last destination rejects them all.
-Inference uses the Pólya–Gamma/Jaakkola–Jordan mean-field coordinate, so its
-reported VFE is a documented upper bound on the exact VFE at the same beliefs.
-Exact regime zeros stay exact, while an improper Gaussian drive is divergence.
+Inference uses a structured source/destination pair belief. Current Gaussian
+moments define a Pólya–Gamma/Jaakkola–Jordan expected-log transition table;
+log-space sum-product sends both categorical messages, and the same pair gives
+the Gaussian-drive message. On an acyclic ordinary categorical recurrence
+component this is exact inference for the bounded table. A categorical loop
+uses local Bethe beliefs and carries no exact-chain claim. The reported VFE is
+a documented upper bound on the exact-transition VFE at the same Gaussian
+belief. Exact regime zeros stay exact, while an improper Gaussian drive is
+divergence. `engine.arena.recurrence_components` records the derived component
+membership and `acyclic` classification.
 
 Hybrid learning and forecasting use factor-local readouts rather than products
 of endpoint marginals:
@@ -218,9 +225,11 @@ posterior = posterior.update(stats["linear"], stats["quadratic"])
 weights, offsets = posterior.rollover()  # next trial's parameter arrays
 ```
 
-`linear` and `quadratic` already contain the soft source/destination masses
-and the coordinate-optimal PG mean. The rollover is an empirical-Bayes point
-estimate; it does not claim to carry weight uncertainty inside inference.
+`linear` and `quadratic` currently retain the historical product of endpoint
+singletons and the coordinate-optimal PG mean. Inference and the BFE already
+use the structured pair; the pair-derived public learning readout is deferred
+to cff-ifbr. The rollover is an empirical-Bayes point estimate; it does not
+claim to carry weight uncertainty inside inference.
 
 ### Recurrent switching state-space models
 
@@ -592,6 +601,13 @@ parts by one colored sweep — before convergence is judged. Only δ form
 constraints (and `damp > 0` on otherwise-exact models) still use plain
 flooding; `engine.schedule.kind` and `.reason` say what you got. Force
 flooding with `Engine(arena, schedule="flood")`.
+
+Recurrence links remain time-local factors in both paths. Each recurrence
+categorical pass is `O(T*K^2)` work with `O(T*K^2)` transient pair storage for
+`T` equal-cardinality links, while factor messages and the BFE keep local pair
+ownership. The current mixed scheduler does not fuse all recurrence links
+into a monolithic chain region; fusion may reduce the number of outer passes
+but cannot change the fixed point or counting numbers.
 
 ## Run an agent
 

@@ -115,6 +115,7 @@ EPIC_FILES = {
         "test_recurrence_learning_numerics.py",
         "test_recurrence_link.py",
         "test_structured_recurrence.py",
+        "test_structured_recurrence_engine.py",
         "test_rslds_fit.py",
     ],
     "SG · Glucose": ["test_glucose.py"],

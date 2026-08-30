@@ -51,6 +51,19 @@ class StructuredGaussianMessage(NamedTuple):
     proper: jax.Array
 
 
+class StructuredRecurrenceUpdate(NamedTuple):
+    """Batched D9 messages plus the factor-local pair-region belief."""
+
+    to_out: jax.Array
+    to_in: jax.Array
+    drive_eta: jax.Array
+    drive_precision: jax.Array
+    pair_probability: jax.Array
+    source_probability: jax.Array
+    destination_probability: jax.Array
+    status: jax.Array
+
+
 def _floating_dtype(*values) -> jnp.dtype:
     return jnp.result_type(*values, jnp.float32)
 
@@ -426,14 +439,161 @@ def structured_node_energy(
     return jnp.where(jnp.isfinite(value), value, jnp.inf)
 
 
+def structured_recurrence_update(
+    destination_cavity,
+    source_cavity,
+    drive_eta,
+    drive_precision,
+    weights,
+    offsets,
+) -> StructuredRecurrenceUpdate:
+    """Batched D9 update from categorical cavities and a Gaussian belief.
+
+    The leading axis indexes factors. ``destination_cavity`` is the incoming
+    message on ``out`` and ``source_cavity`` is the incoming message on
+    ``in``. A precisely vacuous Gaussian belief remains a neutral flooding
+    transient. Any other improper input has status 2 and NaN result arrays.
+    """
+
+    def one(out_cavity, in_cavity, eta, precision, row_weights, row_offsets):
+        card = out_cavity.shape[0]
+        dimension = eta.shape[0]
+        vacuous = jnp.all(eta == 0) & jnp.all(precision == 0)
+        precision_ok = gauss._pd_ok(precision)
+
+        def neutral(_):
+            pair = structured_pair_belief(
+                in_cavity,
+                out_cavity,
+                jnp.zeros((card, card), dtype=out_cavity.dtype),
+            )
+            parameter_ok = (
+                jnp.all(jnp.isfinite(row_weights))
+                & jnp.all(jnp.isfinite(row_offsets))
+            )
+            proper = pair.proper & parameter_ok
+
+            def valid_or_nan(value):
+                return jnp.where(
+                    proper, value, jnp.full_like(value, jnp.nan)
+                )
+
+            return StructuredRecurrenceUpdate(
+                valid_or_nan(pair.to_out),
+                valid_or_nan(pair.to_in),
+                valid_or_nan(jnp.zeros_like(eta)),
+                valid_or_nan(jnp.zeros_like(precision)),
+                valid_or_nan(pair.probability),
+                valid_or_nan(pair.source_probability),
+                valid_or_nan(pair.destination_probability),
+                jnp.where(proper, 0, 2),
+            )
+
+        def evaluate(_):
+            safe_precision = jnp.where(
+                precision_ok,
+                precision,
+                jnp.eye(dimension, dtype=precision.dtype),
+            )
+            covariance = gauss._pd_inverse(safe_precision)
+            mean = gauss._pd_solve(safe_precision, eta)
+            potential = structured_pair_potential(
+                mean, covariance, row_weights, row_offsets
+            )
+            pair = structured_pair_belief(
+                in_cavity, out_cavity, potential.log_potential
+            )
+            gaussian = structured_gaussian_message(
+                pair.probability, potential.omega, row_weights, row_offsets
+            )
+            proper = (
+                precision_ok
+                & potential.proper
+                & pair.proper
+                & gaussian.proper
+            )
+
+            def valid_or_nan(value):
+                return jnp.where(
+                    proper, value, jnp.full_like(value, jnp.nan)
+                )
+
+            return StructuredRecurrenceUpdate(
+                valid_or_nan(pair.to_out),
+                valid_or_nan(pair.to_in),
+                valid_or_nan(gaussian.eta),
+                valid_or_nan(gaussian.precision),
+                valid_or_nan(pair.probability),
+                valid_or_nan(pair.source_probability),
+                valid_or_nan(pair.destination_probability),
+                jnp.where(proper, 0, 2),
+            )
+
+        return jax.lax.cond(vacuous, neutral, evaluate, operand=None)
+
+    return jax.vmap(one)(
+        destination_cavity,
+        source_cavity,
+        drive_eta,
+        drive_precision,
+        weights,
+        offsets,
+    )
+
+
+def structured_recurrence_energy(
+    destination_cavity,
+    source_cavity,
+    drive_eta,
+    drive_precision,
+    weights,
+    offsets,
+) -> jax.Array:
+    """Batched D9 node energy from the current factor cavities."""
+
+    def one(out_cavity, in_cavity, eta, precision, row_weights, row_offsets):
+        dimension = eta.shape[0]
+        precision_ok = gauss._pd_ok(precision)
+        safe_precision = jnp.where(
+            precision_ok,
+            precision,
+            jnp.eye(dimension, dtype=precision.dtype),
+        )
+        covariance = gauss._pd_inverse(safe_precision)
+        mean = gauss._pd_solve(safe_precision, eta)
+        potential = structured_pair_potential(
+            mean, covariance, row_weights, row_offsets
+        )
+        pair = structured_pair_belief(
+            in_cavity, out_cavity, potential.log_potential
+        )
+        value = structured_node_energy(
+            pair.probability, potential.log_potential, safe_precision
+        )
+        proper = precision_ok & potential.proper & pair.proper
+        return jnp.where(proper & jnp.isfinite(value), value, jnp.inf)
+
+    return jax.vmap(one)(
+        destination_cavity,
+        source_cavity,
+        drive_eta,
+        drive_precision,
+        weights,
+        offsets,
+    )
+
+
 __all__ = [
     "StructuredGaussianMessage",
     "StructuredPairBelief",
     "StructuredPairPotential",
+    "StructuredRecurrenceUpdate",
     "structured_gaussian_message",
     "structured_node_energy",
     "structured_pair_belief",
     "structured_pair_energy",
     "structured_pair_potential",
+    "structured_recurrence_energy",
+    "structured_recurrence_update",
     "structured_separator_energy",
 ]
