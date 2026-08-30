@@ -198,8 +198,9 @@ predictive, not the posterior output marginal: it uses the selector and input
 messages but excludes downstream evidence facing `out`. Prior-mixture
 statistics name their arrays `weighted_mean` and `weighted_second` to make the
 weighting explicit. A `recurrence_link` record from `gaussian_node_stats`
-likewise exposes its input/output probabilities, exact supports, and drive
-moments; Pólya–Gamma learning statistics remain a separate learning step.
+likewise exposes its input/output probabilities, exact supports, drive mean,
+direct covariance, and second moment; Pólya–Gamma learning statistics remain a
+separate learning step.
 Every hybrid record has `proper`; consumers must reject a false value and its
 shape-preserving NaNs.
 

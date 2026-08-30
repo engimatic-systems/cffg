@@ -15,6 +15,13 @@ from cffg.gaussian_learning import (
 )
 
 
+def _diagnostic_scalar(readout: Mapping[str, object], key: str) -> str:
+    value = np.asarray(readout.get(key, np.nan))
+    if value.shape != () or not np.issubdtype(value.dtype, np.number):
+        return "missing"
+    return format(float(value), ".17g")
+
+
 def _stack_mniw(posteriors: Sequence[conj.MNIW]) -> dict[str, np.ndarray]:
     return {
         "m": np.stack([posterior.m for posterior in posteriors]),
@@ -261,7 +268,39 @@ class PGWeightsFamily:
             )
 
     def stats(self, ftype, readout) -> dict[str, np.ndarray]:
-        _proper(readout, ftype)
+        if "proper" not in readout or np.shape(readout["proper"]) != ():
+            _proper(readout, ftype)
+        if not bool(readout["proper"]):
+            failures = []
+            if not bool(readout.get("probability_ok", True)):
+                failures.append(
+                    "probability_ok=false "
+                    f"(minimum={_diagnostic_scalar(readout, 'probability_minimum')}, "
+                    "max_sum_error="
+                    f"{_diagnostic_scalar(readout, 'probability_sum_error')}, "
+                    f"tolerance={_diagnostic_scalar(readout, 'probability_tolerance')})"
+                )
+            if not bool(readout.get("drive_ok", True)):
+                failures.append(
+                    "drive_ok=false "
+                    "(min_eigenvalue="
+                    f"{_diagnostic_scalar(readout, 'drive_min_eigenvalue')}, "
+                    "symmetry_error="
+                    f"{_diagnostic_scalar(readout, 'drive_symmetry_error')}, "
+                    f"tolerance={_diagnostic_scalar(readout, 'drive_tolerance')})"
+                )
+            if not bool(readout.get("parameter_ok", True)):
+                failures.append("parameter_ok=false")
+            if not bool(readout.get("second_ok", True)):
+                failures.append(
+                    "second_ok=false "
+                    f"(minimum={_diagnostic_scalar(readout, 'logit_second_minimum')}, "
+                    f"tolerance={_diagnostic_scalar(readout, 'logit_second_tolerance')})"
+                )
+            if not bool(readout.get("finite_output_ok", True)):
+                failures.append("finite_output_ok=false")
+            detail = f": {'; '.join(failures)}" if failures else ""
+            raise ValueError(f"{ftype} statistic is improper{detail}")
         return {
             "linear": _finite_stat(readout, "linear", ftype),
             "quadratic": _finite_stat(readout, "quadratic", ftype),

@@ -673,6 +673,9 @@ def test_recurrence_readout_matches_edge_beliefs_and_preserves_support():
     )
     np.testing.assert_allclose(stats["drive_mean"], drive_mean, atol=1e-11)
     np.testing.assert_allclose(
+        stats["drive_covariance"], drive_covariance, atol=1e-11
+    )
+    np.testing.assert_allclose(
         stats["drive_second"],
         drive_covariance + np.outer(drive_mean, drive_mean),
         atol=1e-11,
@@ -705,6 +708,7 @@ def test_recurrence_readout_matches_edge_beliefs_and_preserves_support():
     )["recurrence"]
     assert not bool(vacuous["proper"])
     assert np.isnan(vacuous["drive_mean"]).all()
+    assert np.isnan(vacuous["drive_covariance"]).all()
 
 
 def test_soft_regime_stats_beat_hard_assignments_for_overlapping_dynamics():
