@@ -563,6 +563,7 @@ class Learnables:
             for name, params in self.params.items()
         }
         changed: set[str] = set()
+        legacy_names: set[str] = set()
         seen: set[tuple[str, str]] = set()
         for flat, arr in data.items():
             if flat.startswith(_STATE_KEY_PREFIX):
@@ -593,6 +594,7 @@ class Learnables:
                         f"no learnable for checkpoint key {flat!r} in this graph"
                     )
                 name, key = candidates[0]
+                legacy_names.add(name)
             if name not in self.params:
                 raise KeyError(f"no learnable {name!r} in this graph")
             if key not in self.params[name]:
@@ -609,6 +611,16 @@ class Learnables:
                 )
             pending[name][key] = np.asarray(arr, dtype=float).copy()
             changed.add(name)
+        for name in legacy_names:
+            present = {key for candidate, key in seen if candidate == name}
+            required = set(self.params[name])
+            if len(required) > 1 and present != required:
+                missing = sorted(required - present)
+                raise KeyError(
+                    f"legacy checkpoint incompletely names learnable {name!r}; "
+                    f"missing hyperparameters {missing}. Rewrite it with a v2 "
+                    "checkpoint"
+                )
         for name in changed:
             plan = self.plans[name]
             FAMILIES[plan.family].validate_prior(name, pending[name], plan.shapes)
