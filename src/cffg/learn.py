@@ -70,6 +70,9 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 READOUTS = {
     "node_beliefs": lambda engine, state: engine.node_beliefs(state),
     "gaussian_node_stats": lambda engine, state: engine.gaussian_node_stats(state),
+    "recurrence_weight_stats": lambda engine, state: engine.recurrence_weight_stats(
+        state
+    ),
 }
 
 
@@ -269,7 +272,7 @@ class Dirichlet:
 
 
 from cffg.gaussian_learning import MNIWFamily, NIWFamily
-from cffg.hybrid_learning import ComponentMNIWFamily
+from cffg.hybrid_learning import ComponentMNIWFamily, PGWeightsFamily
 
 
 FAMILIES: dict[str, Family] = {
@@ -277,6 +280,7 @@ FAMILIES: dict[str, Family] = {
     "niw": NIWFamily(),
     "mniw": MNIWFamily(),
     "component_mniw": ComponentMNIWFamily(),
+    "pg_weights": PGWeightsFamily(),
 }
 
 _STATE_KEY_PREFIX = "v2:"
