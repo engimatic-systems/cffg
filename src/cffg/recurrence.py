@@ -26,6 +26,12 @@ import jax.numpy as jnp
 
 from cffg import gauss
 from cffg.compiler import NEG
+from cffg.recurrence_readout import (
+    RecurrenceWeightStats as RecurrenceWeightStats,
+    StructuredRecurrenceReadout as StructuredRecurrenceReadout,
+    structured_readout as structured_readout,
+    weight_stats as weight_stats,
+)
 from cffg.structured_recurrence import (
     StructuredGaussianMessage,
     StructuredPairBelief,
@@ -63,29 +69,6 @@ class RecurrenceBelief(NamedTuple):
     out_support: jax.Array
     in_support: jax.Array
     proper: jax.Array
-
-
-class RecurrenceWeightStats(NamedTuple):
-    """Natural-statistic increments for augmented stick coefficients."""
-
-    omega: jax.Array
-    exposure: jax.Array
-    linear: jax.Array
-    quadratic: jax.Array
-    proper: jax.Array
-    probability_ok: jax.Array
-    drive_ok: jax.Array
-    parameter_ok: jax.Array
-    second_ok: jax.Array
-    finite_output_ok: jax.Array
-    probability_minimum: jax.Array
-    probability_sum_error: jax.Array
-    probability_tolerance: jax.Array
-    drive_min_eigenvalue: jax.Array
-    drive_symmetry_error: jax.Array
-    drive_tolerance: jax.Array
-    logit_second_minimum: jax.Array
-    logit_second_tolerance: jax.Array
 
 
 def _edge_probability(messages: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
@@ -153,171 +136,6 @@ def belief(
         in_messages,
         drive_eta,
         drive_precision,
-    )
-
-
-def weight_stats(
-    out_probability,
-    in_probability,
-    drive_mean,
-    drive_covariance,
-    weights,
-    offsets,
-) -> RecurrenceWeightStats:
-    """Build PG Gaussian statistics for ``[weights; offset]``.
-
-    Inputs are batched factor-local mean-field beliefs. The direct drive
-    covariance avoids reconstructing it from nearly equal second-moment terms.
-    The PG coordinate is evaluated at the point parameters used by inference;
-    each returned row is one between-trial natural-parameter increment.
-    """
-
-    def one(q_out, q_in, mean, covariance, row_weights, row_offsets):
-        card = q_out.shape[-1]
-        dimension = mean.shape[-1]
-        probability_tolerance = (
-            32.0 * card * jnp.finfo(q_out.dtype).eps
-        )
-        probability_ok = (
-            jnp.all(jnp.isfinite(q_out))
-            & jnp.all(jnp.isfinite(q_in))
-            & jnp.all(q_out >= 0)
-            & jnp.all(q_in >= 0)
-            & (jnp.abs(q_out.sum() - 1.0) <= probability_tolerance)
-            & (jnp.abs(q_in.sum() - 1.0) <= probability_tolerance)
-        )
-        probability_minimum = jnp.minimum(jnp.min(q_out), jnp.min(q_in))
-        probability_sum_error = jnp.maximum(
-            jnp.abs(q_out.sum() - 1.0),
-            jnp.abs(q_in.sum() - 1.0),
-        )
-        symmetric_covariance = 0.5 * (
-            covariance + covariance.swapaxes(-1, -2)
-        )
-        drive_min_eigenvalue = jnp.linalg.eigvalsh(symmetric_covariance)[0]
-        drive_symmetry_error = jnp.max(
-            jnp.abs(covariance - covariance.swapaxes(-1, -2))
-        )
-        drive_tolerance = (
-            16.0
-            * dimension
-            * jnp.finfo(covariance.dtype).eps
-            * gauss._matrix_scale(covariance)
-        )
-        drive_ok = (
-            jnp.all(jnp.isfinite(mean))
-            & jnp.all(jnp.isfinite(covariance))
-            & gauss._psd_ok(covariance)
-        )
-        parameter_ok = (
-            jnp.all(jnp.isfinite(row_weights))
-            & jnp.all(jnp.isfinite(row_offsets))
-        )
-
-        # Invariant protected: after material asymmetry is rejected above,
-        # sufficient statistics use one exactly symmetric covariance.
-        covariance = symmetric_covariance
-        second = covariance + jnp.outer(mean, mean)
-        feature_mean = jnp.concatenate(
-            [mean, jnp.ones(1, dtype=mean.dtype)]
-        )
-        feature_second = jnp.zeros(
-            (dimension + 1, dimension + 1), dtype=second.dtype
-        )
-        feature_second = feature_second.at[:-1, :-1].set(second)
-        feature_second = feature_second.at[:-1, -1].set(mean)
-        feature_second = feature_second.at[-1, :-1].set(mean)
-        feature_second = feature_second.at[-1, -1].set(1.0)
-        logit_mean = (
-            jnp.einsum("ild,d->il", row_weights, mean) + row_offsets
-        )
-        logit_variance = jnp.einsum(
-            "ild,de,ile->il", row_weights, covariance, row_weights
-        )
-        raw_logit_second = jnp.square(logit_mean) + logit_variance
-        variance_scale = jnp.einsum(
-            "ild,de,ile->il",
-            jnp.abs(row_weights),
-            jnp.abs(covariance),
-            jnp.abs(row_weights),
-        )
-        second_scale = jnp.maximum(
-            jnp.maximum(
-                jnp.maximum(jnp.abs(raw_logit_second), jnp.square(logit_mean)),
-                variance_scale,
-            ),
-            jnp.asarray(jnp.finfo(raw_logit_second.dtype).tiny),
-        )
-        second_tolerance = (
-            32.0
-            * (dimension + 1)
-            * jnp.finfo(raw_logit_second.dtype).eps
-            * second_scale
-        )
-        second_ok = jnp.all(raw_logit_second >= -second_tolerance)
-        logit_second_index = jnp.argmin(raw_logit_second)
-        logit_second_minimum = raw_logit_second.reshape(-1)[logit_second_index]
-        logit_second_tolerance = second_tolerance.reshape(-1)[
-            logit_second_index
-        ]
-        xi = jnp.sqrt(jnp.maximum(raw_logit_second, 0.0))
-        omega = _pg_mean(xi)
-
-        at_risk = jnp.cumsum(q_out[::-1])[::-1][:-1]
-        kappa = q_out[:-1] - 0.5 * at_risk
-        exposure = q_in[:, None] * at_risk[None, :]
-        linear_weight = q_in[:, None] * kappa[None, :]
-        linear = linear_weight[..., None] * feature_mean[None, None, :]
-        quadratic = (
-            exposure[..., None, None]
-            * omega[..., None, None]
-            * feature_second[None, None, :, :]
-        )
-        finite_output_ok = (
-            jnp.all(jnp.isfinite(omega))
-            & jnp.all(jnp.isfinite(exposure))
-            & jnp.all(jnp.isfinite(linear))
-            & jnp.all(jnp.isfinite(quadratic))
-        )
-        proper = (
-            probability_ok
-            & drive_ok
-            & parameter_ok
-            & second_ok
-            & finite_output_ok
-        )
-
-        def valid_or_nan(value):
-            return jnp.where(proper, value, jnp.full_like(value, jnp.nan))
-
-        return RecurrenceWeightStats(
-            valid_or_nan(omega),
-            valid_or_nan(exposure),
-            valid_or_nan(linear),
-            valid_or_nan(quadratic),
-            proper,
-            probability_ok,
-            drive_ok,
-            parameter_ok,
-            second_ok,
-            finite_output_ok,
-            probability_minimum,
-            probability_sum_error,
-            probability_tolerance,
-            drive_min_eigenvalue,
-            drive_symmetry_error,
-            drive_tolerance,
-            logit_second_minimum,
-            logit_second_tolerance,
-        )
-
-    return jax.vmap(one)(
-        out_probability,
-        in_probability,
-        drive_mean,
-        drive_covariance,
-        weights,
-        offsets,
     )
 
 

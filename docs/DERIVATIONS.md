@@ -1789,7 +1789,7 @@ Mean-Field Variational Bayes for Logistic Models* (2019).
 
 ---
 
-## D9 — Structured categorical smoothing for recurrent transitions (cff-yr0d)
+## D9 — Structured categorical smoothing for recurrent transitions (cff-s6yy)
 
 ### D9.1 The plain-English version
 
@@ -2072,6 +2072,9 @@ authority is anchored in `tests/test_structured_recurrence_rule.py`:
   `test_path_entropy_matches_literal_enumeration` check (D9.15--D9.16).
 - `test_pair_responsibilities_drive_all_recurrence_statistics` checks
   (D9.12--D9.14) and rejects singleton-product responsibilities.
+- `tests/test_structured_recurrence_learning.py` checks the public pair,
+  Gaussian message, and pooled coefficient statistics against the same
+  independent K=2/K=3 consecutive-state authority.
 - `test_uncertain_drive_retains_the_jj_bound_boundary` separates structured
   categorical exactness from the PG/JJ approximation.
 - the remaining tests preserve literal log-zero support, normalize vacuous

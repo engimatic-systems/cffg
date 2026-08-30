@@ -86,9 +86,9 @@ def test_switch447_uses_direct_covariance_without_roundoff_rejection():
     )
     assert symmetry_error > tolerance
 
+    pair = np.outer(q_in, q_out)
     stats = recurrence.weight_stats(
-        q_out[None],
-        q_in[None],
+        pair[None],
         mean[None],
         covariance[None],
         weights[None],
@@ -109,8 +109,7 @@ def test_large_mean_small_covariance_remains_proper(dtype):
             [[[0.25, 0.5], [0.5, 1.5]]], dtype=dtype
         )
         stats = recurrence.weight_stats(
-            np.full((1, 4), 0.25, dtype=dtype),
-            np.full((1, 4), 0.25, dtype=dtype),
+            np.full((1, 4, 4), 1.0 / 16.0, dtype=dtype),
             mean,
             covariance,
             np.zeros((1, 4, 3, 2), dtype=dtype),
@@ -132,9 +131,9 @@ def test_1279_concentrated_rows_preserve_exact_zero_source_support():
     covariance = np.broadcast_to(
         [[0.25, 0.5], [0.5, 1.5]], (count, 2, 2)
     )
+    pair = q_in[:, :, None] * q_out[:, None, :]
     stats = recurrence.weight_stats(
-        q_out,
-        q_in,
+        pair,
         mean,
         covariance,
         np.zeros((count, 4, 3, 2)),
@@ -192,9 +191,9 @@ def test_1279_concentrated_rows_preserve_exact_zero_source_support():
 def test_invalid_recurrence_statistics_remain_loud(
     q_out, mean, covariance, weights, failed_predicate
 ):
+    pair = np.full((4, 1), 0.25) * np.asarray(q_out)[None, :]
     stats = recurrence.weight_stats(
-        np.asarray(q_out)[None],
-        np.full((1, 4), 0.25),
+        pair[None],
         np.asarray(mean)[None],
         np.asarray(covariance)[None],
         np.asarray(weights)[None],
@@ -210,8 +209,7 @@ def test_invalid_recurrence_statistics_remain_loud(
 
 def test_material_covariance_asymmetry_reports_scale_relative_values():
     stats = recurrence.weight_stats(
-        np.full((1, 4), 0.25),
-        np.full((1, 4), 0.25),
+        np.full((1, 4, 4), 1.0 / 16.0),
         np.zeros((1, 2)),
         np.array([[[1.0, 0.5], [0.0, 1.0]]]),
         np.zeros((1, 4, 3, 2)),

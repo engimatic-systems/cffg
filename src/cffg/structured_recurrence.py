@@ -1,9 +1,8 @@
 """Structured categorical authority for recurrent stick-breaking factors.
 
 These pure functions implement D9 in ``docs/DERIVATIONS.md`` for one
-time-local recurrence factor.  They are intentionally not dispatched by the
-engine yet: the existing recurrence runtime retains its D8 mean-field rules
-until the compiler and schedule integration lands.
+time-local recurrence factor. The engine dispatches them for recurrence
+messages, node energy, the public pair readout, and pair-derived learning.
 
 The source regime indexes pair rows and the destination regime indexes pair
 columns.  Incoming categorical cavities are log potentials.  Numerical

@@ -208,8 +208,9 @@ coordinate from the immutable initial prior. Neither operation turns point-
 parameter inference into full joint VB. Generic registration also supports
 component-MNIW/`gaussian_mixture_linear` and
 PG-weights/`recurrence_link`. Exact-zero mixture responsibilities retain the
-component prior; the recurrence posterior keeps source-regime, stick, and
-augmented drive-coordinate axes. Gamma precision and external EF-kernel
+component prior; exact-zero structured recurrence exposure likewise retains
+the source/stick prior. The recurrence posterior keeps source-regime, stick,
+and augmented drive-coordinate axes. Gamma precision and external EF-kernel
 adapters remain outside the declared-learning registry. (2) "VMP monotonically
 decreases free energy" holds for sequential coordinate updates; this engine
 floods (Jacobi), which converges to the same fixed point but can take
@@ -307,12 +308,14 @@ multimodal joint posterior can remain inaccurate even when the coordinate
 residual converges. v1 requires equal regime cardinalities
 `K >= 2`, a proper Gaussian drive, finite fixed
 `weights[K,K-1,d]`/`offsets[K,K-1]`, and sum-product semantics. Between-trial
-PG learning still accumulates the historical product of endpoint singletons
-into independent Gaussian posteriors for `[weight; offset]`; cff-ifbr owns the
-pair-derived public readout. It rolls only posterior means into the next
+PG learning accumulates the same structured pair-derived at-risk and
+signed-success masses as the Gaussian drive message into independent Gaussian
+posteriors for `[weight; offset]`. It rolls only posterior means into the next
 inference state. Thus weight uncertainty does not enter recurrence messages or
 the next PG coordinate; this is empirical-Bayes variational EM, not full joint
-VB over weights and auxiliaries. Flooding and mixed scheduling solve the same
+VB over weights and auxiliaries. The pair is derived from the current state
+rather than independently serialized; cff-63dd owns persistence identity and
+migration. Flooding and mixed scheduling solve the same
 coordinates, but neither guarantees monotone progress on every loopy hybrid
 graph.
 

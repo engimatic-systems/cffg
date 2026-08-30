@@ -182,9 +182,9 @@ def test_pg_weights_recover_soft_stick_dynamics_in_one_vectorized_batch():
 
     for _ in range(8):
         count = drive.shape[0]
+        pair = q_in[:, :, None] * q_out[:, None, :]
         stats = recurrence.weight_stats(
-            q_out,
-            q_in,
+            pair,
             drive_mean,
             drive_covariance,
             np.broadcast_to(weights, (count, *weights.shape)),

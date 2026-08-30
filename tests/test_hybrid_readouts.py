@@ -642,6 +642,7 @@ def test_recurrence_readout_matches_edge_beliefs_and_preserves_support():
     engine, state = _converge(template, arrays)
     group = engine.arena.recurrence_groups[0]
     stats = engine.gaussian_node_stats(state)["recurrence"]
+    pair = engine.recurrence_pair_beliefs(state)["recurrence"]
 
     out_messages = np.asarray(state.messages)[
         engine.arena.message_indices(group.d_gather_both[:, 0, :], 3)
@@ -665,6 +666,18 @@ def test_recurrence_readout_matches_edge_beliefs_and_preserves_support():
     drive_mean = drive_covariance @ drive_eta
 
     assert bool(stats["proper"])
+    for key, value in pair.items():
+        np.testing.assert_array_equal(stats[key], value)
+    np.testing.assert_allclose(
+        pair["pair_probability"].sum(axis=0),
+        pair["destination_probability"],
+        atol=1e-11,
+    )
+    np.testing.assert_allclose(
+        pair["pair_probability"].sum(axis=1),
+        pair["source_probability"],
+        atol=1e-11,
+    )
     np.testing.assert_allclose(
         stats["out_probability"], normalized(out_messages), atol=1e-11
     )
@@ -684,7 +697,7 @@ def test_recurrence_readout_matches_edge_beliefs_and_preserves_support():
     out_indices = engine.arena.message_indices(
         group.d_gather_both[:, 0, :], 3
     )[0]
-    supported_messages = state.messages.at[out_indices[0, 1]].set(NEG)
+    supported_messages = state.messages.at[out_indices[1, 1]].set(NEG)
     supported = engine.gaussian_node_stats(
         _replace(state, messages=supported_messages)
     )["recurrence"]
@@ -692,7 +705,7 @@ def test_recurrence_readout_matches_edge_beliefs_and_preserves_support():
     assert not bool(supported["out_support"][1])
     assert supported["out_probability"][1] == 0.0
 
-    empty_messages = state.messages.at[out_indices[0]].set(NEG)
+    empty_messages = state.messages.at[out_indices[1]].set(NEG)
     empty = engine.gaussian_node_stats(
         _replace(state, messages=empty_messages)
     )["recurrence"]

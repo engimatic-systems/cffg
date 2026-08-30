@@ -292,6 +292,7 @@ def recurrence_statistics(responsibility, mean, covariance, weights, offsets):
     return {
         "omega": omega,
         "exposure": at_risk,
+        "signed_success": kappa,
         "linear": kappa[..., None] * feature_mean,
         "quadratic": at_risk[..., None, None] * omega[..., None, None] * feature_second,
     }
@@ -414,19 +415,12 @@ def run_cffg_chain(initial, evidence, drives, weights, offsets, *, dtype=np.floa
         card = group.cards[0]
         for member_index, name in enumerate(group.members):
             row = beliefs[name]
-            transition = stick_transition(row["drive_mean"], weights, offsets)
-            cavities = []
             own_messages = []
             for role in range(2):
-                slots = list(group.d_gather_both[member_index, role])
                 own_slot = int(group.d_scatter[member_index, role])
-                cavity_slot = next(int(slot) for slot in slots if int(slot) != own_slot)
-                cavity = state.messages[engine.arena.message_indices(cavity_slot, card)]
                 own = state.messages[engine.arena.message_indices(own_slot, card)]
-                cavities.append(_normalized_log_message(cavity))
                 own_messages.append(_normalized_log_message(own))
-            local = cavities[1][:, None] * transition * cavities[0][None, :]
-            factor_local.append(local / local.sum())
+            factor_local.append(row["pair_probability"])
             factor_messages_out.append(own_messages[0])
             factor_messages_in.append(own_messages[1])
             score = jj_log_transition(
@@ -489,7 +483,16 @@ def _max_error(left, right):
 
 
 def _stats_error(left, right):
-    return max(_max_error(left[key], right[key]) for key in ("omega", "exposure", "linear", "quadratic"))
+    return max(
+        _max_error(left[key], right[key])
+        for key in (
+            "omega",
+            "exposure",
+            "signed_success",
+            "linear",
+            "quadratic",
+        )
+    )
 
 
 def diagnose_case(card: int, *, dtype=np.float64):
@@ -697,9 +700,8 @@ def diagnostic_report(repo: Path) -> dict:
                 "structured_complete": "both structured message and structured learning errors stay within tolerance",
             },
             "production_change": (
-                "Production inference and BFE now use the structured consecutive-regime pair. "
-                "The public learning readout remains the independent singleton product until "
-                "cff-ifbr installs the pair-derived statistics."
+                "Production inference, BFE, the public pair readout, and coefficient "
+                "learning use one structured consecutive-regime pair derivation."
             ),
         },
     }

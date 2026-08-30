@@ -299,22 +299,22 @@ improper Gaussian beliefs are loud, and one unfused categorical pass costs
 `K³` transition tensor. Flooding batches that pass synchronously. The mixed
 schedule runs the same recurrence coordinate before conditionally refreshing
 ordinary BP islands; recurrence fusion is an optional execution optimization,
-not a second pair or energy owner. The sweep and BFE deterministically
-rematerialize the pair from current cavities and drive moments; no pair array
-is persisted or exposed as a public readout before cff-ifbr.
+not a second pair or energy owner. The sweep, BFE, and public readout
+deterministically rematerialize the pair from current cavities and drive
+moments; no pair array is independently persisted.
 
-Its `gaussian_node_stats` record is intentionally pre-PG: the two categorical
-beliefs and exact supports plus the drive mean, directly inverted covariance,
-and second moment. The direct covariance prevents recurrence learning from
-recovering a small covariance by subtracting two large, nearly equal moments.
-`Engine.recurrence_weight_stats` is the derived layer: it checks factor-local
-probability, covariance, parameter, logit-second, and finite-output predicates;
-forms stable PG coordinates from the mean and covariance; and emits additive
-Gaussian natural statistics for augmented `[R; r]`. The inference and BFE
-owners are structured in this release, while this public learning readout
-still uses the historical product of endpoint singletons; cff-ifbr owns its
-pair-derived replacement. Its diagnostic scalars
-identify the failed predicate and its dtype-scaled bound. The generic
+`Engine.recurrence_pair_beliefs` exposes the normalized factor-local pair with
+source rows and destination columns, both marginals, literal support, direct
+Gaussian drive moments, and propriety. `gaussian_node_stats` includes the same
+record. The direct covariance prevents recurrence learning from recovering a
+small covariance by subtracting two large, nearly equal moments.
+`Engine.recurrence_weight_stats` derives its at-risk, signed-success, linear,
+and quadratic rows from that pair: it checks factor-local probability,
+covariance, parameter, logit-second, and finite-output predicates and emits
+additive Gaussian natural statistics for augmented `[R; r]`. The Gaussian
+message and coefficient learning therefore share D9.12's masses without a
+singleton-product fallback. Its diagnostic scalars identify the failed
+predicate and its dtype-scaled bound. The generic
 `pg_weights/recurrence_link` learning pairing pools those statistics into
 `conj.PGWeights` outside JIT and rolls its posterior mean into the next trial.
 Its arrays retain source-regime, stick, and augmented drive-coordinate axes;
@@ -605,11 +605,10 @@ them. Four rules define the contract:
    against the conjugate sufficient statistics in DERIVATIONS D4. Their
    inference rollover writes inverse expected precision, `Psi / nu`, not the
    posterior-mean covariance used by the reporting API. PG weights integrate
-   the current legacy endpoint-product Pólya–Gamma statistics and roll their
-   Gaussian posterior mean into point weights and offsets; cff-ifbr will bind
-   this readout to the same factor-local D9 pair derivation. Every posterior
-   remains outside JIT; inference in the next run consumes point parameters
-   rather than joint parameter uncertainty.
+   the factor-local D9 pair's Pólya–Gamma statistics and roll their Gaussian
+   posterior mean into point weights and offsets. Every posterior remains
+   outside JIT; inference in the next run consumes point parameters rather
+   than joint parameter uncertainty.
 
 Cadence is deliberately not part of `LearnableSpec`. `Learnables` keeps a
 read-only validated copy of every initial prior. `accumulate(engine, result)`
