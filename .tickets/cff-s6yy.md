@@ -1,6 +1,6 @@
 ---
 id: cff-s6yy
-status: open
+status: closed
 deps: [cff-rl7r]
 links: []
 created: 2026-08-30T16:00:47Z
@@ -90,3 +90,9 @@ outside this consolidation.
   regimes at one recurrence factor.
 - **P-substitution:** The LAIF constraint that replaces a selected variational
   marginal with the generative conditional in a GFE node.
+
+## Notes
+
+**2026-08-30T16:28:15Z**
+
+Ported 7c8ad8fb, e70e1b48, 605136ad, 98070d8e, and e38f29d8 as five new atomic commits on cff-rl7r. Added the prerequisite pure recurrence_smoothing oracle and test because the selected commits import and modify them. Kept only production/oracle code, tests, D9 derivation, canonical docs, and EPIC_FILES registrations. Excluded tools/test-suite-runtimes.json, old ticket changes, preregistration, audit notes, and final-parity experiment prose. Focused validation by commit: 16 passed; 37 passed; 64 passed; 82 passed and 1 deselected; final checkpoint plus rSLDS fit 24 passed after correcting the reordered snapshot dependency.
