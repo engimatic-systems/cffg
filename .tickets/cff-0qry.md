@@ -1,6 +1,6 @@
 ---
 id: cff-0qry
-status: open
+status: closed
 deps: [cff-qg1d]
 links: []
 created: 2026-08-30T16:00:47Z
@@ -80,3 +80,9 @@ contract is added here.
 - **rSLDS:** Recurrent switching linear dynamical system.
 - **Status-bearing:** Returning an explicit converged, budget-exhausted,
   diverged, or infeasible state instead of only a value.
+
+## Notes
+
+**2026-08-30T16:12:35Z**
+
+Ported PR #65 as four new atomic commits on cff-qg1d. Retained declared rSLDS model/fitter behavior, tests, and reconciled canonical documentation. Excluded the old cff-11jj ticket state and tools/test-suite-runtimes.json. Focused validation: hybrid plus recurrence tests -> 32 passed; hybrid plus rSLDS fit tests -> 29 passed; recurrence-link tests after the rename regression -> 15 passed.
