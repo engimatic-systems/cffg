@@ -19,8 +19,15 @@ import numpy as np
 from cffg import conj
 from cffg.compiler import compile_template
 from cffg.engine import Engine, RunResult, RunStatus, State, _replace
-from cffg.learn import FAMILIES, Learnables
-from cffg.models.rslds import RSLDSLearning, rslds
+from cffg.learn import Learnables
+from cffg.models.rslds import (
+    DYNAMICS_LEARNABLE,
+    EMISSION_LEARNABLE,
+    INITIAL_REGIME_LEARNABLE,
+    RECURRENCE_LEARNABLE,
+    RSLDSLearning,
+    rslds,
+)
 from cffg.models.rslds_init import (
     PCAARHMMInitializer,
     RSLDSInitialization,
@@ -41,6 +48,14 @@ class RSLDSFitPriors:
 
     def model_prior(self) -> RSLDSLearning:
         return RSLDSLearning(self.initial_alpha, self.dynamics, self.recurrence)
+
+    def learning_priors(self) -> dict[str, object]:
+        return {
+            INITIAL_REGIME_LEARNABLE: self.initial_alpha,
+            DYNAMICS_LEARNABLE: self.dynamics,
+            RECURRENCE_LEARNABLE: self.recurrence,
+            EMISSION_LEARNABLE: self.emission,
+        }
 
 
 def vague_rslds_fit_priors(
@@ -151,58 +166,51 @@ def _validate_priors(
     return model
 
 
-def _emission_points(learning: Learnables) -> dict[str, np.ndarray]:
-    values = FAMILIES["mniw"].rollover(
-        learning.params["emission"], "gaussian_linear"
-    )
+def _point_parameters(learning: Learnables) -> dict[str, np.ndarray]:
     return {
-        "emission_matrix": np.asarray(values["matrix"]).copy(),
-        "emission_offset": np.asarray(values["offset"]).copy(),
-        "emission_covariance": np.asarray(values["cov"]).copy(),
+        "initial_regime_probability": np.asarray(
+            learning.expected(INITIAL_REGIME_LEARNABLE)
+        ).copy(),
+        "dynamics_matrix": np.asarray(
+            learning.rollover(DYNAMICS_LEARNABLE, "matrix")
+        ).copy(),
+        "dynamics_offset": np.asarray(
+            learning.rollover(DYNAMICS_LEARNABLE, "offset")
+        ).copy(),
+        "dynamics_covariance": np.asarray(
+            learning.rollover(DYNAMICS_LEARNABLE, "cov")
+        ).copy(),
+        "recurrence_weights": np.asarray(
+            learning.rollover(RECURRENCE_LEARNABLE, "weights")
+        ).copy(),
+        "recurrence_offsets": np.asarray(
+            learning.rollover(RECURRENCE_LEARNABLE, "offsets")
+        ).copy(),
+        "emission_matrix": np.asarray(
+            learning.rollover(EMISSION_LEARNABLE, "matrix")
+        ).copy(),
+        "emission_offset": np.asarray(
+            learning.rollover(EMISSION_LEARNABLE, "offset")
+        ).copy(),
+        "emission_covariance": np.asarray(
+            learning.rollover(EMISSION_LEARNABLE, "cov")
+        ).copy(),
     }
 
 
-def _point_parameters(
-    model: RSLDSLearning,
-    emission: Learnables,
-) -> dict[str, np.ndarray]:
-    return {**model.parameter_arrays(), **_emission_points(emission)}
-
-
-def _posterior_arrays(
-    model: RSLDSLearning,
-    emission: Learnables,
-) -> dict[str, np.ndarray]:
-    arrays = {"posterior/initial_alpha": np.asarray(model.initial_alpha)}
-    for index, posterior in enumerate(model.dynamics):
-        arrays.update(
-            {
-                f"posterior/dynamics/{index}/m": np.asarray(posterior.m),
-                f"posterior/dynamics/{index}/lam": np.asarray(posterior.lam),
-                f"posterior/dynamics/{index}/psi": np.asarray(posterior.psi),
-                f"posterior/dynamics/{index}/nu": np.asarray(posterior.nu),
-            }
-        )
-    arrays["posterior/recurrence/eta"] = np.asarray(model.recurrence.eta)
-    arrays["posterior/recurrence/precision"] = np.asarray(
-        model.recurrence.precision
-    )
-    arrays.update(
-        {
-            f"posterior/emission/{key}": np.asarray(value)
-            for key, value in emission.params["emission"].items()
-        }
-    )
-    return arrays
+def _posterior_arrays(learning: Learnables) -> dict[str, np.ndarray]:
+    return {
+        f"posterior/{name}": np.asarray(value)
+        for name, value in learning.state_dict().items()
+    }
 
 
 def _snapshot(
-    model: RSLDSLearning,
-    emission: Learnables,
+    learning: Learnables,
     points: dict[str, np.ndarray],
 ) -> dict[str, np.ndarray]:
     return {
-        **_posterior_arrays(model, emission),
+        **_posterior_arrays(learning),
         **{f"point/{name}": np.asarray(value) for name, value in points.items()},
     }
 
@@ -251,13 +259,10 @@ def _cast_state(state: State, dtype: np.dtype) -> State:
 def _install(
     engine: Engine,
     observations: np.ndarray,
-    model: RSLDSLearning,
-    emission: Learnables,
+    learning: Learnables,
 ) -> State:
-    state = model.install(
-        engine, _cast_state(engine.init_state(), observations.dtype)
-    )
-    params = emission.write(engine, state.params, only=("emission",))
+    state = _cast_state(engine.init_state(), observations.dtype)
+    params = learning.write(engine, state.params)
     state = _replace(state, params=params)
     return engine.bind_data(state, _data(observations))
 
@@ -314,6 +319,10 @@ def _run_inner(
     convex combination. The fixed points are unchanged, and every attempt
     restarts from the same parameter-bound state.
     """
+    if engine.arena.mu3_groups:
+        raise ValueError(
+            "deterministic fitting retries do not support stochastic mu3 updates"
+        )
     attempts: list[RSLDSInferenceAttempt] = []
     current_damping = damping
     result: RunResult | None = None
@@ -346,8 +355,7 @@ def _result(
     free_energies: list[float],
     points: dict[str, np.ndarray],
     initialization: RSLDSInitialization,
-    model: RSLDSLearning,
-    emission: Learnables,
+    learning: Learnables,
     last_inference: RunResult | None,
     phases: list[RSLDSFitPhase],
     timings: dict[str, float],
@@ -364,10 +372,10 @@ def _result(
         free_energies=tuple(free_energies),
         parameters={name: np.asarray(value).copy() for name, value in points.items()},
         initialization=initialization,
-        model_posterior=model,
+        model_posterior=RSLDSLearning._from_runtime(learning),
         emission_posterior={
             key: np.asarray(value).copy()
-            for key, value in emission.params["emission"].items()
+            for key, value in learning.params[EMISSION_LEARNABLE].items()
         },
         last_inference=last_inference,
         phases=tuple(phases),
@@ -416,7 +424,7 @@ def fit_rslds(
     if not np.isfinite(outer_tolerance) or outer_tolerance <= 0:
         raise ValueError("outer_tolerance must be finite and positive")
 
-    model_prior = _validate_priors(
+    _validate_priors(
         priors,
         regimes=regimes,
         latent_dimension=latent_dimension,
@@ -453,9 +461,7 @@ def fit_rslds(
     started = time.perf_counter()
     engine = Engine(compile_template(template, arrays=model_arrays), schedule=schedule)
     compile_seconds = time.perf_counter() - started
-    emission_prior = Learnables(engine, priors={"emission": priors.emission})
-    current_model = model_prior
-    current_emission = emission_prior
+    current_learning = Learnables(engine, priors=priors.learning_priors())
     current_points = {
         name: arrays[name]
         for name in (
@@ -470,7 +476,7 @@ def fit_rslds(
             "emission_covariance",
         )
     }
-    current_snapshot = _snapshot(current_model, current_emission, current_points)
+    current_snapshot = _snapshot(current_learning, current_points)
     current_state = engine.bind_data(
         _cast_state(engine.init_state(), observations.dtype), _data(observations)
     )
@@ -526,8 +532,7 @@ def fit_rslds(
                 free_energies=free_energies,
                 points=current_points,
                 initialization=initialization,
-                model=current_model,
-                emission=current_emission,
+                learning=current_learning,
                 last_inference=inner,
                 phases=phases,
                 timings=timings,
@@ -554,8 +559,7 @@ def fit_rslds(
                 free_energies=free_energies,
                 points=current_points,
                 initialization=initialization,
-                model=current_model,
-                emission=current_emission,
+                learning=current_learning,
                 last_inference=inner,
                 phases=phases,
                 timings=timings,
@@ -565,21 +569,16 @@ def fit_rslds(
 
         started = time.perf_counter()
         try:
-            candidate_model = model_prior.update(engine, inner.state)
-            candidate_emission = Learnables(
-                engine, priors={"emission": priors.emission}
+            candidate_learning = Learnables(
+                engine, priors=priors.learning_priors()
             )
-            candidate_emission.replace(engine, inner, only=("emission",))
-            candidate_points = _point_parameters(candidate_model, candidate_emission)
-            candidate_snapshot = _snapshot(
-                candidate_model, candidate_emission, candidate_points
-            )
+            candidate_learning.replace(engine, inner)
+            candidate_points = _point_parameters(candidate_learning)
+            candidate_snapshot = _snapshot(candidate_learning, candidate_points)
             residual = _fixed_point_residual(current_snapshot, candidate_snapshot)
             if not np.isfinite(residual):
                 raise ValueError("outer fixed-point residual is non-finite")
-            candidate_state = _install(
-                engine, observations, candidate_model, candidate_emission
-            )
+            candidate_state = _install(engine, observations, candidate_learning)
         except (FloatingPointError, np.linalg.LinAlgError, ValueError) as error:
             timings["coordinate"] += time.perf_counter() - started
             phases.append(
@@ -602,8 +601,7 @@ def fit_rslds(
                 free_energies=free_energies,
                 points=current_points,
                 initialization=initialization,
-                model=current_model,
-                emission=current_emission,
+                learning=current_learning,
                 last_inference=inner,
                 phases=phases,
                 timings=timings,
@@ -623,8 +621,7 @@ def fit_rslds(
             )
         )
         consecutive = consecutive + 1 if residual <= outer_tolerance else 0
-        current_model = candidate_model
-        current_emission = candidate_emission
+        current_learning = candidate_learning
         current_points = candidate_points
         current_snapshot = candidate_snapshot
         current_state = candidate_state
@@ -683,8 +680,7 @@ def fit_rslds(
         free_energies=free_energies,
         points=current_points,
         initialization=initialization,
-        model=current_model,
-        emission=current_emission,
+        learning=current_learning,
         last_inference=terminal,
         phases=phases,
         timings=timings,
