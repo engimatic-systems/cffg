@@ -511,6 +511,7 @@ def test_declared_rslds_learning_is_independent_of_every_factor_name():
     )
     priors = vague_rslds_fit_priors(2, 1, 1).learning_priors()
     learned = []
+    engines = []
     for candidate in (template, renamed_template):
         engine = Engine(compile_template(candidate, arrays=arrays))
         state = engine.bind_data(
@@ -522,10 +523,16 @@ def test_declared_rslds_learning_is_independent_of_every_factor_name():
         learning = Learnables(engine, priors=priors)
         learning.replace(engine, result)
         learned.append(learning.state_dict())
+        engines.append(engine)
 
     assert learned[0].keys() == learned[1].keys()
     for name in learned[0]:
         np.testing.assert_allclose(learned[0][name], learned[1][name], atol=1e-10)
+
+    restored = Learnables(engines[0], priors=priors)
+    restored.load_state_dict(learned[0])
+    for name, value in learned[0].items():
+        np.testing.assert_array_equal(restored.state_dict()[name], value)
 
 
 def test_rule_matches_independent_numpy_coordinates():
