@@ -2060,7 +2060,9 @@ name stays `recurrence_link`:
   and heterogeneous recovery diagnostics must preserve pair identity and
   cannot infer it later from singletons.
 
-Executable anchors in `tests/test_structured_recurrence.py`:
+The independent NumPy anchors remain in
+`tests/test_structured_recurrence.py`. The independently callable JAX rule
+authority is anchored in `tests/test_structured_recurrence_rule.py`:
 
 - `test_structured_messages_beliefs_and_free_energy_match_enumeration` checks
   (D9.6--D9.11) and (D9.17) for K=2 and K=3.
@@ -2076,3 +2078,9 @@ Executable anchors in `tests/test_structured_recurrence.py`:
   evidence, reject empty/non-finite support, derive float32 tolerance from the
   dtype, and run K=8/T=100 with `O(T K^2)` dynamic programming rather than
   path enumeration.
+- `test_fixed_drive_rules_match_exact_chain_oracle` and
+  `test_pair_node_and_separator_energy_equal_negative_log_normalizer` pin the
+  callable-authority equations and energy ledger to the independent oracle.
+- `test_pair_masses_and_gaussian_message_use_joint_responsibility` checks that
+  the Gaussian message reads the pair directly, while the hostile-input,
+  transform, and K=8 tests pin the public rule's status and scaling boundary.
