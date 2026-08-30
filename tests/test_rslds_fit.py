@@ -17,6 +17,7 @@ from cffg.models import (
     fit_rslds,
     vague_rslds_fit_priors,
 )
+from cffg.models.coordinate_fit import CoordinateResidual
 from cffg.models.rslds_fit import _run_inner
 
 
@@ -193,10 +194,12 @@ def test_fit_replaces_one_sequence_coordinates_and_reuses_one_engine(monkeypatch
         True,
         False,
     ]
-    for phase, legacy_residual in zip(result.phases[:-1], result.residuals):
-        assert phase.fixed_point_residual == legacy_residual
+    for phase, selected_residual in zip(result.phases[:-1], result.residuals):
+        assert phase.fixed_point_residual == selected_residual
         assert phase.runtime_residual is not None
-        assert np.isfinite(phase.runtime_residual.maximum)
+        assert phase.runtime_residual.maximum == selected_residual
+        assert phase.legacy_fixed_point_residual is not None
+        assert np.isfinite(phase.legacy_fixed_point_residual)
         assert set(phase.runtime_residual.per_family) == {
             "initial",
             "dynamics",
@@ -206,6 +209,7 @@ def test_fit_replaces_one_sequence_coordinates_and_reuses_one_engine(monkeypatch
         assert phase.functional_transition_residual is not None
         assert np.isfinite(phase.functional_transition_residual.maximum)
     assert result.phases[-1].runtime_residual is None
+    assert result.phases[-1].legacy_fixed_point_residual is None
     assert result.phases[-1].functional_transition_residual is None
     assert result.model_posterior.initial_alpha.sum() == pytest.approx(
         priors.initial_alpha.sum() + 1.0
@@ -248,6 +252,26 @@ def test_fit_replaces_one_sequence_coordinates_and_reuses_one_engine(monkeypatch
     assert {
         key: value.shape for key, value in result.state.params.items()
     } == {key: value.shape for key, value in initial.params.items()}
+
+
+def test_fit_uses_runtime_map_residual_as_its_outer_certificate(monkeypatch):
+    forced = CoordinateResidual(
+        maximum=3.0,
+        root_mean_square=3.0,
+        per_family={"forced": 3.0},
+        per_array={"forced/value": 3.0},
+        vector=(3.0,),
+    )
+    monkeypatch.setattr("cffg.models.rslds_fit.coordinate_residual", lambda *_: forced)
+
+    result = _fit(_observations(8), outer_iterations=2)
+
+    assert result.status is RunStatus.BUDGET_EXHAUSTED
+    assert result.residuals == (3.0, 3.0)
+    for phase in result.phases[:-1]:
+        assert phase.fixed_point_residual == 3.0
+        assert phase.legacy_fixed_point_residual is not None
+        assert phase.runtime_residual is forced
 
 
 @dataclasses.dataclass(frozen=True)
