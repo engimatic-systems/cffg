@@ -1,6 +1,6 @@
 # CFFG Engine — Architecture
 
-Status: living as-built record, updated 2026-07-30. Unless a section says
+Status: living as-built record, updated 2026-08-17. Unless a section says
 otherwise, every statement before **Target design** describes behavior in the
 current repository. Tickets, not the target section, are the source of truth for
 planned work.
@@ -295,25 +295,31 @@ Gaussian natural statistics for augmented `[R; r]`. The generic
 `pg_weights/recurrence_link` learning pairing pools those statistics into
 `conj.PGWeights` outside JIT and rolls its posterior mean into the next trial.
 Its arrays retain source-regime, stick, and augmented drive-coordinate axes;
-role-bearing addresses write separate weights and offsets. The rSLDS template
-has not adopted that declaration yet; cff-0qry owns its migration.
+role-bearing addresses write separate weights and offsets.
 
 `cffg.models.rslds` is the end-to-end composition boundary. Its serialized
 template uses one `recurrence_link(z[t+1], z[t], x[t])`, a
 `gaussian_mixture_linear` dynamics node selected by `z[t+1]`, and a shared
-`gaussian_linear` emission per slice. The emission blobs are tied across time
-and declared as one generic MNIW `LearnableSpec`; every slice is a statistic
-source for the same posterior.
+`gaussian_linear` emission per slice. Four serialized `LearnableSpec`s own the
+initial-regime Dirichlet, component-MNIW dynamics, PG recurrence block, and
+tied emission MNIW. Their statistic suppliers come from explicit `sources` or
+shared blob references. Factor spelling and sorted factor order have no
+learning meaning; the factor-renaming regression changes every name and
+retains all four posterior values. The continuous initial-state mean and
+covariance are deliberately not learnable: they remain fixed outputs of the
+initializer.
 
-Two host cadences deliberately share that assembly. `RSLDSLearning` owns
-Dirichlet counts for the initial regime, one MNIW for each regime's dynamics,
-and one `PGWeights` block for the recurrent transition. Its `update` method
-accumulates evidence across distinct trials. `fit_rslds` instead owns a single
-observed sequence: `PCAARHMMInitializer` fixes an observation-derived PCA
-coordinate system and an initial regime order; each outer coordinate runs the
-public engine, reconstructs all four posterior families from immutable priors,
-and uses generic `Learnables.replace` for the tied emission. Thus an outer
-iteration cannot count the same sequence as a new trial.
+Two host cadences deliberately share that assembly through `Learnables`.
+`RSLDSLearning` remains a compatibility facade for the historical
+initial-regime, dynamics, and recurrence boundary; its distinct-trial
+`update`, checkpoint, and installation operations delegate to a restricted
+runtime and leave the historical fixed emission unchanged. `fit_rslds` owns a
+single observed sequence: `PCAARHMMInitializer` fixes an observation-derived
+PCA coordinate system and an initial regime order; each outer coordinate
+constructs all four posteriors from immutable priors, calls
+`Learnables.replace`, and writes them atomically. Thus an outer iteration
+cannot count the same sequence as a new trial or expose a partly replaced
+coordinate.
 
 Both cadences install point rollovers through role-bearing addresses into a
 fresh observation-bound state. The compiled engine and every runtime shape
@@ -323,7 +329,9 @@ while it remains a convex natural-parameter blend; this changes the route but
 not the fixed point, support, schedule, tolerance, or FE certificate. A
 non-finite, infeasible, or diverged attempt never retries. After the last
 parameter write, the same bounded cadence runs a terminal hidden-state solve,
-so the returned state and point parameters agree.
+so the returned state and point parameters agree. The cadence rejects an
+engine with functional `mu3` groups before running: it has no explicit key and
+particle-reuse contract with which to make two stochastic attempts comparable.
 
 `RSLDSFitResult.phases` is the evidence boundary for this host schedule. It
 records each attempt's damping, public and recurrence status, iteration count,
@@ -335,11 +343,21 @@ array, requires two consecutive residuals below the dtype-scaled tolerance for
 `converged`, and otherwise propagates `budget_exhausted` or `diverged`. It
 makes no scalar outer-objective claim.
 
-The registry now provides `component_mniw/gaussian_mixture_linear` and
-`pg_weights/recurrence_link` pairings for the per-regime dynamics MNIWs and PG
-block. The rSLDS helpers still update those posteriors manually; the
-ordinary Gaussian emission already uses §3b's generic contract. Ticket
-cff-0qry owns the rSLDS declaration migration and reusable-fit boundary.
+The fit boundary remains deliberately small and model-owned:
+
+| Responsibility | Owner | Classification and evidence |
+| --- | --- | --- |
+| Serialized topology, tied blobs, statistic sources | `cffg.models.rslds` | rSLDS-specific: it names recurrence, mixture dynamics, emissions, and data ports. |
+| PCA/ARHMM initialization and continuous initial-state prior | `cffg.models.rslds_init` | rSLDS-specific: it fixes latent coordinates and regime labels from observation pairs. |
+| Posterior accumulation/replacement, rollover, atomic writes, checkpoints | `cffg.learn.Learnables` | Reusable: ordinary Gaussian declared-learning fixtures and rSLDS exercise the same public operations. |
+| Observation-port binding and result construction | `cffg.models.rslds_fit` | rSLDS-specific: the public result separates recurrence status, inner FE, and outer residual. |
+| Attempt evidence | `cffg.models.rslds_fit` | rSLDS-specific: it inspects recurrence status and Gaussian/mixture belief propriety through an explicit wrapper. |
+| Status-gated run, identical-state retry, posterior/point snapshot comparison, terminal solve | `cffg.models.rslds_fit` | Candidate reusable: the policy is name-independent, but only rSLDS currently needs the whole loop. It stays here until a non-switching production fitter proves the same interface and parity. |
+
+No shared fitting framework is introduced on that last row merely from one
+client. Ordinary non-switching Gaussian models already prove the shared
+declared-learning operations directly; they do not yet prove rSLDS phase or
+retry policy as a reusable abstraction.
 
 ### 2e. Executable factor registration (`cffg.kernels`, cff-ri8m)
 
