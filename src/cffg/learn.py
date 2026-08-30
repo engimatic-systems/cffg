@@ -269,12 +269,14 @@ class Dirichlet:
 
 
 from cffg.gaussian_learning import MNIWFamily, NIWFamily
+from cffg.hybrid_learning import ComponentMNIWFamily
 
 
 FAMILIES: dict[str, Family] = {
     "dirichlet": Dirichlet(),
     "niw": NIWFamily(),
     "mniw": MNIWFamily(),
+    "component_mniw": ComponentMNIWFamily(),
 }
 
 _STATE_KEY_PREFIX = "v2:"
