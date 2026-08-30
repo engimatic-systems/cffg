@@ -1,6 +1,6 @@
 ---
 id: cff-rl7r
-status: open
+status: closed
 deps: [cff-0qry]
 links: []
 created: 2026-08-30T16:00:47Z
@@ -71,3 +71,9 @@ statistics with structured consecutive-state pair beliefs.
   update a conjugate posterior.
 - **Positive semidefinite:** A symmetric matrix with no materially negative
   eigenvalue.
+
+## Notes
+
+**2026-08-30T16:15:59Z**
+
+Ported commit 30aa87e6 as one new atomic commit on cff-0qry. Retained only its production code, tests, canonical documentation, and required EPIC_FILES registration. Imported no old parent commits or generated runtime metadata. Focused validation: uv run pytest -q tests/test_conj.py tests/test_hybrid_readouts.py tests/test_recurrence_learning_numerics.py tests/test_rslds_fit.py -> 42 passed, 1 deselected.
