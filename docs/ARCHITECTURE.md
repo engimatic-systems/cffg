@@ -367,11 +367,18 @@ particle-reuse contract with which to make two stochastic attempts comparable.
 records each attempt's damping, public and recurrence status, iteration count,
 FE and message-delta tails, Gaussian-belief propriety, finite-state check, and
 parameter scales before and after replacement. Inner Bethe free energy remains
-the engine convergence signal. The outer loop reports its separate maximum
-scale-normalized change over every posterior hyperparameter and installed point
-array, requires two consecutive residuals below the dtype-scaled tolerance for
-`converged`, and otherwise propagates `budget_exhausted` or `diverged`. It
-makes no scalar outer-objective claim.
+the engine convergence signal. The outer loop retains its historical maximum
+scale-normalized change over every posterior hyperparameter and reporting point
+array as the current status authority. Alongside it, each replacement records a
+named residual over the normalized initial-regime potential and the dynamics,
+recurrence, and emission values installed into the next solve. A fixed set of
+latent probes derived from the observations and their initializer also records
+the corresponding change in transition probabilities. These canonical runtime
+and functional views are evidence for choosing a later outer certificate; they
+do not yet change accepted steps or terminal status. The historical authority
+requires two consecutive residuals below the dtype-scaled tolerance for
+`converged`, and otherwise propagates `budget_exhausted` or `diverged`. None of
+the views makes a scalar outer-objective claim.
 
 The fit boundary remains deliberately small and model-owned:
 
@@ -382,7 +389,9 @@ The fit boundary remains deliberately small and model-owned:
 | Posterior accumulation/replacement, rollover, atomic writes, checkpoints | `cffg.learn.Learnables` | Reusable: ordinary Gaussian declared-learning fixtures and rSLDS exercise the same public operations. |
 | Observation-port binding and result construction | `cffg.models.rslds_fit` | rSLDS-specific: the public result separates recurrence status, inner FE, and outer residual. |
 | Attempt evidence | `cffg.models.rslds_fit` | rSLDS-specific: it inspects recurrence status and Gaussian/mixture belief propriety through an explicit wrapper. |
-| Status-gated run, identical-state retry, posterior/point snapshot comparison, terminal solve | `cffg.models.rslds_fit` | Candidate reusable: the policy is name-independent, but only rSLDS currently needs the whole loop. It stays here until a non-switching production fitter proves the same interface and parity. |
+| Named coordinate residual | `cffg.models.coordinate_fit` | Reusable evidence primitive: it compares model-owned named blocks without assigning convergence semantics. |
+| Runtime and transition-function coordinate views | `cffg.models.rslds_coordinate` | rSLDS-specific: it projects learned values into installed semantics and evaluates a truth-free observation-derived transition probe. |
+| Status-gated run, identical-state retry, legacy snapshot comparison, terminal solve | `cffg.models.rslds_fit` | Candidate reusable: the policy is name-independent, but only rSLDS currently needs the whole loop. It stays here until a non-switching production fitter proves the same interface and parity. |
 
 No shared fitting framework is introduced on that last row merely from one
 client. Ordinary non-switching Gaussian models already prove the shared

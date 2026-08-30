@@ -20,6 +20,7 @@ from cffg import conj
 from cffg.compiler import compile_template
 from cffg.engine import Engine, RunResult, RunStatus, State, _replace
 from cffg.learn import Learnables
+from cffg.models.coordinate_fit import CoordinateResidual, coordinate_residual
 from cffg.models.rslds import (
     DYNAMICS_LEARNABLE,
     EMISSION_LEARNABLE,
@@ -27,6 +28,14 @@ from cffg.models.rslds import (
     RECURRENCE_LEARNABLE,
     RSLDSLearning,
     rslds,
+)
+from cffg.models.rslds_coordinate import (
+    initial_runtime_blocks,
+    legacy_fixed_point_residual,
+    legacy_snapshot,
+    learned_runtime_blocks,
+    observation_probe_states,
+    transition_residual,
 )
 from cffg.models.rslds_init import (
     PCAARHMMInitializer,
@@ -111,6 +120,8 @@ class RSLDSFitPhase:
     parameter_scales_before: dict[str, float]
     parameter_scales_after: dict[str, float]
     fixed_point_residual: float | None
+    runtime_residual: CoordinateResidual | None = None
+    functional_transition_residual: CoordinateResidual | None = None
 
 
 @dataclass(frozen=True)
@@ -200,49 +211,6 @@ def _point_parameters(learning: Learnables) -> dict[str, np.ndarray]:
             learning.rollover(EMISSION_LEARNABLE, "cov")
         ).copy(),
     }
-
-
-def _posterior_arrays(learning: Learnables) -> dict[str, np.ndarray]:
-    return {
-        f"posterior/{name}": np.asarray(value)
-        for name, value in learning.hyperparameter_snapshot().items()
-    }
-
-
-def _snapshot(
-    learning: Learnables,
-    points: dict[str, np.ndarray],
-) -> dict[str, np.ndarray]:
-    return {
-        **_posterior_arrays(learning),
-        **{f"point/{name}": np.asarray(value) for name, value in points.items()},
-    }
-
-
-def _fixed_point_residual(
-    old: dict[str, np.ndarray],
-    new: dict[str, np.ndarray],
-) -> float:
-    if old.keys() != new.keys():
-        raise ValueError("fixed-point snapshots disagree on parameter families")
-    residual = 0.0
-    for name in old:
-        before = np.asarray(old[name])
-        after = np.asarray(new[name])
-        if before.shape != after.shape:
-            raise ValueError(f"fixed-point array {name!r} changed shape")
-        if not np.all(np.isfinite(before)) or not np.all(np.isfinite(after)):
-            return float("inf")
-        scale = max(
-            1.0,
-            float(np.max(np.abs(before), initial=0.0)),
-            float(np.max(np.abs(after), initial=0.0)),
-        )
-        residual = max(
-            residual,
-            float(np.max(np.abs(after - before), initial=0.0)) / scale,
-        )
-    return residual
 
 
 def _data(observations: np.ndarray) -> dict[str, np.ndarray]:
@@ -480,7 +448,9 @@ def fit_rslds(
             "emission_covariance",
         )
     }
-    current_snapshot = _snapshot(current_learning, current_points)
+    current_snapshot = legacy_snapshot(current_learning, current_points)
+    current_runtime_blocks = initial_runtime_blocks(current_points)
+    probe_states = observation_probe_states(observations, initialization)
     current_state = engine.bind_data(
         _cast_state(engine.init_state(), observations.dtype), _data(observations)
     )
@@ -578,12 +548,23 @@ def fit_rslds(
             )
             candidate_learning.replace(engine, inner)
             candidate_points = _point_parameters(candidate_learning)
-            candidate_snapshot = _snapshot(candidate_learning, candidate_points)
-            residual = _fixed_point_residual(current_snapshot, candidate_snapshot)
+            candidate_snapshot = legacy_snapshot(candidate_learning, candidate_points)
+            residual = legacy_fixed_point_residual(
+                current_snapshot, candidate_snapshot
+            )
             if not np.isfinite(residual):
                 raise ValueError("outer fixed-point residual is non-finite")
+            candidate_runtime_blocks = learned_runtime_blocks(
+                candidate_learning, candidate_points
+            )
+            runtime_residual = coordinate_residual(
+                current_runtime_blocks, candidate_runtime_blocks
+            )
+            functional_residual = transition_residual(
+                current_points, candidate_points, probe_states
+            )
             candidate_state = _install(engine, observations, candidate_learning)
-        except (FloatingPointError, np.linalg.LinAlgError, ValueError) as error:
+        except (FloatingPointError, np.linalg.LinAlgError, TypeError, ValueError) as error:
             timings["coordinate"] += time.perf_counter() - started
             phases.append(
                 RSLDSFitPhase(
@@ -622,12 +603,15 @@ def fit_rslds(
                 parameter_scales_before=scales_before,
                 parameter_scales_after=_parameter_scales(candidate_points),
                 fixed_point_residual=residual,
+                runtime_residual=runtime_residual,
+                functional_transition_residual=functional_residual,
             )
         )
         consecutive = consecutive + 1 if residual <= outer_tolerance else 0
         current_learning = candidate_learning
         current_points = candidate_points
         current_snapshot = candidate_snapshot
+        current_runtime_blocks = candidate_runtime_blocks
         current_state = candidate_state
         if consecutive >= 2:
             fit_status = RunStatus.CONVERGED
