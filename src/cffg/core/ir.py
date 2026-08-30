@@ -110,7 +110,9 @@ class LearnableSpec:
       `A`/`Ac` and `Bs`/`Bc`.
     - joint family — an MNIW over a gaussian_linear node governs its
       `matrix`, `offset`, and `cov` blobs together, so all three name the
-      same learnable.
+      same learnable. A component MNIW keeps the selector state as a leading
+      posterior axis for `gaussian_mixture_linear`; Pólya–Gamma recurrence
+      learning likewise keeps source-regime and stick axes in one posterior.
 
     `family` keys cffg.learn.FAMILIES; the per-factor-type sufficient
     statistic comes from the factor type, not from this spec.

@@ -387,9 +387,10 @@ Supported named-write factors are `categorical`, `matrix_cat`,
 `transition_mixture`, `gaussian`, `gaussian_linear`, `gaussian_mixture`,
 `gaussian_mixture_linear`, `recurrence_link`, and `gaussian_prec`.
 
-Declared learning adds NIW for an ordinary `gaussian` and MNIW for
-`gaussian_linear`, including an observed emission compiled to the conditioned
-runtime rule:
+Declared learning supports NIW for `gaussian`, MNIW for `gaussian_linear`, a
+component MNIW for `gaussian_mixture_linear`, and Pólya–Gamma Gaussian weights
+for `recurrence_link`. An observed Gaussian-linear emission uses the same MNIW
+pairing after compilation to its conditioned runtime rule:
 
 ```python
 from cffg import conj
@@ -401,10 +402,26 @@ template.learnables["emission"] = LearnableSpec(
     "mniw",
     ("emission_matrix", "emission_offset", "emission_covariance"),
 )
+template.learnables["dynamics"] = LearnableSpec(
+    "dynamics",
+    "component_mniw",
+    ("dynamics_matrix", "dynamics_offset", "dynamics_covariance"),
+)
+template.learnables["recurrence"] = LearnableSpec(
+    "recurrence",
+    "pg_weights",
+    ("recurrence_weights", "recurrence_offsets"),
+)
 engine = Engine(compile_template(template, arrays=arrays))
 learnables = Learnables(
     engine,
-    priors={"emission": conj.vague_mniw(observation_dim, state_dim)},
+    priors={
+        "emission": conj.vague_mniw(observation_dim, state_dim),
+        "dynamics": tuple(
+            conj.vague_mniw(state_dim, state_dim) for _ in range(regimes)
+        ),
+        "recurrence": conj.vague_pg_weights(regimes, state_dim),
+    },
 )
 
 result = engine.run(bound_state, 200, tol=1e-7)
@@ -419,8 +436,15 @@ evidence should be added to the current posterior. Both operations pool all
 tied source factors and commit all selected posteriors atomically. Reporting
 uses `learnables.expected(name, role)`; inference rollover writes
 `psi / nu`, the inverse expected precision, rather than the posterior-mean
-covariance. Versioned checkpoints preserve every keyed NIW/MNIW
-hyperparameter.
+covariance. `component_mniw` stores `m`, `lam`, `psi`, and `nu` with a leading
+selector-component axis; exact zero responsibility adds exact zero statistics
+and leaves that component at its prior. `pg_weights` stores `eta` and
+`precision` with source-regime, stick, and augmented `[drive; offset]` axes,
+then rolls posterior means into separate weights and offsets. Both families
+remain host-side empirical-Bayes updates and reject improper or non-finite
+statistics before mutation. Versioned checkpoints preserve every keyed
+hyperparameter. A legacy multi-array checkpoint must name a complete posterior
+or restoration fails with a migration error.
 
 ## Run inference
 

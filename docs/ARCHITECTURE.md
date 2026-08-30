@@ -291,11 +291,12 @@ stable factor-local input to recurrence learning; PG expectations and
 parameter sufficient statistics remain owned by that learning layer.
 `Engine.recurrence_weight_stats` is that derived layer: it combines the soft
 belief with the point coefficients used by inference and emits additive
-Gaussian natural statistics for augmented `[R; r]`. `conj.PGWeights`
-accumulates those statistics outside JIT and rolls its posterior mean into the
-next trial. This standalone path intentionally does not register a
-`LearnableSpec`; recurrence factors have role-bearing named-write addresses,
-but a generic PG family and checkpoint schema remain cff-ahps surfaces.
+Gaussian natural statistics for augmented `[R; r]`. The generic
+`pg_weights/recurrence_link` learning pairing pools those statistics into
+`conj.PGWeights` outside JIT and rolls its posterior mean into the next trial.
+Its arrays retain source-regime, stick, and augmented drive-coordinate axes;
+role-bearing addresses write separate weights and offsets. The rSLDS template
+has not adopted that declaration yet; cff-0qry owns its migration.
 
 `cffg.models.rslds` is the end-to-end composition boundary. Its serialized
 template uses one `recurrence_link(z[t+1], z[t], x[t])`, a
@@ -334,9 +335,11 @@ array, requires two consecutive residuals below the dtype-scaled tolerance for
 `converged`, and otherwise propagates `budget_exhausted` or `diverged`. It
 makes no scalar outer-objective claim.
 
-The per-regime dynamics MNIWs and PG block remain model-specific rather than
-generic `LearnableSpec` families; the ordinary Gaussian emission uses §3b's
-generic contract, while broader adapters remain cff-ahps.
+The registry now provides `component_mniw/gaussian_mixture_linear` and
+`pg_weights/recurrence_link` pairings for the per-regime dynamics MNIWs and PG
+block. The rSLDS helpers still update those posteriors manually; the
+ordinary Gaussian emission already uses §3b's generic contract. Ticket
+cff-0qry owns the rSLDS declaration migration and reusable-fit boundary.
 
 ### 2e. Executable factor registration (`cffg.kernels`, cff-ri8m)
 
@@ -501,29 +504,37 @@ them. Four rules define the contract:
    (→ the reporting readout). `Dirichlet` serves the discrete vocabulary:
    `categorical` over `[K]`, `matrix_cat` over `[K_out, K_in]`,
    `transition_mixture` over `[U, K', K]`. `NIW` serves only
-   `niw/gaussian`; `MNIW` serves only `mniw/gaussian_linear`, including the
+   `niw/gaussian`; ordinary `MNIW` serves `mniw/gaussian_linear`, including the
    conditioned runtime group used by observed outputs. The rSLDS declares its
-   shared emission this way and pools every tied time slice. Mixture,
-   recurrence, precision, and EF factors have named addresses but no generic
-   conjugate adapter yet.
+   shared emission this way and pools every tied time slice.
+   `component_mniw/gaussian_mixture_linear` adds one MNIW posterior per
+   selector state, and `pg_weights/recurrence_link` adds one Gaussian natural-
+   parameter posterior per source regime and stick. Precision and EF factors
+   have named addresses but no generic conjugate adapter yet.
 
    Hyperparameters, statistics and rollover outputs are keyed dicts, and a
    family names which engine readout it draws from (`cffg.learn.READOUTS`),
    because a conjugate posterior is not always one array read off one
    readout. An MNIW over a `gaussian_linear` carries four hyperparameters,
    accumulates three statistics from `Engine.gaussian_node_stats`, and rolls
-   over into three blobs at different shapes — so a `LearnTarget` names both
-   the blob it writes and the parameter role that blob fills, which is what
-   routes a multi-parameter write. `Dirichlet` is the degenerate case of that
-   contract: one hyperparameter, one statistic, one role.
+   over into three blobs at different shapes. Component MNIW uses the same
+   statistic names with leading selector axes and occurrence counts equal to
+   soft responsibilities. PG weights instead draw additive `linear` and
+   `quadratic` records from `Engine.recurrence_weight_stats`. A `LearnTarget`
+   names both the blob it writes and the parameter role that blob fills, which
+   routes every multi-parameter write. `Dirichlet` is the degenerate case of
+   that contract: one hyperparameter, one statistic, one role.
 
 3. **Sources are perception, targets are everywhere.** Statistics come from
    the readout named by the family: discrete families use
-   `Engine.node_beliefs`, while NIW/MNIW use
-   `Engine.gaussian_node_stats`. Every eligible tied factor contributes one
-   local record; the family pools those records and performs one posterior
+   `Engine.node_beliefs`, while NIW/MNIW and component MNIW use
+   `Engine.gaussian_node_stats`; PG weights use
+   `Engine.recurrence_weight_stats`. Every eligible tied factor contributes
+   one local record; the family pools those records and performs one posterior
    update. A masked conditioned Gaussian-linear output contributes zero
-   evidence. GFE composites are write targets but never sources: a planning
+   evidence. An exactly unsupported mixture component likewise contributes
+   exact zeros and retains its prior coordinate. GFE composites are write
+   targets but never sources: a planning
    graph with parameter uncertainty therefore has zero sources for `A` and
    writes the raw counts α that its novelty term differentiates; the perception
    graph supplies the statistics and writes
@@ -547,12 +558,14 @@ them. Four rules define the contract:
    integrates against a factorized measure. Rollover always writes
    E[log θ], the mean-field-consistent point (Part II §5), never log E[θ].
 
-   NIW/MNIW integrate the converged Gaussian node belief against the conjugate
-   sufficient statistics in DERIVATIONS D4. Their inference rollover writes
-   inverse expected precision, `Psi / nu`, not the posterior-mean covariance
-   used by the reporting API. The posterior remains outside JIT; inference in
-   the next run consumes point parameters rather than joint parameter
-   uncertainty.
+   NIW/MNIW and component MNIW integrate the converged Gaussian node belief
+   against the conjugate sufficient statistics in DERIVATIONS D4. Their
+   inference rollover writes inverse expected precision, `Psi / nu`, not the
+   posterior-mean covariance used by the reporting API. PG weights integrate
+   D8's coordinate-optimal Pólya–Gamma natural statistics and roll their
+   Gaussian posterior mean into point weights and offsets. Every posterior
+   remains outside JIT; inference in the next run consumes point parameters
+   rather than joint parameter uncertainty.
 
 Cadence is deliberately not part of `LearnableSpec`. `Learnables` keeps a
 read-only validated copy of every initial prior. `accumulate(engine, result)`
@@ -562,8 +575,10 @@ sequence coordinate. Both require a status-bearing, converged `RunResult`,
 accept an `only` name filter, pool tied sources, validate all selected
 posteriors in temporary storage, and commit atomically. `write` is likewise
 atomic across selected role-bearing targets. Versioned checkpoints encode
-each `(learnable, hyperparameter)` pair independently and round-trip the four
-NIW/MNIW arrays; legacy Dirichlet spellings remain explicit migrations. The
+each `(learnable, hyperparameter)` pair independently and round-trip the NIW,
+MNIW, component-MNIW, and PG arrays. Legacy spellings remain explicit
+migrations; a multi-array posterior must be complete rather than silently
+combining restored and prior hyperparameters. The
 model/runtime interface still declares which boundary learnable is
 episode-scale because that choice determines rollover semantics, not merely
 update frequency.

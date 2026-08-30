@@ -8,7 +8,14 @@ import pytest
 
 from cffg import conj
 from cffg.compiler import CompileError, compile_template
-from cffg.core import BlobRef, FactorSpec, LearnableSpec, Template, VariableSpec
+from cffg.core import (
+    BlobRef,
+    FactorSpec,
+    LearnableSpec,
+    PlateSpec,
+    Template,
+    VariableSpec,
+)
 from cffg.engine import Engine
 from cffg.learn import Learnables
 from cffg.core.serialize import from_json, structure_hash, to_json
@@ -445,6 +452,61 @@ def test_hybrid_learning_declaration_does_not_change_inference_or_ledger(builder
     np.testing.assert_array_equal(left.state.g_eta, right.state.g_eta)
     np.testing.assert_array_equal(left.state.g_lam, right.state.g_lam)
     assert left_engine.bfe(left.state) == right_engine.bfe(right.state)
+
+
+def test_component_mniw_plate_copies_pool_into_one_tied_posterior():
+    fragment, arrays, _sources = _mixture_template()
+    fragment.learnables["neutral_dynamics"] = dataclasses.replace(
+        fragment.learnables["neutral_dynamics"], sources=None
+    )
+    template = Template(
+        name="component_plate",
+        plates={"bank": PlateSpec(fragment, (2,), ())},
+    )
+    engine = Engine(compile_template(template, arrays=arrays))
+    (plan,) = engine.arena.learn_plans
+    assert plan.sources == (
+        "bank/0/outer/source_a",
+        "bank/0/outer/source_b",
+        "bank/1/outer/source_a",
+        "bank/1/outer/source_b",
+    )
+    result = engine.run(engine.init_state(), 100, tol=1e-7)
+    result.require_converged()
+    priors = tuple(conj.vague_mniw(2, 2) for _ in range(3))
+    learnables = Learnables(engine, priors={"neutral_dynamics": priors})
+    learnables.replace(engine, result)
+    rows = engine.gaussian_node_stats(result.state)
+    direct = tuple(
+        prior.update(
+            sum(
+                (rows[source]["Syy"][component] for source in plan.sources),
+                np.zeros((2, 2)),
+            ),
+            sum(
+                (rows[source]["Syx"][component] for source in plan.sources),
+                np.zeros((2, 3)),
+            ),
+            sum(
+                (rows[source]["Sxx"][component] for source in plan.sources),
+                np.zeros((3, 3)),
+            ),
+            sum(
+                float(rows[source]["responsibility"][component])
+                for source in plan.sources
+            ),
+        )
+        if any(
+            rows[source]["responsibility"][component] > 0.0
+            for source in plan.sources
+        )
+        else prior
+        for component, prior in enumerate(priors)
+    )
+    for key, expected in _stacked_params(direct).items():
+        np.testing.assert_allclose(
+            learnables.params["neutral_dynamics"][key], expected
+        )
 
 
 @pytest.mark.parametrize(

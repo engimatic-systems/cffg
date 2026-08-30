@@ -98,11 +98,16 @@ Cat/Dirichlet/equality/δ/transition-mixture, GFE messages for the discrete
 goal-observation composite, and BP for the linear-Gaussian family (gaussian,
 gaussian_linear, Gaussian equality — cff-4e5z: Kalman-smoother parity, exact
 continuous tree identity BFE = −log p(y)). Between converged runs, declared
-NIW and MNIW learning covers `gaussian` and `gaussian_linear`. Everything else
-is a derivation or registration ticket under the roadmap epic cff-ahps:
-- *Additional conjugate adapters* — mixtures need a per-regime posterior-axis
-  contract; recurrence PG learning and precision/EF learning remain separate
-  model-specific paths rather than `LearnableSpec` families.
+NIW, MNIW, component-MNIW, and Pólya–Gamma weight learning covers `gaussian`,
+`gaussian_linear`, `gaussian_mixture_linear`, and `recurrence_link`.
+Everything else requires a separately selected derivation or registration
+ticket. Epic
+cff-ahps records the finite integrated baseline; it does not promise that
+every item below will be implemented:
+- *Additional conjugate adapters* — Gamma precision and EF learning remain
+  separate paths rather than `LearnableSpec` families. The generic hybrid
+  pairings exist, while cff-0qry owns migration of the rSLDS workflows
+  away from their older model-specific updates.
 - *Hybrid discrete–continuous (switching KF, mixture collapse)* — cff-pksr;
   the first place exact FE meets a necessary approximation (mixture entropy).
 - *Nonlinear continuous factors* — cff-o7hs: EP/moment-matching or sigma-point
@@ -200,10 +205,12 @@ deferred; in-loop parameter uncertainty exists today only where it is exactly
 tractable — `gaussian_prec`'s Gamma-precision edge. `accumulate` adds an
 independent trial to the current posterior; `replace` recomputes one sequence
 coordinate from the immutable initial prior. Neither operation turns point-
-parameter inference into full joint VB. Generic registration currently stops
-at NIW/`gaussian` and MNIW/`gaussian_linear`; per-regime mixture families,
-recurrence weights, Gamma precision, and external EF-kernel adapters remain
-outside it. (2) "VMP monotonically
+parameter inference into full joint VB. Generic registration also supports
+component-MNIW/`gaussian_mixture_linear` and
+PG-weights/`recurrence_link`. Exact-zero mixture responsibilities retain the
+component prior; the recurrence posterior keeps source-regime, stick, and
+augmented drive-coordinate axes. Gamma precision and external EF-kernel
+adapters remain outside the declared-learning registry. (2) "VMP monotonically
 decreases free energy" holds for sequential coordinate updates; this engine
 floods (Jacobi), which converges to the same fixed point but can take
 bounded non-monotone steps on multi-node models (measured ≈4e-3 nats at
