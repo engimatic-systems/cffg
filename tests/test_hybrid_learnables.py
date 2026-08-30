@@ -19,6 +19,7 @@ from cffg.core import (
 from cffg.engine import Engine
 from cffg.experiments.recurrence_smoothing import recurrence_statistics
 from cffg.learn import Learnables
+from cffg.learning_checkpoint import CHECKPOINT_MANIFEST_KEY
 from cffg.core.serialize import from_json, structure_hash, to_json
 
 
@@ -461,12 +462,15 @@ def test_pg_scheduled_and_flooded_statistics_produce_same_posterior():
         learnables.replace(engine, result)
         posteriors.append(learnables.state_dict())
     for key, value in posteriors[0].items():
-        np.testing.assert_allclose(
-            value,
-            posteriors[1][key],
-            rtol=1e-7,
-            atol=1e-7,
-        )
+        if key == CHECKPOINT_MANIFEST_KEY:
+            np.testing.assert_array_equal(value, posteriors[1][key])
+        else:
+            np.testing.assert_allclose(
+                value,
+                posteriors[1][key],
+                rtol=1e-7,
+                atol=1e-7,
+            )
 
 
 def test_pg_hostile_statistics_and_precision_fail_before_mutation(monkeypatch):
@@ -486,7 +490,7 @@ def test_pg_hostile_statistics_and_precision_fail_before_mutation(monkeypatch):
 
     broken = dict(before)
     broken["v2:neutral_recurrence:precision"] = -np.ones_like(prior.precision)
-    with pytest.raises(ValueError, match="positive definite"):
+    with pytest.raises(ValueError, match="value digest"):
         learnables.load_state_dict(broken)
     for key, value in before.items():
         np.testing.assert_array_equal(learnables.state_dict()[key], value)
@@ -675,6 +679,11 @@ def test_hybrid_legacy_checkpoint_requires_complete_posterior(
     }
     partial = dict(legacy_checkpoint)
     partial.pop(next(iter(partial)))
+    if "neutral_recurrence" in learnables.params:
+        for checkpoint in (partial, legacy_checkpoint):
+            with pytest.raises(ValueError, match="no statistic identity"):
+                learnables.load_state_dict(checkpoint)
+        return
     with pytest.raises(KeyError, match="incompletely names"):
         learnables.load_state_dict(partial)
     learnables.load_state_dict(legacy_checkpoint)

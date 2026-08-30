@@ -314,8 +314,13 @@ posteriors for `[weight; offset]`. It rolls only posterior means into the next
 inference state. Thus weight uncertainty does not enter recurrence messages or
 the next PG coordinate; this is empirical-Bayes variational EM, not full joint
 VB over weights and auxiliaries. The pair is derived from the current state
-rather than independently serialized; cff-63dd owns persistence identity and
-migration. Flooding and mixed scheduling solve the same
+rather than independently serialized. Learned recurrence checkpoints identify
+the D9 structured-pair statistic, factor/source ownership, dtype, shapes, and
+exact-value digests.
+Pre-manifest D8 and early unidentified D9 posterior arrays share the same keys
+and shapes, so both are conservatively rejected instead of silently resumed.
+Model-only bundles contain no posterior state and continue to load under the
+current semantics. Flooding and mixed scheduling solve the same
 coordinates, but neither guarantees monotone progress on every loopy hybrid
 graph.
 

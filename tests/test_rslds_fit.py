@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 from cffg.engine import Engine, RunResult, RunStatus
+from cffg.learning_checkpoint import RECURRENCE_STATISTIC_IDENTITY
 from cffg.models import (
     PCAARHMMInitializer,
     RSLDSInitialization,
@@ -179,6 +180,10 @@ def test_fit_replaces_one_sequence_coordinates_and_reuses_one_engine(monkeypatch
 
     assert result.status is RunStatus.CONVERGED
     assert result.inner_status is RunStatus.CONVERGED
+    assert (
+        result.model_posterior.recurrence_statistic_identity
+        == RECURRENCE_STATISTIC_IDENTITY
+    )
     assert result.iterations == 2
     assert len(result.residuals) == 2
     assert len(set(engine_ids)) == 1

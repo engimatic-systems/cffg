@@ -25,6 +25,7 @@ from cffg.core.serialize import from_json, to_dict, to_json
 from cffg.core.validate import ModelError
 from cffg.engine import Engine, RunStatus, _replace
 from cffg.learn import Learnables
+from cffg.learning_checkpoint import CHECKPOINT_MANIFEST_KEY
 from cffg.models.rslds import rslds, vague_rslds_learning
 from cffg.models.rslds_fit import vague_rslds_fit_priors
 
@@ -511,6 +512,7 @@ def test_declared_rslds_learning_is_independent_of_every_factor_name():
     )
     priors = vague_rslds_fit_priors(2, 1, 1).learning_priors()
     learned = []
+    checkpoints = []
     engines = []
     for candidate in (template, renamed_template):
         engine = Engine(compile_template(candidate, arrays=arrays))
@@ -522,16 +524,23 @@ def test_declared_rslds_learning_is_independent_of_every_factor_name():
         assert result.status is RunStatus.CONVERGED
         learning = Learnables(engine, priors=priors)
         learning.replace(engine, result)
-        learned.append(learning.state_dict())
+        learned.append(learning.hyperparameter_snapshot())
+        checkpoints.append(learning.state_dict())
         engines.append(engine)
 
     assert learned[0].keys() == learned[1].keys()
     for name in learned[0]:
         np.testing.assert_allclose(learned[0][name], learned[1][name], atol=1e-10)
+    assert (
+        str(checkpoints[0][CHECKPOINT_MANIFEST_KEY])
+        != str(checkpoints[1][CHECKPOINT_MANIFEST_KEY])
+    )
 
     restored = Learnables(engines[0], priors=priors)
-    restored.load_state_dict(learned[0])
-    for name, value in learned[0].items():
+    with pytest.raises(ValueError, match="factor/source ownership"):
+        restored.load_state_dict(checkpoints[1])
+    restored.load_state_dict(checkpoints[0])
+    for name, value in checkpoints[0].items():
         np.testing.assert_array_equal(restored.state_dict()[name], value)
 
 
