@@ -1,6 +1,6 @@
 ---
 id: cff-4jk1
-status: open
+status: closed
 deps: [cff-s6yy]
 links: []
 created: 2026-08-30T16:00:47Z
@@ -79,3 +79,9 @@ or scientific reruns require separate tickets.
   replacement map.
 - **Undamped:** Measured before any partial-step interpolation changes the
   proposed replacement.
+
+## Notes
+
+**2026-08-30T16:42:19Z**
+
+Ported 9dbcc017 and 7405d609 as two new atomic commits on cff-s6yy. Reconciled the reordered rslds_coordinate helper with D9 hyperparameter snapshots and excluded the old cff-ao02 ticket state plus all intervening study/audit history. Focused coordinate and rSLDS validation passed 23 tests after the evidence commit and 24 tests after selecting the installed-parameter certificate. Final default short suite at production head 642aee1: 1,463 passed, 39 deselected, 0 failed in 563.93 pytest seconds; dashboard metadata records 572.505 wall seconds.

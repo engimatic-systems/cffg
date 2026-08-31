@@ -20,6 +20,12 @@ from cffg import conj
 from cffg.compiler import compile_template
 from cffg.engine import Engine, RunResult, RunStatus, State, _replace
 from cffg.learn import Learnables
+from cffg.models.coordinate_fit import (
+    CoordinateResidual,
+    coordinate_decision,
+    coordinate_identity,
+    coordinate_residual,
+)
 from cffg.models.rslds import (
     DYNAMICS_LEARNABLE,
     EMISSION_LEARNABLE,
@@ -27,6 +33,14 @@ from cffg.models.rslds import (
     RECURRENCE_LEARNABLE,
     RSLDSLearning,
     rslds,
+)
+from cffg.models.rslds_coordinate import (
+    initial_runtime_blocks,
+    legacy_fixed_point_residual,
+    legacy_snapshot,
+    learned_runtime_blocks,
+    observation_probe_states,
+    transition_residual,
 )
 from cffg.models.rslds_init import (
     PCAARHMMInitializer,
@@ -106,20 +120,30 @@ class RSLDSFitPhase:
     """One hidden-state solve and its optional parameter replacement."""
 
     iteration: int
+    evaluated_coordinate: str
+    proposed_coordinate: str | None
+    installed_coordinate: str
+    certified_coordinate: str | None
+    returned_coordinate: str | None
     coordinate_replaced: bool
     attempts: tuple[RSLDSInferenceAttempt, ...]
     parameter_scales_before: dict[str, float]
     parameter_scales_after: dict[str, float]
     fixed_point_residual: float | None
+    proposed_parameter_scales: dict[str, float] | None = None
+    legacy_fixed_point_residual: float | None = None
+    runtime_residual: CoordinateResidual | None = None
+    functional_transition_residual: CoordinateResidual | None = None
 
 
 @dataclass(frozen=True)
 class RSLDSFitResult:
     """Terminal fitting status, fitted parameters, and inner-solve evidence.
 
-    When every requested coordinate completes, ``state`` has been inferred
-    once after the final parameter write. ``last_inference`` is that terminal
-    solve, and ``phases`` distinguishes it from parameter-replacement phases.
+    ``state``, ``parameters``, and the learned posteriors all belong to
+    ``returned_coordinate``. A converged result returns the already evaluated
+    ``certified_coordinate``; an exhausted result performs a terminal solve at
+    its last installed coordinate.
     ``model_posterior`` carries the current D9
     structured-pair statistic identity and may be checkpointed for resume;
     point ``parameters`` alone are a model initialization, not a resumable
@@ -141,6 +165,8 @@ class RSLDSFitResult:
     last_inference: RunResult | None
     phases: tuple[RSLDSFitPhase, ...]
     timings: dict[str, float]
+    returned_coordinate: str
+    certified_coordinate: str | None
     error: str | None = None
 
     def require_converged(self) -> "RSLDSFitResult":
@@ -200,49 +226,6 @@ def _point_parameters(learning: Learnables) -> dict[str, np.ndarray]:
             learning.rollover(EMISSION_LEARNABLE, "cov")
         ).copy(),
     }
-
-
-def _posterior_arrays(learning: Learnables) -> dict[str, np.ndarray]:
-    return {
-        f"posterior/{name}": np.asarray(value)
-        for name, value in learning.hyperparameter_snapshot().items()
-    }
-
-
-def _snapshot(
-    learning: Learnables,
-    points: dict[str, np.ndarray],
-) -> dict[str, np.ndarray]:
-    return {
-        **_posterior_arrays(learning),
-        **{f"point/{name}": np.asarray(value) for name, value in points.items()},
-    }
-
-
-def _fixed_point_residual(
-    old: dict[str, np.ndarray],
-    new: dict[str, np.ndarray],
-) -> float:
-    if old.keys() != new.keys():
-        raise ValueError("fixed-point snapshots disagree on parameter families")
-    residual = 0.0
-    for name in old:
-        before = np.asarray(old[name])
-        after = np.asarray(new[name])
-        if before.shape != after.shape:
-            raise ValueError(f"fixed-point array {name!r} changed shape")
-        if not np.all(np.isfinite(before)) or not np.all(np.isfinite(after)):
-            return float("inf")
-        scale = max(
-            1.0,
-            float(np.max(np.abs(before), initial=0.0)),
-            float(np.max(np.abs(after), initial=0.0)),
-        )
-        residual = max(
-            residual,
-            float(np.max(np.abs(after - before), initial=0.0)) / scale,
-        )
-    return residual
 
 
 def _data(observations: np.ndarray) -> dict[str, np.ndarray]:
@@ -363,6 +346,8 @@ def _result(
     last_inference: RunResult | None,
     phases: list[RSLDSFitPhase],
     timings: dict[str, float],
+    returned_coordinate: str,
+    certified_coordinate: str | None,
     error: str | None = None,
 ) -> RSLDSFitResult:
     return RSLDSFitResult(
@@ -384,6 +369,8 @@ def _result(
         last_inference=last_inference,
         phases=tuple(phases),
         timings=dict(timings),
+        returned_coordinate=returned_coordinate,
+        certified_coordinate=certified_coordinate,
         error=error,
     )
 
@@ -409,7 +396,10 @@ def fit_rslds(
     Every outer coordinate reruns hidden-state inference with one compiled
     engine, replaces all conjugate posteriors from ``priors``, and installs the
     resulting point parameters into a fresh state. Two consecutive
-    fixed-point residuals at or below ``outer_tolerance`` certify convergence.
+    installed-runtime-map residuals at or below ``outer_tolerance`` certify the
+    last coordinate actually evaluated. Its unchecked proposal is not installed
+    or returned. The historical mixed-snapshot residual and a truth-free
+    transition-function residual remain phase diagnostics.
     A finite exhausted inner solve may restart from the same state with a
     larger convex update step, up to ``max_inner_retries`` times. The terminal
     state is inferred once after the last parameter replacement.
@@ -480,7 +470,9 @@ def fit_rslds(
             "emission_covariance",
         )
     }
-    current_snapshot = _snapshot(current_learning, current_points)
+    current_snapshot = legacy_snapshot(current_learning, current_points)
+    current_runtime_blocks = initial_runtime_blocks(current_points)
+    probe_states = observation_probe_states(observations, initialization)
     current_state = engine.bind_data(
         _cast_state(engine.init_state(), observations.dtype), _data(observations)
     )
@@ -488,6 +480,7 @@ def fit_rslds(
     free_energies: list[float] = []
     phases: list[RSLDSFitPhase] = []
     consecutive = 0
+    coordinate_index = 0
     timings = {
         "initialization": initialization_seconds,
         "compile": compile_seconds,
@@ -495,10 +488,10 @@ def fit_rslds(
         "coordinate": 0.0,
     }
 
-    fit_status = RunStatus.BUDGET_EXHAUSTED
     completed_iterations = 0
     for iteration in range(1, max_outer_iterations + 1):
         completed_iterations = iteration
+        coordinate = coordinate_identity(coordinate_index)
         scales_before = _parameter_scales(current_points)
         started = time.perf_counter()
         inner, attempts = _run_inner(
@@ -514,6 +507,11 @@ def fit_rslds(
             phases.append(
                 RSLDSFitPhase(
                     iteration=iteration,
+                    evaluated_coordinate=coordinate,
+                    proposed_coordinate=None,
+                    installed_coordinate=coordinate,
+                    certified_coordinate=None,
+                    returned_coordinate=coordinate,
                     coordinate_replaced=False,
                     attempts=attempts,
                     parameter_scales_before=scales_before,
@@ -540,12 +538,19 @@ def fit_rslds(
                 last_inference=inner,
                 phases=phases,
                 timings=timings,
+                returned_coordinate=coordinate,
+                certified_coordinate=None,
                 error=f"inner inference {inner.status.value}",
             )
         if not inner.free_energies or not np.all(np.isfinite(inner.free_energies)):
             phases.append(
                 RSLDSFitPhase(
                     iteration=iteration,
+                    evaluated_coordinate=coordinate,
+                    proposed_coordinate=None,
+                    installed_coordinate=coordinate,
+                    certified_coordinate=None,
+                    returned_coordinate=coordinate,
                     coordinate_replaced=False,
                     attempts=attempts,
                     parameter_scales_before=scales_before,
@@ -567,27 +572,63 @@ def fit_rslds(
                 last_inference=inner,
                 phases=phases,
                 timings=timings,
+                returned_coordinate=coordinate,
+                certified_coordinate=None,
                 error="inner Bethe free energy is missing or non-finite",
             )
         free_energies.append(float(inner.free_energies[-1]))
 
         started = time.perf_counter()
+        proposed_coordinate = coordinate_identity(coordinate_index + 1)
         try:
             candidate_learning = Learnables(
                 engine, priors=priors.learning_priors()
             )
             candidate_learning.replace(engine, inner)
             candidate_points = _point_parameters(candidate_learning)
-            candidate_snapshot = _snapshot(candidate_learning, candidate_points)
-            residual = _fixed_point_residual(current_snapshot, candidate_snapshot)
-            if not np.isfinite(residual):
-                raise ValueError("outer fixed-point residual is non-finite")
-            candidate_state = _install(engine, observations, candidate_learning)
-        except (FloatingPointError, np.linalg.LinAlgError, ValueError) as error:
+            candidate_snapshot = legacy_snapshot(candidate_learning, candidate_points)
+            legacy_residual = legacy_fixed_point_residual(
+                current_snapshot, candidate_snapshot
+            )
+            if not np.isfinite(legacy_residual):
+                raise ValueError("legacy outer fixed-point residual is non-finite")
+            candidate_runtime_blocks = learned_runtime_blocks(
+                candidate_learning, candidate_points
+            )
+            runtime_residual = coordinate_residual(
+                current_runtime_blocks, candidate_runtime_blocks
+            )
+            residual = runtime_residual.maximum
+            functional_residual = transition_residual(
+                current_points, candidate_points, probe_states
+            )
+            candidate_scales = _parameter_scales(candidate_points)
+            decision = coordinate_decision(
+                evaluated_index=coordinate_index,
+                residual=residual,
+                tolerance=outer_tolerance,
+                previous_hits=consecutive,
+            )
+            candidate_state = (
+                _install(engine, observations, candidate_learning)
+                if decision.installs_proposal
+                else None
+            )
+        except (
+            FloatingPointError,
+            np.linalg.LinAlgError,
+            TypeError,
+            ValueError,
+        ) as error:
             timings["coordinate"] += time.perf_counter() - started
             phases.append(
                 RSLDSFitPhase(
                     iteration=iteration,
+                    evaluated_coordinate=coordinate,
+                    proposed_coordinate=proposed_coordinate,
+                    installed_coordinate=coordinate,
+                    certified_coordinate=None,
+                    returned_coordinate=coordinate,
                     coordinate_replaced=False,
                     attempts=attempts,
                     parameter_scales_before=scales_before,
@@ -609,6 +650,8 @@ def fit_rslds(
                 last_inference=inner,
                 phases=phases,
                 timings=timings,
+                returned_coordinate=coordinate,
+                certified_coordinate=None,
                 error=str(error),
             )
         timings["coordinate"] += time.perf_counter() - started
@@ -617,22 +660,53 @@ def fit_rslds(
         phases.append(
             RSLDSFitPhase(
                 iteration=iteration,
-                coordinate_replaced=True,
+                evaluated_coordinate=decision.evaluated,
+                proposed_coordinate=decision.proposed,
+                installed_coordinate=decision.installed,
+                certified_coordinate=decision.certified,
+                returned_coordinate=decision.certified,
+                coordinate_replaced=decision.installs_proposal,
                 attempts=attempts,
                 parameter_scales_before=scales_before,
-                parameter_scales_after=_parameter_scales(candidate_points),
+                parameter_scales_after=(
+                    candidate_scales if decision.installs_proposal else scales_before
+                ),
                 fixed_point_residual=residual,
+                proposed_parameter_scales=candidate_scales,
+                legacy_fixed_point_residual=legacy_residual,
+                runtime_residual=runtime_residual,
+                functional_transition_residual=functional_residual,
             )
         )
-        consecutive = consecutive + 1 if residual <= outer_tolerance else 0
+        consecutive = decision.consecutive_hits
+        if decision.certified is not None:
+            return _result(
+                engine=engine,
+                state=inner.state,
+                status=RunStatus.CONVERGED,
+                inner_status=inner.status,
+                iterations=iteration,
+                residuals=residuals,
+                free_energies=free_energies,
+                points=current_points,
+                initialization=initialization,
+                learning=current_learning,
+                last_inference=inner,
+                phases=phases,
+                timings=timings,
+                returned_coordinate=decision.certified,
+                certified_coordinate=decision.certified,
+            )
+        assert candidate_state is not None
         current_learning = candidate_learning
         current_points = candidate_points
         current_snapshot = candidate_snapshot
+        current_runtime_blocks = candidate_runtime_blocks
         current_state = candidate_state
-        if consecutive >= 2:
-            fit_status = RunStatus.CONVERGED
-            break
+        coordinate_index += 1
 
+    fit_status = RunStatus.BUDGET_EXHAUSTED
+    coordinate = coordinate_identity(coordinate_index)
     scales_before = _parameter_scales(current_points)
     started = time.perf_counter()
     terminal, attempts = _run_inner(
@@ -647,6 +721,11 @@ def fit_rslds(
     phases.append(
         RSLDSFitPhase(
             iteration=completed_iterations + 1,
+            evaluated_coordinate=coordinate,
+            proposed_coordinate=None,
+            installed_coordinate=coordinate,
+            certified_coordinate=None,
+            returned_coordinate=coordinate,
             coordinate_replaced=False,
             attempts=attempts,
             parameter_scales_before=scales_before,
@@ -688,5 +767,7 @@ def fit_rslds(
         last_inference=terminal,
         phases=phases,
         timings=timings,
+        returned_coordinate=coordinate,
+        certified_coordinate=None,
         error=error,
     )

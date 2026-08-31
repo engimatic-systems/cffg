@@ -358,20 +358,34 @@ restart from that same fresh state. Each retry doubles the update fraction
 while it remains a convex natural-parameter blend; this changes the route but
 not the fixed point, support, schedule, tolerance, or FE certificate. A
 non-finite, infeasible, or diverged attempt never retries. After the last
-parameter write, the same bounded cadence runs a terminal hidden-state solve,
-so the returned state and point parameters agree. The cadence rejects an
-engine with functional `mu3` groups before running: it has no explicit key and
-particle-reuse contract with which to make two stochastic attempts comparable.
+parameter write on an exhausted cadence, the same bounded schedule runs a
+terminal hidden-state solve, so the returned state and point parameters agree.
+On convergence, the second qualifying map instead returns the coordinate it
+just evaluated: its hidden-state beliefs, installed runtime parameters, and
+learned posteriors already agree, and the map's unchecked proposal is not
+installed. The cadence rejects an engine with functional `mu3` groups before
+running: it has no explicit key and particle-reuse contract with which to make
+two stochastic attempts comparable.
 
 `RSLDSFitResult.phases` is the evidence boundary for this host schedule. It
 records each attempt's damping, public and recurrence status, iteration count,
 FE and message-delta tails, Gaussian-belief propriety, finite-state check, and
-parameter scales before and after replacement. Inner Bethe free energy remains
-the engine convergence signal. The outer loop reports its separate maximum
-scale-normalized change over every posterior hyperparameter and installed point
-array, requires two consecutive residuals below the dtype-scaled tolerance for
-`converged`, and otherwise propagates `budget_exhausted` or `diverged`. It
-makes no scalar outer-objective claim.
+parameter scales before and after replacement. Every phase explicitly names
+its evaluated, proposed, installed, certified, and returned coordinates; it
+also retains proposed scales when a converged phase discards an unchecked
+proposal. Inner Bethe free energy remains the engine convergence signal. The
+outer loop's status authority is the maximum scale-normalized residual over the
+normalized initial-regime potential and the dynamics, recurrence, and emission
+values proposed by one complete runtime map. It requires two consecutive maps
+at or below the configured tolerance for `converged`. The first installs its
+proposal; the second certifies and returns its evaluated coordinate. A rebound
+resets the consecutive-hit count. Exhaustion terminal-solves the last installed
+coordinate, while inner and non-finite failures propagate their status without
+installing a malformed proposal. Each map also retains the historical mixed
+posterior/reporting residual and a transition-probability residual on fixed
+latent probes derived from the observations and their initializer. Those two
+views diagnose representation or functional disagreement but do not select
+status. None of the three views makes a scalar outer-objective claim.
 
 The fit boundary remains deliberately small and model-owned:
 
@@ -382,7 +396,9 @@ The fit boundary remains deliberately small and model-owned:
 | Posterior accumulation/replacement, rollover, atomic writes, checkpoints | `cffg.learn.Learnables` | Reusable: ordinary Gaussian declared-learning fixtures and rSLDS exercise the same public operations. |
 | Observation-port binding and result construction | `cffg.models.rslds_fit` | rSLDS-specific: the public result separates recurrence status, inner FE, and outer residual. |
 | Attempt evidence | `cffg.models.rslds_fit` | rSLDS-specific: it inspects recurrence status and Gaussian/mixture belief propriety through an explicit wrapper. |
-| Status-gated run, identical-state retry, posterior/point snapshot comparison, terminal solve | `cffg.models.rslds_fit` | Candidate reusable: the policy is name-independent, but only rSLDS currently needs the whole loop. It stays here until a non-switching production fitter proves the same interface and parity. |
+| Named coordinate residual and certification decision | `cffg.models.coordinate_fit` | Reusable evidence and identity primitives: they compare model-owned named blocks, apply the consecutive-hit rule, and keep an unchecked proposal distinct from its evaluated parent. |
+| Runtime and transition-function coordinate views | `cffg.models.rslds_coordinate` | rSLDS-specific: it projects learned values into installed semantics and evaluates a truth-free observation-derived transition probe. |
+| Status-gated run, identical-state retry, runtime-map certificate, terminal solve | `cffg.models.rslds_fit` | The model-owned loop supplies rSLDS parameter views and returns the coordinate selected by the shared decision primitive. The remaining retry and terminal-solve policy stays here until a non-switching production fitter proves the same interface and parity. |
 
 No shared fitting framework is introduced on that last row merely from one
 client. Ordinary non-switching Gaussian models already prove the shared

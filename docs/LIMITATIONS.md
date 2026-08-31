@@ -352,9 +352,11 @@ system and regime order, but those choices are not scientifically identifiable:
 another affine latent representation or label permutation can describe the
 same observed process. Recovery numbers therefore require post-fit affine and
 label alignment and do not establish uniquely recovered physical parameters.
-The outer residual is a fixed-point diagnostic over posterior
-hyperparameters and installed arrays, not a derived scalar variational
-objective. A finite outer budget stays `budget_exhausted`, even when each
+The authoritative outer residual is a fixed-point diagnostic over the
+normalized potentials and point parameters installed into the next solve, not
+a derived scalar variational objective. The historical posterior/reporting
+snapshot and an observation-derived transition-function residual remain
+diagnostic only. A finite outer budget stays `budget_exhausted`, even when each
 inner engine run converged and the returned point parameters are useful.
 
 The learned NASCAR comparison reports held-out prediction, aligned recovery,

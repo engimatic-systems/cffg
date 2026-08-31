@@ -350,7 +350,11 @@ accumulates evidence from a new independent trial, while `fit_rslds` replaces
 one sequence's coordinates and never counts that sequence again as new data.
 The fit result reports `converged`, `budget_exhausted`, or `diverged`, preserves
 the terminal inner-engine status, and keeps the inner Bethe free-energy trace
-separate from the scale-normalized outer fixed-point residual. After a finite
+separate from the scale-normalized outer fixed-point residual. That residual
+compares the normalized initial-regime potential and every dynamics,
+recurrence, and emission value installed into the next solve. The historical
+posterior/reporting snapshot and a truth-free transition-function residual
+remain available in `fit.phases` as diagnostics. After a finite
 inner budget exhaustion, the default two retries restart from the same fresh
 state and double the convex update fraction while preserving the fixed point;
 `max_inner_retries=0` retains one fixed-damping attempt. `fit.phases` records
@@ -363,7 +367,7 @@ not silently relabeled as convergence.
 Functional `mu3` engines are unsupported by this fitter and are rejected
 before inference because the retry policy has no explicit key and fixed-sample
 reuse contract. Fit coordination remains rSLDS-owned until another production
-model proves that its retry, snapshot, and terminal-solve policy has the same
+model proves that its retry, runtime-certificate, and terminal-solve policy has the same
 interface; only the declared-learning transaction is currently shared.
 
 The original canonical NASCAR check supplied the generating parameters and,

@@ -1,6 +1,6 @@
 ---
 id: cff-0qfy
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-30T16:00:47Z
@@ -68,3 +68,9 @@ consolidation.
   adapting it to a different base instead of preserving source ancestry.
 - **Source delta:** The changes introduced by a pull request relative to its
   declared base, or by a commit relative to its first parent.
+
+## Notes
+
+**2026-08-30T16:42:42Z**
+
+Completed the clean five-PR stack from main d805135: PR #95 (cff-qg1d), #96 (cff-0qry), #97 (cff-rl7r), #98 (cff-s6yy), and #99 (cff-4jk1). Each PR targets the preceding clean branch. Existing PRs #64, #65, #92 and all old branches were left unchanged. The final default short suite passed 1,463 tests with 39 deselected and no failures.
