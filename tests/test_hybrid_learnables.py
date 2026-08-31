@@ -324,6 +324,37 @@ def test_pg_replace_is_idempotent_accumulate_adds_and_sources_are_explicit():
     )
 
 
+def test_restricted_runtime_and_public_rollover_use_declared_contract():
+    _template, _arrays, _sources, engine, result = _run_recurrence()
+    prior = conj.vague_pg_weights(3, 2)
+    learnables = Learnables(
+        engine,
+        priors={"neutral_recurrence": prior},
+        only=("neutral_recurrence",),
+    )
+    learnables.replace(engine, result)
+    weights, offsets = prior.update(
+        np.stack(
+            [
+                row["linear"]
+                for row in engine.recurrence_weight_stats(result.state).values()
+            ]
+        ),
+        np.stack(
+            [
+                row["quadratic"]
+                for row in engine.recurrence_weight_stats(result.state).values()
+            ]
+        ),
+    ).rollover()
+    np.testing.assert_allclose(
+        learnables.rollover("neutral_recurrence", "weights"), weights
+    )
+    np.testing.assert_allclose(
+        learnables.rollover("neutral_recurrence", "offsets"), offsets
+    )
+
+
 def test_pg_scheduled_and_flooded_statistics_produce_same_posterior():
     posteriors = []
     for schedule in ("auto", "flood"):

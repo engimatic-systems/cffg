@@ -105,9 +105,9 @@ ticket. Epic
 cff-ahps records the finite integrated baseline; it does not promise that
 every item below will be implemented:
 - *Additional conjugate adapters* — Gamma precision and EF learning remain
-  separate paths rather than `LearnableSpec` families. The generic hybrid
-  pairings exist, while cff-0qry owns migration of the rSLDS workflows
-  away from their older model-specific updates.
+  separate paths rather than `LearnableSpec` families. The rSLDS uses the
+  generic hybrid pairings; other factor/family combinations need their own
+  declared adapter and hostile-input contract.
 - *Hybrid discrete–continuous (switching KF, mixture collapse)* — cff-pksr;
   the first place exact FE meets a necessary approximation (mixture entropy).
 - *Nonlinear continuous factors* — cff-o7hs: EP/moment-matching or sigma-point
@@ -314,8 +314,12 @@ boundaries. `RSLDSLearning.update` accumulates initial-regime, per-regime
 dynamics, and recurrence evidence across distinct trials; calling it again on
 one sequence would count that sequence again. `fit_rslds` is the separate
 one-sequence cadence: each outer coordinate starts from immutable priors,
-updates the tied shared emission through generic MNIW replacement, and writes
-all point estimates into a fresh state. Neither cadence carries parameter
+atomically replaces the declared initial-regime, component-MNIW dynamics, PG
+recurrence, and tied-emission posteriors, and writes all point estimates into
+a fresh state. The compatibility facade keeps emission fixed; applications
+that learn it across distinct trials use the same four declarations through
+`Learnables`. Neither cadence learns the continuous initial-state mean or
+covariance, which remain initializer outputs. Neither cadence carries parameter
 uncertainty into the next hidden-state solve, so both remain empirical-Bayes
 variational EM rather than joint VB.
 
@@ -352,6 +356,13 @@ arbitrary loopy mean-field graphs. This correction does not remove the
 recurrence mean-field bound, point-posterior approximation, single-seed
 boundary, or sensitivity to the initializer and outer budget. The learned
 command took 2,063 seconds and 5.16 GB peak RSS.
+
+The retry loop is deterministic-only. A graph with a functional `mu3` update
+is rejected before fitting because this API does not accept an explicit key or
+promise reuse of one fixed particle set across attempts. Fit coordination is
+still rSLDS-specific: status-gated retries and snapshot comparison are
+plausibly reusable, but no second production fitter yet proves the same
+contract, so the repository exposes no general fitting framework.
 
 cff-r6bl removed the quadratic degree/port rescans from cold validation and
 grounding, but it did not create a variable-shape or rSLDS-private executor.
