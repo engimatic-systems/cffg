@@ -1,7 +1,7 @@
 ---
 id: cff-9vab
 status: open
-deps: [cff-4c7t]
+deps: [cff-4c7t, cff-cz6v]
 links: []
 created: 2026-08-10T02:58:17Z
 type: task
@@ -126,3 +126,7 @@ intended=the contextual assignments in this note; should=the criterion for
 external storage based on long artifact size/runtime; explicit_owner and
 named_ticket_handoff=cff-9vab/cff-0f3g; all=the enumerated outcomes and
 failures; deferred=larger or different topology families.
+
+**2026-08-31T03:23:06Z**
+
+Roadmap refinement cff-av5o adds epic cff-cz6v as a prerequisite. The builder and CFFGZ round trips in outcomes 3 and 4 must use the completed declared-learning bundle contract. This ticket still owns balanced-tree rSLDS integration and measured topology comparisons.

@@ -1,7 +1,7 @@
 ---
 id: cff-4c7t
 status: open
-deps: [cff-lv65, cff-4apw, cff-y4nx]
+deps: [cff-lv65, cff-4apw, cff-y4nx, cff-xabn]
 links: []
 created: 2026-08-10T02:58:17Z
 type: feature
@@ -141,3 +141,7 @@ comparison; parity=fixed-message equality under tied versus copied equal
 coefficients; integrate=cff-9vab's consumer workflow; intended=the contextual
 assignments in this note;
 named_ticket_handoff=cff-9vab as the integration/benchmark owner.
+
+**2026-08-31T03:23:06Z**
+
+Roadmap refinement cff-av5o adds cff-xabn as a prerequisite. cff-xabn owns the family-independent versioned semantic descriptor. This ticket still owns recurrence coefficient-owner identity, pooled owner statistics, and tree-gate learning; it extends that descriptor instead of adding another recurrence-only persistence schema.
