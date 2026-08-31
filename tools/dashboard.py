@@ -98,6 +98,7 @@ EPIC_FILES = {
         "test_gauss_vmp.py",
         "test_params.py",
         "test_gaussian_learnables.py",
+        "test_hybrid_learnables.py",
     ],
     "M16 · Plates": ["test_plates.py"],
     "M17 · Constraints": ["test_csp.py"],
