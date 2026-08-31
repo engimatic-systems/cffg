@@ -1,6 +1,6 @@
 ---
 id: cff-yoxz
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-31T02:44:46Z
@@ -75,3 +75,9 @@ and inspectable.
 - **Resuming between-trial posterior updates**: restoring the accumulated
   posterior hyperparameters and sufficient-statistic schema, then incorporating
   evidence from later trials without restarting from immutable priors.
+
+## Notes
+
+**2026-08-31T02:58:32Z**
+
+Implemented a fixed-path representative rSLDS bundle generator in tests/test_bundle.py. Focused validation: 17 passed, 1 deselected. The archive contains model.json, manifest.json, and 11 parameter blobs; load_bundle integrity checks and compilation pass. git check-ignore confirms tests/.artifacts/cffgz/representative-rslds.cffgz is ignored. Final short suite at 7adca36: 1464 passed, 39 deselected, 0 failed in 574.742 wall seconds. No remaining work in this ticket; resumable-learning bundle state remains deliberately deferred.
