@@ -3,6 +3,8 @@
 import io
 import json
 import zipfile
+from collections import Counter
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -23,7 +25,51 @@ from cffg.core import (
 from cffg.core.serialize import SCHEMA_VERSION, structure_hash, to_dict, to_json
 from cffg.engine import Engine
 from cffg.models.gridworld import build_gridworld
+from cffg.models.rslds import rslds
 from cffg.models.tmaze import build_tmaze
+
+
+REPRESENTATIVE_BUNDLE = (
+    Path(__file__).parent / ".artifacts" / "cffgz" / "representative-rslds.cffgz"
+)
+
+
+def _representative_rslds() -> tuple[Template, dict[str, np.ndarray]]:
+    """A compact model that exercises every rSLDS bundle declaration."""
+    return rslds(
+        5,
+        dynamics_matrix=np.array(
+            [
+                [[0.85, 0.10], [-0.05, 0.75]],
+                [[0.45, -0.35], [0.25, 0.65]],
+                [[-0.60, 0.15], [0.10, 0.50]],
+            ]
+        ),
+        dynamics_offset=np.array([[0.10, -0.05], [-0.20, 0.15], [0.30, 0.10]]),
+        dynamics_covariance=np.array(
+            [
+                [[0.20, 0.04], [0.04, 0.15]],
+                [[0.35, -0.06], [-0.06, 0.25]],
+                [[0.18, 0.02], [0.02, 0.30]],
+            ]
+        ),
+        recurrence_weights=np.array(
+            [
+                [[0.90, -0.20], [-0.35, 0.45]],
+                [[-0.60, 0.30], [0.25, -0.55]],
+                [[0.40, 0.65], [-0.75, 0.10]],
+            ]
+        ),
+        recurrence_offsets=np.array([[0.25, -0.40], [-0.15, 0.35], [0.05, -0.20]]),
+        emission_matrix=np.array([[1.0, 0.2], [-0.3, 0.8], [0.5, -0.6]]),
+        emission_offset=np.array([0.05, -0.10, 0.20]),
+        emission_covariance=np.array(
+            [[0.30, 0.04, -0.02], [0.04, 0.25, 0.03], [-0.02, 0.03, 0.40]]
+        ),
+        initial_state_mean=np.array([0.25, -0.15]),
+        initial_state_covariance=np.array([[0.80, 0.12], [0.12, 0.60]]),
+        initial_regime_probability=np.array([0.50, 0.30, 0.20]),
+    )
 
 
 def _plate_model() -> tuple[Template, dict[str, np.ndarray]]:
@@ -78,6 +124,97 @@ def _write_zip(path, contents):
     with zipfile.ZipFile(path, "w") as zf:
         for name, raw in contents.items():
             zf.writestr(name, raw)
+
+
+def test_writes_representative_rslds_bundle_for_inspection():
+    template, arrays = _representative_rslds()
+    REPRESENTATIVE_BUNDLE.parent.mkdir(parents=True, exist_ok=True)
+    pending = REPRESENTATIVE_BUNDLE.with_suffix(".pending.cffgz")
+
+    try:
+        save_bundle(pending, template, arrays)
+        loaded, loaded_arrays, manifest = load_bundle(pending)
+        with zipfile.ZipFile(pending) as zf:
+            members = set(zf.namelist())
+
+        assert members == {
+            "model.json",
+            "manifest.json",
+            *(f"blobs/{name}.npy" for name in arrays),
+        }
+        assert set(manifest) == {
+            "schema_version",
+            "structure_hash",
+            "blob_sha256",
+            "blob_paths",
+            "created",
+            "generator",
+        }
+        assert manifest["structure_hash"] == structure_hash(loaded)
+        assert set(loaded.learnables) == {
+            "initial_regime",
+            "dynamics",
+            "recurrence",
+            "emission",
+        }
+        assert {name: spec.family for name, spec in loaded.learnables.items()} == {
+            "initial_regime": "dirichlet",
+            "dynamics": "component_mniw",
+            "recurrence": "pg_weights",
+            "emission": "mniw",
+        }
+        assert {
+            name: (spec.blobs, spec.sources)
+            for name, spec in loaded.learnables.items()
+        } == {
+            "initial_regime": (
+                ("initial_regime_probability",),
+                ("z0_prior",),
+            ),
+            "dynamics": (
+                ("dynamics_matrix", "dynamics_offset", "dynamics_covariance"),
+                ("dynamics1", "dynamics2", "dynamics3", "dynamics4"),
+            ),
+            "recurrence": (
+                ("recurrence_weights", "recurrence_offsets"),
+                ("switch1", "switch2", "switch3", "switch4"),
+            ),
+            "emission": (
+                ("emission_matrix", "emission_offset", "emission_covariance"),
+                None,
+            ),
+        }
+        assert loaded.variables["x0"].dim == 2
+        assert loaded.variables["z0"].cardinality == 3
+        assert loaded.variables["y0"].dim == 3
+        assert set(loaded.ports) == {f"y{step}" for step in range(5)}
+        assert {port.role for port in loaded.ports.values()} == {PortRole.DATA}
+        assert Counter(factor.type for factor in loaded.factors.values()) == {
+            "gaussian": 1,
+            "categorical": 1,
+            "equality": 11,
+            "recurrence_link": 4,
+            "gaussian_mixture_linear": 4,
+            "gaussian_linear": 5,
+        }
+        assert {
+            factor.param_blobs["weights"]
+            for factor in loaded.factors.values()
+            if factor.type == "recurrence_link"
+        } == {"recurrence_weights"}
+        assert {
+            factor.param_blobs["matrix"]
+            for factor in loaded.factors.values()
+            if factor.type == "gaussian_mixture_linear"
+        } == {"dynamics_matrix"}
+        assert set(loaded_arrays) == set(arrays)
+        for name, expected in arrays.items():
+            np.testing.assert_array_equal(loaded_arrays[name], expected)
+        compile_template(loaded, arrays=loaded_arrays)
+
+        pending.replace(REPRESENTATIVE_BUNDLE)
+    finally:
+        pending.unlink(missing_ok=True)
 
 
 @pytest.mark.slow
