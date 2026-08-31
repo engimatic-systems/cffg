@@ -309,6 +309,15 @@ not full joint VB over weights and auxiliaries. Flooding and mixed scheduling
 solve the same coordinates but, as for mean-field VMP generally, neither
 guarantees monotone progress on every loopy graph.
 
+The recurrence learning readout carries the Gaussian covariance computed
+directly from precision; it does not reconstruct covariance as
+`second - mean @ mean.T`. After a scale-relative symmetry and PSD check it uses
+an exactly symmetrized covariance for the PG statistics. Material asymmetry,
+negative eigenvalues, non-finite moments, and a mean outer product that
+overflows the dtype remain loud failures. Factor-local diagnostics report the
+failed predicate and dtype-scaled tolerance, but they do not repair or relax an
+invalid belief.
+
 The end-to-end `cffg.models.rslds` helpers preserve these same approximation
 boundaries. `RSLDSLearning.update` accumulates initial-regime, per-regime
 dynamics, and recurrence evidence across distinct trials; calling it again on

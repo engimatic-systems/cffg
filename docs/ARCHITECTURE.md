@@ -286,12 +286,14 @@ variational node energy at the same beliefs. Exact categorical zeros remain
 exact, improper Gaussian beliefs are loud, and one update costs
 `O(P K² d²)` for `P` factors without allocating a `K³` transition tensor.
 Its `gaussian_node_stats` record is intentionally pre-PG: the two categorical
-beliefs and exact supports plus the drive mean and second moment. This is the
-stable factor-local input to recurrence learning; PG expectations and
-parameter sufficient statistics remain owned by that learning layer.
-`Engine.recurrence_weight_stats` is that derived layer: it combines the soft
-belief with the point coefficients used by inference and emits additive
-Gaussian natural statistics for augmented `[R; r]`. The generic
+beliefs and exact supports plus the drive mean, directly inverted covariance,
+and second moment. The direct covariance prevents recurrence learning from
+recovering a small covariance by subtracting two large, nearly equal moments.
+`Engine.recurrence_weight_stats` is the derived layer: it checks factor-local
+probability, covariance, parameter, logit-second, and finite-output predicates;
+forms stable PG coordinates from the mean and covariance; and emits additive
+Gaussian natural statistics for augmented `[R; r]`. Its diagnostic scalars
+identify the failed predicate and its dtype-scaled bound. The generic
 `pg_weights/recurrence_link` learning pairing pools those statistics into
 `conj.PGWeights` outside JIT and rolls its posterior mean into the next trial.
 Its arrays retain source-regime, stick, and augmented drive-coordinate axes;

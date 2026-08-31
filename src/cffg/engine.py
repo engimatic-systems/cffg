@@ -2137,6 +2137,9 @@ class Engine:
                     "out_probability": np.asarray(stats.out_probability[i]),
                     "in_probability": np.asarray(stats.in_probability[i]),
                     "drive_mean": np.asarray(stats.drive_mean[i]),
+                    "drive_covariance": np.asarray(
+                        stats.drive_covariance[i]
+                    ),
                     "drive_second": np.asarray(stats.drive_second[i]),
                     "out_support": np.asarray(stats.out_support[i]),
                     "in_support": np.asarray(stats.in_support[i]),
@@ -2152,6 +2155,7 @@ class Engine:
         The result is keyed by ``recurrence_link`` factor name. ``linear``
         and ``quadratic`` are natural-parameter increments for independent
         Gaussian posteriors over each augmented coefficient ``[R_il; r_il]``.
+        Scalar predicate and tolerance fields explain an improper row.
         """
         out: dict[str, dict[str, np.ndarray]] = {}
         beliefs = self.gaussian_node_stats(state)
@@ -2166,7 +2170,7 @@ class Engine:
                 ),
                 jnp.stack([jnp.asarray(row["drive_mean"]) for row in rows]),
                 jnp.stack(
-                    [jnp.asarray(row["drive_second"]) for row in rows]
+                    [jnp.asarray(row["drive_covariance"]) for row in rows]
                 ),
                 state.params[group.name + ":weights"],
                 state.params[group.name + ":offsets"],
@@ -2178,6 +2182,39 @@ class Engine:
                     "linear": np.asarray(stats.linear[index]),
                     "quadratic": np.asarray(stats.quadratic[index]),
                     "proper": np.asarray(stats.proper[index]),
+                    "probability_ok": np.asarray(
+                        stats.probability_ok[index]
+                    ),
+                    "drive_ok": np.asarray(stats.drive_ok[index]),
+                    "parameter_ok": np.asarray(stats.parameter_ok[index]),
+                    "second_ok": np.asarray(stats.second_ok[index]),
+                    "finite_output_ok": np.asarray(
+                        stats.finite_output_ok[index]
+                    ),
+                    "probability_minimum": np.asarray(
+                        stats.probability_minimum[index]
+                    ),
+                    "probability_sum_error": np.asarray(
+                        stats.probability_sum_error[index]
+                    ),
+                    "probability_tolerance": np.asarray(
+                        stats.probability_tolerance[index]
+                    ),
+                    "drive_min_eigenvalue": np.asarray(
+                        stats.drive_min_eigenvalue[index]
+                    ),
+                    "drive_symmetry_error": np.asarray(
+                        stats.drive_symmetry_error[index]
+                    ),
+                    "drive_tolerance": np.asarray(
+                        stats.drive_tolerance[index]
+                    ),
+                    "logit_second_minimum": np.asarray(
+                        stats.logit_second_minimum[index]
+                    ),
+                    "logit_second_tolerance": np.asarray(
+                        stats.logit_second_tolerance[index]
+                    ),
                 }
         return out
 

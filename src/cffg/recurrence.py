@@ -44,6 +44,7 @@ class RecurrenceBelief(NamedTuple):
     out_probability: jax.Array
     in_probability: jax.Array
     drive_mean: jax.Array
+    drive_covariance: jax.Array
     drive_second: jax.Array
     out_support: jax.Array
     in_support: jax.Array
@@ -58,6 +59,19 @@ class RecurrenceWeightStats(NamedTuple):
     linear: jax.Array
     quadratic: jax.Array
     proper: jax.Array
+    probability_ok: jax.Array
+    drive_ok: jax.Array
+    parameter_ok: jax.Array
+    second_ok: jax.Array
+    finite_output_ok: jax.Array
+    probability_minimum: jax.Array
+    probability_sum_error: jax.Array
+    probability_tolerance: jax.Array
+    drive_min_eigenvalue: jax.Array
+    drive_symmetry_error: jax.Array
+    drive_tolerance: jax.Array
+    logit_second_minimum: jax.Array
+    logit_second_tolerance: jax.Array
 
 
 def _edge_probability(messages: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
@@ -106,12 +120,14 @@ def belief(
             & in_ok
             & precision_ok
             & jnp.all(jnp.isfinite(mean))
+            & jnp.all(jnp.isfinite(covariance))
             & jnp.all(jnp.isfinite(second))
         )
         return RecurrenceBelief(
             jnp.where(proper, q_out, jnp.full_like(q_out, jnp.nan)),
             jnp.where(proper, q_in, jnp.full_like(q_in, jnp.nan)),
             jnp.where(proper, mean, jnp.full_like(mean, jnp.nan)),
+            jnp.where(proper, covariance, jnp.full_like(covariance, jnp.nan)),
             jnp.where(proper, second, jnp.full_like(second, jnp.nan)),
             out_support,
             in_support,
@@ -130,18 +146,19 @@ def weight_stats(
     out_probability,
     in_probability,
     drive_mean,
-    drive_second,
+    drive_covariance,
     weights,
     offsets,
 ) -> RecurrenceWeightStats:
     """Build PG Gaussian statistics for ``[weights; offset]``.
 
-    Inputs are batched factor-local mean-field beliefs. The PG coordinate is
-    evaluated at the point parameters used by inference; each returned row is
-    one between-trial natural-parameter increment.
+    Inputs are batched factor-local mean-field beliefs. The direct drive
+    covariance avoids reconstructing it from nearly equal second-moment terms.
+    The PG coordinate is evaluated at the point parameters used by inference;
+    each returned row is one between-trial natural-parameter increment.
     """
 
-    def one(q_out, q_in, mean, second, row_weights, row_offsets):
+    def one(q_out, q_in, mean, covariance, row_weights, row_offsets):
         card = q_out.shape[-1]
         dimension = mean.shape[-1]
         probability_tolerance = (
@@ -155,10 +172,27 @@ def weight_stats(
             & (jnp.abs(q_out.sum() - 1.0) <= probability_tolerance)
             & (jnp.abs(q_in.sum() - 1.0) <= probability_tolerance)
         )
-        covariance = second - jnp.outer(mean, mean)
+        probability_minimum = jnp.minimum(jnp.min(q_out), jnp.min(q_in))
+        probability_sum_error = jnp.maximum(
+            jnp.abs(q_out.sum() - 1.0),
+            jnp.abs(q_in.sum() - 1.0),
+        )
+        symmetric_covariance = 0.5 * (
+            covariance + covariance.swapaxes(-1, -2)
+        )
+        drive_min_eigenvalue = jnp.linalg.eigvalsh(symmetric_covariance)[0]
+        drive_symmetry_error = jnp.max(
+            jnp.abs(covariance - covariance.swapaxes(-1, -2))
+        )
+        drive_tolerance = (
+            16.0
+            * dimension
+            * jnp.finfo(covariance.dtype).eps
+            * gauss._matrix_scale(covariance)
+        )
         drive_ok = (
             jnp.all(jnp.isfinite(mean))
-            & jnp.all(jnp.isfinite(second))
+            & jnp.all(jnp.isfinite(covariance))
             & gauss._psd_ok(covariance)
         )
         parameter_ok = (
@@ -166,6 +200,10 @@ def weight_stats(
             & jnp.all(jnp.isfinite(row_offsets))
         )
 
+        # Invariant protected: after material asymmetry is rejected above,
+        # sufficient statistics use one exactly symmetric covariance.
+        covariance = symmetric_covariance
+        second = covariance + jnp.outer(mean, mean)
         feature_mean = jnp.concatenate(
             [mean, jnp.ones(1, dtype=mean.dtype)]
         )
@@ -176,20 +214,24 @@ def weight_stats(
         feature_second = feature_second.at[:-1, -1].set(mean)
         feature_second = feature_second.at[-1, :-1].set(mean)
         feature_second = feature_second.at[-1, -1].set(1.0)
-        coefficients = jnp.concatenate(
-            [row_weights, row_offsets[..., None]], axis=-1
+        logit_mean = (
+            jnp.einsum("ild,d->il", row_weights, mean) + row_offsets
         )
-        raw_logit_second = jnp.einsum(
-            "ilp,pq,ilq->il", coefficients, feature_second, coefficients
+        logit_variance = jnp.einsum(
+            "ild,de,ile->il", row_weights, covariance, row_weights
         )
-        contraction_scale = jnp.einsum(
-            "ilp,pq,ilq->il",
-            jnp.abs(coefficients),
-            jnp.abs(feature_second),
-            jnp.abs(coefficients),
+        raw_logit_second = jnp.square(logit_mean) + logit_variance
+        variance_scale = jnp.einsum(
+            "ild,de,ile->il",
+            jnp.abs(row_weights),
+            jnp.abs(covariance),
+            jnp.abs(row_weights),
         )
         second_scale = jnp.maximum(
-            jnp.maximum(jnp.abs(raw_logit_second), contraction_scale),
+            jnp.maximum(
+                jnp.maximum(jnp.abs(raw_logit_second), jnp.square(logit_mean)),
+                variance_scale,
+            ),
             jnp.asarray(jnp.finfo(raw_logit_second.dtype).tiny),
         )
         second_tolerance = (
@@ -199,6 +241,11 @@ def weight_stats(
             * second_scale
         )
         second_ok = jnp.all(raw_logit_second >= -second_tolerance)
+        logit_second_index = jnp.argmin(raw_logit_second)
+        logit_second_minimum = raw_logit_second.reshape(-1)[logit_second_index]
+        logit_second_tolerance = second_tolerance.reshape(-1)[
+            logit_second_index
+        ]
         xi = jnp.sqrt(jnp.maximum(raw_logit_second, 0.0))
         omega = _pg_mean(xi)
 
@@ -212,14 +259,18 @@ def weight_stats(
             * omega[..., None, None]
             * feature_second[None, None, :, :]
         )
+        finite_output_ok = (
+            jnp.all(jnp.isfinite(omega))
+            & jnp.all(jnp.isfinite(exposure))
+            & jnp.all(jnp.isfinite(linear))
+            & jnp.all(jnp.isfinite(quadratic))
+        )
         proper = (
             probability_ok
             & drive_ok
             & parameter_ok
             & second_ok
-            & jnp.all(jnp.isfinite(omega))
-            & jnp.all(jnp.isfinite(linear))
-            & jnp.all(jnp.isfinite(quadratic))
+            & finite_output_ok
         )
 
         def valid_or_nan(value):
@@ -231,13 +282,26 @@ def weight_stats(
             valid_or_nan(linear),
             valid_or_nan(quadratic),
             proper,
+            probability_ok,
+            drive_ok,
+            parameter_ok,
+            second_ok,
+            finite_output_ok,
+            probability_minimum,
+            probability_sum_error,
+            probability_tolerance,
+            drive_min_eigenvalue,
+            drive_symmetry_error,
+            drive_tolerance,
+            logit_second_minimum,
+            logit_second_tolerance,
         )
 
     return jax.vmap(one)(
         out_probability,
         in_probability,
         drive_mean,
-        drive_second,
+        drive_covariance,
         weights,
         offsets,
     )

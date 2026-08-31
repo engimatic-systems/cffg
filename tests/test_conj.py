@@ -175,7 +175,7 @@ def test_pg_weights_recover_soft_stick_dynamics_in_one_vectorized_batch():
     q_in = np.eye(2)[source]
     q_out = np.stack([success, 1.0 - success], axis=-1)
     drive_mean = drive[:, None]
-    drive_second = np.square(drive)[:, None, None]
+    drive_covariance = np.zeros((drive.shape[0], 1, 1))
     prior = conj.vague_pg_weights(2, 1)
     weights = np.zeros_like(true_weights)
     offsets = np.zeros_like(true_offsets)
@@ -186,7 +186,7 @@ def test_pg_weights_recover_soft_stick_dynamics_in_one_vectorized_batch():
             q_out,
             q_in,
             drive_mean,
-            drive_second,
+            drive_covariance,
             np.broadcast_to(weights, (count, *weights.shape)),
             np.broadcast_to(offsets, (count, *offsets.shape)),
         )
