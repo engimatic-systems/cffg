@@ -1,6 +1,6 @@
 ---
 id: cc4-vk3q
-status: in_progress
+status: closed
 deps: [cff-4jk1]
 links: []
 created: 2026-08-31T04:08:07Z
@@ -55,3 +55,11 @@ Changing from two qualifying maps to a one-map convergence rule is not part of t
 - **Unchecked proposal:** The output of a runtime map that has not itself been installed and evaluated.
 - **Rebound:** A below-tolerance map followed by an above-tolerance map.
 
+
+## Notes
+
+**2026-08-31T04:23:44Z**
+
+Implemented in commit 74b31ff without importing historical ancestry. The first qualifying map installs its proposal; the second qualifying map returns the coordinate it evaluated and leaves its unchecked proposal uninstalled. Converged fits now avoid the third inner solve, while exhausted fits still terminal-solve the last installed coordinate. Focused validation: 34 passed. Final default short suite at production commit 74b31ff: 1,473 passed, 39 deselected, 0 failed in 579.57 pytest seconds and 588.183 dashboard wall seconds.
+
+Wiggle-word review retained context-resolved uses: canonical=project-authority document; N/A=structurally irrelevant duplicated surface; preserve=semantic invariant; same=coordinate identity or unchanged engine contract as named; expose=reveal defect; support=literal probability support; complete=the enumerated full runtime map or coordinate; remaining=preserved behavior; certify=runtime certificate; converge=outer runtime status or explicitly named inner status; evidence=phase provenance or automated result; exact=literal zero support; match=the separately named experiment control; pass=tests succeed; sound=implementation judgment; test=automated artifact or execution; fit=repeated fixed-dataset parameter estimation; infer=hidden-state posterior; learn=parameter posterior; scale=dtype numeric magnitude; small=map-count fixture size; can=defect possibility; may=implementation permission; explicit_owner=the named coordinate_fit and rslds_fit components; all=the enumerated status paths; at_least=inclusive lower bound; only=ticket scope boundary; current=PR #99 repository reference; existing=behavior predating this repair. Capability ownership was checked separately; no required owner is omitted. No follow-up work or gotcha remains.
