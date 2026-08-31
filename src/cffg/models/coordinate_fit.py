@@ -9,6 +9,7 @@ import numpy as np
 
 
 ParameterBlocks = Mapping[str, Mapping[str, np.ndarray]]
+CONSECUTIVE_COORDINATE_HITS = 2
 
 
 @dataclass(frozen=True)
@@ -20,6 +21,69 @@ class CoordinateResidual:
     per_family: dict[str, float]
     per_array: dict[str, float]
     vector: tuple[float, ...]
+
+
+@dataclass(frozen=True)
+class CoordinateDecision:
+    """Identity-preserving decision after one complete parameter map."""
+
+    evaluated: str
+    proposed: str
+    installed: str
+    certified: str | None
+    consecutive_hits: int
+
+    @property
+    def installs_proposal(self) -> bool:
+        return self.installed == self.proposed
+
+
+def coordinate_identity(index: int) -> str:
+    """Return the stable evidence identity for one installed coordinate."""
+    if not isinstance(index, int) or isinstance(index, bool) or index < 0:
+        raise ValueError("coordinate index must be a nonnegative integer")
+    return f"coordinate/{index}"
+
+
+def coordinate_decision(
+    *,
+    evaluated_index: int,
+    residual: float,
+    tolerance: float,
+    previous_hits: int,
+) -> CoordinateDecision:
+    """Choose whether to install a proposal or return its evaluated parent.
+
+    A proposal is installed after the first qualifying map so the next map can
+    independently evaluate it. The second consecutive qualifying map certifies
+    the coordinate that was just evaluated; its as-yet unchecked proposal is
+    not installed or returned.
+    """
+    evaluated = coordinate_identity(evaluated_index)
+    proposed = coordinate_identity(evaluated_index + 1)
+    if not np.isfinite(residual) or residual < 0.0:
+        raise ValueError("coordinate residual must be finite and nonnegative")
+    if not np.isfinite(tolerance) or tolerance <= 0.0:
+        raise ValueError("coordinate tolerance must be finite and positive")
+    if (
+        not isinstance(previous_hits, int)
+        or isinstance(previous_hits, bool)
+        or previous_hits not in (0, 1)
+    ):
+        raise ValueError("previous coordinate hits must be zero or one")
+
+    consecutive_hits = previous_hits + 1 if residual <= tolerance else 0
+    certified = (
+        evaluated if consecutive_hits >= CONSECUTIVE_COORDINATE_HITS else None
+    )
+    installed = evaluated if certified is not None else proposed
+    return CoordinateDecision(
+        evaluated=evaluated,
+        proposed=proposed,
+        installed=installed,
+        certified=certified,
+        consecutive_hits=consecutive_hits,
+    )
 
 
 def coordinate_residual(
