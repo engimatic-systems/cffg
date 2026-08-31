@@ -41,6 +41,7 @@ from cffg import ef, kernels
 from cffg.core.ir import FACTOR_TYPES, ConstraintKind, PortRole, Template
 from cffg.core.plates import expand_plates
 from cffg.core.validate import validate
+from cffg.recurrence_topology import classify_recurrence_components
 
 NEG = -1.0e30  # reserved log-space zero sentinel; all other finite values have support
 
@@ -184,10 +185,10 @@ class MixGroupPlan:
 class RecurrencePlan:
     """Source-specific stick-breaking transitions across two arenas.
 
-    Both discrete roles and the Gaussian drive read complete edge marginals,
-    because the coordinate-optimal PG/JJ bound is a variational update. The
-    factor writes its two categorical messages and one possibly singular
-    Gaussian likelihood message back to its own slots.
+    The two discrete roles read their facing cavities for structured
+    sum-product. The Gaussian drive reads its complete edge marginal for the
+    coordinate-optimal PG/JJ bound. The factor writes two categorical
+    messages and one possibly singular Gaussian likelihood message.
     """
 
     name: str
@@ -198,6 +199,21 @@ class RecurrencePlan:
     d_scatter: np.ndarray  # [M, 2 roles]
     drive_gather_both: np.ndarray  # [M, 2 edge slots]
     drive_scatter: np.ndarray  # [M]
+    component_ids: np.ndarray  # [M] rows into Arena.recurrence_components
+
+
+@dataclass(frozen=True)
+class RecurrenceComponentPlan:
+    """Derived categorical component containing recurrence-link factors.
+
+    ``acyclic`` certifies exact sum-product marginals for the component's
+    bounded factor potentials. It does not make the JJ Gaussian expectation
+    exact and it does not claim exactness for a component with a loop.
+    """
+
+    members: tuple[str, ...]
+    categorical_factors: tuple[str, ...]
+    acyclic: bool
 
 
 @dataclass(frozen=True)
@@ -453,6 +469,7 @@ class Arena:
     # Hybrid Gaussian-mixture groups (cff-pksr): each writes both the Gaussian
     # arena (out/in edges) and the discrete arena (selector edge).
     recurrence_groups: list[RecurrencePlan] = field(default_factory=list)
+    recurrence_components: tuple[RecurrenceComponentPlan, ...] = ()
     prec_groups: list["PrecGroupPlan"] = field(default_factory=list)
     # gaussian_prec groups (cff-7c5o): each writes both the Gaussian arena
     # (out edge) and the EF arena (prec edge).
@@ -1530,6 +1547,30 @@ def compile_template(
             _set_member_address(member_of, t, member, index, runtime)
             writable_members.add(member)
 
+    recurrence_members = {
+        member for members in recurrence_buckets.values() for member in members
+    }
+    ordinary_bp = {
+        member
+        for (_, _, mode), members in buckets.items()
+        if mode == "bp"
+        for member in members
+    }
+    recurrence_components = tuple(
+        RecurrenceComponentPlan(*component)
+        for component in classify_recurrence_components(
+            t,
+            endpoints,
+            ordinary_bp,
+            recurrence_members,
+            set(param_specs),
+        )
+    )
+    component_of = {
+        member: component_index
+        for component_index, component in enumerate(recurrence_components)
+        for member in component.members
+    }
     recurrence_groups: list[RecurrencePlan] = []
     for (card, drive_dim), members in sorted(recurrence_buckets.items()):
         gname = f"recurrence:{card}:{drive_dim}"
@@ -1577,6 +1618,10 @@ def compile_template(
                 d_scatter,
                 drive_gather_both,
                 drive_scatter,
+                np.asarray(
+                    [component_of[member] for member in members],
+                    dtype=np.int64,
+                ),
             )
         )
         for key, value in _stack_recurrence_params(
@@ -1864,6 +1909,7 @@ def compile_template(
         g_obs_starts=prefix(obs_lengths),
         mix_groups=mix_groups,
         recurrence_groups=recurrence_groups,
+        recurrence_components=recurrence_components,
         prec_groups=prec_groups,
         gauss_interior=gauss_interior,
         n_efslots=next_efslot,

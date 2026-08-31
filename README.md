@@ -172,9 +172,16 @@ arrays["switch_offsets"] = offsets  # [K, K - 1]
 For source regime `i`, stick `l` has logit
 `weights[i,l] @ x + offsets[i,l]`; destination `j < K - 1` accepts stick `j`
 after rejecting earlier sticks, and the last destination rejects them all.
-Inference uses the Pólya–Gamma/Jaakkola–Jordan mean-field coordinate, so its
-reported VFE is a documented upper bound on the exact VFE at the same beliefs.
-Exact regime zeros stay exact, while an improper Gaussian drive is divergence.
+Inference uses a structured source/destination pair belief. Current Gaussian
+moments define a Pólya–Gamma/Jaakkola–Jordan expected-log transition table;
+log-space sum-product sends both categorical messages, and the same pair gives
+the Gaussian-drive message. On an acyclic ordinary categorical recurrence
+component this is exact inference for the bounded table. A categorical loop
+uses local Bethe beliefs and carries no exact-chain claim. The reported VFE is
+a documented upper bound on the exact-transition VFE at the same Gaussian
+belief. Exact regime zeros stay exact, while an improper Gaussian drive is
+divergence. `engine.arena.recurrence_components` records the derived component
+membership and `acyclic` classification.
 
 Hybrid learning and forecasting use factor-local readouts rather than products
 of endpoint marginals:
@@ -197,10 +204,12 @@ forecast["mean"], forecast["covariance"]
 predictive, not the posterior output marginal: it uses the selector and input
 messages but excludes downstream evidence facing `out`. Prior-mixture
 statistics name their arrays `weighted_mean` and `weighted_second` to make the
-weighting explicit. A `recurrence_link` record from `gaussian_node_stats`
-likewise exposes its input/output probabilities, exact supports, drive mean,
-direct covariance, and second moment; Pólya–Gamma learning statistics remain a
-separate learning step.
+weighting explicit. `recurrence_pair_beliefs` exposes a `recurrence_link`'s
+normalized `[source, destination]` pair, its two marginals, literal support,
+direct Gaussian drive moments, and the at-risk/signed-success masses shared by
+inference and learning. `gaussian_node_stats` includes that same record, with
+`in_probability`/`out_probability` compatibility aliases. The pair is derived
+from current factor cavities; it is not independently persisted.
 Every hybrid record has `proper`; consumers must reject a false value and its
 shape-preserving NaNs.
 
@@ -218,9 +227,11 @@ posterior = posterior.update(stats["linear"], stats["quadratic"])
 weights, offsets = posterior.rollover()  # next trial's parameter arrays
 ```
 
-`linear` and `quadratic` already contain the soft source/destination masses
-and the coordinate-optimal PG mean. The rollover is an empirical-Bayes point
-estimate; it does not claim to carry weight uncertainty inside inference.
+`linear` and `quadratic` use the same structured pair and coordinate-optimal PG
+mean as the Gaussian drive message. Exact-zero pair exposure contributes exact
+zero natural statistics, so an unexposed source/stick retains its prior. The
+rollover is an empirical-Bayes point estimate; it does not claim to carry
+weight uncertainty inside inference.
 
 ### Recurrent switching state-space models
 
@@ -275,6 +286,19 @@ learns emission. The recurrence offsets
 already represent the ordinary source-specific transition baseline; multiplying
 a separate `matrix_cat` into the same transition would require a new normalized
 factor and free-energy derivation.
+
+Recurrence checkpoints include a scalar manifest naming
+`cffg.recurrence.d9-structured-pair/1.0.0`, the contributing factor sources,
+parameter blobs, hyperparameter dtypes, and shapes. A pre-manifest `v2:` or
+slash-key checkpoint may contain D8 singleton-product statistics and is
+therefore rejected for recurrence, even though its array keys and shapes still
+fit. `vague_rslds_learning` and direct `RSLDSLearning(...)` construction define
+fresh priors; `update` and `load_state_dict` return objects explicitly marked
+with the D9 identity. To carry an old posterior forward as a prior, construct a
+new prior deliberately and rerun inference; do not relabel the old checkpoint
+as a D9 posterior. That is a new D9 run, not checkpoint resume; CFFG provides
+no D8-posterior migration. Per-array digests bind the manifest to the exact
+persisted values.
 
 For one-sequence observed-only fitting, use the host-side coordinate loop. It
 chooses latent coordinates from the observations, compiles one engine, and
@@ -460,8 +484,10 @@ and leaves that component at its prior. `pg_weights` stores `eta` and
 then rolls posterior means into separate weights and offsets. Both families
 remain host-side empirical-Bayes updates and reject improper or non-finite
 statistics before mutation. Versioned checkpoints preserve every keyed
-hyperparameter. A legacy multi-array checkpoint must name a complete posterior
-or restoration fails with a migration error.
+hyperparameter. Legacy multi-array checkpoints for unchanged families must
+name a complete posterior. Recurrence is stricter: its current checkpoint must
+also carry the structured-pair statistic manifest; unidentified D8/D9 state is
+never guessed from compatible array shapes.
 
 ## Run inference
 
@@ -593,6 +619,13 @@ constraints (and `damp > 0` on otherwise-exact models) still use plain
 flooding; `engine.schedule.kind` and `.reason` say what you got. Force
 flooding with `Engine(arena, schedule="flood")`.
 
+Recurrence links remain time-local factors in both paths. Each recurrence
+categorical pass is `O(T*K^2)` work with `O(T*K^2)` transient pair storage for
+`T` equal-cardinality links, while factor messages and the BFE keep local pair
+ownership. The current mixed scheduler does not fuse all recurrence links
+into a monolithic chain region; fusion may reduce the number of outer passes
+but cannot change the fixed point or counting numbers.
+
 ## Run an agent
 
 ```python
@@ -678,6 +711,12 @@ from cffg.estimate import estimate
 print(estimate(engine).summary())
 # state 9.1 KiB (messages 2.8, params 6.4) · 2.76e+04 flops/sweep · 0.203 ms/sweep
 ```
+
+A `.cffgz` bundle is model-only: it contains the template and point-parameter
+blobs, not a learned posterior or resumable inference state. Existing bundles
+therefore remain loadable and execute with the current documented recurrence
+semantics. The recurrence statistic manifest belongs only to checkpoints that
+can resume learning.
 
 `.npz` is a ZIP container and does not support ordinary per-array memory
 mapping, so it is reserved for agent checkpoints rather than parameter blobs.

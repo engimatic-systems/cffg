@@ -55,6 +55,11 @@ from urllib.parse import quote, unquote
 import numpy as np
 
 from cffg import ef, efrules
+from cffg.learning_checkpoint import (
+    CHECKPOINT_MANIFEST_KEY,
+    checkpoint_context,
+    encode_manifest,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from cffg.compiler import LearnPlan
@@ -582,21 +587,33 @@ class Learnables:
             )
         return next(iter(out.values()))
 
-    def state_dict(self) -> dict[str, np.ndarray]:
-        """Versioned encoded ``(name, key)`` -> array for flat npz storage.
-
-        A delimiter alone is insufficient: scoped learnable names contain
-        ``/``, and one valid learnable name can equal another learnable's
-        apparent ``name/key`` spelling. Encoding the two components
-        independently makes the boundary structural rather than inferred.
-        """
+    def hyperparameter_snapshot(self) -> dict[str, np.ndarray]:
+        """Encoded numeric values for diagnostics, not checkpoint restore."""
         return {
             _encode_state_key(name, key): arr.copy()
             for name, params in self.params.items()
             for key, arr in params.items()
         }
 
+    def state_dict(self) -> dict[str, np.ndarray]:
+        """Versioned hyperparameters plus required recurrence identity.
+
+        A delimiter alone is insufficient: scoped learnable names contain
+        ``/``, and one valid learnable name can equal another learnable's
+        apparent ``name/key`` spelling. Encoding the two components
+        independently makes the boundary structural rather than inferred.
+        A recurrence manifest additionally binds D9 statistic semantics,
+        source ownership, shapes, and dtypes because those facts are absent
+        from the unchanged template structure hash.
+        """
+        data = self.hyperparameter_snapshot()
+        manifest = encode_manifest(self.plans, self.params)
+        if manifest is not None:
+            data[CHECKPOINT_MANIFEST_KEY] = manifest
+        return data
+
     def load_state_dict(self, data: dict[str, np.ndarray]) -> None:
+        recurrence = checkpoint_context(data, self.plans, self.params)
         pending = {
             name: {key: value.copy() for key, value in params.items()}
             for name, params in self.params.items()
@@ -605,6 +622,8 @@ class Learnables:
         legacy_names: set[str] = set()
         seen: set[tuple[str, str]] = set()
         for flat, arr in data.items():
+            if flat == CHECKPOINT_MANIFEST_KEY:
+                continue
             if flat.startswith(_STATE_KEY_PREFIX):
                 name, key = _decode_state_key(flat)
             else:
@@ -643,13 +662,15 @@ class Learnables:
                     f"checkpoint names learnable {name!r} hyperparameter {key!r} twice"
                 )
             seen.add((name, key))
+            recurrence.require_identity(name)
             if np.shape(arr) != self.params[name][key].shape:
                 raise ValueError(
                     f"learnable {name!r}: checkpoint shape {np.shape(arr)} != "
                     f"{self.params[name][key].shape}"
                 )
-            pending[name][key] = np.asarray(arr, dtype=float).copy()
+            pending[name][key] = recurrence.restore_value(name, key, arr)
             changed.add(name)
+        recurrence.require_complete(seen)
         for name in legacy_names:
             present = {key for candidate, key in seen if candidate == name}
             required = set(self.params[name])

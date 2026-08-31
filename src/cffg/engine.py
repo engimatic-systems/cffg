@@ -918,10 +918,14 @@ class Engine:
         if mu3_code:
             outcome = "budget exhausted" if mu3_code == 1 else "diverged"
             raise RuntimeError(f"mu3 importance update {outcome}; use Engine.run for status")
-        msgs, g_eta, g_lam, ef_eta, _, _ = self._step(
+        msgs, g_eta, g_lam, ef_eta, _, inner_code = self._step(
             state.messages, state.g_eta, state.g_lam, state.g_obs, state.g_mask,
             state.ef_eta, state.ef_obs, state.ef_mask, state.params, damp, harden,
         )
+        if int(inner_code):
+            raise RuntimeError(
+                "factor-local inference diverged; use Engine.run for status"
+            )
         return _replace(state, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta)
 
     def run(
@@ -1940,6 +1944,90 @@ class Engine:
             out[e.name] = (np.asarray(mean), np.asarray(cov))
         return out
 
+    def recurrence_pair_beliefs(
+        self, state: State
+    ) -> dict[str, dict[str, np.ndarray]]:
+        """Factor name -> normalized structured recurrence pair belief.
+
+        Pair rows are source regimes (the ``in`` role) and columns are
+        destination regimes (the ``out`` role). ``pair_support`` records
+        literal categorical support independently of floating-point
+        probability underflow. The readout also exposes the direct Gaussian
+        drive moments and D9.12 masses shared by inference and learning.
+        Improper inputs preserve support but return shape-correct NaNs and
+        ``proper=False`` for numeric fields.
+        """
+        out: dict[str, dict[str, np.ndarray]] = {}
+        for group in self.arena.recurrence_groups:
+            card = group.cards[0]
+            destination = state.messages[
+                self.arena.message_indices(
+                    group.d_gather_both[:, 0, 1], card
+                )
+            ]
+            source = state.messages[
+                self.arena.message_indices(
+                    group.d_gather_both[:, 1, 1], card
+                )
+            ]
+            destination = jnp.where(
+                _jax_log_support(destination), destination, -jnp.inf
+            )
+            source = jnp.where(
+                _jax_log_support(source), source, -jnp.inf
+            )
+            drive_eta = state.g_eta[
+                self.arena.g_eta_indices(
+                    group.drive_gather_both, group.dim
+                )
+            ].sum(axis=1)
+            drive_precision = state.g_lam[
+                self.arena.g_lam_indices(
+                    group.drive_gather_both, group.dim
+                )
+            ].sum(axis=1)
+            beliefs = recurrence.structured_readout(
+                destination,
+                source,
+                drive_eta,
+                drive_precision,
+                state.params[group.name + ":weights"],
+                state.params[group.name + ":offsets"],
+            )
+            for index, name in enumerate(group.members):
+                out[name] = {
+                    "pair_probability": np.asarray(
+                        beliefs.pair_probability[index]
+                    ),
+                    "source_probability": np.asarray(
+                        beliefs.source_probability[index]
+                    ),
+                    "destination_probability": np.asarray(
+                        beliefs.destination_probability[index]
+                    ),
+                    "pair_support": np.asarray(beliefs.pair_support[index]),
+                    "source_support": np.asarray(
+                        beliefs.source_support[index]
+                    ),
+                    "destination_support": np.asarray(
+                        beliefs.destination_support[index]
+                    ),
+                    "drive_mean": np.asarray(beliefs.drive_mean[index]),
+                    "drive_covariance": np.asarray(
+                        beliefs.drive_covariance[index]
+                    ),
+                    "drive_second": np.asarray(
+                        beliefs.drive_second[index]
+                    ),
+                    "omega": np.asarray(beliefs.omega[index]),
+                    "exposure": np.asarray(beliefs.exposure[index]),
+                    "signed_success": np.asarray(
+                        beliefs.signed_success[index]
+                    ),
+                    "proper": np.asarray(beliefs.proper[index]),
+                }
+        return out
+
     def gaussian_node_stats(self, state: State) -> dict[str, dict[str, np.ndarray]]:
         """Factor name -> expected sufficient statistics of the node belief
         (cff-7c5o, D4): the continuous analog of node_beliefs, feeding the
@@ -1954,8 +2042,9 @@ class Engine:
                              weighted ``Syy``, ``Syx``, and ``Sxx``.
         gaussian_mixture: soft ``responsibility``, ``weighted_mean``, and
                              ``weighted_second``.
-        recurrence_link: categorical probabilities and continuous drive
-                             moments, including each categorical exact support.
+        recurrence_link: normalized source/destination pair, its marginals and
+                             literal support, plus shared D9 masses and direct
+                             continuous drive moments.
         Every record includes ``proper``. Improper beliefs or mutated non-PD
         node precisions return ``proper=False`` with NaN sufficient statistics;
         equality nodes are skipped."""
@@ -2112,39 +2201,14 @@ class Engine:
                         "proper": np.asarray(stats.proper[i]),
                     }
 
-        for g in self.arena.recurrence_groups:
-            card = g.cards[0]
-            out_messages = state.messages[
-                self.arena.message_indices(g.d_gather_both[:, 0, :], card)
-            ]
-            in_messages = state.messages[
-                self.arena.message_indices(g.d_gather_both[:, 1, :], card)
-            ]
-            drive_eta = state.g_eta[
-                self.arena.g_eta_indices(g.drive_gather_both, g.dim)
-            ].sum(axis=1)
-            drive_precision = state.g_lam[
-                self.arena.g_lam_indices(g.drive_gather_both, g.dim)
-            ].sum(axis=1)
-            stats = recurrence.belief(
-                out_messages,
-                in_messages,
-                drive_eta,
-                drive_precision,
-            )
-            for i, name in enumerate(g.members):
-                out[name] = {
-                    "out_probability": np.asarray(stats.out_probability[i]),
-                    "in_probability": np.asarray(stats.in_probability[i]),
-                    "drive_mean": np.asarray(stats.drive_mean[i]),
-                    "drive_covariance": np.asarray(
-                        stats.drive_covariance[i]
-                    ),
-                    "drive_second": np.asarray(stats.drive_second[i]),
-                    "out_support": np.asarray(stats.out_support[i]),
-                    "in_support": np.asarray(stats.in_support[i]),
-                    "proper": np.asarray(stats.proper[i]),
-                }
+        for name, pair in self.recurrence_pair_beliefs(state).items():
+            out[name] = {
+                **pair,
+                "out_probability": pair["destination_probability"],
+                "in_probability": pair["source_probability"],
+                "out_support": pair["destination_support"],
+                "in_support": pair["source_support"],
+            }
         return out
 
     def recurrence_weight_stats(
@@ -2153,20 +2217,18 @@ class Engine:
         """Factor-local PG statistics for between-trial recurrence learning.
 
         The result is keyed by ``recurrence_link`` factor name. ``linear``
-        and ``quadratic`` are natural-parameter increments for independent
-        Gaussian posteriors over each augmented coefficient ``[R_il; r_il]``.
-        Scalar predicate and tolerance fields explain an improper row.
+        and ``quadratic`` are pair-derived natural-parameter increments for
+        independent Gaussian posteriors over each augmented coefficient
+        ``[R_il; r_il]``. Scalar predicate and tolerance fields explain an
+        improper row.
         """
         out: dict[str, dict[str, np.ndarray]] = {}
-        beliefs = self.gaussian_node_stats(state)
+        beliefs = self.recurrence_pair_beliefs(state)
         for group in self.arena.recurrence_groups:
             rows = [beliefs[name] for name in group.members]
             stats = recurrence.weight_stats(
                 jnp.stack(
-                    [jnp.asarray(row["out_probability"]) for row in rows]
-                ),
-                jnp.stack(
-                    [jnp.asarray(row["in_probability"]) for row in rows]
+                    [jnp.asarray(row["pair_probability"]) for row in rows]
                 ),
                 jnp.stack([jnp.asarray(row["drive_mean"]) for row in rows]),
                 jnp.stack(
@@ -2179,6 +2241,9 @@ class Engine:
                 out[name] = {
                     "omega": np.asarray(stats.omega[index]),
                     "exposure": np.asarray(stats.exposure[index]),
+                    "signed_success": np.asarray(
+                        stats.signed_success[index]
+                    ),
                     "linear": np.asarray(stats.linear[index]),
                     "quadratic": np.asarray(stats.quadratic[index]),
                     "proper": np.asarray(stats.proper[index]),
@@ -2435,27 +2500,33 @@ def _mix_sweep(arena, messages, g_eta, g_lam, params):
 
 
 def _recurrence_sweep(arena, messages, g_eta, g_lam, params):
-    """One synchronous PG/JJ coordinate sweep across both arenas."""
+    """One synchronous D9 coordinate sweep across both arenas."""
     discrete_writes = []
     gaussian_writes = []
     status = jnp.asarray(0)
     for group in arena.recurrence_groups:
         card = group.cards[0]
-        out_messages = messages[
-            arena.message_indices(group.d_gather_both[:, 0, :], card)
+        out_cavity = messages[
+            arena.message_indices(group.d_gather_both[:, 0, 1], card)
         ]
-        in_messages = messages[
-            arena.message_indices(group.d_gather_both[:, 1, :], card)
+        in_cavity = messages[
+            arena.message_indices(group.d_gather_both[:, 1, 1], card)
         ]
+        out_cavity = jnp.where(
+            _jax_log_support(out_cavity), out_cavity, -jnp.inf
+        )
+        in_cavity = jnp.where(
+            _jax_log_support(in_cavity), in_cavity, -jnp.inf
+        )
         drive_eta = g_eta[
             arena.g_eta_indices(group.drive_gather_both, group.dim)
         ].sum(axis=1)
         drive_precision = g_lam[
             arena.g_lam_indices(group.drive_gather_both, group.dim)
         ].sum(axis=1)
-        result = recurrence.update(
-            out_messages,
-            in_messages,
+        result = recurrence.structured_recurrence_update(
+            out_cavity,
+            in_cavity,
             drive_eta,
             drive_precision,
             params[group.name + ":weights"],
@@ -3611,25 +3682,31 @@ def _mix_bfe(arena, messages, g_eta, g_lam, params):
 
 
 def _recurrence_bfe(arena, messages, g_eta, g_lam, params):
-    """PG/JJ recurrence energies, upper-bounding the exact VMP terms."""
+    """D9 pair-region energies, upper-bounding exact transition terms."""
     total = jnp.asarray(0.0, dtype=g_eta.dtype)
     for group in arena.recurrence_groups:
         card = group.cards[0]
-        out_messages = messages[
-            arena.message_indices(group.d_gather_both[:, 0, :], card)
+        out_cavity = messages[
+            arena.message_indices(group.d_gather_both[:, 0, 1], card)
         ]
-        in_messages = messages[
-            arena.message_indices(group.d_gather_both[:, 1, :], card)
+        in_cavity = messages[
+            arena.message_indices(group.d_gather_both[:, 1, 1], card)
         ]
+        out_cavity = jnp.where(
+            _jax_log_support(out_cavity), out_cavity, -jnp.inf
+        )
+        in_cavity = jnp.where(
+            _jax_log_support(in_cavity), in_cavity, -jnp.inf
+        )
         drive_eta = g_eta[
             arena.g_eta_indices(group.drive_gather_both, group.dim)
         ].sum(axis=1)
         drive_precision = g_lam[
             arena.g_lam_indices(group.drive_gather_both, group.dim)
         ].sum(axis=1)
-        total = total + recurrence.energy(
-            out_messages,
-            in_messages,
+        total = total + recurrence.structured_recurrence_energy(
+            out_cavity,
+            in_cavity,
             drive_eta,
             drive_precision,
             params[group.name + ":weights"],

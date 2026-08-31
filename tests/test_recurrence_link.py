@@ -25,6 +25,7 @@ from cffg.core.serialize import from_json, to_dict, to_json
 from cffg.core.validate import ModelError
 from cffg.engine import Engine, RunStatus, _replace
 from cffg.learn import Learnables
+from cffg.learning_checkpoint import CHECKPOINT_MANIFEST_KEY
 from cffg.models.rslds import rslds, vague_rslds_learning
 from cffg.models.rslds_fit import vague_rslds_fit_priors
 
@@ -511,6 +512,7 @@ def test_declared_rslds_learning_is_independent_of_every_factor_name():
     )
     priors = vague_rslds_fit_priors(2, 1, 1).learning_priors()
     learned = []
+    checkpoints = []
     engines = []
     for candidate in (template, renamed_template):
         engine = Engine(compile_template(candidate, arrays=arrays))
@@ -522,16 +524,23 @@ def test_declared_rslds_learning_is_independent_of_every_factor_name():
         assert result.status is RunStatus.CONVERGED
         learning = Learnables(engine, priors=priors)
         learning.replace(engine, result)
-        learned.append(learning.state_dict())
+        learned.append(learning.hyperparameter_snapshot())
+        checkpoints.append(learning.state_dict())
         engines.append(engine)
 
     assert learned[0].keys() == learned[1].keys()
     for name in learned[0]:
         np.testing.assert_allclose(learned[0][name], learned[1][name], atol=1e-10)
+    assert (
+        str(checkpoints[0][CHECKPOINT_MANIFEST_KEY])
+        != str(checkpoints[1][CHECKPOINT_MANIFEST_KEY])
+    )
 
     restored = Learnables(engines[0], priors=priors)
-    restored.load_state_dict(learned[0])
-    for name, value in learned[0].items():
+    with pytest.raises(ValueError, match="factor/source ownership"):
+        restored.load_state_dict(checkpoints[1])
+    restored.load_state_dict(checkpoints[0])
+    for name, value in checkpoints[0].items():
         np.testing.assert_array_equal(restored.state_dict()[name], value)
 
 
@@ -597,8 +606,7 @@ def test_engine_weight_stats_match_independent_soft_belief_algebra():
     belief = engine.gaussian_node_stats(state)["recurrence"]
     actual = engine.recurrence_weight_stats(state)["recurrence"]
 
-    q_out = belief["out_probability"]
-    q_in = belief["in_probability"]
+    pair = belief["pair_probability"]
     feature_mean = np.append(belief["drive_mean"], 1.0)
     feature_second = np.block(
         [
@@ -616,12 +624,9 @@ def test_engine_weight_stats_match_independent_soft_belief_algebra():
     nonzero = xi > 0
     omega[nonzero] = np.tanh(xi[nonzero] / 2.0) / (2.0 * xi[nonzero])
     omega[~nonzero] = 0.25
-    at_risk = np.cumsum(q_out[::-1])[::-1][:-1]
-    kappa = q_out[:-1] - 0.5 * at_risk
-    exposure = q_in[:, None] * at_risk[None]
-    linear = (
-        q_in[:, None, None] * kappa[None, :, None] * feature_mean
-    )
+    exposure = np.cumsum(pair[:, ::-1], axis=1)[:, ::-1][:, :-1]
+    signed_success = pair[:, :-1] - 0.5 * exposure
+    linear = signed_success[..., None] * feature_mean
     quadratic = (
         exposure[..., None, None]
         * omega[..., None, None]
@@ -631,12 +636,14 @@ def test_engine_weight_stats_match_independent_soft_belief_algebra():
     assert bool(actual["proper"])
     np.testing.assert_allclose(actual["omega"], omega, atol=1e-11)
     np.testing.assert_allclose(actual["exposure"], exposure, atol=1e-11)
+    np.testing.assert_allclose(
+        actual["signed_success"], signed_success, atol=1e-11
+    )
     np.testing.assert_allclose(actual["linear"], linear, atol=1e-11)
     np.testing.assert_allclose(actual["quadratic"], quadratic, atol=1e-11)
 
     extreme = recurrence.weight_stats(
-        np.array([[0.5, 0.5]]),
-        np.array([[0.5, 0.5]]),
+        np.full((1, 2, 2), 0.25),
         np.zeros((1, 1)),
         np.zeros((1, 1, 1)),
         np.zeros((1, 2, 1, 1)),
@@ -645,8 +652,7 @@ def test_engine_weight_stats_match_independent_soft_belief_algebra():
     assert extreme.omega[0, 0, 0] == pytest.approx(0.25)
     assert np.isfinite(extreme.omega[0, 1, 0])
     invalid = recurrence.weight_stats(
-        np.array([[0.4, 0.4]]),
-        np.array([[0.5, 0.5]]),
+        np.full((1, 2, 2), 0.2),
         np.zeros((1, 1)),
         np.ones((1, 1, 1)),
         np.zeros((1, 2, 1, 1)),
@@ -852,9 +858,10 @@ def test_exact_zero_support_is_preserved():
     np.testing.assert_array_equal(learning["exposure"][1], 0.0)
     np.testing.assert_array_equal(learning["linear"][1], 0.0)
     np.testing.assert_array_equal(learning["quadratic"][1], 0.0)
+    deterministic_pair = np.zeros((1, 3, 3))
+    deterministic_pair[0, 0, 0] = 1.0
     zero_at_risk = recurrence.weight_stats(
-        np.array([[1.0, 0.0, 0.0]]),
-        np.array([[1.0, 0.0, 0.0]]),
+        deterministic_pair,
         np.zeros((1, 1)),
         np.ones((1, 1, 1)),
         np.zeros((1, 3, 2, 1)),

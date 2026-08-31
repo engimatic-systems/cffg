@@ -9,7 +9,8 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from cffg.engine import Engine, RunStatus
+from cffg.engine import Engine, RunResult, RunStatus
+from cffg.learning_checkpoint import RECURRENCE_STATISTIC_IDENTITY
 from cffg.models import (
     PCAARHMMInitializer,
     RSLDSInitialization,
@@ -179,6 +180,10 @@ def test_fit_replaces_one_sequence_coordinates_and_reuses_one_engine(monkeypatch
 
     assert result.status is RunStatus.CONVERGED
     assert result.inner_status is RunStatus.CONVERGED
+    assert (
+        result.model_posterior.recurrence_statistic_identity
+        == RECURRENCE_STATISTIC_IDENTITY
+    )
     assert result.iterations == 2
     assert len(result.residuals) == 2
     assert len(set(engine_ids)) == 1
@@ -382,6 +387,52 @@ def test_deterministic_retry_rejects_mu3_engines_before_running():
         )
 
 
+def test_inner_retry_schedule_retries_finite_exhaustion():
+    class FakeEngine:
+        arena = dataclasses.make_dataclass("Arena", [("mu3_groups", tuple)])(())
+
+        def __init__(self):
+            self.dampings = []
+
+        def run(self, state, iterations, *, tol, damp):
+            del tol
+            self.dampings.append(damp)
+            status = (
+                RunStatus.BUDGET_EXHAUSTED
+                if len(self.dampings) < 3
+                else RunStatus.CONVERGED
+            )
+            return RunResult(
+                state=state,
+                status=status,
+                iterations=iterations,
+                message_deltas=(0.25,),
+                free_energies=(1.0,),
+                residual=0.25,
+            )
+
+        def gaussian_node_stats(self, state):
+            del state
+            return {"drive": {"proper": True}}
+
+    engine = FakeEngine()
+    result, attempts = _run_inner(
+        engine,
+        jnp.zeros(1),
+        max_iterations=8,
+        tolerance=1e-4,
+        damping=0.9,
+        max_retries=2,
+    )
+    assert result.status is RunStatus.CONVERGED
+    assert engine.dampings == pytest.approx([0.9, 0.8, 0.6])
+    assert [attempt.status for attempt in attempts] == [
+        RunStatus.BUDGET_EXHAUSTED,
+        RunStatus.BUDGET_EXHAUSTED,
+        RunStatus.CONVERGED,
+    ]
+
+
 def test_float32_fitter_survives_tenfold_horizon():
     result = _fit(
         _observations(80),
@@ -399,7 +450,7 @@ def test_float32_fitter_survives_tenfold_horizon():
     assert all(np.all(np.isfinite(value)) for value in result.parameters.values())
 
 
-def test_repeated_nascar_coordinates_globalize_the_finite_cycle():
+def test_structured_nascar_coordinates_avoid_the_legacy_finite_cycle():
     observations = _nascar_observations()
     key = jax.random.split(
         jax.random.fold_in(jax.random.key(9001), 101), 3
@@ -422,20 +473,13 @@ def test_repeated_nascar_coordinates_globalize_the_finite_cycle():
     assert result.inner_status is RunStatus.CONVERGED
     assert sum(phase.coordinate_replaced for phase in result.phases) == 5
     fourth = result.phases[3]
-    assert [attempt.damping for attempt in fourth.attempts] == pytest.approx(
-        [0.9, 0.8, 0.6]
-    )
-    assert [attempt.status for attempt in fourth.attempts] == [
-        RunStatus.BUDGET_EXHAUSTED,
-        RunStatus.BUDGET_EXHAUSTED,
-        RunStatus.CONVERGED,
-    ]
-    exhausted = fourth.attempts[0]
-    assert exhausted.recurrence_status is RunStatus.CONVERGED
-    assert exhausted.gaussian_beliefs_proper
-    assert exhausted.state_finite
-    assert exhausted.message_delta_tail[-1] > 1e-2
-    assert np.all(np.isfinite(exhausted.free_energy_tail))
+    assert [attempt.damping for attempt in fourth.attempts] == [0.9]
+    completed = fourth.attempts[0]
+    assert completed.status is RunStatus.CONVERGED
+    assert completed.recurrence_status is RunStatus.CONVERGED
+    assert completed.gaussian_beliefs_proper
+    assert completed.state_finite
+    assert np.all(np.isfinite(completed.free_energy_tail))
     assert all(np.isfinite(tuple(fourth.parameter_scales_before.values())))
     assert all(np.isfinite(tuple(fourth.parameter_scales_after.values())))
     terminal = result.phases[-1]

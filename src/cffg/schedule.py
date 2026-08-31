@@ -208,8 +208,16 @@ def _arena_signature(arena: Arena) -> str:
             group.d_scatter,
             group.drive_gather_both,
             group.drive_scatter,
+            group.component_ids,
         ):
             h.update(np.ascontiguousarray(rows).tobytes())
+    for component in arena.recurrence_components:
+        h.update(
+            (
+                f"recurrence-component|{component.members}|"
+                f"{component.categorical_factors}|{component.acyclic}"
+            ).encode()
+        )
     return h.hexdigest()
 
 

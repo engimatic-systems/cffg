@@ -125,7 +125,11 @@ A pure-Python (dataclass) representation, independent of JAX:
   inventories every grounded tied/per-copy array, and per-copy blob paths use an
   `{index}` marker resolved during grounding. Array-key-derived subpaths prevent
   collisions without flattening the plate spec. Original flat schema-1 manifests
-  remain loadable. No third-party interchange format — this schema is canonical.
+  remain loadable. These are model-only bundles and rerun under current built-in
+  factor semantics. A structure hash cannot distinguish D8 from D9 when the
+  `recurrence_link` IR spelling is unchanged; resumable recurrence posterior
+  state therefore owns a separate statistic manifest. No third-party
+  interchange format — this schema is canonical.
 - **Edit actions**: the only public mutation API is transactional bundles
   (`add_slice`, `bind_data`, `set_constraint`, `compose(template, port_map)`) that
   validate the port invariant before committing. This client-neutral API is also
@@ -278,22 +282,43 @@ the rSLDS path. For each previous regime it stores `K - 1` source-specific
 stick logits, with `weights[K,K-1,d]` and `offsets[K,K-1]`, rather than a
 dense transition tensor over a discretized continuous state. A dedicated
 `RecurrencePlan` carries the two categorical slot tables and Gaussian slot
-table into both arenas. `cffg.recurrence` applies the exact Pólya–Gamma
-augmentation followed by its coordinate-optimal mean-field factor, which is
-the Jaakkola–Jordan lower bound on expected log transition probability
-(DERIVATIONS.md D8). Its node energy therefore upper-bounds the exact
-variational node energy at the same beliefs. Exact categorical zeros remain
-exact, improper Gaussian beliefs are loud, and one update costs
-`O(P K² d²)` for `P` factors without allocating a `K³` transition tensor.
-Its `gaussian_node_stats` record is intentionally pre-PG: the two categorical
-beliefs and exact supports plus the drive mean, directly inverted covariance,
-and second moment. The direct covariance prevents recurrence learning from
-recovering a small covariance by subtracting two large, nearly equal moments.
-`Engine.recurrence_weight_stats` is the derived layer: it checks factor-local
-probability, covariance, parameter, logit-second, and finite-output predicates;
-forms stable PG coordinates from the mean and covariance; and emits additive
-Gaussian natural statistics for augmented `[R; r]`. Its diagnostic scalars
-identify the failed predicate and its dtype-scaled bound. The generic
+table into both arenas. The compiler also derives connected ordinary
+categorical components around recurrence factors and records whether each is
+acyclic. This metadata authorizes an exact structured-chain claim only for an
+acyclic component; a loop retains ordinary local Bethe semantics.
+
+`cffg.recurrence` applies D9's hybrid rule. The current Gaussian moments give
+one bounded expected-log pair potential through the coordinate-optimal
+Pólya–Gamma/Jaakkola–Jordan auxiliary. Log-space sum-product sends messages
+through both categorical roles and owns one source/destination pair belief.
+That same pair supplies the at-risk and signed-success masses for the Gaussian
+drive message. The recurrence node energy uses the pair entropy, the expected
+bounded potential, and the Gaussian entropy; ordinary categorical and
+Gaussian edge corrections retain their existing ledger ownership. With a
+fixed drive, the categorical result is exact on an acyclic component. With an
+uncertain drive, the JJ potential remains a lower bound and the node energy
+remains a conservative upper bound. Exact categorical zeros remain exact,
+improper Gaussian beliefs are loud, and one unfused categorical pass costs
+`O(P K²)` work and transient pair memory for `P` factors without allocating a
+`K³` transition tensor. Flooding batches that pass synchronously. The mixed
+schedule runs the same recurrence coordinate before conditionally refreshing
+ordinary BP islands; recurrence fusion is an optional execution optimization,
+not a second pair or energy owner. The sweep, BFE, and public readout
+deterministically rematerialize the pair from current cavities and drive
+moments; no pair array is independently persisted.
+
+`Engine.recurrence_pair_beliefs` exposes the normalized factor-local pair with
+source rows and destination columns, both marginals, literal support, direct
+Gaussian drive moments, and propriety. `gaussian_node_stats` includes the same
+record. The direct covariance prevents recurrence learning from recovering a
+small covariance by subtracting two large, nearly equal moments.
+`Engine.recurrence_weight_stats` derives its at-risk, signed-success, linear,
+and quadratic rows from that pair: it checks factor-local probability,
+covariance, parameter, logit-second, and finite-output predicates and emits
+additive Gaussian natural statistics for augmented `[R; r]`. The Gaussian
+message and coefficient learning therefore share D9.12's masses without a
+singleton-product fallback. Its diagnostic scalars identify the failed
+predicate and its dtype-scaled bound. The generic
 `pg_weights/recurrence_link` learning pairing pools those statistics into
 `conj.PGWeights` outside JIT and rolls its posterior mean into the next trial.
 Its arrays retain source-regime, stick, and augmented drive-coordinate axes;
@@ -315,7 +340,10 @@ Two host cadences deliberately share that assembly through `Learnables`.
 `RSLDSLearning` remains a compatibility facade for the historical
 initial-regime, dynamics, and recurrence boundary; its distinct-trial
 `update`, checkpoint, and installation operations delegate to a restricted
-runtime and leave the historical fixed emission unchanged. `fit_rslds` owns a
+runtime and leave the historical fixed emission unchanged. A freshly
+constructed facade labels its recurrence block as an unlearned prior;
+`update`, fitted posteriors, and checkpoint restore carry the current D9
+structured-pair statistic identity. `fit_rslds` owns a
 single observed sequence: `PCAARHMMInitializer` fixes an observation-derived
 PCA coordinate system and an initial regime order; each outer coordinate
 constructs all four posteriors from immutable priors, calls
@@ -476,11 +504,13 @@ these surfaces:
   `gaussian_mixture(_linear)` output facing a Gaussian goal solves the
   regime-selector fixed point, preserves D3 continuous messages, and reports
   the collapse-entropy optimistic bound plus its exact-channel sandwich.
-- **Recurrent hybrid rules** (D8): source-specific stick-breaking transitions
-  couple two categorical regimes to a Gaussian drive. Pólya–Gamma/JJ
-  coordinates send categorical log scores and Gaussian information-form
-  messages under the mixed schedule; the matching ledger term records the
-  approximation with its conservative VFE bound direction.
+- **Recurrent hybrid rules** (D9): source-specific stick-breaking transitions
+  couple a structured source/destination pair to a Gaussian drive.
+  Pólya–Gamma/JJ potentials feed log-space sum-product and pair-derived
+  Gaussian information messages under flooding or the mixed schedule. The
+  matching pair-region ledger records its conservative VFE bound direction;
+  compiler component metadata limits exact-chain claims to acyclic ordinary
+  categorical components.
 - Every update path has a matching **local free-energy contribution** (average
   energy plus the appropriate entropy terms). `_make_bfe` adds those node terms
   and the arena-derived edge-entropy corrections, so the global BFE/GFE follows
@@ -582,10 +612,10 @@ them. Four rules define the contract:
    against the conjugate sufficient statistics in DERIVATIONS D4. Their
    inference rollover writes inverse expected precision, `Psi / nu`, not the
    posterior-mean covariance used by the reporting API. PG weights integrate
-   D8's coordinate-optimal Pólya–Gamma natural statistics and roll their
-   Gaussian posterior mean into point weights and offsets. Every posterior
-   remains outside JIT; inference in the next run consumes point parameters
-   rather than joint parameter uncertainty.
+   the factor-local D9 pair's Pólya–Gamma statistics and roll their Gaussian
+   posterior mean into point weights and offsets. Every posterior remains
+   outside JIT; inference in the next run consumes point parameters rather
+   than joint parameter uncertainty.
 
 Cadence is deliberately not part of `LearnableSpec`. `Learnables` keeps a
 read-only validated copy of every initial prior. `accumulate(engine, result)`
@@ -596,12 +626,23 @@ accept an `only` name filter, pool tied sources, validate all selected
 posteriors in temporary storage, and commit atomically. `write` is likewise
 atomic across selected role-bearing targets. Versioned checkpoints encode
 each `(learnable, hyperparameter)` pair independently and round-trip the NIW,
-MNIW, component-MNIW, and PG arrays. Legacy spellings remain explicit
-migrations; a multi-array posterior must be complete rather than silently
-combining restored and prior hyperparameters. The
+MNIW, component-MNIW, and PG arrays. Because D8 and D9 recurrence use
+identical IR and array shapes, a recurrence checkpoint also stores a canonical
+manifest with the D9 statistic identity, factor sources, parameter-blob
+ownership, hyperparameter dtype/shape, and exact-value digests. Missing,
+legacy, tampered, or mismatched
+recurrence identity is rejected before mutation. Legacy spellings for
+unchanged families remain explicit migrations; a multi-array posterior must
+be complete rather than silently combining restored and prior
+hyperparameters. The
 model/runtime interface still declares which boundary learnable is
 episode-scale because that choice determines rollover semantics, not merely
 update frequency.
+
+`RollingAgent.checkpoint` namespaces every entry from `Learnables.state_dict`,
+so a recurrence manifest would flow through that container unchanged. No
+shipped rolling-agent builder currently declares a recurrence learnable; the
+agent schema is therefore not broadened with a second identity field.
 
 #### 3c. Rolling boundary contract (`AgentSpec`, cff-nhxf)
 

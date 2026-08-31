@@ -1786,3 +1786,308 @@ Using Pólya–Gamma Latent Variables* (2013); Linderman, Johnson, and Adams,
 *Dependent Multinomial Models Made Easy: Stick-Breaking with the
 Pólya–Gamma Augmentation* (2015); Durante and Rigon, *Conditionally Conjugate
 Mean-Field Variational Bayes for Logistic Models* (2019).
+
+---
+
+## D9 — Structured categorical smoothing for recurrent transitions (cff-s6yy)
+
+### D9.1 The plain-English version
+
+D8 treats the regime before a transition and the regime after it as
+independent categorical beliefs. That makes every recurrence update cheap,
+but it discards the main fact a transition is meant to express: adjacent
+regimes are correlated. The cff-nbo9 oracle shows that the implemented D8
+messages and learning readout are correct for that independent family, while
+their consecutive-state responsibilities differ materially from exact chain
+smoothing.
+
+The repair is to keep one structured belief over the complete regime path.
+For a fixed set of current Gaussian moments, each recurrence factor supplies
+a table of bounded expected log transition scores. Ordinary forward/backward
+sum-product then gives one singleton belief per time and one consistent pair
+belief per transition. Those pair beliefs, not products of singletons, supply
+the at-risk and signed-success masses used by the Gaussian message and by
+coefficient learning.
+
+This does not remove the separate Pólya–Gamma/Jaakkola–Jordan approximation.
+With an uncertain Gaussian drive, the transition table is still a lower bound
+on the expected log transition. The categorical coordinate is exact for that
+bounded table. With a fixed observed drive, the bound is tight and the
+categorical coordinate reduces to ordinary exact chain smoothing.
+
+The selected production owner is the existing set of time-local recurrence
+factors, using hybrid sum-product categorical messages and a factor-local pair
+belief. On an acyclic regime chain, those local pair beliefs are the globally
+consistent marginals of one path belief. Their ordinary Bethe node entropies
+and categorical edge corrections already equal the chain entropy. A new
+monolithic chain region would encode the same junction tree a second time,
+would need special boundary and counting-number suppression, and would not
+improve the objective. A scheduler may fuse a chain's local messages into one
+forward/backward pass, but that is an execution optimization, not a new belief
+or energy owner.
+
+### D9.2 Structured family and bounded pair potential
+
+Let `z_0,...,z_N` be the categorical regime path and let transition `t`
+connect source `z_t=i` to destination `z_{t+1}=j`. The structured inference
+family is
+
+    q(z_0:N) q_G(X) product_til q(omega_til)
+                    product_il delta(theta_il - theta_hat_il).       (D9.1)
+
+`q_G(X)` denotes the Gaussian/collapsed belief already held by the engine. It
+may contain structure outside the recurrence block, but recurrence transition
+`t` reads only the marginal mean `m_t` and covariance `S_t` of its drive.
+Each Pólya–Gamma coordinate remains independent across time, source, and
+stick and is eliminated into the JJ bound. During inference the installed
+coefficient `theta_hat_il=[R_il;r_il]` is a point value. The independent
+Gaussian coefficient posteriors used between trials remain outside this
+within-sequence objective; their means are installed on the next coordinate,
+as in D8.4. Thus the only newly structured belief in (D9.1) is the complete
+categorical path.
+
+For transition `t`, source `i`, and stick `l`, define
+
+    mu_til = R_il^T m_t + r_il,
+    c_til^2 = mu_til^2 + R_il^T S_t R_il,
+    omega_bar_til = tanh(c_til/2) / (2 c_til),                (D9.2)
+
+with the analytic `1/4` limit at zero. Reuse D8.6's success and failure
+scores with `(mu_il,xi_il)` replaced by `(mu_til,c_til)`. Their decision-list
+prefix gives the bounded expected log pair potential
+
+    ell_t(i,j) = sum_l b_jl s_til^- + a_jl (s_til^+ - s_til^-),
+    ell_t(i,j) <= E_qG[log p(z_{t+1}=j | z_t=i, x_t)].       (D9.3)
+
+The algebraic form in (D9.3) says “failure for every at-risk stick, then
+replace the chosen stick's failure by success.” It is the same score table D8
+already computes. No generating state, regime, or parameter enters it.
+
+Let `u_t(i)` collect the ordinary unary log potential and incoming evidence
+on `z_t`. The structured categorical objective is
+
+    F_Z^JJ[q_Z]
+      = -H[q_Z]
+        - sum_tij rho_t(i,j) ell_t(i,j)
+        - sum_ti gamma_t(i) u_t(i),                           (D9.4)
+
+where `gamma_t(i)=q_Z(z_t=i)` and
+`rho_t(i,j)=q_Z(z_t=i,z_{t+1}=j)`. Since (D9.3) is a pointwise lower bound,
+
+    F_Z^JJ[q_Z] >= F_Z^exact[q_Z] for every feasible q_Z,
+    min_q F_Z^JJ >= min_q F_Z^exact.                          (D9.5)
+
+The direction is conservative: the bounded negative free energy is above the
+exact value. This comparison holds at the same `q_G` and installed
+coefficients. It does not claim the bounded and exact objectives select the
+same Gaussian beliefs.
+
+### D9.3 Stationary messages, singleton beliefs, and pair beliefs
+
+Stationarity of (D9.4) on the path simplex gives
+
+    q_Z(z_0:N) = exp(
+        sum_t u_t(z_t) + sum_t ell_t(z_t,z_{t+1}) - log Z_JJ
+    ).                                                        (D9.6)
+
+The normalized log-space forward and backward recursions are, up to an
+additive gauge at each time,
+
+    a_0(i)       = u_0(i),
+    a_{t+1}(j)   = u_{t+1}(j) + logsumexp_i[a_t(i)+ell_t(i,j)],
+    b_N(j)       = 0,
+    b_t(i)       = logsumexp_j[ell_t(i,j)+u_{t+1}(j)+b_{t+1}(j)].   (D9.7)
+
+They give
+
+    gamma_t(i) proportional to exp(a_t(i)+b_t(i)),
+    rho_t(i,j) proportional to exp(
+        a_t(i)+ell_t(i,j)+u_{t+1}(j)+b_{t+1}(j)
+    ).                                                        (D9.8)
+
+Every pair obeys both marginal constraints exactly:
+
+    sum_j rho_t(i,j)=gamma_t(i),
+    sum_i rho_t(i,j)=gamma_{t+1}(j).                          (D9.9)
+
+Equations (D9.7--D9.8) are also the time-local recurrence factor rules. If
+`lambda_L(i)` and `lambda_R(j)` are the two incoming categorical cavity
+messages, the factor sends
+
+    log m_to_out(j) = logsumexp_i[lambda_L(i)+ell_t(i,j)],
+    log m_to_in(i)  = logsumexp_j[ell_t(i,j)+lambda_R(j)],     (D9.10)
+
+and owns the factor-local belief
+
+    rho_t(i,j) proportional to
+        exp(lambda_L(i)+ell_t(i,j)+lambda_R(j)).              (D9.11)
+
+On an acyclic categorical recurrence component, the fixed point of (D9.10)
+is (D9.7), and (D9.11) is the globally consistent pair marginal in (D9.8).
+On a categorical loop the same rules define ordinary Bethe pseudomarginals,
+not one exact path belief. The structured-chain claim therefore requires an
+acyclic recurrence component; a compiler or model validation surface must
+establish that condition rather than infer exactness from convergence alone.
+
+If every drive is fixed, `S_t=0` and `c_til=|mu_til|`. The JJ success and
+failure scores become the exact log logistic probabilities, so
+`ell_t(i,j)=log p(j|i,x_t)`. Equations (D9.6--D9.11) then are ordinary exact
+sum-product smoothing. For uncertain drives they remain exact for the JJ
+potential, while (D9.5) records the remaining approximation.
+
+### D9.4 One pair belief for Gaussian messages and learning
+
+For each transition, source, and stick define its pair-derived at-risk and
+signed-success masses
+
+    E_til = sum_{j>=l} rho_t(i,j),
+    K_til = rho_t(i,l) - E_til/2.                             (D9.12)
+
+The recurrence message to its Gaussian drive is
+
+    Lambda_xt = sum_il E_til omega_bar_til R_il R_il^T,
+    eta_xt    = sum_il (K_til - E_til omega_bar_til r_il) R_il. (D9.13)
+
+For augmented feature moments `h_t=E[[x_t;1]]` and
+`M_t=E[[x_t;1][x_t;1]^T]`, the coefficient-statistic increments are
+
+    Delta eta_til    = K_til h_t,
+    Delta Lambda_til = E_til omega_bar_til M_t.               (D9.14)
+
+The same `rho_t` supplies (D9.12) to both equations. There is no product
+`gamma_t(i) gamma_{t+1}(j)` fallback in messages, diagnostics, checkpoints,
+or learning. Exact zero pair mass gives exact zero exposure and natural
+statistics. If a source/stick has zero total exposure, its between-trial
+Gaussian posterior retains the prior coordinate.
+
+### D9.5 Entropy, counting numbers, and the BFE relationship
+
+For any consistent positive-support chain marginals, the junction-tree
+entropy identity is
+
+    H[q_Z] = sum_t H[rho_t] - sum_{t=1}^{N-1} H[gamma_t].     (D9.15)
+
+The pair regions have entropy counting number `+1`; each repeated interior
+singleton separator has entropy counting number `-1`. In free-energy signs,
+the recurrence part of (D9.4) is therefore
+
+    F_rec^JJ
+      = sum_t { -H[rho_t] - sum_ij rho_t(i,j) ell_t(i,j) }
+        + sum_{t=1}^{N-1} H[gamma_t].                         (D9.16)
+
+Equation (D9.16) is exactly the existing CFFG ledger shape once a recurrence
+factor's node belief changes from the D8 singleton product to `rho_t`:
+
+- each time-local recurrence factor contributes the braced pair-region term;
+- each categorical edge shared by two adjacent pair regions contributes the
+  ordinary `+H[gamma_t]` interior-edge correction;
+- equality branches and external unary factors telescope through their normal
+  node and edge terms, so no chain-specific correction is added;
+- the factor's independent Gaussian-drive entropy remains `-H[q_t(x)]`, and
+  the ordinary Gaussian edge correction removes its duplicate as before.
+
+Thus time-local factor regions already realize the chain objective. A named
+chain region would have to remove the same local node and internal-edge terms
+before adding `-H[q_Z]`, creating a second counting-number owner with no
+mathematical benefit on a tree.
+
+At the stationary belief (D9.6), the complete categorical objective satisfies
+
+    F_Z^JJ[q_Z^*] = -log Z_JJ.                                (D9.17)
+
+With fixed drives this is the exact categorical-chain BFE and exact negative
+log evidence for the held unary potentials. With uncertain drives it is the
+exact BFE of the JJ factor potentials and, by (D9.5), an upper bound on the
+corresponding exact-transition variational objective. Other approximations in
+the full rSLDS, including Gaussian-mixture collapse, retain their separately
+documented bound directions; (D9.17) does not combine them into a new global
+evidence guarantee.
+
+The old D8 node term is recovered when every pair factorizes as
+`rho_t=gamma_t outer gamma_{t+1}`. Away from independence, replacing `rho_t`
+by that product changes both the mutual-information part of the entropy and
+the expected transition energy. Changing only the learning readout would
+therefore not be stationary for either D8 or D9.
+
+### D9.6 Ownership decision and GFE boundary
+
+Two ownership candidates were evaluated:
+
+1. **Selected: time-local hybrid sum-product recurrence factors.** The
+   recurrence rule owns (D9.10--D9.14), its pair belief, and its node energy.
+   Standard categorical edges own the separator corrections. This reuses the
+   existing factor type, parameter blobs, slot addresses, equality behavior,
+   serialization, and Bethe ledger. A scheduled forward/backward pass may
+   fuse the local updates for `O(T K^2)` execution without changing ownership.
+2. **Rejected: a named monolithic chain region.** It would own a duplicate
+   path belief and entropy, require compiler topology fusion across equality
+   branches, suppress the existing recurrence node and edge ledger terms, and
+   invent new boundary serialization. On a tree it yields the same equations
+   and no stronger consistency than candidate 1.
+
+The selected design is ordinary BFE only at the recurrence owner. A model may
+still contain supported GFE/P-substituted factors elsewhere; the recurrence
+terms then remain ordinary bounded BFE contributions inside the mixed global
+ledger. P-substitution on a recurrence factor or any of its roles has no D9
+objective or message derivation and must keep failing at compile time. It must
+not reuse (D9.16) under a GFE label. Supporting recurrence-owned
+P-substitution would require a separate derivation of its substituted path
+belief, boundary messages, and counting numbers.
+
+### D9.7 Implementation change path and executable anchors
+
+The **New factor or rule family** and **BFE or GFE objective** change paths in
+`docs/ARCHITECTURE.md` apply conservatively even though the serialized factor
+name stays `recurrence_link`:
+
+- authority: `cffg.recurrence` owns pair-potential, sum-product, pair-belief,
+  Gaussian-statistic, and node-energy algebra;
+- compiler/arena: existing recurrence parameter packing and slot addresses
+  remain, while acyclic categorical-component classification and any fused
+  forward/backward schedule must agree with unfused execution;
+- engine: host/JIT, synchronous/scheduled, single/`vmap`, support/status,
+  `_recurrence_sweep`, `_make_step`, `_batch_stage_fn`/`_scan_stage_fn`, and
+  `_make_bfe` are paired surfaces;
+- beliefs/learning: `gaussian_node_stats`, a structured pair readout,
+  `recurrence_weight_stats`, `Learnables`, and checkpoint consumers all use
+  (D9.12), never reconstructed singleton products;
+- IR/serialization: no new field or factor spelling is selected, but bundles,
+  executable identities, and restored runtime states must reject pre-D9
+  behavior where a checkpoint could otherwise claim the new semantics;
+- GFE: ordinary coexistence is applicable; recurrence-owned P-substitution is
+  an explicit compile-time rejection; arbitrary new GFE messages are N/A;
+- model/consumer: `cffg.models.rslds`, fit checkpointing, experiment retention,
+  and heterogeneous recovery diagnostics must preserve pair identity and
+  cannot infer it later from singletons.
+
+The independent NumPy anchors remain in
+`tests/test_structured_recurrence.py`. The independently callable JAX rule
+authority is anchored in `tests/test_structured_recurrence_rule.py`:
+
+- `test_structured_messages_beliefs_and_free_energy_match_enumeration` checks
+  (D9.6--D9.11) and (D9.17) for K=2 and K=3.
+- `test_time_local_pair_regions_are_globally_consistent` checks the selected
+  ownership boundary and both constraints in (D9.9).
+- `test_pair_regions_and_edge_corrections_equal_chain_entropy_and_energy` and
+  `test_path_entropy_matches_literal_enumeration` check (D9.15--D9.16).
+- `test_pair_responsibilities_drive_all_recurrence_statistics` checks
+  (D9.12--D9.14) and rejects singleton-product responsibilities.
+- `tests/test_structured_recurrence_learning.py` checks the public pair,
+  Gaussian message, and pooled coefficient statistics against the same
+  independent K=2/K=3 consecutive-state authority.
+- `test_uncertain_drive_retains_the_jj_bound_boundary` separates structured
+  categorical exactness from the PG/JJ approximation.
+- the remaining tests preserve literal log-zero support, normalize vacuous
+  evidence, reject empty/non-finite support, derive float32 tolerance from the
+  dtype, and run K=8/T=100 with `O(T K^2)` dynamic programming rather than
+  path enumeration.
+- `test_fixed_drive_rules_match_exact_chain_oracle` and
+  `test_pair_node_and_separator_energy_equal_negative_log_normalizer` pin the
+  callable-authority equations and energy ledger to the independent oracle.
+- `test_pair_masses_and_gaussian_message_use_joint_responsibility` checks that
+  the Gaussian message reads the pair directly, while the hostile-input,
+  transform, and K=8 tests pin the public rule's status and scaling boundary.
+- `tests/test_structured_recurrence_engine.py` applies the same identities to
+  compiled flooding and mixed schedules. It checks compiler acyclicity,
+  factor-local pairs, Gaussian writes, the pair/separator BFE ledger,
+  fixed-drive `-log Z`, loop claim boundaries, and `O(T K^2)` batch storage.

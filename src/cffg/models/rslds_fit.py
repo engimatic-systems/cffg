@@ -120,6 +120,10 @@ class RSLDSFitResult:
     When every requested coordinate completes, ``state`` has been inferred
     once after the final parameter write. ``last_inference`` is that terminal
     solve, and ``phases`` distinguishes it from parameter-replacement phases.
+    ``model_posterior`` carries the current D9
+    structured-pair statistic identity and may be checkpointed for resume;
+    point ``parameters`` alone are a model initialization, not a resumable
+    posterior.
     """
 
     engine: Engine
@@ -201,7 +205,7 @@ def _point_parameters(learning: Learnables) -> dict[str, np.ndarray]:
 def _posterior_arrays(learning: Learnables) -> dict[str, np.ndarray]:
     return {
         f"posterior/{name}": np.asarray(value)
-        for name, value in learning.state_dict().items()
+        for name, value in learning.hyperparameter_snapshot().items()
     }
 
 
