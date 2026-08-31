@@ -152,3 +152,7 @@ separate comparison; `any` is limited to documented failures; `only` marks the
 named information and ticket boundaries; `current` means the mathematical
 source regime, not repository recency; and `existing` means the three sealed
 qualification artifacts after they have run.
+
+**2026-08-31T03:55:14Z**
+
+Roadmap authoring handoff: PR #102 is stacked on PR #101. The four tickets passed fresh contextual wiggle scans and parse checks; tk dep cycle and git diff --check passed. No short suite ran because this PR changes tickets only. Next work is cff-iur0. Its implementation gate is deliberate: derive and independently test the smallest component contract before touching compiler or engine code. Gotcha: cff-nkbj remains a separate later adapter-comparison chain and is not a prerequisite.
