@@ -2,7 +2,7 @@
 id: cff-t2g3
 status: open
 deps: [cff-5edo, cff-x0sv]
-links: []
+links: [cff-cz6v]
 created: 2026-07-05T23:57:38Z
 type: task
 priority: 3

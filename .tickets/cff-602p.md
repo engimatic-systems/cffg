@@ -2,7 +2,7 @@
 id: cff-602p
 status: open
 deps: [cff-4sor]
-links: []
+links: [cff-cz6v]
 created: 2026-08-10T02:58:17Z
 type: feature
 priority: 2
