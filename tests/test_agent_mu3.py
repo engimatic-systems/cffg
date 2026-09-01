@@ -330,6 +330,49 @@ def test_functional_checkpoint_has_one_exact_outer_and_runtime_manifest(tmp_path
     }
 
 
+def test_agent_version_1_functional_checkpoint_migrates_runtime(tmp_path):
+    source = make_agent()
+    action = source.act()
+    current = tmp_path / "current-functional.npz"
+    source.checkpoint(current)
+    arrays = checkpoint_arrays(current)
+    arrays["agent:version"] = np.asarray(1)
+    for field in (
+        "checkpoint_version",
+        "checkpoint_fields",
+        "plan_structure_hash",
+        "filter_structure_hash",
+        "plan_parameter_hash",
+        "filter_parameter_hash",
+        "horizon",
+        "damp",
+        "n_sweeps",
+        "select",
+        "jax_enable_x64",
+        "mu3_samples",
+        "mu3_min_ess_fraction",
+        "mu3_refresh",
+    ):
+        del arrays[field]
+    legacy = tmp_path / "agent-version-1-functional.npz"
+    np.savez(legacy, **arrays)
+
+    restored = make_agent(key=jax.random.PRNGKey(999))
+    restored.observe(1, 0)
+    restored.restore(legacy)
+
+    assert_result_exact(restored.last_plan_result, source.last_plan_result)
+    np.testing.assert_array_equal(
+        restored.planning_key_cursor, source.planning_key_cursor
+    )
+    np.testing.assert_array_equal(restored.belief, source.belief)
+    np.testing.assert_array_equal(restored.counts, source.counts)
+    assert restored.tick == source.tick
+    assert restored.episode_tick == source.episode_tick
+    assert restored.planning_epoch == source.planning_epoch
+    assert restored.act() == action
+
+
 @pytest.mark.parametrize(
     "mismatch",
     ("samples", "min_ess", "refresh", "mode"),

@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 
 
 _CHECKPOINT_VERSION = 1
+_AGENT_V1_VERSION = 1
 _LEGACY_KEYS = {"counts": "A", "b_counts": "B"}
 _CORE_FIELDS = {
     "checkpoint_version",
@@ -48,6 +49,13 @@ _MU3_CONFIG_FIELDS = {
     "mu3_samples",
     "mu3_min_ess_fraction",
     "mu3_refresh",
+}
+_AGENT_V1_CORE_FIELDS = {
+    "agent:version",
+    "agent:mode",
+    "tick",
+    "episode_tick",
+    "rng_state",
 }
 
 
@@ -119,15 +127,13 @@ def restore_agent(agent: RollingAgent, path: str | Path) -> None:
         else _checkpoint_int(data["checkpoint_version"], "checkpoint_version")
     )
 
-    if version is None:
+    if version is None and "agent:version" in fields:
+        staged_runtime = _validate_agent_v1_envelope(agent, data, fields)
+    elif version is None:
         if _agent_mode(agent) == "functional_mu3":
-            restore_runtime(
-                data,
-                agent.plan,
-                n_iters=agent.n_sweeps,
-                tol=1e-10,
-                run_options=_planning_run_options(agent),
-                refresh_policy=agent._planning.refresh_policy,
+            raise ValueError(
+                "legacy checkpoint cannot restore a functional mu3 agent: "
+                "the checkpoint has no versioned stochastic runtime"
             )
         _validate_legacy_fields(fields)
         staged_runtime = PlanningRuntime(None, agent._planning.refresh_policy)
@@ -407,6 +413,58 @@ def _validate_versioned_envelope(
             "functional checkpoint field inventory does not match its metadata"
         )
     return runtime
+
+
+def _validate_agent_v1_envelope(
+    agent: RollingAgent,
+    data: dict[str, np.ndarray],
+    fields: set[str],
+) -> PlanningRuntime:
+    """Migrate the `agent:version=1` envelope emitted before strict identity."""
+    version = _checkpoint_int(data["agent:version"], "agent:version")
+    if version != _AGENT_V1_VERSION:
+        raise ValueError(
+            f"RollingAgent checkpoint version {version} is not supported; "
+            f"expected {_AGENT_V1_VERSION}"
+        )
+
+    mode = _checkpoint_string(data.get("agent:mode"), "agent:mode")
+    expected_mode = _agent_mode(agent)
+    if mode != expected_mode:
+        raise ValueError(f"{mode} checkpoint cannot restore a {expected_mode} agent")
+
+    belief_fields = (
+        {"belief"}
+        if agent._has_legacy_belief
+        else {f"belief:{name}" for name in agent.beliefs}
+    )
+    learn_fields = {f"learn:{name}" for name in agent.learnables.state_dict()}
+    goal_fields = {f"goal:prior:{name}" for name in agent.goal_priors}
+    pending_fields = {f"goal:pending:{name}" for name in agent.goal_priors}
+    required = _AGENT_V1_CORE_FIELDS | belief_fields | learn_fields | goal_fields
+    if mode == "functional_mu3":
+        required.add("mu3:metadata")
+    missing = sorted(required - fields)
+    unknown = sorted(
+        field
+        for field in fields - required - pending_fields
+        if mode != "functional_mu3" or not field.startswith("mu3:")
+    )
+    if missing:
+        raise KeyError(f"agent version 1 checkpoint is missing fields {missing}")
+    if unknown:
+        raise KeyError(f"agent version 1 checkpoint has unknown fields {unknown}")
+
+    if mode != "functional_mu3":
+        return PlanningRuntime(None, agent._planning.refresh_policy)
+    return restore_runtime(
+        data,
+        agent.plan,
+        n_iters=agent.n_sweeps,
+        tol=1e-10,
+        run_options=_planning_run_options(agent),
+        refresh_policy=agent._planning.refresh_policy,
+    )
 
 
 def _validate_legacy_fields(fields: set[str]) -> None:

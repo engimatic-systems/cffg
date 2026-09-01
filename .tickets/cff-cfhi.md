@@ -43,7 +43,12 @@ short-horizon state and stochastic continuation.
 6. Static-parameter identity covers grounded plate copies and tied values read
    by both learned and static consumers.
 7. Explicit legacy migration accepts only complete and unambiguous historical
-   checkpoints and rejects state that cannot reproduce continuation.
+   checkpoints and rejects state that cannot reproduce continuation:
+   - The `agent:version = 1` functional format emitted by the preceding
+     clean-port layer restores its cached result, particles, weights, JAX key
+     cursor, and planning epoch instead of discarding that runtime.
+   - Unsupported versions, mode mismatches, missing state, and unknown fields
+     fail before mutating an already-used restore target.
 8. Tests cover both deterministic and functional-`mu3` agents, float32 and x64,
    exact-zero beliefs, malformed inputs, incompatible structures and settings,
    already-used restore targets, and models at least ten times a minimal
@@ -94,3 +99,29 @@ Planning audit, 2026-08-31. Capability owners are the top-level facade delegates
 **2026-09-01T03:32:47Z**
 
 Completion handoff, 2026-08-31. Clean-ported old PR #85 onto the functional-mu3 and constraint-flip layers without replaying its sibling merge. Top-level cffg now exposes the bounded pre-1.0 newcomer facade and README carries one subprocess-executed build, bundle, compile, status, belief/BFE, RollingAgent checkpoint, fresh restore, and continuation path in float32 and x64. RollingAgent checkpoints now use a versioned exact-field envelope bound to planning/filtering structures, grounded static parameters, horizon, solver/action settings, construction-time JAX precision, beliefs, complete learnables including recurrence manifests, goals, cadence, NumPy RNG, and functional-mu3 configuration/state. Restore rejects duplicate, unknown, missing, ambiguous, malformed, incompatible, complex, non-normalized, and non-atomic state before mutation. Live runtime checkpoints remain distinct from model-only CFFGZ bundles and the open resumable-learning roadmap. Focused public, functional, legacy, and recurrence compatibility: 94 passed, 11 deselected. Final unchanged-head short suite: 1509 passed, 41 deselected, 0 failed in 762.75 seconds; dashboard refreshed at /Users/ravd/agent-share/cffg-tests.html. No slow test was required because the new hostile checkpoint mechanisms are in the default public/agent suites. Next ready layer: cff-9tvt.
+
+**2026-09-01T05:08:00Z**
+
+Second-review repair handoff, 2026-08-31. A real checkpoint from the preceding
+functional-mu3 layer uses `agent:version = 1`, not the later
+`checkpoint_version` envelope. The strict decoder therefore treated its
+identity and `mu3:*` fields as unknown, and its legacy branch reconstructed but
+then discarded the stochastic runtime. Acceptance criterion 7 now names that
+exact migration boundary. The decoder stages the historical runtime through
+the current strict inner-runtime validator and retains it for atomic commit;
+truly unversioned functional checkpoints remain rejected because they cannot
+carry reproducible stochastic continuation. Capability owners remain the
+RollingAgent outer decoder and functional-mu3 runtime decoder. Regression
+coverage constructs the exact historical outer field inventory and verifies
+the result, particles, weights, key cursor, epoch, beliefs, learnables, cadence,
+and next action after restoration.
+
+Focused repair validation: `tests/test_agent_mu3.py` and
+`tests/test_public_api.py` passed 29 tests with 1 deselected in 177.27 seconds.
+The cumulative short suite will run once at the repaired stack head, so the
+unchanged migration is not exercised again on this intermediate branch.
+The refreshed wiggle scan retained the prior audited meanings and adds:
+`expose` means the exported facade; `ready` and `remaining` name the next stack
+layer; `pass` is the measured pytest result; `verify` is the exact-continuation
+assertion; and `later` distinguishes the historical strict envelope from the
+preceding `agent:version = 1` format.
