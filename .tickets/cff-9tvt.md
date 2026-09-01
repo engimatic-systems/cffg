@@ -1,6 +1,6 @@
 ---
 id: cff-9tvt
-status: open
+status: closed
 deps: [cff-cfhi]
 links: []
 created: 2026-09-01T02:20:19Z
@@ -213,3 +213,10 @@ engine's two mu3 payload writers and the functional checkpoint validator.
 The refreshed wiggle scan retains the recorded meanings; `can` is bounded to
 the two enumerated engine payload writers and `all` refers to the prior named
 single-field regression cases.
+
+Final fourth-review validation at `e0388e5`: the refreshed dashboard short
+suite passed 1,530 tests with 41 deselected, 0 failures, and 4 dependency
+deprecation warnings in 887.81 wall-clock seconds (876.29 seconds reported by
+pytest). The dashboard was refreshed at `~/agent-share/cffg-tests.html`. No
+slow run was required because the coordinated payload corruption is covered by
+the default functional-agent checkpoint suite.
