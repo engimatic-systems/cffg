@@ -1,6 +1,6 @@
 ---
 id: cff-7ozr
-status: in_progress
+status: closed
 deps: [cff-lpsn]
 links: []
 created: 2026-09-01T02:20:19Z
@@ -76,3 +76,7 @@ would require separate derivations and tickets.
 **2026-09-01T02:23:06Z**
 
 Planning audit, 2026-08-31. Capability owners are the independent test oracle and README, ARCHITECTURE, and LIMITATIONS claim boundaries; production runtime ownership is explicitly denied. Wiggle scan reviewed in context; retained candidates mean: fixed=provided A parameters; n_a=execution pairs proven inapplicable; preserve=literal zero support; public=documented claim; reusable=the two compiled agent windows; implement=reference construction or production path under comparison; support=probability support; remaining=old-PR capability; check=enumerated objective identity; equivalent/evidence/exact=mathematical equality checked by exhaustive finite enumeration and automated tests; oracle=independent test reference; sound=optional method quality; test=automated artifacts; learn=explicitly excluded learned-A scope; scale=repeated tick count; may=optional method; all=state components in the declared joint boundary; current=main interfaces or current-main documentation.
+
+**2026-09-01T03:11:53Z**
+
+Completion handoff, 2026-08-31. Clean-ported old PR #84 as an independent test-and-documentation layer above cff-lpsn. The immutable before/after snapshots, separate simplex and filter enumeration, mixed-history graph, and RollingAgent comparisons establish both action posteriors, the intervening filter posterior, local GFE, exact-zero rollover, truthful infeasibility, float32 behavior, the -log evidence ledger offset, and exactly two compiled structures through 16 ticks for the fixed-A binary discrete joint-boundary subclass. The production runtime is unchanged and the docs explicitly deny generalization beyond that boundary. Focused oracle and hygiene: 7 passed. Final unchanged-head short suite: 1493 passed, 41 deselected, 0 failed in 649.70 seconds; dashboard refreshed at /Users/ravd/agent-share/cffg-tests.html. No slow tests apply. Next ready layer: cff-cfhi.
