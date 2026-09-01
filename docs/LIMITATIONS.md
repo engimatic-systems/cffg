@@ -103,9 +103,12 @@ gaussian_linear, Gaussian equality — cff-4e5z: Kalman-smoother parity, exact
 continuous tree identity BFE = −log p(y)). Between converged runs, declared
 NIW, MNIW, component-MNIW, and Pólya–Gamma weight learning covers `gaussian`,
 `gaussian_linear`, `gaussian_mixture_linear`, and `recurrence_link`.
-`MOMENT_MATCHING` remains in the template schema for future EP rules, but it is
-syntax only: compilation rejects it before constructing an arena, so the
-executor cannot silently treat the bead as ordinary marginalization.
+`MOMENT_MATCHING` remains in the template schema as a legacy placeholder, but
+it is underspecified: the factor-only target cannot select the incident edge
+endpoint or sufficient-statistic projection required by the paper. Compilation
+and diagram generation reject it, so neither execution nor visualization can
+silently treat it as ordinary marginalization. Future EP work requires a schema
+migration as well as registered rules and ledger semantics.
 Everything else requires a separately selected derivation or registration
 ticket. Epic
 cff-ahps records the finite integrated baseline; it does not promise that
