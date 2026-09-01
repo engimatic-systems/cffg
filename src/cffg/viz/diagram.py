@@ -103,7 +103,7 @@ class WireView:
     label: str  # variable name; empty for parameter wires (terminal is labeled)
     ends: tuple[NodeEnd | TerminalEnd, NodeEnd | TerminalEnd]
     bead: str | None = None  # None: no bead in q (pointmass wires); "": empty
-    # bead symbols: "" (default normalisation), "delta", "E" (moment matching)
+    # bead symbols: "" (default normalisation), "delta" (point mass)
 
     def node_ends(self) -> list[NodeEnd]:
         return [e for e in self.ends if isinstance(e, NodeEnd)]

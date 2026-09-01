@@ -215,7 +215,7 @@ class ConstraintKind(str, Enum):
 
 
 # Which kinds target an edge (variable name) vs a node (factor name).  The
-# MOMENT_MATCHING entry records the legacy wire format, not a faithful EP schema.
+# MOMENT_MATCHING entry records the legacy payload, not a faithful EP schema.
 EDGE_CONSTRAINTS = frozenset({ConstraintKind.DELTA})
 NODE_CONSTRAINTS = frozenset(
     {ConstraintKind.MEAN_FIELD, ConstraintKind.P_SUBSTITUTION, ConstraintKind.MOMENT_MATCHING}

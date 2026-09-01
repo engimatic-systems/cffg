@@ -670,8 +670,8 @@ def compile_template(
     for constraint in t.constraints:
         if constraint.kind is ConstraintKind.MOMENT_MATCHING:
             problems.append(
-                f"factor {constraint.target!r}: no executable moment-matching "
-                "rule is registered"
+                f"factor {constraint.target!r}: legacy moment-matching syntax "
+                "does not identify an incident edge endpoint or projection"
             )
 
     for f in t.factors.values():

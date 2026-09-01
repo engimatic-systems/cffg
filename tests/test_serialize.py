@@ -37,7 +37,10 @@ def test_legacy_moment_matching_placeholder_round_trips_but_compilation_rejects(
     assert back.constraints == hmm_slice.constraints
     with pytest.raises(
         CompileError,
-        match="factor 'obs': no executable moment-matching rule is registered",
+        match=(
+            "factor 'obs': legacy moment-matching syntax does not identify "
+            "an incident edge endpoint or projection"
+        ),
     ):
         compile_template(back)
 
