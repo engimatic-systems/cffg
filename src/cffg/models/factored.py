@@ -344,6 +344,7 @@ def build_factored_rollout(
     gfe: bool = True,
     learn: tuple[str, ...] = (),
     learned_a: bool = False,
+    mu3: bool = False,
     learned_c: bool = False,
     epistemic_b: bool = False,
 ) -> tuple[Template, dict[str, np.ndarray]]:
@@ -353,7 +354,7 @@ def build_factored_rollout(
     expose action/observation DATA ports; future slices carry an action prior
     and observation preference (with P-substitution when ``gfe`` is true).
 
-    The three boolean compatibility arguments are accepted because
+    The boolean compatibility arguments are accepted because
     :class:`cffg.agent.RollingAgent` supplies them to every rollout builder.
     Their parameter-uncertainty composites remain separate tickets and are
     rejected when enabled here.
@@ -364,11 +365,12 @@ def build_factored_rollout(
         raise ValueError(
             f"factored rollout: past must be between 0 and steps, got {past}"
         )
-    if learned_a or learned_c or epistemic_b:
+    if learned_a or mu3 or learned_c or epistemic_b:
         requested = [
             label
             for label, enabled in (
                 ("learned_a", learned_a),
+                ("mu3", mu3),
                 ("learned_c", learned_c),
                 ("epistemic_b", epistemic_b),
             )
@@ -858,6 +860,7 @@ def build_factored_corridor(
     gfe: bool = True,
     learn: tuple[str, ...] = (),
     learned_a: bool = False,
+    mu3: bool = False,
     learned_c: bool = False,
     epistemic_b: bool = False,
 ) -> tuple[Template, dict[str, np.ndarray]]:
@@ -958,6 +961,7 @@ def build_factored_corridor(
         gfe=gfe,
         learn=learn,
         learned_a=learned_a,
+        mu3=mu3,
         learned_c=learned_c,
         epistemic_b=epistemic_b,
     )
