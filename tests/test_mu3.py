@@ -313,3 +313,28 @@ def test_production_rule_float32_at_uncomfortable_scale_and_exact_zero_support()
         boundary[0],
     )
     np.testing.assert_array_equal(score, [0.0])
+
+
+def test_mu3_float32_positive_predictive_underflow_is_not_zero_support():
+    with jax.enable_x64(False):
+        tiny = jnp.asarray(jnp.finfo(jnp.float32).tiny, dtype=jnp.float32)
+        particles = jnp.asarray(
+            [[[1.0, 0.0], [0.0, 1.0]]], dtype=jnp.float32
+        )
+        abar = jnp.asarray(
+            [[tiny, 0.0], [1.0, 1.0]], dtype=jnp.float32
+        )
+        zbars = jnp.asarray([[tiny, 1.0]], dtype=jnp.float32)
+        logcs = jnp.asarray([[jnp.log(tiny), 0.0]], dtype=jnp.float32)
+
+        assert float((abar @ zbars[0])[0]) == 0.0
+        score = rules.mu3_log_message(particles, zbars, logcs, abar)
+        expected = tiny * -jnp.log(tiny)
+        np.testing.assert_allclose(score, [expected], rtol=2e-6)
+
+        update = rules.mu3_importance_update(
+            particles, zbars, logcs, abar
+        )
+        assert int(update[-1]) == 0
+        for value in update[:-1]:
+            assert bool(jnp.all(jnp.isfinite(value)))
