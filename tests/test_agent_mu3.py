@@ -45,6 +45,12 @@ def binary_builder(*, past: int, steps: int, **kwargs):
     )
 
 
+def zero_goal_builder(*, past: int, steps: int, **kwargs):
+    template, arrays = binary_builder(past=past, steps=steps, **kwargs)
+    arrays["c"] = np.array([1.0, 0.0])
+    return template, arrays
+
+
 def make_agent(
     *,
     key=jax.random.PRNGKey(7),
@@ -69,6 +75,20 @@ def make_agent(
         n_sweeps=n_sweeps,
         select=select,
         seed=seed,
+    )
+
+
+def make_weight_collapse_agent(*, key=jax.random.PRNGKey(5)) -> RollingAgent:
+    return RollingAgent(
+        zero_goal_builder,
+        horizon=1,
+        learn_a=True,
+        initial_counts=ALPHA0,
+        mu3=True,
+        mu3_key=key,
+        mu3_samples=64,
+        mu3_min_ess_fraction=0.01,
+        n_sweeps=100,
     )
 
 
@@ -574,22 +594,7 @@ def test_sampling_failure_returns_no_action_and_preserves_diagnostics():
 
 
 def test_weight_collapse_diverges_and_never_executes_an_action():
-    def zero_goal_builder(*, past, steps, **kwargs):
-        template, arrays = binary_builder(past=past, steps=steps, **kwargs)
-        arrays["c"] = np.array([1.0, 0.0])
-        return template, arrays
-
-    agent = RollingAgent(
-        zero_goal_builder,
-        horizon=1,
-        learn_a=True,
-        initial_counts=ALPHA0,
-        mu3=True,
-        mu3_key=jax.random.PRNGKey(5),
-        mu3_samples=64,
-        mu3_min_ess_fraction=0.01,
-        n_sweeps=100,
-    )
+    agent = make_weight_collapse_agent()
     calls = 0
 
     def environment(_action):
@@ -603,6 +608,85 @@ def test_weight_collapse_diverges_and_never_executes_an_action():
     assert exc.value.result.status is RunStatus.DIVERGED
     assert exc.value.result.mu3_statuses == (RunStatus.DIVERGED,)
     assert next(iter(agent.planning_diagnostics.values()))["status"] == "diverged"
+
+
+def test_weight_collapse_checkpoint_replays_and_advances_exactly(tmp_path):
+    source = make_weight_collapse_agent()
+    with pytest.raises(InferenceError) as collapsed:
+        source.act()
+    source_result = collapsed.value.result
+    assert source_result.status is RunStatus.DIVERGED
+    assert source_result.mu3_statuses == (RunStatus.DIVERGED,)
+    assert source_result.mu3_ess == (0.0,)
+    source_key = np.asarray(source.planning_key_cursor).copy()
+    source_epoch = source.planning_epoch
+    path = tmp_path / "functional-weight-collapse.npz"
+    source.checkpoint(path)
+
+    restored = make_weight_collapse_agent(key=jax.random.PRNGKey(999))
+    restored.restore(path)
+    assert_result_exact(restored.last_plan_result, source_result)
+    np.testing.assert_array_equal(restored.planning_key_cursor, source_key)
+    assert restored.planning_epoch == source_epoch
+
+    with pytest.raises(InferenceError) as replayed:
+        restored.act()
+    assert_result_exact(replayed.value.result, source_result)
+    np.testing.assert_array_equal(restored.planning_key_cursor, source_key)
+    assert restored.planning_epoch == source_epoch
+
+    source.refresh_mu3()
+    restored.refresh_mu3()
+    with pytest.raises(InferenceError) as source_next:
+        source.act()
+    with pytest.raises(InferenceError) as restored_next:
+        restored.act()
+    assert_result_exact(restored_next.value.result, source_next.value.result)
+    np.testing.assert_array_equal(
+        restored.planning_key_cursor, source.planning_key_cursor
+    )
+    assert source.planning_epoch == restored.planning_epoch == source_epoch + 1
+
+
+@pytest.mark.parametrize(
+    ("corruption", "message"),
+    (
+        ("status", "invalid status"),
+        ("ess", "inconsistent ESS"),
+        ("moments", "inconsistent moments"),
+    ),
+)
+def test_weight_collapse_checkpoint_rejects_invalid_failure_state(
+    tmp_path, corruption, message
+):
+    source = make_weight_collapse_agent()
+    with pytest.raises(InferenceError):
+        source.act()
+    good = tmp_path / "functional-weight-collapse.npz"
+    source.checkpoint(good)
+    arrays = checkpoint_arrays(good)
+
+    if corruption == "status":
+        field = next(name for name in arrays if name.endswith(":status"))
+        arrays[field] = np.asarray(3, dtype=arrays[field].dtype)
+    elif corruption == "ess":
+        field = next(name for name in arrays if name.endswith(":ess"))
+        arrays[field] = np.asarray(-1.0, dtype=arrays[field].dtype)
+        metadata = json.loads(str(arrays["mu3:metadata"]))
+        metadata["result"]["mu3_ess"][0] = -1.0
+        arrays["mu3:metadata"] = np.asarray(json.dumps(metadata))
+    else:
+        field = next(name for name in arrays if name.endswith(":Abar"))
+        arrays[field] = np.flip(arrays[field], axis=-2)
+    corrupt = tmp_path / f"functional-weight-collapse-{corruption}.npz"
+    write_checkpoint(corrupt, arrays)
+
+    target = make_weight_collapse_agent()
+    target.observe(0, 1)
+    snapshot = used_agent_snapshot(target)
+    with pytest.raises(ValueError, match=message):
+        target.restore(corrupt)
+    assert_used_agent_unchanged(target, snapshot)
 
 
 def test_posterior_refresh_policy_reuses_particles_for_context_only_changes():

@@ -10,6 +10,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from cffg import efrules
 from cffg.engine import Engine, RunResult, RunStatus, State, _replace
 from cffg.outer import OuterTerminationReason
 
@@ -593,7 +594,9 @@ def _validate_prepared_state(engine: Engine, result: RunResult) -> None:
         raise ValueError(
             "functional checkpoint result contains non-finite state"
         )
-    for plan in engine.arena.mu3_groups:
+    for plan, status in zip(
+        engine.arena.mu3_groups, result.mu3_statuses, strict=True
+    ):
         prefix = plan.name
         if not bool(np.asarray(result.state.params[prefix + ":ready"])):
             raise ValueError(f"functional checkpoint evaluator {plan.name!r} is unprepared")
@@ -601,12 +604,23 @@ def _validate_prepared_state(engine: Engine, result: RunResult) -> None:
         base = np.asarray(result.state.params[prefix + ":base_alpha"])
         if not all(np.array_equal(row, base) for row in counts):
             raise ValueError(f"functional checkpoint evaluator {plan.name!r} has a stale base")
-        _validate_evaluator_state(result.state, plan)
+        _validate_evaluator_state(result.state, plan, status)
 
 
-def _validate_evaluator_state(state: State, plan) -> None:
-    """Check the algebraic domains that make a prepared epoch actionable."""
+def _validate_evaluator_state(state: State, plan, status: RunStatus) -> None:
+    """Validate committed updates and retained-state failure transactions."""
     prefix = plan.name
+    status_code = int(np.asarray(state.params[prefix + ":status"]))
+    expected_status = {
+        0: RunStatus.CONVERGED,
+        1: RunStatus.BUDGET_EXHAUSTED,
+        2: RunStatus.DIVERGED,
+    }.get(status_code)
+    if expected_status is not status:
+        raise ValueError(
+            f"functional checkpoint evaluator {plan.name!r} has invalid status"
+        )
+
     samples = np.asarray(state.params[prefix + ":samples"])
     weights = np.asarray(state.params[prefix + ":weights"])
     dtype = samples.dtype
@@ -625,7 +639,9 @@ def _validate_evaluator_state(state: State, plan) -> None:
 
     ess = float(np.asarray(state.params[prefix + ":ess"]))
     expected_ess = 1.0 / float(np.sum(np.square(weights)))
-    if (
+    # Weight collapse commits its failure marker but retains coherent weights.
+    collapsed = status is RunStatus.DIVERGED and ess == 0.0
+    if not collapsed and (
         not 1.0 <= ess <= samples.shape[0]
         or not np.isclose(ess, expected_ess, rtol=tolerance, atol=tolerance)
     ):
@@ -641,9 +657,22 @@ def _validate_evaluator_state(state: State, plan) -> None:
     expected_hbar = np.einsum("s,si->i", weights, particle_h)
     abar = np.asarray(state.params[plan.gfe_name + ":Abar"])[plan.rows]
     hbar = np.asarray(state.params[plan.gfe_name + ":hbar"])[plan.rows]
-    if (
-        not np.allclose(abar, expected_abar, rtol=tolerance, atol=tolerance)
-        or not np.allclose(hbar, expected_hbar, rtol=tolerance, atol=tolerance)
+    weighted_moments = np.allclose(
+        abar, expected_abar, rtol=tolerance, atol=tolerance
+    ) and np.allclose(hbar, expected_hbar, rtol=tolerance, atol=tolerance)
+    base = state.params[prefix + ":base_alpha"]
+    base_abar = np.asarray(
+        efrules.DIRICHLET.mean_from_concentration(base, axis=0)
+    )
+    base_hbar = -np.asarray(
+        efrules.DIRICHLET.expected_probability_log_probability(base, axis=0)
+    ).sum(axis=0)
+    prepared_moments = np.allclose(
+        abar, base_abar, rtol=tolerance, atol=tolerance
+    ) and np.allclose(hbar, base_hbar, rtol=tolerance, atol=tolerance)
+    # A failed solve retains either preparation or the last successful update.
+    if not weighted_moments and not (
+        status is not RunStatus.CONVERGED and prepared_moments
     ):
         raise ValueError(
             f"functional checkpoint evaluator {plan.name!r} has inconsistent moments"

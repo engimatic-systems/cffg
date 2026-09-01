@@ -1,6 +1,6 @@
 ---
 id: cff-9tvt
-status: closed
+status: open
 deps: [cff-cfhi]
 links: []
 created: 2026-09-01T02:20:19Z
@@ -28,6 +28,12 @@ against the current repository.
    identity that does not match the prepared inputs. Particle, weight, moment,
    ledger, and finite-state validation applies to converged, budget-exhausted,
    infeasible, and diverged results alike.
+   1.1. A genuine importance-weight collapse restores with raw evaluator status
+        2, exact zero ESS, and the last coherent particles, weights, moments,
+        and ledger preserved by the engine transaction.
+   1.2. Zero ESS is accepted only for raw status 2. Prepared moments must match
+        either the analytic base state or the last committed weighted update;
+        other raw statuses and moment states remain invalid.
 2. Cache validation binds every value whose change would make a planning result
    stale, including the installed posterior, prepared stochastic state, bound
    planning data, runtime configuration, and structure identity.
@@ -140,3 +146,33 @@ layers together with #107's repaired cache and ticket state; their focused
 runs were not duplicated. The dashboard was refreshed at
 `~/agent-share/cffg-tests.html`. No slow run was required because both newly
 reported mechanisms are covered in the default checkpoint and mu3 tests.
+
+**2026-09-01T06:15:00Z**
+
+Third-review repair handoff, 2026-08-31. Research question: what state does a
+real functional-mu3 importance-weight collapse commit? Answer: the rule returns
+an invalid candidate update, but the engine transaction commits only raw status
+2 and exact zero ESS. It retains the fixed particles and the last coherent
+weights, moments, and ledger. The prior validator incorrectly treated those
+retained values as a newly committed importance update, derived positive ESS
+from the weights, and rejected the genuine failure checkpoint. Sources:
+`mu3_importance_update`, `Engine._update_mu3`,
+`Engine._mu3_result_diagnostics`, `PlanningRuntime.run`, and the checkpoint
+encoder/decoder. Confidence: high; two read-only agent traces and the direct
+zero-goal reproduction agreed on the exact stored arrays and status path.
+
+Validation now follows the engine transaction. Raw evaluator status must be
+0, 1, or 2. Exact zero ESS is valid only for diverged status 2; otherwise ESS
+must equal the retained normalized weights. Converged moments must match the
+committed weighted particles. Budget-exhausted and diverged moments may match
+either that committed update or the analytic prepared base, the only two
+legitimate writers. The retained ledger identity remains mandatory for every
+status. A real zero-goal collapse now round-trips, replays without consuming a
+key, and advances to the same next refreshed epoch. Unknown status, negative
+ESS, and invalid retained moments remain atomic restore failures. The complete
+checkpoint/public focus passed 44 tests with 1 deselected in 281.54 seconds.
+Capability ownership remains the engine mu3 update transaction, the
+functional-mu3 prepared-state validator, and RollingAgent checkpoint restore.
+The refreshed wiggle scan retains the recorded meanings; `same` is exact
+source/restored stochastic continuation, `reproduce` is the direct zero-goal
+mechanism, and `read` describes non-mutating agent investigation.
