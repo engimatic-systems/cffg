@@ -515,7 +515,7 @@ composite.
 
 ## The one-paragraph honest summary
 
-The bounded release target is a *transparent, compositional,
+The bounded implemented core is a *transparent, compositional,
 continually-learning discrete world-model engine* with principled curiosity,
 source-anchored local ledgers, and models you can read, edit, checkpoint, and
 glue. Exact claims apply only to the registered factor/constraint combinations

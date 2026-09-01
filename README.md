@@ -136,6 +136,12 @@ Before 1.0, deeper rule tables, compiled arenas, group plans, kernel
 registration objects, and private helpers remain internal-unstable. Model JSON
 and `.cffgz` schemas retain their own explicit version contracts.
 
+The bounded paper/public claim covers the registered fixed-A discrete core and
+this newcomer workflow. Functional `mu3(A)` remains finite-sample importance
+sampling, and the literal constraint-flip equivalence covers only the tested
+fixed-A binary discrete joint-boundary construction. This is not a universal
+solver or a claim that every construction in the papers executes.
+
 ## The mental model
 
 A model is a **Template**: a factor graph (square factors, edges = variables)
@@ -603,7 +609,8 @@ and leaves that component at its prior. `pg_weights` stores `eta` and
 then rolls posterior means into separate weights and offsets. Both families
 remain host-side empirical-Bayes updates and reject improper or non-finite
 statistics before mutation. Versioned learnable state dictionaries preserve
-every keyed hyperparameter. Legacy multi-array checkpoints for unchanged families must
+every keyed hyperparameter. Legacy multi-array checkpoints for unchanged
+families must
 name a complete posterior. Recurrence is stricter: its current checkpoint must
 also carry the structured-pair statistic manifest; unidentified D8/D9 state is
 never guessed from compatible array shapes.
