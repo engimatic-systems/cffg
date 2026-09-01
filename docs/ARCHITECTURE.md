@@ -60,7 +60,7 @@ while reserved syntax that round-trips but cannot execute is syntax only.
 | Optimized δ/point mass, Part I §5.3 Eq. (30), Fig. 11 and Fig. 29 application | `ConstraintKind.DELTA` on a discrete edge; compiler records `delta_pairs`; the hardening phase projects both slots to the marginal argmax | Exact discrete point-mass coordinate | Ordinary ledger evaluated on the point mass; `test_map_policy_variant`. Dirichlet-parameter, Gaussian, and EF edges are rejected with named compile errors. |
 | Moment matching, Part I §5.4 Eq. (31), Fig. 12 | The paper selects a node endpoint on an incident edge and a sufficient-statistic projection; each end may be selected independently. The legacy factor-only `ConstraintKind.MOMENT_MATCHING` cannot express those choices. | Underspecified legacy syntax only | Serialization and hashing retain the placeholder, but compilation and diagram derivation reject it. `test_legacy_moment_matching_placeholder_round_trips_but_compilation_rejects` and `test_legacy_moment_matching_placeholder_is_rejected` are the guards. EP execution requires a new schema plus migration, factor-specific rules, and a ledger. |
 | P-substitution, Part I §4 Eqs. (20–25), §5.5 Eq. (32), Fig. 13; Part II §3.3.2 Eqs. (4–5), §4.1 Eqs. (6–8) | `ConstraintKind.P_SUBSTITUTION` plus `substituted_role`; compiler derives a discrete, transition-mixture, or hybrid GFE plan only for registered shapes | Exact local Fig. 5 fixed-A composite; named tentative-decision/analytic-moment approximation for uncertain A without functional `mu3`; separately named TM/hybrid extensions; unsupported otherwise | Specialized GFE update/energy functions own the substituted edge term in `_make_bfe`. Compiler rejects unsupported roles, factors, goals, uncertainty modes, and evaluator names. Figure 5 authorities are inventoried below. |
-| Trial-time planning bead → data bead, Part II §6.3 Fig. 7 (static contrast in §3.3 Fig. 3) | `RollingAgent` uses immutable planning and filtering templates plus a carried boundary belief; it does not mutate one growing trial graph | Named two-window realization; literal-graph equivalence is not yet claimed | Fixed structures and checkpointed boundary state execute. `cff-7ozr` owns the enumerated equivalence boundary, exact-zero rollover, and local-ledger comparison required before the release gate. |
+| Trial-time planning bead → data bead, Part II §6.3 Fig. 7 (static contrast in §3.3 Fig. 3) | `RollingAgent` uses immutable planning and filtering templates plus a carried boundary belief; it does not mutate one growing trial graph | Exact window-transformation oracle for the fixed-A binary discrete joint-boundary case; named two-window realization outside that boundary | `test_literal_snapshots_record_the_constraint_change_without_rewriting_variables` checks the immutable before/after declarations. `test_two_window_agent_matches_two_step_enumerator_and_local_ledgers` checks both action posteriors, the filter posterior, boundary carry, local GFE, the derived boundary offset, and the two-structure bound against independent enumeration. Exact-zero and float32 cases are separate authorities in the same file. |
 
 Normalization and marginalization are therefore always-on compiler/runtime
 invariants, not optional beads in `ConstraintSpec`. General structured forms
@@ -746,6 +746,22 @@ blocks use one joint binding or explicit mean-field bindings. Multi-boundary
 checkpoints store every belief by its binding name. The legacy `belief` key and
 `RollingAgent.belief` view remain exact only for a one-block model.
 
+For the fixed-A binary discrete reference in `test_constraint_flip.py`, replacing
+the first slice's planning/P-substitution declaration with action and
+observation DATA bindings leaves the named trial variables and generative
+factors unchanged. Independent simplex enumeration gives the first action
+posterior, exact filtering posterior, carried boundary, and second action
+posterior. For each rolled one-step plan, the ordinary tree ledger outside the
+goal-observation composite reduces to `-Σ_z q(z) log d_pred(z)`; adding the
+local GFE term gives the enumerated planning objective. The paper-shaped mixed
+history retains the conditioned past slice, so its whole-graph free energy
+exceeds the rolled plan by exactly `-log p(x₁ | u₁, d₀)`. The test checks
+that derived offset rather than asserting raw scalar equality. This establishes
+the window transformation for that registered matrix-categorical,
+joint-boundary case. It does not turn the two immutable templates into a
+literal mutable graph or establish the transformation for mean-field,
+continuous, hybrid, or hierarchical boundaries.
+
 #### 3d. Factored rollout lowering (`cffg.models.factored`, cff-b47g)
 
 `build_factored_rollout` is a topology-generic front end over the existing IR,
@@ -907,8 +923,10 @@ discarding a joint correlation. Exact joint rollover remains the separate
   declared control marginal (or its MAP under a δ-constraint). The runtime
   realizes that lifecycle with separate immutable planning and filtering
   templates; it does not mutate the paper's literal graph. Two compiled windows
-  cover an unbounded episode without graph growth or recompilation, while
-  `cff-7ozr` owns the exact equivalence boundary.
+  cover an unbounded episode without graph growth or recompilation. The exact
+  two-step oracle in §3c validates this transformation for a fixed-A binary
+  discrete joint boundary; other boundary families retain the named
+  fixed-memory realization claim only.
 - **Continual learning**: driven entirely by declared learnables (§3b). The
   agent contributes cadence, while `AgentSpec` supplies all addressing.
   Observation, transition and habit posteriors update every tick from the
