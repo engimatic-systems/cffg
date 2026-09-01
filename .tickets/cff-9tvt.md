@@ -1,6 +1,6 @@
 ---
 id: cff-9tvt
-status: open
+status: closed
 deps: [cff-cfhi]
 links: []
 created: 2026-09-01T02:20:19Z
@@ -176,3 +176,10 @@ functional-mu3 prepared-state validator, and RollingAgent checkpoint restore.
 The refreshed wiggle scan retains the recorded meanings; `same` is exact
 source/restored stochastic continuation, `reproduce` is the direct zero-goal
 mechanism, and `read` describes non-mutating agent investigation.
+
+Final third-review validation at `9ba0987`: the refreshed dashboard short
+suite passed 1,529 tests with 41 deselected, 0 failures, and 4 dependency
+deprecation warnings in 885.69 wall-clock seconds (874.21 seconds reported by
+pytest). The dashboard was refreshed at `~/agent-share/cffg-tests.html`. No
+slow run was needed because the engine-produced collapse and its checkpoint
+continuation are covered by the default functional-agent suite.
