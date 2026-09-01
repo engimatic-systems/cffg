@@ -1,6 +1,6 @@
 ---
 id: cff-8a5m
-status: closed
+status: open
 deps: []
 links: [cff-o7hs]
 created: 2026-09-01T02:20:18Z
@@ -21,6 +21,14 @@ diverged update. The PR also contains a useful, source-anchored inventory of
 the papers' constraint constructions and direct evidence for each Part II
 Figure 5 message.
 
+Independent review of the first clean port found two remaining runtime defects
+and several overstatements in that inventory. A post-root `mu3` failure could
+still be reported as convergence, and a positive float32 predictive could be
+mistaken for structural zero after linear-space underflow. The inventory also
+treated the legacy moment-matching payload as forward-compatible, described
+hybrid assumed-density projection as exact marginalization, and combined paper
+constructions that the template represents differently or does not represent.
+
 This ticket ports those meanings onto current `main` without preserving the old
 branch ancestry or overwriting documentation that has evolved since the old
 PR. It is the first layer of a new PR chain.
@@ -37,17 +45,37 @@ PR. It is the first layer of a new PR chain.
    endpoint or sufficient-statistic projection required by Part I §5.4.
    2.3. Future executable moment matching requires a new schema and migration;
    it must not guess the missing endpoint or projection from the factor name.
-3. Functional `mu3(A)` preserves the support cases in `docs/DERIVATIONS.md`:
-   zero sampled predictive mass contributes zero, positive mass outside exact
-   goal support contributes negative infinity, and positive mass over zero
-   marginal predictive support produces a non-finite divergent update.
+3. Functional `mu3(A)` preserves the support cases in `docs/DERIVATIONS.md`.
+   3.1. Zero sampled predictive mass contributes zero.
+   3.2. Positive mass outside exact goal support contributes negative infinity.
+   3.3. Positive sampled support over zero marginal predictive support produces
+   a non-finite divergent update.
+   3.4. Structural support comes from positive operand pairs, not from a
+   rounded linear-space dot product.
+   3.5. Positive marginal predictive logs use a support-aware log-sum-exp, so a
+   mathematically positive float32 predictive cannot become false divergence
+   through underflow.
 4. `mu3_importance_update` and `Engine.run` report every incoherent or non-finite
    functional score as divergence; they do not floor it, replace it with
    uniform weights, or report convergence or budget exhaustion.
+   4.1. This applies to the initial `mu3` update.
+   4.2. This applies to every `mu3` update after an outer root is found.
+   4.3. A failed post-root update stops later hardening phases and reports its
+   status, residual, diagnostics, and `INNER_FAILURE` termination truthfully.
 5. `docs/ARCHITECTURE.md` contains compact, source-ordered inventories of the
    constraint constructions in Parts I and II and all Part II Figure 5
    messages, with bounded execution classifications, production owners,
    objective-ledger owners, and direct test authorities.
+   5.1. Ordinary registered BP/VMP marginalization is distinguished from the
+   Gaussian-mixture assumed-density projection that preserves selected moments.
+   5.2. Terminating data constraints are distinguished from unsupported
+   non-terminating data constraints.
+   5.3. Part II Figure 1's fixed model clamp is identified with `param_blobs`,
+   separately from observed data.
+   5.4. The paper's tentative-decision approximation is identified separately
+   from the runtime importance-sampling approximation for functional `mu3`.
+   5.5. Diagram generation rejects the underspecified legacy moment-matching
+   placeholder instead of silently omitting it.
 6. Direct tests inspect the raw executable Figure 5 messages and their local
    energy or normalizer before end-to-end normalization can hide an error.
 7. Runtime tests cover exact-zero and vacuous support, float32, and a domain at
@@ -114,3 +142,15 @@ Completion handoff, 2026-08-31. Clean-ported old PR #82 from current main 5c3b06
 **2026-09-01T14:30:25Z**
 
 Independent-review correction, 2026-09-01. Part I section 5.4 binds one selected factor endpoint to its incident edge marginal through named sufficient statistics; the legacy factor-only payload cannot identify that endpoint or projection. Criterion 2 and the future-work handoff now require cff-o7hs to add and migrate to a faithful schema. Capability owners for this correction are core.ir ConstraintKind and ConstraintSpec, core serialization and structure hashing, compiler rejection, viz.diagram rejection, ARCHITECTURE inventory, README, LIMITATIONS, and cff-o7hs. The wiggle scan was rerun after the rewrite. New or changed retained matches mean: preserve = serialized/hash value identity; sufficient = the mathematical sufficient-statistic projection; can/cannot = representational capability of the named schema; explicit_owner and named_ticket_handoff = cff-o7hs owns the future schema and migration; every = each compiler path named by criterion 1. Earlier retained matches keep the meanings recorded in the planning audit.
+
+**2026-09-01T14:33:03Z**
+
+Review-repair start, 2026-09-01. Independent blocking findings are now mapped to criteria 3 through 5: operand-derived float32 support and log-space predictive evaluation; initial and post-root mu3 failure propagation with immediate phase termination; honest moment-matching schema limits; ordinary marginalization versus Gaussian-mixture projection; terminating versus non-terminating data constraints; fixed model clamps; tentative-decision versus importance-sampling approximations; and diagram rejection. Capability owners are rules.mu3_log_message and mu3_importance_update, Engine.run, core.ir and serialization, compiler and viz.diagram rejection, the paper inventory and limitations, cff-o7hs, and their direct tests.
+
+**2026-09-01T14:33:26Z**
+
+Review-rewrite wiggle audit supplement, 2026-09-01. All retained matches were reviewed in context. Meanings not already recorded by the planning and schema-correction notes are: same = bounded claims shared by the named documents; complete = all fields needed to express the paper constraint; land = the historical clean-port completion; ready = tk dependency readiness in the historical handoff; check = the named automated or audit check; match = the mathematical moment-matching term or numeric identity stated locally; pass = an automated-test result; could = a reproduced pre-repair failure mode; only = the factor-only legacy payload or a locally stated scope boundary. The earlier notes retain the meanings for the other candidates.
+
+**2026-09-01T14:33:39Z**
+
+Review-rewrite wiggle audit supplement, 2026-09-01. The retained reproduce candidate means a mechanism-level regression creates the pre-repair failure before asserting the repaired status.
