@@ -337,6 +337,17 @@
       "wall_seconds": 658.997
     },
     {
+      "case_seconds": 761.163,
+      "commit": "7be7fce",
+      "completed_at": "2026-09-01T03:32:35.453153+00:00",
+      "failed": 0,
+      "pytest_exit_code": 0,
+      "result": "passed",
+      "selection": "not slow",
+      "test_count": 1509,
+      "wall_seconds": 773.153
+    },
+    {
       "case_seconds": 566.654,
       "commit": "1f588ab",
       "completed_at": "2026-09-01T14:44:47.952923+00:00",
@@ -349,5 +360,5 @@
     }
   ],
   "schema_version": 1,
-  "suggested_wait_seconds": 840
+  "suggested_wait_seconds": 990
 }

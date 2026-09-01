@@ -1,6 +1,6 @@
 ---
 id: cff-cfhi
-status: in_progress
+status: closed
 deps: [cff-7ozr]
 links: []
 created: 2026-09-01T02:20:19Z
@@ -90,3 +90,7 @@ declared-learning state remains owned by `cff-cz6v` and its child tickets.
 **2026-09-01T02:23:06Z**
 
 Planning audit, 2026-08-31. Capability owners are the top-level facade delegates, RollingAgent checkpoint encoder/decoder, Learnables state validation, bundle identity helpers, and the named public/checkpoint tests and docs. Wiggle scan reviewed in context; retained candidates mean: canonical=existing implementation owner; integrate=combined deterministic and mu3 envelope; public=facade contract; reusable=CFFGZ bundle scope; implement=old-PR behavior or exported workflow; support=checkpoint/API promise; work=explicit roadmap distinction; complete=enumerated state inventory; remaining=named downstream hardening; check=status guard; exact=continuation/value identity; reproduce=continuation contract; sound=optional method quality; test=automated artifacts; validate=input staging; infer=runtime inference; learn/learnable=declared parameter state; small=bounded facade or model; may=optional method; explicit_owner/named_ticket_handoff=cff-9tvt or cff-cz6v; all/every/any/at_least/only=the locally enumerated fields, failures, modes, and migration boundary; current=main 5c3b06a, active format, or decoder; existing=delegated owner; read=compiled consumer access.
+
+**2026-09-01T03:32:47Z**
+
+Completion handoff, 2026-08-31. Clean-ported old PR #85 onto the functional-mu3 and constraint-flip layers without replaying its sibling merge. Top-level cffg now exposes the bounded pre-1.0 newcomer facade and README carries one subprocess-executed build, bundle, compile, status, belief/BFE, RollingAgent checkpoint, fresh restore, and continuation path in float32 and x64. RollingAgent checkpoints now use a versioned exact-field envelope bound to planning/filtering structures, grounded static parameters, horizon, solver/action settings, construction-time JAX precision, beliefs, complete learnables including recurrence manifests, goals, cadence, NumPy RNG, and functional-mu3 configuration/state. Restore rejects duplicate, unknown, missing, ambiguous, malformed, incompatible, complex, non-normalized, and non-atomic state before mutation. Live runtime checkpoints remain distinct from model-only CFFGZ bundles and the open resumable-learning roadmap. Focused public, functional, legacy, and recurrence compatibility: 94 passed, 11 deselected. Final unchanged-head short suite: 1509 passed, 41 deselected, 0 failed in 762.75 seconds; dashboard refreshed at /Users/ravd/agent-share/cffg-tests.html. No slow test was required because the new hostile checkpoint mechanisms are in the default public/agent suites. Next ready layer: cff-9tvt.
