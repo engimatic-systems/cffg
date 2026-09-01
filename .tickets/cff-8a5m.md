@@ -1,6 +1,6 @@
 ---
 id: cff-8a5m
-status: open
+status: closed
 deps: []
 links: [cff-o7hs]
 created: 2026-09-01T02:20:18Z
@@ -154,3 +154,11 @@ Review-rewrite wiggle audit supplement, 2026-09-01. All retained matches were re
 **2026-09-01T14:33:39Z**
 
 Review-rewrite wiggle audit supplement, 2026-09-01. The retained reproduce candidate means a mechanism-level regression creates the pre-repair failure before asserting the repaired status.
+
+**2026-09-01T14:45:12Z**
+
+Independent-review completion handoff, 2026-09-01. The repaired branch now derives float32 predictive support from positive operands and uses log-sum-exp for positive marginal predictives; propagates initial and post-root mu3 failures through overall and inner status, residual, diagnostics, and INNER_FAILURE termination; stops later hardening phases after failure; identifies the factor-only moment-matching payload as a rejected legacy placeholder requiring endpoint/projection schema migration in cff-o7hs; rejects that placeholder in diagrams; and corrects the marginalization, data-constraint, fixed-clamp, tentative-decision, and importance-sampling inventory classifications. Preparation occurred in three isolated worktrees and one integrator assembled the reviewed commits on PR #103. Focused results: combined mu3, derivation, runtime-status, outer-formalism, serialization, visualization, and hygiene selection 47 passed and 5 deselected; final serialization/visualization selection after compiler wording 24 passed. Final dashboard short suite at the production head: 1480 passed, 39 deselected, 0 failed, 4 dependency deprecation warnings in 568.58 seconds. No slow run was needed because the repaired mechanisms execute in the default focused and short-suite selections. Dashboard refreshed at /Users/ravd/agent-share/cffg-tests.html. Descendants must rebase in order and retain the repaired engine classification where cff-lpsn overlaps engine.py.
+
+**2026-09-01T14:45:20Z**
+
+Completion wiggle-audit supplement, 2026-09-01. The retained close candidate means acceptance-based closure after the recorded focused and short-suite evidence.
