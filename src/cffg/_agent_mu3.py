@@ -250,6 +250,12 @@ def restore_runtime(
         raise ValueError("functional checkpoint epoch must be a non-negative integer")
     if metadata["refresh_required"] and not metadata["run_required"]:
         raise ValueError("functional checkpoint cannot require refresh without a run")
+    if metadata["has_result"] and not metadata["has_key"]:
+        raise ValueError("functional checkpoint result has no next JAX key cursor")
+    if metadata["has_result"] and metadata["epoch"] == 0:
+        raise ValueError("functional checkpoint result has no sampling epoch")
+    if metadata["epoch"] > 0 and not metadata["has_key"]:
+        raise ValueError("functional checkpoint sampling epoch has no JAX key cursor")
 
     expected_mu3_fields = {"mu3:metadata"}
     key = None
@@ -287,6 +293,8 @@ def restore_runtime(
     cache_config = metadata["cache_config"]
     if result is None and cache_config is not None:
         raise ValueError("functional checkpoint without a result has cached run state")
+    if result is not None and cache_config is None:
+        raise ValueError("functional checkpoint result has no runtime configuration")
     if cache_config is not None:
         _validate_cache_config(cache_config)
         if (
@@ -324,8 +332,6 @@ def restore_runtime(
     )
     if result is None and not runtime.run_required:
         raise ValueError("functional checkpoint has no result but marks planning reusable")
-    if result is not None and runtime.cache_config is None:
-        raise ValueError("functional checkpoint result has no runtime configuration")
     return runtime
 
 
@@ -447,6 +453,24 @@ def _load_result(state: State, metadata: dict) -> RunResult:
         raise KeyError(
             "functional checkpoint result metadata has unknown or missing fields"
         )
+    counter_fields = {
+        "iterations",
+        "accepted_steps",
+        "rejected_steps",
+        "outer_map_evaluations",
+        "trial_evaluations",
+        "linear_iterations",
+        "solver_compilations",
+    }
+    if any(
+        isinstance(metadata[name], bool)
+        or not isinstance(metadata[name], int)
+        or metadata[name] < 0
+        for name in counter_fields
+    ):
+        raise ValueError(
+            "functional checkpoint result counters must be non-negative integers"
+        )
     values = {name: metadata[name] for name in _RESULT_FIELDS}
     for name in ("message_deltas", "free_energies", "mu3_ess", "mu3_log_normalizers"):
         values[name] = tuple(values[name])
@@ -492,6 +516,23 @@ def _validate_cache_config(config: object) -> None:
         raise ValueError(
             "functional checkpoint cached runtime configuration is invalid"
         )
+    if (
+        config["n_iters"] < 0
+        or config["samples"] <= 0
+        or not np.isfinite(config["tol"])
+        or config["tol"] <= 0
+        or not np.isfinite(config["min_ess_fraction"])
+        or not 0 < config["min_ess_fraction"] <= 1
+        or any(
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not np.isfinite(value)
+            for value in config["run_options"].values()
+        )
+    ):
+        raise ValueError(
+            "functional checkpoint cached runtime configuration is invalid"
+        )
 
 
 def _json_object(value: object, label: str) -> dict:
@@ -524,6 +565,34 @@ def _validate_prepared_state(engine: Engine, result: RunResult) -> None:
         and any(status is not RunStatus.CONVERGED for status in result.mu3_statuses)
     ):
         raise ValueError("functional checkpoint marks failed mu3 evaluation converged")
+    if result.status is RunStatus.CONVERGED and (
+        result.inner_status is not RunStatus.CONVERGED
+        or not np.isfinite(result.residual)
+        or result.residual < 0
+        or not np.isfinite(result.inner_residual)
+        or result.inner_residual < 0
+        or not all(np.isfinite(delta) and delta >= 0 for delta in result.message_deltas)
+        or not all(np.isfinite(result.free_energies))
+        or not np.isfinite(result.outer_residual)
+        or result.outer_residual < 0
+        or not np.isfinite(result.outer_merit)
+        or result.outer_merit < 0
+        or not np.isfinite(result.outer_gradient_norm)
+        or result.outer_gradient_norm < 0
+        or not np.isfinite(result.trust_radius)
+        or result.trust_radius <= 0
+        or result.termination_reason is not OuterTerminationReason.ROOT_CONVERGED
+    ):
+        raise ValueError(
+            "functional checkpoint converged result disagrees with its solver diagnostics"
+        )
+    if result.status is RunStatus.CONVERGED and not all(
+        np.isfinite(np.asarray(leaf)).all()
+        for leaf in jax.tree_util.tree_leaves(result.state)
+    ):
+        raise ValueError(
+            "functional checkpoint converged result contains non-finite state"
+        )
     for plan in engine.arena.mu3_groups:
         prefix = plan.name
         if not bool(np.asarray(result.state.params[prefix + ":ready"])):
@@ -532,3 +601,60 @@ def _validate_prepared_state(engine: Engine, result: RunResult) -> None:
         base = np.asarray(result.state.params[prefix + ":base_alpha"])
         if not all(np.array_equal(row, base) for row in counts):
             raise ValueError(f"functional checkpoint evaluator {plan.name!r} has a stale base")
+        if result.status is RunStatus.CONVERGED:
+            _validate_converged_evaluator_state(result.state, plan)
+
+
+def _validate_converged_evaluator_state(state: State, plan) -> None:
+    """Check the algebraic domains that make a prepared epoch actionable."""
+    prefix = plan.name
+    samples = np.asarray(state.params[prefix + ":samples"])
+    weights = np.asarray(state.params[prefix + ":weights"])
+    dtype = samples.dtype
+    tolerance = 256.0 * np.finfo(dtype).eps * max(1.0, np.sqrt(samples.shape[0]))
+    if (
+        np.any(samples < 0)
+        or not np.allclose(
+            samples.sum(axis=1), 1.0, rtol=tolerance, atol=tolerance
+        )
+        or np.any(weights < 0)
+        or not np.isclose(weights.sum(), 1.0, rtol=tolerance, atol=tolerance)
+    ):
+        raise ValueError(
+            f"functional checkpoint evaluator {plan.name!r} has invalid particles or weights"
+        )
+
+    ess = float(np.asarray(state.params[prefix + ":ess"]))
+    expected_ess = 1.0 / float(np.sum(np.square(weights)))
+    if (
+        not 1.0 <= ess <= samples.shape[0]
+        or not np.isclose(ess, expected_ess, rtol=tolerance, atol=tolerance)
+    ):
+        raise ValueError(
+            f"functional checkpoint evaluator {plan.name!r} has inconsistent ESS"
+        )
+
+    expected_abar = np.einsum("s,soi->oi", weights, samples)
+    log_samples = np.where(samples > 0, np.log(samples), 0.0)
+    particle_h = -np.sum(
+        np.where(samples > 0, samples * log_samples, 0.0), axis=1
+    )
+    expected_hbar = np.einsum("s,si->i", weights, particle_h)
+    abar = np.asarray(state.params[plan.gfe_name + ":Abar"])[plan.rows]
+    hbar = np.asarray(state.params[plan.gfe_name + ":hbar"])[plan.rows]
+    if (
+        not np.allclose(abar, expected_abar, rtol=tolerance, atol=tolerance)
+        or not np.allclose(hbar, expected_hbar, rtol=tolerance, atol=tolerance)
+    ):
+        raise ValueError(
+            f"functional checkpoint evaluator {plan.name!r} has inconsistent moments"
+        )
+    log_normalizer = float(state.params[prefix + ":log_normalizer"])
+    expected_phi = float(state.params[prefix + ":expected_phi"])
+    kl = float(state.params[prefix + ":kl"])
+    if not np.isclose(
+        kl, expected_phi - log_normalizer, rtol=tolerance, atol=tolerance
+    ):
+        raise ValueError(
+            f"functional checkpoint evaluator {plan.name!r} has inconsistent ledger"
+        )

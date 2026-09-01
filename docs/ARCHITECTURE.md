@@ -984,9 +984,11 @@ discarding a joint correlation. Exact joint rollover remains the separate
   For a prepared functional epoch, that envelope additionally stores the full
   `State`, result trace, evaluator and schedule identity, particle
   configuration, refresh flags, and JAX key representation. Restore validates
-  every shape, dtype, base posterior, and diagnostic before atomically mutating
-  the live agent; analytic legacy checkpoints remain supported, while a
-  functional legacy restore is loud.
+  prepared-state array shapes and dtypes, base-posterior identity, solver
+  diagnostics, and the derived `mu3` particles, weights, moments, ESS,
+  log-normalizer, ledger, and status before atomically mutating the live agent;
+  analytic legacy checkpoints remain supported, while a functional legacy
+  restore is loud.
 - Sensor/actuator adapters are plain Python callbacks mapping env observations to
   one-hot data bindings and control marginals to env actions.
 
