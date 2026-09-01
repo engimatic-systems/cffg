@@ -105,22 +105,25 @@ future validation after the synthetic NASCAR comparison.
 
 Roadmap decomposition after the reference-feasibility and CFFG-paper reviews.
 
-Legend: prerequisite --> dependent
+Legend: prerequisite --> dependent; [x] delivered earlier; [-] closed not doing
 
-    [ ] cff-akmp (ready: locked legacy runtime)
+    [-] cff-akmp (reference runtime not delivered)
               |
-              +--> [ ] cff-64ri (paper-equation adapter)
+              +--> [-] cff-64ri (adapter not delivered)
                             |
     [x] cff-l7y4 -----------+
-    [x] cff-garu -----------+--> [ ] cff-0l31 (frozen protocol)
+    [x] cff-garu -----------+--> [-] cff-0l31 (protocol not delivered)
     [x] cff-r6bl -----------+              |
-                                           +--> [ ] cff-oyie (final evidence)
+                                           +--> [-] cff-oyie (no final run)
                                                          |
-                                                         +--> [ ] cff-nkbj
+                                                         +--> [-] cff-nkbj
 
     Parallel linked work: [ ] cff-0f3g balanced-tree epic
     Independent research: [ ] cff-dlrj destination-softmax derivation
     Roadmap parent, not a dependency edge: cff-ahps
+
+    The four-ticket comparison path and this epic are archival. They are not
+    ready work and do not authorize resuming the discontinued experiment.
 
 Research question: what comparison remains faithful to both the CFFG papers
 and the Linderman rSLDS paper? Answer: CFFG does not prescribe source-specific
@@ -202,3 +205,7 @@ The refreshed wiggle scan retains the recorded meanings; `deliver` and
 the counterfactual bounded claim, and `later` refers to historical review
 order. Capability ownership is deliberately absent for the abandoned joint
 outcome; any future owner must be established in newly reviewed tickets.
+The diagram refresh retains the recorded wiggle meanings. In its archival
+legend, `ready` is explicitly denied for the discontinued path and `deliver`
+distinguishes the three earlier completed prerequisites from the four absent
+experiment artifacts.
