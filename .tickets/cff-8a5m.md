@@ -1,6 +1,6 @@
 ---
 id: cff-8a5m
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-09-01T02:20:18Z
@@ -99,3 +99,7 @@ specific rules and objective semantics.
 **2026-09-01T02:23:06Z**
 
 Planning audit, 2026-08-31. Capability owners are compiler constraint classification, rules.mu3_log_message, rules.mu3_importance_update, Engine.run, and the named documentation and direct-test files. Wiggle scan reviewed in context; retained candidates mean: end_to_end=component-chain normalization; fixed=conjugate-family representation; preserve=ancestry exclusion, serialized identity, or probability semantics as stated; register=compiler/runtime dispatch; implement=finite registry coverage or this port; support=probability support; remaining=defects present at main 5c3b06a or named downstream layers; approximate=named mathematical method; converge=RunStatus criterion; correct=defect class; evidence=direct automated or formal evidence; exact=literal zero/support or non-approximated registry class; sound=optional method quality; test=automated artifacts; scale=domain size; small=fixture domain; can=error-masking possibility; may=optional method or future scope; explicit_owner=the named rule or ticket; all/every=the explicitly named compiler paths, scores, paper rows, and current-main changes; current=main 5c3b06a or active runtime value; later=named downstream ticket.
+
+**2026-09-01T02:38:32Z**
+
+Completion handoff, 2026-08-31. Clean-ported old PR #82 from current main 5c3b06a without its ancestry. The compiler now rejects reserved MOMENT_MATCHING syntax before arena construction while JSON and hashing retain it. Functional mu3 preserves exact support and Engine.run reports incoherent marginal-predictive support as divergence. ARCHITECTURE contains the paper constraint and Part II Figure 5 ledgers; README and LIMITATIONS use the same bounded claims. Direct raw mu1 and mu2 plus isolated-energy checks landed. Focused results: test_serialize 9 passed; non-slow mu3 8 passed and 3 deselected; GFE, goal, and hygiene 26 passed. Final unchanged-head short suite: 1477 passed, 39 deselected, 0 failed in 566.68 seconds; dashboard refreshed at /Users/ravd/agent-share/cffg-tests.html. No slow run was needed because the changed hostile mu3 mechanism is covered directly in the default suite. Next ready layer: cff-lpsn.
