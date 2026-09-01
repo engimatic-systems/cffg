@@ -7,10 +7,12 @@ A zip containing:
 - `manifest.json` — schema version, structure hash, per-blob sha256,
   creation time, generator
 
-Unzipping anywhere and pointing the engine at it is a full restore; loading
-verifies every hash, so silent corruption or a mismatched model/blob pairing
-fails loudly. The canonical schema is ours — no third-party interchange
-format (decision recorded in ARCHITECTURE.md).
+``load_bundle`` verifies every hash and returns the template and arrays for
+``compile_template`` and ``Engine``. An extracted bundle may instead compile
+its serialized model with the extraction directory as the blob root. Silent
+corruption or a mismatched model/blob pairing fails loudly. The canonical
+schema is ours — no third-party interchange format (decision recorded in
+ARCHITECTURE.md).
 """
 
 from __future__ import annotations
