@@ -1,6 +1,6 @@
 ---
 id: cff-nkbj
-status: in_progress
+status: closed
 deps: [cff-oyie]
 links: [cff-r6bl, cff-0f3g, cff-dlrj]
 created: 2026-08-09T13:09:26Z
@@ -181,3 +181,7 @@ comparison. Stacked draft PR: https://github.com/engimatic-systems/cffg/pull/62
 **2026-08-13T05:19:12Z**
 
 PR merge-gate correction (2026-08-12): narrowed the epic conclusion from literature or implementation parity to source-specific empirical non-inferiority on the registered outcomes. The epic now excludes authors-code parity and CFFG-paper message/free-energy fidelity from that conclusion. cff-64ri owns adapter provenance and independent conditional oracles; cff-0l31 owns direct CFFG recurrence message/energy oracles, Gibbs mixing diagnostics, calibrated margin ceilings, and the exact paired estimand; cff-oyie owns immutable execution and bounded reporting.
+
+**2026-09-01T03:57:27Z**
+
+Closed as not doing at Cooper’s direction on 2026-08-31. The confirmatory source-specific rSLDS comparison epic is discontinued. No implementation result or scientific conclusion from this epic is claimed. Its open child tickets remain separately open and unchanged; this closure does not close or complete them.
