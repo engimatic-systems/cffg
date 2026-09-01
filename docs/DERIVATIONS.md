@@ -1036,6 +1036,25 @@ bitwise. Samples/weights are runtime state, not template/blob state; a runtime
 checkpoint may store them for mid-attempt replay, while a fresh reconstruction
 needs only the template, blobs, configuration, and key.
 
+For the rolling trial lifecycle, the proper base is the exact raw A posterior
+written by `Learnables` before preparation. `RollingAgent` owns a small planning
+runtime `(epoch, key_cursor, RunResult, invalidation flags)`. A solved unchanged
+trial returns the same result and consumes no key. Perception accumulates the A
+sufficient statistic once, then invalidates planning; exact equality between
+the next written count rows and stored `base_alpha` is required before any
+particle reuse. The `trial` policy draws a new set at that boundary. Under the
+explicit `posterior` policy a context-only rollover reconstructs a fresh
+message state with the stored samples and base moments, then solves the same
+sample objective without another split. Checkpoints store the full prepared
+state rather than regenerating samples, so continuation does not depend on a
+later JAX sampler implementation.
+
+*Executable:* `test_trial_loop_matches_direct_engines_and_checkpoint_replays`,
+`test_metadata_key_and_fixed_epoch_are_explicit`, and
+`test_float32_ten_slice_agent_keeps_one_shared_evaluator_finite`;
+`test_rolling_agent_two_plans_match_binary_quadrature_and_parameter_ledger`
+supplies the independent two-plan quadrature and ledger anchor.
+
 **Reference-implementation boundary.** Part II requires a functional message,
 importance-sampled expectations, a stochastic GFE trace, and post-burn-in
 policy averaging; it does not prescribe the proposal, particle count, ESS

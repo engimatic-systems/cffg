@@ -921,6 +921,24 @@ discarding a joint correlation. Exact joint rollover remains the separate
   named beliefs and episode cadence, so a resumed agent does not re-fire the
   episode-start statistic. Legacy single `belief` and `counts` / `b_counts`
   keys are restored/migrated exactly or refused, never silently dropped.
+- **Functional A-message lifecycle**: `mu3=True` asks the planning builder to
+  serialize `parameter_message=mu3_is_v1`; the compiled arena declaration,
+  not `learn_a` or a factor name, decides whether the runtime is stochastic.
+  The filter is built with `mu3=False`. Before an epoch, `Learnables.write`
+  installs the current raw A posterior and `Engine.prepare_mu3` consumes the
+  explicit key. One particle set remains fixed through the attempt. Repeated
+  unchanged `act()` calls reuse the result; observation/reset invalidates it,
+  and exact comparison with `base_alpha` prevents stale-posterior reuse.
+  `trial` refreshes on every invalidated trial, while `posterior` can rerun a
+  context-only change with the same particles. An action requires the ordinary
+  and all evaluator statuses to be converged, leaving ESS exhaustion distinct
+  from inference-budget exhaustion. The typed planning runtime retains the
+  status-bearing result and next-key cursor separately from NumPy action RNG.
+  Versioned checkpoints store the full `State`, result trace, evaluator and
+  schedule identity, particle configuration, refresh flags, and JAX key
+  representation. Restore validates every shape, dtype, base posterior, and
+  diagnostic before atomically mutating the live agent; analytic legacy
+  checkpoints remain supported, while a functional legacy restore is loud.
 - Sensor/actuator adapters are plain Python callbacks mapping env observations to
   one-hot data bindings and control marginals to env actions.
 
