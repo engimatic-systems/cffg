@@ -1,6 +1,6 @@
 ---
 id: cff-9tvt
-status: in_progress
+status: closed
 deps: [cff-cfhi]
 links: []
 created: 2026-09-01T02:20:19Z
@@ -94,3 +94,21 @@ Roadmap stack, 2026-08-31. Legend: prerequisite --> dependent.
                                           +--> [ ] cff-9tvt (PR #86 unique hardening and release reconciliation)
 
 Immediate blocker: each layer waits only for the preceding layer. Parallel work: none in this clean linear review stack. Downstream result: the final layer carries the bounded paper-core and newcomer-workflow release claim. The tk dependency records are authoritative.
+
+**2026-09-01T03:54:54Z**
+
+Completion handoff, 2026-08-31.
+
+Done: clean-ported only the unique post-integration cache hardening from old commit 7cd3d851 and reconciled the bounded release claims against the current stack. No old merge commit, stale release snapshot, or discontinued ancestry was replayed. The restore path now rejects unclaimed, missing, malformed, non-finite, contradictory, or stale cached mu3 planning results before mutating the live agent. Cross-field validation covers cache identity, epochs, counters, configuration, statuses, diagnostics, particle and weight normalization, ESS, cached moments, KL consistency, and converged-state finiteness. README, architecture, and limitations now state the bounded registered-core, finite-sample functional-mu3, and fixed-A binary joint-boundary constraint-flip claims.
+
+Validation: focused cache/public tests: 38 passed, 1 deselected; documentation, hygiene, and executable quickstart checks: 5 passed; final dashboard short suite at proposed PR head: 1519 passed, 41 deselected, 0 failed, 4 dependency deprecation warnings in 872.45 seconds. No slow run was needed because the corrupt-cache mechanism is covered by the default suite. Dashboard refreshed at ~/agent-share/cffg-tests.html.
+
+Review stack: cff-8a5m -> cff-lpsn -> cff-7ozr -> cff-cfhi -> cff-9tvt. This branch is the final clean-port layer and should target the cff-cfhi branch until the stack is merged.
+
+**2026-09-01T03:55:27Z**
+
+Completion wiggle audit, 2026-08-31. All retained matches were reviewed in context. Meanings: fixed=the supplied, non-learned A boundary; integrate=combined agent and checkpoint layers; preserve=atomic restore invariant; public=the exported newcomer API and its tests; register=runtime family coverage; reusable=cache reuse under equal identity; support=probability support or explicitly named runtime capability; complete=the enumerated cache identity; done=the completion handoff label; ready=tk dependency readiness; remaining=explicitly unchanged surfaces; close=ticket or superseded-PR lifecycle state; check=automated invariant or artifact check; converge=RunStatus criterion; correct=the named defect repair; equivalent=separately scoped mathematical equivalence; exact=bitwise continuation or literal zeros; match=identity equality; pass=successful automated-test outcome; sound=optional method quality; test=automated artifacts; validate=untrusted-input checks; learn/learnable=current-main declared-learning scope or change-path name; scale=functional horizon or domain size; may=optional method; should=temporary stacked-branch base instruction; every=the locally named identity inputs; only=ticket-scope exclusion; current=main 5c3b06a, the active runtime value, or the named active documents. Capability ownership remains RollingAgent checkpoint/cache decoding, mu3 prepared-state and RunResult validation, action gating, and README/architecture/limitations plus their tests.
+
+**2026-09-01T03:55:33Z**
+
+Completion wiggle-audit supplement, 2026-08-31. The retained all candidate means the full enumerated set of mechanical-scan matches, not an unbounded correctness claim.
