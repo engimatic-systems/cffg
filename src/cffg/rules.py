@@ -775,24 +775,44 @@ def mu3_log_message(particles, zbars, logcs, abar):
     # the coordinate is inert or the cavity is incoherent.
     residual = logcs - jnp.where(predictive_support, log_predictive, 0.0)
 
-    sample_predictive = jnp.einsum("soi,ti->sto", particles, zbars)
+    particles_positive = particles > 0
     sample_support = jnp.any(
-        (particles > 0)[:, None, :, :] & zbars_positive[None, :, None, :],
+        particles_positive[:, None, :, :] & zbars_positive[None, :, None, :],
+        axis=-1,
+    )
+    log_particles = jnp.where(particles_positive, jnp.log(particles), -jnp.inf)
+    log_sample_predictive = logsumexp(
+        log_particles[:, None, :, :] + log_zbars[None, :, None, :],
         axis=-1,
     )
     active = sample_support
-    fit_terms = jnp.where(active, sample_predictive, 0.0) * jnp.where(
-        active, residual[None, :, :], 0.0
+    sample_residual = residual[None, :, :]
+    residual_magnitude = jnp.abs(sample_residual)
+    finite_fit = jnp.sign(sample_residual) * jnp.exp(
+        log_sample_predictive
+        + jnp.log(jnp.where(residual_magnitude > 0, residual_magnitude, 1.0))
+    )
+    fit_terms = jnp.where(
+        active & jnp.isfinite(sample_residual),
+        jnp.where(residual_magnitude > 0, finite_fit, 0.0),
+        0.0,
+    )
+    fit_terms = jnp.where(
+        active & jnp.isneginf(sample_residual), -jnp.inf, fit_terms
+    )
+    fit_terms = jnp.where(
+        active & jnp.isposinf(sample_residual), jnp.inf, fit_terms
+    )
+    fit_terms = jnp.where(
+        active & jnp.isnan(sample_residual), jnp.nan, fit_terms
     )
     zero_marginal = active & ~predictive_support[None, :, :]
     zero_goal = jnp.isneginf(logcs)[None, :, :]
     fit_terms = jnp.where(zero_marginal & ~zero_goal, jnp.inf, fit_terms)
     fit_terms = jnp.where(zero_marginal & zero_goal, jnp.nan, fit_terms)
-    fit_terms = jnp.where(sample_predictive < 0, jnp.nan, fit_terms)
     fit = jnp.sum(fit_terms, axis=-1)
-    log_particles = jnp.where(particles > 0, jnp.log(particles), 0.0)
     particle_h = -jnp.sum(
-        jnp.where(particles > 0, particles * log_particles, 0.0), axis=1
+        jnp.where(particles_positive, particles * log_particles, 0.0), axis=1
     )
     entropy = jnp.einsum("ti,si->st", zbars, particle_h)
     return jnp.sum(fit - entropy, axis=-1)

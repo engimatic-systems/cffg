@@ -55,6 +55,10 @@ PR. It is the first layer of a new PR chain.
    3.5. Positive marginal predictive logs use a support-aware log-sum-exp, so a
    mathematically positive float32 predictive cannot become false divergence
    through underflow.
+   3.6. Positive sampled predictives use the same support-aware log-space
+   calculation through their weighted residual. A sample over exact-zero goal
+   support receives a negative-infinite score and zero importance weight even
+   when its linear float32 probability would round to zero.
 4. `mu3_importance_update` and `Engine.run` report every incoherent or non-finite
    functional score as divergence; they do not floor it, replace it with
    uniform weights, or report convergence or budget exhaustion.
@@ -162,3 +166,19 @@ Independent-review completion handoff, 2026-09-01. The repaired branch now deriv
 **2026-09-01T14:45:20Z**
 
 Completion wiggle-audit supplement, 2026-09-01. The retained close candidate means acceptance-based closure after the recorded focused and short-suite evidence.
+
+**2026-09-01T17:19:28Z**
+
+Second-review repair, 2026-09-01. The first float32 repair moved only the marginal predictive to log space. A positive sampled predictive could still underflow in linear space before multiplication by a negative-infinite residual, creating NaN and invalidating every importance particle. Criterion 3.6 now requires support-aware log-space sample scoring. The regression forces the linear sampled probability to zero, verifies a negative-infinite particle score, and verifies zero weight with a valid overall update. Capability owners remain rules.mu3_log_message, mu3_importance_update, and tests/test_mu3.py.
+
+**2026-09-01T17:19:45Z**
+
+Second-review wiggle audit, 2026-09-01. The retained verify candidate means a direct regression assertion on the negative-infinite score, zero importance weight, and valid update status.
+
+**2026-09-01T17:19:45Z**
+
+Second-review completion handoff, 2026-09-01. Sample-predictive support and magnitude now remain in log space through finite weighted residuals; infinite residuals are classified from support before multiplication. The hostile float32 regression reproduces linear underflow over exact-zero goal support and passes with zero particle weight rather than NaN divergence. Focused non-slow tests/test_mu3.py result: 7 passed, 3 deselected. The one final cumulative short suite will run at repaired #107 after sequential rebases and the later blockers.
+
+**2026-09-01T17:19:58Z**
+
+Second-review wiggle-audit supplement, 2026-09-01. The retained will candidate names the required cumulative short-suite step later in this same repair sequence.

@@ -370,3 +370,33 @@ def test_mu3_float32_positive_predictive_underflow_is_not_zero_support():
         assert int(update[-1]) == 0
         for value in update[:-1]:
             assert bool(jnp.all(jnp.isfinite(value)))
+
+
+def test_mu3_float32_underflowing_sample_over_zero_goal_gets_zero_weight():
+    with jax.enable_x64(False):
+        tiny = jnp.asarray(jnp.finfo(jnp.float32).tiny, dtype=jnp.float32)
+        particles = jnp.asarray(
+            [
+                [[tiny, 0.0], [1.0 - tiny, 1.0]],
+                [[0.0, 0.0], [1.0, 1.0]],
+            ],
+            dtype=jnp.float32,
+        )
+        zbars = jnp.asarray([[tiny, 1.0 - tiny]], dtype=jnp.float32)
+        logcs = jnp.asarray([[NEG, 0.0]], dtype=jnp.float32)
+        abar = jnp.asarray(
+            [[1.0, 0.0], [0.0, 1.0]], dtype=jnp.float32
+        )
+
+        rounded = jnp.einsum("soi,ti->sto", particles, zbars)
+        assert float(rounded[0, 0, 0]) == 0.0
+
+        score = rules.mu3_log_message(particles, zbars, logcs, abar)
+        assert bool(jnp.isneginf(score[0]))
+        assert bool(jnp.isfinite(score[1]))
+
+        update = rules.mu3_importance_update(
+            particles, zbars, logcs, abar
+        )
+        assert int(update[-1]) == 0
+        np.testing.assert_array_equal(update[2], [0.0, 1.0])
