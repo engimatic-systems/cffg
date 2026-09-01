@@ -654,6 +654,7 @@ def test_weight_collapse_checkpoint_replays_and_advances_exactly(tmp_path):
         ("status", "invalid status"),
         ("ess", "inconsistent ESS"),
         ("moments", "inconsistent moments"),
+        ("weights_ess", "inconsistent prepared state"),
     ),
 )
 def test_weight_collapse_checkpoint_rejects_invalid_failure_state(
@@ -675,9 +676,19 @@ def test_weight_collapse_checkpoint_rejects_invalid_failure_state(
         metadata = json.loads(str(arrays["mu3:metadata"]))
         metadata["result"]["mu3_ess"][0] = -1.0
         arrays["mu3:metadata"] = np.asarray(json.dumps(metadata))
-    else:
+    elif corruption == "moments":
         field = next(name for name in arrays if name.endswith(":Abar"))
         arrays[field] = np.flip(arrays[field], axis=-2)
+    else:
+        weight_field = next(name for name in arrays if name.endswith(":weights"))
+        weights = np.zeros_like(arrays[weight_field])
+        weights[0] = np.asarray(1.0, dtype=weights.dtype)
+        arrays[weight_field] = weights
+        ess_field = next(name for name in arrays if name.endswith(":ess"))
+        arrays[ess_field] = np.asarray(1.0, dtype=arrays[ess_field].dtype)
+        metadata = json.loads(str(arrays["mu3:metadata"]))
+        metadata["result"]["mu3_ess"][0] = 1.0
+        arrays["mu3:metadata"] = np.asarray(json.dumps(metadata))
     corrupt = tmp_path / f"functional-weight-collapse-{corruption}.npz"
     write_checkpoint(corrupt, arrays)
 

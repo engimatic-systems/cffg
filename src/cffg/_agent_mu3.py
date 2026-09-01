@@ -670,19 +670,32 @@ def _validate_evaluator_state(state: State, plan, status: RunStatus) -> None:
     prepared_moments = np.allclose(
         abar, base_abar, rtol=tolerance, atol=tolerance
     ) and np.allclose(hbar, base_hbar, rtol=tolerance, atol=tolerance)
-    # A failed solve retains either preparation or the last successful update.
-    if not weighted_moments and not (
-        status is not RunStatus.CONVERGED and prepared_moments
-    ):
-        raise ValueError(
-            f"functional checkpoint evaluator {plan.name!r} has inconsistent moments"
-        )
     log_normalizer = float(state.params[prefix + ":log_normalizer"])
     expected_phi = float(state.params[prefix + ":expected_phi"])
     kl = float(state.params[prefix + ":kl"])
-    if not np.isclose(
+    ledger_consistent = np.isclose(
         kl, expected_phi - log_normalizer, rtol=tolerance, atol=tolerance
-    ):
+    )
+    uniform_weights = np.array_equal(
+        weights, np.full_like(weights, 1.0 / samples.shape[0])
+    )
+    prepared_ledger = log_normalizer == expected_phi == kl == 0.0
+    prepared_ess = collapsed or ess == float(samples.shape[0])
+    prepared_payload = (
+        status is not RunStatus.CONVERGED
+        and prepared_moments
+        and uniform_weights
+        and prepared_ledger
+        and prepared_ess
+    )
+    # A failed solve retains one complete writer transaction, never a mixture.
+    if weighted_moments:
+        if not ledger_consistent:
+            raise ValueError(
+                f"functional checkpoint evaluator {plan.name!r} has inconsistent ledger"
+            )
+    elif not prepared_payload:
+        detail = "prepared state" if prepared_moments else "moments"
         raise ValueError(
-            f"functional checkpoint evaluator {plan.name!r} has inconsistent ledger"
+            f"functional checkpoint evaluator {plan.name!r} has inconsistent {detail}"
         )

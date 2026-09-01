@@ -1,6 +1,6 @@
 ---
 id: cff-9tvt
-status: closed
+status: open
 deps: [cff-cfhi]
 links: []
 created: 2026-09-01T02:20:19Z
@@ -31,9 +31,11 @@ against the current repository.
    1.1. A genuine importance-weight collapse restores with raw evaluator status
         2, exact zero ESS, and the last coherent particles, weights, moments,
         and ledger preserved by the engine transaction.
-   1.2. Zero ESS is accepted only for raw status 2. Prepared moments must match
-        either the analytic base state or the last committed weighted update;
-        other raw statuses and moment states remain invalid.
+   1.2. Zero ESS is accepted only for raw status 2. Analytic base moments are
+        accepted only with the dtype-uniform prepared weights, exact-zero
+        prepared ledger, and ESS equal to the particle count or the status-2
+        zero sentinel. Otherwise moments must match the retained weights and
+        their committed ledger; other combined states remain invalid.
 2. Cache validation binds every value whose change would make a planning result
    stale, including the installed posterior, prepared stochastic state, bound
    planning data, runtime configuration, and structure identity.
@@ -183,3 +185,31 @@ deprecation warnings in 885.69 wall-clock seconds (874.21 seconds reported by
 pytest). The dashboard was refreshed at `~/agent-share/cffg-tests.html`. No
 slow run was needed because the engine-produced collapse and its checkpoint
 continuation are covered by the default functional-agent suite.
+
+**2026-09-01T07:10:00Z**
+
+Fourth-review repair handoff, 2026-08-31. Research question: which combined
+payloads can the engine write before a checkpoint? Answer: exactly two. The
+prepared payload has dtype-uniform weights, analytic moments from
+`base_alpha`, an exact-zero ledger, and ESS equal to the particle count. A
+committed importance update has normalized weights, their weighted particle
+moments, a coherent ledger, and weight-derived ESS. Stationary failure retains
+one whole payload. Weight collapse also retains one whole payload and replaces
+only status with 2 and ESS with the exact-zero failure sentinel. Sources:
+`Engine.prepare_mu3`, `Engine._update_mu3`, and `mu3_importance_update`.
+Confidence: high; two read-only traces agreed in float32 and x64, and a direct
+checkpoint mutation reproduced the acceptance gap.
+
+The validator now accepts those payloads as atomic alternatives instead of
+mixing their independently valid fields. Analytic prepared moments therefore
+require bitwise dtype-uniform weights, the zero prepared ledger, and ESS equal
+to the particle count or zero for status-2 collapse. The regression replaces
+uniform weights with a one-hot normalized vector, changes state and metadata
+ESS together to 1, leaves analytic moments and the zero ledger unchanged, and
+verifies atomic rejection. Genuine collapse replay and all prior single-field
+corruption cases remain valid. The complete checkpoint/public focus passed 45
+tests with 1 deselected in 279.05 seconds. Capability ownership remains the
+engine's two mu3 payload writers and the functional checkpoint validator.
+The refreshed wiggle scan retains the recorded meanings; `can` is bounded to
+the two enumerated engine payload writers and `all` refers to the prior named
+single-field regression cases.
