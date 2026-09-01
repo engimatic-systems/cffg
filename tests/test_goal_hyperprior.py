@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 from jax.scipy.special import digamma, gammaln
 
+from cffg import rules
 from cffg.agent import RollingAgent
 from cffg.bundle import load_bundle, save_bundle
 from cffg.compiler import CompileError, compile_template
@@ -117,6 +118,17 @@ def test_mu1_shared_goal_posterior_and_complete_fe_match_direct_algebra():
     marginals = engine.marginals(state)
     predicted = np.stack([marginals["x0"], marginals["x1"]])
     expected_alpha = arrays["Cc"] + predicted.sum(axis=0)
+    group = engine.arena.gfe_groups[0]
+    raw_mu1 = state.messages[
+        engine.arena.message_indices(
+            group.goal_count_scatter, group.cards[0]
+        )
+    ]
+    np.testing.assert_allclose(
+        raw_mu1,
+        np.broadcast_to(predicted.sum(axis=0), raw_mu1.shape),
+        atol=3e-6,
+    )
     goals = engine.goal_marginals(state)
     assert set(goals) == {"goal0", "goal1"}
     for posterior in goals.values():
@@ -128,6 +140,13 @@ def test_mu1_shared_goal_posterior_and_complete_fe_match_direct_algebra():
 
     alpha = jnp.asarray(expected_alpha)
     alpha0 = jnp.asarray(arrays["Cc"])
+    np.testing.assert_allclose(
+        rules.goal_dirichlet_energy(
+            alpha, alpha0, jnp.asarray(predicted.sum(axis=0))
+        ),
+        _log_beta(alpha0) - _log_beta(alpha),
+        atol=3e-6,
+    )
     elog = digamma(alpha) - digamma(alpha.sum())
     matrix = jnp.asarray(arrays["A"])
     h = -jnp.sum(jnp.where(matrix > 0, matrix * jnp.log(matrix), 0.0), axis=0)
