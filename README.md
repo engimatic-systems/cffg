@@ -37,7 +37,7 @@ plus **constraint beads** that pick the variational objective, plus typed
 |---|---|
 | `VariableSpec` | a discrete random variable (an edge; connects ≤ 2 factors) |
 | `FactorSpec` | a distribution node: `categorical`, `matrix_cat`, `transition_mixture`, `equality`, `dirichlet` |
-| `ConstraintSpec` | a bead: `P_SUBSTITUTION` (adds the epistemic/GFE drive), `DELTA` (MAP readout), `MEAN_FIELD` (VMP) |
+| `ConstraintSpec` | a bead: `P_SUBSTITUTION` (adds the epistemic/GFE drive), `DELTA` (MAP readout), `MEAN_FIELD` (VMP); `MOMENT_MATCHING` round-trips as reserved syntax but compilation rejects it until an EP rule is registered |
 | `PortSpec` | a dangling edge with a role: `data` (sensor), `goal`, `prior`, `glue` (composition) |
 | `AgentSpec` | serialized action, sensor, actuator, and rolling-boundary bindings for `RollingAgent` |
 

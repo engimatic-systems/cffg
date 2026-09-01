@@ -667,6 +667,12 @@ def compile_template(
         for c in t.constraints
         if c.kind is ConstraintKind.P_SUBSTITUTION
     }
+    for constraint in t.constraints:
+        if constraint.kind is ConstraintKind.MOMENT_MATCHING:
+            problems.append(
+                f"factor {constraint.target!r}: no executable moment-matching "
+                "rule is registered"
+            )
 
     for f in t.factors.values():
         if f.param_edges:
