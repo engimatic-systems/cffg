@@ -586,12 +586,12 @@ def _validate_prepared_state(engine: Engine, result: RunResult) -> None:
         raise ValueError(
             "functional checkpoint converged result disagrees with its solver diagnostics"
         )
-    if result.status is RunStatus.CONVERGED and not all(
+    if not all(
         np.isfinite(np.asarray(leaf)).all()
         for leaf in jax.tree_util.tree_leaves(result.state)
     ):
         raise ValueError(
-            "functional checkpoint converged result contains non-finite state"
+            "functional checkpoint result contains non-finite state"
         )
     for plan in engine.arena.mu3_groups:
         prefix = plan.name
@@ -601,11 +601,10 @@ def _validate_prepared_state(engine: Engine, result: RunResult) -> None:
         base = np.asarray(result.state.params[prefix + ":base_alpha"])
         if not all(np.array_equal(row, base) for row in counts):
             raise ValueError(f"functional checkpoint evaluator {plan.name!r} has a stale base")
-        if result.status is RunStatus.CONVERGED:
-            _validate_converged_evaluator_state(result.state, plan)
+        _validate_evaluator_state(result.state, plan)
 
 
-def _validate_converged_evaluator_state(state: State, plan) -> None:
+def _validate_evaluator_state(state: State, plan) -> None:
     """Check the algebraic domains that make a prepared epoch actionable."""
     prefix = plan.name
     samples = np.asarray(state.params[prefix + ":samples"])

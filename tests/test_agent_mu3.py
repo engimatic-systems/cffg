@@ -526,6 +526,27 @@ def test_functional_checkpoint_cannot_promote_exhaustion_to_convergence(tmp_path
         target.act()
 
 
+def test_nonconverged_checkpoint_rejects_invalid_particles_before_mutation(tmp_path):
+    source = make_agent(n_sweeps=0)
+    with pytest.raises(InferenceError) as exhausted:
+        source.act()
+    assert exhausted.value.result.status is RunStatus.BUDGET_EXHAUSTED
+    good = tmp_path / "functional-exhausted.npz"
+    source.checkpoint(good)
+    arrays = checkpoint_arrays(good)
+    particle_field = next(name for name in arrays if name.endswith(":samples"))
+    arrays[particle_field] = np.full_like(arrays[particle_field], -1.0)
+    corrupt = tmp_path / "functional-exhausted-negative-particles.npz"
+    write_checkpoint(corrupt, arrays)
+
+    target = make_agent(n_sweeps=0)
+    target.observe(0, 1)
+    snapshot = used_agent_snapshot(target)
+    with pytest.raises(ValueError, match="invalid particles or weights"):
+        target.restore(corrupt)
+    assert_used_agent_unchanged(target, snapshot)
+
+
 def test_sampling_failure_returns_no_action_and_preserves_diagnostics():
     agent = make_agent(samples=32, min_ess=1.0)
     with pytest.raises(InferenceError) as exc:

@@ -1,6 +1,6 @@
 ---
 id: cff-9tvt
-status: closed
+status: open
 deps: [cff-cfhi]
 links: []
 created: 2026-09-01T02:20:19Z
@@ -25,7 +25,9 @@ against the current repository.
 
 1. Restore rejects cached planning results with corrupt fields, impossible
    status or diagnostic combinations, invalid particles or weights, or a cache
-   identity that does not match the prepared inputs.
+   identity that does not match the prepared inputs. Particle, weight, moment,
+   ledger, and finite-state validation applies to converged, budget-exhausted,
+   infeasible, and diverged results alike.
 2. Cache validation binds every value whose change would make a planning result
    stale, including the installed posterior, prepared stochastic state, bound
    planning data, runtime configuration, and structure identity.
@@ -112,3 +114,20 @@ Completion wiggle audit, 2026-08-31. All retained matches were reviewed in conte
 **2026-09-01T03:55:33Z**
 
 Completion wiggle-audit supplement, 2026-08-31. The retained all candidate means the full enumerated set of mechanical-scan matches, not an unbounded correctness claim.
+
+**2026-09-01T05:20:00Z**
+
+Second-review repair handoff, 2026-08-31. The first cache validator applied
+particle, weight, ESS, moment, and ledger checks only when the serialized
+`RunResult` claimed convergence. That status gate admitted negative particles
+in a budget-exhausted checkpoint; its restored runtime could return the cached
+failure directly or reuse those particles after an input change. The prepared
+evaluator domains and finite-state invariant now apply to every cached result
+status. A mechanism regression modifies a real budget-exhausted checkpoint,
+rebuilds its exact field inventory, and verifies rejection before mutation of
+an already-used target. Focused corruption and status validation passed 15
+tests in 141.64 seconds. Capability ownership remains the functional-mu3
+prepared-state validator and RollingAgent atomic restore path.
+The refreshed wiggle scan retains the recorded meanings; `verify` is the
+regression assertion and `could` names the two concrete post-restore runtime
+paths described in the preceding sentence.
