@@ -212,6 +212,32 @@ def test_proposal_refresh_and_stochastic_statuses_are_loud():
     assert collapsed.mu3_statuses == (RunStatus.DIVERGED,)
 
 
+def test_incoherent_predictive_support_diverges_through_engine():
+    engine = _engine(samples=32)
+    state, _ = engine.prepare_mu3(
+        engine.init_state(), jax.random.PRNGKey(31)
+    )
+    plan = engine.arena.mu3_groups[0]
+    group = engine.arena.gfe_groups[0]
+    params = dict(state.params)
+    params[plan.name + ":samples"] = jnp.broadcast_to(
+        jnp.asarray([[1.0, 1.0], [0.0, 0.0]]),
+        params[plan.name + ":samples"].shape,
+    )
+    params[group.name + ":Abar"] = params[group.name + ":Abar"].at[:].set(
+        jnp.asarray([[0.0, 0.0], [1.0, 1.0]])
+    )
+    params[group.name + ":hbar"] = jnp.zeros_like(
+        params[group.name + ":hbar"]
+    )
+
+    result = engine.run(
+        _replace(state, params=params), 10, tol=1e-6, harden_last=0
+    )
+    assert result.status is RunStatus.DIVERGED
+    assert result.mu3_statuses == (RunStatus.DIVERGED,)
+
+
 @pytest.mark.slow
 def test_base_posterior_is_runtime_input_and_burn_in_only_averages_converged_epochs():
     engine = _engine(samples=1024)
