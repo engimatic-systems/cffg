@@ -27,7 +27,9 @@ def test_round_trip_json(hmm_slice):
     validate(back)
 
 
-def test_moment_matching_round_trips_but_compilation_rejects(hmm_slice):
+def test_legacy_moment_matching_placeholder_round_trips_but_compilation_rejects(
+    hmm_slice,
+):
     hmm_slice.constraints.append(
         ConstraintSpec(ConstraintKind.MOMENT_MATCHING, "obs")
     )
