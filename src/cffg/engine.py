@@ -1322,6 +1322,8 @@ class Engine:
         outer_map_evaluations = trial_evaluations = 0
         linear_iterations = solver_compilations = 0
         mu3_pending = False
+        mu3_failure_status: RunStatus | None = None
+        mu3_failure_residual = 0.0
         phases: list[tuple[int, list[tuple[int, np.ndarray]]]] = [
             (n_iters - harden_last, [])
         ]
@@ -1461,13 +1463,23 @@ class Engine:
                 state, mu3_delta, mu3_code, mu3_residual = self._update_mu3(
                     state
                 )
-                mu3_pending = mu3_code == 0 and mu3_delta > solver_tol
-                if mu3_code or mu3_delta <= solver_tol:
+                if mu3_code:
+                    mu3_failure_status = (
+                        RunStatus.BUDGET_EXHAUSTED
+                        if mu3_code == 1 else RunStatus.DIVERGED
+                    )
+                    mu3_failure_residual = mu3_residual
                     break
-            if solved.reason in (
-                OuterTerminationReason.NONFINITE_EVALUATION,
-                OuterTerminationReason.INFEASIBLE,
-                OuterTerminationReason.INNER_FAILURE,
+                mu3_pending = mu3_delta > solver_tol
+                if mu3_delta <= solver_tol:
+                    break
+            if (
+                mu3_failure_status is not None
+                or solved.reason in (
+                    OuterTerminationReason.NONFINITE_EVALUATION,
+                    OuterTerminationReason.INFEASIBLE,
+                    OuterTerminationReason.INNER_FAILURE,
+                )
             ):
                 break
 
@@ -1476,7 +1488,9 @@ class Engine:
                 state, RunStatus.BUDGET_EXHAUSTED, 0, (), (), float("inf"),
                 termination_reason=OuterTerminationReason.ITERATION_BUDGET,
             )
-        if (
+        if mu3_failure_status is not None:
+            status = mu3_failure_status
+        elif (
             solved.reason is OuterTerminationReason.ROOT_CONVERGED
             and not mu3_pending
         ):
@@ -1501,17 +1515,25 @@ class Engine:
             status = RunStatus.DIVERGED
         else:
             status = RunStatus.BUDGET_EXHAUSTED
-        inner_status = (
-            RunStatus.CONVERGED
-            if solved.inner_code == 0 else
-            RunStatus.BUDGET_EXHAUSTED
-            if solved.inner_code == 1 else
-            RunStatus.DIVERGED
-        )
-        residual = (
-            abs(all_energies[-1] - all_energies[-2])
-            if len(all_energies) >= 2 else solved.outer_residual
-        )
+        if mu3_failure_status is not None:
+            inner_status = mu3_failure_status
+            inner_residual = mu3_failure_residual
+            residual = mu3_failure_residual
+            termination_reason = OuterTerminationReason.INNER_FAILURE
+        else:
+            inner_status = (
+                RunStatus.CONVERGED
+                if solved.inner_code == 0 else
+                RunStatus.BUDGET_EXHAUSTED
+                if solved.inner_code == 1 else
+                RunStatus.DIVERGED
+            )
+            inner_residual = solved.inner_residual
+            residual = (
+                abs(all_energies[-1] - all_energies[-2])
+                if len(all_energies) >= 2 else solved.outer_residual
+            )
+            termination_reason = solved.reason
         ess, log_normalizers, mu3_statuses = self._mu3_result_diagnostics(state)
         return RunResult(
             state=state,
@@ -1521,7 +1543,7 @@ class Engine:
             free_energies=tuple(all_energies),
             residual=residual,
             inner_status=inner_status,
-            inner_residual=solved.inner_residual,
+            inner_residual=inner_residual,
             mu3_ess=ess,
             mu3_log_normalizers=log_normalizers,
             mu3_statuses=mu3_statuses,
@@ -1531,7 +1553,7 @@ class Engine:
             trust_radius=solved.trust_radius,
             accepted_steps=accepted,
             rejected_steps=rejected,
-            termination_reason=solved.reason,
+            termination_reason=termination_reason,
             outer_map_evaluations=outer_map_evaluations,
             trial_evaluations=trial_evaluations,
             linear_iterations=linear_iterations,

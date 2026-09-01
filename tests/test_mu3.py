@@ -13,6 +13,7 @@ from cffg.core import ConstraintKind, ConstraintSpec, FactorSpec, Template, Vari
 from cffg.core.ir import BlobRef
 from cffg.core.serialize import from_json, to_json
 from cffg.engine import Engine, RunStatus, _replace
+from cffg.outer import OuterTerminationReason
 
 
 def _model(*, slices=1, parameter_message=True):
@@ -236,6 +237,37 @@ def test_incoherent_predictive_support_diverges_through_engine():
     )
     assert result.status is RunStatus.DIVERGED
     assert result.mu3_statuses == (RunStatus.DIVERGED,)
+
+
+def test_post_root_mu3_divergence_overrides_outer_convergence(monkeypatch):
+    engine = _engine(samples=32)
+    state, _ = engine.prepare_mu3(
+        engine.init_state(), jax.random.PRNGKey(37)
+    )
+    group = engine.arena.gfe_groups[0]
+    update_mu3 = Engine._update_mu3
+    updates = 0
+
+    def diverge_after_outer_root(self, current):
+        nonlocal updates
+        if self is engine:
+            updates += 1
+            if updates == 2:
+                params = dict(current.params)
+                params[group.name + ":c"] = jnp.full_like(
+                    params[group.name + ":c"], NEG
+                )
+                current = _replace(current, params=params)
+        return update_mu3(self, current)
+
+    monkeypatch.setattr(Engine, "_update_mu3", diverge_after_outer_root)
+    result = engine.run(state, 30, tol=1e-6, harden_last=0)
+
+    assert updates == 2
+    assert result.status is RunStatus.DIVERGED
+    assert result.inner_status is RunStatus.DIVERGED
+    assert result.mu3_statuses == (RunStatus.DIVERGED,)
+    assert result.termination_reason is OuterTerminationReason.INNER_FAILURE
 
 
 @pytest.mark.slow
