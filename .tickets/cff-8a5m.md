@@ -2,7 +2,7 @@
 id: cff-8a5m
 status: closed
 deps: []
-links: []
+links: [cff-o7hs]
 created: 2026-09-01T02:20:18Z
 type: task
 priority: 1
@@ -30,8 +30,13 @@ PR. It is the first layer of a new PR chain.
 1. Every compiler path rejects a serialized `MOMENT_MATCHING` constraint with
    a specific error before arena construction because no executable rule owns
    that reserved syntax.
-2. Serialization and structure hashing continue to preserve the reserved
-   constraint so a future registered rule does not need a schema migration.
+2. The legacy factor-only `MOMENT_MATCHING` placeholder remains backward
+   compatible but is not presented as the paper's complete syntax.
+   2.1. Serialization and structure hashing preserve the placeholder.
+   2.2. Documentation states that it cannot identify the incident edge
+   endpoint or sufficient-statistic projection required by Part I §5.4.
+   2.3. Future executable moment matching requires a new schema and migration;
+   it must not guess the missing endpoint or projection from the factor name.
 3. Functional `mu3(A)` preserves the support cases in `docs/DERIVATIONS.md`:
    zero sampled predictive mass contributes zero, positive mass outside exact
    goal support contributes negative infinity, and positive mass over zero
@@ -79,9 +84,9 @@ These suggestions are optional. An implementer may choose another sound method.
 
 `cff-lpsn` clean-ports functional `mu3(A)` through `RollingAgent` after this
 ticket. `cff-7ozr`, `cff-cfhi`, and `cff-9tvt` carry the remaining old PR
-capabilities in later layers of the new stack. A future expectation-propagation
-ticket may replace the `MOMENT_MATCHING` rejection with registered factor-
-specific rules and objective semantics.
+capabilities in later layers of the new stack. `cff-o7hs` owns the new
+endpoint- and projection-aware moment-matching schema, migration from the
+rejected legacy placeholder, factor-specific EP rules, and objective semantics.
 
 ## Definitions
 
@@ -91,8 +96,10 @@ specific rules and objective semantics.
   instead of represented by a fixed conjugate family.
 - **Incoherent support:** Incoming and sampled beliefs assign incompatible
   exact support, making the functional ratio undefined or infinite.
-- **Reserved syntax:** A serializable construct that the executor deliberately
-  rejects until a rule owns its behavior.
+- **Legacy placeholder:** A serializable construct retained for backward
+  compatibility even though it lacks fields required for faithful execution.
+- **Sufficient-statistic projection:** The selected moments that replace full
+  node-to-edge marginal density equality in a moment-matching constraint.
 
 ## Notes
 
@@ -103,3 +110,7 @@ Planning audit, 2026-08-31. Capability owners are compiler constraint classifica
 **2026-09-01T02:38:32Z**
 
 Completion handoff, 2026-08-31. Clean-ported old PR #82 from current main 5c3b06a without its ancestry. The compiler now rejects reserved MOMENT_MATCHING syntax before arena construction while JSON and hashing retain it. Functional mu3 preserves exact support and Engine.run reports incoherent marginal-predictive support as divergence. ARCHITECTURE contains the paper constraint and Part II Figure 5 ledgers; README and LIMITATIONS use the same bounded claims. Direct raw mu1 and mu2 plus isolated-energy checks landed. Focused results: test_serialize 9 passed; non-slow mu3 8 passed and 3 deselected; GFE, goal, and hygiene 26 passed. Final unchanged-head short suite: 1477 passed, 39 deselected, 0 failed in 566.68 seconds; dashboard refreshed at /Users/ravd/agent-share/cffg-tests.html. No slow run was needed because the changed hostile mu3 mechanism is covered directly in the default suite. Next ready layer: cff-lpsn.
+
+**2026-09-01T14:30:25Z**
+
+Independent-review correction, 2026-09-01. Part I section 5.4 binds one selected factor endpoint to its incident edge marginal through named sufficient statistics; the legacy factor-only payload cannot identify that endpoint or projection. Criterion 2 and the future-work handoff now require cff-o7hs to add and migrate to a faithful schema. Capability owners for this correction are core.ir ConstraintKind and ConstraintSpec, core serialization and structure hashing, compiler rejection, viz.diagram rejection, ARCHITECTURE inventory, README, LIMITATIONS, and cff-o7hs. The wiggle scan was rerun after the rewrite. New or changed retained matches mean: preserve = serialized/hash value identity; sufficient = the mathematical sufficient-statistic projection; can/cannot = representational capability of the named schema; explicit_owner and named_ticket_handoff = cff-o7hs owns the future schema and migration; every = each compiler path named by criterion 1. Earlier retained matches keep the meanings recorded in the planning audit.

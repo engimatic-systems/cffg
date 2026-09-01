@@ -2,7 +2,7 @@
 id: cff-o7hs
 status: open
 deps: [cff-4e5z, cff-ri8m, cff-209l]
-links: [cff-1o72, cff-fxmj, cff-ri8m, cff-l6i5, cff-pksr, cff-lquu, cff-k9ws, cff-209l]
+links: [cff-1o72, cff-fxmj, cff-ri8m, cff-l6i5, cff-pksr, cff-lquu, cff-k9ws, cff-209l, cff-8a5m]
 created: 2026-07-08T16:49:34Z
 type: feature
 priority: 2
@@ -11,13 +11,13 @@ parent: cff-ahps
 ---
 # Nonlinear Gaussian factors: linearization + sigma-point moment matching (EP)
 
-## Background in Plain English
+## Background in Plain English — WHY
 
 CFFG has exact Gaussian messages for linear relationships, but many dynamics and sensors are nonlinear. This ticket adds a Gaussian factor whose mean is a deterministic function `g(x)` and whose output has nondegenerate Gaussian noise. It supplies a local linearization and a sigma-point method that better captures curvature. Both methods keep messages Gaussian, so they are approximations whose ledger terms and failure modes must be labeled honestly.
 
-The work builds on the Gaussian arena from cff-4e5z, executable factor registration from cff-ri8m and cff-209l, and the dtype-scaled Gaussian propriety contract from cff-3hgi. It activates the reserved `MOMENT_MATCHING` node constraint for expectation-propagation updates. It does not cover zero-noise continuous delta factors, continuous-to-discrete links, or epistemic GFE scoring through nonlinear nodes.
+The work builds on the Gaussian arena from cff-4e5z, executable factor registration from cff-ri8m and cff-209l, and the dtype-scaled Gaussian propriety contract from cff-3hgi. The current factor-only `MOMENT_MATCHING` placeholder is not faithful to Part I: it cannot name a particular node endpoint on an incident edge or the sufficient-statistic projection. This ticket replaces that placeholder with an endpoint- and projection-aware schema before it adds expectation-propagation updates. It does not cover zero-noise continuous delta factors, continuous-to-discrete links, or epistemic GFE scoring through nonlinear nodes.
 
-## Outcomes / Acceptance Criteria
+## Outcomes / Acceptance Criteria — WHAT
 
 1. The dependency contracts are satisfied before this ticket closes.
    1.1. cff-4e5z is closed with its Gaussian arena contract satisfied.
@@ -35,6 +35,11 @@ The work builds on the Gaussian arena from cff-4e5z, executable factor registrat
    2.9. A `.cffgz` round-trip retains identical function identity, parameter-blob values, constraint details, and structure hash.
    2.10. Recompilation after either round-trip produces messages and ledger values that agree with the pre-round-trip engine within the stated tolerance.
    2.11. A zero-noise deterministic delta is rejected instead of being approximated by a large precision clamp.
+   2.12. The moment-matching schema identifies one factor endpoint by its factor and incident role or variable.
+   2.13. The schema identifies the sufficient-statistic projection enforced between that node endpoint and the incident edge marginal.
+   2.14. The schema can select either or both node endpoints of a degree-two edge independently, matching Part I Figure 12.
+   2.15. The legacy factor-only placeholder remains rejected during compilation and diagram generation until it is migrated.
+   2.16. Migration never guesses an endpoint or projection that the legacy payload did not record.
 3. The factor supplies declared linearization and sigma-point message methods.
    3.1. The linearization method evaluates `g` at the incoming cavity mean.
    3.2. The linearization method evaluates the Jacobian of `g` at that mean.
@@ -56,7 +61,7 @@ The work builds on the Gaussian arena from cff-4e5z, executable factor registrat
    3.18. The linearization method reports its posterior error against the dense-grid reference.
    3.19. The sigma-point method reports its posterior error against the dense-grid reference.
    3.20. The sigma-point error does not exceed the linearization error plus the measured quadrature discretization error.
-4. A `MOMENT_MATCHING` constraint compiles to an expectation-propagation site update.
+4. An endpoint- and projection-aware `MOMENT_MATCHING` constraint compiles to an expectation-propagation site update.
    4.1. The site update runs through synchronous inference.
    4.2. The site update runs through scheduled inference.
    4.3. Each update removes the old site from the local belief to form a cavity.
@@ -105,7 +110,7 @@ The work builds on the Gaussian arena from cff-4e5z, executable factor registrat
    6.15. The scale case returns finite outputs or a truthful machine-readable non-converged status.
    6.16. Persistent arena bytes equal the estimator's named byte counts.
    6.17. Persistent arena bytes grow no faster than factor count times the square of the largest incident Gaussian dimension.
-7. Each affected execution and transport surface recognizes the factor and `MOMENT_MATCHING` constraint.
+7. Each affected execution and transport surface recognizes the factor and the endpoint- and projection-aware `MOMENT_MATCHING` constraint.
    7.1. Compiler dispatch recognizes the factor and constraint without a central type-string branch.
    7.2. Gaussian arena addressing covers the factor.
    7.3. Parameter packing covers the factor.
@@ -127,11 +132,12 @@ The work builds on the Gaussian arena from cff-4e5z, executable factor registrat
    8.3. `docs/DERIVATIONS.md` records the message, globalization, stationary, and surrogate equations.
    8.4. `docs/LIMITATIONS.md` records the approximate ledger meaning, numerical failure behavior, and excluded continuous-to-discrete and nonlinear-GFE cases.
 
-## Methodological Suggestions
+## Methodological Suggestions — HOW
 
 These suggestions are optional. Another method is acceptable if it satisfies the numbered outcomes with equivalent artifacts and executable evidence.
 
 - Use the **New factor or rule family** and **Runtime numerical or status invariant** rows in the `docs/ARCHITECTURE.md` change-path index. Start from the Gaussian `FactorKernel` binding delivered through cff-209l instead of adding a central type-string branch.
+- Design and migrate the moment-matching IR before registering an EP rule. Treat the current factor-only enum payload as rejected legacy input unless an explicit migration supplies the endpoint and projection; do not infer them from graph degree or role order.
 - Keep the serialized core representation free of JAX callables. Resolve the namespaced nonlinear implementation at compile time, and keep function parameters in external `.npy` or `.safetensors` blobs when they are too large for ordinary JSON metadata.
 - Consider `jax.jacfwd` for Jacobians. For sigma points, use a square-root construction whose tolerances and admissible scaling parameters derive from the active dtype and matrix dimension.
 - Derive the linearization, sigma-point, cavity, site, damping/globalization, residual, and surrogate equations before implementation. Put the formal results in rule docstrings and `docs/DERIVATIONS.md`; identify every approximation and unproved bound in `docs/LIMITATIONS.md`.
@@ -158,7 +164,8 @@ These suggestions are optional. Another method is acceptable if it satisfies the
 - **Globalization:** Damping, backtracking, or another method that rejects or shrinks an iterative update when the full proposed step is not acceptable.
 - **Indefinite matrix:** A symmetric matrix with both positive and negative quadratic directions.
 - **Linearization:** Replacing `g` locally by its value and Jacobian at a selected point.
-- **Moment matching:** Choosing a Gaussian with the same mean and covariance as the distribution being approximated.
+- **Moment matching:** Replacing full equality between one node-endpoint marginal and its incident edge marginal with equality of selected sufficient-statistic expectations; Gaussian EP commonly selects mean and covariance.
+- **Node endpoint:** One factor's attachment to a particular edge, identified by the factor and its incident role.
 - **Nondegenerate Gaussian:** A Gaussian distribution with a symmetric positive-definite covariance.
 - **Propriety:** The condition that a belief is finite and normalizable.
 - **Sigma points:** A deterministic weighted point set chosen to reproduce selected moments of a Gaussian input.
@@ -182,3 +189,7 @@ Retained wiggle-audit candidates and intended meanings after the bounded current
 Targeted correction review (2026-08-07 local): a bounded search of `docs/DERIVATIONS.md`, `docs/ARCHITECTURE.md`, `docs/LIMITATIONS.md`, `src/`, and `tests/` found no nonlinear-EP derivation or executable rule proving that each accepted EP step decreases the reported surrogate. `src/cffg/core/ir.py` still describes `MOMENT_MATCHING` as reserved with no registered rules. Criteria 4 and 5 therefore require a derived globalization/merit rule, proper accepted beliefs, finite surrogate-change and stationarity certificates at convergence, and truthful statuses, but do not require monotonic surrogate descent. Surrogate-monotonic backtracking remains a methodological option only if the new derivation proves the surrogate is a valid merit function. Composite outcomes were split into decimal leaves so each leaf presents one reviewer decision. The rerun retained the previously reported candidates with their recorded meanings and added only note-derived or technical uses: fixed = fixed-parameter inference in the earlier audit note; complete = the exact review-completion marker; sufficient = the established term sufficient-statistic readout; performance, intended, current, and existing = literal words inside the earlier timestamped audit explanation, not new capability claims. Intelligible-ticket review: complete.
 
 Intelligible-ticket review: complete.
+
+**2026-09-01T14:30:25Z**
+
+Independent-review correction, 2026-09-01. The ticket now owns an endpoint- and projection-aware moment-matching schema and migration before EP execution. The legacy factor-only payload stays rejected; migration must not infer absent information. Capability owners are core.ir schema, validation, JSON/hash and bundle migration, diagram derivation, compiler grouping, the nonlinear Gaussian FactorKernel and rules, synchronous and scheduled execution, ledger, readouts, estimator, public exports, and the named documentation/tests. The wiggle scan was rerun after the rewrite. New or changed retained matches mean: current = the legacy payload present at PR base d6e006d; factor-only/only = a payload naming a factor and no endpoint, or an explicit acceptance gate; sufficient and match = the paper-defined sufficient-statistic equality; public = the supported template schema; register = future executable compiler/runtime dispatch; implement = planned schema/rule integration; exact = affine-reference analytic equality; all/every = the locally enumerated endpoints or execution surfaces. Earlier retained matches keep the meanings recorded in the prior two audit notes.
