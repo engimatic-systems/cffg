@@ -1,6 +1,6 @@
 ---
 id: cff-9tvt
-status: open
+status: closed
 deps: [cff-cfhi]
 links: []
 created: 2026-09-01T02:20:19Z
@@ -131,3 +131,12 @@ prepared-state validator and RollingAgent atomic restore path.
 The refreshed wiggle scan retains the recorded meanings; `verify` is the
 regression assertion and `could` names the two concrete post-restore runtime
 paths described in the preceding sentence.
+
+Final second-review validation at repaired stack head `55a9e32`: the dashboard
+short suite passed 1,525 tests with 41 deselected, 0 failures, and 4 dependency
+deprecation warnings in 885.21 wall-clock seconds (873.87 seconds reported by
+pytest). This one cumulative run validates the unchanged #103 through #106
+layers together with #107's repaired cache and ticket state; their focused
+runs were not duplicated. The dashboard was refreshed at
+`~/agent-share/cffg-tests.html`. No slow run was required because both newly
+reported mechanisms are covered in the default checkpoint and mu3 tests.
