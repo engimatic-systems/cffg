@@ -2,7 +2,7 @@
 id: cff-8t4d
 status: open
 deps: [cff-544x]
-links: [cff-edoz, cff-ws3c]
+links: [cff-ejib]
 created: 2026-09-02T04:02:00Z
 type: chore
 priority: 1
@@ -10,85 +10,75 @@ assignee: coopwilliams
 parent: cff-edoz
 tags: [compiler, architecture, refactor]
 ---
-# Extract typed compiler lowering stages
+# Extract topology validation and slot layout
 
 ## Background in Plain English — WHY
 
-After `cff-544x`, compiled values have a lower-level owner but one large
-compiler function still validates topology, classifies factors, resolves
-addresses and arrays, recognizes specialized plans, resolves learning, and
-assembles the final arena. These responsibilities need explicit inputs and
-outputs so a future family changes the smallest relevant stage.
+At baseline e488df3, `compile_template` spans
+`src/cffg/compiler.py:632-1936`. Its first responsibility expands plates,
+validates factor/constraint compatibility, builds endpoint tables, and assigns
+discrete, Gaussian, exponential-family, observation, and parameter-edge slots
+through approximately line 870. Later lowering code consumes these tables.
 
-This ticket extracts those stages without changing the model language or
-runtime result. Registered same-arena factors and explicit specialized plans
-remain different compiler paths.
+This ticket extracts only that structural front end. Registered factor
+lowering, specialized plans, learnables, arrays, and final `Arena` assembly
+remain for later tickets.
 
 ## Outcomes / Acceptance Criteria — WHAT
 
 1. `cff-544x` is closed with compiled values behind a one-way boundary.
-2. `compile_template` remains the public orchestration entry point and
-   delegates to typed stages with these responsibilities:
-   2.1. topology validation and message-slot layout;
-   2.2. registered same-arena classification and lowering;
-   2.3. explicit multi-arena, GFE, constraint, and evaluator lowering;
-   2.4. learnable source and target resolution;
-   2.5. parameter, observation, and derived-array resolution; and
-   2.6. final immutable arena assembly.
-3. Each stage accepts and returns a named typed value. Stages do not communicate
-   through module globals, hidden mutation, or a partly initialized arena.
-4. Factor and constraint meaning has one classification owner.
-   4.1. Registered same-arena factors dispatch from kernel metadata.
-   4.2. Each specialized plan class has one explicit lowering owner.
-   4.3. Parameter and observation roles are interpreted once and passed by
-        typed address records.
-5. Existing compile diagnostics continue to name the model item and incompatible
-   declaration that caused failure.
-6. Every `cff-ecw0` characterization value remains unchanged, including
-   ordering, addresses, schedule fingerprints, hashes, learnable plans, and
-   evaluator identity.
-7. The resulting compiler orchestration module has fewer than 1,000 physical
-   lines. No new or extracted file exceeds 1,000 physical lines, and each file
-   has one stated responsibility.
-8. JSON and CFFGZ reconstruction use the same stage sequence. Plates and
-   composition supply ordinary validated templates rather than separate
-   lowerers.
-9. Flooding and scheduled runtimes, direct and `vmap` execution, and
-   checkpoint consumers receive the same final compiled values. No execution
-   pair gains a second compiler path.
-10. Exact-zero support, vacuous messages, improper beliefs, and runtime
-    convergence are not compiler decisions. Float32 and the 32-group
-    characterization fixture retain the values required by `cff-ecw0`.
-11. No factor behavior, objective term, approximation, public API, serialized
-    field, checkpoint schema, or performance claim changes.
-12. Focused compiler and all affected integration tests pass. The
-    dashboard-backed short suite passes after the final code change.
-13. `docs/ARCHITECTURE.md` names the stage inputs, outputs, and dependency
-    direction after the extraction lands.
+2. One topology owner accepts a validated expanded `Template`, semiring, and
+   kernel declarations and returns a named immutable `TopologyLayout`.
+3. `TopologyLayout` contains endpoint order, degree/port facts, parameter-edge
+   shapes, edge records, own/opposite slot maps, data-slot candidates, and the
+   constraint classifications needed by later stages. It contains no packed
+   parameter values or partially built `Arena`.
+4. Plate expansion, schema validation, unsupported constraint/factor/role
+   checks, deterministic endpoint order, and slot numbering have one owner.
+5. The **New factor or rule family** and **New IR field** change-path rows are
+   the affected rows. **Learnable or checkpoint feature** is checked only for
+   parameter-edge addresses carried forward. **Runtime numerical or status
+   invariant** is N/A because this stage does not execute numeric messages.
+6. Flooding/scheduled and direct/`vmap` consumers receive the same final layout
+   downstream. Host/JIT is N/A because topology construction remains host-side.
+   Latest-schema/supported-legacy checkpoints reconstruct the template before
+   this one path.
+7. Sparse/vacuous/improper runtime messages are N/A. Float32 does not change
+   membership or slot order. The 32-group characterization fixture from
+   `cff-ecw0` retains deterministic addresses.
+8. Existing focused compiler tests protect HMM, Gaussian, hybrid, recurrence,
+   GFE, constraint, external-kernel, and malformed-topology paths through
+   old/new observable characterization. No new scientific oracle is required.
+9. Unsupported declarations retain their baseline `CompileError` item and
+   reason. No serialized meaning, rule, objective, or runtime behavior changes.
+10. The topology module is below 1,000 physical lines and the move fits one
+    implementation context: one named input, one named output, and one source
+    responsibility.
+11. Focused compiler/IR/serialization/plate tests and the final short suite
+    pass under the repository protocol.
+12. `docs/ARCHITECTURE.md` names `TopologyLayout`, its owner, and dependency
+    direction in the same commit as the extraction.
 
 ## Methodological Suggestions — HOW
 
 These suggestions are optional. An implementer may choose another sound method.
 
-- Extract one responsibility per atomic commit and keep the suite focused after
-  each move.
-- Prefer descriptive stage modules over a general compiler-utilities module.
-- Keep registered lowering data-driven. Keep specialized plans explicit
-  instead of widening one callback with unused fields.
-- Use the **New factor or rule family**, **New IR field**, and **Learnable or
-  checkpoint feature** change-path rows as the preservation checklist.
+- Move the e488df3 block from `compile_template` start through slot and
+  observation-port layout without moving group lowering.
+- Preserve diagnostic wording through structured errors or a thin compiler
+  adapter.
+- Keep the returned value immutable so later stages cannot reinterpret
+  topology through hidden mutation.
 
 ## Future work
 
-Closing this ticket closes the compiler track `cff-edoz`.
-`cff-sf29` then characterizes the engine against the new compiled-value
-boundary.
+`cff-ejib` consumes `TopologyLayout` to lower registered same-arena groups.
+Specialized plans remain explicit in `cff-kfo7`.
 
 ## Definitions
 
-- **Assembly:** Construction of the complete immutable arena after every stage
-  succeeds.
-- **Classification:** Selecting a registered arena binding or an explicit
-  specialized plan from validated declarations.
-- **Stage value:** A named immutable input or output shared between compiler
-  stages.
+- **Endpoint table:** Deterministically ordered factor-role endpoints for each
+  variable edge.
+- **Slot layout:** Addresses for a factor's own message and the opposite
+  message it reads.
+- **TopologyLayout:** The named immutable output of structural compilation.

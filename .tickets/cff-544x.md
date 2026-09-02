@@ -14,12 +14,11 @@ tags: [compiler, architecture, refactor]
 
 ## Background in Plain English — WHY
 
-At the `cff-ecw0` named baseline, the compiler defines every compiled plan
-record and the full `Arena` beside the code that constructs them. Runtime,
-schedule, estimator,
-learning, and agent code import those values from the compiler implementation
-module. That makes the compiler both a data-contract owner and an
-orchestration owner.
+At the `cff-ecw0` named baseline, `src/cffg/compiler.py:77-602` defines every
+compiled plan record and the full `Arena` beside the code that constructs them.
+Runtime, schedule, estimator, learning, and agent code import those values from
+the compiler implementation module. That makes the compiler both a
+data-contract owner and an orchestration owner.
 
 `cff-ecw0` first records the observable contract. This ticket moves only the
 immutable compiled values to a focused lower-level owner. It does not split
@@ -55,6 +54,8 @@ lowering logic or change any field.
     dashboard-backed short suite passes after the final code change.
 12. `docs/ARCHITECTURE.md` names the compiled-value owner in the same commit
     as the move.
+13. The ticket fits one implementation context because it moves the bounded
+    value-definition region without changing fields or lowering behavior.
 
 ## Methodological Suggestions — HOW
 
