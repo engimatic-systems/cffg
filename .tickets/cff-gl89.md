@@ -1,7 +1,7 @@
 ---
 id: cff-gl89
 status: open
-deps: [cff-ny7f]
+deps: [cff-jrbw]
 links: [cff-3ola, cff-cj5h]
 created: 2026-09-02T04:02:01Z
 type: chore
@@ -14,19 +14,19 @@ tags: [engine, architecture, ledger, refactor]
 
 ## Background in Plain English — WHY
 
-At the `cff-sf29` baseline, the engine computes BFE and GFE after execution,
-but objective assembly lives beside message updates, schedules, readouts, and
+At the `cff-sf29` baseline, objective assembly occupies approximately
+`src/cffg/engine.py:3670-3973` beside message updates, schedules, readouts, and
 public orchestration. This makes it harder to prove that one factor's message
 path and objective term use the same parameters and local belief.
 
-After `cff-ny7f` gives rule execution a focused owner, this ticket gives
-objective accounting its own focused owner. The mathematical formulas and
-independent oracles do not change.
+After `cff-jrbw` completes execution, schedule, lifecycle, and run-control
+ownership, this ticket gives objective accounting its own focused owner. The
+mathematical formulas and existing authorities do not change.
 
 ## Outcomes / Acceptance Criteria — WHAT
 
-1. `cff-ny7f` is closed with execution and schedule owners passing their
-   characterization evidence.
+1. `cff-jrbw` is closed with execution, schedule, lifecycle, and explicit
+   run-control owners passing bounded characterization.
 2. One objective owner assembles the existing:
    2.1. ordinary factor-local BFE terms;
    2.2. GFE and P-substitution terms;
@@ -48,8 +48,10 @@ independent oracles do not change.
    6.3. P-substituted nodes retain their declared GFE replacement.
    6.4. Named approximations remain named approximations and do not become
         labeled exact through the extraction.
-7. Every applicable `cff-sf29` objective total, local term, status, and
-   independent oracle remains unchanged within its dtype-derived tolerance.
+7. Existing analytic, enumeration, quadrature, literature, and family-specific
+   oracle tests remain authoritative where present. Applicable `cff-sf29`
+   old/new objective totals and local terms remain unchanged within their
+   dtype-derived tolerance. This move does not require a new scientific oracle.
 8. Flooding and scheduled states produce the same objective terms where they
    produce equivalent beliefs. Direct and one-instance `vmap` objective
    evaluation agree where both are supported.
@@ -66,6 +68,8 @@ independent oracles do not change.
     passes after the final code change.
 13. `docs/ARCHITECTURE.md` names the objective owner and dependency direction
     in the same commit as the extraction.
+14. The ticket fits one implementation context because it moves the bounded
+    e488df3 ledger region after run-control owners are already separated.
 
 ## Methodological Suggestions — HOW
 
@@ -73,8 +77,9 @@ These suggestions are optional. An implementer may choose another sound method.
 
 - Move one local-term family at a time while keeping `Engine.bfe` as a
   compatibility delegate.
-- Retain independent analytic, enumeration, quadrature, and literature oracles;
-  do not replace them with old-versus-new self-parity.
+- Retain existing independent analytic, enumeration, quadrature, and literature
+  authorities. Use old/new term characterization only to protect the move, not
+  to claim new mathematical validation.
 - Use the **New factor or rule family** and **Runtime numerical or status
   invariant** change-path rows.
 - Keep shared parameter terms explicit rather than assigning them to an

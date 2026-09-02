@@ -14,8 +14,9 @@ tags: [engine, architecture, readout, refactor]
 
 ## Background in Plain English — WHY
 
-After execution, schedules, and objective accounting have focused owners, the
-public engine still contains many readouts. These include discrete and Gaussian
+At e488df3, public readouts occupy `src/cffg/engine.py:1753-2478`. After
+execution, schedules, lifecycle, run control, and objective accounting have
+focused owners, the public engine still contains these readouts: discrete and Gaussian
 marginals, node beliefs, recurrence pairs and statistics, mixture predictions,
 exponential-family marginals, kernel readouts, and goal or parameter
 diagnostics. Several readouts repeat plan and parameter selection.
@@ -26,8 +27,8 @@ Readout vectorization remains separate work in `cff-3kdk`.
 
 ## Outcomes / Acceptance Criteria — WHAT
 
-1. `cff-gl89` is closed with the focused objective owner passing its
-   independent oracles.
+1. `cff-gl89` is closed with the focused objective owner preserving existing
+   mathematical authorities and bounded characterization.
 2. Focused readout owners cover every engine readout documented by the
    `cff-sf29` baseline, including discrete, Gaussian, exponential-family,
    mixture, recurrence, goal, kernel, learning-statistic, GFE, and
@@ -39,12 +40,16 @@ Readout vectorization remains separate work in `cff-3kdk`.
 5. Public `Engine`, `State`, `RunResult`, `RunStatus`, and
    `InferenceError` retain their documented imports, signatures, values, and
    failure behavior.
-6. The public engine owns orchestration only: initialization, data binding,
-   selection of compiled execution, status-bearing public calls, and delegation
-   to objective and readout owners.
-7. `src/cffg/engine.py` has fewer than 1,000 physical lines. No new or
-   extracted file exceeds 1,000 physical lines, and each file has one stated
-   responsibility.
+6. The public engine facade retains public state/result/status types, public
+   construction and compatibility delegates, selection of the explicit run
+   strategy, final `RunStatus`/`RunResult` construction in `Engine.run`, and
+   delegation to lifecycle, objective, and readout owners. It contains no
+   family rule call, schedule builder, solver loop, or local objective formula.
+7. `src/cffg/engine.py` has fewer than 1,000 physical lines because the named
+   owners remove the e488df3 execution region (2511-3040), schedule region
+   (3041-3669), lifecycle region (323-915), run-control regions (916-1752),
+   ledger region (3670-3973), and readout region (1753-2478), with overlap
+   resolved during extraction. No new or extracted file exceeds 1,000 lines.
 8. Every applicable `cff-sf29` message, belief, status, diagnostic,
    objective, and readout remains unchanged within its dtype-derived tolerance.
 9. Flooding and scheduled readouts agree for equivalent states. Direct and
@@ -63,6 +68,9 @@ Readout vectorization remains separate work in `cff-3kdk`.
     after the final code change.
 14. `docs/ARCHITECTURE.md` names the readout owners and final public-engine
     responsibility in the same commit as the extraction.
+15. The ticket fits one implementation context because it moves only the
+    bounded e488df3 readout region after every other engine responsibility has
+    a typed delegate.
 
 ## Methodological Suggestions — HOW
 

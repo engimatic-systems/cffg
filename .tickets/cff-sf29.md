@@ -19,9 +19,10 @@ will move execution, schedules, objective accounting, and readouts out of a
 3,973-line engine module. Before that move, reviewers need direct evidence for
 the values and failures each path produces at the named baseline.
 
-This ticket adds characterization evidence and an ownership map for a named
-baseline commit. It does not move production engine code or redefine a public
-result.
+This ticket inventories the existing mathematical authorities, adds only the
+small old/new observable characterization needed for refactor seams, and maps
+ownership at a named baseline commit. It does not move production engine code,
+redefine a public result, or create a new scientific validation program.
 
 ## Outcomes / Acceptance Criteria — WHAT
 
@@ -29,10 +30,12 @@ result.
    outcomes satisfied.
 2. The characterization record names the exact compiler-track commit used as
    its baseline.
-3. Compact fixtures cover ordinary discrete, Gaussian, exponential-family,
+3. A compact inventory maps ordinary discrete, Gaussian, exponential-family,
    mixture, recurrence, structured recurrence, precision, hard-constraint,
-   fixed-A GFE, transition GFE, hybrid GFE, and functional `mu3` execution.
-4. The fixtures pin applicable observable values:
+   fixed-A GFE, transition GFE, hybrid GFE, and functional `mu3` execution to
+   their existing focused tests and mathematical authority where one exists.
+4. Small characterization fixtures are added only where an extraction seam has
+   no existing observable protection. Together with the inventory they pin:
    4.1. outgoing messages and public beliefs;
    4.2. run status, logical iteration count, residual, and termination reason;
    4.3. schedule kind and fingerprint;
@@ -41,16 +44,18 @@ result.
    4.6. public readouts and their shapes; and
    4.7. prepared stochastic state, key cursor, and cache identity where
         applicable.
-5. Every converged fixture is paired with the independent analytic,
-   enumeration, quadrature, literature, or source-specific oracle named by its
-   baseline test. Self-parity alone is not the evidence for mathematical
-   correctness.
+5. Existing independent analytic, enumeration, quadrature, literature, or
+   source-specific oracle tests remain the mathematical authority where they
+   already exist. Old/new observable characterization is permitted for a
+   refactor-only seam and does not become a scientific correctness claim. A
+   newly discovered evidence gap becomes a separate linked ticket and does not
+   expand this epic unless it shows that the proposed code move is unsafe.
 6. Failure fixtures cover budget exhaustion, divergence, infeasibility,
    unsupported execution, non-finite state, and an inner-solver failure.
-7. A compact ownership table identifies every block at the named baseline that
-   gathers inputs, selects parameters, calls rules, writes messages, builds
-   schedules, computes objective terms, or constructs readouts. Repeated
-   interpretations are named for later removal.
+7. A compact ownership table identifies the named baseline regions that gather
+   inputs, select parameters, call rules, write messages, build schedules,
+   control run strategies, prepare lifecycle state, compute objective terms,
+   or construct readouts. Repeated interpretations are named for later removal.
 8. Deliberate execution pairs are explicit.
    8.1. Flooding and scheduled execution agree where both are supported.
    8.2. Direct and one-instance `vmap` execution agree where both are
@@ -67,13 +72,17 @@ result.
 11. Focused runtime, schedule, rule-family, ledger, readout, agent, and
     checkpoint tests pass. The dashboard-backed short suite passes after the
     final test change.
+12. The ticket fits one implementation context because it inventories existing
+    evidence and adds only the smallest characterization for uncovered seams;
+    it moves no production code and creates no new scientific benchmark.
 
 ## Methodological Suggestions — HOW
 
 These suggestions are optional. An implementer may choose another sound method.
 
-- Extend existing oracle tests and expose focused internal term comparisons
-  only when needed for characterization.
+- Reuse existing oracle tests without broadening their scientific claims. Add
+  only the smallest old/new observable fixture needed by an uncovered
+  extraction seam.
 - Record values field by field rather than storing one opaque engine snapshot.
 - Use the **Runtime numerical or status invariant** row as the primary
   change-path checklist. Also use **New factor or rule family** and **Learnable
@@ -84,8 +93,9 @@ These suggestions are optional. An implementer may choose another sound method.
 
 ## Future work
 
-`cff-ny7f` extracts execution and schedule owners after this evidence passes.
-No other future work is identified.
+`cff-ny7f` extracts execution owners after this evidence passes. Any scientific
+evidence gap discovered by the inventory gets a separate ticket outside this
+architecture epic unless the gap makes the planned refactor unsafe.
 
 ## Definitions
 

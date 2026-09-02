@@ -58,7 +58,9 @@ The ticket does not pretend that both paths fit one universal callback.
 8. The HMM, Kalman, fixed-A GFE, hybrid GFE, recurrence, structured
    recurrence, functional `mu3`, hard-constraint, learning, agent,
    serialization, and checkpoint fixtures named by the architecture tracks
-   retain their results.
+   retain their existing results. Their existing mathematical authorities are
+   reused; this proof does not add a new recovery experiment or oracle for
+   those shipped paths.
 9. Flooding and scheduled, direct and one-instance `vmap`, host and JIT
    status, and latest-schema and supported-legacy checkpoint pairs retain the
    applicability recorded by the architecture tracks.
@@ -74,13 +76,20 @@ The ticket does not pretend that both paths fit one universal callback.
 13. Focused kernel, compiler, runtime, schedule, objective, readout,
     serialization, model, and hostile-input tests pass. The dashboard-backed
     short suite passes after the final code change.
+14. The ticket fits one implementation context because production behavior is
+    frozen: it adds only the two cff-209l extension proofs, source ownership
+    checks, and the compact specialized-plan matrix.
 
 ## Methodological Suggestions — HOW
 
 These suggestions are optional. An implementer may choose another sound method.
 
-- Reuse the external test kernels required by `cff-209l`; the final proof
-  should show that later extraction did not weaken their path.
+- Reuse the external test kernels required by `cff-209l` to demonstrate that
+  later extraction did not weaken their path.
+- For shipped families, reuse existing authority tests and old/new observable
+  characterization from the architecture tracks. A newly noticed scientific
+  gap becomes a separate ticket unless it shows the extension-path proof is
+  structurally unsafe.
 - Make source checks target ownership invariants rather than a total ban on
   every type string in family-local modules.
 - Use the **New factor or rule family** row as the primary extension matrix.

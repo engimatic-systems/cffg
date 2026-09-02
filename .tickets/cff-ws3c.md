@@ -10,92 +10,94 @@ assignee: coopwilliams
 parent: cff-cfqg
 tags: [architecture, engine, extensibility]
 ---
-# Engine track: Give execution, schedules, ledger, and readouts focused owners
+# Engine track: Give runtime responsibilities focused owners
 
 ## Background in Plain English — WHY
 
-At commit e488df3, `src/cffg/engine.py` has 3,973 lines. It defines public
-state and status types, data binding, ordinary and GFE execution, support
-checks, schedule builders, objective accounting, and public readouts. It also
-contains 44 references to factor or group type selection. Several paths gather
-the same arena inputs and parameters separately. That duplication makes a local
-factor change hard to review and can let execution, diagnostics, and the
-free-energy ledger disagree.
+At e488df3, `src/cffg/engine.py` has 3,973 lines. Public lifecycle and run
+control occupy roughly lines 323-1752, readouts 1753-2478, plan execution
+2511-3040, schedules/propagation 3041-3669, and the objective ledger
+3670-3973. The module contains 44 factor/group type-selection references and
+several repeated input/parameter interpretations.
 
-This track preserves the engine behavior recorded at commit e488df3 while
-assigning those responsibilities to focused modules. It starts after the
-compiler track supplies typed compiled values. Four context-sized child tickets
-record the post-compiler contract, extract execution and schedules, extract the
-ledger, and finally extract readouts while leaving the public `Engine` as
-orchestration.
+This track first inventories bounded existing evidence. It then moves one
+responsibility per context: rule execution, schedules, state/data/mu3
+lifecycle, ordinary iteration, explicit outer/exact strategies, objective
+accounting, and readouts. Public `Engine.run` remains the final status authority.
 
 ## Outcomes / Acceptance Criteria — WHAT
 
-1. The direct dependency `cff-3ola` is closed because its acceptance criteria
-   are satisfied. Its chain closes `cff-gl89`, `cff-ny7f`, `cff-sf29`,
-   and `cff-edoz` first.
-2. Characterization evidence pins messages, beliefs, statuses, schedules,
-   diagnostics, objective values, and readouts at its recorded baseline before
-   engine code moves.
-3. Per-arena and specialized execution modules own input gathering, parameter
-   selection, rule calls, and message writes for their named plans.
-4. One schedule-execution owner builds flooding, staged, scan, exact-pass,
-   support-check, and propagation functions from typed compiled values.
-5. One objective owner assembles factor terms, parameter terms, constraint
-   terms, GFE substitutions, and edge-entropy corrections.
-6. Focused readout owners consume typed arena views without reimplementing
-   message rules or objective terms.
-7. Public `Engine`, `State`, `RunResult`, `RunStatus`, and
-   `InferenceError` retain their documented imports, call forms, and meanings.
-8. The public engine module becomes readable orchestration below 1,000 physical
-   lines. No extracted source file exceeds the repository's 1,000-line limit.
-9. Imports remain acyclic. Compiled values and mathematical rules sit below
-   execution, schedule, objective, and readout owners; public orchestration
-   sits above them.
-10. The track preserves template and structure identity, parameter addresses,
-    state shape, checkpoints, messages, beliefs, BFE and GFE meaning,
-    convergence statuses, and each approximation boundary recorded by the
-    baseline documentation and tests.
-11. Literal zero support, vacuous messages, improper beliefs, non-finite
-    updates, float32, and uncomfortable-scale fixtures keep their documented
-    values or loud statuses across flooding and scheduled paths.
-12. This track introduces no runtime-speed threshold, new diagnostic, new
-    factor family, scientific claim, or public-release promise.
-13. `docs/ARCHITECTURE.md` names the final engine owners and their dependency
-    direction after the extraction lands.
+1. Direct dependency `cff-3ola` is closed. Its chain closes `cff-gl89`,
+   `cff-jrbw`, `cff-ii9t`, `cff-5xdy`, `cff-nyad`, `cff-ny7f`, `cff-sf29`,
+   and compiler track `cff-edoz` first.
+2. `cff-sf29` inventories existing mathematical authorities and adds only the
+   smallest old/new observable characterization needed for uncovered refactor
+   seams. New scientific validation gaps remain separate work unless a gap
+   proves the proposed move unsafe.
+3. Per-plan execution owners gather inputs, select compiled parameters, and
+   invoke existing rules. Flooding and scheduled paths share that rule-call
+   owner.
+4. One schedule owner constructs flooding, stage, scan, support-check,
+   exact-unit, and propagation programs without interpreting a factor rule.
+5. Ordinary state/data lifecycle and specialized functional-mu3 lifecycle have
+   narrow owners. Checkpoint decoding stays outside this extraction.
+6. Ordinary iterative control, outer trust-region control, and exact-run
+   control return typed internal outcomes. The specialized strategies remain
+   explicit; no universal solver callback receives irrelevant state.
+7. Public `Engine.run` selects a typed strategy, validates its outcome, and is
+   the only final constructor/authority for public `RunStatus` and `RunResult`.
+8. One objective owner assembles factor, parameter, constraint,
+   GFE/P-substitution, and edge-entropy terms. Focused readout owners consume
+   typed views without reimplementing rules or objective terms.
+9. The public engine facade retains public state/status/result types,
+   construction and compatibility delegates, explicit strategy selection,
+   final status construction, and delegation. It owns no family rule,
+   schedule builder, solver loop, local ledger formula, or readout algorithm.
+10. The below-1,000-line public-engine target follows from named e488df3
+    regions: lifecycle 323-915, ordinary control/status 916-1190 and
+    1657-1752, outer/exact control 1191-1656, readouts 1753-2478, execution
+    2511-3040, schedules 3041-3669, and ledger 3670-3973. Overlap and small
+    compatibility delegates are reconciled during extraction. No extracted
+    source file exceeds 1,000 lines.
+11. Imports remain acyclic: compiled values/rules feed execution; execution
+    feeds schedules; lifecycle and explicit control strategies consume those
+    owners; ledger/readouts consume typed state; the facade sits above them.
+12. Flooding/scheduled, direct/one-instance `vmap`, host/JIT status, and
+    latest-schema/supported-legacy restored-state pairs retain their stated
+    applicability and observable behavior.
+13. Literal zero support, vacuous/improper inputs, non-finite updates, float32,
+    and uncomfortable-scale cases retain documented values or loud statuses.
+14. No runtime-speed threshold, new solver/rule/factor, diagnostic feature,
+    scientific claim, checkpoint migration, or public-release promise enters
+    this track.
+15. `docs/ARCHITECTURE.md` names every final engine owner and dependency.
 
 ## Methodological Suggestions — HOW
 
 These suggestions are optional. An implementer may choose another sound method.
 
-- Follow the child order and land one owner per atomic code commit.
-- Use the **Runtime numerical or status invariant** row as the primary
-  preservation checklist. Also use **New factor or rule family** and
-  **Learnable or checkpoint feature** for affected consumers.
-- Keep flooding and scheduled builders on the same family execution
-  primitives. Keep direct and one-instance batched behavior on the same typed
-  values.
-- Preserve compatibility imports until direct consumers migrate. Avoid broad
-  helper modules that have no single responsibility.
+- Follow the child order and land one typed owner per atomic implementation
+  change.
+- Use **Runtime numerical or status invariant** as the primary change-path row;
+  each child states the additional factor/IR/learning rows that apply.
+- Keep source checks proving schedule code uses the shared execution owner and
+  public `Engine.run` alone constructs final status.
+- Preserve compatibility delegates until all internal consumers use typed
+  owners.
 
 ## Future work
 
-`cff-ofv1` verifies the bounded extension paths after this track closes.
-`cff-3kdk`, `cff-cj5h`, and `cff-wbhu` remain independent consumers of
-the final readout, objective, and schedule seams. They are not prerequisites
-and this track does not claim their performance or diagnostic outcomes.
+`cff-ofv1` verifies the bounded extension paths after this track. `cff-3kdk`,
+`cff-cj5h`, and `cff-wbhu` remain independent readout, diagnostic, and
+performance consumers.
 
 ## Definitions
 
-- **Execution owner:** The module that gathers inputs, calls one rule family,
-  and writes its messages.
-- **Objective owner:** The module that computes and labels BFE or GFE
-  contributions.
-- **Orchestration:** Selection and sequencing of existing contracts without
-  owning their local mathematics.
-- **Readout owner:** The module that converts a typed arena view into a
-  documented posterior or diagnostic value.
-- **Schedule owner:** The module that builds the ordered execution functions
-  selected by a compiled schedule.
-- **Typed arena view:** The focused immutable subset of compiled metadata that
-  one runtime owner needs.
+- **Facade:** The public compatibility/orchestration layer above focused
+  internal owners.
+- **Lifecycle owner:** State initialization, observation binding, or specialized
+  stochastic preparation without convergence decisions.
+- **Run strategy:** One explicit internal control algorithm returning typed
+  termination facts to `Engine.run`.
+- **Status authority:** The sole public owner that constructs `RunStatus` and
+  `RunResult`.
