@@ -14,11 +14,13 @@ tags: [compiler, architecture, refactor]
 
 ## Background in Plain English — WHY
 
-At e488df3, `src/cffg/compiler.py:898-1479` recognizes parameter-edge VMP,
-P-substitution/GFE composites, hybrid mixtures, functional evaluators,
-recurrence, and Gaussian-precision relationships; lines 1743-1818 lower hard
-constraints. These constructs cross arenas or change structural/objective
-meaning and cannot honestly use one ordinary same-arena callback.
+At authoring snapshot e488df3, `src/cffg/compiler.py:898-1479` is the source-
+region anchor for parameter-edge VMP, P-substitution/GFE composites, hybrid
+mixtures, functional evaluators, recurrence, and Gaussian-precision
+relationships; lines 1743-1818 anchor hard constraints. The implementation
+starts from the exact `cff-ecw0` baseline, and those old line ranges are not
+promised future maps. These constructs cross arenas or change structural/
+objective meaning and cannot use one ordinary same-arena callback.
 
 This ticket gives those plan classes explicit lowering owners behind one typed
 specialized-stage result. It does not change their mathematics or invent a
@@ -27,15 +29,18 @@ universal solver interface.
 ## Outcomes / Acceptance Criteria — WHAT
 
 1. `cff-ejib` is closed with registered same-arena lowering passing.
-2. A specialized-lowering stage accepts `Template`, `TopologyLayout`, and
-   registered-stage exclusions and returns immutable `SpecializedPlanDrafts`
-   plus typed `ArrayRequirement` values.
-3. Named lowerers cover the e488df3 plan classes: parameter-edge Dirichlet VMP,
+2. A specialized-lowering stage accepts `Template`, `TopologyLayout`, semiring,
+   and registered-stage exclusions and returns immutable
+   `SpecializedPlanDrafts` plus typed `ArrayRequirement` values.
+3. Named lowerers cover the plan classes present at the `cff-ecw0` baseline:
+   parameter-edge Dirichlet VMP,
    mixture/hybrid, recurrence, Gaussian precision, P-substitution and GFE,
    hard constraints, and functional evaluator metadata.
 4. Each plan class has one classification/lowering owner. Shared orchestration
    invokes those named lowerers without passing unrelated arena state through a
    universal callback.
+   4.1. Neither topology, registered lowering, data resolution, nor assembly
+        chooses specialized plan meaning; this ticket owns those choices.
 5. The affected rows are **New factor or rule family**, **New IR field**, and
    **Learnable or checkpoint feature**. **Runtime numerical or status
    invariant** is N/A except that emitted plan/status metadata must stay

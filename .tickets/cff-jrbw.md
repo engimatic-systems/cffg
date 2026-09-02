@@ -14,10 +14,12 @@ tags: [engine, architecture, runtime, refactor]
 
 ## Background in Plain English — WHY
 
-At e488df3, `src/cffg/engine.py:1191-1656` contains deterministic outer-kernel
-planning, trust-region/globalized mixed-GFE control, and exact two-pass run
-control. These strategies have different state and acceptance facts from the
-ordinary iterative loop.
+At authoring snapshot e488df3, `src/cffg/engine.py:1191-1656` is the scope
+anchor for deterministic outer-kernel planning, trust-region/globalized mixed-
+GFE control, and exact two-pass run control; it is not a promised future line
+map. The implementation starts from the exact `cff-sf29` engine baseline.
+These strategies have different state and acceptance facts from the ordinary
+iterative loop.
 
 This ticket gives outer and exact control separate typed owners. It does not
 force them through one solver callback, and public `Engine.run` remains the
@@ -40,7 +42,7 @@ final status authority.
    final status authority.
 6. Trust-region merit/acceptance, budget and rejection counts, inner status,
    exact two-pass behavior, support classification, traces, and diagnostic
-   fields retain the e488df3 behavior.
+   fields retain the `cff-sf29` baseline behavior.
 7. The affected row is **Runtime numerical or status invariant**. **New factor
    or rule family** applies to the explicit GFE plan input; **New IR field** and
    **Learnable or checkpoint feature** are N/A because plan/checkpoint schemas
@@ -57,8 +59,9 @@ final status authority.
 11. No solver/globalization rule, objective formula, approximation, factor
     behavior, public status, checkpoint field, or performance target changes.
 12. Each strategy owner is below 1,000 physical lines. The ticket fits one
-    context because it moves one contiguous e488df3 region into two explicit
-    strategy values after ordinary control already has its boundary.
+    context because it moves the responsibility anchored by one contiguous
+    e488df3 region into two explicit strategy values after ordinary control
+    already has its boundary.
 13. Focused outer/exact/runtime tests and the final short suite pass.
 14. `docs/ARCHITECTURE.md` names both strategy owners and the public status
     authority in the extraction commit.

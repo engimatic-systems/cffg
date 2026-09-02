@@ -14,11 +14,12 @@ tags: [engine, architecture, lifecycle, refactor]
 
 ## Background in Plain English — WHY
 
-At e488df3, public-engine methods from `src/cffg/engine.py:323-915` construct
-initial state, bind observations, prepare/update functional mu3 stochastic
-state, and produce mu3/hybrid diagnostics and epoch scores. These lifecycle
-operations are mixed with public construction and the run loop even though they
-do not decide convergence.
+At authoring snapshot e488df3, `src/cffg/engine.py:323-915` is the scope anchor
+for initial state, observation binding, functional-mu3 preparation/update,
+diagnostics, and epoch scores; it is not a promised future line map. The
+implementation starts from the exact `cff-sf29` engine baseline. These
+lifecycle operations are mixed with public construction and the run loop even
+though they do not decide convergence.
 
 This ticket gives ordinary state/data preparation and functional-mu3
 preparation explicit internal owners. `Engine` construction stays public and
@@ -37,7 +38,7 @@ preparation explicit internal owners. `Engine` construction stays public and
    methods, and diagnostics remain compatible delegates.
 5. PRNG key consumption, cache identity, retained moments, status-aware mu3
    state, observation masks, parameter defaults, and readout shapes retain the
-   e488df3 contract as repaired through #107.
+   `cff-sf29` baseline, including the #107 repairs present in its history.
 6. The affected rows are **Learnable or checkpoint feature**, **Runtime
    numerical or status invariant**, and the mu3 portion of **New factor or rule
    family**. **New IR field** is N/A because state and plan schemas do not
@@ -57,8 +58,9 @@ preparation explicit internal owners. `Engine` construction stays public and
     convergence status, objective, diagnostic promise, or performance target
     changes.
 11. The ordinary lifecycle and specialized mu3 owner each stay below 1,000
-    physical lines. The ticket fits one context because it moves the bounded
-    e488df3 preparation/binding region and leaves run strategies separate.
+    physical lines. The ticket fits one context because it moves the
+    preparation/binding responsibility anchored by the bounded e488df3 region
+    and leaves run strategies separate.
 12. Focused state/data/mu3/checkpoint tests and the final short suite pass.
 13. `docs/ARCHITECTURE.md` names both lifecycle owners and their narrow typed
     inputs in the extraction commit.

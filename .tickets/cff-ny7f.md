@@ -14,10 +14,11 @@ tags: [engine, architecture, refactor]
 
 ## Background in Plain English — WHY
 
-At e488df3, `src/cffg/engine.py:2511-3040` gathers inputs, selects compiled
-parameters, invokes rules, and writes messages for mixture, recurrence, hybrid
-GFE, precision, Gaussian, exponential-family, constraint, and ordinary groups.
-Flooding and schedule builders risk repeating this rule-call interpretation.
+At authoring snapshot e488df3, `src/cffg/engine.py:2511-3040` is the scope
+anchor for input gathering, compiled-parameter selection, rule invocation, and
+message writes across plan families; it is not a promised future line map. The
+implementation starts from the exact `cff-sf29` engine baseline. Flooding and
+schedule builders risk repeating this rule-call interpretation.
 
 This ticket extracts only per-plan execution. Schedule classification,
 propagation, support checks, and run control stay in later tickets.
@@ -56,7 +57,8 @@ propagation, support checks, and run control stay in later tickets.
 11. No schedule kind, solver, rule, factor family, objective, public status,
     checkpoint field, diagnostic, or performance target changes.
 12. The execution-owner source is below 1,000 physical lines and the ticket
-    fits one context because it moves only the e488df3 rule-call region.
+    fits one context because it moves only the rule-call responsibility anchored
+    by that e488df3 region.
 13. Focused family/runtime tests and the final short suite pass.
 14. `docs/ARCHITECTURE.md` names the execution inputs, output, specialized
     owners, and shared flooding/scheduled rule-call invariant.

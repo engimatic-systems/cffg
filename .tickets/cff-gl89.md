@@ -14,10 +14,12 @@ tags: [engine, architecture, ledger, refactor]
 
 ## Background in Plain English — WHY
 
-At the `cff-sf29` baseline, objective assembly occupies approximately
-`src/cffg/engine.py:3670-3973` beside message updates, schedules, readouts, and
-public orchestration. This makes it harder to prove that one factor's message
-path and objective term use the same parameters and local belief.
+At authoring snapshot e488df3, `src/cffg/engine.py:3670-3973` is the scope
+anchor for objective assembly; it is not a promised future line map. At the
+exact `cff-sf29` baseline, that responsibility still sits beside message
+updates, schedules, readouts, and public orchestration. This makes it harder to
+show that one factor's message path and objective term use the same parameters
+and local belief.
 
 After `cff-jrbw` completes execution, schedule, lifecycle, and run-control
 ownership, this ticket gives objective accounting its own focused owner. The
@@ -41,6 +43,10 @@ mathematical formulas and existing authorities do not change.
    agents.
 5. `Engine.bfe`, `Engine.objective`, convergence checks, and any public
    objective diagnostics delegate to the same local-term implementations.
+   5.1. The final ordinary/outer/exact controllers consume this objective
+        evaluator through explicit injection by the facade or a lower-level
+        protocol. The objective owner never imports run-control owners, and
+        run-control owners never import the public facade.
 6. The true BFE and GFE invariant remains intact.
    6.1. Node-local energy and entropy terms retain their formulas.
    6.2. Each interior edge receives its existing entropy correction exactly
@@ -68,8 +74,9 @@ mathematical formulas and existing authorities do not change.
     passes after the final code change.
 13. `docs/ARCHITECTURE.md` names the objective owner and dependency direction
     in the same commit as the extraction.
-14. The ticket fits one implementation context because it moves the bounded
-    e488df3 ledger region after run-control owners are already separated.
+14. The ticket fits one implementation context because it moves the ledger
+    responsibility anchored by the bounded e488df3 region after run-control
+    owners already accept an injected compatibility evaluator.
 
 ## Methodological Suggestions — HOW
 

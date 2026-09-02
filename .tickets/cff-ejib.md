@@ -14,11 +14,12 @@ tags: [compiler, architecture, refactor]
 
 ## Background in Plain English — WHY
 
-At e488df3, ordinary discrete, Gaussian, and exponential-family group lowering
-is interleaved with specialized GFE, hybrid, recurrence, precision, and
-constraint handling inside `compile_template`, chiefly across
-`src/cffg/compiler.py:1370-1742`. `cff-209l` makes the ordinary families use
-registered same-arena kernel declarations.
+At authoring snapshot e488df3, `src/cffg/compiler.py:1370-1742` is the source-
+region anchor where ordinary discrete, Gaussian, and exponential-family group
+lowering is interleaved with specialized GFE, hybrid, recurrence, precision,
+and constraint handling. The implementation starts from the exact `cff-ecw0`
+baseline, after `cff-209l` makes ordinary families use registered same-arena
+kernel declarations; the old line range is not a promised future map.
 
 After `cff-8t4d` produces topology once, this ticket gives only registered
 same-arena structural lowering a focused owner. It does not load blobs or
@@ -37,6 +38,9 @@ construct an `Arena`.
 4. Ordinary discrete, Gaussian, and exponential-family factors select this
    path from registered metadata. Their type names are not reclassified in a
    second shared compiler block.
+   4.1. Neither `TopologyLayout` nor final assembly chooses registered family
+        meaning; this ticket is the sole registered classification/lowering
+        owner.
 5. The affected change-path row is **New factor or rule family**. **New IR
    field** applies only to roles copied from `TopologyLayout`; **Learnable or
    checkpoint feature** applies only to emitted address requirements;

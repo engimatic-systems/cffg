@@ -14,11 +14,12 @@ tags: [compiler, architecture, refactor]
 
 ## Background in Plain English — WHY
 
-At the `cff-ecw0` named baseline, `src/cffg/compiler.py:77-602` defines every
-compiled plan record and the full `Arena` beside the code that constructs them.
-Runtime, schedule, estimator, learning, and agent code import those values from
-the compiler implementation module. That makes the compiler both a
-data-contract owner and an orchestration owner.
+At authoring snapshot e488df3, `src/cffg/compiler.py:77-602` is the source-
+region anchor for compiled plan records and `Arena`. The exact `cff-ecw0`
+baseline is the completed `cff-209l` head, where those definitions may have
+moved. Runtime, schedule, estimator, learning, and agent code import the values
+from the compiler implementation module. That makes the compiler both a data-
+contract owner and an orchestration owner.
 
 `cff-ecw0` first records the observable contract. This ticket moves only the
 immutable compiled values to a focused lower-level owner. It does not split

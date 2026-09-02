@@ -14,10 +14,11 @@ tags: [compiler, architecture, refactor]
 
 ## Background in Plain English — WHY
 
-At e488df3, `compile_template` begins blob resolution near
-`src/cffg/compiler.py:871`, packs arrays while lowering groups, and then calls
-`_resolve_learnables` at lines 1938-2063. The same source values therefore flow
-through several lowering branches before learning addresses are known.
+At authoring snapshot e488df3, blob resolution near
+`src/cffg/compiler.py:871` and `_resolve_learnables` at lines 1938-2063 are
+source-region anchors, not promised future line numbers. The implementation
+starts from the exact `cff-ecw0` baseline. At e488df3, the same source values
+flow through several lowering branches before learning addresses are known.
 
 After structural plan drafts exist, this ticket gives numeric array loading,
 shape checking, parameter/observation packing, member addresses, and declared
@@ -69,7 +70,8 @@ These suggestions are optional. An implementer may choose another sound method.
 - Make packers consume typed `ArrayRequirement` values from both lowering
   stages.
 - Keep external source loading separate from pure shape/transform functions.
-- Preserve the baseline parameter keys and address order field by field.
+- Preserve the `cff-ecw0` baseline parameter keys and address order field by
+  field.
 
 ## Future work
 

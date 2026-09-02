@@ -14,10 +14,12 @@ tags: [engine, architecture, schedule, refactor]
 
 ## Background in Plain English — WHY
 
-At e488df3, `src/cffg/engine.py:3041-3669` constructs batch stages,
-registerized and flat scans, support checks, exact units, and propagation
-functions. Those builders sit beside the family sweeps they invoke, allowing a
-scheduled path to reinterpret a plan instead of reusing one rule-call owner.
+At authoring snapshot e488df3, `src/cffg/engine.py:3041-3669` is the scope
+anchor for batch stages, registerized/flat scans, support checks, exact units,
+and propagation; it is not a promised future line map. The implementation
+starts from the exact `cff-sf29` engine baseline. Those builders sit beside the
+family sweeps they invoke, allowing a scheduled path to reinterpret a plan
+instead of reusing one rule-call owner.
 
 After `cff-ny7f` owns plan execution, this ticket moves only schedule
 classification and propagation construction.
@@ -52,8 +54,8 @@ classification and propagation construction.
 10. No schedule kind, factor rule, solver, public status, checkpoint schema,
     diagnostic field, or speed target changes.
 11. The schedule module is below 1,000 physical lines and the ticket fits one
-    context because its e488df3 source region is about 629 lines with one
-    `ScheduleProgram` output.
+    context because its source responsibility is anchored by about 629 lines at
+    e488df3 and has one `ScheduleProgram` output.
 12. Focused schedule/runtime tests and the final short suite pass.
 13. `docs/ARCHITECTURE.md` names the schedule owner and its dependency on the
     execution owner in the extraction commit.

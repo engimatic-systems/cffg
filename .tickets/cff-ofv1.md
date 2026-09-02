@@ -77,8 +77,9 @@ The ticket does not pretend that both paths fit one universal callback.
     serialization, model, and hostile-input tests pass. The dashboard-backed
     short suite passes after the final code change.
 14. The ticket fits one implementation context because production behavior is
-    frozen: it adds only the two cff-209l extension proofs, source ownership
-    checks, and the compact specialized-plan matrix.
+    frozen: it re-runs and reuses the two extension factors already delivered
+    by `cff-209l`, then adds only cross-seam ownership/source checks plus the
+    compact specialized-plan matrix and its documentation.
 
 ## Methodological Suggestions — HOW
 

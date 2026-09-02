@@ -28,8 +28,10 @@ names.
 
 1. `cff-209l` is closed with its discrete and Gaussian kernel migration and
    extension tests satisfied.
-2. The characterization record names the exact repository commit used as its
-   baseline.
+2. The characterization record names the exact commit that closes `cff-209l`
+   and uses that commit as its compiler baseline. Where `cff-209l` promises
+   public, serialized, or numerical parity, the record may also compare its
+   outputs with authoring snapshot e488df3 as an external reference.
 3. Compact fixtures cover these compiled paths:
    3.1. discrete HMM and fixed-A Figure 5 GFE;
    3.2. Gaussian linear and observed Gaussian models;
@@ -102,8 +104,8 @@ passes. No other future work is identified.
 
 - **Address:** A stable compiled location for a message, parameter,
   observation, or learning statistic.
-- **Characterization test:** A test that records observable behavior at a
-  named baseline commit before a refactor.
+- **Characterization test:** A test that records observable behavior at the
+  exact cff-209l completion commit before the compiler refactor.
 - **Compiler contract:** The compiled plans, addresses, order, identity, and
   diagnostics visible to repository consumers.
 - **Static value:** Host-created metadata captured by a compiled JAX function.

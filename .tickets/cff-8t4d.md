@@ -14,11 +14,13 @@ tags: [compiler, architecture, refactor]
 
 ## Background in Plain English — WHY
 
-At baseline e488df3, `compile_template` spans
-`src/cffg/compiler.py:632-1936`. Its first responsibility expands plates,
-validates factor/constraint compatibility, builds endpoint tables, and assigns
-discrete, Gaussian, exponential-family, observation, and parameter-edge slots
-through approximately line 870. Later lowering code consumes these tables.
+At authoring snapshot e488df3, `compile_template` spans
+`src/cffg/compiler.py:632-1936`. This is a source-region anchor, not a promised
+future line map. Public orchestration first checks the semiring, expands plates,
+and calls the existing core `validate`. The remaining structural front end
+builds endpoint/degree/port facts and assigns discrete, Gaussian,
+exponential-family, observation, and parameter-edge slots through approximately
+line 870. Later lowering code consumes these facts.
 
 This ticket extracts only that structural front end. Registered factor
 lowering, specialized plans, learnables, arrays, and final `Arena` assembly
@@ -27,14 +29,18 @@ remain for later tickets.
 ## Outcomes / Acceptance Criteria — WHAT
 
 1. `cff-544x` is closed with compiled values behind a one-way boundary.
-2. One topology owner accepts a validated expanded `Template`, semiring, and
-   kernel declarations and returns a named immutable `TopologyLayout`.
-3. `TopologyLayout` contains endpoint order, degree/port facts, parameter-edge
-   shapes, edge records, own/opposite slot maps, data-slot candidates, and the
-   constraint classifications needed by later stages. It contains no packed
-   parameter values or partially built `Arena`.
-4. Plate expansion, schema validation, unsupported constraint/factor/role
-   checks, deterministic endpoint order, and slot numbering have one owner.
+2. One topology owner accepts the already expanded, core-validated `Template`
+   and returns a named immutable `TopologyLayout`.
+3. `TopologyLayout` contains endpoint order, degree/port facts, declared
+   parameter-edge/constraint/role facts, edge records, own/opposite slot maps,
+   and data-slot candidates. It contains no registered-versus-specialized
+   classification, packed parameter value, or partially built `Arena`.
+4. Public `compile_template` owns checking the accepted semiring option, plate
+   expansion, and the existing core `validate` call as thin orchestration. The
+   topology owner owns executable endpoint, degree, exterior-port, and slot-
+   layout invariants only. `cff-ejib` and `cff-kfo7` are the sole registered
+   and specialized semantic classification/lowering owners, including family-
+   specific semiring compatibility.
 5. The **New factor or rule family** and **New IR field** change-path rows are
    the affected rows. **Learnable or checkpoint feature** is checked only for
    parameter-edge addresses carried forward. **Runtime numerical or status
@@ -49,8 +55,10 @@ remain for later tickets.
 8. Existing focused compiler tests protect HMM, Gaussian, hybrid, recurrence,
    GFE, constraint, external-kernel, and malformed-topology paths through
    old/new observable characterization. No new scientific oracle is required.
-9. Unsupported declarations retain their baseline `CompileError` item and
-   reason. No serialized meaning, rule, objective, or runtime behavior changes.
+9. Endpoint/degree/port/slot failures retain their `cff-ecw0` baseline
+   `CompileError` item and reason. Registered/specialized semantic failures
+   remain for their respective later owners. No serialized meaning, rule,
+   objective, or runtime behavior changes.
 10. The topology module is below 1,000 physical lines and the move fits one
     implementation context: one named input, one named output, and one source
     responsibility.
@@ -63,8 +71,9 @@ remain for later tickets.
 
 These suggestions are optional. An implementer may choose another sound method.
 
-- Move the e488df3 block from `compile_template` start through slot and
-  observation-port layout without moving group lowering.
+- Use the e488df3 structural region only as a scope anchor. Leave semiring
+  checking, plate expansion, and core validation in thin public orchestration;
+  move endpoint/degree/port/slot work without moving semantic classification.
 - Preserve diagnostic wording through structured errors or a thin compiler
   adapter.
 - Keep the returned value immutable so later stages cannot reinterpret

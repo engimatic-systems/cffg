@@ -17,11 +17,12 @@ tags: [architecture, trustworthiness, extensibility]
 After the rSLDS clean-port stack, CFFG can run a broad mix of discrete,
 Gaussian, exponential-family, hybrid, recurrence, constraint, and GFE paths.
 Adding or changing one family still requires careful edits across large central
-modules. At commit e488df3, `src/cffg/compiler.py` has 2,368 lines and
-`src/cffg/engine.py` has 3,973 lines. Both interpret factor types in several
-places. That makes a local feature look like an engine-wide change and makes it
-easy for synchronous execution, schedules, objective terms, readouts, and
-serialization-derived plans to drift apart.
+modules. Commit e488df3 is this program's authoring snapshot, source-region
+map, and external-parity reference: `src/cffg/compiler.py` has 2,368 lines and
+`src/cffg/engine.py` has 3,973 lines there. Both interpret factor types in
+several places. That makes a local feature look like an engine-wide change and
+makes it easy for synchronous execution, schedules, objective terms, readouts,
+and serialization-derived plans to drift apart.
 
 This epic makes the existing library easier to trust and extend. It first
 finishes the registered same-arena factor path. It then gives compiler stages,
@@ -52,19 +53,21 @@ release, or change the mathematical meaning of an existing model.
    4.4. No universal callback is introduced by passing irrelevant state for
         unrelated factor families.
 5. Compiler planning uses context-sized typed stages for topology, registered
-   lowering, specialized lowering, data/learning resolution, and assembly after
-   bounded characterization pins the e488df3 serialized-to-arena contract.
+   lowering, specialized lowering, data/learning resolution, and assembly.
+   `cff-ecw0` characterizes the exact commit that closes `cff-209l`, not the
+   older authoring snapshot.
 6. Engine execution, schedules, state/data/mu3 lifecycle, ordinary iteration,
    explicit outer/exact strategies, objective accounting, and readouts use
-   focused owners after bounded characterization records the applicable
-   numerical, support, status, and diagnostic contracts.
-7. The refactor preserves public imports and call forms, template JSON,
-   structure hashes, CFFGZ bundles, parameter and observation addresses,
-   learnable plans, agent checkpoints, and migration behavior present at
-   e488df3.
-8. The refactor preserves each message rule, BFE or GFE ledger term,
-   edge-entropy correction, approximation label, inference schedule, and
-   convergence classification present at e488df3.
+   focused owners after `cff-sf29` characterizes the exact commit that closes
+   compiler track `cff-edoz`.
+7. The refactor preserves the exact compiler and engine characterization
+   baselines. For public, serialized, and numerical surfaces where `cff-209l`
+   promises parity, this also preserves e488df3 imports and call forms,
+   template JSON, structure hashes, CFFGZ behavior, addresses, checkpoints,
+   migrations, messages, objective terms, schedules, and statuses.
+8. The new same-arena registration behavior delivered by `cff-209l` is part of
+   the compiler baseline and remains present through the final proof; it is not
+   incorrectly attributed to e488df3.
 9. Literal zero support, improper or vacuous inputs, float32, and
    uncomfortable-scale cases retain their documented values or loud status.
    No child ticket weakens the numerical robustness contract to make a
@@ -137,6 +140,12 @@ The following tickets remain outside this epic:
 
 Source of truth: `tk dep tree --full`, `tk ready`, and `tk blocked` at this
 revision.
+
+Baseline semantics: e488df3 is the authoring snapshot, source-region map, and
+external-parity reference. `cff-ecw0` characterizes the exact commit that
+closes `cff-209l`; `cff-sf29` characterizes the exact commit that closes
+compiler track `cff-edoz`. Later children preserve those prerequisite-aware
+baselines rather than attempting to characterize the older snapshot directly.
 
 Legend: prerequisite --> dependent
 

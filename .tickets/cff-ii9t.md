@@ -14,11 +14,12 @@ tags: [engine, architecture, runtime, refactor]
 
 ## Background in Plain English — WHY
 
-At e488df3, `Engine.step` and the ordinary iterative portion of `Engine.run`
-occupy `src/cffg/engine.py:916-1190`; finite-state and zero-support checks live
-at lines 1657-1752. They select propagation, track free energy and deltas, apply
-damping/hardening, and distinguish convergence, budget exhaustion, divergence,
-and infeasibility.
+At authoring snapshot e488df3, `src/cffg/engine.py:916-1190` and lines
+1657-1752 are scope anchors for ordinary iteration plus finite-state and zero-
+support checks; they are not promised future line maps. The implementation
+starts from the exact `cff-sf29` engine baseline. This responsibility selects
+propagation, tracks free energy and deltas, applies damping/hardening, and
+distinguishes convergence, exhaustion, divergence, and infeasibility.
 
 This ticket moves only ordinary iterative control behind a typed outcome.
 Specialized deterministic outer trust-region and exact-run strategies remain in

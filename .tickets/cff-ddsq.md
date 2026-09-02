@@ -14,10 +14,13 @@ tags: [compiler, architecture, refactor]
 
 ## Background in Plain English — WHY
 
-At e488df3, `compile_template` computes final support groups, slot prefix
-offsets, delta/interior edge tables, semiring exclusions, and the `Arena`
-constructor across `src/cffg/compiler.py:1819-1936`. Earlier parts of the same
-function also leave intermediate state for that constructor.
+At authoring snapshot e488df3, `compile_template` computes final support groups,
+slot prefix offsets, delta/interior edge tables, semiring exclusions, and the
+`Arena` constructor across `src/cffg/compiler.py:1819-1936`. That range is a
+scope anchor, not a promised future line map. Earlier parts of the same
+function also leave intermediate state for that constructor. The semiring
+exclusions move to public option checking and the registered/specialized
+compatibility owners; they are not an assembly responsibility.
 
 The previous compiler tickets replace those intermediates with complete typed
 values. This ticket gives final invariant checking and immutable assembly one
@@ -30,11 +33,14 @@ owner, leaving `compile_template` as readable sequencing only.
    `SpecializedPlanDrafts`, `ResolvedCompileData`, and semiring; it returns one
    complete immutable `Arena` or a structured `CompileError`.
 3. The assembler computes slot prefix arrays, interior-edge ledger groups,
-   delta pairs, final plan collections, structure/fingerprint inputs, and
-   semiring compatibility without reclassifying a factor type.
-4. `compile_template` performs only plate expansion/validation and sequential
-   calls to topology, registered lowering, specialized lowering, data
-   resolution, and assembly.
+   delta pairs, final plan collections, and structure/fingerprint inputs
+   without reclassifying a factor or reevaluating family-specific semiring
+   compatibility.
+4. `compile_template` performs only accepted-semiring option checking, plate
+   expansion, the existing core `validate` call, and sequential calls to
+   topology, registered lowering, specialized lowering, data resolution, and
+   assembly. Family-specific semiring compatibility stays with its registered
+   or specialized lowering owner.
 5. All four architecture change-path rows are checked because the final value
    serves compiler, runtime, serialized-model, and learning consumers. The
    assembler introduces no new semantic interpretation for any row.

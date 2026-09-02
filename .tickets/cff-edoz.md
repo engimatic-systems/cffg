@@ -14,11 +14,13 @@ tags: [architecture, compiler, extensibility]
 
 ## Background in Plain English — WHY
 
-At e488df3, `src/cffg/compiler.py` has 2,368 lines and `compile_template`
-occupies lines 632-1936. It validates topology, assigns slots, classifies
-registered and specialized factors, resolves arrays and learnables, and
-constructs the final arena. Those responsibilities are too large for one
-implementation context and make a local factor change cross the whole compiler.
+At the e488df3 authoring snapshot, `src/cffg/compiler.py` has 2,368 lines and
+`compile_template` occupies lines 632-1936. Those locations are scope anchors,
+not promised future line numbers. The function validates topology, assigns
+slots, classifies registered and specialized factors, resolves arrays and
+learnables, and constructs the final arena. Those responsibilities are too
+large for one implementation context and make a local factor change cross the
+whole compiler.
 
 This track first records the compiler contract and moves compiled values. It
 then extracts a sequential chain with one named boundary per context: topology,
@@ -31,17 +33,21 @@ program epic rather than this compiler-only track.
 1. Direct dependency `cff-ddsq` is closed. Its chain closes `cff-ecw0`,
    `cff-544x`, `cff-8t4d`, `cff-ejib`, `cff-kfo7`, `cff-bfr9`, and the
    cross-track foundation `cff-209l` first.
-2. Characterization pins the e488df3 compiled plans, addresses, hashes,
-   schedules, and diagnostics before production code moves.
+2. `cff-ecw0` pins compiled plans, addresses, hashes, schedules, and diagnostics
+   at the exact commit that closes `cff-209l`. e488df3 remains the external-
+   parity reference only for behavior that `cff-209l` promises not to change.
 3. Immutable compiled values have one lower-level owner.
 4. The sequential stage boundaries are:
-   4.1. expanded validated template to `TopologyLayout`;
+   4.1. expanded core-validated template to `TopologyLayout`;
    4.2. topology to `RegisteredPlanDrafts`;
    4.3. topology plus exclusions to `SpecializedPlanDrafts`;
    4.4. plan drafts plus array sources to `ResolvedCompileData`; and
    4.5. complete stage values to immutable `Arena`.
 5. Registered same-arena and explicit specialized plans remain distinct. No
-   universal callback is introduced.
+   universal callback is introduced. Public orchestration alone owns accepted-
+   semiring option checking, plate expansion, and the existing core `validate`
+   call; topology carries declared facts without classifying plan meaning.
+   Registered/specialized owners enforce their own semiring compatibility.
 6. `compile_template` stays the public entry point, is below 250 physical
    lines, and sequences named stages. The public compiler orchestration module
    is below 1,000 lines and no extracted file exceeds 1,000 lines.

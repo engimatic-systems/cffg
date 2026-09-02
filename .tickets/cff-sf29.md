@@ -28,8 +28,11 @@ redefine a public result, or create a new scientific validation program.
 
 1. `cff-edoz` is closed with its compiler characterization and typed-stage
    outcomes satisfied.
-2. The characterization record names the exact compiler-track commit used as
-   its baseline.
+2. The characterization record names the exact commit that closes compiler
+   track `cff-edoz` and uses it as the engine baseline. e488df3 remains the
+   authoring/source-map reference and, where `cff-209l` promises parity, an
+   external public/serialized/numerical reference; it is not the engine
+   characterization baseline.
 3. A compact inventory maps ordinary discrete, Gaussian, exponential-family,
    mixture, recurrence, structured recurrence, precision, hard-constraint,
    fixed-A GFE, transition GFE, hybrid GFE, and functional `mu3` execution to
