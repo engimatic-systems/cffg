@@ -51,12 +51,13 @@ release, or change the mathematical meaning of an existing model.
    4.3. Each specialized plan has one objective-accounting owner.
    4.4. No universal callback is introduced by passing irrelevant state for
         unrelated factor families.
-5. Compiler planning and lowering use typed, one-way stages after
-   characterization pins the serialized-to-arena contract at baseline commit
-   e488df3.
-6. Engine execution, schedule construction, objective accounting, and readouts
-   use focused owners after characterization pins the numerical, support,
-   status, and diagnostic contracts at its recorded baseline.
+5. Compiler planning uses context-sized typed stages for topology, registered
+   lowering, specialized lowering, data/learning resolution, and assembly after
+   bounded characterization pins the e488df3 serialized-to-arena contract.
+6. Engine execution, schedules, state/data/mu3 lifecycle, ordinary iteration,
+   explicit outer/exact strategies, objective accounting, and readouts use
+   focused owners after bounded characterization records the applicable
+   numerical, support, status, and diagnostic contracts.
 7. The refactor preserves public imports and call forms, template JSON,
    structure hashes, CFFGZ bundles, parameter and observation addresses,
    learnable plans, agent checkpoints, and migration behavior present at
@@ -83,8 +84,11 @@ These suggestions are optional. An implementer may choose another sound method.
 
 - Land the `cff-209l` same-arena kernel foundation before moving compiler
   types or stages.
-- Commit characterization evidence before each extraction. Move one owner at a
-  time and keep compatibility imports until consumers migrate.
+- Reuse existing mathematical authorities and add old/new observable
+  characterization only for an uncovered refactor seam. A newly discovered
+  scientific gap gets a separate ticket unless it proves the move unsafe.
+- Move one owner at a time and keep compatibility imports until consumers
+  migrate.
 - Prefer typed values named for their responsibility over broad utility
   modules or partially initialized arena objects.
 - Keep same-arena registration and specialized-plan lowering as separate,
@@ -98,7 +102,8 @@ These suggestions are optional. An implementer may choose another sound method.
 
 The following tickets remain outside this epic:
 
-- `cff-xabn` owns versioned declared-learning semantics and persistent arrays.
+- `cff-xabn -> cff-enhs -> cff-jilz -> cff-cz6v` is the parallel persistent-
+  learning/checkpoint chain.
 - `cff-j7mm` owns resource-estimator correctness.
 - `cff-wbhu` owns compiled-loop and Colony throughput.
 - `cff-5edo` owns long-rollout convergence and warm starts.
@@ -140,9 +145,17 @@ Legend: prerequisite --> dependent
   --> [ ] cff-ecw0
   --> [ ] cff-544x
   --> [ ] cff-8t4d
+  --> [ ] cff-ejib
+  --> [ ] cff-kfo7
+  --> [ ] cff-bfr9
+  --> [ ] cff-ddsq
   --> [ ] cff-edoz
   --> [ ] cff-sf29
   --> [ ] cff-ny7f
+  --> [ ] cff-nyad
+  --> [ ] cff-5xdy
+  --> [ ] cff-ii9t
+  --> [ ] cff-jrbw
   --> [ ] cff-gl89
   --> [ ] cff-3ola
   --> [ ] cff-ws3c
@@ -154,7 +167,7 @@ Legend: prerequisite --> dependent
         +-------------------------------------> [ ] cff-ahps
 
 Parallel or downstream consumers outside this epic:
-[ ] cff-xabn
+[ ] cff-xabn --> [ ] cff-enhs --> [ ] cff-jilz --> [ ] cff-cz6v
 [ ] cff-j7mm
 [ ] cff-wbhu --> [ ] cff-5edo
 [ ] cff-3kdk
@@ -166,14 +179,16 @@ Parallel source-recovery research/specification:
 
 Capability ownership:
 
-- `cff-209l` owns executable same-arena discrete and Gaussian kernel
-  registration.
-- `cff-ecw0`, `cff-544x`, and `cff-8t4d` own compiler characterization,
-  compiled values, and typed lowering respectively; `cff-edoz` closes that
-  track.
-- `cff-sf29`, `cff-ny7f`, `cff-gl89`, and `cff-3ola` own engine
-  characterization, execution and schedules, the objective ledger, and
-  readouts respectively; `cff-ws3c` closes that track.
+- `cff-209l` is the cross-track owner of executable same-arena discrete and
+  Gaussian kernel registration.
+- `cff-ecw0` and `cff-544x` own compiler characterization and compiled values;
+  `cff-8t4d`, `cff-ejib`, `cff-kfo7`, `cff-bfr9`, and `cff-ddsq` own topology,
+  registered lowering, specialized lowering, data/learning resolution, and
+  final assembly; `cff-edoz` closes that track.
+- `cff-sf29` owns bounded engine characterization. `cff-ny7f`, `cff-nyad`,
+  `cff-5xdy`, `cff-ii9t`, `cff-jrbw`, `cff-gl89`, and `cff-3ola` own execution,
+  schedules, lifecycle, ordinary control, explicit outer/exact control, the
+  objective ledger, and readouts; `cff-ws3c` closes that track.
 - `cff-ofv1` owns the measured extension-surface proof. It uses the
   `cff-209l` test-only factors to prove same-arena registration without
   central type-name edits and an explicit matrix for multi-arena recurrence,

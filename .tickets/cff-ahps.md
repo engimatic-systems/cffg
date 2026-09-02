@@ -55,13 +55,23 @@ These are suggested ways to reach the outcomes. An implementer may choose a diff
   ```text
   Legend: prerequisite --> dependent
 
-  [ ] cff-209l (ready) --> [ ] cff-cfqg --> cff-o7hs --> cff-1o72 --+
-                                                       |
-  [ ] cff-wbhu (ready) -+--> cff-5edo -----------------+
-                        +--> cff-9xmq -----------------+--> cff-ahps
-                        +------------------------------+
-  [ ] cff-9bex (ready) --> cff-bxk4 -------------------+
-  [ ] cff-j7mm (ready) --> cff-6s31 -------------------+
+  [ ] cff-209l (ready)
+    --> cff-ecw0 --> cff-544x --> cff-8t4d --> cff-ejib
+    --> cff-kfo7 --> cff-bfr9 --> cff-ddsq --> cff-edoz
+    --> cff-sf29 --> cff-ny7f --> cff-nyad --> cff-5xdy
+    --> cff-ii9t --> cff-jrbw --> cff-gl89 --> cff-3ola
+    --> cff-ws3c --> cff-ofv1 --> cff-cfqg
+
+  cff-cfqg -------------------------------------------> cff-ahps
+  cff-cfqg --> cff-o7hs --> cff-1o72 ----------------> cff-ahps
+  [ ] cff-wbhu (ready) -------------------------------> cff-ahps
+  cff-wbhu --> cff-5edo ------------------------------> cff-ahps
+  cff-wbhu --> cff-9xmq ------------------------------> cff-ahps
+  [ ] cff-9bex (ready) --> cff-bxk4 ------------------> cff-ahps
+  [ ] cff-j7mm (ready) --> cff-6s31 ------------------> cff-ahps
+
+  Parallel/outside persistent-learning chain:
+  [ ] cff-xabn --> cff-enhs --> cff-jilz --> cff-cz6v
   ```
 
 ## Future work
