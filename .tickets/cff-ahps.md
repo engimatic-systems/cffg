@@ -1,7 +1,7 @@
 ---
 id: cff-ahps
 status: open
-deps: [cff-1o72, cff-3hgi, cff-44we, cff-5edo, cff-6s31, cff-9xmq, cff-bxk4, cff-d56d, cff-dfpi, cff-l6i5, cff-lquu, cff-o7hs, cff-ri8m, cff-wbhu, cff-izjd]
+deps: [cff-1o72, cff-3hgi, cff-44we, cff-5edo, cff-6s31, cff-9xmq, cff-bxk4, cff-d56d, cff-dfpi, cff-l6i5, cff-lquu, cff-o7hs, cff-ri8m, cff-wbhu, cff-izjd, cff-cfqg]
 links: [cff-cz6v]
 created: 2026-07-08T16:48:44Z
 type: epic
@@ -14,7 +14,11 @@ assignee: coopwilliams
 
 CFFG began with discrete Categorical and Dirichlet factors. Completed tickets have added Gaussian and hybrid models, conjugate exponential-family messages, hard constraints, executable factor registration, and discrete-regime epistemic scoring. This epic finishes the roadmap when the remaining prerequisites add nonlinear and neural factors, scalable plate execution, long-rollout stability, runtime throughput, and continuous-domain diagrams. The result is one serialized modeling system whose compiler, inference runtime, objective ledger, and public tools agree about every factor family they expose.
 
-The direct prerequisites already completed are cff-3hgi, cff-44we, cff-d56d, cff-dfpi, cff-izjd, cff-l6i5, cff-lquu, and cff-ri8m. The unfinished direct prerequisites are cff-1o72, cff-5edo, cff-6s31, cff-9xmq, cff-bxk4, cff-o7hs, and cff-wbhu. The dependency metadata, rather than the order of this prose, determines when this epic is ready to close.
+The direct prerequisites already completed are cff-3hgi, cff-44we, cff-d56d,
+cff-dfpi, cff-izjd, cff-l6i5, cff-lquu, and cff-ri8m. The unfinished direct
+prerequisites are cff-cfqg, cff-1o72, cff-5edo, cff-6s31, cff-9xmq,
+cff-bxk4, cff-o7hs, and cff-wbhu. The dependency metadata, rather than the
+order of this prose, determines when this epic is ready to close.
 
 ## Outcomes / Acceptance Criteria
 
@@ -51,7 +55,7 @@ These are suggested ways to reach the outcomes. An implementer may choose a diff
   ```text
   Legend: prerequisite --> dependent
 
-  [ ] cff-209l (ready) --> cff-o7hs --> cff-1o72 --+
+  [ ] cff-209l (ready) --> [ ] cff-cfqg --> cff-o7hs --> cff-1o72 --+
                                                        |
   [ ] cff-wbhu (ready) -+--> cff-5edo -----------------+
                         +--> cff-9xmq -----------------+--> cff-ahps
@@ -62,7 +66,11 @@ These are suggested ways to reach the outcomes. An implementer may choose a diff
 
 ## Future work
 
-- cff-o7hs owns deterministic nonlinear maps between Gaussian edges, Jacobian linearization, sigma-point moment matching, named approximate ledger terms, and compiler-to-ledger execution of the `MOMENT_MATCHING` constraint. cff-209l is its immediate open prerequisite.
+- cff-o7hs owns deterministic nonlinear maps between Gaussian edges, Jacobian
+  linearization, sigma-point moment matching, named approximate ledger terms,
+  and compiler-to-ledger execution of the `MOMENT_MATCHING` constraint.
+  cff-cfqg is its immediate implementation prerequisite; cff-209l supplies the
+  same-arena kernel foundation inside that architecture program.
 - cff-1o72 follows cff-o7hs and owns deterministic neural-network factors, free-energy-gradient training, solver-gradient evidence, and amortized message initialization.
 - cff-wbhu owns the JIT-compiled sweep loop and its single-engine and batched-runtime throughput and status contracts.
 - cff-5edo follows cff-wbhu and owns depth-aware long-rollout convergence and warm-started replanning without changing action choices.

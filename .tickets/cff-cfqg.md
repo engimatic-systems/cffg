@@ -1,177 +1,126 @@
 ---
 id: cff-cfqg
 status: open
-deps: [cff-3kdk, cff-cj5h, cff-j7mm, cff-209l, cff-5edo, cff-11jj, cff-ws3c]
-links: [cff-bpgm, cff-uy48]
+deps: [cff-ofv1]
+links: [cff-ahps, cff-209l, cff-edoz, cff-ws3c]
 created: 2026-08-13T03:59:30Z
 type: epic
 priority: 1
 assignee: coopwilliams
-tags: [trustworthiness, engine]
+tags: [architecture, trustworthiness, extensibility]
 ---
-# Epic: Make the existing engine trustworthy to operate and extend
+# Epic: Reduce the central extension surface
 
-## Background in Plain English
+## Background in Plain English — WHY
 
-CFFG has strong mathematical and numerical tests, but several public workflows
-still expose avoidable trust gaps. Some readouts and planning loops do not yet
-meet their measured runtime targets. The resource estimator does not describe
-the compiled non-discrete arenas accurately. Ordinary discrete and Gaussian
-factor execution still crosses central type-name branches. The rSLDS fitting
-workflow also bypasses part of the declared-learning API and keeps generally
-useful solver coordination inside a model-specific module.
+After the rSLDS clean-port stack, CFFG can run a broad mix of discrete,
+Gaussian, exponential-family, hybrid, recurrence, constraint, and GFE paths.
+Adding or changing one family still requires careful edits across large central
+modules. At commit e488df3, `src/cffg/compiler.py` has 2,368 lines and
+`src/cffg/engine.py` has 3,973 lines. Both interpret factor types in several
+places. That makes a local feature look like an engine-wide change and makes it
+easy for synchronous execution, schedules, objective terms, readouts, and
+serialization-derived plans to drift apart.
 
-This epic is the release gate for those existing-engine problems. It connects
-the six operational tickets already selected by the 2026-08-09 trajectory
-survey with two narrow learning and fitting tickets and a bounded
-compiler/engine modularization sequence. It does not add a new factor family
-or claim that CFFG is a universal solver. It also does not replace the separate
-paper-faithfulness and rSLDS scientific-evidence work.
+This epic makes the existing library easier to trust and extend. It first
+finishes the registered same-arena factor path. It then gives compiler stages,
+runtime execution, schedules, objective accounting, and readouts focused
+owners behind typed internal contracts. The final gate proves the resulting
+extension paths with executable evidence.
 
-## Outcomes / Acceptance Criteria
+This is an architecture program. It does not repeat rSLDS scientific
+validation, add a factor family, set a performance target, define a public
+release, or change the mathematical meaning of an existing model.
 
-1. Every ticket in this epic's dependency metadata is closed because its own
-   acceptance criteria are satisfied.
-2. Public posterior readouts perform their numerical work in shape batches and
-   preserve their documented support, dtype, and improper-belief behavior.
-3. The public resource estimator reports the supported discrete, Gaussian,
-   exponential-family, hybrid, and compiled-executable costs within its named
-   evidence bounds, and reports unsupported estimates as unavailable rather
-   than as confident numbers.
-4. Ordinary discrete and Gaussian factor execution uses the registered kernel
-   contract across compilation, messages, objective terms, observations,
-   readouts, serialization, and resource estimates.
-5. Every parameter family fitted by the current rSLDS workflow uses the
-   declared-learning contract. Model code does not discover statistical
-   meaning from factor-name prefixes.
-6. Repeated inference, retry, replacement, and terminal-certification code is
-   moved out of an rSLDS module only when a second model fixture proves the
-   same contract. Model-specific initialization and diagnostics remain
-   model-specific.
-6.1. Compiler planning and lowering have typed one-way owners after
-     characterization tests pin the existing arena and address contracts.
-6.2. Engine execution, schedule control, objective assembly, and readouts have
-     focused owners after characterization tests pin the existing numerical
-     and status contracts.
-7. Single-engine and colony loops preserve per-instance termination status and
-   meet the throughput evidence required by `cff-wbhu` before long-rollout
-   planning relies on them.
-8. Long-rollout planning derives its budget from compiled depth, gates actions
-   on a successful status, and records the measured warm- and cold-start
-   behavior required by `cff-5edo`.
-9. Public epistemic diagnostics make absent, inactive, and numerically invalid
-   information-gain channels distinguishable.
-10. The completed work preserves literal zero support, dtype-scaled guards,
-    loud non-finite failure, true node-and-edge objective accounting, and the
-    source-of-truth role of serialized templates.
-11. `README.md`, `docs/ARCHITECTURE.md`, and `docs/LIMITATIONS.md` agree on the
-    delivered runtime envelope, unsupported combinations, and stable public
-    entry points.
-12. Completion of this epic is described as a trustworthy operating and
-    extension baseline. It is not described as proof of every construction in
-    the CFFG papers, rSLDS superiority, or universal factor coverage.
+## Outcomes / Acceptance Criteria — WHAT
 
-## Methodological Suggestions
+1. The direct dependency `cff-ofv1` is closed because its acceptance criteria
+   are satisfied. Its dependency chain closes `cff-209l`, `cff-edoz`, and
+   `cff-ws3c` first.
+2. Registered factors that use one discrete, Gaussian, or exponential-family
+   arena have one documented extension path for structure, messages, energy,
+   parameters, observations, readouts, and serialized implementation identity.
+3. A representative same-arena factor can be added and exercised without
+   adding its type name to central compiler, engine, validation, schedule, or
+   objective dispatch.
+4. Factors that need more than one arena, a GFE composite, or a structural
+   constraint keep explicit specialized plans.
+   4.1. Each specialized plan has one compiler-lowering owner.
+   4.2. Each specialized plan has one runtime-execution owner.
+   4.3. Each specialized plan has one objective-accounting owner.
+   4.4. No universal callback is introduced by passing irrelevant state for
+        unrelated factor families.
+5. Compiler planning and lowering use typed, one-way stages after
+   characterization pins the serialized-to-arena contract at baseline commit
+   e488df3.
+6. Engine execution, schedule construction, objective accounting, and readouts
+   use focused owners after characterization pins the numerical, support,
+   status, and diagnostic contracts at its recorded baseline.
+7. The refactor preserves public imports and call forms, template JSON,
+   structure hashes, CFFGZ bundles, parameter and observation addresses,
+   learnable plans, agent checkpoints, and migration behavior present at
+   e488df3.
+8. The refactor preserves each message rule, BFE or GFE ledger term,
+   edge-entropy correction, approximation label, inference schedule, and
+   convergence classification present at e488df3.
+9. Literal zero support, improper or vacuous inputs, float32, and
+   uncomfortable-scale cases retain their documented values or loud status.
+   No child ticket weakens the numerical robustness contract to make a
+   structural extraction pass.
+10. `docs/ARCHITECTURE.md` names the final owners and gives contributors a
+    bounded change path for same-arena factors and each specialized plan class.
+    `README.md` and `docs/LIMITATIONS.md` change only when a documented
+    import or extension boundary actually changes.
+11. Completion is described as a trustworthy architecture and bounded
+    extension baseline. It is not described as proof of paper faithfulness,
+    rSLDS recovery, runtime speed, release readiness, or universal factor
+    coverage.
 
-These suggestions are optional. An implementer may choose another sound method
-that satisfies the numbered outcomes with equivalent evidence.
+## Methodological Suggestions — HOW
 
-- Use each dependency ticket's named change-path row and duplicated-surface
-  checklist. This epic should integrate their evidence rather than duplicate
-  their implementations.
-- Preserve pre-change numerical and serialization artifacts before moving a
-  dispatch, learning, or fitting boundary. Compare the proposed head with those
-  artifacts after the move.
-- Keep model recipes in `cffg.models`, factor semantics in registered rule or
-  learning families, and generally reusable runtime policy outside model
-  modules only after two consumers establish the common contract.
-- Treat `cff-ahps` as the downstream finite integration baseline. It must not
-  close by counting a model-specific rSLDS learner as generic learning support
-  or by adding another family instead of satisfying a missing surface.
-- Use this compact dependency view when the roadmap changes:
+These suggestions are optional. An implementer may choose another sound method.
 
-  ```text
-  Legend: prerequisite --> dependent
-
-  [ ] cff-3kdk (ready) ------------------------------------+
-  [ ] cff-cj5h (ready) ------------------------------------+
-  [ ] cff-j7mm (ready) ------------------------------------+
-  [ ] cff-209l (ready) ------------------------------------+
-  [ ] cff-wjqg (ready) --> [ ] cff-xdip --> [ ] cff-8whp   |
-                                              --> [ ] cff-5edo
-  [ ] cff-wjqg --> [ ] cff-0fw2 --> [ ] cff-wbhu ----------+
-  [ ] cff-209l --> [ ] cff-edoz ----------------------------+
-  [ ] cff-wbhu + cff-cj5h + cff-3kdk + cff-edoz            |
-                                --> [ ] cff-ws3c ------------+
-  [x] 6tek + 4apw + lquu --> [ ] cff-dqk2 (ready)          |
-                                --> [ ] cff-11jj -----------+
-                                                               |
-                                                               +--> [ ] cff-cfqg
-                                                                        |
-                                                                        +--> [ ] cff-ahps
-
-  Parallel scientific path:
-  [ ] cff-akmp (ready) --> [ ] cff-64ri --+
-                                              +--> [ ] cff-0l31 --> [ ] cff-oyie --> [~] cff-nkbj
-  [ ] cff-dqk2 (ready) --> [ ] cff-11jj -----+
-  ```
+- Land the `cff-209l` same-arena kernel foundation before moving compiler
+  types or stages.
+- Commit characterization evidence before each extraction. Move one owner at a
+  time and keep compatibility imports until consumers migrate.
+- Prefer typed values named for their responsibility over broad utility
+  modules or partially initialized arena objects.
+- Keep same-arena registration and specialized-plan lowering as separate,
+  explicit extension classes.
+- Use the **New factor or rule family**, **New IR field**, **Runtime numerical
+  or status invariant**, and **Learnable or checkpoint feature** rows in the
+  architecture change-path index as preservation checklists. Each child ticket
+  states which duplicated execution surfaces apply.
 
 ## Future work
 
-- `cff-dqk2` owns model-independent declared-learning adapters for the existing
-  `gaussian_mixture_linear` and `recurrence_link` factors.
-- `cff-11jj` consumes those adapters in both rSLDS learning cadences and
-  separates only proven reusable fitting coordination from model policy.
-- `cff-3kdk`, `cff-cj5h`, `cff-j7mm`, and `cff-209l` retain their existing
-  acceptance criteria. The `cff-wbhu` and `cff-5edo` milestones delegate their
-  former bundled criteria to dependency-ordered child tickets. This epic
-  supplies their common trustworthiness gate; it does not absorb their
-  implementation scope.
-- `cff-edoz` owns typed compiler planning and lowering boundaries after
-  `cff-209l`. `cff-ws3c` owns the engine execution, objective, and readout
-  extraction after the affected public contracts are characterized.
-- `cff-uy48` is the separate paper-faithfulness and minimum-usable-release gate
-  recommended by `cff-bpgm`; it remains parallel to this epic.
-- Nonlinear, neural, balanced-tree recurrence, structure-learning, and new
-  model-family work remain downstream or parked under their existing tickets.
+The following tickets remain outside this epic:
+
+- `cff-xabn` owns versioned declared-learning semantics and persistent arrays.
+- `cff-j7mm` owns resource-estimator correctness.
+- `cff-wbhu` owns compiled-loop and Colony throughput.
+- `cff-5edo` owns long-rollout convergence and warm starts.
+- `cff-3kdk` owns readout vectorization.
+- `cff-cj5h` owns epistemic diagnostics.
+- `cff-o7hs` is the immediate nonlinear-family implementation consumer and
+  waits for this epic. Research and derivation that do not implement a factor
+  may continue independently.
+- `cff-ahps` remains the downstream factor-breadth roadmap and waits for this
+  architecture gate.
 
 ## Definitions
 
-- **Arena:** Shape-grouped runtime arrays and compiled index plans derived from
-  a serialized graph template.
-- **Declared learning:** A template names each learnable parameter group and
-  conjugate family so the compiler and `Learnables` runtime can find its
-  statistics, posterior, checkpoint values, and parameter targets.
-- **Engine trustworthiness:** The bounded claim that documented engine
-  workflows report truthful values and statuses, preserve their mathematical
-  contracts, and can be extended through the stated interfaces.
-- **Factor family:** One mathematical factor type together with its messages,
-  objective term, parameters, and supported observations or readouts.
-- **rSLDS:** Recurrent switching linear dynamical system.
-- **Runtime status:** The explicit converged, budget-exhausted, diverged, or
-  infeasible result returned by an inference run.
-- **Shape batch:** A group of runtime items with compatible array shapes that
-  can be evaluated together instead of one item at a time in Python.
-- **Universal solver:** A system claiming executable support for arbitrary
-  factor, constraint, and approximation combinations. This epic makes no such
-  claim.
-
-## Notes
-
-**2026-08-13T04:37:28Z**
-
-Roadmap refinement, 2026-08-12. Legend: prerequisite --> dependent.
-
-[ ] 209l (ready) --> [ ] edoz --+
-[ ] wjqg (ready) --> [ ] 0fw2 --> [ ] wbhu --+--> [ ] ws3c --> [ ] cfqg
-[ ] 3kdk (ready) ----------------------------+
-[ ] cj5h (ready) ----------------------------+
-[ ] wjqg --> [ ] xdip --> [ ] 8whp --> [ ] 5edo --> [ ] cfqg
-[ ] dqk2 (ready) --> [ ] 11jj ---------------------------> [ ] cfqg
-[ ] j7mm (ready) ----------------------------------------> [ ] cfqg
-
-Immediate blockers are shown by the first open prerequisite on each path. New family implementation waits downstream of cfqg.
-
-**2026-08-13T04:40:34Z**
-
-Authoring handoff, 2026-08-12: cff-edoz and cff-ws3c add the characterization-first compiler/engine modularization sequence. cff-wbhu and cff-5edo now delegate their bundled ordinary/mixed-controller and status/warm-start work to ordered children. Ticket scans were reviewed; dependency-cycle and diff-hygiene checks passed. No pytest run was required for ticket/document-only changes.
+- **Central dispatch:** Code in a shared compiler, engine, schedule, validation,
+  or objective module that selects behavior by a factor type name.
+- **Extension surface:** The production modules and contracts that must change
+  to add one factor or feature.
+- **Focused owner:** One module responsible for one named interpretation or
+  operation.
+- **Same-arena factor:** A factor whose variable messages all use one discrete,
+  Gaussian, or exponential-family representation.
+- **Specialized plan:** An explicit compiled plan for behavior that cannot use a
+  same-arena kernel contract, such as a hybrid factor, GFE composite, or
+  structural constraint.
+- **Typed stage:** A compiler or runtime step with a named input and output
+  contract instead of hidden shared state.

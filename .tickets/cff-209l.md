@@ -5,9 +5,9 @@ deps: [cff-ri8m, cff-l6i5]
 links: [cff-1o72, cff-o7hs, cff-l6i5]
 created: 2026-07-30T16:09:57Z
 type: chore
-priority: 2
+priority: 1
 assignee: coopwilliams
-parent: cff-ahps
+parent: cff-edoz
 ---
 # Bind discrete and Gaussian arenas to the FactorKernel execution contract
 

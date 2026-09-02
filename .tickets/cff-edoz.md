@@ -1,105 +1,97 @@
 ---
 id: cff-edoz
 status: open
-deps: [cff-209l]
-links: []
+deps: [cff-8t4d]
+links: [cff-209l, cff-ws3c]
 created: 2026-08-13T04:26:16Z
-type: chore
+type: epic
 priority: 1
 assignee: coopwilliams
 parent: cff-cfqg
-tags: [trustworthiness, compiler, maintainability]
+tags: [architecture, compiler, extensibility]
 ---
-# Extract compiler planning and lowering behind typed internal contracts
+# Compiler track: Give planning and lowering typed owners
 
-## Background in Plain English
+## Background in Plain English — WHY
 
-`src/cffg/compiler.py` is 2,316 lines. It defines every compiled-plan type and
-the `Arena`, then performs topology layout, factor classification, per-arena
-lowering, composite recognition, learnable resolution, parameter packing, and
-final assembly in one module. This makes a change to one factor family look
-like a change to the whole compiler.
+At commit e488df3, `src/cffg/compiler.py` has 2,368 lines. It defines the
+compiled plan records and `Arena`, then performs topology layout, registered
+and specialized factor classification, per-arena lowering, GFE composite
+recognition, learnable resolution, parameter and observation packing, and
+final assembly. The file contains 86 references to factor or group type
+selection. A change to one family can therefore cross several compiler
+responsibilities.
 
-Ticket `cff-209l` first moves ordinary discrete and Gaussian execution onto the
-registered kernel contract. This ticket then extracts compiler responsibilities
-along the resulting typed boundaries. It is a behavior-preserving
-maintainability change. Characterization evidence lands before code moves.
+This track preserves compiler behavior while separating those responsibilities
+behind typed, one-way boundaries. It starts only after `cff-209l` finishes
+the registered discrete and Gaussian factor path. Three context-sized child
+tickets first record the current contract, then move immutable plan values, and
+finally extract lowering stages.
 
-## Outcomes / Acceptance Criteria
+## Outcomes / Acceptance Criteria — WHAT
 
-1. `cff-209l` is closed with the final discrete, Gaussian, and EF kernel
-   metadata available as the classification authority.
-2. Before extraction, characterization tests pin the compiled HMM, Kalman,
-   T-maze, hybrid-mixture, recurrence, hard-constraint, and one external-kernel
-   fixtures.
-   2.1. The tests pin plan kinds, group membership, member order, role order,
-   slot offsets, parameter addresses, schedule fingerprint, structure hash,
-   and learnable source and target addresses where applicable.
-   2.2. The tests pin successful and failing compile diagnostics for one
-   unsupported factor, constraint, role, parameter, and external-kernel case.
-3. Immutable compiled-plan and `Arena` types live in a focused internal module
-   that imports neither the compiler orchestration function nor the inference
-   engine.
-4. `compile_template` remains the public orchestration entry point and delegates
-   to typed stages with these single responsibilities:
-   4.1. topology validation and slot layout;
-   4.2. registered factor classification and per-arena lowering;
-   4.3. specialized constraint and GFE composite lowering;
-   4.4. learnable resolution;
-   4.5. parameter and observation-array resolution; and
-   4.6. final immutable arena assembly.
-5. Each stage accepts and returns a named typed value. No stage communicates
-   through hidden module globals or a partly initialized `Arena`.
-6. Dependency direction is one way: core IR and kernels feed compiler stages;
-   compiler stages feed compiled-plan values; engine and schedule consumers
-   depend on compiled-plan values and do not import compiler implementation
+1. The direct dependency `cff-8t4d` is closed because its acceptance criteria
+   are satisfied. Its chain closes `cff-ecw0`, `cff-544x`, and
+   `cff-209l` first.
+2. Characterization evidence pins the compiled plans, addresses, schedules,
+   hashes, and failure diagnostics at its recorded baseline before
+   implementation code moves.
+3. Immutable compiled plan and arena values have a focused owner below compiler
+   orchestration and runtime consumers.
+4. Topology validation, registered factor lowering, specialized-plan lowering,
+   learnable resolution, array resolution, and final assembly communicate
+   through named typed values.
+5. `compile_template` remains the public entry point and becomes readable
+   orchestration below 1,000 physical lines. No extracted source file exceeds
+   the repository's 1,000-line limit.
+6. Dependency direction is one way: core IR and kernel declarations feed
+   compiler stages; compiler stages produce compiled values; engine, schedule,
+   estimator, and agent consumers do not import compiler implementation
    helpers.
-7. Existing public imports of `compile_template`, `CompileError`, and supported
-   compiled values continue to work or receive a documented compatibility
-   re-export.
-8. The extraction preserves every characterization value from criterion 2.
-9. HMM, Kalman, T-maze, hybrid, recurrence, constraint, plate, learning,
-   bundle, external-kernel, estimator, and schedule tests retain their
-   pre-extraction numerical and serialization results.
-10. Host and JIT, flooding and scheduled, single-instance and `vmap`, and
-    current and legacy checkpoint paths receive no new compiler interpretation.
-    Each pair is checked against the characterization artifacts or marked
-    inapplicable with a concrete reason.
-11. `compiler.py` becomes a readable orchestration module below 1,000 physical
-    nonblank, noncomment lines. No extracted source file exceeds the project's
-    1,000-line limit.
-12. `docs/ARCHITECTURE.md` updates the compiler module map and names the owner of
-    each lowering stage.
+7. The track changes no serialized model meaning, factor rule, objective term,
+   runtime status, learnable cadence, checkpoint schema, or public compiler
+   call form.
+8. Final evidence preserves HMM, Kalman, fixed-A GFE, hybrid GFE, recurrence,
+   structured recurrence, functional `mu3`, hard-constraint, declared-learning,
+   AgentSpec, plate, and external-kernel compilation.
+9. Compile-time hostile cases remain loud, including unsupported factors,
+   constraints, roles, parameters, evaluator metadata, and malformed shapes.
+   Runtime sparse-support, improper-input, float32, and scale behavior is not
+   redefined by this track and remains covered by the affected integration
+   suites.
+10. `docs/ARCHITECTURE.md` names each final compiler-stage and compiled-value
+    owner after the extraction lands.
 
-## Methodological Suggestions
+## Methodological Suggestions — HOW
 
-These suggestions are optional. An implementer may choose another sound method
-that satisfies the numbered outcomes with equivalent evidence.
+These suggestions are optional. An implementer may choose another sound method.
 
-- Make the characterization commit stand alone and pass before the first move.
-- Extract plan dataclasses and `Arena` first because that creates the clearest
-  one-way dependency. Move lowering stages only after their inputs and outputs
-  are explicit.
-- Prefer small internal modules named for responsibilities, not a generic
-  `compiler_utils.py` collection.
+- Follow the child order. Keep the characterization commit independent from
+  plan-value movement and stage extraction.
 - Use the **New factor or rule family**, **New IR field**, and **Learnable or
-  checkpoint feature** change paths only to prove preservation. This ticket
-  adds no new family, field, or learning behavior.
+  checkpoint feature** change-path rows as preservation checklists.
+- Treat flooding versus scheduled execution, single-instance versus `vmap`,
+  and current versus legacy checkpoints as consumers of one compiled contract.
+  Do not add separate compiler interpretations for those pairs.
+- Prefer small modules named for topology, registered lowering, specialized
+  lowering, learning, arrays, and assembly over a general helpers module.
 
 ## Future work
 
-`cff-ws3c` consumes the extracted compiled-plan contract when it separates
-engine execution, ledger, and readout owners. New factor families remain
-blocked on `cff-cfqg` until both modularization tickets and the other trust
-dependencies close.
+`cff-ws3c` consumes the final compiled-value boundary while extracting engine
+owners. New nonlinear-factor implementation remains blocked through
+`cff-cfqg`. Performance, resource estimation, and scientific validation
+remain with their existing tickets.
 
 ## Definitions
 
-- **Characterization test:** A test that records existing observable behavior
-  before a refactor so the move cannot silently change it.
-- **Compiled plan:** Immutable metadata that tells the runtime where and how to
-  execute one class of factors or constraints.
-- **Lowering:** Conversion from validated serialized model declarations into
-  executable arena plans and addresses.
-- **One-way dependency:** A module relationship with no reverse import or
-  circular ownership.
+- **Arena:** Immutable compiled arrays and address plans derived from a
+  serialized template.
+- **Characterization evidence:** Tests that record observable behavior at a
+  named baseline commit before a refactor.
+- **Compiled plan:** Immutable metadata describing how one factor, constraint,
+  schedule, evaluator, or learnable executes.
+- **Lowering:** Conversion from validated serialized declarations into compiled
+  plans and addresses.
+- **One-way dependency:** A module relationship without a reverse import or
+  ownership cycle.
