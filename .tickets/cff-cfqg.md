@@ -7,6 +7,7 @@ created: 2026-08-13T03:59:30Z
 type: epic
 priority: 1
 assignee: coopwilliams
+external-ref: gh-108
 tags: [architecture, trustworthiness, extensibility]
 ---
 # Epic: Reduce the central extension surface
