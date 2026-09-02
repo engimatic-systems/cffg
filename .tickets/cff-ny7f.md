@@ -14,10 +14,10 @@ tags: [engine, architecture, refactor]
 
 ## Background in Plain English — WHY
 
-The engine currently gathers inputs, selects parameters, calls factor rules,
-writes messages, and builds schedule functions in the same module as public
-orchestration. Flooding, staged batches, registerized scans, exact passes, and
-specialized GFE paths repeat parts of that interpretation.
+At the `cff-sf29` named baseline, the engine gathers inputs, selects parameters,
+calls factor rules, writes messages, and builds schedule functions in the same
+module as public orchestration. Flooding, staged batches, registerized scans,
+exact passes, and specialized GFE paths repeat parts of that interpretation.
 
 `cff-sf29` first pins values and failures at a named baseline. This ticket
 then gives execution and scheduling focused owners without changing any

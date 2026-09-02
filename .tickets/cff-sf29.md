@@ -17,7 +17,7 @@ tags: [engine, architecture, characterization]
 The compiler track gives runtime consumers stable typed plans. The next work
 will move execution, schedules, objective accounting, and readouts out of a
 3,973-line engine module. Before that move, reviewers need direct evidence for
-the values and failures each path currently produces.
+the values and failures each path produces at the named baseline.
 
 This ticket adds characterization evidence and an ownership map for a named
 baseline commit. It does not move production engine code or redefine a public
@@ -56,7 +56,7 @@ result.
    8.2. Direct and one-instance `vmap` execution agree where both are
         supported.
    8.3. Host result classification agrees with status values produced by JIT.
-   8.4. Current and supported legacy agent checkpoints reconstruct results that
+   8.4. Latest-schema and supported legacy agent checkpoints reconstruct results that
         satisfy the same public engine invariants; checkpoint decoding itself
         remains outside the engine extraction.
 9. Hostile fixtures include literal zero support, a vacuous message, an
@@ -94,6 +94,6 @@ No other future work is identified.
 - **Local term:** One named factor, parameter, constraint, or edge contribution
   to BFE or GFE.
 - **Ownership map:** A list connecting each repeated operation to the code that
-  currently performs it.
+  performs it at the named baseline.
 - **Termination reason:** The detailed cause associated with a public run
   status.

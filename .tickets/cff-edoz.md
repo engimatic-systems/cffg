@@ -25,7 +25,7 @@ responsibilities.
 This track preserves compiler behavior while separating those responsibilities
 behind typed, one-way boundaries. It starts only after `cff-209l` finishes
 the registered discrete and Gaussian factor path. Three context-sized child
-tickets first record the current contract, then move immutable plan values, and
+tickets first record the e488df3 contract, then move immutable plan values, and
 finally extract lowering stages.
 
 ## Outcomes / Acceptance Criteria — WHAT
@@ -71,7 +71,8 @@ These suggestions are optional. An implementer may choose another sound method.
 - Use the **New factor or rule family**, **New IR field**, and **Learnable or
   checkpoint feature** change-path rows as preservation checklists.
 - Treat flooding versus scheduled execution, single-instance versus `vmap`,
-  and current versus legacy checkpoints as consumers of one compiled contract.
+  and latest-schema versus supported legacy checkpoints as consumers of one
+  compiled contract.
   Do not add separate compiler interpretations for those pairs.
 - Prefer small modules named for topology, registered lowering, specialized
   lowering, learning, arrays, and assembly over a general helpers module.

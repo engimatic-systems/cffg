@@ -69,7 +69,7 @@ Readout vectorization remains separate work in `cff-3kdk`.
 These suggestions are optional. An implementer may choose another sound method.
 
 - Group readouts by representation or plan owner, not by whichever public
-  method currently calls them.
+  method calls them at the `cff-sf29` named baseline.
 - Keep public methods as small delegates until downstream callers can use any
   lower-level stable interface directly.
 - Use the **Runtime numerical or status invariant**, **New factor or rule

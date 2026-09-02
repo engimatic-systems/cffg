@@ -60,8 +60,8 @@ The ticket does not pretend that both paths fit one universal callback.
    serialization, and checkpoint fixtures named by the architecture tracks
    retain their results.
 9. Flooding and scheduled, direct and one-instance `vmap`, host and JIT
-   status, and current and legacy checkpoint pairs retain the applicability
-   recorded by the architecture tracks.
+   status, and latest-schema and supported-legacy checkpoint pairs retain the
+   applicability recorded by the architecture tracks.
 10. Literal zero support, vacuous and improper inputs, non-finite values,
     float32, and uncomfortable-scale tests retain their documented values or
     loud statuses.

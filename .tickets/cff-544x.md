@@ -14,8 +14,9 @@ tags: [compiler, architecture, refactor]
 
 ## Background in Plain English — WHY
 
-The compiler currently defines every compiled plan record and the full
-`Arena` beside the code that constructs them. Runtime, schedule, estimator,
+At the `cff-ecw0` named baseline, the compiler defines every compiled plan
+record and the full `Arena` beside the code that constructs them. Runtime,
+schedule, estimator,
 learning, and agent code import those values from the compiler implementation
 module. That makes the compiler both a data-contract owner and an
 orchestration owner.
@@ -42,8 +43,8 @@ lowering logic or change any field.
 7. Every `cff-ecw0` characterization value and failure diagnostic remains
    unchanged.
 8. JSON and CFFGZ reconstruction, flooding and scheduled execution, direct and
-   `vmap` consumers, and current checkpoint reconstruction use the same moved
-   values.
+   `vmap` consumers, and latest-schema checkpoint reconstruction use the same
+   moved values.
 9. The move changes no array dtype, support mask, numerical guard, message,
    objective value, runtime status, structure hash, or serialized field.
    Sparse-support, improper-input, float32, and scale fixtures remain

@@ -124,3 +124,87 @@ The following tickets remain outside this epic:
   structural constraint.
 - **Typed stage:** A compiler or runtime step with a named input and output
   contract instead of hidden shared state.
+
+## Notes
+
+**2026-09-02 architecture-program handoff**
+
+Source of truth: `tk dep tree --full`, `tk ready`, and `tk blocked` at this
+revision.
+
+Legend: prerequisite --> dependent
+
+```text
+[ ] cff-209l (ready)
+  --> [ ] cff-ecw0
+  --> [ ] cff-544x
+  --> [ ] cff-8t4d
+  --> [ ] cff-edoz
+  --> [ ] cff-sf29
+  --> [ ] cff-ny7f
+  --> [ ] cff-gl89
+  --> [ ] cff-3ola
+  --> [ ] cff-ws3c
+  --> [ ] cff-ofv1
+  --> [ ] cff-cfqg
+        |
+        +--> [ ] cff-o7hs --> [ ] cff-1o72 --> [ ] cff-ahps
+        |
+        +-------------------------------------> [ ] cff-ahps
+
+Parallel or downstream consumers outside this epic:
+[ ] cff-xabn
+[ ] cff-j7mm
+[ ] cff-wbhu --> [ ] cff-5edo
+[ ] cff-3kdk
+[ ] cff-cj5h
+
+Parallel source-recovery research/specification:
+[ ] cff-iur0 --> [ ] cff-ocxl --> [ ] cff-x0if --> [ ] cff-zov5
+```
+
+Capability ownership:
+
+- `cff-209l` owns executable same-arena discrete and Gaussian kernel
+  registration.
+- `cff-ecw0`, `cff-544x`, and `cff-8t4d` own compiler characterization,
+  compiled values, and typed lowering respectively; `cff-edoz` closes that
+  track.
+- `cff-sf29`, `cff-ny7f`, `cff-gl89`, and `cff-3ola` own engine
+  characterization, execution and schedules, the objective ledger, and
+  readouts respectively; `cff-ws3c` closes that track.
+- `cff-ofv1` owns the measured extension-surface proof. It uses the
+  `cff-209l` test-only factors to prove same-arena registration without
+  central type-name edits and an explicit matrix for multi-arena recurrence,
+  GFE/P-substitution, and constraints.
+- `cff-o7hs` is the first new-family implementation consumer. The learning,
+  resource, throughput, rollout, vectorization, diagnostics, and
+  source-recovery tickets shown outside the epic retain their own scopes.
+
+Architecture change-path audit:
+
+- Compiler characterization and extraction use **New factor or rule family**,
+  **New IR field**, and **Learnable or checkpoint feature**. Moving compiled
+  values also checks **Runtime numerical or status invariant** because runtime
+  consumers move imports.
+- Engine characterization and extraction use **Runtime numerical or status
+  invariant** and **New factor or rule family**. Restored-agent and
+  learning-statistic consumers also use **Learnable or checkpoint feature**.
+- The final proof records all four rows in its extension matrix.
+
+Duplicated-surface and robustness audit:
+
+- Compiler tickets keep flooding/scheduled, direct/`vmap`, and
+  latest-schema/supported-legacy consumers on one compiled contract. Host/JIT
+  compilation is N/A because compilation is host-side.
+- Engine tickets pin flooding/scheduled, direct/one-instance `vmap`, host/JIT
+  status, and latest-schema/supported-legacy checkpoint pairs.
+- Compiler hostile values are runtime N/A; dtype-stable structure and a
+  32-group fixture are required. Engine evidence covers literal zero support,
+  vacuous and improper inputs, non-finite updates, float32, and a domain or
+  horizon at least ten times its smallest fixture.
+- Specialized multi-arena, GFE, evaluator, and constraint plans remain
+  explicit. This program does not force a universal callback.
+
+Scope boundary: no child owns scientific recovery claims, a performance
+target, release readiness, or new factor-family behavior.
