@@ -5,9 +5,11 @@ Constrained Forney-style Factor Graphs (CFFG) and Lagrangian Active Inference
 models you can read, edit, checkpoint, and ship, whose exploration comes from
 their objective (Generalised Free Energy) rather than bolted-on noise.
 
-Implements Koudahl, van de Laar & de Vries, *Realising Synthetic Active
-Inference Agents* Parts I & II (arXiv:2306.08014), validated to 1.7e-6
-against the authors' Julia reference on the T-maze benchmark.
+Implements a registered subset of Koudahl, van de Laar & de Vries,
+*Realising Synthetic Active Inference Agents* Parts I & II
+(arXiv:2306.08014). The fixed-A discrete paper core is validated to 1.7e-6
+against the authors' Julia T-maze reference; the source-ordered constraint and
+Figure 5 coverage ledger is in `docs/ARCHITECTURE.md`.
 
 ```sh
 uv sync          # install
@@ -37,13 +39,19 @@ plus **constraint beads** that pick the variational objective, plus typed
 |---|---|
 | `VariableSpec` | a discrete random variable (an edge; connects ≤ 2 factors) |
 | `FactorSpec` | a distribution node: `categorical`, `matrix_cat`, `transition_mixture`, `equality`, `dirichlet` |
-| `ConstraintSpec` | a bead: `P_SUBSTITUTION` (adds the epistemic/GFE drive), `DELTA` (MAP readout), `MEAN_FIELD` (VMP) |
+| `ConstraintSpec` | a bead: `P_SUBSTITUTION` (adds the epistemic/GFE drive), `DELTA` (MAP readout), `MEAN_FIELD` (VMP); the legacy factor-only `MOMENT_MATCHING` placeholder round-trips, but compilation and diagrams reject it because executable EP needs endpoint- and projection-aware schema |
 | `PortSpec` | a dangling edge with a role: `data` (sensor), `goal`, `prior`, `glue` (composition) |
 | `AgentSpec` | serialized action, sensor, actuator, and rolling-boundary bindings for `RollingAgent` |
 
 The load-bearing invariant: every variable is either fully connected or
 exposed through exactly one port — so "no dangling edges" and "models
 compose" are the same rule.
+
+The papers' constraint language is broader than this executor. A construction
+is usable only when its factor family, bead combination, message rule, and
+free-energy owner are registered together. The architecture inventory marks
+each paper construction exact, a named approximation, syntax only, or
+unsupported; serialized syntax alone is never evidence of execution.
 
 **The one bead that matters most:** `P_SUBSTITUTION` on an observation factor
 facing a goal factor turns that pair into a GFE composite — the agent then
@@ -563,6 +571,12 @@ fresh `prepare_mu3` call. `Engine.score_mu3_epochs` refreshes particles between
 policy-scoring epochs and averages only converged post-burn-in scores; burn-in
 does not turn an unfinished or collapsed estimate into convergence.
 
+This is currently an Engine-level functional-message workflow. The public
+`RollingAgent(learn_a=True)` route plans with analytic moments from its
+Dirichlet posterior and does not silently activate `mu3(A)`; `cff-lpsn` owns the
+explicit-key, refresh, status, and checkpoint lifecycle needed for that agent
+option.
+
 A learned goal uses the conjugate Fig. 5 `mu1(c)` path. Future slices sharing
 `Cc` add their predictive observation mass into one Dirichlet posterior:
 
@@ -654,10 +668,18 @@ interface with their own model-local names. A one-block model retains the
 joint versus mean-field rollover is explicit in each `BeliefBinding` rather
 than inferred by the runtime.
 
+These are two immutable templates, not the paper's one growing trial graph
+whose future planning bead is replaced by a data bead. `cff-7ozr` owns the
+exact enumerated boundary under which the two-window transformation is
+equivalent; until that oracle lands, this is a named fixed-memory realization,
+not a literal-graph claim.
+
 Pass
 `learn_a=True, initial_counts=...` for continual Dirichlet learning of the
 observation model (see `cffg/experiments/tmaze_learning.py` for the full
-perception–action–learning cycle reproducing Part II Fig. 9).
+perception–action–learning experiment corresponding to Part II Fig. 9). This
+analytic learned-A approximation does not carry functional `mu3(A)` messages
+between trials.
 
 For behavioral calibration beyond the T-maze golden, the costly-cue experiment
 reports the quantities needed to audit an epistemic decision directly:

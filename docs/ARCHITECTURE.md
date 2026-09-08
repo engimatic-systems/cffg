@@ -1,6 +1,6 @@
 # CFFG Engine — Architecture
 
-Status: living as-built record, updated 2026-08-17. Unless a section says
+Status: living as-built record, updated 2026-08-31. Unless a section says
 otherwise, every statement before **Target design** describes behavior in the
 current repository. Tickets, not the target section, are the source of truth for
 planned work.
@@ -10,7 +10,8 @@ and the project brief in Obsidian `agents/CFFG/0.0.md`.
 
 ## What the papers give us (and what they don't)
 
-The papers provide a complete recipe for a specific, powerful thing:
+The papers provide a general derivational language and complete updates for
+specific submodels:
 
 - **CFFG notation**: a factor graph (nodes = factors, edges = variables) *plus
   constraint annotations* ("beads") that fully specify the variational optimization
@@ -34,6 +35,61 @@ What they do *not* give: GFE messages for arbitrary node types. Each new
 factor-type × constraint combination needs a derived update rule. The
 implementation therefore uses an **extensible rule registry**, not a universal
 solver.
+
+### Paper constraint inventory
+
+The execution class below is part of the release contract. "Exact" means the
+named registered construction implements the paper's local constraint without
+an added mathematical approximation; it does not make loopy Bethe inference
+globally exact. A paper construction with no template syntax is unsupported,
+while reserved syntax that round-trips but cannot execute is syntax only.
+
+| Paper construction and source | Template/compiler representation | Execution class | Rule, ledger, direct authority, or guard |
+| --- | --- | --- | --- |
+| Normalization, Part I §2.1 Eqs. (9a–b), Fig. 4; Part II §2.3 Eq. (2a) | Implicit invariant, not a `ConstraintSpec`; compiler plans create normalized beliefs | Exact for every registered family | `_norm_pad` and natural-family normalizers; node energies in `_make_bfe`; `test_fully_observed_marginals_and_bfe` and `test_bfe_equals_negative_loglikelihood` |
+| Marginalization, Part I §2.1 Eq. (9c), Fig. 4; Part II §2.3 Eq. (2b) | Implicit paired edge slots, gather/scatter maps, fixed-point edge products, and interior-edge entropy corrections | Exact density consistency at a fixed point for ordinary registered BP/VMP rules | BP/VMP reductions plus `_make_bfe`; HMM forward-backward and tree `-log Z` tests. The Gaussian-mixture projection below is a named exception, not exact density consistency. |
+| Gaussian-mixture assumed-density projection, repository extension derived in `DERIVATIONS.md` D3 | `gaussian_mixture(_linear)` rules collapse each Gaussian-edge mixture message to the Gaussian with the same mean and covariance | Named assumed-density approximation; only the selected moments, not the full marginal density, agree | `mixg.py`; node terms are exact for held beliefs, while `_make_bfe` uses the collapsed Gaussian edge entropy and reports the bounded ledger described in LIMITATIONS S1d; `test_mixg.py` and switching-KF enumeration tests |
+| Joint node factorization, Part I §5.1 Figs. 5 and 7 | Absence of a factorization bead selects `GroupPlan.mode="bp"` | Exact registered BP on trees; named Bethe approximation on loopy graphs | `BP_UPDATES`, `NODE_ENERGIES`; exhaustive tree and HMM authorities in `test_engine_tree.py` and `test_engine_hmm.py` |
+| Naive mean field, Part I §5.1 Eq. (26), Figs. 5 and 7; Part II §4.1 Eq. (7) | `ConstraintKind.MEAN_FIELD` targets one factor and selects a VMP or Dirichlet-VMP plan | Named mean-field/VMP approximation | `VMP_UPDATES`, `VMP_ENERGIES`, Dirichlet VMP rules, and `_make_bfe`; `test_vmp_exact_in_conjugate_case`, `test_vmp_differs_from_bp_with_two_free_edges`; unsupported factor/family pairs are compile errors |
+| Structured mean field, Part I §5.1 Eq. (27), Fig. 6; Part II §2.4 Fig. 1 | No role-partition syntax. `BoundaryFactorization` is rolling-state metadata, not this node constraint. | Unsupported | No rule or ledger. The enum cannot express the construction, so it cannot be mistaken for executable syntax. |
+| Edge form constraint, Part I §5.2 Eq. (28), Fig. 8 | No generic variational-family bead. `VariableSpec` chooses a model domain/arena and is not a form constraint on `q`. | Unsupported in general; data and optimized δ are the exact special cases below | Unknown constraint kinds fail deserialization; no generic projection or ledger is advertised. |
+| Node form constraint, Part I §5.2 Eq. (29), Fig. 9 | No node-belief family syntax. `FactorType` declares model factor `f`, not a constrained form for `q_a`. | Unsupported | No rule or ledger; the construction is absent from `ConstraintKind`. |
+| Known data constraint, terminating form, Part I §5.3 Eq. (30), Fig. 10; Part II §3.3.1 Fig. 3 | `PortRole.DATA` on a degree-one variable; `Engine.bind_data` writes categorical one-hot evidence or conditioned Gaussian/EF observations | Exact at registered terminating placements | Port validation requires the exposed variable to have one factor endpoint. Ordinary node energy has no exterior-edge entropy correction; observed/missing tree, Kalman, and EF evidence tests are direct authorities. Unsupported continuous placements are compile errors. |
+| Known data constraint, non-terminating form, Part I §5.3 Fig. 10 | No representation: degree-two variables cannot carry ports | Unsupported | `_check_degrees_and_ports` rejects a port on a fully connected variable. Supporting the paper's information-blocking bead on an interior edge requires separate IR and execution semantics. |
+| Fixed model clamp, Part II §2.4 Fig. 1 | `FactorSpec.param_blobs` binds a fixed value to a factor parameter role | Exact for registered factor roles; this is part of the model, not observed data | Parameter packing and each registered rule consume the blob; `test_blob_bound_node_loses_default` and `test_wire_terminals` check the distinct black-square diagram terminal. |
+| Optimized δ/point mass, Part I §5.3 Eq. (30), Fig. 11 and Fig. 29 application | `ConstraintKind.DELTA` on a discrete edge; compiler records `delta_pairs`; the hardening phase projects both slots to the marginal argmax | Exact discrete point-mass coordinate | Ordinary ledger evaluated on the point mass; `test_map_policy_variant`. Dirichlet-parameter, Gaussian, and EF edges are rejected with named compile errors. |
+| Moment matching, Part I §5.4 Eq. (31), Fig. 12 | The paper selects a node endpoint on an incident edge and a sufficient-statistic projection; each end may be selected independently. The legacy factor-only `ConstraintKind.MOMENT_MATCHING` cannot express those choices. | Underspecified legacy syntax only | Serialization and hashing retain the placeholder, but compilation and diagram derivation reject it. `test_legacy_moment_matching_placeholder_round_trips_but_compilation_rejects` and `test_legacy_moment_matching_placeholder_is_rejected` are the guards. EP execution requires a new schema plus migration, factor-specific rules, and a ledger. |
+| P-substitution, Part I §4 Eqs. (20–25), §5.5 Eq. (32), Fig. 13; Part II §3.3.2 Eqs. (4–5), §4.1 Eqs. (6–8) | `ConstraintKind.P_SUBSTITUTION` plus `substituted_role`; compiler derives a discrete, transition-mixture, or hybrid GFE plan only for registered shapes | Exact local Fig. 5 fixed-A composite; named tentative-decision/analytic-moment approximation for uncertain A without functional `mu3`; separately named TM/hybrid extensions; unsupported otherwise | Specialized GFE update/energy functions own the substituted edge term in `_make_bfe`. Compiler rejects unsupported roles, factors, goals, uncertainty modes, and evaluator names. Figure 5 authorities are inventoried below. |
+| Trial-time planning bead → data bead, Part II §6.3 Fig. 7 (static contrast in §3.3 Fig. 3) | `RollingAgent` uses immutable planning and filtering templates plus a carried boundary belief; it does not mutate one growing trial graph | Named two-window realization; literal-graph equivalence is not yet claimed | Fixed structures and checkpointed boundary state execute. `cff-7ozr` owns the enumerated equivalence boundary, exact-zero rollover, and local-ledger comparison required before the release gate. |
+
+Normalization and marginalization are therefore always-on compiler/runtime
+invariants, not optional beads in `ConstraintSpec`. General structured forms
+and arbitrary facing-node calculations remain paper notation until a concrete
+factor/constraint combination has a registered rule and objective owner.
+
+### Part II Figure 5 message inventory
+
+The table follows Figure 5 and Appendix C in source order. The fixed-A rows are
+exact local categorical algebra. For uncertain A, Appendix C.1 separately uses
+a tentative-decision approximation, replacing `q(A)` by a point mass at its
+mean when forming the predictive `q(x)`. Learned goals remain conjugate. The
+functional `mu3` evaluator then uses importance sampling for the nonconjugate
+message; that sampling approximation is distinct from the tentative decision,
+with exact finite-sample ledger identities and truthful stochastic statuses.
+
+| Paper message and source → destination | Mathematical form and execution | Production rule and ledger owner | Independent oracle and hostile-input authority |
+| --- | --- | --- | --- |
+| `mu1(c)`, Fig. 5 and App. C.3: predicted `x` → goal parameter `c` | Closed-form `Dir(c | Abar zbar + 1)`; executable when the goal uncertainty is declared Dirichlet | The GFE sweep writes raw `Abar zbar` to `goal_count_scatter`; `gfe_goal_structural_stats` plus one `goal_dirichlet_energy` per tie group | `test_mu1_shared_goal_posterior_and_complete_fe_match_direct_algebra` reads the raw count message and checks the isolated energy; its float32, exact-zero count, and 64-outcome case is `test_float32_sparse_zero_mass_and_uncomfortable_observation_scale` |
+| Direct `mu2(z)`, Fig. 5 and App. C.4: goal-observation composite → state `z` | Closed-form categorical `softmax(rho(zbar))` for held moments; recursive direct iteration is not scheduled independently because Part II §4.5 warns it can diverge | `_gfe_rho`; `gfe_update[_stats]` emits normalized `rho` after the stationary solve; `gfe_energy[_stats]` owns `-zbar·rho-H[zbar]` | `test_raw_mu2_and_local_energy_match_independent_formula` checks the raw outgoing message, predictive message, and isolated energy before edge normalization can compensate |
+| Indirect `mu2(z)`, Fig. 5, App. C.5 Eq. (25): same composite → state with incoming `Cat(z|d)` | Nonlinear stationary coordinate: solve `zbar=softmax(rho(zbar)+log d)`, then emit `log zbar-log d` (the production `rho` form is gauge-equivalent) | Gauge-projected globalized `_gfe_solve_result`, `gfe_stationary_stats`, and `gfe_update[_stats]`; failures have converged/budget-exhausted/diverged inner status | Simplex enumeration and objective parity in `test_newton_matches_brute_force_argmin` and `test_bfe_equals_local_objective_minimum`; vacuous input, literal zero support, float32, and 40–80-state cases in `test_gfe.py` |
+| `mu3(A)`, Fig. 5, App. C.6 Eq. (26): future `(x,z,c)` composite → observation matrix `A` | Functional log-density `zbar·xi(A)`, whose predictive term follows Appendix C.1's tentative-decision approximation; it is not Dirichlet-closed, so `cffg.mu3_is.v1` separately uses fixed-particle self-normalized importance sampling | `mu3_log_message`, `mu3_importance_update`, `Engine.prepare_mu3`, and `_update_mu3`; slice structural terms use `gfe_energy_stats`, and one shared KL leaves the parameter contribution `-log Z` | Expanded-form and binary quadrature oracles in `test_mu3_derivation.py`; multi-slice ledger in `test_multiple_slices_add_functional_weights_and_parameter_ledger_once`; exact support, float32, scale, and Engine divergence authorities named in the runtime section below |
+
+Figure 5's average energy is `U_x = -zbar·rho`. Production's composite
+ledger adds the state negative entropy and surrounding edge/factor terms.
+For uncertain A, the analytic agent path feeds closed-form Dirichlet moments
+into `rho` but does not apply the functional density. Only the explicitly
+declared `cffg.mu3_is.v1` evaluator carries the Figure 5 `mu3(A)` update; its
+current Engine-level lifecycle is not evidence that `RollingAgent` executes it.
 
 ## Implemented layers
 
@@ -82,10 +138,16 @@ A pure-Python (dataclass) representation, independent of JAX:
 
 - `VariableSpec` supports discrete cardinalities, Gaussian dimensions, and
   scalar exponential-family tags. `FactorSpec` holds a type plus parameter
-  references, and `ConstraintSpec` holds normalization, marginalization,
-  form/δ, moment-matching, and P-substitution beads. GFE composites are derived
+  references. Default normalization and marginalization are implicit;
+  `ConstraintSpec` holds discrete δ, naive mean-field, legacy moment-matching,
+  and P-substitution beads. GFE composites are derived
   compiler plans detected from factors and constraints; they are not a separate
-  serialized IR node.
+  serialized IR node. `MOMENT_MATCHING` is an underspecified factor-only legacy
+  placeholder: it cannot identify the paper's incident edge endpoint or
+  sufficient-statistic projection. Compilation names the target factor and
+  rejects it before arena construction, and diagram generation rejects it
+  rather than drawing the wrong bead. Executable EP requires a new schema and
+  migration in addition to factor-specific projection and ledger rules.
 - **Templates with ports.** A template is a CFFG fragment whose boundary edges are
   declared **ports** with roles: `data` (sensor clamp), `goal` (goal prior),
   `prior` (parameter prior), `glue` (connects to the next unrolled slice). A model
@@ -824,20 +886,29 @@ discarding a joint correlation. Exact joint rollover remains the separate
   one normalization; the weighted `E[A]` and `E[h(A)]` feed the Fig. 5
   composite without moment-matching back to a Dirichlet. `RunResult` exposes
   ESS, log-normalizer, and converged/budget-exhausted/diverged stochastic
-  status. `Engine.score_mu3_epochs` refreshes independent particle sets,
-  accepts only converged epochs, and applies burn-in solely to the final
-  policy-score average.
+  status. Exact-zero sampled mass is inert, goal-excluded positive mass has
+  zero weight, and positive sampled mass over a zero marginal predictive is an
+  incoherent cavity reported as divergence; the independent D6b formula and
+  Engine propagation are pinned in
+  `test_mu3_hostile_support_weight_collapse_float32_and_scale` and
+  `test_incoherent_predictive_support_diverges_through_engine`.
+  `Engine.score_mu3_epochs` refreshes independent particle sets, accepts only
+  converged epochs, and applies burn-in solely to the final policy-score
+  average.
 - Inference *modes* are just constraint presets on the same grounded model:
   filtering/smoothing (data on past), planning (goals on future, P-substitution
   on), what-if (clamp hypothetical δs), backward inference (goals only, no data).
 
 ### 5. Agent runtime (`cffg.agent`)
 
-- **Receding-horizon loop**: at each tick, bind new observation (future edge's
-  constraint flips from goal to data δ), re-anchor each declared planning
-  prior on its latest filtering posterior, re-infer, and read the declared
-  control marginal (or its MAP under a δ-constraint). Two compiled windows
-  cover an unbounded episode without graph growth or recompilation.
+- **Receding-horizon loop**: at each tick, bind new observation (the logical
+  constraint changes from planning to observed data), re-anchor each declared
+  planning prior on its latest filtering posterior, re-infer, and read the
+  declared control marginal (or its MAP under a δ-constraint). The runtime
+  realizes that lifecycle with separate immutable planning and filtering
+  templates; it does not mutate the paper's literal graph. Two compiled windows
+  cover an unbounded episode without graph growth or recompilation, while
+  `cff-7ozr` owns the exact equivalence boundary.
 - **Continual learning**: driven entirely by declared learnables (§3b). The
   agent contributes cadence, while `AgentSpec` supplies all addressing.
   Observation, transition and habit posteriors update every tick from the
@@ -1157,8 +1228,8 @@ land as docstrings; delegation guidance lives in the epic:
   Pólya–Gamma/JJ VMP update, supplying the transition primitive needed by the
   rSLDS graph without materializing a state-dependent transition tensor.
 - **M12 — Nonlinear factors** (cff-o7hs): Jacobian linearization and
-  sigma-point moment matching; activates the reserved MOMENT_MATCHING bead
-  as EP.
+  sigma-point moment matching; replaces the legacy factor-only
+  `MOMENT_MATCHING` placeholder with endpoint- and projection-aware EP syntax.
 - **M13 — Exponential-family abstraction** (cff-8s6a, cff-l6i5, landed):
   natural parameters + log-partitions as the message contract;
   Gamma/Beta/Poisson/Wishart as table entries. Cat/Dir/Gaussian re-expressed

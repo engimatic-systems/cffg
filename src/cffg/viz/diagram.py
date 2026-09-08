@@ -14,6 +14,8 @@ ConstraintSpec, port, and parameter binding then perturbs that default:
 - ``MEAN_FIELD``       -> one bead per q-edge instead of the joint bead
 - ``P_SUBSTITUTION``   -> the substituted role's bead becomes a square (Fig 13)
 - ``DELTA`` on an edge -> the on-wire bead carries a delta symbol (Fig 11)
+- ``MOMENT_MATCHING``  -> rejected: the legacy factor-only target cannot select
+                          the paper's node/edge endpoint pair (Fig 12)
 - ``param_blobs``      -> black-square pointmass terminal (Fig 10 discussion);
                           the role drops out of q, so the node loses its
                           default factorisation (the f_d case, Fig 16)
@@ -101,7 +103,7 @@ class WireView:
     label: str  # variable name; empty for parameter wires (terminal is labeled)
     ends: tuple[NodeEnd | TerminalEnd, NodeEnd | TerminalEnd]
     bead: str | None = None  # None: no bead in q (pointmass wires); "": empty
-    # bead symbols: "" (default normalisation), "delta", "E" (moment matching)
+    # bead symbols: "" (default normalisation), "delta" (point mass)
 
     def node_ends(self) -> list[NodeEnd]:
         return [e for e in self.ends if isinstance(e, NodeEnd)]
@@ -161,6 +163,11 @@ def derive(template: Template) -> Diagram:
     node_constraints: dict[str, list[ConstraintSpec]] = {}
     edge_constraints: dict[str, list[ConstraintSpec]] = {}
     for c in template.constraints:
+        if c.kind is ConstraintKind.MOMENT_MATCHING:
+            raise ValueError(
+                "cannot diagram MOMENT_MATCHING: the legacy factor-only syntax "
+                "does not identify an incident edge endpoint or projection"
+            )
         bucket = edge_constraints if c.target in template.variables else node_constraints
         bucket.setdefault(c.target, []).append(c)
 

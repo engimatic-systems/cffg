@@ -209,10 +209,13 @@ class ConstraintKind(str, Enum):
     DELTA = "delta"  # pointmass form constraint on an edge marginal (MAP reads)
     MEAN_FIELD = "mean_field"  # naive factorization of a node marginal
     P_SUBSTITUTION = "p_substitution"  # q(x) -> p(x|rest); local VFE becomes GFE
-    MOMENT_MATCHING = "moment_matching"  # reserved for EP; no rules registered yet
+    # Legacy placeholder: this factor-only target cannot identify the incident
+    # edge endpoint or sufficient-statistic projection required by Part I §5.4.
+    MOMENT_MATCHING = "moment_matching"
 
 
-# Which kinds target an edge (variable name) vs a node (factor name).
+# Which kinds target an edge (variable name) vs a node (factor name).  The
+# MOMENT_MATCHING entry records the legacy payload, not a faithful EP schema.
 EDGE_CONSTRAINTS = frozenset({ConstraintKind.DELTA})
 NODE_CONSTRAINTS = frozenset(
     {ConstraintKind.MEAN_FIELD, ConstraintKind.P_SUBSTITUTION, ConstraintKind.MOMENT_MATCHING}
@@ -222,7 +225,7 @@ NODE_CONSTRAINTS = frozenset(
 @dataclass(frozen=True)
 class ConstraintSpec:
     kind: ConstraintKind
-    target: str  # variable name (edge kinds) or factor name (node kinds)
+    target: str  # variable name (edge kinds) or factor name (node/legacy kinds)
     detail: tuple[tuple[str, str], ...] = ()
     # detail is a sorted tuple of key/value pairs so specs stay hashable and
     # canonically serializable, e.g. (("substituted_role", "out"),).

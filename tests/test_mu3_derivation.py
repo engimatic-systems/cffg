@@ -281,6 +281,21 @@ def test_mu3_hostile_support_weight_collapse_float32_and_scale():
         )
     )
 
+    # Positive sampled mass over a zero marginal predictive is an incoherent
+    # cavity, not a tiny-denominator approximation.
+    with jax.enable_x64(False):
+        sample = jnp.asarray([[[1.0], [0.0]]], dtype=jnp.float32)
+        abar = jnp.asarray([[0.0], [1.0]], dtype=jnp.float32)
+        z = jnp.asarray([[1.0]], dtype=jnp.float32)
+        logc = jnp.asarray([[0.0, rules.NEG]], dtype=jnp.float32)
+        reference = _mu3_log(sample[0], abar, z[0], jnp.exp(logc[0]))
+        score = rules.mu3_log_message(sample, z, logc, abar)
+        assert bool(jnp.isposinf(reference))
+        assert bool(jnp.isposinf(score[0]))
+        update = rules.mu3_importance_update(sample, z, logc, abar)
+        assert int(update[-1]) == 2
+        np.testing.assert_array_equal(update[2], [0.0])
+
     with pytest.raises(ValueError, match="finite and > 0"):
         _draw_base(jax.random.PRNGKey(0), jnp.asarray([[0.0], [1.0]]), 8)
     with pytest.raises(RuntimeError, match="all mu3"):

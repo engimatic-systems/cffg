@@ -136,6 +136,16 @@ class TestEdgeCases:
         with pytest.raises(ValueError, match="loose"):
             derive(t)
 
+    def test_legacy_moment_matching_placeholder_is_rejected(self, hmm_slice):
+        hmm_slice.constraints.append(
+            ConstraintSpec(ConstraintKind.MOMENT_MATCHING, "obs")
+        )
+        with pytest.raises(
+            ValueError,
+            match="legacy factor-only syntax.*incident edge endpoint",
+        ):
+            derive(hmm_slice)
+
 
 def test_every_factor_type_has_a_short_glyph():
     """Box labels are capped at 3 characters (Cooper, 2026-07-08): anything

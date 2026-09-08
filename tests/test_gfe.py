@@ -8,6 +8,7 @@ z*, and the engine's total BFE must equal J(z*) (prior node + z-edge entropy
 """
 
 import numpy as np
+from scipy.special import logsumexp
 
 from cffg import rules
 from cffg.compiler import compile_template
@@ -169,6 +170,29 @@ def test_newton_matches_brute_force_argmin():
     engine, state = solve(A_EPI, UNIF, UNIF)
     z_ref, _ = brute_force_zstar(A_EPI, UNIF, UNIF)
     np.testing.assert_allclose(engine.marginals(state)["z"], z_ref, atol=1e-4)
+
+
+def test_raw_mu2_and_local_energy_match_independent_formula():
+    import jax.numpy as jnp
+
+    z_ref, _ = brute_force_zstar(A_EPI, UNIF, UNIF)
+    rho = rho_np(A_EPI, UNIF, z_ref)
+    expected_mu2 = rho - logsumexp(rho)
+    expected_log_qx = np.log(A_EPI @ z_ref)
+    expected_energy = -z_ref @ rho + z_ref @ np.log(z_ref)
+
+    log_d = jnp.log(jnp.asarray(UNIF))[None, :]
+    log_a = jnp.log(jnp.asarray(A_EPI))[None, :, :]
+    log_c = jnp.log(jnp.asarray(UNIF))[None, :]
+    mu2, log_qx = rules.gfe_update(log_d, log_a, log_c, K)
+
+    np.testing.assert_allclose(mu2[0], expected_mu2, atol=2e-6)
+    np.testing.assert_allclose(log_qx[0], expected_log_qx, atol=2e-6)
+    np.testing.assert_allclose(
+        rules.gfe_energy(log_d, log_a, log_c)[0],
+        expected_energy,
+        atol=2e-6,
+    )
 
 
 def test_ambiguity_aversion_and_bfe_ablation():

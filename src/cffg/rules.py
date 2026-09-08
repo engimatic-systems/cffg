@@ -746,9 +746,13 @@ def mu3_log_message(particles, zbars, logcs, abar):
     """Evaluate ``Σ_t log μ₃,t(A_s)`` for fixed Dirichlet particles.
 
     ``abar`` is the current weighted posterior mean and is held fixed while
-    evaluating the functional, exactly as in Part II Fig. 5.  Exact goal
-    zeros remain true log-zeros; masked products avoid the undefined
-    numerical form ``0 * -inf`` without inventing support.
+    evaluating the functional, exactly as in Part II Fig. 5. Exact goal zeros
+    remain true log-zeros. Predictive support comes from positive operand
+    pairs, while positive marginal predictives are evaluated in log space so
+    float32 underflow cannot turn them into structural zeros. Zero sampled
+    mass is inert; positive sampled mass over a zero marginal predictive
+    remains non-finite so the caller can report the incoherent cavity as
+    divergence.
     """
     dtype = jnp.result_type(particles, zbars, logcs, abar)
     particles = jnp.asarray(particles, dtype=dtype)
@@ -756,17 +760,59 @@ def mu3_log_message(particles, zbars, logcs, abar):
     logcs = jnp.asarray(logcs, dtype=dtype)
     abar = jnp.asarray(abar, dtype=dtype)
     logcs = jnp.where(logcs == jnp.asarray(NEG, dtype=dtype), -jnp.inf, logcs)
-    predictive = jnp.einsum("oi,ti->to", abar, zbars)
-    residual = logcs - _safe_log(predictive)
+    abar_positive = abar > 0
+    zbars_positive = zbars > 0
+    predictive_support = jnp.any(
+        abar_positive[None, :, :] & zbars_positive[:, None, :], axis=-1
+    )
+    log_abar = jnp.where(abar_positive, jnp.log(abar), -jnp.inf)
+    log_zbars = jnp.where(zbars_positive, jnp.log(zbars), -jnp.inf)
+    log_predictive = logsumexp(
+        log_abar[None, :, :] + log_zbars[:, None, :], axis=-1
+    )
+    # A zero marginal predictive is a support statement, not a small positive
+    # denominator. Preserve it until the sampled mass below determines whether
+    # the coordinate is inert or the cavity is incoherent.
+    residual = logcs - jnp.where(predictive_support, log_predictive, 0.0)
 
-    sample_predictive = jnp.einsum("soi,ti->sto", particles, zbars)
-    fit = jnp.sum(
-        jnp.where(sample_predictive > 0, sample_predictive * residual[None, :, :], 0.0),
+    particles_positive = particles > 0
+    sample_support = jnp.any(
+        particles_positive[:, None, :, :] & zbars_positive[None, :, None, :],
         axis=-1,
     )
-    log_particles = jnp.where(particles > 0, jnp.log(particles), 0.0)
+    log_particles = jnp.where(particles_positive, jnp.log(particles), -jnp.inf)
+    log_sample_predictive = logsumexp(
+        log_particles[:, None, :, :] + log_zbars[None, :, None, :],
+        axis=-1,
+    )
+    active = sample_support
+    sample_residual = residual[None, :, :]
+    residual_magnitude = jnp.abs(sample_residual)
+    finite_fit = jnp.sign(sample_residual) * jnp.exp(
+        log_sample_predictive
+        + jnp.log(jnp.where(residual_magnitude > 0, residual_magnitude, 1.0))
+    )
+    fit_terms = jnp.where(
+        active & jnp.isfinite(sample_residual),
+        jnp.where(residual_magnitude > 0, finite_fit, 0.0),
+        0.0,
+    )
+    fit_terms = jnp.where(
+        active & jnp.isneginf(sample_residual), -jnp.inf, fit_terms
+    )
+    fit_terms = jnp.where(
+        active & jnp.isposinf(sample_residual), jnp.inf, fit_terms
+    )
+    fit_terms = jnp.where(
+        active & jnp.isnan(sample_residual), jnp.nan, fit_terms
+    )
+    zero_marginal = active & ~predictive_support[None, :, :]
+    zero_goal = jnp.isneginf(logcs)[None, :, :]
+    fit_terms = jnp.where(zero_marginal & ~zero_goal, jnp.inf, fit_terms)
+    fit_terms = jnp.where(zero_marginal & zero_goal, jnp.nan, fit_terms)
+    fit = jnp.sum(fit_terms, axis=-1)
     particle_h = -jnp.sum(
-        jnp.where(particles > 0, particles * log_particles, 0.0), axis=1
+        jnp.where(particles_positive, particles * log_particles, 0.0), axis=1
     )
     entropy = jnp.einsum("ti,si->st", zbars, particle_h)
     return jnp.sum(fit - entropy, axis=-1)

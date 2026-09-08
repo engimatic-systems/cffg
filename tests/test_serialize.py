@@ -2,6 +2,9 @@
 
 import dataclasses
 
+import pytest
+
+from cffg.compiler import CompileError, compile_template
 from cffg.core import ConstraintKind, ConstraintSpec, validate
 from cffg.core.serialize import (
     from_json,
@@ -22,6 +25,24 @@ def test_round_trip_json(hmm_slice):
     back = from_json(to_json(hmm_slice))
     assert to_dict(back) == to_dict(hmm_slice)
     validate(back)
+
+
+def test_legacy_moment_matching_placeholder_round_trips_but_compilation_rejects(
+    hmm_slice,
+):
+    hmm_slice.constraints.append(
+        ConstraintSpec(ConstraintKind.MOMENT_MATCHING, "obs")
+    )
+    back = from_json(to_json(hmm_slice))
+    assert back.constraints == hmm_slice.constraints
+    with pytest.raises(
+        CompileError,
+        match=(
+            "factor 'obs': legacy moment-matching syntax does not identify "
+            "an incident edge endpoint or projection"
+        ),
+    ):
+        compile_template(back)
 
 
 def test_gaussian_domain_round_trips(hmm_slice):
