@@ -220,6 +220,13 @@ A pure-Python (dataclass) representation, independent of JAX:
 
 ### 2. Compiler (`cffg.compiler`)
 
+`cffg.compiled` owns compiled plan/address records, `Arena`, and the unchanged
+log-space sentinel. Compiler orchestration constructs these values; runtime,
+scheduling, learning, and parameter consumers import them from that lower-level
+owner. The old `cffg.compiler` imports remain compatibility re-exports. The
+compiled-value owner imports neither compiler orchestration nor runtime code;
+its dependencies are NumPy and the host-side kernel declarations.
+
 The compiler characterization baseline is `bf6bbe9527b5e1eea9172a30b8c7c214a08ed9ee`,
 the completed discrete/Gaussian registration foundation. Compiler extraction
 preserves its public plans, parameter addresses, slot order, diagnostics, and

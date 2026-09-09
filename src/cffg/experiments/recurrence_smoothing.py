@@ -21,7 +21,8 @@ import numpy as np
 from numpy.polynomial.hermite import hermgauss
 
 from cffg import recurrence
-from cffg.compiler import NEG, compile_template
+from cffg.compiled import NEG
+from cffg.compiler import compile_template
 from cffg.core.ir import (
     BlobRef,
     FactorSpec,

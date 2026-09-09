@@ -38,7 +38,7 @@ import numpy as np
 from jax.scipy.special import logsumexp
 
 from cffg import csp, ef, efrules, gauss, hybrid_gfe, kernels, mixg, recurrence
-from cffg.compiler import NEG, Arena
+from cffg.compiled import NEG, Arena
 from cffg.kernel_runtime import (
     discrete_energy as _disc_energy,
     discrete_message as _disc_message,

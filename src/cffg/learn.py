@@ -62,7 +62,7 @@ from cffg.learning_checkpoint import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    from cffg.compiler import LearnPlan
+    from cffg.compiled import LearnPlan
     from cffg.engine import Engine, RunResult
 
 
@@ -521,7 +521,7 @@ class Learnables:
         consume; counts targets get the raw hyperparameters. A target names
         the parameter role its blob fills, so a family with several
         parameters writes each one where it belongs."""
-        from cffg.compiler import NEG
+        from cffg.compiled import NEG
         from cffg.params import _RuntimeWrite, _apply_runtime_writes
 
         writes: list[_RuntimeWrite] = []

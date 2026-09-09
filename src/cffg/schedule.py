@@ -55,7 +55,7 @@ from dataclasses import dataclass, field, replace
 
 import numpy as np
 
-from cffg.compiler import Arena
+from cffg.compiled import Arena
 
 # Rounds shorter than this unroll as batch stages; longer uniform runs
 # become one lax.scan (trace/compile cost O(1) in the run length).

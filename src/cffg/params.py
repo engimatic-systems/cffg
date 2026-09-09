@@ -11,7 +11,7 @@ import jax.numpy as jnp
 import numpy as np
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    from cffg.compiler import MemberAddress, ParameterAddress
+    from cffg.compiled import MemberAddress, ParameterAddress
     from cffg.engine import Engine
 
 
@@ -132,7 +132,7 @@ def _runtime_layout(
 def _transform(
     factor_type: str, address: "ParameterAddress", value: np.ndarray
 ) -> np.ndarray:
-    from cffg.compiler import NEG
+    from cffg.compiled import NEG
 
     if address.transform == "identity":
         transformed = value

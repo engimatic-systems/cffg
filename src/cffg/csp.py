@@ -35,7 +35,7 @@ from __future__ import annotations
 import jax.numpy as jnp
 from jax.scipy.special import logsumexp
 
-from cffg.compiler import NEG
+from cffg.compiled import NEG
 
 _TINY = 1e-12
 

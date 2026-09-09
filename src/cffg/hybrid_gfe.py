@@ -17,7 +17,7 @@ import jax.numpy as jnp
 from jax.scipy.special import logsumexp
 
 from cffg import gauss
-from cffg.compiler import NEG
+from cffg.compiled import NEG
 from cffg.rules import (
     GfeSolveResult,
     _gfe_guard_incoming,
