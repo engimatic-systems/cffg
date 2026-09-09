@@ -78,12 +78,12 @@ def resolve_learnables(
             )
         blobs = set(spec.blobs)
         readers = sorted(
-            f.name
-            for f in t.factors.values()
-            if blobs & set(f.param_blobs.values())
+            f.name for f in t.factors.values() if blobs & set(f.param_blobs.values())
         )
         if not readers:
-            raise CompileError(f"learnable {name!r}: no factor reads blobs {sorted(blobs)}")
+            raise CompileError(
+                f"learnable {name!r}: no factor reads blobs {sorted(blobs)}"
+            )
         ftypes = {t.factors[r].type for r in readers}
         if len(ftypes) > 1:
             raise CompileError(
@@ -96,7 +96,9 @@ def resolve_learnables(
         # probability blob and a counts blob (build_rollout's A/Ac, Bs/Bc), and
         # a perception graph resolves the first while a planning graph with
         # parameter uncertainty resolves the second.
-        shapes = {b: tuple(np.shape(resolved[b])) for b in sorted(blobs) if b in resolved}
+        shapes = {
+            b: tuple(np.shape(resolved[b])) for b in sorted(blobs) if b in resolved
+        }
         # Which parameter ROLE each blob fills. A multi-parameter family
         # writes its outputs by role, so a gaussian_linear's matrix, offset
         # and cov blobs each receive their own part of one MNIW rollover.

@@ -1,4 +1,10 @@
-"""Declaration-only admission and ownership for named specialized families."""
+"""Declaration-only admission and ownership for named specialized families.
+
+DATA ports request runtime clamps under the family's conditioning contract.
+Unbonded GLUE ports are half-edges with implicit marginalization. PRIOR and
+GOAL ports must be composed or bound before compilation; otherwise a factor
+is missing from the declared model.
+"""
 
 import numpy as np
 
