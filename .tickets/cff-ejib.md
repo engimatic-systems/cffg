@@ -1,6 +1,6 @@
 ---
 id: cff-ejib
-status: open
+status: in_progress
 deps: [cff-kfo7]
 links: [cff-kfo7]
 created: 2026-09-02T04:17:42Z
@@ -110,3 +110,7 @@ Additional boundary clarification: registered binding-capability interpretation 
 **2026-09-09T21:26:45Z**
 
 Ready baseline update: cff-kfo7 is closed; final code tree 9a130c0 (implementation f281a29 plus callback-timing correction dba0429) passed 1736 default-suite tests, 41 slow deselections, four existing Gym warnings, 998.32 seconds wall. Preserve the now explicit specialized ownership and all 27 new stage-boundary tests, especially same-FactorType replacement shape-callback timing. No user decision is pending before registered extraction. Start from the published specialized-lowering branch after its PR publication and normal base update.
+
+**2026-09-09T21:28:21Z**
+
+Starting implementation on agent/cff-ejib-registered-lowering from updated agent/cff-kfo7-specialized-lowering at bbf3036 (PR #118); validated source baseline 9a130c0. Change-path rows: New factor/rule is primary; New IR field only copies existing topology role declarations; Learnable/checkpoint only emits existing address requirements. No new schema or runtime numerical/status change. Flood/scheduled and direct/vmap consume the same assembled plans; host/JIT compiler pair N/A; JSON/current/legacy bundles reconstruct through one owner, agent runtime checkpoint data remains unchanged. Capture a shared immutable binding snapshot, preserve per-factor admission ordering through registered-owned capability helpers, then produce registered structural drafts/observation intent/typed array requirements before specialized completion. Equality remains specialized: carry opaque ordered references and discrete BP membership only. Do not invoke shape, packing or observation-validation callbacks early; no observation/member IDs or partially initialized Arena are published. Numeric packing, observation/member address resolution, learning and assembly remain compatibility-owned until their tickets. Sparse/improper messages N/A; float32 metadata and 32-group ordering parity required. Preserve all existing gates, error classes, binding fallback and legacy EF packing behavior. Focused tests throughout; one final dashboard-backed default suite after the final source change.
