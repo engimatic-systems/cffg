@@ -117,3 +117,7 @@ Final gate running at cdbad68 with no source edits after launch. Extra read-only
 **2026-09-09T20:03:17Z**
 
 Final dashboard-backed gate PASSED at code head cdbad68: 1,690 passed, 41 opt-in slow tests deselected, four existing Gym deprecation warnings. Pytest 991.39 seconds; measured wall 1003.707 seconds. Dashboard refreshed: 14 new cases, zero failures, 30 diagrams in 23 galleries. No source changes after gate launch. Full cross-group sharing, one parameter energy owner, tied solver coordinates and unchanged serialization formats are complete. Publication stacks on PR #115. The next prerequisite cff-gvch remains a separate validation change; no temporary rejection or deferred sharing support is needed.
+
+**2026-09-09T20:04:29Z**
+
+Published as PR #116: https://github.com/engimatic-systems/cffg/pull/116, stacked on #115. Shared architecture HTML shows the completed correction and 1,690-test passing gate. Code unchanged from cdbad68; tree will be clean and pushed before starting the separate validation prerequisite.
