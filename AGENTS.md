@@ -80,8 +80,8 @@ git pull --ff-only origin "$BASE_BRANCH"
 This project will span many context windows. The rule that makes that survivable:
 **tickets are the shared memory; the repo carries no session state.**
 
-- **Start of session**: reuse the current `AGENTS.md` text if already supplied in
-  context; read it if missing or changed. Run `tk ready`, pick ONE ticket (or a few
+- **Start of session**: don't re-read `AGENTS.md` text if already supplied in
+  context. Run `tk ready`, pick ONE ticket (or a few
   trivially small ones), then follow **Session bootstrap** before branching. Don't
   re-derive project state from scratch — the ticket's description, design notes,
   and comments are the handoff.

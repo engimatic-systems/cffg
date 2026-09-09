@@ -52,3 +52,7 @@ Completed on PR112 in separate logical commits. Removed only the six verified re
 AGENTS now reuses current supplied instructions, refreshes changed/missing content, scopes reads to sections or functions, checks PR paths before patches, bounds tool/research output, and keeps read tracking out of the repository. Isolated tooling now defaults to focused tests plus artifact validation with a recorded isolation rationale; runtime behavior, shared dependencies and test-gate changes retain the full suite. README matches.
 
 Validation: exact deletion scope and ignore behavior verified; existing ticket contents unchanged; AGENTS/README reviewed together; git diff --check and tk dep cycle pass. No src/tests/tools/dependency/runtime-history change since b014d99, so the preceding 1,578-test code gate is retained without another inference run. Existing audit narration and scientific reference content remain intact. No further cleanup or architecture work is started.
+
+**2026-09-09T16:15:10Z**
+
+Cooper approved the housekeeping changes and explicitly requested committing his startup-rule edit: do not re-read AGENTS.md when its text is already supplied in context. Committing that exact two-line wording change before merging PR108 through PR112 to main. The later bounded-read rules remain unchanged.
