@@ -2,7 +2,7 @@
 id: cff-ddsq
 status: in_progress
 deps: [cff-bfr9]
-links: [cff-edoz, cff-ws3c]
+links: [cff-edoz, cff-ws3c, cff-sf29, cff-34gi]
 created: 2026-09-02T04:17:42Z
 type: chore
 priority: 1
@@ -140,3 +140,7 @@ Ownership checks are complete in assembly_checks.py. Registered/resolved plan co
 **2026-09-09T23:23:17Z**
 
 Bounded local performance check, no competing tests: 100 retained alternating repetitions after five warmups, assembly only over pre-resolved HMM inputs. Before/after ownership checks: 1 slice/4 factors, 0.032 -> 0.049 ms median; 32 slices/97 factors, 0.080 -> 0.133 ms; 128 slices/385 factors, 0.229 -> 0.389 ms. The baseline assembler came from 4e03323; current checks use one-time indexes and member lookups, with no per-owner whole-template copy. These are host setup costs on this machine, not inference timing or a speedup claim. Review evidence is local source inspection, 14-model parity/publication-count comparison, and explicit mismatch regressions. The additional review agents were unavailable due to usage limits; no independent agent review of this ticket is claimed. Final default gate follows at the completed source commit; no more implementation edits are planned.
+
+**2026-09-09T23:42:33Z**
+
+A final bounded source review confirmed an inherited malformed-input gap: fixed GFE A/c arrays with [-0.2, 1.2] can pass the sum-only check and pack to mass 1.2. This also reproduces in pre-extraction compiler 0bcda82. Separate P2 cff-34gi owns its fix; LIMITATIONS S9 records the current scope. It does not change valid-model parity or make the structural move unsafe, so it is not folded into this refactor or made an epic prerequisite. No numerical source was changed for this finding.
