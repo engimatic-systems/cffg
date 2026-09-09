@@ -1,6 +1,6 @@
 ---
 id: cff-kfo7
-status: in_progress
+status: closed
 deps: [cff-8t4d, cff-n183, cff-gvch]
 links: [cff-bfr9, cff-n183, cff-gvch]
 created: 2026-09-02T04:17:42Z
@@ -252,3 +252,11 @@ Validation before final gate: initial compiler/topology/declaration/shared-goal 
 **2026-09-09T21:09:31Z**
 
 Late targeted parity check found a supported built-in replacement edge case: unregister/re-register matrix_cat with a trusted shape callback that raises. Baseline ad028f0 compiles explicit arrays without invoking that callback and reports missing-blob errors before it; f281a29 requirements invoked it eagerly. The superseded final suite was terminated at 70 percent with no reported failures and is not validation evidence for publication. Correction: specialized requirements never execute registered shape callbacks; discovery owns canonical shapes only for composite-consumed built-in factors. Registered providers still run at the existing _blob_shape initializer checkpoint, and the compatibility fallback remains unchanged for unregistered ordinary layouts. New regression pins explicit arrays, missing blobs, zero early calls and the initializer call. Source: independent isolated baseline/current reproduction plus test_specialized.py; confidence high. Expanded focused run 220 passed, 1 deselected, 46.77 seconds; after narrowing canonical declarations to consumed members, final focused stages/compiler/init run 81 passed, 3.33 seconds. New case count is 27. Ruff/diff checks clear. A fresh final gate follows this source correction.
+
+**2026-09-09T21:13:08Z**
+
+Fresh final dashboard-backed default suite started at 9a130c0 (implementation correction dba0429; following commit is only the cff-ejib preparation handoff). Previous runtime remains 1015.217 seconds with 1290 seconds suggested headroom. Keep this source head unchanged during validation; publication/closure wait for this fresh result, expected 1736 cases including 27 new stage-boundary tests. Shared architecture HTML and draft PR body now show the corrected head and do not claim the terminated run as passing evidence.
+
+**2026-09-09T21:26:45Z**
+
+Final gate PASSED at 9a130c0: 1736 default-suite tests, zero failures, 41 opt-in slow tests deselected, four existing Gym deprecation warnings. Pytest 985.86 seconds; measured wall 998.32 seconds. Dashboard refreshed with 27 new cases, 30 diagrams and 23 galleries. No source changes after launch. All acceptance outcomes are complete; closing specialized extraction. Next is cff-ejib registered structural lowering using the existing claims/draft/requirement boundary and the recorded registry/observation/diagnostic handoff. No remaining work or user decision for cff-kfo7.
