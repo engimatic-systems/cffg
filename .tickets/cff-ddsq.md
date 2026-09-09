@@ -116,3 +116,7 @@ Dependency companion from tk dep tree --full cff-ddsq, tk ready, tk blocked; pre
       --> [blocked] cff-edoz
         --> [blocked] cff-sf29 --> engine track cff-ws3c --> cff-ofv1 --> cff-cfqg
 No parallel prerequisite within this compiler chain; unrelated ready work remains outside this epic. Start from the published bfr9 branch only after its gate and closure, following the normal base update.
+
+**2026-09-09T23:05:14Z**
+
+Ready source baseline: cff-bfr9 is closed. Source339c46a passed1,777 default tests with41 slow deselections andfour existing warnings in999.044 seconds measured wall; runtime record5b3606f. All22 new resolution cases and125 final focused boundary tests pass;14 complete arenas match0bcda82. No source changed after the gate. Begin only after bfr9 PR publication, using agent/cff-bfr9-array-resolution as the intended base and updating it before branching. This ticket requires its own fresh final suite after implementation, not another run of the unchanged base.
