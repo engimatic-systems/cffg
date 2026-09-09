@@ -1,6 +1,6 @@
 ---
 id: cff-ecw0
-status: in_progress
+status: closed
 deps: [cff-209l]
 links: [cff-544x]
 created: 2026-09-02T04:02:00Z
@@ -123,3 +123,7 @@ Research distilled (confidence high; production sources match bf6bbe9). Question
 **2026-09-09T16:37:53Z**
 
 Pre-gate evidence: 44 new characterization tests pass on both current code and exact baseline bf6bbe9 (baseline source loaded from /tmp/cffg-compiler-baseline.Q511t4/repo/src; import path verified). Focused current run with serialization, AgentSpec and dashboard: 71 passed in 4.90s. Final baseline run: 44 passed in 1.87s. Read-only coverage review identified and resolved exact conjugate-family pairing diagnostics, write-only learned-GFE target addresses (ordinary and functional), and checkpoint/model-loading wording. Added a physical Dirichlet parameter-edge fixture to protect count-slot tagging and entropy exclusion. The suite now seals 14 built-in model identities plus one external identity, complete reconstructed arena/schedule fields, source-dtype invariance, 32 groups, and owner-specific failures. Ruff passes. No src files changed. Dashboard mapping includes the new file. Full short-suite gate follows this commit; next ticket remains cff-544x.
+
+**2026-09-09T16:55:53Z**
+
+Completed and published: https://github.com/engimatic-systems/cffg/pull/113 (base main; branch agent/cff-ecw0-compiler-contracts). Implementation fd8ce32 adds only tests, the canonical ownership table, and the dashboard file mapping. Exact bf6bbe9 baseline: 44 characterization tests passed. Focused current run: 71 passed. Final dashboard-backed short suite at 8dbf494: 1,622 passed, 41 opt-in slow tests deselected, four existing Gym warnings; 977.63 seconds pytest / 989.545 measured wall. Dashboard refreshed with 44 new tests and zero failures, runtime history retains three entries. No production source, schema, math, objective, status, or numerical guard changed. Ruff, git diff --check and dependency-cycle checks pass. Current/legacy checkpoint migration and rejection coverage ran as part of the passing short suite. Next: cff-544x type-owner extraction, but first resolve its recorded immutability scope conflict with Cooper. Proposed split separates enforced immutability (a behavior change) from representation-preserving extraction; no implementation of that split or type extraction has started. The shared HTML report is updated. This ticket is closed; the remaining decision belongs to cff-544x.
