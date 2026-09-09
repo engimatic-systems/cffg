@@ -62,9 +62,10 @@ def resolve_learnables(
 
     Every factor reading one of the learnable's blobs becomes a target, so a
     posterior update reaches every instance that shares the parameter — the
-    tying the IR already expresses by blob name. Sources are the subset that
-    live in a plain discrete group, because those are the nodes whose beliefs
-    Engine.node_beliefs reports; GFE composites are write-only here."""
+    tying the IR already expresses by blob name. Family owners declare which
+    readers can supply statistics; an explicit source list can narrow that
+    selection. GFE composites are write-only in declared learning because they
+    own their parameter-message updates separately."""
     from cffg.learn import FAMILIES
 
     plans: list[LearnPlan] = []
