@@ -96,7 +96,8 @@ def _validate_covariance(value: np.ndarray, name: str) -> None:
     if not _symmetry_ok(working):
         raise ValueError(f"{name} must be symmetric")
     try:
-        np.linalg.cholesky(working)
+        # Preserve source-dtype symmetry tolerance; host linalg also accepts f16.
+        np.linalg.cholesky(np.asarray(working, dtype=np.float64))
     except np.linalg.LinAlgError:
         raise ValueError(f"{name} must be positive definite") from None
 

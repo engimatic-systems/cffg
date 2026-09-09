@@ -44,6 +44,9 @@ from cffg.kernel_runtime import (
     discrete_message as _disc_message,
     discrete_potential as _disc_potential,
     discrete_readout as _disc_readout,
+    gaussian_energy as _gauss_energy,
+    gaussian_message as _gauss_outs,
+    gaussian_readout as _gauss_readout,
     parameters as _kernel_params,
 )
 from cffg.outer import (
@@ -336,6 +339,14 @@ class Engine:
         if not 0.0 < mu3_min_ess_fraction <= 1.0:
             raise ValueError("mu3_min_ess_fraction must be in (0, 1]")
         self.arena = arena
+        validators = {
+            int(row): group.kernel.binding.conditioning.validate
+            for group in arena.gauss_groups if group.obs_rows is not None
+            for row in group.obs_rows
+        }
+        self._gauss_validators = {
+            port: validators[row] for port, (row, _) in arena.gauss_data.items()
+        }
         for group in arena.groups:
             if group.kernel is not None and arena.semiring not in group.kernel.binding.semirings:
                 raise ValueError(f"kernel {group.kernel.impl_id!r} does not support {arena.semiring!r}")
@@ -879,11 +890,12 @@ class Engine:
                 if value is None:
                     g_mask = g_mask.at[row].set(0.0)
                 else:
-                    val = np.asarray(value, dtype=np.float64).reshape(-1)
-                    if val.shape[0] != dim:
-                        raise ValueError(
-                            f"port {port!r}: observation has dim {val.shape[0]}, edge has {dim}"
-                        )
+                    try:
+                        val = np.asarray(self._gauss_validators[port](value, dim), dtype=np.float64)
+                        if val.shape != (dim,):
+                            raise ValueError(f"observation validator returned shape {val.shape}, expected {(dim,)}")
+                    except ValueError as err:
+                        raise ValueError(f"port {port!r}: {err}") from None
                     idx = self.arena.g_obs_indices(row, dim)
                     g_obs = g_obs.at[idx].set(jnp.asarray(val, dtype=g_obs.dtype))
                     g_mask = g_mask.at[row].set(1.0)
@@ -2098,106 +2110,22 @@ class Engine:
         node precisions return ``proper=False`` with NaN sufficient statistics;
         equality nodes are skipped."""
         out: dict[str, dict[str, np.ndarray]] = {}
-        g_obs, g_mask = np.asarray(state.g_obs), np.asarray(state.g_mask)
         for g in self.arena.gauss_groups:
-            if g.type == "equality":
+            if g.kernel is None or g.kernel.binding.statistics is None:
                 continue
-            inc_e, inc_l = _gauss_rows(self.arena, state.g_eta, state.g_lam, g.gather, g.dims)
-            inc_e, inc_l = np.asarray(inc_e), np.asarray(inc_l)
+            inc_e, inc_l = _gauss_rows(
+                self.arena, state.g_eta, state.g_lam, g.gather, g.dims
+            )
+            y = mk = None
+            if g.obs_rows is not None:
+                y = _obs_rows(self.arena, state.g_obs, g.obs_rows, g.observed_dim)
+                mk = state.g_mask[g.obs_rows]
+            values = _gauss_readout(
+                g, inc_e, inc_l, _gauss_group_params(g, state.params), y, mk,
+                statistics=True,
+            )
             for i, name in enumerate(g.members):
-                w = np.asarray(state.params[g.name + ":W"][i])
-                if g.type == "gaussian":
-                    (d,) = g.dims
-                    m_blob = np.asarray(state.params[g.name + ":m"][i])
-                    lam_q = w + inc_l[i, 0, :d, :d]
-                    proper = bool(gauss.is_proper_precision(w)) and bool(
-                        gauss.is_proper_precision(lam_q)
-                    )
-                    m_q, sig_q = gauss.moments(
-                        w @ m_blob + inc_e[i, 0, :d], lam_q
-                    )
-                    m_q, sig_q = np.asarray(m_q), np.asarray(sig_q)
-                    if not proper:
-                        m_q = np.full_like(m_q, np.nan)
-                        sig_q = np.full_like(sig_q, np.nan)
-                    out[name] = {
-                        "mean": m_q,
-                        "second": sig_q + np.outer(m_q, m_q),
-                        "proper": np.asarray(proper),
-                    }
-                elif g.type == "gaussian_linear":
-                    do, di = g.dims
-                    a = np.asarray(state.params[g.name + ":A"][i])
-                    b = np.asarray(state.params[g.name + ":b"][i])
-                    e_o, l_o = inc_e[i, 0, :do], inc_l[i, 0, :do, :do]
-                    e_i, l_i = inc_e[i, 1, :di], inc_l[i, 1, :di, :di]
-                    lam_j = np.block([[w + l_o, -w @ a], [-a.T @ w, a.T @ w @ a + l_i]])
-                    eta_j = np.concatenate([w @ b + e_o, -a.T @ w @ b + e_i])
-                    proper = bool(gauss.is_proper_precision(w)) and bool(
-                        gauss.is_proper_precision(lam_j)
-                    )
-                    m_j, sig_j = gauss.moments(eta_j, lam_j)
-                    m_j, sig_j = np.asarray(m_j), np.asarray(sig_j)
-                    if not proper:
-                        m_j = np.full_like(m_j, np.nan)
-                        sig_j = np.full_like(sig_j, np.nan)
-                    m_y, m_x = m_j[:do], m_j[do:]
-                    s_yy = sig_j[:do, :do] + np.outer(m_y, m_y)
-                    s_yx = sig_j[:do, do:] + np.outer(m_y, m_x)
-                    s_xx = sig_j[do:, do:] + np.outer(m_x, m_x)
-                    syx_aug = np.concatenate([s_yx, m_y[:, None]], axis=1)
-                    sxx_aug = np.block(
-                        [[s_xx, m_x[:, None]], [m_x[None, :], np.ones((1, 1))]]
-                    )
-                    if not proper:
-                        s_yy = np.full_like(s_yy, np.nan)
-                        syx_aug = np.full_like(syx_aug, np.nan)
-                        sxx_aug = np.full_like(sxx_aug, np.nan)
-                    out[name] = {
-                        "Syy": s_yy,
-                        "Syx": syx_aug,
-                        "Sxx": sxx_aug,
-                        "proper": np.asarray(proper),
-                    }
-                else:  # gaussian_linear_obs: y is data; q(x) is conditioned
-                    do, di = g.dims
-                    a = np.asarray(state.params[g.name + ":A"][i])
-                    b = np.asarray(state.params[g.name + ":b"][i])
-                    e_i, l_i = inc_e[i, 1, :di], inc_l[i, 1, :di, :di]
-                    row = int(g.obs_rows[i])
-                    y, mk = g_obs[self.arena.g_obs_indices(row, do)], g_mask[row]
-                    lam_q = mk * (a.T @ w @ a) + l_i
-                    proper = bool(gauss.is_proper_precision(w)) and bool(
-                        gauss.is_proper_precision(lam_q)
-                    )
-                    m_x, sig_q = gauss.moments(
-                        mk * (a.T @ (w @ (y - b))) + e_i, lam_q
-                    )
-                    m_x, sig_q = np.asarray(m_x), np.asarray(sig_q)
-                    if not proper:
-                        m_x = np.full_like(m_x, np.nan)
-                        sig_q = np.full_like(sig_q, np.nan)
-                    s_xx = sig_q + np.outer(m_x, m_x)
-                    syx_aug = np.concatenate(
-                        [np.outer(y, m_x), y[:, None]], axis=1
-                    )
-                    sxx_aug = np.block(
-                        [[s_xx, m_x[:, None]], [m_x[None, :], np.ones((1, 1))]]
-                    )
-                    if not proper:
-                        syx_aug = np.full_like(syx_aug, np.nan)
-                        sxx_aug = np.full_like(sxx_aug, np.nan)
-                    out[name] = {
-                        "Syy": (
-                            np.outer(y, y)
-                            if proper
-                            else np.full((do, do), np.nan)
-                        ),
-                        "Syx": syx_aug,
-                        "Sxx": sxx_aug,
-                        "mask": np.asarray(mk),
-                        "proper": np.asarray(proper),
-                    }
+                out[name] = {key: np.asarray(value)[i] for key, value in values.items()}
 
         for g in self.arena.mix_groups:
             mu_e = state.messages[
@@ -2422,6 +2350,17 @@ class Engine:
             inc = (_disc_both(self.arena, state.messages, g.gather_both, g.cards)
                    if g.mode == "vmp" else _disc_rows(self.arena, state.messages, g.gather, g.cards))
             vals = _disc_readout(g, inc, _kernel_params(g, state.params))
+            for i, member in enumerate(g.members):
+                out[member] = {key: np.asarray(v)[i] for key, v in vals.items()}
+        for g in self.arena.gauss_groups:
+            if g.kernel is None or g.kernel.binding.readout is None:
+                continue
+            inc_e, inc_l = _gauss_rows(self.arena, state.g_eta, state.g_lam, g.gather, g.dims)
+            y = mk = None
+            if g.obs_rows is not None:
+                y = _obs_rows(self.arena, state.g_obs, g.obs_rows, g.observed_dim)
+                mk = state.g_mask[g.obs_rows]
+            vals = _gauss_readout(g, inc_e, inc_l, _gauss_group_params(g, state.params), y, mk)
             for i, member in enumerate(g.members):
                 out[member] = {key: np.asarray(v)[i] for key, v in vals.items()}
         for g in self.arena.ef_groups:
@@ -2694,43 +2633,9 @@ def _prec_sweep(arena, g_eta, g_lam, ef_eta, params):
     return gauss_writes, ef_writes
 
 
-def _gauss_outs(g, inc_e, inc_l, par, y=None, mk=None):
-    """Per-role outgoing (eta, Lambda) messages for one Gaussian group.
-
-    Shared by the flooding sweep and the directed-schedule executors
-    (cff-d56d): `par` holds the group's parameter stacks already subset to
-    the members being fired, `inc_e`/`inc_l` the matching gathered rows."""
-    if g.type == "gaussian":
-        w, m = par["W"], par["m"]
-        return [gauss.prior_message(jnp.einsum("mij,mj->mi", w, m), w)]
-    if g.type == "equality":
-        d = g.dims[0]
-        to_e, to_l = gauss.equality_messages(inc_e[..., :d], inc_l[..., :d, :d])
-        return [(to_e[:, r], to_l[:, r]) for r in range(len(g.roles))]
-    do, di = g.dims  # gaussian_linear / gaussian_linear_obs; roles = (out, in)
-    a, b, w = par["A"], par["b"], par["W"]
-    e_in, l_in = inc_e[:, 1, :di], inc_l[:, 1, :di, :di]
-    outs = [gauss.linear_forward(e_in, l_in, a, b, w)]
-    if g.type == "gaussian_linear_obs":
-        outs.append(gauss.linear_observed_backward(y, mk, a, b, w))
-    else:
-        e_out, l_out = inc_e[:, 0, :do], inc_l[:, 0, :do, :do]
-        outs.append(gauss.linear_backward(e_out, l_out, a, b, w))
-    return outs
-
-
 def _gauss_group_params(g, params, rows=None):
-    """The group's parameter stacks, keyed bare and optionally row-subset."""
-    keys = {
-        "gaussian": ("W", "m"),
-        "equality": (),
-        "gaussian_linear": ("A", "b", "W"),
-        "gaussian_linear_obs": ("A", "b", "W"),
-    }[g.type]
-    return {
-        k: params[f"{g.name}:{k}"] if rows is None else params[f"{g.name}:{k}"][rows]
-        for k in keys
-    }
+    """The group's named parameter stacks, optionally row-subset."""
+    return _kernel_params(g, params, rows)
 
 
 def _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params):
@@ -2741,8 +2646,8 @@ def _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params):
     for g in arena.gauss_groups:
         inc_e, inc_l = _gauss_rows(arena, g_eta, g_lam, g.gather, g.dims)
         y = mk = None
-        if g.type == "gaussian_linear_obs":
-            y, mk = _obs_rows(arena, g_obs, g.obs_rows, g.dims[0]), g_mask[g.obs_rows]
+        if g.obs_rows is not None:
+            y, mk = _obs_rows(arena, g_obs, g.obs_rows, g.observed_dim), g_mask[g.obs_rows]
         outs = _gauss_outs(g, inc_e, inc_l, _gauss_group_params(g, params), y, mk)
         for r, (oe, ol) in enumerate(outs):
             new_eta, new_lam = _set_gauss_block(
@@ -3097,8 +3002,8 @@ def _batch_stage_fn(arena: Arena, stage, op):
     def fn(messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params):
         inc_e, inc_l = _gauss_rows(arena, g_eta, g_lam, gather, g.dims)
         y = mk = None
-        if g.type == "gaussian_linear_obs":
-            y, mk = _obs_rows(arena, g_obs, obs_rows, g.dims[0]), g_mask[obs_rows]
+        if g.obs_rows is not None:
+            y, mk = _obs_rows(arena, g_obs, obs_rows, g.observed_dim), g_mask[obs_rows]
         outs = _gauss_outs(g, inc_e, inc_l, _gauss_group_params(g, params, rows), y, mk)
         for r, (oe, ol) in enumerate(outs):
             g_eta, g_lam = _set_gauss_block(
@@ -3272,9 +3177,9 @@ def _registerized_scan_fn(arena: Arena, stage, plans, op):
             else:
                 for k, v in _gauss_group_params(g, params).items():
                     x[f"p{k}"] = v[elem.rows]
-                if g.type == "gaussian_linear_obs":
+                if g.obs_rows is not None:
                     orows = g.obs_rows[elem.rows]
-                    x["ov"] = g_obs[jnp.asarray(arena.g_obs_indices(orows, g.dims[0]))]
+                    x["ov"] = g_obs[jnp.asarray(arena.g_obs_indices(orows, g.observed_dim))]
                     x["om"] = g_mask[jnp.asarray(orows)]
             xs.append(x)
         xs = tuple(xs)
@@ -3385,7 +3290,7 @@ def _registerized_scan_fn(arena: Arena, stage, plans, op):
                     inc_e, inc_l = jnp.stack(eb, axis=-2), jnp.stack(lb, axis=-3)
                     par = {k[1:]: v for k, v in x_t[ei].items() if k.startswith("p")}
                     y = mk = None
-                    if g.type == "gaussian_linear_obs":
+                    if g.obs_rows is not None:
                         y, mk = x_t[ei]["ov"], x_t[ei]["om"]
                     outs = _gauss_outs(g, inc_e, inc_l, par, y, mk)
                     for r, (oe, ol) in enumerate(outs):
@@ -3483,9 +3388,9 @@ def _flat_scan_fn(arena: Arena, stage, op):
                     for r, d in enumerate(g.dims)
                 ),
             }
-            if g.type == "gaussian_linear_obs":
+            if g.obs_rows is not None:
                 orows = g.obs_rows[elem.rows]  # [S, m]
-                x["ov"] = jnp.asarray(arena.g_obs_indices(orows, g.dims[0]))
+                x["ov"] = jnp.asarray(arena.g_obs_indices(orows, g.observed_dim))
                 x["mr"] = jnp.asarray(orows)
         metas.append((elem.kind, g))
         xs.append(x)
@@ -3532,7 +3437,7 @@ def _flat_scan_fn(arena: Arena, stage, op):
                     inc_e, inc_l = jnp.stack(eb, axis=-2), jnp.stack(lb, axis=-3)
                     par = _gauss_group_params(g, params, x["rows"])
                     y = mk = None
-                    if g.type == "gaussian_linear_obs":
+                    if g.obs_rows is not None:
                         y, mk = g_obs[x["ov"]], g_mask[x["mr"]]
                     outs = _gauss_outs(g, inc_e, inc_l, par, y, mk)
                     for r, (oe, ol) in enumerate(outs):
@@ -3680,25 +3585,11 @@ def _gauss_bfe(arena, g_eta, g_lam, g_obs, g_mask, params):
     total = jnp.asarray(0.0, dtype=g_eta.dtype)
     for g in arena.gauss_groups:
         inc_e, inc_l = _gauss_rows(arena, g_eta, g_lam, g.gather, g.dims)
-        if g.type == "gaussian":
-            (d,) = g.dims
-            total = total + gauss.prior_energy(
-                inc_e[:, 0, :d], inc_l[:, 0, :d, :d],
-                params[g.name + ":m"], params[g.name + ":W"],
-            ).sum()
-        elif g.type == "equality":
-            d = g.dims[0]
-            total = total + gauss.equality_energy(inc_e[..., :d], inc_l[..., :d, :d]).sum()
-        else:
-            do, di = g.dims
-            a, b, w = (params[g.name + k] for k in (":A", ":b", ":W"))
-            e_i, l_i = inc_e[:, 1, :di], inc_l[:, 1, :di, :di]
-            if g.type == "gaussian_linear_obs":
-                y, mk = _obs_rows(arena, g_obs, g.obs_rows, do), g_mask[g.obs_rows]
-                total = total + gauss.linear_observed_energy(e_i, l_i, y, mk, a, b, w).sum()
-            else:
-                e_o, l_o = inc_e[:, 0, :do], inc_l[:, 0, :do, :do]
-                total = total + gauss.linear_energy(e_o, l_o, e_i, l_i, a, b, w).sum()
+        y = mk = None
+        if g.obs_rows is not None:
+            y = _obs_rows(arena, g_obs, g.obs_rows, g.observed_dim)
+            mk = g_mask[g.obs_rows]
+        total = total + _gauss_energy(g, inc_e, inc_l, _gauss_group_params(g, params), y, mk).sum()
     for d, pairs in arena.gauss_interior:
         l0 = g_lam[arena.g_lam_indices(pairs[:, 0], d)]
         l1 = g_lam[arena.g_lam_indices(pairs[:, 1], d)]

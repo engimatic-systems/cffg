@@ -133,12 +133,13 @@ every item below will be implemented:
 The registry architecture exists precisely so each of these lands as an isolated
 contribution.
 
-**S1i. Executable registration covers EF and ordinary discrete factors.**
+**S1i. Executable registration covers three single-arena bindings.**
 `FactorKernel` (`cffg.kernels`, ARCHITECTURE 2e) binds scalar EF and ordinary
-discrete BP/VMP factors, including external implementations. The discrete
+discrete BP/VMP and Gaussian factors, including external implementations. The discrete
 binding requires a log-potential accessor for support, joint beliefs and
 assignment scoring; it is not a sparse/combinatorial factor interface.
-Gaussian execution still uses central paths until cff-zq25. Structural
+Gaussian conditioning currently declares one DATA role per factor; Gaussian
+mean-field and nonlinear rules are not delivered by this interface. Structural
 equality, hard constraints, Dirichlet parameter-edge composites, GFE
 composites and multi-arena factors remain separate plans. Registration alone
 does not add a new conjugate-learning rule or inference method.

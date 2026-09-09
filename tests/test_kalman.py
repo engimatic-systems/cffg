@@ -173,7 +173,7 @@ def test_data_port_elsewhere_rejected():
 
     t.blobs = {"m": BlobRef("m", "m.npy"), "v": BlobRef("v", "v.npy")}
     t.ports["x"] = PortSpec("x", "x", PortRole.DATA)
-    with pytest.raises(CompileError, match="gaussian_linear 'out'"):
+    with pytest.raises(CompileError, match="registered conditioning role"):
         compile_template(t, arrays={"m": np.zeros(1), "v": np.eye(1)})
 
 

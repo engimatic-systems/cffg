@@ -8,11 +8,11 @@ adversarial finding behind cff-ri8m). A `FactorKernel` declares that
 executable half in one typed record; the compiler, VM, ledger, and
 serialization dispatch from the registry instead of branching.
 
-Bindings currently cover scalar EF natural-parameter messages and ordinary
-discrete BP/VMP messages. Tests register external implementations without
+Bindings cover scalar EF, ordinary discrete BP/VMP, and Gaussian
+information-form messages. Tests register external implementations without
 central dispatch edits and reconstruct them through JSON and .cffgz.
-Gaussian and hybrid execution remain on separate paths. Equality stays
-structural infrastructure (family-polymorphic sum-minus-self), not a kernel.
+Cross-arena factors retain separate plans. Equality stays structural
+infrastructure (family-polymorphic sum-minus-self), not a kernel.
 
 Registration is refused without a `HostileInputs` declaration — the
 numerical-robustness contract's planning-time checklist made machine-checked
@@ -48,7 +48,14 @@ from cffg.core.ir import (
     Template,
     register_factor_type,
 )
-from cffg.kernel_bindings import DiscreteBinding, DiscreteMode, EFBinding, ParameterSpec
+from cffg.kernel_bindings import (
+    DiscreteBinding,
+    DiscreteMode,
+    EFBinding,
+    GaussianBinding,
+    GaussianConditioning,
+    ParameterSpec,
+)
 
 
 @dataclass(frozen=True)
@@ -78,7 +85,7 @@ class FactorKernel:
     impl_id: str
     version: str
     hostile: HostileInputs
-    binding: EFBinding | DiscreteBinding
+    binding: EFBinding | DiscreteBinding | GaussianBinding
 
     def __init__(
         self,
@@ -172,8 +179,17 @@ def register_kernel(k: FactorKernel) -> FactorKernel:
     problems: list[str] = []
     if name in KERNELS:
         raise ValueError(f"kernel for factor type {name!r} already registered")
-    if not isinstance(k.binding, (EFBinding, DiscreteBinding)):
+    if not isinstance(k.binding, (EFBinding, DiscreteBinding, GaussianBinding)):
         raise TypeError("unsupported arena binding")
+    plan_aliases = {
+        other.binding.conditioning.plan_type
+        for other in KERNELS.values()
+        if isinstance(other.binding, GaussianBinding)
+        and other.binding.conditioning is not None
+        and other.binding.conditioning.plan_type is not None
+    }
+    if name in plan_aliases:
+        problems.append(f"factor type {name!r} is reserved for a conditioned plan")
     if "." not in k.impl_id or any(c.isspace() for c in k.impl_id) or not k.impl_id:
         problems.append(
             f"impl_id {k.impl_id!r} must be namespaced ('<namespace>.<name>')"
@@ -207,6 +223,52 @@ def register_kernel(k: FactorKernel) -> FactorKernel:
                 problems.append(f"{mode} requires message and node-energy callbacks")
             elif callbacks.readout is not None and not callable(callbacks.readout):
                 problems.append(f"{mode} readout must be callable when declared")
+    if isinstance(k.binding, GaussianBinding):
+        b = k.binding
+        if k.factor_type.family != "gaussian":
+            problems.append("Gaussian binding requires a Gaussian FactorType")
+        if b.roles != k.factor_type.edge_roles:
+            problems.append("Gaussian roles must match the structural role order")
+        if not b.roles or len(set(b.roles)) != len(b.roles):
+            problems.append("Gaussian roles must be nonempty and unique")
+        if not callable(b.message) or not callable(b.energy):
+            problems.append(
+                "Gaussian binding requires message and node-energy callbacks"
+            )
+        for callback_name, callback in (
+            ("statistics", b.statistics),
+            ("readout", b.readout),
+        ):
+            if callback is not None and not callable(callback):
+                problems.append(
+                    f"Gaussian {callback_name} must be callable when declared"
+                )
+        if b.conditioning is not None:
+            if not isinstance(b.conditioning, GaussianConditioning):
+                problems.append("Gaussian conditioning requires a typed declaration")
+            elif b.conditioning.role not in b.roles or not callable(
+                b.conditioning.validate
+            ):
+                problems.append(
+                    "Gaussian conditioning requires a declared role and validator"
+                )
+            elif b.conditioning.plan_type is not None:
+                alias = b.conditioning.plan_type
+                if not k.impl_id.startswith("cffg."):
+                    problems.append(
+                        "conditioned plan_type overrides are reserved for built-ins"
+                    )
+                elif (
+                    not isinstance(alias, str)
+                    or not alias
+                    or alias in FACTOR_TYPES
+                    or alias in plan_aliases
+                ):
+                    problems.append(
+                        "conditioned plan_type must be a unique nonempty internal label"
+                    )
+    if isinstance(k.binding, (DiscreteBinding, GaussianBinding)):
+        b = k.binding
         if set(b.parameters) != set(k.factor_type.param_roles):
             problems.append(
                 "parameter shape declarations must cover serialized parameter roles"
@@ -236,8 +298,18 @@ def register_kernel(k: FactorKernel) -> FactorKernel:
             not key for key in b.param_keys
         ):
             problems.append("packed parameter keys must be nonempty and unique")
+        bare = {
+            spec.key
+            for spec in b.parameters.values()
+            if isinstance(spec, ParameterSpec) and spec.group_key
+        }
+        if len(bare) > 1 or None in bare:
+            problems.append(
+                "only one named packed parameter may occupy the group-name key"
+            )
     for probe in ("sparse_support", "improper_messages", "float32", "scale"):
-        if not str(getattr(k.hostile, probe, "")).strip():
+        declaration = getattr(k.hostile, probe, None)
+        if not isinstance(declaration, str) or not declaration.strip():
             problems.append(
                 f"hostile-input declaration {probe!r} is blank — the numerical "
                 "robustness contract requires an answer (or 'provably N/A: why')"
@@ -599,5 +671,18 @@ _install_discrete(
         improper_messages="Vacuous messages are neutral; nonfinite results diverge.",
         float32="Categorical algebra uses active-dtype support and normalization.",
         scale="Local cardinality padding only; tested at cardinality 128 and above.",
+    ),
+)
+
+from cffg.gaussian_kernels import install as _install_gaussian
+
+_install_gaussian(
+    register_kernel,
+    FactorKernel,
+    HostileInputs(
+        sparse_support="Provably N/A: continuous Gaussian support has no categorical log-zero states.",
+        improper_messages="Vacuous messages are neutral; improper required beliefs report infinite energy and false propriety.",
+        float32="Information-form rules and covariance validation use dtype-scaled guards.",
+        scale="Local dimension padding only; tested at dimension100 and above.",
     ),
 )

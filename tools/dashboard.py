@@ -86,7 +86,10 @@ EPIC_FILES = {
         "test_viz_layout.py",
         "test_viz_svg.py",
     ],
-    "M9 · Gaussian": ["test_gauss_rules.py", "test_kalman.py"],
+    "M9 · Gaussian": [
+        "test_gauss_rules.py", "test_kalman.py", "test_gaussian_kernels.py",
+        "test_gaussian_kernel_schedules.py",
+    ],
     "L1 · B-learning": ["test_b_learning.py", "test_learnables.py"],
     "L2 · Dynamics curiosity": ["test_b_epistemics.py"],
     "M13 · Exp. families": [

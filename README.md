@@ -911,7 +911,7 @@ migration path.
 
 ## Register a custom factor
 
-EF and ordinary discrete factor types are executable registrations
+EF, ordinary discrete and Gaussian factor types are executable registrations
 (`cffg.kernels`, ARCHITECTURE 2e). Declare the structure, math, and
 robustness answers in one `FactorKernel`; the compiler, VM, ledger, and
 serialization dispatch from the registry:
@@ -968,9 +968,50 @@ and support initializer reconstruction. The potential accessor also powers
 support checks, joint BP beliefs and decoded assignment scoring.
 
 `tests/test_discrete_kernels.py` contains the complete bilinear example,
-independent BP/VMP/energy oracles, float32 and cardinality-128 tests. Gaussian
-registration is the next foundation step. Python binding fields are
-internal-unstable before 1.0; serialized implementation identities are stable.
+independent BP/VMP/energy oracles, float32 and cardinality-128 tests.
+
+A Gaussian extension uses information-form messages and can declare one
+observation-conditioned role:
+
+```python
+from cffg import GaussianBinding, GaussianConditioning
+
+binding = GaussianBinding(
+    roles=("field", "sensor", "offset"),
+    parameters={
+        "center": ParameterSpec(lambda sizes: (sum(sizes.values()),)),
+        "precision_root": ParameterSpec(
+            lambda sizes: (sum(sizes.values()), sum(sizes.values()))),
+    },
+    param_keys=("joint_precision", "joint_information", "log_scale"),
+    pack_params=my_joint_pack, message=my_joint_message, energy=my_joint_energy,
+    conditioning=GaussianConditioning("sensor", my_sensor_validator),
+    readout=my_joint_readout,
+)
+register_kernel(FactorKernel(
+    FactorType("joint_field_sensor", ("field", "sensor", "offset"),
+               ("center", "precision_root"), family="gaussian"),
+    "mypkg.joint_field_sensor", "1.0.0",
+    hostile=my_hostile_answers, binding=binding,
+))
+```
+
+Gaussian callbacks receive `(eta, precision, params, dims, observed_role, y,
+mask)`. Incoming blocks are `[members, roles, local_dimension]` and
+`[members, roles, local_dimension, local_dimension]`; message outputs are
+one exact-sized `(eta, precision)` pair per role. `observed_role` is a static
+index, or `None`. The validator receives `(value, dimension)` and returns
+the observation vector. Keep the observed role's cavity predictive and the
+conditioned factor's normalization constant. Missing data means marginalizing
+that role, not automatically deleting the factor.
+
+`tests/gaussian_kernel_fixture.py` is the complete joint-normal implementation;
+`tests/test_gaussian_kernels.py` checks it against independent Gaussian
+oracles, including float32 and dimension 100. Joint/nonlinear parameter packs
+without direct-write keys reconstruct from updated raw blobs through
+`compile_template`; registration does not automatically extend learning.
+Python binding fields are internal-unstable before 1.0; serialized
+implementation identities are stable.
 
 ## Consume the engine from an experiment harness
 
