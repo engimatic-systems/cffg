@@ -1,6 +1,6 @@
 ---
 id: cff-n183
-status: open
+status: in_progress
 deps: []
 links: [cff-kfo7]
 created: 2026-09-09T18:17:11Z
@@ -29,21 +29,15 @@ no global shared-parameter owner.
 
 This is pre-existing behavior, not introduced by topology extraction. It
 conflicts with cff-kfo7's requirement for one shared-parameter owner and its
-promise not to change supported combinations. Cooper has been asked whether
-to implement correct cross-group sharing first (recommended) or reject the
-affected models explicitly until full support is implemented. No fix is
-authorized or implemented by this planning ticket alone.
+promise not to change supported combinations. Cooper approved fixing sharing
+before continuing extraction. Implement full cross-group sharing; do not
+temporarily reject these otherwise supported models.
 
 ## Outcomes / Acceptance Criteria — WHAT
 
-1. Record Cooper's scope decision before changing inference behavior:
-   1.1. Full support: one logical prior owner pools contributions across all
-        compatible groups referencing the shared prior blob, updates every
-        associated parameter edge consistently, and charges its parameter
-        free-energy contribution once.
-   1.2. Temporary rejection: compilation identifies the shared blob and
-        conflicting groups before returning an Arena; no apparently valid
-        inference state is produced. Full support becomes linked follow-up work.
+1. One logical prior owner pools contributions across all compatible groups
+   referencing the shared prior blob, updates every associated parameter edge
+   consistently, and charges its parameter free-energy contribution once.
 2. Preserve the existing within-group sharing contract and distinguish a shared
    latent goal from merely equal numeric prior values. Document the serialized
    identity that selects sharing; do not infer it by comparing arrays.
@@ -58,9 +52,8 @@ authorized or implemented by this planning ticket alone.
 5. Hostile inputs are acceptance cases, not only planning prose: exact-zero
    likelihood support stays exact; nonpositive/improper Dirichlet priors fail
    loudly; float32 uses existing dtype-aware guards and status checks; at least
-   32 contributing composites include multiple shape groups. If rejection is
-   chosen, these fixtures instead prove early rejection plus unchanged behavior
-   for still-supported within-group sharing.
+   32 contributing composites include multiple shape groups. An outcome absent
+   in one group's support may still receive another group's positive count.
 6. No Python host callback or repeated whole-arena rebuild is introduced inside
    numerical inference. Report any new per-step reduction/storage costs.
 7. The selected policy is explicit in ARCHITECTURE and LIMITATIONS as needed.
@@ -79,8 +72,7 @@ shared parameter term when checking the objective.
 ## Future work
 
 cff-kfo7 extracts specialized discovery after this ownership policy is resolved.
-If temporary rejection is selected, implement full cross-group sharing in a
-linked follow-up rather than representing it as completed support.
+No further learned-goal capability is delegated by this fix.
 
 ## Definitions
 
@@ -101,3 +93,11 @@ Sources at 8cd8919: compiler.py:608-645; engine.py:1900-1925,2821-2842,
 3807-3833; tests/test_goal_hyperprior.py:103-166,245-252. Confidence: high,
 bounded formalism-agent inspection plus a primary-agent compile/step/readout
 reproducer. No engine code changed during this investigation.
+
+**2026-09-09T19:34:06Z**
+
+Cooper approved full sharing on 2026-09-09: “let’s not delay fixing it.” Base agent/cff-8t4d-topology updated from origin at e4a6640; work branch agent/cff-n183-shared-goals. Before implementation: applicable architecture rows New factor/rule (GFE ownership), Runtime numerical/status (sweep, objective, trust chart), Learnable/checkpoint (rollover and restore), New IR field only for derived compiled metadata; no serialized field changes. Flooding/mixed share _make_step; exact BP-only execution is N/A to GFE. Host/JIT and direct/vmap need parity. Trust-region trial charts must preserve tied parameter copies, not merely completed sweeps. JSON/bundle recompile reconstructs ownership; current and supported-legacy agent envelopes already restore per-blob goal priors through with_goal_priors, with unchanged schema. Sparse exact-zero counts, improper/nonpositive priors, f32 and 32 mixed-group contributors are acceptance cases. Keep unsupported learned-A plus learned-goal/mu3 combinations rejected.
+
+**2026-09-09T19:34:06Z**
+
+Research: correct update ordering? Formalism review confirms all local predictions use pre-sweep goal counts, then sum each new prediction once globally and replace every carrier before damping. BFE recomputes its own current-state predictions and retains the off-coordinate (alpha-alpha0-sum predictions) expected-log term; do not replace it with stored counts or a fixed-point-only beta ratio. Source: engine _make_step/_make_bfe and DERIVATIONS D6c; confidence high. Integration review: global immutable GoalParameterPlan must own grouping, pooling and parameter energy independently of GfePlan buckets; local metadata stays a compatibility view. OuterChart currently gives aliases independent coordinates; constrain them to a single vector copied to all aliases during trial reconstruction. Include aliases/global plans in cache/schedule signatures. Sources: outer.py:224, engine.py:1901,2767,3804, schedule.py:168, _agent_checkpoint.py:88,548,610; confidence high. No separate GFE scan or learned-c mu3 implementation exists.
