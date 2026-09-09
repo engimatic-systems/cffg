@@ -1,6 +1,6 @@
 ---
 id: cff-8t4d
-status: open
+status: in_progress
 deps: [cff-544x]
 links: [cff-ejib]
 created: 2026-09-02T04:02:00Z
@@ -49,8 +49,9 @@ remain for later tickets.
    invariant** is N/A because this stage does not execute numeric messages.
 6. Flooding/scheduled and direct/`vmap` consumers receive the same final layout
    downstream. Host/JIT is N/A because topology construction remains host-side.
-   Latest-schema/supported-legacy checkpoints reconstruct the template before
-   this one path.
+   JSON and model bundles reconstruct templates before this one path.
+   Latest-schema/supported-legacy agent checkpoints restore runtime data
+   against an already compiled, builder-defined model.
 7. Sparse/vacuous/improper runtime messages are N/A. Float32 does not change
    membership or slot order. The 32-group characterization fixture from
    `cff-ecw0` retains deterministic addresses.
@@ -58,7 +59,11 @@ remain for later tickets.
    GFE, constraint, external-kernel, and malformed-topology paths through
    old/new observable characterization. No new scientific oracle is required.
 9. Endpoint/degree/port/slot failures retain their `cff-ecw0` baseline
-   `CompileError` item and reason. Registered/specialized semantic failures
+   exception owner, item, reason, and reporting order. Core validation retains
+   `ModelError` for malformed degrees/endpoints; compiler-owned executable-port
+   failures retain `CompileError`. If topology runs before semantic admission,
+   it returns ordered diagnostics for aggregation at the existing compiler
+   gate rather than raising earlier. Registered/specialized semantic failures
    remain for their respective later owners. No serialized meaning, rule,
    objective, or runtime behavior changes.
 10. The topology module is below 1,000 physical lines and the move fits one
@@ -94,3 +99,13 @@ completes drafts using that membership without repeating classification.
 - **Slot layout:** Addresses for a factor's own message and the opposite
   message it reads.
 - **TopologyLayout:** The named immutable output of structural compilation.
+
+## Notes
+
+**2026-09-09T17:38:47Z**
+
+Preparation during cff-544x gate (no topology implementation started). Question: what can move without semantic reclassification? Answer: compiler.py at 315b082:152-160 degree/port indexes; 162-169 constraint declarations only; 252-258 executable-port diagnostics returned for existing aggregation; 287-333 sorted endpoints, declared-domain raw EdgeInfo, own/opposite maps and logical counts; DATA candidates from 332-372, without conditioning decisions; declared-domain segment widths/prefixes from 1404-1416. Parameter carriers already declare flat cardinality, so shape/axis tags can be attached later by building a new edge mapping. Keep admission (170-251), shape inference (262-285), conditioning validation (334-369), absorption, classification, observation rows (1000-1013,1199-1207), DELTA checks and entropy exclusions outside topology. Observation row numbers follow lowered group order, not sorted-variable topology. Error-order caveat: factor semantic errors precede executable-port errors at the 259-260 gate; conditioning errors survive array resolution until the 462-463 gate. Preserve both boundaries and the distinction between core ModelError and compiler CompileError. Endpoint order sorts factor/role names; declared message-role order and hard-constraint numeric x0...xN order are separate conventions. Source: bounded read-only modularity-agent inspection of current compiler and core/validate.py; confidence high. TopologyLayout should snapshot declaration facts and hold ordered endpoints/degrees/ports, raw edges/own-opposite slots/counts/prefixes, ordered DATA candidates, and deferred port diagnostics. Use cff-544x publication rather than mutable nested IR aliases. Before implementation, update intended branch base and recheck ready status; these are planning notes, not completed extraction.
+
+**2026-09-09T17:52:18Z**
+
+Starting from updated agent/cff-544x-immutable-values at 39d5bf2 (PR #114). Architecture rows: New factor or rule family and New IR field; Learnable/checkpoint checked for carried parameter-edge addresses; Runtime numerical/status N/A. Duplicated surfaces: flooding/scheduled and direct/vmap consume the same final arena; host/JIT compiler N/A; JSON/bundle reconstruction and current/supported-legacy checkpoint consumers retain the one compiler and their existing restore owners. Sparse/vacuous/improper runtime messages N/A; dtype-independent topology and 32 distinct groups remain required. Use the recorded extraction/diagnostic-order boundary; do not move conditioning semantics or observation row numbering into topology.
