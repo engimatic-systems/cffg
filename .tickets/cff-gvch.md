@@ -115,3 +115,7 @@ Implementation ready: core/constraint_details.py detects conflicting complete P-
 **2026-09-09T20:33:32Z**
 
 Final validation passed at implementation head ad028f0: 1,709 default-suite tests, zero failures, 41 opt-in slow tests deselected, four existing Gym deprecation warnings; pytest 1002.92 seconds, measured wall 1015.217 seconds. Dashboard refreshed with 19 new cases, 30 diagrams and 23 galleries. No source changes after this gate. Closing the validation prerequisite; publication is stacked on PR #116. Specialized extraction must preserve this declaration policy and cdbad68 shared-goal behavior. No remaining work or user decision in this ticket.
+
+**2026-09-09T20:34:09Z**
+
+Published as PR #117, https://github.com/engimatic-systems/cffg/pull/117, head agent/cff-gvch-psub-validation on agent/cff-n183-shared-goals (#116). Final gate remains ad028f0; subsequent commits contain only ticket handoffs and runtime evidence. Shared architecture HTML links the completed correction and passing 1,709-test gate. No work remains in cff-gvch.
