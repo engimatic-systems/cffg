@@ -8,3 +8,4 @@ __pycache__/
 tests/.artifacts/
 tools/wiggle_words/ticket-wiggle-word-audit.yaml
 tools/wiggle_words/ticket-wiggle-word-audit-v2.yaml
+/chats/
