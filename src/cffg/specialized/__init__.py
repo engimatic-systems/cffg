@@ -1,5 +1,6 @@
 """Two-stage specialized lowering, independent of numeric array resolution."""
 
+from cffg.compiler_errors import CompileError
 from cffg.goal_parameters import build_goal_parameter_plans
 
 from .composites import (
@@ -19,7 +20,21 @@ from .discovery import discover_specialized, initializer_fallbacks
 from .mixed import lower_mixtures, lower_precision, lower_recurrence
 from .structural import lower_delta, lower_equalities
 
-__all__ = ["OrdinaryMembership", "complete_specialized", "discover_specialized"]
+__all__ = [
+    "OrdinaryMembership",
+    "complete_specialized",
+    "discover_specialized",
+    "validate_admission",
+]
+
+
+def validate_admission(template_name: str, claims: SpecializedClaims) -> None:
+    """Publish admission and parameter-layout diagnostics before later stages."""
+    for errors in (claims.admission_problems, claims.layout_problems):
+        if errors:
+            raise CompileError(
+                f"cannot compile {template_name!r}:\n  - " + "\n  - ".join(errors)
+            )
 
 
 def _ownership(
