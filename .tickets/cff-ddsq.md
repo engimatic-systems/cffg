@@ -119,4 +119,8 @@ No parallel prerequisite within this compiler chain; unrelated ready work remain
 
 **2026-09-09T23:05:14Z**
 
-Ready source baseline: cff-bfr9 is closed. Source339c46a passed1,777 default tests with41 slow deselections andfour existing warnings in999.044 seconds measured wall; runtime record5b3606f. All22 new resolution cases and125 final focused boundary tests pass;14 complete arenas match0bcda82. No source changed after the gate. Begin only after bfr9 PR publication, using agent/cff-bfr9-array-resolution as the intended base and updating it before branching. This ticket requires its own fresh final suite after implementation, not another run of the unchanged base.
+Ready source baseline: cff-bfr9 is closed. Source 339c46a passed 1,777 default tests with 41 slow deselections and four existing warnings in 999.044 seconds measured wall; runtime record 5b3606f. All 22 new resolution cases and 125 final focused boundary tests pass; 14 complete arenas match 0bcda82. No source changed after the gate. Begin only after bfr9 PR publication, using agent/cff-bfr9-array-resolution as the intended base and updating it before branching. This ticket requires its own fresh final suite after implementation, not another run of the unchanged base.
+
+**2026-09-09T23:07:24Z**
+
+Published base: PR #120, https://github.com/engimatic-systems/cffg/pull/120, branch agent/cff-bfr9-array-resolution. It is stacked on #119 and has the passing final gate described above. Update this branch before creating the final-assembly work branch.
