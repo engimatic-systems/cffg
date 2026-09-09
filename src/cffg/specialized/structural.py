@@ -5,7 +5,7 @@ import numpy as np
 from cffg.compiled import EfGroupPlan, GaussGroupPlan, GroupPlan
 from cffg.core.ir import ConstraintKind
 
-from .contracts import SpecializedClaims
+from .contracts import SpecializedClaims, SpecializedPlanDrafts
 
 
 def lower_equalities(
@@ -87,24 +87,24 @@ def lower_delta(claims: SpecializedClaims) -> tuple[np.ndarray, str | None]:
 
 
 def semiring_problem(
-    claims: SpecializedClaims,
+    drafts: SpecializedPlanDrafts,
     has_mean_field: bool,
     gauss_present: bool,
     ef_present: bool,
 ) -> str | None:
     """Retain the final admission gate after all family array checks."""
-    if claims.semiring != "max":
+    if drafts.semiring != "max":
         return None
     rejects = []
     if has_mean_field:
         rejects.append("mean-field (vmp) beads")
     if any(
-        not claim.is_goal and claim.prior is not None for claim in claims.parameters
+        not claim.is_goal and claim.prior is not None for claim in drafts.parameters
     ):
         rejects.append("Dirichlet parameter-edge VMP groups")
-    if claims.gfe or claims.transition_gfe or claims.hybrid_gfe:
+    if drafts.gfe or drafts.transition_gfe or drafts.hybrid_gfe:
         rejects.append("P-substitution / GFE composites")
-    if gauss_present or claims.mixtures or claims.recurrence or claims.precision:
+    if gauss_present or drafts.mixtures or drafts.recurrence or drafts.precision:
         rejects.append("Gaussian/hybrid groups")
     if ef_present:
         rejects.append("EF groups")

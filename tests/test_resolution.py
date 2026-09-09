@@ -1,6 +1,6 @@
 """Data-resolution contracts, including the final validation checkpoints."""
 
-from dataclasses import replace
+from dataclasses import fields, replace
 
 import numpy as np
 import pytest
@@ -8,7 +8,8 @@ from test_compiler_contracts import IDENTITIES, assert_same, model
 from test_ef_engine import gamma_poisson
 from test_registered import stages
 
-from cffg import kernels
+from cffg import compiler, kernels
+from cffg._immutable import FrozenArray, FrozenMap
 from cffg.compiler import CompileError, _resolve_arrays, compile_template
 from cffg.core import (
     BlobRef,
@@ -22,6 +23,7 @@ from cffg.core import (
 from cffg.core.plates import expand_plates
 from cffg.registered.contracts import EqualityReference
 from cffg.resolution.addresses import AddressBuilder, resolve_learnables
+from cffg.resolution.resolve import resolve_compile_data
 from cffg.specialized import OrdinaryMembership, complete_specialized
 
 
@@ -111,6 +113,15 @@ def test_declared_addresses_and_learning_match_existing_compiler(name):
         for factor in template.factors.values()
         for role, blob in factor.param_blobs.items()
     ]
+    data = resolve_compile_data(
+        template, arrays, None, claims.topology, registered, specialized
+    )
+    aliases = {"mu3": "mu3_groups", "goal_parameters": "goal_parameter_plans"}
+    for field in fields(data):
+        assert_same(
+            getattr(data, field.name),
+            getattr(arena, aliases.get(field.name, field.name)),
+        )
 
 
 def test_initializer_fallback_is_not_the_composite_packing_shape():
@@ -131,3 +142,35 @@ def test_initializer_fallback_is_not_the_composite_packing_shape():
     assert source.shape is not None
     assert source.initializer_fallback is None
     assert (member, "matrix") not in specialized.initializer_fallbacks
+
+
+@pytest.mark.parametrize("name", ["gaussian", "ef", "learning"])
+def test_arena_reuses_resolved_publication_without_mutable_aliases(name, monkeypatch):
+    template, arrays = model(name)
+    arrays = {key: np.array(value, copy=True) for key, value in arrays.items()}
+    published = []
+
+    def capture(*args, **kwargs):
+        data = resolve_compile_data(*args, **kwargs)
+        published.append(data)
+        return data
+
+    monkeypatch.setattr(compiler, "resolve_compile_data", capture)
+    arena = compile_template(template, arrays=arrays)
+    (data,) = published
+    aliases = {"mu3": "mu3_groups", "goal_parameters": "goal_parameter_plans"}
+    for field in fields(data):
+        value = getattr(data, field.name)
+        if isinstance(value, (FrozenArray, FrozenMap, tuple)):
+            assert value is getattr(arena, aliases.get(field.name, field.name))
+
+    expected = {key: np.asarray(value) for key, value in data.log_params.items()}
+    for source in arrays.values():
+        source[...] = 0
+    for key, value in data.log_params.items():
+        detached = np.asarray(value)
+        detached[...] = 0
+        with pytest.raises(TypeError, match="read-only"):
+            value[...] = 0
+        np.testing.assert_array_equal(value, expected[key])
+        np.testing.assert_array_equal(arena.log_params[key], expected[key])

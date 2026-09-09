@@ -18,6 +18,7 @@ from cffg.core.validate import validate
 from cffg.models.rollout import build_rollout
 from cffg.registered.capabilities import snapshot_registry
 from cffg.registered.lowering import lower_registered
+from cffg.resolution import sources as resolution_sources
 from cffg.specialized import (
     OrdinaryMembership,
     complete_specialized,
@@ -279,11 +280,11 @@ def test_late_composite_errors_do_not_preempt_array_resolution(
     class ResolutionFailure(Exception):
         pass
 
-    def fail(*args):
+    def fail(*args, **kwargs):
         raise ResolutionFailure
 
     with monkeypatch.context() as patch:
-        patch.setattr(compiler, "_resolve_arrays", fail)
+        patch.setattr(resolution_sources, "resolve_arrays", fail)
         with pytest.raises(ResolutionFailure):
             compiler.compile_template(template, arrays=arrays)
     with pytest.raises(compiler.CompileError) as error:

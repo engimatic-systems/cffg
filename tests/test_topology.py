@@ -20,6 +20,7 @@ from cffg.core import (
 )
 from cffg.core.plates import expand_plates
 from cffg.core.validate import validate
+from cffg.resolution import sources as resolution_sources
 from cffg.topology import build_topology, prefix_offsets
 
 
@@ -163,11 +164,11 @@ def test_conditioning_diagnostics_still_wait_until_after_array_resolution(monkey
     class ResolutionFailure(Exception):
         pass
 
-    def fail_resolution(*args):
+    def fail_resolution(*args, **kwargs):
         raise ResolutionFailure
 
     with monkeypatch.context() as patch:
-        patch.setattr(compiler, "_resolve_arrays", fail_resolution)
+        patch.setattr(resolution_sources, "resolve_arrays", fail_resolution)
         with pytest.raises(ResolutionFailure):
             compiler.compile_template(template)
     with pytest.raises(compiler.CompileError) as exc:
