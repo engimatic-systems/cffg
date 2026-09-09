@@ -9,6 +9,7 @@ report the complete damage, not the first symptom.
 
 from __future__ import annotations
 
+from cffg.core.constraint_details import p_substitution_conflicts
 from cffg.core.ir import (
     EDGE_CONSTRAINTS,
     EF_EDGE_FAMILIES,
@@ -468,4 +469,5 @@ def _check_constraints(t: Template) -> list[str]:
                 problems.append(
                     f"p_substitution on {c.target!r}: role {role!r} is not one of its edges"
                 )
+    problems.extend(p_substitution_conflicts(t.constraints))
     return problems

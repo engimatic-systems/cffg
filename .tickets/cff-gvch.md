@@ -39,6 +39,9 @@ mechanical extraction.
    Compare all metadata, including unknown nested JSON values; missing keys
    remain distinct from explicitly supplied values. Declaration order never
    resolves a conflict.
+   2.1. Equality uses the existing serializer's JSON representation: mapping
+        order is irrelevant, but 1 versus 1.0, signed zero, and true versus 1
+        remain distinct. Do not infer the meaning of unknown metadata fields.
 3. Preserve supported single-declaration behavior and its existing diagnostics.
    Tests cover both orders of conflicting roles, conflicting evaluator details,
    identical repetitions under the stated policy, and serialized reconstruction.
@@ -83,6 +86,11 @@ evaluator family.
   evaluate that objective and its messages.
 - **Dictionary collapse:** Retaining one value per key while silently replacing
   an earlier value with the same key.
+- **Raw detail tuple:** The original sequence of metadata key/value pairs,
+  before conversion to a mapping removes repeated keys.
+- **Canonical JSON:** Deterministically key-ordered JSON text used to compare
+  model declarations. JSON is the object/array/scalar text format used to save
+  templates; its numeric representations remain distinct here.
 
 ## Notes
 
@@ -99,3 +107,7 @@ Preparation during cff-n183 final gate; no validation implementation started. Qu
 **2026-09-09T20:05:42Z**
 
 Starting from updated agent/cff-n183-shared-goals at a9e28ce (PR #116); branch agent/cff-gvch-psub-validation. Applicable architecture rows: New IR field and New factor/rule for declaration interpretation and serialized source truth. No new IR field or schema. Runtime numerical/status and learning/checkpoint implementation N/A. Host validation runs before numerical JIT, flood/mixed/direct/vmap all share compile; no separate runtime change. Core validation retains existing target/role ordering and adds deterministic conflict diagnostics afterward. Serializer invokes only the P-substitution conflict guard, not full-template validation. Identical repeats remain valid and unmodified; conflicting raw detail-key repeats are included because the same dict conversion otherwise erases them. Scalar/string metadata and nested JSON metadata retain meaning; a missing key differs from an explicit value. General JSON duplicate-object-key policy and other constraint kinds are outside scope. JSON/bundles recompile the same declarations; current/legacy agent restores do not reconstruct templates. Sparse/improper numerical messages N/A, float32 structurally irrelevant, 32 declarations test deterministic diagnostics without repeated whole-template scans.
+
+**2026-09-09T20:16:06Z**
+
+Implementation ready: core/constraint_details.py detects conflicting complete P-substitution declarations and repeated raw detail keys without mutating templates. Core appends stable per-target ModelError diagnostics after existing target/role diagnostics. Serializer invokes the same narrow guard before dict conversion/sorting and reports ValueError with template identity; bundle hashing reaches it on current and legacy inputs. General model validation and other constraint kinds are unchanged. Repeated identical declarations/raw keys preserve encoding and hashes. JSON representation equality deliberately distinguishes numeric spellings/types while ignoring mapping order; review requested and tests now pin that policy. Initial regressions on old code: 3 failed and the identical-repeat control passed, including one declaration order that silently compiled. Final focused run: 177 passed, 6 opt-in slow tests deselected, 62.19 seconds; includes core, serializer, compiler contracts, bundles, plates, dashboard, mu3, learned goals, GFE and outer formalism. New 19-case file also covers missing/unknown/nested metadata, 32-factor sorted diagnostics, and bundle rejection before destination creation. Independent bounded integration review found no blocking defects. New files pass Ruff; validate/serialize retain their two baseline diagnostics with no additions. Diff/dependency checks clear. No numerical/source-schema change. Final short-suite gate next.
