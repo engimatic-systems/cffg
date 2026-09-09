@@ -128,3 +128,9 @@ architecture epic unless the gap makes the planned refactor unsafe.
   performs it at the named baseline.
 - **Termination reason:** The detailed cause associated with a public run
   status.
+
+## Notes
+
+**2026-09-09T23:27:48Z**
+
+Preparation only while cff-ddsq final gate runs at source 707c31b; the required exact compiler-track closing commit will be recorded after that gate and closure. Colony evidence gap confirmed by bounded local inspection: colony.py:94-111 runs GFE groups through per-instance Engine.run; lines113-121 also bypass vectorization for one-instance groups. The real shared path builds filter_vmap(one) at lines148-156 and applies per-instance active masks/results at lines174-276. tests/test_gaussian_kernel_schedules.py:109 proves cached-engine sharing with two distinct parameter/observation instances and analytic Gaussian means/covariances/FE, but not the required iterative BP/VMP comparison of status, residual, iterations, traces, a second structure, and bind/remove isolation. Do not label that Gaussian test a one-shot Colony execution: Colony batches can iterate even when the corresponding standalone Engine uses its exact-unit path. The new characterization should explicitly assert a non-exact ordinary schedule and absence of GFE/mu3 fallback, then observe actual vectorized update entry. Existing test_colony GFE/perception/cache cases remain useful but do not substitute for this complete deliberate pair. Source: colony.py:39-78,94-276; engine.py:329-412; tests/test_colony.py:24-99 and test_gaussian_kernel_schedules.py:109-132. No runtime code changes or probes were made; this is an inventory/handoff, not a reported behavioral defect.
