@@ -133,15 +133,15 @@ every item below will be implemented:
 The registry architecture exists precisely so each of these lands as an isolated
 contribution.
 
-**S1i. Executable registration covers the EF arena only (cff-ri8m).** The
-`FactorKernel` contract (`cffg.kernels`, ARCHITECTURE 2e) makes factor
-registration executable — but in v1 only EF-arena factors dispatch through
-it (gamma, beta, poisson_obs, bernoulli_obs, plus externally registered
-kernels). Discrete and Gaussian factors now share the exponential-family
-message algebra, but they and the hybrid factors still run on central
-compiler/engine branches. Adding a factor in those arenas therefore still
-means central surgery until the executable registry gains multi-arena
-bindings (cff-209l).
+**S1i. Executable registration covers EF and ordinary discrete factors.**
+`FactorKernel` (`cffg.kernels`, ARCHITECTURE 2e) binds scalar EF and ordinary
+discrete BP/VMP factors, including external implementations. The discrete
+binding requires a log-potential accessor for support, joint beliefs and
+assignment scoring; it is not a sparse/combinatorial factor interface.
+Gaussian execution still uses central paths until cff-zq25. Structural
+equality, hard constraints, Dirichlet parameter-edge composites, GFE
+composites and multi-arena factors remain separate plans. Registration alone
+does not add a new conjugate-learning rule or inference method.
 The registration API itself is internal-unstable pre-1.0; only the
 serialized `(impl, version)` manifest and its loud-failure guarantee are
 stable now.

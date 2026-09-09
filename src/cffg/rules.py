@@ -142,6 +142,8 @@ NODE_ENERGIES = {
 
 
 def _edge_q(inc2, r, card):
+    if isinstance(inc2, tuple):
+        return inc2[r]
     eta_q = efrules.CATEGORICAL.product(
         inc2[:, r, 0, :card], inc2[:, r, 1, :card]
     )

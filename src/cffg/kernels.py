@@ -8,15 +8,11 @@ adversarial finding behind cff-ri8m). A `FactorKernel` declares that
 executable half in one typed record; the compiler, VM, ledger, and
 serialization dispatch from the registry instead of branching.
 
-v1 binding scope: kernels attach to the scalar-EF arena (natural-parameter
-messages, `ef_eta [n_slots, n_params]`). That is the representative extension
-surface: a new conjugate observation factor registers from user code with
-zero edits to cffg compiler/engine/validation source and round-trips through
-template JSON and .cffgz via its namespaced (impl_id, version) — see
-tests/test_kernels.py. The discrete, Gaussian, and hybrid families still run
-on their central paths and migrate incrementally (cff-209l); `equality`
-stays structural infrastructure (family-polymorphic sum-minus-self), not a
-kernel.
+Bindings currently cover scalar EF natural-parameter messages and ordinary
+discrete BP/VMP messages. Tests register external implementations without
+central dispatch edits and reconstruct them through JSON and .cffgz.
+Gaussian and hybrid execution remain on separate paths. Equality stays
+structural infrastructure (family-polymorphic sum-minus-self), not a kernel.
 
 Registration is refused without a `HostileInputs` declaration — the
 numerical-robustness contract's planning-time checklist made machine-checked
@@ -38,8 +34,8 @@ schema — templates check impl identity and MAJOR compatibility at load.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
-from typing import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -52,6 +48,7 @@ from cffg.core.ir import (
     Template,
     register_factor_type,
 )
+from cffg.kernel_bindings import DiscreteBinding, DiscreteMode, EFBinding, ParameterSpec
 
 
 @dataclass(frozen=True)
@@ -68,34 +65,95 @@ class HostileInputs:
     scale: str  # 10-100x the fixture's domain size
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class FactorKernel:
-    """One factor type's executable contract, declared in one place.
+    """Identity and robustness declaration plus exactly one arena binding.
 
-    The jnp callables run inside the jitted step/BFE with the group static —
-    they must be trace-safe and dtype-polymorphic (derive dtype from `inc`,
-    never from literals). `message`/`energy`/`readout` all take
-    `(inc, params, obs, mask)`: `inc = ef_eta[gather]` is [M, R, P] incoming
-    messages on `message_roles`, `params` maps each of `param_keys` to its
-    stacked [M, ...] array, and `obs`/`mask` are [M] observation rows (None
-    when `observed_out` is None)."""
+    The original EF keyword/positional constructor remains an adapter to
+    ``EFBinding``. New factors pass ``binding=...``; no second callback set
+    is retained. Callback selection is static, numerical arrays are dynamic.
+    """
 
-    factor_type: FactorType  # structural roles/domains (core registry record)
-    impl_id: str  # namespaced identity, e.g. "cffg.ef.gamma" / "mypkg.myfactor"
-    version: str  # "MAJOR.MINOR.PATCH"; serialization records + checks MAJOR
-    arena: str  # message representation this kernel binds to ("ef" in v1)
-    family: str  # EF family of the message edges (key into ef.FAMILIES)
-    message_roles: tuple[str, ...]  # structural roles that carry messages
-    edge_families: Mapping[str, str]  # role -> required VariableSpec.ef tag
-    message: Callable  # (inc, params, obs, mask) -> outgoing [M, R, P]
-    energy: Callable  # (inc, params, obs, mask) -> node energies [M]
+    factor_type: FactorType
+    impl_id: str
+    version: str
     hostile: HostileInputs
-    param_keys: tuple[str, ...] = ()  # params-dict keys the runtime passes through
-    pack_params: Callable | None = None  # (template, members, resolved) -> {key: [M, ...]}
-    observed_out: str | None = None  # obs-family tag when "out" is a conditioned DATA port
-    validate_observation: Callable | None = None  # raw value -> float, raises ValueError
-    constraint_modes: frozenset[str] = frozenset()  # ConstraintKind values this node accepts
-    readout: Callable | None = None  # optional (inc, params, obs, mask) -> {name: [M, ...]}
+    binding: EFBinding | DiscreteBinding
+
+    def __init__(
+        self,
+        factor_type,
+        impl_id,
+        version,
+        arena=None,
+        family="",
+        message_roles=(),
+        edge_families=None,
+        message=None,
+        energy=None,
+        hostile=None,
+        param_keys=(),
+        pack_params=None,
+        observed_out=None,
+        validate_observation=None,
+        constraint_modes=frozenset(),
+        readout=None,
+        *,
+        binding=None,
+    ):
+        if binding is None:
+            if arena != "ef":
+                raise ValueError(f"arena {arena!r} requires an explicit arena binding")
+            binding = EFBinding(
+                family,
+                message_roles,
+                edge_families or {},
+                message,
+                energy,
+                param_keys,
+                pack_params,
+                observed_out,
+                validate_observation,
+                constraint_modes,
+                readout,
+            )
+        elif (
+            arena is not None
+            or family
+            or message_roles
+            or edge_families
+            or message is not None
+            or energy is not None
+            or param_keys
+            or pack_params is not None
+            or observed_out is not None
+            or validate_observation is not None
+            or constraint_modes
+            or readout
+        ):
+            raise ValueError("declare binding or legacy EF callbacks, not both")
+        for name, value in (
+            ("factor_type", factor_type),
+            ("impl_id", impl_id),
+            ("version", version),
+            ("hostile", hostile),
+            ("binding", binding),
+        ):
+            object.__setattr__(self, name, value)
+
+    def __getattr__(self, name):
+        # Preserve the original EF accessors without duplicating declarations.
+        return getattr(object.__getattribute__(self, "binding"), name)
+
+    @property
+    def edge_families(self):
+        return self.binding.edge_families if isinstance(self.binding, EFBinding) else {}
+
+    @property
+    def observed_out(self):
+        return (
+            self.binding.observed_out if isinstance(self.binding, EFBinding) else None
+        )
 
 
 KERNELS: dict[str, FactorKernel] = {}
@@ -114,17 +172,70 @@ def register_kernel(k: FactorKernel) -> FactorKernel:
     problems: list[str] = []
     if name in KERNELS:
         raise ValueError(f"kernel for factor type {name!r} already registered")
-    if k.arena != "ef":
-        problems.append(
-            f"arena {k.arena!r} has no kernel binding yet — discrete/Gaussian/"
-            "hybrid dispatch migrates under cff-209l"
-        )
+    if not isinstance(k.binding, (EFBinding, DiscreteBinding)):
+        raise TypeError("unsupported arena binding")
     if "." not in k.impl_id or any(c.isspace() for c in k.impl_id) or not k.impl_id:
-        problems.append(f"impl_id {k.impl_id!r} must be namespaced ('<namespace>.<name>')")
+        problems.append(
+            f"impl_id {k.impl_id!r} must be namespaced ('<namespace>.<name>')"
+        )
     if not _VERSION_RE.match(k.version):
         problems.append(f"version {k.version!r} is not MAJOR.MINOR.PATCH")
-    if k.family not in ef.FAMILIES:
+    if k.arena == "ef" and k.family not in ef.FAMILIES:
         problems.append(f"family {k.family!r} not in ef.FAMILIES {sorted(ef.FAMILIES)}")
+    if k.arena == "ef" and (not callable(k.message) or not callable(k.energy)):
+        problems.append("EF binding requires message and energy callbacks")
+    if isinstance(k.binding, DiscreteBinding):
+        b = k.binding
+        if k.factor_type.family != "discrete":
+            problems.append("discrete binding requires a discrete FactorType")
+        if b.roles != k.factor_type.edge_roles:
+            problems.append("discrete roles must match the structural role order")
+        if not b.roles or len(set(b.roles)) != len(b.roles):
+            problems.append("discrete roles must be nonempty and unique")
+        if not callable(b.potential):
+            problems.append(
+                "discrete support and assignment scoring require a potential accessor"
+            )
+        if not b.semirings or not b.semirings <= {"sum", "max"}:
+            problems.append("discrete semirings must select sum and/or max")
+        for mode, callbacks in (("bp", b.bp), ("vmp", b.vmp)):
+            if callbacks is None and mode == "vmp":
+                continue
+            if not isinstance(callbacks, DiscreteMode) or not all(
+                callable(fn) for fn in (callbacks.message, callbacks.energy)
+            ):
+                problems.append(f"{mode} requires message and node-energy callbacks")
+            elif callbacks.readout is not None and not callable(callbacks.readout):
+                problems.append(f"{mode} readout must be callable when declared")
+        if set(b.parameters) != set(k.factor_type.param_roles):
+            problems.append(
+                "parameter shape declarations must cover serialized parameter roles"
+            )
+        for role, spec in b.parameters.items():
+            if not isinstance(spec, ParameterSpec) or not callable(spec.shape):
+                problems.append(f"parameter {role!r} requires a shape provider")
+            elif spec.key is not None and spec.key not in b.param_keys:
+                problems.append(
+                    f"parameter {role!r} names undeclared packed key {spec.key!r}"
+                )
+            elif spec.transform not in {
+                "identity",
+                "probability_to_log",
+                "covariance_to_precision",
+            }:
+                problems.append(f"parameter {role!r} has an unknown transform")
+            elif (
+                spec.transform == "probability_to_log" and spec.probability_axis is None
+            ):
+                problems.append(f"parameter {role!r} requires a probability axis")
+            elif spec.permutation and set(spec.permutation) != set(
+                range(len(spec.permutation))
+            ):
+                problems.append(f"parameter {role!r} has an invalid axis permutation")
+        if len(set(b.param_keys)) != len(b.param_keys) or any(
+            not key for key in b.param_keys
+        ):
+            problems.append("packed parameter keys must be nonempty and unique")
     for probe in ("sparse_support", "improper_messages", "float32", "scale"):
         if not str(getattr(k.hostile, probe, "")).strip():
             problems.append(
@@ -148,6 +259,8 @@ def register_kernel(k: FactorKernel) -> FactorKernel:
         )
     if (k.pack_params is None) != (len(k.param_keys) == 0):
         problems.append("pack_params and param_keys must be declared together")
+    if k.pack_params is not None and not callable(k.pack_params):
+        problems.append("pack_params must be callable when declared")
     if k.observed_out is not None:
         if "out" not in k.factor_type.edge_roles or "out" in k.message_roles:
             problems.append(
@@ -200,6 +313,64 @@ def kernel_for(factor_type: str) -> FactorKernel | None:
     return KERNELS.get(factor_type)
 
 
+def packed_parameters(kernel, template, members, resolved):
+    """Pack once, checking the declared keys and member axis on the host."""
+    for name in members:
+        factor = template.factors[name]
+        sizes = {
+            role: template.variables[var].dim or template.variables[var].cardinality
+            for role, var in factor.edges.items()
+        }
+        for role, spec in kernel.binding.parameters.items():
+            expected = tuple(spec.shape(sizes))
+            if spec.probability_axis is not None and (
+                not isinstance(spec.probability_axis, int)
+                or not -len(expected) <= spec.probability_axis < len(expected)
+            ):
+                raise ValueError(
+                    f"factor {name!r}: parameter {role!r} probability axis is outside shape {expected}"
+                )
+            if spec.permutation and len(spec.permutation) != len(expected):
+                raise ValueError(
+                    f"factor {name!r}: parameter {role!r} permutation does not match rank {len(expected)}"
+                )
+            actual = resolved[factor.param_blobs[role]].shape
+            if actual != expected:
+                raise ValueError(
+                    f"factor {name!r}: parameter {role!r} shape {actual} != {expected}"
+                )
+    packed = (
+        {}
+        if kernel.pack_params is None
+        else kernel.pack_params(template, members, resolved)
+    )
+    if set(packed) != set(kernel.param_keys):
+        raise ValueError(
+            f"kernel {kernel.impl_id!r}: pack_params returned keys {sorted(packed)}, "
+            f"declared param_keys {sorted(kernel.param_keys)}"
+        )
+    result = {}
+    for key, value in packed.items():
+        arr = np.asarray(value)
+        if not arr.ndim or arr.shape[0] != len(members):
+            raise ValueError(
+                f"kernel {kernel.impl_id!r}: parameter {key!r} needs member axis {len(members)}, got {arr.shape}"
+            )
+        result[key] = arr
+    return result
+
+
+def parameter_paths(kernel, group_name):
+    """Resolve logical packed keys to stable persistent-state addresses."""
+    bare = {spec.key for spec in kernel.binding.parameters.values() if spec.group_key}
+    if len(bare) > 1:
+        raise ValueError("only one packed parameter may occupy the group-name key")
+    return {
+        key: group_name if key in bare else f"{group_name}:{key}"
+        for key in kernel.param_keys
+    }
+
+
 def conditioned_out_types() -> frozenset[str]:
     """Factor types whose 'out' edge is a conditioned DATA-only port."""
     return frozenset(n for n, k in KERNELS.items() if k.observed_out is not None)
@@ -235,7 +406,7 @@ def manifest(factor_types: Iterable[str]) -> dict[str, dict[str, str]]:
 
 # --- Built-in EF kernels ------------------------------------------------------
 # The jnp math stays in cffg.efrules; imports are deferred into the callables
-# so this module (used by the JAX-free compiler and core.validate) never
+# so this module (used by host packing and core.validate) never
 # imports JAX at module scope.
 
 
@@ -416,4 +587,17 @@ register_kernel(
         observed_out="bernoulli",
         validate_observation=_validate_bernoulli,
     )
+)
+
+from cffg.discrete_kernels import install as _install_discrete
+
+_install_discrete(
+    register_kernel,
+    FactorKernel,
+    HostileInputs(
+        sparse_support="Exact zeros retain NEG; empty support is infeasible.",
+        improper_messages="Vacuous messages are neutral; nonfinite results diverge.",
+        float32="Categorical algebra uses active-dtype support and normalization.",
+        scale="Local cardinality padding only; tested at cardinality 128 and above.",
+    ),
 )
