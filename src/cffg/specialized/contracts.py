@@ -1,8 +1,10 @@
 """Immutable inputs and outputs of specialized structural lowering."""
 
+from __future__ import annotations
+
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from cffg._immutable import FrozenArray, ImmutableRecord
 from cffg.array_requirements import ArrayRequirement
@@ -22,6 +24,9 @@ from cffg.compiled import (
     RecurrencePlan,
 )
 from cffg.topology import TopologyLayout
+
+if TYPE_CHECKING:
+    from cffg.registered.contracts import RegistrySnapshot
 
 
 @dataclass(frozen=True)
@@ -84,6 +89,7 @@ class EqualityRoute(ImmutableRecord):
 @dataclass(frozen=True)
 class SpecializedClaims(ImmutableRecord):
     topology: TopologyLayout
+    registry: RegistrySnapshot
     semiring: str
     mean_field: frozenset[str]
     parameter_layouts: Mapping[str, ParameterLayout]
@@ -141,6 +147,13 @@ class CompositeOwnership(ImmutableRecord):
 
 @dataclass(frozen=True)
 class SpecializedPlanDrafts(ImmutableRecord):
+    semiring: str
+    parameters: tuple[ParameterClaim, ...]
+    parameter_layouts: Mapping[str, ParameterLayout]
+    prior_names: tuple[str, ...]
+    composite_problems: tuple[str, ...]
+    excluded_edges: frozenset[str]
+    initializer_fallbacks: Mapping[tuple[str, str], tuple[int, ...]]
     dirichlet: tuple[PlanDraft[DirichletGroupPlan], ...]
     gfe: tuple[PlanDraft[GfePlan], ...]
     gfe_goals: Mapping[str, tuple[str, ...]]

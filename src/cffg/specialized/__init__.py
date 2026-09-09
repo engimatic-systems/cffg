@@ -15,7 +15,7 @@ from .contracts import (
     SpecializedClaims,
     SpecializedPlanDrafts,
 )
-from .discovery import discover_specialized
+from .discovery import discover_specialized, initializer_fallbacks
 from .mixed import lower_mixtures, lower_precision, lower_recurrence
 from .structural import lower_delta, lower_equalities
 
@@ -155,6 +155,21 @@ def complete_specialized(
         mu3=mu3,
     )
     return SpecializedPlanDrafts(
+        semiring=claims.semiring,
+        parameters=claims.parameters,
+        parameter_layouts=dict(sorted(claims.parameter_layouts.items())),
+        prior_names=tuple(
+            sorted(
+                f.name
+                for f in claims.topology.factors.values()
+                if f.type == "dirichlet"
+            )
+        ),
+        composite_problems=claims.composite_problems,
+        excluded_edges=claims.excluded_edges,
+        initializer_fallbacks=initializer_fallbacks(
+            claims.topology, claims.parameter_layouts
+        ),
         dirichlet=dirichlet,
         gfe=gfe,
         gfe_goals=goals,

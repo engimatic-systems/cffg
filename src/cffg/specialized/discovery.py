@@ -479,6 +479,17 @@ def _initializer_shapes(t, layouts, consumed):
     return shapes
 
 
+def initializer_fallbacks(t, layouts=None):
+    """Historical fallback shapes, distinct from canonical composite shapes."""
+    return {
+        (factor.name, role): shape
+        for _, factor in sorted(t.factors.items())
+        for role in sorted(factor.param_blobs)
+        if (shape := specialized_initializer_shape(t, factor, role, layouts))
+        is not None
+    }
+
+
 def discover_specialized(
     template: Template,
     topology: TopologyLayout,
@@ -548,6 +559,7 @@ def discover_specialized(
             )
     return SpecializedClaims(
         topology=topology,
+        registry=registry,
         semiring=semiring,
         mean_field=mean_field,
         parameter_layouts=layouts,

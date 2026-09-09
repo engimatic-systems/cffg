@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from cffg.array_requirements import ArrayRecipe
+from cffg.array_requirements import ArrayRecipe, ParameterRuntime
 from cffg.compiled import (
     MixGroupPlan,
     PrecGroupPlan,
@@ -13,7 +13,7 @@ from cffg.core.ir import FACTOR_TYPES
 from cffg.recurrence_topology import classify_recurrence_components
 
 from .contracts import OrdinaryMembership, PlanDraft, SpecializedClaims
-from .requirements import array_requirement
+from .requirements import array_requirement, member_requirements
 
 
 def lower_mixtures(claims: SpecializedClaims) -> tuple[PlanDraft[MixGroupPlan], ...]:
@@ -56,6 +56,18 @@ def lower_mixtures(claims: SpecializedClaims) -> tuple[PlanDraft[MixGroupPlan], 
             )
         )
         keys = ("m", "W") if mtype == "gaussian_mixture" else ("A", "b", "W")
+        runtime = (
+            {
+                "mean": ParameterRuntime(f"{gname}:m"),
+                "cov": ParameterRuntime(f"{gname}:W", "covariance_to_precision"),
+            }
+            if mtype == "gaussian_mixture"
+            else {
+                "matrix": ParameterRuntime(f"{gname}:A"),
+                "offset": ParameterRuntime(f"{gname}:b"),
+                "cov": ParameterRuntime(f"{gname}:W", "covariance_to_precision"),
+            }
+        )
         requirements.append(
             array_requirement(
                 claims,
@@ -63,6 +75,7 @@ def lower_mixtures(claims: SpecializedClaims) -> tuple[PlanDraft[MixGroupPlan], 
                 ArrayRecipe.MIXTURE,
                 members,
                 tuple(f"{gname}:{key}" for key in keys),
+                addresses=member_requirements(members, runtime),
             )
         )
 
@@ -155,6 +168,13 @@ def lower_recurrence(
                 ArrayRecipe.RECURRENCE,
                 members,
                 (f"{gname}:weights", f"{gname}:offsets"),
+                addresses=member_requirements(
+                    members,
+                    {
+                        "weights": ParameterRuntime(f"{gname}:weights"),
+                        "offsets": ParameterRuntime(f"{gname}:offsets"),
+                    },
+                ),
             )
         )
 
@@ -209,6 +229,9 @@ def lower_precision(claims: SpecializedClaims) -> tuple[PlanDraft[PrecGroupPlan]
                 ArrayRecipe.PRECISION,
                 members,
                 (f"{gname}:m",),
+                addresses=member_requirements(
+                    members, {"mean": ParameterRuntime(f"{gname}:m")}
+                ),
             )
         )
 

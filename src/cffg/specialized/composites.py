@@ -2,12 +2,12 @@
 
 import numpy as np
 
-from cffg.array_requirements import ArrayRecipe
+from cffg.array_requirements import ArrayRecipe, ParameterRuntime
 from cffg.compiled import DirichletGroupPlan, GfePlan, GfeTmPlan, HybridGfePlan, Mu3Plan
 from cffg.core.ir import FACTOR_TYPES
 
 from .contracts import PlanDraft, SpecializedClaims
-from .requirements import array_requirement
+from .requirements import array_requirement, member_requirements
 
 
 def lower_dirichlet(
@@ -184,6 +184,38 @@ def lower_gfe(
                 ArrayRecipe.GFE,
                 sources,
                 (a_key, c_key),
+                addresses=tuple(
+                    intent
+                    for pair in zip(
+                        member_requirements(
+                            tuple(obs for obs, _ in pairs),
+                            {
+                                "matrix": ParameterRuntime(
+                                    a_key,
+                                    "identity" if learned else "probability_to_log",
+                                    learning_form="counts" if learned else "expected",
+                                )
+                            },
+                            writable=False,
+                            statistic_source=False,
+                        ),
+                        member_requirements(
+                            goals[gname],
+                            {
+                                "statistic": ParameterRuntime(
+                                    c_key,
+                                    "identity"
+                                    if goal_learned
+                                    else "probability_to_log",
+                                )
+                            },
+                            writable=False,
+                            statistic_source=False,
+                        ),
+                        strict=True,
+                    )
+                    for intent in pair
+                ),
             )
         )
         if mu3:
@@ -237,7 +269,25 @@ def lower_transition_gfe(claims: SpecializedClaims) -> tuple[PlanDraft[GfeTmPlan
         plan = GfeTmPlan(gname, (ko, ki, ku), tuple(members), gather, scatter, learned)
         key = f"{gname}:counts" if learned else f"{gname}:B"
         requirements.append(
-            array_requirement(claims, gname, ArrayRecipe.GFE_TM, members, (key,))
+            array_requirement(
+                claims,
+                gname,
+                ArrayRecipe.GFE_TM,
+                members,
+                (key,),
+                addresses=member_requirements(
+                    members,
+                    {
+                        "matrices": ParameterRuntime(
+                            key,
+                            "identity" if learned else "probability_to_log",
+                            learning_form="counts" if learned else "expected",
+                        )
+                    },
+                    writable=False,
+                    statistic_source=False,
+                ),
+            )
         )
         gfe_tm_groups.append(plan)
 
@@ -303,6 +353,7 @@ def lower_hybrid_gfe(claims: SpecializedClaims) -> tuple[PlanDraft[HybridGfePlan
                 ArrayRecipe.HYBRID_GFE,
                 tuple(members) + tuple(goals),
                 tuple(f"{gname}:{key}" for key in (*keys, "goal_m", "goal_W")),
+                auxiliary_kernels={"goal": claims.registry.bindings.get("gaussian")},
             )
         )
 
