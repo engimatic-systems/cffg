@@ -1,6 +1,6 @@
 ---
 id: cff-edoz
-status: open
+status: closed
 deps: [cff-ddsq]
 links: [cff-209l, cff-ws3c]
 created: 2026-08-13T04:26:16Z
@@ -98,3 +98,9 @@ estimation, source recovery, and new-family work retain their own tickets.
   arena assembly.
 - **One-way dependency:** Lower-level declarations and values never import
   compiler orchestration or runtime owners.
+
+## Notes
+
+**2026-09-09T23:42:34Z**
+
+Compiler track complete. The dependency chain has closed compiler contracts (cff-ecw0), immutable compiled values (cff-544x), declared topology (cff-8t4d), specialized discovery/completion (cff-kfo7), registered lowering (cff-ejib), array/learning resolution (cff-bfr9), and final assembly (cff-ddsq), on the completed registration foundation. Shared learned-goal and declaration-conflict corrections were delivered separately before extraction. The public compiler is 138 lines; all extracted modules are below 1,000 lines. It sequences expanded/core-validated Template -> TopologyLayout -> SpecializedClaims -> RegisteredPlanDrafts -> completed SpecializedPlanDrafts -> ResolvedCompileData -> checked immutable Arena. No stage reads back through the public compiler facade. Final source 707c31b passed 1,813 default tests, 41 slow deselections and four existing warnings, in 1,016.282 seconds measured wall; runtime record 6364053. Fourteen complete arenas and immutable-array publication counts match the pre-assembly compiler. Existing model identities, addresses, schedules, family oracles, external kernels, learning and checkpoint consumers remain protected. Architecture records the delivered owners and change paths. The exact commit closing this ticket becomes the engine characterization baseline; cff-sf29 is next. Independent P2 cff-34gi records an inherited invalid-probability input gap without expanding this refactor.
