@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from cffg.array_requirements import ArrayRecipe
 from cffg.compiled import (
     MixGroupPlan,
     PrecGroupPlan,
@@ -11,7 +12,7 @@ from cffg.compiled import (
 from cffg.core.ir import FACTOR_TYPES
 from cffg.recurrence_topology import classify_recurrence_components
 
-from .contracts import ArrayRecipe, OrdinaryMembership, PlanDraft, SpecializedClaims
+from .contracts import OrdinaryMembership, PlanDraft, SpecializedClaims
 from .requirements import array_requirement
 
 

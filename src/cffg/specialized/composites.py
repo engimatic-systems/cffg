@@ -2,10 +2,11 @@
 
 import numpy as np
 
+from cffg.array_requirements import ArrayRecipe
 from cffg.compiled import DirichletGroupPlan, GfePlan, GfeTmPlan, HybridGfePlan, Mu3Plan
 from cffg.core.ir import FACTOR_TYPES
 
-from .contracts import ArrayRecipe, PlanDraft, SpecializedClaims
+from .contracts import PlanDraft, SpecializedClaims
 from .requirements import array_requirement
 
 

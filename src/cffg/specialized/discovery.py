@@ -2,8 +2,14 @@
 
 import numpy as np
 
-from cffg import ef, kernels
-from cffg.core.ir import FACTOR_TYPES, ConstraintKind, PortRole, Template
+from cffg import ef
+from cffg.core.ir import FACTOR_TYPES, ConstraintKind, Template
+from cffg.registered.capabilities import (
+    conditioned_output_problems,
+    constraint_problems,
+    snapshot_registry,
+)
+from cffg.registered.contracts import RegistrySnapshot
 from cffg.topology import TopologyLayout
 
 from .contracts import (
@@ -17,10 +23,8 @@ from .contracts import (
 )
 
 
-def _admission(t, constraints):
+def _admission(t, constraints, registry):
     problems = []
-    degrees = t.degrees
-    ports_by_variable = t.ports_by_variable
     topology = t
     mean_field = {c.target for c in constraints if c.kind is ConstraintKind.MEAN_FIELD}
     psub = {
@@ -68,27 +72,16 @@ def _admission(t, constraints):
                 f"factor {f.name!r}: P-substitution on Gaussian nodes is open research "
                 "(ticket cff-dfpi)"
             )
-        kern = kernels.kernel_for(f.type)
-        if kern is not None and not (
-            f.name in psub
-            and f.type in {"categorical", "matrix_cat", "transition_mixture"}
-        ):
-            requested = set()
-            if f.name in mean_field:
-                requested.add(ConstraintKind.MEAN_FIELD.value)
-            if f.name in psub:
-                requested.add(ConstraintKind.P_SUBSTITUTION.value)
-            bad = sorted(requested - set(kern.constraint_modes))
-            if bad:
-                problems.append(
-                    f"factor {f.name!r}: kernel {kern.impl_id!r} does not accept "
-                    f"{bad} beads (conjugate BP is already exact on EF subgraphs)"
-                )
-        elif FACTOR_TYPES[f.type].family == "ef" and f.name in (mean_field | set(psub)):
-            problems.append(
-                f"factor {f.name!r}: beads on EF nodes are undefined in M-scope — "
-                "conjugate BP is already exact on EF subgraphs (cff-8s6a)"
+        problems.extend(
+            constraint_problems(
+                f,
+                registry,
+                mean_field=f.name in mean_field,
+                psub=f.name in psub,
+                delegated_psub=f.name in psub
+                and f.type in {"categorical", "matrix_cat", "transition_mixture"},
             )
+        )
         if FACTOR_TYPES[f.type].family == "hybrid" and f.name in mean_field:
             problems.append(
                 f"factor {f.name!r}: hybrid beads are undefined for mean-field "
@@ -100,16 +93,7 @@ def _admission(t, constraints):
                 f"factor {f.name!r}: P-substitution on recurrence_link is "
                 "unsupported; its PG/JJ coordinate defines a VFE bound"
             )
-        if f.type in kernels.conditioned_out_types():
-            out_var = f.edges["out"]
-            out_ports = [
-                p for p in ports_by_variable.get(out_var, ()) if p.role is PortRole.DATA
-            ]
-            if degrees.get(out_var, 0) == 2 or not out_ports:
-                problems.append(
-                    f"factor {f.name!r}: {f.type} is a conditioned likelihood — its 'out' "
-                    "edge must be a DATA port (unobserved predictives leave the family)"
-                )
+        problems.extend(conditioned_output_problems(f, topology, registry))
     problems.extend(topology.port_problems)
 
     return mean_field, psub, tuple(problems)
@@ -496,14 +480,18 @@ def _initializer_shapes(t, layouts, consumed):
 
 
 def discover_specialized(
-    template: Template, topology: TopologyLayout, semiring: str
+    template: Template,
+    topology: TopologyLayout,
+    semiring: str,
+    registry: RegistrySnapshot | None = None,
 ) -> SpecializedClaims:
     """Interpret a validated immutable declaration snapshot, without blob access.
 
     The template argument makes the stage boundary explicit; no mutable template
     reference escapes. Diagnostics are data until the compiler's existing gates.
     """
-    mean_field, psub, admission = _admission(topology, template.constraints)
+    registry = snapshot_registry() if registry is None else registry
+    mean_field, psub, admission = _admission(topology, template.constraints, registry)
     layouts, layout_problems = ({}, ()) if admission else _parameter_layouts(topology)
     parameters = (
         ()
