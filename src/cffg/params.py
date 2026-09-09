@@ -60,9 +60,10 @@ def _symmetry_ok(matrices: np.ndarray) -> bool:
 
 
 def _validate_probability(
-    factor_type: str, role: str, value: np.ndarray, name: str
+    factor_type: str, role: str, value: np.ndarray, name: str, axis=None
 ) -> None:
-    axis = _PROBABILITY_AXES.get((factor_type, role))
+    if axis is None:
+        axis = _PROBABILITY_AXES.get((factor_type, role))
     if axis is None:
         raise ValueError(
             f"{name}: role {role!r} of {factor_type!r} is not a probability parameter"
@@ -114,20 +115,16 @@ def _serialized_shape(
             f"{runtime_shape}"
         )
     row_shape = runtime_shape[1:]
-    if member.factor_type == "transition_mixture" and address.key.startswith(
-        ("bp:", "vmp:")
-    ):
-        return (row_shape[2], row_shape[0], row_shape[1])
+    if address.permutation:
+        return tuple(row_shape[i] for i in np.argsort(address.permutation))
     return row_shape
 
 
 def _runtime_layout(
     factor_type: str, address: "ParameterAddress", value: np.ndarray
 ) -> np.ndarray:
-    if factor_type == "transition_mixture" and address.key.startswith(
-        ("bp:", "vmp:")
-    ):
-        return value.transpose(1, 2, 0)
+    if address.permutation:
+        return value.transpose(address.permutation)
     return value
 
 
@@ -233,7 +230,7 @@ def set_params(
                     f"{expected_shape}"
                 )
             if address.transform == "probability_to_log":
-                _validate_probability(member.factor_type, role, value, name)
+                _validate_probability(member.factor_type, role, value, name, address.probability_axis)
             elif address.transform == "covariance_to_precision":
                 _validate_covariance(value, name)
             elif not np.all(np.isfinite(_working_float(value))):

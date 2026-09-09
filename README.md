@@ -911,7 +911,7 @@ migration path.
 
 ## Register a custom factor
 
-EF-arena factor types are executable registrations, not engine edits
+EF and ordinary discrete factor types are executable registrations
 (`cffg.kernels`, ARCHITECTURE 2e). Declare the structure, math, and
 robustness answers in one `FactorKernel`; the compiler, VM, ledger, and
 serialization dispatch from the registry:
@@ -935,6 +935,42 @@ Templates using the type record `(impl, version)` in their JSON/.cffgz;
 loading without the kernel registered fails loudly and names what to
 install. `tests/test_kernels.py` is the worked example, including the
 independent evidence oracle every kernel is expected to ship with.
+
+For a discrete factor, declare a `DiscreteBinding` instead of the legacy EF
+arguments. A two-role example has the following shape (callbacks supplied
+by the extension):
+
+```python
+from cffg import DiscreteBinding, DiscreteMode, ParameterSpec
+
+binding = DiscreteBinding(
+    roles=("spin", "color"),
+    parameters={"coupling": ParameterSpec(lambda sizes: (), key="strength")},
+    param_keys=("strength",), pack_params=my_pack,
+    potential=my_log_potential,  # (params, cards) -> [members, spin, color]
+    bp=DiscreteMode(my_bp_message, my_bp_energy, my_bp_readout),
+    vmp=DiscreteMode(my_vmp_message, my_vmp_energy, my_vmp_readout),
+)
+register_kernel(FactorKernel(
+    FactorType("spin_color", ("spin", "color"), ("coupling",)),
+    "mypkg.spin_color", "1.0.0", hostile=my_hostile_answers, binding=binding,
+))
+```
+
+BP messages receive `(cavities, params, cards, local_width, reduction)`;
+VMP messages receive `(beliefs, params, cards, local_width)`, where each
+role's belief is a normalized `(q, log_q)` pair from both edge messages.
+Both return `[members, roles, local_width]`, padded with `NEG`. Energies and
+readouts receive `(inputs, params, cards)` using that mode's input meaning.
+The packer receives `(template, members, resolved_arrays)` and returns every
+declared `[members, ...]` parameter. Shape providers receive role-size maps
+and support initializer reconstruction. The potential accessor also powers
+support checks, joint BP beliefs and decoded assignment scoring.
+
+`tests/test_discrete_kernels.py` contains the complete bilinear example,
+independent BP/VMP/energy oracles, float32 and cardinality-128 tests. Gaussian
+registration is the next foundation step. Python binding fields are
+internal-unstable before 1.0; serialized implementation identities are stable.
 
 ## Consume the engine from an experiment harness
 

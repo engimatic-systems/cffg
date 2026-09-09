@@ -1,6 +1,6 @@
 ---
 id: cff-wera
-status: open
+status: closed
 deps: [cff-ri8m, cff-l6i5]
 links: []
 created: 2026-09-09T03:25:11Z
@@ -92,3 +92,17 @@ cff-wbhu owns compiled convergence loops and throughput.
   its outputs to the flat arena after the loop.
 - **CFFGZ:** The bundle containing a serialized template and referenced arrays.
 - **XLA:** The compiler JAX uses to create numerical executables.
+
+## Notes
+
+**2026-09-09T04:02:25Z**
+
+Implementation handoff: base 30a7425 (review PR109). Change-path rows: New factor or rule family; Runtime numerical or status invariant; Learnable or checkpoint feature for parameter addresses/readouts; New IR field only manifest verification, no schema change. Affected pairs: host/JIT support and execution, flooding/batch/registerized scan/flat scan, direct/vmap with distinct inputs, BP/VMP belief construction, message/node-energy/readout/assignment parameter views. Checkpoint latest/legacy decoding: no schema or state-leaf changes, existing regression tests apply. Hostile inputs: preserve exact NEG and report empty support infeasible; nonfinite callback outputs diverge; float32 rules use active-dtype algebra; custom cardinality128 coexists with small roles in flat storage. Equality, Dirichlet parameter edges and GFE composites remain specialized; Gaussian execution unchanged until cff-zq25. Research: runtime audit identified dense-potential assumptions in both support checks, node_beliefs and objective; declared potential access will own these. Source: engine.py consumers independently audited by performance_review; confidence high. Modular binding and serialized shape metadata must also cover parameter reconstruction and writes; source compiler.py and params.py audit by modularity_review; confidence high.
+
+**2026-09-09T04:14:19Z**
+
+Implementation ready for full gate: typed EF/discrete bindings, unchanged legacy EF constructor, compiled named parameter paths, serialized shape providers and direct-write metadata, BP/VMP-specific inputs, potential access for support/joint beliefs/assignment scores, all flooding/batch/registerized/flat-scan local calls, and abstract message/energy/potential/readout shape checks during compilation. External bilinear fixture supplies enumeration oracles, two uncertain neighbors, total VMP ledger, sparse-support/float32/cardinality128, distinct-input vmap, JSON/CFFGZ/file/init/override reconstruction, named writes, nonfinite statuses, chain transport and trace-reuse proofs. Focused selections passed: 80 tests (kernels/VMP/schedule/params/status/estimate) and latest 43 tests (external/EF/params). Independent review fixed deepcopy recursion and malformed pack/axis metadata; no dispatch bypass found. Strict pre-change comparison at 30a7425 passes all 10 HMM/Kalman/T-maze fixtures, including existing member-address fields, messages/readouts/energies, hashes, params, schedules and scan carries. Newly introduced address declarations are explicitly excluded from old-field comparison only. HMM BFE22.09818901990299, bytes9544; Kalman BFE5.412683875149131, bytes2016; T-maze GFE3.5227151149325486, bytes8064. HMM scan carries one (1,3) block; Gaussian baseline remains unchanged. Reproducer/artifacts: /tmp/cffg-registration-baseline/compare_registration.py and baseline/. Await dashboard-backed short suite, then close and stack Gaussian cff-zq25. No wiggle audit was run.
+
+**2026-09-09T04:30:07Z**
+
+Completed at code commit a9bbf79. Required dashboard short suite passed: 1546 tests, 41 slow tests deselected, 0 failures, 900.41 seconds; four existing Gym deprecation warnings. Dashboard refreshed. Extra direct/JIT float32/float64 EF callback comparison: all64 arrays bit-identical for gamma/beta/poisson_obs/bernoulli_obs including missing masks; reproducer /tmp/cffg-registration-baseline/compare_ef_callbacks.py. External discrete Colony check: two different parameter instances share one cached Engine, both converge and match enumeration. git diff from e488df3 to base30a7425 is empty across src/tests/dependencies, so old-code parity also covers that external anchor. Independent registration review findings (deepcopy recursion and malformed pack/axis/permutation declarations) are fixed and tested. git diff --check and tk dep cycle pass. Next: cff-zq25 Gaussian migration; stop after it and cff-209l. No short-suite rerun is needed for PR metadata or dashboard refresh alone.

@@ -47,7 +47,7 @@ SUITE_SELECTION = "not slow"
 EPIC_FILES = {
     "M0 · Foundations": ["test_hygiene.py"],
     "M1 · Core IR": ["test_ir.py", "test_serialize.py", "test_edits.py", "test_compose.py", "test_inits.py"],
-    "M2 · BP Engine": ["test_engine_tree.py", "test_engine_hmm.py", "test_schedule.py"],
+    "M2 · BP Engine": ["test_engine_tree.py", "test_engine_hmm.py", "test_schedule.py", "test_discrete_kernels.py"],
     "M3 · VMP + GFE": [
         "test_vmp.py",
         "test_gfe.py",

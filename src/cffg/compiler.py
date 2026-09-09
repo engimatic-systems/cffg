@@ -83,6 +83,8 @@ class GroupPlan:
     scatter: np.ndarray  # [n_members, n_roles] slot to write (own side)
     mode: str = "bp"  # "bp" (sum-product) | "vmp" (mean-field bead)
     gather_both: np.ndarray | None = None  # [M, R, 2] both slots (vmp: marginals)
+    kernel: kernels.FactorKernel | None = None
+    parameter_paths: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -310,6 +312,8 @@ class ParameterAddress:
     key: str
     index: int
     transform: str
+    probability_axis: int | None = None
+    permutation: tuple[int, ...] = ()
 
     def __post_init__(self) -> None:
         if self.transform not in PARAMETER_TRANSFORMS:
@@ -606,6 +610,7 @@ def _set_member_address(
     member: str,
     index: int,
     runtime: dict[str, tuple[str, str]],
+    declarations=None,
 ) -> None:
     """Register the runtime row for every blob-backed role of ``member``."""
     factor = template.factors[member]
@@ -623,6 +628,8 @@ def _set_member_address(
             key=runtime[role][0],
             index=index,
             transform=runtime[role][1],
+            probability_axis=declarations[role].probability_axis if declarations else None,
+            permutation=declarations[role].permutation if declarations else (),
         )
         for role, blob in sorted(factor.param_blobs.items())
     )
@@ -708,7 +715,9 @@ def compile_template(
                 "(ticket cff-dfpi)"
             )
         kern = kernels.kernel_for(f.type)
-        if kern is not None:
+        if kern is not None and not (
+            f.name in psub and f.type in {"categorical", "matrix_cat", "transition_mixture"}
+        ):
             requested = set()
             if f.name in mean_field:
                 requested.add(ConstraintKind.MEAN_FIELD.value)
@@ -1690,7 +1699,7 @@ def compile_template(
                 rows.append(n_ef_obs)
                 n_ef_obs += 1
             obs_rows = np.array(rows, dtype=np.int64)
-        elif kern is not None and kern.pack_params is not None:
+        if kern is not None and kern.pack_params is not None:
             try:
                 packed = kern.pack_params(t, members, resolved)
             except ValueError as err:
@@ -1719,26 +1728,35 @@ def compile_template(
             [[slot_of[(m, r)] for r in roles] for m in members], dtype=np.int64
         )
         both = np.stack([scatter, gather], axis=-1)  # own & opposite = the edge pair
-        groups.append(
-            GroupPlan(gname, ftype, roles, cards, tuple(members), gather, scatter, mode, both)
-        )
-        stacked = _stack_params(t, ftype, cards, members, resolved)
-        if stacked is not None:
-            log_params[gname] = stacked
-            role = {
-                "categorical": "statistic",
-                "matrix_cat": "matrix",
-                "transition_mixture": "matrices",
-            }[ftype]
+        kern = kernels.kernel_for(ftype)
+        if ftype != "equality" and (kern is None or kern.arena != "discrete"):
+            raise CompileError(f"factor type {ftype!r} has no discrete kernel binding")
+        if kern is not None and semiring not in kern.binding.semirings:
+            raise CompileError(f"kernel {kern.impl_id!r} does not support {semiring!r}")
+        paths = {} if kern is None else kernels.parameter_paths(kern, gname)
+        groups.append(GroupPlan(
+            gname, ftype, roles, cards, tuple(members), gather, scatter, mode, both,
+            kern, tuple(paths.items()),
+        ))
+        if kern is not None:
+            try:
+                packed = kernels.packed_parameters(kern, t, members, resolved)
+                from cffg.kernel_runtime import validate_discrete_shapes
+
+                validate_discrete_shapes(groups[-1], packed, semiring)
+            except (ValueError, TypeError, KeyError, AttributeError) as err:
+                raise CompileError(f"kernel {kern.impl_id!r}: {err}") from err
+            log_params.update({paths[key]: value for key, value in packed.items()})
+            specs = kern.binding.parameters
+            direct = all(spec.key is not None for spec in specs.values())
+            runtime = {
+                role: (paths[spec.key], spec.transform)
+                for role, spec in specs.items() if spec.key is not None
+            }
             for index, member in enumerate(members):
-                _set_member_address(
-                    member_of,
-                    t,
-                    member,
-                    index,
-                    {role: (gname, "probability_to_log")},
-                )
-                writable_members.add(member)
+                if direct:
+                    _set_member_address(member_of, t, member, index, runtime, specs)
+                    writable_members.add(member)
 
     constraint_groups: list[ConstraintPlan] = []
     for fname in constraint_names:
@@ -2116,6 +2134,19 @@ def _resolve_arrays(
 def _blob_shape(t: Template, blob_name: str) -> tuple[int, ...] | None:
     """Expected array shape for a blob, inferred from the first factor role
     that references it (the compiler validates full agreement later)."""
+    declared = set()
+    for f in t.factors.values():
+        kern = kernels.kernel_for(f.type)
+        if kern is None or not kern.binding.parameters:
+            continue
+        sizes = {r: t.variables[v].dim or t.variables[v].cardinality for r, v in f.edges.items()}
+        for role, blob in f.param_blobs.items():
+            if blob == blob_name and role in kern.binding.parameters:
+                declared.add(tuple(kern.binding.parameters[role].shape(sizes)))
+    if len(declared) > 1:
+        raise CompileError(f"blob {blob_name!r}: conflicting registered shapes {sorted(declared)}")
+    if declared:
+        return declared.pop()
     for f in t.factors.values():
         for role, b in f.param_blobs.items():
             if b != blob_name:
@@ -2128,12 +2159,6 @@ def _blob_shape(t: Template, blob_name: str) -> tuple[int, ...] | None:
                     if parameter_var in likelihood.param_edges.values():
                         return _dirichlet_shape(t, likelihood.name)[0]
                 return (card("out"),)
-            if f.type == "categorical":
-                return (card("out"),)
-            if f.type == "matrix_cat":
-                return (card("out"), card("in"))
-            if f.type == "transition_mixture":
-                return (card("selector"), card("out"), card("in"))
             if f.type == "gaussian":
                 d = dim("out")
                 return {"mean": (d,), "cov": (d, d)}[role]
@@ -2184,31 +2209,11 @@ def _stack_params(
     and column-stochasticity checks ("true FE" needs normalized conditionals)."""
     if ftype == "equality":
         return None
-    log_of = _log_of
-
-    stacked = []
-    for m in members:
-        f = t.factors[m]
-        arr = resolved[next(iter(f.param_blobs.values()))]
-        if ftype == "categorical":
-            (k,) = cards
-            _expect(m, arr, (k,))
-            _stochastic(m, arr[:, None])  # one column: the whole vector sums to 1
-            stacked.append(log_of(arr))
-        elif ftype == "matrix_cat":
-            ko, ki = cards
-            _expect(m, arr, (ko, ki))
-            _stochastic(m, arr)
-            stacked.append(log_of(arr))
-        elif ftype == "transition_mixture":
-            ko, ki, ku = cards
-            _expect(m, arr, (ku, ko, ki))  # blob is a [K_u] stack of B_u
-            for u in range(ku):
-                _stochastic(f"{m}[u={u}]", arr[u])
-            stacked.append(log_of(arr.transpose(1, 2, 0)))  # -> [ko, ki, ku]
-        else:
-            raise CompileError(f"factor {m!r}: no BP rule for type {ftype!r} in M2")
-    return np.stack(stacked)
+    kern = kernels.kernel_for(ftype)
+    if kern is None or kern.arena != "discrete":
+        raise CompileError(f"factor type {ftype!r}: no discrete binding")
+    packed = kernels.packed_parameters(kern, t, members, resolved)
+    return np.asarray(kern.binding.potential(packed, cards))
 
 
 def _stack_gauss_params(

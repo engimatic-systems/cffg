@@ -39,6 +39,13 @@ from jax.scipy.special import logsumexp
 
 from cffg import csp, ef, efrules, gauss, hybrid_gfe, kernels, mixg, recurrence
 from cffg.compiler import NEG, Arena
+from cffg.kernel_runtime import (
+    discrete_energy as _disc_energy,
+    discrete_message as _disc_message,
+    discrete_potential as _disc_potential,
+    discrete_readout as _disc_readout,
+    parameters as _kernel_params,
+)
 from cffg.outer import (
     OuterArrays,
     OuterChart,
@@ -59,10 +66,6 @@ from cffg.schedule import (
     eliminated_slot_sets,
 )
 from cffg.rules import (
-    BP_UPDATES,
-    NODE_ENERGIES,
-    VMP_ENERGIES,
-    VMP_UPDATES,
     dirichlet_vmp_energy,
     dirichlet_vmp_update,
     dirichlet_expected_log,
@@ -333,6 +336,9 @@ class Engine:
         if not 0.0 < mu3_min_ess_fraction <= 1.0:
             raise ValueError("mu3_min_ess_fraction must be in (0, 1]")
         self.arena = arena
+        for group in arena.groups:
+            if group.kernel is not None and arena.semiring not in group.kernel.binding.semirings:
+                raise ValueError(f"kernel {group.kernel.impl_id!r} does not support {arena.semiring!r}")
         self.mu3_samples = int(mu3_samples)
         self.mu3_min_ess_fraction = float(mu3_min_ess_fraction)
         self._gfe_by_name = {g.name: g for g in arena.gfe_groups}
@@ -1701,7 +1707,7 @@ class Engine:
                 if not np.all(np.any(joint, axis=-1)):
                     return True
                 continue
-            factor_support = _np_log_support(state.params[group.name])
+            factor_support = _np_log_support(_disc_potential(group, _kernel_params(group, state.params)))
             for role, card in enumerate(group.cards):
                 shape = [n] + [1] * len(group.cards)
                 shape[1 + role] = card
@@ -1800,7 +1806,7 @@ class Engine:
                     edge_q = norm_exp(lq).reshape(len(g.members), *([1] * r), k)
                     q = edge_q if q is None else q[..., None] * edge_q
             else:
-                lb = np.asarray(state.params[g.name]).copy()  # [M, *cards]
+                lb = np.asarray(_disc_potential(g, _kernel_params(g, state.params))).copy()
                 for r, k in enumerate(g.cards):
                     shape = [len(g.members)] + [1] * len(g.cards)
                     shape[1 + r] = k
@@ -2407,6 +2413,17 @@ class Engine:
         computed from the same (inc, params, obs, mask) contract as the
         message/energy callables. Kernels without a readout are skipped."""
         out: dict[str, dict[str, np.ndarray]] = {}
+        for g in self.arena.groups:
+            if g.kernel is None:
+                continue
+            mode = g.kernel.binding.vmp if g.mode == "vmp" else g.kernel.binding.bp
+            if mode.readout is None:
+                continue
+            inc = (_disc_both(self.arena, state.messages, g.gather_both, g.cards)
+                   if g.mode == "vmp" else _disc_rows(self.arena, state.messages, g.gather, g.cards))
+            vals = _disc_readout(g, inc, _kernel_params(g, state.params))
+            for i, member in enumerate(g.members):
+                out[member] = {key: np.asarray(v)[i] for key, v in vals.items()}
         for g in self.arena.ef_groups:
             kern = kernels.kernel_for(g.type)
             if kern is None or kern.readout is None:
@@ -2467,7 +2484,7 @@ class Engine:
                 for v in vals:
                     total += 0.0 if v[0] == v[1] == v[2] else np.inf
                 continue
-            logf = np.asarray(state.params[g.name])  # [M, *cards], log potential
+            logf = np.asarray(_disc_potential(g, _kernel_params(g, state.params)))
             for i, v in enumerate(vals):
                 total += -float(logf[(i, *v)])
         for c in self.arena.constraint_groups:
@@ -2813,14 +2830,11 @@ def _make_step(arena: Arena, skip_scheduled: bool = False):
         inner_residual = jnp.asarray(0.0, dtype=messages.dtype)
         inner_status = jnp.asarray(0)
         for g in groups:
-            logf = params.get(g.name)
-            k_local = max(g.cards)
             if g.mode == "vmp":
-                inc2 = _disc_both(arena, messages, g.gather_both, g.cards)
-                out = VMP_UPDATES[g.type](inc2, logf, g.cards, k_local)
+                inc = _disc_both(arena, messages, g.gather_both, g.cards)
             else:
                 inc = _disc_rows(arena, messages, g.gather, g.cards)
-                out = BP_UPDATES[g.type](inc, logf, g.cards, k_local, op)
+            out = _disc_message(g, inc, _kernel_params(g, params), op)
             new = _set_disc_rows(arena, new, g.scatter, g.cards, out)
         for g in arena.dirichlet_groups:
             inc2 = _disc_both(arena, messages, g.gather_both, g.cards)
@@ -3050,10 +3064,7 @@ def _batch_stage_fn(arena: Arena, stage, op):
 
         def fn(messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params):
             inc = _disc_rows(arena, messages, gather, g.cards)
-            logf = params.get(g.name)
-            if logf is not None:
-                logf = logf[rows]
-            out = BP_UPDATES[g.type](inc, logf, g.cards, k_local, op)
+            out = _disc_message(g, inc, _kernel_params(g, params, rows), op)
             out = jnp.maximum(out, NEG)
             messages = _set_disc_rows(arena, messages, scatter, g.cards, out)
             return messages, g_eta, g_lam, ef_eta
@@ -3247,9 +3258,8 @@ def _registerized_scan_fn(arena: Arena, stage, plans, op):
                     x[f"se{r}"] = g_eta[jnp.asarray(arena.g_eta_indices(slots, d))]
                     x[f"sl{r}"] = g_lam[jnp.asarray(arena.g_lam_indices(slots, d))]
             if elem.kind == "disc":
-                logf = params.get(g.name)
-                if logf is not None:
-                    x["lf"] = logf[elem.rows]
+                for key, value in _kernel_params(g, params, elem.rows).items():
+                    x[f"p{key}"] = value
             elif elem.kind == "ef":
                 kern = kernels.kernel_for(g.type)
                 if kern is not None:
@@ -3340,9 +3350,8 @@ def _registerized_scan_fn(arena: Arena, stage, plans, op):
                         for r, card in enumerate(g.cards)
                     ]
                     inc = jnp.stack(blocks, axis=-2)
-                    out = BP_UPDATES[g.type](
-                        inc, x_t[ei].get("lf"), g.cards, k_local, op
-                    )
+                    gp = {key: x_t[ei][f"p{key}"] for key, _ in g.parameter_paths}
+                    out = _disc_message(g, inc, gp, op)
                     out = jnp.maximum(out, NEG)
                     for r, card in enumerate(g.cards):
                         block = out[:, r, :card]
@@ -3496,10 +3505,7 @@ def _flat_scan_fn(arena: Arena, stage, op):
                         for r, card in enumerate(g.cards)
                     ]
                     inc = jnp.stack(blocks, axis=-2)
-                    logf = params.get(g.name)
-                    if logf is not None:
-                        logf = logf[x["rows"]]
-                    out = BP_UPDATES[g.type](inc, logf, g.cards, k_local, op)
+                    out = _disc_message(g, inc, _kernel_params(g, params, x["rows"]), op)
                     out = jnp.maximum(out, NEG)
                     for r, card in enumerate(g.cards):
                         messages = messages.at[x["sv"][r]].set(out[:, r, :card])
@@ -3586,7 +3592,7 @@ def _make_support_check(arena: Arena):
                     joint = joint & s
                 bad |= ~jnp.all(jnp.any(joint, axis=-1))
                 continue
-            factor_support = _jax_log_support(params[group.name])
+            factor_support = _jax_log_support(_disc_potential(group, _kernel_params(group, params)))
             for role, card in enumerate(group.cards):
                 shape = [n] + [1] * len(group.cards)
                 shape[1 + role] = card
@@ -3890,15 +3896,11 @@ def _make_bfe(arena: Arena):
                 g.cards,
             ).sum()
         for g in groups:
-            logf = params.get(g.name)
-            if logf is None:
-                logf = jnp.zeros(())  # equality handles its own zero log-f
             if g.mode == "vmp":
                 inc = _disc_both(arena, messages, g.gather_both, g.cards)
-                total = total + VMP_ENERGIES[g.type](inc, logf, g.cards).sum()
             else:
                 inc = _disc_rows(arena, messages, g.gather, g.cards)
-                total = total + NODE_ENERGIES[g.type](inc, logf, g.cards).sum()
+            total = total + _disc_energy(g, inc, _kernel_params(g, params)).sum()
         for c in arena.constraint_groups:
             inc = _disc_rows(arena, messages, c.gather, c.cards)
             fn = csp.CONSTRAINT_ENERGIES[c.type]

@@ -125,7 +125,7 @@ and review context proportional to the change.
 | Ticket shape | Authority | Derived surfaces that must agree | Canonical focused tests | Durable documentation |
 | --- | --- | --- | --- | --- |
 | New IR field | `src/cffg/core/ir.py` (`Template` or its spec dataclass) | `src/cffg/core/validate.py`; `src/cffg/core/serialize.py` (`to_dict`, `from_dict`, `structure_hash`); `src/cffg/core/plates.py` scoping; `src/cffg/core/compose.py` and `src/cffg/core/edits.py` when editable; `src/cffg/compiler.py` and `Arena` when executable; bundle and agent state when persisted | `tests/test_ir.py`, `tests/test_serialize.py`, `tests/test_plates.py`; add `tests/test_edit_codec.py`, `tests/test_edits.py`, `tests/test_agent_spec.py`, or `tests/test_bundle.py` only for the affected boundary | Contract in this document; public construction and migration in `README.md`; unsupported cases in `LIMITATIONS.md` |
-| New factor or rule family | `src/cffg/kernels.py:FactorKernel`, its `src/cffg/core/ir.py:FactorType`, and the family rule module; formal equations are authoritative in code docstrings and `DERIVATIONS.md` | Compiler grouping, slot addressing, parameter packing, `Arena`, and `member_of`; synchronous `_make_step`; scheduled `_batch_stage_fn` / `_scan_stage_fn`; `_make_bfe`; schedule classification, readouts, serialization manifest, estimator, and public exports as applicable | `tests/test_kernels.py`; the family rule and engine-oracle tests; `tests/test_schedule.py`; sparse-support, float32, and uncomfortable-scale cases required by the robustness contract | Derivation in `DERIVATIONS.md`; integration contract here; approximations in `LIMITATIONS.md`; public modeling API in `README.md` |
+| New factor or rule family | `src/cffg/kernels.py:FactorKernel`, `kernel_bindings.py`, its `src/cffg/core/ir.py:FactorType`, and the family rule module; formal equations are authoritative in code docstrings and `DERIVATIONS.md` | Compiler grouping, slot addressing, parameter packing, `Arena`, and `member_of`; shared local calls in `kernel_runtime.py`; synchronous `_make_step`; scheduled batch/registerized/flat scans; `_make_bfe`; support checks, assignment scoring, readouts, schedule classification, serialization manifest, estimator, and public exports as applicable | `tests/test_kernels.py`, `tests/test_discrete_kernels.py`; family rule and engine-oracle tests; `tests/test_schedule.py`; sparse-support, float32, and uncomfortable-scale cases | Derivation in `DERIVATIONS.md`; integration contract here; approximations in `LIMITATIONS.md`; public modeling API in `README.md` |
 | Runtime numerical or status invariant | `AGENTS.md` numerical contract and `src/cffg/engine.py` (`RunStatus`, `RunResult`, `Engine.run`) | Flooding, colored/mixed, and exact schedules; host `_has_zero_support` and JIT `_make_support_check`; `_make_step`, `_make_exact_unit`, `_make_propagate`, and `_make_bfe`; inner-solver status; `RollingAgent`, `Colony`, estimator, benchmark, and dashboard consumers | `tests/test_runtime_status.py`, `tests/test_schedule.py`, `tests/test_colony.py`, plus the changed rule family's hostile-input tests | Runtime contract here and in `README.md`; any accepted failure mode or approximation in `LIMITATIONS.md` |
 | Learnable or checkpoint feature | `src/cffg/core/ir.py` (`LearnableSpec`, `AgentSpec`, `BeliefBinding`) and `src/cffg/learn.py` (`Family`, `Learnables`) | Validation, JSON/hash, plate scoping, compiler `_resolve_learnables`, `Arena.learn_plans`, `member_of`, engine readouts and parameter writes, agent cadence, checkpoint encode/decode and legacy migration, and bundles | `tests/test_learnables.py`, `tests/test_agent_spec.py`, `tests/test_agent.py`, and `tests/test_bundle.py`; add the contributing factor family's statistic test | Conjugate contract here; statistics beyond the papers in `DERIVATIONS.md`; public cadence/checkpoint API in `README.md`; remaining family gaps in `LIMITATIONS.md` |
 
@@ -509,13 +509,36 @@ record `(impl, version)` for external kernels, so loading a template whose
 implementation is absent fails at load time and names what to install;
 a registered kernel with the wrong identity or MAJOR version is refused too.
 
-v1 binding scope: kernels attach to the EF arena, where the message
-representation is uniform (natural parameters, products add, vacuous is
-zeros) — `gamma`, `beta`, `poisson_obs`, and `bernoulli_obs` are kernels,
-and `equality` remains structural infrastructure. The discrete and Gaussian
-families share the natural-family math but still dispatch through central
-compiler/engine paths; their migration onto executable registration is
-tracked by cff-209l. Hybrid families also remain central.
+Each kernel contains exactly one typed arena binding in `kernel_bindings.py`.
+`EFBinding` preserves the original scalar natural-parameter contract and its
+legacy constructor. `DiscreteBinding` owns ordinary `categorical`,
+`matrix_cat`, and `transition_mixture` execution, including mean-field rules.
+Its ordered roles get cardinalities from the template. BP consumes padded
+opposite-side cavities; VMP consumes normalized `(q, log_q)` per role from
+both facing messages. Mode-specific message, node-energy and optional
+readout callbacks use the same inputs and named parameter snapshot.
+
+`ParameterSpec` supplies serialized shape inference and optional writable
+packed-row metadata. The packer declares every output key; the compiler
+checks keys, shapes and member axes. Existing built-ins keep their bare
+group-name parameter addresses and transition-table axis order. External
+keys normally occupy `group:key` addresses. Nonlinear/joint packs can omit
+direct-write addresses and reconstruct through compilation. The declared
+log-potential accessor owns ordinary discrete support checks, BP joint
+beliefs and decoded assignment scoring. Max-product does not report BFE.
+
+`kernel_runtime.py` shares local calls across flooding, batch stages,
+registerized scans, fallback scans and the node ledger. It never regathers
+the global arena; scan carry and persistent flat layout remain unchanged.
+Outgoing-message, node-energy and potential shapes are checked by abstract
+JAX evaluation during `compile_template`, after host grouping and packing;
+no callback receives concrete values in this check. Structural registration
+and serialization do not import numerical rules. External implementation
+fixtures and independent enumeration live in `test_discrete_kernels.py`.
+
+Structural equality, Dirichlet parameter-edge plans, hard constraints and
+GFE composites retain their separate plans. Gaussian migration follows in
+cff-zq25; multi-arena hybrid registration remains outside this foundation.
 
 Compatibility policy (AC6, pre-1.0): the Python registration API
 (`register_kernel`, the `FactorKernel` field set) is internal-unstable and
@@ -576,10 +599,11 @@ hyperparameters checkpointed separately.
 
 ### 3. Message rule library (`cffg.rules`)
 
-Discrete BP and VMP use factor-type update and energy tables; `FactorKernel`
-packages the same pair for registered EF factors; specialized GFE composites
-have explicit update and ledger functions. The compiled plan selects among
-these surfaces:
+Discrete BP/VMP and EF factors use `FactorKernel` bindings. The discrete
+built-in adapters reuse the numerical update and energy functions in this
+module; the engine does not dispatch their type-name tables. Specialized
+GFE composites have explicit update and ledger functions. The compiled plan
+selects among these surfaces:
 
 - **Standard rules**: sum-product (BP) and VMP for `Cat`, `Dir`, `TransitionMixture`
   (the TM node from Part I Appendix C), equality nodes, δ.

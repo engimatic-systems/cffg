@@ -165,13 +165,20 @@ def _assert_agent_snapshot(agent: RollingAgent, expected) -> None:
 def test_top_level_facade_reexports_only_canonical_owners():
     expected = {
         "CorridorEnv": CanonicalCorridorEnv,
+        "DiscreteBinding": cffg.kernel_bindings.DiscreteBinding,
+        "DiscreteMode": cffg.kernel_bindings.DiscreteMode,
+        "EFBinding": cffg.kernel_bindings.EFBinding,
         "Engine": CanonicalEngine,
+        "FactorKernel": cffg.kernels.FactorKernel,
+        "HostileInputs": cffg.kernels.HostileInputs,
+        "ParameterSpec": cffg.kernel_bindings.ParameterSpec,
         "RollingAgent": CanonicalRollingAgent,
         "RunStatus": CanonicalRunStatus,
         "build_gridworld": canonical_build_gridworld,
         "compile_template": canonical_compile_template,
         "load_bundle": canonical_load_bundle,
         "save_bundle": canonical_save_bundle,
+        "register_kernel": cffg.kernels.register_kernel,
         "set_params": canonical_set_params,
     }
     assert cffg.__all__ == list(expected)
