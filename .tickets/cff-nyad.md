@@ -30,11 +30,20 @@ classification and propagation construction.
 2. One schedule owner accepts immutable `Arena` schedule plans and the typed
    execution-owner collection and returns a `ScheduleProgram` for flooding,
    batch stages, scan stages, exact units, support checks, and propagation.
-3. Schedule builders decide ordering and repetition only. They do not gather
-   family parameters, call a family rule directly, compute an objective, or
-   classify a public `RunStatus`.
+3. Schedule builders decide ordering, repetition, and array/register transport
+   from typed execution plans. They do not select family parameter meanings,
+   call a family rule directly, compute an objective, or classify a public
+   `RunStatus`.
 4. Flooding, batch, registerized scan, and flat scan use the cff-ny7f
    rule-call owner for each equivalent update.
+   4.1. Registerized scans retain prefetched inputs, local-block carry, and one
+        final scatter through the shared local-update interface. They do not
+        gain a full-arena carry or gather on each chain step.
+   4.2. Existing discrete and Gaussian chain checks retain schedule kind,
+        shapes/dtypes, flat persistent bytes, and trace reuse when only runtime
+        parameter or observation values change on one Engine.
+   4.3. Local solver status/residual facts flow through scheduled and flooding
+        updates with the same aggregation rules and fixed-shape array types.
 5. Schedule selection, fingerprints, forest priming, exact two-pass behavior,
    damping restrictions, delta hardening, and logical iteration meaning remain
    unchanged.
@@ -80,4 +89,4 @@ schedule program.
 - **ScheduleProgram:** Static callable stages built from compiled plans and
   typed execution owners.
 - **Support signal:** Internal evidence that a state has literal zero support;
-  public status classification remains with `Engine.run`.
+  public status classification uses the shared runtime result owner.

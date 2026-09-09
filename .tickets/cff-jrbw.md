@@ -22,8 +22,8 @@ These strategies have different state and acceptance facts from the ordinary
 iterative loop.
 
 This ticket gives outer and exact control separate typed owners. It does not
-force them through one solver callback, and public `Engine.run` remains the
-final status authority.
+force them through one solver callback. Engine.run delegates final status to
+the shared result owner delivered by cff-ii9t.
 
 ## Outcomes / Acceptance Criteria — WHAT
 
@@ -37,9 +37,9 @@ final status authority.
 4. Neither strategy accepts irrelevant state for the other. There is no
    universal solver callback. Shared termination facts may use a small typed
    protocol consumed by `Engine.run`.
-5. `Engine.run` selects the applicable explicit strategy, validates the
-   outcome, constructs the public `RunStatus`/`RunResult`, and remains the only
-   final status authority.
+5. `Engine.run` selects the applicable explicit strategy and submits its typed
+   outcome to the shared result finalizer for validation and public
+   `RunStatus`/`RunResult` construction. No second status mapping is introduced.
 6. Trust-region merit/acceptance, budget and rejection counts, inner status,
    exact two-pass behavior, support classification, traces, and diagnostic
    fields retain the `cff-sf29` baseline behavior.

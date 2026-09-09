@@ -22,8 +22,8 @@ lifecycle operations are mixed with public construction and the run loop even
 though they do not decide convergence.
 
 This ticket gives ordinary state/data preparation and functional-mu3
-preparation explicit internal owners. `Engine` construction stays public and
-`Engine.run` remains the final status authority.
+preparation explicit internal owners. `Engine` construction stays public.
+Engine and Colony delegate final status to the shared runtime result owner.
 
 ## Outcomes / Acceptance Criteria — WHAT
 

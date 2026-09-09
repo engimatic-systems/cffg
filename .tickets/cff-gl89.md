@@ -38,11 +38,15 @@ mathematical formulas and existing authorities do not change.
 3. Each registered same-arena kernel contributes through its declared energy
    callback. Each specialized plan contributes through one explicit local-term
    owner.
-4. The objective owner consumes typed compiled plans and beliefs. It does not
-   perform message updates, select actions, decode states, or construct public
-   agents.
-5. `Engine.bfe`, `Engine.objective`, convergence checks, and any public
-   objective diagnostics delegate to the same local-term implementations.
+4. The objective owner consumes typed compiled plans and the corresponding
+   beliefs or already decoded assignment, plus parameter, observation/mask,
+   and evaluator snapshots. Decoding remains outside this owner. It does not
+   perform message updates, select actions, or construct public agents.
+5. One objective owner supplies distinct operations for belief free energy
+   and decoded assignment energy. Engine.bfe and FE convergence checks share
+   BFE/GFE local terms; Engine.objective and max-mode scoring share declared
+   assignment-energy callbacks. They do not substitute one quantity for the
+   other. BFE remains rejected in max-product mode.
    5.1. The final ordinary/outer/exact controllers consume this objective
         evaluator through explicit injection by the facade or a lower-level
         protocol. The objective owner never imports run-control owners, and
@@ -54,12 +58,16 @@ mathematical formulas and existing authorities do not change.
    6.3. P-substituted nodes retain their declared GFE replacement.
    6.4. Named approximations remain named approximations and do not become
         labeled exact through the extraction.
+   6.5. The cff-kfo7 ownership mapping connects factors, absorbed goals/priors,
+        edge exclusions, and shared parameter terms to existing authority
+        tests. A two-slice mu3 case retains one shared parameter KL term.
 7. Existing analytic, enumeration, quadrature, literature, and family-specific
    oracle tests remain authoritative where present. Applicable `cff-sf29`
    old/new objective totals and local terms remain unchanged within their
    dtype-derived tolerance. This move does not require a new scientific oracle.
-8. Flooding and scheduled states produce the same objective terms where they
-   produce equivalent beliefs. Direct and one-instance `vmap` objective
+8. Flooding and scheduled states produce the same objective terms for
+   equivalent beliefs and matching parameter, observation/mask, and evaluator
+   snapshots. Direct and one-instance `vmap` objective
    evaluation agree where both are supported.
 9. Literal zero support produces the existing infinite or infeasible ledger
    result. Vacuous and improper beliefs, non-finite local terms, float32, and
