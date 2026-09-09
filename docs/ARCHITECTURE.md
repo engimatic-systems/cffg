@@ -150,6 +150,22 @@ A pure-Python (dataclass) representation, independent of JAX:
   rejects it before arena construction, and diagram generation rejects it
   rather than drawing the wrong bead. Executable EP requires a new schema and
   migration in addition to factor-specific projection and ledger rules.
+- **P-substitution declaration consistency.** `core/constraint_details.py`
+  checks every declaration and every raw detail key before dictionary conversion
+  can discard a conflicting value. Core validation preserves existing target/
+  role diagnostics and then appends one sorted conflict report per target as
+  `ModelError`. Serialization uses the same targeted check and raises
+  `ValueError` before detail conversion or sorting; it does not perform general
+  model validation. Bundle structure-hash checks also reach that guard.
+  Identical repeated declarations and detail keys remain accepted and are not
+  removed from the template. Equality means identical canonical JSON metadata,
+  ignoring mapping-key order but preserving numeric representations such as
+  `1` versus `1.0`; a missing key differs from an explicit value. Unknown fields
+  participate so another declaration cannot silently discard future meaning.
+  The schema and valid-model hashes are unchanged. Tests live in
+  `tests/test_constraint_details.py`, alongside core/serialization/compiler and
+  current/legacy bundle checks. This does not change other constraint families
+  or the JSON parser's general duplicate-object-key behavior.
 - **Templates with ports.** A template is a CFFG fragment whose boundary edges are
   declared **ports** with roles: `data` (sensor clamp), `goal` (goal prior),
   `prior` (parameter prior), `glue` (connects to the next unrolled slice). A model
