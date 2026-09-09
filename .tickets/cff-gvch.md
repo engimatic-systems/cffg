@@ -1,6 +1,6 @@
 ---
 id: cff-gvch
-status: in_progress
+status: closed
 deps: []
 links: [cff-kfo7]
 created: 2026-09-09T18:17:11Z
@@ -111,3 +111,7 @@ Starting from updated agent/cff-n183-shared-goals at a9e28ce (PR #116); branch a
 **2026-09-09T20:16:06Z**
 
 Implementation ready: core/constraint_details.py detects conflicting complete P-substitution declarations and repeated raw detail keys without mutating templates. Core appends stable per-target ModelError diagnostics after existing target/role diagnostics. Serializer invokes the same narrow guard before dict conversion/sorting and reports ValueError with template identity; bundle hashing reaches it on current and legacy inputs. General model validation and other constraint kinds are unchanged. Repeated identical declarations/raw keys preserve encoding and hashes. JSON representation equality deliberately distinguishes numeric spellings/types while ignoring mapping order; review requested and tests now pin that policy. Initial regressions on old code: 3 failed and the identical-repeat control passed, including one declaration order that silently compiled. Final focused run: 177 passed, 6 opt-in slow tests deselected, 62.19 seconds; includes core, serializer, compiler contracts, bundles, plates, dashboard, mu3, learned goals, GFE and outer formalism. New 19-case file also covers missing/unknown/nested metadata, 32-factor sorted diagnostics, and bundle rejection before destination creation. Independent bounded integration review found no blocking defects. New files pass Ruff; validate/serialize retain their two baseline diagnostics with no additions. Diff/dependency checks clear. No numerical/source-schema change. Final short-suite gate next.
+
+**2026-09-09T20:33:32Z**
+
+Final validation passed at implementation head ad028f0: 1,709 default-suite tests, zero failures, 41 opt-in slow tests deselected, four existing Gym deprecation warnings; pytest 1002.92 seconds, measured wall 1015.217 seconds. Dashboard refreshed with 19 new cases, 30 diagrams and 23 galleries. No source changes after this gate. Closing the validation prerequisite; publication is stacked on PR #116. Specialized extraction must preserve this declaration policy and cdbad68 shared-goal behavior. No remaining work or user decision in this ticket.
