@@ -32,9 +32,11 @@ remain for later tickets.
 2. One topology owner accepts the already expanded, core-validated `Template`
    and returns a named immutable `TopologyLayout`.
 3. `TopologyLayout` contains endpoint order, degree/port facts, declared
-   parameter-edge/constraint/role facts, edge records, own/opposite slot maps,
-   and data-slot candidates. It contains no registered-versus-specialized
-   classification, packed parameter value, or partially built `Arena`.
+   variable/constraint/role facts, raw edge records, own/opposite logical slot
+   maps, segment lengths, and data-slot candidates. It contains no
+   registered-versus-specialized classification, inferred parameter-edge
+   shape/axis tags, packed value, or partially built `Arena`. Specialized
+   discovery supplies those semantic tags after topology construction.
 4. Public `compile_template` owns checking the accepted semiring option, plate
    expansion, and the existing core `validate` call as thin orchestration. The
    topology owner owns executable endpoint, degree, exterior-port, and slot-
@@ -81,8 +83,9 @@ These suggestions are optional. An implementer may choose another sound method.
 
 ## Future work
 
-`cff-ejib` consumes `TopologyLayout` to lower registered same-arena groups.
-Specialized plans remain explicit in `cff-kfo7`.
+`cff-kfo7` first discovers specialized ownership from `TopologyLayout`.
+`cff-ejib` then lowers the unclaimed registered groups; the specialized owner
+completes drafts using that membership without repeating classification.
 
 ## Definitions
 

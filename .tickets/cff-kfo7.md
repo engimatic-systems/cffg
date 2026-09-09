@@ -1,7 +1,7 @@
 ---
 id: cff-kfo7
 status: open
-deps: [cff-ejib]
+deps: [cff-8t4d]
 links: [cff-bfr9]
 created: 2026-09-02T04:17:42Z
 type: chore
@@ -28,19 +28,39 @@ universal solver interface.
 
 ## Outcomes / Acceptance Criteria — WHAT
 
-1. `cff-ejib` is closed with registered same-arena lowering passing.
-2. A specialized-lowering stage accepts `Template`, `TopologyLayout`, semiring,
-   and registered-stage exclusions and returns immutable
-   `SpecializedPlanDrafts` plus typed `ArrayRequirement` values.
+1. `cff-8t4d` is closed with raw topology and logical slots characterized.
+2. The specialized owner exposes two ordered operations:
+   2.1. Discovery accepts `Template`, `TopologyLayout`, and semiring and returns
+        immutable `SpecializedClaims`: plan kind, owned factors, absorbed
+        goals/priors, and inferred parameter-edge shape/axis tags.
+   2.2. Completion accepts those claims plus ordinary registered membership
+        and returns `SpecializedPlanDrafts` and typed `ArrayRequirement`
+        values. It can construct recurrence components without classifying
+        factors again. Until cff-ejib lands, a compatibility delegate supplies
+        the ordinary membership from the existing compiler path.
 3. Named lowerers cover the plan classes present at the `cff-ecw0` baseline:
    parameter-edge Dirichlet VMP,
    mixture/hybrid, recurrence, Gaussian precision, P-substitution and GFE,
    hard constraints, and functional evaluator metadata.
+   Structural equality is also owned here: discovery chooses its representation
+   from declared edge domains, and lowering may retain the existing runtime
+   group shape. Edge DELTA applicability and semantic validation belong here;
+   assembly receives validated delta-pair facts without choosing their meaning.
 4. Each plan class has one classification/lowering owner. Shared orchestration
    invokes those named lowerers without passing unrelated arena state through a
    universal callback.
    4.1. Neither topology, registered lowering, data resolution, nor assembly
         chooses specialized plan meaning; this ticket owns those choices.
+   4.2. Claims partition factor ownership before ordinary grouping. Conflicting
+        claims fail with the affected factor or absorbed member. Shared
+        parameter terms have one declared owner rather than one owner per user.
+   4.3. Drafts describe blob-derived hard-constraint k/table payloads through
+        declared requirements and family-owned validators/transforms. They do
+        not pretend the numeric payload exists before data resolution.
+   4.4. A compact mapping connects each composite's original factors and
+        constraints to its runtime plan, local objective terms, absorbed
+        factor/edge exclusions, and shared-parameter owner. Existing GFE,
+        hybrid, and multi-slice mu3 authority tests check the mapping.
 5. The affected rows are **New factor or rule family**, **New IR field**, and
    **Learnable or checkpoint feature**. **Runtime numerical or status
    invariant** is N/A except that emitted plan/status metadata must stay
@@ -78,8 +98,9 @@ These suggestions are optional. An implementer may choose another sound method.
 
 ## Future work
 
-`cff-bfr9` resolves arrays and learning addresses for both registered and
-specialized drafts.
+`cff-ejib` extracts ordinary registered lowering between discovery and
+completion. `cff-bfr9` then resolves arrays, constraint payloads, and learning
+addresses from both sets of declared requirements.
 
 ## Definitions
 
@@ -87,5 +108,15 @@ specialized drafts.
   GFE behavior cannot use the ordinary same-arena contract.
 - **SpecializedPlanDrafts:** The typed collection of explicit specialized plan
   values before array resolution.
+- **SpecializedClaims:** Discovered ownership and semantic edge tags used to
+  exclude composite members from ordinary grouping.
+- **Absorbed member:** A goal or prior represented inside a composite rather
+  than executed and charged to the objective again as an ordinary factor.
 - **Universal callback:** One callable forced to accept unrelated state for
   every plan class.
+
+## Notes
+
+**2026-09-09T03:29:39Z**
+
+PR #108 research — question: can ordinary lowering precede specialized ownership? Answer: no; GFE absorbs ordinary-looking goals/priors before ordinary grouping, and recurrence completion later needs ordinary BP membership. One specialized owner now discovers claims first and completes drafts after registered membership. Raw slots remain topology-owned; semantic parameter-edge tags and blob-derived constraint payloads have explicit later owners. Sources at 7885bf5: compiler.py:760-823, 877-947, 1389-1392, 1547-1569, 1776-1815, 2080-2130. Confidence: high from direct code inspection. Assembly checks execution ownership and objective exclusions without rediscovering semantics.
