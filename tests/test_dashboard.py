@@ -173,8 +173,9 @@ def test_run_suite_mode_runs_once_and_removes_its_temporary_report(
     assert '"suggested_wait_seconds": 180' in timing
 
 
+@pytest.mark.parametrize("version,history_key", [(1, "recent"), (2, "previous-3")])
 def test_runtime_history_is_bounded_and_reuse_does_not_overwrite_it(
-    dashboard, monkeypatch, tmp_path
+    dashboard, monkeypatch, tmp_path, version, history_key
 ):
     report = valid_report(tmp_path)
     expected = {"test_alpha.py", "test_beta.py"}
@@ -182,8 +183,8 @@ def test_runtime_history_is_bounded_and_reuse_does_not_overwrite_it(
     dashboard.RUNTIMES.write_text(
         json.dumps(
             {
-                "schema_version": 1,
-                "recent": [
+                "schema_version": version,
+                history_key: [
                     {
                         "wall_seconds": float(index + 1),
                         "result": "passed",
@@ -194,17 +195,71 @@ def test_runtime_history_is_bounded_and_reuse_does_not_overwrite_it(
         )
     )
     tests = dashboard.load_junit(report)
-    state = dashboard.record_suite_runtime(
-        tests, wall_seconds=100.0, pytest_code=1
-    )
-    assert len(state["recent"]) == dashboard.RUNTIME_HISTORY_LIMIT
-    assert state["recent"][0]["wall_seconds"] == 2.0
+    state = dashboard.record_suite_runtime(tests, wall_seconds=100.0, pytest_code=1)
+    assert state["schema_version"] == 2
+    assert "recent" not in state
+    assert len(state["previous-3"]) == dashboard.RUNTIME_HISTORY_LIMIT == 3
+    assert state["previous-3"][0]["wall_seconds"] == 2.0
+    assert state["previous-3"][-1] == state["latest"]
     assert state["latest"]["result"] == "failed"
     assert state["latest"]["case_seconds"] == 0.375
     before = dashboard.RUNTIMES.read_text()
 
     dashboard.main(["--junitxml", str(report)])
     assert dashboard.RUNTIMES.read_text() == before
+
+
+def test_runtime_wait_uses_only_comparable_retained_runs(
+    dashboard, monkeypatch, tmp_path
+):
+    report = valid_report(tmp_path)
+    configure_publish(
+        dashboard, monkeypatch, tmp_path, {"test_alpha.py", "test_beta.py"}
+    )
+    dashboard.RUNTIMES.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "recent": [
+                    {"selection": "not slow", "wall_seconds": 8000.0},
+                    {"selection": "not slow", "wall_seconds": 180.0},
+                    {"selection": "slow", "wall_seconds": 9000.0},
+                ],
+            }
+        )
+    )
+    tests = dashboard.load_junit(report)
+    state = dashboard.record_suite_runtime(tests, wall_seconds=100.0, pytest_code=0)
+    assert [r["wall_seconds"] for r in state["previous-3"]] == [180.0, 9000.0, 100.0]
+    assert state["suggested_wait_seconds"] == 240
+    state = dashboard.record_suite_runtime(tests, wall_seconds=90.0, pytest_code=0)
+    assert [r["wall_seconds"] for r in state["previous-3"]] == [9000.0, 100.0, 90.0]
+    assert state["suggested_wait_seconds"] == 150
+    state = dashboard.record_suite_runtime(tests, wall_seconds=80.0, pytest_code=0)
+    assert [r["wall_seconds"] for r in state["previous-3"]] == [100.0, 90.0, 80.0]
+    assert state["suggested_wait_seconds"] == 150
+
+
+@pytest.mark.parametrize(
+    "state",
+    [
+        [],
+        {"schema_version": 2, "recent": []},
+        {"schema_version": 2, "previous-3": {}},
+        {"schema_version": 3, "previous-3": []},
+    ],
+)
+def test_runtime_history_rejects_invalid_schema(
+    dashboard, monkeypatch, tmp_path, state
+):
+    configure_publish(dashboard, monkeypatch, tmp_path, set())
+    original = json.dumps(state)
+    dashboard.RUNTIMES.write_text(original)
+    with pytest.raises(
+        dashboard.DashboardError, match="invalid runtime history schema"
+    ):
+        dashboard.record_suite_runtime([], wall_seconds=10.0, pytest_code=0)
+    assert dashboard.RUNTIMES.read_text() == original
 
 
 def test_failing_reused_report_renders_red_and_exits_nonzero(

@@ -41,7 +41,7 @@ STATE = SHARE / ".cffg-dashboard-state.json"
 RUNTIMES = REPO / "tools" / "test-suite-runtimes.json"
 ARTIFACTS = REPO / "tests" / ".artifacts"
 GALLERY = SHARE / "cffg-viz"
-RUNTIME_HISTORY_LIMIT = 40
+RUNTIME_HISTORY_LIMIT = 3
 SUITE_SELECTION = "not slow"
 
 EPIC_FILES = {
@@ -293,7 +293,7 @@ def record_suite_runtime(
     outside testcase calls, and pytest teardown.  Agents therefore wait from
     ``wall_seconds``; ``case_seconds`` remains useful for diagnosing the gap.
     Reused JUnit reports never call this function because their wall time is
-    unknowable after the fact.
+    unknowable after the fact. ``previous-3`` includes the latest completed run.
     """
     if not math.isfinite(wall_seconds) or wall_seconds <= 0:
         raise DashboardError(
@@ -306,16 +306,18 @@ def record_suite_runtime(
             raise DashboardError(
                 f"malformed runtime history {RUNTIMES}: {error}"
             ) from error
-        if (
-            runtime_state.get("schema_version") != 1
-            or not isinstance(runtime_state.get("recent"), list)
-        ):
+        version = (
+            runtime_state.get("schema_version")
+            if isinstance(runtime_state, dict) else None
+        )
+        history_key = "recent" if version == 1 else "previous-3"
+        if version not in (1, 2) or not isinstance(runtime_state.get(history_key), list):
             raise DashboardError(
                 f"invalid runtime history schema in {RUNTIMES}"
             )
-        recent = list(runtime_state["recent"])
+        previous = list(runtime_state[history_key])
     else:
-        recent = []
+        previous = []
 
     failed = sum(1 for test in tests if not test["ok"])
     record = {
@@ -331,24 +333,24 @@ def record_suite_runtime(
         "wall_seconds": round(float(wall_seconds), 3),
         "case_seconds": round(sum(test["ms"] for test in tests) / 1000, 3),
     }
-    recent.append(record)
-    recent = recent[-RUNTIME_HISTORY_LIMIT:]
+    previous.append(record)
+    previous = previous[-RUNTIME_HISTORY_LIMIT:]
     # Compare like-for-like suite selections so an opt-in slow run cannot
     # poison the default suite's wait budget.
     comparable = [
-        entry for entry in recent
+        entry for entry in previous
         if entry.get("selection") == SUITE_SELECTION
     ]
-    observed = [entry["wall_seconds"] for entry in comparable[-5:]]
+    observed = [entry["wall_seconds"] for entry in comparable]
     # Use the slowest comparable measurement, add 25% headroom, and round
     # upward to a human-friendly 30-second polling boundary.
     padded = max(observed) * 1.25
     suggested_wait = max(60, math.ceil(padded / 30) * 30)
     runtime_state = {
-        "schema_version": 1,
+        "schema_version": 2,
         "latest": record,
         "suggested_wait_seconds": suggested_wait,
-        "recent": recent,
+        "previous-3": previous,
     }
     RUNTIMES.parent.mkdir(parents=True, exist_ok=True)
     temporary = RUNTIMES.with_name(f".{RUNTIMES.name}.tmp")
