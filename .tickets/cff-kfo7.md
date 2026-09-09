@@ -260,3 +260,7 @@ Fresh final dashboard-backed default suite started at 9a130c0 (implementation co
 **2026-09-09T21:26:45Z**
 
 Final gate PASSED at 9a130c0: 1736 default-suite tests, zero failures, 41 opt-in slow tests deselected, four existing Gym deprecation warnings. Pytest 985.86 seconds; measured wall 998.32 seconds. Dashboard refreshed with 27 new cases, 30 diagrams and 23 galleries. No source changes after launch. All acceptance outcomes are complete; closing specialized extraction. Next is cff-ejib registered structural lowering using the existing claims/draft/requirement boundary and the recorded registry/observation/diagnostic handoff. No remaining work or user decision for cff-kfo7.
+
+**2026-09-09T21:27:16Z**
+
+Published as PR #118, https://github.com/engimatic-systems/cffg/pull/118, head agent/cff-kfo7-specialized-lowering on agent/cff-gvch-psub-validation (#117). Final passing gate remains 9a130c0; later commits contain only ticket handoffs and runtime evidence. Shared architecture HTML links the completed extraction and 1736-test gate. No work remains in this ticket.
