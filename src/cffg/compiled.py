@@ -1,18 +1,25 @@
-"""Internal compiled plans and flat-array addresses shared by compiler consumers."""
+"""Internal immutable plans and addresses shared by compiler consumers.
+
+Constructors snapshot mutable input data. Stored arrays are FrozenArray values;
+NumPy conversion produces independent working storage. Inference updates belong
+to runtime State, never to these shared plans or their initial parameters.
+"""
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 import numpy as np
 
 from cffg import kernels
+from cffg._immutable import FrozenArray, ImmutableRecord
 
 NEG = -1.0e30  # Reserved log-space zero sentinel.
 
 
 @dataclass(frozen=True)
-class EdgeInfo:
+class EdgeInfo(ImmutableRecord):
     name: str
     card: int
     slot0: int  # side-0 message: into the edge from its first endpoint
@@ -32,7 +39,7 @@ class EdgeInfo:
 
 
 @dataclass(frozen=True)
-class GroupPlan:
+class GroupPlan(ImmutableRecord):
     """All factors of one (type, cardinality-signature, mode), run together."""
 
     name: str
@@ -40,16 +47,16 @@ class GroupPlan:
     roles: tuple[str, ...]
     cards: tuple[int, ...]  # cardinality per role
     members: tuple[str, ...]  # factor names, defines the stacking order
-    gather: np.ndarray  # [n_members, n_roles] slot to read (opposite side)
-    scatter: np.ndarray  # [n_members, n_roles] slot to write (own side)
+    gather: FrozenArray  # [n_members, n_roles] slot to read (opposite side)
+    scatter: FrozenArray  # [n_members, n_roles] slot to write (own side)
     mode: str = "bp"  # "bp" (sum-product) | "vmp" (mean-field bead)
-    gather_both: np.ndarray | None = None  # [M, R, 2] both slots (vmp: marginals)
+    gather_both: FrozenArray | None = None  # [M, R, 2] both slots (vmp: marginals)
     kernel: kernels.FactorKernel | None = None
     parameter_paths: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
-class DirichletGroupPlan:
+class DirichletGroupPlan(ImmutableRecord):
     """Mean-field categorical likelihoods with an in-graph Dirichlet table.
 
     One member consumes a structural likelihood factor and its facing
@@ -67,10 +74,10 @@ class DirichletGroupPlan:
     cards: tuple[int, ...]
     members: tuple[str, ...]  # likelihood factor names
     priors: tuple[str, ...]  # facing dirichlet factor names
-    gather_both: np.ndarray  # [M, R, 2] both structural slots
-    scatter: np.ndarray  # [M, R] likelihood-owned structural slots
-    prior_scatter: np.ndarray  # [M] prior-owned parameter slots
-    count_scatter: np.ndarray  # [M] likelihood-owned parameter slots
+    gather_both: FrozenArray  # [M, R, 2] both structural slots
+    scatter: FrozenArray  # [M, R] likelihood-owned structural slots
+    prior_scatter: FrozenArray  # [M] prior-owned parameter slots
+    count_scatter: FrozenArray  # [M] likelihood-owned parameter slots
     param_shape: tuple[int, ...]  # canonical serialized layout
     output_axis: int  # Dirichlet-normalized axis in param_shape
 
@@ -80,7 +87,7 @@ class DirichletGroupPlan:
 
 
 @dataclass(frozen=True)
-class ConstraintPlan:
+class ConstraintPlan(ImmutableRecord):
     """One hard-constraint (indicator) factor, run on its own (cff-e8zk).
 
     Carries structural metadata only — NO dense potential is stacked. Edges are
@@ -94,14 +101,14 @@ class ConstraintPlan:
     type: str
     cards: tuple[int, ...]  # per-edge cardinality
     members: tuple[str, ...]  # single factor name (kept a tuple for symmetry)
-    gather: np.ndarray  # [n] slot to read (opposite side)
-    scatter: np.ndarray  # [n] slot to write (own side)
+    gather: FrozenArray  # [n] slot to read (opposite side)
+    scatter: FrozenArray  # [n] slot to write (own side)
     k: int = 0  # exactly_k / at_most_k threshold
-    table: np.ndarray | None = None  # [T, n] allowed tuples (table)
+    table: FrozenArray | None = None  # [T, n] allowed tuples (table)
 
 
 @dataclass(frozen=True)
-class GaussGroupPlan:
+class GaussGroupPlan(ImmutableRecord):
     """All Gaussian-family factors of one (type, dim-signature), run together.
 
     Types: "gaussian" (prior), "gaussian_linear", "gaussian_linear_obs" (a
@@ -115,9 +122,9 @@ class GaussGroupPlan:
     roles: tuple[str, ...]
     dims: tuple[int, ...]  # dimension per role
     members: tuple[str, ...]
-    gather: np.ndarray  # [M, R] gaussian slot to read (opposite side)
-    scatter: np.ndarray  # [M, R] gaussian slot to write (own side)
-    obs_rows: np.ndarray | None = None  # [M] rows into the g_obs array
+    gather: FrozenArray  # [M, R] gaussian slot to read (opposite side)
+    scatter: FrozenArray  # [M, R] gaussian slot to write (own side)
+    obs_rows: FrozenArray | None = None  # [M] rows into the g_obs array
     kernel: kernels.FactorKernel | None = None
     parameter_paths: tuple[tuple[str, str], ...] = ()
     observed_role: int | None = None
@@ -128,7 +135,7 @@ class GaussGroupPlan:
 
 
 @dataclass(frozen=True)
-class MixGroupPlan:
+class MixGroupPlan(ImmutableRecord):
     """All hybrid Gaussian-mixture factors of one (type, dim-signature,
     selector cardinality), run together (cff-pksr). A hybrid node straddles
     two arenas: its out(/in) edges live in the Gaussian (eta, Lambda) arena
@@ -145,14 +152,14 @@ class MixGroupPlan:
     dims: tuple[int, ...]  # (do,) or (do, di)
     k_sel: int  # selector cardinality K (the per-regime stack axis)
     members: tuple[str, ...]
-    g_gather: np.ndarray  # [M, R_g] gaussian slot to read (opposite side)
-    g_scatter: np.ndarray  # [M, R_g] gaussian slot to write (own side)
-    s_gather: np.ndarray  # [M] selector discrete slot to read (opposite side)
-    s_scatter: np.ndarray  # [M] selector discrete slot to write (own side)
+    g_gather: FrozenArray  # [M, R_g] gaussian slot to read (opposite side)
+    g_scatter: FrozenArray  # [M, R_g] gaussian slot to write (own side)
+    s_gather: FrozenArray  # [M] selector discrete slot to read (opposite side)
+    s_scatter: FrozenArray  # [M] selector discrete slot to write (own side)
 
 
 @dataclass(frozen=True)
-class RecurrencePlan:
+class RecurrencePlan(ImmutableRecord):
     """Source-specific stick-breaking transitions across two arenas.
 
     The two discrete roles read their facing cavities for structured
@@ -165,15 +172,15 @@ class RecurrencePlan:
     cards: tuple[int, int]  # (K_out, K_in), equal in the rSLDS v1 family
     dim: int
     members: tuple[str, ...]
-    d_gather_both: np.ndarray  # [M, 2 roles, 2 edge slots]
-    d_scatter: np.ndarray  # [M, 2 roles]
-    drive_gather_both: np.ndarray  # [M, 2 edge slots]
-    drive_scatter: np.ndarray  # [M]
-    component_ids: np.ndarray  # [M] rows into Arena.recurrence_components
+    d_gather_both: FrozenArray  # [M, 2 roles, 2 edge slots]
+    d_scatter: FrozenArray  # [M, 2 roles]
+    drive_gather_both: FrozenArray  # [M, 2 edge slots]
+    drive_scatter: FrozenArray  # [M]
+    component_ids: FrozenArray  # [M] rows into Arena.recurrence_components
 
 
 @dataclass(frozen=True)
-class RecurrenceComponentPlan:
+class RecurrenceComponentPlan(ImmutableRecord):
     """Derived categorical component containing recurrence-link factors.
 
     ``acyclic`` certifies exact sum-product marginals for the component's
@@ -187,7 +194,7 @@ class RecurrenceComponentPlan:
 
 
 @dataclass(frozen=True)
-class PrecGroupPlan:
+class PrecGroupPlan(ImmutableRecord):
     """All gaussian_prec factors, run together (cff-7c5o). A scalar Gaussian
     node f(x; m, τ) = N(x; m, τ⁻¹) whose precision lives on an ef:gamma edge —
     the first factor straddling the Gaussian (eta, Lambda) arena (its `out`
@@ -198,14 +205,14 @@ class PrecGroupPlan:
 
     name: str
     members: tuple[str, ...]
-    x_gather_both: np.ndarray  # [M, 2] both Gaussian slots of the out edge
-    tau_gather_both: np.ndarray  # [M, 2] both EF slots of the prec edge
-    x_scatter: np.ndarray  # [M] own Gaussian slot on the out edge
-    tau_scatter: np.ndarray  # [M] own EF slot on the prec edge
+    x_gather_both: FrozenArray  # [M, 2] both Gaussian slots of the out edge
+    tau_gather_both: FrozenArray  # [M, 2] both EF slots of the prec edge
+    x_scatter: FrozenArray  # [M] own Gaussian slot on the out edge
+    tau_scatter: FrozenArray  # [M] own EF slot on the prec edge
 
 
 @dataclass(frozen=True)
-class EfGroupPlan:
+class EfGroupPlan(ImmutableRecord):
     """All EF-family factors of one (type, family), run together (cff-8s6a).
 
     Every non-equality type dispatches through its registered FactorKernel
@@ -221,13 +228,13 @@ class EfGroupPlan:
     family: str  # message family of the edges it reads/writes
     roles: tuple[str, ...]  # message-carrying roles only (obs "out" is data)
     members: tuple[str, ...]
-    gather: np.ndarray  # [M, R] ef slot to read (opposite side)
-    scatter: np.ndarray  # [M, R] ef slot to write (own side)
-    obs_rows: np.ndarray | None = None  # [M] rows into the ef_obs array
+    gather: FrozenArray  # [M, R] ef slot to read (opposite side)
+    scatter: FrozenArray  # [M, R] ef slot to write (own side)
+    obs_rows: FrozenArray | None = None  # [M] rows into the ef_obs array
 
 
 @dataclass(frozen=True)
-class GfeTmPlan:
+class GfeTmPlan(ImmutableRecord):
     """A P-substituted transition_mixture node (cff-fk2u): the dynamics-
     curiosity composite. Solves the Corollary-1 fixed point over the joint
     (z, u) simplex with the downstream state message in the goal prior's
@@ -239,13 +246,13 @@ class GfeTmPlan:
     name: str
     cards: tuple[int, int, int]  # (K_out, K_in, U)
     members: tuple[str, ...]
-    gather: np.ndarray  # [M, 3] incoming slots: (out=μ_down, in=μ_in, sel=μ_e)
-    scatter: np.ndarray  # [M, 3] outgoing slots, same role order
+    gather: FrozenArray  # [M, 3] incoming slots: (out=μ_down, in=μ_in, sel=μ_e)
+    scatter: FrozenArray  # [M, 3] outgoing slots, same role order
     learned: bool = False
 
 
 @dataclass(frozen=True)
-class HybridGfePlan:
+class HybridGfePlan(ImmutableRecord):
     """A D5 P-substituted Gaussian-mixture node and absorbed Gaussian goal.
 
     The hybrid factor retains its selector and Gaussian state slots, while
@@ -260,10 +267,10 @@ class HybridGfePlan:
     k_sel: int
     members: tuple[str, ...]
     goal_members: tuple[str, ...]
-    g_gather: np.ndarray
-    g_scatter: np.ndarray
-    s_gather: np.ndarray
-    s_scatter: np.ndarray
+    g_gather: FrozenArray
+    g_scatter: FrozenArray
+    s_gather: FrozenArray
+    s_scatter: FrozenArray
 
 
 PARAMETER_TRANSFORMS = frozenset(
@@ -272,7 +279,7 @@ PARAMETER_TRANSFORMS = frozenset(
 
 
 @dataclass(frozen=True)
-class ParameterAddress:
+class ParameterAddress(ImmutableRecord):
     """One serialized parameter role's row in the runtime arena."""
 
     role: str
@@ -284,12 +291,13 @@ class ParameterAddress:
     permutation: tuple[int, ...] = ()
 
     def __post_init__(self) -> None:
+        super().__post_init__()
         if self.transform not in PARAMETER_TRANSFORMS:
             raise ValueError(f"unknown parameter transform {self.transform!r}")
 
 
 @dataclass(frozen=True)
-class MemberAddress:
+class MemberAddress(ImmutableRecord):
     """All runtime parameter rows owned by one serialized factor."""
 
     factor_type: str
@@ -306,7 +314,7 @@ class MemberAddress:
 
 
 @dataclass(frozen=True)
-class LearnTarget:
+class LearnTarget(ImmutableRecord):
     """One place a learnable posterior writes back into stacked params.
 
     `form` is how that consumer reads the parameter: "expected" wants the
@@ -333,7 +341,7 @@ class LearnTarget:
 
 
 @dataclass(frozen=True)
-class LearnPlan:
+class LearnPlan(ImmutableRecord):
     """A declared learnable, resolved against the compiled arena (cff-x0sv).
 
     `sources` are the factor instances whose node beliefs supply sufficient
@@ -348,13 +356,13 @@ class LearnPlan:
     name: str
     family: str
     ftype: str  # factor type of the sources — fixes the sufficient statistic
-    shapes: dict[str, tuple[int, ...]]  # blob -> array shape
+    shapes: Mapping[str, tuple[int, ...]]  # blob -> array shape
     sources: tuple[str, ...]  # factor names, sorted
     targets: tuple[LearnTarget, ...]
 
 
 @dataclass(frozen=True)
-class GfePlan:
+class GfePlan(ImmutableRecord):
     """A P-substituted goal-observation composite (Part II §4): matrix_cat
     observation node facing a categorical goal node across the x edge. The
     composite owns both factors' updates and their joint FE term.
@@ -367,9 +375,9 @@ class GfePlan:
     name: str
     cards: tuple[int, int]  # (M_obs, K_state)
     members: tuple[str, ...]  # obs-factor names
-    gather_z: np.ndarray  # [M] incoming state-message slot (μ_D)
-    scatter_z: np.ndarray  # [M] outgoing backward-message slot (μ 2)
-    scatter_x: np.ndarray  # [M] obs-side x slot (posterior predictive q_x)
+    gather_z: FrozenArray  # [M] incoming state-message slot (μ_D)
+    scatter_z: FrozenArray  # [M] outgoing backward-message slot (μ 2)
+    scatter_x: FrozenArray  # [M] obs-side x slot (posterior predictive q_x)
     learned: bool = False
     mu3: bool = False
     param_blobs: tuple[str, ...] = ()
@@ -379,16 +387,16 @@ class GfePlan:
     goal_priors: tuple[str, ...] = ()
     goal_prior_blobs: tuple[str, ...] = ()
     goal_tie_groups: tuple[tuple[int, ...], ...] = ()
-    goal_prior_scatter: np.ndarray = field(
+    goal_prior_scatter: FrozenArray = field(
         default_factory=lambda: np.zeros(0, dtype=np.int64)
     )
-    goal_count_scatter: np.ndarray = field(
+    goal_count_scatter: FrozenArray = field(
         default_factory=lambda: np.zeros(0, dtype=np.int64)
     )
 
 
 @dataclass(frozen=True)
-class Mu3Plan:
+class Mu3Plan(ImmutableRecord):
     """One serialized functional parameter-message evaluator.
 
     Every ``row`` is a future GFE slice reading the same Dirichlet parameter
@@ -401,77 +409,77 @@ class Mu3Plan:
     name: str
     evaluator: str
     gfe_name: str
-    rows: np.ndarray
+    rows: FrozenArray
     members: tuple[str, ...]
     param_blob: str
     count_key: str
     cards: tuple[int, int]
 
 
-@dataclass
-class Arena:
+@dataclass(frozen=True)
+class Arena(ImmutableRecord):
     template_name: str
     n_slots: int
-    message_starts: np.ndarray  # [n_slots + 1] prefix offsets into flat messages
-    edges: dict[str, EdgeInfo]
-    groups: list[GroupPlan]
-    data_slots: dict[str, int]  # DATA port name -> external slot
+    message_starts: FrozenArray  # [n_slots + 1] prefix offsets into flat messages
+    edges: Mapping[str, EdgeInfo]
+    groups: tuple[GroupPlan, ...]
+    data_slots: Mapping[str, int]  # DATA port name -> external slot
     semiring: str = "sum"  # "sum" (sum-product / BFE) | "max" (min-sum / MAP)
-    dirichlet_groups: list[DirichletGroupPlan] = field(default_factory=list)
-    constraint_groups: list[ConstraintPlan] = field(default_factory=list)
-    log_params: dict[str, np.ndarray] = field(default_factory=dict)  # group -> [M, ...]
+    dirichlet_groups: tuple[DirichletGroupPlan, ...] = field(default_factory=tuple)
+    constraint_groups: tuple[ConstraintPlan, ...] = field(default_factory=tuple)
+    log_params: Mapping[str, FrozenArray] = field(default_factory=dict)  # group -> [M, ...]
     # Gaussian arena (cff-4e5z): eta and Lambda are separate flat arrays.
     # Prefix offsets make each logical slot exactly d and d*d values;
     # vacuous = zeros, so init and half-edges remain free.
     n_gslots: int = 0
-    g_eta_starts: np.ndarray = field(
+    g_eta_starts: FrozenArray = field(
         default_factory=lambda: np.zeros(1, dtype=np.int64)
     )
-    g_lam_starts: np.ndarray = field(
+    g_lam_starts: FrozenArray = field(
         default_factory=lambda: np.zeros(1, dtype=np.int64)
     )
-    gauss_groups: list[GaussGroupPlan] = field(default_factory=list)
-    gauss_data: dict[str, tuple[int, int]] = field(default_factory=dict)
+    gauss_groups: tuple[GaussGroupPlan, ...] = field(default_factory=tuple)
+    gauss_data: Mapping[str, tuple[int, int]] = field(default_factory=dict)
     # Gaussian DATA port -> (row in g_obs, dim of the observed edge)
     n_obs_rows: int = 0
-    g_obs_starts: np.ndarray = field(
+    g_obs_starts: FrozenArray = field(
         default_factory=lambda: np.zeros(1, dtype=np.int64)
     )
-    mix_groups: list[MixGroupPlan] = field(default_factory=list)
+    mix_groups: tuple[MixGroupPlan, ...] = field(default_factory=tuple)
     # Hybrid Gaussian-mixture groups (cff-pksr): each writes both the Gaussian
     # arena (out/in edges) and the discrete arena (selector edge).
-    recurrence_groups: list[RecurrencePlan] = field(default_factory=list)
+    recurrence_groups: tuple[RecurrencePlan, ...] = field(default_factory=tuple)
     recurrence_components: tuple[RecurrenceComponentPlan, ...] = ()
-    prec_groups: list[PrecGroupPlan] = field(default_factory=list)
+    prec_groups: tuple[PrecGroupPlan, ...] = field(default_factory=tuple)
     # gaussian_prec groups (cff-7c5o): each writes both the Gaussian arena
     # (out edge) and the EF arena (prec edge).
-    gauss_interior: list[tuple[int, np.ndarray]] = field(default_factory=list)
+    gauss_interior: tuple[tuple[int, FrozenArray], ...] = field(default_factory=tuple)
     # [(dim, [E, 2] slot pairs)] interior Gaussian edges for the entropy ledger
     # EF arena (cff-8s6a): messages are natural parameters ef_eta
     # [n_efslots, 2], zero-padded past each family's n_params; vacuous =
     # zeros, so init and half-edges are free (η = 0 is the empty product).
     n_efslots: int = 0
-    ef_groups: list[EfGroupPlan] = field(default_factory=list)
-    ef_data: dict[str, tuple[int, str]] = field(default_factory=dict)
+    ef_groups: tuple[EfGroupPlan, ...] = field(default_factory=tuple)
+    ef_data: Mapping[str, tuple[int, str]] = field(default_factory=dict)
     # EF DATA port -> (row in the ef_obs/ef_mask arrays, observation family)
     n_ef_obs: int = 0
-    ef_interior: list[tuple[str, np.ndarray]] = field(default_factory=list)
+    ef_interior: tuple[tuple[str, FrozenArray], ...] = field(default_factory=tuple)
     # [(family, [E, 2] slot pairs)] interior EF edges for the entropy ledger
-    gfe_groups: list[GfePlan] = field(default_factory=list)
-    mu3_groups: list[Mu3Plan] = field(default_factory=list)
-    gfe_tm_groups: list[GfeTmPlan] = field(default_factory=list)
-    hybrid_gfe_groups: list[HybridGfePlan] = field(default_factory=list)
+    gfe_groups: tuple[GfePlan, ...] = field(default_factory=tuple)
+    mu3_groups: tuple[Mu3Plan, ...] = field(default_factory=tuple)
+    gfe_tm_groups: tuple[GfeTmPlan, ...] = field(default_factory=tuple)
+    hybrid_gfe_groups: tuple[HybridGfePlan, ...] = field(default_factory=tuple)
     gfe_x_edges: frozenset[str] = frozenset()  # entropy absorbed into composite term
-    delta_pairs: np.ndarray = field(
+    delta_pairs: FrozenArray = field(
         default_factory=lambda: np.zeros((0, 2), dtype=np.int64)
     )  # [n_delta_edges, 2] slot pairs projected to a pointmass each sweep
-    member_of: dict[str, MemberAddress] = field(default_factory=dict)
+    member_of: Mapping[str, MemberAddress] = field(default_factory=dict)
     # Factor name -> role-bearing rows in the stacked runtime parameters.
     # One factor can span several arrays (for example A, b and W).
     writable_members: frozenset[str] = frozenset()
     # Synthetic GFE members retain internal learning addresses but are not
     # direct named-write entry points.
-    learn_plans: list[LearnPlan] = field(default_factory=list)
+    learn_plans: tuple[LearnPlan, ...] = field(default_factory=tuple)
     # Declared learnables resolved to stat sources and write targets (cff-x0sv).
 
     @property
@@ -549,7 +557,7 @@ class Arena:
         return int(self.g_obs_starts[-1])
 
     @staticmethod
-    def _segment_indices(starts: np.ndarray, slots: np.ndarray | int, width: int) -> np.ndarray:
+    def _segment_indices(starts: FrozenArray, slots: np.ndarray | int, width: int) -> np.ndarray:
         base = starts[np.asarray(slots, dtype=np.int64)]
         return base[..., None] + np.arange(width, dtype=np.int64)
 

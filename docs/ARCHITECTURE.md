@@ -227,6 +227,44 @@ owner. The old `cffg.compiler` imports remain compatibility re-exports. The
 compiled-value owner imports neither compiler orchestration nor runtime code;
 its dependencies are NumPy and the host-side kernel declarations.
 
+Published arenas and plans are immutable shared blueprints. Their constructors
+snapshot mutable input arrays, mappings, and sequences without changing the
+caller's objects. Stored mappings are read-only, sequences are tuples, and
+numeric fields use the internal `FrozenArray` value. Field names, numeric
+dtypes, shapes, element order, and serialized identities are unchanged; the
+container representation intentionally differs from the characterization
+baseline. Kernel binding declarations follow the same publication policy.
+
+`FrozenArray` owns private numeric storage. Its shape and dtype cannot be
+reassigned, and its NumPy conversions return detached working arrays; requesting
+a zero-copy NumPy export is rejected. This separation is necessary because
+NumPy's `ufunc.at` can bypass the read-only flag, including through NumPy views
+of CPU JAX arrays. JAX conversion explicitly copies as well. Reusing a published
+value in another plan, arena, or `dataclasses.replace` reuses its stored payload;
+it does not republish a copy. Indexing selects from private storage before any
+conversion, so reading a slot does not copy the complete graph's prefix table.
+The value owner does not import JAX at module load; conversion imports it lazily.
+
+Runtime consumers explicitly convert index values at the JAX boundary. Numerical
+message updates and free-energy evaluation remain JAX computations; compiler
+construction and host address calculations remain NumPy operations. There is no
+per-iteration arena freezing. Host array exports have a copy cost, and initial
+publication adds allocation and construction work; immutability itself is not an
+inference speedup. The benefit is that captured JIT metadata, schedules,
+readouts, and parallel instances cannot accidentally observe different versions
+of a shared plan.
+
+Mutable compiler builders remain private. Structure changes require a new
+template/compilation; observations, messages, and learned parameters still update
+through per-instance `State`. `Arena.log_params` contains initial parameter
+values, not a prohibition on learning. Kernel handles preserve registered
+identity, including when copied; arbitrary callback closure state is trusted,
+not recursively frozen. This ownership contract is not a security sandbox.
+`dataclasses.asdict` supports inspection but retains read-only mapping/array
+leaves; it is not a model or checkpoint serializer. Templates plus data remain
+the reconstruction authority. `tests/test_compiled.py` covers publication,
+alias isolation, copy behavior, import direction, and distinct vmapped states.
+
 The compiler characterization baseline is `bf6bbe9527b5e1eea9172a30b8c7c214a08ed9ee`,
 the completed discrete/Gaussian registration foundation. Compiler extraction
 preserves its public plans, parameter addresses, slot order, diagnostics, and

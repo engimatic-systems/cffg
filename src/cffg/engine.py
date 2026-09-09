@@ -1750,7 +1750,7 @@ class Engine:
             elif constraint.type == "table":
                 feasible = any(
                     all(int(row[i]) in supports[i] for i in range(len(supports)))
-                    for row in np.asarray(constraint.table)
+                    for row in constraint.table
                 )
             else:  # alldifferent, n/card <= 10 by compiler validation
                 def match(i: int, used: set[int]) -> bool:
@@ -2119,7 +2119,7 @@ class Engine:
             y = mk = None
             if g.obs_rows is not None:
                 y = _obs_rows(self.arena, state.g_obs, g.obs_rows, g.observed_dim)
-                mk = state.g_mask[g.obs_rows]
+                mk = state.g_mask[jnp.asarray(g.obs_rows)]
             values = _gauss_readout(
                 g, inc_e, inc_l, _gauss_group_params(g, state.params), y, mk,
                 statistics=True,
@@ -2359,7 +2359,7 @@ class Engine:
             y = mk = None
             if g.obs_rows is not None:
                 y = _obs_rows(self.arena, state.g_obs, g.obs_rows, g.observed_dim)
-                mk = state.g_mask[g.obs_rows]
+                mk = state.g_mask[jnp.asarray(g.obs_rows)]
             vals = _gauss_readout(g, inc_e, inc_l, _gauss_group_params(g, state.params), y, mk)
             for i, member in enumerate(g.members):
                 out[member] = {key: np.asarray(v)[i] for key, v in vals.items()}
@@ -2368,8 +2368,8 @@ class Engine:
             if kern is None or kern.readout is None:
                 continue
             gp = {key: state.params[f"{g.name}:{key}"] for key in kern.param_keys}
-            obs = state.ef_obs[g.obs_rows] if g.obs_rows is not None else None
-            mask = state.ef_mask[g.obs_rows] if g.obs_rows is not None else None
+            obs = state.ef_obs[jnp.asarray(g.obs_rows)] if g.obs_rows is not None else None
+            mask = state.ef_mask[jnp.asarray(g.obs_rows)] if g.obs_rows is not None else None
             vals = kern.readout(state.ef_eta[np.asarray(g.gather)], gp, obs, mask)
             for i, member in enumerate(g.members):
                 out[member] = {key: np.asarray(v)[i] for key, v in vals.items()}
@@ -2440,7 +2440,7 @@ class Engine:
         if c.type == "at_most_k":
             return sum(v) <= c.k
         # table: the assignment must be one of the allowed tuples
-        return any(np.array_equal(np.asarray(v), row) for row in np.asarray(c.table))
+        return any(np.array_equal(np.asarray(v), row) for row in c.table)
 
 
 @dataclass(frozen=True)
@@ -2623,7 +2623,7 @@ def _prec_sweep(arena, g_eta, g_lam, ef_eta, params):
     gauss_writes = []
     ef_writes = []
     for g in arena.prec_groups:
-        tau_q = ef_eta[g.tau_gather_both].sum(axis=1)  # [M, 2] τ-edge marginal
+        tau_q = ef_eta[jnp.asarray(g.tau_gather_both)].sum(axis=1)  # [M, 2] τ-edge marginal
         x_eta_q = g_eta[arena.g_eta_indices(g.x_gather_both, 1)].sum(axis=1)
         x_lam_q = g_lam[arena.g_lam_indices(g.x_gather_both, 1)].sum(axis=1)
         m = params[g.name + ":m"]  # [M, 1]
@@ -2647,7 +2647,7 @@ def _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params):
         inc_e, inc_l = _gauss_rows(arena, g_eta, g_lam, g.gather, g.dims)
         y = mk = None
         if g.obs_rows is not None:
-            y, mk = _obs_rows(arena, g_obs, g.obs_rows, g.observed_dim), g_mask[g.obs_rows]
+            y, mk = _obs_rows(arena, g_obs, g.obs_rows, g.observed_dim), g_mask[jnp.asarray(g.obs_rows)]
         outs = _gauss_outs(g, inc_e, inc_l, _gauss_group_params(g, params), y, mk)
         for r, (oe, ol) in enumerate(outs):
             new_eta, new_lam = _set_gauss_block(
@@ -2680,10 +2680,10 @@ def _ef_sweep(arena, ef_eta, ef_obs, ef_mask, params):
     at trace time and the jitted step is branch-free."""
     new = ef_eta
     for g in arena.ef_groups:
-        obs = ef_obs[g.obs_rows] if g.obs_rows is not None else None
-        mask = ef_mask[g.obs_rows] if g.obs_rows is not None else None
-        out = _ef_group_out(g, ef_eta[g.gather], params, None, obs, mask).astype(new.dtype)
-        new = new.at[g.scatter.reshape(-1)].set(out.reshape(-1, out.shape[-1]))
+        obs = ef_obs[jnp.asarray(g.obs_rows)] if g.obs_rows is not None else None
+        mask = ef_mask[jnp.asarray(g.obs_rows)] if g.obs_rows is not None else None
+        out = _ef_group_out(g, ef_eta[jnp.asarray(g.gather)], params, None, obs, mask).astype(new.dtype)
+        new = new.at[jnp.asarray(g.scatter).reshape(-1)].set(out.reshape(-1, out.shape[-1]))
     return new
 
 
@@ -2920,7 +2920,7 @@ def _make_step(arena: Arena, skip_scheduled: bool = False):
             if arena.ef_groups and not skip_scheduled:
                 new_ef = _ef_sweep(arena, ef_eta, ef_obs, ef_mask, params)
             for scatter, out in prec_ef:
-                new_ef = new_ef.at[scatter].set(out)
+                new_ef = new_ef.at[jnp.asarray(scatter)].set(out)
             new_ef = damp * ef_eta + (1.0 - damp) * new_ef
         # Hybrid selector writes join the discrete arena before its damping.
         for scatter, card, rows in [
@@ -2964,7 +2964,7 @@ def _batch_stage_fn(arena: Arena, stage, op):
     if stage.kind == "disc":
         g = arena.groups[stage.group]
         rows = stage.rows
-        gather, scatter = g.gather[rows], g.scatter[rows]
+        gather, scatter = np.asarray(g.gather[rows]), np.asarray(g.scatter[rows])
         k_local = max(g.cards)
 
         def fn(messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params):
@@ -2979,8 +2979,8 @@ def _batch_stage_fn(arena: Arena, stage, op):
     if stage.kind == "ef":
         g = arena.ef_groups[stage.group]
         rows = stage.rows
-        gather, scatter = g.gather[rows], g.scatter[rows]
-        obs_rows = g.obs_rows[rows] if g.obs_rows is not None else None
+        gather, scatter = np.asarray(g.gather[rows]), np.asarray(g.scatter[rows])
+        obs_rows = np.asarray(g.obs_rows[rows]) if g.obs_rows is not None else None
 
         def fn(messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params):
             obs = ef_obs[obs_rows] if obs_rows is not None else None
@@ -2996,8 +2996,8 @@ def _batch_stage_fn(arena: Arena, stage, op):
 
     g = arena.gauss_groups[stage.group]
     rows = stage.rows
-    gather, scatter = g.gather[rows], g.scatter[rows]
-    obs_rows = g.obs_rows[rows] if g.obs_rows is not None else None
+    gather, scatter = np.asarray(g.gather[rows]), np.asarray(g.scatter[rows])
+    obs_rows = np.asarray(g.obs_rows[rows]) if g.obs_rows is not None else None
 
     def fn(messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params):
         inc_e, inc_l = _gauss_rows(arena, g_eta, g_lam, gather, g.dims)
@@ -3588,7 +3588,7 @@ def _gauss_bfe(arena, g_eta, g_lam, g_obs, g_mask, params):
         y = mk = None
         if g.obs_rows is not None:
             y = _obs_rows(arena, g_obs, g.obs_rows, g.observed_dim)
-            mk = g_mask[g.obs_rows]
+            mk = g_mask[jnp.asarray(g.obs_rows)]
         total = total + _gauss_energy(g, inc_e, inc_l, _gauss_group_params(g, params), y, mk).sum()
     for d, pairs in arena.gauss_interior:
         l0 = g_lam[arena.g_lam_indices(pairs[:, 0], d)]
@@ -3700,7 +3700,7 @@ def _prec_bfe(arena, g_eta, g_lam, ef_eta, params):
     the single mean-field −H[q_i] per variable. Improper marginals ⇒ +inf."""
     total = jnp.asarray(0.0, dtype=g_eta.dtype)
     for g in arena.prec_groups:
-        tau_q = ef_eta[g.tau_gather_both].sum(axis=1)  # [M, 2]
+        tau_q = ef_eta[jnp.asarray(g.tau_gather_both)].sum(axis=1)  # [M, 2]
         x_eta_q = g_eta[arena.g_eta_indices(g.x_gather_both, 1)].sum(axis=1)
         x_lam_q = g_lam[arena.g_lam_indices(g.x_gather_both, 1)].sum(axis=1)
         m = params[g.name + ":m"]
@@ -3719,7 +3719,7 @@ def _ef_bfe(arena, ef_eta, ef_obs, ef_mask, params):
     holds exactly (no ridge: nothing here is iterative or solved)."""
     total = jnp.asarray(0.0, dtype=ef_eta.dtype)
     for g in arena.ef_groups:
-        inc = ef_eta[g.gather]  # [M, R, 2]
+        inc = ef_eta[jnp.asarray(g.gather)]  # [M, R, 2]
         if g.type == "equality":
             total = total + efrules.equality_energy(
                 efrules.JFAMILIES[g.family], inc
@@ -3727,13 +3727,13 @@ def _ef_bfe(arena, ef_eta, ef_obs, ef_mask, params):
         else:  # node energy comes from the registered kernel (cff-ri8m)
             kern = kernels.KERNELS[g.type]
             gp = {key: params[f"{g.name}:{key}"] for key in kern.param_keys}
-            obs = ef_obs[g.obs_rows] if g.obs_rows is not None else None
-            mask = ef_mask[g.obs_rows] if g.obs_rows is not None else None
+            obs = ef_obs[jnp.asarray(g.obs_rows)] if g.obs_rows is not None else None
+            mask = ef_mask[jnp.asarray(g.obs_rows)] if g.obs_rows is not None else None
             total = total + kern.energy(inc, gp, obs, mask).sum()
     for fam_name, pairs in arena.ef_interior:
         fam = efrules.JFAMILIES[fam_name]
         total = total + efrules.edge_entropy(
-            fam, ef_eta[pairs[:, 0]], ef_eta[pairs[:, 1]]
+            fam, ef_eta[jnp.asarray(pairs[:, 0])], ef_eta[jnp.asarray(pairs[:, 1])]
         ).sum()
     return total
 

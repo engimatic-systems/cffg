@@ -50,6 +50,9 @@ This ticket does not extract lowering logic or change field names or values.
    4.3. Existing field names, numeric dtypes, shapes, element order, and values
         are preserved. Container representation may change to enforce the
         approved read-only contract; those changes are documented and tested.
+        Numeric fields use an owned array value whose NumPy/JAX exports detach
+        storage. Requesting a zero-copy NumPy export fails explicitly; external
+        callers must not be able to acquire a writable alias to stored data.
    4.4. Mutable compiler builders stay private. Consumers receive complete
         values and update inference/learning data only through runtime State.
    4.5. Captured kernel handles keep their registered identity. This contract
@@ -95,9 +98,10 @@ These suggestions are optional. An implementer may choose another sound method.
   unchanged high-level model output.
 - Use all four architecture change-path rows as a consumer checklist. This
   ticket changes transport ownership, not their semantics.
-- An immutable backing buffer can protect NumPy values against writes through
-  retained aliases; setting an array's writeable flag alone is insufficient.
-  Reuse already protected buffers rather than copying at each containing record.
+- Do not rely on NumPy's writeable flag or bytes-backed ndarray views: installed
+  NumPy 2.5.1 allows ufunc.at to modify those buffers, including a NumPy view of
+  a CPU JAX array. Own storage behind an explicit export boundary, and reuse
+  published values rather than copying at each containing record.
 
 ## Future work
 
@@ -127,3 +131,7 @@ Pre-implementation research from cff-ecw0 (no extraction started). Question: can
 **2026-09-09T17:06:35Z**
 
 Revised decision: Cooper explicitly approved enforcing immutability within this extraction. No separate ticket was created. Branch agent/cff-544x-immutable-values starts from updated agent/cff-ecw0-compiler-contracts at 1c246f3 (PR #113). All four ARCHITECTURE change-path rows apply to transport ownership and consumers; there are no model/schema/rule changes. Pairs: flooding/scheduled, direct/vmap and current/supported-legacy reconstruction consume the same immutable arena; host/JIT receive one host-built value, with no second compiler. Sparse/zero-support and improper/vacuous runtime values retain existing numerical behavior; float32/float64 arrays preserve their current compiler dtypes and values. The 32-group fixture and publication measurements cover scale. Implementation will separate the mechanical ownership move from the explicit immutability behavior change in atomic commits, preserve compatibility re-exports, and leave runtime parameter/observation updates functional.
+
+**2026-09-09T17:32:55Z**
+
+Implementation/research handoff: moved all 19 compiled value records plus NEG/PARAMETER_TRANSFORMS to cffg.compiled in 0dab458, preserving compiler re-exports and redirecting direct consumers. Immutability uses frozen records, tuples, FrozenMap, and private-storage FrozenArray; constructors isolate caller aliases and replacement/assembly reuse published payloads. Question: do bytes-backed NumPy arrays or CPU JAX arrays provide the required public-alias protection? Answer: no on NumPy 2.5.1/JAX 0.10.2: np.add.at(np.asarray(value), ...) mutates nominally read-only backing storage. Source: local performance-agent probes; confidence high, reproduced for integer/f32/f64. Chosen explicit detached NumPy/JAX exports; JAX index consumers convert at their boundary. Follow-up review found no remaining public alias leak in 54 JAX export, 13 ufunc, and six view probes, and no replacement/assembly payload recopy. Host scalar/address operations stay NumPy; JAX remains the numerical inference backend. Focused checks so far: 96 compiled/Gaussian/EF/parameter/schedule tests plus 124 characterization/discrete/precision/hybrid-learning/CSP/dashboard tests passed. Final short-suite gate and construction-cost evidence pending. No serialized callback or schema changes.
