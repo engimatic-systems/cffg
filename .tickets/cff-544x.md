@@ -1,6 +1,6 @@
 ---
 id: cff-544x
-status: in_progress
+status: closed
 deps: [cff-ecw0]
 links: [cff-8t4d]
 created: 2026-09-02T04:02:00Z
@@ -135,3 +135,15 @@ Revised decision: Cooper explicitly approved enforcing immutability within this 
 **2026-09-09T17:32:55Z**
 
 Implementation/research handoff: moved all 19 compiled value records plus NEG/PARAMETER_TRANSFORMS to cffg.compiled in 0dab458, preserving compiler re-exports and redirecting direct consumers. Immutability uses frozen records, tuples, FrozenMap, and private-storage FrozenArray; constructors isolate caller aliases and replacement/assembly reuse published payloads. Question: do bytes-backed NumPy arrays or CPU JAX arrays provide the required public-alias protection? Answer: no on NumPy 2.5.1/JAX 0.10.2: np.add.at(np.asarray(value), ...) mutates nominally read-only backing storage. Source: local performance-agent probes; confidence high, reproduced for integer/f32/f64. Chosen explicit detached NumPy/JAX exports; JAX index consumers convert at their boundary. Follow-up review found no remaining public alias leak in 54 JAX export, 13 ufunc, and six view probes, and no replacement/assembly payload recopy. Host scalar/address operations stay NumPy; JAX remains the numerical inference backend. Focused checks so far: 96 compiled/Gaussian/EF/parameter/schedule tests plus 124 characterization/discrete/precision/hybrid-learning/CSP/dashboard tests passed. Final short-suite gate and construction-cost evidence pending. No serialized callback or schema changes.
+
+**2026-09-09T17:34:48Z**
+
+Construction evidence at code head 315b082 vs mechanical-move baseline 0dab458: sequential warmed CPU measurements, median of five batches of ten compilations, exclude JAX tracing/inference. HMM: 14.471 -> 14.626 ms; Gaussian: 71.001 -> 70.698 ms (timing noise, no speedup claim); EF: 0.071 -> 0.167 ms; 32 distinct groups: 93.980 -> 95.861 ms. Retained numeric payload unchanged: 512/672/208/6048 bytes respectively. One traced allocation sample: EF peak 12017 -> 19713 bytes; 32-group peak 175123 -> 198422 bytes. These are Python/NumPy tracemalloc samples, not total process/device memory. Initial publication snapshots mutable inputs; detached exports may allocate; no per-iteration or per-shared-instance structural republication. Reproduction script: ~/agent-share/CFFG architecture overhaul/measure-immutable-values.py; run using uv with PYTHONPATH=<chosen worktree>/src:<repo>/tests. Exact baseline worktree: /tmp/cffg-immutable-measure.xSoMyd/baseline. Final focused ownership file: 41 passed, including caller aliases, NumPy ufunc.at, JAX exports, dtype/bit preservation, copy/asdict, import direction, and shared-arena runtime/vmap isolation. Final dashboard gate running at 315b082.
+
+**2026-09-09T17:36:58Z**
+
+Dependency handoff (records checked with tk dep tree --full, tk ready, tk blocked; tk dep cycle is clear). Legend: prerequisite --> dependent. [x] cff-209l --> [x] cff-ecw0 --> [in_progress] cff-544x --> [blocked by cff-544x] cff-8t4d --> cff-kfo7 --> cff-ejib --> remaining compiler owners --> cff-edoz --> engine owners --> cff-cfqg. cff-544x is the only ready root in this serial extraction chain; unrelated ready roadmap tickets are not pulled into its scope. Final validation is running at committed code head 315b082; subsequent edits so far are ticket/share-report evidence only.
+
+**2026-09-09T17:50:57Z**
+
+Final gate passed at code head 315b082: 1663 passed, 41 opt-in slow tests deselected, four existing Gym deprecation warnings; pytest 980.69 seconds, measured wall 992.697 seconds. Dashboard refreshed with 41 new tests, zero failures, 30 diagrams and 23 galleries. The code has not changed since this gate; closure/publication edits only tickets and runtime evidence, so no second unchanged suite run. All acceptance criteria are met: canonical one-way value owner and compatibility imports; explicit alias-isolated publication and copy policy; preserved numeric/address/order/hash/diagnostic contracts; existing JSON/bundle/checkpoint, flooding/scheduled and direct/vmap consumers pass. Next work is cff-8t4d topology extraction, whose preparation note preserves observation-row ownership and error reporting order. No remaining user decision blocks that ticket.
