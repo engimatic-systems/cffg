@@ -1020,13 +1020,21 @@ class Engine:
         effective_tol = None if tol is None else max(float(tol), 64.0 * np.finfo(dtype).eps)
 
         if not self._state_is_finite(state):
+            ess, log_normalizers, mu3_statuses = self._mu3_result_diagnostics(state)
             return RunResult(
                 state, RunStatus.DIVERGED, 0, (), (), float("inf"),
                 RunStatus.DIVERGED, float("inf"),
+                mu3_ess=ess,
+                mu3_log_normalizers=log_normalizers,
+                mu3_statuses=mu3_statuses,
             )
         if self._has_zero_support(state):
+            ess, log_normalizers, mu3_statuses = self._mu3_result_diagnostics(state)
             return RunResult(
-                state, RunStatus.INFEASIBLE, 0, (), (float("inf"),), float("inf")
+                state, RunStatus.INFEASIBLE, 0, (), (float("inf"),), float("inf"),
+                mu3_ess=ess,
+                mu3_log_normalizers=log_normalizers,
+                mu3_statuses=mu3_statuses,
             )
 
         if self._prime is not None and n_iters >= 1:
@@ -1271,19 +1279,28 @@ class Engine:
     ) -> RunResult:
         """Solve each fixed hard-constraint phase with the D7 outer method."""
         dtype = np.asarray(state.messages).dtype
-        solver_tol = (
-            64.0 * np.finfo(dtype).eps if tol is None else float(tol)
+        solver_tol = max(
+            64.0 * np.finfo(dtype).eps,
+            0.0 if tol is None else float(tol),
         )
         if not self._state_is_finite(state):
+            ess, log_normalizers, mu3_statuses = self._mu3_result_diagnostics(state)
             return RunResult(
                 state, RunStatus.DIVERGED, 0, (), (), float("inf"),
                 RunStatus.DIVERGED, float("inf"),
+                mu3_ess=ess,
+                mu3_log_normalizers=log_normalizers,
+                mu3_statuses=mu3_statuses,
                 termination_reason=OuterTerminationReason.NONFINITE_EVALUATION,
             )
         if self._has_zero_support(state):
+            ess, log_normalizers, mu3_statuses = self._mu3_result_diagnostics(state)
             return RunResult(
                 state, RunStatus.INFEASIBLE, 0, (), (float("inf"),),
                 float("inf"),
+                mu3_ess=ess,
+                mu3_log_normalizers=log_normalizers,
+                mu3_statuses=mu3_statuses,
                 termination_reason=OuterTerminationReason.INFEASIBLE,
             )
 
@@ -1484,8 +1501,12 @@ class Engine:
                 break
 
         if solved is None:
+            ess, log_normalizers, mu3_statuses = self._mu3_result_diagnostics(state)
             return RunResult(
                 state, RunStatus.BUDGET_EXHAUSTED, 0, (), (), float("inf"),
+                mu3_ess=ess,
+                mu3_log_normalizers=log_normalizers,
+                mu3_statuses=mu3_statuses,
                 termination_reason=OuterTerminationReason.ITERATION_BUDGET,
             )
         if mu3_failure_status is not None:

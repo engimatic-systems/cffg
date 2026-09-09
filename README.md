@@ -571,11 +571,13 @@ fresh `prepare_mu3` call. `Engine.score_mu3_epochs` refreshes particles between
 policy-scoring epochs and averages only converged post-burn-in scores; burn-in
 does not turn an unfinished or collapsed estimate into convergence.
 
-This is currently an Engine-level functional-message workflow. The public
-`RollingAgent(learn_a=True)` route plans with analytic moments from its
-Dirichlet posterior and does not silently activate `mu3(A)`; `cff-lpsn` owns the
-explicit-key, refresh, status, and checkpoint lifecycle needed for that agent
-option.
+`RollingAgent(learn_a=True)` keeps that analytic-moment path as its
+deterministic default. Add `mu3=True, mu3_key=key` to select the serialized
+functional evaluator in the planning template; the one-slice perception
+template stays analytic and supplies the next proper Dirichlet base posterior.
+The agent exposes `last_plan_result`, `planning_diagnostics`,
+`planning_key_cursor`, and `planning_epoch`. It returns no action unless both
+ordinary inference and every functional evaluator converge.
 
 A learned goal uses the conjugate Fig. 5 `mu1(c)` path. Future slices sharing
 `Cc` add their predictive observation mass into one Dirichlet posterior:
@@ -679,7 +681,37 @@ Pass
 observation model (see `cffg/experiments/tmaze_learning.py` for the full
 perception–action–learning experiment corresponding to Part II Fig. 9). This
 analytic learned-A approximation does not carry functional `mu3(A)` messages
-between trials.
+between trials. The functional route is explicit:
+
+```python
+import jax
+
+agent = RollingAgent(
+    functools.partial(build_gridworld, k=6),
+    horizon=3,
+    learn_a=True,
+    initial_counts=alpha_A,
+    mu3=True,
+    mu3_key=jax.random.PRNGKey(7),
+    mu3_samples=4096,
+    mu3_min_ess_fraction=0.1,
+)
+action = agent.act()
+agent.planning_diagnostics       # evaluator, weights, log Z, KL, ESS, status
+next_key = agent.planning_key_cursor
+```
+
+The default `mu3_refresh="trial"` draws a fresh fixed particle set after a
+successful observation or episode reset; repeated `act()` calls in the same
+unchanged trial reuse the solved epoch and consume no key. Use
+`mu3_refresh="posterior"` to retain the particle set across a context-only
+rollover while refreshing whenever A changes, or call `refresh_mu3()` to
+declare an independent scoring epoch. The NumPy action-selection generator is
+separate from the JAX key stream. Versioned checkpoints preserve the complete
+prepared state, result diagnostics, next key, evaluator/configuration identity,
+and base posterior without another split. Legacy checkpoints still restore the
+analytic path but are refused for a functional agent because they contain no
+stochastic continuation state.
 
 For behavioral calibration beyond the T-maze golden, the costly-cue experiment
 reports the quantities needed to audit an epistemic decision directly:

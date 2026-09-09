@@ -1,6 +1,6 @@
 ---
 id: cff-lpsn
-status: open
+status: closed
 deps: [cff-8a5m]
 links: []
 created: 2026-09-01T02:20:19Z
@@ -91,3 +91,7 @@ runtime state formats are integrated.
 **2026-09-01T02:23:06Z**
 
 Planning audit, 2026-08-31. Capability owners are serialized evaluator metadata, Engine mu3 preparation/results, Learnables parameter installation, RollingAgent lifecycle and checkpoint transport, and the named documentation/tests. Wiggle scan reviewed in context; retained candidates mean: fixed=one particle set or conjugate family; integrate=agent lifecycle wiring; preserve=current-main compatibility; public=RollingAgent behavior; register=runtime evaluator identity; expose=RunResult fields; implement=old-PR behavior or component wiring; support=probability support or supported lifecycle; complete=the named trial cycle or replay state inventory; remaining=active posterior/state; approximate=named analytic path; material=meaningful state change; sufficient=checkpoint inventory or statistics; converge=RunStatus criterion; estimate=importance estimator; exact=posterior identity or literal zero; oracle=independent quadrature test; sound=optional method quality; stable=posterior identity; test=automated artifacts; validate=cache/state input checking; infer=runtime inference; learn/learnable=declared parameter update workflow; rollover=boundary transfer; small=fixture size; can=engine capability; may=declared refresh or optional method; explicit_owner=filtering; all/every/any/only=the enumerated active evaluators and state transitions; current=main 5c3b06a or active posterior; existing=pre-ticket analytic path; later=named downstream envelope.
+
+**2026-09-01T02:57:31Z**
+
+Completion handoff, 2026-08-31. Clean-ported old PR #83 onto cff-8a5m without replaying discarded ancestry. RollingAgent now follows serialized cffg.mu3_is.v1 metadata, owns an explicit JAX key cursor and fixed-particle epoch, installs the current proper A posterior through Learnables, separates NumPy action randomness, exposes stochastic diagnostics/status, refuses actions on any failed evaluator, invalidates or reuses prepared state by declared policy, and replays full stochastic continuation through a versioned checkpoint. Current-main recurrence checkpoint manifests and declared-learning behavior remain authoritative. Focused compatibility: 89 passed, 14 deselected. Targeted slow float32 ten-slice and two-plan quadrature/ledger oracles: 2 passed in 29.77 seconds. Final unchanged-head short suite: 1489 passed, 41 deselected, 0 failed in 638.97 seconds; dashboard refreshed at /Users/ravd/agent-share/cffg-tests.html. Next ready layer: cff-7ozr.
