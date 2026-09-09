@@ -1,6 +1,6 @@
 ---
 id: cff-n183
-status: in_progress
+status: closed
 deps: []
 links: [cff-kfo7]
 created: 2026-09-09T18:17:11Z
@@ -109,3 +109,11 @@ Implementation ready: GoalParameterPlan is immutable global blob ownership; goal
 **2026-09-09T19:45:36Z**
 
 Independent reviews found no blocking numerical/integration/performance defects. Formalism review strengthened explicit raw/local zero-support assertions; modularity review confirmed scheduler elimination cannot remove canonical learned-goal slots, and restore uses existing per-blob boundaries. CPU f64 same-group 32-contributor comparison against e4a6640: raw JIT step 79.08 to 79.32 microseconds, public step 121.60 to 119.33 microseconds, host compilation 7.788 to 7.799 ms; nine warmed synchronized batches, not an isolated throughput claim. Messages, BFE and three parameter arrays byte-identical. State stays 6,912 bytes; new immutable scatter metadata 512 bytes. Outer vector blocks 64 to 2, uneliminated chart coordinates 384 to 198. Pooling arithmetic/temp storage linear in contributors times outcomes; static trace work grows with shape-group count, with no per-instance callbacks. Host rollover now compares every alias but copies once per owner. Sources: code diff and performance-agent artifacts /tmp/cffg-shared-goal-probe.py and /tmp/cffg-shared-goal-{before,after}.{json,npz}; confidence high for this fixture, no production-throughput claim.
+
+**2026-09-09T19:53:33Z**
+
+Final gate running at cdbad68 with no source edits after launch. Extra read-only mixed-precision probe: three composites (state cardinalities 2,2,3), shared Cc supplied as float32 and an independent prior as float64; compilation normalizes both goal-parameter batches consistently, and installing a high-precision shared prior yields identical posterior copies across groups. No additional fix needed.
+
+**2026-09-09T20:03:17Z**
+
+Final dashboard-backed gate PASSED at code head cdbad68: 1,690 passed, 41 opt-in slow tests deselected, four existing Gym deprecation warnings. Pytest 991.39 seconds; measured wall 1003.707 seconds. Dashboard refreshed: 14 new cases, zero failures, 30 diagrams in 23 galleries. No source changes after gate launch. Full cross-group sharing, one parameter energy owner, tied solver coordinates and unchanged serialization formats are complete. Publication stacks on PR #115. The next prerequisite cff-gvch remains a separate validation change; no temporary rejection or deferred sharing support is needed.
