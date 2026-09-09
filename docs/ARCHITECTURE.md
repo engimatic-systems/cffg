@@ -350,6 +350,9 @@ destinations. Recipes are identifiers, not serialized callables. Compatibility
 packers consume these declared inputs and destinations. A `ConstraintDraft`
 deliberately has no k/table value until its family validator resolves the payload.
 Generic array resolution does not choose a factor's mathematical meaning.
+Specialized composite shapes come from their family declarations, not an ordinary
+kernel's shape callback. Replacing a built-in kernel must not cause its callback
+to run earlier; registered shape providers retain their initializer/packing gates.
 
 `CompositeOwnership` connects original factors and constraints to their plan,
 absorbed members, ordinary-entropy exclusions, parameter edges, and shared
