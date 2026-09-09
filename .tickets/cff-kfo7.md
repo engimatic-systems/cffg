@@ -1,8 +1,8 @@
 ---
 id: cff-kfo7
 status: open
-deps: [cff-8t4d]
-links: [cff-bfr9]
+deps: [cff-8t4d, cff-n183, cff-gvch]
+links: [cff-bfr9, cff-n183, cff-gvch]
 created: 2026-09-02T04:17:42Z
 type: chore
 priority: 1
@@ -79,6 +79,9 @@ universal solver interface.
    and plan combinations retain a loud factor-specific `CompileError`.
 10. The specialized stage changes no approximation label, factor behavior,
     objective term, schema, public API, or supported combination.
+    Correctness prerequisites cff-n183 and cff-gvch explicitly settle their
+    behavior changes first; record their resulting baseline here before moving
+    code. Do not silently resolve either issue during extraction.
 11. Each named lowerer and its stage module is below 1,000 physical lines. The
     ticket fits one context because it moves structural classification only;
     arrays and final assembly remain separate.
@@ -116,6 +119,91 @@ addresses from both sets of declared requirements.
   every plan class.
 
 ## Notes
+
+**2026-09-09 preparation at 8cd8919 — decision required before implementation**
+
+Question: can the existing implementation satisfy one shared-parameter owner
+without changing behavior? Answer: not for learned goals shared across GFE
+shape groups. Ties, count pooling and parameter energy are group-local;
+goal_prior_updates can reject two posteriors for the same prior blob. Reproduced
+with two observation composites sharing Cc but state cardinalities 2 and 3.
+cff-n183 records the reproducer and asks Cooper to choose correct global sharing
+(recommended) or explicit temporary rejection. No runtime fix is underway.
+Sources: compiler.py:608-645; engine.py:1900-1925,2821-2842,3807-3833;
+tests/test_goal_hyperprior.py:103-166,245-252. Confidence: high, formalism-agent
+inspection and primary-agent execution.
+
+Question: can discovery lose a conflicting declaration? Answer: yes, the
+target-keyed P-substitution dictionary silently retains the last declaration.
+cff-gvch separates that validation correction from extraction. Sources:
+compiler.py:161-165; core/validate.py:452 onward; test_mu3.py's model with
+opposite substituted-role declarations. Confidence: high, bounded inspection
+and reproduction. Both correctness tickets are explicit prerequisites.
+
+Question: which decisions require blob contents? Answer: ownership and plan
+kind are declaration-only. Dirichlet/GFE/hybrid/recurrence/precision arrays
+validate and pack a previously selected kind; hard-constraint k/table contents
+also become plan payloads. Suggested ArrayRequirement fields are owner,
+ordered (factor, role, blob) references, declared initializer shapes,
+family-owned validation/packing operation and a typed destination. Resolve a
+blob source once while preserving each role's requirement: the same blob can
+have distinct interpretations. The generic resolver must not choose
+probabilities versus counts, absorption, evaluators or constraint meaning.
+Keep diagnostic bookkeeping separate from ownership claims: invalid Dirichlet
+counts currently produce both concentration and orphan-prior diagnostics, and
+early claims must not erase either or preempt existing blob-load failures.
+Source: bounded modularity-agent inspection of compiler.py at 8cd8919.
+Confidence: high. Array resolution remains cff-bfr9, not this ticket.
+
+Question: what is the factor-to-objective ownership map? Answer:
+
+- DirichletGroupPlan absorbs likelihood plus prior; parameter-edge counts are
+  excluded from categorical normalization/support/entropy and its dedicated
+  energy function owns the parameter term.
+- GfePlan absorbs an observation and categorical goal; the substituted output
+  has no ordinary interior-edge entropy correction. A learned goal also absorbs
+  its Dirichlet prior. Fixed goals are absorbed even though existing compiled
+  goal_members is empty; discovery must retain original identity without
+  changing that public field merely for convenience.
+- Mu3Plan intentionally overlays the same observation members as GfePlan for
+  evaluator/shared-parameter energy ownership. This is not a second execution
+  claim to reject as a collision.
+- GfeTmPlan consumes only the transition-mixture factor and does not put its
+  output in gfe_x_edges; downstream factor and interior-edge correction remain.
+- HybridGfePlan absorbs the mixture and Gaussian goal, removes the substituted
+  output entropy correction, retains selector/input edges, and owns goal_m and
+  goal_W without a separate goal execution or energy charge.
+
+Sources: compiler.py:330,462,608,1477; engine.py:3780 onward;
+compiled.py:365 onward at 8cd8919. Confidence: high, bounded formalism-agent
+review against existing family tests. Preserve these distinctions in claims
+and the compact mapping required by acceptance criterion 4.4.
+
+Dependency companion, checked with tk dep tree --full cff-kfo7, tk ready,
+tk blocked and tk dep cycle. The two correctness roots have no tk prerequisites;
+cff-n183 nevertheless awaits Cooper's scope choice. They can be separate PRs
+and do not depend on each other. Extraction waits for both and topology.
+
+```text
+Legend: prerequisite --> dependent
+[x] cff-544x --> [x] cff-8t4d (1,676 tests pass) ---+
+[ ] cff-n183 (ready in tk; user decision pending) --+--> [ ] cff-kfo7
+[ ] cff-gvch (ready; independent correctness fix) -+         |
+                                                           v
+                                              [ ] cff-ejib registered
+                                                           |
+                                                           v
+                                              [ ] cff-bfr9 arrays
+                                                           |
+                                                           v
+                                              [ ] cff-ddsq assembly
+                                                           |
+                                                           v
+                                              [ ] cff-edoz compiler track
+                                                           |
+                                                           v
+                                              engine track --> cff-cfqg epic
+```
 
 **2026-09-09T03:29:39Z**
 
