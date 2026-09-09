@@ -124,10 +124,10 @@ and review context proportional to the change.
 
 | Ticket shape | Authority | Derived surfaces that must agree | Canonical focused tests | Durable documentation |
 | --- | --- | --- | --- | --- |
-| New IR field | `src/cffg/core/ir.py` (`Template` or its spec dataclass) | `src/cffg/core/validate.py`; `src/cffg/core/serialize.py` (`to_dict`, `from_dict`, `structure_hash`); `src/cffg/core/plates.py` scoping; `src/cffg/core/compose.py` and `src/cffg/core/edits.py` when editable; `src/cffg/topology.py` declaration snapshots/layout, `src/cffg/compiler.py` lowering, and `src/cffg/compiled.py` values when executable; bundle and agent state when persisted | `tests/test_ir.py`, `tests/test_serialize.py`, `tests/test_plates.py`, `tests/test_topology.py`; add `tests/test_edit_codec.py`, `tests/test_edits.py`, `tests/test_agent_spec.py`, or `tests/test_bundle.py` only for the affected boundary | Contract in this document; public construction and migration in `README.md`; unsupported cases in `LIMITATIONS.md` |
-| New factor or rule family | `src/cffg/kernels.py:FactorKernel`, `kernel_bindings.py`, its `src/cffg/core/ir.py:FactorType`, and the family rule module; formal equations are authoritative in code docstrings and `DERIVATIONS.md` | `topology.py` declared role/slot facts; compiler grouping, parameter packing, `Arena`, and `member_of`; shared local calls in `kernel_runtime.py`; synchronous `_make_step`; scheduled batch/registerized/flat scans; `_make_bfe`; support checks, assignment scoring, readouts, schedule classification, serialization manifest, estimator, and public exports as applicable | `tests/test_kernels.py`, `tests/test_discrete_kernels.py`, `tests/test_gaussian_kernels.py`, `tests/test_gaussian_kernel_schedules.py`; family rule and engine-oracle tests; `tests/test_schedule.py`; sparse-support, float32, and uncomfortable-scale cases | Derivation in `DERIVATIONS.md`; integration contract here; approximations in `LIMITATIONS.md`; public modeling API in `README.md` |
+| New IR field | `src/cffg/core/ir.py` (`Template` or its spec dataclass) | `src/cffg/core/validate.py`; `src/cffg/core/serialize.py` (`to_dict`, `from_dict`, `structure_hash`); `src/cffg/core/plates.py` scoping; `src/cffg/core/compose.py` and `src/cffg/core/edits.py` when editable; `src/cffg/topology.py` declaration snapshots/layout, `src/cffg/specialized/` semantic claims/drafts and `src/cffg/compiler.py` ordinary compatibility lowering, and `src/cffg/compiled.py` values when executable; bundle and agent state when persisted | `tests/test_ir.py`, `tests/test_serialize.py`, `tests/test_plates.py`, `tests/test_topology.py`; add `tests/test_edit_codec.py`, `tests/test_edits.py`, `tests/test_agent_spec.py`, or `tests/test_bundle.py` only for the affected boundary | Contract in this document; public construction and migration in `README.md`; unsupported cases in `LIMITATIONS.md` |
+| New factor or rule family | `src/cffg/kernels.py:FactorKernel`, `kernel_bindings.py`, its `src/cffg/core/ir.py:FactorType`, and the family rule module; formal equations are authoritative in code docstrings and `DERIVATIONS.md` | `topology.py` declared role/slot facts; `specialized/` named family discovery/completion and array requirements; compiler ordinary grouping, parameter packing, `Arena`, and `member_of`; shared local calls in `kernel_runtime.py`; synchronous `_make_step`; scheduled batch/registerized/flat scans; `_make_bfe`; support checks, assignment scoring, readouts, schedule classification, serialization manifest, estimator, and public exports as applicable | `tests/test_kernels.py`, `tests/test_discrete_kernels.py`, `tests/test_gaussian_kernels.py`, `tests/test_gaussian_kernel_schedules.py`; family rule and engine-oracle tests; `tests/test_schedule.py`; sparse-support, float32, and uncomfortable-scale cases | Derivation in `DERIVATIONS.md`; integration contract here; approximations in `LIMITATIONS.md`; public modeling API in `README.md` |
 | Runtime numerical or status invariant | `AGENTS.md` numerical contract and `src/cffg/engine.py` (`RunStatus`, `RunResult`, `Engine.run`) | Flooding, colored/mixed, and exact schedules; host `_has_zero_support` and JIT `_make_support_check`; `_make_step`, `_make_exact_unit`, `_make_propagate`, and `_make_bfe`; inner-solver status; `RollingAgent`, `Colony`, estimator, benchmark, and dashboard consumers | `tests/test_runtime_status.py`, `tests/test_schedule.py`, `tests/test_colony.py`, plus the changed rule family's hostile-input tests | Runtime contract here and in `README.md`; any accepted failure mode or approximation in `LIMITATIONS.md` |
-| Learnable or checkpoint feature | `src/cffg/core/ir.py` (`LearnableSpec`, `AgentSpec`, `BeliefBinding`) and `src/cffg/learn.py` (`Family`, `Learnables`) | Validation, JSON/hash, plate scoping, compiler `_resolve_learnables`, `Arena.learn_plans`, `member_of`, engine readouts and parameter writes, agent cadence, checkpoint encode/decode and legacy migration, and bundles | `tests/test_learnables.py`, `tests/test_agent_spec.py`, `tests/test_agent.py`, and `tests/test_bundle.py`; add the contributing factor family's statistic test | Conjugate contract here; statistics beyond the papers in `DERIVATIONS.md`; public cadence/checkpoint API in `README.md`; remaining family gaps in `LIMITATIONS.md` |
+| Learnable or checkpoint feature | `src/cffg/core/ir.py` (`LearnableSpec`, `AgentSpec`, `BeliefBinding`) and `src/cffg/learn.py` (`Family`, `Learnables`) | Validation, JSON/hash, plate scoping, specialized parameter/objective ownership, compiler `_resolve_learnables`, `Arena.learn_plans`, `member_of`, engine readouts and parameter writes, agent cadence, checkpoint encode/decode and legacy migration, and bundles | `tests/test_learnables.py`, `tests/test_agent_spec.py`, `tests/test_agent.py`, and `tests/test_bundle.py`; add the contributing factor family's statistic test | Conjugate contract here; statistics beyond the papers in `DERIVATIONS.md`; public cadence/checkpoint API in `README.md`; remaining family gaps in `LIMITATIONS.md` |
 
 Duplicated execution surfaces are deliberate review pairs: host/JIT,
 flooding/scheduled, single-instance/`vmap`, and current/legacy checkpoint
@@ -311,6 +311,74 @@ orchestration appends them after factor-admission errors at the existing
 resolution and Dirichlet discovery. Moving structural work does not change the
 error owner or precedence. `tests/test_topology.py` directly protects these
 boundaries and the immutable declaration snapshot.
+
+#### Specialized structural lowering
+
+`src/cffg/specialized/` owns factor semantics that do not fit the ordinary
+same-arena registered-kernel contract. It is an explicit set of lowerers, not a
+fallback for unrecognized factor types. Its two operations are:
+
+1. `discover_specialized(Template, TopologyLayout, semiring)` returns immutable
+   `SpecializedClaims`: parameter-edge shape/axis tags, composite membership,
+   absorbed factors, equality routes, specialized conditioning restrictions,
+   and deferred diagnostics. It never reads a blob. Raw constraint details are
+   used transiently for the existing diagnostic text; mutable template objects
+   are not retained.
+2. `complete_specialized(claims, OrdinaryMembership)` returns immutable
+   `SpecializedPlanDrafts`. Ordinary categorical BP membership, including
+   structural equalities, completes recurrence components without classifying
+   their factors again. The current `_ordinary_grouping` compatibility helper
+   supplies this membership until ordinary registered lowering is extracted.
+
+The specialized owners are:
+
+| Responsibility | Owner |
+| --- | --- |
+| Admission, parameter-edge tags, composite claims, domain routing, specialized initializer shapes | `specialized/discovery.py` |
+| Dirichlet parameter paths, categorical and transition GFE, hybrid GFE, functional μ3 metadata | Named `lower_*` functions in `specialized/composites.py` |
+| Mixture, recurrence, and Gaussian precision plans | Named `lower_*` functions in `specialized/mixed.py`; recurrence incidence classification consumes immutable variable/endpoint mappings in `recurrence_topology.py` |
+| Hard-constraint drafts and family-owned k/table validation | `specialized/constraints.py` |
+| Equality plans, edge DELTA meaning, final semiring restrictions | `specialized/structural.py` |
+| Global learned-goal parameter plan | Completion delegates to `goal_parameters.build_goal_parameter_plans`; runtime count pooling and energy remain in `goal_parameters.py` |
+| Cross-family completion and original-factor/objective ownership map | `specialized/__init__.py`; value contracts in `specialized/contracts.py` |
+
+Drafts reuse existing immutable compiled records when every field is structural.
+They are the same objects passed into `Arena`, without republishing their array
+payloads. `ArrayRequirement` declares ordered factor/role/blob inputs, initializer
+shapes, a named family recipe, and parameter-key or constraint-payload
+destinations. Recipes are identifiers, not serialized callables. Compatibility
+packers consume these declared inputs and destinations. A `ConstraintDraft`
+deliberately has no k/table value until its family validator resolves the payload.
+Generic array resolution does not choose a factor's mathematical meaning.
+
+`CompositeOwnership` connects original factors and constraints to their plan,
+absorbed members, ordinary-entropy exclusions, parameter edges, and shared
+parameter/objective owners. Fixed categorical goals remain explicit in this map
+even though the existing `GfePlan.goal_members` compatibility field is empty.
+μ3 and global learned-goal owners are overlays, not duplicate factor execution.
+Transition GFE absorbs no facing factor and retains its output edge entropy;
+categorical/hybrid observation GFE excludes only the substituted output.
+Dirichlet carriers are excluded through their parameter tags, separately from
+GFE output exclusions. Specialized claimed factors and ordinary registered
+factors form a disjoint, exhaustive partition.
+
+Discovery/completion happen before blob resolution, but error publication keeps
+the existing checkpoints: admission, parameter layout, conditioning and prior
+arrays, composite declarations/arrays, remaining-factor grouping, family arrays,
+hard constraints, semiring, DELTA, and assembly. Invalid concentrations still
+produce the original orphan-prior diagnostic. Explicit constraint diagnostics
+become `CompileError`; incidental array-library exceptions retain their original
+class. Array loading, numerical packer mathematics, observation/member addresses,
+learning resolution, and final assembly remain in the compiler compatibility
+path for their later extraction tickets. No numerical update, approximation,
+saved-model schema, supported combination, or public compiled-plan field changes.
+
+`tests/test_specialized.py` protects these boundaries, ownership distinctions,
+immutable snapshots, unresolved constraint payloads, registered `any`-domain
+routing, diagnostic timing, and 32 specialized shape groups under float32 and
+serialized reconstruction. Existing family tests remain the mathematical
+authorities. The explicit corrected behavior baseline is `ad028f0`, following
+the global learned-goal and conflicting-declaration fixes.
 
 The compiler characterization baseline is `bf6bbe9527b5e1eea9172a30b8c7c214a08ed9ee`,
 the completed discrete/Gaussian registration foundation. Compiler extraction
