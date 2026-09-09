@@ -1,6 +1,6 @@
 ---
 id: cff-209l
-status: open
+status: closed
 deps: [cff-ri8m, cff-l6i5, cff-zq25]
 links: [cff-1o72, cff-o7hs, cff-l6i5, cff-cfqg, cff-edoz, cff-ws3c]
 created: 2026-07-30T16:09:57Z
@@ -277,3 +277,21 @@ Intelligible-ticket review: complete.
 **2026-09-09T03:29:39Z**
 
 PR #108 research — question: does arena binding specify the variational rule and every score? Answer: no; BP cavities and VMP beliefs differ, and decoded assignment energy is distinct from free energy. The contract now declares these semantics and custom-parameter assignment scoring. Sources at 7885bf5: engine.py:2818-2823, 3896-3901, 2422-2472; tests/test_vmp.py:120; Part I equations (8), (25), (26), pp.5, 11-13. Question: does a renamed built-in prove extensibility? Answer: it can miss role/packing assumptions, so existing planned fixtures now require nonbuiltin roles/keys and a new signature. Sources: tests/test_kernels.py and compiler.py:2080-2130. Confidence: high. The registration work is split by arena to make each compiler-to-reconstruction delivery reviewable.
+
+**2026-09-09T04:53:14Z**
+
+Foundation completion review at code head a635a73 (final dashboard gate still running). Prerequisites cff-ri8m and cff-l6i5 are closed; discrete child cff-wera is closed in PR110; Gaussian child cff-zq25 is implemented on top of it. The only remaining completion action is the final integration result and delivery metadata.
+
+Acceptance map: sections 2-4 are exercised by tests/test_kernels.py, test_discrete_kernels.py, gaussian_kernel_fixture.py, test_gaussian_kernels.py and test_gaussian_kernel_schedules.py. The fixtures use new roles, separate packed keys, explicit BP/VMP input meanings, independent enumeration/covariance/KL references, middle-role conditioning, and captured callbacks rather than central type-name dispatch. Built-ins use the same registered operations; structural equality, constraints, parameter-edge/GFE composites and cross-arena plans remain excluded.
+
+Sections 5 and 7 compatibility: ten frozen model cases pass exact comparisons at a635a73, and all 64 EF callback arrays are bit-identical. Existing named addresses, ordering, slot offsets, hashes, output arrays, free energies, statuses, estimator bytes and scan carries are unchanged. New ParameterAddress probability-axis/permutation declarations have no old counterpart and are excluded only from that metadata comparison. The known tied-HMM max divergence remains in its frozen case; a separate tie-free case converges. No runtime or development dependency changed.
+
+Section 6 and execution pairs: exact discrete support/infeasibility, Gaussian vacuity/improper outputs, loud nonfinite divergence, float32, cardinality128/dimension100 beside small factors, callback-shape and packed-key rejection, host/JIT, flooding/scheduled, direct/distinct-instance Colony execution, registerized/fallback scans and traced-code reuse are covered. Latest/legacy checkpoint schemas are structurally unchanged; existing bundle/learning tests remain the gate for those consumer paths. Section 8 documentation is updated in README, ARCHITECTURE (including the change-path index), and LIMITATIONS. The shared HTML preserves the historical planning snapshot and adds delivery status.
+
+Stop here after the gate: cff-ecw0 becomes ready, but neither that compiler baseline nor any compiler/engine extraction is authorized for this session. Performance work cff-wbhu/cff-j7mm/cff-rqqc remains separate. The P2 cff-umag is open; no wiggle audit ran. Frozen snapshots, fixture sources and comparison scripts are downloadable from /Users/ravd/agent-share/CFFG architecture overhaul/registration-evidence.tar.gz; reproduction instructions are included.
+
+**2026-09-09T05:05:28Z**
+
+Completion gate satisfied: cff-wera and cff-zq25 are closed; prerequisite EF registration and natural-parameter algebra tickets remain closed. At a635a73, the final dashboard-backed suite passed 1,572 tests with zero failures (41 opt-in slow tests excluded, four existing Gym warnings, 971.29 seconds). All ten frozen model cases and 64 EF callback arrays match; the preceding acceptance map names the executable evidence and preserved surfaces. Delivery branch agent/cff-zq25-gaussian-kernels is stacked on PR110. Only ticket closure and measured runtime metadata follow the tested code commit.
+
+Working registration is complete. cff-ecw0 is the next ready architecture ticket, but it and all compiler/engine extraction remain unstarted per Cooper. Review/merge the stacked PR chain before resuming that work. The shared report is /Users/ravd/agent-share/CFFG architecture overhaul/index.html; the frozen evidence archive is next to it. No further implementation is planned in this session.

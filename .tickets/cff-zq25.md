@@ -1,6 +1,6 @@
 ---
 id: cff-zq25
-status: in_progress
+status: closed
 deps: [cff-wera]
 links: []
 created: 2026-09-09T03:25:11Z
@@ -100,3 +100,9 @@ Implementation complete; final integration gate pending. GaussianBinding and Gau
 Review question: can two registrations silently share storage? Answer: derived Gaussian group-name collisions and multiple bare parameter keys now fail before writes; built-in conditioned aliases are reserved. Source: kernels.register_kernel, compiler Gaussian grouping, tests/test_gaussian_kernels.py; modularity_review reproduced distinct means being overwritten before the guard. Confidence high. Question: can host dtype conversion reject valid input? Answer: covariance symmetry is checked with the source dtype, with Cholesky/inversion performed in float64; array/file regressions include float16, float32 one-ULP asymmetry and float64. Source: compiler._resolve_arrays, params._validate_covariance and regression tests; confidence high. This aligns initial registered covariance validation with named writes, rejecting truly asymmetric/nonfinite/indefinite inputs rather than using the older absolute symmetry tolerance. No rule formula changed.
 
 Validation so far: ten frozen HMM/Kalman/T-maze cases retain all compared preexisting arrays, addresses, hashes, public outputs, objective values, schedule and scan-carry structure; all 64 EF callback arrays are bit-identical. Pristine baseline is 30a7425, whose src/tests/dependency contents equal e488df3. Readout/statistics operation order stays unchanged. Shared fixtures and scripts remain in /tmp/cffg-registration-baseline; the final evidence archive will also be placed beside the shared HTML. Wiggle audit was not run. Stop after this ticket and cff-209l.
+
+**2026-09-09T05:05:28Z**
+
+Final delivery: code commit a635a73 passes the dashboard-backed not-slow suite: 1,572 passed, 41 slow tests deselected, 0 failures, four existing Gym deprecation warnings, 971.29 seconds pytest time. Runtime history and the shared dashboard were refreshed. Focused integration: 99 passed; follow-up parameter/learning tests: 30 passed; final declaration/dtype guard cases: 9 passed. Ten frozen model comparisons and all 64 EF callback arrays pass at this exact code head. Ruff checks for new binding/runtime/fixture modules, git diff --check and tk dep cycle pass. No dependencies or checkpoint schemas changed.
+
+The delivery branch is agent/cff-zq25-gaussian-kernels, stacked on discrete PR110. The shared HTML contains delivery status and a downloadable, reproduction-checked evidence archive. Completed: Gaussian execution registration, observed/missing roles, host statistics, custom extension proof, documentation and final gate. Next: close cff-209l and stop. Compiler baseline/extraction, learning-family expansion and performance work remain unstarted. Gotcha: nonlinear/joint raw-to-runtime packs without direct-write keys reconstruct through compilation; registration does not imply a conjugate learning rule. No wiggle audit was run.
