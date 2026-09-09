@@ -79,7 +79,7 @@ with exact finite-sample ledger identities and truthful stochastic statuses.
 
 | Paper message and source → destination | Mathematical form and execution | Production rule and ledger owner | Independent oracle and hostile-input authority |
 | --- | --- | --- | --- |
-| `mu1(c)`, Fig. 5 and App. C.3: predicted `x` → goal parameter `c` | Closed-form `Dir(c | Abar zbar + 1)`; executable when the goal uncertainty is declared Dirichlet | The GFE sweep writes raw `Abar zbar` to `goal_count_scatter`; `gfe_goal_structural_stats` plus one `goal_dirichlet_energy` per tie group | `test_mu1_shared_goal_posterior_and_complete_fe_match_direct_algebra` reads the raw count message and checks the isolated energy; its float32, exact-zero count, and 64-outcome case is `test_float32_sparse_zero_mass_and_uncomfortable_observation_scale` |
+| `mu1(c)`, Fig. 5 and App. C.3: predicted `x` → goal parameter `c` | Closed-form `Dir(c | Abar zbar + 1)`; executable when the goal uncertainty is declared Dirichlet | `GoalParameterPlan` pools original GFE predictions across shape groups; `goal_parameters.shared_goal_energy` charges one `goal_dirichlet_energy` per serialized owner | `test_mu1_shared_goal_posterior_and_complete_fe_match_direct_algebra` checks the same-shape oracle; `test_shared_goals.py` covers cross-shape posterior, off-coordinate energy, tied trust-region coordinates, and 32 sparse float32 contributors |
 | Direct `mu2(z)`, Fig. 5 and App. C.4: goal-observation composite → state `z` | Closed-form categorical `softmax(rho(zbar))` for held moments; recursive direct iteration is not scheduled independently because Part II §4.5 warns it can diverge | `_gfe_rho`; `gfe_update[_stats]` emits normalized `rho` after the stationary solve; `gfe_energy[_stats]` owns `-zbar·rho-H[zbar]` | `test_raw_mu2_and_local_energy_match_independent_formula` checks the raw outgoing message, predictive message, and isolated energy before edge normalization can compensate |
 | Indirect `mu2(z)`, Fig. 5, App. C.5 Eq. (25): same composite → state with incoming `Cat(z|d)` | Nonlinear stationary coordinate: solve `zbar=softmax(rho(zbar)+log d)`, then emit `log zbar-log d` (the production `rho` form is gauge-equivalent) | Gauge-projected globalized `_gfe_solve_result`, `gfe_stationary_stats`, and `gfe_update[_stats]`; failures have converged/budget-exhausted/diverged inner status | Simplex enumeration and objective parity in `test_newton_matches_brute_force_argmin` and `test_bfe_equals_local_objective_minimum`; vacuous input, literal zero support, float32, and 40–80-state cases in `test_gfe.py` |
 | `mu3(A)`, Fig. 5, App. C.6 Eq. (26): future `(x,z,c)` composite → observation matrix `A` | Functional log-density `zbar·xi(A)`, whose predictive term follows Appendix C.1's tentative-decision approximation; it is not Dirichlet-closed, so `cffg.mu3_is.v1` separately uses fixed-particle self-normalized importance sampling | `mu3_log_message`, `mu3_importance_update`, `Engine.prepare_mu3`, and `_update_mu3`; slice structural terms use `gfe_energy_stats`, and one shared KL leaves the parameter contribution `-log Z` | Expanded-form and binary quadrature oracles in `test_mu3_derivation.py`; multi-slice ledger in `test_multiple_slices_add_functional_weights_and_parameter_ledger_once`; exact support, float32, scale, and Engine divergence authorities named in the runtime section below |
@@ -713,14 +713,30 @@ A P-substituted goal-observation composite may replace its fixed categorical
 goal blob with a `statistic` parameter edge facing a proper Dirichlet prior.
 The mean-field bead on the goal and
 `goal_uncertainty=dirichlet` on the P-substitution make that coordinate
-explicit in serialized structure. `GfePlan` owns the parameter update because
-the categorical goal node and substituted observation edge are absorbed into
-one composite; it is not also compiled as an ordinary `DirichletGroupPlan`.
+explicit in serialized structure. `GfePlan` owns each local predictive update
+because the categorical goal node and substituted observation edge are absorbed
+into one composite; it is not also compiled as an ordinary
+`DirichletGroupPlan`. An immutable `GoalParameterPlan` owns the shared goal
+coordinate independently of those shape-batched composites.
 
 Each future member emits `n_t=Abar_t zbar_t`. Members whose priors read the
-same blob form one tie group and use `alpha=alpha0+sum_t n_t`; their state
-message consumes `E[log c]`. The complete stable ledger adds the shared
-Dirichlet beta-function ratio once, not once per member. Runtime rollover is
+same blob name form one owner across all compatible shape groups and use
+`alpha=alpha0+sum_t n_t`; their state message consumes `E[log c]`. Equal numeric
+priors with different blob names remain independent. The owner records original
+group rows, carrier edges, and prior/count slots; existing `GfePlan.goal_*`
+metadata remains a per-group compatibility view, not the pooling authority.
+`goal_parameters.py` derives these owners without moving addresses or adding
+runtime state. The sweep computes all predictions from pre-sweep counts, pools
+each original member once, and copies the result to all carrier slots before
+damping. The outer solver charts each shared message side once and broadcasts
+trial coordinates to its aliases; aliases are included in the chart cache key.
+
+The complete stable ledger charges the shared parameter term once, not once
+per member or shape group. Away from a fixed point it retains the D6c.5
+expected-log correction using freshly recomputed predictions, not stored
+predictive messages. Global owners enter the schedule fingerprint. No template,
+bundle, or checkpoint schema changes are needed: recompilation reconstructs the
+owners from existing references. Runtime rollover is
 explicit: `goal_prior_updates` reads a converged trial, and
 `with_goal_priors` accepts it only on a fresh state. `RollingAgent` stages
 planning output and commits it once at `reset_episode`, with current/pending

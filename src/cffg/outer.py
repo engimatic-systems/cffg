@@ -57,6 +57,7 @@ class _VectorBlock:
     indices: np.ndarray
     forward: np.ndarray
     inverse: np.ndarray
+    aliases: np.ndarray | None = None
 
 
 @dataclass(frozen=True)
@@ -133,7 +134,8 @@ class OuterChart:
                 jnp.asarray(block.inverse)
                 @ coordinates[offset : offset + width]
             )
-            fields[block.field] = fields[block.field].at[block.indices].set(
+            targets = block.indices if block.aliases is None else block.aliases
+            fields[block.field] = fields[block.field].at[targets].set(
                 values
             )
             offset += width
@@ -204,6 +206,16 @@ def build_outer_chart(
     precisions: list[_PrecisionBlock] = []
     proper = True
 
+    parameter_aliases: dict[int, np.ndarray] = {}
+    duplicate_slots: set[int] = set()
+    for plan in arena.goal_parameter_plans:
+        for slots in (plan.prior_scatter, plan.count_scatter):
+            if len(slots) > 1:
+                parameter_aliases[int(slots[0])] = arena.message_indices(
+                    slots, plan.cardinality
+                )
+                duplicate_slots.update(int(slot) for slot in slots[1:])
+
     for edge in sorted(arena.edges.values(), key=lambda item: item.name):
         if not edge.dim and not edge.ef and not edge.param_shape:
             for slot in (edge.slot0, edge.slot1):
@@ -224,12 +236,14 @@ def build_outer_chart(
         elif edge.param_shape:
             width = int(np.prod(edge.param_shape))
             for slot in (edge.slot0, edge.slot1):
-                if slot in discrete_eliminated:
+                if slot in discrete_eliminated or slot in duplicate_slots:
                     continue
                 indices = arena.message_indices(slot, width)
                 forward, inverse = _unit_scaled(messages[indices])
                 vectors.append(
-                    _VectorBlock("messages", indices, forward, inverse)
+                    _VectorBlock(
+                        "messages", indices, forward, inverse, parameter_aliases.get(slot)
+                    )
                 )
 
     g_eta = np.asarray(arrays.g_eta)
@@ -368,6 +382,7 @@ def outer_chart_signature(chart: OuterChart) -> tuple:
                 array_key(block.indices),
                 array_key(block.forward),
                 array_key(block.inverse),
+                None if block.aliases is None else array_key(block.aliases),
             )
             for block in chart.vectors
         ),

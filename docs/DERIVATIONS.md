@@ -1138,9 +1138,15 @@ There is no additional `+1` in `alpha`. The GFE state coordinate consumes
 It is `E[log c]`, not `log E[c]`. In the serialized graph, each categorical
 goal connects its `statistic` role through a parameter edge to a Dirichlet
 prior, carries an explicit mean-field bead, and its facing P-substitution
-declares `goal_uncertainty=dirichlet`. Reusing one prior blob ties the
-composites: the compiler groups their count messages and writes `n` back to
-every derived carrier edge. The template and prior blob are source truth;
+declares `goal_uncertainty=dirichlet`. Reusing one prior blob name ties the
+composites even when their hidden-state cardinalities put them in different
+execution groups. Equal prior values under distinct blob names do not tie them.
+One `GoalParameterPlan` collects original predictive contributions across all
+groups and writes `n` back to every derived carrier edge. Its runtime owner is
+`goal_parameters.py`. Every local solve reads the pre-sweep shared coordinate;
+pooling follows all those solves and precedes damping. The trust-region chart
+also gives each shared message side one coordinate, copied to every alias in
+trial states. The template and prior blob are source truth;
 posterior messages are runtime state.
 
 ### D6c.3 Complete ledger and rollover boundary
@@ -1160,6 +1166,12 @@ zero. This is the same cancellation as D6a and is essential for sparse
 float32 priors. The remaining per-slice GFE terms—predictive entropy,
 `hbar(A)`, state entropy, and ordinary state-factor/edge terms—remain in the
 structural ledger; `-n_t^T ell` must not be counted a second time.
+
+Away from that coordinate relation, retain the entire coefficient in D6c.5.
+The ledger holds the evaluated state's `alpha` fixed and recomputes its local
+predictions. Their sum is not generally the stored count message, nor the
+stored predictive output after damping. `shared_goal_energy` charges this
+full expression once across shape groups.
 
 `Engine.goal_prior_updates` reads the converged posterior keyed by serialized
 prior blob. `Engine.with_goal_priors` accepts it only on a fresh state, making
@@ -1181,6 +1193,14 @@ finite.
 *Executable:* `test_mu1_shared_goal_posterior_and_complete_fe_match_direct_algebra`,
 `test_sweeps_replace_mu1_and_explicit_rollover_adds_one_new_trial`,
 `test_float32_sparse_zero_mass_and_uncomfortable_observation_scale`.
+Cross-group authorities in `test_shared_goals.py`:
+`test_mixed_shape_step_pools_one_shared_goal`,
+`test_off_coordinate_energy_charges_one_shared_parameter_term`,
+`test_outer_trial_coordinates_keep_goal_aliases_equal`, and
+`test_float32_sparse_support_with_32_shared_composites`. The off-coordinate
+oracle deliberately changes both count and stored predictive messages; its
+constant channels make the expected complete energy independent of the
+production local solver.
 
 ---
 

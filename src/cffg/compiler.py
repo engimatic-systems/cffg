@@ -49,6 +49,7 @@ from cffg.compiled import (
     GaussGroupPlan,
     GfePlan,
     GfeTmPlan,
+    GoalParameterPlan,
     GroupPlan,
     HybridGfePlan,
     LearnPlan,
@@ -64,6 +65,7 @@ from cffg.compiled import (
 from cffg.core.ir import FACTOR_TYPES, ConstraintKind, PortRole, Template
 from cffg.core.plates import expand_plates
 from cffg.core.validate import validate
+from cffg.goal_parameters import build_goal_parameter_plans
 from cffg.recurrence_topology import classify_recurrence_components
 from cffg.topology import build_topology, prefix_offsets
 
@@ -78,6 +80,7 @@ __all__ = [
     "GaussGroupPlan",
     "GfePlan",
     "GfeTmPlan",
+    "GoalParameterPlan",
     "GroupPlan",
     "HybridGfePlan",
     "LearnPlan",
@@ -1384,6 +1387,7 @@ def compile_template(
         n_ef_obs=n_ef_obs,
         ef_interior=ef_interior,
         gfe_groups=gfe_groups,
+        goal_parameter_plans=build_goal_parameter_plans(gfe_groups),
         mu3_groups=mu3_groups,
         gfe_tm_groups=gfe_tm_groups,
         hybrid_gfe_groups=hybrid_gfe_groups,
