@@ -136,3 +136,7 @@ Family-semantics research handoff: retain exact existing validators/tolerances d
 **2026-09-09T21:58:20Z**
 
 Prefix/learning regression verified on current baseline in 0.32 seconds with no large allocation: one equality factor eq with roles/variables a,b,c and GLUE ports on all three; one declared but unreferenced blob unused; LearnableSpec("bad", "dirichlet", ("unused",)). At cardinality 2**63, compile_template raises OverflowError: Python int too large to convert to C long from prefix_offsets. At cardinality2, it instead reaches CompileError: learnable bad has no factor reading blob unused. The unused blob is never loaded; only small address arrays are constructed. Add this paired mechanism regression before extraction, pinning the literal original learning diagnostic from the baseline. Question -> answer -> source: modularity-agent isolated current compiler probe at83c3e98; confidence high.
+
+**2026-09-09T22:07:02Z**
+
+Ready baseline: cff-ejib is closed. Source701c10f, final gate recorded at2c29d5c (ticket-only descendants of gate-start758d43e) passed1755 default tests,41 slow deselections,4 existing warnings in1005.304 seconds measured wall. All19 registered stage cases and90 final compiler-boundary checks pass;14 complete arenas equal the pre-extraction compiler. Registered lowerer335 lines, compiler1024. Start from the published agent/cff-ejib-registered-lowering branch after PR publication and normal base update. No source changes after gate; one fresh final gate belongs to this ticket only after its implementation.
