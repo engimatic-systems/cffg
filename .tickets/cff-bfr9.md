@@ -1,6 +1,6 @@
 ---
 id: cff-bfr9
-status: open
+status: in_progress
 deps: [cff-ejib]
 links: [cff-ddsq]
 created: 2026-09-02T04:17:42Z
@@ -146,3 +146,7 @@ The registered lowerer is 335 lines; compiler.py is 1,024 lines. Start from the 
 **2026-09-09T22:08:44Z**
 
 Published base: PR #119, https://github.com/engimatic-systems/cffg/pull/119, branch agent/cff-ejib-registered-lowering. It is stacked on #118 and has the passing final gate described above. Update this base before creating the array-resolution work branch.
+
+**2026-09-09T22:10:17Z**
+
+Starting on agent/cff-bfr9-array-resolution from updated PR #119 branch at 0d8bfe9; validated source remains 701c10f (1,755 passing default tests). Change-path rows: New IR field copies existing declarations only; Learnable/checkpoint owns addresses and source/target pairing; New factor/rule owns declared numeric packing; Runtime numerical/status applies only to preserving source dtype and transforms, with no solver/status change. Flood/scheduled and direct/vmap share one resolved output. Host/JIT compiler pair is N/A. JSON and current/legacy bundles reconstruct through the same compiler; runtime checkpoint data and learning cadence stay unchanged. Sparse/improper messages are N/A; exact-zero log encoding, float32 source covariance checks, 32-group order and existing malformed-input gates are required. Resolution will return immutable data once all old gates pass; private numerical builders stay mutable so premature publication cannot introduce an earlier callback-payload exception. Complete draft metadata must replace discovery-state dependencies and family-name/suffix inference. Prefix conversion occurs before learning, as now specified in both resolution and assembly tickets. Preserve compatibility helper exports and legacy EF callback behavior. First pin the tiny prefix-versus-learning mechanism before moving code, then focused tests throughout and one final dashboard-backed gate.
