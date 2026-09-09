@@ -87,9 +87,11 @@ with exact finite-sample ledger identities and truthful stochastic statuses.
 Figure 5's average energy is `U_x = -zbar·rho`. Production's composite
 ledger adds the state negative entropy and surrounding edge/factor terms.
 For uncertain A, the analytic agent path feeds closed-form Dirichlet moments
-into `rho` but does not apply the functional density. Only the explicitly
-declared `cffg.mu3_is.v1` evaluator carries the Figure 5 `mu3(A)` update; its
-current Engine-level lifecycle is not evidence that `RollingAgent` executes it.
+into `rho` but does not apply the functional density. Only an explicitly
+declared `cffg.mu3_is.v1` evaluator carries the Figure 5 `mu3(A)` update.
+`RollingAgent` executes it only when its serialized planning template compiles
+to that evaluator; `learn_a=True` alone retains the analytic-moment
+approximation.
 
 ## Implemented layers
 
@@ -167,7 +169,13 @@ A pure-Python (dataclass) representation, independent of JAX:
   `.npz` is a ZIP container and cannot memory-map its individual arrays through
   ordinary `np.load`, so it is reserved for `RollingAgent` runtime checkpoints,
   whose many small state arrays benefit from one container but do not need
-  memory mapping.
+  memory mapping. The agent envelope records its version, exact field manifest,
+  planning/filtering structure and static-parameter hashes, runtime
+  planning/action configuration and construction-time JAX execution precision,
+  named belief shapes, cadence, NumPy RNG, learnables, and learned-goal state.
+  Restore rejects duplicate physical members and validates all fields into
+  temporary values before committing; legacy unversioned analytic checkpoints
+  retain an explicit migration path.
   The structural content hash ignores blob paths and groups compatible Colony
   instances.
 - **Init templates (cff-wx28)**: a `BlobRef` may carry a canonical-initializer
@@ -180,8 +188,10 @@ A pure-Python (dataclass) representation, independent of JAX:
   structure hash (parameter data, not structure).
 - **Portable bundle**: the deployable unit is a ZIP (`.cffgz`) containing
   `model.json` (structure + constraints), `blobs/` (parameter arrays), and
-  `manifest.json` (schema version, content hashes, provenance). Unzipping and
-  pointing the engine at `model.json` is a full model restore. Bundle parameter
+  `manifest.json` (schema version, content hashes, provenance). The supported
+  restore path is `load_bundle` → `compile_template` → `Engine`; an extracted
+  model may instead use the serialized loader and `compile_template(...,
+  root=extracted_directory)`. Bundle parameter
   members are canonical `.npy` files; ordinary external references may also use
   safetensors. Plate fragments remain nested specs in `model.json`; the manifest
   inventories every grounded tied/per-copy array, and per-copy blob paths use an
@@ -192,10 +202,21 @@ A pure-Python (dataclass) representation, independent of JAX:
   `recurrence_link` IR spelling is unchanged; resumable recurrence posterior
   state therefore owns a separate statistic manifest. No third-party
   interchange format — this schema is canonical.
-- **Edit actions**: the only public mutation API is transactional bundles
-  (`add_slice`, `bind_data`, `set_constraint`, `compose(template, port_map)`) that
-  validate the port invariant before committing. This client-neutral API is also
-  the incremental serialization of model-edit history.
+- **Edit actions**: `check_edits` validates a sequence of typed actions and
+  `apply_edits` commits it atomically to a copy. `AddVariable`, `AddFactor`,
+  `RemoveFactor`, `RemoveVariable`, `ReplaceFactor`, `AddConstraint`,
+  `RemoveConstraint`, `DeclarePort`, `RemovePort`, `AddBlob`,
+  `RebindBlobPath`, and `SetPlateDims` are the executable action vocabulary;
+  `bundle_to_json` / `bundle_from_json` serialize the sequence. `compose`
+  remains the separate complete-template composition operation. No public
+  `add_slice` or template-level `bind_data` function is advertised.
+- **Supported facade**: top-level `cffg` re-exports only `CorridorEnv`, `Engine`,
+  `RollingAgent`, `RunStatus`, `build_gridworld`, `compile_template`,
+  `load_bundle`, `save_bundle`, and the existing `set_params` compatibility
+  helper. Their focused modules remain canonical owners. Before 1.0, rule
+  tables, compiled arenas/group plans, kernel registration objects, and private
+  helpers are internal-unstable; serialized schemas retain their explicit
+  version contracts.
 
 ### 2. Compiler (`cffg.compiler`)
 
@@ -937,8 +958,16 @@ discarding a joint correlation. Exact joint rollover remains the separate
   `learn_a` / `learn_b` remain as the older spelling of `learn=("A",)` /
   `learn=("B",)`. Checkpoints carry every learnable's hyperparameters, the
   named beliefs and episode cadence, so a resumed agent does not re-fire the
-  episode-start statistic. Legacy single `belief` and `counts` / `b_counts`
-  keys are restored/migrated exactly or refused, never silently dropped.
+  episode-start statistic. The versioned envelope also binds the payload to
+  both serialized window structure hashes, the non-checkpointed static
+  parameter values, and the horizon, solver, damping, action-selection, and JAX
+  precision configuration; it inventories every logical and physical field,
+  checks normalized beliefs and learned-state shapes, restores the NumPy action
+  RNG, and commits only after complete validation. Unknown versions,
+  structures, parameterizations, configurations, shapes, fields, and duplicate
+  archive members fail specifically. Legacy single `belief` and `counts` /
+  `b_counts` spellings are complete and unambiguous or refused, never silently
+  dropped.
 - **Functional A-message lifecycle**: `mu3=True` asks the planning builder to
   serialize `parameter_message=mu3_is_v1`; the compiled arena declaration,
   not `learn_a` or a factor name, decides whether the runtime is stochastic.
@@ -952,11 +981,12 @@ discarding a joint correlation. Exact joint rollover remains the separate
   and all evaluator statuses to be converged, leaving ESS exhaustion distinct
   from inference-budget exhaustion. The typed planning runtime retains the
   status-bearing result and next-key cursor separately from NumPy action RNG.
-  Versioned checkpoints store the full `State`, result trace, evaluator and
-  schedule identity, particle configuration, refresh flags, and JAX key
-  representation. Restore validates every shape, dtype, base posterior, and
-  diagnostic before atomically mutating the live agent; analytic legacy
-  checkpoints remain supported, while a functional legacy restore is loud.
+  For a prepared functional epoch, that envelope additionally stores the full
+  `State`, result trace, evaluator and schedule identity, particle
+  configuration, refresh flags, and JAX key representation. Restore validates
+  every shape, dtype, base posterior, and diagnostic before atomically mutating
+  the live agent; analytic legacy checkpoints remain supported, while a
+  functional legacy restore is loud.
 - Sensor/actuator adapters are plain Python callbacks mapping env observations to
   one-hot data bindings and control marginals to env actions.
 

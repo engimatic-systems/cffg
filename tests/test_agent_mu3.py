@@ -99,6 +99,39 @@ def assert_result_exact(actual: RunResult, expected: RunResult) -> None:
             )
 
 
+def checkpoint_arrays(path) -> dict[str, np.ndarray]:
+    with np.load(path, allow_pickle=False) as archive:
+        return {key: archive[key].copy() for key in archive.files}
+
+
+def write_checkpoint(path, arrays: dict[str, np.ndarray]) -> None:
+    arrays["checkpoint_fields"] = np.asarray(json.dumps(sorted(arrays)))
+    np.savez(path, **arrays)
+
+
+def used_agent_snapshot(agent: RollingAgent):
+    return (
+        agent._planning,
+        agent.last_filter_result,
+        agent.belief.copy(),
+        agent.counts.copy(),
+        agent.tick,
+        agent.episode_tick,
+        json.dumps(agent.rng.bit_generator.state, sort_keys=True),
+    )
+
+
+def assert_used_agent_unchanged(agent: RollingAgent, snapshot) -> None:
+    planning, filter_result, belief, counts, tick, episode_tick, rng = snapshot
+    assert agent._planning is planning
+    assert agent.last_filter_result is filter_result
+    np.testing.assert_array_equal(agent.belief, belief)
+    np.testing.assert_array_equal(agent.counts, counts)
+    assert agent.tick == tick
+    assert agent.episode_tick == episode_tick
+    assert json.dumps(agent.rng.bit_generator.state, sort_keys=True) == rng
+
+
 def direct_plan(
     agent: RollingAgent,
     learnables: Learnables,
@@ -266,6 +299,155 @@ def test_trial_loop_matches_direct_engines_and_checkpoint_replays(tmp_path):
     assert not np.array_equal(
         samples1, agent.last_plan_result.state.params[plan.name + ":samples"]
     )
+
+
+def test_functional_checkpoint_has_one_exact_outer_and_runtime_manifest(tmp_path):
+    source = make_agent()
+    source.act()
+    path = tmp_path / "functional-envelope.npz"
+    source.checkpoint(path)
+
+    arrays = checkpoint_arrays(path)
+    assert int(arrays["checkpoint_version"]) == 1
+    assert str(arrays["agent:mode"]) == "functional_mu3"
+    assert int(arrays["mu3_samples"]) == source.plan.mu3_samples
+    assert float(arrays["mu3_min_ess_fraction"]) == source.plan.mu3_min_ess_fraction
+    assert str(arrays["mu3_refresh"]) == source._planning.refresh_policy
+    assert json.loads(str(arrays["checkpoint_fields"])) == sorted(arrays)
+
+    state_fields = {
+        f"mu3:state:{field.name}" for field in fields(State) if field.name != "params"
+    }
+    parameter_fields = {
+        f"mu3:state:param:{name}" for name in source.last_plan_result.state.params
+    }
+    assert {name for name in arrays if name.startswith("mu3:")} == {
+        "mu3:metadata",
+        "mu3:key",
+        "mu3:state:metadata",
+        *state_fields,
+        *parameter_fields,
+    }
+
+
+def test_agent_version_1_functional_checkpoint_migrates_runtime(tmp_path):
+    source = make_agent()
+    action = source.act()
+    current = tmp_path / "current-functional.npz"
+    source.checkpoint(current)
+    arrays = checkpoint_arrays(current)
+    arrays["agent:version"] = np.asarray(1)
+    for field in (
+        "checkpoint_version",
+        "checkpoint_fields",
+        "plan_structure_hash",
+        "filter_structure_hash",
+        "plan_parameter_hash",
+        "filter_parameter_hash",
+        "horizon",
+        "damp",
+        "n_sweeps",
+        "select",
+        "jax_enable_x64",
+        "mu3_samples",
+        "mu3_min_ess_fraction",
+        "mu3_refresh",
+    ):
+        del arrays[field]
+    legacy = tmp_path / "agent-version-1-functional.npz"
+    np.savez(legacy, **arrays)
+
+    restored = make_agent(key=jax.random.PRNGKey(999))
+    restored.observe(1, 0)
+    restored.restore(legacy)
+
+    assert_result_exact(restored.last_plan_result, source.last_plan_result)
+    np.testing.assert_array_equal(
+        restored.planning_key_cursor, source.planning_key_cursor
+    )
+    np.testing.assert_array_equal(restored.belief, source.belief)
+    np.testing.assert_array_equal(restored.counts, source.counts)
+    assert restored.tick == source.tick
+    assert restored.episode_tick == source.episode_tick
+    assert restored.planning_epoch == source.planning_epoch
+    assert restored.act() == action
+
+
+@pytest.mark.parametrize(
+    "mismatch",
+    ("samples", "min_ess", "refresh", "mode"),
+)
+def test_functional_checkpoint_configuration_mismatch_is_atomic(
+    tmp_path, mismatch
+):
+    source = make_agent()
+    source.act()
+    path = tmp_path / f"functional-{mismatch}.npz"
+    source.checkpoint(path)
+
+    if mismatch == "samples":
+        target = make_agent(samples=64)
+        message = "runtime configuration mismatch"
+    elif mismatch == "min_ess":
+        target = make_agent(min_ess=0.02)
+        message = "runtime configuration mismatch"
+    elif mismatch == "refresh":
+        target = make_agent(refresh="posterior")
+        message = "runtime configuration mismatch"
+    else:
+        target = RollingAgent(
+            binary_builder,
+            horizon=1,
+            learn_a=True,
+            initial_counts=ALPHA0,
+            n_sweeps=100,
+        )
+        message = "cannot restore"
+    action = target.act()
+    target.observe(action, 0)
+    snapshot = used_agent_snapshot(target)
+
+    with pytest.raises(ValueError, match=message):
+        target.restore(path)
+    assert_used_agent_unchanged(target, snapshot)
+
+
+@pytest.mark.parametrize(
+    "corruption",
+    ("extra_array", "missing_key", "extra_metadata", "missing_state"),
+)
+def test_functional_checkpoint_runtime_schema_corruption_is_atomic(
+    tmp_path, corruption
+):
+    source = make_agent()
+    source.act()
+    good = tmp_path / "functional-good.npz"
+    source.checkpoint(good)
+    arrays = checkpoint_arrays(good)
+
+    if corruption == "extra_array":
+        arrays["mu3:future"] = np.asarray(1)
+    elif corruption == "missing_key":
+        del arrays["mu3:key"]
+    elif corruption == "extra_metadata":
+        metadata = json.loads(str(arrays["mu3:metadata"]))
+        metadata["future"] = True
+        arrays["mu3:metadata"] = np.asarray(json.dumps(metadata))
+    else:
+        state_field = next(
+            name for name in arrays if name.startswith("mu3:state:param:")
+        )
+        del arrays[state_field]
+    path = tmp_path / f"functional-{corruption}.npz"
+    write_checkpoint(path, arrays)
+
+    target = make_agent()
+    action = target.act()
+    target.observe(action, 0)
+    snapshot = used_agent_snapshot(target)
+    with pytest.raises((KeyError, ValueError), match="functional checkpoint"):
+        target.restore(path)
+    assert_used_agent_unchanged(target, snapshot)
 
 
 def test_sampling_failure_returns_no_action_and_preserves_diagnostics():
