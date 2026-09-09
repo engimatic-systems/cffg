@@ -438,15 +438,28 @@ def _remaining(t, consumed):
     return mix, recurrence, tuple(precision), tuple(constraints), equalities, problems
 
 
-def specialized_initializer_shape(t, factor, role, layouts=None):
-    """Initializer declarations shared with the compatibility array loader."""
+def specialized_initializer_shape(t, factor, role, layouts=None, *, composite=False):
+    """Family declarations without executing an ordinary kernel's callbacks.
+
+    Built-in shapes belong to their composite when used there. The compatibility
+    loader retains registered declarations first and its narrower fallback.
+    """
     cards = {
         name: t.variables[variable].cardinality
         for name, variable in factor.edges.items()
     }
     dims = {name: t.variables[variable].dim for name, variable in factor.edges.items()}
     declared = {}
-    if factor.type == "dirichlet":
+    if composite and factor.type == "categorical":
+        declared = {"statistic": (cards["out"],)}
+    elif composite and factor.type == "matrix_cat":
+        declared = {"matrix": (cards["out"], cards["in"])}
+    elif composite and factor.type == "transition_mixture":
+        declared = {"matrices": (cards["selector"], cards["out"], cards["in"])}
+    elif composite and factor.type == "gaussian":
+        d = dims["out"]
+        declared = {"mean": (d,), "cov": (d, d)}
+    elif factor.type == "dirichlet":
         variable = factor.edges["out"]
         layout = layouts.get(variable) if layouts is not None else None
         shape = layout.shape if layout else None
@@ -470,11 +483,13 @@ def specialized_initializer_shape(t, factor, role, layouts=None):
     return declared.get(role)
 
 
-def _initializer_shapes(t, layouts):
+def _initializer_shapes(t, layouts, consumed):
     shapes = {}
     for factor in t.factors.values():
         for role in factor.param_blobs:
-            shape = specialized_initializer_shape(t, factor, role, layouts)
+            shape = specialized_initializer_shape(
+                t, factor, role, layouts, composite=factor.name in consumed
+            )
             if shape is not None:
                 shapes[factor.name, role] = shape
     return shapes
@@ -526,7 +541,7 @@ def discover_specialized(
         mix, recurrence, precision, constraints, equalities, grouping_problems = (
             _remaining(topology, consumed)
         )
-        shapes = _initializer_shapes(topology, layouts)
+        shapes = _initializer_shapes(topology, layouts, consumed)
     conditioning = {}
     for candidate in topology.data_candidates:
         name, role = candidate.endpoint

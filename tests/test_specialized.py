@@ -329,6 +329,40 @@ def test_registered_any_family_keeps_declared_ef_domain_routing():
         kernels.unregister_kernel(name)
 
 
+def test_composite_discovery_does_not_execute_replacement_kernel_shape_callbacks():
+    template, arrays = model("gfe")
+    original = kernels.kernel_for("matrix_cat")
+    calls = []
+
+    def fail_shape(sizes):
+        calls.append(sizes)
+        raise RuntimeError("shape callback executed")
+
+    parameters = dict(original.binding.parameters)
+    parameters["matrix"] = replace(parameters["matrix"], shape=fail_shape)
+    replacement = replace(
+        original, binding=replace(original.binding, parameters=parameters)
+    )
+    kernels.unregister_kernel("matrix_cat")
+    try:
+        kernels.register_kernel(replacement)
+        _, _, drafts = stages(template)
+        (matrix,) = (
+            source for source in drafts.gfe[0].arrays.inputs if source.role == "matrix"
+        )
+        assert matrix.initializer_shape == (2, 2)
+        compiler.compile_template(template, arrays=arrays)
+        with pytest.raises(compiler.CompileError, match="no array override"):
+            compiler.compile_template(template, arrays={})
+        assert calls == []
+        with pytest.raises(RuntimeError, match="shape callback executed"):
+            compiler._blob_shape(template, "A")
+        assert len(calls) == 1
+    finally:
+        kernels.unregister_kernel("matrix_cat")
+        kernels.register_kernel(original)
+
+
 def test_32_specialized_shapes_preserve_dtype_and_reconstruction_contracts():
     template, arrays = mixed_goals(states=tuple(range(2, 34)))
     claims, _, drafts = stages(template)
