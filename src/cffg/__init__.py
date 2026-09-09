@@ -7,7 +7,10 @@ from cffg.engine import Engine, RunStatus
 from cffg.models.gridworld import CorridorEnv, build_gridworld
 from cffg.params import set_params
 from cffg.kernels import FactorKernel, HostileInputs, register_kernel
-from cffg.kernel_bindings import DiscreteBinding, DiscreteMode, EFBinding, ParameterSpec
+from cffg.kernel_bindings import (
+    DiscreteBinding, DiscreteMode, EFBinding, GaussianBinding,
+    GaussianConditioning, ParameterSpec,
+)
 
 __all__ = [
     "CorridorEnv",
@@ -16,6 +19,8 @@ __all__ = [
     "EFBinding",
     "Engine",
     "FactorKernel",
+    "GaussianBinding",
+    "GaussianConditioning",
     "HostileInputs",
     "ParameterSpec",
     "RollingAgent",

@@ -157,6 +157,13 @@ class GaussGroupPlan:
     gather: np.ndarray  # [M, R] gaussian slot to read (opposite side)
     scatter: np.ndarray  # [M, R] gaussian slot to write (own side)
     obs_rows: np.ndarray | None = None  # [M] rows into the g_obs array
+    kernel: kernels.FactorKernel | None = None
+    parameter_paths: tuple[tuple[str, str], ...] = ()
+    observed_role: int | None = None
+
+    @property
+    def observed_dim(self) -> int:
+        return self.dims[self.observed_role] if self.observed_role is not None else 0
 
 
 @dataclass(frozen=True)
@@ -840,11 +847,12 @@ def compile_template(
                 if port.role is not PortRole.DATA:
                     continue
                 if v.dim:
-                    # Gaussian observations compile to conditioning: legal only
-                    # where a conditioned rule exists (gaussian_linear "out").
+                    # Gaussian DATA ports use the binding's conditioning rule.
                     fname, role = ends[0]
                     ftype_here = t.factors[fname].type
-                    if ftype_here == "gaussian_linear" and role == "out":
+                    kern = kernels.kernel_for(ftype_here)
+                    conditioning = kern.binding.conditioning if kern is not None and kern.arena == "gaussian" else None
+                    if conditioning is not None and role == conditioning.role:
                         gauss_data_ports[vname] = port.name
                     elif ftype_here in ("gaussian_mixture", "gaussian_mixture_linear"):
                         problems.append(
@@ -858,8 +866,8 @@ def compile_template(
                         )
                     else:
                         problems.append(
-                            f"port {port.name!r}: Gaussian DATA ports must clamp a "
-                            f"gaussian_linear 'out' edge, not {fname!r}/{role!r}"
+                            f"port {port.name!r}: Gaussian DATA port on {fname!r}/{role!r} "
+                            "requires a registered conditioning role"
                         )
                 elif v.ef:
                     # EF observations compile to conditioning too: legal only
@@ -1432,9 +1440,13 @@ def compile_template(
         )
         if gaussian:
             dims = tuple(t.variables[f.edges[r]].dim for r in roles)
-            observed = f.type == "gaussian_linear" and f.edges["out"] in gauss_data_ports
-            gtype = "gaussian_linear_obs" if observed else f.type
-            gauss_buckets.setdefault((gtype, dims), []).append(fname)
+            kern = kernels.kernel_for(f.type)
+            if f.type != "equality" and (kern is None or kern.arena != "gaussian"):
+                raise CompileError(f"factor type {f.type!r} has no Gaussian kernel binding")
+            conditioning = None if kern is None else kern.binding.conditioning
+            observed = conditioning is not None and f.edges[conditioning.role] in gauss_data_ports
+            gtype = (conditioning.plan_type or f"{f.type}:observed:{conditioning.role}") if observed else f.type
+            gauss_buckets.setdefault((gtype, dims, f.type, observed), []).append(fname)
             continue
         if f.type == "gaussian_prec":  # mixed Gaussian/EF node: its own arena pair
             d_out = t.variables[f.edges["out"]].dim
@@ -1487,44 +1499,51 @@ def compile_template(
         buckets.setdefault((f.type, cards, mode), []).append(fname)
 
     gauss_groups: list[GaussGroupPlan] = []
+    gauss_group_names: set[str] = set()
     gauss_data: dict[str, int] = {}
     n_obs_rows = 0
-    for (gtype, dims), members in sorted(gauss_buckets.items()):
-        base = "gaussian_linear" if gtype == "gaussian_linear_obs" else gtype
+    for (gtype, dims, base, observed), members in sorted(gauss_buckets.items()):
+        kern = kernels.kernel_for(base)
         roles = FACTOR_TYPES[base].edge_roles
         gname = f"gauss:{gtype}:{'x'.join(map(str, dims))}"
+        if gname in gauss_group_names:
+            raise CompileError(f"Gaussian group name collision: {gname!r}")
+        gauss_group_names.add(gname)
         gather = np.array([[opposite[(m, r)] for r in roles] for m in members], dtype=np.int64)
         scatter = np.array([[slot_of[(m, r)] for r in roles] for m in members], dtype=np.int64)
         obs_rows = None
-        if gtype == "gaussian_linear_obs":
+        observed_role = None
+        if observed:
+            role = kern.binding.conditioning.role
+            observed_role = roles.index(role)
             rows = []
             for m in members:
-                port = gauss_data_ports[t.factors[m].edges["out"]]
-                gauss_data[port] = (n_obs_rows, dims[0])
+                port = gauss_data_ports[t.factors[m].edges[role]]
+                gauss_data[port] = (n_obs_rows, dims[observed_role])
                 rows.append(n_obs_rows)
                 n_obs_rows += 1
             obs_rows = np.array(rows, dtype=np.int64)
-        gauss_groups.append(
-            GaussGroupPlan(gname, gtype, roles, dims, tuple(members), gather, scatter, obs_rows)
-        )
-        for key, arr in _stack_gauss_params(t, base, dims, members, resolved).items():
-            log_params[f"{gname}:{key}"] = arr
-        runtime = (
-            {
-                "mean": (f"{gname}:m", "identity"),
-                "cov": (f"{gname}:W", "covariance_to_precision"),
-            }
-            if base == "gaussian"
-            else {
-                "matrix": (f"{gname}:A", "identity"),
-                "offset": (f"{gname}:b", "identity"),
-                "cov": (f"{gname}:W", "covariance_to_precision"),
-            }
-        )
-        for index, member in enumerate(members):
-            _set_member_address(member_of, t, member, index, runtime)
-            if member in member_of:
-                writable_members.add(member)
+        paths = {} if kern is None else kernels.parameter_paths(kern, gname)
+        gauss_groups.append(GaussGroupPlan(
+            gname, gtype, roles, dims, tuple(members), gather, scatter, obs_rows,
+            kern, tuple(paths.items()), observed_role,
+        ))
+        if kern is not None:
+            try:
+                from cffg.kernel_runtime import validate_gaussian_shapes
+
+                packed = kernels.packed_parameters(kern, t, members, resolved)
+                validate_gaussian_shapes(gauss_groups[-1], packed)
+            except (ValueError, TypeError, KeyError, AttributeError) as err:
+                raise CompileError(f"kernel {kern.impl_id!r}: {err}") from err
+            log_params.update({paths[key]: value for key, value in packed.items()})
+            specs = kern.binding.parameters
+            if all(spec.key is not None for spec in specs.values()):
+                runtime = {role: (paths[spec.key], spec.transform) for role, spec in specs.items()}
+                for index, member in enumerate(members):
+                    _set_member_address(member_of, t, member, index, runtime, specs)
+                    if member in member_of:
+                        writable_members.add(member)
 
     mix_groups: list[MixGroupPlan] = []
     for (mtype, dims, k_sel), members in sorted(mix_buckets.items()):
@@ -2101,33 +2120,46 @@ def _resolve_arrays(
     Files beat init specs so a continual-learning checkpoint written to the
     blob path overrides the warm start on reload (cff-wx28)."""
     needed = {b for f in t.factors.values() for b in f.param_blobs.values()}
+    covariance_blobs = {
+        blob
+        for factor in t.factors.values()
+        if (kernel := kernels.kernel_for(factor.type)) is not None
+        for role, blob in factor.param_blobs.items()
+        if (spec := kernel.binding.parameters.get(role)) is not None
+        and spec.transform == "covariance_to_precision"
+    }
     out: dict[str, np.ndarray] = {}
     for name in sorted(needed):
-        if arrays is not None and name in arrays:
-            out[name] = np.asarray(arrays[name], dtype=np.float64)
-            continue
         path = Path(root) / t.blobs[name].path if root is not None else None
-        if path is not None and path.exists():
-            out[name] = _load_blob(path, name)
-            continue
-        if t.blobs[name].init:
+        if arrays is not None and name in arrays:
+            value = np.asarray(arrays[name])
+        elif path is not None and path.exists():
+            value = _load_blob(path, name)
+        elif t.blobs[name].init:
             from cffg import inits
 
             shape = _blob_shape(t, name)
             if shape is None:
                 raise CompileError(f"blob {name!r}: cannot infer shape for init spec")
             try:
-                out[name] = np.asarray(
-                    inits.from_spec(t.blobs[name].init, shape), dtype=np.float64
-                )
+                value = np.asarray(inits.from_spec(t.blobs[name].init, shape))
             except ValueError as e:
                 raise CompileError(f"blob {name!r}: init spec failed: {e}") from None
-            continue
-        raise CompileError(
-            f"blob {name!r}: no array override, no file"
-            + (f" at {path}" if path is not None else " (no root directory)")
-            + ", and no init spec"
-        )
+        else:
+            raise CompileError(
+                f"blob {name!r}: no array override, no file"
+                + (f" at {path}" if path is not None else " (no root directory)")
+                + ", and no init spec"
+            )
+        if name in covariance_blobs:
+            from cffg.params import _validate_covariance
+
+            try:
+                # Validate roundoff in the source dtype before host packing widens it.
+                _validate_covariance(value, f"blob {name!r}: covariance")
+            except ValueError as err:
+                raise CompileError(str(err)) from err
+        out[name] = np.asarray(value, dtype=np.float64)
     return out
 
 
@@ -2159,12 +2191,6 @@ def _blob_shape(t: Template, blob_name: str) -> tuple[int, ...] | None:
                     if parameter_var in likelihood.param_edges.values():
                         return _dirichlet_shape(t, likelihood.name)[0]
                 return (card("out"),)
-            if f.type == "gaussian":
-                d = dim("out")
-                return {"mean": (d,), "cov": (d, d)}[role]
-            if f.type == "gaussian_linear":
-                do, di = dim("out"), dim("in")
-                return {"matrix": (do, di), "offset": (do,), "cov": (do, do)}[role]
             if f.type == "gaussian_mixture":
                 d, k = dim("out"), card("selector")
                 return {"mean": (k, d), "cov": (k, d, d)}[role]
@@ -2186,7 +2212,7 @@ def _blob_shape(t: Template, blob_name: str) -> tuple[int, ...] | None:
 
 def _load_blob(path: Path, name: str) -> np.ndarray:
     if path.suffix == ".npy":
-        return np.asarray(np.load(path), dtype=np.float64)
+        return np.asarray(np.load(path))
     if path.suffix == ".safetensors":
         from safetensors.numpy import load_file
 
@@ -2194,7 +2220,7 @@ def _load_blob(path: Path, name: str) -> np.ndarray:
         key = name if name in tensors else next(iter(tensors)) if len(tensors) == 1 else None
         if key is None:
             raise CompileError(f"blob {name!r}: {path} holds {sorted(tensors)}, need {name!r}")
-        return np.asarray(tensors[key], dtype=np.float64)
+        return np.asarray(tensors[key])
     raise CompileError(f"blob {name!r}: unsupported format {path.suffix!r}")
 
 
@@ -2228,31 +2254,13 @@ def _stack_gauss_params(
     consumes); the compile-time Cholesky is also the SPD check."""
     if ftype == "equality":
         return {}
-    out: dict[str, list[np.ndarray]] = {}
-    for m in members:
-        f = t.factors[m]
-        blobs = {role: resolved[f.param_blobs[role]] for role in sorted(f.param_blobs)}
-        cov = blobs["cov"]
-        if ftype == "gaussian":
-            (d,) = dims
-            _expect(m, blobs["mean"], (d,))
-            _expect(m, cov, (d, d))
-            out.setdefault("m", []).append(blobs["mean"])
-        else:  # gaussian_linear
-            do, di = dims
-            _expect(m, blobs["matrix"], (do, di))
-            _expect(m, blobs["offset"], (do,))
-            _expect(m, cov, (do, do))
-            out.setdefault("A", []).append(blobs["matrix"])
-            out.setdefault("b", []).append(blobs["offset"])
-        if not np.allclose(cov, cov.T, atol=1e-12):
-            raise CompileError(f"factor {m!r}: covariance not symmetric")
-        try:
-            np.linalg.cholesky(cov)
-        except np.linalg.LinAlgError:
-            raise CompileError(f"factor {m!r}: covariance not positive definite") from None
-        out.setdefault("W", []).append(np.linalg.inv(cov))
-    return {k: np.stack(v) for k, v in out.items()}
+    kern = kernels.kernel_for(ftype)
+    if kern is None or kern.arena != "gaussian":
+        raise CompileError(f"factor type {ftype!r}: no Gaussian binding")
+    try:
+        return kernels.packed_parameters(kern, t, members, resolved)
+    except ValueError as err:
+        raise CompileError(str(err)) from err
 
 
 def _stack_mix_params(

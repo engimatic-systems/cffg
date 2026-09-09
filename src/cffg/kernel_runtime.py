@@ -120,3 +120,92 @@ def validate_discrete_shapes(group, packed, semiring):
         callbacks = plan.kernel.binding.vmp if mode == "vmp" else plan.kernel.binding.bp
         if callbacks.readout is not None:
             jax.eval_shape(partial(discrete_readout, plan), inc, params)
+
+
+def gaussian_message(group, eta, precision, params, observation=None, mask=None):
+    if group.kernel is None:
+        from cffg import gauss
+
+        d = group.dims[0]
+        e, p = gauss.equality_messages(eta[..., :d], precision[..., :d, :d])
+        outputs = tuple((e[:, r], p[:, r]) for r in range(len(group.roles)))
+    else:
+        outputs = group.kernel.binding.message(
+            eta,
+            precision,
+            params,
+            group.dims,
+            group.observed_role,
+            observation,
+            mask,
+        )
+    if len(outputs) != len(group.roles):
+        raise ValueError(
+            f"group {group.name!r}: outgoing message needs one pair per role"
+        )
+    for role, dim, pair in zip(group.roles, group.dims, outputs):
+        e, p = pair
+        if e.shape != (eta.shape[0], dim) or p.shape != (eta.shape[0], dim, dim):
+            raise ValueError(
+                f"group {group.name!r}: outgoing message shape for {role!r} must be [M,{dim}] and [M,{dim},{dim}]"
+            )
+    return outputs
+
+
+def gaussian_energy(group, eta, precision, params, observation=None, mask=None):
+    if group.kernel is None:
+        from cffg import gauss
+
+        d = group.dims[0]
+        out = gauss.equality_energy(eta[..., :d], precision[..., :d, :d])
+    else:
+        out = group.kernel.binding.energy(
+            eta,
+            precision,
+            params,
+            group.dims,
+            group.observed_role,
+            observation,
+            mask,
+        )
+    if out.shape != (eta.shape[0],):
+        raise ValueError(
+            f"group {group.name!r}: node energy must have one value per member"
+        )
+    return out
+
+
+def gaussian_readout(
+    group, eta, precision, params, observation=None, mask=None, *, statistics=False
+):
+    binding = group.kernel.binding
+    callback = binding.statistics if statistics else binding.readout
+    values = callback(
+        eta, precision, params, group.dims, group.observed_role, observation, mask
+    )
+    for key, value in values.items():
+        if not value.shape or value.shape[0] != eta.shape[0]:
+            raise ValueError(
+                f"group {group.name!r}: readout {key!r} needs a member axis"
+            )
+    return values
+
+
+def validate_gaussian_shapes(group, packed):
+    params = {
+        key: jax.ShapeDtypeStruct(
+            value.shape, jax.dtypes.canonicalize_dtype(value.dtype)
+        )
+        for key, value in packed.items()
+    }
+    dtype = jax.dtypes.canonicalize_dtype(np.float64)
+    m, r, width = len(group.members), len(group.roles), max(group.dims)
+    eta = jax.ShapeDtypeStruct((m, r, width), dtype)
+    precision = jax.ShapeDtypeStruct((m, r, width, width), dtype)
+    observation = mask = None
+    if group.observed_role is not None:
+        observation = jax.ShapeDtypeStruct((m, group.observed_dim), dtype)
+        mask = jax.ShapeDtypeStruct((m,), dtype)
+    args = (eta, precision, params, observation, mask)
+    jax.eval_shape(partial(gaussian_message, group), *args)
+    jax.eval_shape(partial(gaussian_energy, group), *args)

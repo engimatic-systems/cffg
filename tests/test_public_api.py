@@ -170,6 +170,8 @@ def test_top_level_facade_reexports_only_canonical_owners():
         "EFBinding": cffg.kernel_bindings.EFBinding,
         "Engine": CanonicalEngine,
         "FactorKernel": cffg.kernels.FactorKernel,
+        "GaussianBinding": cffg.kernel_bindings.GaussianBinding,
+        "GaussianConditioning": cffg.kernel_bindings.GaussianConditioning,
         "HostileInputs": cffg.kernels.HostileInputs,
         "ParameterSpec": cffg.kernel_bindings.ParameterSpec,
         "RollingAgent": CanonicalRollingAgent,

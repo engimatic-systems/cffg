@@ -49,8 +49,8 @@ OBSERVED OUT-EDGE (Gaussian DATA port — conditioning, not clamping):
                                                       (the edge is exterior)
     and the node energy uses q(x) ∝ N(y*; Ax+b, V) mu_in(x), which makes the
     tree identity  BFE = −log p(y*)  hold exactly. A missing observation
-    (mask 0) removes the node: vacuous message to in, zero energy
-    (∫ f dy = 1 contributes nothing to x).
+    (mask 0) gives a vacuous message to in and node energy −H[q_in],
+    cancelling the interior input-edge entropy in the Bethe ledger.
 
 NODE ENERGIES  F[q_a] = E_{q_a}[log q_a − log f_a],  q_a ∝ f_a · Π incoming:
     all closed-form. For a Gaussian belief with precision Λ_q,

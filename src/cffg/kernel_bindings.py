@@ -94,3 +94,54 @@ class DiscreteBinding:
     @property
     def constraint_modes(self) -> frozenset[str]:
         return frozenset({"mean_field"}) if self.vmp is not None else frozenset()
+
+
+@dataclass(frozen=True)
+class GaussianConditioning:
+    """One legal DATA role and its host validator ``(value, dimension)``.
+
+    ``plan_type`` is reserved for built-in compatibility labels. External
+    labels are derived from the factor type and observed role. Neither
+    changes the serialized factor type or implementation identity.
+    """
+
+    role: str
+    validate: Callable
+    plan_type: str | None = None
+
+
+@dataclass(frozen=True)
+class GaussianBinding:
+    """Information-form callbacks retaining every structural role.
+
+    Callbacks receive ``(eta, precision, params, dims, observed_role, y, mask)``.
+    Incoming blocks are [M,R,Dlocal] and [M,R,Dlocal,Dlocal]; dimensions and
+    the optional observed-role index are static. Observation arrays are
+    [M,d_observed] and [M], or None for unobserved groups. Messages return
+    one exact-sized ``(eta [M,d], precision [M,d,d])`` pair per role,
+    including the cavity predictive on a conditioned role. Energy returns
+    [M]. Optional readout/statistics callbacks return named [M,...] arrays.
+
+    ``statistics`` feeds gaussian_node_stats (conjugate sufficient statistics);
+    ``readout`` feeds kernel_readouts (extension-specific summaries). They
+    may use host NumPy; message and energy callbacks must be JAX trace-safe.
+    A missing observation means marginalization of its role, not necessarily
+    deletion of the remaining factor. The callback owns that mathematical
+    distinction and the node's normalization constant.
+    """
+
+    roles: tuple[str, ...]
+    parameters: Mapping[str, ParameterSpec]
+    param_keys: tuple[str, ...]
+    pack_params: Callable | None
+    message: Callable
+    energy: Callable
+    conditioning: GaussianConditioning | None = None
+    statistics: Callable | None = None
+    readout: Callable | None = None
+    arena: str = field(default="gaussian", init=False)
+    constraint_modes: frozenset[str] = field(default=frozenset(), init=False)
+
+    @property
+    def message_roles(self) -> tuple[str, ...]:
+        return self.roles
