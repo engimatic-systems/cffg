@@ -2,7 +2,7 @@
 id: cff-cfqg
 status: open
 deps: [cff-ofv1]
-links: [cff-ahps, cff-209l, cff-edoz, cff-ws3c]
+links: [cff-ahps, cff-209l, cff-edoz, cff-ws3c, cff-ty0v]
 created: 2026-08-13T03:59:30Z
 type: epic
 priority: 1
@@ -30,9 +30,11 @@ runtime execution, schedules, objective accounting, and readouts focused
 owners behind typed internal contracts. The final gate proves the resulting
 extension paths with executable evidence.
 
-This is an architecture program. It does not repeat rSLDS scientific
-validation, add a factor family, set a performance target, define a public
-release, or change the mathematical meaning of an existing model.
+This is an architecture program with execution-structure preservation gates.
+It protects the existing flat storage, chain scans, traced-executable reuse,
+and actual Colony batches while improving extension ownership. It does not
+repeat rSLDS scientific validation, add a factor family, promise a speedup,
+define a public release, or change an existing model's mathematics.
 
 ## Outcomes / Acceptance Criteria — WHAT
 
@@ -42,6 +44,10 @@ release, or change the mathematical meaning of an existing model.
 2. Registered factors that use one discrete, Gaussian, or exponential-family
    arena have one documented extension path for structure, messages, energy,
    parameters, observations, readouts, and serialized implementation identity.
+   Mode-specific input meaning is explicit: arena storage does not decide
+   whether a rule consumes cavities, factorized beliefs, or a specialized
+   variational construction. Max-product assignment scoring has its own
+   declared capability, distinct from BFE/GFE.
 3. A representative same-arena factor can be added and exercised without
    adding its type name to central compiler, engine, validation, schedule, or
    objective dispatch.
@@ -56,10 +62,17 @@ release, or change the mathematical meaning of an existing model.
    lowering, specialized lowering, data/learning resolution, and assembly.
    `cff-ecw0` characterizes the exact commit that closes `cff-209l`, not the
    older authoring snapshot.
+   Specialized discovery precedes ordinary grouping; the same owner then
+   completes specialized drafts using registered membership. Raw topology,
+   semantic edge tags, and blob-derived payloads have distinct owners.
+   Assembly verifies factor/composite and objective ownership exactly once.
 6. Engine execution, schedules, state/data/mu3 lifecycle, ordinary iteration,
    explicit outer/exact strategies, objective accounting, and readouts use
    focused owners after `cff-sf29` characterizes the exact commit that closes
    compiler track `cff-edoz`.
+   Execution accepts local blocks from flat arrays or scan registers and
+   returns local solver facts alongside writes. Engine and Colony share
+   termination interpretation and result construction below the facade.
 7. The refactor preserves the exact compiler and engine characterization
    baselines. For public, serialized, and numerical surfaces where `cff-209l`
    promises parity, this also preserves e488df3 imports and call forms,
@@ -80,13 +93,21 @@ release, or change the mathematical meaning of an existing model.
     extension baseline. It is not described as proof of paper faithfulness,
     rSLDS recovery, runtime speed, release readiness, or universal factor
     coverage.
+12. Existing discrete and Gaussian chains retain flat persistent bytes,
+    registerized scan carry/scatter behavior, and traced-executable reuse when
+    runtime values change at unchanged shapes/dtypes/static controls.
+13. A Colony fixture with at least two distinct-input instances sharing a
+    structure plus a different-structure instance retains the recorded Engine
+    comparison, grouping, and isolation contract. An invalid/stopped neighbor
+    does not change a healthy instance's state or termination facts.
 
 ## Methodological Suggestions — HOW
 
 These suggestions are optional. An implementer may choose another sound method.
 
-- Land the `cff-209l` same-arena kernel foundation before moving compiler
-  types or stages.
+- Land the cff-wera discrete migration, then cff-zq25 Gaussian migration,
+  closing the cff-209l foundation before compiler extraction. This ordering
+  coordinates overlapping edits; it is not a mathematical arena dependency.
 - Reuse existing mathematical authorities and add old/new observable
   characterization only for an uncovered refactor seam. A newly discovered
   scientific gap gets a separate ticket unless it proves the move unsafe.
@@ -109,6 +130,8 @@ The following tickets remain outside this epic:
   learning/checkpoint chain.
 - `cff-j7mm` owns resource-estimator correctness.
 - `cff-wbhu` owns compiled-loop and Colony throughput.
+- `cff-rqqc` owns per-instance stochastic keys/state/statuses; this epic retains
+  Colony's explicit rejection of unsupported stochastic evaluators.
 - `cff-5edo` owns long-rollout convergence and warm starts.
 - `cff-3kdk` owns readout vectorization.
 - `cff-cj5h` owns epistemic diagnostics.
@@ -136,7 +159,7 @@ The following tickets remain outside this epic:
 
 ## Notes
 
-**2026-09-02 architecture-program handoff**
+**2026-09-08 PR #108 review handoff (supersedes the September 2 plan)**
 
 Source of truth: `tk dep tree --full`, `tk ready`, and `tk blocked` at this
 revision.
@@ -150,12 +173,14 @@ baselines rather than attempting to characterize the older snapshot directly.
 Legend: prerequisite --> dependent
 
 ```text
-[ ] cff-209l (ready)
+[ ] cff-wera (ready)
+  --> [ ] cff-zq25
+  --> [ ] cff-209l
   --> [ ] cff-ecw0
   --> [ ] cff-544x
   --> [ ] cff-8t4d
-  --> [ ] cff-ejib
   --> [ ] cff-kfo7
+  --> [ ] cff-ejib
   --> [ ] cff-bfr9
   --> [ ] cff-ddsq
   --> [ ] cff-edoz
@@ -179,6 +204,7 @@ Parallel or downstream consumers outside this epic:
 [ ] cff-xabn --> [ ] cff-enhs --> [ ] cff-jilz --> [ ] cff-cz6v
 [ ] cff-j7mm
 [ ] cff-wbhu --> [ ] cff-5edo
+[ ] cff-rqqc
 [ ] cff-3kdk
 [ ] cff-cj5h
 
@@ -188,8 +214,8 @@ Parallel source-recovery research/specification:
 
 Capability ownership:
 
-- `cff-209l` is the cross-track owner of executable same-arena discrete and
-  Gaussian kernel registration.
+- `cff-209l` is the registration completion gate. cff-wera delivers the
+  discrete binding; cff-zq25 delivers the Gaussian binding and combined proof.
 - `cff-ecw0` and `cff-544x` own compiler characterization and compiled values;
   `cff-8t4d`, `cff-ejib`, `cff-kfo7`, `cff-bfr9`, and `cff-ddsq` own topology,
   registered lowering, specialized lowering, data/learning resolution, and
@@ -222,7 +248,7 @@ Duplicated-surface and robustness audit:
 - Compiler tickets keep flooding/scheduled, direct/`vmap`, and
   latest-schema/supported-legacy consumers on one compiled contract. Host/JIT
   compilation is N/A because compilation is host-side.
-- Engine tickets pin flooding/scheduled, direct/one-instance `vmap`, host/JIT
+- Engine tickets pin flooding/scheduled, direct/multi-instance Colony, host/JIT
   status, and latest-schema/supported-legacy checkpoint pairs.
 - Compiler hostile values are runtime N/A; dtype-stable structure and a
   32-group fixture are required. Engine evidence covers literal zero support,
@@ -231,5 +257,7 @@ Duplicated-surface and robustness audit:
 - Specialized multi-arena, GFE, evaluator, and constraint plans remain
   explicit. This program does not force a universal callback.
 
-Scope boundary: no child owns scientific recovery claims, a performance
-target, release readiness, or new factor-family behavior.
+Scope boundary: no child owns scientific recovery claims, a speedup target,
+release readiness, or new factor-family behavior. Execution structure and
+batch isolation are architecture acceptance criteria. The serial ticket chain
+is a safe landing order for overlapping files; it is not the runtime call graph.
