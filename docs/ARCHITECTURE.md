@@ -220,6 +220,34 @@ A pure-Python (dataclass) representation, independent of JAX:
 
 ### 2. Compiler (`cffg.compiler`)
 
+The compiler characterization baseline is `bf6bbe9527b5e1eea9172a30b8c7c214a08ed9ee`,
+the completed discrete/Gaussian registration foundation. Compiler extraction
+preserves its public plans, parameter addresses, slot order, diagnostics, and
+serialized identities. The baseline's ownership is concentrated in these blocks
+of `src/cffg/compiler.py` (line numbers refer to that commit):
+
+| Responsibility | Baseline owner | Interpretation to consolidate during extraction |
+| --- | --- | --- |
+| Public entry | `compile_template`, 646–665 | Semiring argument, plate expansion, and core validation stay at the public boundary. |
+| Topology and slot layout | `compile_template`, 666–681, 801–886, 1898–1936 | Degree, incidence, endpoint order, and prefix offsets describe declared structure; conditioning and parameter-edge semantic tags currently enter the same pass. |
+| Registered lowering | Remaining-factor classification, 1417–1547 and 1703–1778; `_stack_params`, `_stack_gauss_params` | Registry roles, shapes, conditioning, packing, and same-arena classification recur in admission checks, grouping, and array-shape inference. |
+| Specialized lowering | Constraint admission and parameter tags, 677–799; composite discovery/construction, 894–1415; mixed/recurrence/precision plans, 1548–1701; hard constraints, 1780–1854 | Composite claims must precede ordinary grouping. Goal and prior absorption, inferred parameter-edge meaning, and objective ownership cannot be independently rediscovered by each stage. |
+| Learning addresses | `_set_member_address`, `_resolve_learnables` | Group construction records parameter roles and transforms; learning resolution interprets those addresses and rejects unsupported source/target pairings. |
+| Array resolution | `_resolve_arrays`, `_blob_shape`, `_load_blob`, `_stack_*` | Override/file/init precedence belongs to resolution. Registered shape declarations and specialized shape rules must agree with their lowering owners. |
+| Final assembly | `compile_template`, 1856–1972 | Semiring restrictions, delta checks, entropy-edge membership, and array offsets currently finish beside `Arena` construction; assembly must eventually consume validated results, not repeat semantic decisions. |
+
+Schedule construction is a consumer in `cffg.schedule`, not another compiler.
+Flooding, scheduled stages, and batched execution use the same arena addresses.
+Model JSON and bundles reconstruct the declared template before compilation.
+Current and supported legacy agent checkpoints restore runtime data against an
+already compiled, builder-defined model. There is no separate host/JIT compiler
+pair.
+`tests/test_compiler_contracts.py` pins these addresses and identities with
+small existing model builders, exact diagnostics at their owning boundary,
+float32/float64 source comparisons, and 32 distinct shape groups. The existing
+schedule, kernel, learning, AgentSpec, and checkpoint tests retain the runtime
+and compatibility proofs; characterization does not replace them.
+
 Compilation has two phases, mirroring PGMax:
 
 1. **Grounding and validation**: plate fragments expand, the complete Template
