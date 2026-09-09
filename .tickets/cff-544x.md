@@ -84,3 +84,9 @@ other future work is identified.
   model structure for runtime use.
 - **Partly initialized:** Missing required fields that another function is
   expected to fill later.
+
+## Notes
+
+**2026-09-09T16:43:59Z**
+
+Pre-implementation research from cff-ecw0 (no extraction started). Question: can the planned pure move also deliver enforced immutability? Answer: no. At baseline bf6bbe9, compiler.py:450 uses an unfrozen Arena dataclass; frozen plan dataclasses still contain writable NumPy arrays, dictionaries and lists (including LearnPlan.shapes). Read-only inspection found no production consumer mutation of compiled metadata, which establishes an ownership convention, not enforcement. Engine.init_state creates separate runtime parameters; learning and named writes update runtime State rather than compiled addresses. Minimal type consumers are engine.py, outer.py, schedule.py (Arena), plus TYPE_CHECKING imports in learn.py (LearnPlan) and params.py (MemberAddress/ParameterAddress). Source: compiler.py:54-611, engine.py:41/460, schedule.py:58/292-304, learn.py:65/524, params.py:14/200. Confidence: high, direct source inspection by the modularity research agent. Existing AC4 conflicts with pure-move/no-field-change scope if immutable means enforced. Asked Cooper whether to split enforced immutability into its own behavior-change ticket and preserve current representation during extraction; decision pending. Any enforcement ticket must specify container types, NumPy writeability, alias/copy ownership and dataclasses.replace compatibility. Do not silently claim that moving classes or setting frozen=True provides deep immutability.
