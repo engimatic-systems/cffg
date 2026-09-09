@@ -467,10 +467,14 @@ stochastic factor families and batched per-agent keys remain future work.
 
 The agent's fixed-memory trial loop likewise uses separate immutable planning
 and filtering templates. It does not mutate the paper's literal graph when an
-observation changes from a planning constraint to data. The enumerated
-equivalence boundary, exact-zero rollover, and any boundary-ledger offset are
-owned by `cff-7ozr`; until that ticket lands, only the two-window behavior is
-claimed.
+observation changes from a planning constraint to data. A two-state, two-action,
+fixed-A oracle proves the two-window transformation for two consecutive steps
+with one joint categorical boundary: literal before/after snapshots,
+independent action and filter enumeration, exact-zero rollover, float32, and
+the derived past-evidence ledger offset are executable checks. This does not
+generalize the equivalence to mean-field, continuous, hybrid, hierarchical,
+learned-parameter, or arbitrary loopy boundaries; those retain only the named
+two-window implementation claim until they receive their own oracle.
 
 **S3. Deep temporal / hierarchical models.** The papers say extensions are
 "straightforward — write the CFFG," which is true of the *notation*; the message
