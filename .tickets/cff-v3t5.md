@@ -1,6 +1,6 @@
 ---
 id: cff-v3t5
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-09-09T15:58:40Z
@@ -44,3 +44,11 @@ cff-umag still owns optimizing future wording-audit output. Cooper explicitly de
 **2026-09-09T15:59:19Z**
 
 Pre-implementation handoff: continue PR112 at b014d99 on agent/housekeeping-runtime-history, refreshed from origin. Change-path index: Runtime numerical or status invariant, contributor validation policy only; no runtime authority changes. Host/JIT, flooding/scheduled, direct/batched inference and model checkpoint pairs are N/A. Review pairs: AGENTS/README testing instructions; supplied/changed/missing repository context; tracked/untracked archive scope. Verified exactly six clean tracked regular files under chats/ and no untracked or ignored contents. Validation is documentation/configuration and deletion-scope checking, not an inference run. Existing audit notes will not be edited.
+
+**2026-09-09T16:03:00Z**
+
+Completed on PR112 in separate logical commits. Removed only the six verified repository chat archives and added /chats/ to .gitignore; the directory is gone, while Git history and original agent logs outside the repository are untouched. Recovery is available from b014d99 before the archive-removal commit 379e037.
+
+AGENTS now reuses current supplied instructions, refreshes changed/missing content, scopes reads to sections or functions, checks PR paths before patches, bounds tool/research output, and keeps read tracking out of the repository. Isolated tooling now defaults to focused tests plus artifact validation with a recorded isolation rationale; runtime behavior, shared dependencies and test-gate changes retain the full suite. README matches.
+
+Validation: exact deletion scope and ignore behavior verified; existing ticket contents unchanged; AGENTS/README reviewed together; git diff --check and tk dep cycle pass. No src/tests/tools/dependency/runtime-history change since b014d99, so the preceding 1,578-test code gate is retained without another inference run. Existing audit narration and scientific reference content remain intact. No further cleanup or architecture work is started.

@@ -18,16 +18,23 @@ uv run python tools/dashboard.py --run-suite  # short default suite + dashboard
 uv run pytest -m slow  # opt-in long-running regressions
 ```
 
-Run focused tests as often as useful while changing code. Pytest excludes
-tests marked `slow` by default, so one passing short suite after the final
-code change is sufficient to open or update a PR. The dashboard command above
-runs pytest exactly once and renders that result. Before starting or waiting
-on the short pass, inspect
-`tools/test-suite-runtimes.json`: it records recent measured wall times and a
-conservative `suggested_wait_seconds`.
-Ticket- and documentation-only changes use their relevant validation instead
-of the short suite. Run slow regressions explicitly when changing the behavior
-they cover; they are not part of the default PR gate.
+Run focused tests as often as useful while changing code. Outside the isolated
+tooling exception below, one passing short suite after the final code change is
+sufficient to open or update a PR. Pytest excludes `slow` tests by default. The
+dashboard command above runs pytest exactly once and renders that result.
+Before starting or waiting on it, read only `latest.wall_seconds` and
+`suggested_wait_seconds` from `tools/test-suite-runtimes.json`.
+
+Isolated tooling changes use focused tests and changed-artifact checks;
+record the isolation rationale, commands, and results in the ticket and PR.
+Changes affecting engine/model/numerical/serialization behavior, shared
+dependencies, test discovery/selection/execution, or pass/fail interpretation
+still require the full short suite, even when their files are under `tools/`.
+If isolation is uncertain, use the full gate. Do not label focused results as a
+fresh full-suite result. Ticket- and documentation-only changes also use their
+relevant artifact validation instead of the short suite. Run slow regressions
+explicitly when changing the behavior they cover; they are not part of the
+default PR gate. `AGENTS.md` defines the contributor validation policy.
 
 ## Quickstart: build, run, checkpoint, continue
 

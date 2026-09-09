@@ -57,10 +57,8 @@ git pull --ff-only origin "$BASE_BRANCH"
    export GH_TOKEN=$(printf "protocol=https\nhost=github.com\n" | git credential fill | sed -n 's/^password=//p')
    ```
 
-6. **Side research goes to sub-agents.** When background reading is needed
-   (downloading another paper, checking how PGMax allocates tensors, clarifying an
-   active-inference derivation), spawn a sub-agent with the *specific questions* to
-   answer and have it report back a short summary. Do not read whole papers into the
+6. **Side research goes to sub-agents.** Delegate background reading under
+   **Sub-agent research protocol** below. Do not read whole papers into the
    main context window mid-task.
 
 7. **De-weight development costs.** When making technical decisions, do not give much weight to development cost and give more weight to quality, simplicity, correctness, scalability, and long-term maintainability.
@@ -82,7 +80,8 @@ git pull --ff-only origin "$BASE_BRANCH"
 This project will span many context windows. The rule that makes that survivable:
 **tickets are the shared memory; the repo carries no session state.**
 
-- **Start of session**: read this file, run `tk ready`, pick ONE ticket (or a few
+- **Start of session**: reuse the current `AGENTS.md` text if already supplied in
+  context; read it if missing or changed. Run `tk ready`, pick ONE ticket (or a few
   trivially small ones), then follow **Session bootstrap** before branching. Don't
   re-derive project state from scratch — the ticket's description, design notes,
   and comments are the handoff.
@@ -93,12 +92,13 @@ This project will span many context windows. The rule that makes that survivable
   surface affected; checked pairs that do not apply are marked N/A.
 - **During implementation**, run focused test files as often as useful for the
   changed component.
-- **Final validation for a code change** requires one passing short-suite run
-  after the final code change. One passing suite at the proposed PR head is
+- **Final validation for code outside the isolated-tooling exception below**
+  requires one passing short-suite run after the final code change.
+  One passing suite at the proposed PR head is
   sufficient to open or update a PR. Before launching or waiting on it, inspect
-  `tools/test-suite-runtimes.json`; its `latest.wall_seconds` is the
-  most recent measured wall time and `suggested_wait_seconds` includes
-  headroom from recent runs. Run
+  only `latest.wall_seconds` and `suggested_wait_seconds` in
+  `tools/test-suite-runtimes.json` for measured wall time and a wait budget
+  with headroom. Run
   `uv run python tools/dashboard.py --run-suite` to execute the default
   `not slow` pytest selection exactly once
   and refresh both that runtime history and `~/agent-share/cffg-tests.html`
@@ -107,8 +107,17 @@ This project will span many context windows. The rule that makes that survivable
   result: `uv run pytest -q --junitxml=/tmp/cffg-tests.xml`, then
   `uv run python tools/dashboard.py --junitxml /tmp/cffg-tests.xml`. Opening a
   PR, requesting review, or refreshing the dashboard never calls for a second
-  unchanged short-suite run. A later code change supersedes the previous result
-  and gets one fresh final run.
+  unchanged short-suite run. A later change requiring this gate supersedes the
+  previous result and gets one fresh final run.
+- **Isolated tooling changes** use focused tests and changed-artifact checks
+  instead of the full short suite. Examples include runtime-history storage,
+  developer reports, and formatting helpers. Record the isolation rationale,
+  commands, and results in the ticket and PR. Being under `tools/` is not enough:
+  changes affecting engine/model/numerical/serialization behavior, shared
+  dependencies, test discovery/selection/execution, or pass/fail interpretation
+  still require the full gate. If isolation is uncertain, use the full gate.
+  Validate after the final relevant edit; never publish focused results as if
+  they were a fresh full-suite result.
 - **Slow tests are opt-in.** Mark long behavioral, multi-trial, and globalization
   regressions with `@pytest.mark.slow`; pytest excludes them by default. Run
   them explicitly with `uv run pytest -m slow` only when the changed behavior
@@ -123,6 +132,20 @@ This project will span many context windows. The rule that makes that survivable
   landing.
 - **One ticket ≈ one context window.** If a ticket can't fit, split it before
   starting, not after running out of context.
+
+### Bounded reads
+
+- Reuse unchanged repository text and ticket content already available in
+  context. Refresh when relevant content changes through an edit, branch switch,
+  or pull, or when the needed text is missing after context compaction. If
+  freshness is uncertain, check a diff or file hash before reloading it.
+- Find filenames, headings, or symbols first; then read the needed section or
+  function. Use the architecture change-path index before opening large modules.
+  For PRs, inspect the changed-path list before requesting patches.
+  Re-read to resolve missing evidence, not merely because a new turn starts.
+- Return relevant matches, counts, and failures from tools. Keep long diagnostic
+  detail in artifacts and return their paths instead of repeatedly printing it.
+- Track prior reads in working context only; do not create repository read logs.
 
 ### Ticket and roadmap authoring
 
@@ -152,6 +175,8 @@ This project will span many context windows. The rule that makes that survivable
 - Spawn research sub-agents with **specific questions**, not topics ("What update
   rule does PGMax use for factor-to-variable messages and how are its arenas
   indexed?" — not "read about PGMax").
+- Supply only the needed facts and source paths. Include full conversation
+  history only when the research question needs it.
 - The sub-agent's report gets **distilled into the ticket that needed it** as a
   comment (question → answer → source → confidence). Durable engine-relevant
   conclusions go into docstrings next to the code they justify.
