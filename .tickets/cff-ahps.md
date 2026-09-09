@@ -10,7 +10,7 @@ assignee: coopwilliams
 ---
 # Roadmap: universal factor library — continuous, hybrid, constraints, neural
 
-## Background in Plain English
+## Background in Plain English — WHY
 
 CFFG began with discrete Categorical and Dirichlet factors. Completed tickets have added Gaussian and hybrid models, conjugate exponential-family messages, hard constraints, executable factor registration, and discrete-regime epistemic scoring. This epic finishes the roadmap when the remaining prerequisites add nonlinear and neural factors, scalable plate execution, long-rollout stability, runtime throughput, and continuous-domain diagrams. The result is one serialized modeling system whose compiler, inference runtime, objective ledger, and public tools agree about every factor family they expose.
 
@@ -20,7 +20,7 @@ prerequisites are cff-cfqg, cff-1o72, cff-5edo, cff-6s31, cff-9xmq,
 cff-bxk4, cff-o7hs, and cff-wbhu. The dependency metadata, rather than the
 order of this prose, determines when this epic is ready to close.
 
-## Outcomes / Acceptance Criteria
+## Outcomes / Acceptance Criteria — WHAT
 
 1. Every ticket listed in this epic's `deps` metadata is closed because its own acceptance criteria are satisfied, not because its remaining work was moved into this epic.
 2. The supported public modeling workflow satisfies the documented combinations of discrete, Gaussian, hybrid, hard-constraint, and neural factors.
@@ -40,7 +40,7 @@ order of this prose, determines when this epic is ready to close.
 6. `README.md`, `docs/ARCHITECTURE.md`, `docs/DERIVATIONS.md`, and `docs/LIMITATIONS.md` agree with the delivered public API, mathematical contracts, named approximations, and remaining limits.
 7. No completed work remains described only in a ticket or a `docs/todo-notes/` file.
 
-## Methodological Suggestions
+## Methodological Suggestions — HOW
 
 These are suggested ways to reach the outcomes. An implementer may choose a different method if it satisfies the numbered outcomes and supplies equivalent artifact and test coverage.
 
@@ -50,14 +50,14 @@ These are suggested ways to reach the outcomes. An implementer may choose a diff
 - Keep messages in log space unless a family derivation requires another representation and documents that exception. Normalize messages aggressively, derive numeric guards from `jnp.finfo(dtype)`, and give stochastic rules explicit JAX PRNG keys.
 - Put message and objective derivations in rule docstrings and `docs/DERIVATIONS.md`. Per Cooper's 2026-07-08 delegation decision, keep free-energy ledger semantics, constraint semantics, bead semantics, and the true-BFE invariant under top-level review. Well-specified arena plumbing, builders, focused test scaffolding, reference-number generation, and bounded literature questions may be delegated and then reviewed at top level.
 - Run the contributing ticket's focused rule, compiler, schedule, ledger, serialization, hostile-input, and public-workflow tests during implementation. After the final code change, run the repository's dashboard-backed short suite once as required by `AGENTS.md`; run marked slow tests only when the changed behavior needs them.
-- Recheck the roadmap with `tk dep tree --full cff-ahps`, `tk ready`, `tk blocked`, and `tk dep cycle`. The dependency records remain authoritative. A compact view of the open paths at the 2026-08-07 rewrite is:
+- Recheck the roadmap with `tk dep tree --full cff-ahps`, `tk ready`, `tk blocked`, and `tk dep cycle`. The dependency records remain authoritative. A compact view of the open paths at the 2026-09-08 review is:
 
   ```text
   Legend: prerequisite --> dependent
 
-  [ ] cff-209l (ready)
-    --> cff-ecw0 --> cff-544x --> cff-8t4d --> cff-ejib
-    --> cff-kfo7 --> cff-bfr9 --> cff-ddsq --> cff-edoz
+  [ ] cff-wera (ready) --> cff-zq25 --> cff-209l
+    --> cff-ecw0 --> cff-544x --> cff-8t4d --> cff-kfo7
+    --> cff-ejib --> cff-bfr9 --> cff-ddsq --> cff-edoz
     --> cff-sf29 --> cff-ny7f --> cff-nyad --> cff-5xdy
     --> cff-ii9t --> cff-jrbw --> cff-gl89 --> cff-3ola
     --> cff-ws3c --> cff-ofv1 --> cff-cfqg
@@ -101,7 +101,8 @@ These are suggested ways to reach the outcomes. An implementer may choose a diff
 - **Host/JIT:** Execution controlled by Python on the host compared with execution compiled by JAX's just-in-time compiler.
 - **Improper belief:** A message product that does not define a normalizable probability distribution.
 - **MOMENT_MATCHING:** The constraint used for expectation-propagation-style Gaussian site approximations.
-- **P-substitution:** Replacement of a selected model factor by a posterior belief inside the GFE construction.
+- **P-substitution:** Replacing a selected conditional variational belief with
+  the corresponding model conditional in the GFE construction.
 - **Semiring:** The pair of aggregation operations that gives message passing sum-product or max-product meaning.
 - **Support:** The states to which a probability distribution assigns nonzero probability.
 - **Vacuous message:** A neutral message that contributes no information when multiplied with other incoming messages.

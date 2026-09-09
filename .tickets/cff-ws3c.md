@@ -25,7 +25,7 @@ and several repeated input/parameter interpretations.
 This track first inventories bounded existing evidence. It then moves one
 responsibility per context: rule execution, schedules, state/data/mu3
 lifecycle, ordinary iteration, explicit outer/exact strategies, objective
-accounting, and readouts. Public `Engine.run` remains the final status authority.
+accounting, and readouts. Engine and Colony use one shared result policy.
 
 ## Outcomes / Acceptance Criteria — WHAT
 
@@ -37,9 +37,9 @@ accounting, and readouts. Public `Engine.run` remains the final status authority
    smallest old/new observable characterization needed for uncovered refactor
    seams. New scientific validation gaps remain separate work unless a gap
    proves the proposed move unsafe.
-3. Per-plan execution owners gather inputs, select compiled parameters, and
-   invoke existing rules. Flooding and scheduled paths share that rule-call
-   owner.
+3. Per-plan local-update owners consume typed input/parameter blocks and invoke
+   existing rules. Flat-arena and registerized-scan transport share that owner
+   while preserving local solver facts and existing scan carry.
 4. One schedule owner constructs flooding, stage, scan, support-check,
    exact-unit, and propagation programs without interpreting a factor rule.
 5. Ordinary state/data lifecycle and specialized functional-mu3 lifecycle have
@@ -47,14 +47,16 @@ accounting, and readouts. Public `Engine.run` remains the final status authority
 6. Ordinary iterative control, outer trust-region control, and exact-run
    control return typed internal outcomes. The specialized strategies remain
    explicit; no universal solver callback receives irrelevant state.
-7. Public `Engine.run` selects a typed strategy, validates its outcome, and is
-   the only final constructor/authority for public `RunStatus` and `RunResult`.
+7. Engine.run selects a typed strategy. Engine and Colony use the shared
+   termination policy and result finalizer delivered by cff-ii9t; neither
+   duplicates the public status mapping. Runtime value definitions sit below
+   the facade and retain their documented re-exports and identity.
 8. One objective owner assembles factor, parameter, constraint,
    GFE/P-substitution, and edge-entropy terms. Focused readout owners consume
    typed views without reimplementing rules or objective terms.
-9. The public engine facade retains public state/status/result types,
+9. The public engine facade re-exports public state/status/result types,
    construction and compatibility delegates, explicit strategy selection,
-   final status construction, and delegation. It owns no family rule,
+   shared result-finalizer calls, and delegation. It owns no family rule,
    schedule builder, solver loop, local ledger formula, or readout algorithm.
 10. The below-1,000-line public-engine target follows from e488df3 source-region
     anchors:
@@ -70,7 +72,8 @@ accounting, and readouts. Public `Engine.run` remains the final status authority
     state; the facade injects/selects these owners and sits above them. The
     ledger may land later via a compatibility delegate, but it never imports a
     controller and no controller imports the public facade.
-12. Flooding/scheduled, direct/one-instance `vmap`, host/JIT status, and
+12. Flooding/scheduled, direct/multi-instance and multi-structure Colony,
+    host/JIT status, and
     latest-schema/supported-legacy restored-state pairs retain their stated
     applicability and observable behavior.
 13. Literal zero support, vacuous/improper inputs, non-finite updates, float32,
@@ -89,7 +92,7 @@ These suggestions are optional. An implementer may choose another sound method.
 - Use **Runtime numerical or status invariant** as the primary change-path row;
   each child states the additional factor/IR/learning rows that apply.
 - Keep source checks proving schedule code uses the shared execution owner and
-  public `Engine.run` alone constructs final status.
+  Engine and Colony use one shared termination/result owner.
 - Preserve compatibility delegates until all internal consumers use typed
   owners.
 
@@ -108,4 +111,4 @@ performance consumers.
 - **Run strategy:** One explicit internal control algorithm returning typed
   termination facts to `Engine.run`.
 - **Status authority:** The sole public owner that constructs `RunStatus` and
-  `RunResult`.
+  `RunResult` from typed facts for both Engine and Colony.

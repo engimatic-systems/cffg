@@ -61,8 +61,18 @@ redefine a public result, or create a new scientific validation program.
    or construct readouts. Repeated interpretations are named for later removal.
 8. Deliberate execution pairs are explicit.
    8.1. Flooding and scheduled execution agree where both are supported.
-   8.2. Direct and one-instance `vmap` execution agree where both are
-        supported.
+   8.2. A deterministic Colony fixture contains at least two instances with
+        one structure and different parameters/observations, plus one instance
+        with a different structure. The shared group uses ordinary iterative
+        BP/VMP and actually enters Colony's vectorized update path; a GFE
+        per-instance controller or exact one-shot group cannot substitute.
+        Per-instance state, objective trace,
+        status, residual, and iterations are compared with separate Engine
+        runs under the named baseline contract. Pre-existing discrepancies
+        are recorded and separately ticketed unless they make extraction unsafe.
+   8.2.1. One shared structure retains one cached Engine; different structures
+          retain separate groups. Updating/removing one instance does not alter
+          another's data or identity. A one-instance group is not this proof.
    8.3. Host result classification agrees with status values produced by JIT.
    8.4. Latest-schema and supported legacy agent checkpoints reconstruct results that
         satisfy the same public engine invariants; checkpoint decoding itself
@@ -78,6 +88,14 @@ redefine a public result, or create a new scientific validation program.
 12. The ticket fits one implementation context because it inventories existing
     evidence and adds only the smallest characterization for uncovered seams;
     it moves no production code and creates no new scientific benchmark.
+13. The ownership inventory includes Colony's existing status loop and result
+    construction, plus State/public result type imports. It identifies the
+    shared result policy to extract in cff-ii9t and a lower-level runtime value
+    owner re-exported by the facade, avoiding imports back into Engine.
+14. Existing discrete/Gaussian chains record schedule kind, array shapes and
+    dtypes, persistent bytes, scan carry, and trace reuse. These extend the
+    pre-registration records from cff-wera/cff-zq25; they are structural
+    preservation checks, not benchmark or speedup claims.
 
 ## Methodological Suggestions — HOW
 

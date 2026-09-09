@@ -126,16 +126,6 @@ This project will span many context windows. The rule that makes that survivable
 
 ### Ticket and roadmap authoring
 
-- After creating or materially rewriting a ticket, run
-  `uv run python tools/wiggle_words/query_ticket_wiggle_audit.py scan <ticket-id>`. Review
-  every match in context and clarify any claim whose owner, time, layer, scope,
-  comparison, or evidence has more than one reading. Clear intentional uses may
-  remain; rerun the scan after refinement and report retained matches by
-  candidate and intended meaning in the handoff. The scan cannot detect omitted
-  ownership, so check the ticket's capability owners separately. For historical
-  classifications, use
-  `uv run python tools/wiggle_words/query_ticket_wiggle_audit.py slice <ticket-id>`; never
-  load the complete audit when a ticket slice is sufficient.
 - A roadmap-refinement change includes a compact ASCII dependency tree in its
   ticket note or PR description. State the arrow direction and show the ready
   roots, parallel work, immediate blockers, and downstream roadmap

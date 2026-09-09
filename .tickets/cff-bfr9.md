@@ -1,7 +1,7 @@
 ---
 id: cff-bfr9
 status: open
-deps: [cff-kfo7]
+deps: [cff-ejib]
 links: [cff-ddsq]
 created: 2026-09-02T04:17:42Z
 type: chore
@@ -20,23 +20,28 @@ source-region anchors, not promised future line numbers. The implementation
 starts from the exact `cff-ecw0` baseline. At e488df3, the same source values
 flow through several lowering branches before learning addresses are known.
 
-After structural plan drafts exist, this ticket gives numeric array loading,
-shape checking, parameter/observation packing, member addresses, and declared
-learning resolution one owner. It does not assemble the final arena.
+After structural plan drafts exist, this ticket gives array loading and the
+execution of declared validators/packers, member addressing, and declared
+learning resolution one owner. Family owners retain the meaning of their
+numeric transforms and constraints. It does not assemble the final arena.
 
 ## Outcomes / Acceptance Criteria — WHAT
 
-1. `cff-kfo7` is closed with registered and specialized plan drafts passing.
+1. `cff-ejib` is closed with registered and specialized plan drafts passing.
 2. One data-resolution owner accepts the expanded `Template`, root/array
    sources, `TopologyLayout`, `RegisteredPlanDrafts`, and
    `SpecializedPlanDrafts`; it returns immutable `ResolvedCompileData`.
 3. `ResolvedCompileData` contains packed parameter arrays, observation address
    tables, member/runtime parameter addresses, writable-member facts,
-   functional evaluator identity/state metadata, and resolved `LearnPlan`
-   values. It contains no schedule or partially initialized `Arena`.
-4. Blob precedence, dtype/shape validation, probability-to-log and
-   covariance-to-precision transforms, observation rows, and learnable
-   source/target pairing have one owner.
+   functional evaluator identity/state metadata, validated hard-constraint
+   payloads, and resolved `LearnPlan` values. It contains no schedule or
+   partially initialized `Arena`.
+4. Source resolution preserves supplied-array overrides, file blobs, and
+   declared initializers in their baseline precedence. It invokes validators,
+   shape providers, packers, probability-to-log and covariance-to-precision
+   transforms declared by the registered or specialized owner. It owns
+   observation/member addresses and learnable source/target pairing, without
+   duplicating factor-type selection or reinterpreting a constraint payload.
 5. The affected rows are **New IR field**, **Learnable or checkpoint feature**,
    and the packing portion of **New factor or rule family**. **Runtime numerical
    or status invariant** applies only to preserving dtype-derived arrays; no
@@ -70,6 +75,9 @@ These suggestions are optional. An implementer may choose another sound method.
 - Make packers consume typed `ArrayRequirement` values from both lowering
   stages.
 - Keep external source loading separate from pure shape/transform functions.
+- Include an external-kernel initializer/override/blob case and a hard
+  constraint whose k/table payload comes from a blob. Both must reach assembly
+  without a new family branch in the resolver.
 - Preserve the `cff-ecw0` baseline parameter keys and address order field by
   field.
 

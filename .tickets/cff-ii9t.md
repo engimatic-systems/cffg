@@ -23,7 +23,8 @@ distinguishes convergence, exhaustion, divergence, and infeasibility.
 
 This ticket moves only ordinary iterative control behind a typed outcome.
 Specialized deterministic outer trust-region and exact-run strategies remain in
-`cff-jrbw`. Public `Engine.run` retains final `RunStatus`/`RunResult` authority.
+`cff-jrbw`. Engine and Colony share one termination policy and result finalizer;
+each public entry point delegates its result construction to that owner.
 
 ## Outcomes / Acceptance Criteria — WHAT
 
@@ -34,9 +35,13 @@ Specialized deterministic outer trust-region and exact-run strategies remain in
 3. `IterationOutcome` contains final internal state, iteration count, delta/FE
    trace facts, finite/support signals, and one typed termination reason. It is
    not a public `RunResult` and does not choose a public status enum.
-4. `Engine.run` selects the ordinary controller, validates its outcome, maps
-   termination reason to the final public `RunStatus`, attaches diagnostics,
-   and remains the only public `RunResult` constructor.
+4. One lower-level result owner interprets termination facts, validates the
+   outcome, maps it to public `RunStatus`, and constructs `RunResult`.
+   Engine.run and Colony.run both delegate to it. Their ordinary iterations
+   share incremental termination assessment instead of retaining separate
+   finite/support/FE/status policies. Public results and enum identity remain
+   compatible; runtime value definitions live below the facade and are
+   re-exported through the existing imports.
 5. Non-finite delta/FE is divergence; exhausted budget is not convergence;
    literal zero support is infeasible; existing convergence tolerances and
    logical iteration meaning remain unchanged.
@@ -45,8 +50,16 @@ Specialized deterministic outer trust-region and exact-run strategies remain in
    **New IR field** and **Learnable or checkpoint feature** are N/A because no
    schema or restored-state decoding changes.
 7. Flooding/scheduled controllers consume the same executor/schedule owners.
-   Direct/one-instance `vmap` and host/JIT termination facts agree where
-   supported. Restored states enter through the same prepared-state boundary.
+   The cff-sf29 multi-instance/multi-structure Colony fixture and host/JIT
+   termination facts retain their recorded contract. Restored states enter
+   through the same prepared-state boundary. Colony keeps batching and active
+   instance freezing; it is not replaced with a sequential Engine loop.
+   7.1. A bounded batch case includes one initially invalid or infeasible
+        instance beside a healthy instance, and instances that stop at
+        different iterations. Results retain independent status and state.
+   7.2. Numerical step/termination facts remain fixed-shape arrays usable by
+        JAX transformations. Converting traces to public Python tuples occurs
+        at the result boundary. Compiling the convergence loop is cff-wbhu.
 8. Literal zero support, vacuous/improper state, non-finite update or FE,
    float32, and uncomfortable-scale cases retain their exact status reason and
    trace behavior.
@@ -57,8 +70,8 @@ Specialized deterministic outer trust-region and exact-run strategies remain in
 10. No solver/globalization rule, objective formula, factor behavior, public
     status, diagnostic field, checkpoint schema, or performance target changes.
 11. The iterative-controller module is below 1,000 physical lines and the
-    ticket fits one context because it owns the bounded ordinary-loop and
-    support/finite classification regions only.
+    ticket owns ordinary-loop and support/finite classification plus the
+    corresponding duplicated Colony policy. It adds no new run strategy.
 12. Focused runtime-status/schedule tests and the final short suite pass.
 13. `docs/ARCHITECTURE.md` names `IterationOutcome`, the controller, and the
     final public status boundary in the extraction commit.
@@ -67,8 +80,8 @@ Specialized deterministic outer trust-region and exact-run strategies remain in
 
 These suggestions are optional. An implementer may choose another sound method.
 
-- Use an internal termination enum distinct from the public enum so
-  `Engine.run` visibly remains authority.
+- Use typed numerical reason codes beneath one shared public-result finalizer;
+  avoid parallel enum-to-status mappings in Engine and Colony.
 - Pass the already-built schedule and objective callables; do not make the
   controller inspect factor types.
 - Characterize traces and status facts field by field rather than adding a
@@ -77,7 +90,8 @@ These suggestions are optional. An implementer may choose another sound method.
 ## Future work
 
 `cff-jrbw` extracts explicit outer trust-region and exact strategies under the
-same public status boundary.
+same shared result boundary. cff-wbhu compiles the ordinary convergence loop;
+cff-rqqc owns stochastic Colony state/PRNG isolation.
 
 ## Definitions
 
@@ -87,3 +101,11 @@ same public status boundary.
   by existing delta and free-energy convergence rules.
 - **Termination reason:** Internal converged, exhausted, diverged, infeasible,
   or unsupported fact before public status construction.
+- **Result finalizer:** The shared operation that validates termination facts
+  and constructs the public result for Engine or Colony.
+
+## Notes
+
+**2026-09-09T03:29:39Z**
+
+PR #108 research — question: does one-instance vmap test Colony result handling? Answer: no; Colony bypasses its batched path for one instance and constructs RunResult itself for actual batches. Engine and Colony need a shared termination/result owner, with real mixed-input batches and independent stopping checks. Sources at 7885bf5: colony.py:111-118, 149-280. Confidence: high. This moves existing status semantics; cff-wbhu still owns compiling the host convergence loop.

@@ -1,7 +1,7 @@
 ---
 id: cff-ejib
 status: open
-deps: [cff-8t4d]
+deps: [cff-kfo7]
 links: [cff-kfo7]
 created: 2026-09-02T04:17:42Z
 type: chore
@@ -21,15 +21,16 @@ and constraint handling. The implementation starts from the exact `cff-ecw0`
 baseline, after `cff-209l` makes ordinary families use registered same-arena
 kernel declarations; the old line range is not a promised future map.
 
-After `cff-8t4d` produces topology once, this ticket gives only registered
+After `cff-8t4d` produces topology and `cff-kfo7` identifies specialized
+ownership, this ticket gives only registered
 same-arena structural lowering a focused owner. It does not load blobs or
 construct an `Arena`.
 
 ## Outcomes / Acceptance Criteria — WHAT
 
-1. `cff-8t4d` is closed with `TopologyLayout` characterization passing.
+1. `cff-kfo7` is closed with specialized discovery and completion extracted.
 2. One registered-lowering owner accepts `Template`, `TopologyLayout`,
-   semiring, and the kernel registry and returns immutable
+   `SpecializedClaims`, semiring, and the kernel registry and returns immutable
    `RegisteredPlanDrafts` plus typed `ArrayRequirement` values.
 3. The output records group identity, members, roles, family, message mode,
    gather/scatter addresses, observation intent, parameter roles, energy and
@@ -41,6 +42,11 @@ construct an `Arena`.
    4.1. Neither `TopologyLayout` nor final assembly chooses registered family
         meaning; this ticket is the sole registered classification/lowering
         owner.
+   4.2. Factors claimed by a composite, including absorbed goals and priors,
+        never enter ordinary groups. This owner consumes claims without
+        rediscovering their GFE or parameter-edge meaning.
+   4.3. Completed registered membership is available to the specialized owner
+        for recurrence-component construction; it does not change prior claims.
 5. The affected change-path row is **New factor or rule family**. **New IR
    field** applies only to roles copied from `TopologyLayout`; **Learnable or
    checkpoint feature** applies only to emitted address requirements;
@@ -73,8 +79,8 @@ These suggestions are optional. An implementer may choose another sound method.
 
 ## Future work
 
-`cff-kfo7` extracts explicit specialized plan lowering. It must not route
-multi-arena or structural behavior through this same-arena interface.
+`cff-bfr9` resolves declared data requirements after both kinds of draft exist.
+The specialized completion call remains owned by `cff-kfo7`.
 
 ## Definitions
 
@@ -82,5 +88,7 @@ multi-arena or structural behavior through this same-arena interface.
   observation value that a later stage resolves.
 - **Plan draft:** Complete structural plan metadata before numeric arrays are
   loaded and the final arena is assembled.
+- **SpecializedClaims:** Explicit ownership of factors and absorbed members
+  by specialized plans, plus their parameter-edge semantic tags.
 - **Registered same-arena:** A kernel whose message-bearing edges share one
   discrete, Gaussian, or exponential-family representation.

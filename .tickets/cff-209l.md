@@ -1,27 +1,34 @@
 ---
 id: cff-209l
 status: open
-deps: [cff-ri8m, cff-l6i5]
+deps: [cff-ri8m, cff-l6i5, cff-zq25]
 links: [cff-1o72, cff-o7hs, cff-l6i5, cff-cfqg, cff-edoz, cff-ws3c]
 created: 2026-07-30T16:09:57Z
-type: chore
+type: epic
 priority: 1
 assignee: coopwilliams
 parent: cff-cfqg
 ---
 # Bind discrete and Gaussian arenas to the FactorKernel execution contract
 
-## Background in Plain English
+## Background in Plain English — WHY
 
 CFFG already lets exponential-family factors register their executable messages, energy, parameters, observations, and readouts in one `FactorKernel`. Ordinary discrete and Gaussian factors still rely on type-name branches spread across the compiler and inference runtime. This ticket extends the executable contract to those two dedicated arenas and migrates their ordinary built-in rules without changing serialized models or numerical behavior. The completed workflow lets a new factor using one of the EF, discrete, or Gaussian arenas compile, run, report its objective term, and serialize without adding its type name to central dispatch code.
 
 The migration is not a promise that one callback shape fits every factor in the project. Structural equality, Dirichlet parameter-edge composites, hard constraints, GFE composites, and factors that span more than one arena keep their specialized plans. cff-o7hs depends on this ticket because its nonlinear Gaussian factor needs the new same-arena Gaussian extension path.
 
-## Outcomes / Acceptance Criteria
+This is a completion gate for two vertical migrations: cff-wera owns the
+discrete binding and cff-zq25 owns the Gaussian binding. Each delivers its
+compiler, execution, objective, and reconstruction path in one reviewable
+change sequence. They land in that order because they edit the same central
+modules. The numbered contract below applies across both deliveries.
+
+## Outcomes / Acceptance Criteria — WHAT
 
 1. The prerequisite contracts are satisfied before this ticket closes.
    1.1. cff-ri8m is closed with its executable EF-arena `FactorKernel` contract satisfied.
    1.2. cff-l6i5 is closed with its shared natural-parameter algebra and bit-identical Cat/Dir/Gaussian parity evidence satisfied.
+   1.3. cff-wera and cff-zq25 are closed with their arena migration proofs.
 2. `FactorKernel` represents executable factors in the EF, discrete, and Gaussian arenas.
    2.1. Each registered kernel declares exactly one arena binding.
    2.2. A discrete binding declares its role cardinalities.
@@ -41,6 +48,15 @@ The migration is not a promise that one callback shape fits every factor in the 
    2.16. Each binding carries a nonempty `HostileInputs` declaration.
    2.17. Registration rejects a callback set that is incomplete for the declared arena.
    2.18. Registration rejects a callback set that is incomplete for the declared constraint modes.
+   2.19. Each message mode declares its input meaning separately from storage:
+         BP consumes opposite-side cavities; VMP consumes normalized beliefs
+         constructed from both edge messages as required by the rule.
+   2.20. Message, energy, and readout adapters use the mode's declared belief
+         construction and the same parameter/observation snapshot. Arena
+         selection alone never selects a variational constraint.
+   2.21. A max-product binding declares assignment-energy evaluation or a
+         potential accessor for minus log potential at a decoded assignment.
+         Registration rejects max support without this capability.
 3. Test-only factors prove the same-arena extension workflow.
    3.1. A test-only discrete factor registers without editing `compiler.py`, `engine.py`, `core/validate.py`, or the built-in rule tables.
    3.2. The test-only discrete factor compiles into the discrete arena.
@@ -51,6 +67,12 @@ The migration is not a promise that one callback shape fits every factor in the 
    3.7. The test-only discrete factor's VMP messages agree with an independent finite-enumeration oracle.
    3.8. The test-only discrete factor contributes its registered BP node energy to BFE in sum-product mode.
    3.9. The test-only discrete factor contributes its registered VMP node energy to BFE in mean-field mode.
+   3.9.1. Two uncertain neighbors distinguish BP cavities from VMP beliefs;
+          the custom factor's two updates agree with separate enumeration formulas.
+   3.9.2. A custom named-parameter pack exercises decoded assignment scoring
+          against enumeration without a dense-potential group-key assumption.
+   3.9.3. BFE evaluation in max-product mode retains its explicit rejection;
+          decoded assignment energy is never labeled BFE or GFE.
    3.10. A test-only Gaussian factor registers without editing `compiler.py`, `engine.py`, `core/validate.py`, or `gauss.py`.
    3.11. The test-only Gaussian factor compiles into the Gaussian arena.
    3.12. The test-only Gaussian factor's messages agree with an independent analytic Gaussian oracle.
@@ -59,6 +81,16 @@ The migration is not a promise that one callback shape fits every factor in the 
    3.15. The test-only Gaussian kernel rejects an invalid observation through its registered validator.
    3.16. Conditioned messages from the test-only Gaussian factor agree with an independent analytic oracle.
    3.17. Conditioned node energy from the test-only Gaussian factor agrees with an independent analytic oracle.
+   3.17.1. The two external fixtures use nonbuiltin role names and independently
+           named parameter keys; at least one uses unequal role sizes and a
+           structural signature absent from built-ins. Their callbacks
+           implement the fixture rule rather than alias a built-in callback.
+   3.17.2. The Gaussian fixture combines observation conditioning with its
+           custom parameter packer. Unsupported role combinations fail at the
+           declared binding boundary, not through a central type-name branch.
+   3.17.3. External reconstruction covers supplied-array override, file-backed
+           blob, and declared initializer paths, including shape inference
+           from registered metadata without a new _blob_shape type branch.
    3.18. A source check confirms that neither test-only factor's type name appears in compiler dispatch.
    3.19. A source check confirms that neither test-only factor's type name appears in engine dispatch.
    3.20. A JSON round-trip records and checks each external kernel's namespaced implementation identity and version.
@@ -156,14 +188,21 @@ The migration is not a promise that one callback shape fits every factor in the 
    7.7. Schedule classification uses registered arena and constraint metadata.
    7.8. Public factor readouts use registered readout callbacks when declared.
    7.9. Serialization manifests use registered implementation identity and version metadata.
-   7.10. The resource estimator uses registered arena metadata.
-   7.11. The resource estimator uses registered parameter metadata.
-   7.12. The resource estimator uses registered callback metadata for operation counts.
+   7.10. Registered factors appear in existing persistent-state byte accounting
+         without factor-name branches in the estimator.
+   7.11. Parameter and arena byte counts equal actual State array-leaf totals
+         and retain the recorded flat-layout baseline.
+   7.12. XLA operation counts, temporary buffers, and calibration remain owned
+         by cff-j7mm; this foundation adds no callback cost model.
    7.13. Package exports expose the documented registration surface.
    7.14. Host and JIT execution agree within the stated dtype tolerance for both test-only kernels.
    7.15. Flooding and scheduled execution agree within the stated dtype tolerance for migrated ordinary BP groups.
-   7.16. Single-instance and `vmap` execution agree within the stated dtype tolerance for both test-only kernels.
+   7.16. Direct execution and batches of at least two distinct-input instances
+         agree within the stated dtype tolerance for both test-only kernels.
    7.17. Latest-schema and legacy checkpoint decoding are unchanged or marked structurally irrelevant with a reason.
+   7.18. The discrete and Gaussian chain checks in cff-wera and cff-zq25 retain
+         schedule kind, flat bytes, registerized scan carry, and reuse of a
+         traced executable when only parameter/observation values change.
 8. Durable documentation distinguishes stable serialization from the pre-1.0 Python extension API.
    8.1. `README.md` documents one discrete custom-kernel example.
    8.2. `README.md` documents one Gaussian custom-kernel example.
@@ -178,7 +217,7 @@ The migration is not a promise that one callback shape fits every factor in the 
    9.1. The focused kernel, compiler, discrete, Gaussian, schedule, serialization, estimator, runtime-status, and hostile-input test selection passes.
    9.2. The dashboard-backed short suite passes after the final code change.
 
-## Methodological Suggestions
+## Methodological Suggestions — HOW
 
 These suggestions are optional. Another method is acceptable if it satisfies the numbered outcomes with equivalent artifacts and executable evidence.
 
@@ -198,6 +237,9 @@ These suggestions are optional. Another method is acceptable if it satisfies the
 - cff-ahps uses this ticket to complete the executable-registration foundation for its nonlinear and neural roadmap branches.
 - cff-6tek owns `member_of`, named parameter writes, and learnable-family registration outside the discrete arena. This ticket preserves those surfaces but does not expand them.
 - A unified public registration path for hybrid or other multi-arena factors remains outside this ticket. No downstream ticket for that generalization is identified.
+- cff-j7mm owns estimator analysis/repair; cff-wbhu owns compiled convergence
+  loops. The foundation protects existing execution structure without claiming
+  their throughput outcomes.
 
 ## Definitions
 
@@ -208,6 +250,10 @@ These suggestions are optional. Another method is acceptable if it satisfies the
 - **Conditioning:** Supplying an observed value to its likelihood rule without representing the observation as a high-precision message.
 - **Exact support:** States whose log probability is not the reserved `NEG` zero-probability sentinel.
 - **FactorKernel:** The executable registration record for factor structure, arena binding, parameters, messages, energy, observations, readouts, robustness declarations, and serialized identity.
+- **Cavity:** Information arriving from the opposite side of an edge, excluding
+  the factor whose outgoing message is being computed.
+- **Assignment energy:** Minus log potential at one decoded state assignment,
+  distinct from free energy evaluated over beliefs.
 - **HostileInputs:** Required declarations for sparse support, improper messages, float32, and uncomfortable scale.
 - **Implementation manifest:** Serialized external-kernel identities and versions required to reconstruct executable behavior.
 - **Internal-unstable:** A Python interface that may change incompatibly before version 1.0 even though its serialized contract is stable.
@@ -227,3 +273,7 @@ Dependency audit (2026-07-30): cff-o7hs now depends on this ticket because nonli
 Intelligible-ticket review retained all 42 current-scan candidates because their local meanings are bounded: `fixed` means supplied parameters remain unchanged during inference; `generic` means protocol-general hybrid registration in the preserved historical note; `preserve` means byte/value identity or the explicitly named unchanged surface; `public` means exported/documented consumer surface; `register` means the executable metadata, compiler, runtime, or external-extension layer named by the sentence; `reusable` means internal callback reuse; `same` means same-arena or same-base-revision identity; `expose` means package export; `implement` means the named implementation identity or delivery action; `support` means declared inference-mode coverage or exact probability support; `complete` means the numbered migration contract or named downstream foundation; `deliver` means satisfying that numbered contract; `remaining` means the listed out-of-scope exclusions; `close` means ticket closure after named prerequisites; `check` means the named source, manifest, artifact, or automated comparison; `converge` means the solver status; `equivalent` means equal review evidence; `estimate` means the resource estimator; `evidence` means named tests, snapshots, or artifacts; `exact` means literal sentinel/vacuous values or exact identity; `match` means declared shape/representation agreement; `oracle` means an independent finite-enumeration or analytic reference; `parity` means comparison with the named deterministic baseline; `pass` means test success or message-passing terminology; `robust` means the repository numerical-robustness contract; `stable` means the documented serialized contract; `test` means the named automated fixture or selection; `validate` means observation/input or complete acceptance validation as stated; `fit` means structural callback compatibility; `infer` means fixed-parameter inference runtime; `learnable` means the registered parameter-family scope owned by cff-6tek; `scale` means named numeric magnitude or domain size; `may` means permitted pre-1.0 API change; `should` means design intent in the preserved historical note; `explicit_owner` and `named_ticket_handoff` point to cff-6tek; `all` refers exactly to the 42 listed scan candidates; `at_least` is an inclusive cardinality/dimension lower bound; `every` distributes over the locally named states, factors, or execution pairs; `only` marks test fixtures or the stated arena-scope boundary; `current` identifies the post-rewrite scan recorded by this note; and `existing` means the dependency that predates this rewrite in the preserved historical note. Capability owners were also checked separately: this ticket owns EF/discrete/Gaussian same-arena executable dispatch and parity, cff-o7hs and cff-1o72 own the nonlinear and neural consumers, cff-ahps owns the roadmap foundation, cff-6tek owns learnable-family registration, and no ticket currently owns generalized hybrid registration.
 
 Intelligible-ticket review: complete.
+
+**2026-09-09T03:29:39Z**
+
+PR #108 research — question: does arena binding specify the variational rule and every score? Answer: no; BP cavities and VMP beliefs differ, and decoded assignment energy is distinct from free energy. The contract now declares these semantics and custom-parameter assignment scoring. Sources at 7885bf5: engine.py:2818-2823, 3896-3901, 2422-2472; tests/test_vmp.py:120; Part I equations (8), (25), (26), pp.5, 11-13. Question: does a renamed built-in prove extensibility? Answer: it can miss role/packing assumptions, so existing planned fixtures now require nonbuiltin roles/keys and a new signature. Sources: tests/test_kernels.py and compiler.py:2080-2130. Confidence: high. The registration work is split by arena to make each compiler-to-reconstruction delivery reviewable.

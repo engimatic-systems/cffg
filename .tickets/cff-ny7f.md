@@ -29,17 +29,29 @@ propagation, support checks, and run control stay in later tickets.
 2. Typed execution owners cover every plan class exercised by `cff-sf29`:
    registered discrete/Gaussian/EF, mixture, recurrence, precision, constraint,
    GFE/P-substitution, and functional evaluator plans.
-3. Each executor accepts a typed compiled-plan view, state-array view, and
-   compiled parameter view and returns an `ExecutionDelta` containing only the
-   messages/internal values to write.
-4. Each executor gathers inputs, selects compiled parameters/observations, and
-   calls one existing mathematical rule. It does not build schedules, loop to
-   convergence, classify public status, or construct a public `Engine`.
+3. Each local-update owner accepts static plan metadata, typed local message
+   or belief blocks, and selected parameter/observation blocks. It returns an
+   `ExecutionDelta` with outgoing blocks and existing inner-solver status,
+   residual, and support facts. Numeric leaves are fixed-shape JAX pytrees;
+   they are not Python status objects or a public `RunResult`.
+4. One owner translates each plan's declared input semantics into calls to
+   existing rules. Transport adapters supply local inputs from either flat
+   arenas or prefetched/register-carried scan blocks and write the outputs.
+   They do not reinterpret BP cavities, VMP beliefs, parameters, or constraints.
+   The local-update owner does not build schedules, loop to convergence,
+   classify public status, or construct a public `Engine`.
 5. Registered same-arena plans dispatch from kernel metadata. Each multi-arena,
    GFE, evaluator, and structural plan keeps an explicit typed executor.
 6. Flooding and existing scheduled wrappers invoke the same rule-call owner for
    equivalent updates. `cff-nyad` later moves schedule construction without
    creating a second factor interpretation.
+   6.1. Registerized chains keep prefetched inputs, local-block carry, and one
+        final scatter; no full-arena carry or per-step full-arena gather is
+        introduced to share the rule call.
+   6.2. Kernel callables, shapes, and mode selection remain static at trace
+        time; parameters and observations remain numerical runtime arguments.
+   6.3. Inner exhaustion/divergence and residual facts survive both transport
+        paths and reach control without being replaced by successful writes.
 7. A direct executor and one-instance `vmap` agree where batching applies.
    Host/JIT status classification and checkpoint decoding are N/A to this
    ticket; they consume the resulting state downstream.
@@ -80,8 +92,17 @@ executors. `cff-wbhu` remains the separate compiled-loop performance owner.
 ## Definitions
 
 - **ExecutionDelta:** Typed messages or internal values produced by one plan
-  update before the caller writes them to state.
+  update, together with local solver facts before control classifies the run.
 - **Rule-call owner:** The only runtime owner that translates one compiled plan
   into a call to its existing mathematical rule.
 - **State-array view:** The smallest immutable selection of message, belief,
   observation, and parameter arrays needed by an executor.
+- **Transport adapter:** The code that reads/writes arrays or scan registers
+  according to a compiled plan, without choosing mathematical input meaning.
+- **Pytree:** A JAX-recognized nested structure whose numerical leaves are arrays.
+
+## Notes
+
+**2026-09-09T03:29:39Z**
+
+PR #108 research — question: can one state-gathering executor serve every schedule? Answer: registerized scans consume prefetched/carried blocks and scatter once; a local-block rule API lets both transport paths share mathematics. ExecutionDelta must also carry existing inner residual/status facts or a failed local solve can disappear at the boundary. Sources at 7885bf5: engine.py:2545-2658, 2924, 3036, 3191-3196, 3288-3406; Part II section 4.5, p.15 distinguishes stationary equations from iteration convergence. Confidence: high; no benchmarks run.

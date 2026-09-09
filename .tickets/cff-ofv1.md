@@ -37,6 +37,11 @@ The ticket does not pretend that both paths fit one universal callback.
    2.3. Each agrees with its independent finite-enumeration or analytic oracle.
    2.4. Each declares sparse-support, improper-input, float32, and
         uncomfortable-scale behavior.
+   2.5. The fixtures retain the nonbuiltin role names, parameter keys, unequal
+        role sizes/new signature, and observation-plus-packing cases required
+        by cff-209l; they cannot be renamed built-in kernels.
+   2.6. The existing external EF factor remains in the proof. All three arena
+        bindings reconstruct through their declared sources/initializers.
 3. A source-inspection test proves that the test-only factor type names do not
    appear in central compiler orchestration, public engine orchestration,
    validation maps, schedule builders, objective assembly, or readout dispatch.
@@ -52,18 +57,36 @@ The ticket does not pretend that both paths fit one universal callback.
    classification and lowering owner, one runtime-execution owner, and one
    objective owner. Source checks fail if its semantic selection is copied
    back into unrelated central orchestration.
+   6.1. It maps original factors/constraints, absorbed goals/priors, edge
+        exclusions, and shared-parameter terms to the cff-kfo7 claims and
+        existing mathematical authorities. No factor or shared parameter is
+        executed or charged twice because it appears in several drafts.
 7. The extension matrix states which change-path surfaces remain required for
    a new same-arena factor and for each specialized plan class. A surface is
    marked not applicable only with a concrete reason.
+   7.1. It explicitly includes initializer shape inference, array/blob
+        precedence, named parameter writes, learning addresses, Colony,
+        persistent-byte estimation, manifests, and checkpoint consumers.
+   7.2. Same-arena registration does not imply new variational methods:
+        each cell names accepted constraints and semirings. Generalized
+        moment matching and new P-substitution combinations remain downstream.
 8. The HMM, Kalman, fixed-A GFE, hybrid GFE, recurrence, structured
    recurrence, functional `mu3`, hard-constraint, learning, agent,
    serialization, and checkpoint fixtures named by the architecture tracks
    retain their existing results. Their existing mathematical authorities are
    reused; this proof does not add a new recovery experiment or oracle for
    those shipped paths.
-9. Flooding and scheduled, direct and one-instance `vmap`, host and JIT
+9. Flooding and scheduled, direct and the cff-sf29 multi-instance/multi-structure
+   Colony fixture, host and JIT
    status, and latest-schema and supported-legacy checkpoint pairs retain the
    applicability recorded by the architecture tracks.
+   9.1. The cff-ii9t independent-stop/invalid-neighbor batch case retains
+        per-instance status and state through the shared termination policy.
+   9.2. Engine and Colony use one result finalizer, and lower runtime value
+        owners do not import the facade.
+   9.3. The existing discrete/Gaussian chain records retain flat bytes,
+        registerized local carry and one final scatter, and traced-executable
+        reuse at unchanged shapes/dtypes/static controls. No speedup is inferred.
 10. Literal zero support, vacuous and improper inputs, non-finite values,
     float32, and uncomfortable-scale tests retain their documented values or
     loud statuses.
@@ -76,10 +99,10 @@ The ticket does not pretend that both paths fit one universal callback.
 13. Focused kernel, compiler, runtime, schedule, objective, readout,
     serialization, model, and hostile-input tests pass. The dashboard-backed
     short suite passes after the final code change.
-14. The ticket fits one implementation context because production behavior is
-    frozen: it re-runs and reuses the two extension factors already delivered
-    by `cff-209l`, then adds only cross-seam ownership/source checks plus the
-    compact specialized-plan matrix and its documentation.
+14. This gate reuses extension factors and the batch, failure, and execution-
+    structure checks delivered by its prerequisites. Its new work is the
+    cross-seam ownership checks and matrix documentation, not another set of
+    fixture implementations or scientific experiments.
 
 ## Methodological Suggestions — HOW
 
@@ -117,3 +140,9 @@ independent.
   supported representation.
 - **Specialized path:** Explicit compiler, runtime, and objective handling for a
   factor or constraint that does not fit the same-arena contract.
+
+## Notes
+
+**2026-09-09T03:29:39Z**
+
+PR #108 research — question: can factor registration alone prove objective accounting? Answer: composite ownership and exclusions also need a checked map. Hybrid GFE excludes absorbed goals/output entropies; functional mu3 charges one shared KL across slices. Sources at 7885bf5: engine.py:3761, 3950; tests/test_mu3.py:131; docs/DERIVATIONS.md:1220; Part I equations (8) and (25). Confidence: high. Reuse existing authorities; the map is a refactor preservation gate, not new scientific recovery evidence.

@@ -23,15 +23,15 @@ large for one implementation context and make a local factor change cross the
 whole compiler.
 
 This track first records the compiler contract and moves compiled values. It
-then extracts a sequential chain with one named boundary per context: topology,
-registered lowering, specialized lowering, data/learning resolution, and final
+then extracts a sequence of owners: topology, specialized discovery/completion,
+registered lowering, data/learning resolution, and final
 assembly. `cff-209l` is the cross-track same-arena foundation parented by the
 program epic rather than this compiler-only track.
 
 ## Outcomes / Acceptance Criteria — WHAT
 
 1. Direct dependency `cff-ddsq` is closed. Its chain closes `cff-ecw0`,
-   `cff-544x`, `cff-8t4d`, `cff-ejib`, `cff-kfo7`, `cff-bfr9`, and the
+   `cff-544x`, `cff-8t4d`, `cff-kfo7`, `cff-ejib`, `cff-bfr9`, and the
    cross-track foundation `cff-209l` first.
 2. `cff-ecw0` pins compiled plans, addresses, hashes, schedules, and diagnostics
    at the exact commit that closes `cff-209l`. e488df3 remains the external-
@@ -39,15 +39,22 @@ program epic rather than this compiler-only track.
 3. Immutable compiled values have one lower-level owner.
 4. The sequential stage boundaries are:
    4.1. expanded core-validated template to `TopologyLayout`;
-   4.2. topology to `RegisteredPlanDrafts`;
-   4.3. topology plus exclusions to `SpecializedPlanDrafts`;
-   4.4. plan drafts plus array sources to `ResolvedCompileData`; and
-   4.5. complete stage values to immutable `Arena`.
+   4.2. topology to `SpecializedClaims`, including absorbed goals/priors and
+        inferred parameter-edge semantic tags;
+   4.3. topology plus claims to `RegisteredPlanDrafts` for unclaimed factors;
+   4.4. claims plus registered membership to completed `SpecializedPlanDrafts`;
+   4.5. plan requirements plus sources to `ResolvedCompileData`, including
+        validated constraint payloads; and
+   4.6. stage values to immutable `Arena`, with exactly-once execution and
+        objective ownership checks.
 5. Registered same-arena and explicit specialized plans remain distinct. No
    universal callback is introduced. Public orchestration alone owns accepted-
    semiring option checking, plate expansion, and the existing core `validate`
    call; topology carries declared facts without classifying plan meaning.
    Registered/specialized owners enforce their own semiring compatibility.
+   Specialized discovery and completion belong to one owner. Extraction order
+   is a landing sequence, not a requirement that the owner be called once;
+   compatibility delegates supply ordinary membership until cff-ejib lands.
 6. `compile_template` stays the public entry point, is below 250 physical
    lines, and sequences named stages. The public compiler orchestration module
    is below 1,000 lines and no extracted file exceeds 1,000 lines.

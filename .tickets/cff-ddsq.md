@@ -36,11 +36,18 @@ owner, leaving `compile_template` as readable sequencing only.
    delta pairs, final plan collections, and structure/fingerprint inputs
    without reclassifying a factor or reevaluating family-specific semiring
    compatibility.
+   3.1. It mechanically joins raw topology, specialized semantic edge tags,
+        drafts, and validated numeric payloads. No plan requires a missing
+        blob-derived field before resolution.
+   3.2. It verifies exactly one execution owner for each factor or absorbed
+        member and the declared objective ownership/exclusions. A shared
+        parameter contribution is accounted once, independent of its users.
 4. `compile_template` performs only accepted-semiring option checking, plate
    expansion, the existing core `validate` call, and sequential calls to
-   topology, registered lowering, specialized lowering, data resolution, and
-   assembly. Family-specific semiring compatibility stays with its registered
-   or specialized lowering owner.
+   topology, specialized discovery, registered lowering, specialized
+   completion, data resolution, and assembly. Discovery and completion use
+   one specialized owner. Family-specific semiring compatibility stays with
+   its registered or specialized owner.
 5. All four architecture change-path rows are checked because the final value
    serves compiler, runtime, serialized-model, and learning consumers. The
    assembler introduces no new semantic interpretation for any row.

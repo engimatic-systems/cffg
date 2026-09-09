@@ -42,9 +42,9 @@ Readout vectorization remains separate work in `cff-3kdk`.
 5. Public `Engine`, `State`, `RunResult`, `RunStatus`, and
    `InferenceError` retain their documented imports, signatures, values, and
    failure behavior.
-6. The public engine facade retains public state/result/status types, public
-   construction and compatibility delegates, selection of the explicit run
-   strategy, final `RunStatus`/`RunResult` construction in `Engine.run`, and
+6. The public engine facade re-exports state/result/status types from their
+   lower-level owner and retains public construction, compatibility delegates,
+   selection of the explicit run strategy, shared result-finalizer calls, and
    delegation to lifecycle, objective, and readout owners. The facade injects
    the schedule program and objective evaluator into the selected run-control
    owner. It contains no family rule call, schedule builder, solver loop, or
@@ -84,7 +84,7 @@ These suggestions are optional. An implementer may choose another sound method.
 - Group readouts by representation or plan owner, not by whichever public
   method calls them at the `cff-sf29` named baseline.
 - Keep public methods as small delegates until downstream callers can use any
-  lower-level stable interface directly.
+  lower-level typed owner directly.
 - Use the **Runtime numerical or status invariant**, **New factor or rule
   family**, and **Learnable or checkpoint feature** change-path rows.
 - Preserve output order and dtype deliberately; do not combine this move with
