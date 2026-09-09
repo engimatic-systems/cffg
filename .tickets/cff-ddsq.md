@@ -102,3 +102,17 @@ in `cff-sf29` then records the runtime baseline against these compiled owners.
 **2026-09-09T21:53:23Z**
 
 cff-bfr9 now publishes immutable slot/observation prefixes at the original final resolution checkpoint before learning validation. This small ownership correction preserves Python constructor-argument evaluation order from compiler.py:606-640 at701c10f; otherwise a later invalid learnable could hide an earlier prefix-overflow error. Assembly consumes these arrays without republishing numeric storage. Delta pairs already belong to specialized drafts. Acceptance criterion3 updated; no extra scientific or public contract change. Prerequisite --> dependent: cff-ejib (final gate running) --> cff-bfr9 (immediate blocker) --> cff-ddsq --> cff-edoz --> engine track --> cff-cfqg. No parallel prerequisite within this chain; tk records are authoritative.
+
+**2026-09-09T22:57:05Z**
+
+Preparation during bfr9 final gate at339c46a, not an implementation start. Remaining assembly is compiler.py:129-134 edge tagging plus142-199 Gaussian/EF interior tables and Arena construction. Inputs now include ResolvedCompileData with immutable prefixes, final ordinary plans, validated constraints, learning/member/observation data, and unchanged mu3/global-goal plans; do not load arrays, repack, recompute prefixes, or repeat learning. schedule._arena_signature already consumes Arena, so fingerprint inputs means preserve its fields/order, not add a second fingerprint schema. CompositeOwnership distinguishes executed and absorbed factors from parameter-owner references. Equality plans appear in resolved ordinary collections but belong to specialized ownership; count their execution once. mu3 and goal-parameter plans are overlays, not additional executed factors. Validate declared ownership/exclusion/reference consistency using one-pass indexes; keep family-specific interpretation in specialized owners. Negative tests should remove or duplicate an execution owner, mismatch an exclusion/parameter reference, and duplicate a shared-parameter definition, while positive mixed-goal and mu3 fixtures protect valid shared references. Reuse all published maps/arrays/plans; assemble only new edge tags and interior tables. Source: bounded local inspection of compiler.py, specialized/contracts.py and __init__.py, resolution/contracts.py, compiled.py and schedule.py at339c46a; no new tests or benchmarks. Extra preparation agents were unavailable due to usage limits; do not treat them as reviewers of this handoff.
+
+**2026-09-09T22:57:05Z**
+
+Dependency companion from tk dep tree --full cff-ddsq, tk ready, tk blocked; prerequisite --> dependent:
+[x] cff-ejib (#119)
+  --> [in_progress: final gate] cff-bfr9
+    --> [blocked: next] cff-ddsq
+      --> [blocked] cff-edoz
+        --> [blocked] cff-sf29 --> engine track cff-ws3c --> cff-ofv1 --> cff-cfqg
+No parallel prerequisite within this compiler chain; unrelated ready work remains outside this epic. Start from the published bfr9 branch only after its gate and closure, following the normal base update.
