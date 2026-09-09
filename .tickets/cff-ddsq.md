@@ -1,6 +1,6 @@
 ---
 id: cff-ddsq
-status: open
+status: in_progress
 deps: [cff-bfr9]
 links: [cff-edoz, cff-ws3c]
 created: 2026-09-02T04:17:42Z
@@ -124,3 +124,7 @@ Ready source baseline: cff-bfr9 is closed. Source 339c46a passed 1,777 default t
 **2026-09-09T23:07:24Z**
 
 Published base: PR #120, https://github.com/engimatic-systems/cffg/pull/120, branch agent/cff-bfr9-array-resolution. It is stacked on #119 and has the passing final gate described above. Update this branch before creating the final-assembly work branch.
+
+**2026-09-09T23:09:38Z**
+
+Starting from updated PR #120 branch at 2779e5d; validated source is 339c46a (1,777 passing default tests). Change paths: New IR field, New factor/rule family, Learnable/checkpoint, and Runtime numerical/status all consume the assembled value; assembly adds no mathematical interpretation or status. Flooding/scheduled, direct/vmap, host/JIT runtime, and current/legacy reconstruction pairs share this Arena. Sparse/vacuous/improper runtime messages are N/A; preserve exact support/offsets, source float32 behavior, group order, and published storage reuse. Scope: move edge tagging and interior ledger construction into a pure typed assembler; verify complete execution/absorption ownership and declared objective/exclusion references without loading sources, calling kernels, redoing prefixes, or changing valid-model admission. Group names are not globally unique across family namespaces, so ownership checks must join original member identities rather than reject harmless cross-family name collisions. One fresh default suite after final implementation; focused contracts and field-by-field baseline comparison first.
