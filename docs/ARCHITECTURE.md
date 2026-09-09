@@ -124,8 +124,8 @@ and review context proportional to the change.
 
 | Ticket shape | Authority | Derived surfaces that must agree | Canonical focused tests | Durable documentation |
 | --- | --- | --- | --- | --- |
-| New IR field | `src/cffg/core/ir.py` (`Template` or its spec dataclass) | `src/cffg/core/validate.py`; `src/cffg/core/serialize.py` (`to_dict`, `from_dict`, `structure_hash`); `src/cffg/core/plates.py` scoping; `src/cffg/core/compose.py` and `src/cffg/core/edits.py` when editable; `src/cffg/compiler.py` and `Arena` when executable; bundle and agent state when persisted | `tests/test_ir.py`, `tests/test_serialize.py`, `tests/test_plates.py`; add `tests/test_edit_codec.py`, `tests/test_edits.py`, `tests/test_agent_spec.py`, or `tests/test_bundle.py` only for the affected boundary | Contract in this document; public construction and migration in `README.md`; unsupported cases in `LIMITATIONS.md` |
-| New factor or rule family | `src/cffg/kernels.py:FactorKernel`, `kernel_bindings.py`, its `src/cffg/core/ir.py:FactorType`, and the family rule module; formal equations are authoritative in code docstrings and `DERIVATIONS.md` | Compiler grouping, slot addressing, parameter packing, `Arena`, and `member_of`; shared local calls in `kernel_runtime.py`; synchronous `_make_step`; scheduled batch/registerized/flat scans; `_make_bfe`; support checks, assignment scoring, readouts, schedule classification, serialization manifest, estimator, and public exports as applicable | `tests/test_kernels.py`, `tests/test_discrete_kernels.py`, `tests/test_gaussian_kernels.py`, `tests/test_gaussian_kernel_schedules.py`; family rule and engine-oracle tests; `tests/test_schedule.py`; sparse-support, float32, and uncomfortable-scale cases | Derivation in `DERIVATIONS.md`; integration contract here; approximations in `LIMITATIONS.md`; public modeling API in `README.md` |
+| New IR field | `src/cffg/core/ir.py` (`Template` or its spec dataclass) | `src/cffg/core/validate.py`; `src/cffg/core/serialize.py` (`to_dict`, `from_dict`, `structure_hash`); `src/cffg/core/plates.py` scoping; `src/cffg/core/compose.py` and `src/cffg/core/edits.py` when editable; `src/cffg/topology.py` declaration snapshots/layout, `src/cffg/compiler.py` lowering, and `src/cffg/compiled.py` values when executable; bundle and agent state when persisted | `tests/test_ir.py`, `tests/test_serialize.py`, `tests/test_plates.py`, `tests/test_topology.py`; add `tests/test_edit_codec.py`, `tests/test_edits.py`, `tests/test_agent_spec.py`, or `tests/test_bundle.py` only for the affected boundary | Contract in this document; public construction and migration in `README.md`; unsupported cases in `LIMITATIONS.md` |
+| New factor or rule family | `src/cffg/kernels.py:FactorKernel`, `kernel_bindings.py`, its `src/cffg/core/ir.py:FactorType`, and the family rule module; formal equations are authoritative in code docstrings and `DERIVATIONS.md` | `topology.py` declared role/slot facts; compiler grouping, parameter packing, `Arena`, and `member_of`; shared local calls in `kernel_runtime.py`; synchronous `_make_step`; scheduled batch/registerized/flat scans; `_make_bfe`; support checks, assignment scoring, readouts, schedule classification, serialization manifest, estimator, and public exports as applicable | `tests/test_kernels.py`, `tests/test_discrete_kernels.py`, `tests/test_gaussian_kernels.py`, `tests/test_gaussian_kernel_schedules.py`; family rule and engine-oracle tests; `tests/test_schedule.py`; sparse-support, float32, and uncomfortable-scale cases | Derivation in `DERIVATIONS.md`; integration contract here; approximations in `LIMITATIONS.md`; public modeling API in `README.md` |
 | Runtime numerical or status invariant | `AGENTS.md` numerical contract and `src/cffg/engine.py` (`RunStatus`, `RunResult`, `Engine.run`) | Flooding, colored/mixed, and exact schedules; host `_has_zero_support` and JIT `_make_support_check`; `_make_step`, `_make_exact_unit`, `_make_propagate`, and `_make_bfe`; inner-solver status; `RollingAgent`, `Colony`, estimator, benchmark, and dashboard consumers | `tests/test_runtime_status.py`, `tests/test_schedule.py`, `tests/test_colony.py`, plus the changed rule family's hostile-input tests | Runtime contract here and in `README.md`; any accepted failure mode or approximation in `LIMITATIONS.md` |
 | Learnable or checkpoint feature | `src/cffg/core/ir.py` (`LearnableSpec`, `AgentSpec`, `BeliefBinding`) and `src/cffg/learn.py` (`Family`, `Learnables`) | Validation, JSON/hash, plate scoping, compiler `_resolve_learnables`, `Arena.learn_plans`, `member_of`, engine readouts and parameter writes, agent cadence, checkpoint encode/decode and legacy migration, and bundles | `tests/test_learnables.py`, `tests/test_agent_spec.py`, `tests/test_agent.py`, and `tests/test_bundle.py`; add the contributing factor family's statistic test | Conjugate contract here; statistics beyond the papers in `DERIVATIONS.md`; public cadence/checkpoint API in `README.md`; remaining family gaps in `LIMITATIONS.md` |
 
@@ -264,6 +264,37 @@ not recursively frozen. This ownership contract is not a security sandbox.
 leaves; it is not a model or checkpoint serializer. Templates plus data remain
 the reconstruction authority. `tests/test_compiled.py` covers publication,
 alias isolation, copy behavior, import direction, and distinct vmapped states.
+
+`cffg.topology.build_topology` accepts the expanded, core-validated template
+and returns one immutable `TopologyLayout`. It snapshots variable, factor-role,
+constraint, and port declarations; records ordered endpoints, degrees,
+ports-by-variable, raw edges, own/opposite slots and DATA candidates; and
+records discrete/Gaussian segment lengths. Factor role mappings use the
+read-only `FactorDeclaration` snapshot, not mutable core `FactorSpec` mappings.
+The three logical slot domains
+retain independent numbering. Endpoint order sorts factor/role names, while
+declared message-role order and numeric hard-constraint role order remain
+separate conventions in lowering.
+
+Topology does not classify registered or specialized factors, infer a parameter
+edge's table shape/axis, decide legal observation conditioning, or assign
+observation rows. Parameter carriers already declare their flat cardinality;
+semantic discovery produces new tagged edge records without changing topology.
+Observation rows follow lowered group/member order, not DATA-candidate order.
+Assembly converts these lengths into int64 prefixes at its existing late gate,
+so out-of-range declarations cannot preempt earlier admission or array errors.
+Observation prefixes and entropy exclusions also remain with assembly. The
+module's `prefix_offsets` helper calculates offsets from supplied segment lengths;
+it does not choose observation assignments or interpret factors.
+
+`compile_template` still owns semiring argument checking, plate expansion, and
+core `validate`. Core malformed-incidence failures remain `ModelError`.
+Topology returns executable-port diagnostics in declaration order, and compiler
+orchestration appends them after factor-admission errors at the existing
+`CompileError` gate. Conditioning errors retain their later gate after array
+resolution and Dirichlet discovery. Moving structural work does not change the
+error owner or precedence. `tests/test_topology.py` directly protects these
+boundaries and the immutable declaration snapshot.
 
 The compiler characterization baseline is `bf6bbe9527b5e1eea9172a30b8c7c214a08ed9ee`,
 the completed discrete/Gaussian registration foundation. Compiler extraction
