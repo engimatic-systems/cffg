@@ -1,6 +1,6 @@
 ---
 id: cff-8t4d
-status: in_progress
+status: closed
 deps: [cff-544x]
 links: [cff-ejib]
 created: 2026-09-02T04:02:00Z
@@ -113,3 +113,11 @@ Starting from updated agent/cff-544x-immutable-values at 39d5bf2 (PR #114). Arch
 **2026-09-09T18:06:23Z**
 
 Implementation handoff: cffg.topology owns one immutable TopologyLayout with declared variable/constraint/port snapshots, Mapping-typed FactorDeclaration role bindings, ordered endpoints/degrees/ports, raw edges, own/opposite maps, three slot counts, Python segment-length tuples, ordered DATA candidates and deferred executable-port diagnostics. Compiler retains semantic admission, inferred Dirichlet tags, conditioning decisions and observation row numbers; tags create new EdgeInfo records instead of mutating topology. Int64 prefix allocation stays at final assembly. Review found and fixed an early OverflowError for a 2**63-cardinality declaration that should first report legacy/unterminated-port errors; the exact precedence regression is now a test. Independent bounded review confirmed the original error and order are restored. The tuple endpoint representation is explicitly rendered as the prior list in its existing error diagnostic. Focused compiler/topology/IR/serialization/plate/dashboard run: 121 passed; Ruff and diff/dependency checks pass. Architecture change-path rows now name topology. Final dashboard gate pending; no numerical/serialized/runtime behavior is intentionally changed.
+
+**2026-09-09T18:11:29Z**
+
+Final short-suite gate running at committed implementation head 8cd8919, after the 121-test focused pass. No source edits after launch. The publication PR will stack on #114; cff-kfo7 remains the next serial dependency, not an implementation started during this gate.
+
+**2026-09-09T18:23:47Z**
+
+Completed at implementation head 8cd8919: dashboard-backed default short suite passed 1,676 tests, 41 opt-in slow tests deselected, four existing Gym deprecation warnings. Pytest 979.15 seconds; measured wall 991.115 seconds. Dashboard refreshed with 13 new topology cases and zero failures. No source edits after the passing run. Focused run: 121 passed; existing 44 characterization cases unchanged. Topology extraction is complete and will be published stacked on PR #114. Next cff-kfo7 is blocked by separate pre-existing correctness tickets cff-n183 and cff-gvch; cff-n183 awaits Cooper’s choice of correct cross-group goal sharing versus explicit temporary rejection. No inference behavior was changed here.
