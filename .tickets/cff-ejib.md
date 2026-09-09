@@ -125,4 +125,12 @@ Final review refinement: a malformed family=any EF observation whose output is d
 
 **2026-09-09T22:07:02Z**
 
-Final gate passed: 1755 tests, zero failures, 41 opt-in slow deselections, four existing Gym deprecation warnings. Pytest992.95 seconds; measured wall1005.304 seconds. Dashboard refreshed with19 new cases,30 diagrams and23 galleries. Source701c10f; run began758d43e and runtime history records2c29d5c after ticket-only handoff commits; src/tests/dashboard code/ARCHITECTURE are identical across these heads. Final focused90 passed in3.03 seconds after the optional-port guard; earlier broad224 passed in79.76 seconds. All14 complete baseline arenas match. Changed source/tests Ruff-clean, diff/dependency checks pass. Closing cff-ejib; registered owner335 lines, compiler1122->1024 lines. Next cff-bfr9 owns source/numeric/address/learning resolution with the recorded full-map callbacks, original failure gates, explicit family numeric owners and prefix-before-learning correction. No significant user decision remains before that extraction. PR publication follows; no unchanged second suite is required.
+Final gate passed: 1,755 tests, zero failures, 41 opt-in slow deselections, four existing Gym deprecation warnings. Pytest took 992.95 seconds; measured wall time was 1,005.304 seconds. The dashboard includes 19 new cases, 30 diagrams and 23 galleries.
+
+Source commit: 701c10f. The run began at 758d43e; runtime history records 2c29d5c after ticket-only handoffs. Source, tests, dashboard code and ARCHITECTURE are identical across these heads. The final focused check passed 90 tests in 3.03 seconds after the optional-port guard; the earlier broad check passed 224 in 79.76 seconds. All 14 complete baseline arenas match. Changed source/tests pass Ruff; diff/dependency checks pass.
+
+Closing cff-ejib: the registered lowerer is 335 lines; compiler.py shrank from 1,122 to 1,024 lines. Next, cff-bfr9 owns source, numeric, address and learning resolution. Its handoff preserves full-map callbacks, original failure gates, named family numeric owners and prefix conversion before learning. No significant user decision remains before that extraction. PR publication follows; an unchanged second suite is not required.
+
+**2026-09-09T22:08:44Z**
+
+Published PR #119: https://github.com/engimatic-systems/cffg/pull/119, based on specialized-lowering PR #118. The shared architecture HTML and test dashboard show the completed 1,755-test gate. Later commits contain only runtime evidence, ticket handoffs and ticket readability improvements; implementation source remains 701c10f. cff-bfr9 is ready, with the agreed validation-order boundary correction already recorded.
