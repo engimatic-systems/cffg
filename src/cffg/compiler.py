@@ -32,6 +32,7 @@ Module map:
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -64,6 +65,7 @@ from cffg.core.ir import FACTOR_TYPES, ConstraintKind, PortRole, Template
 from cffg.core.plates import expand_plates
 from cffg.core.validate import validate
 from cffg.recurrence_topology import classify_recurrence_components
+from cffg.topology import build_topology, prefix_offsets
 
 __all__ = [
     "NEG",
@@ -149,15 +151,9 @@ def compile_template(
     t = expand_plates(t)  # materialize plates (validates the spec first); no-op when plateless
     validate(t)
     problems: list[str] = []
-    degrees = {name: 0 for name in t.variables}
-    for factor in t.factors.values():
-        for variable in factor.all_edges().values():
-            if variable in degrees:
-                degrees[variable] += 1
-    ports_by_variable: dict[str, list] = {name: [] for name in t.variables}
-    for port in t.ports.values():
-        if port.variable in ports_by_variable:
-            ports_by_variable[port.variable].append(port)
+    topology = build_topology(t)
+    degrees = topology.degrees
+    ports_by_variable = topology.ports_by_variable
 
     mean_field = {
         c.target for c in t.constraints if c.kind is ConstraintKind.MEAN_FIELD
@@ -250,12 +246,7 @@ def compile_template(
                     f"factor {f.name!r}: {f.type} is a conditioned likelihood — its 'out' "
                     "edge must be a DATA port (unobserved predictives leave the family)"
                 )
-    for p in t.ports.values():
-        if p.role in (PortRole.PRIOR, PortRole.GOAL):
-            problems.append(
-                f"port {p.name!r} ({p.role.value}) is unterminated: compose the missing "
-                "factor before compiling"
-            )
+    problems.extend(topology.port_problems)
     if problems:
         raise CompileError(f"cannot compile {t.name!r}:\n  - " + "\n  - ".join(problems))
 
@@ -284,92 +275,51 @@ def compile_template(
     if problems:
         raise CompileError(f"cannot compile {t.name!r}:\n  - " + "\n  - ".join(problems))
 
-    # Edge table: endpoints in deterministic order; external side is side 1.
-    endpoints: dict[str, list[tuple[str, str]]] = {v: [] for v in t.variables}
-    for f in sorted(t.factors.values(), key=lambda f: f.name):
-        for role, var in sorted(f.all_edges().items()):
-            endpoints[var].append((f.name, role))
-
-    edges: dict[str, EdgeInfo] = {}
-    slot_of: dict[tuple[str, str], int] = {}  # (factor, role) -> its own slot
-    opposite: dict[tuple[str, str], int] = {}  # (factor, role) -> slot it reads
+    endpoints = topology.endpoints
+    edges = dict(topology.edges)
+    for name, (shape, axis, _) in param_specs.items():
+        edges[name] = replace(edges[name], param_shape=shape, param_axis=axis)
+    slot_of, opposite = topology.slot_of, topology.opposite
     data_slots: dict[str, int] = {}
-    gauss_data_ports: dict[str, str] = {}  # variable -> DATA port name (gaussian)
-    ef_data_ports: dict[str, str] = {}  # variable -> DATA port name (ef obs)
-    next_slot = 0
-    next_gslot = 0
-    next_efslot = 0
-    for vname in sorted(t.variables):
-        ends = endpoints[vname]
-        v = t.variables[vname]
-        if v.dim:  # gaussian slots have their own numbering (own arena)
-            s0, s1 = next_gslot, next_gslot + 1
-            next_gslot += 2
-        elif v.ef:  # ef slots likewise (third arena)
-            s0, s1 = next_efslot, next_efslot + 1
-            next_efslot += 2
+    gauss_data_ports: dict[str, str] = {}
+    ef_data_ports: dict[str, str] = {}
+    for candidate in topology.data_candidates:
+        vname, port_name = candidate.variable, candidate.port
+        variable = topology.variables[vname]
+        fname, role = candidate.endpoint
+        ftype_here = t.factors[fname].type
+        if variable.dim:
+            kern = kernels.kernel_for(ftype_here)
+            conditioning = kern.binding.conditioning if kern is not None and kern.arena == "gaussian" else None
+            if conditioning is not None and role == conditioning.role:
+                gauss_data_ports[vname] = port_name
+            elif ftype_here in ("gaussian_mixture", "gaussian_mixture_linear"):
+                problems.append(
+                    f"port {port_name!r}: observed mixture outputs are not "
+                    f"supported yet (Gaussian DATA port on {fname!r}/{role!r})"
+                )
+            elif ftype_here == "gaussian_prec":
+                problems.append(
+                    f"port {port_name!r}: observed gaussian_prec outputs: bind "
+                    "observations via a gaussian_linear emission or an equality branch"
+                )
+            else:
+                problems.append(
+                    f"port {port_name!r}: Gaussian DATA port on {fname!r}/{role!r} "
+                    "requires a registered conditioning role"
+                )
+        elif variable.ef:
+            if ftype_here in kernels.conditioned_out_types() and role == "out":
+                ef_data_ports[vname] = port_name
+            else:
+                problems.append(
+                    f"port {port_name!r}: EF DATA ports must clamp a conditioned "
+                    f"observation kernel's 'out' edge "
+                    f"({sorted(kernels.conditioned_out_types())}), not "
+                    f"{fname!r}/{role!r}"
+                )
         else:
-            s0, s1 = next_slot, next_slot + 1
-            next_slot += 2
-        pshape, paxis, _ = param_specs.get(vname, ((), 0, ""))
-        edges[vname] = EdgeInfo(
-            vname,
-            v.cardinality,
-            s0,
-            s1,
-            len(ends) == 2,
-            v.dim,
-            v.ef,
-            pshape,
-            paxis,
-        )
-        slot_of[ends[0]] = s0
-        if len(ends) == 2:
-            slot_of[ends[1]] = s1
-            opposite[ends[0]], opposite[ends[1]] = s1, s0
-        else:  # dangling: outer side s1 is external (clamp or uniform/vacuous)
-            opposite[ends[0]] = s1
-            for port in ports_by_variable[vname]:
-                if port.role is not PortRole.DATA:
-                    continue
-                if v.dim:
-                    # Gaussian DATA ports use the binding's conditioning rule.
-                    fname, role = ends[0]
-                    ftype_here = t.factors[fname].type
-                    kern = kernels.kernel_for(ftype_here)
-                    conditioning = kern.binding.conditioning if kern is not None and kern.arena == "gaussian" else None
-                    if conditioning is not None and role == conditioning.role:
-                        gauss_data_ports[vname] = port.name
-                    elif ftype_here in ("gaussian_mixture", "gaussian_mixture_linear"):
-                        problems.append(
-                            f"port {port.name!r}: observed mixture outputs are not "
-                            f"supported yet (Gaussian DATA port on {fname!r}/{role!r})"
-                        )
-                    elif ftype_here == "gaussian_prec":
-                        problems.append(
-                            f"port {port.name!r}: observed gaussian_prec outputs: bind "
-                            "observations via a gaussian_linear emission or an equality branch"
-                        )
-                    else:
-                        problems.append(
-                            f"port {port.name!r}: Gaussian DATA port on {fname!r}/{role!r} "
-                            "requires a registered conditioning role"
-                        )
-                elif v.ef:
-                    # EF observations compile to conditioning too: legal only
-                    # on a conjugate observation factor's "out" edge.
-                    fname, role = ends[0]
-                    if t.factors[fname].type in kernels.conditioned_out_types() and role == "out":
-                        ef_data_ports[vname] = port.name
-                    else:
-                        problems.append(
-                            f"port {port.name!r}: EF DATA ports must clamp a conditioned "
-                            f"observation kernel's 'out' edge "
-                            f"({sorted(kernels.conditioned_out_types())}), not "
-                            f"{fname!r}/{role!r}"
-                        )
-                else:
-                    data_slots[port.name] = s1
+            data_slots[port_name] = candidate.external_slot
 
     resolved = _resolve_arrays(t, arrays, root)
     member_of: dict[str, MemberAddress] = {}
@@ -409,7 +359,7 @@ def compile_template(
         if len(other) != 1:
             problems.append(
                 f"parameter edge {var!r}: requires exactly one facing Dirichlet prior, "
-                f"got endpoints {ends}"
+                f"got endpoints {list(ends)}"
             )
             continue
         prior_name, prior_role = other[0]
@@ -1401,27 +1351,14 @@ def compile_template(
         (fam, np.array(pairs, dtype=np.int64)) for fam, pairs in sorted(by_fam.items())
     ]
 
-    message_lengths = np.zeros(next_slot, dtype=np.int64)
-    g_eta_lengths = np.zeros(next_gslot, dtype=np.int64)
-    g_lam_lengths = np.zeros(next_gslot, dtype=np.int64)
-    for e in edges.values():
-        if e.dim:
-            g_eta_lengths[[e.slot0, e.slot1]] = e.dim
-            g_lam_lengths[[e.slot0, e.slot1]] = e.dim * e.dim
-        elif not e.ef:
-            message_lengths[[e.slot0, e.slot1]] = e.card
-
-    def prefix(lengths: np.ndarray) -> np.ndarray:
-        return np.concatenate([np.zeros(1, dtype=np.int64), np.cumsum(lengths)])
-
     obs_lengths = np.zeros(n_obs_rows, dtype=np.int64)
     for row, dim in gauss_data.values():
         obs_lengths[row] = dim
 
     return Arena(
         template_name=t.name,
-        n_slots=next_slot,
-        message_starts=prefix(message_lengths),
+        n_slots=topology.n_slots,
+        message_starts=prefix_offsets(topology.message_lengths),
         edges=edges,
         groups=groups,
         data_slots=data_slots,
@@ -1429,19 +1366,19 @@ def compile_template(
         dirichlet_groups=dirichlet_groups,
         constraint_groups=constraint_groups,
         log_params=log_params,
-        n_gslots=next_gslot,
-        g_eta_starts=prefix(g_eta_lengths),
-        g_lam_starts=prefix(g_lam_lengths),
+        n_gslots=topology.n_gslots,
+        g_eta_starts=prefix_offsets(topology.g_eta_lengths),
+        g_lam_starts=prefix_offsets(topology.g_lam_lengths),
         gauss_groups=gauss_groups,
         gauss_data=gauss_data,
         n_obs_rows=n_obs_rows,
-        g_obs_starts=prefix(obs_lengths),
+        g_obs_starts=prefix_offsets(obs_lengths),
         mix_groups=mix_groups,
         recurrence_groups=recurrence_groups,
         recurrence_components=recurrence_components,
         prec_groups=prec_groups,
         gauss_interior=gauss_interior,
-        n_efslots=next_efslot,
+        n_efslots=topology.n_efslots,
         ef_groups=ef_groups,
         ef_data=ef_data,
         n_ef_obs=n_ef_obs,
