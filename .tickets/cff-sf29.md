@@ -138,3 +138,7 @@ Preparation only while cff-ddsq final gate runs at source 707c31b; the required 
 **2026-09-09T23:43:39Z**
 
 Exact engine characterization baseline: 76251b44fc467a976aa056556f8fb371fe5de7f4, the commit that closes compiler track cff-edoz and final assembly cff-ddsq. Its source is 707c31b, validated by 1,813 passing default tests with 41 slow deselections and four existing Gym warnings in 1,016.282 seconds measured wall; runtime record 6364053. Later publication/handoff commits may change tickets/docs only. Start from the published agent/cff-ddsq-arena-assembly branch after its PR is created and update that intended base before branching. This ticket adds characterization/inventory only, with no production engine move or numerical behavior change. P2 cff-34gi records a separate, pre-existing fixed-GFE probability-input validation gap; use valid probability inputs for engine behavior parity and do not redefine that defect as a supported mathematical approximation.
+
+**2026-09-09T23:45:38Z**
+
+Published intended base: PR #121, https://github.com/engimatic-systems/cffg/pull/121, branch agent/cff-ddsq-arena-assembly. Update that branch before starting the engine characterization branch. The exact comparison baseline remains compiler-track closing commit 76251b44fc467a976aa056556f8fb371fe5de7f4, not a later publication-note commit.

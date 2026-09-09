@@ -148,3 +148,7 @@ A final bounded source review confirmed an inherited malformed-input gap: fixed 
 **2026-09-09T23:42:33Z**
 
 Final gate passed: 1,813 tests, zero failures, 41 opt-in slow deselections, and four existing Gym deprecation warnings. Pytest: 1,003.86 seconds; measured wall: 1,016.282 seconds. Source: 707c31b; runtime record at documentation/ticket descendant 6364053, completed 2026-09-09T23:40:14.531582+00:00. Dashboard refreshed with 36 new cases and 30 diagrams in 23 galleries. No source/test change after the gate began. All assembly criteria are complete: typed pure join, exactly-once factor/objective checks, immutable publication reuse, slim facade, preserved public values and scientific behavior, one-way imports, explicit execution pairs, focused/full verification and updated architecture. Source work is finished. Publish on PR #120, close compiler track cff-edoz, and record its exact closing commit for engine characterization. No second unchanged suite is required for publication or epic closure.
+
+**2026-09-09T23:45:38Z**
+
+Published as PR #121: https://github.com/engimatic-systems/cffg/pull/121, stacked on #120. Compiler track cff-edoz is closed at 76251b44fc467a976aa056556f8fb371fe5de7f4, which is the exact engine-characterization baseline. Shared HTML now records the completed stages, 1,813-test final gate, host assembly cost, and separate P2 cff-34gi. Source is unchanged after 707c31b; later commits are documentation, ticket and publication metadata only. No second unchanged suite was run.
