@@ -121,3 +121,7 @@ Final short-suite gate running at committed implementation head 8cd8919, after t
 **2026-09-09T18:23:47Z**
 
 Completed at implementation head 8cd8919: dashboard-backed default short suite passed 1,676 tests, 41 opt-in slow tests deselected, four existing Gym deprecation warnings. Pytest 979.15 seconds; measured wall 991.115 seconds. Dashboard refreshed with 13 new topology cases and zero failures. No source edits after the passing run. Focused run: 121 passed; existing 44 characterization cases unchanged. Topology extraction is complete and will be published stacked on PR #114. Next cff-kfo7 is blocked by separate pre-existing correctness tickets cff-n183 and cff-gvch; cff-n183 awaits Cooper’s choice of correct cross-group goal sharing versus explicit temporary rejection. No inference behavior was changed here.
+
+**2026-09-09T18:25:20Z**
+
+Published as PR #115: https://github.com/engimatic-systems/cffg/pull/115, stacked on PR #114. The separate planning commit records cff-n183/cff-gvch prerequisites and research for cff-kfo7; it implements neither fix. The shared architecture HTML now shows this completed extraction and the pending shared-goal decision. Worktree code is unchanged from the passing 8cd8919 gate.
