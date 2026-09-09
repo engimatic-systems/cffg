@@ -139,4 +139,10 @@ Prefix/learning regression verified on current baseline in 0.32 seconds with no 
 
 **2026-09-09T22:07:02Z**
 
-Ready baseline: cff-ejib is closed. Source701c10f, final gate recorded at2c29d5c (ticket-only descendants of gate-start758d43e) passed1755 default tests,41 slow deselections,4 existing warnings in1005.304 seconds measured wall. All19 registered stage cases and90 final compiler-boundary checks pass;14 complete arenas equal the pre-extraction compiler. Registered lowerer335 lines, compiler1024. Start from the published agent/cff-ejib-registered-lowering branch after PR publication and normal base update. No source changes after gate; one fresh final gate belongs to this ticket only after its implementation.
+Ready baseline: cff-ejib is closed. Source commit 701c10f passed 1,755 default tests, with 41 slow deselections and four existing warnings, in 1,005.304 seconds measured wall time. The gate began at 758d43e and is recorded at its ticket-only descendant 2c29d5c. All 19 registered stage cases and 90 final compiler-boundary checks pass; 14 complete arenas equal the pre-extraction compiler.
+
+The registered lowerer is 335 lines; compiler.py is 1,024 lines. Start from the published agent/cff-ejib-registered-lowering branch after PR publication and normal base update. No source changed after the gate. This ticket needs one fresh final gate after its own implementation, not another run of the unchanged baseline.
+
+**2026-09-09T22:08:44Z**
+
+Published base: PR #119, https://github.com/engimatic-systems/cffg/pull/119, branch agent/cff-ejib-registered-lowering. It is stacked on #118 and has the passing final gate described above. Update this base before creating the array-resolution work branch.
