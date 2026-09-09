@@ -1,6 +1,6 @@
 ---
 id: cff-ddsq
-status: in_progress
+status: closed
 deps: [cff-bfr9]
 links: [cff-edoz, cff-ws3c, cff-sf29, cff-34gi]
 created: 2026-09-02T04:17:42Z
@@ -144,3 +144,7 @@ Bounded local performance check, no competing tests: 100 retained alternating re
 **2026-09-09T23:42:33Z**
 
 A final bounded source review confirmed an inherited malformed-input gap: fixed GFE A/c arrays with [-0.2, 1.2] can pass the sum-only check and pack to mass 1.2. This also reproduces in pre-extraction compiler 0bcda82. Separate P2 cff-34gi owns its fix; LIMITATIONS S9 records the current scope. It does not change valid-model parity or make the structural move unsafe, so it is not folded into this refactor or made an epic prerequisite. No numerical source was changed for this finding.
+
+**2026-09-09T23:42:33Z**
+
+Final gate passed: 1,813 tests, zero failures, 41 opt-in slow deselections, and four existing Gym deprecation warnings. Pytest: 1,003.86 seconds; measured wall: 1,016.282 seconds. Source: 707c31b; runtime record at documentation/ticket descendant 6364053, completed 2026-09-09T23:40:14.531582+00:00. Dashboard refreshed with 36 new cases and 30 diagrams in 23 galleries. No source/test change after the gate began. All assembly criteria are complete: typed pure join, exactly-once factor/objective checks, immutable publication reuse, slim facade, preserved public values and scientific behavior, one-way imports, explicit execution pairs, focused/full verification and updated architecture. Source work is finished. Publish on PR #120, close compiler track cff-edoz, and record its exact closing commit for engine characterization. No second unchanged suite is required for publication or epic closure.
