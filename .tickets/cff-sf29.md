@@ -1,6 +1,6 @@
 ---
 id: cff-sf29
-status: open
+status: in_progress
 deps: [cff-edoz]
 links: [cff-ny7f, cff-34gi, cff-ddsq]
 created: 2026-09-02T04:02:01Z
@@ -142,3 +142,7 @@ Exact engine characterization baseline: 76251b44fc467a976aa056556f8fb371fe5de7f4
 **2026-09-09T23:45:38Z**
 
 Published intended base: PR #121, https://github.com/engimatic-systems/cffg/pull/121, branch agent/cff-ddsq-arena-assembly. Update that branch before starting the engine characterization branch. The exact comparison baseline remains compiler-track closing commit 76251b44fc467a976aa056556f8fb371fe5de7f4, not a later publication-note commit.
+
+**2026-09-09T23:47:40Z**
+
+Starting from updated PR #121 branch at 1f5f18d. The exact comparison baseline remains compiler-track closing commit 76251b44fc467a976aa056556f8fb371fe5de7f4; source 707c31b passed 1,813 default tests. Primary change-path row: Runtime numerical or status invariant. New factor/rule and Learnable/checkpoint rows apply to inventory/readout/reconstruction consumers; New IR field is N/A because no schema or model meaning changes. Deliberate pairs: flooding/scheduled, standalone/actual iterative vmap with two distinct same-structure instances plus another structure, host/JIT status, and current/legacy agent reconstruction. Inventory existing independent authorities before adding tests; add characterization only for uncovered extraction seams, especially per-instance Colony result policy and cache/lifecycle identity. Hostile cases must include zero support, vacuous/improper beliefs, non-finite updates, float32 and a tenfold domain/horizon, primarily through existing focused tests. No production engine changes or new scientific benchmark. New gaps become separate tickets unless they make extraction unsafe. Use the exact baseline for source regions and observable values; update the dashboard for new test files and run one final short suite after the last test change. Additional agents remain unavailable; bounded local inspection and executable comparisons will provide the evidence.
