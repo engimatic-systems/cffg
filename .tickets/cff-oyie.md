@@ -1,6 +1,6 @@
 ---
 id: cff-oyie
-status: open
+status: closed
 deps: [cff-0l31]
 links: []
 created: 2026-08-10T02:58:08Z
@@ -130,3 +130,15 @@ deferred=the explicitly excluded model families and datasets.
 **2026-08-13T05:19:12Z**
 
 PR merge-gate correction (2026-08-12): the final report may claim only source-specific empirical non-inferiority for the registered outcomes. It must explicitly deny authors-code parity and CFFG-paper message/free-energy validation.
+
+**2026-09-01T05:28:00Z**
+
+Closed as not doing at Cooper's direction. The source-heterogeneous rSLDS
+comparison sequence was discontinued before any confirmatory run began. No
+seed result, aggregate, scientific conclusion, or documentation claim from
+this ticket was delivered. Its dependency links remain only as history of the
+abandoned sequence; future empirical comparison work requires a deliberately
+rewritten ticket with a newly reviewed owner and scope.
+The refreshed wiggle scan retains the recorded meanings; `deliver` means the
+explicitly absent result/artifact and `close` retains its ticket-lifecycle
+meaning.

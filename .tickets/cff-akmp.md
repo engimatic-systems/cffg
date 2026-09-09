@@ -1,6 +1,6 @@
 ---
 id: cff-akmp
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-10T02:58:08Z
@@ -110,3 +110,15 @@ Classification-note additions: check=the named normalization or provenance
 verification; estimate=external observed-only parameter estimation;
 intended=the contextual meaning assignments in this note; current=the term
 identified here as replaced by the pinned Python/platform boundary.
+
+**2026-09-01T05:28:00Z**
+
+Closed as not doing at Cooper's direction. The source-heterogeneous rSLDS
+comparison sequence was discontinued before this reference runtime was built.
+No runtime, smoke artifact, or reproducibility claim from this ticket was
+delivered. Its dependency links remain only as history of the abandoned
+sequence; future reference-runtime work requires a deliberately rewritten
+ticket with a newly reviewed owner and scope.
+The refreshed wiggle scan retains the recorded meanings; `deliver` means the
+explicitly absent runtime/artifact and `close` means this ticket's lifecycle
+state.

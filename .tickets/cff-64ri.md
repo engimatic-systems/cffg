@@ -1,6 +1,6 @@
 ---
 id: cff-64ri
-status: open
+status: closed
 deps: [cff-akmp]
 links: []
 created: 2026-08-10T02:58:08Z
@@ -145,3 +145,15 @@ deferred=the optional future reference variants.
 **2026-08-13T05:19:12Z**
 
 PR merge-gate correction (2026-08-12): separate versioning is no longer treated as sufficient independence. The adapter must map every added surface to exact paper equations, reused legacy primitives, adapter code, and a direct oracle that shares neither the adapter nor legacy state-update helper.
+
+**2026-09-01T05:28:00Z**
+
+Closed as not doing at Cooper's direction. The source-heterogeneous rSLDS
+comparison sequence was discontinued before this paper-equation adapter was
+implemented. No adapter, oracle, or reference-equivalence claim from this
+ticket was delivered. Its dependency links remain only as history of the
+abandoned sequence; future adapter work requires a deliberately rewritten
+ticket with a newly reviewed owner and scope.
+The refreshed wiggle scan retains the recorded meanings; `close` means this
+ticket's lifecycle state and `deliver` retains its prior capability/no-delivery
+meanings selected by the surrounding sentence.

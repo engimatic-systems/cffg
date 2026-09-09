@@ -1,6 +1,6 @@
 ---
 id: cff-nkbj
-status: in_progress
+status: closed
 deps: [cff-oyie]
 links: [cff-r6bl, cff-0f3g, cff-dlrj]
 created: 2026-08-09T13:09:26Z
@@ -23,21 +23,22 @@ regime, while the executable learner shares slopes across sources. The pinned
 NASCAR generator and learner also select different transition trees unless the
 learner tree is supplied explicitly.
 
-This epic coordinates a fair confirmatory comparison without narrowing CFFG's
-source-specific model. cff-akmp locks the legacy runtime. cff-64ri adds an
-independent paper-equation Gibbs adapter for the full model. cff-0l31 freezes
-the mapping, harness, and statistical protocol. cff-oyie runs the final seeds
-and reports the result. The split keeps environment repair, reference
-semantics, scientific choices, and confirmatory evidence independently
-reviewable.
+This epic formerly coordinated a confirmatory comparison without narrowing
+CFFG's source-specific model. Cooper discontinued that comparison on
+2026-08-31 before its legacy runtime, paper-equation adapter, preregistration,
+or final execution was delivered. Its four child tickets are closed as not
+doing and their dependency links now record only the abandoned sequence.
 
-The comparison can support an empirical non-inferiority conclusion for the
-registered model, metrics, seed set, and reference adapter. It cannot establish
-implementation parity with the authors' executable learner or validate CFFG's
-local variational messages and free-energy ledger against the two CFFG papers.
-Those are separate claims with separate direct evidence.
+Had it run, the comparison could have supported a bounded empirical
+non-inferiority conclusion for its registered model, metrics, seed set, and
+reference adapter. It did not run and supports no scientific or implementation
+conclusion. Any future comparison requires newly reviewed tickets rather than
+resuming this sequence.
 
 ## Outcomes / Acceptance Criteria
+
+Not delivered. The criteria below are an archival description of the
+discontinued comparison, not actionable work or accepted outcomes.
 
 1. cff-akmp is closed with a reproducible decision-list legacy runtime and an
    observed-only recurrence-only smoke artifact.
@@ -64,8 +65,8 @@ Those are separate claims with separate direct evidence.
 
 ## Methodological Suggestions
 
-These suggestions are optional. The implementer may choose another sound
-method that satisfies the outcomes.
+These historical suggestions described the discontinued sequence. They are
+not instructions for active work.
 
 - Treat the four child tickets as phase barriers. Do not move semantic adapter
   work into environment repair or implementation changes into final execution.
@@ -104,22 +105,25 @@ future validation after the synthetic NASCAR comparison.
 
 Roadmap decomposition after the reference-feasibility and CFFG-paper reviews.
 
-Legend: prerequisite --> dependent
+Legend: prerequisite --> dependent; [x] delivered earlier; [-] closed not doing
 
-    [ ] cff-akmp (ready: locked legacy runtime)
+    [-] cff-akmp (reference runtime not delivered)
               |
-              +--> [ ] cff-64ri (paper-equation adapter)
+              +--> [-] cff-64ri (adapter not delivered)
                             |
     [x] cff-l7y4 -----------+
-    [x] cff-garu -----------+--> [ ] cff-0l31 (frozen protocol)
+    [x] cff-garu -----------+--> [-] cff-0l31 (protocol not delivered)
     [x] cff-r6bl -----------+              |
-                                           +--> [ ] cff-oyie (final evidence)
+                                           +--> [-] cff-oyie (no final run)
                                                          |
-                                                         +--> [ ] cff-nkbj
+                                                         +--> [-] cff-nkbj
 
     Parallel linked work: [ ] cff-0f3g balanced-tree epic
     Independent research: [ ] cff-dlrj destination-softmax derivation
     Roadmap parent, not a dependency edge: cff-ahps
+
+    The four-ticket comparison path and this epic are archival. They are not
+    ready work and do not authorize resuming the discontinued experiment.
 
 Research question: what comparison remains faithful to both the CFFG papers
 and the Linderman rSLDS paper? Answer: CFFG does not prescribe source-specific
@@ -181,3 +185,27 @@ comparison. Stacked draft PR: https://github.com/engimatic-systems/cffg/pull/62
 **2026-08-13T05:19:12Z**
 
 PR merge-gate correction (2026-08-12): narrowed the epic conclusion from literature or implementation parity to source-specific empirical non-inferiority on the registered outcomes. The epic now excludes authors-code parity and CFFG-paper message/free-energy fidelity from that conclusion. cff-64ri owns adapter provenance and independent conditional oracles; cff-0l31 owns direct CFFG recurrence message/energy oracles, Gibbs mixing diagnostics, calibrated margin ceilings, and the exact paired estimand; cff-oyie owns immutable execution and bounded reporting.
+
+**2026-09-01T03:57:27Z**
+
+Closed as not doing at Cooper’s direction on 2026-08-31. The confirmatory source-specific rSLDS comparison epic is discontinued. No implementation result or scientific conclusion from this epic is claimed. Its open child tickets remain separately open and unchanged; this closure does not close or complete them.
+
+**2026-09-01T05:28:00Z**
+
+Roadmap-state repair, 2026-08-31. The earlier closure left all four children
+actionable even though their only joint outcome had been discontinued.
+`cff-akmp`, `cff-64ri`, `cff-0l31`, and `cff-oyie` are now each closed as not
+doing with explicit no-delivery handoffs. The background and outcomes label
+the former implementation sequence as archival. Dependency links are retained
+only to preserve the historical decomposition; they do not authorize resuming
+the work. The separately linked balanced-tree and destination-softmax tickets
+keep their own scopes and statuses.
+The refreshed wiggle scan retains the recorded meanings; `deliver` and
+`complete` distinguish missing outcomes from ticket closure, `could` describes
+the counterfactual bounded claim, and `later` refers to historical review
+order. Capability ownership is deliberately absent for the abandoned joint
+outcome; any future owner must be established in newly reviewed tickets.
+The diagram refresh retains the recorded wiggle meanings. In its archival
+legend, `ready` is explicitly denied for the discontinued path and `deliver`
+distinguishes the three earlier completed prerequisites from the four absent
+experiment artifacts.

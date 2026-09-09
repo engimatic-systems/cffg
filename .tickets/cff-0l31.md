@@ -1,6 +1,6 @@
 ---
 id: cff-0l31
-status: open
+status: closed
 deps: [cff-64ri, cff-garu, cff-r6bl, cff-l7y4]
 links: []
 created: 2026-08-10T02:58:08Z
@@ -160,3 +160,15 @@ note; named_ticket_handoff=cff-oyie as the final-run owner.
 **2026-08-13T05:19:12Z**
 
 PR merge-gate correction (2026-08-12): the frozen protocol now includes a direct production recurrence-message and factor-energy audit, Gibbs key streams and retained samples, ESS and split-R-hat gates, calibration-derived margins capped by domain-meaningful loss, and the exact paired estimand, direction, and multiplicity procedure.
+
+**2026-09-01T05:28:00Z**
+
+Closed as not doing at Cooper's direction. The source-heterogeneous rSLDS
+comparison sequence was discontinued before this harness or preregistration
+was frozen. No protocol, calibration, or statistical claim from this ticket
+was delivered. Its dependency links remain only as history of the abandoned
+sequence; future comparison-protocol work requires a deliberately rewritten
+ticket with a newly reviewed owner and scope.
+The refreshed wiggle scan retains the recorded meanings; `deliver` means the
+explicitly absent protocol/artifact and `close` means this ticket's lifecycle
+state.
