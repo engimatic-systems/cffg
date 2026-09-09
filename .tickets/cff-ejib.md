@@ -1,6 +1,6 @@
 ---
 id: cff-ejib
-status: in_progress
+status: closed
 deps: [cff-kfo7]
 links: [cff-kfo7]
 created: 2026-09-02T04:17:42Z
@@ -122,3 +122,7 @@ Registered drafts implemented; final validation pending. Registry capability int
 **2026-09-09T21:49:11Z**
 
 Final review refinement: a malformed family=any EF observation whose output is discrete has no earlier conditioning diagnostic. Preserve its original late KeyError(variable) at observation-row resolution instead of publishing ef_data[None]. The optional source-port contract now covers both early conditioning rejection and late missing-port rejection; the regression is parameterized over Gaussian/discrete malformed output domains. Broad focused run before this final guard: 224 passed in 79.76 seconds. New stage file now has 19 tests; final focused check/gate follows.
+
+**2026-09-09T22:07:02Z**
+
+Final gate passed: 1755 tests, zero failures, 41 opt-in slow deselections, four existing Gym deprecation warnings. Pytest992.95 seconds; measured wall1005.304 seconds. Dashboard refreshed with19 new cases,30 diagrams and23 galleries. Source701c10f; run began758d43e and runtime history records2c29d5c after ticket-only handoff commits; src/tests/dashboard code/ARCHITECTURE are identical across these heads. Final focused90 passed in3.03 seconds after the optional-port guard; earlier broad224 passed in79.76 seconds. All14 complete baseline arenas match. Changed source/tests Ruff-clean, diff/dependency checks pass. Closing cff-ejib; registered owner335 lines, compiler1122->1024 lines. Next cff-bfr9 owns source/numeric/address/learning resolution with the recorded full-map callbacks, original failure gates, explicit family numeric owners and prefix-before-learning correction. No significant user decision remains before that extraction. PR publication follows; no unchanged second suite is required.
