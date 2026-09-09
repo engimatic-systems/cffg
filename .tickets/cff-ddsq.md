@@ -32,10 +32,11 @@ owner, leaving `compile_template` as readable sequencing only.
 2. One assembly owner accepts `TopologyLayout`, `RegisteredPlanDrafts`,
    `SpecializedPlanDrafts`, `ResolvedCompileData`, and semiring; it returns one
    complete immutable `Arena` or a structured `CompileError`.
-3. The assembler computes slot prefix arrays, interior-edge ledger groups,
-   delta pairs, final plan collections, and structure/fingerprint inputs
-   without reclassifying a factor or reevaluating family-specific semiring
-   compatibility.
+3. The assembler consumes resolved slot prefix arrays and specialized delta
+   pairs, and constructs interior-edge ledger groups, final plan collections,
+   and structure/fingerprint inputs without reclassifying a factor or
+   reevaluating family-specific semiring compatibility. Prefix arrays are
+   resolved by `cff-bfr9` before learning validation to preserve failure order.
    3.1. It mechanically joins raw topology, specialized semantic edge tags,
         drafts, and validated numeric payloads. No plan requires a missing
         blob-derived field before resolution.
@@ -95,3 +96,9 @@ in `cff-sf29` then records the runtime baseline against these compiled owners.
 - **Compiler orchestration:** Ordered calls to focused compiler stages without
   duplicating their interpretations.
 - **Prefix array:** Cumulative offsets that map logical slots into flat arrays.
+
+## Notes
+
+**2026-09-09T21:53:23Z**
+
+cff-bfr9 now publishes immutable slot/observation prefixes at the original final resolution checkpoint before learning validation. This small ownership correction preserves Python constructor-argument evaluation order from compiler.py:606-640 at701c10f; otherwise a later invalid learnable could hide an earlier prefix-overflow error. Assembly consumes these arrays without republishing numeric storage. Delta pairs already belong to specialized drafts. Acceptance criterion3 updated; no extra scientific or public contract change. Prerequisite --> dependent: cff-ejib (final gate running) --> cff-bfr9 (immediate blocker) --> cff-ddsq --> cff-edoz --> engine track --> cff-cfqg. No parallel prerequisite within this chain; tk records are authoritative.
