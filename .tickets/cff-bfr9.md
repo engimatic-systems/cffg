@@ -1,6 +1,6 @@
 ---
 id: cff-bfr9
-status: in_progress
+status: closed
 deps: [cff-ejib]
 links: [cff-ddsq]
 created: 2026-09-02T04:17:42Z
@@ -166,3 +166,7 @@ Integrated resolution now returns immutable ResolvedCompileData through one orde
 **2026-09-09T22:47:59Z**
 
 Bounded reviews: formalism question -> are probability/concentration/covariance semantics and global-goal ownership preserved? Answer: yes by comparison to the prior compiler; fixed normalization, raw learned concentrations, mixture inversion, recurrence/precision validation, source-dtype covariance checks and learning eligibility/layout are unchanged. Modularity question -> are source/callback/error checkpoints retained without rediscovery? Answer: no blocker found; absorbed-source traversal, mutable per-factor shape dictionaries, initializer fallbacks, full-map callbacks and prefix-learning-publication order preserved. Corrected semiring_problem annotation to the completed draft type. Performance question -> is publication duplicated or a whole-template scan added per group? Answer: no; frozen arrays/maps/plans are reused, role/runtime metadata shared. Initializer lookup per blob and factors per learnable retain baseline scaling limitations; no speedup is claimed. Sources: agent comparisons against 0bcda82 in resolution/resolve.py, sources.py, addresses.py and named packing modules; direct 14-model arena parity and boundary identity/alias tests. Confidence high for reviewed paths; no new performance benchmark or scientific oracle was run.
+
+**2026-09-09T23:05:14Z**
+
+Final gate passed: 1,777 tests, zero failures, 41 opt-in slow deselections, four existing Gym deprecation warnings. Pytest986.60 seconds; measured wall999.044 seconds. Source339c46a; runtime record at ticket-only descendant5b3606f, completed2026-09-09T23:04:39.153983+00:00. Dashboard refreshed with22 new cases and30 diagrams in23 galleries. No source/test change after the gate began. All acceptance criteria are satisfied: typed complete inputs, ordered validation, immutable output reused by Arena, numerical/serialization/runtime behavior retained, focused/full checks and architecture updates. Source work is complete; publish the stacked PR on#119, then cff-ddsq consumes this result for final assembly. No additional unchanged suite is needed for publication.
