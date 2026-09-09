@@ -2,7 +2,7 @@
 id: cff-sf29
 status: open
 deps: [cff-edoz]
-links: [cff-ny7f]
+links: [cff-ny7f, cff-34gi, cff-ddsq]
 created: 2026-09-02T04:02:01Z
 type: task
 priority: 1
