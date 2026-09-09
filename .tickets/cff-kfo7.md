@@ -1,6 +1,6 @@
 ---
 id: cff-kfo7
-status: open
+status: in_progress
 deps: [cff-8t4d, cff-n183, cff-gvch]
 links: [cff-bfr9, cff-n183, cff-gvch]
 created: 2026-09-02T04:17:42Z
@@ -228,3 +228,7 @@ Pre-extraction comparison source: detached worktree /tmp/cffg-specialized-baseli
 **2026-09-09T20:33:32Z**
 
 Corrected extraction baseline is now complete: cff-n183 at cdbad68 and cff-gvch at ad028f0, with 1,709 default-suite tests passing at ad028f0 (1015.217 seconds wall, 41 slow deselections, four existing Gym warnings). Both correctness prerequisites are closed. The detached ad028f0 comparison worktree contains the exact numerical, declaration-validation, encoding and diagnostic behavior to preserve. Extraction is ready; no pending user decision.
+
+**2026-09-09T20:34:36Z**
+
+Implementation starts on agent/cff-kfo7-specialized-lowering from updated agent/cff-gvch-psub-validation at 69864ab (PR #117); corrected code baseline ad028f0. Applicable change-path rows: New factor or rule family, New IR field, Learnable or checkpoint feature. Emitted immutable plan metadata remains the shared input for flooding/scheduled and direct/vmap consumers; numerical runtime/status changes N/A, host/JIT compiler pair N/A. JSON/current/legacy bundles reconstruct the same declarations; agent checkpoint envelopes N/A. Scope is explicit immutable discovery and completion, named family lowerers, typed array requirements, equality/DELTA meaning and factor/objective ownership. A compatibility ordinary-membership product feeds recurrence completion; array resolution/validation order, packer mathematics, observation/member addresses and final Arena assembly remain in compiler until their own tickets. Named deferred checkpoints preserve existing error precedence, including blob-load failures and invalid concentration plus orphan-prior diagnostics. Sparse/improper incoming messages N/A, float32 plans identical, 32-group specialized fixture required. No approximation, source schema, supported-combination, message, energy or public-plan field change. Source modules stay below 1,000 physical lines. Focused family/compiler tests throughout, then one final dashboard-backed short suite after the final code change.
