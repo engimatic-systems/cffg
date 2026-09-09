@@ -415,7 +415,19 @@ routing is retained for non-equality registered extensions.
 `array_requirements.py` is the shared declaration contract. Registered inputs
 record factor/parameter-role/blob identity and an unevaluated `ShapeRequirement`
 (trusted `ParameterSpec` plus shared immutable role sizes); destinations record
-the existing packed parameter paths. External shape callbacks still execute only
+the existing packed parameter paths. `SourceRequirement` records source roles
+for every referenced factor, including absorbed members, in original traversal
+order; covariance checks and historical initializer fallbacks remain distinct
+from canonical packing shapes. `MemberRequirement` and `ParameterRuntime`
+declare row/write eligibility, transforms, and learning form/layout without
+interpreting runtime key suffixes in the learning resolver. Specialized drafts
+also retain prior claims, deferred diagnostics, edge tags and initializer fallback
+facts needed after discovery. `resolution/addresses.py` materializes the declared
+addresses and binds learning sources/targets; compiler compatibility still owns
+the integrated numeric/address checkpoints. `compiler_errors.py` supplies their
+shared `CompileError`, reexported by the public compiler facade.
+
+External shape callbacks still execute only
 at initializer or packing checkpoints. Registered packers retain their complete
 resolved-blob mapping and original callback/key-validation behavior, including
 the legacy EF adapter. Requirements do not narrow this callback input contract.

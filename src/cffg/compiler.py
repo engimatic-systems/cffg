@@ -67,6 +67,7 @@ from cffg.compiled import (
     RecurrenceComponentPlan,
     RecurrencePlan,
 )
+from cffg.compiler_errors import CompileError
 from cffg.core.ir import Template
 from cffg.core.plates import expand_plates
 from cffg.core.validate import validate
@@ -109,10 +110,6 @@ __all__ = [
     "RecurrencePlan",
     "compile_template",
 ]
-
-class CompileError(ValueError):
-    pass
-
 
 def _requirement_arrays(requirement: ArrayRequirement, resolved):
     """Restrict a compatibility packer to its declared source arrays."""

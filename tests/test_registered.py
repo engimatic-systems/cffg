@@ -298,7 +298,11 @@ def test_32_registered_groups_keep_numeric_order_under_float32_and_reconstructio
     _, drafts = stages(template)
     assert [d.plan.cards for d in drafts.discrete] == [(c,) for c in range(2, 34)]
     _, restored = stages(from_json(to_json(template)))
-    assert_same(drafts, restored)
+    # JSON sorts declarations; source callbacks retain each input's traversal.
+    assert {(s.factor, s.role): s for s in drafts.sources} == {
+        (s.factor, s.role): s for s in restored.sources
+    }
+    assert_same(replace(drafts, sources=restored.sources), restored)
     narrow = compiler.compile_template(template, arrays=arrays)
     wide = compiler.compile_template(
         template, arrays={k: v.astype(np.float64) for k, v in arrays.items()}

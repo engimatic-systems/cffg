@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from cffg._immutable import FrozenArray, ImmutableRecord
-from cffg.array_requirements import ArrayRequirement
+from cffg.array_requirements import ArrayRequirement, SourceRequirement
 from cffg.compiled import GroupPlan
 from cffg.kernels import FactorKernel
 
@@ -83,6 +83,7 @@ class EfDraft(ImmutableRecord):
 
 @dataclass(frozen=True)
 class RegisteredPlanDrafts(ImmutableRecord):
+    sources: tuple[SourceRequirement, ...]
     discrete: tuple[DiscreteDraft | EqualityReference, ...]
     gaussian: tuple[GaussianDraft | EqualityReference, ...]
     ef: tuple[EfDraft | EqualityReference, ...]

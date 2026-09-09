@@ -3,13 +3,11 @@
 import numpy as np
 
 from cffg import kernels
-from cffg._immutable import FrozenMap
 from cffg.array_requirements import (
     ArrayDestination,
     ArrayInput,
     ArrayRecipe,
     ArrayRequirement,
-    ShapeRequirement,
 )
 from cffg.compiled import GroupPlan
 from cffg.core.ir import FACTOR_TYPES, Template
@@ -26,6 +24,7 @@ from .contracts import (
     RegisteredPlanDrafts,
     RegistrySnapshot,
 )
+from .requirements import member_requirements, source_requirements
 
 
 def _conditioning(topology, claims, registry):
@@ -160,30 +159,21 @@ def _parameter_paths(kernel, name):
         return {}, str(error)
 
 
-def _arrays(topology, name, members, kernel, paths):
+def _arrays(topology, name, members, kernel, paths, source_of, *, rejected=False):
     inputs = []
     for member in members:
         factor = topology.factors[member]
-        sizes = FrozenMap(
-            {
-                role: topology.variables[variable].dim
-                or topology.variables[variable].cardinality
-                for role, variable in factor.edges.items()
-            }
-        )
         for role, blob in sorted(factor.param_blobs.items()):
-            parameter = (
-                kernel.binding.parameters.get(role) if kernel is not None else None
-            )
-            pending = (
-                ShapeRequirement(parameter, sizes) if parameter is not None else None
-            )
+            pending = source_of[member, role].shape
             inputs.append(ArrayInput(member, role, blob, None, pending))
     return ArrayRequirement(
         name,
         ArrayRecipe.REGISTERED,
         tuple(inputs),
         tuple(ArrayDestination("parameter", value) for value in paths.values()),
+        members=()
+        if rejected
+        else member_requirements(topology, name, members, kernel, paths),
     )
 
 
@@ -212,6 +202,8 @@ def lower_registered(
     registry: RegistrySnapshot,
 ) -> RegisteredPlanDrafts:
     """Capture registered metadata; preserve all numeric/callback checkpoints."""
+    sources = source_requirements(topology, registry)
+    source_of = {(source.factor, source.role): source for source in sources}
     gauss_ports, ef_ports, data_slots, conditioning_problems = _conditioning(
         topology, claims, registry
     )
@@ -255,7 +247,15 @@ def lower_registered(
         discrete.append(
             DiscreteDraft(
                 plan,
-                _arrays(topology, name, members, kernel, paths),
+                _arrays(
+                    topology,
+                    name,
+                    members,
+                    kernel,
+                    paths,
+                    source_of,
+                    rejected=bool(problem or path_problem),
+                ),
                 problem,
                 path_problem,
             )
@@ -288,7 +288,15 @@ def lower_registered(
                 kernel,
                 tuple(paths.items()),
                 observation,
-                _arrays(topology, name, members, kernel, paths),
+                _arrays(
+                    topology,
+                    name,
+                    members,
+                    kernel,
+                    paths,
+                    source_of,
+                    rejected=bool(path_problem),
+                ),
                 path_problem,
             )
         )
@@ -316,10 +324,11 @@ def lower_registered(
                 scatter,
                 kernel,
                 observation,
-                _arrays(topology, name, members, kernel, paths),
+                _arrays(topology, name, members, kernel, paths, source_of),
             )
         )
     return RegisteredPlanDrafts(
+        sources=sources,
         discrete=discrete,
         gaussian=gaussian,
         ef=ef,
