@@ -489,6 +489,24 @@ source files, initializer, numerical packer, or registry lookup. Published
 parameters, prefixes, and plans are reused, not copied. Discrete interior groups
 and schedule fingerprints remain derived by their existing consumers.
 
+`assembly_checks.py` checks the cross-stage joins before publication. Every
+original factor must have exactly one execution owner, either ordinary or
+specialized, including absorbed goals and priors. Equality references bind to
+specialized plans without counting those factors twice. Ownership is joined by
+original member identity, not a globally unique plan name. Declared entropy
+exclusions, parameter-edge tags, and attached constraints must agree with their
+owners. Resolved plan addresses and functional/shared-goal owners must retain
+their published references; prefix lengths must match their logical slot counts.
+
+Parameter-message/objective owners are separate from factor execution. Shared
+goal contributor rows and carrier slots must agree with the completed GFE plans,
+and each original contribution appears once; several groups may reference the
+same shared owner. Functional μ3 rows must match their declared members. These
+checks inspect completed declarations, never choose a factor's rule, rederive
+its energy, or compare numeric parameter values to infer sharing. Mismatches
+raise `CompileError`. Indexes are built once per assembly; no whole-template
+scan is repeated for each plan or member.
+
 `compiler.py:compile_template` checks its public semiring argument, expands
 plates, runs core validation, captures one registry, and sequences topology,
 specialized discovery/admission, registered lowering, specialized completion,
@@ -502,6 +520,8 @@ helpers remain available.
 discarded, rejects accidental source/packing/prefix callbacks, verifies storage
 reuse, and confirms the facade delegates final construction once. Plan names may
 repeat across execution-family namespaces; they are not globally unique IDs.
+Negative cases remove or duplicate owners and corrupt exclusions, parameter
+references, shared-goal carriers, μ3 rows, prefixes, and resolved group membership.
 
 The compiler characterization baseline is `bf6bbe9527b5e1eea9172a30b8c7c214a08ed9ee`,
 the completed discrete/Gaussian registration foundation. Compiler extraction

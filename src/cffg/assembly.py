@@ -4,6 +4,7 @@ from dataclasses import replace
 
 import numpy as np
 
+from cffg.assembly_checks import validate_assembly
 from cffg.compiled import Arena
 from cffg.registered.contracts import RegisteredPlanDrafts
 from cffg.resolution.contracts import ResolvedCompileData
@@ -19,6 +20,7 @@ def assemble_arena(
     semiring: str,
 ) -> Arena:
     """Join stage values; reuse published parameters, prefixes and plans."""
+    validate_assembly(topology, registered, drafts, data, semiring)
     edges = dict(topology.edges)
     for name, layout in drafts.parameter_layouts.items():
         edges[name] = replace(
