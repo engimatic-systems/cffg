@@ -65,6 +65,7 @@ EPIC_FILES = {
         "test_behavioral_epistemics.py",
     ],
     "M5 · Runtime": [
+        "test_engine_contracts.py",
         "test_agent.py",
         "test_agent_mu3.py",
         "test_agent_spec.py",
