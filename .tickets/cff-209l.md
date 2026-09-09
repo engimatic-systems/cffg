@@ -2,12 +2,12 @@
 id: cff-209l
 status: open
 deps: [cff-ri8m, cff-l6i5]
-links: [cff-1o72, cff-o7hs, cff-l6i5]
+links: [cff-1o72, cff-o7hs, cff-l6i5, cff-cfqg, cff-edoz, cff-ws3c]
 created: 2026-07-30T16:09:57Z
 type: chore
-priority: 2
+priority: 1
 assignee: coopwilliams
-parent: cff-ahps
+parent: cff-cfqg
 ---
 # Bind discrete and Gaussian arenas to the FactorKernel execution contract
 

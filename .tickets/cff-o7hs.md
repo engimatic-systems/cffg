@@ -1,7 +1,7 @@
 ---
 id: cff-o7hs
 status: open
-deps: [cff-4e5z, cff-ri8m, cff-209l]
+deps: [cff-4e5z, cff-ri8m, cff-cfqg]
 links: [cff-1o72, cff-fxmj, cff-ri8m, cff-l6i5, cff-pksr, cff-lquu, cff-k9ws, cff-209l, cff-8a5m]
 created: 2026-07-08T16:49:34Z
 type: feature
@@ -15,7 +15,17 @@ parent: cff-ahps
 
 CFFG has exact Gaussian messages for linear relationships, but many dynamics and sensors are nonlinear. This ticket adds a Gaussian factor whose mean is a deterministic function `g(x)` and whose output has nondegenerate Gaussian noise. It supplies a local linearization and a sigma-point method that better captures curvature. Both methods keep messages Gaussian, so they are approximations whose ledger terms and failure modes must be labeled honestly.
 
-The work builds on the Gaussian arena from cff-4e5z, executable factor registration from cff-ri8m and cff-209l, and the dtype-scaled Gaussian propriety contract from cff-3hgi. The current factor-only `MOMENT_MATCHING` placeholder is not faithful to Part I: it cannot name a particular node endpoint on an incident edge or the sufficient-statistic projection. This ticket replaces that placeholder with an endpoint- and projection-aware schema before it adds expectation-propagation updates. It does not cover zero-noise continuous delta factors, continuous-to-discrete links, or epistemic GFE scoring through nonlinear nodes.
+The work builds on the Gaussian arena from cff-4e5z, executable factor
+registration from cff-ri8m and cff-209l, and the dtype-scaled Gaussian
+propriety contract from cff-3hgi. Implementation also waits for cff-cfqg so the
+new family lands through the refactored compiler and engine seams instead of
+adding another central dispatch path. The current factor-only
+`MOMENT_MATCHING` placeholder is not faithful to Part I: it cannot name a
+particular node endpoint on an incident edge or the sufficient-statistic
+projection. This ticket replaces that placeholder with an endpoint- and
+projection-aware schema before it adds expectation-propagation updates. It
+does not cover zero-noise continuous delta factors, continuous-to-discrete
+links, or epistemic GFE scoring through nonlinear nodes.
 
 ## Outcomes / Acceptance Criteria — WHAT
 
@@ -23,6 +33,8 @@ The work builds on the Gaussian arena from cff-4e5z, executable factor registrat
    1.1. cff-4e5z is closed with its Gaussian arena contract satisfied.
    1.2. cff-ri8m is closed with its executable-registration contract satisfied.
    1.3. cff-209l is closed with its Gaussian `FactorKernel` binding satisfied.
+   1.4. cff-cfqg is closed with its compiler, engine, and bounded extension
+        paths satisfied.
 2. The public template schema represents the nonlinear Gaussian factor.
    2.1. The factor has the form `y ~ N(g(x), V)` with Gaussian `in` and `out` edges.
    2.2. The factor records a namespaced implementation identity and compatible version for `g`.
