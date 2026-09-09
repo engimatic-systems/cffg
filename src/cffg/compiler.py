@@ -24,8 +24,9 @@ Port policy at compile time:
 Module map:
 - ``compiled`` owns immutable plan dataclasses and ``Arena``; this facade
   retains their compatibility exports.
-- ``topology`` records declared wiring; ``specialized`` owns semantic claims
-  and structural drafts. ``_ordinary_grouping`` supplies their BP membership.
+- ``topology`` records declared wiring; ``specialized`` owns named semantic
+  claims and drafts. ``registered`` lowers remaining same-arena structure and
+  supplies ordinary BP membership for specialized completion.
 - ``compile_template`` preserves validation order, packs declared arrays, and
   assembles the arena from these stage products.
 - ``_resolve_learnables`` binds declarations to statistic sources and writes.
@@ -41,6 +42,7 @@ from pathlib import Path
 import numpy as np
 
 from cffg import kernels
+from cffg.array_requirements import ArrayRequirement
 from cffg.compiled import (
     NEG,
     PARAMETER_TRANSFORMS,
@@ -65,16 +67,18 @@ from cffg.compiled import (
     RecurrenceComponentPlan,
     RecurrencePlan,
 )
-from cffg.core.ir import FACTOR_TYPES, Template
+from cffg.core.ir import Template
 from cffg.core.plates import expand_plates
 from cffg.core.validate import validate
+from cffg.registered.capabilities import snapshot_registry
+from cffg.registered.contracts import EqualityReference
+from cffg.registered.lowering import lower_registered
 from cffg.specialized import (
     OrdinaryMembership,
     complete_specialized,
     discover_specialized,
 )
 from cffg.specialized.constraints import ConstraintValidationError, resolve_constraint
-from cffg.specialized.contracts import ArrayRequirement
 from cffg.specialized.discovery import dirichlet_shape, specialized_initializer_shape
 from cffg.specialized.structural import semiring_problem
 from cffg.topology import build_topology, prefix_offsets
@@ -108,63 +112,6 @@ __all__ = [
 
 class CompileError(ValueError):
     pass
-
-
-def _ordinary_grouping(t, claims, gauss_data_ports):
-    """Compatibility membership product; specialized routes are already chosen.
-
-    This read-only pass runs before draft completion. Its first error is raised
-    only at the former remaining-factor grouping checkpoint, after GFE packing.
-    """
-    buckets, gauss_buckets, ef_buckets = {}, {}, {}
-    problem = None
-    specialized_members = set(claims.precision) | set(claims.constraints)
-    specialized_members.update(member for claim in claims.mixtures for member in claim.members)
-    specialized_members.update(member for members in claims.recurrence.values() for member in members)
-    for fname in sorted(t.factors):
-        if fname in claims.consumed:
-            continue
-        if fname in claims.grouping_problems:
-            problem = problem or claims.grouping_problems[fname]
-            continue
-        if fname in specialized_members:
-            continue
-        if fname in claims.equalities:
-            route = claims.equalities[fname]
-            destination = {"discrete": buckets, "gaussian": gauss_buckets, "ef": ef_buckets}[route.arena]
-            destination.setdefault(route.key, []).append(fname)
-            continue
-        f = t.factors[fname]
-        ft = FACTOR_TYPES[f.type]
-        roles = ft.edge_roles
-        if ft.family == "gaussian" or (
-            ft.family == "any" and t.variables[f.edges[roles[0]]].dim > 0
-        ):
-            dims = tuple(t.variables[f.edges[r]].dim for r in roles)
-            kern = kernels.kernel_for(f.type)
-            if kern is None or kern.arena != "gaussian":
-                problem = problem or f"factor type {f.type!r} has no Gaussian kernel binding"
-                continue
-            conditioning = kern.binding.conditioning
-            observed = conditioning is not None and f.edges[conditioning.role] in gauss_data_ports
-            gtype = (conditioning.plan_type or f"{f.type}:observed:{conditioning.role}") if observed else f.type
-            gauss_buckets.setdefault((gtype, dims, f.type, observed), []).append(fname)
-        elif ft.family == "ef" or (
-            ft.family == "any" and bool(t.variables[f.edges[roles[0]]].ef)
-        ):
-            kern = kernels.kernel_for(f.type)
-            if kern is None:
-                problem = problem or (
-                    f"factor {fname!r}: EF type {f.type!r} has no registered "
-                    "FactorKernel — register one before compiling (cff-ri8m)"
-                )
-                continue
-            ef_buckets.setdefault((f.type, kern.family), []).append(fname)
-        else:
-            cards = tuple(t.variables[f.edges[r]].cardinality for r in roles)
-            mode = "vmp" if fname in claims.mean_field else "bp"
-            buckets.setdefault((f.type, cards, mode), []).append(fname)
-    return buckets, gauss_buckets, ef_buckets, problem
 
 
 def _requirement_arrays(requirement: ArrayRequirement, resolved):
@@ -239,7 +186,8 @@ def compile_template(
     problems: list[str] = []
     topology = build_topology(t)
 
-    claims = discover_specialized(t, topology, semiring)
+    registry = snapshot_registry()
+    claims = discover_specialized(t, topology, semiring, registry)
     for errors in (claims.admission_problems, claims.layout_problems):
         if errors:
             raise CompileError(f"cannot compile {t.name!r}:\n  - " + "\n  - ".join(errors))
@@ -251,48 +199,13 @@ def compile_template(
     edges = dict(topology.edges)
     for name, (shape, axis, _) in param_specs.items():
         edges[name] = replace(edges[name], param_shape=shape, param_axis=axis)
-    slot_of, opposite = topology.slot_of, topology.opposite
-    data_slots: dict[str, int] = {}
-    gauss_data_ports: dict[str, str] = {}
-    ef_data_ports: dict[str, str] = {}
-    for candidate in topology.data_candidates:
-        vname, port_name = candidate.variable, candidate.port
-        variable = topology.variables[vname]
-        fname, role = candidate.endpoint
-        ftype_here = t.factors[fname].type
-        if variable.dim:
-            kern = kernels.kernel_for(ftype_here)
-            conditioning = kern.binding.conditioning if kern is not None and kern.arena == "gaussian" else None
-            if conditioning is not None and role == conditioning.role:
-                gauss_data_ports[vname] = port_name
-            elif port_name in claims.conditioning_problems:
-                problems.append(claims.conditioning_problems[port_name])
-            else:
-                problems.append(
-                    f"port {port_name!r}: Gaussian DATA port on {fname!r}/{role!r} "
-                    "requires a registered conditioning role"
-                )
-        elif variable.ef:
-            if ftype_here in kernels.conditioned_out_types() and role == "out":
-                ef_data_ports[vname] = port_name
-            else:
-                problems.append(
-                    f"port {port_name!r}: EF DATA ports must clamp a conditioned "
-                    f"observation kernel's 'out' edge "
-                    f"({sorted(kernels.conditioned_out_types())}), not "
-                    f"{fname!r}/{role!r}"
-                )
-        else:
-            data_slots[port_name] = candidate.external_slot
-
-    buckets, gauss_buckets, ef_buckets, grouping_problem = _ordinary_grouping(
-        t, claims, gauss_data_ports,
-    )
-    ordinary = OrdinaryMembership(frozenset(
-        member for (_, _, mode), members in buckets.items() if mode == "bp"
-        for member in members
-    ))
-    drafts = complete_specialized(claims, ordinary)
+    registered = lower_registered(t, topology, claims, semiring, registry)
+    problems.extend(registered.conditioning_problems)
+    data_slots = registered.data_slots
+    drafts = complete_specialized(claims, OrdinaryMembership(registered.bp_members))
+    equality_of = {
+        member: plan for plan in drafts.equalities.values() for member in plan.members
+    }
     resolved = _resolve_arrays(t, arrays, root)
     member_of: dict[str, MemberAddress] = {}
     writable_members: set[str] = set()
@@ -459,41 +372,43 @@ def compile_template(
         packed.update(goal_m=goal_params["m"], goal_W=goal_params["W"])
         _publish_required_parameters(log_params, draft.arrays, packed)
 
-    if grouping_problem:
-        raise CompileError(grouping_problem)
+    if registered.grouping_problem:
+        raise CompileError(registered.grouping_problem)
 
     gauss_groups: list[GaussGroupPlan] = []
     gauss_group_names: set[str] = set()
     gauss_data: dict[str, int] = {}
     n_obs_rows = 0
-    for (gtype, dims, base, observed), members in sorted(gauss_buckets.items()):
-        kern = kernels.kernel_for(base)
-        roles = FACTOR_TYPES[base].edge_roles
-        gname = f"gauss:{gtype}:{'x'.join(map(str, dims))}"
+    for draft in registered.gaussian:
+        if isinstance(draft, EqualityReference):
+            plan = equality_of[draft.members[0]]
+            if plan.name in gauss_group_names:
+                raise CompileError(f"Gaussian group name collision: {plan.name!r}")
+            gauss_group_names.add(plan.name)
+            gauss_groups.append(plan)
+            continue
+        gname, gtype, roles, dims = draft.name, draft.type, draft.roles, draft.dims
+        members, kern = list(draft.members), draft.kernel
         if gname in gauss_group_names:
             raise CompileError(f"Gaussian group name collision: {gname!r}")
         gauss_group_names.add(gname)
-        if gname in drafts.equalities:
-            gauss_groups.append(drafts.equalities[gname])
-            continue
-        gather = np.array([[opposite[(m, r)] for r in roles] for m in members], dtype=np.int64)
-        scatter = np.array([[slot_of[(m, r)] for r in roles] for m in members], dtype=np.int64)
-        obs_rows = None
-        observed_role = None
-        if observed:
-            role = kern.binding.conditioning.role
-            observed_role = roles.index(role)
+        obs_rows, observed_role = None, None
+        if draft.observation is not None:
+            observed_role = draft.observation.role_index
             rows = []
-            for m in members:
-                port = gauss_data_ports[t.factors[m].edges[role]]
-                gauss_data[port] = (n_obs_rows, dims[observed_role])
+            for source in draft.observation.sources:
+                if source.port is None:
+                    raise KeyError(source.variable)
+                gauss_data[source.port] = (n_obs_rows, source.dim)
                 rows.append(n_obs_rows)
                 n_obs_rows += 1
             obs_rows = np.array(rows, dtype=np.int64)
-        paths = {} if kern is None else kernels.parameter_paths(kern, gname)
+        if draft.path_problem:
+            raise ValueError(draft.path_problem)
+        paths = dict(draft.parameter_paths)
         gauss_groups.append(GaussGroupPlan(
-            gname, gtype, roles, dims, tuple(members), gather, scatter, obs_rows,
-            kern, tuple(paths.items()), observed_role,
+            gname, gtype, roles, dims, tuple(members), draft.gather, draft.scatter,
+            obs_rows, kern, draft.parameter_paths, observed_role,
         ))
         if kern is not None:
             try:
@@ -572,21 +487,19 @@ def compile_template(
     ef_groups: list[EfGroupPlan] = []
     ef_data: dict[str, int] = {}
     n_ef_obs = 0
-    for (ftype, family), members in sorted(ef_buckets.items()):
-        gname = f"ef:{ftype}:{family}"
-        if gname in drafts.equalities:
-            ef_groups.append(drafts.equalities[gname])
+    for draft in registered.ef:
+        if isinstance(draft, EqualityReference):
+            ef_groups.append(equality_of[draft.members[0]])
             continue
-        kern = kernels.kernel_for(ftype)
-        roles = kern.message_roles
-        gather = np.array([[opposite[(m, r)] for r in roles] for m in members], dtype=np.int64)
-        scatter = np.array([[slot_of[(m, r)] for r in roles] for m in members], dtype=np.int64)
+        gname, ftype, family, roles = draft.name, draft.type, draft.family, draft.roles
+        members, kern = list(draft.members), draft.kernel
         obs_rows = None
-        if kern is not None and kern.observed_out is not None:
+        if draft.observation is not None:
             rows = []
-            for m in members:
-                out_var = t.factors[m].edges["out"]
-                ef_data[ef_data_ports[out_var]] = (n_ef_obs, t.variables[out_var].ef)
+            for source in draft.observation.sources:
+                if source.port is None:
+                    raise KeyError(source.variable)
+                ef_data[source.port] = (n_ef_obs, source.family)
                 rows.append(n_ef_obs)
                 n_ef_obs += 1
             obs_rows = np.array(rows, dtype=np.int64)
@@ -603,35 +516,24 @@ def compile_template(
             for key, arr in packed.items():
                 log_params[f"{gname}:{key}"] = arr
         ef_groups.append(
-            EfGroupPlan(gname, ftype, family, roles, tuple(members), gather, scatter, obs_rows)
+            EfGroupPlan(gname, ftype, family, roles, tuple(members), draft.gather, draft.scatter, obs_rows)
         )
         # member_of stays discrete-only: per-member EF prior updates are the
         # conjugate-learning ticket's call (cff-x0sv), as with Gaussian.
 
     groups: list[GroupPlan] = []
-    for (ftype, cards, mode), members in sorted(buckets.items()):
-        roles = FACTOR_TYPES[ftype].edge_roles
-        gname = f"{mode}:{ftype}:{'x'.join(map(str, cards))}"
-        if gname in drafts.equalities:
-            groups.append(drafts.equalities[gname])
+    for draft in registered.discrete:
+        if isinstance(draft, EqualityReference):
+            groups.append(equality_of[draft.members[0]])
             continue
-        gather = np.array(
-            [[opposite[(m, r)] for r in roles] for m in members], dtype=np.int64
-        )
-        scatter = np.array(
-            [[slot_of[(m, r)] for r in roles] for m in members], dtype=np.int64
-        )
-        both = np.stack([scatter, gather], axis=-1)  # own & opposite = the edge pair
-        kern = kernels.kernel_for(ftype)
-        if kern is None or kern.arena != "discrete":
-            raise CompileError(f"factor type {ftype!r} has no discrete kernel binding")
-        if kern is not None and semiring not in kern.binding.semirings:
-            raise CompileError(f"kernel {kern.impl_id!r} does not support {semiring!r}")
-        paths = {} if kern is None else kernels.parameter_paths(kern, gname)
-        groups.append(GroupPlan(
-            gname, ftype, roles, cards, tuple(members), gather, scatter, mode, both,
-            kern, tuple(paths.items()),
-        ))
+        if draft.problem:
+            raise CompileError(draft.problem)
+        if draft.path_problem:
+            raise ValueError(draft.path_problem)
+        plan = draft.plan
+        gname, members, kern = plan.name, list(plan.members), plan.kernel
+        paths = dict(plan.parameter_paths)
+        groups.append(plan)
         if kern is not None:
             try:
                 packed = kernels.packed_parameters(kern, t, members, resolved)

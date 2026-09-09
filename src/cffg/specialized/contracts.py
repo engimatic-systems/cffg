@@ -2,10 +2,10 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from enum import Enum
 from typing import Literal
 
 from cffg._immutable import FrozenArray, ImmutableRecord
+from cffg.array_requirements import ArrayRequirement
 from cffg.compiled import (
     DirichletGroupPlan,
     EfGroupPlan,
@@ -22,43 +22,6 @@ from cffg.compiled import (
     RecurrencePlan,
 )
 from cffg.topology import TopologyLayout
-
-
-class ArrayRecipe(str, Enum):
-    """Family-owned interpretations, not executable or serialized callbacks."""
-
-    DIRICHLET = "dirichlet"
-    GFE = "gfe"
-    GFE_TM = "gfe_tm"
-    HYBRID_GFE = "hybrid_gfe"
-    MIXTURE = "mixture"
-    RECURRENCE = "recurrence"
-    PRECISION = "precision"
-    CONSTRAINT = "constraint"
-
-
-@dataclass(frozen=True)
-class ArrayInput(ImmutableRecord):
-    factor: str
-    role: str
-    blob: str
-    initializer_shape: tuple[int, ...] | None
-
-
-@dataclass(frozen=True)
-class ArrayDestination(ImmutableRecord):
-    kind: Literal["parameter", "payload"]
-    name: str
-
-
-@dataclass(frozen=True)
-class ArrayRequirement(ImmutableRecord):
-    """Ordered source roles and destinations for one family packing operation."""
-
-    owner: str
-    recipe: ArrayRecipe
-    inputs: tuple[ArrayInput, ...]
-    destinations: tuple[ArrayDestination, ...]
 
 
 @dataclass(frozen=True)

@@ -10,34 +10,31 @@ from test_gauss_vmp import gamma_gauss_prec
 from test_shared_goals import mixed_goals
 
 from cffg import compiler, kernels
+from cffg.array_requirements import ArrayRecipe
 from cffg.core import ConstraintKind, ConstraintSpec
 from cffg.core.plates import expand_plates
 from cffg.core.serialize import from_json, structure_hash, to_json
 from cffg.core.validate import validate
 from cffg.models.rollout import build_rollout
+from cffg.registered.capabilities import snapshot_registry
+from cffg.registered.lowering import lower_registered
 from cffg.specialized import (
     OrdinaryMembership,
     complete_specialized,
     discover_specialized,
 )
 from cffg.specialized.constraints import resolve_constraint
-from cffg.specialized.contracts import ArrayRecipe
 from cffg.topology import build_topology
 
 
 def stages(template):
     template = expand_plates(template)
     validate(template)
-    claims = discover_specialized(template, build_topology(template), "sum")
-    buckets, _, _, _ = compiler._ordinary_grouping(template, claims, {})
-    ordinary = OrdinaryMembership(
-        frozenset(
-            member
-            for (_, _, mode), members in buckets.items()
-            if mode == "bp"
-            for member in members
-        )
-    )
+    topology = build_topology(template)
+    registry = snapshot_registry()
+    claims = discover_specialized(template, topology, "sum", registry)
+    registered = lower_registered(template, topology, claims, "sum", registry)
+    ordinary = OrdinaryMembership(registered.bp_members)
     return claims, ordinary, complete_specialized(claims, ordinary)
 
 

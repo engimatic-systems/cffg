@@ -1,6 +1,6 @@
 """Describe source arrays without loading them or choosing factor meaning."""
 
-from .contracts import ArrayDestination, ArrayInput, ArrayRequirement
+from cffg.array_requirements import ArrayDestination, ArrayInput, ArrayRequirement
 
 
 def array_requirement(claims, owner, recipe, members, keys=(), *, payload=None):

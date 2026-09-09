@@ -2,9 +2,10 @@
 
 import numpy as np
 
+from cffg.array_requirements import ArrayRecipe
 from cffg.compiled import ConstraintPlan
 
-from .contracts import ArrayRecipe, ConstraintDraft, SpecializedClaims
+from .contracts import ConstraintDraft, SpecializedClaims
 from .requirements import array_requirement
 
 
