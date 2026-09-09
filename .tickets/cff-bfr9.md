@@ -94,3 +94,13 @@ immutable arena.
   file-backed blob paths.
 - **Transform:** A declared representation change such as probability to log
   probability or covariance to precision.
+
+## Notes
+
+**2026-09-09T21:47:49Z**
+
+Input-contract handoff from cff-ejib review: common ArrayRequirement/ArrayInput/ArrayDestination/ArrayRecipe and ShapeRequirement now live in array_requirements.py. Registered ShapeRequirement retains the trusted ParameterSpec and shared immutable role sizes without invoking the provider; callbacks must stay at initializer/packing gates. Registered callbacks currently receive the complete resolved mapping of all model-referenced blobs and list-valued members. Preserve that read surface: narrowing to the current group’s declared role blobs breaks accepted external callbacks (confirmed baseline reproduction reading another factor’s spin_prior). Requirements declare ownership and destinations, not an authorization boundary. Legacy EF pack callbacks and key checks must remain as-is, not silently upgraded to discrete/Gaussian validation. ObservationIntent distinguishes unobserved from observed without rows; ObservationSource.port may be None only when deferred conditioning diagnostics reject the model before row allocation. Gaussian and EF row counters stay independent. Reuse published structural FrozenArrays and role-size maps, do not copy them on final plan construction. Question -> answer -> source: modularity/performance-agent bounded review and baseline/current reproductions in cff-ejib; see tests/test_registered.py full-map, missing-blob/conditioning, and plan-identity cases. Confidence high. Start only after cff-ejib final gate and publication; retain all diagnostic checkpoint ordering and explicit cff-n183/cff-gvch corrected baseline.
+
+**2026-09-09T21:49:11Z**
+
+Correction to optional-port handoff: None does not guarantee an earlier conditioning problem. Existing family=any EF registration can reach row resolution with a discrete output. Preserve the original late KeyError(source.variable) there; never publish an observation address under None. tests/test_registered.py parameterizes the malformed Gaussian/discrete output cases and preserves missing-blob precedence for both.
