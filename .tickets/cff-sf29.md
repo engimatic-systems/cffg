@@ -1,6 +1,6 @@
 ---
 id: cff-sf29
-status: in_progress
+status: closed
 deps: [cff-edoz]
 links: [cff-ny7f, cff-34gi, cff-ddsq, cff-wbhu, cff-yglj]
 created: 2026-09-02T04:02:01Z
@@ -224,3 +224,9 @@ Legend: prerequisite --> dependent. Based on tk dep tree --full cff-ii9t, tk rea
                                                             --> cff-ws3c engine track
 
 cff-ny7f and cff-yglj become independently ready after characterization closes; both paths must finish before ordinary control extraction. cff-34gi probability validation remains a separate ready P2, not a prerequisite of this engine track. No independent scientific authority was missing in a way that makes the local-call move unsafe. The confirmed Colony discrepancy is separately ticketed under acceptance 8.2, not added as a production change here.
+
+**2026-09-10T00:25:00Z**
+
+Complete. Five new characterization cases, the family-authority inventory and the baseline ownership map are delivered. Final test change: 81ed86b. Final default gate at ce8452a: 1,818 passed, 41 slow deselections, four existing Gym deprecation warnings; pytest 993.08 seconds, measured wall 1,005.421 seconds. Runtime history recorded in 20f391e; dashboard refreshed with zero failures and five new cases, 30 diagrams in 23 galleries. Ruff check/format, git diff --check and tk dep cycle pass. Production src/ is byte-for-byte unchanged from exact engine baseline 76251b44fc467a976aa056556f8fb371fe5de7f4. Subsequent ticket/PR publication edits require no second unchanged suite.
+
+Next: publish the stacked characterization PR on agent/cff-sf29-engine-contracts over PR #121, then take the separate cff-yglj initial-failure repair. cff-ny7f execution extraction is independently ready and has a handoff for Dirichlet parameters, shared-goal pooling, functional evaluators and the duplicated registerized EF call. The repair must precede cff-ii9t. No user decision remains. Agent review was unavailable because the previously reported usage limit persists; no independent agent approval is claimed. The intelligible-ticket skill shaped the evidence handoff and bounded bug ticket; wiggle auditing was not used.
