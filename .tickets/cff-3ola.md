@@ -142,3 +142,7 @@ Old/new numerical proof against prerequisite fb211eb: 17 models, both JAX precis
 **2026-09-10T09:26:46Z**
 
 Complete at source 6f36043. Final dashboard gate: 2,121 passed, 41 opt-in slow tests deselected, four existing Gym warnings; pytest 1,144.02 seconds. The gate was read exactly once, at its planned 20-minute completion check. Earlier focused and old/new parity evidence is recorded above. All public readout signatures, ordering, precision, conversion boundaries and current-state guards are retained. Engine is now 659 physical lines; no readout, local message, schedule, solver-loop or objective algorithm remains there. Final readout modules consume narrow read-only structural protocols, and with_goal_priors belongs to StateLifecycle. Functional diagnostics remain with Mu3Lifecycle. No vectorization, scientific claim or speedup. Next: close runtime parent cff-ws3c and perform cff-ofv1 cross-seam ownership proof. Source unchanged after this passing gate; ticket/document/publication edits do not require another run.
+
+**2026-09-10T09:28:31Z**
+
+Published as PR #133 against #132: https://github.com/engimatic-systems/cffg/pull/133 . Gate record e03fe70; measured wall time 1,157.463 seconds, completed 2026-09-10T09:25:34.997915+00:00. Shared architecture HTML now records compiler/runtime completion and the final extension gate. Runtime parent cff-ws3c is closed. Final next base is this branch including its publication handoff; cff-ofv1 is ready. No stack merge performed.
