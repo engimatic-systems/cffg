@@ -1,6 +1,6 @@
 ---
 id: cff-ws3c
-status: open
+status: closed
 deps: [cff-3ola]
 links: [cff-edoz, cff-3kdk, cff-cj5h, cff-wbhu]
 created: 2026-08-13T04:26:16Z
@@ -112,3 +112,9 @@ performance consumers.
   termination facts to `Engine.run`.
 - **Status authority:** The sole public owner that constructs `RunStatus` and
   `RunResult` from typed facts for both Engine and Colony.
+
+## Notes
+
+**2026-09-10T09:26:46Z**
+
+Runtime track complete through cff-3ola source 6f36043 and its passing final 2,121-test dashboard suite (41 slow deselected, four existing warnings). All child owners are closed: typed local execution and synchronous transport, shared schedule construction, ordinary and mu3 lifecycle, ordinary/exact/outer control, common result construction, objective accounting and typed-view readouts. Engine contains only construction, public validation/strategy selection, compatibility exports and delegation; it is 659 physical lines against the below-1,000 target. The compiler facade is 138 lines; among 69 newly added production files across the stack, the largest is schedule_program.py at 808 physical lines. Existing tests protect acyclic lower-owner imports, per-instance state, scan carry/scatter, status behavior, reconstruction and numerical authorities. The child handoffs preserve prerequisite-aware baselines and separately landed shared-goal/constraint/failure corrections, not the known pre-repair defects. ARCHITECTURE records final ownership and change paths. No new solver, factor, approximation, checkpoint schema or performance claim. Next and sole remaining architecture gate: cff-ofv1; no significant user decision is pending.

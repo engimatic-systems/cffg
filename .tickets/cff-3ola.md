@@ -1,6 +1,6 @@
 ---
 id: cff-3ola
-status: in_progress
+status: closed
 deps: [cff-gl89]
 links: [cff-ws3c, cff-3kdk, cff-7kfk]
 created: 2026-09-02T04:02:01Z
@@ -138,3 +138,7 @@ Readouts now live in focused discrete, Gaussian, parameter, recurrence, exponent
 **2026-09-10T09:06:17Z**
 
 Old/new numerical proof against prerequisite fb211eb: 17 models, both JAX precision settings, 266 state snapshots, 4,006 public calls (20 matching exceptions), and 7,124 raw-byte-identical numerical leaves. Dictionary insertion order, dtype/shape, enum identity, readout value fields, and goal-prior guards agree. This complements 22 AST body-equivalence checks, 27 public signatures, and the final 82-test focused pass. No vectorization or speedup claim. Starting the final dashboard-backed short suite at source 6f36043; first output check at 20 minutes, then only at the documented allowance if needed.
+
+**2026-09-10T09:26:46Z**
+
+Complete at source 6f36043. Final dashboard gate: 2,121 passed, 41 opt-in slow tests deselected, four existing Gym warnings; pytest 1,144.02 seconds. The gate was read exactly once, at its planned 20-minute completion check. Earlier focused and old/new parity evidence is recorded above. All public readout signatures, ordering, precision, conversion boundaries and current-state guards are retained. Engine is now 659 physical lines; no readout, local message, schedule, solver-loop or objective algorithm remains there. Final readout modules consume narrow read-only structural protocols, and with_goal_priors belongs to StateLifecycle. Functional diagnostics remain with Mu3Lifecycle. No vectorization, scientific claim or speedup. Next: close runtime parent cff-ws3c and perform cff-ofv1 cross-seam ownership proof. Source unchanged after this passing gate; ticket/document/publication edits do not require another run.
