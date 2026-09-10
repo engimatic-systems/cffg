@@ -1,6 +1,6 @@
 ---
 id: cff-ny7f
-status: in_progress
+status: closed
 deps: [cff-sf29]
 links: [cff-nyad, cff-wbhu, cff-6n9c]
 created: 2026-09-02T04:02:01Z
@@ -166,3 +166,11 @@ Direct explicit-owner tests now pass: 39 cases in 42.62 seconds. Thirty cover 15
 Bounded trusted-source comparison against 1308688 completed using /tmp/cffg-execution-parity.py: 17 model fixtures, 68 auto/flood and float32/float64 configurations, and 2,336 array comparisons, all bitwise equal (including matched NaNs). Coverage includes initial state/parameter leaves, three damped update steps and their existing residual/status facts, free energy at each step, exact propagation when present, and the prepared mu3 numerical update. The script dynamically loads the old tracked Engine source with the unchanged compiled/rule modules; this is wiring parity, not an independent mathematical oracle or performance benchmark. Existing family tests remain authorities.
 
 New execution modules and both execution test files pass Ruff/format checks; git diff --check and tk dep cycle pass. Dashboard enrollment includes both new files. Implementation is complete pending the one final default-suite gate. Independent agent review remains unavailable due to the reported agent usage limit.
+
+**2026-09-10T02:31:02Z**
+
+Completed the extraction and final default gate. At final code/test source b84560e (production extraction ab17b5a), all 1,894 tests passed, with 41 opt-in slow deselections and four existing Gym deprecation warnings. Pytest reported 1,050.10 seconds; dashboard measured 1,062.672 seconds wall time, completed 2026-09-10T02:25:45.542649+00:00, and recorded observed ticket-only head fe07e88. The new suggested wait budget is 1,350 seconds. Dashboard and runtime history are refreshed. No source/test changes followed this gate; opening the PR does not require a second run.
+
+The implementation, 51 new local-boundary cases, prior focused family runs, and 2,336 bitwise old/new array comparisons are complete. No new mathematics, schedule, convergence strategy, public result/schema field, or throughput claim is included. The new execution package remains 586 lines; Engine is 3,717 lines. User-visible HTML explains the ownership changes separately from the preserved planning snapshot.
+
+Next in the authorized architecture chain is P1 cff-jby3: remove shared hard-constraint numeric binding, preserve all four consumers and genuine shape-compatible Colony batching, and verify reconstruction. It blocks cff-nyad schedule extraction. P2 cff-6n9c and cff-34gi remain separate numerical validation work. Agent review was unavailable due to the reported usage limit; the PR reports local review and executable evidence only.
