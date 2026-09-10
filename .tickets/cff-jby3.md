@@ -82,3 +82,11 @@ Legend: prerequisite --> dependent.
                           --> cff-jrbw --> cff-gl89 --> cff-3ola --> cff-ws3c
 
 cff-nyad also retains its direct dependency on cff-ny7f. This tree is based on tk dep tree --full cff-nyad, tk ready and tk blocked; tk dep cycle passes.
+
+**2026-09-10T02:12:40Z**
+
+Bounded pre-implementation inspection at cff-ny7f source b84560e confirms four consumers of compiled constraint data: Engine._has_zero_support (:1734-1757), assignment_energy/_constraint_ok (:2432-2446), _constraint_writes via execution.parameters.constraint_defaults (:2615-2617), and _make_bfe (:3650-3656). Constraint-bearing models are excluded from _make_support_check (:3318); exact-path JIT combinatorial support is therefore N/A, not an omitted parallel implementation. Auto mixed and flood updates, host feasibility, sum-product FE, max-product assignment, solo and genuine vmap execution all remain in scope.
+
+Compilation map: specialized/constraints.py resolves and validates threshold/table payloads into ConstraintPlan; resolution/resolve.py:149-154 currently collects those plans without adding runtime numeric data. Move the validated values into the published initial parameter map and have runtime selection read State.params. No numerical rule rewrite is needed. Colony.spawn already installs each freshly compiled arena.log_params for a reused Engine, but Colony.run groups solely by structure hash and immediately stacks every State. Group compatible State shapes/dtypes within each structure; do not put numeric contents into the public structure hash or lose same-shaped vmap reuse.
+
+Checkpoint map: _agent_checkpoint.static_parameter_hash(:216) hashes grounded fixed blobs; _planning_inputs(:595) starts from plan.init_state before installing restored learnables/beliefs. Current and supported legacy reconstruction must be exercised with constraint data, and current fixed-data mismatch checks preserved. A change to derived State parameter keys is not by itself a schema change. Check remaining compiled-value tests explicitly when removing or redefining the static k/table fields; do not silently preserve runtime reads of those old fields. Read-only preparation only; implementation follows the completed cff-ny7f gate and updated base.
