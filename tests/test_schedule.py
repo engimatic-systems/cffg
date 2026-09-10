@@ -26,6 +26,7 @@ from cffg.core import (
 from cffg.core.compose import compose, unroll
 from cffg.core.serialize import from_json, to_json
 from cffg.engine import Engine, RunStatus, _replace
+from cffg.execution.synchronous import make_sweep
 from cffg.models.kalman import kalman_smoother, lgssm
 from cffg.schedule import BatchStage, ScanStage, build_schedule
 from cffg.schedule_program import make_exact_unit, make_propagate
@@ -496,7 +497,7 @@ def test_float32_missing_phase_cannot_certify_at_t256():
         )
         engine._exact_unit = eqx.filter_jit(
             make_exact_unit(
-                arena, inward_only, engine_mod._make_step(arena), engine_mod._make_bfe(arena)
+                arena, inward_only, make_sweep(arena), engine_mod._make_bfe(arena)
             )
         )  # bypasses the fingerprint guard on purpose: this pins the
         # *certificate* itself, not the schedule validation
@@ -572,7 +573,7 @@ def test_float32_mixed_scales_cannot_widen_the_certificate():
         )
         engine._exact_unit = eqx.filter_jit(
             make_exact_unit(
-                arena, inward_only, engine_mod._make_step(arena), engine_mod._make_bfe(arena)
+                arena, inward_only, make_sweep(arena), engine_mod._make_bfe(arena)
             )
         )
         result = engine.run(state, 1, tol=None)

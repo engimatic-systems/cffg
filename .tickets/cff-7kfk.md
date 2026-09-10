@@ -110,3 +110,13 @@ cff-5xdy retains its direct nyad dependency as well. No parallel architecture ro
 **2026-09-10T04:01:32Z**
 
 Starting from updated, remotely verified PR #126 head 930a8c32f88235dadf6b572538a62169add79e09 after its 1,991-test final gate. The source/caller inventory above remains current. Keep the existing sweep factory signature and every numerical operation; move transport into execution/synchronous.py and redirect Engine plus private test instrumentation. Replace the redundant Gaussian selector wrapper with its existing kernel_runtime.parameters owner at the three ledger/readout callers. No new model, State, schema, objective, public status or PRNG policy is in scope.
+
+**2026-09-10T04:09:07Z**
+
+The move is implemented in execution/synchronous.py (417 physical lines); Engine is 352 lines shorter. Its nine moved function bodies match baseline 47701a6 under AST normalization that excludes only docstrings, the factory name/return annotation and the redundant Gaussian selector-forwarding alias. The three Gaussian ledger/readout callers now use kernel_runtime.parameters directly. Engine injects make_sweep into the unchanged ScheduleProgram contract; private tests follow the moved owner. No formula, parameter ownership, State schema or public status changed.
+
+Focused execution/specialized/shared-goal/constraint/program/Colony/engine-contract checks passed 168 cases in 94.91 seconds. After adding the explicit ownership-boundary test, test_execution.py passed all 13 cases in 6.03 seconds. The boundary check requires one canonical factory outside Engine and no Engine/State/public-status/family-rule imports in the synchronous owner. New/small-file Ruff and format checks pass. Engine retains 20 baseline findings and schedule tests retain three; no new code/message findings appeared. Architecture and the change-path index are updated. The existing schedule/custom-kernel-focused selection and bounded numerical parity are finishing; no final full-suite claim yet.
+
+**2026-09-10T04:11:58Z**
+
+Final schedule/custom-kernel selection passed 40 tests in 27.49 seconds. The bounded numerical comparison at /tmp/cffg-synchronous-parity.py loads trusted Engine source 47701a6 and compares 17 models across automatic/flooding and float32/float64: all 2,622 arrays are bitwise identical, including matched NaNs, with the same functional scatter dtype warning as the prior extraction. Schedule identity, priming, reconstruction and exact units also match. All focused checks are complete; no further code change is planned. Commit the source, then run the final default suite once. Latest measured wall is 1,135.251 seconds and suggested wait is 1,440 seconds; first output check at 20 minutes, then at the 24-minute allowance only if still running.

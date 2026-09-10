@@ -16,8 +16,9 @@ from test_schedule import A, D, unit_categorical, vmp_unit_template
 from cffg import schedule_program
 from cffg.compiler import compile_template
 from cffg.core import BlobRef, FactorSpec, Template, VariableSpec
-from cffg.engine import Engine, _make_bfe, _make_step, _replace
+from cffg.engine import Engine, _make_bfe, _replace
 from cffg.execution.owners import SCHEDULED_EXECUTORS
+from cffg.execution.synchronous import make_sweep
 from cffg.schedule import ScanStage
 from cffg.schedule_program import _batch_stage_fn, _flat_scan_fn, build_schedule_program
 
@@ -78,16 +79,16 @@ def test_program_composes_only_required_stages_and_preserves_facade(kind, dtype)
     assert engine._schedule_program.iter_step is engine._iter_step
     requests = []
 
-    def make_sweep(received, skip_scheduled):
+    def counted_sweep(received, skip_scheduled):
         assert received is arena
         requests.append(skip_scheduled)
-        return _make_step(received, skip_scheduled)
+        return make_sweep(received, skip_scheduled)
 
     program = build_schedule_program(
         arena,
         selection,
         SCHEDULED_EXECUTORS,
-        make_sweep=make_sweep,
+        make_sweep=counted_sweep,
         free_energy=_make_bfe(arena),
     )
     assert requests == ([False, True] if kind == "mixed" else [False])
@@ -130,7 +131,7 @@ def test_exact_unit_uses_injected_ledger_only_when_defined(dtype, semiring):
         arena,
         "auto",
         SCHEDULED_EXECUTORS,
-        make_sweep=_make_step,
+        make_sweep=make_sweep,
         free_energy=ledger,
     )
     result = program.exact_unit(*state_args(state_in_dtype(engine, dtype)))
@@ -148,8 +149,8 @@ def test_mixed_schedule_transports_inner_failure_facts_without_classifying(dtype
     arena = program_arena("mixed")
     engine = Engine(arena)
 
-    def make_sweep(received, skip_scheduled):
-        raw = _make_step(received, skip_scheduled)
+    def marked_sweep(received, skip_scheduled):
+        raw = make_sweep(received, skip_scheduled)
 
         def sweep(messages, *args):
             result = raw(messages, *args)
@@ -165,7 +166,7 @@ def test_mixed_schedule_transports_inner_failure_facts_without_classifying(dtype
         arena,
         "auto",
         SCHEDULED_EXECUTORS,
-        make_sweep=make_sweep,
+        make_sweep=marked_sweep,
         free_energy=_make_bfe(arena),
     )
     result = program.iter_step(*state_args(state_in_dtype(engine, dtype)), 0.0, False)
@@ -209,7 +210,7 @@ def test_ef_registerized_prefetch_uses_owner_and_reuses_dynamic_observations(dty
 
     owners = replace(SCHEDULED_EXECUTORS, ef_parameters=select)
     program = build_schedule_program(
-        arena, "auto", owners, make_sweep=_make_step, free_energy=_make_bfe(arena)
+        arena, "auto", owners, make_sweep=make_sweep, free_energy=_make_bfe(arena)
     )
     assert program.scan_registerized and all(program.scan_registerized)
     initial = state_in_dtype(engine, dtype)

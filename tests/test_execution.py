@@ -1,5 +1,7 @@
 """Local executor contracts; family tests remain the mathematical authorities."""
 
+import ast
+import inspect
 from functools import partial
 
 import jax
@@ -20,6 +22,27 @@ from cffg.execution.registered import (
     execute_gaussian,
 )
 from cffg.kernel_runtime import parameters
+
+
+def test_synchronous_transport_has_one_owner_outside_engine():
+    from cffg import engine
+    from cffg.execution import synchronous
+
+    assert engine.make_sweep is synchronous.make_sweep
+    assert "_make_step" not in vars(engine)
+    tree = ast.parse(inspect.getsource(synchronous))
+    imported = {
+        node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)
+    }
+    assert not imported & {
+        "cffg.engine",
+        "cffg.rules",
+        "cffg.csp",
+        "cffg.gauss",
+        "cffg.efrules",
+    }
+    names = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
+    assert not names & {"State", "RunStatus", "RunResult"}
 
 
 def registered_case(kind, dtype):
