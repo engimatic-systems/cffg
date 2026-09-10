@@ -1,6 +1,6 @@
 ---
 id: cff-gl89
-status: open
+status: in_progress
 deps: [cff-jrbw]
 links: [cff-3ola, cff-cj5h]
 created: 2026-09-02T04:02:01Z
@@ -133,3 +133,7 @@ Local-term inventory from baaad19 (read once, no numerical work while jrbw gate 
 **2026-09-10T08:04:58Z**
 
 Prerequisite cff-jrbw is closed and published as PR #131. Start from its final published agent/cff-jrbw-run-strategies head after an ff-only pull. Source baaad19 passed the final 2,081-test gate (41 slow deselections, four existing warnings), recorded at aeaf18c; wall 1,165.949 seconds. All three controllers now consume injected evaluators and run_results owns public statuses. Local-term inventory and compatibility-alias details are in the preceding handoff; no design decision is pending.
+
+**2026-09-10T08:07:08Z**
+
+Starting from verified PR #131 head 3dad32b after an ff-only pull. Applicable change paths: New factor or rule family (declared and specialized local-energy owners) and Runtime numerical or status invariant (objective gates and controller injection). Paired surfaces: host Engine.bfe versus raw fused/JIT schedule energy; ordinary/outer/exact controller callbacks; flooding/scheduled equivalent states; direct/vmap raw evaluation; same-structure instances with distinct current params, observations, masks and fixed functional snapshots; decoded assignment versus belief energy. New IR/checkpoint fields, action selection and unsupported solver batching are N/A. Preserve local-addition order, trace-time legacy EF callback lookup, one shared-goal term and one KL per functional parameter group. Plan: ledger.py owns objective assembly/public host gates and decoded scoring; ledger_terms.py owns explicit existing specialized/local-energy adapters; Engine retains compatibility aliases and supplies current evaluator/check/readiness handles. No new formula, approximation, decoder, diagnostic output or benchmark target.
