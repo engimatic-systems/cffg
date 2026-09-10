@@ -1,6 +1,6 @@
 ---
 id: cff-5xdy
-status: open
+status: in_progress
 deps: [cff-nyad, cff-7kfk]
 links: [cff-ii9t]
 created: 2026-09-02T04:17:42Z
@@ -102,3 +102,7 @@ Binding preserves discrete None-to-uniform behavior, Gaussian/EF None-to-unbound
 Additional boundary checks at cff-7kfk source 2aaef36 (read-only): do not turn this extraction into constructor-time numeric caching. init_state/_uniform_messages currently create JAX arrays at call time, so the active JAX precision setting is observed then. A probe constructed one HMM Engine under x64=True, then initialized under False/True: both messages and Gaussian arrays were float32/float64 respectively. Changing one functional Engine.mu3_samples from 16 to 32 made subsequent initial particle arrays contain 16/32 rows. prepare_mu3/update/init_state read the current Engine.mu3_samples and mu3_min_ess_fraction attributes; the separate owner should receive those current values rather than silently capturing initial settings. Gaussian observation validators currently come from the compiled binding snapshot, while EF validators are looked up through kernels.observation_validator during each bind; preserve those lookup times and error behavior.
 
 A leaf runtime-types module can avoid Engine import cycles while preserving public re-exports. RunResult defaults refer to OuterTerminationReason, currently the small enum at outer.py:22-36; if the result records move, move that pure enum to the same leaf and re-export it from outer instead of making the state/types leaf depend on the numerical solver. Do not move solver code or change enum values. Mu3ScoreResult needs the same state/result/status identity. Epoch scoring must receive the current run/prepare callbacks at method call time, preserving explicit key threading and any existing public delegation. The unchanged checkpoint codec is array/metadata based, not Python-class serialization; verify public import identity and all declared field/value contracts, not an unsafe pickle compatibility promise. Hybrid GFE diagnostics remain with the cff-3ola readout responsibility.
+
+**2026-09-10T04:37:04Z**
+
+Starting from updated and remotely verified PR #127 head 67745474ee6bf1ef7a51875f36c7c60854dcb62e after its 1,992-test final gate. The existing handoffs above define scope and checked pairs. Implementation will use a leaf runtime-types module with public Engine/outer re-exports, a state/data lifecycle owner over immutable Arena/default parameters, and a separate functional owner over Mu3Plan views with precomputed latent-message indices. Functional settings are passed from current Engine attributes at each call; ordinary models do not enter the mu3 owner. Public epoch scoring supplies the current run/prepare callbacks, leaving run-result authority outside preparation. Move declarations and operations without changing field schemas, enum values, formulas, error policy, key order or call-time dtype behavior. Hybrid GFE diagnostics remain for cff-3ola. Current/legacy checkpoint decoding stays untouched; the cff-jby3 reconstruction regressions remain part of the baseline.
