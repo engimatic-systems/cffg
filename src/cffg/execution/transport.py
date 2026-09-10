@@ -1,14 +1,30 @@
 """Shape-local gathers and scatters shared by runtime consumers."""
 
+from typing import Protocol
+
 import jax
 import jax.numpy as jnp
 import numpy as np
 
-from cffg.compiled import NEG, Arena
+from cffg.compiled import NEG
+
+
+class MessageLayout(Protocol):
+    def message_indices(self, slots: np.ndarray | int, card: int) -> np.ndarray: ...
+
+
+class GaussianLayout(Protocol):
+    def g_eta_indices(self, slots: np.ndarray | int, dim: int) -> np.ndarray: ...
+
+    def g_lam_indices(self, slots: np.ndarray | int, dim: int) -> np.ndarray: ...
+
+
+class ObservationLayout(Protocol):
+    def g_obs_indices(self, rows: np.ndarray | int, dim: int) -> np.ndarray: ...
 
 
 def _disc_rows(
-    arena: Arena,
+    arena: MessageLayout,
     messages: jax.Array,
     slots: np.ndarray,
     cards: tuple[int, ...],
@@ -34,7 +50,7 @@ def _disc_rows(
 
 
 def _disc_both(
-    arena: Arena,
+    arena: MessageLayout,
     messages: jax.Array,
     slots: np.ndarray,
     cards: tuple[int, ...],
@@ -51,7 +67,7 @@ def _disc_both(
 
 
 def _set_disc_rows(
-    arena: Arena,
+    arena: MessageLayout,
     messages: jax.Array,
     slots: np.ndarray,
     cards: tuple[int, ...],
@@ -66,7 +82,7 @@ def _set_disc_rows(
 
 
 def _set_disc_block(
-    arena: Arena,
+    arena: MessageLayout,
     messages: jax.Array,
     slots: np.ndarray,
     card: int,
@@ -76,7 +92,7 @@ def _set_disc_block(
 
 
 def _gauss_rows(
-    arena: Arena,
+    arena: GaussianLayout,
     eta: jax.Array,
     lam: jax.Array,
     slots: np.ndarray,
@@ -96,7 +112,7 @@ def _gauss_rows(
 
 
 def _set_gauss_block(
-    arena: Arena,
+    arena: GaussianLayout,
     eta: jax.Array,
     lam: jax.Array,
     slots: np.ndarray,
@@ -111,6 +127,6 @@ def _set_gauss_block(
 
 
 def _obs_rows(
-    arena: Arena, observations: jax.Array, rows: np.ndarray, dim: int
+    arena: ObservationLayout, observations: jax.Array, rows: np.ndarray, dim: int
 ) -> jax.Array:
     return observations[arena.g_obs_indices(rows, dim)]
