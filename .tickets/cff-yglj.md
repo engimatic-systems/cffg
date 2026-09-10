@@ -1,6 +1,6 @@
 ---
 id: cff-yglj
-status: in_progress
+status: closed
 deps: [cff-sf29]
 links: [cff-sf29, cff-wbhu]
 created: 2026-09-10T00:07:26Z
@@ -75,3 +75,11 @@ Starting from updated PR #122 head 84bfd66. Primary change-path row: Runtime num
 **2026-09-10T00:31:15Z**
 
 Implementation and focused verification: original states are classified before any priming; initial non-finite members now report inner divergence/infinite inner residual, matching Engine.run. The same active mask freezes rejected members across priming and later updates. All-healthy priming keeps its direct result path without the new masking copy; fully rejected groups skip numerical execution. Twenty-four cases cover NaN/infinity/empty support, auto mixed/flood, zero/eight updates and float32/float64, comparing every State leaf and RunResult field with standalone Engine and observing real batch-size-two updates for healthy peers. One additional case forbids both priming and updates when every member is rejected. The new regression failed against the baseline on inner_status before the fix. Focused final command across colony_failures, engine_contracts, runtime_status, colony, gaussian_kernel_schedules and schedule: 64 passed, 3 slow deselected in 24.99s. A final readability-only if/else rewrite followed and will be included in the final gate. Test-file Ruff/format passes; colony.py passes Ruff with B023 excluded. Its five remaining B023 closure warnings are unchanged existing sites; the baseline had seven, and binding the moved freeze helper removes two. No new lint findings are hidden. No numerical rules, model/checkpoint schema, result fields or schedule kinds change.
+
+**2026-09-10T00:49:06Z**
+
+Complete at production source 1308688. Final dashboard-backed short suite: 1,843 passed, 41 slow deselections and four existing Gym deprecation warnings; pytest 998.75 seconds, measured wall 1,011.157 seconds. Runtime history is recorded in e30b330; the dashboard reports zero failures, 25 new cases, and 30 diagrams in 23 galleries. No code/test change followed this passing gate. All 25 regressions pass, including complete result/state parity for invalid/healthy peers and no numerical execution for fully rejected groups. Focused evidence remains 64 passed, 3 slow deselected. git diff --check and tk dep cycle pass. The new test file passes Ruff/format; the production file has only the five pre-existing B023 sites documented above, with no added findings.
+
+This establishes the corrected initial-failure reference for cff-ii9t: non-finite input has overall/inner divergence and infinite inner residual; rejected input values survive initial propagation and remain at zero logical iterations. Empty-support infeasibility stays distinct, and healthy peers retain the real batched path. No numerical-rule, schema, solver or public result-field change.
+
+Next: publish the repair PR over #122, then update that published repair branch before creating the cff-ny7f execution-extraction branch. Use 1308688 as the authorized correction on top of the cff-sf29 engine baseline. No user decision or independent agent approval is being claimed.
