@@ -36,7 +36,7 @@ earlier snapshot is an inventory, not a baseline to restore.
    2.1. ordinary factor-local BFE terms;
    2.2. GFE and P-substitution terms;
    2.3. shared parameter terms, including functional `mu3` state;
-   2.4. hard-constraint and delta terms; and
+   2.4. hard-constraint energies and the existing treatment of delta-constrained beliefs; and
    2.5. edge-entropy overcounting corrections.
 3. Each registered same-arena kernel contributes through its declared energy
    callback. Each specialized plan contributes through one explicit local-term
@@ -123,3 +123,7 @@ objective owner; that feature is not part of this ticket.
 **2026-09-10T07:38:50Z**
 
 Pre-implementation inspection at cff-jrbw source baaad19: Engine.bfe (1163+) owns max-mode rejection, functional readiness and host exact-support rejection before _bfe; preserve that order. Engine.objective (1187+) decodes once, then scores ordinary/equality/constraint factors using current State.params; decoding stays with the facade/readout work. _constraint_ok is a compatibility static helper. _make_bfe (1417+) is the remaining numerical assembly. Runtime consumers now receive objectives through IterationServices, ExactRunStrategy, OuterServices and the ScheduleProgram factory; the ledger must not import these controllers. Preserve engine._make_bfe as a compatibility alias because exact-schedule fault-injection tests build units from it. Next implementation should inventory local terms once, use current shared-goal and mu3 ownership plans, and characterize against final jrbw rather than pre-repair sf29.
+
+**2026-09-10T07:44:13Z**
+
+Local-term inventory from baaad19 (read once, no numerical work while jrbw gate runs): _gauss_bfe combines declared Gaussian/equality energies with Gaussian interior entropy; _mix_bfe, _recurrence_bfe, _hybrid_gfe_bfe and _prec_bfe are explicit local adapters; _ef_bfe combines EF node terms with EF interior entropy. _make_bfe orders those, Dirichlet VMP, ordinary declared energies, current-parameter constraints, GFE structural terms, one shared_goal_energy call, one KL per mu3 plan, transition-GFE terms and discrete interior entropy. Preserve summation order for characterization. No standalone delta-energy function exists in this baseline: hardening changes the beliefs consumed by those terms; the acceptance wording now explicitly preserves that treatment rather than requesting an invented new term. EF non-equality energy callbacks still come from kernels.KERNELS at trace time; do not silently change callback lookup timing during a move. No external consumers of the six private local helpers or _constraint_ok were found in src/tests; _make_bfe remains used by exact-schedule instrumentation. Local source inspection only, not independent formalism review.
