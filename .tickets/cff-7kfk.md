@@ -1,6 +1,6 @@
 ---
 id: cff-7kfk
-status: open
+status: in_progress
 deps: [cff-nyad]
 links: [cff-3ola]
 created: 2026-09-10T03:41:20Z
@@ -106,3 +106,7 @@ Legend: prerequisite --> dependent; based on tk dep tree --full cff-5xdy, tk rea
                                 --> cff-3ola --> cff-ws3c runtime epic
 
 cff-5xdy retains its direct nyad dependency as well. No parallel architecture root is introduced; unrelated P2 validators cff-34gi and cff-6n9c remain independently ready. tk dep cycle passes. This small insertion keeps cff-3ola limited to readouts/facade work and requires no new inference choice.
+
+**2026-09-10T04:01:32Z**
+
+Starting from updated, remotely verified PR #126 head 930a8c32f88235dadf6b572538a62169add79e09 after its 1,991-test final gate. The source/caller inventory above remains current. Keep the existing sweep factory signature and every numerical operation; move transport into execution/synchronous.py and redirect Engine plus private test instrumentation. Replace the redundant Gaussian selector wrapper with its existing kernel_runtime.parameters owner at the three ledger/readout callers. No new model, State, schema, objective, public status or PRNG policy is in scope.
