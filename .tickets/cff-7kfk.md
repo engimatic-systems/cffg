@@ -130,3 +130,7 @@ All acceptance criteria are met: one synchronous transport owner supplies the ex
 **2026-09-10T04:34:12Z**
 
 Published as PR #127, https://github.com/engimatic-systems/cffg/pull/127, above #126. The shared architecture page now explains the completed synchronous transport owner, preserved global update ordering and baseline parity, and the next lifecycle boundary. HTML validation passed with 63 unique IDs and 35 resolved internal anchors. The dashboard shows 1,992 passing tests. Source 2aaef36 and gate/closure 9f939fa remain authoritative; publication changes no code. Next: verify/update this published branch and start ready cff-5xdy. The PR stack remains open for review, not merged.
+
+**2026-09-10T05:20:10Z**
+
+Evidence wording correction: the historical 2,622-array comparison used np.array_equal(..., equal_nan=True), not raw-byte comparison. Its result is exact numerical equality with matching NaNs treated as equal; it does not distinguish signed zeros or NaN payload bits. The PR description and shared HTML now say this precisely. No numerical discrepancy was found, and no code or test result changed.

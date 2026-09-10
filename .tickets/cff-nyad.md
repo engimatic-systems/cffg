@@ -126,3 +126,7 @@ All acceptance criteria are met: schedule construction and certification composi
 **2026-09-10T04:00:46Z**
 
 Published as PR #126, https://github.com/engimatic-systems/cffg/pull/126, above #125. The shared architecture page now explains the completed schedule owner, preserved local-register transport, exact baseline parity and the cff-7kfk follow-up. HTML validation passed with 62 unique IDs and 35 resolved internal anchors. The dashboard shows 1,991 passing tests. Source 47701a6 and gate/closure edbe8a5 remain authoritative; publication changes no code. Next: verify/update this published branch and execute ready cff-7kfk. The open PR stack remains for review, not merged.
+
+**2026-09-10T05:20:10Z**
+
+Evidence wording correction: the historical 2,622-array comparison used np.array_equal(..., equal_nan=True), not raw-byte comparison. Its result is exact numerical equality with matching NaNs treated as equal; it does not distinguish signed zeros or NaN payload bits. The PR description and shared HTML now say this precisely. No numerical discrepancy was found, and no code or test result changed.
