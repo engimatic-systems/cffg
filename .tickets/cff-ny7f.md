@@ -101,6 +101,9 @@ executors. `cff-wbhu` remains the separate compiled-loop performance owner.
 - **Transport adapter:** The code that reads/writes arrays or scan registers
   according to a compiled plan, without choosing mathematical input meaning.
 - **Pytree:** A JAX-recognized nested structure whose numerical leaves are arrays.
+- **Dirichlet parameter edge:** An edge representing uncertainty about a
+  probability vector or conditional-probability table; it carries prior
+  concentrations and fractional observation counts, not categorical log messages.
 
 ## Notes
 
