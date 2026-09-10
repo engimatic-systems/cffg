@@ -278,6 +278,8 @@ class Colony:
                     )
                 ):
                     statuses[b] = RunStatus.DIVERGED
+                if statuses[b] in (RunStatus.DIVERGED, RunStatus.INFEASIBLE):
+                    residuals[b] = float("inf")
                 result = RunResult(
                     state=st,
                     status=statuses[b],

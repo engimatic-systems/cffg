@@ -52,3 +52,7 @@ Pre-implementation evidence at cf5cdb6: /tmp/cffg-colony-late-failure.py checks 
 **2026-09-10T05:20:10Z**
 
 The second controlled probe /tmp/cffg-colony-terminal-failure.py confirms both remaining residual branches: non-finite max objective reports Colony residual 0 versus Engine infinity, and final undefined continuous ledger after an inner budget stop reports Colony 0.125 versus Engine infinity. Overall divergence agrees. These are now reproduced, not just inferred from source.
+
+**2026-09-10T05:41:56Z**
+
+Residual repair checkpoint: a new f32 primed-schedule regression failed on the old Colony residual=1, as intended. Setting the final public residual to infinity for divergence/infeasibility repairs all terminal branches without changing their statuses or inner facts. The complete Colony-failure and engine-contract selection then passed 50 tests in 9.67 seconds. The 20 new cases cover later inner failure/budget, FE failure, empty support, max-objective failure and undefined continuous ledger, both precisions and available primed/flood schedules. Healthy neighbors and every other result field match standalone execution. Non-finite delta aggregation is the next separate commit; final default gate follows the final code/test change.

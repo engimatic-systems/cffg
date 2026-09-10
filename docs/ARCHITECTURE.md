@@ -1526,6 +1526,11 @@ an infinite inner residual, matching standalone `Engine.run`. Healthy peers
 continue through the vmapped updates; a fully rejected group skips priming and
 updates. `tests/test_colony_failures.py` checks complete result/state parity
 across both float precisions, zero/positive budgets and mixed/flood schedules.
+Later divergence or infeasibility reports an infinite public residual, even
+when earlier updates produced a finite residual. Inner-solver facts and FE
+trace entries are retained; a budget stop with a defined ledger keeps its
+existing residual. Controlled-failure tests compare every public result field
+with standalone execution and verify that healthy batch members continue.
 `tests/test_constraint_data.py` additionally checks distinct per-instance limits
 and tables, both spawn orders, all four numeric consumers, and actual batching
 of mixed float precisions and table lengths. `test_constraint_reconstruction.py`
