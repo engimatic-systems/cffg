@@ -1,6 +1,6 @@
 ---
 id: cff-3ose
-status: in_progress
+status: closed
 deps: [cff-5xdy]
 links: [cff-yglj]
 created: 2026-09-10T05:14:03Z
@@ -60,3 +60,9 @@ Residual repair checkpoint: a new f32 primed-schedule regression failed on the o
 **2026-09-10T05:44:45Z**
 
 Non-finite delta repair: the new f32 Gaussian precision-block case failed on the old finite delta=1 even though that later block contained NaN. Engine and Colony now use NumPy maximum reductions that propagate NaN from any representation, preserving all finite delta values and the existing divergence status. Added first/later representation cases and genuine 20-instance batches in both precisions. The complete focused failure/engine-contract/runtime-status/Colony selection passed 72 tests, 3 slow deselected, in 14.65 seconds. There are 32 new cases in the existing dashboard-enrolled failure file (314 lines). Small-file lint/format checks and diff check pass; Engine retains 19 and Colony five pre-existing Ruff findings, with none introduced. Source changes are complete; the single final default gate is next. No numerical factor update, objective, schema, tolerance or public status changed.
+
+**2026-09-10T06:05:58Z**
+
+Completed in separate source commits: 8bb584a repairs stale Colony failure residuals; a2c55e6 preserves non-finite delta traces. The final focused selection passed 72 tests with three slow deselections. The single final default gate passed 2,043 tests, zero failures, 41 slow deselections and four existing Gym warnings. Pytest took 1,132.26 seconds; measured wall time was 1,145.615 seconds. It completed 2026-09-10T06:03:51.571355+00:00 at ticket-only head 25f537c. Code/test source a2c55e6 is authoritative. Runtime history and the shared dashboard are refreshed. Only one suite-output check was made after the planned first deadline.
+
+Every reproduced failure still has its original overall status; residuals and non-finite deltas now report the failure consistently. Healthy batch peers, finite budget results, inner facts, traces apart from previously masked NaN deltas, and numerical states retain their reference behavior. No factor formula, solver, objective, schema or tolerance changed. Publication reuses this gate. Next is cff-ii9t, whose handoff records the ordering and trace-precision constraints. Independent agent review remains unavailable and is not claimed.
