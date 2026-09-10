@@ -1,27 +1,16 @@
 {
   "latest": {
-    "case_seconds": 1002.213,
-    "commit": "6364053",
-    "completed_at": "2026-09-09T23:40:14.531582+00:00",
+    "case_seconds": 991.442,
+    "commit": "ce8452a",
+    "completed_at": "2026-09-10T00:24:22.718746+00:00",
     "failed": 0,
     "pytest_exit_code": 0,
     "result": "passed",
     "selection": "not slow",
-    "test_count": 1813,
-    "wall_seconds": 1016.282
+    "test_count": 1818,
+    "wall_seconds": 1005.421
   },
   "previous-3": [
-    {
-      "case_seconds": 991.331,
-      "commit": "2c29d5c",
-      "completed_at": "2026-09-09T22:06:15.001861+00:00",
-      "failed": 0,
-      "pytest_exit_code": 0,
-      "result": "passed",
-      "selection": "not slow",
-      "test_count": 1755,
-      "wall_seconds": 1005.304
-    },
     {
       "case_seconds": 984.996,
       "commit": "5b3606f",
@@ -43,6 +32,17 @@
       "selection": "not slow",
       "test_count": 1813,
       "wall_seconds": 1016.282
+    },
+    {
+      "case_seconds": 991.442,
+      "commit": "ce8452a",
+      "completed_at": "2026-09-10T00:24:22.718746+00:00",
+      "failed": 0,
+      "pytest_exit_code": 0,
+      "result": "passed",
+      "selection": "not slow",
+      "test_count": 1818,
+      "wall_seconds": 1005.421
     }
   ],
   "schema_version": 2,
