@@ -1,6 +1,6 @@
 ---
 id: cff-yglj
-status: open
+status: in_progress
 deps: [cff-sf29]
 links: [cff-sf29, cff-wbhu]
 created: 2026-09-10T00:07:26Z
@@ -67,3 +67,7 @@ cff-sf29 supplies the fixture. Fix this before cff-ii9t's shared controller/resu
 **2026-09-10T00:18:15Z**
 
 Second mechanism confirmed on the same unchanged baseline: put NaN in the final message entry of ordinary_case(0), retain a healthy same-structure peer, and call Colony.run(5, tol=1e-12). The mixed schedule has a prime function. The rejected instance reports divergence at zero iterations but its returned message entries 7, 8 and 9 differ from the input; these are propagation writes performed before failure classification. The healthy peer converges. The fix must freeze rejected instances across priming as well as repeated updates, and the regression must compare the entire failed State against the input rather than checking only status or the poisoned entry. Source and confidence: direct executable probe, high.
+
+**2026-09-10T00:28:15Z**
+
+Starting from updated PR #122 head 84bfd66. Primary change-path row: Runtime numerical or status invariant. Deliberate pairs: standalone/actual multi-instance batch, auto mixed priming/flooding, zero/positive budgets, and float32/float64. Host/JIT update facts remain unchanged; this repair aligns host initial-result construction and retains invalid state across priming. Model schema, checkpoint decoding, new factors and mu3 batching are N/A. Tests will reproduce NaN/infinity failure and exact-zero infeasibility beside a healthy distinct-parameter peer, compare every result field and State leaf with standalone Engine, and observe real batch update entry. Existing improper/vacuous numerical rules are unchanged; tenfold domain size is N/A to the classification repair. Separate behavior-change commit; focused tests first, then one final short suite. No code from the later controller extraction is moved.
