@@ -1,6 +1,6 @@
 ---
 id: cff-cfqg
-status: open
+status: closed
 deps: [cff-ofv1]
 links: [cff-ahps, cff-209l, cff-edoz, cff-ws3c, cff-ty0v]
 created: 2026-08-13T03:59:30Z
@@ -261,3 +261,7 @@ Scope boundary: no child owns scientific recovery claims, a speedup target,
 release readiness, or new factor-family behavior. Execution structure and
 batch isolation are architecture acceptance criteria. The serial ticket chain
 is a safe landing order for overlapping files; it is not the runtime call graph.
+
+**2026-09-10T09:52:50Z**
+
+Architecture epic complete on the review stack, not merged to main. All four gate children are closed: registration cff-209l, compiler cff-edoz, runtime cff-ws3c and extension proof cff-ofv1. The final source bc35dc6 passes 2,151 default-suite tests, including the 30 final ownership checks; 41 slow tests remain opt-in and four existing Gym warnings remain. Compiler and Engine facades are 138 and 659 physical lines; the largest new production owner is 808 lines. Same-arena external discrete/Gaussian/EF factors reuse declared registration for compilation, execution, energy, readouts and serialized implementation identity. Explicit recurrence/GFE/constraint owners retain specialized meanings and once-only composite/shared-parameter accounting. Existing oracles, frozen compiled plans, scan carry/scatter and trace-reuse tests, distinct-input Colony isolation, shared result finalization and supported reconstruction contracts remain green. The final contributor matrix covers inference capabilities, initialization, writes, learning, batching, bytes, manifests and checkpoints. The separate correctness repairs are documented in their own tickets/PRs; preservation does not mean restoring known pre-repair defects. This completion is a bounded architecture/extension baseline, not a new scientific validation, factor family, speedup, public API stabilization or production-release claim. Remaining parallel work includes cff-xabn learning persistence, cff-wbhu throughput, cff-rqqc stochastic Colony and cff-3kdk readout vectorization. cff-o7hs is the next new-family consumer; it is not started as part of this epic.

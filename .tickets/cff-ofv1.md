@@ -1,6 +1,6 @@
 ---
 id: cff-ofv1
-status: in_progress
+status: closed
 deps: [cff-ws3c]
 links: [cff-cfqg, cff-o7hs, cff-ahps]
 created: 2026-09-02T04:02:01Z
@@ -154,3 +154,7 @@ Pre-implementation handoff prepared while cff-3ola is under its final gate; cff-
 **2026-09-10T09:32:13Z**
 
 Implementation complete on the final runtime prerequisite 80d6afe (#133), pending the final full gate. Added 30 cross-seam checks in test_extension_ownership.py: test-only identities absent from every production source; no original factor-type interpretation in facades/transport; no duplicate ordinary built-in numerical selection; acyclic lower owners with no facade imports; exactly owned specialized lowering/update/objective calls; shared flat/scheduled registered executors. Existing fixtures were reused, not reimplemented. ARCHITECTURE now has semantic-owner, accepted-mode, required-consumer and composite-ownership matrices, with README/LIMITATIONS links and scope boundaries. Initializer/precedence/write/learning/Colony/byte/manifest/checkpoint surfaces and concrete N/A reasons are explicit. Focused final selection: 161 passed in 61.98 seconds, covering new checks, all three external factors, compiler joins, runtime contracts, common finalization and Gaussian scan/batch contracts. Ruff passes; canonical-doc test links resolve; no production source file changed. The numerical/serialized preservation authorities and hostile cases remain the prerequisite tests. Starting one dashboard-backed final short suite after the final test change; first output check at 20 minutes, allowance 1,470 seconds if needed. No independent agent review or runtime speedup is claimed.
+
+**2026-09-10T09:52:50Z**
+
+Final gate passed at source bc35dc610583061bb9f6f4df6ac61c529cdb3798: 2,151 passed, 41 opt-in slow tests deselected, four existing Gym deprecation warnings; pytest 1,145.30 seconds. Dashboard refreshed with all 30 new ownership cases. The gate was read exactly once at the planned 20-minute completion check. No production numerical source changed in this ticket. All same-arena oracle/reconstruction, specialized ownership, execution structure, runtime isolation/status and current/legacy checkpoint authorities in the default suite remain green. The final matrix names semantic owners, accepted modes, derived consumers and concrete N/A boundaries. Numerical source parity belongs to the prerequisite code moves, while these cross-seam checks protect the final extension surface. Acceptance criteria are satisfied; close cff-ofv1 and parent cff-cfqg. Publication and shared-HTML refresh follow without another unchanged suite. Downstream new-family, throughput, stochastic batching and persistent-learning work remain separate; no PR-stack merge is performed.
