@@ -1384,6 +1384,10 @@ discarding a joint correlation. Exact joint rollover remains the separate
   Max mode uses its message fixed-point residual and validates the decoded
   objective. Non-finite arenas/residuals are divergence, while proven empty
   exact support is infeasible with FE = +∞.
+  Ordinary Engine and Colony delta reductions preserve NaN from any message
+  representation; a finite change in another block cannot hide it. Their
+  failed-run traces therefore retain the non-finite change as well as reporting
+  divergence. Finite deltas and successful-run stopping rules are unchanged.
   "Proven empty" is decided in log space by exact comparison with the
   reserved `NEG` sentinel, never by exponentiating or applying a magnitude
   threshold. `exp` underflows below about -745, while a threshold merely

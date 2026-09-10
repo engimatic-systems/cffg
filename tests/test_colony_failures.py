@@ -224,6 +224,9 @@ def check_later_failure(
         assert actual[ids[0]].residual == 0.125
     else:
         assert np.isinf(actual[ids[0]].residual)
+    if failure == "state":
+        assert not np.isfinite(actual[ids[0]].message_deltas[-1])
+        assert not np.isfinite(expected[0].message_deltas[-1])
     for iid, reference in zip(ids, expected, strict=True):
         assert_result_equal(actual[iid], reference)
         assert colony.instances[iid].state is actual[iid].state
@@ -235,11 +238,29 @@ def check_later_failure(
 
 @pytest.mark.parametrize("dtype", (np.float32, np.float64))
 @pytest.mark.parametrize("schedule", ("auto", "flood"))
-@pytest.mark.parametrize("failure", ("inner", "inner_budget", "energy", "support"))
+@pytest.mark.parametrize(
+    "failure", ("inner", "inner_budget", "energy", "support", "state")
+)
 def test_later_failure_reports_current_residual_and_preserves_healthy_peer(
     monkeypatch, dtype, schedule, failure
 ):
     check_later_failure(monkeypatch, dtype, schedule, failure)
+
+
+@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+@pytest.mark.parametrize("representation", ("g_eta", "g_lam"))
+def test_nonfinite_changes_are_reported_for_each_continuous_representation(
+    monkeypatch, dtype, representation
+):
+    check_later_failure(
+        monkeypatch, dtype, "flood", "state", representation=representation
+    )
+
+
+@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+@pytest.mark.parametrize("failure", ("inner", "state"))
+def test_late_failure_is_isolated_in_a_larger_batch(monkeypatch, dtype, failure):
+    check_later_failure(monkeypatch, dtype, "auto", failure, size=20)
 
 
 @pytest.mark.parametrize("dtype", (np.float32, np.float64))

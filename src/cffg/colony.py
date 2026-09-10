@@ -197,13 +197,16 @@ class Colony:
                 for b in np.flatnonzero(active):
                     old = jax.tree_util.tree_map(lambda x: x[b], previous)
                     st = jax.tree_util.tree_map(lambda x: x[b], batched)
-                    delta = max(
-                        (
-                            float(jnp.max(jnp.abs(getattr(st, f) - getattr(old, f))))
-                            for f in ("messages", "g_eta", "g_lam", "ef_eta")
-                            if getattr(st, f).size
-                        ),
-                        default=0.0,
+                    # Preserve NaN from any representation, regardless of order.
+                    delta = float(
+                        np.max(
+                            [
+                                float(jnp.max(jnp.abs(getattr(st, f) - getattr(old, f))))
+                                for f in ("messages", "g_eta", "g_lam", "ef_eta")
+                                if getattr(st, f).size
+                            ],
+                            initial=0.0,
+                        )
                     )
                     deltas[b].append(delta)
                     inner_residuals[b] = float(inner_r_np[b])
