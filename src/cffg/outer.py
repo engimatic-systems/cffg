@@ -16,9 +16,9 @@ import numpy as np
 
 from cffg import efrules
 from cffg.compiled import NEG, Arena
-from cffg.runtime_types import OuterTerminationReason as OuterTerminationReason
-
-
+from cffg.runtime_types import (
+    OuterTerminationReason as OuterTerminationReason,  # noqa: PLC0414
+)
 
 
 class OuterArrays(NamedTuple):

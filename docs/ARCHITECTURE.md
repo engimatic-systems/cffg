@@ -125,9 +125,9 @@ and review context proportional to the change.
 | Ticket shape | Authority | Derived surfaces that must agree | Canonical focused tests | Durable documentation |
 | --- | --- | --- | --- | --- |
 | New IR field | `src/cffg/core/ir.py` (`Template` or its spec dataclass) | `src/cffg/core/validate.py`; `src/cffg/core/serialize.py` (`to_dict`, `from_dict`, `structure_hash`); `src/cffg/core/plates.py` scoping; `src/cffg/core/compose.py` and `src/cffg/core/edits.py` when editable; `src/cffg/topology.py` declaration snapshots/layout, `src/cffg/specialized/` semantic claims/drafts, `src/cffg/registered/` same-arena drafts, `src/cffg/resolution/` arrays/addresses, `src/cffg/assembly.py` arena assembly, and `src/cffg/compiled.py` values when executable; bundle and agent state when persisted | `tests/test_ir.py`, `tests/test_serialize.py`, `tests/test_plates.py`, `tests/test_topology.py`, `tests/test_registered.py`, `tests/test_resolution.py`, `tests/test_assembly.py`; add `tests/test_edit_codec.py`, `tests/test_edits.py`, `tests/test_agent_spec.py`, or `tests/test_bundle.py` only for the affected boundary | Contract in this document; public construction and migration in `README.md`; unsupported cases in `LIMITATIONS.md` |
-| New factor or rule family | `src/cffg/kernels.py:FactorKernel`, `kernel_bindings.py`, its `src/cffg/core/ir.py:FactorType`, and the family rule module; formal equations are authoritative in code docstrings and `DERIVATIONS.md` | `topology.py` declared role/slot facts; `specialized/` named family discovery/completion; `registered/` binding capabilities and same-arena structural lowering; common declarations in `array_requirements.py`; `registered/packing.py` and `specialized/packing.py` family adapters; `resolution/` parameter/observation resolution; `assembly.py`, `Arena`, and `member_of`; typed local updates in `execution/` and `ExecutionDelta`; registered mathematics/readouts/energy in `kernel_runtime.py`; `execution/synchronous.py:make_sweep`; `execution/transport.py` and `schedule_program.py` batch/registerized/flat scans; `_make_bfe`; support checks, assignment scoring, readouts, schedule classification, serialization manifest, estimator, and public exports as applicable | `tests/test_kernels.py`, `tests/test_execution.py`, `tests/test_registered.py`, `tests/test_resolution.py`, `tests/test_assembly.py`, `tests/test_discrete_kernels.py`, `tests/test_gaussian_kernels.py`, `tests/test_gaussian_kernel_schedules.py`; family rule and engine-oracle tests; `tests/test_schedule.py`, `tests/test_schedule_program.py`; sparse-support, float32, and uncomfortable-scale cases | Derivation in `DERIVATIONS.md`; integration contract here; approximations in `LIMITATIONS.md`; public modeling API in `README.md` |
-| Runtime numerical or status invariant | `AGENTS.md` numerical contract and `src/cffg/runtime_types.py` (state/result/status values) and `src/cffg/engine.py:Engine.run` (run policy) | Flooding, colored/mixed, and exact schedules; host `_has_zero_support` and `schedule_program.make_support_check`; `execution.synchronous.make_sweep`, `ScheduleProgram`, `make_exact_unit`, `make_propagate`, and `_make_bfe`; inner-solver status; `RollingAgent`, `Colony`, estimator, benchmark, and dashboard consumers | `tests/test_runtime_status.py`, `tests/test_schedule.py`, `tests/test_schedule_program.py`, `tests/test_engine_contracts.py`, `tests/test_colony.py`, `tests/test_colony_failures.py`, `tests/test_constraint_data.py`, `tests/test_constraint_reconstruction.py`, plus the changed rule family's hostile-input tests | Runtime contract here and in `README.md`; any accepted failure mode or approximation in `LIMITATIONS.md` |
-| Learnable or checkpoint feature | `src/cffg/core/ir.py` (`LearnableSpec`, `AgentSpec`, `BeliefBinding`) and `src/cffg/learn.py` (`Family`, `Learnables`) | Validation, JSON/hash, plate scoping, specialized parameter/objective ownership, `resolution/addresses.py:resolve_learnables` and declared member/parameter requirements, `Arena.learn_plans`, `member_of`, engine readouts and parameter writes, agent cadence, checkpoint encode/decode and legacy migration, and bundles | `tests/test_learnables.py`, `tests/test_constraint_reconstruction.py`, `tests/test_resolution.py`, `tests/test_assembly.py`, `tests/test_agent_spec.py`, `tests/test_agent.py`, and `tests/test_bundle.py`; add the contributing factor family's statistic test | Conjugate contract here; statistics beyond the papers in `DERIVATIONS.md`; public cadence/checkpoint API in `README.md`; remaining family gaps in `LIMITATIONS.md` |
+| New factor or rule family | `src/cffg/kernels.py:FactorKernel`, `kernel_bindings.py`, its `src/cffg/core/ir.py:FactorType`, and the family rule module; formal equations are authoritative in code docstrings and `DERIVATIONS.md` | `topology.py` declared role/slot facts; `specialized/` named family discovery/completion; `registered/` binding capabilities and same-arena structural lowering; common declarations in `array_requirements.py`; `registered/packing.py` and `specialized/packing.py` family adapters; `resolution/` parameter/observation resolution; `assembly.py`, `Arena`, and `member_of`; typed local updates in `execution/` and `ExecutionDelta`; registered mathematics/readouts/energy in `kernel_runtime.py`; `execution/synchronous.py:make_sweep`; `execution/transport.py` and `schedule_program.py` batch/registerized/flat scans; `lifecycle.py` observation binding and `mu3_lifecycle.py` functional state; `_make_bfe`; support checks, assignment scoring, readouts, schedule classification, serialization manifest, estimator, and public exports as applicable | `tests/test_kernels.py`, `tests/test_execution.py`, `tests/test_registered.py`, `tests/test_resolution.py`, `tests/test_assembly.py`, `tests/test_discrete_kernels.py`, `tests/test_gaussian_kernels.py`, `tests/test_gaussian_kernel_schedules.py`; family rule and engine-oracle tests; `tests/test_schedule.py`, `tests/test_schedule_program.py`; sparse-support, float32, and uncomfortable-scale cases | Derivation in `DERIVATIONS.md`; integration contract here; approximations in `LIMITATIONS.md`; public modeling API in `README.md` |
+| Runtime numerical or status invariant | `AGENTS.md` numerical contract and `src/cffg/runtime_types.py` (state/result/status values) and `src/cffg/engine.py:Engine.run` (run policy) | Flooding, colored/mixed, and exact schedules; host `_has_zero_support` and `schedule_program.make_support_check`; `execution.synchronous.make_sweep`, `ScheduleProgram`, `make_exact_unit`, `make_propagate`, and `_make_bfe`; `StateLifecycle`/`Mu3Lifecycle` initialization, preparation and status forwarding; inner-solver status; `RollingAgent`, `Colony`, estimator, benchmark, and dashboard consumers | `tests/test_runtime_status.py`, `tests/test_schedule.py`, `tests/test_schedule_program.py`, `tests/test_engine_contracts.py`, `tests/test_lifecycle.py`, `tests/test_colony.py`, `tests/test_colony_failures.py`, `tests/test_constraint_data.py`, `tests/test_constraint_reconstruction.py`, plus the changed rule family's hostile-input tests | Runtime contract here and in `README.md`; any accepted failure mode or approximation in `LIMITATIONS.md` |
+| Learnable or checkpoint feature | `src/cffg/core/ir.py` (`LearnableSpec`, `AgentSpec`, `BeliefBinding`) and `src/cffg/learn.py` (`Family`, `Learnables`) | Validation, JSON/hash, plate scoping, specialized parameter/objective ownership, `resolution/addresses.py:resolve_learnables` and declared member/parameter requirements, `Arena.learn_plans`, `member_of`, `StateLifecycle` initial arrays and binding, `Mu3Lifecycle` functional parameter state, engine readouts and parameter writes, agent cadence, checkpoint encode/decode and legacy migration, and bundles | `tests/test_learnables.py`, `tests/test_lifecycle.py`, `tests/test_constraint_reconstruction.py`, `tests/test_resolution.py`, `tests/test_assembly.py`, `tests/test_agent_spec.py`, `tests/test_agent.py`, and `tests/test_bundle.py`; add the contributing factor family's statistic test | Conjugate contract here; statistics beyond the papers in `DERIVATIONS.md`; public cadence/checkpoint API in `README.md`; remaining family gaps in `LIMITATIONS.md` |
 
 Duplicated execution surfaces are deliberate review pairs: host/JIT,
 flooding/scheduled, single-instance/`vmap`, and current/legacy checkpoint
@@ -886,6 +886,26 @@ or numerical solver. Field schemas, enum values and the top-level facade's
 export list are unchanged; checkpoint data remains arrays and explicit metadata,
 not serialized Python classes.
 
+`lifecycle.py:StateLifecycle` owns initial array construction and DATA-port
+binding over the immutable arena. It converts defaults at each call, so the
+active JAX precision setting still determines newly initialized dtypes.
+Binding returns a replacement State only after every observation succeeds;
+`None` keeps the existing categorical-uniform or continuous-mask behavior.
+Gaussian validators come from compiled bindings, while EF validator lookup
+retains its existing bind-time behavior.
+
+`mu3_lifecycle.py:Mu3Lifecycle` separately owns functional parameter defaults,
+particle preparation, readiness checks, moment installation and diagnostics.
+It receives immutable functional plans and latent-message indices, not the
+arena. Its numerical State view contains only messages and parameters, and
+current particle-budget/ESS settings are supplied at each call. Ordinary
+models have no functional lifecycle instance. Epoch scoring carries complete
+States opaquely through supplied preparation and run callbacks; the run
+controller remains the authority for convergence. `Engine` preserves the
+public methods as delegates. PRNG split order, parameter keys, observation
+masks and checkpoint schemas are unchanged. `test_lifecycle.py` protects these
+boundaries, precision/settings timing, atomic binding and epoch failure forwarding.
+
 `execution/registered.py` owns the typed local-update boundary for registered
 discrete, Gaussian and exponential-family plans. Flooding, batch stages,
 registerized scans and fallback scans all use these owners, including the
@@ -907,7 +927,7 @@ values still come from `State.params`. `Engine` injects this factory into the
 schedule program and contains no synchronous transport implementation.
 
 `schedule.py` derives the deterministic declarative schedule. The independent
-`schedule_program.py` owner validates the selected schedule and builds an
+`schedule_program.py` owner validates the selected schedule and builds a
 frozen `ScheduleProgram` record: flooding/iterative updates, optional priming and
 forest reconstruction, directed propagation, and exact certification. The
 program consumes the typed `ScheduledExecutors` collection plus the existing
@@ -946,7 +966,8 @@ runtime consumer falls back to another instance's compiled defaults.
 
 `execution/functional.py` separates the existing stationary and fixed-particle
 importance calculations. Readiness, base-posterior checks, low-ESS policy and
-State installation remain in the lifecycle path. Shared-goal contributors are
+moment installation belong to `Mu3Lifecycle`; `Engine` installs the returned
+parameters in the complete State. Shared-goal contributors are
 still pooled once after all local GFE updates and before damping. Objective
 terms and their once-only parameter accounting are unchanged. The exact JAX
 log-zero predicate lives in `execution/support.py`; finite/support
