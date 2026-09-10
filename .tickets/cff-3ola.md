@@ -16,7 +16,9 @@ tags: [engine, architecture, readout, refactor]
 
 At authoring snapshot e488df3, `src/cffg/engine.py:1753-2478` is the scope
 anchor for public readouts, not a promised future line map. The implementation
-starts from the exact `cff-sf29` engine baseline. After execution, schedules,
+starts from the final published `cff-gl89` head, including the intervening
+parameter-ownership and failure-diagnostic repairs. `cff-sf29` is the contract
+inventory, not an instruction to restore its older implementation. After execution, schedules,
 lifecycle, run control, and objective accounting have focused owners, the
 public engine still contains discrete and Gaussian marginals, node beliefs,
 recurrence pairs and statistics, mixture predictions, exponential-family
@@ -39,6 +41,10 @@ Readout vectorization remains separate work in `cff-3kdk`.
    member, and role interpretation is delegated to the same compiled or
    execution owner used by inference.
 4. A readout does not reimplement a message update or objective term.
+   4.1. `with_goal_priors`, which sits among the current readouts but replaces
+        state parameters, delegates to a lifecycle or goal-parameter state
+        owner. Keep its fresh-state guard and validation unchanged; do not
+        make a readout owner responsible for state replacement.
 5. Public `Engine`, `State`, `RunResult`, `RunStatus`, and
    `InferenceError` retain their documented imports, signatures, values, and
    failure behavior.
@@ -47,16 +53,18 @@ Readout vectorization remains separate work in `cff-3kdk`.
    selection of the explicit run strategy, shared result-finalizer calls, and
    delegation to lifecycle, objective, and readout owners. The facade injects
    the schedule program and objective evaluator into the selected run-control
-   owner. It contains no family rule call, schedule builder, solver loop, or
-   local objective formula.
+   owner. It implements no family rule, schedule-construction algorithm,
+   solver loop, or local objective formula. Invoking the existing schedule
+   owner's builder from public construction remains facade orchestration.
 7. `src/cffg/engine.py` has fewer than 1,000 physical lines because the named
    owners move responsibilities anchored by the e488df3 execution region
    (2511-3040), schedule region (3041-3669), lifecycle region (323-915), run-
    control regions (916-1752), ledger region (3670-3973), and readout region
    (1753-2478), with overlap resolved during extraction. No new or extracted
    file exceeds 1,000 lines.
-8. Every applicable `cff-sf29` message, belief, status, diagnostic,
-   objective, and readout remains unchanged within its dtype-derived tolerance.
+8. Every applicable contract case for messages, beliefs, statuses, diagnostics,
+   objectives and readouts is characterized against the final `cff-gl89`
+   source and remains unchanged within its dtype-derived tolerance.
 9. Flooding and scheduled readouts agree for equivalent states. Direct and
    one-instance `vmap` readouts agree where both are supported.
 10. Latest-schema and explicitly supported legacy RollingAgent checkpoints
@@ -104,3 +112,9 @@ readout-vectorization owner.
   by a declared learning family.
 - **Readout:** A public posterior, statistic, prediction, or diagnostic derived
   from an engine state.
+
+## Notes
+
+**2026-09-10T08:18:52Z**
+
+Pre-implementation inspection at ledger source 90c58b1: remaining Engine readouts are marginals, node_beliefs, dirichlet_marginals, goal_marginals, goal_prior_updates, gaussian_marginals, recurrence_pair_beliefs, gaussian_node_stats, recurrence_weight_stats, gaussian_mixture_predictives, ef_marginals, kernel_readouts and decode, plus hybrid_gfe_diagnostics near the lifecycle delegates. Mu3 diagnostics/epoch scoring already have Mu3Lifecycle owners; do not duplicate their implementation. with_goal_priors is a 55-line parameter-state replacement, not a readout: place it with lifecycle/goal-state ownership, preserving its unknown-blob check, fresh count-message guard, finite-positive shape validation, dtype cast and replacement State. Public inter-readout calls currently exist from goal_marginals/goal_prior_updates to dirichlet_marginals, gaussian_node_stats/recurrence_weight_stats to recurrence_pair_beliefs, and decode to marginals. Account for those explicit dependencies when designing typed views/callbacks; preserve output order and current parameter/observation interpretation, including legacy EF lookup timing. EfMarginal and DirichletMarginal value declarations need lower-level ownership with their existing engine import aliases preserved. Existing schedule construction may be invoked by the facade; its algorithm is already outside Engine. Local inspection, not independent agent review.
