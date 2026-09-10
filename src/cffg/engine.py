@@ -39,14 +39,18 @@ from jax.scipy.special import logsumexp
 
 from cffg import csp, ef, efrules, gauss, hybrid_gfe, kernels, mixg, recurrence
 from cffg.compiled import NEG, Arena
+from cffg.execution.registered import (
+    ef_parameters as _ef_parameters,
+    execute_discrete as _execute_discrete,
+    execute_ef as _execute_ef,
+    execute_gaussian as _execute_gaussian,
+)
 from cffg.goal_parameters import shared_goal_energy, write_goal_counts
 from cffg.kernel_runtime import (
     discrete_energy as _disc_energy,
-    discrete_message as _disc_message,
     discrete_potential as _disc_potential,
     discrete_readout as _disc_readout,
     gaussian_energy as _gauss_energy,
-    gaussian_message as _gauss_outs,
     gaussian_readout as _gauss_readout,
     parameters as _kernel_params,
 )
@@ -2647,7 +2651,9 @@ def _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params):
         y = mk = None
         if g.obs_rows is not None:
             y, mk = _obs_rows(arena, g_obs, g.obs_rows, g.observed_dim), g_mask[jnp.asarray(g.obs_rows)]
-        outs = _gauss_outs(g, inc_e, inc_l, _gauss_group_params(g, params), y, mk)
+        outs = _execute_gaussian(
+            g, inc_e, inc_l, _gauss_group_params(g, params), y, mk
+        ).outgoing
         for r, (oe, ol) in enumerate(outs):
             new_eta, new_lam = _set_gauss_block(
                 arena, new_eta, new_lam, g.scatter[:, r], g.dims[r], oe, ol
@@ -2661,14 +2667,7 @@ def _ef_group_out(g, inc, params, rows=None, obs=None, mask=None):
     Shared by the flooding sweep and the directed-schedule executors
     (cff-d56d): ``rows`` optionally subsets the group's parameter stacks to
     the members being fired."""
-    if g.type == "equality":
-        return efrules.equality_messages(inc)
-    kern = kernels.KERNELS[g.type]
-    gp = {
-        key: params[f"{g.name}:{key}"] if rows is None else params[f"{g.name}:{key}"][rows]
-        for key in kern.param_keys
-    }
-    return kern.message(inc, gp, obs, mask)
+    return _execute_ef(g, inc, _ef_parameters(g, params, rows), obs, mask).outgoing
 
 
 def _ef_sweep(arena, ef_eta, ef_obs, ef_mask, params):
@@ -2738,7 +2737,7 @@ def _make_step(arena: Arena, skip_scheduled: bool = False):
                 inc = _disc_both(arena, messages, g.gather_both, g.cards)
             else:
                 inc = _disc_rows(arena, messages, g.gather, g.cards)
-            out = _disc_message(g, inc, _kernel_params(g, params), op)
+            out = _execute_discrete(g, inc, _kernel_params(g, params), op).outgoing
             new = _set_disc_rows(arena, new, g.scatter, g.cards, out)
         for g in arena.dirichlet_groups:
             inc2 = _disc_both(arena, messages, g.gather_both, g.cards)
@@ -2957,7 +2956,9 @@ def _batch_stage_fn(arena: Arena, stage, op):
 
         def fn(messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params):
             inc = _disc_rows(arena, messages, gather, g.cards)
-            out = _disc_message(g, inc, _kernel_params(g, params, rows), op)
+            out = _execute_discrete(
+                g, inc, _kernel_params(g, params, rows), op
+            ).outgoing
             out = jnp.maximum(out, NEG)
             messages = _set_disc_rows(arena, messages, scatter, g.cards, out)
             return messages, g_eta, g_lam, ef_eta
@@ -2992,7 +2993,9 @@ def _batch_stage_fn(arena: Arena, stage, op):
         y = mk = None
         if g.obs_rows is not None:
             y, mk = _obs_rows(arena, g_obs, obs_rows, g.observed_dim), g_mask[obs_rows]
-        outs = _gauss_outs(g, inc_e, inc_l, _gauss_group_params(g, params, rows), y, mk)
+        outs = _execute_gaussian(
+            g, inc_e, inc_l, _gauss_group_params(g, params, rows), y, mk
+        ).outgoing
         for r, (oe, ol) in enumerate(outs):
             g_eta, g_lam = _set_gauss_block(
                 arena, g_eta, g_lam, scatter[:, r], g.dims[r], oe, ol
@@ -3244,7 +3247,7 @@ def _registerized_scan_fn(arena: Arena, stage, plans, op):
                     ]
                     inc = jnp.stack(blocks, axis=-2)
                     gp = {key: x_t[ei][f"p{key}"] for key, _ in g.parameter_paths}
-                    out = _disc_message(g, inc, gp, op)
+                    out = _execute_discrete(g, inc, gp, op).outgoing
                     out = jnp.maximum(out, NEG)
                     for r, card in enumerate(g.cards):
                         block = out[:, r, :card]
@@ -3254,15 +3257,12 @@ def _registerized_scan_fn(arena: Arena, stage, plans, op):
                     inc = jnp.stack(
                         [read(ei, r, False) for r in range(len(g.roles))], axis=-2
                     )
-                    if g.type == "equality":
-                        out = efrules.equality_messages(inc)
-                    else:
-                        gp = {
-                            k[1:]: v for k, v in x_t[ei].items() if k.startswith("p")
-                        }
-                        out = kernels.KERNELS[g.type].message(
-                            inc, gp, x_t[ei].get("ov"), x_t[ei].get("om")
-                        )
+                    gp = {
+                        k[1:]: v for k, v in x_t[ei].items() if k.startswith("p")
+                    }
+                    out = _execute_ef(
+                        g, inc, gp, x_t[ei].get("ov"), x_t[ei].get("om")
+                    ).outgoing
                     out = out.astype(inc.dtype)
                     for r in range(len(g.roles)):
                         block = out[:, r]
@@ -3280,7 +3280,7 @@ def _registerized_scan_fn(arena: Arena, stage, plans, op):
                     y = mk = None
                     if g.obs_rows is not None:
                         y, mk = x_t[ei]["ov"], x_t[ei]["om"]
-                    outs = _gauss_outs(g, inc_e, inc_l, par, y, mk)
+                    outs = _execute_gaussian(g, inc_e, inc_l, par, y, mk).outgoing
                     for r, (oe, ol) in enumerate(outs):
                         d = g.dims[r]
                         oe, ol = oe[..., :d], ol[..., :d, :d]
@@ -3398,7 +3398,9 @@ def _flat_scan_fn(arena: Arena, stage, op):
                         for r, card in enumerate(g.cards)
                     ]
                     inc = jnp.stack(blocks, axis=-2)
-                    out = _disc_message(g, inc, _kernel_params(g, params, x["rows"]), op)
+                    out = _execute_discrete(
+                        g, inc, _kernel_params(g, params, x["rows"]), op
+                    ).outgoing
                     out = jnp.maximum(out, NEG)
                     for r, card in enumerate(g.cards):
                         messages = messages.at[x["sv"][r]].set(out[:, r, :card])
@@ -3427,7 +3429,7 @@ def _flat_scan_fn(arena: Arena, stage, op):
                     y = mk = None
                     if g.obs_rows is not None:
                         y, mk = g_obs[x["ov"]], g_mask[x["mr"]]
-                    outs = _gauss_outs(g, inc_e, inc_l, par, y, mk)
+                    outs = _execute_gaussian(g, inc_e, inc_l, par, y, mk).outgoing
                     for r, (oe, ol) in enumerate(outs):
                         d = g.dims[r]
                         g_eta = g_eta.at[x["se"][r]].set(oe[..., :d])
