@@ -2,7 +2,7 @@
 id: cff-ny7f
 status: in_progress
 deps: [cff-sf29]
-links: [cff-nyad, cff-wbhu]
+links: [cff-nyad, cff-wbhu, cff-6n9c]
 created: 2026-09-02T04:02:01Z
 type: chore
 priority: 1
