@@ -18,8 +18,9 @@ from jax.scipy.special import logsumexp
 from cffg import kernels
 from cffg.colony import Colony
 from cffg.compiler import compile_template
-from cffg.engine import Engine, _batch_stage_fn, _flat_scan_fn
+from cffg.engine import Engine
 from cffg.schedule import ScanStage
+from cffg.schedule_program import _batch_stage_fn, _flat_scan_fn
 
 
 @pytest.fixture

@@ -68,6 +68,7 @@ EPIC_FILES = {
         "test_engine_contracts.py",
         "test_execution.py",
         "test_execution_specialized.py",
+        "test_schedule_program.py",
         "test_colony_failures.py",
         "test_constraint_data.py",
         "test_constraint_reconstruction.py",
