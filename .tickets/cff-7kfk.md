@@ -1,6 +1,6 @@
 ---
 id: cff-7kfk
-status: in_progress
+status: closed
 deps: [cff-nyad]
 links: [cff-3ola]
 created: 2026-09-10T03:41:20Z
@@ -120,3 +120,9 @@ Focused execution/specialized/shared-goal/constraint/program/Colony/engine-contr
 **2026-09-10T04:11:58Z**
 
 Final schedule/custom-kernel selection passed 40 tests in 27.49 seconds. The bounded numerical comparison at /tmp/cffg-synchronous-parity.py loads trusted Engine source 47701a6 and compares 17 models across automatic/flooding and float32/float64: all 2,622 arrays are bitwise identical, including matched NaNs, with the same functional scatter dtype warning as the prior extraction. Schedule identity, priming, reconstruction and exact units also match. All focused checks are complete; no further code change is planned. Commit the source, then run the final default suite once. Latest measured wall is 1,135.251 seconds and suggested wait is 1,440 seconds; first output check at 20 minutes, then at the 24-minute allowance only if still running.
+
+**2026-09-10T04:32:30Z**
+
+Final default gate passed at source 2aaef36: 1,992 tests, zero failures, 41 opt-in slow deselections and four existing Gym warnings; pytest reported 1,124.65 seconds and measured wall time was 1,138.059 seconds. Completion: 2026-09-10T04:30:56.938172+00:00, recorded against 8a92f49. The dashboard includes the new ownership-boundary case. Subsequent e35aae6/8a92f49 commits change only lifecycle ticket text, not code. The suite was checked once after its 20-minute estimate; no repeated test polling or publication rerun is needed.
+
+All acceptance criteria are met: one synchronous transport owner supplies the existing schedule factory interface; every moved function body and all bounded numerical outputs match; runtime constraint ownership, shared goals, cross-domain damping, hardening and failure facts are preserved; public schemas and policies are unchanged; the owner is below 1,000 lines and the architecture index is updated. Close and publish above PR #126, then update that published base and proceed to ready cff-5xdy using its detailed handoff. No significant user decision is pending.
