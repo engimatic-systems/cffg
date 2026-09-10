@@ -148,3 +148,7 @@ Concrete ownership constraints:
 - Reuse runtime_types as the pure value leaf. Extract host finite/support checks without importing Engine back into the new owners. Exact and trust-region strategy implementations, their caching and solver diagnostics remain cff-jrbw; FE formulas remain cff-gl89.
 
 Authorities: existing test_engine_contracts, test_runtime_status and test_colony_failures. cff-3ose adds late failures, NaN in first/later representations, finite budget residuals and real 20-instance batches; its final gate will establish the repaired baseline. This is a local source/fixture handoff, not independent agent review.
+
+**2026-09-10T06:10:20Z**
+
+Prerequisite cff-3ose is closed and published as PR #129. Its repaired code/test source is a2c55e6; final 2,043-test gate (41 slow deselections, four existing warnings) is recorded in 29a4c9f, measured wall 1,145.615 seconds. Use the final published agent/cff-3ose-failure-diagnostics head as this ticket's branch base. The 32 new failure cases preserve truthful non-finite delta traces and infinite failed-run residuals; do not restore the old discrepancies.
