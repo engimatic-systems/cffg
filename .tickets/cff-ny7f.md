@@ -27,8 +27,9 @@ propagation, support checks, and run control stay in later tickets.
 
 1. `cff-sf29` is closed with the bounded engine characterization baseline.
 2. Typed execution owners cover every plan class exercised by `cff-sf29`:
-   registered discrete/Gaussian/EF, mixture, recurrence, precision, constraint,
-   GFE/P-substitution, and functional evaluator plans.
+   registered discrete/Gaussian/EF, in-graph Dirichlet parameters, mixture,
+   recurrence, precision, constraint, GFE/P-substitution, and functional
+   evaluator plans.
 3. Each local-update owner accepts static plan metadata, typed local message
    or belief blocks, and selected parameter/observation blocks. It returns an
    `ExecutionDelta` with outgoing blocks and existing inner-solver status,
@@ -116,3 +117,9 @@ Two non-local facts constrain the local API. First, shared-goal updates collect 
 For transport parity, inspect only the relevant callers: _make_step:2708-2947, batch_stage:2948, registerized_scan:3095 and flat_scan:3326. Registerized chains keep prefetched local blocks and one final scatter; all mathematical parameter/mode selection should have one owner regardless of transport. Existing discrete/Gaussian chain tests already check carry size, persistent bytes and trace reuse. New test_engine_contracts pins real two-instance iterative batching plus another structure and full result/cache identities.
 
 cff-yglj is a separate small result-reporting correction that can proceed alongside this ticket after characterization closes; it blocks cff-ii9t, not per-plan extraction. Do not change run policy or fix unrelated specialized input validation (cff-34gi) in this code move.
+
+**2026-09-10T00:13:24Z**
+
+Plan-class completeness check: DirichletGroupPlan is an explicit local executor too, not an ordinary GroupPlan or an EF arena slot. engine.py:2744-2764 calls dirichlet_vmp_update from both-slot categorical inputs and alpha0, then publishes categorical outputs plus distinct prior-concentration/count parameter blocks. Keep those meanings and shapes unchanged. Its independent algebra and in-graph tests are now explicitly listed in cff-sf29's inventory.
+
+RecurrenceComponentPlan, GoalParameterPlan and LearnPlan describe component, parameter or learning ownership; they are not extra factors to execute. For mu3, the local numerical calls to gfe_stationary_stats and mu3_importance_update at engine.py:636-663 belong to an explicit functional adapter if moved here. Readiness/base-posterior checks, particle preparation, host ESS policy, parameter installation and result/key lifecycle remain in Engine until cff-5xdy. Do not invent a new schedule stage for that evaluator. Existing registerized EF code at engine.py:3254-3265 bypasses _ef_group_out and directly calls the registered message function; this is a concrete duplicate local-call interpretation to unify without introducing arena gathers into the scan.
