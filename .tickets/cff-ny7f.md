@@ -158,3 +158,11 @@ execution/cross_domain.py owns mixture, recurrence and precision calls; composit
 Global goal predictions remain collected from every original GFE group before one write_goal_counts call and before damping. Ledger formulas and once-only shared-goal/mu3 parameter energy remain in their existing owner. The current constraint defaults are deliberately not described as per-instance data; cff-jby3 owns that separate correction.
 
 The execution package is 586 physical lines across nine files (largest 133); Engine is 3,717 lines. New modules pass Ruff/format; unused moved rule imports were removed and git diff --check passes. Next: direct specialized-owner/JAX failure-fact tests, bounded old/new execution comparison and final full suite. No final gate yet.
+
+**2026-09-10T02:08:02Z**
+
+Direct explicit-owner tests now pass: 39 cases in 42.62 seconds. Thirty cover 15 plan variants in float32/float64; three preserve existing divergence codes and non-finite residual facts under JIT/vmap; six show threshold/table arrays remain dynamic for sum- and max-product. Functional fixture moments are derived inputs, not compiler fields. Numerical residuals retain their original NaN/inf values rather than being rewritten by the adapter. The discovered malformed-particle gap is separately recorded in P2 cff-6n9c; public initial-State finite checks are not claimed broken.
+
+Bounded trusted-source comparison against 1308688 completed using /tmp/cffg-execution-parity.py: 17 model fixtures, 68 auto/flood and float32/float64 configurations, and 2,336 array comparisons, all bitwise equal (including matched NaNs). Coverage includes initial state/parameter leaves, three damped update steps and their existing residual/status facts, free energy at each step, exact propagation when present, and the prepared mu3 numerical update. The script dynamically loads the old tracked Engine source with the unchanged compiled/rule modules; this is wiring parity, not an independent mathematical oracle or performance benchmark. Existing family tests remain authorities.
+
+New execution modules and both execution test files pass Ruff/format checks; git diff --check and tk dep cycle pass. Dashboard enrollment includes both new files. Implementation is complete pending the one final default-suite gate. Independent agent review remains unavailable due to the reported agent usage limit.
