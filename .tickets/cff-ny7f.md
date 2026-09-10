@@ -174,3 +174,7 @@ Completed the extraction and final default gate. At final code/test source b8456
 The implementation, 51 new local-boundary cases, prior focused family runs, and 2,336 bitwise old/new array comparisons are complete. No new mathematics, schedule, convergence strategy, public result/schema field, or throughput claim is included. The new execution package remains 586 lines; Engine is 3,717 lines. User-visible HTML explains the ownership changes separately from the preserved planning snapshot.
 
 Next in the authorized architecture chain is P1 cff-jby3: remove shared hard-constraint numeric binding, preserve all four consumers and genuine shape-compatible Colony batching, and verify reconstruction. It blocks cff-nyad schedule extraction. P2 cff-6n9c and cff-34gi remain separate numerical validation work. Agent review was unavailable due to the reported usage limit; the PR reports local review and executable evidence only.
+
+**2026-09-10T02:32:59Z**
+
+Published PR #124: https://github.com/engimatic-systems/cffg/pull/124, based on PR #123 (agent/cff-yglj-colony-initial-failures). Final gate and closure are recorded at a7e87c7; no source/test changes since the passing gate. The shared HTML now links #124 and reports 1,894 passing tests and 1,062.672 seconds wall time. Current code/test source is b84560e. Continue with ready P1 cff-jby3 after updating this published branch as the intended base; no stack merge is included.
