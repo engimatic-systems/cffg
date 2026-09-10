@@ -83,3 +83,7 @@ Complete at production source 1308688. Final dashboard-backed short suite: 1,843
 This establishes the corrected initial-failure reference for cff-ii9t: non-finite input has overall/inner divergence and infinite inner residual; rejected input values survive initial propagation and remain at zero logical iterations. Empty-support infeasibility stays distinct, and healthy peers retain the real batched path. No numerical-rule, schema, solver or public result-field change.
 
 Next: publish the repair PR over #122, then update that published repair branch before creating the cff-ny7f execution-extraction branch. Use 1308688 as the authorized correction on top of the cff-sf29 engine baseline. No user decision or independent agent approval is being claimed.
+
+**2026-09-10T00:51:06Z**
+
+Published as PR #123: https://github.com/engimatic-systems/cffg/pull/123, branch agent/cff-yglj-colony-initial-failures, base agent/cff-sf29-engine-contracts (#122). Final default gate at 1308688 passed 1,843 tests and is recorded in e30b330. Only ticket/publication edits followed. Shared HTML now reports the completed correction. Next is cff-ny7f on the updated published repair branch.
