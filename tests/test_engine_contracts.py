@@ -9,6 +9,7 @@ from enum import Enum
 
 import equinox as eqx
 import jax
+import jax.numpy as jnp
 import numpy as np
 import pytest
 from test_schedule import vmp_unit_template
@@ -150,12 +151,18 @@ def test_iterative_colony_results_match_distinct_standalone_instances(
         assert colony.last_results[iid] is actual
         size = len(CASES[index][0])
         assert engine.schedule.fingerprint == SCHEDULES[size]
+        assert actual.state.messages.shape == (2 * (size + 2),)
+        assert actual.state.messages.dtype == np.dtype("float64")
+        assert sum(
+            value.nbytes for value in jax.tree_util.tree_leaves(actual.state)
+        ) == (152 if size == 3 else 192)
         assert actual.status is (
             RunStatus.BUDGET_EXHAUSTED if budget == 1 else RunStatus.CONVERGED
         )
         assert actual.iterations == (1 if budget == 1 else 3)
         assert actual.inner_status is RunStatus.CONVERGED
         assert actual.inner_residual == 0.0
+        assert actual.termination_reason.value == "not_run"
         assert actual.residual == (float("inf") if budget == 1 else 0.0)
         np.testing.assert_allclose(
             actual.message_deltas, CASES[index][3][: actual.iterations], atol=1e-13
@@ -186,3 +193,45 @@ def test_colony_binding_removal_and_spawn_preserve_other_instances_and_cache():
     for iid, state in untouched.items():
         assert colony.instances[iid].state is state
         assert colony.last_results[iid] is results[iid]
+
+
+@pytest.mark.parametrize(
+    "code,status", [(1, RunStatus.BUDGET_EXHAUSTED), (2, RunStatus.DIVERGED)]
+)
+def test_jit_inner_status_codes_define_host_failure_results(code, status, monkeypatch):
+    template, arrays, observations = ordinary_case(0)
+    engine = Engine(compile_template(template, arrays=arrays))
+    state = engine.bind_data(engine.init_state(), observations)
+
+    @jax.jit
+    def inner_result(
+        messages,
+        eta,
+        precision,
+        observations,
+        mask,
+        ef_eta,
+        ef_observations,
+        ef_mask,
+        params,
+        damp,
+        harden,
+    ):
+        return (
+            messages,
+            eta,
+            precision,
+            ef_eta,
+            jnp.asarray(0.125, messages.dtype),
+            jnp.asarray(code, jnp.int32),
+        )
+
+    monkeypatch.setattr(engine, "_iter_step", inner_result)
+    result = engine.run(state, 5, tol=1e-12)
+    assert result.status is result.inner_status is status
+    assert result.inner_residual == 0.125
+    assert result.residual == (0.125 if code == 1 else float("inf"))
+    assert result.iterations == 1
+    assert result.message_deltas == (0.0,)
+    assert result.free_energies == ()
+    assert result.termination_reason.value == "not_run"
