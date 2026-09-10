@@ -42,3 +42,13 @@ cff-ii9t removes the duplicated termination policy after this repaired baseline.
 - Late failure: a failure after earlier successful updates, potentially after a finite residual was already measured.
 - Undefined ledger: the existing continuous/EF run path never produced a finite free-energy entry before termination.
 
+
+## Notes
+
+**2026-09-10T05:19:13Z**
+
+Pre-implementation evidence at cf5cdb6: /tmp/cffg-colony-late-failure.py checks four injected failure paths in both precisions and a healthy peer. All eight cases differ in residual (Colony 1, Engine infinity); the NaN-message cases also differ in the final delta (Colony NaN, Engine 0). Every other non-State result field agrees. This is a controller-fact probe, not a claim about a naturally failing factor rule. Confidence: high; source owners are Engine.run phase and Colony.run's batched classification. The source also has residual omissions in max-objective failure and final undefined-ledger classification; these are included in acceptance before implementation.
+
+**2026-09-10T05:20:10Z**
+
+The second controlled probe /tmp/cffg-colony-terminal-failure.py confirms both remaining residual branches: non-finite max objective reports Colony residual 0 versus Engine infinity, and final undefined continuous ledger after an inner budget stop reports Colony 0.125 versus Engine infinity. Overall divergence agrees. These are now reproduced, not just inferred from source.
