@@ -1025,6 +1025,20 @@ without direct-write keys reconstruct from updated raw blobs through
 Python binding fields are internal-unstable before 1.0; serialized
 implementation identities are stable.
 
+Registration is the path for an ordinary factor using one existing message
+representation. It does not turn every factor into the same variational object:
+BP cavities, mean-field beliefs, P-substitution composites and structural support
+constraints have different contracts. Multi-arena factors such as recurrence,
+GFE composites and hard constraints therefore have explicit compiler, execution
+and objective owners. "Specialized" names those declared paths; it is not a
+catch-all for an unrecognized type.
+
+For a new factor, start with the [extension matrix](docs/ARCHITECTURE.md#bounded-factor-extension-paths).
+It names the owners and the checks for initialization, learning, parallel instances
+and reconstruction. Staying within an existing binding requires no factor-name
+branch in the public compiler or Engine. A new representation or variational
+method needs an explicit design and mathematical contract, not just registration.
+
 ## Consume the engine from an experiment harness
 
 Evaluation harnesses live *outside* this repo (sibling folders under
