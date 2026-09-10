@@ -1,6 +1,6 @@
 ---
 id: cff-5xdy
-status: in_progress
+status: closed
 deps: [cff-nyad, cff-7kfk]
 links: [cff-ii9t]
 created: 2026-09-02T04:17:42Z
@@ -118,3 +118,9 @@ Implementation checkpoint: pure runtime types are committed separately in e8493c
 Compatibility evidence: the trusted pre-extraction Engine at 2aaef36 and the extracted implementation produced 2,908 byte-identical comparisons across 17 model fixtures and both call-time precisions. This compares every State field, binding/unbinding, functional budgets 16/32, prepared and updated particles/moments, key progression and diagnostics. A separate 47-test existing-family/checkpoint/status selection passed (3 slow deselected); the new lifecycle file initially passed 19 cases. The final focused selection and full short-suite gate are the remaining validation, not yet claimed.
 
 Ownership sizes: ordinary lifecycle 143 lines, functional lifecycle 380, pure values 146. Engine is 409 physical lines shorter than 2aaef36. New modules/tests pass Ruff and formatting; existing Engine lint findings decrease from 20 to 19 and outer remains 11, with no new findings after explicitly marking compatibility re-exports. Architecture change paths now name both lifecycle owners. Independent review agents remain unavailable; this evidence is local comparison and tests.
+
+**2026-09-10T05:32:27Z**
+
+Completed at code/test source cf5cdb6, with pure value types separately committed in e8493c4. Final focused lifecycle/public-API selection passed 26 tests in 19.70 seconds. The single final default suite passed 2,011 tests, zero failures, 41 slow deselections and four existing Gym warnings: pytest 1,127.50 seconds, measured wall 1,140.978 seconds. It completed 2026-09-10T05:29:54.237366+00:00 at ticket-only head 9009343. Runtime history and shared dashboard are refreshed. The gate was read once after the planned first completion check; no later code/test changes supersede it.
+
+The lifecycle owners, pure type leaf, compatible Engine delegates and updated architecture/change paths are done. PR publication will reuse this gate. Next: cff-3ose repairs existing late-failure diagnostic discrepancies before cff-ii9t unifies the iterative policy. No significant user decision is pending. Keep hybrid-GFE diagnostics with the later readout extraction; do not capture JAX precision or mutable particle settings at Engine construction. Independent review agents remain unavailable and are not claimed.
