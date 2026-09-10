@@ -1,6 +1,6 @@
 ---
 id: cff-3ola
-status: open
+status: in_progress
 deps: [cff-gl89]
 links: [cff-ws3c, cff-3kdk, cff-7kfk]
 created: 2026-09-02T04:02:01Z
@@ -126,3 +126,7 @@ Typed-view design note from the remaining source: the readout owners can use rea
 **2026-09-10T08:41:56Z**
 
 Prerequisite cff-gl89 is closed and published as PR #132. Start from its final published agent/cff-gl89-objective-ledger head after an ff-only pull. Source 90c58b1 passed the final 2,098-test gate (41 slow deselections, four existing Gym warnings), recorded in daaff2f; measured wall 1,151.159 seconds. Engine is now 1,196 lines. Its remaining readout/mutator inventory and view guidance are recorded above; current numerical and public behavior remains the comparison baseline. No design decision is pending.
+
+**2026-09-10T08:43:26Z**
+
+Starting from verified PR #132 head fb211eb after an ff-only pull. Applicable rows: Runtime numerical or status invariant, New factor or rule family, and Learnable or checkpoint feature (readout consumers and existing goal-prior replacement; no schema changes). Paired surfaces: equivalent flooding/scheduled State; direct and supported vmap readouts; current params/observations/masks; ordinary/goal/functional parameter ownership; learning and checkpoint consumers; public aliases and inter-readout delegation. New factor behavior, solver or objective formulas, unsupported vectorization and new checkpoint migrations are N/A. Use focused representation/plan readout modules with typed structural views; retain current algorithms and public method signatures. Move with_goal_priors into StateLifecycle. Preserve public value-type imports and current callable lookup/delegation timing. Final short-suite source will be validated once before publication.
