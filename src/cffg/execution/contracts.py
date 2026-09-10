@@ -18,3 +18,53 @@ class ExecutionDelta[T](NamedTuple):
     outgoing: T
     residual: jax.Array | None = None
     status: jax.Array | None = None
+
+
+class GaussianMessage(NamedTuple):
+    eta: jax.Array
+    precision: jax.Array
+
+
+class HybridMessages(NamedTuple):
+    selector: jax.Array
+    gaussian: tuple[GaussianMessage, ...]
+
+
+class RecurrenceMessages(NamedTuple):
+    destination: jax.Array
+    source: jax.Array
+    drive: GaussianMessage
+
+
+class PrecisionMessages(NamedTuple):
+    gaussian: GaussianMessage
+    precision_parameter: jax.Array
+
+
+class DirichletMessages(NamedTuple):
+    structural: jax.Array
+    prior: jax.Array
+    counts: jax.Array
+
+
+class GfeMessages(NamedTuple):
+    latent: jax.Array
+    log_prediction: jax.Array
+    goal_prior: jax.Array | None
+    goal_prediction: jax.Array | None
+
+
+class TransitionMessages(NamedTuple):
+    destination: jax.Array
+    source: jax.Array
+    selector: jax.Array
+
+
+class FunctionalEstimate(NamedTuple):
+    mean: jax.Array
+    column_entropy: jax.Array
+    weights: jax.Array
+    log_normalizer: jax.Array
+    expected_phi: jax.Array
+    kl: jax.Array
+    ess: jax.Array

@@ -148,3 +148,13 @@ Validation before this commit: 109 existing discrete/Gaussian/EF/schedule/Colony
 **2026-09-10T01:23:08Z**
 
 New P1 cff-jby3 directly reproduces shared hard-constraint data in Colony: exactly_k, at_most_k and same-shaped table values from the first instance govern both results, including false convergence when spawn order is reversed. The current local extraction must expose selected numeric threshold/table arguments to its explicit constraint executor while preserving existing outer binding and numerical rules. Existing JAX rules already accept those values as traced inputs. cff-jby3 then moves per-instance data ownership and fixes incompatible-shape grouping across execution, ledger, support/assignment and reconstruction; it is an additional prerequisite of cff-nyad. Do not claim that introducing the local typed API alone fixes the current shared-data defect.
+
+**2026-09-10T01:56:39Z**
+
+Explicit-owner extraction is now connected and passes 127 focused tests (4 slow deselections) in 145.17 seconds. This run includes execution, CSP, Dirichlet parameter edges, mixture/hybrid engine, hybrid GFE, structured recurrence, precision VMP, shared goals, mu3 and transition GFE. Source changes move local parameter selection and existing rule calls only.
+
+execution/cross_domain.py owns mixture, recurrence and precision calls; composites.py owns Dirichlet, fixed/functional-statistic GFE, transition GFE and hybrid GFE; constraints.py accepts explicit numerical threshold/table data. parameters.py selects named array records. functional.py exposes the existing stationary and importance phases separately; Engine retains readiness/base checks, host ESS policy, installation and failure staging. The JAX log-zero predicate is moved verbatim to support.py and re-exported under the existing Engine-private alias. There is no new numeric guard or status default: absent local facts stay None, and existing residual/status arrays flow unchanged into the step reductions. Categorical/Gaussian/parameter/predictive outputs have distinct named records.
+
+Global goal predictions remain collected from every original GFE group before one write_goal_counts call and before damping. Ledger formulas and once-only shared-goal/mu3 parameter energy remain in their existing owner. The current constraint defaults are deliberately not described as per-instance data; cff-jby3 owns that separate correction.
+
+The execution package is 586 physical lines across nine files (largest 133); Engine is 3,717 lines. New modules pass Ruff/format; unused moved rule imports were removed and git diff --check passes. Next: direct specialized-owner/JAX failure-fact tests, bounded old/new execution comparison and final full suite. No final gate yet.

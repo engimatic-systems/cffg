@@ -39,12 +39,20 @@ from jax.scipy.special import logsumexp
 
 from cffg import csp, ef, efrules, gauss, hybrid_gfe, kernels, mixg, recurrence
 from cffg.compiled import NEG, Arena
+from cffg.execution import (
+    composites as _composites,
+    cross_domain as _cross_domain,
+    functional as _functional,
+    parameters as _parameters,
+)
+from cffg.execution.constraints import execute_constraint as _execute_constraint
 from cffg.execution.registered import (
     ef_parameters as _ef_parameters,
     execute_discrete as _execute_discrete,
     execute_ef as _execute_ef,
     execute_gaussian as _execute_gaussian,
 )
+from cffg.execution.support import log_support as _jax_log_support
 from cffg.goal_parameters import shared_goal_energy, write_goal_counts
 from cffg.kernel_runtime import (
     discrete_energy as _disc_energy,
@@ -75,18 +83,12 @@ from cffg.schedule import (
 )
 from cffg.rules import (
     dirichlet_vmp_energy,
-    dirichlet_vmp_update,
     dirichlet_expected_log,
     gfe_energy,
     gfe_energy_stats,
     gfe_goal_structural_stats,
     gfe_parameter_stats,
-    gfe_stationary_stats,
     gfe_tm_energy,
-    gfe_tm_update,
-    gfe_update,
-    gfe_update_stats,
-    mu3_importance_update,
 )
 
 class State(eqx.Module):
@@ -207,11 +209,6 @@ def _np_log_support(values: np.ndarray) -> np.ndarray:
     """
     values = np.asarray(values)
     return values != np.asarray(NEG, dtype=values.dtype)
-
-
-def _jax_log_support(values: jax.Array) -> jax.Array:
-    """JAX mirror of :func:`_np_log_support` for the exact-path JIT."""
-    return values != jnp.asarray(NEG, dtype=values.dtype)
 
 
 def _disc_rows(
@@ -636,11 +633,12 @@ class Engine:
             old_abar = params[gfe.name + ":Abar"][rows]
             old_hbar = params[gfe.name + ":hbar"][rows]
             logc = params[gfe.name + ":c"][rows]
-            zbars, solve_residuals, solve_statuses = gfe_stationary_stats(
-                log_d, old_abar, old_hbar, logc
+            stationary = _functional.execute_functional_stationary(
+                plan, log_d, old_abar, old_hbar, logc
             )
-            solve_code = int(np.max(np.asarray(solve_statuses)))
-            solve_residual = float(np.max(np.asarray(solve_residuals)))
+            zbars = stationary.outgoing
+            solve_code = int(np.max(np.asarray(stationary.status)))
+            solve_residual = float(np.max(np.asarray(stationary.residual)))
             if solve_code:
                 params[prefix + ":status"] = jnp.asarray(solve_code)
                 overall_code = max(overall_code, solve_code)
@@ -648,6 +646,9 @@ class Engine:
                 continue
 
             particles = params[prefix + ":samples"]
+            estimate = _functional.execute_functional_importance(
+                plan, particles, zbars, logc, old_abar[0]
+            )
             (
                 new_abar,
                 new_hbar,
@@ -656,9 +657,8 @@ class Engine:
                 expected_phi,
                 kl,
                 ess,
-                weight_status,
-            ) = mu3_importance_update(particles, zbars, logc, old_abar[0])
-            code = int(np.asarray(weight_status))
+            ) = estimate.outgoing
+            code = int(np.asarray(estimate.status))
             ess_value = float(np.asarray(ess))
             if code == 0 and ess_value < self.mu3_min_ess_fraction * self.mu3_samples:
                 code = 1
@@ -2468,171 +2468,93 @@ class DirichletMarginal:
 
 
 def _mix_sweep(arena, messages, g_eta, g_lam, params):
-    """One synchronous flooding sweep over the hybrid Gaussian-mixture groups
-    (cff-pksr). Reads only the pre-sweep arrays; returns the writes for both
-    arenas so the caller can fold them into each arena's damping phase:
-    Each write carries its exact cardinality/dimension; no model-wide padded
-    representation is constructed. Dims and K are static per group."""
+    """Gather mixture cavities and collect writes for both message arenas."""
     sel_writes = []
     gauss_writes = []
     for g in arena.mix_groups:
-        mu_e = messages[arena.message_indices(g.s_gather, g.k_sel)]
-        inc_e, inc_l = _gauss_rows(arena, g_eta, g_lam, g.g_gather, g.dims)
-        w = params[g.name + ":W"]
-        if g.type == "gaussian_mixture_linear":
-            do, di = g.dims
-            a, b = params[g.name + ":A"], params[g.name + ":b"]
-            e_o, l_o = inc_e[:, 0, :do], inc_l[:, 0, :do, :do]
-            e_i, l_i = inc_e[:, 1, :di], inc_l[:, 1, :di, :di]
-            g_outs = [
-                mixg.mixlin_forward(e_i, l_i, mu_e, a, b, w),  # -> out
-                mixg.mixlin_backward(e_o, l_o, mu_e, a, b, w),  # -> in
-            ]
-            to_sel = mixg.mixlin_to_selector(e_o, l_o, e_i, l_i, a, b, w)  # [M, K]
-        else:  # gaussian_mixture
-            (do,) = g.dims
-            m = params[g.name + ":m"]
-            e_o, l_o = inc_e[:, 0, :do], inc_l[:, 0, :do, :do]
-            g_outs = [mixg.mix_forward(mu_e, m, w)]  # -> out
-            to_sel = mixg.mix_to_selector(e_o, l_o, m, w)  # [M, K]
-        for r, (oe, ol) in enumerate(g_outs):
-            gauss_writes.append((g.g_scatter[:, r], g.dims[r], oe, ol))
-        sel_writes.append((g.s_scatter, g.k_sel, to_sel))
+        selector = messages[arena.message_indices(g.s_gather, g.k_sel)]
+        eta, precision = _gauss_rows(arena, g_eta, g_lam, g.g_gather, g.dims)
+        delta = _cross_domain.execute_mixture(
+            g, selector, eta, precision, _parameters.mixture_parameters(g, params)
+        )
+        for role, outgoing in enumerate(delta.outgoing.gaussian):
+            gauss_writes.append((
+                g.g_scatter[:, role], g.dims[role], outgoing.eta, outgoing.precision
+            ))
+        sel_writes.append((g.s_scatter, g.k_sel, delta.outgoing.selector))
     return sel_writes, gauss_writes
 
 
 def _recurrence_sweep(arena, messages, g_eta, g_lam, params):
-    """One synchronous D9 coordinate sweep across both arenas."""
+    """Gather declared recurrence inputs and collect categorical/drive writes."""
     discrete_writes = []
     gaussian_writes = []
     status = jnp.asarray(0)
     for group in arena.recurrence_groups:
         card = group.cards[0]
-        out_cavity = messages[
+        destination = messages[
             arena.message_indices(group.d_gather_both[:, 0, 1], card)
         ]
-        in_cavity = messages[
+        source = messages[
             arena.message_indices(group.d_gather_both[:, 1, 1], card)
         ]
-        out_cavity = jnp.where(
-            _jax_log_support(out_cavity), out_cavity, -jnp.inf
+        eta_both = g_eta[arena.g_eta_indices(group.drive_gather_both, group.dim)]
+        precision_both = g_lam[arena.g_lam_indices(group.drive_gather_both, group.dim)]
+        delta = _cross_domain.execute_recurrence(
+            group, destination, source, eta_both, precision_both,
+            _parameters.recurrence_parameters(group, params),
         )
-        in_cavity = jnp.where(
-            _jax_log_support(in_cavity), in_cavity, -jnp.inf
-        )
-        drive_eta = g_eta[
-            arena.g_eta_indices(group.drive_gather_both, group.dim)
-        ].sum(axis=1)
-        drive_precision = g_lam[
-            arena.g_lam_indices(group.drive_gather_both, group.dim)
-        ].sum(axis=1)
-        result = recurrence.structured_recurrence_update(
-            out_cavity,
-            in_cavity,
-            drive_eta,
-            drive_precision,
-            params[group.name + ":weights"],
-            params[group.name + ":offsets"],
-        )
-        discrete_writes.extend(
-            (
-                (group.d_scatter[:, 0], card, result.to_out),
-                (group.d_scatter[:, 1], card, result.to_in),
-            )
-        )
-        gaussian_writes.append(
-            (
-                group.drive_scatter,
-                group.dim,
-                result.drive_eta,
-                result.drive_precision,
-            )
-        )
-        status = jnp.maximum(status, jnp.max(result.status))
+        discrete_writes.extend((
+            (group.d_scatter[:, 0], card, delta.outgoing.destination),
+            (group.d_scatter[:, 1], card, delta.outgoing.source),
+        ))
+        gaussian_writes.append((
+            group.drive_scatter, group.dim,
+            delta.outgoing.drive.eta, delta.outgoing.drive.precision,
+        ))
+        status = jnp.maximum(status, jnp.max(delta.status))
     return discrete_writes, gaussian_writes, status
 
 
 def _hybrid_gfe_sweep(arena, messages, g_eta, g_lam, params):
-    """One synchronous D5 composite sweep across discrete/Gaussian arenas."""
+    """Gather hybrid-composite inputs and retain their local solver facts."""
     selector_writes = []
     gaussian_writes = []
     residual = jnp.asarray(0.0, dtype=messages.dtype)
     status = jnp.asarray(0)
     for group in arena.hybrid_gfe_groups:
-        incoming = messages[
-            arena.message_indices(group.s_gather, group.k_sel)
-        ]
-        inc_eta, inc_lam = _gauss_rows(
+        selector = messages[arena.message_indices(group.s_gather, group.k_sel)]
+        eta, precision = _gauss_rows(
             arena, g_eta, g_lam, group.g_gather, group.dims
         )
-        goal_mean = params[group.name + ":goal_m"]
-        goal_precision = params[group.name + ":goal_W"]
-        noise_precision = params[group.name + ":W"]
-        if group.type == "gaussian_mixture_linear":
-            do, di = group.dims
-            result = hybrid_gfe.linear_update(
-                incoming,
-                inc_eta[:, 1, :di],
-                inc_lam[:, 1, :di, :di],
-                params[group.name + ":A"],
-                params[group.name + ":b"],
-                noise_precision,
-                goal_mean,
-                goal_precision,
-            )
-            (
-                to_selector,
-                out_eta,
-                out_lam,
-                in_eta,
-                in_lam,
-                local_r,
-                local_s,
-            ) = result
-            gaussian_writes.extend(
-                (
-                    (group.g_scatter[:, 0], do, out_eta, out_lam),
-                    (group.g_scatter[:, 1], di, in_eta, in_lam),
-                )
-            )
-        else:
-            (do,) = group.dims
-            to_selector, out_eta, out_lam, local_r, local_s = (
-                hybrid_gfe.prior_update(
-                    incoming,
-                    params[group.name + ":m"],
-                    noise_precision,
-                    goal_mean,
-                    goal_precision,
-                )
-            )
-            gaussian_writes.append(
-                (group.g_scatter[:, 0], do, out_eta, out_lam)
-            )
-        selector_writes.append(
-            (group.s_scatter, group.k_sel, to_selector)
+        delta = _composites.execute_hybrid_gfe(
+            group, selector, eta, precision, _parameters.hybrid_parameters(group, params)
         )
-        residual = jnp.maximum(residual, jnp.max(local_r))
-        status = jnp.maximum(status, jnp.max(local_s))
+        for role, outgoing in enumerate(delta.outgoing.gaussian):
+            gaussian_writes.append((
+                group.g_scatter[:, role], group.dims[role],
+                outgoing.eta, outgoing.precision,
+            ))
+        selector_writes.append((group.s_scatter, group.k_sel, delta.outgoing.selector))
+        residual = jnp.maximum(residual, jnp.max(delta.residual))
+        status = jnp.maximum(status, jnp.max(delta.status))
     return selector_writes, gaussian_writes, residual, status
 
 
 def _prec_sweep(arena, g_eta, g_lam, ef_eta, params):
-    """One synchronous flooding sweep over the gaussian_prec groups (cff-7c5o).
-    Straddles the Gaussian and EF arenas; reads only the pre-sweep arrays and
-    returns the writes for both so they fold into each arena's damping phase:
-    Both VMP messages read marginals (both slots summed), the mean-field
-    convention."""
+    """Gather both edge sides for the precision owner's VMP belief inputs."""
     gauss_writes = []
     ef_writes = []
     for g in arena.prec_groups:
-        tau_q = ef_eta[jnp.asarray(g.tau_gather_both)].sum(axis=1)  # [M, 2] τ-edge marginal
-        x_eta_q = g_eta[arena.g_eta_indices(g.x_gather_both, 1)].sum(axis=1)
-        x_lam_q = g_lam[arena.g_lam_indices(g.x_gather_both, 1)].sum(axis=1)
-        m = params[g.name + ":m"]  # [M, 1]
-        oe, ol = gauss.prec_to_x(tau_q, m)  # (eta [M,1], lam [M,1,1])
-        gauss_writes.append((g.x_scatter, 1, oe, ol))
-        ef_writes.append((g.tau_scatter, gauss.prec_to_tau(x_eta_q, x_lam_q, m)))  # [M, 2]
+        tau_both = ef_eta[jnp.asarray(g.tau_gather_both)]
+        eta_both = g_eta[arena.g_eta_indices(g.x_gather_both, 1)]
+        precision_both = g_lam[arena.g_lam_indices(g.x_gather_both, 1)]
+        delta = _cross_domain.execute_precision(
+            g, tau_both, eta_both, precision_both, _parameters.precision_mean(g, params)
+        )
+        gaussian = delta.outgoing.gaussian
+        gauss_writes.append((g.x_scatter, 1, gaussian.eta, gaussian.precision))
+        ef_writes.append((g.tau_scatter, delta.outgoing.precision_parameter))
     return gauss_writes, ef_writes
 
 
@@ -2691,16 +2613,9 @@ def _constraint_writes(arena: Arena, messages: jax.Array, op):
     writes for the discrete arena, folded into damping by the caller."""
     writes = []
     for c in arena.constraint_groups:
-        k_local = max(c.cards)
         inc = _disc_rows(arena, messages, c.gather, c.cards)
-        fn = csp.CONSTRAINT_MESSAGES[c.type]
-        if c.type in ("exactly_k", "at_most_k"):
-            out = fn(inc, c.cards, k_local, op, k=c.k)
-        elif c.type == "table":
-            out = fn(inc, c.cards, k_local, op, table=jnp.asarray(c.table))
-        else:
-            out = fn(inc, c.cards, k_local, op)
-        writes.append((c.scatter, c.cards, out))
+        delta = _execute_constraint(c, inc, _parameters.constraint_defaults(c), op)
+        writes.append((c.scatter, c.cards, delta.outgoing))
     return writes
 
 
@@ -2741,110 +2656,60 @@ def _make_step(arena: Arena, skip_scheduled: bool = False):
             new = _set_disc_rows(arena, new, g.scatter, g.cards, out)
         for g in arena.dirichlet_groups:
             inc2 = _disc_both(arena, messages, g.gather_both, g.cards)
-            alpha0 = params[f"{g.name}:alpha0"]
-            out, counts = dirichlet_vmp_update(
-                g.type, inc2, alpha0, g.cards, max(g.cards)
+            delta = _composites.execute_dirichlet(
+                g, inc2, _parameters.dirichlet_prior(g, params)
             )
-            new = _set_disc_rows(arena, new, g.scatter, g.cards, out)
+            new = _set_disc_rows(arena, new, g.scatter, g.cards, delta.outgoing.structural)
             new = _set_disc_block(
                 arena,
                 new,
                 g.prior_scatter,
                 g.param_size,
-                alpha0.reshape((len(g.members), g.param_size)),
+                delta.outgoing.prior.reshape((len(g.members), g.param_size)),
             )
             new = _set_disc_block(
                 arena,
                 new,
                 g.count_scatter,
                 g.param_size,
-                counts.reshape((len(g.members), g.param_size)),
+                delta.outgoing.counts.reshape((len(g.members), g.param_size)),
             )
         for scatter, cards, out in _constraint_writes(arena, messages, op):
             new = _set_disc_rows(arena, new, scatter, cards, out)
         goal_predictions = {}
         for g in arena.gfe_groups:
             ko, ki = g.cards
-            k_local = max(g.cards)
-            log_d = messages[arena.message_indices(g.gather_z, ki)]
-            a_key = g.name + (":counts" if g.learned else ":A")
+            incoming = messages[arena.message_indices(g.gather_z, ki)]
+            goal_counts = (
+                messages[arena.message_indices(g.goal_count_scatter, ko)]
+                if g.goal_learned else None
+            )
+            delta = _composites.execute_gfe(
+                g, incoming, _parameters.gfe_parameters(g, params), goal_counts
+            )
+            new = _set_disc_block(arena, new, g.scatter_z, ki, delta.outgoing.latent)
+            new = _set_disc_block(arena, new, g.scatter_x, ko, delta.outgoing.log_prediction)
             if g.goal_learned:
-                c_alpha0 = params[g.name + ":c_alpha0"]
-                c_counts = messages[
-                    arena.message_indices(g.goal_count_scatter, ko)
-                ]
-                if g.mu3:
-                    outcome_support = jnp.any(
-                        params[g.name + ":Abar"] > 0, axis=2
-                    )
-                elif g.learned:
-                    outcome_support = jnp.any(
-                        params[a_key] > 0, axis=2
-                    )
-                else:
-                    outcome_support = jnp.any(
-                        params[a_key] != NEG, axis=2
-                    )
-                c_posterior = efrules.DIRICHLET.posterior(
-                    c_alpha0, c_counts
-                )
-                # Unsupported channel rows are algebraically absent. Replace
-                # their concentration before digamma so reverse mode never
-                # forms 0 * trigamma(tiny), which is NaN in float32.
-                safe_posterior = jnp.where(
-                    outcome_support, c_posterior, 1.0
-                )
-                logc = jnp.where(
-                    outcome_support,
-                    dirichlet_expected_log(safe_posterior),
-                    0.0,
-                )
-            else:
-                logc = params[g.name + ":c"]
-            if g.mu3:
-                mu2, log_qx, residuals, statuses = gfe_update_stats(
-                    log_d,
-                    params[g.name + ":Abar"],
-                    params[g.name + ":hbar"],
-                    logc,
-                    k_local,
-                    return_diagnostics=True,
-                )
-            else:
-                mu2, log_qx, residuals, statuses = gfe_update(
-                    log_d, params[a_key], logc, k_local,
-                    learned=g.learned, return_diagnostics=True,
-                )
-            new = _set_disc_block(arena, new, g.scatter_z, ki, mu2)
-            new = _set_disc_block(arena, new, g.scatter_x, ko, log_qx)
-            if g.goal_learned:
-                goal_predictions[g.name] = jnp.exp(log_qx[..., :ko])
+                goal_predictions[g.name] = delta.outgoing.goal_prediction
                 new = _set_disc_block(
-                    arena,
-                    new,
-                    g.goal_prior_scatter,
-                    ko,
-                    c_alpha0,
+                    arena, new, g.goal_prior_scatter, ko, delta.outgoing.goal_prior
                 )
-            inner_residual = jnp.maximum(inner_residual, jnp.max(residuals))
-            inner_status = jnp.maximum(inner_status, jnp.max(statuses))
+            inner_residual = jnp.maximum(inner_residual, jnp.max(delta.residual))
+            inner_status = jnp.maximum(inner_status, jnp.max(delta.status))
         new = write_goal_counts(arena, new, goal_predictions)
         for g in arena.gfe_tm_groups:
             ko, ki, ku = g.cards
-            k_local = max(g.cards)
-            md = messages[arena.message_indices(g.gather[:, 0], ko)]
-            mi = messages[arena.message_indices(g.gather[:, 1], ki)]
-            me = messages[arena.message_indices(g.gather[:, 2], ku)]
-            b_key = g.name + (":counts" if g.learned else ":B")
-            to_out, to_in, to_sel, residuals, statuses = gfe_tm_update(
-                mi, me, md, params[b_key], k_local,
-                learned=g.learned, return_diagnostics=True,
+            destination = messages[arena.message_indices(g.gather[:, 0], ko)]
+            source = messages[arena.message_indices(g.gather[:, 1], ki)]
+            selector = messages[arena.message_indices(g.gather[:, 2], ku)]
+            delta = _composites.execute_transition_gfe(
+                g, destination, source, selector, _parameters.transition_parameters(g, params)
             )
-            new = _set_disc_block(arena, new, g.scatter[:, 0], ko, to_out)
-            new = _set_disc_block(arena, new, g.scatter[:, 1], ki, to_in)
-            new = _set_disc_block(arena, new, g.scatter[:, 2], ku, to_sel)
-            inner_residual = jnp.maximum(inner_residual, jnp.max(residuals))
-            inner_status = jnp.maximum(inner_status, jnp.max(statuses))
+            new = _set_disc_block(arena, new, g.scatter[:, 0], ko, delta.outgoing.destination)
+            new = _set_disc_block(arena, new, g.scatter[:, 1], ki, delta.outgoing.source)
+            new = _set_disc_block(arena, new, g.scatter[:, 2], ku, delta.outgoing.selector)
+            inner_residual = jnp.maximum(inner_residual, jnp.max(delta.residual))
+            inner_status = jnp.maximum(inner_status, jnp.max(delta.status))
         hybrid_sel, hybrid_gauss, hybrid_residual, hybrid_status = (
             _hybrid_gfe_sweep(arena, messages, g_eta, g_lam, params)
             if arena.hybrid_gfe_groups

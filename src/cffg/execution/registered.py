@@ -8,11 +8,11 @@ import numpy as np
 from cffg import efrules, kernel_runtime, kernels
 from cffg._immutable import FrozenArray
 from cffg.compiled import EfGroupPlan, GaussGroupPlan, GroupPlan
-from cffg.execution.contracts import ExecutionDelta
+from cffg.execution.contracts import ExecutionDelta, GaussianMessage
 
 type Parameters = Mapping[str, jax.Array]
 type Rows = jax.Array | np.ndarray | FrozenArray | None
-type GaussianMessages = tuple[tuple[jax.Array, jax.Array], ...]
+type GaussianMessages = tuple[GaussianMessage, ...]
 
 
 def execute_discrete(
@@ -37,7 +37,7 @@ def execute_gaussian(
     outgoing = kernel_runtime.gaussian_message(
         plan, eta, precision, params, observation, mask
     )
-    return ExecutionDelta(tuple((e, p) for e, p in outgoing))
+    return ExecutionDelta(tuple(GaussianMessage(e, p) for e, p in outgoing))
 
 
 def ef_parameters(
