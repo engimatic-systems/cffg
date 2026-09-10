@@ -16,7 +16,7 @@ tags: [engine, architecture, ledger, refactor]
 
 At authoring snapshot e488df3, `src/cffg/engine.py:3670-3973` is the scope
 anchor for objective assembly; it is not a promised future line map. At the
-exact `cff-sf29` baseline, that responsibility still sits beside message
+`cff-sf29` contract snapshot, that responsibility still sat beside message
 updates, schedules, readouts, and public orchestration. This makes it harder to
 show that one factor's message path and objective term use the same parameters
 and local belief.
@@ -24,6 +24,9 @@ and local belief.
 After `cff-jrbw` completes execution, schedule, lifecycle, and run-control
 ownership, this ticket gives objective accounting its own focused owner. The
 mathematical formulas and existing authorities do not change.
+Implementation starts from the final published `cff-jrbw` head, including
+the intervening parameter-ownership and failure-diagnostic repairs. The
+earlier snapshot is an inventory, not a baseline to restore.
 
 ## Outcomes / Acceptance Criteria — WHAT
 
@@ -62,8 +65,9 @@ mathematical formulas and existing authorities do not change.
         edge exclusions, and shared parameter terms to existing authority
         tests. A two-slice mu3 case retains one shared parameter KL term.
 7. Existing analytic, enumeration, quadrature, literature, and family-specific
-   oracle tests remain authoritative where present. Applicable `cff-sf29`
-   old/new objective totals and local terms remain unchanged within their
+   oracle tests remain authoritative where present. Applicable contract
+   cases compare old/new objective totals and local terms against the final
+   `cff-jrbw` source, unchanged within their
    dtype-derived tolerance. This move does not require a new scientific oracle.
 8. Flooding and scheduled states produce the same objective terms for
    equivalent beliefs and matching parameter, observation/mask, and evaluator
@@ -113,3 +117,9 @@ objective owner; that feature is not part of this ticket.
 - **Ledger:** The labeled collection of local terms whose sum is BFE or GFE.
 - **Shared parameter term:** An objective contribution owned once by a
   parameter belief used by several factors.
+
+## Notes
+
+**2026-09-10T07:38:50Z**
+
+Pre-implementation inspection at cff-jrbw source baaad19: Engine.bfe (1163+) owns max-mode rejection, functional readiness and host exact-support rejection before _bfe; preserve that order. Engine.objective (1187+) decodes once, then scores ordinary/equality/constraint factors using current State.params; decoding stays with the facade/readout work. _constraint_ok is a compatibility static helper. _make_bfe (1417+) is the remaining numerical assembly. Runtime consumers now receive objectives through IterationServices, ExactRunStrategy, OuterServices and the ScheduleProgram factory; the ledger must not import these controllers. Preserve engine._make_bfe as a compatibility alias because exact-schedule fault-injection tests build units from it. Next implementation should inventory local terms once, use current shared-goal and mu3 ownership plans, and characterize against final jrbw rather than pre-repair sf29.
