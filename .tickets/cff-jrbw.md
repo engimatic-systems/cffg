@@ -117,3 +117,7 @@ Pre-implementation handoff at source 20c0367 while cff-ii9t's final gate runs. S
 - Outer initial non-finite/support failures have NONFINITE_EVALUATION/INFEASIBLE public detail tags, not ordinary NOT_RUN. Zero-budget outer runs can still do the existing functional coordinate update; no eager budget shortcut may skip it. Functional failures preserve their supplied residual and INNER_FAILURE tag.
 - OuterOutcome must retain the last solver diagnostics and accumulated accepted/rejected, map/trial, linear-iteration and kernel-creation counts. ExactOutcome needs no such fields. A typed outcome union at the shared result owner is appropriate; a universal solver callback is not.
 - Keep the current finite/support/checkpoint boundary and the static strategy selection order. Ordinary iteration is now delegated and does not move again. The primitive numerical solver remains outer.py; objective formulas remain for cff-gl89.
+
+**2026-09-10T07:20:21Z**
+
+Prerequisite cff-ii9t is closed and published as PR #130. Use its final published agent/cff-ii9t-iteration-control head as the work-branch base. Code/test source 20c0367 has a final 2,059-test gate (41 slow deselections, four existing warnings), recorded in bbbbccb; measured wall 1,155.815 seconds. Ordinary outcome/finalization lives in iteration_types.py/run_results.py; shared host predicates are in runtime_checks.py. Extend the result authority for exact/outer facts without changing the already-extracted ordinary policy.
