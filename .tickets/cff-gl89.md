@@ -153,3 +153,7 @@ Documentation-only navigation follow-up while the unchanged final gate runs: can
 **2026-09-10T08:40:23Z**
 
 Final gate passed at code/test source 90c58b1, with documentation/ticket-only head 095ce57 recorded by the dashboard: 2,098 passed, 41 opt-in slow deselections, four existing Gym warnings; pytest 1,137.81 seconds, measured wall 1,151.159 seconds, completed 2026-09-10T08:38:47.641525+00:00. The suite was read exactly once at 08:39:55 UTC, after the planned 20-minute deadline. Runtime history and shared dashboard are refreshed. Objective owners are 168 and 287 lines; Engine is 343 lines shorter. Acceptance criteria are met; current formulas, summation order, shared ownership, aliases, host gates and public behavior are preserved. Next: publish the stacked PR and update the shared architecture page, then start cff-3ola from the final published head. Its source inventory, parameter-state exception and typed-view guidance are recorded in that ticket. No independent review or speedup claim.
+
+**2026-09-10T08:41:56Z**
+
+Published as PR #132 against PR #131. Shared architecture HTML now explains the separate objective owner, unchanged shared-term accounting and final 2,098-test gate, with readout extraction next. Page validation: 69 unique IDs and 35 resolved internal anchors. Source 90c58b1; gate record daaff2f. Main is unchanged; no stack merge was performed.

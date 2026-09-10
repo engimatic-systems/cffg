@@ -122,3 +122,7 @@ Pre-implementation inspection at ledger source 90c58b1: remaining Engine readout
 **2026-09-10T08:24:09Z**
 
 Typed-view design note from the remaining source: the readout owners can use read-only structural protocols implemented by the immutable Arena, rather than duplicating segment-index arithmetic or copying plans per call. Derive each view from both direct field use and transitive transport-helper dependencies; a direct attribute scan alone misses helpers that receive the whole arena. Preserve the current public inter-readout delegation points noted above. This is an optional implementation approach, not new runtime validation or a performance feature. No source changes were made during the ledger final gate.
+
+**2026-09-10T08:41:56Z**
+
+Prerequisite cff-gl89 is closed and published as PR #132. Start from its final published agent/cff-gl89-objective-ledger head after an ff-only pull. Source 90c58b1 passed the final 2,098-test gate (41 slow deselections, four existing Gym warnings), recorded in daaff2f; measured wall 1,151.159 seconds. Engine is now 1,196 lines. Its remaining readout/mutator inventory and view guidance are recorded above; current numerical and public behavior remains the comparison baseline. No design decision is pending.
