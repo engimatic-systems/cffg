@@ -160,6 +160,7 @@ Mathematical authority and observable coverage:
 | Family | Existing evidence and scope |
 | --- | --- |
 | Ordinary discrete BP/VMP | test_engine_tree:71-109 and test_engine_hmm:79-111 compare enumeration/forward-backward and negative log evidence; test_vmp:54-120 checks conjugate updates and the BP/VMP distinction. test_discrete_kernels:263,299 protects external registration and mode-specific local inputs. |
+| In-graph Dirichlet parameters | test_dirichlet_param_edges:115,153 checks exact observed conjugacy, fractional counts and direct total VFE; :220,247,283 protects rejected nonclosed BP use, serialization, sparse float32 and scale. test_dirichlet_vmp_derivation:75-107 independently expands Dirichlet algebra and distinguishes VMP closure from nonclosed exact BP. |
 | Gaussian | test_kalman:40-101 uses independent RTS means/covariances and negative log likelihood. test_gaussian_kernels:41,84,220 covers joint conditioning, nonvacuous cavities, KL energy and distinct batched inputs. |
 | Exponential family | test_ef_engine:193-264 compares Gamma-Poisson and Beta-Bernoulli posterior parameters and closed-form evidence; missing/vacuous/improper cases protect readout and ledger failures. |
 | Gaussian mixture | test_mixg:82-192 uses independent one-dimensional numerical quadrature for messages and local energy, with an explicit entropy bound. test_hybrid_engine:221,262 checks transport and assembled ledger. K=1 parity is a degeneracy check, not the sole mathematical authority. |
