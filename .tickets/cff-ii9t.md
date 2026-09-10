@@ -152,3 +152,7 @@ Authorities: existing test_engine_contracts, test_runtime_status and test_colony
 **2026-09-10T06:10:20Z**
 
 Prerequisite cff-3ose is closed and published as PR #129. Its repaired code/test source is a2c55e6; final 2,043-test gate (41 slow deselections, four existing warnings) is recorded in 29a4c9f, measured wall 1,145.615 seconds. Use the final published agent/cff-3ose-failure-diagnostics head as this ticket's branch base. The 32 new failure cases preserve truthful non-finite delta traces and infinite failed-run residuals; do not restore the old discrepancies.
+
+**2026-09-10T06:20:05Z**
+
+First extraction checkpoint: runtime_checks.StateChecks now owns host exact-support checks and immutable edge-cardinality buckets; state_is_finite is a standalone check. Engine's existing private check methods remain delegates for ordinary, exact and outer callers. Current constraint values still come from State.params. The immediate alldifferent search binds its per-constraint support list explicitly; the search algorithm and evaluation order are unchanged. The existing failure/runtime-status/constraint-data selection passed 120 tests in 29.20 seconds. New check-owner lint/format and diff checks pass; architecture and the change-path row name the owner. Iterative progress/outcomes and the shared public result finalizer are next; no final default gate has been run for this ticket yet.
