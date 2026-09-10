@@ -12,30 +12,42 @@ correction (interior edges have degree 2, hence counting number d_i − 1 = 1).
 On tree graphs at the BP fixed point, F = −log Z.
 
 Module map:
-- ``State`` and status results define the runtime boundary.
-- ``Engine`` owns state setup, data binding, host control flow, and readouts.
+- ``runtime_types`` defines public State and status values.
+- ``lifecycle`` and ``mu3_lifecycle`` own state/data and functional preparation.
+- ``iteration`` owns ordinary control; ``run_results`` constructs its public results.
+- ``Engine`` composes these owners and retains exact/outer strategies and readouts.
 - ``execution.synchronous`` gathers, combines and damps local factor updates.
 - ``schedule_program`` owns stage construction and exact certification units;
   ``execution.transport`` owns shared segmented gathers and scatters.
 - ``_make_bfe`` owns the ledger supplied to the schedule program.
 
 Paired paths:
-- ``Engine.step`` calls the shared sweep; ``Engine.run`` drives flooding or mixed
+- ``Engine.step`` calls the shared sweep; ``Engine.run`` delegates ordinary
   iterations, while ``_run_exact`` consumes the program's exact unit.
-- Host ``_has_zero_support`` and the program's JIT support check share exact-support
+- Host ``StateChecks`` and the program's JIT support check share exact-support
   semantics; public ``Engine.bfe`` delegates to ``_make_bfe``.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
 
-from cffg import csp, ef, efrules, gauss, hybrid_gfe, kernels, mixg, recurrence
+from cffg import (
+    csp,
+    ef,
+    efrules,
+    gauss,
+    hybrid_gfe,
+    kernels,
+    mixg,
+    recurrence,
+    run_results,
+)
 from cffg.compiled import NEG, Arena
 from cffg.execution import (
     parameters as _parameters,
@@ -43,9 +55,6 @@ from cffg.execution import (
 from cffg.execution.owners import SCHEDULED_EXECUTORS
 from cffg.execution.support import log_support as _jax_log_support
 from cffg.execution.synchronous import make_sweep
-from cffg.lifecycle import StateLifecycle
-from cffg.runtime_checks import StateChecks, state_is_finite
-from cffg.mu3_lifecycle import Mu3Lifecycle, Mu3PlanView, Mu3StateView
 from cffg.execution.transport import (
     _disc_both,
     _disc_rows,
@@ -53,14 +62,27 @@ from cffg.execution.transport import (
     _obs_rows,
 )
 from cffg.goal_parameters import shared_goal_energy
+from cffg.iteration import IterationPolicy, IterationServices, run_iterations
 from cffg.kernel_runtime import (
     discrete_energy as _disc_energy,
+)
+from cffg.kernel_runtime import (
     discrete_potential as _disc_potential,
+)
+from cffg.kernel_runtime import (
     discrete_readout as _disc_readout,
+)
+from cffg.kernel_runtime import (
     gaussian_energy as _gauss_energy,
+)
+from cffg.kernel_runtime import (
     gaussian_readout as _gauss_readout,
+)
+from cffg.kernel_runtime import (
     parameters as _kernel_params,
 )
+from cffg.lifecycle import StateLifecycle
+from cffg.mu3_lifecycle import Mu3Lifecycle, Mu3PlanView, Mu3StateView
 from cffg.outer import (
     OuterArrays,
     OuterChart,
@@ -73,28 +95,36 @@ from cffg.outer import (
     outer_chart_signature,
     solve_outer,
 )
-from cffg.schedule import Schedule, eliminated_slot_sets
-from cffg.schedule_program import build_schedule_program
-from cffg.runtime_types import (
-    InferenceError as InferenceError,  # noqa: PLC0414
-    Mu3ScoreResult as Mu3ScoreResult,  # noqa: PLC0414
-    RunResult as RunResult,  # noqa: PLC0414
-    RunStatus as RunStatus,  # noqa: PLC0414
-    State as State,  # noqa: PLC0414
-    _replace as _replace,  # noqa: PLC0414
-)
 from cffg.rules import (
-    dirichlet_vmp_energy,
     dirichlet_expected_log,
+    dirichlet_vmp_energy,
     gfe_energy,
     gfe_energy_stats,
     gfe_goal_structural_stats,
     gfe_parameter_stats,
     gfe_tm_energy,
 )
-
-
-
+from cffg.runtime_checks import StateChecks, state_is_finite
+from cffg.runtime_types import (
+    InferenceError as InferenceError,  # noqa: PLC0414
+)
+from cffg.runtime_types import (
+    Mu3ScoreResult as Mu3ScoreResult,  # noqa: PLC0414
+)
+from cffg.runtime_types import (
+    RunResult as RunResult,  # noqa: PLC0414
+)
+from cffg.runtime_types import (
+    RunStatus as RunStatus,  # noqa: PLC0414
+)
+from cffg.runtime_types import (
+    State as State,  # noqa: PLC0414
+)
+from cffg.runtime_types import (
+    _replace as _replace,  # noqa: PLC0414
+)
+from cffg.schedule import Schedule, eliminated_slot_sets
+from cffg.schedule_program import ScheduleProgram, build_schedule_program
 
 
 class Engine:
@@ -422,188 +452,49 @@ class Engine:
                 state, n_iters, tol=tol, harden_last=harden_last
             )
 
-        deltas: list[float] = []
-        energies: list[float] = []
-        status = RunStatus.BUDGET_EXHAUSTED
-        residual = float("inf")
-        inner_status = RunStatus.CONVERGED
-        inner_residual = 0.0
+        outcome = run_iterations(
+            state,
+            self._iteration_program(),
+            services=self._iteration_services(),
+            policy=self._iteration_policy(state, tol),
+            n_iters=n_iters,
+            damp=damp,
+            harden_last=harden_last,
+        )
+        ess, log_normalizers, mu3_statuses = self._mu3_result_diagnostics(outcome.state)
+        return run_results.finalize_iteration(
+            outcome,
+            legacy_picard=has_gfe,
+            mu3_ess=ess,
+            mu3_log_normalizers=log_normalizers,
+            mu3_statuses=mu3_statuses,
+        )
 
-        dtype = np.asarray(state.messages).dtype
-        # A requested tolerance below the active dtype's resolution cannot be
-        # falsified.  This floor protects truthful convergence in consumer f32.
-        effective_tol = None if tol is None else max(float(tol), 64.0 * np.finfo(dtype).eps)
+    def _iteration_services(self) -> IterationServices:
+        return IterationServices(
+            self._state_is_finite,
+            self._has_zero_support,
+            self.bfe,
+            self.objective,
+            self._update_mu3,
+        )
 
-        if not self._state_is_finite(state):
-            ess, log_normalizers, mu3_statuses = self._mu3_result_diagnostics(state)
-            return RunResult(
-                state, RunStatus.DIVERGED, 0, (), (), float("inf"),
-                RunStatus.DIVERGED, float("inf"),
-                mu3_ess=ess,
-                mu3_log_normalizers=log_normalizers,
-                mu3_statuses=mu3_statuses,
-            )
-        if self._has_zero_support(state):
-            ess, log_normalizers, mu3_statuses = self._mu3_result_diagnostics(state)
-            return RunResult(
-                state, RunStatus.INFEASIBLE, 0, (), (float("inf"),), float("inf"),
-                mu3_ess=ess,
-                mu3_log_normalizers=log_normalizers,
-                mu3_statuses=mu3_statuses,
-            )
-
-        if self._prime is not None and n_iters >= 1:
-            # Colored/mixed priming: equilibrate the forest islands once
-            # (exact, O(E)) before the iterative loop starts counting.
-            msgs, g_eta, g_lam, ef_eta = self._prime(
-                state.messages, state.g_eta, state.g_lam, state.ef_eta,
-                state.g_obs, state.g_mask, state.ef_obs, state.ef_mask,
-                state.params,
-            )
-            state = _replace(
-                state, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta
-            )
-
-        def phase(n: int, harden: bool, st: State) -> tuple[State, bool]:
-            nonlocal status, residual, inner_status, inner_residual
-            previous_fe: float | None = None
-            for _ in range(n):
-                st, mu3_delta, mu3_code, mu3_residual = self._update_mu3(st)
-                if mu3_code:
-                    inner_status = (
-                        RunStatus.BUDGET_EXHAUSTED
-                        if mu3_code == 1 else RunStatus.DIVERGED
-                    )
-                    inner_residual = mu3_residual
-                    status = inner_status
-                    residual = mu3_residual
-                    return st, True
-                msgs, g_eta, g_lam, ef_eta, inner_r, inner_code = self._iter_step(
-                    st.messages, st.g_eta, st.g_lam, st.g_obs, st.g_mask,
-                    st.ef_eta, st.ef_obs, st.ef_mask, st.params, damp, harden,
-                )
-                nxt = _replace(
-                    st, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta
-                )
-                # Preserve NaN from any representation, regardless of order.
-                delta = float(
-                    np.max(
-                        [
-                            mu3_delta,
-                            *(
-                                float(jnp.max(jnp.abs(getattr(nxt, f) - getattr(st, f))))
-                                for f in ("messages", "g_eta", "g_lam", "ef_eta")
-                                if getattr(st, f).size
-                            ),
-                        ]
-                    )
-                )
-                deltas.append(delta)
-                st = nxt
-                inner_residual = float(inner_r)
-                code = int(inner_code)
-                inner_status = (
-                    RunStatus.CONVERGED if code == 0 else
-                    RunStatus.BUDGET_EXHAUSTED if code == 1 else
-                    RunStatus.DIVERGED
-                )
-
-                if (
-                    not np.isfinite(delta)
-                    or not self._state_is_finite(st)
-                    or not np.isfinite(inner_residual)
-                    or inner_status is RunStatus.DIVERGED
-                ):
-                    status = RunStatus.DIVERGED
-                    residual = float("inf")
-                    return st, True
-                if self._has_zero_support(st):
-                    status = RunStatus.INFEASIBLE
-                    residual = float("inf")
-                    energies.append(float("inf"))
-                    return st, True
-                if inner_status is RunStatus.BUDGET_EXHAUSTED:
-                    status = RunStatus.BUDGET_EXHAUSTED
-                    residual = inner_residual
-                    return st, True
-
-                if self.arena.semiring == "max":
-                    residual = delta
-                    if effective_tol is not None and delta <= effective_tol:
-                        objective = self.objective(st)
-                        if not np.isfinite(objective):
-                            status = RunStatus.DIVERGED
-                            residual = float("inf")
-                        else:
-                            status = RunStatus.CONVERGED
-                        return st, True
-                    continue
-
-                fe = self.bfe(st)
-                if np.isfinite(fe):
-                    energies.append(fe)
-                    if previous_fe is not None:
-                        residual = abs(fe - previous_fe)
-                        if (
-                            effective_tol is not None
-                            and residual <= effective_tol
-                            and delta <= effective_tol
-                        ):
-                            status = RunStatus.CONVERGED
-                            return st, True
-                    previous_fe = fe
-                elif previous_fe is not None or not (
-                    self.arena.gauss_groups
-                    or self.arena.ef_groups
-                    or self.arena.prec_groups
-                    or self.arena.recurrence_groups
-                ):
-                    status = RunStatus.DIVERGED
-                    residual = float("inf")
-                    return st, True
-            return st, False
-
-        state, stopped = phase(n_iters - harden_last, harden=False, st=state)
-        if not stopped and harden_last:
-            state, stopped = phase(harden_last, harden=True, st=state)
-        elif stopped and harden_last and status is RunStatus.CONVERGED:
-            # Soft coherence is only the start state for the hardening phase.
-            status = RunStatus.BUDGET_EXHAUSTED
-            state, stopped = phase(harden_last, harden=True, st=state)
-
-        if (
-            status is RunStatus.BUDGET_EXHAUSTED
-            and self.arena.semiring != "max"
-            and not energies
-            and deltas
-            and (
+    def _iteration_policy(self, state: State, tol: float | None) -> IterationPolicy:
+        return IterationPolicy.from_dtype(
+            state.messages.dtype,
+            semiring=self.arena.semiring,
+            allow_initial_undefined_energy=bool(
                 self.arena.gauss_groups
                 or self.arena.ef_groups
                 or self.arena.prec_groups
                 or self.arena.recurrence_groups
-            )
-        ):
-            # A continuous/EF ledger that never became defined is not a
-            # usable budget result; it is a numerically failed inference.
-            status = RunStatus.DIVERGED
-            residual = float("inf")
-        ess, log_normalizers, mu3_statuses = self._mu3_result_diagnostics(state)
-        return RunResult(
-            state=state,
-            status=status,
-            iterations=len(deltas),
-            message_deltas=tuple(deltas),
-            free_energies=tuple(energies),
-            residual=residual,
-            inner_status=inner_status,
-            inner_residual=inner_residual,
-            mu3_ess=ess,
-            mu3_log_normalizers=log_normalizers,
-            mu3_statuses=mu3_statuses,
-            termination_reason=(
-                OuterTerminationReason.LEGACY_PICARD
-                if has_gfe else OuterTerminationReason.NOT_RUN
             ),
+            tol=tol,
+        )
+
+    def _iteration_program(self) -> ScheduleProgram:
+        return replace(
+            self._schedule_program, iter_step=self._iter_step, prime=self._prime
         )
 
     def _outer_kernel_plan(

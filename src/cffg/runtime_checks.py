@@ -69,7 +69,7 @@ class StateChecks:
         lose which operand (if either) carried NEG.
 
         Vectorized over each edge-cardinality bucket and each group's member
-        stack (cff-d56d): the check runs on every exact-path run, so a
+        stack: the check runs on every exact-path run, so a
         per-member Python loop would put an O(T) interpreter cost back into
         the O(E) schedule."""
         messages = np.asarray(state.messages)
