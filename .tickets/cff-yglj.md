@@ -49,6 +49,10 @@ cff-ii9t removes duplicated ordinary termination and result policy. cff-wbhu com
 - **Logical iteration:** An update counted in the public result; a rejected initial state has zero such updates.
 - **VMP:** Variational message passing.
 - **JIT:** Just-in-time compilation of array computations.
+- **State:** One graph instance's message, observation and parameter arrays.
+- **Float32 / float64:** Floating-point numbers stored in 32 or 64 bits.
+- **Exact-zero support:** Outcomes that are impossible retain zero probability;
+  the engine uses a reserved finite value for their logarithm.
 
 
 
