@@ -1,6 +1,6 @@
 ---
 id: cff-3ose
-status: open
+status: in_progress
 deps: [cff-5xdy]
 links: [cff-yglj]
 created: 2026-09-10T05:14:03Z
