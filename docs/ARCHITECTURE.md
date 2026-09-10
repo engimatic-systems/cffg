@@ -911,6 +911,13 @@ terms and their once-only parameter accounting are unchanged. The exact JAX
 log-zero predicate lives in `execution/support.py`; finite/support
 classification and public results remain outside local execution.
 
+`test_execution.py` checks registered local outputs with distinct runtime
+inputs under jitted batching. `test_execution_specialized.py` checks the
+explicit owners, preservation of numerical failure facts, and runtime
+threshold/table arguments. Existing family tests remain the mathematical
+authorities; these tests protect the execution boundary, not a new inference
+approximation.
+
 The owners delegate existing discrete/Gaussian mathematics to
 `kernel_runtime.py`, which also retains the node-ledger/readout calls. It never
 regathers the global arena; scan carry and persistent flat layout remain unchanged.
@@ -925,8 +932,8 @@ tests live in `test_gaussian_kernels.py` and `test_gaussian_kernel_schedules.py`
 
 Structural equality, Dirichlet parameter-edge plans, hard constraints and
 GFE composites retain their separate plans. Multi-arena hybrid registration
-remains outside this foundation, as do compiler/engine extraction and new
-nonlinear Gaussian rules.
+remains outside the registration foundation, as do new nonlinear Gaussian
+rules. The compiler and execution extractions preserve those explicit owners.
 
 Compatibility policy (AC6, pre-1.0): the Python registration API
 (`register_kernel`, the `FactorKernel` field set) is internal-unstable and
