@@ -1,7 +1,7 @@
 ---
 id: cff-ii9t
 status: open
-deps: [cff-5xdy]
+deps: [cff-5xdy, cff-yglj]
 links: [cff-jrbw]
 created: 2026-09-02T04:17:42Z
 type: chore
@@ -109,3 +109,7 @@ cff-rqqc owns stochastic Colony state/PRNG isolation.
 **2026-09-09T03:29:39Z**
 
 PR #108 research — question: does one-instance vmap test Colony result handling? Answer: no; Colony bypasses its batched path for one instance and constructs RunResult itself for actual batches. Engine and Colony need a shared termination/result owner, with real mixed-input batches and independent stopping checks. Sources at 7885bf5: colony.py:111-118, 149-280. Confidence: high. This moves existing status semantics; cff-wbhu still owns compiling the host convergence loop.
+
+**2026-09-10T00:09:36Z**
+
+The cff-sf29 inventory found and directly reproduced the initial-state result discrepancy now isolated in cff-yglj. That ticket is an additional prerequisite here: it establishes one corrected initial-failure contract before this behavior-preserving extraction. Do not preserve Colony's old inner_status=converged/inner_residual=0 for an initially non-finite state merely because the pre-repair characterization baseline recorded it. The overall status was already diverged; the repair concerns consistent inner facts and retaining the rejected state. Ordinary valid-state baseline fixtures remain unchanged.
