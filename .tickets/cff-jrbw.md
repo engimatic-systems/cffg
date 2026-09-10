@@ -137,3 +137,7 @@ Complete-result characterization passed against PR #130 source b379a28: 110 comp
 **2026-09-10T08:03:51Z**
 
 Final gate passed at code/test source baaad19, with ticket-only head a8485bc recorded by the dashboard: 2,081 passed, 41 slow deselections, four existing Gym warnings; pytest 1,152.59 seconds, measured wall 1,165.949 seconds, completed 2026-09-10T08:02:26.885194+00:00. The suite was read exactly once, at 08:03:20 UTC after the planned 20-minute first-check deadline. Runtime history and shared dashboard are refreshed. New owner sizes: exact 114 lines, outer control 312, kernel provider 123, structural view 41, outcome 40, shared results 202; Engine is 417 lines shorter. All acceptance criteria are met. Next: publish the stacked PR and update the shared architecture page, then start cff-gl89 from this final published head. No solver, objective, serialization or performance-target change; no independent review or speedup claim.
+
+**2026-09-10T08:04:58Z**
+
+Published as PR #131 against PR #130. Shared architecture HTML now names the completed exact/outer owners, compatibility evidence and final 2,081-test gate, with the ledger as next work. Page validation: 68 unique IDs and 35 resolved internal anchors. Source baaad19; gate record aeaf18c. Main is unchanged; no stack merge was performed.
