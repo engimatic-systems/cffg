@@ -1,6 +1,6 @@
 ---
 id: cff-ofv1
-status: open
+status: in_progress
 deps: [cff-ws3c]
 links: [cff-cfqg, cff-o7hs, cff-ahps]
 created: 2026-09-02T04:02:01Z
