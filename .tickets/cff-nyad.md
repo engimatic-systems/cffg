@@ -90,3 +90,13 @@ schedule program.
   typed execution owners.
 - **Support signal:** Internal evidence that a state has literal zero support;
   public status classification uses the shared runtime result owner.
+
+## Notes
+
+**2026-09-10T03:17:51Z**
+
+Read-only preparation at cff-jby3 source 84aa318; that prerequisite is still awaiting its final gate. Current extraction anchors are engine.py:2816-3439 (batch, scan classification, registerized and flat scans, support, exact unit, propagation) plus constructor schedule selection/program assembly at :359-442. Synchronous _make_step and the free-energy ledger are separate inputs, not family math to duplicate inside schedule builders.
+
+Proposed boundary: one immutable ScheduleProgram from the validated Schedule, a typed collection of registered execution/parameter-selection owners, the existing synchronous sweep factory, and the existing raw free-energy callback. Schedule construction owns kind selection, priming, mixed-phase ordering, certification orchestration and JIT wrapping. Keep public status decisions, outer elimination policy and objective formulas outside. Move shared segmented transport to a leaf module to avoid importing Engine from the schedule owner. The current EF scan prefetch reads kernel param_keys itself; route it through the existing ef_parameters owner. Move the equality/potential-specific support calculation to the execution support owner; the schedule layer combines its results with edge support. These are ownership moves, not new numerical behavior.
+
+Change paths: Runtime numerical or status invariant and New factor or rule family. Flood/batch/registerized/flat updates, host/JIT support, mixed priming/reconstruction, exact certification, solo/vmap and restored-State consumers are checked pairs. IR, schema, checkpoint decoding, readout math, objective formulas and public statuses are N/A to modification. Existing test_schedule.py has empty-support, poisoned input, doctored schedule, float32 missing-phase and T=256 mixed-scale certificates. The discrete/Gaussian kernel schedule tests cover dynamic parameters/observations, trace reuse and local-register carry without full-arena storage. Preserve these assertions; follow moved private instrumentation to its new owner as needed. Plan additional boundary tests for program composition and no direct family-rule imports, plus bounded old/new schedule/result parity. No implementation started; update the published prerequisite base before branching.
