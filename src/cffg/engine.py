@@ -17,17 +17,18 @@ Module map:
 - ``iteration``, ``exact_strategy`` and ``outer_strategy`` own run control;
   ``run_results`` constructs their public results.
 - ``outer_kernels`` owns lazy derivative plans and dynamic runtime context.
-- ``Engine`` composes these owners and retains objective accounting and readouts.
+- ``ledger`` owns belief and assignment objectives; ``ledger_terms`` owns local terms.
+- ``Engine`` composes these owners and retains readouts.
 - ``execution.synchronous`` gathers, combines and damps local factor updates.
 - ``schedule_program`` owns stage construction and exact certification units;
   ``execution.transport`` owns shared segmented gathers and scatters.
-- ``_make_bfe`` owns the ledger supplied to the schedule program.
+- ``_make_bfe`` is a compatibility alias for the raw ledger factory.
 
 Paired paths:
 - ``Engine.step`` calls the shared sweep; ``Engine.run`` delegates ordinary
   iterations, while ``_run_exact`` consumes the program's exact unit.
 - Host ``StateChecks`` and the program's JIT support check share exact-support
-  semantics; public ``Engine.bfe`` delegates to ``_make_bfe``.
+  semantics; public ``Engine.bfe`` delegates to ``ObjectiveLedger``.
 """
 
 from __future__ import annotations
@@ -40,7 +41,6 @@ import jax.numpy as jnp
 import numpy as np
 
 from cffg import (
-    csp,
     ef,
     efrules,
     gauss,
@@ -65,11 +65,7 @@ from cffg.execution.transport import (
     _gauss_rows,
     _obs_rows,
 )
-from cffg.goal_parameters import shared_goal_energy
 from cffg.iteration import IterationPolicy, IterationServices, run_iterations
-from cffg.kernel_runtime import (
-    discrete_energy as _disc_energy,
-)
 from cffg.kernel_runtime import (
     discrete_potential as _disc_potential,
 )
@@ -77,14 +73,13 @@ from cffg.kernel_runtime import (
     discrete_readout as _disc_readout,
 )
 from cffg.kernel_runtime import (
-    gaussian_energy as _gauss_energy,
-)
-from cffg.kernel_runtime import (
     gaussian_readout as _gauss_readout,
 )
 from cffg.kernel_runtime import (
     parameters as _kernel_params,
 )
+from cffg.ledger import ObjectiveLedger, constraint_satisfied
+from cffg.ledger import make_belief_energy as _make_bfe
 from cffg.lifecycle import StateLifecycle
 from cffg.mu3_lifecycle import Mu3Lifecycle, Mu3PlanView, Mu3StateView
 from cffg.outer import (
@@ -95,15 +90,6 @@ from cffg.outer import OuterTerminationReason as OuterTerminationReason  # noqa:
 from cffg.outer_kernels import OuterKernelProvider
 from cffg.outer_strategy import OuterServices, OuterTrustRegionStrategy
 from cffg.outer_structure import OuterStructure
-from cffg.rules import (
-    dirichlet_expected_log,
-    dirichlet_vmp_energy,
-    gfe_energy,
-    gfe_energy_stats,
-    gfe_goal_structural_stats,
-    gfe_parameter_stats,
-    gfe_tm_energy,
-)
 from cffg.runtime_checks import StateChecks, state_is_finite
 from cffg.runtime_types import (
     InferenceError as InferenceError,  # noqa: PLC0414
@@ -175,6 +161,7 @@ class Engine:
                 )
             )
         raw_bfe = _make_bfe(arena)
+        self._ledger = ObjectiveLedger(arena, raw_bfe)
         self._bfe = eqx.filter_jit(raw_bfe)
         program = build_schedule_program(
             arena, schedule, SCHEDULED_EXECUTORS,
@@ -1161,21 +1148,11 @@ class Engine:
         return out
 
     def bfe(self, state: State) -> float:
-        if self.arena.semiring == "max":
-            raise RuntimeError(
-                "min-sum reports an objective value, not a free energy — call Engine.objective"
-            )
-        self._require_mu3_ready(state)
-        # NEG is a finite representation of log zero, so the local ledger can
-        # otherwise turn log Z = -inf into a huge finite sentinel score.  Empty
-        # exact edge support proves Z=0 and therefore F=+inf.
-        if self._has_zero_support(state):
-            return float("inf")
-        return float(
-            self._bfe(
-                state.messages, state.g_eta, state.g_lam, state.g_obs, state.g_mask,
-                state.ef_eta, state.ef_obs, state.ef_mask, state.params,
-            )
+        return self._ledger.free_energy(
+            state,
+            evaluate=self._bfe,
+            zero_support=self._has_zero_support,
+            require_ready=self._require_mu3_ready,
         )
 
     def decode(self, state: State) -> dict[str, int]:
@@ -1191,42 +1168,11 @@ class Engine:
         contribute 0 when the decode is consistent and +inf when it is not — an
         inconsistent decode is reported loudly. On a tree at the max-product
         fixed point this equals the brute-force MAP energy (Viterbi identity)."""
-        xhat = self.decode(state)
-        slot2var = {}
-        for e in self.arena.edges.values():
-            if e.dim or e.ef or e.param_shape:
-                continue
-            slot2var[e.slot0] = e.name
-            slot2var[e.slot1] = e.name
-        total = 0.0
-        for g in self.arena.groups:
-            vals = [
-                [xhat[slot2var[int(g.scatter[i, r])]] for r in range(len(g.roles))]
-                for i in range(len(g.members))
-            ]
-            if g.type == "equality":
-                for v in vals:
-                    total += 0.0 if v[0] == v[1] == v[2] else np.inf
-                continue
-            logf = np.asarray(_disc_potential(g, _kernel_params(g, state.params)))
-            for i, v in enumerate(vals):
-                total += -float(logf[(i, *v)])
-        for c in self.arena.constraint_groups:
-            v = [xhat[slot2var[int(c.scatter[j])]] for j in range(len(c.cards))]
-            parameters = _parameters.constraint_parameters(c, state.params)
-            total += 0.0 if self._constraint_ok(c, v, parameters) else np.inf
-        return total
+        return self._ledger.assignment_energy(self.decode(state), state.params)
 
     @staticmethod
     def _constraint_ok(c, v: list[int], parameters: _parameters.ConstraintParameters) -> bool:
-        if c.type == "alldifferent":
-            return len(set(v)) == len(v)
-        if c.type == "exactly_k":
-            return sum(v) == int(np.asarray(parameters.threshold))
-        if c.type == "at_most_k":
-            return sum(v) <= int(np.asarray(parameters.threshold))
-        # table: the assignment must be one of the allowed tuples
-        return any(np.array_equal(np.asarray(v), row) for row in np.asarray(parameters.table))
+        return constraint_satisfied(c, v, parameters)
 
 
 @dataclass(frozen=True)
@@ -1248,292 +1194,3 @@ class DirichletMarginal:
     mean: np.ndarray
     expected_log: np.ndarray
     proper: bool
-
-
-
-
-
-
-def _gauss_bfe(arena, g_eta, g_lam, g_obs, g_mask, params):
-    """Gaussian node energies + interior-edge differential entropies. Exact
-    closed forms (cffg.gauss docstring); with conditioned observations the
-    tree identity BFE = −log p(y) holds to fixed-point/ridge precision."""
-    total = jnp.asarray(0.0, dtype=g_eta.dtype)
-    for g in arena.gauss_groups:
-        inc_e, inc_l = _gauss_rows(arena, g_eta, g_lam, g.gather, g.dims)
-        y = mk = None
-        if g.obs_rows is not None:
-            y = _obs_rows(arena, g_obs, g.obs_rows, g.observed_dim)
-            mk = g_mask[jnp.asarray(g.obs_rows)]
-        total = total + _gauss_energy(g, inc_e, inc_l, _kernel_params(g, params), y, mk).sum()
-    for d, pairs in arena.gauss_interior:
-        l0 = g_lam[arena.g_lam_indices(pairs[:, 0], d)]
-        l1 = g_lam[arena.g_lam_indices(pairs[:, 1], d)]
-        total = total + gauss.edge_entropy(l0, l1).sum()
-    return total
-
-
-def _mix_bfe(arena, messages, g_eta, g_lam, params):
-    """Hybrid Gaussian-mixture node energies (cff-pksr): exact for the held
-    labelled-mixture beliefs (mixg energies). The Gaussian and selector edge
-    entropies need no code here — the out/in edges land in gauss_interior and
-    the selector edge in interior_slot_pairs, both factor-agnostic tables."""
-    total = jnp.asarray(0.0, dtype=g_eta.dtype)
-    for g in arena.mix_groups:
-        mu_e = messages[arena.message_indices(g.s_gather, g.k_sel)]
-        inc_e, inc_l = _gauss_rows(arena, g_eta, g_lam, g.g_gather, g.dims)
-        w = params[g.name + ":W"]
-        if g.type == "gaussian_mixture_linear":
-            do, di = g.dims
-            a, b = params[g.name + ":A"], params[g.name + ":b"]
-            e_o, l_o = inc_e[:, 0, :do], inc_l[:, 0, :do, :do]
-            e_i, l_i = inc_e[:, 1, :di], inc_l[:, 1, :di, :di]
-            total = total + mixg.mixlin_energy(e_o, l_o, e_i, l_i, mu_e, a, b, w).sum()
-        else:
-            (do,) = g.dims
-            m = params[g.name + ":m"]
-            e_o, l_o = inc_e[:, 0, :do], inc_l[:, 0, :do, :do]
-            total = total + mixg.mix_energy(e_o, l_o, mu_e, m, w).sum()
-    return total
-
-
-def _recurrence_bfe(arena, messages, g_eta, g_lam, params):
-    """D9 pair-region energies, upper-bounding exact transition terms."""
-    total = jnp.asarray(0.0, dtype=g_eta.dtype)
-    for group in arena.recurrence_groups:
-        card = group.cards[0]
-        out_cavity = messages[
-            arena.message_indices(group.d_gather_both[:, 0, 1], card)
-        ]
-        in_cavity = messages[
-            arena.message_indices(group.d_gather_both[:, 1, 1], card)
-        ]
-        out_cavity = jnp.where(
-            _jax_log_support(out_cavity), out_cavity, -jnp.inf
-        )
-        in_cavity = jnp.where(
-            _jax_log_support(in_cavity), in_cavity, -jnp.inf
-        )
-        drive_eta = g_eta[
-            arena.g_eta_indices(group.drive_gather_both, group.dim)
-        ].sum(axis=1)
-        drive_precision = g_lam[
-            arena.g_lam_indices(group.drive_gather_both, group.dim)
-        ].sum(axis=1)
-        total = total + recurrence.structured_recurrence_energy(
-            out_cavity,
-            in_cavity,
-            drive_eta,
-            drive_precision,
-            params[group.name + ":weights"],
-            params[group.name + ":offsets"],
-        ).sum()
-    return total
-
-
-def _hybrid_gfe_bfe(arena, messages, g_eta, g_lam, params):
-    """Direct D5 G-hat terms; absorbed goals and output entropies stay out."""
-    total = jnp.asarray(0.0, dtype=g_eta.dtype)
-    for group in arena.hybrid_gfe_groups:
-        incoming = messages[
-            arena.message_indices(group.s_gather, group.k_sel)
-        ]
-        inc_eta, inc_lam = _gauss_rows(
-            arena, g_eta, g_lam, group.g_gather, group.dims
-        )
-        common = (
-            params[group.name + ":W"],
-            params[group.name + ":goal_m"],
-            params[group.name + ":goal_W"],
-        )
-        if group.type == "gaussian_mixture_linear":
-            _, di = group.dims
-            values = hybrid_gfe.linear_energy(
-                incoming,
-                inc_eta[:, 1, :di],
-                inc_lam[:, 1, :di, :di],
-                params[group.name + ":A"],
-                params[group.name + ":b"],
-                *common,
-            )
-        else:
-            values = hybrid_gfe.prior_energy(
-                incoming,
-                params[group.name + ":m"],
-                *common,
-            )
-        total = total + values.sum()
-    return total
-
-
-def _prec_bfe(arena, g_eta, g_lam, ef_eta, params):
-    """gaussian_prec node energies (cff-7c5o): the mean-field VFE contribution
-    −H[q_x] − H[q_τ] − E_q[log f]. gauss.prec_energy supplies −E_q[log f] (with
-    the digamma correction that makes the mean-field VFE exact); the two edge
-    neg-entropies are added here, exactly as the discrete VMP energies add one
-    _neg_entropy per edge (cffg.rules.vmp_energy_matrix_cat). They net against
-    the neighbours' −H and the interior +H (gauss_interior / ef_interior) to
-    the single mean-field −H[q_i] per variable. Improper marginals ⇒ +inf."""
-    total = jnp.asarray(0.0, dtype=g_eta.dtype)
-    for g in arena.prec_groups:
-        tau_q = ef_eta[jnp.asarray(g.tau_gather_both)].sum(axis=1)  # [M, 2]
-        x_eta_q = g_eta[arena.g_eta_indices(g.x_gather_both, 1)].sum(axis=1)
-        x_lam_q = g_lam[arena.g_lam_indices(g.x_gather_both, 1)].sum(axis=1)
-        m = params[g.name + ":m"]
-        e = gauss.prec_energy(tau_q, x_eta_q, x_lam_q, m)  # −E_q[log f], +inf if improper
-        neg_h_x = gauss._neg_entropy(x_lam_q)  # −H[q_x]
-        neg_h_tau = -efrules.GAMMA.entropy(tau_q)  # −H[q_τ]
-        ok = (x_lam_q[..., 0, 0] > 0) & efrules.GAMMA.is_proper(tau_q)
-        total = total + jnp.where(ok, neg_h_x + neg_h_tau + e, jnp.inf).sum()
-    return total
-
-
-def _ef_bfe(arena, ef_eta, ef_obs, ef_mask, params):
-    """EF node energies + interior-edge entropies, all closed form
-    (cffg.efrules). Improper beliefs anywhere make the total +inf — loud.
-    With conditioned observations the tree identity BFE = −log p(data)
-    holds exactly (no ridge: nothing here is iterative or solved)."""
-    total = jnp.asarray(0.0, dtype=ef_eta.dtype)
-    for g in arena.ef_groups:
-        inc = ef_eta[jnp.asarray(g.gather)]  # [M, R, 2]
-        if g.type == "equality":
-            total = total + efrules.equality_energy(
-                efrules.JFAMILIES[g.family], inc
-            ).sum()
-        else:  # node energy comes from the registered kernel (cff-ri8m)
-            kern = kernels.KERNELS[g.type]
-            gp = {key: params[f"{g.name}:{key}"] for key in kern.param_keys}
-            obs = ef_obs[jnp.asarray(g.obs_rows)] if g.obs_rows is not None else None
-            mask = ef_mask[jnp.asarray(g.obs_rows)] if g.obs_rows is not None else None
-            total = total + kern.energy(inc, gp, obs, mask).sum()
-    for fam_name, pairs in arena.ef_interior:
-        fam = efrules.JFAMILIES[fam_name]
-        total = total + efrules.edge_entropy(
-            fam, ef_eta[jnp.asarray(pairs[:, 0])], ef_eta[jnp.asarray(pairs[:, 1])]
-        ).sum()
-    return total
-
-
-def _make_bfe(arena: Arena):
-    groups = arena.groups
-
-    def bfe(
-        messages: jax.Array,
-        g_eta: jax.Array,
-        g_lam: jax.Array,
-        g_obs: jax.Array,
-        g_mask: jax.Array,
-        ef_eta: jax.Array,
-        ef_obs: jax.Array,
-        ef_mask: jax.Array,
-        params: dict[str, jax.Array],
-    ) -> jax.Array:
-        total = jnp.asarray(0.0, dtype=messages.dtype)
-        # prec_groups included so the interior-edge entropy tables run even for
-        # a prec-only model: _gauss_bfe owns gauss_interior (the out edges),
-        # _ef_bfe owns ef_interior (the prec edges), both EdgeInfo-driven.
-        if arena.gauss_groups or arena.prec_groups or arena.recurrence_groups:
-            total = total + _gauss_bfe(arena, g_eta, g_lam, g_obs, g_mask, params)
-        if arena.mix_groups:
-            total = total + _mix_bfe(arena, messages, g_eta, g_lam, params)
-        if arena.recurrence_groups:
-            total = total + _recurrence_bfe(
-                arena, messages, g_eta, g_lam, params
-            )
-        if arena.hybrid_gfe_groups:
-            total = total + _hybrid_gfe_bfe(
-                arena, messages, g_eta, g_lam, params
-            )
-        if arena.ef_groups or arena.prec_groups:
-            total = total + _ef_bfe(arena, ef_eta, ef_obs, ef_mask, params)
-        if arena.prec_groups:
-            total = total + _prec_bfe(arena, g_eta, g_lam, ef_eta, params)
-        for g in arena.dirichlet_groups:
-            inc = _disc_both(arena, messages, g.gather_both, g.cards)
-            packed_alpha = (
-                messages[arena.message_indices(g.prior_scatter, g.param_size)]
-                + messages[arena.message_indices(g.count_scatter, g.param_size)]
-            )
-            alpha = packed_alpha.reshape((len(g.members), *g.param_shape))
-            total = total + dirichlet_vmp_energy(
-                g.type,
-                inc,
-                alpha,
-                params[f"{g.name}:alpha0"],
-                g.cards,
-            ).sum()
-        for g in groups:
-            if g.mode == "vmp":
-                inc = _disc_both(arena, messages, g.gather_both, g.cards)
-            else:
-                inc = _disc_rows(arena, messages, g.gather, g.cards)
-            total = total + _disc_energy(g, inc, _kernel_params(g, params)).sum()
-        for c in arena.constraint_groups:
-            inc = _disc_rows(arena, messages, c.gather, c.cards)
-            fn = csp.CONSTRAINT_ENERGIES[c.type]
-            parameters = _parameters.constraint_parameters(c, params)
-            if c.type in ("exactly_k", "at_most_k"):
-                total = total + fn(inc, c.cards, k=parameters.threshold)
-            elif c.type == "table":
-                total = total + fn(inc, c.cards, table=parameters.table)
-            else:
-                total = total + fn(inc, c.cards)
-        goal_predictions = {}
-        for g in arena.gfe_groups:
-            _, ki = g.cards
-            ko, _ = g.cards
-            log_d = messages[arena.message_indices(g.gather_z, ki)]
-            a_key = g.name + (":counts" if g.learned else ":A")
-            if g.goal_learned:
-                alpha0 = params[g.name + ":c_alpha0"]
-                current_counts = messages[
-                    arena.message_indices(g.goal_count_scatter, ko)
-                ]
-                alpha = efrules.DIRICHLET.posterior(
-                    alpha0, current_counts
-                )
-                expected_log_c = dirichlet_expected_log(alpha)
-                abar, hbar = gfe_parameter_stats(
-                    params[a_key], learned=g.learned
-                )
-                structural, predicted = gfe_goal_structural_stats(
-                    log_d, abar, hbar, expected_log_c
-                )
-                total = total + structural.sum()
-                goal_predictions[g.name] = predicted
-            elif g.mu3:
-                total = total + gfe_energy_stats(
-                    log_d,
-                    params[g.name + ":Abar"],
-                    params[g.name + ":hbar"],
-                    params[g.name + ":c"],
-                ).sum()
-            else:
-                total = total + gfe_energy(
-                    log_d, params[a_key], params[g.name + ":c"], learned=g.learned
-                ).sum()
-        total = total + shared_goal_energy(arena, messages, params, goal_predictions)
-        # The structural terms above contain -E_q[Σ phi_t]. At the coordinate
-        # optimum q*(A) ∝ q0(A) exp(Σ phi_t), the shared parameter ledger is
-        # KL(q*||q0) = E_q[Σ phi_t] - log Z. Add it exactly once per tied
-        # particle group, leaving the complete parameter contribution -log Z.
-        for plan in arena.mu3_groups:
-            total = total + params[plan.name + ":kl"]
-        for g in arena.gfe_tm_groups:
-            ko, ki, ku = g.cards
-            md = messages[arena.message_indices(g.gather[:, 0], ko)]
-            mi = messages[arena.message_indices(g.gather[:, 1], ki)]
-            me = messages[arena.message_indices(g.gather[:, 2], ku)]
-            b_key = g.name + (":counts" if g.learned else ":B")
-            total = total + gfe_tm_energy(
-                mi, me, md, params[b_key], learned=g.learned
-            ).sum()
-        for card, pairs in arena.interior_slot_groups:
-            lq = efrules.CATEGORICAL.product(
-                messages[arena.message_indices(pairs[:, 0], card)],
-                messages[arena.message_indices(pairs[:, 1], card)],
-            )
-            total = total + efrules.CATEGORICAL.entropy_total(lq)
-        return total
-
-    return bfe
