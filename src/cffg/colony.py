@@ -115,36 +115,6 @@ class Colony:
                 self.instances[iids[0]].state = result.state
                 self.last_results[iids[0]] = result
                 continue
-            batched = jax.tree_util.tree_map(lambda *xs: jnp.stack(xs), *states)
-
-            # The batch runs the engine's *scheduled* iteration (cff-d56d) —
-            # the same function the sequential path loops — so vmapped and
-            # sequential results stay bitwise-comparable. Colored/mixed
-            # schedules also prime once (their exact island passes).
-            if engine._prime is not None and n_iters >= 1:
-                def prime_one(st: State):
-                    msgs, g_eta, g_lam, ef_eta = engine._prime(
-                        st.messages, st.g_eta, st.g_lam, st.ef_eta,
-                        st.g_obs, st.g_mask, st.ef_obs, st.ef_mask, st.params,
-                    )
-                    return _replace(
-                        st, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta
-                    )
-
-                batched = eqx.filter_vmap(prime_one)(batched)
-
-            def one(st: State):
-                msgs, g_eta, g_lam, ef_eta, inner_residual, inner_status = engine._iter_step(
-                    st.messages, st.g_eta, st.g_lam, st.g_obs, st.g_mask,
-                    st.ef_eta, st.ef_obs, st.ef_mask, st.params, damp, True,
-                )
-                return (
-                    _replace(st, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta),
-                    inner_residual,
-                    inner_status,
-                )
-
-            step_v = eqx.filter_vmap(one)
             n = len(states)
             active = np.ones(n, dtype=bool)
             statuses = [RunStatus.BUDGET_EXHAUSTED] * n
@@ -163,19 +133,57 @@ class Colony:
                 if not engine._state_is_finite(st):
                     active[b] = False
                     statuses[b] = RunStatus.DIVERGED
+                    inner_statuses[b] = RunStatus.DIVERGED
+                    inner_residuals[b] = float("inf")
                 elif engine._has_zero_support(st):
                     active[b] = False
                     statuses[b] = RunStatus.INFEASIBLE
                     energies[b].append(float("inf"))
 
+            def freeze(old, new, *, active=active, n=n):
+                mask = jnp.asarray(active).reshape((n,) + (1,) * (old.ndim - 1))
+                return jnp.where(mask, new, old)
+
+            batched = jax.tree_util.tree_map(lambda *xs: jnp.stack(xs), *states)
+
+            # The batch runs the engine's *scheduled* iteration (cff-d56d) —
+            # the same function the sequential path loops — so vmapped and
+            # sequential results stay bitwise-comparable. Colored/mixed
+            # schedules also prime once (their exact island passes).
+            if engine._prime is not None and n_iters >= 1 and active.any():
+                def prime_one(st: State):
+                    msgs, g_eta, g_lam, ef_eta = engine._prime(
+                        st.messages, st.g_eta, st.g_lam, st.ef_eta,
+                        st.g_obs, st.g_mask, st.ef_obs, st.ef_mask, st.params,
+                    )
+                    return _replace(
+                        st, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta
+                    )
+
+                primed = eqx.filter_vmap(prime_one)(batched)
+                # Rejected inputs stay frozen across initial propagation too.
+                if active.all():
+                    batched = primed
+                else:
+                    batched = jax.tree_util.tree_map(freeze, batched, primed)
+
+            def one(st: State):
+                msgs, g_eta, g_lam, ef_eta, inner_residual, inner_status = engine._iter_step(
+                    st.messages, st.g_eta, st.g_lam, st.g_obs, st.g_mask,
+                    st.ef_eta, st.ef_obs, st.ef_mask, st.params, damp, True,
+                )
+                return (
+                    _replace(st, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta),
+                    inner_residual,
+                    inner_status,
+                )
+
+            step_v = eqx.filter_vmap(one)
+
             for _ in range(n_iters):
                 if not active.any():
                     break
                 candidate, inner_r, inner_code = step_v(batched)
-
-                def freeze(old, new):
-                    mask = jnp.asarray(active).reshape((n,) + (1,) * (old.ndim - 1))
-                    return jnp.where(mask, new, old)
 
                 previous = batched
                 batched = jax.tree_util.tree_map(freeze, batched, candidate)
