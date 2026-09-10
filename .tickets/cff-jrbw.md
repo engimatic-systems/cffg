@@ -1,6 +1,6 @@
 ---
 id: cff-jrbw
-status: open
+status: in_progress
 deps: [cff-ii9t]
 links: [cff-gl89]
 created: 2026-09-02T04:17:42Z
@@ -121,3 +121,7 @@ Pre-implementation handoff at source 20c0367 while cff-ii9t's final gate runs. S
 **2026-09-10T07:20:21Z**
 
 Prerequisite cff-ii9t is closed and published as PR #130. Use its final published agent/cff-ii9t-iteration-control head as the work-branch base. Code/test source 20c0367 has a final 2,059-test gate (41 slow deselections, four existing warnings), recorded in bbbbccb; measured wall 1,155.815 seconds. Ordinary outcome/finalization lives in iteration_types.py/run_results.py; shared host predicates are in runtime_checks.py. Extend the result authority for exact/outer facts without changing the already-extracted ordinary policy.
+
+**2026-09-10T07:25:58Z**
+
+Starting from verified PR #130 head b379a28 after an ff-only pull. Applicable change paths: Runtime numerical or status invariant, plus explicit GFE chart inputs under New factor or rule family. Paired surfaces: host checks/fused JIT exact certification; flooding/colored/mixed schedule propagation; standalone/existing Colony exact and GFE fallback routes; restored State/current parameter and observation context. New IR/checkpoint schema and unsupported outer-vmap execution are N/A. Preserve schedule instrumentation aliases, dynamic chart/hard-value cache inputs, exact logical counts independent of trace lengths, and strategy-specific tolerance semantics. No mathematical or solver-policy change is intended.
