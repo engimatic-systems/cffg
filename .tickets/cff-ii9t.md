@@ -113,3 +113,7 @@ PR #108 research — question: does one-instance vmap test Colony result handlin
 **2026-09-10T00:09:36Z**
 
 The cff-sf29 inventory found and directly reproduced the initial-state result discrepancy now isolated in cff-yglj. That ticket is an additional prerequisite here: it establishes one corrected initial-failure contract before this behavior-preserving extraction. Do not preserve Colony's old inner_status=converged/inner_residual=0 for an initially non-finite state merely because the pre-repair characterization baseline recorded it. The overall status was already diverged; the repair concerns consistent inner facts and retaining the rejected state. Ordinary valid-state baseline fixtures remain unchanged.
+
+**2026-09-10T00:49:06Z**
+
+cff-yglj is now closed. Source 1308688 repairs initial Colony result facts and freezes rejected inputs across priming; its final gate passed 1,843 tests with 41 slow deselections and four existing warnings, recorded in e30b330. tests/test_colony_failures.py contains 25 reference cases for the controller extraction. Preserve this corrected behavior, not the pre-repair discrepancy recorded at 76251b4. The original valid-state characterization remains unchanged.
