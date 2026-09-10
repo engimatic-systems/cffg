@@ -1,6 +1,6 @@
 ---
 id: cff-jby3
-status: open
+status: in_progress
 deps: [cff-ny7f]
 links: [cff-ii9t, cff-sf29]
 created: 2026-09-10T01:20:57Z
@@ -94,3 +94,9 @@ Checkpoint map: _agent_checkpoint.static_parameter_hash(:216) hashes grounded fi
 **2026-09-10T02:14:28Z**
 
 Checkpoint acceptance clarification: strict fixed-data hashes are checked by _validate_versioned_envelope (:337-343); the old agent:version=1 and raw legacy decoders predate strict identity. Criterion 11 now preserves that actual contract rather than claiming a missing legacy hash can detect changed input data. Test current mismatch rejection and supported legacy reconstruction separately. Also update README Colony caching wording when shape-compatible batching lands: one Engine object can hold several JAX shape/dtype specializations; one cached Engine must not be described as universally one numerical compilation.
+
+**2026-09-10T02:34:14Z**
+
+Starting from updated published PR #124 head 8f8aa6f82363270a3b345401235d7b8fcd2fa1e9. The extraction gate passed 1,894 default tests at code/test source b84560e, recorded in a7e87c7. Primary change paths and all four consumers are mapped above. Keep ConstraintPlan structural: validated integer thresholds and allowed-tuple arrays will move to initial runtime parameters, with explicit family-prefixed keys and no runtime fallback to a captured plan value. A typed constraint-resolution result will carry the plan and its initial parameter mapping. Current numerical rule functions are unchanged. Compatible State shapes/dtypes will batch under one cached Engine per public structure hash; incompatible table lengths get separate batches, not fabricated padding or sequential fallback for compatible peers.
+
+Tests first reproduce the existing wrong-data mechanism, then verify both spawn orders, solo/result parity, actual vmap for compatible healthy peers, sum/max consumers, both float precisions, tenfold table size, and strict versus legacy reconstruction. New IR fields are N/A; derived compiled fields and State parameter keys intentionally change to correct data ownership. The exact-path JIT support check remains N/A for constraints, as confirmed in its admission guard. No solver, CSP numerical formula, public model hash, schema or public status changes.
