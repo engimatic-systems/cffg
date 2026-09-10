@@ -528,9 +528,10 @@ def test_hard_constraint_threshold_and_endpoint_order():
         cards=(2, 2, 2),
         gather=[1, 3, 5],
         scatter=[0, 2, 4],
-        k=1,
-        table=None,
+        parameter_key="constraint:c:k",
     )
+    assert not hasattr(plan, "k") and not hasattr(plan, "table")
+    np.testing.assert_array_equal(arena.log_params[plan.parameter_key], 1)
 
 
 def test_parameter_edges_have_count_slots_not_categorical_entropy():

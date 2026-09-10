@@ -16,6 +16,7 @@ from cffg._agent_mu3 import (
     prepared_inputs_match,
     restore_runtime,
 )
+from cffg._constraint_checkpoint import legacy_constraint_keys
 from cffg.compiler import _log_of, _resolve_arrays
 from cffg.core.ir import AgentSpec, Template
 from cffg.engine import _replace
@@ -408,6 +409,15 @@ def _validate_versioned_envelope(
         run_options=_planning_run_options(agent),
     )
     actual_mu3_fields = {field for field in fields if field.startswith("mu3:")}
+    if runtime.result is not None:
+        reconstructed = legacy_constraint_keys(
+            data,
+            _checkpoint_json(data["mu3:state:metadata"], "mu3:state:metadata"),
+            runtime.result.state.params.keys(),
+            {plan.parameter_key for plan in agent.plan.arena.constraint_groups
+             if plan.parameter_key is not None},
+        )
+        actual_mu3_fields |= {f"mu3:state:param:{key}" for key in reconstructed}
     if actual_mu3_fields != set(expected_mu3):
         raise KeyError(
             "functional checkpoint field inventory does not match its metadata"

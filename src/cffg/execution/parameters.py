@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import NamedTuple
 
 import jax
-import jax.numpy as jnp
 
 from cffg.compiled import (
     ConstraintPlan,
@@ -108,10 +107,12 @@ def gfe_parameters(plan: GfePlan, values: Parameters) -> GfeParameters:
     )
 
 
-def constraint_defaults(plan: ConstraintPlan) -> ConstraintParameters:
-    """Initial constant arrays from the compiled constraint declaration."""
+def constraint_parameters(
+    plan: ConstraintPlan, values: Parameters
+) -> ConstraintParameters:
+    """Select this instance's data without capturing another arena's defaults."""
     if plan.type in ("exactly_k", "at_most_k"):
-        return ConstraintParameters(threshold=jnp.asarray(plan.k))
+        return ConstraintParameters(threshold=values[plan.parameter_key])
     if plan.type == "table":
-        return ConstraintParameters(table=jnp.asarray(plan.table))
+        return ConstraintParameters(table=values[plan.parameter_key])
     return ConstraintParameters()

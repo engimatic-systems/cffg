@@ -1,8 +1,8 @@
 """Colony execution: many small graphs, one machine (ARCHITECTURE §5b).
 
 An instance is pure data — (structure key, State pytree). Engines are cached
-by structure hash, so N instances of one template cost one compilation.
-Ordinary iterative plans stack a structure-group's states and run one vmapped
+by structure hash; JAX specializes their programs to numeric shapes and dtypes.
+Ordinary iterative plans stack compatible states and run one vmapped
 step-loop; mixed-GFE plans share the compiled numerical kernels but retain
 per-instance trust controllers until cff-wbhu. Instances couple only through
 the host (bind_data / read marginals), never by merging graphs.
@@ -27,6 +27,12 @@ from cffg.engine import Engine, RunResult, RunStatus, State, _replace
 class _Instance:
     key: str  # structure hash
     state: State
+
+
+def _batch_signature(state: State) -> tuple:
+    """Stack only matching numerical layouts; values do not define a batch."""
+    leaves, structure = jax.tree_util.tree_flatten(state)
+    return structure, tuple((value.shape, value.dtype) for value in leaves)
 
 
 class Colony:
@@ -85,11 +91,11 @@ class Colony:
         Rule evaluation remains vmapped.  Termination is tracked per instance
         on the host until cff-wbhu moves this status carry into ``lax.scan``.
         """
-        by_key: dict[str, list[int]] = {}
+        by_key: dict[tuple, list[int]] = {}
         for iid, inst in self.instances.items():
-            by_key.setdefault(inst.key, []).append(iid)
+            by_key.setdefault((inst.key, _batch_signature(inst.state)), []).append(iid)
 
-        for key, iids in by_key.items():
+        for (key, _signature), iids in by_key.items():
             engine = self.engines[key]
             states = [self.instances[i].state for i in iids]
             if engine.arena.gfe_groups or engine.arena.gfe_tm_groups:

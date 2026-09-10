@@ -149,9 +149,16 @@ def resolve_compile_data(
     constraint_groups = []
     for draft in specialized.constraints:
         try:
-            constraint_groups.append(resolve_constraint(draft, resolved))
+            constraint = resolve_constraint(draft, resolved)
         except ConstraintValidationError as error:
             raise CompileError(str(error)) from error
+        collision = parameters.keys() & constraint.parameters.keys()
+        if collision:
+            raise CompileError(
+                f"constraint parameter address collision: {sorted(collision)}"
+            )
+        constraint_groups.append(constraint.plan)
+        parameters.update(constraint.parameters)
     rejects = semiring_problem(
         specialized,
         any(group.mode == "vmp" for group in groups),

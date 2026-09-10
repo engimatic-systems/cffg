@@ -190,8 +190,9 @@ def test_constraint_payload_is_unresolved_until_family_validation():
     ] == [("c", "k", "kk")]
     assert draft.arrays.inputs[0].initializer_shape is None
     assert [(d.kind, d.name) for d in draft.arrays.destinations] == [("payload", "k")]
-    plan = resolve_constraint(draft, arrays)
-    assert plan.k == 1
+    resolved = resolve_constraint(draft, arrays)
+    assert not hasattr(resolved.plan, "k") and not hasattr(resolved.plan, "table")
+    np.testing.assert_array_equal(resolved.parameters[resolved.plan.parameter_key], 1)
     with pytest.raises(ValueError, match="scalar integer"):
         resolve_constraint(draft, {**arrays, "kk": np.array(1.5)})
 

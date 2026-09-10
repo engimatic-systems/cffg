@@ -69,6 +69,8 @@ EPIC_FILES = {
         "test_execution.py",
         "test_execution_specialized.py",
         "test_colony_failures.py",
+        "test_constraint_data.py",
+        "test_constraint_reconstruction.py",
         "test_agent.py",
         "test_agent_mu3.py",
         "test_agent_spec.py",
