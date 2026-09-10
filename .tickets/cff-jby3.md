@@ -1,6 +1,6 @@
 ---
 id: cff-jby3
-status: in_progress
+status: closed
 deps: [cff-ny7f]
 links: [cff-ii9t, cff-sf29]
 created: 2026-09-10T01:20:57Z
@@ -116,3 +116,9 @@ Implementation and focused verification are complete. All 152 tests in the final
 Thirty existing checkpoint/restore-focused cases passed in 249.54 seconds (nine deselections), before the final outer-inventory adjustment; the upcoming default gate will validate that final source against all existing cases. Earlier compiler/CSP focused evidence is 168 passing tests. CSP/rules source files are unchanged. The only compiler characterizations updated are the intentionally obsolete plan.k/table storage assertions; endpoint order, public model hashes and numerical authorities remain unchanged.
 
 Ruff passes for the new helper, changed small modules, compiled values and new tests. Baseline findings are unchanged by code/message multiset: Engine 23, Colony 5, _agent_mu3 7, _agent_checkpoint 3. New/changed small-file formatting, git diff --check and tk dep cycle pass. Architecture, README batching/checkpoint descriptions, change-path test anchors, and dashboard enrollment are updated. LIMITATIONS S10 is removed because the defect is repaired. No final full-suite claim yet; run it once after this final source commit and use its measured timing rather than repeatedly polling.
+
+**2026-09-10T03:22:54Z**
+
+Final default gate passed at code/test source 84aa318: 1,974 tests passed, 41 slow tests deselected, and four existing Gym deprecation warnings; pytest reported 1,119.00 seconds and measured wall time was 1,132.293 seconds. Completion was 2026-09-10T03:21:26.867992+00:00, recorded against ea82c53. The dashboard was refreshed and includes the 80 new constraint cases. The only intervening commit ea82c53 records the next ticket handoff; no source/test change supersedes this result. The suite was checked once, after the expected completion window, and will not be rerun for publication.
+
+All acceptance criteria are satisfied. The numerical constraint rules and public structure hash are unchanged; instance parameters, compatible vectorized batches and strict/legacy reconstruction are covered by the final gate. Close this ticket and publish the next PR above #124; cff-nyad is the next ready architecture step. Its note already maps the exact schedule boundary and preserved hostile-input/transport tests. Independent agent review remains unavailable at the reported usage limit; no such review is claimed.
