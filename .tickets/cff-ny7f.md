@@ -106,3 +106,13 @@ executors. `cff-wbhu` remains the separate compiled-loop performance owner.
 **2026-09-09T03:29:39Z**
 
 PR #108 research — question: can one state-gathering executor serve every schedule? Answer: registerized scans consume prefetched/carried blocks and scatter once; a local-block rule API lets both transport paths share mathematics. ExecutionDelta must also carry existing inner residual/status facts or a failed local solve can disappear at the boundary. Sources at 7885bf5: engine.py:2545-2658, 2924, 3036, 3191-3196, 3288-3406; Part II section 4.5, p.15 distinguishes stationary equations from iteration convergence. Confidence: high; no benchmarks run.
+
+**2026-09-10T00:11:44Z**
+
+Pre-extraction handoff from cff-sf29 at unchanged production baseline 76251b44fc467a976aa056556f8fb371fe5de7f4: use the compact family/owner inventory in that ticket instead of re-reading the whole engine. kernel_runtime.py already centralizes registered discrete/Gaussian local calls; retain that authority rather than introducing a second dispatch path. The extraction must cover registered EF and explicit mixture/recurrence/structured recurrence/precision/GFE/transition-GFE/hybrid-GFE/functional evaluators as applicable.
+
+Two non-local facts constrain the local API. First, shared-goal updates collect fresh original predictions from all GFE groups before write_goal_counts at engine.py:2832 and before final damping; a family executor returns those contributions but must not finalize a shared parameter independently. Second, mu3's prepared particle state and update lifecycle (engine.py:515-695) are not a second structural factor execution. Preserve that boundary and the once-only parameter ledger at :3826-3832 while leaving lifecycle and objective extraction to their tickets.
+
+For transport parity, inspect only the relevant callers: _make_step:2708-2947, batch_stage:2948, registerized_scan:3095 and flat_scan:3326. Registerized chains keep prefetched local blocks and one final scatter; all mathematical parameter/mode selection should have one owner regardless of transport. Existing discrete/Gaussian chain tests already check carry size, persistent bytes and trace reuse. New test_engine_contracts pins real two-instance iterative batching plus another structure and full result/cache identities.
+
+cff-yglj is a separate small result-reporting correction that can proceed alongside this ticket after characterization closes; it blocks cff-ii9t, not per-plan extraction. Do not change run policy or fix unrelated specialized input validation (cff-34gi) in this code move.
