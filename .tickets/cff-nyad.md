@@ -1,7 +1,7 @@
 ---
 id: cff-nyad
 status: open
-deps: [cff-ny7f]
+deps: [cff-ny7f, cff-jby3]
 links: [cff-5xdy]
 created: 2026-09-02T04:17:42Z
 type: chore

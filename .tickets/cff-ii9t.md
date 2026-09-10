@@ -2,7 +2,7 @@
 id: cff-ii9t
 status: open
 deps: [cff-5xdy, cff-yglj]
-links: [cff-jrbw]
+links: [cff-jrbw, cff-sf29, cff-jby3]
 created: 2026-09-02T04:17:42Z
 type: chore
 priority: 1
