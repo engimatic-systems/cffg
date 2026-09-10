@@ -1,6 +1,6 @@
 ---
 id: cff-ii9t
-status: in_progress
+status: closed
 deps: [cff-5xdy, cff-yglj, cff-3ose]
 links: [cff-jrbw, cff-sf29, cff-jby3]
 created: 2026-09-02T04:17:42Z
@@ -168,3 +168,9 @@ Ordinary controller implementation checkpoint: iteration.py owns the soft/hard c
 Evidence: the trusted pre-extraction Engine and Colony at a2c55e6 matched all public fields in 118 complete results (100 standalone configurations across ten model families and both precisions, plus 18 Colony results), with 3,818 byte-identical scalar/array comparisons. After the final per-group callback binding, the 18 Colony results were rechecked with 486 byte-identical comparisons. The existing mixed-precision mu3 scatter warning also appears in this bounded comparison; no new warning is claimed. This is baseline compatibility evidence, not an independent mathematical oracle.
 
 Existing failure/engine-contract/runtime/Colony selection: 72 passed, 3 slow deselected, 14.71 seconds. New boundary file: 16 passed in 0.96 seconds. Final boundary/schedule/CSP/GFE/mu3 selection: 82 passed, 3 slow deselected, 58.01 seconds. New modules/tests pass Ruff and formatting; Engine findings decrease 19 to 16, Colony five to three, with no new findings. New owner sizes: iteration 282, types 98, result finalizer 77, runtime checks 147; boundary tests 202. The new test file is dashboard-enrolled. Architecture/module maps and change paths describe the actual owners. The final default-suite gate is next; no current-head default result is yet claimed.
+
+**2026-09-10T07:16:58Z**
+
+Completed at code/test source 20c0367, with host checks separately extracted in a746778. The single final default suite passed 2,059 tests, zero failures, 41 slow deselections and four existing Gym warnings. Pytest took 1,142.43 seconds; measured wall time was 1,155.815 seconds. It completed 2026-09-10T07:13:55.778316+00:00 at ticket-only head ef94242. Runtime history and shared dashboard are refreshed; suggested allowance is now 1,470 seconds. The suite output was read once after the planned first deadline, and no later code/test edits supersede the result.
+
+All ordinary run-control, shared assessment, immutable outcome/fact and shared public-result responsibilities are complete. Existing state/result schemas, enum identity, PRNG use, factor/FE mathematics and successful-run behavior are preserved against the repaired baseline. Batching/freezing remain with Colony; exact/outer strategy implementation and public result classification for those paths remain cff-jrbw. Its handoff now records lazy kernel-plan selection and strategy-specific count/tag/certificate rules. PR publication reuses this gate. No significant user decision is pending. Independent agent review is unavailable and is not claimed.
