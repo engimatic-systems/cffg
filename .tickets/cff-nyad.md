@@ -1,6 +1,6 @@
 ---
 id: cff-nyad
-status: in_progress
+status: closed
 deps: [cff-ny7f, cff-jby3]
 links: [cff-5xdy]
 created: 2026-09-02T04:17:42Z
@@ -116,3 +116,9 @@ Ruff/format pass on new modules and tests. Engine lint findings decrease from 23
 **2026-09-10T03:39:00Z**
 
 Final combined focused selection passed after retention of the ScheduleProgram: 62 tests in 31.70 seconds across test_schedule_program.py, test_schedule.py, test_gaussian_kernel_schedules.py, test_discrete_kernels.py and test_engine_contracts.py. No assertion weakening, formula change or schema change was needed. Commit this final source, then run the dashboard-backed default gate once. Cached timing: latest wall 1,132.293 seconds; suggested wait 1,440 seconds. First output check is planned at 20 minutes, with a second only at the 24-minute allowance if still running.
+
+**2026-09-10T03:59:27Z**
+
+Final default gate passed: 1,991 tests, zero failures, 41 opt-in slow deselections and four existing Gym deprecation warnings; pytest reported 1,121.93 seconds and measured wall time was 1,135.251 seconds. Completion: 2026-09-10T03:57:56.251866+00:00, recorded against f48def6. The dashboard includes all 17 new boundary cases. Tested code source is 47701a6; the subsequent f48def6 change is ticket-only. The suite was checked once at the scheduled 20-minute deadline, not repeatedly polled. No later source/test changes supersede the gate.
+
+All acceptance criteria are met: schedule construction and certification composition have one typed owner, registerized transport and numeric/status facts match the baseline, the schedule file is below 1,000 lines, existing oracles remain intact and the architecture index is updated. Close this ticket and publish above PR #125. The next ready ticket is cff-7kfk, moving the remaining synchronous transport through the already-defined sweep-factory interface; its source/caller map and downstream lifecycle handoff are recorded. No new user decision is required.
