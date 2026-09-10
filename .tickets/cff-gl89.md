@@ -36,7 +36,7 @@ earlier snapshot is an inventory, not a baseline to restore.
    2.1. ordinary factor-local BFE terms;
    2.2. GFE and P-substitution terms;
    2.3. shared parameter terms, including functional `mu3` state;
-   2.4. hard-constraint energies and the existing treatment of delta-constrained beliefs; and
+   2.4. hard-constraint energies and the existing treatment of discrete delta-constrained beliefs; and
    2.5. edge-entropy overcounting corrections.
 3. Each registered same-arena kernel contributes through its declared energy
    callback. Each specialized plan contributes through one explicit local-term
@@ -117,6 +117,8 @@ objective owner; that feature is not part of this ticket.
 - **Ledger:** The labeled collection of local terms whose sum is BFE or GFE.
 - **Shared parameter term:** An objective contribution owned once by a
   parameter belief used by several factors.
+- **Discrete delta-constrained belief:** A belief restricted to one category,
+  with probability one there and zero elsewhere.
 
 ## Notes
 
