@@ -2,7 +2,7 @@
 id: cff-3ola
 status: open
 deps: [cff-gl89]
-links: [cff-ws3c, cff-3kdk]
+links: [cff-ws3c, cff-3kdk, cff-7kfk]
 created: 2026-09-02T04:02:01Z
 type: chore
 priority: 1

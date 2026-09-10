@@ -1,7 +1,7 @@
 ---
 id: cff-5xdy
 status: open
-deps: [cff-nyad]
+deps: [cff-nyad, cff-7kfk]
 links: [cff-ii9t]
 created: 2026-09-02T04:17:42Z
 type: chore
@@ -86,3 +86,13 @@ These suggestions are optional. An implementer may choose another sound method.
   epoch without consuming an extra key.
 - **Status authority:** The public owner that turns internal termination facts
   into `RunStatus` and `RunResult`.
+
+## Notes
+
+**2026-09-10T03:44:02Z**
+
+Read-only preparation at 47701a6: ordinary initialization/uniform messages are engine.py:291-347; functional initialization currently lives inside init_state, preparation/readiness/update at :348-531, mu3 diagnostics/results/epoch scoring at :600-703, and data binding at :704-769. Hybrid GFE diagnostics (:532-599) are a readout responsibility already covered by cff-3ola, not a reason to broaden the functional-mu3 lifecycle interface. The new prerequisite cff-7kfk first relocates the remaining synchronous transport without changing these lifecycle algorithms.
+
+Avoid an Engine import cycle: State/_replace and any needed pure public result records can move to a leaf owner with Engine re-exports preserving public imports and field schemas. Ordinary initialization should install defaults and arrays, then merge functional initial parameters supplied by the separate mu3 owner. A bounded functional plan view needs the existing Mu3Plan, associated moment/goal addresses and precomputed latent-message indices; its operations need numeric state/parameter views and explicit keys, not a whole Engine or access to unrelated factor families. Preserve scalar status/residual results and exact key splitting. Epoch scoring must call the existing run authority through an explicit typed callback; it may consume that result but must not add a convergence decision or resample during restore. The prepare/update code currently shares base-posterior checks and low-ESS policy that must move verbatim.
+
+Binding preserves discrete None-to-uniform behavior, Gaussian/EF None-to-unbound masks, custom observed-Gaussian validators, existing unknown-port errors, and all-or-nothing State installation. cff-jby3 constraint keys and old prepared-cache reconstruction are now part of the current baseline; do not resurrect pre-repair empty constraint parameters. Current/legacy decoding remains outside these owners. New IR/schema/formulas/PRNG policy are N/A to modification. Use existing mu3, agent/checkpoint, custom-kernel data, constraint reconstruction and runtime tests plus bounded old/new state/key/diagnostic characterization. No implementation begun; nyad remains under its final gate.
