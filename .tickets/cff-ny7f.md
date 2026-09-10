@@ -1,6 +1,6 @@
 ---
 id: cff-ny7f
-status: open
+status: in_progress
 deps: [cff-sf29]
 links: [cff-nyad, cff-wbhu]
 created: 2026-09-02T04:02:01Z
@@ -130,3 +130,11 @@ RecurrenceComponentPlan, GoalParameterPlan and LearnPlan describe component, par
 **2026-09-10T00:51:06Z**
 
 Published intended implementation base: PR #123, branch agent/cff-yglj-colony-initial-failures. Update that base before branching. Its source 1308688 passed 1,843 default tests, 41 slow deselections and four existing warnings; gate recorded in e30b330. This includes the separately approved initial-failure repair. The engine characterization source baseline remains 76251b4, and its valid-state observable contracts remain unchanged. Preserve the cff-yglj correction during execution extraction; do not reintroduce the earlier Colony discrepancy.
+
+**2026-09-10T00:51:59Z**
+
+Starting from updated PR #123 head 8209628. The exact engine-characterization baseline remains 76251b44fc467a976aa056556f8fb371fe5de7f4, with the separate cff-yglj correction at source 1308688 retained (1,843 passing default tests, gate e30b330). Primary change paths: New factor or rule family and Runtime numerical or status invariant. Learnable/checkpoint applies to parameter/statistic consumers; New IR field and checkpoint decoding are N/A.
+
+Move local parameter selection, input interpretation and existing rule calls behind typed per-plan outputs/facts. Keep schedule selection, flat/register transport, lifecycle checks, host run control, objective formulas and public results outside this extraction. Flooding, batch, registerized and flat scans must share the same registered local call. Preserve static kernel/mode/shape decisions, dynamic numeric inputs, prefetched scan carry and final scatter. Explicit owners include in-graph Dirichlet, mixture, structured recurrence, precision, constraints, fixed/transition/hybrid GFE and functional mu3 numerical phases; metadata-only component/goal/learning plans are not extra executable factors. Shared-goal predictions are pooled once after all contributors and before damping; parameter energy ownership is unchanged. Functional readiness, base checks, host ESS policy and State installation stay staged until cff-5xdy.
+
+Hostile zero/vacuous/improper/nonfinite, float32 and uncomfortable-scale behavior must retain baseline values or loud failure through existing authorities. Direct owner/vmap parity tests cover new typed boundaries; existing scientific oracles remain authoritative. No new solver, schedule, factor type, schema or performance claim. The cff-sf29 inventory and execution handoff are the source map; research agents remain unavailable, so local bounded inspection and executable comparisons supply the review evidence.
