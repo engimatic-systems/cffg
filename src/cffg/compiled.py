@@ -396,6 +396,22 @@ class GfePlan(ImmutableRecord):
 
 
 @dataclass(frozen=True)
+class GoalParameterPlan(ImmutableRecord):
+    """One learned goal shared by blob identity, independent of shape batches.
+
+    Group rows select each composite's prediction exactly once. The first
+    prior/count slot is canonical; all slots on that side carry the same value.
+    """
+
+    prior_blob: str
+    cardinality: int
+    group_rows: tuple[tuple[str, tuple[int, ...]], ...]
+    parameter_edges: tuple[str, ...]
+    prior_scatter: FrozenArray
+    count_scatter: FrozenArray
+
+
+@dataclass(frozen=True)
 class Mu3Plan(ImmutableRecord):
     """One serialized functional parameter-message evaluator.
 
@@ -466,6 +482,7 @@ class Arena(ImmutableRecord):
     ef_interior: tuple[tuple[str, FrozenArray], ...] = field(default_factory=tuple)
     # [(family, [E, 2] slot pairs)] interior EF edges for the entropy ledger
     gfe_groups: tuple[GfePlan, ...] = field(default_factory=tuple)
+    goal_parameter_plans: tuple[GoalParameterPlan, ...] = ()
     mu3_groups: tuple[Mu3Plan, ...] = field(default_factory=tuple)
     gfe_tm_groups: tuple[GfeTmPlan, ...] = field(default_factory=tuple)
     hybrid_gfe_groups: tuple[HybridGfePlan, ...] = field(default_factory=tuple)

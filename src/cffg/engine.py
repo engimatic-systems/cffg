@@ -39,6 +39,7 @@ from jax.scipy.special import logsumexp
 
 from cffg import csp, ef, efrules, gauss, hybrid_gfe, kernels, mixg, recurrence
 from cffg.compiled import NEG, Arena
+from cffg.goal_parameters import shared_goal_energy, write_goal_counts
 from cffg.kernel_runtime import (
     discrete_energy as _disc_energy,
     discrete_message as _disc_message,
@@ -81,7 +82,6 @@ from cffg.rules import (
     gfe_tm_update,
     gfe_update,
     gfe_update_stats,
-    goal_dirichlet_energy,
     mu3_importance_update,
 )
 
@@ -1906,23 +1906,22 @@ class Engine:
         """
         parameter = self.dirichlet_marginals(state)
         out: dict[str, np.ndarray] = {}
-        for group in self.arena.gfe_groups:
-            for tied in group.goal_tie_groups:
-                first = tied[0]
-                blob = group.goal_prior_blobs[first]
-                marginal = parameter[group.goal_param_edges[first]]
+        for plan in self.arena.goal_parameter_plans:
+            blob = plan.prior_blob
+            alpha = parameter[plan.parameter_edges[0]].alpha
+            for edge in plan.parameter_edges:
+                marginal = parameter[edge]
                 if not marginal.proper:
                     raise ValueError(
                         f"goal prior {blob!r}: posterior is improper; "
                         "rollover requires a completed proper coordinate"
                     )
-                alpha = marginal.alpha.copy()
-                if blob in out and not np.array_equal(out[blob], alpha):
+                if not np.array_equal(alpha, marginal.alpha):
                     raise ValueError(
                         f"goal prior blob {blob!r} has inconsistent posteriors "
-                        "across compiled composite groups"
+                        "across compiled goal parameter edges"
                     )
-                out[blob] = alpha
+            out[blob] = alpha.copy()
         return out
 
     def with_goal_priors(
@@ -2764,6 +2763,7 @@ def _make_step(arena: Arena, skip_scheduled: bool = False):
             )
         for scatter, cards, out in _constraint_writes(arena, messages, op):
             new = _set_disc_rows(arena, new, scatter, cards, out)
+        goal_predictions = {}
         for g in arena.gfe_groups:
             ko, ki = g.cards
             k_local = max(g.cards)
@@ -2819,13 +2819,7 @@ def _make_step(arena: Arena, skip_scheduled: bool = False):
             new = _set_disc_block(arena, new, g.scatter_z, ki, mu2)
             new = _set_disc_block(arena, new, g.scatter_x, ko, log_qx)
             if g.goal_learned:
-                predicted = jnp.exp(log_qx[..., :ko])
-                for tied in g.goal_tie_groups:
-                    rows = jnp.asarray(tied)
-                    combined = predicted[rows].sum(axis=0)
-                    predicted = predicted.at[rows].set(
-                        jnp.broadcast_to(combined, predicted[rows].shape)
-                    )
+                goal_predictions[g.name] = jnp.exp(log_qx[..., :ko])
                 new = _set_disc_block(
                     arena,
                     new,
@@ -2833,15 +2827,9 @@ def _make_step(arena: Arena, skip_scheduled: bool = False):
                     ko,
                     c_alpha0,
                 )
-                new = _set_disc_block(
-                    arena,
-                    new,
-                    g.goal_count_scatter,
-                    ko,
-                    predicted,
-                )
             inner_residual = jnp.maximum(inner_residual, jnp.max(residuals))
             inner_status = jnp.maximum(inner_status, jnp.max(statuses))
+        new = write_goal_counts(arena, new, goal_predictions)
         for g in arena.gfe_tm_groups:
             ko, ki, ku = g.cards
             k_local = max(g.cards)
@@ -3801,6 +3789,7 @@ def _make_bfe(arena: Arena):
                 total = total + fn(inc, c.cards, table=jnp.asarray(c.table))
             else:
                 total = total + fn(inc, c.cards)
+        goal_predictions = {}
         for g in arena.gfe_groups:
             _, ki = g.cards
             ko, _ = g.cards
@@ -3822,13 +3811,7 @@ def _make_bfe(arena: Arena):
                     log_d, abar, hbar, expected_log_c
                 )
                 total = total + structural.sum()
-                for tied in g.goal_tie_groups:
-                    rows = jnp.asarray(tied)
-                    total = total + goal_dirichlet_energy(
-                        alpha[rows[0]],
-                        alpha0[rows[0]],
-                        predicted[rows].sum(axis=0),
-                    )
+                goal_predictions[g.name] = predicted
             elif g.mu3:
                 total = total + gfe_energy_stats(
                     log_d,
@@ -3840,6 +3823,7 @@ def _make_bfe(arena: Arena):
                 total = total + gfe_energy(
                     log_d, params[a_key], params[g.name + ":c"], learned=g.learned
                 ).sum()
+        total = total + shared_goal_energy(arena, messages, params, goal_predictions)
         # The structural terms above contain -E_q[Σ phi_t]. At the coordinate
         # optimum q*(A) ∝ q0(A) exp(Σ phi_t), the shared parameter ledger is
         # KL(q*||q0) = E_q[Σ phi_t] - log Z. Add it exactly once per tied

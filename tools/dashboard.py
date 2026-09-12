@@ -55,6 +55,7 @@ EPIC_FILES = {
         "test_mu3_derivation.py",
         "test_mu3.py",
         "test_goal_hyperprior.py",
+        "test_shared_goals.py",
         "test_factored_rollout.py",
         "test_outer_gfe_formalism.py",
     ],

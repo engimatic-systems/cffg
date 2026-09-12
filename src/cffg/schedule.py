@@ -180,6 +180,13 @@ def _arena_signature(arena: Arena) -> str:
             g.goal_count_scatter,
         ):
             h.update(np.ascontiguousarray(rows).tobytes())
+    for plan in arena.goal_parameter_plans:
+        h.update(
+            f"goal|{plan.prior_blob}|{plan.cardinality}|{plan.group_rows}|"
+            f"{plan.parameter_edges}".encode()
+        )
+        for slots in (plan.prior_scatter, plan.count_scatter):
+            h.update(np.ascontiguousarray(slots).tobytes())
     for plan in arena.mu3_groups:
         h.update(
             f"mu3|{plan.name}|{plan.evaluator}|{plan.param_blob}|"
