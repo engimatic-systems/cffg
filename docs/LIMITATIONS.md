@@ -334,6 +334,11 @@ current semantics. Flooding and mixed scheduling solve the same
 coordinates, but neither guarantees monotone progress on every loopy hybrid
 graph.
 
+All five currently registered declared-learning families provide the generic
+persistent-state descriptor. Archive storage and restoration of those
+descriptors are deliberately deferred to `cff-enhs`; this release records and
+validates their meaning but does not make model-only CFFGZ bundles resumable.
+
 The recurrence learning readout carries the Gaussian covariance computed
 directly from precision; it does not reconstruct covariance as
 `second - mean @ mean.T`. After a scale-relative symmetry and PSD check it uses

@@ -1441,6 +1441,10 @@ def _resolve_learnables(
             )
         ftype = ftypes.pop()
         family = FAMILIES[spec.family]
+        try:
+            semantic_identity = family.canonical_identity(spec.semantic_identity)
+        except ValueError as err:
+            raise CompileError(f"learnable {name!r}: {err}") from None
         # Only the blobs this template actually reads: one learnable spans a
         # probability blob and a counts blob (build_rollout's A/Ac, Bs/Bc), and
         # a perception graph resolves the first while a planning graph with
@@ -1520,7 +1524,10 @@ def _resolve_learnables(
         # template reads A only through GFE composites, and learns nothing.
         # Statistics come from the perception template, parameters flow back.
         plans.append(
-            LearnPlan(name, spec.family, ftype, shapes, tuple(sources), tuple(targets))
+            LearnPlan(
+                name, spec.family, semantic_identity, ftype, shapes,
+                tuple(sources), tuple(targets)
+            )
         )
     return plans
 

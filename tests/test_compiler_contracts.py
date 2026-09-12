@@ -100,12 +100,12 @@ IDENTITIES = {
         "c44f455d3bc71f68dad130ff7b0d14344bdc1818793867936b386c5c35ccfb54",
     ),
     "learning": (
-        "9d7b679129879a07c310122a6aa831e07c7a723d877260520969bd3a30f7b07d",
+        "c18a8e0d2fcd98acd6df8fab0fc3c731e7da1257050271e719920db9de1b72a3",
         "two_pass",
         "c0b3f1a9c468ca043a5735f5970cb83f1b916fc4895e57fa7a92da945e75ed5c",
     ),
     "agent": (
-        "afde0a8e53be36afd58662c39ef36c27b9740412a8133a243018b157ae94f161",
+        "e1d1ce9ac1ffa3ed57e5e8c435da14b92f71ef7b945d3b3f5ac86f0583603536",
         "mixed",
         "df58038adff8df1ee92ba318b91e0b0303c04d2846cdecb63ba676bd38386c5c",
     ),

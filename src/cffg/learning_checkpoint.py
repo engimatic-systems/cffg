@@ -36,7 +36,10 @@ def _recurrence_plans(plans: Mapping[str, object]) -> list[object]:
     )
 
 
-def _descriptor(plan, params: Mapping[str, np.ndarray]) -> dict:
+def _descriptor(
+    plan,
+    params: Mapping[str, np.ndarray],
+) -> dict:
     targets = sorted(
         {
             (
@@ -52,6 +55,7 @@ def _descriptor(plan, params: Mapping[str, np.ndarray]) -> dict:
     return {
         "name": plan.name,
         "family": plan.family,
+        "semantic_identity": plan.semantic_identity,
         "factor_type": plan.ftype,
         "sources": list(plan.sources),
         "parameter_blobs": [
@@ -83,26 +87,36 @@ def _descriptor(plan, params: Mapping[str, np.ndarray]) -> dict:
 def manifest_document(
     plans: Mapping[str, object],
     params: Mapping[str, Mapping[str, np.ndarray]],
+    initial_params: Mapping[str, Mapping[str, np.ndarray]] | None = None,
 ) -> dict | None:
-    """Return the canonical D9 manifest, or ``None`` without recurrence."""
+    """Return canonical declared-learning ownership and array metadata."""
     recurrence = _recurrence_plans(plans)
     if not recurrence:
         return None
-    return {
+    document = {
         "checkpoint_version": RECURRENCE_CHECKPOINT_VERSION,
-        "statistic_identity": RECURRENCE_STATISTIC_IDENTITY,
         "learnables": [
-            _descriptor(plan, params[plan.name]) for plan in recurrence
+            _descriptor(
+                plan,
+                params[plan.name],
+            )
+            for plan in recurrence
         ],
     }
+    # Kept for backwards-compatible diagnostics of the one historical
+    # ambiguity. Per-learnable semantic_identity is the general authority.
+    if recurrence:
+        document["statistic_identity"] = RECURRENCE_STATISTIC_IDENTITY
+    return document
 
 
 def encode_manifest(
     plans: Mapping[str, object],
     params: Mapping[str, Mapping[str, np.ndarray]],
+    initial_params: Mapping[str, Mapping[str, np.ndarray]] | None = None,
 ) -> np.ndarray | None:
     """Encode the recurrence manifest as one scalar Unicode npz value."""
-    document = manifest_document(plans, params)
+    document = manifest_document(plans, params, initial_params)
     if document is None:
         return None
     return np.asarray(
@@ -218,7 +232,10 @@ def validate_manifest(
             "recurrence learnables"
         )
     document = _decode_scalar(value)
-    allowed = {"checkpoint_version", "statistic_identity", "learnables"}
+    recurrence = _recurrence_plans(plans)
+    allowed = {"checkpoint_version", "learnables"}
+    if recurrence:
+        allowed.add("statistic_identity")
     if set(document) != allowed:
         raise ValueError(
             "recurrence checkpoint manifest fields do not match the current "
@@ -229,7 +246,7 @@ def validate_manifest(
             "unknown recurrence checkpoint version "
             f"{document['checkpoint_version']!r}"
         )
-    if document["statistic_identity"] != RECURRENCE_STATISTIC_IDENTITY:
+    if recurrence and document["statistic_identity"] != RECURRENCE_STATISTIC_IDENTITY:
         raise ValueError(
             "recurrence checkpoint statistic identity is not the current "
             "D9 structured-pair identity"

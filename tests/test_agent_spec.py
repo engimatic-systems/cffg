@@ -249,7 +249,9 @@ def test_agent_spec_json_bundle_and_hash_round_trip(tmp_path):
     save_bundle(path, template, arrays)
     bundled, bundled_arrays, _manifest = load_bundle(path)
     assert bundled.agent == template.agent
-    assert bundled.learnables == template.learnables
+    assert bundled.learnables["d"].semantic_identity == (
+        "cffg.dirichlet.node-belief/1.0.0"
+    )
     assert structure_hash(bundled) == structure_hash(template)
     assert set(bundled_arrays) == set(arrays)
 

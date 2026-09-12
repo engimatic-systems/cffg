@@ -13,6 +13,17 @@ def _copy_params(params: Mapping[str, object]) -> dict[str, np.ndarray]:
     return {key: np.asarray(value).copy() for key, value in params.items()}
 
 
+def _canonical_identity(family, declared: str | None) -> str:
+    if declared is None:
+        return family.semantic_identity
+    if declared != family.semantic_identity:
+        raise ValueError(
+            f"semantic identity {declared!r} is incompatible with family "
+            f"{family.name!r}; expected {family.semantic_identity!r}"
+        )
+    return declared
+
+
 def _require_keys(
     learnable: str, params: Mapping[str, object], expected: set[str], family: str
 ) -> None:
@@ -53,7 +64,11 @@ class NIWFamily:
 
     name = "niw"
     readout = "gaussian_node_stats"
+    semantic_identity = "cffg.gaussian.niw-node-moments/1.0.0"
     _PARAMS = {"mu", "kappa", "psi", "nu"}
+
+    def canonical_identity(self, declared):
+        return _canonical_identity(self, declared)
 
     def check(self, learnable, ftype, shapes, roles) -> None:
         if ftype != "gaussian":
@@ -158,7 +173,11 @@ class MNIWFamily:
 
     name = "mniw"
     readout = "gaussian_node_stats"
+    semantic_identity = "cffg.gaussian.mniw-node-moments/1.0.0"
     _PARAMS = {"m", "lam", "psi", "nu"}
+
+    def canonical_identity(self, declared):
+        return _canonical_identity(self, declared)
 
     def check(self, learnable, ftype, shapes, roles) -> None:
         if ftype != "gaussian_linear":

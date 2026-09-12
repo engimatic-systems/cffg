@@ -355,6 +355,7 @@ class LearnPlan(ImmutableRecord):
 
     name: str
     family: str
+    semantic_identity: str
     ftype: str  # factor type of the sources — fixes the sufficient statistic
     shapes: Mapping[str, tuple[int, ...]]  # blob -> array shape
     sources: tuple[str, ...]  # factor names, sorted

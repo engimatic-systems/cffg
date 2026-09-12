@@ -125,11 +125,15 @@ def to_dict(t: Template) -> dict[str, Any]:
     # model that learns its transitions is a different model from one that
     # does not, so this participates in the structure hash.
     if t.learnables:
+        from cffg.learn import canonical_semantic_identity
+
         d["learnables"] = {
             name: (
-                {"family": ln.family, "blobs": list(ln.blobs), "sources": list(ln.sources)}
+                {"family": ln.family, "blobs": list(ln.blobs), "sources": list(ln.sources),
+                 "semantic_identity": canonical_semantic_identity(ln.family, ln.semantic_identity)}
                 if ln.sources is not None
-                else {"family": ln.family, "blobs": list(ln.blobs)}
+                else {"family": ln.family, "blobs": list(ln.blobs),
+                      "semantic_identity": canonical_semantic_identity(ln.family, ln.semantic_identity)}
             )
             for name in sorted(t.learnables)
             for ln in [t.learnables[name]]
@@ -233,6 +237,7 @@ def from_dict(d: dict[str, Any]) -> Template:
                 spec["family"],
                 tuple(spec["blobs"]),
                 tuple(spec["sources"]) if "sources" in spec else None,
+                spec.get("semantic_identity"),
             )
             for name, spec in d.get("learnables", {}).items()
         },

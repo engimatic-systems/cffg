@@ -1,6 +1,6 @@
 ---
 id: cff-xabn
-status: open
+status: in_progress
 deps: [cff-6tek, cff-s6yy]
 links: []
 created: 2026-08-31T03:16:28Z
@@ -113,3 +113,7 @@ Retained bounded-scan candidates and intended meanings: canonical=normalized Num
 **2026-08-31T03:25:56Z**
 
 Post-handoff scan additions: implement=the planned descriptor and migration work; appropriate=the named semantics-versus-storage ticket boundary; intended=the locally stated classification meaning.
+
+**2026-09-12T19:25:42Z**
+
+Implemented semantic identities and generic persistent-state descriptors. LearnableSpec now serializes a deterministic versioned family identity; compiler plans retain it; composition and plate expansion preserve it; legacy declarations migrate on re-save. Learnables exposes immutable prior/current descriptor arrays with canonical floating dtypes, while the recurrence checkpoint manifest binds D9 identity plus the new descriptor metadata. Focused validation: uv run python -m compileall -q src/cffg; focused learning/serialization pytest selection (all passed). Full short-suite gate is next. Host/JIT, flooding/scheduled, and single-instance/vmap are N/A because this changes host-side declaration/persistence metadata only; current/legacy checkpoint decoding is covered, including preserved recurrence D8 rejection.

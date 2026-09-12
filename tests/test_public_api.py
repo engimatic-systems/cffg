@@ -174,6 +174,8 @@ def test_top_level_facade_reexports_only_canonical_owners():
         "GaussianConditioning": cffg.kernel_bindings.GaussianConditioning,
         "HostileInputs": cffg.kernels.HostileInputs,
         "ParameterSpec": cffg.kernel_bindings.ParameterSpec,
+        "PersistentArray": cffg.learn.PersistentArray,
+        "PersistentStateDescriptor": cffg.learn.PersistentStateDescriptor,
         "RollingAgent": CanonicalRollingAgent,
         "RunStatus": CanonicalRunStatus,
         "build_gridworld": canonical_build_gridworld,

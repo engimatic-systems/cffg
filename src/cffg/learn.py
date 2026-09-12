@@ -81,6 +81,37 @@ READOUTS = {
 }
 
 
+@dataclass(frozen=True)
+class PersistentArray:
+    """One named, schema-checked learnable array snapshot."""
+
+    name: str
+    key: str
+    shape: tuple[int, ...]
+    dtype: str
+    value: np.ndarray
+
+
+@dataclass(frozen=True)
+class PersistentStateDescriptor:
+    """Family-independent identity and array schema for one posterior.
+
+    ``prior`` is immutable evidence-free state; ``posterior`` is the current
+    update state. The names use the checkpoint key codec, so nesting a
+    learnable under composition cannot make two persistent arrays ambiguous.
+    """
+
+    name: str
+    family: str
+    factor_type: str
+    semantic_identity: str
+    sources: tuple[str, ...]
+    parameter_blobs: tuple[tuple[str, tuple[int, ...]], ...]
+    targets: tuple[tuple[str, str, str], ...]
+    prior: tuple[PersistentArray, ...]
+    posterior: tuple[PersistentArray, ...]
+
+
 class Family(Protocol):
     """A conjugate family: where its statistics come from, what its
     hyperparameters look like, and how the posterior rolls over into the
@@ -99,6 +130,10 @@ class Family(Protocol):
     name: str
     #: key into READOUTS: which engine readout supplies this family's stats
     readout: str
+    semantic_identity: str
+
+    def canonical_identity(self, declared: str | None) -> str:
+        """Resolve a legacy declaration or reject another update meaning."""
 
     def check(
         self, learnable: str, ftype: str, shapes: dict[str, tuple[int, ...]], roles: dict[str, str]
@@ -179,6 +214,7 @@ class Dirichlet:
 
     name: str = "dirichlet"
     readout: str = "node_beliefs"
+    semantic_identity: str = "cffg.dirichlet.node-belief/1.0.0"
 
     _AXIS = {"categorical": 0, "matrix_cat": 0, "transition_mixture": 1}
     _ROLE = {
@@ -186,6 +222,16 @@ class Dirichlet:
         "matrix_cat": "matrix",
         "transition_mixture": "matrices",
     }
+
+    def canonical_identity(self, declared: str | None) -> str:
+        if declared is None:
+            return self.semantic_identity
+        if declared != self.semantic_identity:
+            raise ValueError(
+                f"semantic identity {declared!r} is incompatible with "
+                f"family {self.name!r}; expected {self.semantic_identity!r}"
+            )
+        return declared
 
     def check(
         self,
@@ -288,6 +334,17 @@ FAMILIES: dict[str, Family] = {
     "pg_weights": PGWeightsFamily(),
 }
 
+
+def canonical_semantic_identity(family: str, declared: str | None) -> str:
+    """Return the versioned update meaning for one serialized declaration."""
+    try:
+        resolved = FAMILIES[family].canonical_identity(declared)
+    except KeyError as exc:
+        raise ValueError(f"unknown conjugate family {family!r}") from exc
+    if not resolved.startswith("cffg.") or "/" not in resolved:
+        raise ValueError(f"semantic identity {resolved!r} is not namespaced and versioned")
+    return resolved
+
 _STATE_KEY_PREFIX = "v2:"
 
 
@@ -381,6 +438,65 @@ class Learnables:
                 key: value.copy() for key, value in initial.items()
             }
         self.initial_params = MappingProxyType(initial_params)
+
+    def persistent_descriptor(self, name: str) -> PersistentStateDescriptor:
+        """Resolve one portable prior/posterior schema without family branches."""
+        if name not in self.plans:
+            raise KeyError(f"no declared learnable {name!r}")
+        plan = self.plans[name]
+        family = FAMILIES[plan.family]
+        prior = self._persistent_arrays(name, "prior", self.initial_params[name])
+        posterior = self._persistent_arrays(name, "posterior", self.params[name])
+        for label, arrays in (("prior", prior), ("posterior", posterior)):
+            values = {array.key: array.value for array in arrays}
+            family.validate_prior(name, values, plan.shapes)
+            if {array.key for array in arrays} != set(self.params[name]):
+                raise ValueError(f"learnable {name!r}: incomplete {label} array schema")
+        return PersistentStateDescriptor(
+            name,
+            plan.family,
+            plan.ftype,
+            plan.semantic_identity,
+            plan.sources,
+            tuple(sorted(plan.shapes.items())),
+            tuple(sorted((target.blob, target.role, target.form) for target in plan.targets)),
+            prior,
+            posterior,
+        )
+
+    @property
+    def persistent_descriptors(self) -> tuple[PersistentStateDescriptor, ...]:
+        """Resolved persistence contracts, in deterministic learnable order."""
+        return tuple(self.persistent_descriptor(name) for name in sorted(self.plans))
+
+    @staticmethod
+    def _persistent_arrays(
+        learnable: str, kind: str, params: Mapping[str, np.ndarray]
+    ) -> tuple[PersistentArray, ...]:
+        arrays = []
+        for key, value in sorted(params.items()):
+            array = np.asarray(value)
+            if array.dtype.kind != "f" or array.dtype.str != np.dtype(array.dtype).str:
+                raise ValueError(
+                    f"learnable {learnable!r}: {kind} hyperparameter {key!r} "
+                    "must have a canonical real floating dtype"
+                )
+            if not np.all(np.isfinite(array)):
+                raise ValueError(
+                    f"learnable {learnable!r}: {kind} hyperparameter {key!r} must be finite"
+                )
+            snapshot = array.copy()
+            snapshot.setflags(write=False)
+            arrays.append(
+                PersistentArray(
+                    f"{kind}/{_encode_state_key(learnable, key)}",
+                    key,
+                    tuple(array.shape),
+                    array.dtype.str,
+                    snapshot,
+                )
+            )
+        return tuple(arrays)
 
     @staticmethod
     def _from_compiled(engine: "Engine", plan: "LearnPlan") -> np.ndarray:
@@ -618,7 +734,7 @@ class Learnables:
         from the unchanged template structure hash.
         """
         data = self.hyperparameter_snapshot()
-        manifest = encode_manifest(self.plans, self.params)
+        manifest = encode_manifest(self.plans, self.params, self.initial_params)
         if manifest is not None:
             data[CHECKPOINT_MANIFEST_KEY] = manifest
         return data

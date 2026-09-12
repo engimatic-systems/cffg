@@ -29,8 +29,9 @@ from cffg.core.ir import (
 )
 from cffg.core.compose import merge, scoped as scoped_template
 from cffg.core.validate import ModelError, validate
+from cffg.core.serialize import from_dict, structure_hash, to_dict
 from cffg.engine import Engine, RunStatus, _replace
-from cffg.learn import Learnables
+from cffg.learn import FAMILIES, Learnables, canonical_semantic_identity
 from cffg.models.rollout import build_rollout
 
 RNG = np.random.default_rng(17)
@@ -38,6 +39,40 @@ RNG = np.random.default_rng(17)
 KC, U = 4, 2
 ACC = 0.9
 SLIP = 0.15
+
+
+def test_semantic_identity_migrates_and_persistent_descriptor_is_complete():
+    template, arrays = corridor_builder(past=1, steps=1, learn=("B",))
+    legacy = to_dict(template)
+    del legacy["learnables"]["B"]["semantic_identity"]
+    migrated = from_dict(legacy)
+
+    assert migrated.learnables["B"].semantic_identity is None
+    assert to_dict(migrated)["learnables"]["B"]["semantic_identity"] == (
+        "cffg.dirichlet.node-belief/1.0.0"
+    )
+    assert structure_hash(migrated) == structure_hash(template)
+
+    engine = Engine(compile_template(migrated, arrays=arrays))
+    learnables = Learnables(engine, priors={"B": np.ones((U, KC, KC))})
+    (descriptor,) = learnables.persistent_descriptors
+    assert descriptor.semantic_identity == "cffg.dirichlet.node-belief/1.0.0"
+    assert {array.key for array in descriptor.prior} == {"alpha"}
+    assert descriptor.prior[0].name == "prior/v2:B:alpha"
+    assert not descriptor.prior[0].value.flags.writeable
+    assert {array.dtype for array in descriptor.posterior} == {np.dtype(float).str}
+
+
+def test_registered_families_have_distinct_versioned_semantic_identities():
+    identities = {
+        family: canonical_semantic_identity(family, None) for family in FAMILIES
+    }
+    assert set(identities) == {
+        "dirichlet", "niw", "mniw", "component_mniw", "pg_weights"
+    }
+    assert len(set(identities.values())) == len(identities)
+    with pytest.raises(ValueError, match="incompatible"):
+        canonical_semantic_identity("dirichlet", identities["niw"])
 
 
 def obs_matrix(k: int = KC, acc: float = ACC) -> np.ndarray:

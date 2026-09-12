@@ -252,6 +252,13 @@ def _check_learnables(t: Template) -> list[str]:
             problems.append(f"learnable {name!r}: spec name is {spec.name!r}")
         if not spec.blobs:
             problems.append(f"learnable {name!r}: declares no blobs")
+        if spec.semantic_identity is not None:
+            from cffg.learn import canonical_semantic_identity
+
+            try:
+                canonical_semantic_identity(spec.family, spec.semantic_identity)
+            except ValueError as exc:
+                problems.append(f"learnable {name!r}: {exc}")
         for b in spec.blobs:
             if b not in t.blobs:
                 problems.append(f"learnable {name!r}: unknown blob {b!r}")

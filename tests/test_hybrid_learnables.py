@@ -535,7 +535,16 @@ def test_pg_float32_k32_d16_updates_and_writes_without_dense_transition():
 def test_hybrid_declarations_serialize_and_checkpoints_round_trip(builder, priors):
     template, arrays, _sources = builder()
     restored_template = from_json(to_json(template))
-    assert restored_template.learnables == template.learnables
+    assert {
+        name: spec.semantic_identity
+        for name, spec in restored_template.learnables.items()
+    } == {
+        name: {
+            "component_mniw": "cffg.hybrid.component-mniw-node-moments/1.0.0",
+            "pg_weights": "cffg.recurrence.d9-structured-pair/1.0.0",
+        }[spec.family]
+        for name, spec in template.learnables.items()
+    }
     assert structure_hash(restored_template) == structure_hash(template)
     engine = Engine(compile_template(restored_template, arrays=arrays))
     result = engine.run(engine.init_state(), 100, tol=1e-7)

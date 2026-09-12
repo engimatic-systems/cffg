@@ -255,7 +255,7 @@ def test_structure_hash_cannot_identify_recurrence_statistic_semantics():
     )
 
     assert structure_hash(template) == template_identity
-    assert RECURRENCE_STATISTIC_IDENTITY not in to_json(template)
+    assert RECURRENCE_STATISTIC_IDENTITY in to_json(template)
     with pytest.raises(ValueError, match="statistic identity"):
         Learnables(
             engine,

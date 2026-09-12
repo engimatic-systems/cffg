@@ -422,9 +422,15 @@ def test_gaussian_family_declarations_serialize_and_addresses_stay_derived():
     serialized = to_dict(template)
     assert serialized["learnables"]["a_state"]["family"] == "niw"
     assert serialized["learnables"]["z_dynamics"]["blobs"] == ["A", "b", "Q"]
+    assert (
+        serialized["learnables"]["a_state"]["semantic_identity"]
+        == "cffg.gaussian.niw-node-moments/1.0.0"
+    )
     assert "member_of" not in serialized
     restored = from_json(to_json(template))
-    assert restored.learnables == template.learnables
+    assert restored.learnables["a_state"].semantic_identity == (
+        "cffg.gaussian.niw-node-moments/1.0.0"
+    )
     assert structure_hash(restored) == structure_hash(template)
     changed = dataclasses.replace(
         template,

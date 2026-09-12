@@ -8,6 +8,7 @@ import numpy as np
 
 from cffg import conj
 from cffg.gaussian_learning import (
+    _canonical_identity,
     _copy_params,
     _finite_stat,
     _proper,
@@ -36,7 +37,11 @@ class ComponentMNIWFamily:
 
     name = "component_mniw"
     readout = "gaussian_node_stats"
+    semantic_identity = "cffg.hybrid.component-mniw-node-moments/1.0.0"
     _PARAMS = {"m", "lam", "psi", "nu"}
+
+    def canonical_identity(self, declared):
+        return _canonical_identity(self, declared)
 
     def check(self, learnable, ftype, shapes, roles) -> None:
         if ftype != "gaussian_mixture_linear":
@@ -234,7 +239,11 @@ class PGWeightsFamily:
 
     name = "pg_weights"
     readout = "recurrence_weight_stats"
+    semantic_identity = "cffg.recurrence.d9-structured-pair/1.0.0"
     _PARAMS = {"eta", "precision"}
+
+    def canonical_identity(self, declared):
+        return _canonical_identity(self, declared)
 
     def check(self, learnable, ftype, shapes, roles) -> None:
         if ftype != "recurrence_link":

@@ -133,6 +133,9 @@ class LearnableSpec:
     family: str  # "dirichlet" | ... (key into cffg.learn.FAMILIES)
     blobs: tuple[str, ...]  # every blob this posterior writes
     sources: tuple[str, ...] | None = None  # stat suppliers; None = all readers
+    semantic_identity: str | None = None
+    # None is a pre-cff-xabn declaration. Serialization migrates it through
+    # the registered family identity; new JSON always carries the result.
 
 
 class BoundaryFactorization(str, Enum):

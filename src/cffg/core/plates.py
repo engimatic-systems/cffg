@@ -130,6 +130,7 @@ def _scope_copy(
             ln.family,
             tuple(sb(b) for b in ln.blobs),
             None if ln.sources is None else tuple(s(f) for f in ln.sources),
+            ln.semantic_identity,
         )
         for ln in frag.learnables.values()
         if set(ln.blobs) <= per_copy

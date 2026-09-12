@@ -907,6 +907,18 @@ model/runtime interface still declares which boundary learnable is
 episode-scale because that choice determines rollover semantics, not merely
 update frequency.
 
+Every `LearnableSpec` also has a namespaced, versioned semantic identity. A
+legacy declaration without one migrates when it is serialized through the
+registered family identity; a supplied unknown identity is rejected before a
+posterior or point parameter can change. The identity is structural, so it
+participates in the template hash while prior and posterior values do not.
+`Learnables.persistent_descriptors` is the family-independent archive boundary:
+each descriptor names the learnable, family, factor type, sources, target
+forms, semantic identity, parameter blobs, and immutable-prior/current-
+posterior arrays with canonical floating dtypes. Scoping preserves those names
+through the checkpoint-key codec. The CFFGZ storage ticket consumes this
+descriptor rather than branching on family names.
+
 `RollingAgent.checkpoint` namespaces every entry from `Learnables.state_dict`,
 so a recurrence manifest would flow through that container unchanged. No
 shipped rolling-agent builder currently declares a recurrence learnable; the

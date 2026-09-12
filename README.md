@@ -622,6 +622,12 @@ name a complete posterior. Recurrence is stricter: its current checkpoint must
 also carry the structured-pair statistic manifest; unidentified D8/D9 state is
 never guessed from compatible array shapes.
 
+Declared-learning JSON now records a versioned semantic identity for every
+posterior update. Older declarations without that field migrate to the current
+registered identity when loaded and re-saved. A diagnostic that names an
+unknown or incompatible identity means the saved posterior must not be
+restored into that model, even if its arrays have matching names and shapes.
+
 ## Run inference
 
 ```python
