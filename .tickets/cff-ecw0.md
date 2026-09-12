@@ -1,6 +1,6 @@
 ---
 id: cff-ecw0
-status: open
+status: closed
 deps: [cff-209l]
 links: [cff-544x]
 created: 2026-09-02T04:02:00Z
@@ -109,3 +109,21 @@ passes. No other future work is identified.
 - **Compiler contract:** The compiled plans, addresses, order, identity, and
   diagnostics visible to repository consumers.
 - **Static value:** Host-created metadata captured by a compiled JAX function.
+
+## Notes
+
+**2026-09-09T16:24:25Z**
+
+Execution handoff: Cooper authorized continuing the architecture epic after merging PRs #108–#112; compaction is complete. Branch agent/cff-ecw0-compiler-contracts starts from updated main b9c1c65. Exact compiler baseline: bf6bbe9527b5e1eea9172a30b8c7c214a08ed9ee, the commit closing cff-209l. Current src and tests retain that compiler behavior. Applicable ARCHITECTURE change-path rows: New factor or rule family (plans, addresses, registered and specialized ownership); New IR field (serialization/hash/plate reconstruction, with no schema edits); Learnable or checkpoint feature (source/target addresses, AgentSpec and supported legacy reconstruction). Review pairs: flooding/scheduled and direct/vmap share compiled values and will be covered by existing execution tests plus structural assertions; current/legacy checkpoint decoding uses existing compatibility tests. Host/JIT compiler duplication is N/A: compilation is host-side static planning. Sparse/vacuous/improper message values are runtime-only and N/A to lowering; f32/f64 metadata identity and at least 32 distinct groups will be characterized. Production behavior and mathematical rules remain unchanged. Three read-only research agents are identifying covered fixtures and compact assertion gaps. No wiggle audit will run.
+
+**2026-09-09T16:33:12Z**
+
+Research distilled (confidence high; production sources match bf6bbe9). Question: which compiler contracts are not already pinned? Answer: family tests cover numerical behavior and broad plan shapes, but literal directional addresses, ordered parameter rows, exact schedule fingerprints, and unknown functional evaluator diagnostics are mostly missing. Sources: test_schedule, test_kalman, test_ef_engine, test_gfe, test_mu3, test_hybrid_engine, test_hybrid_gfe, test_recurrence_link, test_structured_recurrence_engine, test_learnables, test_agent_spec, test_kernels, and external-kernel tests. Reuse their builders without inference; preserve current/legacy checkpoint behavioral tests rather than duplicate them. Observation-shape rejection belongs to Engine.bind_data, not compile_template. Decision-list transition parameters and structured recurrence components use one RecurrencePlan representation, not two compiler modes. Source arrays are intentionally widened to float64 during resolution; f32/JAX-default comparisons must pin structure, not require f32 packed host arrays. New tests compare live dataclass fields without inventing a persisted snapshot format. Ownership inventory is in ARCHITECTURE beside the compiler description.
+
+**2026-09-09T16:37:53Z**
+
+Pre-gate evidence: 44 new characterization tests pass on both current code and exact baseline bf6bbe9 (baseline source loaded from /tmp/cffg-compiler-baseline.Q511t4/repo/src; import path verified). Focused current run with serialization, AgentSpec and dashboard: 71 passed in 4.90s. Final baseline run: 44 passed in 1.87s. Read-only coverage review identified and resolved exact conjugate-family pairing diagnostics, write-only learned-GFE target addresses (ordinary and functional), and checkpoint/model-loading wording. Added a physical Dirichlet parameter-edge fixture to protect count-slot tagging and entropy exclusion. The suite now seals 14 built-in model identities plus one external identity, complete reconstructed arena/schedule fields, source-dtype invariance, 32 groups, and owner-specific failures. Ruff passes. No src files changed. Dashboard mapping includes the new file. Full short-suite gate follows this commit; next ticket remains cff-544x.
+
+**2026-09-09T16:55:53Z**
+
+Completed and published: https://github.com/engimatic-systems/cffg/pull/113 (base main; branch agent/cff-ecw0-compiler-contracts). Implementation fd8ce32 adds only tests, the canonical ownership table, and the dashboard file mapping. Exact bf6bbe9 baseline: 44 characterization tests passed. Focused current run: 71 passed. Final dashboard-backed short suite at 8dbf494: 1,622 passed, 41 opt-in slow tests deselected, four existing Gym warnings; 977.63 seconds pytest / 989.545 measured wall. Dashboard refreshed with 44 new tests and zero failures, runtime history retains three entries. No production source, schema, math, objective, status, or numerical guard changed. Ruff, git diff --check and dependency-cycle checks pass. Current/legacy checkpoint migration and rejection coverage ran as part of the passing short suite. Next: cff-544x type-owner extraction, but first resolve its recorded immutability scope conflict with Cooper. Proposed split separates enforced immutability (a behavior change) from representation-preserving extraction; no implementation of that split or type extraction has started. The shared HTML report is updated. This ticket is closed; the remaining decision belongs to cff-544x.
