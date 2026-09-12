@@ -3,6 +3,8 @@
 Role sizes come from the template, in the binding's role order. Parameter
 shapes describe serialized blobs, not the possibly transformed runtime pack.
 This module deliberately does not import JAX.
+Construction snapshots declaration mappings and sequences. Executable callbacks
+remain trusted identity-bearing objects; their closure state is not frozen.
 """
 
 from __future__ import annotations
@@ -10,9 +12,11 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
+from cffg._immutable import ImmutableRecord
+
 
 @dataclass(frozen=True)
-class ParameterSpec:
+class ParameterSpec(ImmutableRecord):
     """Shape inference and optional direct replacement of a serialized blob.
 
     ``shape`` receives a mapping from role names to cardinalities/dimensions.
@@ -31,7 +35,7 @@ class ParameterSpec:
 
 
 @dataclass(frozen=True)
-class EFBinding:
+class EFBinding(ImmutableRecord):
     """Scalar natural-parameter messages; legacy callback signatures preserved."""
 
     family: str
@@ -50,7 +54,7 @@ class EFBinding:
 
 
 @dataclass(frozen=True)
-class DiscreteMode:
+class DiscreteMode(ImmutableRecord):
     """Callbacks for one explicitly selected inference mode.
 
     BP input is opposite-side cavities [M,R,Klocal]. Its message receives
@@ -67,7 +71,7 @@ class DiscreteMode:
 
 
 @dataclass(frozen=True)
-class DiscreteBinding:
+class DiscreteBinding(ImmutableRecord):
     """Finite discrete factors using local padded log-message blocks.
 
     ``potential(params, cards)`` returns [M,*cards] log potentials in role
@@ -97,7 +101,7 @@ class DiscreteBinding:
 
 
 @dataclass(frozen=True)
-class GaussianConditioning:
+class GaussianConditioning(ImmutableRecord):
     """One legal DATA role and its host validator ``(value, dimension)``.
 
     ``plan_type`` is reserved for built-in compatibility labels. External
@@ -111,7 +115,7 @@ class GaussianConditioning:
 
 
 @dataclass(frozen=True)
-class GaussianBinding:
+class GaussianBinding(ImmutableRecord):
     """Information-form callbacks retaining every structural role.
 
     Callbacks receive ``(eta, precision, params, dims, observed_role, y, mask)``.

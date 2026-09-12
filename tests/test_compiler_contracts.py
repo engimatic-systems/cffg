@@ -5,6 +5,7 @@ mathematics. Literal addresses are paired with readable role/member assertions;
 hashes seal serialized identity and the schedule that consumes those addresses.
 """
 
+from collections.abc import Mapping
 from dataclasses import fields, is_dataclass, replace
 
 import jax
@@ -29,6 +30,7 @@ from test_schedule import hmm_arrays, hmm_template
 from test_structured_recurrence_engine import _loop_template
 
 from cffg import kernels
+from cffg._immutable import FrozenArray
 from cffg.compiler import CompileError, compile_template
 from cffg.core import (
     BlobRef,
@@ -192,7 +194,7 @@ def model(name):
 def assert_fields(value, **expected):
     for name, wanted in expected.items():
         actual = getattr(value, name)
-        if isinstance(actual, np.ndarray):
+        if isinstance(actual, (np.ndarray, FrozenArray)):
             np.testing.assert_array_equal(actual, wanted, err_msg=name)
         else:
             assert actual == wanted, name
@@ -200,7 +202,7 @@ def assert_fields(value, **expected):
 
 def assert_same(left, right):
     """Compare live values field by field; no snapshot serialization format."""
-    if isinstance(left, np.ndarray):
+    if isinstance(left, (np.ndarray, FrozenArray)):
         assert left.dtype == right.dtype
         np.testing.assert_array_equal(left, right)
     elif isinstance(left, kernels.FactorKernel):
@@ -209,12 +211,11 @@ def assert_same(left, right):
         assert type(left) is type(right)
         for field in fields(left):
             assert_same(getattr(left, field.name), getattr(right, field.name))
-    elif isinstance(left, dict):
+    elif isinstance(left, Mapping):
         assert tuple(left) == tuple(right)
         for key in left:
             assert_same(left[key], right[key])
     elif isinstance(left, (tuple, list)):
-        assert type(left) is type(right)
         assert len(left) == len(right)
         for a, b in zip(left, right, strict=True):
             assert_same(a, b)

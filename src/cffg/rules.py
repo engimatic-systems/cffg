@@ -20,7 +20,7 @@ import jax.numpy as jnp
 from jax.scipy.special import gammaln, logsumexp
 
 from cffg import efrules
-from cffg.compiler import NEG
+from cffg.compiled import NEG
 
 
 def _norm_pad(x: jnp.ndarray, card: int, k_max: int) -> jnp.ndarray:

@@ -31,7 +31,7 @@ import jax
 import jax.numpy as jnp
 
 from cffg import gauss
-from cffg.compiler import NEG
+from cffg.compiled import NEG
 
 _LOG2PI = 1.8378770664093453
 

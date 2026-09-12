@@ -16,7 +16,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from cffg import efrules
-from cffg.compiler import NEG, Arena
+from cffg.compiled import NEG, Arena
 
 
 class OuterTerminationReason(str, Enum):

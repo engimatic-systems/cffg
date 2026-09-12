@@ -152,6 +152,13 @@ class FactorKernel:
         # Preserve the original EF accessors without duplicating declarations.
         return getattr(object.__getattribute__(self, "binding"), name)
 
+    def __copy__(self):
+        return self
+
+    def __deepcopy__(self, memo):
+        # Kernels are identity handles; executable callbacks are never copied.
+        return self
+
     @property
     def edge_families(self):
         return self.binding.edge_families if isinstance(self.binding, EFBinding) else {}

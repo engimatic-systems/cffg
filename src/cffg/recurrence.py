@@ -25,7 +25,7 @@ import jax
 import jax.numpy as jnp
 
 from cffg import gauss
-from cffg.compiler import NEG
+from cffg.compiled import NEG
 from cffg.recurrence_readout import (
     RecurrenceWeightStats as RecurrenceWeightStats,
     StructuredRecurrenceReadout as StructuredRecurrenceReadout,
