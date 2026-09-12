@@ -1,6 +1,6 @@
 ---
 id: cff-8t4d
-status: open
+status: closed
 deps: [cff-544x]
 links: [cff-ejib]
 created: 2026-09-02T04:02:00Z
@@ -49,8 +49,9 @@ remain for later tickets.
    invariant** is N/A because this stage does not execute numeric messages.
 6. Flooding/scheduled and direct/`vmap` consumers receive the same final layout
    downstream. Host/JIT is N/A because topology construction remains host-side.
-   Latest-schema/supported-legacy checkpoints reconstruct the template before
-   this one path.
+   JSON and model bundles reconstruct templates before this one path.
+   Latest-schema/supported-legacy agent checkpoints restore runtime data
+   against an already compiled, builder-defined model.
 7. Sparse/vacuous/improper runtime messages are N/A. Float32 does not change
    membership or slot order. The 32-group characterization fixture from
    `cff-ecw0` retains deterministic addresses.
@@ -58,7 +59,11 @@ remain for later tickets.
    GFE, constraint, external-kernel, and malformed-topology paths through
    old/new observable characterization. No new scientific oracle is required.
 9. Endpoint/degree/port/slot failures retain their `cff-ecw0` baseline
-   `CompileError` item and reason. Registered/specialized semantic failures
+   exception owner, item, reason, and reporting order. Core validation retains
+   `ModelError` for malformed degrees/endpoints; compiler-owned executable-port
+   failures retain `CompileError`. If topology runs before semantic admission,
+   it returns ordered diagnostics for aggregation at the existing compiler
+   gate rather than raising earlier. Registered/specialized semantic failures
    remain for their respective later owners. No serialized meaning, rule,
    objective, or runtime behavior changes.
 10. The topology module is below 1,000 physical lines and the move fits one
@@ -94,3 +99,29 @@ completes drafts using that membership without repeating classification.
 - **Slot layout:** Addresses for a factor's own message and the opposite
   message it reads.
 - **TopologyLayout:** The named immutable output of structural compilation.
+
+## Notes
+
+**2026-09-09T17:38:47Z**
+
+Preparation during cff-544x gate (no topology implementation started). Question: what can move without semantic reclassification? Answer: compiler.py at 315b082:152-160 degree/port indexes; 162-169 constraint declarations only; 252-258 executable-port diagnostics returned for existing aggregation; 287-333 sorted endpoints, declared-domain raw EdgeInfo, own/opposite maps and logical counts; DATA candidates from 332-372, without conditioning decisions; declared-domain segment widths/prefixes from 1404-1416. Parameter carriers already declare flat cardinality, so shape/axis tags can be attached later by building a new edge mapping. Keep admission (170-251), shape inference (262-285), conditioning validation (334-369), absorption, classification, observation rows (1000-1013,1199-1207), DELTA checks and entropy exclusions outside topology. Observation row numbers follow lowered group order, not sorted-variable topology. Error-order caveat: factor semantic errors precede executable-port errors at the 259-260 gate; conditioning errors survive array resolution until the 462-463 gate. Preserve both boundaries and the distinction between core ModelError and compiler CompileError. Endpoint order sorts factor/role names; declared message-role order and hard-constraint numeric x0...xN order are separate conventions. Source: bounded read-only modularity-agent inspection of current compiler and core/validate.py; confidence high. TopologyLayout should snapshot declaration facts and hold ordered endpoints/degrees/ports, raw edges/own-opposite slots/counts/prefixes, ordered DATA candidates, and deferred port diagnostics. Use cff-544x publication rather than mutable nested IR aliases. Before implementation, update intended branch base and recheck ready status; these are planning notes, not completed extraction.
+
+**2026-09-09T17:52:18Z**
+
+Starting from updated agent/cff-544x-immutable-values at 39d5bf2 (PR #114). Architecture rows: New factor or rule family and New IR field; Learnable/checkpoint checked for carried parameter-edge addresses; Runtime numerical/status N/A. Duplicated surfaces: flooding/scheduled and direct/vmap consume the same final arena; host/JIT compiler N/A; JSON/bundle reconstruction and current/supported-legacy checkpoint consumers retain the one compiler and their existing restore owners. Sparse/vacuous/improper runtime messages N/A; dtype-independent topology and 32 distinct groups remain required. Use the recorded extraction/diagnostic-order boundary; do not move conditioning semantics or observation row numbering into topology.
+
+**2026-09-09T18:06:23Z**
+
+Implementation handoff: cffg.topology owns one immutable TopologyLayout with declared variable/constraint/port snapshots, Mapping-typed FactorDeclaration role bindings, ordered endpoints/degrees/ports, raw edges, own/opposite maps, three slot counts, Python segment-length tuples, ordered DATA candidates and deferred executable-port diagnostics. Compiler retains semantic admission, inferred Dirichlet tags, conditioning decisions and observation row numbers; tags create new EdgeInfo records instead of mutating topology. Int64 prefix allocation stays at final assembly. Review found and fixed an early OverflowError for a 2**63-cardinality declaration that should first report legacy/unterminated-port errors; the exact precedence regression is now a test. Independent bounded review confirmed the original error and order are restored. The tuple endpoint representation is explicitly rendered as the prior list in its existing error diagnostic. Focused compiler/topology/IR/serialization/plate/dashboard run: 121 passed; Ruff and diff/dependency checks pass. Architecture change-path rows now name topology. Final dashboard gate pending; no numerical/serialized/runtime behavior is intentionally changed.
+
+**2026-09-09T18:11:29Z**
+
+Final short-suite gate running at committed implementation head 8cd8919, after the 121-test focused pass. No source edits after launch. The publication PR will stack on #114; cff-kfo7 remains the next serial dependency, not an implementation started during this gate.
+
+**2026-09-09T18:23:47Z**
+
+Completed at implementation head 8cd8919: dashboard-backed default short suite passed 1,676 tests, 41 opt-in slow tests deselected, four existing Gym deprecation warnings. Pytest 979.15 seconds; measured wall 991.115 seconds. Dashboard refreshed with 13 new topology cases and zero failures. No source edits after the passing run. Focused run: 121 passed; existing 44 characterization cases unchanged. Topology extraction is complete and will be published stacked on PR #114. Next cff-kfo7 is blocked by separate pre-existing correctness tickets cff-n183 and cff-gvch; cff-n183 awaits Cooper’s choice of correct cross-group goal sharing versus explicit temporary rejection. No inference behavior was changed here.
+
+**2026-09-09T18:25:20Z**
+
+Published as PR #115: https://github.com/engimatic-systems/cffg/pull/115, stacked on PR #114. The separate planning commit records cff-n183/cff-gvch prerequisites and research for cff-kfo7; it implements neither fix. The shared architecture HTML now shows this completed extraction and the pending shared-goal decision. Worktree code is unchanged from the passing 8cd8919 gate.
