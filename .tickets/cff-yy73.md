@@ -1,6 +1,6 @@
 ---
 id: cff-yy73
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-09-13T16:42:05Z
@@ -62,3 +62,13 @@ Implementation validation: all 17 checkpoint rejection mechanisms remain. Two in
 **2026-09-13T16:55:10Z**
 
 Final review found and fixed a collection-provenance gap: overriding python_functions could omit PR regressions while retaining every module. Explicit discovery overrides and alternate config files now mark reports partial. Real subprocess cases cover the normal gate, developer selection, keyword filtering, file narrowing, explicit deselection, last-failed selection, discovery overrides and alternate config. Final focused metadata/dashboard validation: 27 passed in 1.28 s. Deferred prepared constraint checkpoint reuse is tracked in cff-sten; tk dep cycle passed.
+
+**2026-09-13T17:23:15Z**
+
+Completed implementation and final validation at code commit 149ff54. The developer selection is not slow and not pr_head; dashboard runs the complete not slow PR gate exactly once. The four PR-only cases all passed, contributing 103.626 s in that gate: NASCAR cycle 38.804 s, glucose cohort 33.993 s, large float64 Gaussian 17.044 s, tenfold fitter horizon 13.785 s. These remain mandatory at each PR head and must be included in focused runs when changing their behavior.
+
+The 17 checkpoint rejection cases now contribute 34.014 s, including shared preparation, versus 183.158 s in the earlier shared dashboard. The four Kalman assertions together now contribute 4.203 s versus 14.606 s. No original assertion or invalid-input variant was removed; source and target checkpoint states are independent and atomicity assertions were strengthened.
+
+Final command: uv run python tools/dashboard.py --run-suite. Result: 2224 passed, 41 slow cases deselected, four existing Gym deprecation warnings; pytest 988.85 s, measured subprocess wall time 1001.442 s (16m41s). tools/test-suite-runtimes.json and ~/agent-share/cffg-tests.html were refreshed. Prior tracked main gate: 2210 tests, 1163.362 s wall time (19m23s), the current run is about 162 s / 14% shorter. Compared b01edae..main source/tests/config: only runtime-history JSON differed, so this baseline has the same production/test source as our starting main. It remains a historical comparison, not a controlled repeated benchmark. The older 2270-test HTML includes the separate CFFGZ stack and is used only for named unchanged test-group comparisons.
+
+No separate developer suite was run just for benchmarking. The 103.626 s deferred-case sum is not a measured developer wall-time saving. Default selection behavior and report rejection were verified using real tiny subprocess suites; broad coverage passed at the final code. AGENTS.md and README document per-axis coverage claims, independent oracles/execution surfaces, representative hostile inputs, safe fixture reuse, timing review from necessary runs, and one gate per independent PR head. Follow-up cff-sten is ready after this ticket closes. No engine or bundle code changed.
