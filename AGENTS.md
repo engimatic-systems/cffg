@@ -104,8 +104,7 @@ This project will span many context windows. The rule that makes that survivable
   frequent progress updates, including once-per-minute check-ins.** Announce
   the suite launch and wait budget once, then wait quietly for the full
   `suggested_wait_seconds`: no periodic commentary and no polling the process,
-  logs, or dashboard. Respond if Cooper sends a message; otherwise, give the
-  next update after the wait window, when checking the result. Run
+  logs, or dashboard. Run
   `uv run python tools/dashboard.py --run-suite` to execute the default
   `not slow` pytest selection exactly once
   and refresh both that runtime history and `~/agent-share/cffg-tests.html`
