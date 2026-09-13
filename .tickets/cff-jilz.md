@@ -53,8 +53,8 @@ workflow boundary.
    `tests/.artifacts/cffgz/representative-rslds.cffgz` as a schema-current,
    learning-resumable specimen and validates its complete inventory.
 10. Original model-only specimens and hand-built incomplete schema-current
-    archives exercise the documented legacy-load and schema-current refusal
-    rules.
+    archives exercise the documented unsupported-version and incomplete-state
+    refusal rules. Cooper waived legacy bundle preservation on 2026-09-13.
 11. `README.md` gives a complete save, load, inference, update, and resave
     example. `docs/ARCHITECTURE.md` identifies each state owner.
     `docs/LIMITATIONS.md` states that `.cffgz` resumes at a committed learning
@@ -117,3 +117,7 @@ Post-handoff scan additions: fixed=the fixed-parameter inference input or legacy
 **2026-08-31T03:26:14Z**
 
 Final classification addition: estimate=registered-family parameter estimation.
+
+**2026-09-13T15:23:37Z**
+
+Alpha policy clarification from Cooper: legacy bundle preservation is not required at this version. Criterion 10 now verifies unsupported-schema refusal. cff-1xig tracks the compatibility and migration contract required before stabilizing the bundle format.
