@@ -338,6 +338,7 @@ class LearnTarget(ImmutableRecord):
     blob: str = ""  # the blob this target's factor reads
     role: str = "statistic"  # the parameter role that blob fills
     transform: str = "identity"  # serialized value -> runtime row
+    factor: str = ""  # logical reader name for persistent ownership
 
 
 @dataclass(frozen=True)
@@ -359,6 +360,7 @@ class LearnPlan(ImmutableRecord):
     shapes: Mapping[str, tuple[int, ...]]  # blob -> array shape
     sources: tuple[str, ...]  # factor names, sorted
     targets: tuple[LearnTarget, ...]
+    semantic_identity: str
 
 
 @dataclass(frozen=True)

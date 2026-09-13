@@ -6,6 +6,10 @@ from cffg.compiler import compile_template
 from cffg.engine import Engine, RunStatus
 from cffg.models.gridworld import CorridorEnv, build_gridworld
 from cffg.params import set_params
+from cffg.learning_schema import (
+    PersistentArray, PersistentParameter, PersistentStateDescriptor,
+    PersistentTarget, resolve_persistent_state,
+)
 from cffg.kernels import FactorKernel, HostileInputs, register_kernel
 from cffg.kernel_bindings import (
     DiscreteBinding, DiscreteMode, EFBinding, GaussianBinding,
@@ -23,6 +27,10 @@ __all__ = [
     "GaussianConditioning",
     "HostileInputs",
     "ParameterSpec",
+    "PersistentArray",
+    "PersistentParameter",
+    "PersistentStateDescriptor",
+    "PersistentTarget",
     "RollingAgent",
     "RunStatus",
     "build_gridworld",
@@ -30,5 +38,6 @@ __all__ = [
     "load_bundle",
     "save_bundle",
     "register_kernel",
+    "resolve_persistent_state",
     "set_params",
 ]

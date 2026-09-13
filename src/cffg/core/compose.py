@@ -35,9 +35,21 @@ class ComposeError(ValueError):
     pass
 
 
+def _require_flat(template: Template) -> None:
+    if template.plates:
+        names = sorted({
+            name for plate in template.plates.values() for name in plate.fragment.learnables
+        })
+        raise ComposeError(
+            f"compact plates cannot be composed directly (learnables {names}); "
+            "call expand_plates before scoping or merging"
+        )
+
+
 def scoped(template: Template, prefix: str) -> Template:
     """A copy of `template` with every name under `prefix/`. Blob names are
     scoped too (their *paths* are not — two scopes may share a parameter file)."""
+    _require_flat(template)
     p = prefix + SCOPE_SEP
 
     def s(name: str) -> str:
@@ -67,6 +79,7 @@ def scoped(template: Template, prefix: str) -> Template:
                 ln.family,
                 tuple(s(b) for b in ln.blobs),
                 None if ln.sources is None else tuple(s(f) for f in ln.sources),
+                ln.semantic_identity,
             )
             for ln in template.learnables.values()
         },
@@ -109,6 +122,8 @@ def scoped(template: Template, prefix: str) -> Template:
 
 def merge(a: Template, b: Template, name: str) -> Template:
     """Disjoint union; caller is responsible for prior scoping."""
+    _require_flat(a)
+    _require_flat(b)
     for kind in ("variables", "factors", "ports", "blobs", "learnables"):
         clash = set(getattr(a, kind)) & set(getattr(b, kind))
         if clash:

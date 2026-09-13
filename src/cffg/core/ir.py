@@ -115,7 +115,10 @@ class LearnableSpec:
       learning likewise keeps source-regime and stick axes in one posterior.
 
     `family` keys cffg.learn.FAMILIES; the per-factor-type sufficient
-    statistic comes from the factor type, not from this spec.
+    statistic comes from the factor type. `semantic_identity` versions both
+    that statistic and the posterior update. New Python declarations default
+    to the family's current identity; serialized legacy declarations migrate
+    separately and never infer recurrence semantics from array shapes.
 
     `sources` restricts which factor instances *supply* statistics. `None`
     means every reader does; a tuple means exactly those, and an empty tuple
@@ -133,6 +136,15 @@ class LearnableSpec:
     family: str  # "dirichlet" | ... (key into cffg.learn.FAMILIES)
     blobs: tuple[str, ...]  # every blob this posterior writes
     sources: tuple[str, ...] | None = None  # stat suppliers; None = all readers
+    semantic_identity: str | None = None
+
+    def __post_init__(self):
+        from cffg.core.learning_identity import LEARNING_IDENTITIES
+
+        if self.semantic_identity is None:
+            object.__setattr__(
+                self, "semantic_identity", LEARNING_IDENTITIES.get(self.family, "")
+            )
 
 
 class BoundaryFactorization(str, Enum):

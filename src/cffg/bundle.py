@@ -33,9 +33,12 @@ from cffg.core.plates import PLATE_INDEX_TOKEN, expand_plates
 from cffg.core.serialize import (
     SCHEMA_VERSION,
     from_json,
+    legacy_learning_structure_hash,
     structure_hash,
     to_json,
 )
+from cffg.core.validate import validate
+from cffg.learning_schema import validate_learning_declarations
 
 
 class BundleError(ValueError):
@@ -111,10 +114,12 @@ def save_bundle(path: str | Path, template: Template, arrays: dict[str, np.ndarr
     # fragment blobs appear once, while per-copy blobs acquire indexed names.
     # It also validates the plate spec before the destination is opened.
     expanded = expand_plates(template)
+    validate(expanded)
     required = set(expanded.blobs)
     missing = sorted(required - set(arrays))
     if missing:
         raise BundleError(f"arrays missing for blobs: {missing}")
+    validate_learning_declarations(expanded, arrays)
 
     bundled = _rewrite_blob_paths(template)
 
@@ -161,10 +166,16 @@ def load_bundle(path: str | Path) -> tuple[Template, dict[str, np.ndarray], dict
             raise BundleError(
                 f"{path}: schema {manifest.get('schema_version')!r} != {SCHEMA_VERSION!r}"
             )
-        template = from_json(zf.read("model.json").decode())
+        model_json = zf.read("model.json").decode()
+        template = from_json(model_json)
 
         actual_hash = structure_hash(template)
-        if actual_hash != manifest.get("structure_hash"):
+        legacy_hash = (
+            legacy_learning_structure_hash(template)
+            if '"semantic_identity"' not in model_json else None
+        )
+        recorded_hash = manifest.get("structure_hash")
+        if recorded_hash is None or recorded_hash not in {actual_hash, legacy_hash}:
             raise BundleError(
                 f"{path}: structure hash mismatch (manifest {manifest.get('structure_hash')!r}, "
                 f"model {actual_hash!r})"

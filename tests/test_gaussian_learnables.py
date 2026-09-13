@@ -276,7 +276,7 @@ def test_empty_sources_roll_back_to_immutable_initial_prior():
         engine,
         priors={"a_state": conj.vague_niw(1), "z_dynamics": prior},
     )
-    checkpoint = learnables.state_dict()
+    checkpoint = learnables.hyperparameter_snapshot()
     checkpoint["v2:z_dynamics:nu"] = np.asarray(prior.nu + 10.0)
     learnables.load_state_dict(checkpoint)
     assert learnables.params["z_dynamics"]["nu"] == prior.nu + 10.0
@@ -357,7 +357,7 @@ def test_scheduled_and_flooded_gaussian_updates_match():
         result.require_converged()
         learnables = Learnables(engine, priors=priors)
         learnables.replace(engine, result)
-        posteriors.append(learnables.state_dict())
+        posteriors.append(learnables.hyperparameter_snapshot())
     for key in posteriors[0]:
         np.testing.assert_allclose(
             posteriors[0][key], posteriors[1][key], rtol=1e-9, atol=1e-9
@@ -402,7 +402,7 @@ def test_checkpoint_round_trips_keyed_gaussian_hyperparameters_atomically():
     source = Learnables(engine, priors=priors)
     source.replace(engine, result)
     checkpoint = source.state_dict()
-    assert len(checkpoint) == 8
+    assert len(checkpoint) == 9
     restored = Learnables(engine, priors=priors)
     restored.load_state_dict(checkpoint)
     for name in source.params:
@@ -411,7 +411,7 @@ def test_checkpoint_round_trips_keyed_gaussian_hyperparameters_atomically():
     before = restored.state_dict()
     broken = dict(checkpoint)
     broken["v2:z_dynamics:psi"] = np.zeros((2, 2))
-    with pytest.raises(ValueError, match="positive definite"):
+    with pytest.raises(ValueError, match="digest mismatch"):
         restored.load_state_dict(broken)
     for key, value in before.items():
         np.testing.assert_array_equal(restored.state_dict()[key], value)

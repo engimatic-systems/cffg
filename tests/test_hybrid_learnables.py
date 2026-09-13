@@ -19,7 +19,6 @@ from cffg.core import (
 from cffg.engine import Engine
 from cffg.experiments.recurrence_smoothing import recurrence_statistics
 from cffg.learn import Learnables
-from cffg.learning_checkpoint import CHECKPOINT_MANIFEST_KEY
 from cffg.core.serialize import from_json, structure_hash, to_json
 
 
@@ -460,17 +459,9 @@ def test_pg_scheduled_and_flooded_statistics_produce_same_posterior():
         prior = conj.vague_pg_weights(3, 2)
         learnables = Learnables(engine, priors={"neutral_recurrence": prior})
         learnables.replace(engine, result)
-        posteriors.append(learnables.state_dict())
+        posteriors.append(learnables.hyperparameter_snapshot())
     for key, value in posteriors[0].items():
-        if key == CHECKPOINT_MANIFEST_KEY:
-            np.testing.assert_array_equal(value, posteriors[1][key])
-        else:
-            np.testing.assert_allclose(
-                value,
-                posteriors[1][key],
-                rtol=1e-7,
-                atol=1e-7,
-            )
+        np.testing.assert_allclose(value, posteriors[1][key], rtol=1e-7, atol=1e-7)
 
 
 def test_pg_hostile_statistics_and_precision_fail_before_mutation(monkeypatch):
@@ -561,7 +552,7 @@ def test_hybrid_declarations_serialize_and_checkpoints_round_trip(builder, prior
 def test_hybrid_learning_rejects_incompatible_family_pair(builder, family, match):
     template, arrays, _sources = builder()
     name, spec = next(iter(template.learnables.items()))
-    template.learnables[name] = dataclasses.replace(spec, family=family)
+    template.learnables[name] = dataclasses.replace(spec, family=family, semantic_identity=None)
     with pytest.raises(CompileError, match=match):
         compile_template(template, arrays=arrays)
 

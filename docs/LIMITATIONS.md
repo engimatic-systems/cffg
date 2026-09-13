@@ -329,10 +329,22 @@ the D9 structured-pair statistic, factor/source ownership, dtype, shapes, and
 exact-value digests.
 Pre-manifest D8 and early unidentified D9 posterior arrays share the same keys
 and shapes, so both are conservatively rejected instead of silently resumed.
-Model-only bundles contain no posterior state and continue to load under the
-current semantics. Flooding and mixed scheduling solve the same
+Model-only bundles contain no posterior state. New bundles serialize the
+learning identity; an older unversioned recurrence declaration is rejected
+because its intended update cannot be recovered safely. Flooding and mixed scheduling solve the same
 coordinates, but neither guarantees monotone progress on every loopy hybrid
 graph.
+
+All five declared-learning families supply versioned persistent-state
+descriptors. The generic checkpoint inventory describes immutable priors and
+current posteriors, but flat `Learnables` checkpoints restore only posteriors;
+they retain the caller's destination priors. CFFGZ bundles still contain model
+structure and point parameters only. Complete learning-state storage and
+restoration belong to `cff-enhs`. The four unchanged nonrecurrence families
+have deterministic legacy migration; unidentified recurrence has none.
+Scoping or merging a template with compact plates requires `expand_plates`
+first; direct compact composition is rejected to prevent declaration loss
+(`cff-b2fz`).
 
 The recurrence learning readout carries the Gaussian covariance computed
 directly from precision; it does not reconstruct covariance as

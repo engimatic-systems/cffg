@@ -1415,6 +1415,7 @@ def _resolve_learnables(
     live in a plain discrete group, because those are the nodes whose beliefs
     Engine.node_beliefs reports; GFE composites are write-only here."""
     from cffg.learn import FAMILIES
+    from cffg.learning_schema import persistent_schema
 
     plans: list[LearnPlan] = []
     ftype_of_group = {g.name: g.type for g in groups}
@@ -1455,6 +1456,12 @@ def _resolve_learnables(
             for role, b in t.factors[r].param_blobs.items()
             if b in blobs
         }
+        for reader in readers:
+            for role, blob in t.factors[reader].param_blobs.items():
+                if blob in roles and role != roles[blob]:
+                    raise CompileError(
+                        f"learnable {name!r}: blob {blob!r} has incompatible target roles"
+                    )
         try:
             family.check(name, ftype, shapes, roles)
         except ValueError as err:
@@ -1493,6 +1500,7 @@ def _resolve_learnables(
                             blob,
                             role,
                             parameter.transform,
+                            r,
                         )
                     )
                     continue
@@ -1510,6 +1518,7 @@ def _resolve_learnables(
                         blob,
                         role,
                         parameter.transform,
+                        r,
                     )
                 )
             if all(p.key not in composite_keys for p in member.parameters) and (
@@ -1519,9 +1528,15 @@ def _resolve_learnables(
         # A graph with no sources is normal, not an error: the planning
         # template reads A only through GFE composites, and learns nothing.
         # Statistics come from the perception template, parameters flow back.
-        plans.append(
-            LearnPlan(name, spec.family, ftype, shapes, tuple(sources), tuple(targets))
+        plan = LearnPlan(
+            name, spec.family, ftype, shapes, tuple(sources), tuple(targets),
+            spec.semantic_identity,
         )
+        try:
+            persistent_schema(plan, family)
+        except ValueError as error:
+            raise CompileError(str(error)) from error
+        plans.append(plan)
     return plans
 
 

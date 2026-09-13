@@ -244,10 +244,27 @@ def _check_learnables(t: Template) -> list[str]:
     """Structural checks on declared learnables (cff-x0sv). The conjugate
     family and per-factor-type sufficient statistic are checked at compile
     time, where the factor types and resolved arrays are known; core stays
-    JAX-free and checks only names and disjointness."""
+    JAX-free and checks names, semantic identities, and disjointness."""
     problems: list[str] = []
     owner: dict[str, str] = {}
+    from cffg.core.learning_identity import (
+        LEARNING_IDENTITIES, check_identity, check_scoped_name,
+    )
+
     for name, spec in sorted(t.learnables.items()):
+        try:
+            if not spec.semantic_identity and spec.family not in LEARNING_IDENTITIES:
+                raise ValueError(f"unknown conjugate family {spec.family!r} needs an explicit semantic identity")
+            check_identity(name, spec.semantic_identity)
+            expected = LEARNING_IDENTITIES.get(spec.family)
+            if expected is not None and spec.semantic_identity != expected:
+                raise ValueError(f"unknown or incompatible semantic identity {spec.semantic_identity!r}")
+            for scoped in (name, *spec.blobs, *(spec.sources or ())):
+                check_scoped_name(scoped)
+            if spec.sources is not None and len(set(spec.sources)) != len(spec.sources):
+                raise ValueError("duplicate statistic sources")
+        except ValueError as error:
+            problems.append(f"learnable {name!r}: {error}")
         if spec.name != name:
             problems.append(f"learnable {name!r}: spec name is {spec.name!r}")
         if not spec.blobs:

@@ -3,6 +3,8 @@
 These small existing models pin structure before compiler extraction, not new
 mathematics. Literal addresses are paired with readable role/member assertions;
 hashes seal serialized identity and the schedule that consumes those addresses.
+Learning and agent fixture hashes include versioned learning semantics;
+their schedule fingerprints and execution layouts remain unchanged.
 """
 
 from collections.abc import Mapping
@@ -100,12 +102,12 @@ IDENTITIES = {
         "c44f455d3bc71f68dad130ff7b0d14344bdc1818793867936b386c5c35ccfb54",
     ),
     "learning": (
-        "9d7b679129879a07c310122a6aa831e07c7a723d877260520969bd3a30f7b07d",
+        "b1ac47c9484acb63100f0f0ba9efaaf78c10d9eff9558ccca1032a52dfb9f647",
         "two_pass",
         "c0b3f1a9c468ca043a5735f5970cb83f1b916fc4895e57fa7a92da945e75ed5c",
     ),
     "agent": (
-        "afde0a8e53be36afd58662c39ef36c27b9740412a8133a243018b157ae94f161",
+        "b0cabcc9db63a80e0740b6ce0fb65dae744b2bc2a041c233105bb9dff8ea0296",
         "mixed",
         "df58038adff8df1ee92ba318b91e0b0303c04d2846cdecb63ba676bd38386c5c",
     ),

@@ -31,6 +31,7 @@ from cffg.core.compose import merge, scoped as scoped_template
 from cffg.core.validate import ModelError, validate
 from cffg.engine import Engine, RunStatus, _replace
 from cffg.learn import Learnables
+from cffg.learning_schema import PERSISTENT_MANIFEST_KEY
 from cffg.models.rollout import build_rollout
 
 RNG = np.random.default_rng(17)
@@ -133,10 +134,10 @@ def test_perception_supplies_the_habit_statistic():
     assert t.ports["act1"].variable == "ud1"
 
 
-def test_unknown_family_is_a_compile_error():
+def test_unknown_unversioned_family_is_a_validation_error():
     t, arrays = corridor_builder(past=1, steps=1)
     t.learnables["B"] = LearnableSpec("B", "beta", ("Bs",))
-    with pytest.raises(CompileError, match="unknown conjugate family"):
+    with pytest.raises(ModelError, match="unknown conjugate family"):
         compile_template(t, arrays=arrays)
 
 
@@ -478,7 +479,7 @@ def test_scoped_learnable_checkpoints_round_trip():
 
     learn = Learnables(engine, priors={"outer/B": np.full((U, K3, K3), 2.0)})
     keys = list(learn.state_dict())
-    assert keys == ["v2:outer%2FB:alpha"], keys
+    assert keys == ["v2:outer%2FB:alpha", PERSISTENT_MANIFEST_KEY], keys
 
     other = Learnables(engine, priors={"outer/B": np.ones((U, K3, K3))})
     other.load_state_dict(learn.state_dict())
@@ -516,7 +517,7 @@ def test_nested_scopes_cannot_collide_in_checkpoint_keys():
         },
     )
     checkpoint = source.state_dict()
-    assert len(checkpoint) == 2
+    assert len(checkpoint) == 3
 
     restored = Learnables(
         engine,

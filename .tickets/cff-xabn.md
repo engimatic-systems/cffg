@@ -1,6 +1,6 @@
 ---
 id: cff-xabn
-status: open
+status: in_progress
 deps: [cff-6tek, cff-s6yy]
 links: []
 created: 2026-08-31T03:16:28Z
@@ -113,3 +113,23 @@ Retained bounded-scan candidates and intended meanings: canonical=normalized Num
 **2026-08-31T03:25:56Z**
 
 Post-handoff scan additions: implement=the planned descriptor and migration work; appropriate=the named semantics-versus-storage ticket boundary; intended=the locally stated classification meaning.
+
+**2026-09-12T23:47:34Z**
+
+Implementation handoff: using the New IR field and Learnable or checkpoint feature change-path rows. Affected: core declaration validation and JSON/hash; plates/composition and transactional edits/copies; compiler resolution and LearnPlan transport; Family persistence schema and Learnables checkpoint encode/decode; bundle pre-write declaration validation; public descriptor exports. Topology keeps declarations through the existing template snapshot; member_of supplies existing target addresses. Host/JIT, flooding/scheduled, and single-instance/vmap numerical execution and agent cadence: N/A (no message rules, statistics, or scheduling changes). Current/legacy declaration and checkpoint decoding are affected and need separate tests. Sparse/zero support and vacuous messages: N/A to metadata validation; invalid schemas fail before mutation. Float32: preserve canonical dtype without casting in persistence. Scale: exercise at least 64 scoped declarations. Working on the existing clean agent/cff-xabn-retry branch as Cooper requested; no branch creation or base switch.
+
+**2026-09-13T00:03:33Z**
+
+Research question: Which recurrence guards must generic persistence preserve? Answer: the older D9 manifest binds version, statistic identity, source/target/blob ownership, complete hyperparameter shapes, canonical dtype, and exact-value digests; unidentified v2/slash state and D8 remain rejected. Sources: learning_checkpoint.py, Learnables.load_state_dict, _agent_checkpoint.py, and test_recurrence_checkpoint.py. Confidence: high (read-only sub-agent implementation/test inspection). Integration found that agent inventories derive required fields from emitted learning state, so older envelopes need an explicit optional-metadata path; historical hashes are accepted only for the four unchanged family identities. The new descriptor additionally names each logical target factor. Discovered compact-plate composition silently discarded plate learnables: this ticket rejects that operation with affected names and an expand_plates diagnostic; cff-b2fz owns implementing compact composition.
+
+**2026-09-13T00:06:41Z**
+
+Implementation complete for review: semantic identity is transported by LearnableSpec and LearnPlan; the family-owned persistent-parameter schema resolves logical target factors/blobs/forms and named prior/posterior arrays. Generic checkpoints bind semantics, exact dtypes, shapes, and digests; old identified D9 and unchanged-family declaration/checkpoint/hash migration remain explicit. Descriptor construction and encoding validate before writing. Focused validation: 112 passed, 3 slow tests deselected across learning schemas, declared/ Gaussian learning, and bundles; recurrence/hybrid/plate/composition run passed 102. Functional-agent corruption regression passed with recomputed metadata so it still exercises stale planning-state rejection. Topology clarification: TopologyLayout snapshots factor/variable topology, not learning declarations; it needs no new field. Compiler resolution reads the expanded Template directly, then stores identity in Arena.learn_plans. Full short-suite gate remains pending.
+
+**2026-09-13T00:10:50Z**
+
+Final API audit updated the canonical-export test and the renamed-recurrence checkpoint ownership test for the generic manifest; both pass (2 passed in 8.72 s). The first short-suite attempt was stopped before completion when this audit found those stale expectations. It produced no gate result or dashboard update. One fresh short-suite run is now validating the final code and tests; the previous 1003.707 s wall-time measurement and 1260 s wait budget remain the basis for the wait.
+
+**2026-09-13T00:28:47Z**
+
+The first completed short suite reported 1734 passed, 3 failed, 41 deselected (989.07 s pytest; 1001.601 s measured wall time). All three failures were compiler-contract assertions pinning the pre-identity learning/agent structure hashes. Updated exactly those two expected hashes; schedule fingerprints and execution-layout expectations are unchanged. All 44 compiler-contract tests now pass in 2.08 s. A fresh final short-suite run will replace the failing dashboard result; no focused result is being represented as a full-suite pass.

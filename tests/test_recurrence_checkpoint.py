@@ -11,8 +11,10 @@ from cffg.compiler import compile_template
 from cffg.core.serialize import structure_hash, to_json
 from cffg.engine import Engine, RunStatus
 from cffg.learn import Learnables
+from cffg.learning_schema import PERSISTENT_MANIFEST_KEY
 from cffg.learning_checkpoint import (
     CHECKPOINT_MANIFEST_KEY,
+    encode_manifest,
     RECURRENCE_CHECKPOINT_VERSION,
     RECURRENCE_PRIOR_IDENTITY,
     RECURRENCE_STATISTIC_IDENTITY,
@@ -60,6 +62,14 @@ def _runtime(dtype=np.float64):
     return template, arrays, engine, learning
 
 
+def _legacy_checkpoint(learning):
+    """The identified D9 format emitted before generic learning descriptors."""
+    return {
+        **learning.hyperparameter_snapshot(),
+        CHECKPOINT_MANIFEST_KEY: encode_manifest(learning.plans, learning.params),
+    }
+
+
 def _copy(checkpoint):
     return {name: np.asarray(value).copy() for name, value in checkpoint.items()}
 
@@ -77,9 +87,9 @@ def _with_manifest(checkpoint, document):
 
 
 @pytest.mark.parametrize("dtype", (np.float32, np.float64))
-def test_current_checkpoint_round_trips_identity_ownership_dtype_and_values(dtype):
+def test_legacy_d9_checkpoint_round_trips_identity_ownership_dtype_and_values(dtype):
     _template, _arrays, engine, source = _runtime(dtype)
-    checkpoint = source.state_dict()
+    checkpoint = _legacy_checkpoint(source)
     document = _manifest(checkpoint)
 
     assert document["checkpoint_version"] == RECURRENCE_CHECKPOINT_VERSION
@@ -118,7 +128,7 @@ def test_current_checkpoint_round_trips_identity_ownership_dtype_and_values(dtyp
     for key, value in source.params["recurrence"].items():
         np.testing.assert_array_equal(restored.params["recurrence"][key], value)
         assert restored.params["recurrence"][key].dtype == np.dtype(dtype)
-    assert str(restored.state_dict()[CHECKPOINT_MANIFEST_KEY]) == str(
+    assert str(_legacy_checkpoint(restored)[CHECKPOINT_MANIFEST_KEY]) == str(
         checkpoint[CHECKPOINT_MANIFEST_KEY]
     )
 
@@ -185,7 +195,7 @@ def test_manifest_version_statistic_factor_and_source_tampering_fail(
     mutation, match
 ):
     _template, _arrays, engine, source = _runtime()
-    checkpoint = source.state_dict()
+    checkpoint = _legacy_checkpoint(source)
     broken = _with_manifest(checkpoint, mutation(_manifest(checkpoint)))
     restored = Learnables(
         engine,
@@ -198,7 +208,7 @@ def test_manifest_version_statistic_factor_and_source_tampering_fail(
 
 def test_incomplete_unknown_shape_dtype_nonfinite_and_manifest_encoding_fail():
     _template, _arrays, engine, source = _runtime(np.float32)
-    checkpoint = source.state_dict()
+    checkpoint = _legacy_checkpoint(source)
     eta_key = "v2:recurrence:eta"
     cases = []
 
@@ -245,17 +255,17 @@ def test_incomplete_unknown_shape_dtype_nonfinite_and_manifest_encoding_fail():
             )
 
 
-def test_structure_hash_cannot_identify_recurrence_statistic_semantics():
+def test_model_identity_does_not_authorize_a_d8_checkpoint():
     template, _arrays, engine, source = _runtime()
     template_identity = structure_hash(template)
-    checkpoint = source.state_dict()
+    checkpoint = _legacy_checkpoint(source)
     legacy = _manifest(checkpoint)
     legacy["statistic_identity"] = (
         "cffg.recurrence.d8-singleton-product/1.0.0"
     )
 
     assert structure_hash(template) == template_identity
-    assert RECURRENCE_STATISTIC_IDENTITY not in to_json(template)
+    assert RECURRENCE_STATISTIC_IDENTITY in to_json(template)
     with pytest.raises(ValueError, match="statistic identity"):
         Learnables(
             engine,
@@ -309,6 +319,6 @@ def test_fit_legacy_numeric_snapshot_excludes_checkpoint_manifest():
     checkpoint = learning.state_dict()
     snapshot = legacy_snapshot(learning, {"probe": np.asarray([1.0])})
 
-    assert CHECKPOINT_MANIFEST_KEY in checkpoint
+    assert PERSISTENT_MANIFEST_KEY in checkpoint
     assert all(np.issubdtype(value.dtype, np.number) for value in snapshot.values())
     assert not any(CHECKPOINT_MANIFEST_KEY in key for key in snapshot)

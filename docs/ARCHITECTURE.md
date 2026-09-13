@@ -819,7 +819,9 @@ them. Four rules define the contract:
    `check` (compile-time admissibility), `stats` (engine readout → statistic),
    `fold` (statistic into hyperparameters), `rollover` (hyperparameters →
    what the rules consume), `raw` (→ what a counts target consumes), `mean`
-   (→ the reporting readout). `Dirichlet` serves the discrete vocabulary:
+   (→ the reporting readout), `semantic_identity`, `parameter_forms`, and
+   `persistent_parameters` (checked target-role shapes → named persistent
+   array schemas). `Dirichlet` serves the discrete vocabulary:
    `categorical` over `[K]`, `matrix_cat` over `[K_out, K_in]`,
    `transition_mixture` over `[U, K', K]`. `NIW` serves only
    `niw/gaussian`; ordinary `MNIW` serves `mniw/gaussian_linear`, including the
@@ -892,25 +894,58 @@ starts from the current posterior and adds a distinct trial;
 sequence coordinate. Both require a status-bearing, converged `RunResult`,
 accept an `only` name filter, pool tied sources, validate all selected
 posteriors in temporary storage, and commit atomically. `write` is likewise
-atomic across selected role-bearing targets. Versioned checkpoints encode
-each `(learnable, hyperparameter)` pair independently and round-trip the NIW,
-MNIW, component-MNIW, and PG arrays. Because D8 and D9 recurrence use
-identical IR and array shapes, a recurrence checkpoint also stores a canonical
-manifest with the D9 statistic identity, factor sources, parameter-blob
-ownership, hyperparameter dtype/shape, and exact-value digests. Missing,
-legacy, tampered, or mismatched
-recurrence identity is rejected before mutation. Legacy spellings for
-unchanged families remain explicit migrations; a multi-array posterior must
-be complete rather than silently combining restored and prior
-hyperparameters. The
+atomic across selected role-bearing targets.
+
+`LearnableSpec.semantic_identity` is serialized under learning schema `1`
+and participates in the structure hash. It identifies both the posterior
+update and sufficient-statistic meaning. Built-in identities are
+`cffg.learning.dirichlet/1.0.0`, `cffg.learning.niw/1.0.0`,
+`cffg.learning.mniw/1.0.0`, `cffg.learning.component-mniw/1.0.0`, and
+`cffg.recurrence.d9-structured-pair/1.0.0`. New Python declarations select
+these defaults. An unknown identity is rejected on JSON loading, validation,
+or compilation; numeric prior, posterior, and point values remain outside
+the structure hash. Scoping transports the identity unchanged, and compiling
+reconstructs its resolved descriptor from the scoped declarations.
+Composition currently requires flat operands: call `expand_plates` before
+`scoped` or `merge`. Compact operands are rejected with affected learnable
+names; `cff-b2fz` owns preserving compact plates through composition.
+
+`cffg.learning_schema.PersistentStateDescriptor`, returned by
+`Learnables.persistent_descriptors()`, binds each learnable's name, family,
+factor type, semantic identity, statistic sources, and logical parameter
+targets (factor, blob, role, consumption form, layout, transform). Each named
+immutable-prior and current-posterior array has a hyperparameter key, shape,
+canonical NumPy dtype spelling (`dtype.str`), and SHA-256 of C-order bytes.
+Array names encode each scoped owner and key independently; empty, dot,
+parent, backslash, and control-character scopes are rejected. Group keys and
+arena indices are derived addresses and never enter this descriptor.
+The family owns required keys and shapes; generic validation checks complete
+schemas, duplicate keys, compatible roles/forms, and floating dtypes without
+casting. All five registered families implement the contract.
+
+`state_dict()` keeps the independently encoded `v2:` posterior keys and adds
+`__cffg_learning_manifest__`, a scalar Unicode JSON inventory with schema
+`1.0.0`. Restoration checks semantic identity, ownership, completeness, exact
+dtype/value digests, and family admissibility before mutation. The manifest
+describes priors, but this flat checkpoint API still restores only posteriors;
+immutable priors remain those supplied by the destination caller. Complete
+prior/posterior CFFGZ storage is owned by `cff-enhs`.
+
+Unversioned declarations and bare/slash/v2 checkpoints for the four unchanged
+nonrecurrence families migrate deterministically. Complete multi-array state
+is required. Historical bundle and agent structure hashes are accepted only
+for those unchanged identities. Legacy recurrence-only manifests retain their
+D9 identity/ownership/digest checks; D8 and unidentified recurrence declarations
+or posterior state cannot migrate. `hyperparameter_snapshot()` is numeric
+diagnostic output, not a recurrence checkpoint. The
 model/runtime interface still declares which boundary learnable is
 episode-scale because that choice determines rollover semantics, not merely
 update frequency.
 
 `RollingAgent.checkpoint` namespaces every entry from `Learnables.state_dict`,
-so a recurrence manifest would flow through that container unchanged. No
-shipped rolling-agent builder currently declares a recurrence learnable; the
-agent schema is therefore not broadened with a second identity field.
+including the generic manifest. Its inventory decoder also accepts historical
+envelopes without that field, then delegates learning migration and complete
+state validation to `Learnables` before committing any agent state.
 
 #### 3c. Rolling boundary contract (`AgentSpec`, cff-nhxf)
 

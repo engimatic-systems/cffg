@@ -125,12 +125,14 @@ def to_dict(t: Template) -> dict[str, Any]:
     # model that learns its transitions is a different model from one that
     # does not, so this participates in the structure hash.
     if t.learnables:
+        d["learning_schema_version"] = "1"
         d["learnables"] = {
-            name: (
-                {"family": ln.family, "blobs": list(ln.blobs), "sources": list(ln.sources)}
-                if ln.sources is not None
-                else {"family": ln.family, "blobs": list(ln.blobs)}
-            )
+            name: {
+                "family": ln.family,
+                "blobs": list(ln.blobs),
+                "semantic_identity": ln.semantic_identity,
+                **({"sources": list(ln.sources)} if ln.sources is not None else {}),
+            }
             for name in sorted(t.learnables)
             for ln in [t.learnables[name]]
         }
@@ -183,6 +185,11 @@ def to_dict(t: Template) -> dict[str, Any]:
 
 
 def from_dict(d: dict[str, Any]) -> Template:
+    from cffg.core.learning_identity import declaration_identity
+
+    learning_version = d.get("learning_schema_version")
+    if learning_version not in (None, "1"):
+        raise ValueError(f"unknown learning schema version {learning_version!r}")
     if d.get("schema_version") != SCHEMA_VERSION:
         raise ValueError(
             f"schema version {d.get('schema_version')!r} != supported {SCHEMA_VERSION!r}"
@@ -233,6 +240,7 @@ def from_dict(d: dict[str, Any]) -> Template:
                 spec["family"],
                 tuple(spec["blobs"]),
                 tuple(spec["sources"]) if "sources" in spec else None,
+                declaration_identity(name, spec["family"], spec, learning_version),
             )
             for name, spec in d.get("learnables", {}).items()
         },
@@ -343,6 +351,25 @@ def _erase_blob_data(d: dict[str, Any]) -> None:
     d["blobs"] = {name: {} for name in d.get("blobs", {})}
     for pspec in d.get("plates", {}).values():
         _erase_blob_data(pspec["fragment"])
+
+
+def legacy_learning_structure_hash(t: Template) -> str | None:
+    """Pre-identity hash, only for families whose legacy semantics are known."""
+    from cffg.core.learning_identity import LEGACY_IDENTITIES
+
+    def erase_identity(document):
+        for spec in document.get("learnables", {}).values():
+            if spec["semantic_identity"] != LEGACY_IDENTITIES.get(spec["family"]):
+                return False
+            del spec["semantic_identity"]
+        document.pop("learning_schema_version", None)
+        return all(erase_identity(p["fragment"]) for p in document.get("plates", {}).values())
+
+    document = to_dict(t)
+    if not erase_identity(document):
+        return None
+    _erase_blob_data(document)
+    return hashlib.sha256(json.dumps(document, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
 def _sorted(mapping: dict[str, Any]) -> list[Any]:

@@ -55,10 +55,18 @@ from urllib.parse import quote, unquote
 import numpy as np
 
 from cffg import ef, efrules
+from cffg.core.learning_identity import LEARNING_IDENTITIES
+from cffg.learning_schema import (
+    PERSISTENT_MANIFEST_KEY,
+    PersistentParameter,
+    encode_persistent_manifest,
+    resolve_persistent_state,
+    restore_persistent_array,
+    validate_persistent_manifest,
+)
 from cffg.learning_checkpoint import (
     CHECKPOINT_MANIFEST_KEY,
     checkpoint_context,
-    encode_manifest,
 )
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -97,8 +105,15 @@ class Family(Protocol):
     """
 
     name: str
+    semantic_identity: str
+    parameter_forms: tuple[str, ...]
     #: key into READOUTS: which engine readout supplies this family's stats
     readout: str
+
+    def persistent_parameters(
+        self, role_shapes: dict[str, tuple[int, ...]]
+    ) -> tuple[PersistentParameter, ...]:
+        """Name every persistent array and derive its shape from checked target roles."""
 
     def check(
         self, learnable: str, ftype: str, shapes: dict[str, tuple[int, ...]], roles: dict[str, str]
@@ -186,6 +201,12 @@ class Dirichlet:
         "matrix_cat": "matrix",
         "transition_mixture": "matrices",
     }
+
+    semantic_identity = LEARNING_IDENTITIES["dirichlet"]
+    parameter_forms = ("expected", "counts")
+
+    def persistent_parameters(self, role_shapes):
+        return (PersistentParameter("alpha", next(iter(role_shapes.values()))),)
 
     def check(
         self,
@@ -489,7 +510,9 @@ class Learnables:
                 raise KeyError(
                     f"engine declares {plan.name!r}, which this Learnables lacks"
                 )
-            if (plan.family, plan.ftype) != (original.family, original.ftype):
+            if (plan.family, plan.ftype, plan.semantic_identity) != (
+                original.family, original.ftype, original.semantic_identity
+            ):
                 raise ValueError(
                     f"learnable {plan.name!r} has an incompatible plan in this engine"
                 )
@@ -607,21 +630,22 @@ class Learnables:
         }
 
     def state_dict(self) -> dict[str, np.ndarray]:
-        """Versioned hyperparameters plus required recurrence identity.
-
-        A delimiter alone is insufficient: scoped learnable names contain
-        ``/``, and one valid learnable name can equal another learnable's
-        apparent ``name/key`` spelling. Encoding the two components
-        independently makes the boundary structural rather than inferred.
-        A recurrence manifest additionally binds D9 statistic semantics,
-        source ownership, shapes, and dtypes because those facts are absent
-        from the unchanged template structure hash.
-        """
+        """Posterior arrays plus versioned semantics and persistent-state inventory."""
         data = self.hyperparameter_snapshot()
-        manifest = encode_manifest(self.plans, self.params)
-        if manifest is not None:
-            data[CHECKPOINT_MANIFEST_KEY] = manifest
+        if self.plans:
+            data[PERSISTENT_MANIFEST_KEY] = encode_persistent_manifest(
+                self.persistent_descriptors()
+            )
         return data
+
+    def persistent_descriptors(self):
+        """Resolve complete immutable-prior/current-posterior array ownership."""
+        return tuple(
+            resolve_persistent_state(
+                plan, FAMILIES[plan.family], self.initial_params[name], self.params[name]
+            )
+            for name, plan in sorted(self.plans.items())
+        )
 
     def load_state_dict(
         self,
@@ -630,6 +654,12 @@ class Learnables:
         exact: bool = False,
     ) -> None:
         """Restore hyperparameters, optionally requiring the complete state."""
+        descriptors = self.persistent_descriptors()
+        manifest = data.get(PERSISTENT_MANIFEST_KEY)
+        payload = (
+            validate_persistent_manifest(manifest, descriptors)
+            if manifest is not None else None
+        )
         recurrence = checkpoint_context(data, self.plans, self.params)
         pending = {
             name: {key: value.copy() for key, value in params.items()}
@@ -639,7 +669,7 @@ class Learnables:
         legacy_names: set[str] = set()
         seen: set[tuple[str, str]] = set()
         for flat, arr in data.items():
-            if flat == CHECKPOINT_MANIFEST_KEY:
+            if flat in (CHECKPOINT_MANIFEST_KEY, PERSISTENT_MANIFEST_KEY):
                 continue
             if flat.startswith(_STATE_KEY_PREFIX):
                 name, key = _decode_state_key(flat)
@@ -679,7 +709,8 @@ class Learnables:
                     f"checkpoint names learnable {name!r} hyperparameter {key!r} twice"
                 )
             seen.add((name, key))
-            recurrence.require_identity(name)
+            if payload is None:
+                recurrence.require_identity(name)
             if np.iscomplexobj(arr):
                 raise ValueError(
                     f"learnable {name!r}: checkpoint hyperparameter {key!r} "
@@ -690,10 +721,15 @@ class Learnables:
                     f"learnable {name!r}: checkpoint shape {np.shape(arr)} != "
                     f"{self.params[name][key].shape}"
                 )
-            pending[name][key] = recurrence.restore_value(name, key, arr)
+            pending[name][key] = (
+                restore_persistent_array(name, key, arr, payload)
+                if payload is not None else recurrence.restore_value(name, key, arr)
+            )
             changed.add(name)
         recurrence.require_complete(seen)
-        for name in legacy_names:
+        if payload is not None and seen != set(payload):
+            raise KeyError(f"checkpoint is missing learnable hyperparameters {sorted(set(payload) - seen)}")
+        for name in changed if payload is None else legacy_names:
             present = {key for candidate, key in seen if candidate == name}
             required = set(self.params[name])
             if len(required) > 1 and present != required:

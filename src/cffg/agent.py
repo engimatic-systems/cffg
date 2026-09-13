@@ -57,7 +57,7 @@ from cffg._agent_mu3 import PlanningRuntime, functional
 from cffg.compiler import _log_of, compile_template
 from cffg.core.ir import AgentSpec, BeliefBinding, Template
 from cffg.core.plates import expand_plates
-from cffg.core.serialize import structure_hash
+from cffg.core.serialize import legacy_learning_structure_hash, structure_hash
 from cffg.core.validate import validate
 from cffg.engine import Engine, InferenceError, RunResult, RunStatus, State, _replace
 from cffg.learn import Learnables
@@ -158,6 +158,8 @@ class RollingAgent:
         _check_window_compatibility(plan_t, plan_spec, filt_t, filter_spec)
         self._plan_structure_hash = structure_hash(plan_t)
         self._filter_structure_hash = structure_hash(filt_t)
+        self._legacy_plan_structure_hash = legacy_learning_structure_hash(plan_t)
+        self._legacy_filter_structure_hash = legacy_learning_structure_hash(filt_t)
         grounded_plan = expand_plates(plan_t)
         grounded_filter = expand_plates(filt_t)
 
