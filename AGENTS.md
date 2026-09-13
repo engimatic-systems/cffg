@@ -98,8 +98,14 @@ This project will span many context windows. The rule that makes that survivable
   sufficient to open or update a PR. Before launching or waiting on it, inspect
   only `latest.wall_seconds` and `suggested_wait_seconds` in
   `tools/test-suite-runtimes.json` for measured wall time and a wait budget
-  with headroom. If the focused tests passed before, then don't poll the full 
-  test suite. Instead just wait for the `suggested_wait_seconds` time. Run
+  with headroom. If the focused tests passed before, then don't poll the full
+  test suite. Instead just wait for the `suggested_wait_seconds` time.
+  **Test-suite waits are an explicit exception to general guidance to send
+  frequent progress updates, including once-per-minute check-ins.** Announce
+  the suite launch and wait budget once, then wait quietly for the full
+  `suggested_wait_seconds`: no periodic commentary and no polling the process,
+  logs, or dashboard. Respond if Cooper sends a message; otherwise, give the
+  next update after the wait window, when checking the result. Run
   `uv run python tools/dashboard.py --run-suite` to execute the default
   `not slow` pytest selection exactly once
   and refresh both that runtime history and `~/agent-share/cffg-tests.html`
