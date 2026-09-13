@@ -503,15 +503,18 @@ class Engine:
                 nxt = _replace(
                     st, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta
                 )
-                delta = max(
-                    [
-                        mu3_delta,
-                        *(
-                        float(jnp.max(jnp.abs(getattr(nxt, f) - getattr(st, f))))
-                        for f in ("messages", "g_eta", "g_lam", "ef_eta")
-                        if getattr(st, f).size
-                        ),
-                    ]
+                # Preserve NaN from any representation, regardless of order.
+                delta = float(
+                    np.max(
+                        [
+                            mu3_delta,
+                            *(
+                                float(jnp.max(jnp.abs(getattr(nxt, f) - getattr(st, f))))
+                                for f in ("messages", "g_eta", "g_lam", "ef_eta")
+                                if getattr(st, f).size
+                            ),
+                        ]
+                    )
                 )
                 deltas.append(delta)
                 st = nxt

@@ -1,6 +1,6 @@
 ---
 id: cff-3ose
-status: open
+status: closed
 deps: [cff-5xdy]
 links: [cff-yglj]
 created: 2026-09-10T05:14:03Z
@@ -52,3 +52,21 @@ Pre-implementation evidence at cf5cdb6: /tmp/cffg-colony-late-failure.py checks 
 **2026-09-10T05:20:10Z**
 
 The second controlled probe /tmp/cffg-colony-terminal-failure.py confirms both remaining residual branches: non-finite max objective reports Colony residual 0 versus Engine infinity, and final undefined continuous ledger after an inner budget stop reports Colony 0.125 versus Engine infinity. Overall divergence agrees. These are now reproduced, not just inferred from source.
+
+**2026-09-10T05:41:56Z**
+
+Residual repair checkpoint: a new f32 primed-schedule regression failed on the old Colony residual=1, as intended. Setting the final public residual to infinity for divergence/infeasibility repairs all terminal branches without changing their statuses or inner facts. The complete Colony-failure and engine-contract selection then passed 50 tests in 9.67 seconds. The 20 new cases cover later inner failure/budget, FE failure, empty support, max-objective failure and undefined continuous ledger, both precisions and available primed/flood schedules. Healthy neighbors and every other result field match standalone execution. Non-finite delta aggregation is the next separate commit; final default gate follows the final code/test change.
+
+**2026-09-10T05:44:45Z**
+
+Non-finite delta repair: the new f32 Gaussian precision-block case failed on the old finite delta=1 even though that later block contained NaN. Engine and Colony now use NumPy maximum reductions that propagate NaN from any representation, preserving all finite delta values and the existing divergence status. Added first/later representation cases and genuine 20-instance batches in both precisions. The complete focused failure/engine-contract/runtime-status/Colony selection passed 72 tests, 3 slow deselected, in 14.65 seconds. There are 32 new cases in the existing dashboard-enrolled failure file (314 lines). Small-file lint/format checks and diff check pass; Engine retains 19 and Colony five pre-existing Ruff findings, with none introduced. Source changes are complete; the single final default gate is next. No numerical factor update, objective, schema, tolerance or public status changed.
+
+**2026-09-10T06:05:58Z**
+
+Completed in separate source commits: 8bb584a repairs stale Colony failure residuals; a2c55e6 preserves non-finite delta traces. The final focused selection passed 72 tests with three slow deselections. The single final default gate passed 2,043 tests, zero failures, 41 slow deselections and four existing Gym warnings. Pytest took 1,132.26 seconds; measured wall time was 1,145.615 seconds. It completed 2026-09-10T06:03:51.571355+00:00 at ticket-only head 25f537c. Code/test source a2c55e6 is authoritative. Runtime history and the shared dashboard are refreshed. Only one suite-output check was made after the planned first deadline.
+
+Every reproduced failure still has its original overall status; residuals and non-finite deltas now report the failure consistently. Healthy batch peers, finite budget results, inner facts, traces apart from previously masked NaN deltas, and numerical states retain their reference behavior. No factor formula, solver, objective, schema or tolerance changed. Publication reuses this gate. Next is cff-ii9t, whose handoff records the ordering and trace-precision constraints. Independent agent review remains unavailable and is not claimed.
+
+**2026-09-10T06:10:20Z**
+
+Published as PR #129, stacked on #128: https://github.com/engimatic-systems/cffg/pull/129. Shared HTML now explains the completed repair and the shared-controller next step; validation found 66 unique IDs and 35 resolved internal anchors. Main is unchanged and the open stack is not merged. Code/test source a2c55e6 and gate record 29a4c9f remain authoritative.

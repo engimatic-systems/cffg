@@ -133,3 +133,22 @@ The existing direct lifecycle prerequisite remains; tk dependency records are au
 **2026-09-10T05:17:25Z**
 
 The full late-failure result comparison also found Engine masking a NaN message delta as 0 because Python max begins with the finite mu3 delta. Colony may instead preserve that NaN, or mask one from a later representation. Both already report overall divergence. cff-3ose was refined before implementation to repair non-finite delta traces as well as stale residuals; preserve its corrected diagnostic baseline during extraction.
+
+**2026-09-10T05:49:59Z**
+
+Implementation handoff prepared while cff-3ose's gate runs. The intended baseline is its final published head; current repair source is a2c55e6, not the earlier discrepant snapshot. Applicable row: Runtime numerical or status invariant; New factor/rule applies only through supplied schedule/objective callbacks. New IR and learning/checkpoint decoding are N/A. Host/JIT, flooding/scheduled and standalone/real vmap remain checked pairs. Current/legacy restored arrays enter the same State boundary; decoding itself does not move.
+
+Concrete ownership constraints:
+- The ordinary controller takes State, ScheduleProgram, explicit controls and narrow objective/check/functional-update callbacks, never Engine or factor-type dispatch. A shared incremental assessment owner is used by the standalone loop and Colony's existing batched transport. The finalizer alone maps the internal typed termination reason to public RunStatus and constructs ordinary RunResult.
+- Retain per-instance active masks and freezing across both priming and later updates. Do not replace Colony with sequential Engine calls. Initial invalid states are checked before priming. Support checks keep reading current State.params, including constraint thresholds/tables repaired in cff-jby3.
+- Preserve evaluation order: functional update failure stops before a counted scheduled step; finite/state/inner checks precede support, then inner budget, then objective evaluation. Max objective is evaluated only when its delta threshold is met. Initial undefined continuous FE may propagate until a finite entry appears; a nonempty run that never records FE is still divergence at termination.
+- FE comparison history resets at each soft/hard phase. Soft convergence starts the requested hardening phase instead of ending the whole run. Initial rejection keeps zero iterations; functional-update rejection does not invent a delta entry.
+- Numerical facts must stay fixed-shape array values suitable for JAX transformation; outcome/status policy remains host-side until cff-wbhu. Trace conversion must preserve the current Python-float precision: do not turn host-double FE differences into default-f32 JAX arrays just to store the internal trace. Convert traces to public Python tuples at the finalizer.
+- Engine's current private step/prime aliases are instrumented by the contract tests and Colony. If the controller consumes ScheduleProgram directly, either overlay the current aliases at call time or consistently move instrumentation to the program boundary without changing test oracles. Do not accidentally make failure tests patch a handle the controller no longer uses.
+- Reuse runtime_types as the pure value leaf. Extract host finite/support checks without importing Engine back into the new owners. Exact and trust-region strategy implementations, their caching and solver diagnostics remain cff-jrbw; FE formulas remain cff-gl89.
+
+Authorities: existing test_engine_contracts, test_runtime_status and test_colony_failures. cff-3ose adds late failures, NaN in first/later representations, finite budget residuals and real 20-instance batches; its final gate will establish the repaired baseline. This is a local source/fixture handoff, not independent agent review.
+
+**2026-09-10T06:10:20Z**
+
+Prerequisite cff-3ose is closed and published as PR #129. Its repaired code/test source is a2c55e6; final 2,043-test gate (41 slow deselections, four existing warnings) is recorded in 29a4c9f, measured wall 1,145.615 seconds. Use the final published agent/cff-3ose-failure-diagnostics head as this ticket's branch base. The 32 new failure cases preserve truthful non-finite delta traces and infinite failed-run residuals; do not restore the old discrepancies.

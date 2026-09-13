@@ -1384,6 +1384,10 @@ discarding a joint correlation. Exact joint rollover remains the separate
   Max mode uses its message fixed-point residual and validates the decoded
   objective. Non-finite arenas/residuals are divergence, while proven empty
   exact support is infeasible with FE = +∞.
+  Ordinary Engine and Colony delta reductions preserve NaN from any message
+  representation; a finite change in another block cannot hide it. Their
+  failed-run traces therefore retain the non-finite change as well as reporting
+  divergence. Finite deltas and successful-run stopping rules are unchanged.
   "Proven empty" is decided in log space by exact comparison with the
   reserved `NEG` sentinel, never by exponentiating or applying a magnitude
   threshold. `exp` underflows below about -745, while a threshold merely
@@ -1526,6 +1530,11 @@ an infinite inner residual, matching standalone `Engine.run`. Healthy peers
 continue through the vmapped updates; a fully rejected group skips priming and
 updates. `tests/test_colony_failures.py` checks complete result/state parity
 across both float precisions, zero/positive budgets and mixed/flood schedules.
+Later divergence or infeasibility reports an infinite public residual, even
+when earlier updates produced a finite residual. Inner-solver facts and FE
+trace entries are retained; a budget stop with a defined ledger keeps its
+existing residual. Controlled-failure tests compare every public result field
+with standalone execution and verify that healthy batch members continue.
 `tests/test_constraint_data.py` additionally checks distinct per-instance limits
 and tables, both spawn orders, all four numeric consumers, and actual batching
 of mixed float precisions and table lengths. `test_constraint_reconstruction.py`
