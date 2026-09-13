@@ -32,4 +32,3 @@ This follows cff-xabn and removes its expand-before-composition limitation. No o
 ## Definitions
 
 A compact plate stores one fragment plus copy dimensions and wiring rules. Expansion materializes the individual copies. A tied blob is shared by copies; a per-copy blob is owned separately by each copy.
-
