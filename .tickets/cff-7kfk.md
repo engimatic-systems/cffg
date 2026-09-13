@@ -1,6 +1,6 @@
 ---
 id: cff-7kfk
-status: open
+status: closed
 deps: [cff-nyad]
 links: [cff-3ola]
 created: 2026-09-10T03:41:20Z
@@ -106,3 +106,27 @@ Legend: prerequisite --> dependent; based on tk dep tree --full cff-5xdy, tk rea
                                 --> cff-3ola --> cff-ws3c runtime epic
 
 cff-5xdy retains its direct nyad dependency as well. No parallel architecture root is introduced; unrelated P2 validators cff-34gi and cff-6n9c remain independently ready. tk dep cycle passes. This small insertion keeps cff-3ola limited to readouts/facade work and requires no new inference choice.
+
+**2026-09-10T04:01:32Z**
+
+Starting from updated, remotely verified PR #126 head 930a8c32f88235dadf6b572538a62169add79e09 after its 1,991-test final gate. The source/caller inventory above remains current. Keep the existing sweep factory signature and every numerical operation; move transport into execution/synchronous.py and redirect Engine plus private test instrumentation. Replace the redundant Gaussian selector wrapper with its existing kernel_runtime.parameters owner at the three ledger/readout callers. No new model, State, schema, objective, public status or PRNG policy is in scope.
+
+**2026-09-10T04:09:07Z**
+
+The move is implemented in execution/synchronous.py (417 physical lines); Engine is 352 lines shorter. Its nine moved function bodies match baseline 47701a6 under AST normalization that excludes only docstrings, the factory name/return annotation and the redundant Gaussian selector-forwarding alias. The three Gaussian ledger/readout callers now use kernel_runtime.parameters directly. Engine injects make_sweep into the unchanged ScheduleProgram contract; private tests follow the moved owner. No formula, parameter ownership, State schema or public status changed.
+
+Focused execution/specialized/shared-goal/constraint/program/Colony/engine-contract checks passed 168 cases in 94.91 seconds. After adding the explicit ownership-boundary test, test_execution.py passed all 13 cases in 6.03 seconds. The boundary check requires one canonical factory outside Engine and no Engine/State/public-status/family-rule imports in the synchronous owner. New/small-file Ruff and format checks pass. Engine retains 20 baseline findings and schedule tests retain three; no new code/message findings appeared. Architecture and the change-path index are updated. The existing schedule/custom-kernel-focused selection and bounded numerical parity are finishing; no final full-suite claim yet.
+
+**2026-09-10T04:11:58Z**
+
+Final schedule/custom-kernel selection passed 40 tests in 27.49 seconds. The bounded numerical comparison at /tmp/cffg-synchronous-parity.py loads trusted Engine source 47701a6 and compares 17 models across automatic/flooding and float32/float64: all 2,622 arrays are bitwise identical, including matched NaNs, with the same functional scatter dtype warning as the prior extraction. Schedule identity, priming, reconstruction and exact units also match. All focused checks are complete; no further code change is planned. Commit the source, then run the final default suite once. Latest measured wall is 1,135.251 seconds and suggested wait is 1,440 seconds; first output check at 20 minutes, then at the 24-minute allowance only if still running.
+
+**2026-09-10T04:32:30Z**
+
+Final default gate passed at source 2aaef36: 1,992 tests, zero failures, 41 opt-in slow deselections and four existing Gym warnings; pytest reported 1,124.65 seconds and measured wall time was 1,138.059 seconds. Completion: 2026-09-10T04:30:56.938172+00:00, recorded against 8a92f49. The dashboard includes the new ownership-boundary case. Subsequent e35aae6/8a92f49 commits change only lifecycle ticket text, not code. The suite was checked once after its 20-minute estimate; no repeated test polling or publication rerun is needed.
+
+All acceptance criteria are met: one synchronous transport owner supplies the existing schedule factory interface; every moved function body and all bounded numerical outputs match; runtime constraint ownership, shared goals, cross-domain damping, hardening and failure facts are preserved; public schemas and policies are unchanged; the owner is below 1,000 lines and the architecture index is updated. Close and publish above PR #126, then update that published base and proceed to ready cff-5xdy using its detailed handoff. No significant user decision is pending.
+
+**2026-09-10T04:34:12Z**
+
+Published as PR #127, https://github.com/engimatic-systems/cffg/pull/127, above #126. The shared architecture page now explains the completed synchronous transport owner, preserved global update ordering and baseline parity, and the next lifecycle boundary. HTML validation passed with 63 unique IDs and 35 resolved internal anchors. The dashboard shows 1,992 passing tests. Source 2aaef36 and gate/closure 9f939fa remain authoritative; publication changes no code. Next: verify/update this published branch and start ready cff-5xdy. The PR stack remains open for review, not merged.

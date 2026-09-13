@@ -14,13 +14,13 @@ On tree graphs at the BP fixed point, F = −log Z.
 Module map:
 - ``State`` and status results define the runtime boundary.
 - ``Engine`` owns state setup, data binding, host control flow, and readouts.
-- Family sweeps and ``_make_step`` implement synchronous flooding.
+- ``execution.synchronous`` gathers, combines and damps local factor updates.
 - ``schedule_program`` owns stage construction and exact certification units;
   ``execution.transport`` owns shared segmented gathers and scatters.
 - ``_make_bfe`` owns the ledger supplied to the schedule program.
 
 Paired paths:
-- ``Engine.step`` calls ``_make_step``; ``Engine.run`` drives flooding or mixed
+- ``Engine.step`` calls the shared sweep; ``Engine.run`` drives flooding or mixed
   iterations, while ``_run_exact`` consumes the program's exact unit.
 - Host ``_has_zero_support`` and the program's JIT support check share exact-support
   semantics; public ``Engine.bfe`` delegates to ``_make_bfe``.
@@ -35,35 +35,23 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
-from jax.scipy.special import logsumexp
 
 from cffg import csp, ef, efrules, gauss, hybrid_gfe, kernels, mixg, recurrence
 from cffg.compiled import NEG, Arena
 from cffg.execution import (
-    composites as _composites,
-    cross_domain as _cross_domain,
     functional as _functional,
     parameters as _parameters,
 )
-from cffg.execution.constraints import execute_constraint as _execute_constraint
 from cffg.execution.owners import SCHEDULED_EXECUTORS
-from cffg.execution.registered import (
-    ef_parameters as _ef_parameters,
-    execute_discrete as _execute_discrete,
-    execute_ef as _execute_ef,
-    execute_gaussian as _execute_gaussian,
-)
 from cffg.execution.support import log_support as _jax_log_support
+from cffg.execution.synchronous import make_sweep
 from cffg.execution.transport import (
     _disc_both,
     _disc_rows,
     _gauss_rows,
     _obs_rows,
-    _set_disc_block,
-    _set_disc_rows,
-    _set_gauss_block,
 )
-from cffg.goal_parameters import shared_goal_energy, write_goal_counts
+from cffg.goal_parameters import shared_goal_energy
 from cffg.kernel_runtime import (
     discrete_energy as _disc_energy,
     discrete_potential as _disc_potential,
@@ -260,7 +248,7 @@ class Engine:
         self._bfe = eqx.filter_jit(raw_bfe)
         program = build_schedule_program(
             arena, schedule, SCHEDULED_EXECUTORS,
-            make_sweep=_make_step, free_energy=raw_bfe,
+            make_sweep=make_sweep, free_energy=raw_bfe,
         )
         self._schedule_program = program
         self.schedule = program.schedule
@@ -1959,7 +1947,7 @@ class Engine:
                 y = _obs_rows(self.arena, state.g_obs, g.obs_rows, g.observed_dim)
                 mk = state.g_mask[jnp.asarray(g.obs_rows)]
             values = _gauss_readout(
-                g, inc_e, inc_l, _gauss_group_params(g, state.params), y, mk,
+                g, inc_e, inc_l, _kernel_params(g, state.params), y, mk,
                 statistics=True,
             )
             for i, name in enumerate(g.members):
@@ -2198,7 +2186,7 @@ class Engine:
             if g.obs_rows is not None:
                 y = _obs_rows(self.arena, state.g_obs, g.obs_rows, g.observed_dim)
                 mk = state.g_mask[jnp.asarray(g.obs_rows)]
-            vals = _gauss_readout(g, inc_e, inc_l, _gauss_group_params(g, state.params), y, mk)
+            vals = _gauss_readout(g, inc_e, inc_l, _kernel_params(g, state.params), y, mk)
             for i, member in enumerate(g.members):
                 out[member] = {key: np.asarray(v)[i] for key, v in vals.items()}
         for g in self.arena.ef_groups:
@@ -2303,346 +2291,6 @@ class DirichletMarginal:
     proper: bool
 
 
-def _mix_sweep(arena, messages, g_eta, g_lam, params):
-    """Gather mixture cavities and collect writes for both message arenas."""
-    sel_writes = []
-    gauss_writes = []
-    for g in arena.mix_groups:
-        selector = messages[arena.message_indices(g.s_gather, g.k_sel)]
-        eta, precision = _gauss_rows(arena, g_eta, g_lam, g.g_gather, g.dims)
-        delta = _cross_domain.execute_mixture(
-            g, selector, eta, precision, _parameters.mixture_parameters(g, params)
-        )
-        for role, outgoing in enumerate(delta.outgoing.gaussian):
-            gauss_writes.append((
-                g.g_scatter[:, role], g.dims[role], outgoing.eta, outgoing.precision
-            ))
-        sel_writes.append((g.s_scatter, g.k_sel, delta.outgoing.selector))
-    return sel_writes, gauss_writes
-
-
-def _recurrence_sweep(arena, messages, g_eta, g_lam, params):
-    """Gather declared recurrence inputs and collect categorical/drive writes."""
-    discrete_writes = []
-    gaussian_writes = []
-    status = jnp.asarray(0)
-    for group in arena.recurrence_groups:
-        card = group.cards[0]
-        destination = messages[
-            arena.message_indices(group.d_gather_both[:, 0, 1], card)
-        ]
-        source = messages[
-            arena.message_indices(group.d_gather_both[:, 1, 1], card)
-        ]
-        eta_both = g_eta[arena.g_eta_indices(group.drive_gather_both, group.dim)]
-        precision_both = g_lam[arena.g_lam_indices(group.drive_gather_both, group.dim)]
-        delta = _cross_domain.execute_recurrence(
-            group, destination, source, eta_both, precision_both,
-            _parameters.recurrence_parameters(group, params),
-        )
-        discrete_writes.extend((
-            (group.d_scatter[:, 0], card, delta.outgoing.destination),
-            (group.d_scatter[:, 1], card, delta.outgoing.source),
-        ))
-        gaussian_writes.append((
-            group.drive_scatter, group.dim,
-            delta.outgoing.drive.eta, delta.outgoing.drive.precision,
-        ))
-        status = jnp.maximum(status, jnp.max(delta.status))
-    return discrete_writes, gaussian_writes, status
-
-
-def _hybrid_gfe_sweep(arena, messages, g_eta, g_lam, params):
-    """Gather hybrid-composite inputs and retain their local solver facts."""
-    selector_writes = []
-    gaussian_writes = []
-    residual = jnp.asarray(0.0, dtype=messages.dtype)
-    status = jnp.asarray(0)
-    for group in arena.hybrid_gfe_groups:
-        selector = messages[arena.message_indices(group.s_gather, group.k_sel)]
-        eta, precision = _gauss_rows(
-            arena, g_eta, g_lam, group.g_gather, group.dims
-        )
-        delta = _composites.execute_hybrid_gfe(
-            group, selector, eta, precision, _parameters.hybrid_parameters(group, params)
-        )
-        for role, outgoing in enumerate(delta.outgoing.gaussian):
-            gaussian_writes.append((
-                group.g_scatter[:, role], group.dims[role],
-                outgoing.eta, outgoing.precision,
-            ))
-        selector_writes.append((group.s_scatter, group.k_sel, delta.outgoing.selector))
-        residual = jnp.maximum(residual, jnp.max(delta.residual))
-        status = jnp.maximum(status, jnp.max(delta.status))
-    return selector_writes, gaussian_writes, residual, status
-
-
-def _prec_sweep(arena, g_eta, g_lam, ef_eta, params):
-    """Gather both edge sides for the precision owner's VMP belief inputs."""
-    gauss_writes = []
-    ef_writes = []
-    for g in arena.prec_groups:
-        tau_both = ef_eta[jnp.asarray(g.tau_gather_both)]
-        eta_both = g_eta[arena.g_eta_indices(g.x_gather_both, 1)]
-        precision_both = g_lam[arena.g_lam_indices(g.x_gather_both, 1)]
-        delta = _cross_domain.execute_precision(
-            g, tau_both, eta_both, precision_both, _parameters.precision_mean(g, params)
-        )
-        gaussian = delta.outgoing.gaussian
-        gauss_writes.append((g.x_scatter, 1, gaussian.eta, gaussian.precision))
-        ef_writes.append((g.tau_scatter, delta.outgoing.precision_parameter))
-    return gauss_writes, ef_writes
-
-
-def _gauss_group_params(g, params, rows=None):
-    """The group's named parameter stacks, optionally row-subset."""
-    return _kernel_params(g, params, rows)
-
-
-def _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params):
-    """One synchronous flooding sweep over the Gaussian groups; returns the
-    fully rewritten flat (eta, Lambda) arrays. Dims are static per group, so
-    every rule call sees a shape-local block."""
-    new_eta, new_lam = g_eta, g_lam
-    for g in arena.gauss_groups:
-        inc_e, inc_l = _gauss_rows(arena, g_eta, g_lam, g.gather, g.dims)
-        y = mk = None
-        if g.obs_rows is not None:
-            y, mk = _obs_rows(arena, g_obs, g.obs_rows, g.observed_dim), g_mask[jnp.asarray(g.obs_rows)]
-        outs = _execute_gaussian(
-            g, inc_e, inc_l, _gauss_group_params(g, params), y, mk
-        ).outgoing
-        for r, (oe, ol) in enumerate(outs):
-            new_eta, new_lam = _set_gauss_block(
-                arena, new_eta, new_lam, g.scatter[:, r], g.dims[r], oe, ol
-            )
-    return new_eta, new_lam
-
-
-def _ef_group_out(g, inc, params, rows=None, obs=None, mask=None):
-    """Outgoing EF messages [m, R, 2] for one group from gathered ``inc``.
-
-    Shared by the flooding sweep and the directed-schedule executors
-    (cff-d56d): ``rows`` optionally subsets the group's parameter stacks to
-    the members being fired."""
-    return _execute_ef(g, inc, _ef_parameters(g, params, rows), obs, mask).outgoing
-
-
-def _ef_sweep(arena, ef_eta, ef_obs, ef_mask, params):
-    """One synchronous flooding sweep over the EF groups — conjugate BP in
-    its entirety (DERIVATIONS.md D2). Each non-equality group's update comes
-    from its registered FactorKernel (cffg.kernels, cff-ri8m); equality is
-    structural sum-minus-self. Groups are static, so kernel dispatch happens
-    at trace time and the jitted step is branch-free."""
-    new = ef_eta
-    for g in arena.ef_groups:
-        obs = ef_obs[jnp.asarray(g.obs_rows)] if g.obs_rows is not None else None
-        mask = ef_mask[jnp.asarray(g.obs_rows)] if g.obs_rows is not None else None
-        out = _ef_group_out(g, ef_eta[jnp.asarray(g.gather)], params, None, obs, mask).astype(new.dtype)
-        new = new.at[jnp.asarray(g.scatter).reshape(-1)].set(out.reshape(-1, out.shape[-1]))
-    return new
-
-
-def _constraint_writes(arena: Arena, messages: jax.Array, params, op):
-    """Combinatorial messages for the hard-constraint factors (cff-e8zk). Reads
-    the pre-sweep messages (synchronous flooding); returns exact segmented
-    writes for the discrete arena, folded into damping by the caller."""
-    writes = []
-    for c in arena.constraint_groups:
-        inc = _disc_rows(arena, messages, c.gather, c.cards)
-        delta = _execute_constraint(c, inc, _parameters.constraint_parameters(c, params), op)
-        writes.append((c.scatter, c.cards, delta.outgoing))
-    return writes
-
-
-def _make_step(arena: Arena, skip_scheduled: bool = False):
-    """The synchronous sweep. With ``skip_scheduled=True`` (the mixed-mode
-    phase step, cff-d56d) the plain BP discrete groups, Gaussian groups, and
-    EF groups are omitted — the directed island passes own them — while
-    every iterative structure (vmp beads, GFE composites, constraints,
-    hybrid mixtures, gaussian_prec) still fires and damps exactly as in
-    flooding."""
-    groups = (
-        [g for g in arena.groups if g.mode != "bp"] if skip_scheduled else arena.groups
-    )
-    op = jnp.max if arena.semiring == "max" else logsumexp
-
-    def step(
-        messages: jax.Array,
-        g_eta: jax.Array,
-        g_lam: jax.Array,
-        g_obs: jax.Array,
-        g_mask: jax.Array,
-        ef_eta: jax.Array,
-        ef_obs: jax.Array,
-        ef_mask: jax.Array,
-        params: dict[str, jax.Array],
-        damp: float = 0.0,
-        harden: bool = True,
-    ) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array, jax.Array, jax.Array]:
-        new = messages
-        inner_residual = jnp.asarray(0.0, dtype=messages.dtype)
-        inner_status = jnp.asarray(0)
-        for g in groups:
-            if g.mode == "vmp":
-                inc = _disc_both(arena, messages, g.gather_both, g.cards)
-            else:
-                inc = _disc_rows(arena, messages, g.gather, g.cards)
-            out = _execute_discrete(g, inc, _kernel_params(g, params), op).outgoing
-            new = _set_disc_rows(arena, new, g.scatter, g.cards, out)
-        for g in arena.dirichlet_groups:
-            inc2 = _disc_both(arena, messages, g.gather_both, g.cards)
-            delta = _composites.execute_dirichlet(
-                g, inc2, _parameters.dirichlet_prior(g, params)
-            )
-            new = _set_disc_rows(arena, new, g.scatter, g.cards, delta.outgoing.structural)
-            new = _set_disc_block(
-                arena,
-                new,
-                g.prior_scatter,
-                g.param_size,
-                delta.outgoing.prior.reshape((len(g.members), g.param_size)),
-            )
-            new = _set_disc_block(
-                arena,
-                new,
-                g.count_scatter,
-                g.param_size,
-                delta.outgoing.counts.reshape((len(g.members), g.param_size)),
-            )
-        for scatter, cards, out in _constraint_writes(arena, messages, params, op):
-            new = _set_disc_rows(arena, new, scatter, cards, out)
-        goal_predictions = {}
-        for g in arena.gfe_groups:
-            ko, ki = g.cards
-            incoming = messages[arena.message_indices(g.gather_z, ki)]
-            goal_counts = (
-                messages[arena.message_indices(g.goal_count_scatter, ko)]
-                if g.goal_learned else None
-            )
-            delta = _composites.execute_gfe(
-                g, incoming, _parameters.gfe_parameters(g, params), goal_counts
-            )
-            new = _set_disc_block(arena, new, g.scatter_z, ki, delta.outgoing.latent)
-            new = _set_disc_block(arena, new, g.scatter_x, ko, delta.outgoing.log_prediction)
-            if g.goal_learned:
-                goal_predictions[g.name] = delta.outgoing.goal_prediction
-                new = _set_disc_block(
-                    arena, new, g.goal_prior_scatter, ko, delta.outgoing.goal_prior
-                )
-            inner_residual = jnp.maximum(inner_residual, jnp.max(delta.residual))
-            inner_status = jnp.maximum(inner_status, jnp.max(delta.status))
-        new = write_goal_counts(arena, new, goal_predictions)
-        for g in arena.gfe_tm_groups:
-            ko, ki, ku = g.cards
-            destination = messages[arena.message_indices(g.gather[:, 0], ko)]
-            source = messages[arena.message_indices(g.gather[:, 1], ki)]
-            selector = messages[arena.message_indices(g.gather[:, 2], ku)]
-            delta = _composites.execute_transition_gfe(
-                g, destination, source, selector, _parameters.transition_parameters(g, params)
-            )
-            new = _set_disc_block(arena, new, g.scatter[:, 0], ko, delta.outgoing.destination)
-            new = _set_disc_block(arena, new, g.scatter[:, 1], ki, delta.outgoing.source)
-            new = _set_disc_block(arena, new, g.scatter[:, 2], ku, delta.outgoing.selector)
-            inner_residual = jnp.maximum(inner_residual, jnp.max(delta.residual))
-            inner_status = jnp.maximum(inner_status, jnp.max(delta.status))
-        hybrid_sel, hybrid_gauss, hybrid_residual, hybrid_status = (
-            _hybrid_gfe_sweep(arena, messages, g_eta, g_lam, params)
-            if arena.hybrid_gfe_groups
-            else ([], [], jnp.asarray(0.0, messages.dtype), jnp.asarray(0))
-        )
-        inner_residual = jnp.maximum(inner_residual, hybrid_residual)
-        inner_status = jnp.maximum(inner_status, hybrid_status)
-        recurrence_disc, recurrence_gauss, recurrence_status = (
-            _recurrence_sweep(arena, messages, g_eta, g_lam, params)
-            if arena.recurrence_groups
-            else ([], [], jnp.asarray(0))
-        )
-        inner_status = jnp.maximum(inner_status, recurrence_status)
-        # Hybrid Gaussian-mixture sweep (cff-pksr): straddles both arenas.
-        # Computed here from the pre-sweep arrays so its writes fold into each
-        # arena's damping phase — Gaussian writes below, selector writes with
-        # the discrete blend (synchronous flooding: gather from OLD arrays).
-        mix_sel, mix_gauss = (
-            _mix_sweep(arena, messages, g_eta, g_lam, params)
-            if arena.mix_groups
-            else ([], [])
-        )
-        # gaussian_prec sweep (cff-7c5o): also straddles two arenas — its out
-        # edge writes the Gaussian arena, its prec edge the EF arena. Computed
-        # here from the pre-sweep arrays so both writes fold into the matching
-        # arena's damping phase (synchronous flooding: gather from OLD arrays).
-        prec_gauss, prec_ef = (
-            _prec_sweep(arena, g_eta, g_lam, ef_eta, params)
-            if arena.prec_groups
-            else ([], [])
-        )
-        # Gaussian sweep: information-form damping below is the log-space
-        # damping of the Gaussian family (log of a Gaussian is its (eta,
-        # Lambda) quadratic), so one damp knob covers both arenas.
-        new_eta, new_lam = g_eta, g_lam
-        if arena.gauss_groups and not skip_scheduled:
-            new_eta, new_lam = _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params)
-        for scatter, dim, oe, ol in [
-            *recurrence_gauss,
-            *hybrid_gauss,
-            *mix_gauss,
-            *prec_gauss,
-        ]:
-            new_eta, new_lam = _set_gauss_block(
-                arena, new_eta, new_lam, scatter, dim, oe, ol
-            )
-        if (
-            arena.gauss_groups
-            or arena.hybrid_gfe_groups
-            or arena.mix_groups
-            or arena.recurrence_groups
-            or arena.prec_groups
-        ):
-            new_eta = damp * g_eta + (1.0 - damp) * new_eta
-            new_lam = damp * g_lam + (1.0 - damp) * new_lam
-        # EF sweep: natural parameters are the log-space of their family, so
-        # the same damp knob is log-space damping here too.
-        new_ef = ef_eta
-        if arena.ef_groups or arena.prec_groups:
-            if arena.ef_groups and not skip_scheduled:
-                new_ef = _ef_sweep(arena, ef_eta, ef_obs, ef_mask, params)
-            for scatter, out in prec_ef:
-                new_ef = new_ef.at[jnp.asarray(scatter)].set(out)
-            new_ef = damp * ef_eta + (1.0 - damp) * new_ef
-        # Hybrid selector writes join the discrete arena before its damping.
-        for scatter, card, rows in [
-            *recurrence_disc,
-            *hybrid_sel,
-            *mix_sel,
-        ]:
-            new = _set_disc_block(arena, new, scatter, card, rows)
-        # Log-space damping: stabilizes the outer coordination between GFE
-        # composites (their local solves are exact, but synchronous flooding
-        # between them can limit-cycle — the outer face of Part II §4.5).
-        new = damp * messages + (1.0 - damp) * new
-        # Floor at NEG: exact log-zeros compound additively through chains
-        # (NEG + NEG + ...), and unchecked they overflow to -inf and NaN once
-        # δ-hardened controls make states truly impossible. exp(NEG) == 0
-        # either way, so clamping changes nothing semantically.
-        new = jnp.maximum(new, NEG)
-        if harden and len(arena.delta_pairs):
-            # δ form constraint: project each constrained edge onto a pointmass
-            # at the argmax of its current marginal (both slots one-hot).
-            for card, pairs in arena.delta_slot_groups:
-                p0, p1 = pairs[:, 0], pairs[:, 1]
-                i0 = arena.message_indices(p0, card)
-                i1 = arena.message_indices(p1, card)
-                lq = new[i0] + new[i1]
-                hot = jnp.where(
-                    jnp.arange(card)[None, :] == jnp.argmax(lq, axis=-1)[:, None],
-                    0.0,
-                    NEG,
-                ).astype(new.dtype)
-                new = new.at[i0].set(hot).at[i1].set(hot)
-        return new, new_eta, new_lam, new_ef, inner_residual, inner_status
-
-    return step
 
 
 
@@ -2658,7 +2306,7 @@ def _gauss_bfe(arena, g_eta, g_lam, g_obs, g_mask, params):
         if g.obs_rows is not None:
             y = _obs_rows(arena, g_obs, g.obs_rows, g.observed_dim)
             mk = g_mask[jnp.asarray(g.obs_rows)]
-        total = total + _gauss_energy(g, inc_e, inc_l, _gauss_group_params(g, params), y, mk).sum()
+        total = total + _gauss_energy(g, inc_e, inc_l, _kernel_params(g, params), y, mk).sum()
     for d, pairs in arena.gauss_interior:
         l0 = g_lam[arena.g_lam_indices(pairs[:, 0], d)]
         l1 = g_lam[arena.g_lam_indices(pairs[:, 1], d)]

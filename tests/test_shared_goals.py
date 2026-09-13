@@ -14,7 +14,8 @@ from cffg.bundle import load_bundle, save_bundle
 from cffg.compiler import CompileError, compile_template
 from cffg.core import BlobRef, VariableSpec
 from cffg.core.serialize import from_json, structure_hash, to_json
-from cffg.engine import Engine, RunStatus, _make_step
+from cffg.engine import Engine, RunStatus
+from cffg.execution.synchronous import make_sweep
 from cffg.outer import OuterArrays, build_outer_chart, outer_chart_signature
 from cffg.schedule import _arena_signature
 
@@ -198,7 +199,7 @@ def test_group_order_damping_and_vmapped_instances():
             posterior.alpha, engine.goal_prior_updates(next_state)["Cc"]
         )
 
-    raw_step = _make_step(arena)
+    raw_step = make_sweep(arena)
 
     def advance(messages, params):
         return raw_step(

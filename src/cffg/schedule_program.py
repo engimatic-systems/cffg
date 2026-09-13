@@ -781,7 +781,7 @@ def make_propagate(
     """Compile a stage list into one jittable propagation function.
 
     Stages execute in order against the running arrays (asynchronous /
-    directed semantics), unlike `_make_step`, which gathers everything from
+    directed semantics), unlike the synchronous sweep, which gathers from
     the pre-sweep arrays (synchronous flooding). Iterative structures (vmp,
     GFE, constraints, hybrid, prec) never appear as stages — they run in the
     restricted synchronous step of the mixed loop."""
