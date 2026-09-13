@@ -1,4 +1,4 @@
-"""The inference VM: flooding message passing over a compiled arena.
+"""Public inference facade over immutable plans and focused runtime owners.
 
 State is pure data (an Equinox pytree of flat, shape-segmented message arrays
 plus per-group log-parameters); the step is a pure function of it. Prefix
@@ -18,7 +18,8 @@ Module map:
   ``run_results`` constructs their public results.
 - ``outer_kernels`` owns lazy derivative plans and dynamic runtime context.
 - ``ledger`` owns belief and assignment objectives; ``ledger_terms`` owns local terms.
-- ``Engine`` composes these owners and retains readouts.
+- ``readouts`` owns representation and plan-specific posterior/statistic adapters.
+- ``Engine`` composes these owners behind the existing public API.
 - ``execution.synchronous`` gathers, combines and damps local factor updates.
 - ``schedule_program`` owns stage construction and exact certification units;
   ``execution.transport`` owns shared segmented gathers and scatters.
@@ -33,21 +34,13 @@ Paired paths:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import replace
 
 import equinox as eqx
 import jax
-import jax.numpy as jnp
 import numpy as np
 
 from cffg import (
-    ef,
-    efrules,
-    gauss,
-    hybrid_gfe,
-    kernels,
-    mixg,
-    recurrence,
     run_results,
 )
 from cffg.compiled import NEG as NEG  # noqa: PLC0414
@@ -57,27 +50,12 @@ from cffg.execution import (
     parameters as _parameters,
 )
 from cffg.execution.owners import SCHEDULED_EXECUTORS
-from cffg.execution.support import log_support as _jax_log_support
 from cffg.execution.synchronous import make_sweep
-from cffg.execution.transport import (
-    _disc_both,
-    _disc_rows,
-    _gauss_rows,
-    _obs_rows,
-)
+from cffg.execution.transport import _disc_both as _disc_both  # noqa: PLC0414
+from cffg.execution.transport import _disc_rows as _disc_rows  # noqa: PLC0414
+from cffg.execution.transport import _gauss_rows as _gauss_rows  # noqa: PLC0414
+from cffg.execution.transport import _obs_rows as _obs_rows  # noqa: PLC0414
 from cffg.iteration import IterationPolicy, IterationServices, run_iterations
-from cffg.kernel_runtime import (
-    discrete_potential as _disc_potential,
-)
-from cffg.kernel_runtime import (
-    discrete_readout as _disc_readout,
-)
-from cffg.kernel_runtime import (
-    gaussian_readout as _gauss_readout,
-)
-from cffg.kernel_runtime import (
-    parameters as _kernel_params,
-)
 from cffg.ledger import ObjectiveLedger, constraint_satisfied
 from cffg.ledger import make_belief_energy as _make_bfe
 from cffg.lifecycle import StateLifecycle
@@ -90,6 +68,15 @@ from cffg.outer import OuterTerminationReason as OuterTerminationReason  # noqa:
 from cffg.outer_kernels import OuterKernelProvider
 from cffg.outer_strategy import OuterServices, OuterTrustRegionStrategy
 from cffg.outer_structure import OuterStructure
+from cffg.readouts import discrete as _discrete_readouts
+from cffg.readouts import exponential_family as _exponential_family_readouts
+from cffg.readouts import gaussian as _gaussian_readouts
+from cffg.readouts import hybrid as _hybrid_readouts
+from cffg.readouts import parameters as _parameters_readouts
+from cffg.readouts import recurrence as _recurrence_readouts
+from cffg.readouts import registered as _registered_readouts
+from cffg.readouts.types import DirichletMarginal as DirichletMarginal  # noqa: PLC0414
+from cffg.readouts.types import EfMarginal as EfMarginal  # noqa: PLC0414
 from cffg.runtime_checks import StateChecks, state_is_finite
 from cffg.runtime_types import (
     InferenceError as InferenceError,  # noqa: PLC0414
@@ -229,69 +216,9 @@ class Engine:
         self, state: State
     ) -> dict[str, dict[str, np.ndarray | float | str]]:
         """D5 objective channels and exact-mixture entropy bounds by factor."""
-        output: dict[str, dict[str, np.ndarray | float | str]] = {}
-        for group in self.arena.hybrid_gfe_groups:
-            incoming = state.messages[
-                self.arena.message_indices(group.s_gather, group.k_sel)
-            ]
-            inc_eta, inc_lam = _gauss_rows(
-                self.arena,
-                state.g_eta,
-                state.g_lam,
-                group.g_gather,
-                group.dims,
-            )
-            common = (
-                state.params[group.name + ":W"],
-                state.params[group.name + ":goal_m"],
-                state.params[group.name + ":goal_W"],
-            )
-            if group.type == "gaussian_mixture_linear":
-                _, di = group.dims
-                diagnostics = hybrid_gfe.linear_diagnostics(
-                    incoming,
-                    inc_eta[:, 1, :di],
-                    inc_lam[:, 1, :di, :di],
-                    state.params[group.name + ":A"],
-                    state.params[group.name + ":b"],
-                    *common,
-                )
-            else:
-                diagnostics = hybrid_gfe.prior_diagnostics(
-                    incoming,
-                    state.params[group.name + ":m"],
-                    *common,
-                )
-            for row, member in enumerate(group.members):
-                code = int(np.asarray(diagnostics.status[row]))
-                output[member] = {
-                    "goal_factor": group.goal_members[row],
-                    "rho": np.asarray(diagnostics.rho[row]),
-                    "gfe_lower_bound": float(diagnostics.total[row]),
-                    "mi_regime_surrogate": float(
-                        diagnostics.mi_regime_surrogate[row]
-                    ),
-                    "mi_regime_exact_lower": float(
-                        diagnostics.mi_regime_lower[row]
-                    ),
-                    "mi_regime_exact_upper": float(
-                        diagnostics.mi_regime_upper[row]
-                    ),
-                    "mi_state": float(diagnostics.mi_state[row]),
-                    "h_regime": float(diagnostics.h_regime[row]),
-                    "h_state": float(diagnostics.h_state[row]),
-                    "goal_risk": float(diagnostics.goal_risk[row]),
-                    "local_residual": float(diagnostics.residual[row]),
-                    "status": (
-                        RunStatus.CONVERGED.value
-                        if code == 0
-                        else RunStatus.BUDGET_EXHAUSTED.value
-                        if code == 1
-                        else RunStatus.DIVERGED.value
-                    ),
-                    "bound_direction": "reported_gfe_lower_bounds_exact",
-                }
-        return output
+        return _hybrid_readouts.hybrid_gfe_diagnostics(
+            self.arena, state,
+        )
 
     def mu3_diagnostics(self, state: State) -> dict[str, dict[str, np.ndarray | float | str]]:
         """Per-group weighted moments and stochastic diagnostics."""
@@ -542,17 +469,9 @@ class Engine:
     # -- readouts ---------------------------------------------------------
 
     def marginals(self, state: State) -> dict[str, np.ndarray]:
-        out: dict[str, np.ndarray] = {}
-        msgs = np.asarray(state.messages)
-        for e in self.arena.edges.values():
-            if e.dim or e.ef or e.param_shape:
-                continue  # gaussian_marginals / ef_marginals
-            lq = ef.CATEGORICAL.product(
-                msgs[self.arena.message_indices(e.slot0, e.card)],
-                msgs[self.arena.message_indices(e.slot1, e.card)],
-            )
-            out[e.name] = ef.CATEGORICAL.mean(lq)
-        return out
+        return _discrete_readouts.marginals(
+            self.arena, state,
+        )
 
     def node_beliefs(self, state: State) -> dict[str, np.ndarray]:
         """Factor name -> the node belief q_a, the object conjugate updates
@@ -566,53 +485,9 @@ class Engine:
         marginal [k] (their joint lives on the diagonal). GFE composites and
         Gaussian groups are not included: composites own their update path
         (agent A-learning), Gaussian sufficient stats land with cff-7c5o."""
-        out: dict[str, np.ndarray] = {}
-        msgs = np.asarray(state.messages)
-
-        def norm_exp(lb: np.ndarray) -> np.ndarray:
-            m = lb.shape[0]
-            flat = lb.reshape(m, -1)
-            return ef.CATEGORICAL.mean(flat, axis=1).reshape(lb.shape)
-
-        for g in self.arena.groups:
-            inc = np.asarray(_disc_rows(self.arena, state.messages, g.gather, g.cards))
-            if g.type == "equality":
-                k = g.cards[0]
-                q = norm_exp(
-                    ef.CATEGORICAL.product_axis(inc[:, :, :k], axis=1)
-                )
-            elif g.mode == "vmp":
-                both = np.asarray(_disc_both(self.arena, state.messages, g.gather_both, g.cards))
-                q = None
-                for r, k in enumerate(g.cards):
-                    lq = ef.CATEGORICAL.product(
-                        both[:, r, 0, :k], both[:, r, 1, :k]
-                    )
-                    edge_q = norm_exp(lq).reshape(len(g.members), *([1] * r), k)
-                    q = edge_q if q is None else q[..., None] * edge_q
-            else:
-                lb = np.asarray(_disc_potential(g, _kernel_params(g, state.params))).copy()
-                for r, k in enumerate(g.cards):
-                    shape = [len(g.members)] + [1] * len(g.cards)
-                    shape[1 + r] = k
-                    lb = lb + inc[:, r, :k].reshape(shape)
-                q = norm_exp(lb)
-            for i, name in enumerate(g.members):
-                out[name] = q[i]
-        for g in self.arena.dirichlet_groups:
-            both = np.asarray(
-                _disc_both(self.arena, state.messages, g.gather_both, g.cards)
-            )
-            q = None
-            for r, k in enumerate(g.cards):
-                lq = both[:, r, 0, :k] + both[:, r, 1, :k]
-                edge_q = norm_exp(lq).reshape(
-                    len(g.members), *([1] * r), k
-                )
-                q = edge_q if q is None else q[..., None] * edge_q
-            for i, name in enumerate(g.members):
-                out[name] = q[i]
-        return out
+        return _discrete_readouts.node_beliefs(
+            self.arena, state,
+        )
 
     def dirichlet_marginals(
         self, state: State
@@ -624,52 +499,17 @@ class Engine:
         fractional counts.  Improper pre-sweep state is reported with
         ``proper=False`` and NaN moments rather than resembling a posterior.
         """
-        out: dict[str, DirichletMarginal] = {}
-        messages = np.asarray(state.messages)
-
-        for e in self.arena.edges.values():
-            if not e.param_shape:
-                continue
-            packed = ef.DIRICHLET.posterior(
-                messages[self.arena.message_indices(e.slot0, e.card)],
-                messages[self.arena.message_indices(e.slot1, e.card)],
-            )
-            alpha = packed.reshape(e.param_shape)
-            proper = bool(
-                ef.DIRICHLET.is_proper_concentration(
-                    alpha, axis=tuple(range(alpha.ndim))
-                )
-            )
-            if proper:
-                mean = ef.DIRICHLET.mean_from_concentration(
-                    alpha, axis=e.param_axis
-                )
-                expected_log = np.asarray(
-                    efrules.DIRICHLET.mean_stats_from_concentration(
-                        alpha, axis=e.param_axis
-                    )
-                )
-            else:
-                mean = np.full_like(alpha, np.nan)
-                expected_log = np.full_like(alpha, np.nan)
-            out[e.name] = DirichletMarginal(
-                alpha=alpha.copy(),
-                mean=mean,
-                expected_log=expected_log,
-                proper=proper,
-            )
-        return out
+        return _parameters_readouts.dirichlet_marginals(
+            self.arena, state,
+        )
 
     def goal_marginals(
         self, state: State
     ) -> dict[str, "DirichletMarginal"]:
         """Learned goal-factor name -> its Dirichlet posterior."""
-        parameter = self.dirichlet_marginals(state)
-        out: dict[str, DirichletMarginal] = {}
-        for group in self.arena.gfe_groups:
-            for goal, edge in zip(group.goal_members, group.goal_param_edges):
-                out[goal] = parameter[edge]
-        return out
+        return _parameters_readouts.goal_marginals(
+            self.arena, state, parameter_beliefs=self.dirichlet_marginals,
+        )
 
     def goal_prior_updates(self, state: State) -> dict[str, np.ndarray]:
         """Return converged goal posteriors keyed by serialized prior blob.
@@ -677,25 +517,9 @@ class Engine:
         This dictionary is the explicit trial-rollover/checkpoint boundary.
         Reading it does not mutate this state or a future trial's prior.
         """
-        parameter = self.dirichlet_marginals(state)
-        out: dict[str, np.ndarray] = {}
-        for plan in self.arena.goal_parameter_plans:
-            blob = plan.prior_blob
-            alpha = parameter[plan.parameter_edges[0]].alpha
-            for edge in plan.parameter_edges:
-                marginal = parameter[edge]
-                if not marginal.proper:
-                    raise ValueError(
-                        f"goal prior {blob!r}: posterior is improper; "
-                        "rollover requires a completed proper coordinate"
-                    )
-                if not np.array_equal(alpha, marginal.alpha):
-                    raise ValueError(
-                        f"goal prior blob {blob!r} has inconsistent posteriors "
-                        "across compiled goal parameter edges"
-                    )
-            out[blob] = alpha.copy()
-        return out
+        return _parameters_readouts.goal_prior_updates(
+            self.arena, state, parameter_beliefs=self.dirichlet_marginals,
+        )
 
     def with_goal_priors(
         self, state: State, priors: dict[str, np.ndarray]
@@ -706,76 +530,16 @@ class Engine:
         has participated in inference. Callers must start the next trial from
         ``init_state`` rather than add a posterior to an old count message.
         """
-        known = {
-            blob
-            for group in self.arena.gfe_groups
-            for blob in group.goal_prior_blobs
-        }
-        unknown = sorted(set(priors) - known)
-        if unknown:
-            raise KeyError(
-                f"unknown learned-goal prior blobs {unknown}; have {sorted(known)}"
-            )
-        params = dict(state.params)
-        for group in self.arena.gfe_groups:
-            if not group.goal_learned:
-                continue
-            existing = np.asarray(
-                state.messages[
-                    self.arena.message_indices(
-                        group.goal_count_scatter, group.cards[0]
-                    )
-                ]
-            )
-            if np.any(existing != 0):
-                raise ValueError(
-                    "goal priors can only be installed on a fresh inference "
-                    "state; within-trial count messages are replaced per sweep"
-                )
-            alpha0 = params[group.name + ":c_alpha0"]
-            for row, blob in enumerate(group.goal_prior_blobs):
-                if blob not in priors:
-                    continue
-                value = np.asarray(priors[blob])
-                if (
-                    value.shape != (group.cards[0],)
-                    or not np.all(np.isfinite(value))
-                    or not np.all(value > 0)
-                ):
-                    raise ValueError(
-                        f"goal prior {blob!r}: expected finite positive shape "
-                        f"{(group.cards[0],)}, got {value.shape}"
-                    )
-                alpha0 = alpha0.at[row].set(
-                    jnp.asarray(value, dtype=alpha0.dtype)
-                )
-            params[group.name + ":c_alpha0"] = alpha0
-        return _replace(state, params=params)
+        return self._state_lifecycle.with_goal_priors(state, priors)
 
     def gaussian_marginals(self, state: State) -> dict[str, tuple[np.ndarray, np.ndarray]]:
         """Edge name -> (mean, cov). Requires a proper combined precision —
         run to coherence (and bind data) first. Improper beliefs return NaN
         mean/cov arrays, an explicit readout that cannot resemble a valid
         negative or huge covariance."""
-        out: dict[str, tuple[np.ndarray, np.ndarray]] = {}
-        eta, lam = np.asarray(state.g_eta), np.asarray(state.g_lam)
-        for e in self.arena.edges.values():
-            if not e.dim:
-                continue
-            d = e.dim
-            eta_q, lam_q = ef.GAUSSIAN.product(
-                (
-                    eta[self.arena.g_eta_indices(e.slot0, d)],
-                    lam[self.arena.g_lam_indices(e.slot0, d)],
-                ),
-                (
-                    eta[self.arena.g_eta_indices(e.slot1, d)],
-                    lam[self.arena.g_lam_indices(e.slot1, d)],
-                ),
-            )
-            mean, cov = gauss.moments(eta_q, lam_q)
-            out[e.name] = (np.asarray(mean), np.asarray(cov))
-        return out
+        return _gaussian_readouts.gaussian_marginals(
+            self.arena, state,
+        )
 
     def recurrence_pair_beliefs(
         self, state: State
@@ -790,76 +554,9 @@ class Engine:
         Improper inputs preserve support but return shape-correct NaNs and
         ``proper=False`` for numeric fields.
         """
-        out: dict[str, dict[str, np.ndarray]] = {}
-        for group in self.arena.recurrence_groups:
-            card = group.cards[0]
-            destination = state.messages[
-                self.arena.message_indices(
-                    group.d_gather_both[:, 0, 1], card
-                )
-            ]
-            source = state.messages[
-                self.arena.message_indices(
-                    group.d_gather_both[:, 1, 1], card
-                )
-            ]
-            destination = jnp.where(
-                _jax_log_support(destination), destination, -jnp.inf
-            )
-            source = jnp.where(
-                _jax_log_support(source), source, -jnp.inf
-            )
-            drive_eta = state.g_eta[
-                self.arena.g_eta_indices(
-                    group.drive_gather_both, group.dim
-                )
-            ].sum(axis=1)
-            drive_precision = state.g_lam[
-                self.arena.g_lam_indices(
-                    group.drive_gather_both, group.dim
-                )
-            ].sum(axis=1)
-            beliefs = recurrence.structured_readout(
-                destination,
-                source,
-                drive_eta,
-                drive_precision,
-                state.params[group.name + ":weights"],
-                state.params[group.name + ":offsets"],
-            )
-            for index, name in enumerate(group.members):
-                out[name] = {
-                    "pair_probability": np.asarray(
-                        beliefs.pair_probability[index]
-                    ),
-                    "source_probability": np.asarray(
-                        beliefs.source_probability[index]
-                    ),
-                    "destination_probability": np.asarray(
-                        beliefs.destination_probability[index]
-                    ),
-                    "pair_support": np.asarray(beliefs.pair_support[index]),
-                    "source_support": np.asarray(
-                        beliefs.source_support[index]
-                    ),
-                    "destination_support": np.asarray(
-                        beliefs.destination_support[index]
-                    ),
-                    "drive_mean": np.asarray(beliefs.drive_mean[index]),
-                    "drive_covariance": np.asarray(
-                        beliefs.drive_covariance[index]
-                    ),
-                    "drive_second": np.asarray(
-                        beliefs.drive_second[index]
-                    ),
-                    "omega": np.asarray(beliefs.omega[index]),
-                    "exposure": np.asarray(beliefs.exposure[index]),
-                    "signed_success": np.asarray(
-                        beliefs.signed_success[index]
-                    ),
-                    "proper": np.asarray(beliefs.proper[index]),
-                }
-        return out
+        return _recurrence_readouts.recurrence_pair_beliefs(
+            self.arena, state,
+        )
 
     def gaussian_node_stats(self, state: State) -> dict[str, dict[str, np.ndarray]]:
         """Factor name -> expected sufficient statistics of the node belief
@@ -881,84 +578,9 @@ class Engine:
         Every record includes ``proper``. Improper beliefs or mutated non-PD
         node precisions return ``proper=False`` with NaN sufficient statistics;
         equality nodes are skipped."""
-        out: dict[str, dict[str, np.ndarray]] = {}
-        for g in self.arena.gauss_groups:
-            if g.kernel is None or g.kernel.binding.statistics is None:
-                continue
-            inc_e, inc_l = _gauss_rows(
-                self.arena, state.g_eta, state.g_lam, g.gather, g.dims
-            )
-            y = mk = None
-            if g.obs_rows is not None:
-                y = _obs_rows(self.arena, state.g_obs, g.obs_rows, g.observed_dim)
-                mk = state.g_mask[jnp.asarray(g.obs_rows)]
-            values = _gauss_readout(
-                g, inc_e, inc_l, _kernel_params(g, state.params), y, mk,
-                statistics=True,
-            )
-            for i, name in enumerate(g.members):
-                out[name] = {key: np.asarray(value)[i] for key, value in values.items()}
-
-        for g in self.arena.mix_groups:
-            mu_e = state.messages[
-                self.arena.message_indices(g.s_gather, g.k_sel)
-            ]
-            inc_e, inc_l = _gauss_rows(
-                self.arena,
-                state.g_eta,
-                state.g_lam,
-                g.g_gather,
-                g.dims,
-            )
-            w = state.params[g.name + ":W"]
-            if g.type == "gaussian_mixture_linear":
-                do, di = g.dims
-                stats = mixg.mixlin_stats(
-                    inc_e[:, 0, :do],
-                    inc_l[:, 0, :do, :do],
-                    inc_e[:, 1, :di],
-                    inc_l[:, 1, :di, :di],
-                    mu_e,
-                    state.params[g.name + ":A"],
-                    state.params[g.name + ":b"],
-                    w,
-                )
-                for i, name in enumerate(g.members):
-                    out[name] = {
-                        "responsibility": np.asarray(stats.responsibility[i]),
-                        "Syy": np.asarray(stats.syy[i]),
-                        "Syx": np.asarray(stats.syx[i]),
-                        "Sxx": np.asarray(stats.sxx[i]),
-                        "proper": np.asarray(stats.proper[i]),
-                    }
-            else:
-                (do,) = g.dims
-                stats = mixg.mix_stats(
-                    inc_e[:, 0, :do],
-                    inc_l[:, 0, :do, :do],
-                    mu_e,
-                    state.params[g.name + ":m"],
-                    w,
-                )
-                for i, name in enumerate(g.members):
-                    out[name] = {
-                        "responsibility": np.asarray(stats.responsibility[i]),
-                        "weighted_mean": np.asarray(stats.weighted_mean[i]),
-                        "weighted_second": np.asarray(
-                            stats.weighted_second[i]
-                        ),
-                        "proper": np.asarray(stats.proper[i]),
-                    }
-
-        for name, pair in self.recurrence_pair_beliefs(state).items():
-            out[name] = {
-                **pair,
-                "out_probability": pair["destination_probability"],
-                "in_probability": pair["source_probability"],
-                "out_support": pair["destination_support"],
-                "in_support": pair["source_support"],
-            }
-        return out
+        return _gaussian_readouts.gaussian_node_stats(
+            self.arena, state, pair_beliefs=self.recurrence_pair_beliefs,
+        )
 
     def recurrence_weight_stats(
         self, state: State
@@ -971,66 +593,9 @@ class Engine:
         ``[R_il; r_il]``. Scalar predicate and tolerance fields explain an
         improper row.
         """
-        out: dict[str, dict[str, np.ndarray]] = {}
-        beliefs = self.recurrence_pair_beliefs(state)
-        for group in self.arena.recurrence_groups:
-            rows = [beliefs[name] for name in group.members]
-            stats = recurrence.weight_stats(
-                jnp.stack(
-                    [jnp.asarray(row["pair_probability"]) for row in rows]
-                ),
-                jnp.stack([jnp.asarray(row["drive_mean"]) for row in rows]),
-                jnp.stack(
-                    [jnp.asarray(row["drive_covariance"]) for row in rows]
-                ),
-                state.params[group.name + ":weights"],
-                state.params[group.name + ":offsets"],
-            )
-            for index, name in enumerate(group.members):
-                out[name] = {
-                    "omega": np.asarray(stats.omega[index]),
-                    "exposure": np.asarray(stats.exposure[index]),
-                    "signed_success": np.asarray(
-                        stats.signed_success[index]
-                    ),
-                    "linear": np.asarray(stats.linear[index]),
-                    "quadratic": np.asarray(stats.quadratic[index]),
-                    "proper": np.asarray(stats.proper[index]),
-                    "probability_ok": np.asarray(
-                        stats.probability_ok[index]
-                    ),
-                    "drive_ok": np.asarray(stats.drive_ok[index]),
-                    "parameter_ok": np.asarray(stats.parameter_ok[index]),
-                    "second_ok": np.asarray(stats.second_ok[index]),
-                    "finite_output_ok": np.asarray(
-                        stats.finite_output_ok[index]
-                    ),
-                    "probability_minimum": np.asarray(
-                        stats.probability_minimum[index]
-                    ),
-                    "probability_sum_error": np.asarray(
-                        stats.probability_sum_error[index]
-                    ),
-                    "probability_tolerance": np.asarray(
-                        stats.probability_tolerance[index]
-                    ),
-                    "drive_min_eigenvalue": np.asarray(
-                        stats.drive_min_eigenvalue[index]
-                    ),
-                    "drive_symmetry_error": np.asarray(
-                        stats.drive_symmetry_error[index]
-                    ),
-                    "drive_tolerance": np.asarray(
-                        stats.drive_tolerance[index]
-                    ),
-                    "logit_second_minimum": np.asarray(
-                        stats.logit_second_minimum[index]
-                    ),
-                    "logit_second_tolerance": np.asarray(
-                        stats.logit_second_tolerance[index]
-                    ),
-                }
-        return out
+        return _recurrence_readouts.recurrence_weight_stats(
+            self.arena, state, pair_beliefs=self.recurrence_pair_beliefs,
+        )
 
     def gaussian_mixture_predictives(
         self, state: State
@@ -1042,110 +607,27 @@ class Engine:
         output-facing message and therefore remains suitable for one-step
         prediction after an observation has updated that edge.
         """
-        out: dict[str, dict[str, np.ndarray]] = {}
-        for g in self.arena.mix_groups:
-            mu_e = state.messages[
-                self.arena.message_indices(g.s_gather, g.k_sel)
-            ]
-            w = state.params[g.name + ":W"]
-            if g.type == "gaussian_mixture_linear":
-                _, di = g.dims
-                inc_e, inc_l = _gauss_rows(
-                    self.arena,
-                    state.g_eta,
-                    state.g_lam,
-                    g.g_gather,
-                    g.dims,
-                )
-                predictive = mixg.mixlin_predictive(
-                    inc_e[:, 1, :di],
-                    inc_l[:, 1, :di, :di],
-                    mu_e,
-                    state.params[g.name + ":A"],
-                    state.params[g.name + ":b"],
-                    w,
-                )
-            else:
-                predictive = mixg.mix_predictive(
-                    mu_e,
-                    state.params[g.name + ":m"],
-                    w,
-                )
-            for i, name in enumerate(g.members):
-                out[name] = {
-                    "weight": np.asarray(predictive.weight[i]),
-                    "component_mean": np.asarray(
-                        predictive.component_mean[i]
-                    ),
-                    "component_covariance": np.asarray(
-                        predictive.component_covariance[i]
-                    ),
-                    "mean": np.asarray(predictive.mean[i]),
-                    "covariance": np.asarray(predictive.covariance[i]),
-                    "proper": np.asarray(predictive.proper[i]),
-                }
-        return out
+        return _gaussian_readouts.gaussian_mixture_predictives(
+            self.arena, state,
+        )
 
     def ef_marginals(self, state: State) -> dict[str, "EfMarginal"]:
         """Edge name -> EF marginal in standard parameters. Observation-family
         edges (poisson/bernoulli DATA ports) carry no messages and are
         skipped. An improper combined belief (e.g. before any sweep) reports
         proper=False with NaN moments — check it before trusting `mean`."""
-        out: dict[str, EfMarginal] = {}
-        eta = np.asarray(state.ef_eta)
-        for e in self.arena.edges.values():
-            if not e.ef or e.ef not in ef.FAMILIES:
-                continue
-            fam = ef.FAMILIES[e.ef]
-            eta_q = fam.product(eta[e.slot0], eta[e.slot1])
-            proper = bool(fam.is_proper(eta_q))
-            out[e.name] = EfMarginal(
-                family=e.ef,
-                params=tuple(float(p) for p in fam.from_natural(eta_q)),
-                mean=float(fam.mean(eta_q)) if proper else float("nan"),
-                proper=proper,
-            )
-        return out
+        return _exponential_family_readouts.ef_marginals(
+            self.arena, state,
+        )
 
     def kernel_readouts(self, state: State) -> dict[str, dict[str, np.ndarray]]:
         """Factor name -> the optional readout its FactorKernel declares
         (cff-ri8m): posterior summaries beyond the generic edge marginals,
         computed from the same (inc, params, obs, mask) contract as the
         message/energy callables. Kernels without a readout are skipped."""
-        out: dict[str, dict[str, np.ndarray]] = {}
-        for g in self.arena.groups:
-            if g.kernel is None:
-                continue
-            mode = g.kernel.binding.vmp if g.mode == "vmp" else g.kernel.binding.bp
-            if mode.readout is None:
-                continue
-            inc = (_disc_both(self.arena, state.messages, g.gather_both, g.cards)
-                   if g.mode == "vmp" else _disc_rows(self.arena, state.messages, g.gather, g.cards))
-            vals = _disc_readout(g, inc, _kernel_params(g, state.params))
-            for i, member in enumerate(g.members):
-                out[member] = {key: np.asarray(v)[i] for key, v in vals.items()}
-        for g in self.arena.gauss_groups:
-            if g.kernel is None or g.kernel.binding.readout is None:
-                continue
-            inc_e, inc_l = _gauss_rows(self.arena, state.g_eta, state.g_lam, g.gather, g.dims)
-            y = mk = None
-            if g.obs_rows is not None:
-                y = _obs_rows(self.arena, state.g_obs, g.obs_rows, g.observed_dim)
-                mk = state.g_mask[jnp.asarray(g.obs_rows)]
-            vals = _gauss_readout(g, inc_e, inc_l, _kernel_params(g, state.params), y, mk)
-            for i, member in enumerate(g.members):
-                out[member] = {key: np.asarray(v)[i] for key, v in vals.items()}
-        for g in self.arena.ef_groups:
-            kern = kernels.kernel_for(g.type)
-            if kern is None or kern.readout is None:
-                continue
-            gp = {key: state.params[f"{g.name}:{key}"] for key in kern.param_keys}
-            obs = state.ef_obs[jnp.asarray(g.obs_rows)] if g.obs_rows is not None else None
-            mask = state.ef_mask[jnp.asarray(g.obs_rows)] if g.obs_rows is not None else None
-            vals = kern.readout(state.ef_eta[np.asarray(g.gather)], gp, obs, mask)
-            for i, member in enumerate(g.members):
-                out[member] = {key: np.asarray(v)[i] for key, v in vals.items()}
-        return out
+        return _registered_readouts.kernel_readouts(
+            self.arena, state,
+        )
 
     def bfe(self, state: State) -> float:
         return self._ledger.free_energy(
@@ -1159,7 +641,9 @@ class Engine:
         """MAP decode x-hat: the per-edge argmax of the (max-)marginals. Defined
         in both semirings (sum-mode marginals decode too); in max mode at a tree
         fixed point this is the exact Viterbi assignment (cff-e8zk)."""
-        return {name: int(np.argmax(q)) for name, q in self.marginals(state).items()}
+        return _discrete_readouts.decode(
+            state, marginals=self.marginals,
+        )
 
     def objective(self, state: State) -> float:
         """Exact -log f(x-hat) of the decoded assignment, summed over every
@@ -1173,24 +657,3 @@ class Engine:
     @staticmethod
     def _constraint_ok(c, v: list[int], parameters: _parameters.ConstraintParameters) -> bool:
         return constraint_satisfied(c, v, parameters)
-
-
-@dataclass(frozen=True)
-class EfMarginal:
-    """A scalar EF edge belief: standard parameters, e.g. (shape, rate) for
-    gamma, (a, b) for beta."""
-
-    family: str
-    params: tuple[float, ...]
-    mean: float
-    proper: bool
-
-
-@dataclass(frozen=True)
-class DirichletMarginal:
-    """One in-graph table posterior in canonical serialized layout."""
-
-    alpha: np.ndarray
-    mean: np.ndarray
-    expected_log: np.ndarray
-    proper: bool

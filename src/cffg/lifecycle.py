@@ -1,4 +1,4 @@
-"""Ordinary State initialization and observation binding."""
+"""State initialization, observation binding and fresh-trial goal priors."""
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -141,3 +141,50 @@ class StateLifecycle:
             ef_obs=ef_obs,
             ef_mask=ef_mask,
         )
+
+    def with_goal_priors(self, state: State, priors: dict[str, np.ndarray]) -> State:
+        """Install trial priors on a fresh state without accumulating sweeps.
+
+        Counts already present on a goal parameter edge prove that the state
+        has participated in inference. Callers must start the next trial from
+        ``init_state`` rather than add a posterior to an old count message.
+        """
+        known = {
+            blob for group in self.arena.gfe_groups for blob in group.goal_prior_blobs
+        }
+        unknown = sorted(set(priors) - known)
+        if unknown:
+            raise KeyError(
+                f"unknown learned-goal prior blobs {unknown}; have {sorted(known)}"
+            )
+        params = dict(state.params)
+        for group in self.arena.gfe_groups:
+            if not group.goal_learned:
+                continue
+            existing = np.asarray(
+                state.messages[
+                    self.arena.message_indices(group.goal_count_scatter, group.cards[0])
+                ]
+            )
+            if np.any(existing != 0):
+                raise ValueError(
+                    "goal priors can only be installed on a fresh inference "
+                    "state; within-trial count messages are replaced per sweep"
+                )
+            alpha0 = params[group.name + ":c_alpha0"]
+            for row, blob in enumerate(group.goal_prior_blobs):
+                if blob not in priors:
+                    continue
+                value = np.asarray(priors[blob])
+                if (
+                    value.shape != (group.cards[0],)
+                    or not np.all(np.isfinite(value))
+                    or not np.all(value > 0)
+                ):
+                    raise ValueError(
+                        f"goal prior {blob!r}: expected finite positive shape "
+                        f"{(group.cards[0],)}, got {value.shape}"
+                    )
+                alpha0 = alpha0.at[row].set(jnp.asarray(value, dtype=alpha0.dtype))
+            params[group.name + ":c_alpha0"] = alpha0
+        return _replace(state, params=params)

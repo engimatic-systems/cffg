@@ -1,6 +1,6 @@
 ---
 id: cff-3ola
-status: open
+status: closed
 deps: [cff-gl89]
 links: [cff-ws3c, cff-3kdk, cff-7kfk]
 created: 2026-09-02T04:02:01Z
@@ -126,3 +126,23 @@ Typed-view design note from the remaining source: the readout owners can use rea
 **2026-09-10T08:41:56Z**
 
 Prerequisite cff-gl89 is closed and published as PR #132. Start from its final published agent/cff-gl89-objective-ledger head after an ff-only pull. Source 90c58b1 passed the final 2,098-test gate (41 slow deselections, four existing Gym warnings), recorded in daaff2f; measured wall 1,151.159 seconds. Engine is now 1,196 lines. Its remaining readout/mutator inventory and view guidance are recorded above; current numerical and public behavior remains the comparison baseline. No design decision is pending.
+
+**2026-09-10T08:43:26Z**
+
+Starting from verified PR #132 head fb211eb after an ff-only pull. Applicable rows: Runtime numerical or status invariant, New factor or rule family, and Learnable or checkpoint feature (readout consumers and existing goal-prior replacement; no schema changes). Paired surfaces: equivalent flooding/scheduled State; direct and supported vmap readouts; current params/observations/masks; ordinary/goal/functional parameter ownership; learning and checkpoint consumers; public aliases and inter-readout delegation. New factor behavior, solver or objective formulas, unsupported vectorization and new checkpoint migrations are N/A. Use focused representation/plan readout modules with typed structural views; retain current algorithms and public method signatures. Move with_goal_priors into StateLifecycle. Preserve public value-type imports and current callable lookup/delegation timing. Final short-suite source will be validated once before publication.
+
+**2026-09-10T09:01:14Z**
+
+Readouts now live in focused discrete, Gaussian, parameter, recurrence, exponential-family, hybrid-diagnostic and registered-kernel modules. Read-only protocols expose their compiled-plan/addressing dependencies without copies; transport accepts shared layout protocols with unchanged numerical bodies. with_goal_priors moved unchanged into StateLifecycle. Public readout/value and existing transport aliases remain available. The previous unused node-belief temporary became a discarded expression, deliberately preserving its host materialization call and failure boundary. Engine has no family-rule or local readout calculation. Focused validation: 79 shared-goal/lifecycle/runtime/ledger/discrete/Gaussian cases passed in 40.75 seconds; 23 new ownership cases passed in 6.89 seconds; final broader readout/learning/recurrence/public-API selection passed 82 cases in 114.72 seconds. AST checks preserve 22 moved/transport bodies, and all 27 public signatures, including both value-record constructors and their annotations. Numerical old/new public-value/error characterization is running; one final short suite remains. Three pre-existing quoted-annotation lint findings remain on preserved facade signatures; new modules/tests and changed lifecycle/transport files are Ruff-clean.
+
+**2026-09-10T09:06:17Z**
+
+Old/new numerical proof against prerequisite fb211eb: 17 models, both JAX precision settings, 266 state snapshots, 4,006 public calls (20 matching exceptions), and 7,124 raw-byte-identical numerical leaves. Dictionary insertion order, dtype/shape, enum identity, readout value fields, and goal-prior guards agree. This complements 22 AST body-equivalence checks, 27 public signatures, and the final 82-test focused pass. No vectorization or speedup claim. Starting the final dashboard-backed short suite at source 6f36043; first output check at 20 minutes, then only at the documented allowance if needed.
+
+**2026-09-10T09:26:46Z**
+
+Complete at source 6f36043. Final dashboard gate: 2,121 passed, 41 opt-in slow tests deselected, four existing Gym warnings; pytest 1,144.02 seconds. The gate was read exactly once, at its planned 20-minute completion check. Earlier focused and old/new parity evidence is recorded above. All public readout signatures, ordering, precision, conversion boundaries and current-state guards are retained. Engine is now 659 physical lines; no readout, local message, schedule, solver-loop or objective algorithm remains there. Final readout modules consume narrow read-only structural protocols, and with_goal_priors belongs to StateLifecycle. Functional diagnostics remain with Mu3Lifecycle. No vectorization, scientific claim or speedup. Next: close runtime parent cff-ws3c and perform cff-ofv1 cross-seam ownership proof. Source unchanged after this passing gate; ticket/document/publication edits do not require another run.
+
+**2026-09-10T09:28:31Z**
+
+Published as PR #133 against #132: https://github.com/engimatic-systems/cffg/pull/133 . Gate record e03fe70; measured wall time 1,157.463 seconds, completed 2026-09-10T09:25:34.997915+00:00. Shared architecture HTML now records compiler/runtime completion and the final extension gate. Runtime parent cff-ws3c is closed. Final next base is this branch including its publication handoff; cff-ofv1 is ready. No stack merge performed.
