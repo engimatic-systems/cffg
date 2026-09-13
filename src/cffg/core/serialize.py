@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from cffg.core.constraint_details import p_substitution_conflicts
 from cffg.core.ir import (
     AgentSpec,
     BeliefBinding,
@@ -83,6 +84,12 @@ def _plate_from_dict(d: dict[str, Any]) -> PlateSpec:
 
 
 def to_dict(t: Template) -> dict[str, Any]:
+    conflicts = p_substitution_conflicts(t.constraints)
+    if conflicts:
+        raise ValueError(
+            f"cannot serialize {t.name!r}: P-substitution conflicts:\n  - "
+            + "\n  - ".join(conflicts)
+        )
     d: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "name": t.name,

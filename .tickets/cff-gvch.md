@@ -1,6 +1,6 @@
 ---
 id: cff-gvch
-status: open
+status: closed
 deps: []
 links: [cff-kfo7]
 created: 2026-09-09T18:17:11Z
@@ -31,16 +31,26 @@ mechanical extraction.
 1. Inspect all P-substitution declarations before any dictionary keyed by
    target discards duplicates. Conflicting declarations fail with the affected
    factor and conflicting roles or evaluator details identified.
-2. State the policy for identical repeated declarations. Preserve them if
-   harmless repetition is supported; otherwise document and test the rejection.
-   Do not rely on declaration order to resolve differences.
+   1.1. Inspect repeated keys within each raw P-substitution detail tuple too;
+        differing values must not disappear in detail_dict or serialization.
+2. Preserve identical repeated declarations and identical repeated detail
+   key/value pairs, including metadata-key order differences. Do not remove
+   repeated declarations from the template or change their serialization/hash.
+   Compare all metadata, including unknown nested JSON values; missing keys
+   remain distinct from explicitly supplied values. Declaration order never
+   resolves a conflict.
+   2.1. Equality uses the existing serializer's JSON representation: mapping
+        order is irrelevant, but 1 versus 1.0, signed zero, and true versus 1
+        remain distinct. Do not infer the meaning of unknown metadata fields.
 3. Preserve supported single-declaration behavior and its existing diagnostics.
    Tests cover both orders of conflicting roles, conflicting evaluator details,
    identical repetitions under the stated policy, and serialized reconstruction.
-4. Before implementation, name the validation owner in the New IR field and
-   New factor or rule family architecture rows. Core ModelError versus compiler
-   CompileError and aggregation order are deliberate choices, recorded in this
-   ticket and tested. Update cff-kfo7's compatibility baseline after the fix.
+4. Core constraint validation owns ModelError for conflicts. Preserve existing
+   per-declaration target/role diagnostics, then append one conflict report per
+   target in sorted target order. Reports identify differing keys and values
+   deterministically. Serialization rejects these same conflicts with ValueError
+   before its lossy detail conversion, without adding full-model validation to
+   serialization. Update cff-kfo7's compatibility baseline after the fix.
 5. Host/JIT, flooding/scheduled and direct/vmap runtime execution are N/A:
    conflict rejection is host-side declaration validation before execution.
    JSON/bundle reconstruction reaches the same validator. Check current and
@@ -54,10 +64,13 @@ mechanical extraction.
 
 ## Methodological Suggestions — HOW
 
-These suggestions are optional. Collect declarations per target, compare their
-semantic fields, then construct the unique-target lookup only after validation.
-Keep declaration validation separate from later ownership claims so discarded
-metadata cannot become a hidden second interpretation of a factor.
+These suggestions are optional. Use one P-substitution-specific inspection
+helper shared by core validation and serialization. Collect declarations per
+target before converting raw details to mappings, and compare canonical JSON
+values only where repetitions need comparison. Keep declaration validation
+separate from later ownership claims so discarded metadata cannot become a
+hidden second interpretation of a factor. Do not change other constraint
+families or the JSON parser's general duplicate-object-key policy.
 
 ## Future work
 
@@ -73,6 +86,11 @@ evaluator family.
   evaluate that objective and its messages.
 - **Dictionary collapse:** Retaining one value per key while silently replacing
   an earlier value with the same key.
+- **Raw detail tuple:** The original sequence of metadata key/value pairs,
+  before conversion to a mapping removes repeated keys.
+- **Canonical JSON:** Deterministically key-ordered JSON text used to compare
+  model declarations. JSON is the object/array/scalar text format used to save
+  templates; its numeric representations remain distinct here.
 
 ## Notes
 
@@ -85,3 +103,19 @@ bounded formalism-agent inspection and compile reproducer. No fix implemented.
 **2026-09-09T19:50:49Z**
 
 Preparation during cff-n183 final gate; no validation implementation started. Question: where should conflicts be detected? Answer: core.validate._check_constraints before compiler psub dictionary collapse, preserving existing per-declaration target/role diagnostics and appending deterministic per-target conflict diagnostics. Preserve identical repeats, including metadata-key order changes, without rewriting template constraints or hashes. Compare complete metadata, including unknown/nested JSON values; missing keys are distinct from explicit values. Sources: core/validate.py:452, compiler.py:165, core/ir.py:233, core/serialize.py:108,111,314 at cdbad68; confidence high from bounded modularity-agent review. Additional loss point in the same P-substitution declarations: repeated raw detail keys are collapsed by both detail_dict and serialization dict conversion. Before implementation, explicitly settle raw-key conflicts (recommended: reject differing repeats, retain identical repeats) and protect that serializer conversion without invoking full-template validation. Canonical serializer sorting can also TypeError on conflicting nested mappings; do not depend on sorting for validation. JSON and flat current/legacy bundles normally defer whole-model validation until compile; plate fragments already validate; agent checkpoint restores do not reconstruct templates and need no format change. Test locations: test_ir constraints, test_serialize, existing current/legacy-flat bundle paths, and test_mu3 model for the swallowed unsupported in-role declaration. Check 32 declarations and deterministic reversed-order conflicts. Keep scope P-substitution only, not a general constraint rewrite.
+
+**2026-09-09T20:05:42Z**
+
+Starting from updated agent/cff-n183-shared-goals at a9e28ce (PR #116); branch agent/cff-gvch-psub-validation. Applicable architecture rows: New IR field and New factor/rule for declaration interpretation and serialized source truth. No new IR field or schema. Runtime numerical/status and learning/checkpoint implementation N/A. Host validation runs before numerical JIT, flood/mixed/direct/vmap all share compile; no separate runtime change. Core validation retains existing target/role ordering and adds deterministic conflict diagnostics afterward. Serializer invokes only the P-substitution conflict guard, not full-template validation. Identical repeats remain valid and unmodified; conflicting raw detail-key repeats are included because the same dict conversion otherwise erases them. Scalar/string metadata and nested JSON metadata retain meaning; a missing key differs from an explicit value. General JSON duplicate-object-key policy and other constraint kinds are outside scope. JSON/bundles recompile the same declarations; current/legacy agent restores do not reconstruct templates. Sparse/improper numerical messages N/A, float32 structurally irrelevant, 32 declarations test deterministic diagnostics without repeated whole-template scans.
+
+**2026-09-09T20:16:06Z**
+
+Implementation ready: core/constraint_details.py detects conflicting complete P-substitution declarations and repeated raw detail keys without mutating templates. Core appends stable per-target ModelError diagnostics after existing target/role diagnostics. Serializer invokes the same narrow guard before dict conversion/sorting and reports ValueError with template identity; bundle hashing reaches it on current and legacy inputs. General model validation and other constraint kinds are unchanged. Repeated identical declarations/raw keys preserve encoding and hashes. JSON representation equality deliberately distinguishes numeric spellings/types while ignoring mapping order; review requested and tests now pin that policy. Initial regressions on old code: 3 failed and the identical-repeat control passed, including one declaration order that silently compiled. Final focused run: 177 passed, 6 opt-in slow tests deselected, 62.19 seconds; includes core, serializer, compiler contracts, bundles, plates, dashboard, mu3, learned goals, GFE and outer formalism. New 19-case file also covers missing/unknown/nested metadata, 32-factor sorted diagnostics, and bundle rejection before destination creation. Independent bounded integration review found no blocking defects. New files pass Ruff; validate/serialize retain their two baseline diagnostics with no additions. Diff/dependency checks clear. No numerical/source-schema change. Final short-suite gate next.
+
+**2026-09-09T20:33:32Z**
+
+Final validation passed at implementation head ad028f0: 1,709 default-suite tests, zero failures, 41 opt-in slow tests deselected, four existing Gym deprecation warnings; pytest 1002.92 seconds, measured wall 1015.217 seconds. Dashboard refreshed with 19 new cases, 30 diagrams and 23 galleries. No source changes after this gate. Closing the validation prerequisite; publication is stacked on PR #116. Specialized extraction must preserve this declaration policy and cdbad68 shared-goal behavior. No remaining work or user decision in this ticket.
+
+**2026-09-09T20:34:09Z**
+
+Published as PR #117, https://github.com/engimatic-systems/cffg/pull/117, head agent/cff-gvch-psub-validation on agent/cff-n183-shared-goals (#116). Final gate remains ad028f0; subsequent commits contain only ticket handoffs and runtime evidence. Shared architecture HTML links the completed correction and passing 1,709-test gate. No work remains in cff-gvch.

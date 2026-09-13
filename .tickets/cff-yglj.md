@@ -1,0 +1,89 @@
+---
+id: cff-yglj
+status: closed
+deps: [cff-sf29]
+links: [cff-sf29, cff-wbhu]
+created: 2026-09-10T00:07:26Z
+type: bug
+priority: 2
+assignee: coopwilliams
+tags: [engine, colony, status]
+---
+# Align Colony initial-failure results with standalone Engine
+
+## Background in Plain English — WHY
+
+A graph with a non-finite initial state must report a consistent failure whether it runs alone or beside another graph. At engine baseline 76251b44fc467a976aa056556f8fb371fe5de7f4, Engine.run reports inner divergence with an infinite inner residual. Colony's actual batched path reports inner convergence with a zero inner residual for the same input, even though both public statuses are diverged at zero iterations.
+
+This is a result-reporting defect, not evidence that the poisoned graph converged. Fix it before cff-ii9t unifies the two result policies so the extraction does not preserve conflicting contracts.
+
+## Outcomes / Acceptance Criteria — WHAT
+
+1. The same initially non-finite ordinary state produces matching public status, inner status, inner residual and zero logical iterations in standalone Engine and a real multi-instance Colony batch.
+2. The failed instance retains its input state without priming or updating it.
+3. A healthy same-structure peer still produces the same state, traces and result fields as its standalone run.
+4. The regression exercises both zero and positive iteration budgets and both float32 and float64.
+5. Exact-zero infeasibility remains distinct from non-finite divergence. Existing vacuous/improper-state tests retain their classifications.
+6. The test uses at least two same-structure instances and demonstrates batch execution for the healthy peer when a positive budget permits an update.
+7. The Runtime numerical or status invariant change-path row covers standalone/batched and host/JIT classification. Flooding/scheduled priming is checked where applicable; model serialization and stochastic checkpoint decoding are N/A.
+8. Focused runtime/Colony/characterization tests and one final dashboard-backed short suite pass after the last code change.
+9. The repair is a separate behavior-change commit, not part of the cff-sf29 characterization or a new batching optimization.
+
+## Methodological Suggestions — HOW
+
+These suggestions are optional; another sound method is acceptable.
+
+- Reuse the ordinary VMP multi-instance fixture from tests/test_engine_contracts.py.
+- Classify original states before priming. Freeze invalid members at that boundary and use Engine's existing initial-failure fields as the authority.
+- Hostile-input review: NaN and infinity are the triggering inputs; literal log-zeros are not NaNs and must retain support semantics. Vacuous/improper continuous states keep existing policy. Test both dtypes. A tenfold model size is N/A to this host-side per-instance result initialization; batching isolation, not a new numerical rule, is changed.
+
+## Future work
+
+cff-ii9t removes duplicated ordinary termination and result policy. cff-wbhu compiles the ordinary convergence loop. cff-rqqc owns stochastic Colony key/state batching. This repair implements none of those larger changes.
+
+## Definitions
+
+- **Colony:** The service that groups graph instances by structure and executes compatible numerical updates together.
+- **Inner status:** The public result field describing the numerical update solver, distinct from the overall run status.
+- **Priming:** A schedule's initial propagation pass before its repeated updates.
+- **Logical iteration:** An update counted in the public result; a rejected initial state has zero such updates.
+- **VMP:** Variational message passing.
+- **JIT:** Just-in-time compilation of array computations.
+- **State:** One graph instance's message, observation and parameter arrays.
+- **Float32 / float64:** Floating-point numbers stored in 32 or 64 bits.
+- **Exact-zero support:** Outcomes that are impossible retain zero probability;
+  the engine uses a reserved finite value for their logarithm.
+
+
+
+## Notes
+
+**2026-09-10T00:09:36Z**
+
+Confirmed at unchanged production source 707c31b, identical to engine baseline 76251b44fc467a976aa056556f8fb371fe5de7f4. A read-only probe imports spawn_cases from tests/test_engine_contracts.py, sets instance zero's messages[0] to NaN with _replace, and compares cached_engine.run(state, 5, tol=1e-12, harden_last=5) with colony.run(5, tol=1e-12). Standalone: status=diverged, iterations=0, inner_status=diverged, inner_residual=inf. Actual batch: status=diverged, iterations=0, inner_status=converged, inner_residual=0.0. Both returned messages remain non-finite. Colony also invokes its prime function before initial-state classification; state preservation across that boundary requires an explicit regression rather than assuming the prime is inert. Sources: engine.py:1022-1048; colony.py:129-146,159-184,260-271. Confidence: high, direct executable reproduction; this is not a report of false overall convergence.
+
+cff-sf29 supplies the fixture. Fix this before cff-ii9t's shared controller/result-policy extraction, in a separate behavior-change PR. cff-wbhu already requires truthful initial-failure classification as part of its broader compiled-loop work; this ticket isolates the present result-field defect without waiting for that optimization.
+
+**2026-09-10T00:18:15Z**
+
+Second mechanism confirmed on the same unchanged baseline: put NaN in the final message entry of ordinary_case(0), retain a healthy same-structure peer, and call Colony.run(5, tol=1e-12). The mixed schedule has a prime function. The rejected instance reports divergence at zero iterations but its returned message entries 7, 8 and 9 differ from the input; these are propagation writes performed before failure classification. The healthy peer converges. The fix must freeze rejected instances across priming as well as repeated updates, and the regression must compare the entire failed State against the input rather than checking only status or the poisoned entry. Source and confidence: direct executable probe, high.
+
+**2026-09-10T00:28:15Z**
+
+Starting from updated PR #122 head 84bfd66. Primary change-path row: Runtime numerical or status invariant. Deliberate pairs: standalone/actual multi-instance batch, auto mixed priming/flooding, zero/positive budgets, and float32/float64. Host/JIT update facts remain unchanged; this repair aligns host initial-result construction and retains invalid state across priming. Model schema, checkpoint decoding, new factors and mu3 batching are N/A. Tests will reproduce NaN/infinity failure and exact-zero infeasibility beside a healthy distinct-parameter peer, compare every result field and State leaf with standalone Engine, and observe real batch update entry. Existing improper/vacuous numerical rules are unchanged; tenfold domain size is N/A to the classification repair. Separate behavior-change commit; focused tests first, then one final short suite. No code from the later controller extraction is moved.
+
+**2026-09-10T00:31:15Z**
+
+Implementation and focused verification: original states are classified before any priming; initial non-finite members now report inner divergence/infinite inner residual, matching Engine.run. The same active mask freezes rejected members across priming and later updates. All-healthy priming keeps its direct result path without the new masking copy; fully rejected groups skip numerical execution. Twenty-four cases cover NaN/infinity/empty support, auto mixed/flood, zero/eight updates and float32/float64, comparing every State leaf and RunResult field with standalone Engine and observing real batch-size-two updates for healthy peers. One additional case forbids both priming and updates when every member is rejected. The new regression failed against the baseline on inner_status before the fix. Focused final command across colony_failures, engine_contracts, runtime_status, colony, gaussian_kernel_schedules and schedule: 64 passed, 3 slow deselected in 24.99s. A final readability-only if/else rewrite followed and will be included in the final gate. Test-file Ruff/format passes; colony.py passes Ruff with B023 excluded. Its five remaining B023 closure warnings are unchanged existing sites; the baseline had seven, and binding the moved freeze helper removes two. No new lint findings are hidden. No numerical rules, model/checkpoint schema, result fields or schedule kinds change.
+
+**2026-09-10T00:49:06Z**
+
+Complete at production source 1308688. Final dashboard-backed short suite: 1,843 passed, 41 slow deselections and four existing Gym deprecation warnings; pytest 998.75 seconds, measured wall 1,011.157 seconds. Runtime history is recorded in e30b330; the dashboard reports zero failures, 25 new cases, and 30 diagrams in 23 galleries. No code/test change followed this passing gate. All 25 regressions pass, including complete result/state parity for invalid/healthy peers and no numerical execution for fully rejected groups. Focused evidence remains 64 passed, 3 slow deselected. git diff --check and tk dep cycle pass. The new test file passes Ruff/format; the production file has only the five pre-existing B023 sites documented above, with no added findings.
+
+This establishes the corrected initial-failure reference for cff-ii9t: non-finite input has overall/inner divergence and infinite inner residual; rejected input values survive initial propagation and remain at zero logical iterations. Empty-support infeasibility stays distinct, and healthy peers retain the real batched path. No numerical-rule, schema, solver or public result-field change.
+
+Next: publish the repair PR over #122, then update that published repair branch before creating the cff-ny7f execution-extraction branch. Use 1308688 as the authorized correction on top of the cff-sf29 engine baseline. No user decision or independent agent approval is being claimed.
+
+**2026-09-10T00:51:06Z**
+
+Published as PR #123: https://github.com/engimatic-systems/cffg/pull/123, branch agent/cff-yglj-colony-initial-failures, base agent/cff-sf29-engine-contracts (#122). Final default gate at 1308688 passed 1,843 tests and is recorded in e30b330. Only ticket/publication edits followed. Shared HTML now reports the completed correction. Next is cff-ny7f on the updated published repair branch.

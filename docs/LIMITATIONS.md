@@ -514,6 +514,26 @@ DSL would still soften that boundary. Learned `c` and learned `A` coordinates
 are currently compiled separately rather than as one jointly uncertain
 composite.
 
+**S9. Fixed GFE probability validation is incomplete.** The categorical GFE
+packer currently accepts negative likelihood or goal entries when their checked
+sum is one. Conversion to log space maps those entries to zero probability,
+leaving invalid total mass; for example, `[-0.2, 1.2]` becomes mass `1.2`.
+Callers must supply finite, nonnegative, normalized fixed probabilities.
+This is an inherited input-validation defect, not a supported approximation.
+P2 ticket cff-34gi owns rejecting it and checking the analogous transition-GFE
+path. Positive Dirichlet concentrations have a different contract and need not
+sum to one.
+
+**S10. Colony currently shares hard-constraint data incorrectly.** Instances
+with one template but different `exactly_k` / `at_most_k` limits or allowed-tuple
+tables reuse the first instance's compiled constraint values. The result can
+be false infeasibility or false convergence, depending on spawn order. Use
+separate `Engine` instances for models with different hard-constraint data
+until P1 cff-jby3 is resolved. The numerical constraint rules themselves accept
+per-instance values; the defect is in runtime data ownership and batching, not
+an accepted approximation. Ordinary per-instance likelihood/prior arrays do
+not use this faulty constraint-data path.
+
 ## The one-paragraph honest summary
 
 The bounded implemented core is a *transparent, compositional,

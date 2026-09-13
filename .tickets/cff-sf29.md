@@ -1,8 +1,8 @@
 ---
 id: cff-sf29
-status: open
+status: closed
 deps: [cff-edoz]
-links: [cff-ny7f]
+links: [cff-ny7f, cff-34gi, cff-ddsq, cff-wbhu, cff-yglj, cff-ii9t, cff-jby3]
 created: 2026-09-02T04:02:01Z
 type: task
 priority: 1
@@ -128,3 +128,109 @@ architecture epic unless the gap makes the planned refactor unsafe.
   performs it at the named baseline.
 - **Termination reason:** The detailed cause associated with a public run
   status.
+
+## Notes
+
+**2026-09-09T23:27:48Z**
+
+Preparation only while cff-ddsq final gate runs at source 707c31b; the required exact compiler-track closing commit will be recorded after that gate and closure. Colony evidence gap confirmed by bounded local inspection: colony.py:94-111 runs GFE groups through per-instance Engine.run; lines113-121 also bypass vectorization for one-instance groups. The real shared path builds filter_vmap(one) at lines148-156 and applies per-instance active masks/results at lines174-276. tests/test_gaussian_kernel_schedules.py:109 proves cached-engine sharing with two distinct parameter/observation instances and analytic Gaussian means/covariances/FE, but not the required iterative BP/VMP comparison of status, residual, iterations, traces, a second structure, and bind/remove isolation. Do not label that Gaussian test a one-shot Colony execution: Colony batches can iterate even when the corresponding standalone Engine uses its exact-unit path. The new characterization should explicitly assert a non-exact ordinary schedule and absence of GFE/mu3 fallback, then observe actual vectorized update entry. Existing test_colony GFE/perception/cache cases remain useful but do not substitute for this complete deliberate pair. Source: colony.py:39-78,94-276; engine.py:329-412; tests/test_colony.py:24-99 and test_gaussian_kernel_schedules.py:109-132. No runtime code changes or probes were made; this is an inventory/handoff, not a reported behavioral defect.
+
+**2026-09-09T23:43:39Z**
+
+Exact engine characterization baseline: 76251b44fc467a976aa056556f8fb371fe5de7f4, the commit that closes compiler track cff-edoz and final assembly cff-ddsq. Its source is 707c31b, validated by 1,813 passing default tests with 41 slow deselections and four existing Gym warnings in 1,016.282 seconds measured wall; runtime record 6364053. Later publication/handoff commits may change tickets/docs only. Start from the published agent/cff-ddsq-arena-assembly branch after its PR is created and update that intended base before branching. This ticket adds characterization/inventory only, with no production engine move or numerical behavior change. P2 cff-34gi records a separate, pre-existing fixed-GFE probability-input validation gap; use valid probability inputs for engine behavior parity and do not redefine that defect as a supported mathematical approximation.
+
+**2026-09-09T23:45:38Z**
+
+Published intended base: PR #121, https://github.com/engimatic-systems/cffg/pull/121, branch agent/cff-ddsq-arena-assembly. Update that branch before starting the engine characterization branch. The exact comparison baseline remains compiler-track closing commit 76251b44fc467a976aa056556f8fb371fe5de7f4, not a later publication-note commit.
+
+**2026-09-09T23:47:40Z**
+
+Starting from updated PR #121 branch at 1f5f18d. The exact comparison baseline remains compiler-track closing commit 76251b44fc467a976aa056556f8fb371fe5de7f4; source 707c31b passed 1,813 default tests. Primary change-path row: Runtime numerical or status invariant. New factor/rule and Learnable/checkpoint rows apply to inventory/readout/reconstruction consumers; New IR field is N/A because no schema or model meaning changes. Deliberate pairs: flooding/scheduled, standalone/actual iterative vmap with two distinct same-structure instances plus another structure, host/JIT status, and current/legacy agent reconstruction. Inventory existing independent authorities before adding tests; add characterization only for uncovered extraction seams, especially per-instance Colony result policy and cache/lifecycle identity. Hostile cases must include zero support, vacuous/improper beliefs, non-finite updates, float32 and a tenfold domain/horizon, primarily through existing focused tests. No production engine changes or new scientific benchmark. New gaps become separate tickets unless they make extraction unsafe. Use the exact baseline for source regions and observable values; update the dashboard for new test files and run one final short suite after the last test change. Additional agents remain unavailable; bounded local inspection and executable comparisons will provide the evidence.
+
+**2026-09-09T23:55:28Z**
+
+First uncovered seam is now characterized by three passing cases in tests/test_engine_contracts.py. Two ordinary VMP instances share one cached Engine while differing in priors, likelihoods and observed outcomes; a four-state instance has a different structure. The fixture asserts a mixed, non-exact schedule with no GFE/mu3 fallback and instruments actual filter_vmap update entry with batch size two. Budget-one and converged runs match independent Engine instances in every RunResult field and every State array/dtype/shape. Literal baseline fingerprints, deltas, FE traces, beliefs, statuses and logical iteration counts are pinned from 76251b4. Binding, removing and replacing one instance preserves the others by state/result identity and retains both Engine cache entries. This adds no production behavior or new scientific oracle; existing VMP/schedule authorities remain responsible for the mathematics. New file is enrolled in the dashboard. Inventory and any remaining uncovered seams are next; no final default suite yet.
+
+**2026-09-10T00:08:54Z**
+
+Characterization inventory and extraction handoff at exact baseline 76251b44fc467a976aa056556f8fb371fe5de7f4 (production source 707c31b; no production changes in this ticket).
+
+Mathematical authority and observable coverage:
+
+| Family | Existing evidence and scope |
+| --- | --- |
+| Ordinary discrete BP/VMP | test_engine_tree:71-109 and test_engine_hmm:79-111 compare enumeration/forward-backward and negative log evidence; test_vmp:54-120 checks conjugate updates and the BP/VMP distinction. test_discrete_kernels:263,299 protects external registration and mode-specific local inputs. |
+| In-graph Dirichlet parameters | test_dirichlet_param_edges:115,153 checks exact observed conjugacy, fractional counts and direct total VFE; :220,247,283 protects rejected nonclosed BP use, serialization, sparse float32 and scale. test_dirichlet_vmp_derivation:75-107 independently expands Dirichlet algebra and distinguishes VMP closure from nonclosed exact BP. |
+| Gaussian | test_kalman:40-101 uses independent RTS means/covariances and negative log likelihood. test_gaussian_kernels:41,84,220 covers joint conditioning, nonvacuous cavities, KL energy and distinct batched inputs. |
+| Exponential family | test_ef_engine:193-264 compares Gamma-Poisson and Beta-Bernoulli posterior parameters and closed-form evidence; missing/vacuous/improper cases protect readout and ledger failures. |
+| Gaussian mixture | test_mixg:82-192 uses independent one-dimensional numerical quadrature for messages and local energy, with an explicit entropy bound. test_hybrid_engine:221,262 checks transport and assembled ledger. K=1 parity is a degeneracy check, not the sole mathematical authority. |
+| Recurrence | test_recurrence_link:547,587,665,792 covers independent NumPy coordinate calculations, sufficient statistics, the named JJ lower bound, and dense quadrature/evidence bounds. Do not promote the approximation to unrestricted exact inference. |
+| Structured recurrence | test_structured_recurrence_rule:25,67,119 protects exact fixed-drive chains, pair responsibilities and node/separator energy; :157 identifies the uncertain-drive JJ boundary. test_structured_recurrence_engine:134,167,240,351,731,797 protects readout/write, schedule, loopy limitation, GFE coexistence and quadratic scaling. |
+| Precision | test_gauss_vmp:177,196 uses the conjugate fixed point; :270 checks ledger against independent SciPy quadrature. The multinode flooding-oscillation case remains an explicit limitation, not an extraction target. |
+| Hard constraints / MAP | test_csp:47,80,132,164,288,313,336 uses enumeration/Viterbi across constraint families; :360,375 protects unsupported free-energy and execution combinations. |
+| Fixed-A GFE | test_gfe:169-213 checks brute-force objective minimization and direct NumPy message/local-energy expressions; :29,55 protects inner solver classification and scale. |
+| Transition GFE | test_b_epistemics:171 enumerates the node-local GFE and :188 uses independent constrained SLSQP minimization of a two-composite objective. The optimizer does not call production GFE-TM updates or energy rules. |
+| Hybrid GFE | test_hybrid_gfe:258 compares the named D5 oracle and reports its information bounds; :324 protects flooding/mixed parity. This is the documented approximation/bound, not an exact unrestricted mixture-information claim. |
+| Functional mu3 | test_mu3_derivation:162,197,239,261 checks the expanded density, independent binary quadrature, explicit-key replay and hostile importance weights. test_mu3:106 protects bitwise particles/weights/fixed-point replay; test_agent_mu3:243,613,703,723,744,760,782 protects checkpoint replay, key cursor, particle/cache reuse and invalidation. The slower multislice ledger test remains opt-in; test_shared_goals and the derivation tests also protect tied-parameter accounting. |
+| Shared learned goals | test_shared_goals:49,61,90,106,131,158,183,229 protects pooled updates across shapes, off-coordinate D6c parameter energy once, identity by blob name, convergence/rollover, outer coordinates, serialization/fingerprints, damping/order/vmap, sparse float32 scale. |
+
+All test references above are under tests/ and name baseline line anchors, not future line-number promises. Existing derivation docstrings and docs/DERIVATIONS.md remain formal authorities; the new tests do not replace them.
+
+Named baseline ownership map (engine.py unless another file is named):
+
+| Responsibility | Existing owner and repeated interpretation to remove later |
+| --- | --- |
+| Runtime values and public result | State:88, RunStatus:105, RunResult:126, _replace:189; Colony imports these from the facade and constructs its own RunResult at colony.py:260. cff-ii9t must put values below the facade, re-export them, and share result policy without import cycles. |
+| Gather and write transport | Discrete helpers:213-276; Gaussian:277-328; EF:2658-2707. Flood/batch/flat scans gather arena blocks while registerized_scan:3095 carries local prefetched blocks. Share local mathematical calls, not full-arena transport. |
+| Parameter selection and local rules | kernel_runtime.py already owns registered local calls. Family sweeps:2466-2707 and _make_step:2708-2947 select specialized arrays and invoke rules. batch_stage:2948, registerized_scan:3095 and flat_scan:3326 repeat subsets of the interpretation. Move those shared calls in cff-ny7f, preserving static kernel/mode/shape and dynamic params/observations. |
+| Schedule construction and propagation | Engine.__init__:329-457, batch_stage:2948, classify_scan:3013, scan_stage:3313, flat_scan:3326, exact_unit:3499 and propagate:3541. cff-nyad owns construction; registerized carry and final scatter must not regress to full-arena carry. |
+| Ordinary run and failure facts | Engine.run:949-1208, finite:1675, host support:1682, JIT support:3445. Colony.run:80-279 duplicates initial checks, active masks, convergence assessment and finalization. cff-ii9t owns the shared policy; cff-yglj first repairs the confirmed initial-inner-status mismatch. |
+| Exact and outer strategies | exact run:1602; outer plan/cache:1209 and trust controller:1290. Keep cache identity, support/dtype key distinctions and solver diagnostics; move in cff-jrbw, not per-plan execution. |
+| Lifecycle and stochastic state | init_state:458, uniform messages:505, prepare_mu3:515, readiness:589, update_mu3:601, bind_data:868, goal-prior replacement:1927. Agent checkpoint decoding remains outside extraction; cff-5xdy owns preparation and repair. |
+| Objective ledger | _make_bfe:3729 plus family wrappers:3569-3728 and shared_goal_energy:3826. Node terms, excluded/interior edge entropy, parameter terms and mu3 KL each retain their current ownership and multiplicity. cff-gl89 owns ledger extraction. |
+| Readouts and diagnostics | mu3/hybrid diagnostics:696-867; public readouts:1771-2433, value records:2446-2465. Several readouts repeat gather/parameter interpretation. cff-3ola moves them without altering public shapes or approximation labels. |
+
+Critical cross-plan barrier: _make_step:2832 calls write_goal_counts only after collecting fresh original GFE predictions from all contributing groups and before final damping. A per-plan executor must not independently overwrite a shared goal. _make_bfe:3826 charges shared_goal_energy once; :3832 adds each mu3 parameter KL once. These global parameter owners are not extra executing factors. Preserve this coordination through the local-call extraction.
+
+Deliberate pairs and hostile evidence:
+- Flooding/scheduled: test_schedule:96,171,199,297,367 and family parity tests above.
+- Actual iterative Colony: new test_engine_contracts contains two distinct three-state VMP instances plus a four-state structure; it observes batch-size-two update entry and compares every State leaf and RunResult field to separate Engines for budget-one and converged runs. Cache, binding, removal and replacement identities are covered. Structural literals pin 152/192 State bytes and float64 array shapes, with baseline schedule fingerprints.
+- JIT/host: two new compiled inner-failure fixtures pin codes 1/2 to exhaustion/divergence and residual/trace/reason fields. Existing test_gfe and test_runtime_status protect real solver and exact-path mathematics/classification.
+- Current/legacy reconstruction: test_agent_mu3:324,353,400,453,613,800 and test_agent_spec:229,296,348 cover manifest validation, version-one migration, replay and rollback. No checkpoint decoding is moved.
+- Literal zeros/nonfinite: test_runtime_status:88-108; test_discrete_kernels:475,569; test_gfe:296,314; test_b_epistemics:413; test_mu3:216,242. Vacuous/improper: test_ef_engine:253,264; test_kalman:82; test_mixg:268; test_hybrid_gfe:377,392.
+- Float32 and uncomfortable scale: discrete kernels:414, Gaussian kernels:220, recurrence:906 (K32/D16), structured recurrence engine:797 (K8/T100), hard constraints:409,430 (100 variables), schedule:482,510 (T256), agent_mu3:840 (ten slices). These are existing mechanism-focused tests, not fresh benchmark claims.
+- Persistent storage/trace/scan evidence: test_discrete_kernels:651 and test_gaussian_kernel_schedules:32 retain dtype/shape/bytes, bounded local carry and trace reuse. No timing target or speedup is asserted.
+
+Focused validation at test head 81ed86b: 17 passed, 3 slow deselected in 9.95s for engine_contracts, runtime_status, colony and gaussian_kernel_schedules. Ruff check/format and git diff --check pass. Five new cases total; production code remains identical to the exact compiler-track closing baseline. One final dashboard-backed short suite is now running.
+
+**2026-09-10T00:09:37Z**
+
+Legend: prerequisite --> dependent. Based on tk dep tree --full cff-ii9t, tk ready and tk blocked; cycle check passes.
+
+[x] cff-edoz compiler track
+  |
+  +--> [~] cff-sf29 characterization (final gate running)
+          |
+          +--> [ ] cff-ny7f execution owners
+          |         --> cff-nyad schedules --> cff-5xdy lifecycle --+
+          |                                                       |
+          +--> [ ] cff-yglj initial-failure repair ----------------+
+                                                                  |
+                                                                  v
+                                                          cff-ii9t control
+                                                            --> cff-jrbw strategies
+                                                            --> cff-gl89 ledger
+                                                            --> cff-3ola readouts
+                                                            --> cff-ws3c engine track
+
+cff-ny7f and cff-yglj become independently ready after characterization closes; both paths must finish before ordinary control extraction. cff-34gi probability validation remains a separate ready P2, not a prerequisite of this engine track. No independent scientific authority was missing in a way that makes the local-call move unsafe. The confirmed Colony discrepancy is separately ticketed under acceptance 8.2, not added as a production change here.
+
+**2026-09-10T00:25:00Z**
+
+Complete. Five new characterization cases, the family-authority inventory and the baseline ownership map are delivered. Final test change: 81ed86b. Final default gate at ce8452a: 1,818 passed, 41 slow deselections, four existing Gym deprecation warnings; pytest 993.08 seconds, measured wall 1,005.421 seconds. Runtime history recorded in 20f391e; dashboard refreshed with zero failures and five new cases, 30 diagrams in 23 galleries. Ruff check/format, git diff --check and tk dep cycle pass. Production src/ is byte-for-byte unchanged from exact engine baseline 76251b44fc467a976aa056556f8fb371fe5de7f4. Subsequent ticket/PR publication edits require no second unchanged suite.
+
+Next: publish the stacked characterization PR on agent/cff-sf29-engine-contracts over PR #121, then take the separate cff-yglj initial-failure repair. cff-ny7f execution extraction is independently ready and has a handoff for Dirichlet parameters, shared-goal pooling, functional evaluators and the duplicated registerized EF call. The repair must precede cff-ii9t. No user decision remains. Agent review was unavailable because the previously reported usage limit persists; no independent agent approval is claimed. The intelligible-ticket skill shaped the evidence handoff and bounded bug ticket; wiggle auditing was not used.
+
+**2026-09-10T00:26:39Z**
+
+Published as PR #122: https://github.com/engimatic-systems/cffg/pull/122, head agent/cff-sf29-engine-contracts, base agent/cff-ddsq-arena-assembly (#121). Final default gate is 1,818 passing tests, recorded in 20f391e; code remains unchanged after that gate. The shared architecture HTML now reports completion. Next implementation is the separate cff-yglj initial-failure repair before cff-ny7f execution extraction.

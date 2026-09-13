@@ -46,7 +46,7 @@ SUITE_SELECTION = "not slow"
 
 EPIC_FILES = {
     "M0 · Foundations": ["test_hygiene.py"],
-    "M1 · Core IR": ["test_ir.py", "test_serialize.py", "test_edits.py", "test_compose.py", "test_inits.py", "test_compiler_contracts.py", "test_compiled.py", "test_topology.py"],
+    "M1 · Core IR": ["test_ir.py", "test_serialize.py", "test_edits.py", "test_compose.py", "test_inits.py", "test_compiler_contracts.py", "test_compiled.py", "test_topology.py", "test_constraint_details.py", "test_specialized.py", "test_registered.py", "test_resolution.py", "test_assembly.py"],
     "M2 · BP Engine": ["test_engine_tree.py", "test_engine_hmm.py", "test_schedule.py", "test_discrete_kernels.py"],
     "M3 · VMP + GFE": [
         "test_vmp.py",
@@ -65,6 +65,10 @@ EPIC_FILES = {
         "test_behavioral_epistemics.py",
     ],
     "M5 · Runtime": [
+        "test_engine_contracts.py",
+        "test_execution.py",
+        "test_execution_specialized.py",
+        "test_colony_failures.py",
         "test_agent.py",
         "test_agent_mu3.py",
         "test_agent_spec.py",
