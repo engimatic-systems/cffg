@@ -639,11 +639,13 @@ Pre-identity JSON declarations for `dirichlet`, `niw`, `mniw`, and
 bare-name, slash-key, and `v2:` checkpoints remain readable when they contain
 complete multi-array posteriors. Current declarations missing an identity,
 unknown versions, and mismatched ownership fail with the affected learnable's
-name. An unversioned `pg_weights` declaration or unidentified recurrence state
-fails with a D8/D9 migration diagnostic: compatible shapes cannot establish
-which statistics produced it. Older checkpoints with an explicit D9 recurrence
-manifest remain readable. Recreate unidentified recurrence models with a
-deliberately chosen fresh prior and rerun inference; do not relabel D8 evidence.
+name. A standalone unversioned `pg_weights` JSON declaration or unidentified
+recurrence posterior fails with a D8/D9 migration diagnostic: compatible shapes
+cannot establish which statistics produced it. Older checkpoints with an
+explicit D9 recurrence manifest remain readable. Verified model-only bundles
+remain loadable for fixed-parameter inference, including old recurrence models.
+New learning from those models requires deliberately chosen fresh priors; do
+not relabel D8 evidence.
 
 ## Run inference
 
@@ -920,11 +922,14 @@ print(estimate(engine).summary())
 ```
 
 A `.cffgz` bundle is model-only: it contains the template and point-parameter
-blobs, not a learned posterior or resumable inference state. Bundles with
-unversioned declarations for the four unchanged families migrate on loading.
-Unversioned recurrence declarations are rejected with the D8/D9 diagnostic
-described above. Checkpoint manifests bind the posterior arrays needed to
-resume learning.
+blobs, not a learned posterior or resumable inference state. Loading verifies
+the stored model hash and blob digests before returning the model, and reports
+`manifest["resumable"] is False`. Unversioned declarations, including recurrence,
+select the current learning rules without assigning provenance to old posterior
+statistics. Fixed-parameter inference remains available; new learning requires
+fresh priors. D8 and unidentified recurrence posteriors remain inadmissible for
+restoration. Checkpoint manifests bind the posterior arrays needed to resume
+learning.
 
 `.npz` is a ZIP container and does not support ordinary per-array memory
 mapping, so it is reserved for agent checkpoints rather than parameter blobs.

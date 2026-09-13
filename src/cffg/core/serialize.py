@@ -10,6 +10,7 @@ wire, a bead — changes the hash.
 
 from __future__ import annotations
 
+from copy import deepcopy
 import hashlib
 import json
 from pathlib import Path
@@ -339,7 +340,12 @@ def structure_hash(t: Template) -> str:
     """Hex sha256 of the structure: blob paths AND init specs erased, names
     kept — both are parameter data, not structure (colony batching groups
     instances that differ only in parameters)."""
-    d = to_dict(t)
+    return document_structure_hash(to_dict(t))
+
+
+def document_structure_hash(document: dict[str, Any]) -> str:
+    """Hash the stored model before declaration migration, without changing it."""
+    d = deepcopy(document)
     _erase_blob_data(d)
     canonical = json.dumps(d, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode()).hexdigest()

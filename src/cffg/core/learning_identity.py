@@ -4,6 +4,7 @@ These defaults describe new declarations. Legacy migration is deliberately
 separate: an unidentified recurrence posterior cannot be assigned D9 semantics.
 """
 
+from copy import deepcopy
 import re
 from types import MappingProxyType
 
@@ -19,6 +20,29 @@ LEARNING_IDENTITIES = MappingProxyType({
 LEGACY_IDENTITIES = MappingProxyType({
     key: value for key, value in LEARNING_IDENTITIES.items() if key != "pg_weights"
 })
+
+
+def model_only_declarations(document: dict) -> dict:
+    """Select current learning rules for a verified model-only archive.
+
+    Point parameters carry no posterior provenance. These declarations allow
+    inference and learning from explicitly supplied fresh priors; they never
+    identify the statistics in an old checkpoint. Posterior restoration must
+    still pass its separate semantic-identity checks.
+    """
+    migrated = deepcopy(document)
+
+    def visit(fragment):
+        if fragment.get("learning_schema_version") is None:
+            for spec in fragment.get("learnables", {}).values():
+                identity = LEARNING_IDENTITIES.get(spec["family"])
+                if "semantic_identity" not in spec and identity is not None:
+                    spec["semantic_identity"] = identity
+        for plate in fragment.get("plates", {}).values():
+            visit(plate["fragment"])
+
+    visit(migrated)
+    return migrated
 
 
 def check_scoped_name(name: str) -> None:

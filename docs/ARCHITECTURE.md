@@ -938,11 +938,16 @@ current posteriors. Both modes stage validation before committing any changes.
 
 Unversioned declarations and bare/slash/v2 checkpoints for the four unchanged
 nonrecurrence families migrate deterministically. Complete multi-array state
-is required. Historical bundle and agent structure hashes are accepted only
-for those unchanged identities. Legacy recurrence-only manifests retain their
-D9 identity/ownership/digest checks; D8 and unidentified recurrence declarations
-or posterior state cannot migrate. `hyperparameter_snapshot()` is numeric
-diagnostic output, not a recurrence checkpoint. The
+is required. Historical agent structure hashes are accepted only for those
+unchanged identities. Model-only bundles instead verify the original serialized
+model hash before declaration migration, then verify every blob digest. They
+remain loadable with current learning rules, including unversioned recurrence,
+and the returned manifest reports `resumable=False`. Their point parameters
+provide no posterior provenance; any new learning requires fresh priors.
+Standalone unversioned recurrence JSON remains rejected. Legacy recurrence-only
+checkpoint manifests retain their D9 identity/ownership/digest checks; D8 and
+unidentified recurrence posteriors cannot migrate. `hyperparameter_snapshot()`
+is numeric diagnostic output, not a recurrence checkpoint. The
 model/runtime interface still declares which boundary learnable is
 episode-scale because that choice determines rollover semantics, not merely
 update frequency.
