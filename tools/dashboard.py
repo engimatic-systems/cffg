@@ -1,6 +1,6 @@
 """Generate the mobile test dashboard and tracked suite-runtime history.
 
-Consumes a completed default-suite JUnit report, groups tests by M-epic, diffs
+Consumes a completed PR-gate JUnit report, groups tests by M-epic, diffs
 against the previous run's snapshot (NEW badges), and renders a self-contained
 dark/light HTML page served by the agent-share file browser (port 8080 over
 Tailscale). ``--run-suite`` remains the one-command standalone path; it runs
@@ -12,9 +12,10 @@ Tests that render diagrams record SVGs into tests/.artifacts/ (gitignored)
 via the `viz_gallery` fixture; those rows become twirl-down galleries here,
 with images copied to ~/agent-share/cffg-viz/ so the page works remotely.
 
-After an existing default run:
+After an existing PR-gate run:
+  uv run pytest -q -m 'not slow' --junitxml=/tmp/cffg-tests.xml
   uv run python tools/dashboard.py --junitxml /tmp/cffg-tests.xml
-Standalone short run + refresh:
+Standalone PR gate + refresh:
   uv run python tools/dashboard.py --run-suite
 When a new test file appears, add it to EPIC_FILES.
 """
@@ -89,6 +90,7 @@ EPIC_FILES = {
     "M6 · Tooling": [
         "test_bundle.py",
         "test_dashboard.py",
+        "test_test_selection.py",
         "test_estimate.py",
         "test_edit_codec.py",
         "test_ticket_dashboard.py",
@@ -147,16 +149,17 @@ EPIC_ORDER = list(EPIC_FILES) + ["Unassigned"]
 
 
 class DashboardError(ValueError):
-    """A JUnit report cannot truthfully certify the current default suite."""
+    """A JUnit report cannot truthfully certify the current PR gate."""
 
 
 def run_suite() -> tuple[Path, int, float]:
-    """Run the default short suite; return its report, status, and wall time."""
+    """Run the PR gate; return its report, status, and wall time."""
     with tempfile.NamedTemporaryFile(suffix=".xml", delete=False) as tmp:
         xml_path = Path(tmp.name)
     started = time.monotonic()
     result = subprocess.run(
-        ["uv", "run", "pytest", "-q", f"--junitxml={xml_path}"], cwd=REPO
+        ["uv", "run", "pytest", "-q", "-m", SUITE_SELECTION, f"--junitxml={xml_path}"],
+        cwd=REPO,
     )
     return xml_path, result.returncode, time.monotonic() - started
 
@@ -168,7 +171,7 @@ def repository_test_files(repo: Path = REPO) -> set[str]:
 def newest_test_input(
     repo: Path = REPO, *, exclude: Path | None = None
 ) -> tuple[float, Path]:
-    """Newest mtime among files whose contents can affect the default result."""
+    """Newest mtime among files whose contents can affect the PR-gate result."""
     candidates = [repo / "pyproject.toml", repo / "uv.lock"]
     for directory in (repo / "src", repo / "tests", repo / "tools"):
         candidates.extend(directory.rglob("*.py"))
@@ -188,11 +191,12 @@ def load_junit(
     expected_files: set[str] | None = None,
     newest_input: tuple[float, Path] | None = None,
 ) -> list[dict]:
-    """Parse and validate a default-suite JUnit report.
+    """Parse and validate a PR-gate JUnit report.
 
     Completeness is checked without spawning pytest: every repository test
-    module must appear, declared suite counts must match the testcase records,
-    and the report must be newer than the code/test/tool inputs it certifies.
+    module must appear, collection provenance must certify the PR selection,
+    declared suite counts must match the testcase records, and the report must
+    be newer than the code/test/tool inputs it certifies.
     """
     if not xml_path.is_file():
         raise DashboardError(f"JUnit report does not exist: {xml_path}")
@@ -219,6 +223,35 @@ def load_junit(
         raise DashboardError(
             f"JUnit count mismatch: suites declare {declared}, report contains {len(cases)} cases"
         )
+
+    provenance = [
+        prop.get("value")
+        for suite in suites
+        for prop in suite.findall("./properties/property")
+        if prop.get("name") == "cffg.suite"
+    ]
+    if len(suites) != 1 or len(provenance) != 1:
+        raise DashboardError(
+            "JUnit report lacks unique PR-gate selection provenance; developer, "
+            "focused, and legacy reports cannot certify the PR gate. Run "
+            "uv run pytest -q -m 'not slow' --junitxml=/tmp/cffg-tests.xml"
+        )
+    try:
+        suite_info = json.loads(provenance[0])
+    except (TypeError, json.JSONDecodeError) as error:
+        raise DashboardError("JUnit report has malformed suite provenance") from error
+    if not isinstance(suite_info, dict) or (
+        suite_info.get("selection") != SUITE_SELECTION
+        or suite_info.get("scope") != "repository"
+    ):
+        raise DashboardError(
+            "JUnit report does not certify the complete PR-gate selection 'not slow'; "
+            "developer and focused reports cannot be published as PR results"
+        )
+    if type(suite_info.get("selected_count")) is not int or (
+        suite_info["selected_count"] != len(cases)
+    ):
+        raise DashboardError("JUnit report is partial; selected test count does not match report")
 
     tests = []
     for case in cases:
@@ -350,7 +383,7 @@ def record_suite_runtime(
     previous.append(record)
     previous = previous[-RUNTIME_HISTORY_LIMIT:]
     # Compare like-for-like suite selections so an opt-in slow run cannot
-    # poison the default suite's wait budget.
+    # poison the PR gate's wait budget.
     comparable = [
         entry for entry in previous
         if entry.get("selection") == SUITE_SELECTION
@@ -473,7 +506,7 @@ def render(
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CFFG tests</title>
+<title>CFFG PR gate</title>
 <style>
 :root {{
   --surface:#fcfcfb; --card:#f2f2ef; --ink:#0b0b0b; --ink2:#52514e; --mut:#8b8a85;
@@ -523,7 +556,7 @@ svg {{ width:100%; height:80px; display:block; }}
 footer {{ color:var(--mut); font-size:12px; margin:18px 0 8px; }}
 </style></head><body>
 <header>
-  <h1>CFFG test suite {status}</h1>
+  <h1>CFFG PR gate {status}</h1>
   <div class="meta">{when} · commit {commit} · {len(tests)} tests</div>
 </header>
 <div class="tiles">
@@ -543,11 +576,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument(
         "--junitxml", type=Path, metavar="PATH",
-        help="reuse an existing completed default-suite JUnit report",
+        help="reuse an existing completed PR-gate JUnit report with selection provenance",
     )
     mode.add_argument(
         "--run-suite", action="store_true",
-        help="run the default short suite once, then render its report",
+        help="run the PR gate (not slow) once, then render its report",
     )
     return parser.parse_args(argv)
 

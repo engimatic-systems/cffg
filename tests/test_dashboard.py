@@ -7,6 +7,7 @@ import json
 import os
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -35,6 +36,15 @@ def write_report(path: Path, cases: list[tuple[str, str, float, bool]]) -> Path:
         tests=str(len(cases)),
         failures=str(sum(failed for *_, failed in cases)),
         errors="0",
+    )
+    properties = ET.SubElement(suite, "properties")
+    ET.SubElement(
+        properties,
+        "property",
+        name="cffg.suite",
+        value=json.dumps(
+            {"selection": "not slow", "scope": "repository", "selected_count": len(cases)}
+        ),
     )
     for module, name, seconds, failed in cases:
         case = ET.SubElement(
@@ -121,6 +131,47 @@ def test_load_junit_rejects_partial_and_stale_reports(dashboard, tmp_path):
         dashboard.load_junit(report, newest_input=(newer_time, newer))
 
 
+@pytest.mark.parametrize(
+    "provenance,reason",
+    [
+        (None, "lacks unique PR-gate selection provenance"),
+        ("not JSON", "malformed suite provenance"),
+        (
+            {"selection": "not slow and not pr_head", "scope": "repository", "selected_count": 2},
+            "does not certify the complete PR-gate selection",
+        ),
+        (
+            {"selection": "not slow", "scope": "focused", "selected_count": 2},
+            "does not certify the complete PR-gate selection",
+        ),
+        (
+            {"selection": "not slow", "scope": "repository", "selected_count": 3},
+            "selected test count does not match",
+        ),
+    ],
+    ids=["legacy", "malformed", "developer", "focused", "incomplete"],
+)
+def test_reuse_rejects_uncertified_reports_even_with_every_module(
+    dashboard, monkeypatch, tmp_path, provenance, reason
+):
+    report = valid_report(tmp_path)
+    configure_publish(dashboard, monkeypatch, tmp_path, {"test_alpha.py", "test_beta.py"})
+    tree = ET.parse(report)
+    properties = tree.getroot().find("testsuite/properties")
+    prop = properties.find("property")
+    if provenance is None:
+        properties.remove(prop)
+    else:
+        prop.set("value", provenance if isinstance(provenance, str) else json.dumps(provenance))
+    tree.write(report)
+
+    with pytest.raises(SystemExit, match=reason):
+        dashboard.main(["--junitxml", str(report)])
+    assert not dashboard.OUT.exists()
+    assert not dashboard.STATE.exists()
+    assert not dashboard.RUNTIMES.exists()
+
+
 def configure_publish(dashboard, monkeypatch, tmp_path, expected_files):
     monkeypatch.setattr(dashboard, "OUT", tmp_path / "cffg-tests.html")
     monkeypatch.setattr(dashboard, "STATE", tmp_path / "state.json")
@@ -171,6 +222,28 @@ def test_run_suite_mode_runs_once_and_removes_its_temporary_report(
     assert '"wall_seconds": 123.25' in timing
     assert '"selection": "not slow"' in timing
     assert '"suggested_wait_seconds": 180' in timing
+
+
+def test_run_suite_explicitly_selects_pr_gate(dashboard, monkeypatch):
+    calls = []
+
+    def run(command, *, cwd):
+        calls.append((command, cwd))
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(dashboard.subprocess, "run", run)
+    report, code, wall_seconds = dashboard.run_suite()
+    try:
+        assert calls == [
+            (
+                ["uv", "run", "pytest", "-q", "-m", "not slow", f"--junitxml={report}"],
+                dashboard.REPO,
+            )
+        ]
+        assert code == 0
+        assert wall_seconds >= 0
+    finally:
+        report.unlink(missing_ok=True)
 
 
 @pytest.mark.parametrize("version,history_key", [(1, "recent"), (2, "previous-3")])

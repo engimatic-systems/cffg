@@ -14,25 +14,46 @@ Figure 5 coverage ledger is in `docs/ARCHITECTURE.md`.
 ```sh
 uv sync          # install
 uv run pytest tests/test_engine_tree.py  # focused iteration
-uv run python tools/dashboard.py --run-suite  # short default suite + dashboard
+uv run pytest    # developer suite
+uv run pytest tests/test_tmaze.py -m 'not slow'  # include its PR regressions
+uv run python tools/dashboard.py --run-suite  # complete PR gate + dashboard
 uv run pytest -m slow  # opt-in long-running regressions
 ```
 
-Run focused tests as often as useful while changing code. Outside the isolated
-tooling exception below, one passing short suite after the final code change is
-sufficient to open or update a PR. Pytest excludes `slow` tests by default. The
-dashboard command above runs pytest exactly once and renders that result.
+Run focused tests as often as useful while changing code. Plain pytest excludes
+`slow` and `pr_head` tests; `pr_head` marks stable expensive regressions required
+at every PR head. Include those regressions in focused runs when changing their
+behavior. Outside the isolated tooling exception below, each independent PR
+head needs one passing gate after its final code change. The dashboard command
+explicitly runs `not slow`, including `pr_head`, exactly once and renders that
+result. Reuse a passing result for the same unchanged head when opening or
+updating its PR; a developer or focused run does not satisfy this gate.
 Before starting or waiting on it, read only `latest.wall_seconds` and
 `suggested_wait_seconds` from `tools/test-suite-runtimes.json`.
+
+To reuse a directly executed PR gate, run
+`uv run pytest -q -m 'not slow' --junitxml=/tmp/cffg-tests.xml`, then
+`uv run python tools/dashboard.py --junitxml /tmp/cffg-tests.xml`. Reports carry
+their selection and collection provenance. Developer, focused, and legacy
+reports without PR provenance cannot be published as PR results. Dashboard
+runtime history records only the PR gate, keeping its wait budget comparable.
+
+Keep tests for distinct invariants and failure mechanisms. Expensive parameter
+combinations need a distinct coverage claim; reuse deterministic solved models
+across assertions with immutable results or fresh copies. Preserve direct
+sparse-support, improper-message, float32, and scale checks in the developer
+suite while deferring expensive integration repetitions to `pr_head`. Review
+costs from required runs when adding expensive coverage. `AGENTS.md` gives the
+full test-writing and validation protocol.
 
 Isolated tooling changes use focused tests and changed-artifact checks;
 record the isolation rationale, commands, and results in the ticket and PR.
 Changes affecting engine/model/numerical/serialization behavior, shared
 dependencies, test discovery/selection/execution, or pass/fail interpretation
-still require the full short suite, even when their files are under `tools/`.
+still require the PR gate, even when their files are under `tools/`.
 If isolation is uncertain, use the full gate. Do not label focused results as a
 fresh full-suite result. Ticket- and documentation-only changes also use their
-relevant artifact validation instead of the short suite. Run slow regressions
+relevant artifact validation instead of the PR gate. Run slow regressions
 explicitly when changing the behavior they cover; they are not part of the
 default PR gate. `AGENTS.md` defines the contributor validation policy.
 

@@ -9,6 +9,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 from cffg.compiler import CompileError, compile_template
 from cffg.core.serialize import from_json, to_json
@@ -37,8 +38,13 @@ def run_engine(ys):
     return engine, state
 
 
-def test_smoothed_marginals_match_rts():
-    engine, state = run_engine(YS)
+@pytest.fixture(scope="module")
+def observed_solution():
+    return run_engine(YS)
+
+
+def test_smoothed_marginals_match_rts(observed_solution):
+    engine, state = observed_solution
     means, covs, _ = kalman_smoother(YS, F, Q, H, R, M0, P0)
     marg = engine.gaussian_marginals(state)
     for k in range(T):
@@ -49,8 +55,8 @@ def test_smoothed_marginals_match_rts():
             np.testing.assert_allclose(marg[f"x{k}o"][0], means[k], atol=1e-8)
 
 
-def test_bfe_is_negative_log_likelihood():
-    engine, state = run_engine(YS)
+def test_bfe_is_negative_log_likelihood(observed_solution):
+    engine, state = observed_solution
     _, _, loglik = kalman_smoother(YS, F, Q, H, R, M0, P0)
     np.testing.assert_allclose(engine.bfe(state), -loglik, atol=1e-7)
 
@@ -67,20 +73,20 @@ def test_missing_observation():
     np.testing.assert_allclose(engine.bfe(state), -loglik, atol=1e-7)
 
 
-def test_predictive_readout_on_observed_edge():
+def test_predictive_readout_on_observed_edge(observed_solution):
     # The observed edge's exterior marginal is the *cavity* predictive: the
     # forward message excludes y0's own likelihood (BP semantics), i.e. the
     # distribution of y0 given every OTHER observation — the innovation
     # quantity a model-scoring loop wants.
-    engine, state = run_engine(YS)
+    engine, state = observed_solution
     means_loo, covs_loo, _ = kalman_smoother([None, *YS[1:]], F, Q, H, R, M0, P0)
     mean_y, cov_y = engine.gaussian_marginals(state)["y0"]
     np.testing.assert_allclose(mean_y, H @ means_loo[0], atol=1e-8)
     np.testing.assert_allclose(cov_y, H @ covs_loo[0] @ H.T + R, atol=1e-8)
 
 
-def test_improper_edge_readout_is_explicit_nan():
-    engine, state = run_engine(YS)
+def test_improper_edge_readout_is_explicit_nan(observed_solution):
+    engine, state = observed_solution
     bad = _replace(state, g_lam=-jnp.ones_like(state.g_lam))
     mean, cov = engine.gaussian_marginals(bad)["x0"]
     assert np.isnan(mean).all() and np.isnan(cov).all()

@@ -18,6 +18,8 @@ from pathlib import Path
 import jax
 import pytest
 
+pytest_plugins = ["suite_selection"]
+
 jax.config.update("jax_enable_x64", True)  # FE parity tests need f64
 
 from cffg.core import (

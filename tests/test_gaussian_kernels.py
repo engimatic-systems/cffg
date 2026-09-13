@@ -216,7 +216,10 @@ def test_reconstruction_identity_files_initializers_and_override(registered, tmp
         from_json(text)
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize(
+    "dtype",
+    [np.float32, pytest.param(np.float64, marks=pytest.mark.pr_head)],
+)
 def test_large_flat_storage_host_jit_and_distinct_batches(registered, dtype):
     with jax.enable_x64(dtype == np.float64):
         dims = (100, 2, 1)
