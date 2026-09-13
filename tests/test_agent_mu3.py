@@ -129,9 +129,33 @@ def write_checkpoint(path, arrays: dict[str, np.ndarray]) -> None:
     np.savez(path, **arrays)
 
 
+@pytest.fixture(scope="module")
+def prepared_functional_checkpoints(tmp_path_factory) -> tuple[bytes, bytes]:
+    source = make_agent()
+    target = make_agent(key=jax.random.PRNGKey(19), seed=1)
+    directory = tmp_path_factory.mktemp("functional-checkpoints")
+    checkpoints = []
+    for name, agent in (("source", source), ("target", target)):
+        agent.act()
+        path = directory / f"{name}.npz"
+        agent.checkpoint(path)
+        checkpoints.append(path.read_bytes())
+    assert not np.array_equal(source.planning_key_cursor, target.planning_key_cursor)
+    sample_key = source.plan.arena.mu3_groups[0].name + ":samples"
+    assert not np.array_equal(
+        source.last_plan_result.state.params[sample_key],
+        target.last_plan_result.state.params[sample_key],
+    )
+    assert source.rng.bit_generator.state != target.rng.bit_generator.state
+    return checkpoints[0], checkpoints[1]
+
+
 def used_agent_snapshot(agent: RollingAgent):
     return (
         agent._planning,
+        agent.last_plan_result,
+        agent.planning_key_cursor,
+        (agent.planning_epoch, agent._planning.run_required, agent._planning.refresh_required),
         agent.last_filter_result,
         agent.belief.copy(),
         agent.counts.copy(),
@@ -142,8 +166,16 @@ def used_agent_snapshot(agent: RollingAgent):
 
 
 def assert_used_agent_unchanged(agent: RollingAgent, snapshot) -> None:
-    planning, filter_result, belief, counts, tick, episode_tick, rng = snapshot
+    (
+        planning, plan_result, key, pending, filter_result, belief, counts,
+        tick, episode_tick, rng,
+    ) = snapshot
     assert agent._planning is planning
+    assert agent.last_plan_result is plan_result
+    np.testing.assert_array_equal(agent.planning_key_cursor, key)
+    assert (
+        agent.planning_epoch, agent._planning.run_required, agent._planning.refresh_required
+    ) == pending
     assert agent.last_filter_result is filter_result
     np.testing.assert_array_equal(agent.belief, belief)
     np.testing.assert_array_equal(agent.counts, counts)
@@ -398,12 +430,10 @@ def test_agent_version_1_functional_checkpoint_migrates_runtime(tmp_path):
     ("samples", "min_ess", "refresh", "mode"),
 )
 def test_functional_checkpoint_configuration_mismatch_is_atomic(
-    tmp_path, mismatch
+    tmp_path, mismatch, prepared_functional_checkpoints
 ):
-    source = make_agent()
-    source.act()
     path = tmp_path / f"functional-{mismatch}.npz"
-    source.checkpoint(path)
+    path.write_bytes(prepared_functional_checkpoints[0])
 
     if mismatch == "samples":
         target = make_agent(samples=64)
@@ -451,12 +481,10 @@ def test_functional_checkpoint_configuration_mismatch_is_atomic(
     ),
 )
 def test_functional_checkpoint_runtime_schema_corruption_is_atomic(
-    tmp_path, corruption
+    tmp_path, corruption, prepared_functional_checkpoints
 ):
-    source = make_agent()
-    source.act()
     good = tmp_path / "functional-good.npz"
-    source.checkpoint(good)
+    good.write_bytes(prepared_functional_checkpoints[0])
     arrays = checkpoint_arrays(good)
 
     if corruption == "extra_array":
@@ -513,7 +541,10 @@ def test_functional_checkpoint_runtime_schema_corruption_is_atomic(
     path = tmp_path / f"functional-{corruption}.npz"
     write_checkpoint(path, arrays)
 
+    target_path = tmp_path / "functional-target.npz"
+    target_path.write_bytes(prepared_functional_checkpoints[1])
     target = make_agent()
+    target.restore(target_path)
     action = target.act()
     target.observe(action, 0)
     snapshot = used_agent_snapshot(target)
