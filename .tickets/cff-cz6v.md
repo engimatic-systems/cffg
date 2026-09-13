@@ -1,6 +1,6 @@
 ---
 id: cff-cz6v
-status: open
+status: closed
 deps: [cff-jilz]
 links: [cff-av5o, cff-1o72, cff-t2g3, cff-602p, cff-ahps, cff-pyy9]
 created: 2026-08-31T03:16:28Z
@@ -113,3 +113,7 @@ Final classification addition: estimate=registered-family parameter estimation.
 **2026-09-13T16:01:26Z**
 
 Cooper clarified the alpha policy: schema-current learning resume is required now, while stable legacy compatibility is deferred to cff-1xig. Acceptance criterion 6 reflects that scope. cff-enhs is complete in PR #138; cff-jilz supplies the remaining family workflow, specimen and fit-export proof in the stacked PR. No exact inference/agent snapshot capability is claimed.
+
+**2026-09-13T16:32:17Z**
+
+Epic complete under the alpha policy approved by Cooper. cff-xabn supplies semantic descriptors; cff-enhs delivers complete schema-2 storage in PR #138; cff-jilz delivers all-family resume equivalence, fit export, executable documentation and the complete representative specimen. The integrated final short suite passed 2,270 tests. Alpha loaders reject older schemas explicitly; cff-1xig owns the stable compatibility and migration contract. Exact inference, hierarchy, optimizer and agent snapshots remain outside this model-level resume epic.

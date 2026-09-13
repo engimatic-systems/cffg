@@ -1,6 +1,6 @@
 ---
 id: cff-ilms
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-09-13T15:56:39Z
@@ -43,3 +43,7 @@ This fixes the immediate blocker to cff-jilz reporting-mean equivalence. No furt
 **2026-09-13T15:58:58Z**
 
 Fixed the missing MNIW covariance-mean method and made ordinary MNIW reporting delegate to the same implementation already called by component MNIW. The analytic covariance regression distinguishes reporting from rollover, rejects undefined means, preserves float32 and literal zeros, and exercises 64 components. Focused validation: 48 tests passed, 1 slow test deselected across test_conj.py, test_hybrid_learnables.py and test_gaussian_learnables.py. The integrated cff-jilz short suite remains the final gate.
+
+**2026-09-13T16:32:17Z**
+
+Final integrated validation passed in the cff-jilz PR: 2,270 short-suite tests passed, 41 slow tests deselected. The dedicated analytic reporting tests and all-family bundle reporting equivalence pass. The correction is committed separately as 0c5fc90 and no work remains on this defect.

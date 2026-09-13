@@ -1,6 +1,6 @@
 ---
 id: cff-jilz
-status: in_progress
+status: closed
 deps: [cff-enhs, cff-ilms]
 links: []
 created: 2026-08-31T03:16:28Z
@@ -133,3 +133,7 @@ All-family workflow proof now passes for both accumulate and replace with float3
 **2026-09-13T16:03:19Z**
 
 Final focused validation after the last code/test changes: 186 tests passed, 11 slow tests deselected across bundles, resume workflows, learnables, learning schemas, recurrence checkpoints, and agent boundaries. Fitter/export coverage separately passed 16 tests; the reporting correction passed 48 conjugate/family tests; the executable README and auto/flood resume checks passed. git diff --check and tk dep cycle pass. The final integrated short suite is next.
+
+**2026-09-13T16:32:17Z**
+
+Final gate: uv run python tools/dashboard.py --run-suite passed 2,270 tests, with 41 slow tests deselected and 4 existing Gym deprecation warnings, in 1,220.16 seconds. Dashboard and runtime history refreshed. Focused bundle/learning/recurrence/agent coverage passed 186 tests; fitter/export coverage passed 16; reporting-family coverage passed 48. All five families resume exact next updates, means, rollover and installed parameter values under both cadences. Complete rSLDS specimen regenerated at tests/.artifacts/cffgz/representative-rslds.cffgz. No remaining work for this ticket; stable historical compatibility stays with cff-1xig and executing-state snapshots stay with the linked checkpoint tickets.
