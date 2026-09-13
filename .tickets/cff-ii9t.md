@@ -1,6 +1,6 @@
 ---
 id: cff-ii9t
-status: open
+status: closed
 deps: [cff-5xdy, cff-yglj, cff-3ose]
 links: [cff-jrbw, cff-sf29, cff-jby3]
 created: 2026-09-02T04:17:42Z
@@ -152,3 +152,29 @@ Authorities: existing test_engine_contracts, test_runtime_status and test_colony
 **2026-09-10T06:10:20Z**
 
 Prerequisite cff-3ose is closed and published as PR #129. Its repaired code/test source is a2c55e6; final 2,043-test gate (41 slow deselections, four existing warnings) is recorded in 29a4c9f, measured wall 1,145.615 seconds. Use the final published agent/cff-3ose-failure-diagnostics head as this ticket's branch base. The 32 new failure cases preserve truthful non-finite delta traces and infinite failed-run residuals; do not restore the old discrepancies.
+
+**2026-09-10T06:20:05Z**
+
+First extraction checkpoint: runtime_checks.StateChecks now owns host exact-support checks and immutable edge-cardinality buckets; state_is_finite is a standalone check. Engine's existing private check methods remain delegates for ordinary, exact and outer callers. Current constraint values still come from State.params. The immediate alldifferent search binds its per-constraint support list explicitly; the search algorithm and evaluation order are unchanged. The existing failure/runtime-status/constraint-data selection passed 120 tests in 29.20 seconds. New check-owner lint/format and diff checks pass; architecture and the change-path row name the owner. Iterative progress/outcomes and the shared public result finalizer are next; no final default gate has been run for this ticket yet.
+
+**2026-09-10T06:25:43Z**
+
+Additional result-field trap identified before wiring the controller: in explicit legacy-Picard GFE runs, initial non-finite/empty-support rejection returns termination_reason=NOT_RUN, while a valid zero-budget run and later failures reach the common final result and report LEGACY_PICARD. Internal outcomes distinguish initial rejection so the shared finalizer can preserve this field. A zero iteration count alone cannot distinguish these cases.
+
+**2026-09-10T06:54:39Z**
+
+Ordinary controller implementation checkpoint: iteration.py owns the soft/hard controller and shared IterationProgress assessment; Engine and real Colony batches both use run_results.finalize_iteration. Colony retains vmapped transport and active-member freezing. iteration_types.py provides immutable host-double traces, a typed reason and fixed-shape numeric facts; unchecked predicates remain distinct from false predicates. Current step/prime aliases are overlaid on ScheduleProgram at entry, and per-group callbacks explicitly bind their program. Exact/trust-region implementations remain in Engine.
+
+Evidence: the trusted pre-extraction Engine and Colony at a2c55e6 matched all public fields in 118 complete results (100 standalone configurations across ten model families and both precisions, plus 18 Colony results), with 3,818 byte-identical scalar/array comparisons. After the final per-group callback binding, the 18 Colony results were rechecked with 486 byte-identical comparisons. The existing mixed-precision mu3 scatter warning also appears in this bounded comparison; no new warning is claimed. This is baseline compatibility evidence, not an independent mathematical oracle.
+
+Existing failure/engine-contract/runtime/Colony selection: 72 passed, 3 slow deselected, 14.71 seconds. New boundary file: 16 passed in 0.96 seconds. Final boundary/schedule/CSP/GFE/mu3 selection: 82 passed, 3 slow deselected, 58.01 seconds. New modules/tests pass Ruff and formatting; Engine findings decrease 19 to 16, Colony five to three, with no new findings. New owner sizes: iteration 282, types 98, result finalizer 77, runtime checks 147; boundary tests 202. The new test file is dashboard-enrolled. Architecture/module maps and change paths describe the actual owners. The final default-suite gate is next; no current-head default result is yet claimed.
+
+**2026-09-10T07:16:58Z**
+
+Completed at code/test source 20c0367, with host checks separately extracted in a746778. The single final default suite passed 2,059 tests, zero failures, 41 slow deselections and four existing Gym warnings. Pytest took 1,142.43 seconds; measured wall time was 1,155.815 seconds. It completed 2026-09-10T07:13:55.778316+00:00 at ticket-only head ef94242. Runtime history and shared dashboard are refreshed; suggested allowance is now 1,470 seconds. The suite output was read once after the planned first deadline, and no later code/test edits supersede the result.
+
+All ordinary run-control, shared assessment, immutable outcome/fact and shared public-result responsibilities are complete. Existing state/result schemas, enum identity, PRNG use, factor/FE mathematics and successful-run behavior are preserved against the repaired baseline. Batching/freezing remain with Colony; exact/outer strategy implementation and public result classification for those paths remain cff-jrbw. Its handoff now records lazy kernel-plan selection and strategy-specific count/tag/certificate rules. PR publication reuses this gate. No significant user decision is pending. Independent agent review is unavailable and is not claimed.
+
+**2026-09-10T07:20:21Z**
+
+Published as PR #130, stacked on #129: https://github.com/engimatic-systems/cffg/pull/130. The shared HTML now describes the completed controller and the next separate exact/outer owners; validation found 67 unique IDs and 35 resolved internal anchors. Source 20c0367 and gate record bbbbccb remain authoritative. Main is unchanged and the open stack is not merged.
