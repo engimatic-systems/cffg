@@ -615,12 +615,37 @@ and leaves that component at its prior. `pg_weights` stores `eta` and
 `precision` with source-regime, stick, and augmented `[drive; offset]` axes,
 then rolls posterior means into separate weights and offsets. Both families
 remain host-side empirical-Bayes updates and reject improper or non-finite
-statistics before mutation. Versioned learnable state dictionaries preserve
-every keyed hyperparameter. Legacy multi-array checkpoints for unchanged
-families must
-name a complete posterior. Recurrence is stricter: its current checkpoint must
-also carry the structured-pair statistic manifest; unidentified D8/D9 state is
-never guessed from compatible array shapes.
+statistics before mutation.
+
+Every `LearnableSpec` now records a namespaced `semantic_identity` for its
+update and sufficient statistics. New Python declarations select the current
+family identity automatically; changing that identity changes the model's
+structure hash. `learnables.persistent_descriptors()` describes each prior and
+posterior array, its dtype and shape, and the sources and parameter targets it
+belongs to. All five registered families support this descriptor.
+
+`state_dict()` includes a scalar JSON learning manifest alongside the keyed
+posterior arrays. Use `hyperparameter_snapshot()` for numeric-only diagnostics.
+Restore validates metadata and values before changing any posterior and
+preserves the stored floating dtype. This API restores posteriors; the initial
+priors remain those supplied when constructing the destination `Learnables`.
+`load_state_dict(..., exact=False)` accepts complete posteriors for selected
+learnables and leaves other posteriors unchanged. `exact=True` requires every
+destination learnable. Missing arrays within a supplied posterior fail in
+either mode before any state changes.
+
+Pre-identity JSON declarations for `dirichlet`, `niw`, `mniw`, and
+`component_mniw` migrate to their documented `/1.0.0` identities. Their old
+bare-name, slash-key, and `v2:` checkpoints remain readable when they contain
+complete multi-array posteriors. Current declarations missing an identity,
+unknown versions, and mismatched ownership fail with the affected learnable's
+name. A standalone unversioned `pg_weights` JSON declaration or unidentified
+recurrence posterior fails with a D8/D9 migration diagnostic: compatible shapes
+cannot establish which statistics produced it. Older checkpoints with an
+explicit D9 recurrence manifest remain readable. Verified model-only bundles
+remain loadable for fixed-parameter inference, including old recurrence models.
+New learning from those models requires deliberately chosen fresh priors; do
+not relabel D8 evidence.
 
 ## Run inference
 
@@ -900,10 +925,14 @@ print(estimate(engine).summary())
 ```
 
 A `.cffgz` bundle is model-only: it contains the template and point-parameter
-blobs, not a learned posterior or resumable inference state. Existing bundles
-therefore remain loadable and execute with the current documented recurrence
-semantics. The recurrence statistic manifest belongs only to checkpoints that
-can resume learning.
+blobs, not a learned posterior or resumable inference state. Loading verifies
+the stored model hash and blob digests before returning the model, and reports
+`manifest["resumable"] is False`. Unversioned declarations, including recurrence,
+select the current learning rules without assigning provenance to old posterior
+statistics. Fixed-parameter inference remains available; new learning requires
+fresh priors. D8 and unidentified recurrence posteriors remain inadmissible for
+restoration. Checkpoint manifests bind the posterior arrays needed to resume
+learning.
 
 `.npz` is a ZIP container and does not support ordinary per-array memory
 mapping, so it is reserved for agent checkpoints rather than parameter blobs.

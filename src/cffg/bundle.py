@@ -29,13 +29,17 @@ from urllib.parse import quote
 import numpy as np
 
 from cffg.core.ir import Template
+from cffg.core.learning_identity import model_only_declarations
 from cffg.core.plates import PLATE_INDEX_TOKEN, expand_plates
 from cffg.core.serialize import (
     SCHEMA_VERSION,
-    from_json,
+    document_structure_hash,
+    from_dict,
     structure_hash,
     to_json,
 )
+from cffg.core.validate import validate
+from cffg.learning_schema import validate_learning_declarations
 
 
 class BundleError(ValueError):
@@ -111,10 +115,12 @@ def save_bundle(path: str | Path, template: Template, arrays: dict[str, np.ndarr
     # fragment blobs appear once, while per-copy blobs acquire indexed names.
     # It also validates the plate spec before the destination is opened.
     expanded = expand_plates(template)
+    validate(expanded)
     required = set(expanded.blobs)
     missing = sorted(required - set(arrays))
     if missing:
         raise BundleError(f"arrays missing for blobs: {missing}")
+    validate_learning_declarations(expanded, arrays)
 
     bundled = _rewrite_blob_paths(template)
 
@@ -147,7 +153,7 @@ def save_bundle(path: str | Path, template: Template, arrays: dict[str, np.ndarr
 
 
 def load_bundle(path: str | Path) -> tuple[Template, dict[str, np.ndarray], dict]:
-    """Read and verify a .cffgz; returns (template, arrays, manifest)."""
+    """Read a model-only .cffgz; the returned manifest reports ``resumable=False``."""
     with zipfile.ZipFile(path) as zf:
         listed_names = zf.namelist()
         if len(listed_names) != len(set(listed_names)):
@@ -161,14 +167,17 @@ def load_bundle(path: str | Path) -> tuple[Template, dict[str, np.ndarray], dict
             raise BundleError(
                 f"{path}: schema {manifest.get('schema_version')!r} != {SCHEMA_VERSION!r}"
             )
-        template = from_json(zf.read("model.json").decode())
-
-        actual_hash = structure_hash(template)
-        if actual_hash != manifest.get("structure_hash"):
+        document = json.loads(zf.read("model.json"))
+        actual_hash = document_structure_hash(document)
+        recorded_hash = manifest.get("structure_hash")
+        if recorded_hash != actual_hash:
             raise BundleError(
                 f"{path}: structure hash mismatch (manifest {manifest.get('structure_hash')!r}, "
                 f"model {actual_hash!r})"
             )
+        template = from_dict(model_only_declarations(document))
+        if not template.plates:
+            validate(template)
 
         arrays: dict[str, np.ndarray] = {}
         blob_paths = manifest.get("blob_paths")
@@ -212,4 +221,4 @@ def load_bundle(path: str | Path) -> tuple[Template, dict[str, np.ndarray], dict
                     f"{path}: blob {name!r} sha256 mismatch — corrupted or tampered"
                 )
             arrays[name] = np.load(io.BytesIO(raw), allow_pickle=False)
-    return template, arrays, manifest
+    return template, arrays, {**manifest, "resumable": False}

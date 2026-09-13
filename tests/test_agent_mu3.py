@@ -823,6 +823,16 @@ def test_bad_base_and_legacy_functional_restore_fail_before_mutation(tmp_path):
         corrupt_payload = {key: stored[key].copy() for key in stored.files}
     learn_key = next(key for key in corrupt_payload if key.startswith("learn:"))
     corrupt_payload[learn_key] = corrupt_payload[learn_key] + 1.0
+    from cffg.learning_checkpoint import array_sha256
+    from cffg.learning_schema import PERSISTENT_MANIFEST_KEY
+
+    manifest_key = f"learn:{PERSISTENT_MANIFEST_KEY}"
+    manifest = json.loads(corrupt_payload[manifest_key].item())
+    for descriptor in manifest["learnables"]:
+        for row in descriptor["arrays"]:
+            if row["role"] == "posterior":
+                row["sha256"] = array_sha256(corrupt_payload[learn_key])
+    corrupt_payload[manifest_key] = np.asarray(json.dumps(manifest))
     corrupt = tmp_path / "corrupt.npz"
     np.savez(corrupt, **corrupt_payload)
 

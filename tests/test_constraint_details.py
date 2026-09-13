@@ -10,7 +10,9 @@ from test_mu3 import _arrays, _model
 from cffg.bundle import load_bundle, save_bundle
 from cffg.compiler import compile_template
 from cffg.core import ConstraintKind, ConstraintSpec, ModelError, validate
-from cffg.core.serialize import from_json, structure_hash, to_dict, to_json
+from cffg.core.serialize import (
+    document_structure_hash, from_json, structure_hash, to_dict, to_json,
+)
 
 
 def declaration(target="obs", **detail):
@@ -205,7 +207,8 @@ def test_bundle_save_rejects_conflicts_before_creating_destination(tmp_path):
 
 
 @pytest.mark.parametrize("legacy", [False, True])
-def test_loaded_bundle_rejects_conflicts_during_structure_hash_check(tmp_path, legacy):
+@pytest.mark.parametrize("matching_hash", [False, True])
+def test_loaded_bundle_rejects_conflicting_structure(tmp_path, legacy, matching_hash):
     path = tmp_path / "conflicting-input.cffgz"
     save_bundle(path, _model(), _arrays())
     contents = _zip_contents(path)
@@ -218,10 +221,13 @@ def test_loaded_bundle_rejects_conflicts_during_structure_hash_check(tmp_path, l
         }
     )
     contents["model.json"] = json.dumps(model).encode()
+    manifest = json.loads(contents["manifest.json"])
     if legacy:
-        manifest = json.loads(contents["manifest.json"])
         del manifest["blob_paths"]
-        contents["manifest.json"] = json.dumps(manifest).encode()
+    if matching_hash:
+        manifest["structure_hash"] = document_structure_hash(model)
+    contents["manifest.json"] = json.dumps(manifest).encode()
     _write_zip(path, contents)
-    with pytest.raises(ValueError, match="conflicting.*substituted_role"):
+    message = "conflicting.*substituted_role" if matching_hash else "structure hash mismatch"
+    with pytest.raises(ValueError, match=message):
         load_bundle(path)

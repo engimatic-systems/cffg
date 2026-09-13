@@ -7,6 +7,8 @@ from collections.abc import Mapping, Sequence
 import numpy as np
 
 from cffg import conj
+from cffg.core.learning_identity import LEARNING_IDENTITIES
+from cffg.learning_schema import PersistentParameter
 from cffg.gaussian_learning import (
     _copy_params,
     _finite_stat,
@@ -37,6 +39,18 @@ class ComponentMNIWFamily:
     name = "component_mniw"
     readout = "gaussian_node_stats"
     _PARAMS = {"m", "lam", "psi", "nu"}
+    semantic_identity = LEARNING_IDENTITIES["component_mniw"]
+    parameter_forms = ("expected",)
+
+    def persistent_parameters(self, role_shapes):
+        components, output, inputs = role_shapes["matrix"]
+        augmented = inputs + 1
+        return (
+            PersistentParameter("m", (components, output, augmented)),
+            PersistentParameter("lam", (components, augmented, augmented)),
+            PersistentParameter("psi", (components, output, output)),
+            PersistentParameter("nu", (components,)),
+        )
 
     def check(self, learnable, ftype, shapes, roles) -> None:
         if ftype != "gaussian_mixture_linear":
@@ -235,6 +249,16 @@ class PGWeightsFamily:
     name = "pg_weights"
     readout = "recurrence_weight_stats"
     _PARAMS = {"eta", "precision"}
+    semantic_identity = LEARNING_IDENTITIES["pg_weights"]
+    parameter_forms = ("expected",)
+
+    def persistent_parameters(self, role_shapes):
+        regimes, sticks, dimension = role_shapes["weights"]
+        augmented = dimension + 1
+        return (
+            PersistentParameter("eta", (regimes, sticks, augmented)),
+            PersistentParameter("precision", (regimes, sticks, augmented, augmented)),
+        )
 
     def check(self, learnable, ftype, shapes, roles) -> None:
         if ftype != "recurrence_link":

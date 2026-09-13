@@ -174,6 +174,10 @@ def test_top_level_facade_reexports_only_canonical_owners():
         "GaussianConditioning": cffg.kernel_bindings.GaussianConditioning,
         "HostileInputs": cffg.kernels.HostileInputs,
         "ParameterSpec": cffg.kernel_bindings.ParameterSpec,
+        "PersistentArray": cffg.learning_schema.PersistentArray,
+        "PersistentParameter": cffg.learning_schema.PersistentParameter,
+        "PersistentStateDescriptor": cffg.learning_schema.PersistentStateDescriptor,
+        "PersistentTarget": cffg.learning_schema.PersistentTarget,
         "RollingAgent": CanonicalRollingAgent,
         "RunStatus": CanonicalRunStatus,
         "build_gridworld": canonical_build_gridworld,
@@ -181,6 +185,7 @@ def test_top_level_facade_reexports_only_canonical_owners():
         "load_bundle": canonical_load_bundle,
         "save_bundle": canonical_save_bundle,
         "register_kernel": cffg.kernels.register_kernel,
+        "resolve_persistent_state": cffg.learning_schema.resolve_persistent_state,
         "set_params": canonical_set_params,
     }
     assert cffg.__all__ == list(expected)

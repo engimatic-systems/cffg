@@ -149,6 +149,7 @@ def test_writes_representative_rslds_bundle_for_inspection():
             "blob_paths",
             "created",
             "generator",
+            "resumable",
         }
         assert manifest["structure_hash"] == structure_hash(loaded)
         assert set(loaded.learnables) == {

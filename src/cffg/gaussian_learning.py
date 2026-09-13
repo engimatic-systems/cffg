@@ -7,6 +7,8 @@ from collections.abc import Mapping
 import numpy as np
 
 from cffg import conj
+from cffg.core.learning_identity import LEARNING_IDENTITIES
+from cffg.learning_schema import PersistentParameter
 
 
 def _copy_params(params: Mapping[str, object]) -> dict[str, np.ndarray]:
@@ -54,6 +56,16 @@ class NIWFamily:
     name = "niw"
     readout = "gaussian_node_stats"
     _PARAMS = {"mu", "kappa", "psi", "nu"}
+    semantic_identity = LEARNING_IDENTITIES["niw"]
+    parameter_forms = ("expected",)
+
+    def persistent_parameters(self, role_shapes):
+        return (
+            PersistentParameter("mu", role_shapes["mean"]),
+            PersistentParameter("kappa", ()),
+            PersistentParameter("psi", role_shapes["cov"]),
+            PersistentParameter("nu", ()),
+        )
 
     def check(self, learnable, ftype, shapes, roles) -> None:
         if ftype != "gaussian":
@@ -159,6 +171,18 @@ class MNIWFamily:
     name = "mniw"
     readout = "gaussian_node_stats"
     _PARAMS = {"m", "lam", "psi", "nu"}
+    semantic_identity = LEARNING_IDENTITIES["mniw"]
+    parameter_forms = ("expected",)
+
+    def persistent_parameters(self, role_shapes):
+        output, inputs = role_shapes["matrix"]
+        augmented = inputs + 1
+        return (
+            PersistentParameter("m", (output, augmented)),
+            PersistentParameter("lam", (augmented, augmented)),
+            PersistentParameter("psi", (output, output)),
+            PersistentParameter("nu", ()),
+        )
 
     def check(self, learnable, ftype, shapes, roles) -> None:
         if ftype != "gaussian_linear":

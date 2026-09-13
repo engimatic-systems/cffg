@@ -25,7 +25,7 @@ from cffg.core.serialize import from_json, to_dict, to_json
 from cffg.core.validate import ModelError
 from cffg.engine import Engine, RunStatus, _replace
 from cffg.learn import Learnables
-from cffg.learning_checkpoint import CHECKPOINT_MANIFEST_KEY
+from cffg.learning_schema import PERSISTENT_MANIFEST_KEY
 from cffg.models.rslds import rslds, vague_rslds_learning
 from cffg.models.rslds_fit import vague_rslds_fit_priors
 
@@ -532,12 +532,12 @@ def test_declared_rslds_learning_is_independent_of_every_factor_name():
     for name in learned[0]:
         np.testing.assert_allclose(learned[0][name], learned[1][name], atol=1e-10)
     assert (
-        str(checkpoints[0][CHECKPOINT_MANIFEST_KEY])
-        != str(checkpoints[1][CHECKPOINT_MANIFEST_KEY])
+        str(checkpoints[0][PERSISTENT_MANIFEST_KEY])
+        != str(checkpoints[1][PERSISTENT_MANIFEST_KEY])
     )
 
     restored = Learnables(engines[0], priors=priors)
-    with pytest.raises(ValueError, match="factor/source ownership"):
+    with pytest.raises(ValueError, match="ownership"):
         restored.load_state_dict(checkpoints[1])
     restored.load_state_dict(checkpoints[0])
     for name, value in checkpoints[0].items():

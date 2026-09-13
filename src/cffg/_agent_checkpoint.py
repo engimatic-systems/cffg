@@ -21,6 +21,8 @@ from cffg.compiler import _log_of, _resolve_arrays
 from cffg.core.ir import AgentSpec, Template
 from cffg.engine import _replace
 from cffg.learn import Learnables
+from cffg.learning_checkpoint import CHECKPOINT_MANIFEST_KEY
+from cffg.learning_schema import PERSISTENT_MANIFEST_KEY
 
 if TYPE_CHECKING:
     from cffg.agent import RollingAgent
@@ -306,7 +308,7 @@ def _validate_versioned_envelope(
         if agent._has_legacy_belief
         else {f"belief:{name}" for name in agent.beliefs}
     )
-    learn_fields = {f"learn:{name}" for name in agent.learnables.state_dict()}
+    learn_fields = _learnable_inventory(agent, fields)
     goal_fields = {f"goal:prior:{name}" for name in agent.goal_priors}
     pending_fields = {f"goal:pending:{name}" for name in agent.goal_priors}
     required = _CORE_FIELDS | belief_fields | learn_fields | goal_fields
@@ -330,7 +332,10 @@ def _validate_versioned_envelope(
         actual = _checkpoint_string(
             data[f"{label}_structure_hash"], f"{label}_structure_hash"
         )
-        if actual != expected:
+        legacy = getattr(agent, f"_legacy_{label}_structure_hash")
+        if actual != expected and not (
+            f"learn:{PERSISTENT_MANIFEST_KEY}" not in fields and actual == legacy
+        ):
             raise ValueError(
                 f"checkpoint {label} structure mismatch: {actual!r} != {expected!r}"
             )
@@ -448,7 +453,7 @@ def _validate_agent_v1_envelope(
         if agent._has_legacy_belief
         else {f"belief:{name}" for name in agent.beliefs}
     )
-    learn_fields = {f"learn:{name}" for name in agent.learnables.state_dict()}
+    learn_fields = _learnable_inventory(agent, fields)
     goal_fields = {f"goal:prior:{name}" for name in agent.goal_priors}
     pending_fields = {f"goal:pending:{name}" for name in agent.goal_priors}
     required = _AGENT_V1_CORE_FIELDS | belief_fields | learn_fields | goal_fields
@@ -528,6 +533,14 @@ def _restore_beliefs(
         )
         for name, value in restored.items()
     }
+
+
+def _learnable_inventory(agent, fields):
+    """Require all posterior arrays and accept metadata from either checkpoint era."""
+    required = {f"learn:{name}" for name in agent.learnables.hyperparameter_snapshot()}
+    return required | (fields & {
+        f"learn:{PERSISTENT_MANIFEST_KEY}", f"learn:{CHECKPOINT_MANIFEST_KEY}",
+    })
 
 
 def _restore_learnable_fields(
