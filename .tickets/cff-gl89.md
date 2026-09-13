@@ -1,6 +1,6 @@
 ---
 id: cff-gl89
-status: open
+status: closed
 deps: [cff-jrbw]
 links: [cff-3ola, cff-cj5h]
 created: 2026-09-02T04:02:01Z
@@ -133,3 +133,27 @@ Local-term inventory from baaad19 (read once, no numerical work while jrbw gate 
 **2026-09-10T08:04:58Z**
 
 Prerequisite cff-jrbw is closed and published as PR #131. Start from its final published agent/cff-jrbw-run-strategies head after an ff-only pull. Source baaad19 passed the final 2,081-test gate (41 slow deselections, four existing warnings), recorded at aeaf18c; wall 1,165.949 seconds. All three controllers now consume injected evaluators and run_results owns public statuses. Local-term inventory and compatibility-alias details are in the preceding handoff; no design decision is pending.
+
+**2026-09-10T08:07:08Z**
+
+Starting from verified PR #131 head 3dad32b after an ff-only pull. Applicable change paths: New factor or rule family (declared and specialized local-energy owners) and Runtime numerical or status invariant (objective gates and controller injection). Paired surfaces: host Engine.bfe versus raw fused/JIT schedule energy; ordinary/outer/exact controller callbacks; flooding/scheduled equivalent states; direct/vmap raw evaluation; same-structure instances with distinct current params, observations, masks and fixed functional snapshots; decoded assignment versus belief energy. New IR/checkpoint fields, action selection and unsupported solver batching are N/A. Preserve local-addition order, trace-time legacy EF callback lookup, one shared-goal term and one KL per functional parameter group. Plan: ledger.py owns objective assembly/public host gates and decoded scoring; ledger_terms.py owns explicit existing specialized/local-energy adapters; Engine retains compatibility aliases and supplies current evaluator/check/readiness handles. No new formula, approximation, decoder, diagnostic output or benchmark target.
+
+**2026-09-10T08:16:47Z**
+
+Extraction implemented in ledger.py (ObjectiveLedger, raw factory and decoded-assignment scoring) and ledger_terms.py (six existing local adapters plus explicit Dirichlet, constraint, GFE/shared-parameter and transition-GFE additions). Accumulator-threading preserves the original addition order. Engine.bfe/objective are compatibility delegates; engine._make_bfe remains the same factory alias used by schedule tests. The host gate order and current evaluator/params/readiness/support handles are protected by 17 new tests, including a two-slice fixed-functional KL perturbation in both precisions with updates forbidden. Focused results so far: 116 schedule/runtime/GFE/shared-goal/constraint tests passed in 71.55 seconds; 17 new tests passed in 3.93 seconds; the broader family selection reports 105 passed, four slow deselections in 114.39 seconds (process exit confirmation pending). An AST comparison against 3dad32b passed ten body checks: six local adapters, ordered assembly after helper inlining, host gates, decoded scoring and constraint predicate. Numerical old/new objective characterization and one final short suite are next. No independent agent review is claimed.
+
+**2026-09-10T08:19:36Z**
+
+Numerical characterization passed against PR #131 source 3dad32b: 17 models, 204 state snapshots and 1,918 raw-byte-identical comparisons. Cases cover initial, bound, unbound and three updated states in both call-time precisions; raw, compiled, host and two-instance jit-vmap totals; six local adapters; and supported discrete assignment scoring. Families include Gaussian/EF, mixture, hybrid GFE, recurrence/tree-loop, ordinary/transition/functional GFE, shared learned goals, precision, learned parameter edges, constraints and compiled plates. Script /tmp/cffg-ledger-parity.py. All 105 broader focused cases exited successfully (four slow deselections, 114.39 seconds). Final code/test source 90c58b1; c38ab34 is next-ticket text only. Starting the one required final short suite with cached measured wall 1,165.949 seconds and allowance 1,470 seconds. First output check after 20 minutes; no interim suite polling. No new scientific oracle, performance claim or independent review is implied.
+
+**2026-09-10T08:31:08Z**
+
+Documentation-only navigation follow-up while the unchanged final gate runs: canonical architecture and derivation references now name ledger.make_belief_energy directly; the engine._make_bfe compatibility alias remains documented. D7 names OuterTrustRegionStrategy above outer.py and Engine.run as selector; D9 names the already-extracted synchronous and schedule owners. Mathematical expressions, authority tests and runtime source are unchanged. This prevents future work from searching removed monolithic implementations.
+
+**2026-09-10T08:40:23Z**
+
+Final gate passed at code/test source 90c58b1, with documentation/ticket-only head 095ce57 recorded by the dashboard: 2,098 passed, 41 opt-in slow deselections, four existing Gym warnings; pytest 1,137.81 seconds, measured wall 1,151.159 seconds, completed 2026-09-10T08:38:47.641525+00:00. The suite was read exactly once at 08:39:55 UTC, after the planned 20-minute deadline. Runtime history and shared dashboard are refreshed. Objective owners are 168 and 287 lines; Engine is 343 lines shorter. Acceptance criteria are met; current formulas, summation order, shared ownership, aliases, host gates and public behavior are preserved. Next: publish the stacked PR and update the shared architecture page, then start cff-3ola from the final published head. Its source inventory, parameter-state exception and typed-view guidance are recorded in that ticket. No independent review or speedup claim.
+
+**2026-09-10T08:41:56Z**
+
+Published as PR #132 against PR #131. Shared architecture HTML now explains the separate objective owner, unchanged shared-term accounting and final 2,098-test gate, with readout extraction next. Page validation: 69 unique IDs and 35 resolved internal anchors. Source 90c58b1; gate record daaff2f. Main is unchanged; no stack merge was performed.
