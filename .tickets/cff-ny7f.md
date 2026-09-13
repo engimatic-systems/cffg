@@ -178,3 +178,7 @@ Next in the authorized architecture chain is P1 cff-jby3: remove shared hard-con
 **2026-09-10T02:32:59Z**
 
 Published PR #124: https://github.com/engimatic-systems/cffg/pull/124, based on PR #123 (agent/cff-yglj-colony-initial-failures). Final gate and closure are recorded at a7e87c7; no source/test changes since the passing gate. The shared HTML now links #124 and reports 1,894 passing tests and 1,062.672 seconds wall time. Current code/test source is b84560e. Continue with ready P1 cff-jby3 after updating this published branch as the intended base; no stack merge is included.
+
+**2026-09-10T05:20:10Z**
+
+Evidence wording correction: the historical 2,336-array comparison used np.array_equal(..., equal_nan=True), not raw-byte comparison. Its result is exact numerical equality with matching NaNs treated as equal; it does not distinguish signed zeros or NaN payload bits. The PR description and shared HTML now say this precisely. No numerical discrepancy was found, and no code or test result changed.

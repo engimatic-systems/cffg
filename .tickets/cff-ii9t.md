@@ -1,7 +1,7 @@
 ---
 id: cff-ii9t
 status: open
-deps: [cff-5xdy, cff-yglj]
+deps: [cff-5xdy, cff-yglj, cff-3ose]
 links: [cff-jrbw, cff-sf29, cff-jby3]
 created: 2026-09-02T04:17:42Z
 type: chore
@@ -117,3 +117,19 @@ The cff-sf29 inventory found and directly reproduced the initial-state result di
 **2026-09-10T00:49:06Z**
 
 cff-yglj is now closed. Source 1308688 repairs initial Colony result facts and freezes rejected inputs across priming; its final gate passed 1,843 tests with 41 slow deselections and four existing warnings, recorded in e30b330. tests/test_colony_failures.py contains 25 reference cases for the controller extraction. Preserve this corrected behavior, not the pre-repair discrepancy recorded at 76251b4. The original valid-state characterization remains unchanged.
+
+**2026-09-10T05:14:04Z**
+
+Pre-controller probe at cf5cdb6 confirmed a second duplicated-result mismatch: after FE=(1,2), later inner/FE/State/support failure yields Colony residual=1 while Engine reports infinity, in both f32 and f64. Overall failure statuses already agree, and healthy peers continue. Repair is isolated in cff-3ose, now an explicit prerequisite. Do not normalize this discrepancy inside the extraction commit.
+
+Legend: prerequisite --> dependent
+[x] cff-7kfk
+  --> [~] cff-5xdy (final gate running)
+        --> [ ] cff-3ose (late Colony residual repair)
+              --> [ ] cff-ii9t (shared iterative policy/result owner)
+                    --> [ ] cff-jrbw --> cff-gl89 --> cff-3ola --> cff-ws3c
+The existing direct lifecycle prerequisite remains; tk dependency records are authoritative.
+
+**2026-09-10T05:17:25Z**
+
+The full late-failure result comparison also found Engine masking a NaN message delta as 0 because Python max begins with the finite mu3 delta. Colony may instead preserve that NaN, or mask one from a later representation. Both already report overall divergence. cff-3ose was refined before implementation to repair non-finite delta traces as well as stale residuals; preserve its corrected diagnostic baseline during extraction.

@@ -2,7 +2,7 @@
 id: cff-yglj
 status: closed
 deps: [cff-sf29]
-links: [cff-sf29, cff-wbhu]
+links: [cff-sf29, cff-wbhu, cff-3ose]
 created: 2026-09-10T00:07:26Z
 type: bug
 priority: 2

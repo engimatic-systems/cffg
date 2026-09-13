@@ -8,7 +8,6 @@ for trust-region step acceptance.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
 from typing import Callable, NamedTuple
 
 import jax
@@ -17,23 +16,9 @@ import numpy as np
 
 from cffg import efrules
 from cffg.compiled import NEG, Arena
-
-
-class OuterTerminationReason(str, Enum):
-    """Machine-readable detail beneath the public inference status."""
-
-    NOT_RUN = "not_run"
-    ROOT_CONVERGED = "root_converged"
-    STATIONARY_NONROOT = "stationary_nonroot"
-    INNER_FAILURE = "inner_failure"
-    NONFINITE_EVALUATION = "nonfinite_evaluation"
-    INFEASIBLE = "infeasible"
-    SUPPORT_RESTART_EXHAUSTED = "support_restart_exhausted"
-    STAGNATION = "stagnation"
-    TRUST_REGION_COLLAPSED = "trust_region_collapsed"
-    ITERATION_BUDGET = "iteration_budget"
-    LINEAR_SOLVE_BUDGET = "linear_solve_budget"
-    LEGACY_PICARD = "legacy_picard"
+from cffg.runtime_types import (
+    OuterTerminationReason as OuterTerminationReason,  # noqa: PLC0414
+)
 
 
 class OuterArrays(NamedTuple):
