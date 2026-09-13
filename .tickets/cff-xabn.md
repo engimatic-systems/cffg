@@ -1,6 +1,6 @@
 ---
 id: cff-xabn
-status: in_progress
+status: closed
 deps: [cff-6tek, cff-s6yy]
 links: []
 created: 2026-08-31T03:16:28Z
@@ -189,3 +189,7 @@ The first integrated short-suite run completed with 2206 passed, 2 failed, 41 sl
 **2026-09-13T03:15:50Z**
 
 Focused validation after the final bundle-validation correction passed: 134 passed, 1 slow test deselected in 10.45 seconds across constraint details, learning schemas, recurrence checkpoints, bundles, serialization, and plates. Both integrity/constraint orderings are tested, and the existing nested-plate BundleError contract remains unchanged. The failed full-suite measurement is retained honestly in runtime history pending the final rerun; the next wait budget is 1500 seconds.
+
+**2026-09-13T03:41:40Z**
+
+Final integration gate passed at b01edae after the last code/test change: uv run python tools/dashboard.py --run-suite, 2210 passed, 41 slow tests deselected, 0 failures (1149.60 seconds pytest; 1163.362 measured wall seconds). The full 1500-second wait budget elapsed before inspecting the result. Dashboard and runtime history are refreshed; log: /tmp/cffg-pr137-integrated-suite-final.log. Earlier focused integration checks passed295 tests; the bundle/constraint correction passed134 focused tests. PR117–134 are merged with the final reviewed stack tree preserved. PR137 now combines the extracted compiler owner with learning schemas and retains both migration fixes plus post-hash constraint validation. Implementation and validation are complete; publishing the validated branch and merging PR137 is the final landing step authorized by Cooper.
