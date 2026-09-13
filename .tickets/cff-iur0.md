@@ -1,6 +1,6 @@
 ---
 id: cff-iur0
-status: in_progress
+status: closed
 deps: [cff-s6yy]
 links: []
 created: 2026-08-31T03:47:35Z
@@ -189,3 +189,9 @@ No parallel implementation root is ready: cff-ulbz waits on the mathematical
 decision, and cff-x0if waits on both branches plus future implementation
 dependencies. Built from tk dep tree --full, tk ready, tk blocked.
 tk dep cycle: no cycles.
+
+**2026-09-13T18:42:45Z**
+
+Final validation and landing: uv run python tools/dashboard.py --run-suite passed once after the final code edit: 2,295 passed, 41 deselected, 4 dependency deprecation warnings, 1,220.64 seconds pytest time. The required 1,560-second quiet wait was honored. Dashboard refreshed at ~/agent-share/cffg-tests.html; runtime history updated. Focused checks passed 57 tests before the full run. tk dep cycle reports no cycles; git diff --check is clean.
+
+Closing under acceptance criterion 11's explicit negative outcome. No larger construction or production implementation is claimed accepted. D11.15's independently integrated source-mean and variance counterexamples falsify the separate-boundary repair. cff-ocxl is the ready next mathematical gate after this closure; cff-ulbz remains conditional on its decision; cff-x0if is blocked on both and must receive future implementation dependencies before qualification. No unanswered user decision is needed for this bounded negative-result PR.
