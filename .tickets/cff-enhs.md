@@ -1,6 +1,6 @@
 ---
 id: cff-enhs
-status: in_progress
+status: closed
 deps: [cff-xabn, cff-yoxz]
 links: []
 created: 2026-08-31T03:16:28Z
@@ -131,3 +131,7 @@ Cooper clarified the alpha policy: only schema-current bundles must load in this
 **2026-09-13T15:24:35Z**
 
 Implementation complete for the alpha contract. Added schema-2 LoadedBundle, complete family-independent prior/posterior inventories, point-array validation, coordinated snapshot capture, and atomic verified publication. Updated public docs and save callers; unsupported schema-1 archives now fail explicitly. Focused validation after the final code change: 148 passed, 1 slow test deselected across bundle, learning schema, recurrence checkpoint, agent specification, constraint validation, and facade checks. Earlier agent/learnable/consumer coverage also passed after compatibility fixes. Full short-suite gate is next.
+
+**2026-09-13T15:52:34Z**
+
+Final validation: uv run python tools/dashboard.py --run-suite passed 2,245 tests, with 41 slow tests deselected and 4 existing Gym deprecation warnings, in 1,163.36 seconds. Dashboard and runtime history refreshed. Focused final set: 148 passed. git diff --check and tk dep cycle passed. Archive mechanics and current-schema refusal are complete; cff-jilz owns the all-family consumer workflow, full specimen inventory proof, and export handoff. Alpha compatibility is deliberately deferred to cff-1xig.
