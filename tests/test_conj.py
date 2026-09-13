@@ -325,3 +325,34 @@ def test_trial_loop_recovers_lgssm_parameters():
     assert abs(a_cur[0, 0] - a_true) < 0.05
     assert abs(b_cur[0]) < 0.05
     assert abs(q_cur[0, 0] - q_true) < 0.03
+
+
+@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+def test_mniw_reporting_covariance_and_64_component_means(dtype):
+    from dataclasses import replace
+    from cffg.learn import FAMILIES
+
+    posterior = conj.MNIW(
+        m=np.zeros((2, 3), dtype=dtype),
+        lam=np.eye(3, dtype=dtype),
+        psi=np.diag(np.array([2.0, 4.0], dtype=dtype)),
+        nu=5.0,
+    )
+    expected = np.diag(np.array([1.0, 2.0], dtype=dtype))
+    np.testing.assert_array_equal(posterior.mean_cov(), expected)
+    assert posterior.mean_cov().dtype == dtype
+    assert not np.array_equal(posterior.rollover()[2], expected)
+    for family_name, given in (("mniw", posterior), ("component_mniw", (posterior,) * 64)):
+        family = FAMILIES[family_name]
+        params = family.as_params(given)
+        report = family.mean(params, "gaussian_linear" if family_name == "mniw" else "gaussian_mixture_linear")
+        want = expected if family_name == "mniw" else np.broadcast_to(expected, (64, 2, 2))
+        np.testing.assert_array_equal(report["cov"], want)
+        assert report["cov"].dtype == dtype
+        assert np.all(report["matrix"] == 0)
+        assert np.all(report["offset"] == 0)
+        params["nu"] = np.full_like(params["nu"], 3.0)
+        with pytest.raises(ValueError, match="posterior-mean covariance undefined"):
+            family.mean(params, "unused")
+    with pytest.raises(ValueError, match="posterior-mean covariance undefined"):
+        replace(posterior, nu=2.0).mean_cov()

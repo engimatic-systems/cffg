@@ -137,7 +137,11 @@ def test_writes_representative_rslds_bundle_for_inspection():
         learning = Learnables(Engine(compile_template(template, arrays=arrays)),
                              priors=vague_rslds_fit_priors(3, 2, 3).learning_priors())
         save_bundle(pending, template, arrays, learnables=learning)
-        loaded, loaded_arrays, manifest = load_bundle(pending)
+        bundle = load_bundle(pending)
+        loaded, loaded_arrays, manifest = bundle
+        assert bundle.resumable
+        assert manifest["schema_version"] == BUNDLE_SCHEMA_VERSION
+        assert bundle.learnables.persistent_descriptors() == learning.persistent_descriptors()
         with zipfile.ZipFile(pending) as zf:
             members = set(zf.namelist())
 
@@ -158,6 +162,13 @@ def test_writes_representative_rslds_bundle_for_inspection():
             "generator",
             "resumable",
         }
+        records = manifest["learning"]["learnables"]
+        assert len(records) == 4
+        assert sum(len(record["arrays"]) for record in records) == 22
+        for record in records:
+            assert {row["role"] for row in record["arrays"]} == {"prior", "posterior"}
+            assert record["semantic_identity"] == loaded.learnables[record["name"]].semantic_identity
+            assert {target["blob"] for target in record["targets"]} == set(loaded.learnables[record["name"]].blobs)
         assert manifest["structure_hash"] == structure_hash(loaded)
         assert set(loaded.learnables) == {
             "initial_regime",

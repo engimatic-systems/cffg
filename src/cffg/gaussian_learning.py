@@ -272,14 +272,10 @@ class MNIWFamily:
 
     def mean(self, params, ftype) -> dict[str, np.ndarray]:
         posterior = self._posterior("posterior", params)
-        output_dim = posterior.psi.shape[0]
-        denominator = posterior.nu - output_dim - 1
-        if denominator <= 0:
-            raise ValueError("posterior-mean covariance undefined for nu <= d+1")
         return {
             "matrix": posterior.m[:, :-1].copy(),
             "offset": posterior.m[:, -1].copy(),
-            "cov": posterior.psi / denominator,
+            "cov": posterior.mean_cov(),
         }
 
     def as_params(self, prior) -> dict[str, np.ndarray]:
