@@ -1,6 +1,6 @@
 ---
 id: cff-xabn
-status: in_progress
+status: closed
 deps: [cff-6tek, cff-s6yy]
 links: []
 created: 2026-08-31T03:16:28Z
@@ -133,3 +133,11 @@ Final API audit updated the canonical-export test and the renamed-recurrence che
 **2026-09-13T00:28:47Z**
 
 The first completed short suite reported 1734 passed, 3 failed, 41 deselected (989.07 s pytest; 1001.601 s measured wall time). All three failures were compiler-contract assertions pinning the pre-identity learning/agent structure hashes. Updated exactly those two expected hashes; schedule fingerprints and execution-layout expectations are unchanged. All 44 compiler-contract tests now pass in 2.08 s. A fresh final short-suite run will replace the failing dashboard result; no focused result is being represented as a full-suite pass.
+
+**2026-09-13T00:46:09Z**
+
+Completed on agent/cff-xabn-retry. Implementation commit: 534d783. All five registered families now declare versioned semantics and complete persistent array schemas. JSON/hash, compiler plans, scoped declarations, immutable-prior/current-posterior descriptors, generic checkpoint validation, legacy D9 and unchanged-family migration, agent envelopes, bundle pre-write validation, and public exports agree. Canonical docs describe migration and storage scope.
+
+Final gate after the last test edit: uv run python tools/dashboard.py --run-suite passed 1737 tests, with 41 slow tests deselected and 4 existing dependency deprecation warnings. Pytest took 985.55 s; measured wall time was 998.071 s. The runtime history and ~/agent-share/cffg-tests.html are refreshed with zero failures. Log: /tmp/cff-xabn-short-suite-pass.log. Focused compiler-contract validation passed all 44 tests; schedule fingerprints and execution-layout assertions remain unchanged. No numerical rules changed, so slow behavioral runs were not needed.
+
+No work remains for cff-xabn. Downstream cff-enhs owns complete CFFGZ learning-state storage/restoration. Discovered cff-b2fz owns compact-plate composition; until then, expand_plates before scoping or merging. The current flat checkpoint API still restores posteriors while retaining destination immutable priors, as documented. Main was not changed; Cooper requested this existing branch.
