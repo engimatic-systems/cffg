@@ -16,12 +16,14 @@ accounting — a harder-cohort benchmark variant is part of the later stage.
 """
 
 import numpy as np
+import pytest
 
 from cffg.benchmarks.glucose import ADULTS, run_cohort, run_patient
 
 FDA_TIR_BOUND = 0.70
 
 
+@pytest.mark.pr_head
 def test_reactive_controller_clears_fda_bound():
     """Full 10-adult cohort, 24 h, unannounced meals (~35 s)."""
     result = run_cohort("reactive")

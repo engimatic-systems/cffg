@@ -31,7 +31,7 @@ The implementer may choose another sound method. Audit parametrization, costly i
 
 ## Future work
 
-Create separate linked tickets for expensive runtime or compiler optimizations that are not needed to establish the test protocol. Keep numerical correctness obligations and the separate PR heads in the existing CFFGZ chain intact.
+cff-sten will examine shared preparation for constraint checkpoint migration and rejection tests, preserving their distinct formats and failure mechanisms. Keep numerical correctness obligations and the separate PR heads in the existing CFFGZ chain intact.
 
 ## Definitions
 
@@ -58,3 +58,7 @@ Recorded timings came from dashboard commit 48dbc8b (the CFFGZ stack), whereas t
 **2026-09-13T16:53:38Z**
 
 Implementation validation: all 17 checkpoint rejection mechanisms remain. Two independently prepared checkpoints have different particle values, JAX cursors and NumPy RNG states; only immutable archive bytes are shared, and every test gets a fresh target and array dictionaries. Atomicity checks additionally snapshot plan-result identity, cursor, epoch and pending flags. Focused checkpoint validation: 25 passed, 14 deselected in 60.52 s; the changed group consumed about 33.84 s including shared preparation, compared with 183.16 s in the historical dashboard (not a controlled same-head comparison). Shared read-only Kalman solve keeps all independent assertions: 11 passed in 15.46 s. Metadata/dashboard checks: 25 passed in 0.99 s. Collection: developer 2218 selected / 45 deselected; PR gate 2222 selected / 41 deselected. Final validation will run the required PR gate once and extract case durations from that same run; there is no second overlapping suite just for timing.
+
+**2026-09-13T16:55:10Z**
+
+Final review found and fixed a collection-provenance gap: overriding python_functions could omit PR regressions while retaining every module. Explicit discovery overrides and alternate config files now mark reports partial. Real subprocess cases cover the normal gate, developer selection, keyword filtering, file narrowing, explicit deselection, last-failed selection, discovery overrides and alternate config. Final focused metadata/dashboard validation: 27 passed in 1.28 s. Deferred prepared constraint checkpoint reuse is tracked in cff-sten; tk dep cycle passed.

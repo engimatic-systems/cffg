@@ -600,6 +600,7 @@ def test_inner_retry_schedule_retries_finite_exhaustion():
     ]
 
 
+@pytest.mark.pr_head
 def test_float32_fitter_survives_tenfold_horizon():
     result = _fit(
         _observations(80),
@@ -617,6 +618,7 @@ def test_float32_fitter_survives_tenfold_horizon():
     assert all(np.all(np.isfinite(value)) for value in result.parameters.values())
 
 
+@pytest.mark.pr_head
 def test_structured_nascar_coordinates_avoid_the_legacy_finite_cycle():
     observations = _nascar_observations()
     key = jax.random.split(

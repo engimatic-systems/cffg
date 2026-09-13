@@ -39,11 +39,12 @@ dev = [
 simglucose = { git = "https://github.com/jxx123/simglucose" }
 
 [tool.pytest.ini_options]
-addopts = "-m 'not slow'"
+addopts = "-m 'not slow and not pr_head'"
 filterwarnings = [
     "ignore::SyntaxWarning",
     "ignore:pkg_resources is deprecated:UserWarning",
 ]
 markers = [
+    "pr_head: stable expensive regression required at each independent PR head",
     "slow: long-running behavioral, multi-trial, or globalization regression",
 ]

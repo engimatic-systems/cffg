@@ -91,11 +91,34 @@ This project will span many context windows. The rule that makes that survivable
   `docs/ARCHITECTURE.md` change-path index and lists each duplicated execution
   surface affected; checked pairs that do not apply are marked N/A.
 - **During implementation**, run focused test files as often as useful for the
-  changed component.
+  changed component. Plain `uv run pytest` runs the developer selection,
+  `not slow and not pr_head`. Stable expensive regressions carry
+  `@pytest.mark.pr_head` and run at every PR head. When changing their behavior,
+  include them in focused iteration with
+  `uv run pytest tests/test_component.py -m 'not slow'`. A developer or focused
+  result does not satisfy the PR gate.
+- **Test coverage and cost**: each test and parameter axis earns its place by
+  exercising a distinct invariant, failure mechanism, or execution surface.
+  Keep cheap useful combinations; replace redundant expensive Cartesian
+  products with explicit representative cases. Host/JIT, flooding/scheduled,
+  single-instance/`vmap`, and checkpoint-version checks remain distinct where
+  they exercise independent implementations. Keep representative numerical
+  contract cases in the developer suite: sparse support, improper messages,
+  float32, and uncomfortable scale. Defer expensive end-to-end repetitions to
+  `pr_head` without removing their direct numerical coverage.
+  Reuse an expensive deterministic setup when several assertions need the
+  same solved model, with immutable results or fresh copies so tests cannot
+  affect each other. Added seeds, sizes, horizons, and parameter combinations
+  need an additional claim; more test instances alone are not more coverage.
+  Measure expensive additions and the largest contributors using durations
+  from the required runs, record the coverage gained and cost in the ticket,
+  and review growth before adding more. Do not add a separate suite run just
+  to measure cost or impose arbitrary universal time limits.
 - **Final validation for code outside the isolated-tooling exception below**
-  requires one passing short-suite run after the final code change.
-  One passing suite at the proposed PR head is
-  sufficient to open or update a PR. Before launching or waiting on it, inspect
+  requires one passing PR-gate run after the final code change at each
+  independent proposed PR head. One passing gate at that head is sufficient
+  to open or update its PR; another independent PR head requires its own gate.
+  Before launching or waiting on it, inspect
   only `latest.wall_seconds` and `suggested_wait_seconds` in
   `tools/test-suite-runtimes.json` for measured wall time and a wait budget
   with headroom. If the focused tests passed before, then don't poll the full
@@ -105,18 +128,21 @@ This project will span many context windows. The rule that makes that survivable
   the suite launch and wait budget once, then wait quietly for the full
   `suggested_wait_seconds`: no periodic commentary and no polling the process,
   logs, or dashboard. Run
-  `uv run python tools/dashboard.py --run-suite` to execute the default
-  `not slow` pytest selection exactly once
+  `uv run python tools/dashboard.py --run-suite` to execute the PR-gate
+  `not slow` pytest selection, including `pr_head`, exactly once
   and refresh both that runtime history and `~/agent-share/cffg-tests.html`
-  (add new test files to `EPIC_FILES`). If the short suite was run directly,
+  (add new test files to `EPIC_FILES`). If the PR gate was run directly,
   preserve and reuse its
-  result: `uv run pytest -q --junitxml=/tmp/cffg-tests.xml`, then
+  result: `uv run pytest -q -m 'not slow' --junitxml=/tmp/cffg-tests.xml`, then
   `uv run python tools/dashboard.py --junitxml /tmp/cffg-tests.xml`. Opening a
   PR, requesting review, or refreshing the dashboard never calls for a second
-  unchanged short-suite run. A later change requiring this gate supersedes the
-  previous result and gets one fresh final run.
+  unchanged PR-gate run. The dashboard accepts only reports carrying complete
+  PR-selection provenance; developer, focused, and legacy reports without
+  that provenance cannot certify it. Runtime history records only this gate,
+  so developer runs do not change its wait budget. A later change requiring
+  this gate supersedes the previous result and gets one fresh final run.
 - **Isolated tooling changes** use focused tests and changed-artifact checks
-  instead of the full short suite. Examples include runtime-history storage,
+  instead of the PR gate. Examples include runtime-history storage,
   developer reports, and formatting helpers. Record the isolation rationale,
   commands, and results in the ticket and PR. Being under `tools/` is not enough:
   changes affecting engine/model/numerical/serialization behavior, shared
@@ -127,8 +153,10 @@ This project will span many context windows. The rule that makes that survivable
 - **Slow tests are opt-in.** Mark long behavioral, multi-trial, and globalization
   regressions with `@pytest.mark.slow`; pytest excludes them by default. Run
   them explicitly with `uv run pytest -m slow` only when the changed behavior
-  needs that validation. They are not part of the default PR gate.
-- **Ticket- and documentation-only changes** do not require the short test suite.
+  needs that validation. They are not part of the PR gate. Use `pr_head` for
+  stable expensive regressions required at every PR head; do not combine the
+  two markers on one case.
+- **Ticket- and documentation-only changes** do not require the PR gate.
   Validate the artifacts they change, including `tk dep cycle` and
   `git diff --check` for ticket-only work.
 - **End of session**: leave `main` green and the tree clean. Update the ticket
