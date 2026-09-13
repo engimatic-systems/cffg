@@ -2132,3 +2132,432 @@ authority is anchored in `tests/test_structured_recurrence_rule.py`:
   compiled flooding and mixed schedules. It checks compiler acyclicity,
   factor-local pairs, Gaussian writes, the pair/separator BFE ledger,
   fixed-drive `-log Z`, loop claim boundaries, and `O(T K^2)` batch storage.
+
+## D11 — Pair-conditioned Gaussian recurrence regions (cff-iur0)
+
+### D11.1 Plain English and the decision
+
+**Decision: no new production coordinate is authorized.** The local
+pair-conditioned Gaussian EC candidate below has sound stationary equations,
+but fails a source-association counterexample at its ordinary boundaries.
+cff-ocxl is rewritten as a hybrid-separator derivation gate before any
+implementation. D10 remains the name of the retired historical whole-model
+candidate; the equations below do not revive that dispatch path.
+
+D9 remembers which regimes occurred together, but forgets which continuous
+states went with those regime transitions. For example, two equally likely
+source regimes can favor positive and negative positions respectively. Their
+overall mean position is zero. Multiplying each source's responsibility by
+that zero loses both learning signals. Learning which regime labels explain
+observations does not recover the missing positions automatically.
+
+The candidate region remembers a mean and covariance for each source/destination
+pair. It sends their combined mean and covariance to ordinary Gaussian
+neighbors. Those neighbors retain one Gaussian belief, while the recurrence
+region retains its labeled mixture. The two beliefs agree on moments, not
+on their probability densities. This distinction is an explicit constraint
+choice, not an exact Gaussian representation of the mixture. It can remember
+association induced by its own recurrence factor, but cannot receive
+association that another factor inferred between source and position. That
+remaining information loss is the reason for the negative decision.
+
+Part I §5.4, Eq. (31), permits replacing marginal consistency by
+sufficient-statistic consistency and obtains expectation propagation (EP).
+We apply that construction to this recurrence region. The term
+*expectation consistent* (EC) below names this moment constraint.
+Sources: [Part I](https://biaslab.github.io/pdf/arxiv/2306.08014.pdf),
+[Opper and Winther, 2005](https://www.jmlr.org/papers/volume6/opper05a/opper05a.pdf).
+The recurrence-specific equations and minimality comparison below are our
+derivation, not claims that those sources analyzed this recurrence rule.
+
+Two consequences remain useful for the next derivation. A Gaussian **message** can have
+negative precision; the beliefs and integrals used by the rule must remain
+proper. Also, the complete EC objective has no general bound direction against
+the true negative log evidence. The JJ bound retains its precise direction
+against the same EC objective with literal logistic factors (D11.9).
+
+### D11.2 What D9 removes; the factor-local candidate
+
+Use D9's transition indexing, with `T` regimes, `T-1` drives, `K` regimes
+per slice, dimension `d`, and fixed installed `theta_il=[R_il;r_il]`.
+Let `h=[x;1]`, `b_jl=1(j>=l)`, and `k_jl=1(j=l)-b_jl/2`, for
+`l=0,...,K-2`. The learning coordinates require
+
+    A_til = sum_j k_jl E[1(z_t=i,z_{t+1}=j) h_t],
+    B_til = omega_til sum_j b_jl E[1(z_t=i,z_{t+1}=j) h_t h_t^T]. (D11.1)
+
+D9 replaces the expectations by `rho_tij E_qG[h_t]` and
+`rho_tij E_qG[h_t h_t^T]`. It sets both the indicator/feature covariance
+and the indicator/second-moment covariance to zero. Preserving `rho` alone
+does not restore either covariance. D11 changes the auxiliary as well as
+the learning statistic; using its moments with D9's unconditional auxiliary
+would not solve the declared coordinate.
+
+Consider one region per recurrence factor:
+
+    b_t(i,j,x) = rho_tij N(x; m_tij, S_tij),                 (D11.2)
+    rho >= 0, sum_ij rho = 1, S_ij positive definite on active pairs.
+
+Retain `rho`, `m`, `S`, `h_ij=[m_ij;1]`, and
+`M_ij=[[S_ij+m_ij m_ij^T,m_ij],[m_ij^T,1]]`. The last two are derived,
+not independent coordinates. All required cross-moments are `rho h` and
+`rho M`. Retain categorical edge beliefs `gamma_L=sum_j rho`,
+`gamma_R=sum_i rho`, and Gaussian edge belief `q_x=N(mu,V)`, constrained by
+
+    mu = sum_ij rho_ij m_ij,
+    V + mu mu^T = sum_ij rho_ij (S_ij+m_ij m_ij^T).          (D11.3)
+
+No continuous cross-time covariance is stored in this region. An external
+Gaussian dynamics factor retains its own joint Gaussian covariance under
+its own node and edge ownership. There is no global `q(Z,X)` asserted by
+(D11.2--3).
+
+The auxiliary coordinates are one `xi_il=c_il^2>=0` per source/stick,
+shared across at-risk destinations. This is a deliberate tying constraint
+on the JJ bound. No random coefficient posterior or extra independent PG
+entropy is included: coefficients are installed point values and the PG
+coordinate is eliminated into the bound, as in D9.
+
+| Candidate | Decision |
+| --- | --- |
+| D9 pair times one unconditional Gaussian | Cannot represent either covariance in D11.1. |
+| One Gaussian per source, with `q(x\|i,j)=q(x\|i)` | Cannot distinguish success/failure positions even when the source is clamped. |
+| Pair-conditioned Gaussian triplet | Smallest recurrence-factor scope with unrestricted local conditional moments, but rejected as a sufficient source-learning repair by D11.15. |
+| Per-destination auxiliaries `c_ijl` | Can tighten JJ, but add an `O(K^3)` coordinate inventory without retaining another required cross-moment. Deferred. |
+| Hybrid separator `(z_t,x_t)` between grouped/overlapping regions | Necessary to communicate source-conditioned moments across the counterexample boundary, unless the coupled factors share one owner. Full construction deferred to cff-ocxl. |
+| Whole-trajectory mixture / dense continuous trajectory | Not justified: a hybrid separator is a smaller candidate to evaluate first; path enumeration/dense covariance violates the required scaling. |
+
+This is minimality among those stated region/conditional-Gaussian candidates,
+not a proof of optimal recovery or a comparison against every possible
+approximation or an accepted composable trajectory approximation. Keeping only moment numbers without a density does not define
+the required region entropy.
+
+### D11.3 One objective, counting numbers, and the bound
+
+For `psi_il(x)=R_il^T x+r_il`, put
+
+    w_il = tanh(c_il/2)/(2 c_il), with w(0)=1/4,
+    L_il(x) = log(2 cosh(c_il/2)) + w_il (psi_il(x)^2-c_il^2)/2,
+    log f_t^JJ(i,j,x) = sum_l [k_jl psi_il(x) - b_jl L_il(x)]
+                     = a_ij + h_ij^nat x - x^T P_ij x/2.   (D11.4)
+
+Here `h^nat` is a row/vector natural coefficient, distinct from augmented
+feature `h`. Explicitly,
+
+    P_ij = sum_l b_jl w_il R_il R_il^T,
+    h_ij^nat = sum_l (k_jl-b_jl w_il r_il) R_il,
+    a_ij = sum_l { k_jl r_il - b_jl [log(2 cosh(c_il/2))
+                                  + w_il (r_il^2-c_il^2)/2] }. (D11.5)
+
+Every `c>=0` gives a pointwise lower bound on the literal log factor.
+All constants in (D11.5) belong in the node energy. With
+`G(S)=d(1+log(2 pi))/2+logdet(S)/2`, the recurrence node owns
+
+    H(b_t) = H(rho_t) + sum_ij rho_tij G(S_tij),
+    F_t = -H(b_t) - sum_ij rho_tij [a_ij + h_ij^nat m_ij
+                         - tr(P_ij(S_ij+m_ij m_ij^T))/2].   (D11.6)
+
+For a factor graph after equality expansion, or its equivalent variable-node
+representation with variable degree `d_v`, the **single** objective is
+
+    F_EC^JJ = sum_f { -H(b_f) - E_bf[log f_f^JJ] }
+                           + sum_v (d_v-1) H(q_v).         (D11.7)
+
+Only recurrence factors use the JJ replacement. Other declared node
+objectives retain their own factors/constraints. Region entropy counting
+numbers are `+1`; variable-separator entropy counting numbers are `1-d_v`.
+Their free-energy signs are respectively minus and plus. A Forney internal
+edge has `d_v=2`; a dangling edge has `d_v=1`. Normal categorical equality
+expansion telescopes to these counts. Gaussian equality expansion must carry
+the same moment constraints, rather than assert mixture-density equality.
+For a categorical recurrence chain the interior correction is `+H(gamma_t)`;
+each recurrence drive also gets the Gaussian corrections dictated by its
+actual incidence. There is no second trajectory entropy owner.
+
+Minimize (D11.7) subject to normalization, categorical marginal consistency,
+and the Gaussian first/second-moment constraints (D11.3) at each incidence.
+Other included regions must have their own compatible stationary rules.
+The entropy of the Gaussian edge is exact for `q_v`; it is not substituted
+for the mixture entropy in (D11.6).
+
+For local solving with categorical cavities `lambda_L,lambda_R` and Gaussian
+cavity `log m_c(x)=eta_c^T x-x^T J_c x/2`, use
+
+    F_local = F_t - E_b[lambda_L(i)+lambda_R(j)+log m_c(x)]. (D11.8)
+
+This is the complete cavity-inclusive local objective. It is **not** an
+additional graph ledger term: remove cavity expectations to recover (D11.6).
+Canonical Gaussian cavities omit an arbitrary log scale. A known normalized
+prior's scale must be counted once when reporting its evidence; the oracle
+uses explicitly stated, unnormalized canonical potentials on both sides.
+
+At any identical feasible region/edge beliefs and held auxiliaries,
+
+    F_EC^JJ - F_EC^literal
+       = sum_t E_bt[log f_t - log f_t^JJ] >= 0.             (D11.9)
+
+The inequality also holds between infima over the same feasible set. Neither
+EC value has a general bound against true `-log Z`: moment consistency does
+not establish a globally consistent joint density. In the isolated local
+problem, however, `F_local = KL(b || normalized tilted f_JJ)-log Z_JJ`.
+Its fixed-c minimum is exactly `-log Z_JJ >= -log Z_literal`. The independent-
+drive categorical chain below also has a genuine tree joint and this stronger
+evidence statement. Do not extend that special case to coupled Gaussian
+dynamics or arbitrary loops. No GFE/P-substitution is derived here.
+
+### D11.4 Every coordinate and boundary equation
+
+For held cavities and auxiliaries, define
+
+    J_ij = J_c + P_ij, eta_ij = eta_c + h_ij^nat,
+    S_ij = J_ij^-1, m_ij = S_ij eta_ij,
+    log I_ij = a_ij + d log(2 pi)/2 - logdet(J_ij)/2
+                                         + eta_ij^T m_ij/2,
+    log rho_ij = lambda_L(i)+lambda_R(j)+log I_ij-log Z,
+    log Z = logsumexp_ij[lambda_L(i)+lambda_R(j)+log I_ij]. (D11.10)
+
+Each active `J_ij` must be positive definite. These are the unique
+fixed-cavity, fixed-c stationary Gaussian and simplex coordinates. The
+auxiliary stationarity condition is
+
+    e_il = sum_j b_jl rho_ij,
+    xi_il = sum_j b_jl rho_ij theta_il^T M_ij theta_il / e_il,
+    c_il = sqrt(xi_il),                                    (D11.11)
+
+on positive exposure. Zero exposure gives exact zero learning increments;
+choose `xi=0` to fix the otherwise unidentifiable auxiliary. Use
+`xi - conditional E[psi^2]` as the residual. Differentiating in `c` alone
+creates a spurious zero at `c=0`: the derivative in `xi` is
+`(e_il/2) (dw/dxi) (conditional E[psi^2]-xi)`, with
+`dw/dxi|0=-1/48`. At the nonnegative boundary `xi=0` stationarity requires
+zero squared-logit moment. This handles the KKT condition as well as positive
+auxiliaries.
+
+All outgoing messages are
+
+    log m_to_L(i) = logsumexp_j[lambda_R(j)+log I_ij] + C_L,
+    log m_to_R(j) = logsumexp_i[lambda_L(i)+log I_ij] + C_R,
+    J_to_x = V^-1-J_c, eta_to_x = V^-1 mu-eta_c,            (D11.12)
+
+using (D11.3). Constants `C_L,C_R` normalize on the active categorical face.
+These categorical formulas use the held optimized auxiliary; its dependence
+on cavities is not differentiated again (stationarity eliminates that term).
+Gaussian natural messages omit their log scale. Incoming cavities are sums
+of other incident outgoing natural/log messages, exactly as for ordinary
+factor boundaries. An attached likelihood changes these sums without changing
+the chosen region. A quotient precision can be negative and must not be
+clamped: with unit Gaussian cavity, equal source weights, observed success,
+and logits `4x-4,-4x-4`, the converged pair means are approximately
+`+/-1.25954`, their variances `0.25954`, and total variance `1.84599`.
+The required outgoing precision is approximately `-0.45828`.
+
+For completeness, the graph stationary equations can be expressed without a
+hidden internal coordinate. Let each directed message have natural coordinate
+`theta_fv`, let `chi_fv=sum_{g!=f} theta_gv`, and let
+`q_v` have coordinate `sum_f theta_fv`. Form (D11.10) from `chi` at recurrence
+nodes and the declared tilted beliefs at other compatible nodes. Neighbors
+with additional internal constraints must also supply their internal
+stationarity equations; this inventory assumes unrestricted tilted beliefs
+for those neighbors. The residual
+has, at **each** factor/variable incidence,
+
+    R_fv = E_bf[phi_v] - E_qv[phi_v],
+    R_il = xi_il - sum_j b_jl rho_ij theta_il^T M_ij theta_il/e_il, (D11.13)
+
+where categorical `phi` drops one active indicator and Gaussian `phi` contains
+`x` and the independent entries of `xx^T`. On zero exposure replace the
+second residual by `xi_il`. Normalize/drop one categorical log coordinate
+per message to remove its additive gauge. Setting off-support entries to log
+zero is a fixed feasible-face restriction, not an additive gauge; all
+stationarity claims are conditional on that face. Gaussian symmetric natural
+coordinates have no gauge after discarding the log scale. Absent pairs have
+no mean/covariance coordinates. There is no regime-label gauge with fixed
+installed source-specific coefficients. Inactive auxiliaries are the only
+additional unidentifiable coordinates and the zero convention fixes them.
+
+To see completeness, introduce incidence multipliers for the constraints in
+(D11.7). Variation in `b_f` gives `b_f proportional to f_f^JJ exp(sum chi_fv phi_v)`;
+variation in `q_v` gives the exponential-family edge with natural coordinate
+`sum_f chi_fv/(d_v-1)` when `d_v>1`. With the message parameterization above
+this is exactly `sum_f theta_fv`. At degree one the cavity is vacuous and
+the sole site's moment equation sets `q_v`. Variation in `xi` gives
+(D11.11). Thus (D11.13), positivity, and the support/normalization constraints
+are the full gauge-reduced stationarity system. Equation (D11.12) is its
+ordinary message fixed-point form.
+
+Alternating (D11.10) and (D11.11) performs exact minimizations of (D11.8);
+it needs no Newton globalization claim. Require both its finite FE change
+and auxiliary residual to meet tolerance; return `budget_exhausted` when
+the declared budget ends. At graph level this local descent is not a
+convergence proof. A future implementation would need a damped/backtracked solve of the scaled
+residual (D11.13), checking integrability and finite FE at proposed iterates.
+The residual norm is a solver merit function, never free energy. Graph
+convergence requires a small residual and stable finite (D11.7), not merely
+small parameter changes. A non-finite objective or residual is divergence.
+
+The existing D3 switching-Gaussian rule is **not** automatically a compatible
+neighbor. Its outgoing mixture is collapsed before the receiving Gaussian
+cavity is included; its node energy uses the full tilted labeled mixture.
+These operations generally leave a nonzero moment-consistency residual.
+For example, a prior mixture `0.5 N(-2,1)+0.5 N(2,1)` facing `N(0,1)` gives
+edge variance `5/6` under collapse-first messaging. The full tilted region
+has equal components `N(-1,1/2),N(1,1/2)` and variance `3/2`.
+
+The needed companion keeps D3.2's **same factor scope** and full tilted
+blocks, `b(s,y,x)=rho_s N([y;x];m_s,S_s)`. Its selector output is still the
+integrated Gaussian log mass without the selector cavity. For each Gaussian
+role `v` extract that role's block and set
+
+    mu_v = sum_s rho_s m_sv,
+    V_v = sum_s rho_s [S_svv+(m_sv-mu_v)(m_sv-mu_v)^T],
+    J_to_v = V_v^-1-J_cavity_v,
+    eta_to_v = V_v^-1 mu_v-eta_cavity_v.                    (D11.14)
+
+All role cavities participate in `rho_s,m_s,S_s`. There is no JJ auxiliary
+at this companion. D3.2 already gives its factor precision, linear term,
+constant, selector integral, and exact labeled node entropy/energy. Together
+with (D11.14) and ordinary edge corrections these are its complete stationary
+coordinates under (D11.7). The example's outgoing precision is `-1/3`.
+Cost is `O(K(d_in+d_out)^3)` per node and storage
+`O(K(d_in+d_out)^2)`. cff-ulbz tracks this distinct mixture boundary issue,
+conditional on the region design from cff-ocxl. It does not change existing
+D3 behavior and does not solve the source-association obstruction below.
+
+**Decisive boundary falsifier.** Consider the source-dependent prior
+`p(i)=1/2, p(x|i)=N(a_i,1)`, with `a=(2,-2)`, and an observed destination
+success under `R=r=0`. Recurrence success is exactly `1/2`; JJ at `c=0` is
+exact. Exhaustive pair enumeration and independent quadrature give
+
+    rho_i0 = 1/2, E[x]=0, E[x^2]=5,
+    E[1(i=0,j=0)x]=1, E[1(i=1,j=0)x]=-1,
+    Delta eta_weight = (1/2,-1/2).                         (D11.15)
+
+Swap the two prior means. Both ordinary singleton boundaries stay identical:
+uniform source and Gaussian moments `(0,5)`. The required source-conditioned
+first moments and weight updates change sign. D11.10 receives identical
+inputs for both models and returns all conditional means zero. Its local
+residual is zero and its JJ bound is exact; neither fact detects this lost
+information. This is not a numerical-tolerance or approximation-bound issue.
+
+Consequently **no factor-local function of those separate singleton cavities
+can return both models' correct source-conditioned moments**. Allowing the
+recurrence region to hold such moments internally is insufficient. A
+companion EC mixture rule fixes its own moment projection, but the two
+regions still share only separate regime and continuous moments; they do not
+constrain `E[1_i x]` to agree. Gaussian source-dependent variances produce the
+analogous second-moment obstruction.
+
+The next candidate must retain a joint hybrid separator over `(z_t,x_t)`,
+including `gamma_i`, `E[1_i x]`, and `E[1_i xx^T]`, or place the factors that
+infer and consume those statistics inside one owner with equivalent internal
+constraints. Ordinary Gaussian/categorical external ports can remain only
+where they do not cut that required association. The full entropy, messages,
+gauge-reduced residual, and complexity of that larger construction are **not
+established here**. This is the explicit negative branch of cff-iur0's
+acceptance criterion 11, rather than authorization based on local exactness.
+
+### D11.5 Cost, hostile inputs, and reductions
+
+For one region, prefix accumulation of (D11.5) costs `O(K^2 d^2)`, its
+`K^2` dense factorizations/solves cost `O(K^2 d^3)`, and reverse cumulative
+pair moments compute (D11.11) and learning statistics in `O(K^2 d^2)`.
+There is no `K x K x (K-1)` stick tensor. Across `T-1` regions,
+persistent region/message/auxiliary storage is `O(T K^2 d^2)`; streamed
+transient storage is `O(K^2 d^2)` (batching all times uses another
+`O(T K^2 d^2)`). Parameters take `O(K^2 d)` when shared across time.
+Objective and residual evaluation are linear in `T` with these polynomial
+local costs. A declared budget of `I` local updates and `J` graph residual
+evaluations costs `O(J I T K^2 d^3)`, plus the stated costs of external
+regions. The experiment is NumPy; it makes no production JIT claim.
+
+These are bounded-work costs, not a claim that convergence takes constant
+`I,J` as horizon grows. Flooding a chain may itself require a horizon-dependent
+number of sweeps. Production must publish its budgets/status and avoid a
+dense numerical Jacobian: directional derivatives or local blocks preserve
+linear storage; a dense global Newton solve would violate this contract.
+No complete regime paths or dense continuous trajectory covariance are
+materialized by this local candidate. Only the tiny oracle may do so.
+
+| Hostile input | Required behavior |
+| --- | --- |
+| Literal log-zero regime support | Work on the active face, retain exact zero masses/statistics, and never take `-inf-(-inf)`. Outgoing categorical coordinates outside the face are fixed to log zero. |
+| A previously impossible regime becomes possible | Invalidate affected messages and reinitialize support/auxiliaries; inactive auxiliary values do not define a unique counterfactual message. No silent support revival from cached values. |
+| Empty supported component | Error; never normalize an all-zero region. |
+| Vacuous or improper Gaussian cavity | Accept only if every active **bounded tilt** is positive definite and the projected edge belief is proper. A vacuous cavity with an unconstrained direction fails. This local integrability claim is for JJ, not proof that the literal logistic integral is finite. |
+| Signed Gaussian output | Preserve it. Validate aggregate beliefs and the next tilted integrals; a consumer requiring positive site precision is incompatible and must reject the composition. |
+| Float32 / unresolved precision | Reject eigenvalues at or below `32 d eps * max(abs(eigenvalues))`; no ridge or absolute floor. This is a relative resolution check, not a repair. |
+| Small `c`, roundoff in a squared moment | Use `w=1/4-c^2/48` below `sqrt(eps)`; clip only negative roundoff bounded by `32 eps` times the sum of absolute quadratic terms. Larger negatives fail. |
+| Non-finite coordinates/objective/residual | Error or explicit `diverged`, never convergence or a vacuous-message substitute. |
+| Long horizon / larger state | The executable case uses `T=100,K=8` (50 times the smallest horizon), plus a separate `d=10` local case in both dtypes. |
+
+With a fixed drive, condition on that value rather than inserting a singular
+Gaussian density into the entropy formula. Setting `c_il=abs(psi_il(x))`
+makes JJ exact, and categorical messages/statistics reduce to D9. With
+`R_il=0`, the pair conditionals equal the Gaussian cavity, the Gaussian output
+is zero, and the local rule equals D9 even with uncertain continuous states.
+That is not global source-learning exactness when another factor couples
+source and drive, as (D11.15) shows. **Identical
+source rows with nonzero `R` are not a D9 reduction**: destination/drive
+dependence can remain. Source relabeling/invariance must still hold there.
+
+### D11.6 Independent executable anchors and implementation handoff
+
+`tests/regime_trajectory_reference.py` imports no CFFG code. It enumerates all
+discrete paths for `K=2,d=1,2<=T<=6`, integrates fixed-JJ paths by independent
+dense Gaussian completion, and separately uses adaptive scalar quadrature for
+literal logistic and JJ node integrals, moments, and trial-belief objectives.
+The reference uses float64 arithmetic even when checking a float32 candidate.
+Comparison budgets are declared before evaluating the candidate:
+`256 n eps(dtype)` absolute and relative tolerance for `n` accumulated terms;
+central-difference gradient tolerance is `2048 eps(float64)^(2/3)`, with
+step `eps(float64)^(1/3)`. Quadrature requests absolute and relative error
+`2e-11`; the Gaussian-JJ analytic enumeration supplies an independent check
+below that requested quadrature budget. These tolerances are comparison
+budgets, not numeric floors in the rule.
+
+`cffg.experiments.regime_pair` is an unregistered executable derivation.
+`tests/test_regime_pair_derivation.py` anchors:
+
+- `test_all_boundary_messages_moments_and_local_energy_match_quadrature`:
+  all three messages, both weighted moments, full (D11.8), and `-log Z_JJ`.
+- `test_literal_logistic_reference_exposes_lost_d9_and_source_only_moments`:
+  nonzero indicator/drive covariance and destination-conditioned means,
+  measured JJ approximation error, and the local bound directions.
+- `test_drive_independent_reduction_is_d9_exact` and
+  `test_fixed_drive_and_multistick_learning_contract`: the genuine D9
+  reductions and augmented learning statistics, including multiple sticks.
+- `test_complete_chain_region_objective_and_moments_match_path_enumeration`:
+  `T=5`, independent Gaussian drives, full node/chain-separator counting,
+  pair moments, and exact bounded-path normalization.
+- `test_complete_objective_gradient_and_stationary_auxiliary_match_quadrature`:
+  gauge-reduced probability, Gaussian mean/variance, and auxiliary coordinates,
+  both at stationarity and at a nonstationary perturbation.
+- The remaining named tests pin the source-homogeneity counterexample,
+  signed output, literal support, invalid/vacuous cavities, separate budget
+  status, float32, and the `T=100,K=8,d=10` inventory above.
+- `test_existing_mixture_collapse_requires_a_distinct_ec_binding` pins the
+  D3/EC second-moment mismatch and D11.14's signed Gaussian quotient by
+  independent adaptive quadrature.
+- `test_separate_boundaries_erase_external_source_association` pins D11.15
+  in both dtypes: the exact source moments are opposite while all available
+  singleton cavities are equal. This is a passing test of a rejected candidate,
+  not a production recovery success.
+- `test_separate_boundaries_also_erase_source_conditioned_second_moments`
+  repeats the obstruction with swapped variances and the precision statistic.
+
+**Implementation is not authorized by this result.** cff-ocxl now derives
+the smallest hybrid separator/grouping that passes D11.15 and provides a
+complete objective and ordinary exterior boundary contract. It must decide
+the grouping from serialized local semantics, never a whole-rSLDS classifier.
+Its positive outcome must create a separate bounded implementation ticket;
+its negative outcome must leave the mathematical blocker explicit. cff-ulbz
+tracks the independently discovered D3/EC projection issue and remains
+conditional on that decision. cff-x0if cannot qualify source recovery before
+both mathematical boundaries and their implementation dependencies are met.
+
+The local candidate meets the requested local equation, objective, oracle,
+hostile-input, and bounded-cost checks. It does **not** meet the requested
+composable source-association construction; no claim is made that the larger
+candidate satisfies criteria 4–8. The negative decision and rewritten
+downstream gate are the deliverable. Production selection, engine paths,
+public factors, readouts, and checkpoints remain D9 in this ticket.
