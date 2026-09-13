@@ -1,7 +1,7 @@
 ---
 id: cff-x0if
 status: open
-deps: [cff-ocxl]
+deps: [cff-ocxl, cff-ulbz]
 links: []
 created: 2026-08-31T03:47:35Z
 type: task
@@ -164,3 +164,7 @@ artifact requirement; `all`, `any`, `at least`, `every`, and `only` are bounded
 by the three fits, four sources, three gates, named thresholds, and explicit
 scope exclusions; and `current` means mathematical current regime or the
 current/legacy checkpoint pair, not an unpinned repository claim.
+
+**2026-09-13T18:15:52Z**
+
+cff-iur0 used its negative outcome: cff-ocxl is now a hybrid-separator derivation gate, not a shipped component. cff-ulbz is an additional conditional blocker for compatible mixture projection. Before qualification, require the production implementation dependencies created by a positive cff-ocxl decision. D11.15 source-mean/variance twins are mandatory information-transfer falsifiers; passing local stationary equations is insufficient.

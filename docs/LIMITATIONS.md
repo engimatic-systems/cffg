@@ -321,7 +321,18 @@ same time-local rules are Bethe pseudomarginals and do not define one exact
 path posterior. The remaining factorization separates the categorical path
 from the Gaussian drive and PG auxiliaries, so a strongly coupled or
 multimodal joint posterior can remain inaccurate even when the coordinate
-residual converges. v1 requires equal regime cardinalities
+residual converges. D11 evaluates a pair-conditioned Gaussian candidate with
+explicit moment consistency and rejects it as a sufficient repair: separate
+source and drive boundaries lose association inferred by external switching
+factors even when the local JJ bound is exact. cff-ocxl must derive a hybrid
+separator or grouping before production implementation. The candidate's JJ energy
+upper-bounds the literal-factor EC energy at the same feasible region beliefs,
+but neither has a general bound against true negative log evidence. It does
+not establish source recovery, Gaussian trajectory exactness, or a
+horizon-independent convergence budget. Its signed Gaussian messages also
+require compatible boundary consumers (cff-ocxl).
+
+The current v1 requires equal regime cardinalities
 `K >= 2`, a proper Gaussian drive, finite fixed
 `weights[K,K-1,d]`/`offsets[K,K-1]`, and sum-product semantics. Between-trial
 PG learning accumulates the same structured pair-derived at-risk and

@@ -841,6 +841,18 @@ client. Ordinary non-switching Gaussian models already prove the shared
 declared-learning operations directly; they do not yet prove rSLDS phase or
 retry policy as a reusable abstraction.
 
+D11 evaluates a local pair-conditioned Gaussian recurrence region with
+explicit Gaussian moment consistency. Its stationary equations and bounded
+node energy are executable, but D11.15 rejects it as a sufficient source-learning
+repair: separate regime and Gaussian boundaries cannot convey source/state
+association inferred outside the region. No new production coordinate is
+authorized. cff-ocxl now derives a joint hybrid separator or grouping that
+retains that association; implementation requires a subsequent positive gate.
+Existing D3 mixture outputs also collapse before including the receiving
+cavity, so they do not automatically satisfy EC moment constraints. D11.14
+derives the different local projection and cff-ulbz tracks that companion
+issue. These are future design boundaries; the runtime still executes D9.
+
 ### 2e. Executable factor registration (`cffg.kernels`)
 
 A `FactorKernel` declares everything the compiler, VM, ledger, and

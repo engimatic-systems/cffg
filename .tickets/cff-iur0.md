@@ -1,6 +1,6 @@
 ---
 id: cff-iur0
-status: open
+status: closed
 deps: [cff-s6yy]
 links: []
 created: 2026-08-31T03:47:35Z
@@ -154,3 +154,44 @@ mathematical expectation; `may` marks possibility or methodological choice;
 coordinates, boundaries, and scope exclusions; `current` appears only in the
 named current/legacy review pair; and `existing` names the two architecture
 rows quoted in the handoff.
+
+**2026-09-13T17:51:33Z**
+
+Planning handoff: use New factor or rule family for region/message/energy ownership and Runtime numerical or status invariant for auxiliary iteration. Production compiler, host/JIT, flooding/scheduled, single/vmap, and current/legacy checkpoint surfaces are N/A. The experiment and independent oracle will cover exact zero support (prune without floors), empty support (error), vacuous/improper Gaussian cavities (accept only integrable tilted components), float32 guards derived from finfo, and a 10–100x horizon case. Candidate comparison starts with pair-conditioned Gaussian recurrence regions and explicit boundary moment constraints; a full trajectory coordinate is not presumed necessary.
+
+**2026-09-13T17:59:40Z**
+
+Research question → smallest region and ordinary boundary feasibility. Answer → b(i,j,x)=rho_ij N(x;m_ij,S_ij) with explicit first/second-moment consistency; Part I §5.4 Eq.31 permits this EP construction. Shared source/stick JJ auxiliaries use exposure-weighted conditional squared logits. Exact local region entropy and Gaussian separator entropy define one constrained Bethe functional; JJ raises it at the same feasible beliefs, with no global evidence-bound claim. Gaussian quotient precision may be negative, and source-homogeneous logits alone do not reduce to D9. Sources → Part I https://biaslab.github.io/pdf/arxiv/2306.08014.pdf ; Opper & Winther 2005 https://www.jmlr.org/papers/volume6/opper05a/opper05a.pdf ; direct algebra and independent scalar counterexample. Confidence → high. These findings will be distilled into D11 and the cff-ocxl handoff.
+
+**2026-09-13T18:10:27Z**
+
+The boundary audit found a decisive source-learning falsifier: two external switched priors with source-conditioned means (+2,-2) versus (-2,+2) have identical source probabilities and Gaussian marginal moments (mean 0, variance 5). With R=r=0 and observed success, exact weighted source first moments are (+1,-1) versus (-1,+1); the local triplet sees the same cavities and returns zeros. JJ is exact here. Separate singleton constraints cannot convey the missing association, even with the companion EC mixture messages. Decision: use criterion 11 negative outcome, withhold production authorization, and rewrite cff-ocxl as the hybrid-separator derivation gate. The local equations remain useful, independently tested candidates, not an accepted repair.
+
+**2026-09-13T18:15:52Z**
+
+Roadmap decision and review handoff:
+- D11 derives the local pair-Gaussian/JJ candidate, its full local and EC objectives, stationary messages/auxiliaries, all required learning moments, gauges, support semantics, signed outputs, and bounded-work/storage costs.
+- The independent K=2 scalar oracle enumerates paths up to T=6 and integrates Gaussian paths or literal/JJ factors without production/candidate imports. Exact reductions, nonzero local cross-moments, objective/gradient, float32, T=100/K=8, and d=10 are executable.
+- The decisive D11.15 twins have identical separate boundaries but opposite required source-weighted means. The variance twin loses the precision statistic too. Local exactness therefore does not justify a composable source-learning implementation. This is criterion 11's negative outcome, not completion of the proposed larger construction.
+- cff-ocxl is rewritten as the joint hybrid separator/grouping derivation gate. A positive result must create bounded production tickets and attach them as qualification blockers. cff-ulbz separately tracks D3's projection-order mismatch; its implementation is conditional on the gate.
+- No production compiler/runtime/readout/checkpoint behavior changed. Applicable change paths remain the inventory in the planning note; duplicated production pairs are N/A.
+- Focused validation after final code edit: 57 passed (regime-pair derivation, structured recurrence, repository hygiene, dashboard). Full short-suite gate follows.
+
+Legend: prerequisite --> dependent
+[x] cff-s6yy (D9 foundation)
+  --> [ ] cff-iur0 (negative decision; validation in progress)
+        --> [ ] cff-ocxl (hybrid separator derivation; ready after this gate)
+              +--> [ ] cff-ulbz (conditional mixture EC binding)
+              |       --> [ ] cff-x0if (source recovery)
+              +----------> [ ] cff-x0if
+                              --> [ ] cff-zov5 (recovery epic)
+No parallel implementation root is ready: cff-ulbz waits on the mathematical
+decision, and cff-x0if waits on both branches plus future implementation
+dependencies. Built from tk dep tree --full, tk ready, tk blocked.
+tk dep cycle: no cycles.
+
+**2026-09-13T18:42:45Z**
+
+Final validation and landing: uv run python tools/dashboard.py --run-suite passed once after the final code edit: 2,295 passed, 41 deselected, 4 dependency deprecation warnings, 1,220.64 seconds pytest time. The required 1,560-second quiet wait was honored. Dashboard refreshed at ~/agent-share/cffg-tests.html; runtime history updated. Focused checks passed 57 tests before the full run. tk dep cycle reports no cycles; git diff --check is clean.
+
+Closing under acceptance criterion 11's explicit negative outcome. No larger construction or production implementation is claimed accepted. D11.15's independently integrated source-mean and variance counterexamples falsify the separate-boundary repair. cff-ocxl is the ready next mathematical gate after this closure; cff-ulbz remains conditional on its decision; cff-x0if is blocked on both and must receive future implementation dependencies before qualification. No unanswered user decision is needed for this bounded negative-result PR.
