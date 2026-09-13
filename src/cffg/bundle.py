@@ -176,6 +176,8 @@ def load_bundle(path: str | Path) -> tuple[Template, dict[str, np.ndarray], dict
                 f"model {actual_hash!r})"
             )
         template = from_dict(model_only_declarations(document))
+        if not template.plates:
+            validate(template)
 
         arrays: dict[str, np.ndarray] = {}
         blob_paths = manifest.get("blob_paths")

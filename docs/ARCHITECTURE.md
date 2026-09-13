@@ -1470,7 +1470,8 @@ Unversioned declarations and bare/slash/v2 checkpoints for the four unchanged
 nonrecurrence families migrate deterministically. Complete multi-array state
 is required. Historical agent structure hashes are accepted only for those
 unchanged identities. Model-only bundles instead verify the original serialized
-model hash before declaration migration, then verify every blob digest. They
+model hash before declaration migration, validate the migrated template, then
+verify every blob digest. They
 remain loadable with current learning rules, including unversioned recurrence,
 and the returned manifest reports `resumable=False`. Their point parameters
 provide no posterior provenance; any new learning requires fresh priors.

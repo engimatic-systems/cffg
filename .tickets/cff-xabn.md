@@ -181,3 +181,11 @@ Cooper authorized merging PR117–134 followed by PR137. The stack is now merged
 **2026-09-13T02:43:36Z**
 
 Resolved the compiler conflict by preserving main's facade and moving the schema additions into resolution/addresses.py. The final main tree was verified identical to the reviewed PR134 tree before this integration. Focused validation of resolver, assembly, compiled values, compiler contracts, all learning families, schemas, bundles, and recurrence checkpoints passed: 295 passed, 3 slow tests deselected in 69.60 seconds. The existing regression tests cover both review fixes on the merged architecture. git diff --check and tk dep cycle pass. Full short-suite validation is next; its runtime budget comes from the completed architecture stack measurement.
+
+**2026-09-13T03:14:50Z**
+
+The first integrated short-suite run completed with 2206 passed, 2 failed, 41 slow tests deselected (1168.69 seconds pytest; 1191.08 measured wall seconds). Both failures were older P-substitution bundle tests expecting a structural-conflict diagnostic before the new stored-hash integrity check. Integration now explicitly validates flat migrated templates after verifying the stored hash; compact models retain the existing validation and BundleError wrapper in plate expansion. The regression covers current and legacy inventories with mismatching hashes and matching hashes: integrity mismatches fail first, and contradictory constraints still fail when the stored hash matches. No message rules or inference mathematics changed. A fresh final short-suite run is required after this integration correction.
+
+**2026-09-13T03:15:50Z**
+
+Focused validation after the final bundle-validation correction passed: 134 passed, 1 slow test deselected in 10.45 seconds across constraint details, learning schemas, recurrence checkpoints, bundles, serialization, and plates. Both integrity/constraint orderings are tested, and the existing nested-plate BundleError contract remains unchanged. The failed full-suite measurement is retained honestly in runtime history pending the final rerun; the next wait budget is 1500 seconds.
