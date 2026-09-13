@@ -1,6 +1,6 @@
 ---
 id: cff-jby3
-status: open
+status: closed
 deps: [cff-ny7f]
 links: [cff-ii9t, cff-sf29]
 created: 2026-09-10T01:20:57Z
@@ -94,3 +94,35 @@ Checkpoint map: _agent_checkpoint.static_parameter_hash(:216) hashes grounded fi
 **2026-09-10T02:14:28Z**
 
 Checkpoint acceptance clarification: strict fixed-data hashes are checked by _validate_versioned_envelope (:337-343); the old agent:version=1 and raw legacy decoders predate strict identity. Criterion 11 now preserves that actual contract rather than claiming a missing legacy hash can detect changed input data. Test current mismatch rejection and supported legacy reconstruction separately. Also update README Colony caching wording when shape-compatible batching lands: one Engine object can hold several JAX shape/dtype specializations; one cached Engine must not be described as universally one numerical compilation.
+
+**2026-09-10T02:34:14Z**
+
+Starting from updated published PR #124 head 8f8aa6f82363270a3b345401235d7b8fcd2fa1e9. The extraction gate passed 1,894 default tests at code/test source b84560e, recorded in a7e87c7. Primary change paths and all four consumers are mapped above. Keep ConstraintPlan structural: validated integer thresholds and allowed-tuple arrays will move to initial runtime parameters, with explicit family-prefixed keys and no runtime fallback to a captured plan value. A typed constraint-resolution result will carry the plan and its initial parameter mapping. Current numerical rule functions are unchanged. Compatible State shapes/dtypes will batch under one cached Engine per public structure hash; incompatible table lengths get separate batches, not fabricated padding or sequential fallback for compatible peers.
+
+Tests first reproduce the existing wrong-data mechanism, then verify both spawn orders, solo/result parity, actual vmap for compatible healthy peers, sum/max consumers, both float precisions, tenfold table size, and strict versus legacy reconstruction. New IR fields are N/A; derived compiled fields and State parameter keys intentionally change to correct data ownership. The exact-path JIT support check remains N/A for constraints, as confirmed in its admission guard. No solver, CSP numerical formula, public model hash, schema or public status changes.
+
+**2026-09-10T02:48:48Z**
+
+Implementation checkpoint: the new regression failed before the repair with the second k=1 graph receiving k=0 messages (4 of 8 message entries wrong, including exact-zero support). ConstraintPlan now holds only structure and a family-prefixed runtime parameter key. A typed ResolvedConstraint publishes validated integer payloads into initial State parameters; collisions with another family are rejected. Local updates, free energy, Engine.objective (the actual decoded-assignment API; the earlier note called it assignment_energy), and host feasibility all select current State data. Colony partitions each structure by pytree layout, array shape and dtype while retaining one Engine. No CSP rule changed.
+
+Current focused evidence: 168 compiler/CSP/constraint checks passed before the last extra collision case; all 71 new tests now pass, including 48 two-instance cases, real same-shaped vmap, one Colony mixing both precisions and 2/20-row tables, six sum/max consumer checks, collision rejection, and 15 bundle/analytic checkpoint checks. New/changed small modules pass Ruff/format. The 23 Engine and five Colony Ruff findings match the exact pre-repair baseline; no blanket cleanup was made. The old LIMITATIONS S10 workaround has been removed from the working docs because the new runtime paths are fixed.
+
+One compatibility edge remains before the final gate: prepared functional-mu3 checkpoints serialize every State parameter, whereas analytic envelopes reconstruct initial parameters. _agent_mu3.restore_runtime (:280-294) and _load_state (:398-421) demand the current exact parameter inventory, so an older prepared cache will lack the newly derived constraint entries. Verify this with a fixed-particle cache regression, then migrate only the exact pre-constraint parameter layout from the supplied model data, retaining all other missing/extra-field, dtype, fixed-identity and cache checks. Current analytic, raw legacy analytic, and agent:version=1 analytic restoration already pass. No final default gate yet; no source changes committed yet.
+
+**2026-09-10T03:02:34Z**
+
+Implementation and focused verification are complete. All 152 tests in the final constraint/reconstruction/Colony/engine-contract/local-owner selection passed in 134.68 seconds, with three slow deselections. The two new files contribute 80 cases. They include current prepared mu3 caches plus exact older cached-parameter inventories under strict and agent:version=1 envelopes, with bitwise result/key preservation and no resampling. Regressions also retain rejection of missing declared constraint fields, missing messages and extra arrays. The older inventory was reproduced as a real rejection before the migration. Both the inner runtime inventory and the outer strict-envelope re-encoding check now recognize the same narrow legacy layout through _constraint_checkpoint.py; every other decoder check remains in force.
+
+Thirty existing checkpoint/restore-focused cases passed in 249.54 seconds (nine deselections), before the final outer-inventory adjustment; the upcoming default gate will validate that final source against all existing cases. Earlier compiler/CSP focused evidence is 168 passing tests. CSP/rules source files are unchanged. The only compiler characterizations updated are the intentionally obsolete plan.k/table storage assertions; endpoint order, public model hashes and numerical authorities remain unchanged.
+
+Ruff passes for the new helper, changed small modules, compiled values and new tests. Baseline findings are unchanged by code/message multiset: Engine 23, Colony 5, _agent_mu3 7, _agent_checkpoint 3. New/changed small-file formatting, git diff --check and tk dep cycle pass. Architecture, README batching/checkpoint descriptions, change-path test anchors, and dashboard enrollment are updated. LIMITATIONS S10 is removed because the defect is repaired. No final full-suite claim yet; run it once after this final source commit and use its measured timing rather than repeatedly polling.
+
+**2026-09-10T03:22:54Z**
+
+Final default gate passed at code/test source 84aa318: 1,974 tests passed, 41 slow tests deselected, and four existing Gym deprecation warnings; pytest reported 1,119.00 seconds and measured wall time was 1,132.293 seconds. Completion was 2026-09-10T03:21:26.867992+00:00, recorded against ea82c53. The dashboard was refreshed and includes the 80 new constraint cases. The only intervening commit ea82c53 records the next ticket handoff; no source/test change supersedes this result. The suite was checked once, after the expected completion window, and will not be rerun for publication.
+
+All acceptance criteria are satisfied. The numerical constraint rules and public structure hash are unchanged; instance parameters, compatible vectorized batches and strict/legacy reconstruction are covered by the final gate. Close this ticket and publish the next PR above #124; cff-nyad is the next ready architecture step. Its note already maps the exact schedule boundary and preserved hostile-input/transport tests. Independent agent review remains unavailable at the reported usage limit; no such review is claimed.
+
+**2026-09-10T03:24:16Z**
+
+Published as PR #125, https://github.com/engimatic-systems/cffg/pull/125, above #124. The shared architecture page now explains the repaired per-instance constraint ownership, compatible batching and narrow checkpoint reconstruction; HTML checks passed with 61 unique IDs and 35 resolved internal anchors. The dashboard shows 1,974 passing tests. Source/test head remains 84aa318, with gate/closure recorded in 2a90bf6; publication has not changed code. Next: update this published branch and start cff-nyad. The open stack is left for review, not merged without another merge request.

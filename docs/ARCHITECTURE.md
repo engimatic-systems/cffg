@@ -126,8 +126,8 @@ and review context proportional to the change.
 | --- | --- | --- | --- | --- |
 | New IR field | `src/cffg/core/ir.py` (`Template` or its spec dataclass) | `src/cffg/core/validate.py`; `src/cffg/core/serialize.py` (`to_dict`, `from_dict`, `structure_hash`); `src/cffg/core/plates.py` scoping; `src/cffg/core/compose.py` and `src/cffg/core/edits.py` when editable; `src/cffg/topology.py` declaration snapshots/layout, `src/cffg/specialized/` semantic claims/drafts, `src/cffg/registered/` same-arena drafts, `src/cffg/resolution/` arrays/addresses, `src/cffg/assembly.py` arena assembly, and `src/cffg/compiled.py` values when executable; bundle and agent state when persisted | `tests/test_ir.py`, `tests/test_serialize.py`, `tests/test_plates.py`, `tests/test_topology.py`, `tests/test_registered.py`, `tests/test_resolution.py`, `tests/test_assembly.py`; add `tests/test_edit_codec.py`, `tests/test_edits.py`, `tests/test_agent_spec.py`, or `tests/test_bundle.py` only for the affected boundary | Contract in this document; public construction and migration in `README.md`; unsupported cases in `LIMITATIONS.md` |
 | New factor or rule family | `src/cffg/kernels.py:FactorKernel`, `kernel_bindings.py`, its `src/cffg/core/ir.py:FactorType`, and the family rule module; formal equations are authoritative in code docstrings and `DERIVATIONS.md` | `topology.py` declared role/slot facts; `specialized/` named family discovery/completion; `registered/` binding capabilities and same-arena structural lowering; common declarations in `array_requirements.py`; `registered/packing.py` and `specialized/packing.py` family adapters; `resolution/` parameter/observation resolution; `assembly.py`, `Arena`, and `member_of`; typed local updates in `execution/` and `ExecutionDelta`; registered mathematics/readouts/energy in `kernel_runtime.py`; synchronous `_make_step`; scheduled batch/registerized/flat scans; `_make_bfe`; support checks, assignment scoring, readouts, schedule classification, serialization manifest, estimator, and public exports as applicable | `tests/test_kernels.py`, `tests/test_execution.py`, `tests/test_registered.py`, `tests/test_resolution.py`, `tests/test_assembly.py`, `tests/test_discrete_kernels.py`, `tests/test_gaussian_kernels.py`, `tests/test_gaussian_kernel_schedules.py`; family rule and engine-oracle tests; `tests/test_schedule.py`; sparse-support, float32, and uncomfortable-scale cases | Derivation in `DERIVATIONS.md`; integration contract here; approximations in `LIMITATIONS.md`; public modeling API in `README.md` |
-| Runtime numerical or status invariant | `AGENTS.md` numerical contract and `src/cffg/engine.py` (`RunStatus`, `RunResult`, `Engine.run`) | Flooding, colored/mixed, and exact schedules; host `_has_zero_support` and JIT `_make_support_check`; `_make_step`, `_make_exact_unit`, `_make_propagate`, and `_make_bfe`; inner-solver status; `RollingAgent`, `Colony`, estimator, benchmark, and dashboard consumers | `tests/test_runtime_status.py`, `tests/test_schedule.py`, `tests/test_engine_contracts.py`, `tests/test_colony.py`, `tests/test_colony_failures.py`, plus the changed rule family's hostile-input tests | Runtime contract here and in `README.md`; any accepted failure mode or approximation in `LIMITATIONS.md` |
-| Learnable or checkpoint feature | `src/cffg/core/ir.py` (`LearnableSpec`, `AgentSpec`, `BeliefBinding`) and `src/cffg/learn.py` (`Family`, `Learnables`) | Validation, JSON/hash, plate scoping, specialized parameter/objective ownership, `resolution/addresses.py:resolve_learnables` and declared member/parameter requirements, `Arena.learn_plans`, `member_of`, engine readouts and parameter writes, agent cadence, checkpoint encode/decode and legacy migration, and bundles | `tests/test_learnables.py`, `tests/test_resolution.py`, `tests/test_assembly.py`, `tests/test_agent_spec.py`, `tests/test_agent.py`, and `tests/test_bundle.py`; add the contributing factor family's statistic test | Conjugate contract here; statistics beyond the papers in `DERIVATIONS.md`; public cadence/checkpoint API in `README.md`; remaining family gaps in `LIMITATIONS.md` |
+| Runtime numerical or status invariant | `AGENTS.md` numerical contract and `src/cffg/engine.py` (`RunStatus`, `RunResult`, `Engine.run`) | Flooding, colored/mixed, and exact schedules; host `_has_zero_support` and JIT `_make_support_check`; `_make_step`, `_make_exact_unit`, `_make_propagate`, and `_make_bfe`; inner-solver status; `RollingAgent`, `Colony`, estimator, benchmark, and dashboard consumers | `tests/test_runtime_status.py`, `tests/test_schedule.py`, `tests/test_engine_contracts.py`, `tests/test_colony.py`, `tests/test_colony_failures.py`, `tests/test_constraint_data.py`, `tests/test_constraint_reconstruction.py`, plus the changed rule family's hostile-input tests | Runtime contract here and in `README.md`; any accepted failure mode or approximation in `LIMITATIONS.md` |
+| Learnable or checkpoint feature | `src/cffg/core/ir.py` (`LearnableSpec`, `AgentSpec`, `BeliefBinding`) and `src/cffg/learn.py` (`Family`, `Learnables`) | Validation, JSON/hash, plate scoping, specialized parameter/objective ownership, `resolution/addresses.py:resolve_learnables` and declared member/parameter requirements, `Arena.learn_plans`, `member_of`, engine readouts and parameter writes, agent cadence, checkpoint encode/decode and legacy migration, and bundles | `tests/test_learnables.py`, `tests/test_constraint_reconstruction.py`, `tests/test_resolution.py`, `tests/test_assembly.py`, `tests/test_agent_spec.py`, `tests/test_agent.py`, and `tests/test_bundle.py`; add the contributing factor family's statistic test | Conjugate contract here; statistics beyond the papers in `DERIVATIONS.md`; public cadence/checkpoint API in `README.md`; remaining family gaps in `LIMITATIONS.md` |
 
 Duplicated execution surfaces are deliberate review pairs: host/JIT,
 flooding/scheduled, single-instance/`vmap`, and current/legacy checkpoint
@@ -898,10 +898,12 @@ selection lives in `execution/parameters.py`; categorical cavities remain
 cavities, while recurrence-drive and precision VMP beliefs are assembled by
 their local owners from the supplied edge sides.
 
-The constraint owner accepts explicit numerical threshold/table arguments.
-Its current Engine binding still supplies compiled defaults; the per-instance
-constraint-data defect and required correction are documented in LIMITATIONS
-S10. The typed local API alone does not repair that binding.
+The constraint owner accepts explicit numerical threshold/table arguments
+selected from `State.params`. Family validation publishes their initial integer
+arrays in `Arena.log_params`; `ConstraintPlan` retains only structural metadata
+and a family-prefixed `parameter_key`. Updates, free energy, host feasibility
+and decoded-assignment scoring all read the current instance's values. No
+runtime consumer falls back to another instance's compiled defaults.
 
 `execution/functional.py` separates the existing stationary and fixed-particle
 importance calculations. Readiness, base-posterior checks, low-ESS policy and
@@ -1424,6 +1426,17 @@ discarding a joint correlation. Exact joint rollover remains the separate
   log-normalizer, ledger, and status before atomically mutating the live agent;
   analytic legacy checkpoints remain supported, while a functional legacy
   restore is loud.
+  Legacy analytic envelopes that lack fixed-parameter hashes cannot detect a
+  change to supplied fixed model data. Their initial runtime parameters still
+  come from the supplied template and arrays; strict identity checks belong to
+  the current envelope.
+  Prepared functional caches with the exact older parameter layout, before
+  constraints were stored in State, reconstruct only those fixed arrays from
+  the supplied model data. Their other parameter fields, physical inventory,
+  shapes, dtypes and cached-result checks remain mandatory. The migration lives
+  in `_constraint_checkpoint.py`. New checkpoints use the existing parameter-
+  array encoding for these values; no new envelope version or model field is
+  introduced.
 - Sensor/actuator adapters are plain Python callbacks mapping env observations to
   one-hot data bindings and control marginals to env actions.
 
@@ -1432,9 +1445,14 @@ discarding a joint correlation. Exact joint rollover remains the separate
 `Colony` owns an instance table of `(structure_hash, State)` pairs and caches one
 `Engine` per structure hash. Each `State` is an Equinox pytree containing
 messages, parameters, and conditioned observations; structure remains in the
-cached engine. Ordinary iterative instances with one structure are stacked and
-one scheduled iteration is evaluated under `filter_vmap`, while different
-structures run as separate groups. Mixed-GFE instances reuse the same compiled
+cached engine. Ordinary iterative instances are grouped by structure plus State
+pytree layout, array shapes and dtypes before stacking. Each compatible batch
+evaluates one scheduled iteration under `filter_vmap`; different structures or
+numeric layouts run as separate groups. Different allowed-tuple table lengths
+therefore cannot enter one stack, while same-shaped tables with different
+contents retain vectorized execution. One cached Engine can have several JAX
+shape/dtype specializations; numeric contents do not define its identity.
+Mixed-GFE instances reuse the same compiled
 trust kernels but currently run one host controller per instance so each keeps
 its own trust radius, active support, and termination reason. Inter-instance
 coupling happens through host-side data binding and marginal reads, never by
@@ -1447,6 +1465,11 @@ an infinite inner residual, matching standalone `Engine.run`. Healthy peers
 continue through the vmapped updates; a fully rejected group skips priming and
 updates. `tests/test_colony_failures.py` checks complete result/state parity
 across both float precisions, zero/positive budgets and mixed/flood schedules.
+`tests/test_constraint_data.py` additionally checks distinct per-instance limits
+and tables, both spawn orders, all four numeric consumers, and actual batching
+of mixed float precisions and table lengths. `test_constraint_reconstruction.py`
+checks bundles, current and supported legacy agent reconstruction, and strict
+fixed-data mismatch rejection.
 
 The convergence loop and per-instance status bookkeeping are currently Python
 host control flow around the vmapped iteration. The measured 32-instance CPU

@@ -11,6 +11,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from cffg import efrules
+from cffg._constraint_checkpoint import restore_legacy_constraint_arrays
 from cffg.engine import Engine, RunResult, RunStatus, State, _replace
 from cffg.outer import OuterTerminationReason
 
@@ -278,6 +279,15 @@ def restore_runtime(
     result = None
     if metadata["has_result"]:
         expected_state = engine.init_state()
+        constraint_keys = {
+            plan.parameter_key for plan in engine.arena.constraint_groups
+            if plan.parameter_key is not None
+        }
+        if constraint_keys and "mu3:state:metadata" in data:
+            state_metadata = _json_object(data["mu3:state:metadata"], "mu3:state:metadata")
+            data = restore_legacy_constraint_arrays(
+                data, state_metadata, expected_state.params, constraint_keys
+            )
         expected_mu3_fields |= {
             "mu3:state:metadata",
             *(f"mu3:state:{name}" for name in _STATE_FIELDS if name != "params"),

@@ -867,9 +867,12 @@ colony.run(100)                # grouped by structure
 colony.marginals(ids[0])
 ```
 
-Engines are cached by structure hash — N instances of one template cost one
-compilation, and instances couple only through their ports. Ordinary iterative
-plans use vmapped rule iterations with host status tracking. Mixed-GFE plans
+Engines are cached by structure hash, and instances couple only through their
+ports. Numeric parameters, including hard-constraint limits and allowed-tuple
+tables, belong to each instance. Ordinary iterative plans batch matching State
+shapes and dtypes and use vmapped rule iterations with host status tracking.
+Different table lengths use separate batches; one cached Engine can have
+several JAX shape/dtype specializations. Mixed-GFE plans
 reuse the compiled matrix-free kernels but currently run one trust controller
 per instance so radii, active supports, and termination reasons remain
 independent.
@@ -915,6 +918,8 @@ before one atomic commit. An unknown version, field, structure,
 parameterization, configuration, or shape raises a specific error; legacy
 unversioned analytic checkpoints retain an explicit, completeness-checked
 migration path.
+Legacy formats without fixed-parameter hashes cannot detect a change to supplied
+fixed model data; use the current checkpoint format for that identity check.
 
 ## Register a custom factor
 

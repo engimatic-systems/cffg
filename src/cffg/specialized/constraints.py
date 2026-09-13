@@ -1,5 +1,7 @@
 """Hard-constraint drafts and their family-owned payload validation."""
 
+from typing import NamedTuple
+
 import numpy as np
 
 from cffg.array_requirements import ArrayRecipe
@@ -11,6 +13,11 @@ from .requirements import array_requirement
 
 class ConstraintValidationError(ValueError):
     """An explicit family diagnostic, distinct from incidental array errors."""
+
+
+class ResolvedConstraint(NamedTuple):
+    plan: ConstraintPlan
+    parameters: dict[str, np.ndarray]
 
 
 def lower_constraints(claims: SpecializedClaims) -> tuple[ConstraintDraft, ...]:
@@ -48,7 +55,7 @@ def lower_constraints(claims: SpecializedClaims) -> tuple[ConstraintDraft, ...]:
 
 def resolve_constraint(
     draft: ConstraintDraft, resolved: dict[str, np.ndarray]
-) -> ConstraintPlan:
+) -> ResolvedConstraint:
     """Run this family's existing checks at the late constraint checkpoint."""
     fname, cards = draft.name, draft.cards
     n = len(cards)
@@ -111,13 +118,17 @@ def resolve_constraint(
                     f"factor {fname!r}: table column {j} has values outside [0, {cards[j]})"
                 )
 
-    return ConstraintPlan(
+    plan = ConstraintPlan(
         name=fname,
         type=draft.type,
         cards=cards,
         members=(fname,),
         gather=draft.gather,
         scatter=draft.scatter,
-        k=k,
-        table=table_arr,
     )
+    parameters = {}
+    if plan.parameter_key is not None:
+        parameters[plan.parameter_key] = (
+            table_arr if draft.type == "table" else np.asarray(k, dtype=np.int64)
+        )
+    return ResolvedConstraint(plan, parameters)

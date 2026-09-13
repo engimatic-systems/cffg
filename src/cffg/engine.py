@@ -1732,6 +1732,7 @@ class Engine:
                 return True
 
         for constraint in self.arena.constraint_groups:
+            parameters = _parameters.constraint_parameters(constraint, state.params)
             supports = [
                 np.flatnonzero(
                     _np_log_support(
@@ -1748,13 +1749,15 @@ class Engine:
                 possible = {0}
                 for support in supports:
                     possible = {total + value for total in possible for value in support}
-                feasible = constraint.k in possible
+                feasible = int(np.asarray(parameters.threshold)) in possible
             elif constraint.type == "at_most_k":
-                feasible = sum(min(support) for support in supports) <= constraint.k
+                feasible = sum(min(support) for support in supports) <= int(
+                    np.asarray(parameters.threshold)
+                )
             elif constraint.type == "table":
                 feasible = any(
                     all(int(row[i]) in supports[i] for i in range(len(supports)))
-                    for row in constraint.table
+                    for row in np.asarray(parameters.table)
                 )
             else:  # alldifferent, n/card <= 10 by compiler validation
                 def match(i: int, used: set[int]) -> bool:
@@ -2431,19 +2434,20 @@ class Engine:
                 total += -float(logf[(i, *v)])
         for c in self.arena.constraint_groups:
             v = [xhat[slot2var[int(c.scatter[j])]] for j in range(len(c.cards))]
-            total += 0.0 if self._constraint_ok(c, v) else np.inf
+            parameters = _parameters.constraint_parameters(c, state.params)
+            total += 0.0 if self._constraint_ok(c, v, parameters) else np.inf
         return total
 
     @staticmethod
-    def _constraint_ok(c, v: list[int]) -> bool:
+    def _constraint_ok(c, v: list[int], parameters: _parameters.ConstraintParameters) -> bool:
         if c.type == "alldifferent":
             return len(set(v)) == len(v)
         if c.type == "exactly_k":
-            return sum(v) == c.k
+            return sum(v) == int(np.asarray(parameters.threshold))
         if c.type == "at_most_k":
-            return sum(v) <= c.k
+            return sum(v) <= int(np.asarray(parameters.threshold))
         # table: the assignment must be one of the allowed tuples
-        return any(np.array_equal(np.asarray(v), row) for row in c.table)
+        return any(np.array_equal(np.asarray(v), row) for row in np.asarray(parameters.table))
 
 
 @dataclass(frozen=True)
@@ -2607,14 +2611,14 @@ def _ef_sweep(arena, ef_eta, ef_obs, ef_mask, params):
     return new
 
 
-def _constraint_writes(arena: Arena, messages: jax.Array, op):
+def _constraint_writes(arena: Arena, messages: jax.Array, params, op):
     """Combinatorial messages for the hard-constraint factors (cff-e8zk). Reads
     the pre-sweep messages (synchronous flooding); returns exact segmented
     writes for the discrete arena, folded into damping by the caller."""
     writes = []
     for c in arena.constraint_groups:
         inc = _disc_rows(arena, messages, c.gather, c.cards)
-        delta = _execute_constraint(c, inc, _parameters.constraint_defaults(c), op)
+        delta = _execute_constraint(c, inc, _parameters.constraint_parameters(c, params), op)
         writes.append((c.scatter, c.cards, delta.outgoing))
     return writes
 
@@ -2674,7 +2678,7 @@ def _make_step(arena: Arena, skip_scheduled: bool = False):
                 g.param_size,
                 delta.outgoing.counts.reshape((len(g.members), g.param_size)),
             )
-        for scatter, cards, out in _constraint_writes(arena, messages, op):
+        for scatter, cards, out in _constraint_writes(arena, messages, params, op):
             new = _set_disc_rows(arena, new, scatter, cards, out)
         goal_predictions = {}
         for g in arena.gfe_groups:
@@ -3650,10 +3654,11 @@ def _make_bfe(arena: Arena):
         for c in arena.constraint_groups:
             inc = _disc_rows(arena, messages, c.gather, c.cards)
             fn = csp.CONSTRAINT_ENERGIES[c.type]
+            parameters = _parameters.constraint_parameters(c, params)
             if c.type in ("exactly_k", "at_most_k"):
-                total = total + fn(inc, c.cards, k=c.k)
+                total = total + fn(inc, c.cards, k=parameters.threshold)
             elif c.type == "table":
-                total = total + fn(inc, c.cards, table=jnp.asarray(c.table))
+                total = total + fn(inc, c.cards, table=parameters.table)
             else:
                 total = total + fn(inc, c.cards)
         goal_predictions = {}
