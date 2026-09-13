@@ -277,89 +277,9 @@ def test_model_identity_does_not_authorize_a_d8_checkpoint():
         ).load_state_dict(_with_manifest(checkpoint, legacy))
 
 
-def test_model_only_bundle_stays_loadable_and_runs_current_pair_semantics(tmp_path):
-    template, arrays = _model()
-    path = tmp_path / "rslds.cffgz"
-    save_bundle(path, template, arrays)
-    restored, restored_arrays, manifest = load_bundle(path)
-
-    assert structure_hash(restored) == structure_hash(template)
-    assert CHECKPOINT_MANIFEST_KEY not in manifest
-    assert manifest["resumable"] is False
-    engine = Engine(compile_template(restored, arrays=restored_arrays))
-    result = engine.run(engine.init_state(), 200, tol=1e-8)
-    assert result.status is RunStatus.CONVERGED
-    pairs = engine.recurrence_pair_beliefs(result.state)
-    assert set(pairs) == {"switch1", "switch2"}
-    assert all(bool(pair["proper"]) for pair in pairs.values())
-
-
-LEGACY_BUNDLE = Path(__file__).parent / "fixtures" / "rslds-base-4d790231.cffgz"
-
-
-def test_actual_pre_change_recurrence_bundle_loads_for_fixed_inference():
-    """Produced by rslds(3, **parameters) and save_bundle at
-    4d7902317ef5007f90a36ea59bb276cf6866bfcb, using the values in _model().
-    That revision reloaded the archive and produced the inference goldens below.
-    """
-    assert hashlib.sha256(LEGACY_BUNDLE.read_bytes()).hexdigest() == (
-        "c0adf08883f4e6e283dce3af8ac890d51049b15211afbb58400f6bc42e0fe58f"
-    )
-    _, expected_arrays = _model()
-    with zipfile.ZipFile(LEGACY_BUNDLE) as archive:
-        document = json.loads(archive.read("model.json"))
-        assert "learning_schema_version" not in document
-        assert all("semantic_identity" not in spec for spec in document["learnables"].values())
-        assert set(archive.namelist()) == {
-            "model.json", "manifest.json", *(f"blobs/{key}.npy" for key in expected_arrays),
-        }
-
-    template, arrays, manifest = load_bundle(LEGACY_BUNDLE)
-    assert manifest["resumable"] is False
-    assert template.learnables["recurrence"].semantic_identity == RECURRENCE_STATISTIC_IDENTITY
-    assert manifest["structure_hash"] == "3b69798f0ab37b52a91b3fa34f9a3f61f1c7a19b426e41013b9b229e2789eeec"
-    for key, value in expected_arrays.items():
-        np.testing.assert_array_equal(arrays[key], value)
-    engine = Engine(compile_template(template, arrays=arrays))
-    state = engine.bind_data(engine.init_state(), {
-        "y0": np.array([0.3]), "y1": np.array([-0.25]), "y2": np.array([0.6]),
-    })
-    result = engine.run(state, 200, tol=1e-8)
-    assert result.status is RunStatus.CONVERGED
-    assert engine.bfe(result.state) == pytest.approx(3.3879904041391486, abs=1e-8)
-    np.testing.assert_allclose(
-        engine.marginals(result.state)["z2"], [0.5043641957783871, 0.49563580422161296], atol=1e-8,
-    )
-
-    learning = Learnables(engine, priors={"recurrence": _recurrence_prior()}, only=("recurrence",))
-    unidentified = learning.hyperparameter_snapshot()
-    d8 = _manifest(_legacy_checkpoint(learning))
-    d8["statistic_identity"] = "cffg.recurrence.d8-singleton-product/1.0.0"
-    for checkpoint in (unidentified, _with_manifest(unidentified, d8)):
-        with pytest.raises(ValueError, match="identity"):
-            learning.load_state_dict(checkpoint)
-    for key, value in unidentified.items():
-        np.testing.assert_array_equal(learning.hyperparameter_snapshot()[key], value)
-
-
-@pytest.mark.parametrize("corruption", ("model", "blob"))
-def test_pre_change_bundle_hashes_are_verified_before_migration(tmp_path, corruption):
-    with zipfile.ZipFile(LEGACY_BUNDLE) as archive:
-        records = {key: archive.read(key) for key in archive.namelist()}
-    if corruption == "model":
-        document = json.loads(records["model.json"])
-        document["learnables"]["recurrence"]["sources"] = []
-        records["model.json"] = json.dumps(document).encode()
-        match = "structure hash mismatch"
-    else:
-        key = "blobs/recurrence_weights.npy"
-        records[key] = records[key][:-1] + bytes([records[key][-1] ^ 1])
-        match = "sha256 mismatch"
-    path = tmp_path / "tampered.cffgz"
-    with zipfile.ZipFile(path, "w") as archive:
-        for key, value in records.items():
-            archive.writestr(key, value)
-    with pytest.raises(BundleError, match=match):
+def test_original_model_only_recurrence_bundle_is_refused():
+    path = Path(__file__).parent / "fixtures" / "rslds-base-4d790231.cffgz"
+    with pytest.raises(BundleError, match="unsupported bundle schema '1'"):
         load_bundle(path)
 
 

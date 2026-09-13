@@ -164,7 +164,7 @@ A pure-Python (dataclass) representation, independent of JAX:
   participate so another declaration cannot silently discard future meaning.
   The schema and valid-model hashes are unchanged. Tests live in
   `tests/test_constraint_details.py`, alongside core/serialization/compiler and
-  current/legacy bundle checks. This does not change other constraint families
+  current bundle and current/legacy agent checks. This does not change other constraint families
   or the JSON parser's general duplicate-object-key behavior.
 - **Templates with ports.** A template is a CFFG fragment whose boundary edges are
   declared **ports** with roles: `data` (sensor clamp), `goal` (goal prior),
@@ -202,22 +202,33 @@ A pure-Python (dataclass) representation, independent of JAX:
   explicit arrays > existing blob file > init spec — a persisted blob overrides
   its warm start on reload. Init specs, like paths, are erased from the
   structure hash (parameter data, not structure).
-- **Portable bundle**: the deployable unit is a ZIP (`.cffgz`) containing
-  `model.json` (structure + constraints), `blobs/` (parameter arrays), and
-  `manifest.json` (schema version, content hashes, provenance). The supported
-  restore path is `load_bundle` → `compile_template` → `Engine`; an extracted
-  model may instead use the serialized loader and `compile_template(...,
-  root=extracted_directory)`. Bundle parameter
-  members are canonical `.npy` files; ordinary external references may also use
-  safetensors. Plate fragments remain nested specs in `model.json`; the manifest
-  inventories every grounded tied/per-copy array, and per-copy blob paths use an
-  `{index}` marker resolved during grounding. Array-key-derived subpaths prevent
-  collisions without flattening the plate spec. Original flat schema-1 manifests
-  remain loadable. These are model-only bundles and rerun under current built-in
-  factor semantics. A structure hash cannot distinguish D8 from D9 when the
-  `recurrence_link` IR spelling is unchanged; resumable recurrence posterior
-  state therefore owns a separate statistic manifest. No third-party
-  interchange format — this schema is canonical.
+- **Portable bundle**: schema `"2"` is a ZIP (`.cffgz`) containing `model.json`,
+  `blobs/`, `learning/`, and `manifest.json`. Template JSON keeps its independent
+  schema version. The manifest owns the complete point inventory, NPY hashes,
+  exact array shape/dtype/value digests, and the family-independent learning
+  inventory. Each learning member uses
+  `learning/<percent-encoded-owner>/<prior|posterior>/<percent-encoded-key>.npy`;
+  owner and key are encoded independently, including scoped slash characters.
+  Blob members use reversible per-segment encoding under `blobs/`, a separate
+  namespace. Plate fragments stay compact in `model.json`; grounding resolves
+  the `{index}` marker in per-copy blob paths and enumerates every concrete
+  learnable and point array. Compiler plans reconstruct logical ownership;
+  no arena address or executable callback is serialized.
+  `load_bundle` returns a `LoadedBundle` with template, point arrays, manifest,
+  and reconstructed `Learnables`. The learner owns read-only immutable priors
+  and current posteriors; the caller owns the supplied point arrays. An empty
+  declared-learning inventory is explicit. Loading verifies unique safe ZIP
+  members, exhaustive inventories, all hashes, compiler shapes and both family
+  states before returning. Saving copies state under the learner's update lock,
+  validates the exact archive bytes, then fsyncs a sibling and replaces the
+  destination atomically. Direct edits to caller-owned mappings require caller
+  synchronization. This is a committed learning boundary, not executing state.
+  The supported inference path remains `load_bundle` → `compile_template` →
+  `Engine`; extracted point blobs also work with `root=extracted_directory`.
+  During alpha only the current bundle schema is accepted. Older versions
+  fail explicitly; no point estimate supplies missing posterior provenance.
+  A stable compatibility and migration contract remains future work. No
+  third-party interchange format is implied.
 - **Edit actions**: `check_edits` validates a sequence of typed actions and
   `apply_edits` commits it atomically to a copy. `AddVariable`, `AddFactor`,
   `RemoveFactor`, `RemoveVariable`, `ReplaceFactor`, `AddConstraint`,
@@ -1458,8 +1469,9 @@ does not duplicate learning resolution.
 `1.0.0`. Restoration checks semantic identity, ownership, completeness, exact
 dtype/value digests, and family admissibility before mutation. The manifest
 describes priors, but this flat checkpoint API still restores only posteriors;
-immutable priors remain those supplied by the destination caller. Complete
-prior/posterior CFFGZ storage is owned by `cff-enhs`.
+immutable priors remain those supplied by the destination caller. Schema-2
+CFFGZ archives instead store and restore both complete states through
+`Learnables.from_persistent_state`, preserving source dtypes without coercion.
 With `load_state_dict(exact=False)`, the manifest may name a subset of the
 destination owners; every supplied descriptor and posterior must still be
 complete. `exact=True` additionally requires all destination owners. Arrays
@@ -1469,12 +1481,9 @@ current posteriors. Both modes stage validation before committing any changes.
 Unversioned declarations and bare/slash/v2 checkpoints for the four unchanged
 nonrecurrence families migrate deterministically. Complete multi-array state
 is required. Historical agent structure hashes are accepted only for those
-unchanged identities. Model-only bundles instead verify the original serialized
-model hash before declaration migration, validate the migrated template, then
-verify every blob digest. They
-remain loadable with current learning rules, including unversioned recurrence,
-and the returned manifest reports `resumable=False`. Their point parameters
-provide no posterior provenance; any new learning requires fresh priors.
+unchanged identities. Alpha CFFGZ loading accepts only the current bundle
+schema, including its complete learning descriptors and arrays. Older bundle
+versions are rejected; checkpoint migration has its own version contract.
 Standalone unversioned recurrence JSON remains rejected. Legacy recurrence-only
 checkpoint manifests retain their D9 identity/ownership/digest checks; D8 and
 unidentified recurrence posteriors cannot migrate. `hyperparameter_snapshot()`

@@ -1,6 +1,6 @@
 ---
 id: cff-enhs
-status: open
+status: closed
 deps: [cff-xabn, cff-yoxz]
 links: []
 created: 2026-08-31T03:16:28Z
@@ -48,9 +48,9 @@ bundle format and public save/load workflow.
 7. A save operation observes one committed learning boundary. It either stores
    a mutually compatible model, prior, posterior, and point state or fails
    atomically; it never records a partly applied update.
-8. Original schema-1 model-only bundles remain loadable and are explicitly
-   reported as non-resumable. Loading does not infer posterior hyperparameters
-   from point estimates or fabricate immutable priors.
+8. Only schema-current bundles are supported. Older bundle schemas fail with
+   an explicit unsupported-version error; loading never fabricates priors or
+   posterior history. Cooper waived legacy bundle preservation on 2026-09-13.
 9. Scoped and plate-expanded names have reversible member encoding and cannot
    collide with model blobs, manifest members, or another learning-state key.
 10. Tampered, missing, duplicate, non-finite, wrong-shape, wrong-dtype, unknown-
@@ -58,7 +58,7 @@ bundle format and public save/load workflow.
 11. Exact zero array entries round-trip bit-for-bit; float32 arrays retain their
     dtype; and an archive with at least 64 learnables loads without family-
     specific bundle branches.
-12. `README.md` documents the public save/load and legacy capability check.
+12. `README.md` documents the public save/load and unsupported-version behavior.
     `docs/ARCHITECTURE.md` documents member layout and ownership.
     `docs/LIMITATIONS.md` distinguishes next-trial learning resume from an exact
     inference or agent-runtime snapshot.
@@ -119,3 +119,19 @@ Post-handoff scan additions: end_to_end=consumer workflow delegated to cff-jilz;
 **2026-08-31T03:26:14Z**
 
 Final classification addition: later=ordered downstream workflow.
+
+**2026-09-13T15:09:48Z**
+
+Implementation handoff: use the Learnable or checkpoint feature change path. Authority: existing LearnableSpec identities and family persistent descriptors; no new IR field (New IR field row N/A). Bundle schema-current/legacy encode/decode, public exports, compiler learn-plan reconstruction, and immutable-prior/posterior ownership are directly affected. Existing checkpoint decode remains unchanged and is checked with recurrence/learning tests. Host/JIT, flooding/scheduled, and single-instance/vmap execution changes are N/A: restored point arrays use the existing compiler and the persistence boundary is host-side. Preserve literal zero and float32 bytes; reject missing/extra/invalid state and malformed archives; exercise 64 scoped plate owners. API: save_bundle(..., learnables=learning), LoadedBundle(template, arrays, learnables, manifest) with tuple-unpacking compatibility and explicit resumable capability. Snapshot copies plus validation and atomic sibling replacement prevent partially published archives.
+
+**2026-09-13T15:23:37Z**
+
+Cooper clarified the alpha policy: only schema-current bundles must load in this version. Removed schema-1 migration from this implementation and changed the acceptance criteria to explicit unsupported-version refusal. Stable compatibility and migration policy is tracked separately in cff-1xig, after cff-jilz. Legacy checkpoint APIs retain their independent contracts.
+
+**2026-09-13T15:24:35Z**
+
+Implementation complete for the alpha contract. Added schema-2 LoadedBundle, complete family-independent prior/posterior inventories, point-array validation, coordinated snapshot capture, and atomic verified publication. Updated public docs and save callers; unsupported schema-1 archives now fail explicitly. Focused validation after the final code change: 148 passed, 1 slow test deselected across bundle, learning schema, recurrence checkpoint, agent specification, constraint validation, and facade checks. Earlier agent/learnable/consumer coverage also passed after compatibility fixes. Full short-suite gate is next.
+
+**2026-09-13T15:52:34Z**
+
+Final validation: uv run python tools/dashboard.py --run-suite passed 2,245 tests, with 41 slow tests deselected and 4 existing Gym deprecation warnings, in 1,163.36 seconds. Dashboard and runtime history refreshed. Focused final set: 148 passed. git diff --check and tk dep cycle passed. Archive mechanics and current-schema refusal are complete; cff-jilz owns the all-family consumer workflow, full specimen inventory proof, and export handoff. Alpha compatibility is deliberately deferred to cff-1xig.

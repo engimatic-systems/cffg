@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from cffg.bundle import BundleError, load_bundle, save_bundle
+from cffg.bundle import BUNDLE_SCHEMA_VERSION, BundleError, load_bundle, save_bundle
 from cffg.compiler import compile_template
 from cffg.core import (
     BlobRef,
@@ -26,6 +26,8 @@ from cffg.core.serialize import SCHEMA_VERSION, structure_hash, to_dict, to_json
 from cffg.engine import Engine
 from cffg.models.gridworld import build_gridworld
 from cffg.models.rslds import rslds
+from cffg.models.rslds_fit import vague_rslds_fit_priors
+from cffg.learn import Learnables
 from cffg.models.tmaze import build_tmaze
 
 
@@ -132,7 +134,9 @@ def test_writes_representative_rslds_bundle_for_inspection():
     pending = REPRESENTATIVE_BUNDLE.with_suffix(".pending.cffgz")
 
     try:
-        save_bundle(pending, template, arrays)
+        learning = Learnables(Engine(compile_template(template, arrays=arrays)),
+                             priors=vague_rslds_fit_priors(3, 2, 3).learning_priors())
+        save_bundle(pending, template, arrays, learnables=learning)
         loaded, loaded_arrays, manifest = load_bundle(pending)
         with zipfile.ZipFile(pending) as zf:
             members = set(zf.namelist())
@@ -141,12 +145,15 @@ def test_writes_representative_rslds_bundle_for_inspection():
             "model.json",
             "manifest.json",
             *(f"blobs/{name}.npy" for name in arrays),
+            *(row.name for d in learning.persistent_descriptors() for row in d.arrays),
         }
         assert set(manifest) == {
             "schema_version",
             "structure_hash",
             "blob_sha256",
             "blob_paths",
+            "blob_arrays",
+            "learning",
             "created",
             "generator",
             "resumable",
@@ -382,22 +389,24 @@ def test_missing_nested_or_per_copy_blob_rejected(tmp_path, logical_name):
         load_bundle(path)
 
 
-def test_original_flat_schema_one_bundle_remains_loadable(tmp_path):
+def test_original_flat_schema_one_bundle_is_refused(tmp_path):
     template, arrays = build_gridworld(k=5)
     path = tmp_path / "legacy-flat.cffgz"
     save_bundle(path, template, arrays)
     contents = _zip_contents(path)
     manifest = json.loads(contents["manifest.json"])
+    manifest["schema_version"] = SCHEMA_VERSION
+    manifest.pop("blob_arrays")
+    manifest.pop("learning")
     del manifest["blob_paths"]  # exact inventory shape emitted before plate support
     contents["manifest.json"] = json.dumps(manifest).encode()
     _write_zip(path, contents)
 
-    loaded, loaded_arrays, _ = load_bundle(path)
-    assert structure_hash(loaded) == structure_hash(template)
-    assert set(loaded_arrays) == set(arrays)
+    with pytest.raises(BundleError, match="unsupported bundle schema '1'"):
+        load_bundle(path)
 
 
-def test_legacy_flat_manifest_rejects_plate_instead_of_truncating(tmp_path):
+def test_current_plate_bundle_requires_blob_paths(tmp_path):
     template, arrays = _plate_model()
     path = tmp_path / "legacy-plate.cffgz"
     save_bundle(path, template, arrays)
@@ -407,7 +416,7 @@ def test_legacy_flat_manifest_rejects_plate_instead_of_truncating(tmp_path):
     contents["manifest.json"] = json.dumps(manifest).encode()
     _write_zip(path, contents)
 
-    with pytest.raises(BundleError, match="legacy flat blob manifest"):
+    with pytest.raises(BundleError, match="requires blob_paths"):
         load_bundle(path)
 
 
@@ -424,7 +433,7 @@ def test_save_rejects_nested_plate_before_creating_destination(tmp_path):
 def test_load_rejects_hand_built_nested_plate_bundle(tmp_path):
     template = _nested_plate_model()
     manifest = {
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": BUNDLE_SCHEMA_VERSION,
         "structure_hash": structure_hash(template),
         "blob_sha256": {},
         "blob_paths": {},
