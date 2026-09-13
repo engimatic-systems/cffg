@@ -198,12 +198,13 @@ def encode_persistent_manifest(descriptors) -> np.ndarray:
     return encoded
 
 
-def validate_persistent_manifest(value, descriptors) -> dict:
+def validate_persistent_manifest(value, descriptors, *, exact: bool = True) -> dict:
     """Check metadata against resolved owners before any posterior is changed.
 
     Destination priors and floating dtypes may differ. Each incoming array is
     validated against its recorded dtype/digest and the family's required shape.
     The descriptor's prior rows are inventory only in a posterior checkpoint.
+    With ``exact=False``, complete descriptors may name a subset of owners.
     """
     encoded = np.asarray(value)
     if encoded.shape != () or encoded.dtype.kind != "U":
@@ -274,7 +275,7 @@ def validate_persistent_manifest(value, descriptors) -> dict:
                 payload[name, row["key"]] = (dtype, digest)
         if present != set(required):
             raise ValueError(f"{label}: incomplete multi-array persistent schema")
-    if seen != set(expected):
+    if exact and seen != set(expected):
         raise ValueError(f"learning manifest missing learnables {sorted(set(expected) - seen)}")
     return payload
 

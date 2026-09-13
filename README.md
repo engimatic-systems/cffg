@@ -629,6 +629,10 @@ posterior arrays. Use `hyperparameter_snapshot()` for numeric-only diagnostics.
 Restore validates metadata and values before changing any posterior and
 preserves the stored floating dtype. This API restores posteriors; the initial
 priors remain those supplied when constructing the destination `Learnables`.
+`load_state_dict(..., exact=False)` accepts complete posteriors for selected
+learnables and leaves other posteriors unchanged. `exact=True` requires every
+destination learnable. Missing arrays within a supplied posterior fail in
+either mode before any state changes.
 
 Pre-identity JSON declarations for `dirichlet`, `niw`, `mniw`, and
 `component_mniw` migrate to their documented `/1.0.0` identities. Their old

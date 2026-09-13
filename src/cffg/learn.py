@@ -653,11 +653,11 @@ class Learnables:
         *,
         exact: bool = False,
     ) -> None:
-        """Restore hyperparameters, optionally requiring the complete state."""
+        """Restore complete posteriors for supplied owners; ``exact`` requires all owners."""
         descriptors = self.persistent_descriptors()
         manifest = data.get(PERSISTENT_MANIFEST_KEY)
         payload = (
-            validate_persistent_manifest(manifest, descriptors)
+            validate_persistent_manifest(manifest, descriptors, exact=exact)
             if manifest is not None else None
         )
         recurrence = checkpoint_context(data, self.plans, self.params)
@@ -704,6 +704,11 @@ class Learnables:
                 raise KeyError(f"no learnable {name!r} in this graph")
             if key not in self.params[name]:
                 raise KeyError(f"learnable {name!r} has no hyperparameter {key!r}")
+            if payload is not None and (name, key) not in payload:
+                raise KeyError(
+                    f"learnable {name!r}: checkpoint hyperparameter {key!r} "
+                    "has no persistent descriptor"
+                )
             if (name, key) in seen:
                 raise KeyError(
                     f"checkpoint names learnable {name!r} hyperparameter {key!r} twice"

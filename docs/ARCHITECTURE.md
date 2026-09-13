@@ -930,6 +930,11 @@ dtype/value digests, and family admissibility before mutation. The manifest
 describes priors, but this flat checkpoint API still restores only posteriors;
 immutable priors remain those supplied by the destination caller. Complete
 prior/posterior CFFGZ storage is owned by `cff-enhs`.
+With `load_state_dict(exact=False)`, the manifest may name a subset of the
+destination owners; every supplied descriptor and posterior must still be
+complete. `exact=True` additionally requires all destination owners. Arrays
+without a supplied descriptor are rejected, and untouched owners retain their
+current posteriors. Both modes stage validation before committing any changes.
 
 Unversioned declarations and bare/slash/v2 checkpoints for the four unchanged
 nonrecurrence families migrate deterministically. Complete multi-array state

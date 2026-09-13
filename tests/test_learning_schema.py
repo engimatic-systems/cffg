@@ -311,3 +311,73 @@ def test_pre_ticket_agent_envelope_restores_without_new_metadata(tmp_path):
     restored.restore(path)
     for name, state in source.learnables.params.items():
         np.testing.assert_equal(restored.learnables.params[name], state)
+
+
+@pytest.fixture
+def scoped_gaussian_learning():
+    template, arrays = _learning_template(1)
+    scope = "outer/inner"
+    engine = Engine(compile_template(
+        scoped(template, scope), arrays={f"{scope}/{key}": value for key, value in arrays.items()},
+    ))
+    priors = {
+        f"{scope}/a_state": conj.vague_niw(1),
+        f"{scope}/z_dynamics": conj.vague_mniw(1, 1),
+    }
+    return engine, priors
+
+
+@pytest.mark.parametrize("owner", ("a_state", "z_dynamics"))
+def test_selected_complete_checkpoint_restores_only_supplied_owner(scoped_gaussian_learning, owner):
+    engine, priors = scoped_gaussian_learning
+    name = f"outer/inner/{owner}"
+    source = Learnables(engine, priors={name: priors[name]}, only=(name,))
+    source.params[name]["nu"] += 10.0
+    checkpoint = source.state_dict()
+    destination = Learnables(engine, priors=priors)
+    unrelated = next(key for key in priors if key != name)
+    destination.params[unrelated]["nu"] += 3.0
+    before = destination.hyperparameter_snapshot()
+
+    with pytest.raises(ValueError, match=f"missing learnables.*{unrelated}"):
+        destination.load_state_dict(checkpoint, exact=True)
+    for key, value in before.items():
+        np.testing.assert_array_equal(destination.hyperparameter_snapshot()[key], value)
+
+    unrelated_before = {key: value.copy() for key, value in destination.params[unrelated].items()}
+    destination.load_state_dict(checkpoint, exact=False)
+    for key, value in source.params[name].items():
+        np.testing.assert_array_equal(destination.params[name][key], value)
+    for key, value in unrelated_before.items():
+        np.testing.assert_array_equal(destination.params[unrelated][key], value)
+
+
+@pytest.mark.parametrize("corruption", ("missing_array", "missing_schema_key", "extra_owner", "dtype", "identity"))
+def test_invalid_subset_checkpoint_is_atomic(scoped_gaussian_learning, corruption):
+    engine, priors = scoped_gaussian_learning
+    name = "outer/inner/a_state"
+    source = Learnables(engine, priors={name: priors[name]}, only=(name,))
+    source.params[name]["nu"] += 10.0
+    checkpoint = source.state_dict()
+    destination = Learnables(engine, priors=priors)
+    before = destination.hyperparameter_snapshot()
+    array_key = next(key for key in checkpoint if key.endswith(":nu"))
+    if corruption == "missing_array":
+        checkpoint.pop(array_key)
+    elif corruption == "extra_owner":
+        extra = next(key for key in before if key.endswith(":m"))
+        checkpoint[extra] = before[extra]
+    elif corruption == "dtype":
+        checkpoint[array_key] = checkpoint[array_key].astype(np.float32)
+    else:
+        document = json.loads(checkpoint[PERSISTENT_MANIFEST_KEY].item())
+        record = document["learnables"][0]
+        if corruption == "missing_schema_key":
+            record["arrays"].pop()
+        else:
+            record["semantic_identity"] = "cffg.learning.niw/99.0.0"
+        checkpoint[PERSISTENT_MANIFEST_KEY] = np.asarray(json.dumps(document))
+    with pytest.raises((ValueError, KeyError), match="learnable"):
+        destination.load_state_dict(checkpoint, exact=False)
+    for key, value in before.items():
+        np.testing.assert_array_equal(destination.hyperparameter_snapshot()[key], value)

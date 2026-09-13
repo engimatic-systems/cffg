@@ -1,6 +1,6 @@
 ---
 id: cff-xabn
-status: closed
+status: in_progress
 deps: [cff-6tek, cff-s6yy]
 links: []
 created: 2026-08-31T03:16:28Z
@@ -145,3 +145,11 @@ No work remains for cff-xabn. Downstream cff-enhs owns complete CFFGZ learning-s
 **2026-09-13T01:07:45Z**
 
 Published PR #137 against main: https://github.com/engimatic-systems/cffg/pull/137 . The PR uses the existing 1737-passing short-suite result; subsequent changes only record validation/publication metadata and normalize ticket formatting. Final branch diff whitespace check and ticket dependency cycle check pass. No code changes or unchanged suite rerun were needed to publish.
+
+**2026-09-13T01:43:34Z**
+
+PR #137 bounded review fixes (comments 3998216389 and 3998216393): preserve verified original schema-1 recurrence bundles as model-only/non-resumable inputs without inferring posterior evidence; restore complete selected learnables under exact=False while exact=True still requires all destination learnables. Applicable change-path rows remain New IR field and Learnable or checkpoint feature. Affected pairs: current/legacy bundle parsing/hash checks and current/legacy checkpoint completeness; host/JIT, flooding/scheduled, single-instance/vmap numerics, parameter writes, and agent cadence are N/A. Both changes keep staged validation before mutation. Hostile inputs: missing selected arrays, extra undeclared arrays, tampered identity/digest, sparse fixed point values, and float32 preservation; 64-owner schema scale is already covered. Genuine base-revision bundle production is delegated as bounded compatibility research. One atomic commit per fix; final short-suite run after focused tests, then wait the complete suggested_wait_seconds without polling, per updated AGENTS.md.
+
+**2026-09-13T01:46:09Z**
+
+Review fix 1: generic manifest validation now accepts a subset of known owners when load_state_dict(exact=False), while exact=True retains complete-destination validation. Every supplied descriptor and posterior remains complete; arrays without supplied descriptors are rejected before mutation. New regressions cover selected NIW/MNIW posteriors under nested scopes, untouched unrelated posteriors, exact=True rejection, missing arrays/schema keys, extra owners, dtype tampering, and unknown identities. Focused schema/Gaussian/recurrence checkpoint run: 82 passed in 23.03 s. Final full gate remains pending both bounded fixes.
