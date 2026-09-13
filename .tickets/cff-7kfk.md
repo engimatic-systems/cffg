@@ -1,0 +1,108 @@
+---
+id: cff-7kfk
+status: open
+deps: [cff-nyad]
+links: [cff-3ola]
+created: 2026-09-10T03:41:20Z
+type: chore
+priority: 1
+assignee: coopwilliams
+parent: cff-ws3c
+tags: [engine, architecture, execution, refactor]
+---
+# Move synchronous sweep transport behind the execution owner
+
+## Background in Plain English — WHY
+
+The engine still contains the global synchronous update loop. Local factor
+calculations now have execution owners, and schedule construction has its own
+owner, but Engine still gathers each factor's inputs, collects its proposed
+messages, combines shared-goal contributions and applies damping. Leaving this
+code for the final readout ticket would add an unrelated responsibility there.
+
+At source 47701a6, engine.py:2306-2648 contains about 343 lines of these helpers
+and the sweep factory. This is the source anchor, not a future line promise.
+The schedule program already accepts the factory as an explicit input. This
+ticket moves that factory and its transport helpers to an execution module;
+it does not change the update algorithm.
+
+## Outcomes / Acceptance Criteria — WHAT
+
+1. cff-nyad is closed and its published head is updated before branching.
+2. One synchronous execution owner accepts an immutable Arena and the existing
+   full-versus-iterative-phase selection, and returns the same typed sweep.
+3. Engine supplies that owner's factory to ScheduleProgram instead of defining
+   the global numerical transport loop itself.
+4. Local factor calculations and parameter selection remain delegated to the
+   existing execution owners; this move creates no second family rule.
+5. Every factor reads the pre-sweep arrays. Shared-goal predictions are pooled
+   once before damping; cross-domain writes join their original damping phase.
+6. Full flooding and the restricted mixed phase preserve their selected groups,
+   update ordering, output arrays, dtype, inner residual/status facts, log-zero
+   flooring and delta hardening.
+7. Constraint updates still consume the current State.params values repaired
+   in cff-jby3, not captured compiled defaults.
+8. The thin Gaussian parameter selector remains usable by ledger/readout code
+   without importing the public Engine into the new execution owner.
+9. Affected change paths are Runtime numerical or status invariant and New
+   factor or rule family. Full/restricted sweeps, direct/JIT/vmap transport,
+   shared goals and cross-domain writes are checked pairs. State schemas,
+   checkpoint decoding, public result classification and objective formulas
+   are N/A to modification; restored states remain consumers of the same sweep.
+10. Exact zeros, vacuous/improper inputs, non-finite updates, float32/float64
+    and existing larger-chain fixtures preserve baseline values or failures.
+    Existing guards are moved unchanged; no new numerical policy is introduced.
+11. Existing family, shared-goal, constraint, schedule, Colony and engine-contract
+    assertions remain authoritative. Bounded old/new array characterization
+    protects the move; no new scientific or speed claim is added.
+12. The new owner is below 1,000 physical lines and does not import Engine.
+13. Focused tests, one final default gate and artifact checks pass.
+14. ARCHITECTURE and the change-path index name the delivered sweep owner.
+
+## Methodological Suggestions — HOW
+
+These suggestions are optional; another sound method is acceptable.
+
+- Move the existing helpers and factory to execution/synchronous.py, reusing
+  execution/transport.py and the existing typed local outputs/selectors.
+- Keep the ScheduleProgram factory input unchanged. Redirect private test
+  instrumentation to its new owner without weakening assertions.
+- Reuse the bounded trusted-source comparison approach from cff-nyad, including
+  shared goals, constraints, precision, recurrence, hybrid and functional cases.
+
+## Future work
+
+cff-5xdy follows this move with state/data and functional lifecycle owners.
+cff-3ola can then remain a readout/facade extraction instead of also moving the
+synchronous transport loop. The convergence-loop compilation target remains
+separate in cff-wbhu.
+
+## Definitions
+
+- **Synchronous sweep / flooding:** Compute all proposed factor messages from
+  the same old graph state, then install their combined updates.
+- **Damping:** Blend a proposed update with the previous value.
+- **Restricted mixed phase:** Update iterative factor groups before the
+  schedule refreshes ordinary belief-propagation islands.
+- **Transport:** Gather local inputs and scatter local outputs, without
+  redefining the factor calculation.
+- **Delta hardening:** Project a declared point-mass edge onto its selected value.
+- **JIT / vmap:** JAX compilation and vectorized execution transformations.
+- **State.params:** One graph instance's numerical runtime parameters.
+
+## Notes
+
+**2026-09-10T03:44:02Z**
+
+Planning evidence at 47701a6: the remaining engine.py:2306-2648 block is synchronous transport and damping, not the family-local numerical rules already extracted by cff-ny7f. ScheduleProgram receives _make_step as a factory input, so that boundary need not change. _gauss_group_params also serves Gaussian readouts (:1962,2201) and the ledger (:2661); preserve its selector identity or redirect those callers to the existing selector. Private factory instrumentation appears in shared-goal and schedule tests. Confidence: high, bounded symbol/caller inspection; no independent agent review is claimed.
+
+Legend: prerequisite --> dependent; based on tk dep tree --full cff-5xdy, tk ready and tk blocked.
+[x] cff-ny7f local execution
+  --> [x] cff-jby3 constraint isolation
+        --> [~] cff-nyad schedule construction (final gate running)
+              --> [ ] cff-7kfk synchronous transport (immediately blocked by nyad)
+                    --> [ ] cff-5xdy lifecycle
+                          --> cff-ii9t --> cff-jrbw --> cff-gl89
+                                --> cff-3ola --> cff-ws3c runtime epic
+
+cff-5xdy retains its direct nyad dependency as well. No parallel architecture root is introduced; unrelated P2 validators cff-34gi and cff-6n9c remain independently ready. tk dep cycle passes. This small insertion keeps cff-3ola limited to readouts/facade work and requires no new inference choice.

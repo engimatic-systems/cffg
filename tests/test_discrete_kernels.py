@@ -649,8 +649,8 @@ def chain_model(n=32):
 
 
 def test_external_chain_scans_and_parameter_changes_reuse_trace(registered):
-    from cffg.engine import _flat_scan_fn
     from cffg.schedule import ScanStage
+    from cffg.schedule_program import _flat_scan_fn
 
     traces = []
 
@@ -695,7 +695,7 @@ def test_external_chain_scans_and_parameter_changes_reuse_trace(registered):
         initial.params,
     )
     current = args[:4]
-    from cffg.engine import _batch_stage_fn
+    from cffg.schedule_program import _batch_stage_fn
 
     for stage in eng.schedule.stages:
         fn = (
