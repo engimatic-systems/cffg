@@ -1,6 +1,6 @@
 ---
 id: cff-xabn
-status: in_progress
+status: closed
 deps: [cff-6tek, cff-s6yy]
 links: []
 created: 2026-08-31T03:16:28Z
@@ -165,3 +165,11 @@ Focused validation after the final relevant edit: uv run pytest -q tests/test_le
 **2026-09-13T02:02:50Z**
 
 Cooper requested an explicit AGENTS.md exception to general frequent-progress guidance during test-suite waits. The suite protocol now says to announce launch and budget once, then wait the full suggested_wait_seconds without periodic commentary or process/log/dashboard polling; user messages still receive responses. This documentation-only change was made while the already-launched final gate runs and does not invalidate that code/test result. Whitespace checks pass.
+
+**2026-09-13T02:15:32Z**
+
+Both bounded PR #137 requests are complete in separate commits: 31d4251 restores complete selected posteriors under exact=False; 97824a2 preserves verified legacy model-only recurrence bundles as non-resumable inputs. Cooper's requested quiet-wait exception is committed in c82ea33.
+
+Final validation after the last code/test change: uv run python tools/dashboard.py --run-suite passed 1747 tests, with 41 slow tests deselected and 4 existing dependency deprecation warnings. Pytest took 993.36 s; measured wall time was 1005.804 s. The dashboard and runtime history are refreshed with zero failures. Log: /tmp/cff-xabn-review-short-suite.log. The suite was launched once and its output was first inspected after the full 1260-second suggested wait; no periodic suite polling occurred. Focused persistence validation passed 139 tests before launch.
+
+No implementation work remains for these requests. Model-only archives still do not contain learning state; cff-enhs owns complete archive storage/restoration. D8 and unidentified recurrence posteriors remain rejected. Flat selected restores retain destination priors and untouched owners. cff-b2fz remains the separate compact-composition follow-up. Closing cff-xabn and updating PR #137 on Cooper's existing branch; main remains unchanged.
