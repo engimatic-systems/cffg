@@ -141,3 +141,7 @@ Completed on agent/cff-xabn-retry. Implementation commit: 534d783. All five regi
 Final gate after the last test edit: uv run python tools/dashboard.py --run-suite passed 1737 tests, with 41 slow tests deselected and 4 existing dependency deprecation warnings. Pytest took 985.55 s; measured wall time was 998.071 s. The runtime history and ~/agent-share/cffg-tests.html are refreshed with zero failures. Log: /tmp/cff-xabn-short-suite-pass.log. Focused compiler-contract validation passed all 44 tests; schedule fingerprints and execution-layout assertions remain unchanged. No numerical rules changed, so slow behavioral runs were not needed.
 
 No work remains for cff-xabn. Downstream cff-enhs owns complete CFFGZ learning-state storage/restoration. Discovered cff-b2fz owns compact-plate composition; until then, expand_plates before scoping or merging. The current flat checkpoint API still restores posteriors while retaining destination immutable priors, as documented. Main was not changed; Cooper requested this existing branch.
+
+**2026-09-13T01:07:45Z**
+
+Published PR #137 against main: https://github.com/engimatic-systems/cffg/pull/137 . The PR uses the existing 1737-passing short-suite result; subsequent changes only record validation/publication metadata and normalize ticket formatting. Final branch diff whitespace check and ticket dependency cycle check pass. No code changes or unchanged suite rerun were needed to publish.
