@@ -141,6 +141,13 @@ class MNIW:
         cov = E[W]⁻¹ = Ψ/ν (D4.1.3)."""
         return self.m[:, :-1].copy(), self.m[:, -1].copy(), self.psi / self.nu
 
+    def mean_cov(self) -> np.ndarray:
+        """Posterior-mean noise covariance Ψ/(ν−d−1), as in D4.1.3."""
+        dimension = self.psi.shape[0]
+        if self.nu <= dimension + 1:
+            raise ValueError("posterior-mean covariance undefined for nu <= d+1")
+        return self.psi / (self.nu - dimension - 1)
+
 
 def _numpy_symmetry_ok(matrices: np.ndarray) -> np.ndarray:
     scale = np.max(np.abs(matrices), axis=(-2, -1))

@@ -1,7 +1,7 @@
 ---
 id: cff-jilz
-status: open
-deps: [cff-enhs]
+status: in_progress
+deps: [cff-enhs, cff-ilms]
 links: []
 created: 2026-08-31T03:16:28Z
 type: task
@@ -121,3 +121,7 @@ Final classification addition: estimate=registered-family parameter estimation.
 **2026-09-13T15:23:37Z**
 
 Alpha policy clarification from Cooper: legacy bundle preservation is not required at this version. Criterion 10 now verifies unsupported-schema refusal. cff-1xig tracks the compatibility and migration contract required before stabilizing the bundle format.
+
+**2026-09-13T15:53:07Z**
+
+Implementation handoff: Learnable or checkpoint feature change path. Schema-current bundle restore and compiler learn-plan reconstruction are the persistence authority established in PR #138; unsupported older bundle versions are checked as refusal, and current/legacy flat checkpoint behavior remains independently covered. Exercise all five registered families through public save/load, converged inference, accumulate/replace, reporting, rollover and installed parameters. Host/JIT and flooding/scheduled are checked where the feeding inference executes; single-instance/vmap mutation N/A because learning is host-side. Scoped names, tied sources, multi-blob targets, 64 plate owners, literal zero statistics, improper state and float32 preservation are required. No new numerical guards or inference semantics are planned.
