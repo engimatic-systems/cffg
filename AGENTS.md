@@ -99,7 +99,7 @@ This project will span many context windows. The rule that makes that survivable
   only `latest.wall_seconds` and `suggested_wait_seconds` in
   `tools/test-suite-runtimes.json` for measured wall time and a wait budget
   with headroom. If the focused tests passed before, then don't poll the full 
-  test suite. Instead just wait for the suggested amount of time. Run
+  test suite. Instead just wait for the `suggested_wait_seconds` time. Run
   `uv run python tools/dashboard.py --run-suite` to execute the default
   `not slow` pytest selection exactly once
   and refresh both that runtime history and `~/agent-share/cffg-tests.html`
