@@ -459,6 +459,7 @@ if fit.status.value == "diverged":
 
 # The fitter certifies the state once after its terminal parameter write.
 final = fit.last_inference.require_converged()
+fit.save_bundle("fitted.cffgz")   # template, points, immutable priors, posteriors
 ```
 
 `PCAARHMMInitializer` uses PCA for a reproducible observation-derived latent
@@ -929,13 +930,63 @@ Pass `learnables=learning` to `save_bundle` for a template that declares
 learnables. Saving checks all inventories, family admissibility, ownership,
 shapes, dtypes and digests before atomically replacing the destination.
 
+This complete example saves an initialized model, loads it without external
+priors, learns from two converged trials, and saves the updated history:
+
+<!-- bundle-resume:start -->
 ```python
-save_bundle("learned.cffgz", template, arrays, learnables=learning)
-bundle = load_bundle("learned.cffgz")
-if bundle.resumable:
-    template, arrays = bundle.template, bundle.arrays
-    learning = bundle.learnables  # includes immutable priors; no external arrays needed
+import equinox as eqx
+import numpy as np
+
+from cffg import Engine, compile_template, load_bundle, save_bundle
+from cffg.core import (
+    BlobRef, FactorSpec, LearnableSpec, PortRole, PortSpec, Template, VariableSpec,
+)
+from cffg.learn import Learnables
+
+template = Template(
+    name="sensor",
+    variables={"x": VariableSpec("x", cardinality=2)},
+    factors={"prior": FactorSpec(
+        "prior", "categorical", edges={"out": "x"}, param_blobs={"statistic": "p"},
+    )},
+    blobs={"p": BlobRef("p", "p.npy")},
+    ports={"observation": PortSpec("observation", "x", PortRole.DATA)},
+    learnables={"probabilities": LearnableSpec("probabilities", "dirichlet", ("p",))},
+)
+arrays = {"p": np.array([0.5, 0.5])}
+engine = Engine(compile_template(template, arrays=arrays))
+learning = Learnables(engine, priors={"probabilities": np.ones(2)})
+save_bundle("sensor.cffgz", template, arrays, learnables=learning)
+
+bundle = load_bundle("sensor.cffgz")
+learning = bundle.learnables
+engine = Engine(compile_template(bundle.template, arrays=bundle.arrays))
+for observation in (1, 0):                    # two distinct trials
+    state = engine.init_state()
+    params = learning.write(engine, state.params)
+    state = eqx.tree_at(lambda s: s.params, state, params)
+    state = engine.bind_data(state, {"observation": observation})
+    result = engine.run(state, 10)
+    learning.accumulate(engine, result)       # requires converged RunResult
+
+save_bundle("sensor.cffgz", bundle.template, bundle.arrays, learnables=learning)
 ```
+<!-- bundle-resume:end -->
+
+Use `replace` instead of `accumulate` when recomputing the same sequence from
+its immutable prior. After loading, `Learnables.write` installs the posterior's
+inference parameters into each fresh state. Bundle point arrays remain in the
+model's serialized parameter form; a runtime parameter mapping is not a blob
+mapping. In particular, Dirichlet inference uses expected log probabilities,
+while Gaussian covariance rollover uses inverse expected precision. Reporting
+means remain available through `learning.expected`.
+
+`RSLDSFitResult` retains `template` and a complete `learnables` snapshot for its
+returned coordinate. `fit.save_bundle(path)` exports those priors and posteriors
+with the fitted point arrays and fixed continuous-state initialization. Loading
+that file uses the same inference, update, and resave workflow above. Tied
+sources, scoped names, and separate target blobs retain their declared owners.
 
 `LoadedBundle` also supports the historical `template, arrays, manifest`
 unpacking. A successful load reports `resumable=True`, including fixed models

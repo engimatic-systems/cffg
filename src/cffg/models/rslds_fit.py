@@ -11,6 +11,7 @@ posteriors.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 import time
 
 import jax
@@ -18,6 +19,7 @@ import numpy as np
 
 from cffg import conj
 from cffg.compiler import compile_template
+from cffg.core import Template
 from cffg.engine import Engine, RunResult, RunStatus, State, _replace
 from cffg.learn import Learnables
 from cffg.models.coordinate_fit import (
@@ -147,9 +149,12 @@ class RSLDSFitResult:
     ``model_posterior`` carries the current D9
     structured-pair statistic identity and may be checkpointed for resume;
     point ``parameters`` alone are a model initialization, not a resumable
-    posterior.
+    posterior. ``template`` and ``learnables`` retain the complete portable
+    model and immutable priors for :meth:`save_bundle`.
     """
 
+    template: Template
+    learnables: Learnables
     engine: Engine
     state: State
     status: RunStatus
@@ -168,6 +173,18 @@ class RSLDSFitResult:
     returned_coordinate: str
     certified_coordinate: str | None
     error: str | None = None
+
+    def save_bundle(self, path: str | Path) -> None:
+        """Export the returned learning coordinate for a later trial.
+
+        Point arrays include the fixed continuous-state initialization and
+        fitted parameters. Inference progress and solver status are not part
+        of this portable archive.
+        """
+        from cffg.bundle import save_bundle
+
+        arrays = {**self.initialization.arrays(), **self.parameters}
+        save_bundle(path, self.template, arrays, learnables=self.learnables)
 
     def require_converged(self) -> "RSLDSFitResult":
         if self.status is not RunStatus.CONVERGED:
@@ -333,6 +350,7 @@ def _run_inner(
 
 def _result(
     *,
+    template: Template,
     engine: Engine,
     state: State,
     status: RunStatus,
@@ -351,6 +369,10 @@ def _result(
     error: str | None = None,
 ) -> RSLDSFitResult:
     return RSLDSFitResult(
+        template=template,
+        learnables=Learnables.from_persistent_state(
+            engine, learning.initial_params, learning.params
+        ),
         engine=engine,
         state=state,
         status=status,
@@ -525,6 +547,7 @@ def fit_rslds(
                 else RunStatus.DIVERGED
             )
             return _result(
+                template=template,
                 engine=engine,
                 state=inner.state,
                 status=outer_status,
@@ -559,6 +582,7 @@ def fit_rslds(
                 )
             )
             return _result(
+                template=template,
                 engine=engine,
                 state=inner.state,
                 status=RunStatus.DIVERGED,
@@ -637,6 +661,7 @@ def fit_rslds(
                 )
             )
             return _result(
+                template=template,
                 engine=engine,
                 state=inner.state,
                 status=RunStatus.DIVERGED,
@@ -681,6 +706,7 @@ def fit_rslds(
         consecutive = decision.consecutive_hits
         if decision.certified is not None:
             return _result(
+                template=template,
                 engine=engine,
                 state=inner.state,
                 status=RunStatus.CONVERGED,
@@ -750,6 +776,7 @@ def fit_rslds(
         free_energies.append(float(terminal.free_energies[-1]))
 
     return _result(
+        template=template,
         engine=engine,
         state=terminal.state,
         status=fit_status,

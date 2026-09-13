@@ -223,6 +223,17 @@ A pure-Python (dataclass) representation, independent of JAX:
   validates the exact archive bytes, then fsyncs a sibling and replaces the
   destination atomically. Direct edits to caller-owned mappings require caller
   synchronization. This is a committed learning boundary, not executing state.
+  A fit result retains the original template and an independent complete
+  `Learnables` snapshot of its returned coordinate. Its `save_bundle` method
+  combines fixed initialization arrays with fitted point arrays. On resume,
+  `Learnables.write` installs the posterior's inference parameters in a fresh
+  State; these packed parameters remain derived values, not ZIP blob keys.
+  Reporting arrays and inference rollover values have distinct owners in the
+  family API. `test_bundle_resume.py` compares both plus the next posterior
+  and installed state against uninterrupted learning for all registered
+  families, accumulation/replacement, float32, tied sources, sparse statistics,
+  and 64 scoped plate owners. `test_bundle.py` regenerates the representative
+  rSLDS archive with the complete 22-array learning inventory.
   The supported inference path remains `load_bundle` → `compile_template` →
   `Engine`; extracted point blobs also work with `root=extracted_directory`.
   During alpha only the current bundle schema is accepted. Older versions

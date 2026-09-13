@@ -41,9 +41,9 @@ rolling agent. Those exact runtime snapshots remain checkpoints.
 5. Loading returns a model artifact that can reconstruct both an `Engine` and
    compatible `Learnables`; integrity and semantic checks finish before either
    object is exposed for mutation.
-6. Original model-only bundles remain loadable through a documented legacy
-   path that reports their inability to resume learning and never invents
-   priors or posterior history.
+6. During alpha, only the current bundle schema is accepted; older schemas
+   fail explicitly. Cooper clarified on 2026-09-13 that stable compatibility
+   and migration policy is future work, tracked in cff-1xig.
 7. The five registered families—Dirichlet, NIW, MNIW, component MNIW, and
    Pólya–Gamma weights—demonstrate save, load, and next-update equivalence.
 8. Registering a later learning family provides the same persistent-state
@@ -67,7 +67,7 @@ and edits, compiler learn plans, family registration, checkpoint migration,
 bundle encode/decode, agent handoff, and public exports. Numerical message rules
 do not change, but loaded point parameters must remain usable under host/JIT,
 flooding/scheduled, and single-instance/`vmap` consumers. Current/legacy bundle
-and checkpoint pairs require explicit tests.
+refusal and current/legacy checkpoint pairs require explicit tests.
 
 ## Future work
 
@@ -109,3 +109,7 @@ Post-handoff scan additions: integrate=public save/load-to-update workflow; impl
 **2026-08-31T03:26:14Z**
 
 Final classification addition: estimate=registered-family parameter estimation.
+
+**2026-09-13T16:01:26Z**
+
+Cooper clarified the alpha policy: schema-current learning resume is required now, while stable legacy compatibility is deferred to cff-1xig. Acceptance criterion 6 reflects that scope. cff-enhs is complete in PR #138; cff-jilz supplies the remaining family workflow, specimen and fit-export proof in the stacked PR. No exact inference/agent snapshot capability is claimed.

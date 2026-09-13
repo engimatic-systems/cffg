@@ -125,3 +125,11 @@ Alpha policy clarification from Cooper: legacy bundle preservation is not requir
 **2026-09-13T15:53:07Z**
 
 Implementation handoff: Learnable or checkpoint feature change path. Schema-current bundle restore and compiler learn-plan reconstruction are the persistence authority established in PR #138; unsupported older bundle versions are checked as refusal, and current/legacy flat checkpoint behavior remains independently covered. Exercise all five registered families through public save/load, converged inference, accumulate/replace, reporting, rollover and installed parameters. Host/JIT and flooding/scheduled are checked where the feeding inference executes; single-instance/vmap mutation N/A because learning is host-side. Scoped names, tied sources, multi-blob targets, 64 plate owners, literal zero statistics, improper state and float32 preservation are required. No new numerical guards or inference semantics are planned.
+
+**2026-09-13T16:01:26Z**
+
+All-family workflow proof now passes for both accumulate and replace with float32 and float64 source state. It compares immutable priors, posteriors, public reporting means, rollover values, descriptors, and installed parameters exactly. Coverage includes scoped rSLDS (Dirichlet, component MNIW, tied MNIW, D9 PG), ordinary NIW, sparse component statistics, 64 plate owners, schema/D9 refusal, and auto/flood inference inputs. Fit results now retain the original template and an independent complete Learnables snapshot; save_bundle exports the returned coordinate with its fixed initialization and fitted point arrays. Existing fitter behavior tests and the real fit/export/resume test pass. The representative archive now verifies all 22 learning arrays, and the full README workflow executes as a test. The reporting bug discovered by this proof is separately committed under cff-ilms.
+
+**2026-09-13T16:03:19Z**
+
+Final focused validation after the last code/test changes: 186 tests passed, 11 slow tests deselected across bundles, resume workflows, learnables, learning schemas, recurrence checkpoints, and agent boundaries. Fitter/export coverage separately passed 16 tests; the reporting correction passed 48 conjugate/family tests; the executable README and auto/flood resume checks passed. git diff --check and tk dep cycle pass. The final integrated short suite is next.

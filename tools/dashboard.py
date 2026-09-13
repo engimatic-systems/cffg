@@ -89,6 +89,7 @@ EPIC_FILES = {
     "M6 · Tooling": [
         "test_bundle.py",
         "test_bundle_learning.py",
+        "test_bundle_resume.py",
         "test_dashboard.py",
         "test_estimate.py",
         "test_edit_codec.py",

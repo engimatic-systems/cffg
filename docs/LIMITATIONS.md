@@ -346,7 +346,9 @@ descriptors. The generic checkpoint inventory describes immutable priors and
 current posteriors, but flat `Learnables` checkpoints restore only posteriors;
 they retain the caller's destination priors. Schema-2 CFFGZ bundles store both
 complete states and resume a later trial at a
-committed learning boundary. They do not store inference messages, solver
+committed learning boundary. Fit exports retain that coordinate's original
+priors and current posteriors; they do not resume an outer fitting loop at its
+interrupted iteration. They do not store inference messages, solver
 progress, executing agent or hierarchy state, PRNG streams, or optimizer state.
 Exact mid-run continuation and supported agent replay require their checkpoint
 APIs; a portable learning bundle is not a runtime snapshot. The four unchanged
