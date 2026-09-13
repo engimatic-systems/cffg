@@ -270,29 +270,15 @@ def test_unsafe_scoped_names_fail_before_archive_writing(tmp_path, name):
     assert path.read_bytes() == b"keep destination"
 
 
-def test_bundle_migrates_old_model_hash_and_rejects_invalid_new_declarations(tmp_path):
+def test_bundle_rejects_invalid_declarations_before_replacing_destination(tmp_path):
     template, arrays = _categorical()
     path = tmp_path / "model.cffgz"
-    save_bundle(path, template, arrays)
-    with zipfile.ZipFile(path) as archive:
-        records = {name: archive.read(name) for name in archive.namelist()}
-    document = json.loads(records["model.json"])
-    old_hash = legacy_learning_structure_hash(from_dict(document))
-    document.pop("learning_schema_version")
-    document["learnables"]["q"].pop("semantic_identity")
-    records["model.json"] = json.dumps(document).encode()
-    manifest = json.loads(records["manifest.json"])
-    manifest["structure_hash"] = old_hash
-    records["manifest.json"] = json.dumps(manifest).encode()
-    with zipfile.ZipFile(path, "w") as archive:
-        for name, value in records.items():
-            archive.writestr(name, value)
-    restored, _arrays, _manifest = load_bundle(path)
-    assert restored.learnables["q"].semantic_identity == LEARNING_IDENTITIES["dirichlet"]
+    learning = Learnables(Engine(compile_template(template, arrays=arrays)), priors={"q": np.ones(2)})
+    save_bundle(path, template, arrays, learnables=learning)
     template.learnables["q"] = replace(template.learnables["q"], semantic_identity="")
     before = path.read_bytes()
     with pytest.raises(ValueError, match="q.*identity"):
-        save_bundle(path, template, arrays)
+        save_bundle(path, template, arrays, learnables=learning)
     assert path.read_bytes() == before
 
 

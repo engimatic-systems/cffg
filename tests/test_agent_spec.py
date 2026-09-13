@@ -246,7 +246,12 @@ def test_agent_spec_json_bundle_and_hash_round_trip(tmp_path):
     assert structure_hash(changed) != structure_hash(template)
 
     path = tmp_path / "agent.cffgz"
-    save_bundle(path, template, arrays)
+    from cffg.learn import Learnables
+    from cffg.engine import Engine
+    from cffg.compiler import compile_template
+
+    learning = Learnables(Engine(compile_template(template, arrays=arrays)), priors={"d": np.ones(2)})
+    save_bundle(path, template, arrays, learnables=learning)
     bundled, bundled_arrays, _manifest = load_bundle(path)
     assert bundled.agent == template.agent
     assert bundled.learnables == template.learnables

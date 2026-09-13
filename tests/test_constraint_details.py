@@ -172,10 +172,7 @@ def test_conflict_reporting_is_sorted_and_complete_for_32_factors():
         assert f"on {target!r}: conflicting" in message
 
 
-@pytest.mark.parametrize("legacy", [False, True])
-def test_repeated_declarations_reconstruct_from_current_and_legacy_bundles(
-    tmp_path, legacy
-):
+def test_repeated_declarations_reconstruct_from_bundles(tmp_path):
     template = _model()
     original = next(
         c for c in template.constraints if c.kind is ConstraintKind.P_SUBSTITUTION
@@ -185,12 +182,6 @@ def test_repeated_declarations_reconstruct_from_current_and_legacy_bundles(
     )
     path = tmp_path / "repeated.cffgz"
     save_bundle(path, template, _arrays())
-    if legacy:
-        contents = _zip_contents(path)
-        manifest = json.loads(contents["manifest.json"])
-        del manifest["blob_paths"]
-        contents["manifest.json"] = json.dumps(manifest).encode()
-        _write_zip(path, contents)
     restored, arrays, _ = load_bundle(path)
     assert len(restored.constraints) == len(template.constraints)
     assert structure_hash(restored) == structure_hash(template)
@@ -206,9 +197,8 @@ def test_bundle_save_rejects_conflicts_before_creating_destination(tmp_path):
     assert not path.exists()
 
 
-@pytest.mark.parametrize("legacy", [False, True])
 @pytest.mark.parametrize("matching_hash", [False, True])
-def test_loaded_bundle_rejects_conflicting_structure(tmp_path, legacy, matching_hash):
+def test_loaded_bundle_rejects_conflicting_structure(tmp_path, matching_hash):
     path = tmp_path / "conflicting-input.cffgz"
     save_bundle(path, _model(), _arrays())
     contents = _zip_contents(path)
@@ -222,8 +212,6 @@ def test_loaded_bundle_rejects_conflicting_structure(tmp_path, legacy, matching_
     )
     contents["model.json"] = json.dumps(model).encode()
     manifest = json.loads(contents["manifest.json"])
-    if legacy:
-        del manifest["blob_paths"]
     if matching_hash:
         manifest["structure_hash"] = document_structure_hash(model)
     contents["manifest.json"] = json.dumps(manifest).encode()

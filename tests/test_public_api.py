@@ -173,6 +173,7 @@ def test_top_level_facade_reexports_only_canonical_owners():
         "GaussianBinding": cffg.kernel_bindings.GaussianBinding,
         "GaussianConditioning": cffg.kernel_bindings.GaussianConditioning,
         "HostileInputs": cffg.kernels.HostileInputs,
+        "LoadedBundle": cffg.bundle.LoadedBundle,
         "ParameterSpec": cffg.kernel_bindings.ParameterSpec,
         "PersistentArray": cffg.learning_schema.PersistentArray,
         "PersistentParameter": cffg.learning_schema.PersistentParameter,

@@ -48,6 +48,8 @@ Exactness (per family, documented because the FE ledger depends on it):
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import wraps
+from threading import RLock
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Protocol
 from urllib.parse import quote, unquote
@@ -338,6 +340,15 @@ def _decode_state_key(flat: str) -> tuple[str, str]:
     return unquote(encoded_name), unquote(encoded_key)
 
 
+def _committed(method):
+    """Serialize public updates and persistence at complete learning boundaries."""
+    @wraps(method)
+    def call(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+    return call
+
+
 class Learnables:
     """Hyperparameters for every learnable an engine declares, plus the two
     operations that move them: `accumulate` folds a converged state's
@@ -367,6 +378,7 @@ class Learnables:
         *,
         only: tuple[str, ...] | None = None,
     ):
+        self._lock = RLock()
         engine_plans = {p.name: p for p in engine.arena.learn_plans}
         if only is None:
             names = tuple(engine_plans)
@@ -435,6 +447,7 @@ class Learnables:
         """Recompute selected posteriors from immutable initial priors."""
         self._update(engine, result, only, replace=True)
 
+    @_committed
     def _update(
         self,
         engine: "Engine",
@@ -533,6 +546,7 @@ class Learnables:
                 )
         return selected
 
+    @_committed
     def write(
         self,
         engine: "Engine",
@@ -629,6 +643,7 @@ class Learnables:
             for key, arr in params.items()
         }
 
+    @_committed
     def state_dict(self) -> dict[str, np.ndarray]:
         """Posterior arrays plus versioned semantics and persistent-state inventory."""
         data = self.hyperparameter_snapshot()
@@ -647,6 +662,36 @@ class Learnables:
             for name, plan in sorted(self.plans.items())
         )
 
+    @classmethod
+    def from_persistent_state(cls, engine, priors, posteriors):
+        """Construct complete learning state without prior coercion or inference.
+
+        Both inventories must match the compiled declarations. Validation of
+        every family finishes before the new learner becomes available.
+        """
+        plans = {plan.name: plan for plan in engine.arena.learn_plans}
+        if set(priors) != set(plans) or set(posteriors) != set(plans):
+            raise ValueError("persistent priors and posteriors must name every learnable")
+        priors = {name: {key: np.asarray(value).copy() for key, value in values.items()}
+                  for name, values in priors.items()}
+        posteriors = {name: {key: np.asarray(value).copy() for key, value in values.items()}
+                      for name, values in posteriors.items()}
+        for name, plan in plans.items():
+            resolve_persistent_state(plan, FAMILIES[plan.family], priors[name], posteriors[name])
+        result = cls.__new__(cls)
+        result._lock = RLock()
+        result.plans = plans
+        result._restricted = False
+        for values in priors.values():
+            for value in values.values():
+                value.setflags(write=False)
+        result.initial_params = MappingProxyType({
+            name: MappingProxyType(values) for name, values in priors.items()
+        })
+        result.params = posteriors
+        return result
+
+    @_committed
     def load_state_dict(
         self,
         data: dict[str, np.ndarray],

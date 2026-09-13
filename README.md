@@ -136,7 +136,7 @@ assert resumed.episode_tick == agent.episode_tick
 <!-- public-quickstart:end -->
 
 The supported top-level names are `CorridorEnv`, `Engine`, `RollingAgent`,
-`RunStatus`, `build_gridworld`, `compile_template`, `load_bundle`,
+`RunStatus`, `build_gridworld`, `compile_template`, `LoadedBundle`, `load_bundle`,
 `save_bundle`, and the compatibility helper `set_params`. Their canonical
 implementations remain in the focused modules; `cffg` only re-exports them.
 Before 1.0, deeper rule tables, compiled arenas, group plans, kernel
@@ -642,10 +642,9 @@ unknown versions, and mismatched ownership fail with the affected learnable's
 name. A standalone unversioned `pg_weights` JSON declaration or unidentified
 recurrence posterior fails with a D8/D9 migration diagnostic: compatible shapes
 cannot establish which statistics produced it. Older checkpoints with an
-explicit D9 recurrence manifest remain readable. Verified model-only bundles
-remain loadable for fixed-parameter inference, including old recurrence models.
-New learning from those models requires deliberately chosen fresh priors; do
-not relabel D8 evidence.
+explicit D9 recurrence manifest remain readable. Alpha CFFGZ loading supports
+only the current bundle schema; older model-only archives are rejected.
+Missing priors or posterior provenance are never inferred from point estimates.
 
 ## Run inference
 
@@ -924,15 +923,33 @@ print(estimate(engine).summary())
 # state 9.1 KiB (messages 2.8, params 6.4) · 2.76e+04 flops/sweep · 0.203 ms/sweep
 ```
 
-A `.cffgz` bundle is model-only: it contains the template and point-parameter
-blobs, not a learned posterior or resumable inference state. Loading verifies
-the stored model hash and blob digests before returning the model, and reports
-`manifest["resumable"] is False`. Unversioned declarations, including recurrence,
-select the current learning rules without assigning provenance to old posterior
-statistics. Fixed-parameter inference remains available; new learning requires
-fresh priors. D8 and unidentified recurrence posteriors remain inadmissible for
-restoration. Checkpoint manifests bind the posterior arrays needed to resume
-learning.
+Schema-2 `.cffgz` bundles contain the template, point-parameter arrays, and
+complete declared-learning state: immutable priors and current posteriors.
+Pass `learnables=learning` to `save_bundle` for a template that declares
+learnables. Saving checks all inventories, family admissibility, ownership,
+shapes, dtypes and digests before atomically replacing the destination.
+
+```python
+save_bundle("learned.cffgz", template, arrays, learnables=learning)
+bundle = load_bundle("learned.cffgz")
+if bundle.resumable:
+    template, arrays = bundle.template, bundle.arrays
+    learning = bundle.learnables  # includes immutable priors; no external arrays needed
+```
+
+`LoadedBundle` also supports the historical `template, arrays, manifest`
+unpacking. A successful load reports `resumable=True`, including fixed models
+with an explicit empty learning inventory. During alpha, only the current
+bundle schema is supported: older or unknown versions raise `BundleError`.
+No prior or posterior statistics are reconstructed from point estimates, and
+D8 or unidentified recurrence state cannot be resumed as D9. A compatibility
+and migration contract will be established before the format stabilizes.
+
+Bundles capture a committed learning boundary for a later trial, not an exact
+mid-inference or agent-runtime snapshot. Public learner updates and snapshot
+capture share a lock. Callers must synchronize direct edits to templates,
+point arrays, or learner mappings. The supplied point arrays are retained
+exactly, including initialization points that differ from a prior's rollover.
 
 `.npz` is a ZIP container and does not support ordinary per-array memory
 mapping, so it is reserved for agent checkpoints rather than parameter blobs.
