@@ -1,6 +1,6 @@
 ---
 id: cff-jrbw
-status: open
+status: closed
 deps: [cff-ii9t]
 links: [cff-gl89]
 created: 2026-09-02T04:17:42Z
@@ -121,3 +121,23 @@ Pre-implementation handoff at source 20c0367 while cff-ii9t's final gate runs. S
 **2026-09-10T07:20:21Z**
 
 Prerequisite cff-ii9t is closed and published as PR #130. Use its final published agent/cff-ii9t-iteration-control head as the work-branch base. Code/test source 20c0367 has a final 2,059-test gate (41 slow deselections, four existing warnings), recorded in bbbbccb; measured wall 1,155.815 seconds. Ordinary outcome/finalization lives in iteration_types.py/run_results.py; shared host predicates are in runtime_checks.py. Extend the result authority for exact/outer facts without changing the already-extracted ordinary policy.
+
+**2026-09-10T07:25:58Z**
+
+Starting from verified PR #130 head b379a28 after an ff-only pull. Applicable change paths: Runtime numerical or status invariant, plus explicit GFE chart inputs under New factor or rule family. Paired surfaces: host checks/fused JIT exact certification; flooding/colored/mixed schedule propagation; standalone/existing Colony exact and GFE fallback routes; restored State/current parameter and observation context. New IR/checkpoint schema and unsupported outer-vmap execution are N/A. Preserve schedule instrumentation aliases, dynamic chart/hard-value cache inputs, exact logical counts independent of trace lengths, and strategy-specific tolerance semantics. No mathematical or solver-policy change is intended.
+
+**2026-09-10T07:37:18Z**
+
+Implementation now gives exact_strategy.ExactRunStrategy and outer_strategy.OuterTrustRegionStrategy separate typed outcomes. run_results owns all public result/status construction; Engine retains selection and compatibility delegates. OuterStructure contains only edges, shared-goal plans and three segment-offset arrays. OuterKernelProvider owns the existing chart/hard-index keyed cache; current base, observations, masks, parameters and hard values are supplied as runtime context. outer.py changed only one import and two accepted-type annotations: chart/solver mathematics are untouched. Focused validation: 82 passed, five slow deselections in 37.82 seconds; 22 new boundary tests cover exact pre/post-support counts, tolerance semantics, functional zero-budget updates, accumulated outer work, structure parity, dynamic cached context and owner boundaries. New modules/tests are Ruff-clean; no independent agent review is claimed. Full old/new result characterization and the final short-suite gate are next.
+
+**2026-09-10T07:43:00Z**
+
+Complete-result characterization passed against PR #130 source b379a28: 110 complete results and 3,416 raw-byte-identical numeric comparisons, with enum identity preserved. Coverage: discrete/Gaussian/EF exact execution; ordinary/hybrid/functional GFE; mixed-shape shared learned goals; T-maze staged hardening; both precisions; zero budgets, tol=None, finite tolerances, initial non-finite/support failures, repeated cached runs and existing Colony exact/GFE routes. Script: /tmp/cffg-strategy-parity.py. This is compatibility evidence, not a new scientific oracle. The existing mixed-precision functional scatter FutureWarning appeared. Kernel-plan AST parity separately passed. Final code/test source is baaad19; intervening 6812590 only refines the next ticket. Final short suite starts using cached runtime 1,155.815 seconds and allowance 1,470 seconds; first output check after 20 minutes, no intermediate suite polling.
+
+**2026-09-10T08:03:51Z**
+
+Final gate passed at code/test source baaad19, with ticket-only head a8485bc recorded by the dashboard: 2,081 passed, 41 slow deselections, four existing Gym warnings; pytest 1,152.59 seconds, measured wall 1,165.949 seconds, completed 2026-09-10T08:02:26.885194+00:00. The suite was read exactly once, at 08:03:20 UTC after the planned 20-minute first-check deadline. Runtime history and shared dashboard are refreshed. New owner sizes: exact 114 lines, outer control 312, kernel provider 123, structural view 41, outcome 40, shared results 202; Engine is 417 lines shorter. All acceptance criteria are met. Next: publish the stacked PR and update the shared architecture page, then start cff-gl89 from this final published head. No solver, objective, serialization or performance-target change; no independent review or speedup claim.
+
+**2026-09-10T08:04:58Z**
+
+Published as PR #131 against PR #130. Shared architecture HTML now names the completed exact/outer owners, compatibility evidence and final 2,081-test gate, with the ledger as next work. Page validation: 68 unique IDs and 35 resolved internal anchors. Source baaad19; gate record aeaf18c. Main is unchanged; no stack merge was performed.

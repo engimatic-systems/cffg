@@ -16,6 +16,7 @@ import numpy as np
 
 from cffg import efrules
 from cffg.compiled import NEG, Arena
+from cffg.outer_structure import OuterStructure
 from cffg.runtime_types import (
     OuterTerminationReason as OuterTerminationReason,  # noqa: PLC0414
 )
@@ -175,7 +176,7 @@ def _unit_scaled(values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 
 
 def build_outer_chart(
-    arena: Arena,
+    arena: Arena | OuterStructure,
     arrays: OuterArrays,
     eliminated: dict[str, frozenset[int]] | None = None,
 ) -> OuterChart:
@@ -663,7 +664,7 @@ def _array_delta(left: OuterArrays, right: OuterArrays) -> float:
 
 def solve_outer(
     initial: OuterArrays,
-    arena: Arena,
+    arena: Arena | OuterStructure,
     outer_map: Callable[
         [OuterArrays], tuple[OuterArrays, jax.Array, jax.Array]
     ],
