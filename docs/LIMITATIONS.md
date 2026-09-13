@@ -147,6 +147,12 @@ The registration API itself is internal-unstable pre-1.0; only the
 serialized `(impl, version)` manifest and its loud-failure guarantee are
 stable now.
 
+The [extension matrix](ARCHITECTURE.md#bounded-factor-extension-paths) documents
+these separate owners and their accepted modes. Ownership checks and the existing
+external-factor oracles protect the extension boundary; they do not establish a
+new rule's mathematical validity, performance or production readiness. Runtime
+callbacks remain trusted local code, not serialized model or checkpoint payloads.
+
 **S1b. Gaussian numerics.** Rules do not require incoming precisions to be
 invertible: improper/vacuous messages propagate exactly. Potentially singular
 Schur systems use a Moore-Penrose limit whose numerical-rank cutoff scales with
