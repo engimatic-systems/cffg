@@ -26,8 +26,10 @@ from cffg.core import (
 from cffg.core.compose import compose, unroll
 from cffg.core.serialize import from_json, to_json
 from cffg.engine import Engine, RunStatus, _replace
+from cffg.execution.synchronous import make_sweep
 from cffg.models.kalman import kalman_smoother, lgssm
 from cffg.schedule import BatchStage, ScanStage, build_schedule
+from cffg.schedule_program import make_exact_unit, make_propagate
 from conftest import K, M, make_hmm_slice
 from test_compose import make_state_prior
 
@@ -490,11 +492,13 @@ def test_float32_missing_phase_cannot_certify_at_t256():
         arena = compile_template(hmm_template(n), arrays=hmm_arrays(n))
         engine = Engine(arena)
         assert engine.schedule.kind == "two_pass"
-        inward_only = engine_mod._make_propagate(
+        inward_only = make_propagate(
             arena, engine.schedule.stages[: len(engine.schedule.stages) // 2]
         )
         engine._exact_unit = eqx.filter_jit(
-            engine_mod._make_exact_unit(arena, inward_only)
+            make_exact_unit(
+                arena, inward_only, make_sweep(arena), engine_mod._make_bfe(arena)
+            )
         )  # bypasses the fingerprint guard on purpose: this pins the
         # *certificate* itself, not the schedule validation
         obs = [int(v) for v in np.random.default_rng(1).integers(0, M, size=n)]
@@ -564,11 +568,13 @@ def test_float32_mixed_scales_cannot_widen_the_certificate():
         # The genuine schedule still certifies despite the 1e12 block.
         assert engine.run(state, 1, tol=None).status is RunStatus.CONVERGED
         # A missing outward pass must not.
-        inward_only = engine_mod._make_propagate(
+        inward_only = make_propagate(
             arena, engine.schedule.stages[: len(engine.schedule.stages) // 2]
         )
         engine._exact_unit = eqx.filter_jit(
-            engine_mod._make_exact_unit(arena, inward_only)
+            make_exact_unit(
+                arena, inward_only, make_sweep(arena), engine_mod._make_bfe(arena)
+            )
         )
         result = engine.run(state, 1, tol=None)
         assert result.status is not RunStatus.CONVERGED

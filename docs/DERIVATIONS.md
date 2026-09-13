@@ -1243,7 +1243,7 @@ Let \(\mathcal V\) contain every node-local belief and \(\mathcal E\) every
 interior edge belief represented by a sum/GFE plan. This includes ordinary
 factor beliefs, P-substituted composite beliefs, mean-field parameter beliefs,
 and Gaussian or other minimal exponential-family beliefs. Write the unchanged
-ledger assembled by `_make_bfe` as
+ledger assembled by `ledger.make_belief_energy` as
 
     F(b) = sum_{a in V} F_a(b_a) + sum_{e in E} H_e(b_e).       (D7.1)
 
@@ -1498,7 +1498,7 @@ for stationary merit points is false:
     grad phi = J_f^T f = 0
 
 allows a nonzero `f` orthogonal to the range of \(J_f\). Consequently `phi`
-never enters `_make_bfe`, a node ledger, a learned parameter, or a policy
+never enters `ledger.make_belief_energy`, a node ledger, a learned parameter, or a policy
 score. It is only step-acceptance machinery.
 
 At iteration \(k\), approximately solve the Gauss--Newton trust-region model
@@ -1547,7 +1547,7 @@ budget is `budget_exhausted` with a diagnostic such as
 Numerical convergence requires all of:
 
 - the existing dtype-scaled componentwise fixed-point certificate for `R`;
-- a finite, stationary original `_make_bfe` ledger at the same accepted
+- a finite, stationary original `ledger.make_belief_energy` ledger at the same accepted
   state;
 - every local inner status `converged`; and
 - support/propriety and predicted-reduction checks passing.
@@ -1577,9 +1577,10 @@ The cff-weff production implementation follows the
   support face, supported incoming logits are normalized before the
   dtype-scaled finite workspace guard is applied; the guard therefore cannot
   turn a categorical gauge shift into a different local root or derivative.
-- `_make_step` and the mixed schedule define the pure undamped \(T\).
-  `_make_bfe` remains the sole scientific objective. `Engine.run` owns the
-  trust-region controller, selects it by default for every GFE plan, and
+- `execution.synchronous.make_sweep` and the mixed `ScheduleProgram` define
+  the pure undamped \(T\). `ledger.make_belief_energy` remains the sole
+  scientific objective. `OuterTrustRegionStrategy` owns phase control above
+  the numerical solver in `outer.py`; `Engine.run` selects it for GFE plans and
   rejects nonzero `damp` unless `outer_solver="picard"` explicitly requests
   the historical diagnostic.
 - `RunResult` retains the original FE trace/residual and local status, and
@@ -1608,7 +1609,7 @@ The cff-weff production implementation follows the
   must cover repeated outer-root and particle-moment block alternations. For
   other plans this is only a candidate phase: success still requires an
   independently evaluated undamped residual, converged inner status, feasible
-  unchanged support, finite stationary `_make_bfe` ledger, and the matrix-free
+  unchanged support, finite stationary `ledger.make_belief_energy` ledger, and the matrix-free
   merit-gradient diagnostic. Failure to certify transfers the remaining
   iteration budget and latest valid state to the unchanged trust-region
   controller.
@@ -2085,8 +2086,9 @@ name stays `recurrence_link`:
   remain, while acyclic categorical-component classification and any fused
   forward/backward schedule must agree with unfused execution;
 - engine: host/JIT, synchronous/scheduled, single/`vmap`, support/status,
-  `_recurrence_sweep`, `_make_step`, `_batch_stage_fn`/`_scan_stage_fn`, and
-  `_make_bfe` are paired surfaces;
+  `execution.synchronous._recurrence_sweep`/`make_sweep`,
+  `schedule_program._batch_stage_fn`/`_scan_stage_fn`, and
+  `ledger.make_belief_energy` are paired surfaces;
 - beliefs/learning: `gaussian_node_stats`, a structured pair readout,
   `recurrence_weight_stats`, `Learnables`, and checkpoint consumers all use
   (D9.12), never reconstructed singleton products;

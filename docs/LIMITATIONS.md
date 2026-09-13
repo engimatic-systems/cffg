@@ -147,6 +147,12 @@ The registration API itself is internal-unstable pre-1.0; only the
 serialized `(impl, version)` manifest and its loud-failure guarantee are
 stable now.
 
+The [extension matrix](ARCHITECTURE.md#bounded-factor-extension-paths) documents
+these separate owners and their accepted modes. Ownership checks and the existing
+external-factor oracles protect the extension boundary; they do not establish a
+new rule's mathematical validity, performance or production readiness. Runtime
+callbacks remain trusted local code, not serialized model or checkpoint payloads.
+
 **S1b. Gaussian numerics.** Rules do not require incoming precisions to be
 invertible: improper/vacuous messages propagate exactly. Potentially singular
 Schur systems use a Moore-Penrose limit whose numerical-rank cutoff scales with
@@ -527,6 +533,16 @@ translate natural-language/task rewards into an initial prior; a small goal
 DSL would still soften that boundary. Learned `c` and learned `A` coordinates
 are currently compiled separately rather than as one jointly uncertain
 composite.
+
+**S9. Fixed GFE probability validation is incomplete.** The categorical GFE
+packer currently accepts negative likelihood or goal entries when their checked
+sum is one. Conversion to log space maps those entries to zero probability,
+leaving invalid total mass; for example, `[-0.2, 1.2]` becomes mass `1.2`.
+Callers must supply finite, nonnegative, normalized fixed probabilities.
+This is an inherited input-validation defect, not a supported approximation.
+P2 ticket cff-34gi owns rejecting it and checking the analogous transition-GFE
+path. Positive Dirichlet concentrations have a different contract and need not
+sum to one.
 
 ## The one-paragraph honest summary
 

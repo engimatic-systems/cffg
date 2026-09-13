@@ -1,6 +1,6 @@
 ---
 id: cff-ofv1
-status: open
+status: closed
 deps: [cff-ws3c]
 links: [cff-cfqg, cff-o7hs, cff-ahps]
 created: 2026-09-02T04:02:01Z
@@ -146,3 +146,19 @@ independent.
 **2026-09-09T03:29:39Z**
 
 PR #108 research — question: can factor registration alone prove objective accounting? Answer: composite ownership and exclusions also need a checked map. Hybrid GFE excludes absorbed goals/output entropies; functional mu3 charges one shared KL across slices. Sources at 7885bf5: engine.py:3761, 3950; tests/test_mu3.py:131; docs/DERIVATIONS.md:1220; Part I equations (8) and (25). Confidence: high. Reuse existing authorities; the map is a refactor preservation gate, not new scientific recovery evidence.
+
+**2026-09-10T09:14:50Z**
+
+Pre-implementation handoff prepared while cff-3ola is under its final gate; cff-ws3c remains the blocker. Applicable ARCHITECTURE rows: New factor or rule family (primary), Runtime numerical or status invariant, New IR field and Learnable or checkpoint feature. New work is targeted cross-seam source/import/call ownership checks plus an owner/capability/consumer matrix; reuse all three existing external factors and their independent oracles. Reviewed duplicated pairs: flooding/scheduled, direct/multi-instance and multi-structure Colony, host/JIT facts, latest/supported-legacy restoration all retain their prerequisite applicability. New ownership checks have numerical hostile-input behavior N/A because no rule, solver or numerical guard is added; existing sparse support, improper/non-finite, float32 and 10x-scale authorities remain required. Preserve the corrected global-goal, P-substitution validation, per-instance constraint-data and failure-diagnostic baselines; do not restore pre-repair goldens. Prepared source checks distinguish arena and transport labels from original factor-type dispatch. Matrix must make scalar-EF initialization compatibility, unsupported new learning/projection combinations, deterministic-only Colony and specialized non-BP scheduling explicit. No implementation has begun on this ticket branch yet.
+
+**2026-09-10T09:32:13Z**
+
+Implementation complete on the final runtime prerequisite 80d6afe (#133), pending the final full gate. Added 30 cross-seam checks in test_extension_ownership.py: test-only identities absent from every production source; no original factor-type interpretation in facades/transport; no duplicate ordinary built-in numerical selection; acyclic lower owners with no facade imports; exactly owned specialized lowering/update/objective calls; shared flat/scheduled registered executors. Existing fixtures were reused, not reimplemented. ARCHITECTURE now has semantic-owner, accepted-mode, required-consumer and composite-ownership matrices, with README/LIMITATIONS links and scope boundaries. Initializer/precedence/write/learning/Colony/byte/manifest/checkpoint surfaces and concrete N/A reasons are explicit. Focused final selection: 161 passed in 61.98 seconds, covering new checks, all three external factors, compiler joins, runtime contracts, common finalization and Gaussian scan/batch contracts. Ruff passes; canonical-doc test links resolve; no production source file changed. The numerical/serialized preservation authorities and hostile cases remain the prerequisite tests. Starting one dashboard-backed final short suite after the final test change; first output check at 20 minutes, allowance 1,470 seconds if needed. No independent agent review or runtime speedup is claimed.
+
+**2026-09-10T09:52:50Z**
+
+Final gate passed at source bc35dc610583061bb9f6f4df6ac61c529cdb3798: 2,151 passed, 41 opt-in slow tests deselected, four existing Gym deprecation warnings; pytest 1,145.30 seconds. Dashboard refreshed with all 30 new ownership cases. The gate was read exactly once at the planned 20-minute completion check. No production numerical source changed in this ticket. All same-arena oracle/reconstruction, specialized ownership, execution structure, runtime isolation/status and current/legacy checkpoint authorities in the default suite remain green. The final matrix names semantic owners, accepted modes, derived consumers and concrete N/A boundaries. Numerical source parity belongs to the prerequisite code moves, while these cross-seam checks protect the final extension surface. Acceptance criteria are satisfied; close cff-ofv1 and parent cff-cfqg. Publication and shared-HTML refresh follow without another unchanged suite. Downstream new-family, throughput, stochastic batching and persistent-learning work remain separate; no PR-stack merge is performed.
+
+**2026-09-10T09:54:39Z**
+
+Published as PR #134 against #133: https://github.com/engimatic-systems/cffg/pull/134 . Final gate record ab9b5f3; measured wall time 1,158.971 seconds, completed 2026-09-10T09:51:32.462749+00:00. The shared architecture page now states epic completion, includes a two-column delivered-outcome/refinement summary, links the final contributor matrix, and preserves the historical planning snapshots. HTML validation: 72 unique IDs, 35 resolved internal anchors, no placeholders, HTTP 200 at the shared URL. Parent cff-cfqg is closed; cff-o7hs is ready but not started. Working registration remains merged, while the extraction/proof stack #113–#134 remains open. No second unchanged test run and no stack merge.

@@ -1,6 +1,6 @@
 ---
 id: cff-xabn
-status: closed
+status: in_progress
 deps: [cff-6tek, cff-s6yy]
 links: []
 created: 2026-08-31T03:16:28Z
@@ -173,3 +173,11 @@ Both bounded PR #137 requests are complete in separate commits: 31d4251 restores
 Final validation after the last code/test change: uv run python tools/dashboard.py --run-suite passed 1747 tests, with 41 slow tests deselected and 4 existing dependency deprecation warnings. Pytest took 993.36 s; measured wall time was 1005.804 s. The dashboard and runtime history are refreshed with zero failures. Log: /tmp/cff-xabn-review-short-suite.log. The suite was launched once and its output was first inspected after the full 1260-second suggested wait; no periodic suite polling occurred. Focused persistence validation passed 139 tests before launch.
 
 No implementation work remains for these requests. Model-only archives still do not contain learning state; cff-enhs owns complete archive storage/restoration. D8 and unidentified recurrence posteriors remain rejected. Flat selected restores retain destination priors and untouched owners. cff-b2fz remains the separate compact-composition follow-up. Closing cff-xabn and updating PR #137 on Cooper's existing branch; main remains unchanged.
+
+**2026-09-13T02:41:45Z**
+
+Cooper authorized merging PR117–134 followed by PR137. The stack is now merged into main with the final reviewed PR134 file tree preserved exactly. Integration uses the New IR field and Learnable or checkpoint feature change-path rows. Move PR137's learnable role checks, logical factor names, semantic identity, and persistent schema validation from the old compiler body into resolution/addresses.py::resolve_learnables, retaining the stack's ParameterRuntime declarations and statistic-source selection. Compiled values and downstream arena assembly keep transporting the resolved fields; core JSON/hash and current/legacy persistence keep their reviewed behavior. Host/JIT, flooding/scheduled, and single-instance/vmap execution changes are N/A: no numerical rules change. Validation will cover resolver/assembly contracts and learning/checkpoint migration, followed by one fresh full short-suite run for the combined code. Retain the full-stack runtime measurement to budget that run.
+
+**2026-09-13T02:43:36Z**
+
+Resolved the compiler conflict by preserving main's facade and moving the schema additions into resolution/addresses.py. The final main tree was verified identical to the reviewed PR134 tree before this integration. Focused validation of resolver, assembly, compiled values, compiler contracts, all learning families, schemas, bundles, and recurrence checkpoints passed: 295 passed, 3 slow tests deselected in 69.60 seconds. The existing regression tests cover both review fixes on the merged architecture. git diff --check and tk dep cycle pass. Full short-suite validation is next; its runtime budget comes from the completed architecture stack measurement.

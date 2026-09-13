@@ -1,50 +1,50 @@
 {
   "latest": {
-    "case_seconds": 991.713,
-    "commit": "c82ea33",
-    "completed_at": "2026-09-13T02:10:25.195154+00:00",
+    "case_seconds": 1143.521,
+    "commit": "bc35dc6",
+    "completed_at": "2026-09-10T09:51:32.462749+00:00",
     "failed": 0,
     "pytest_exit_code": 0,
     "result": "passed",
     "selection": "not slow",
-    "test_count": 1747,
-    "wall_seconds": 1005.804
+    "test_count": 2151,
+    "wall_seconds": 1158.971
   },
   "previous-3": [
     {
-      "case_seconds": 987.488,
-      "commit": "3871e9a",
-      "completed_at": "2026-09-13T00:27:30.765492+00:00",
-      "failed": 3,
-      "pytest_exit_code": 1,
-      "result": "failed",
-      "selection": "not slow",
-      "test_count": 1737,
-      "wall_seconds": 1001.601
-    },
-    {
-      "case_seconds": 983.893,
-      "commit": "534d783",
-      "completed_at": "2026-09-13T00:45:26.086200+00:00",
+      "case_seconds": 1136.048,
+      "commit": "095ce57",
+      "completed_at": "2026-09-10T08:38:47.641525+00:00",
       "failed": 0,
       "pytest_exit_code": 0,
       "result": "passed",
       "selection": "not slow",
-      "test_count": 1737,
-      "wall_seconds": 998.071
+      "test_count": 2098,
+      "wall_seconds": 1151.159
     },
     {
-      "case_seconds": 991.713,
-      "commit": "c82ea33",
-      "completed_at": "2026-09-13T02:10:25.195154+00:00",
+      "case_seconds": 1142.243,
+      "commit": "938e52c",
+      "completed_at": "2026-09-10T09:25:34.997915+00:00",
       "failed": 0,
       "pytest_exit_code": 0,
       "result": "passed",
       "selection": "not slow",
-      "test_count": 1747,
-      "wall_seconds": 1005.804
+      "test_count": 2121,
+      "wall_seconds": 1157.463
+    },
+    {
+      "case_seconds": 1143.521,
+      "commit": "bc35dc6",
+      "completed_at": "2026-09-10T09:51:32.462749+00:00",
+      "failed": 0,
+      "pytest_exit_code": 0,
+      "result": "passed",
+      "selection": "not slow",
+      "test_count": 2151,
+      "wall_seconds": 1158.971
     }
   ],
   "schema_version": 2,
-  "suggested_wait_seconds": 1260
+  "suggested_wait_seconds": 1470
 }

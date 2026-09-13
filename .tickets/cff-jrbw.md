@@ -1,6 +1,6 @@
 ---
 id: cff-jrbw
-status: open
+status: closed
 deps: [cff-ii9t]
 links: [cff-gl89]
 created: 2026-09-02T04:17:42Z
@@ -17,7 +17,9 @@ tags: [engine, architecture, runtime, refactor]
 At authoring snapshot e488df3, `src/cffg/engine.py:1191-1656` is the scope
 anchor for deterministic outer-kernel planning, trust-region/globalized mixed-
 GFE control, and exact two-pass run control; it is not a promised future line
-map. The implementation starts from the exact `cff-sf29` engine baseline.
+map. The implementation starts from the final published `cff-ii9t` head,
+including its dependency repairs; `cff-sf29` remains the contract inventory,
+not an instruction to restore pre-repair discrepancies.
 These strategies have different state and acceptance facts from the ordinary
 iterative loop.
 
@@ -28,12 +30,23 @@ the shared result owner delivered by cff-ii9t.
 ## Outcomes / Acceptance Criteria — WHAT
 
 1. `cff-ii9t` is closed with ordinary iterative outcomes passing.
-2. An `OuterTrustRegionStrategy` accepts only the compiled outer-kernel plan,
-   prepared state, propagation/objective callables, and existing trust-region
-   controls; it returns a typed `OuterOutcome`.
-3. An `ExactRunStrategy` accepts only the exact schedule unit, prepared state,
-   support/objective callables, and tolerance; it returns a typed
-   `ExactOutcome`.
+2. An `OuterTrustRegionStrategy` accepts an explicit outer-kernel plan provider,
+   the structural chart/hardening inputs it actually needs, prepared state,
+   propagation/objective callables, and existing trust-region controls; it
+   returns a typed `OuterOutcome`.
+   2.1. The provider selects or builds kernels for the current chart and hard
+        message positions. One permanently fixed kernel cannot represent
+        support-dependent charts and later hardening phases. Preserve the
+        existing cache key, creation timing and public compilation count.
+   2.2. Chart bases, observations, masks, parameters and hard message values
+        stay current runtime inputs, not values captured from the first
+        instance using a cached kernel. Keep chart construction's structural
+        dependencies explicit; wrapping an entire Engine in a plan object is
+        not a narrow interface.
+3. An `ExactRunStrategy` accepts only the exact schedule unit, its objective
+   mode, prepared state, support/objective callables, and tolerance; it returns
+   a typed `ExactOutcome`. Exact certification does not accept trust-region
+   controls, functional-particle state services or an outer-kernel provider.
 4. Neither strategy accepts irrelevant state for the other. There is no
    universal solver callback. Shared termination facts may use a small typed
    protocol consumed by `Engine.run`.
@@ -42,7 +55,7 @@ the shared result owner delivered by cff-ii9t.
    `RunStatus`/`RunResult` construction. No second status mapping is introduced.
 6. Trust-region merit/acceptance, budget and rejection counts, inner status,
    exact two-pass behavior, support classification, traces, and diagnostic
-   fields retain the `cff-sf29` baseline behavior.
+   fields retain the repaired prerequisite baseline behavior.
 7. The affected row is **Runtime numerical or status invariant**. **New factor
    or rule family** applies to the explicit GFE plan input; **New IR field** and
    **Learnable or checkpoint feature** are N/A because plan/checkpoint schemas
@@ -87,3 +100,44 @@ and every run-control strategy have named owners.
   globalization and acceptance control.
 - **Strategy outcome:** Internal state, traces, and termination facts returned
   to `Engine.run` without constructing a public status.
+- **Kernel-plan provider:** The owner that reuses or creates the derivative
+  kernels for a particular outer-coordinate chart and hard message positions,
+  then supplies that call's runtime context separately.
+
+## Notes
+
+**2026-09-10T07:04:26Z**
+
+Pre-implementation handoff at source 20c0367 while cff-ii9t's final gate runs. Source anchors: Engine._outer_kernel_plan, _run_outer_trust_region and _run_exact; outer.build_outer_chart, outer_chart_signature and solve_outer. This is local source inspection, not independent agent review.
+
+- The kernel cache key is chart signature plus hard index dtypes/shapes/bytes. The context separately carries chart.base, observations/masks, State.params and hard values. Preserve that separation and lazy creation; a constructor-time single-kernel snapshot would be wrong.
+- outer.py currently uses Arena edges, goal_parameter_plans and three index helpers for chart construction, plus edges in solve_outer. Resolve that explicit structural interface when choosing a chart-plan/provider shape; do not hide an Engine behind a generic callback. No new solver or mathematical chart representation is authorized by this refinement.
+- Exact certification has distinct result facts: initial non-finite input is zero iterations with inner divergence; pre-support rejection retains the input; post-support rejection is one logical iteration but an empty delta trace and FE=+infinity. Therefore do not reuse ordinary IterationOutcome's iterations=len(deltas) property as a universal strategy count.
+- Exact tol=None can converge from its structural certificate. Outer ROOT_CONVERGED with tol=None still maps to budget exhaustion. Preserve the existing mode-specific meaning; one shared finalizer does not mean one convergence rule.
+- Outer initial non-finite/support failures have NONFINITE_EVALUATION/INFEASIBLE public detail tags, not ordinary NOT_RUN. Zero-budget outer runs can still do the existing functional coordinate update; no eager budget shortcut may skip it. Functional failures preserve their supplied residual and INNER_FAILURE tag.
+- OuterOutcome must retain the last solver diagnostics and accumulated accepted/rejected, map/trial, linear-iteration and kernel-creation counts. ExactOutcome needs no such fields. A typed outcome union at the shared result owner is appropriate; a universal solver callback is not.
+- Keep the current finite/support/checkpoint boundary and the static strategy selection order. Ordinary iteration is now delegated and does not move again. The primitive numerical solver remains outer.py; objective formulas remain for cff-gl89.
+
+**2026-09-10T07:20:21Z**
+
+Prerequisite cff-ii9t is closed and published as PR #130. Use its final published agent/cff-ii9t-iteration-control head as the work-branch base. Code/test source 20c0367 has a final 2,059-test gate (41 slow deselections, four existing warnings), recorded in bbbbccb; measured wall 1,155.815 seconds. Ordinary outcome/finalization lives in iteration_types.py/run_results.py; shared host predicates are in runtime_checks.py. Extend the result authority for exact/outer facts without changing the already-extracted ordinary policy.
+
+**2026-09-10T07:25:58Z**
+
+Starting from verified PR #130 head b379a28 after an ff-only pull. Applicable change paths: Runtime numerical or status invariant, plus explicit GFE chart inputs under New factor or rule family. Paired surfaces: host checks/fused JIT exact certification; flooding/colored/mixed schedule propagation; standalone/existing Colony exact and GFE fallback routes; restored State/current parameter and observation context. New IR/checkpoint schema and unsupported outer-vmap execution are N/A. Preserve schedule instrumentation aliases, dynamic chart/hard-value cache inputs, exact logical counts independent of trace lengths, and strategy-specific tolerance semantics. No mathematical or solver-policy change is intended.
+
+**2026-09-10T07:37:18Z**
+
+Implementation now gives exact_strategy.ExactRunStrategy and outer_strategy.OuterTrustRegionStrategy separate typed outcomes. run_results owns all public result/status construction; Engine retains selection and compatibility delegates. OuterStructure contains only edges, shared-goal plans and three segment-offset arrays. OuterKernelProvider owns the existing chart/hard-index keyed cache; current base, observations, masks, parameters and hard values are supplied as runtime context. outer.py changed only one import and two accepted-type annotations: chart/solver mathematics are untouched. Focused validation: 82 passed, five slow deselections in 37.82 seconds; 22 new boundary tests cover exact pre/post-support counts, tolerance semantics, functional zero-budget updates, accumulated outer work, structure parity, dynamic cached context and owner boundaries. New modules/tests are Ruff-clean; no independent agent review is claimed. Full old/new result characterization and the final short-suite gate are next.
+
+**2026-09-10T07:43:00Z**
+
+Complete-result characterization passed against PR #130 source b379a28: 110 complete results and 3,416 raw-byte-identical numeric comparisons, with enum identity preserved. Coverage: discrete/Gaussian/EF exact execution; ordinary/hybrid/functional GFE; mixed-shape shared learned goals; T-maze staged hardening; both precisions; zero budgets, tol=None, finite tolerances, initial non-finite/support failures, repeated cached runs and existing Colony exact/GFE routes. Script: /tmp/cffg-strategy-parity.py. This is compatibility evidence, not a new scientific oracle. The existing mixed-precision functional scatter FutureWarning appeared. Kernel-plan AST parity separately passed. Final code/test source is baaad19; intervening 6812590 only refines the next ticket. Final short suite starts using cached runtime 1,155.815 seconds and allowance 1,470 seconds; first output check after 20 minutes, no intermediate suite polling.
+
+**2026-09-10T08:03:51Z**
+
+Final gate passed at code/test source baaad19, with ticket-only head a8485bc recorded by the dashboard: 2,081 passed, 41 slow deselections, four existing Gym warnings; pytest 1,152.59 seconds, measured wall 1,165.949 seconds, completed 2026-09-10T08:02:26.885194+00:00. The suite was read exactly once, at 08:03:20 UTC after the planned 20-minute first-check deadline. Runtime history and shared dashboard are refreshed. New owner sizes: exact 114 lines, outer control 312, kernel provider 123, structural view 41, outcome 40, shared results 202; Engine is 417 lines shorter. All acceptance criteria are met. Next: publish the stacked PR and update the shared architecture page, then start cff-gl89 from this final published head. No solver, objective, serialization or performance-target change; no independent review or speedup claim.
+
+**2026-09-10T08:04:58Z**
+
+Published as PR #131 against PR #130. Shared architecture HTML now names the completed exact/outer owners, compatibility evidence and final 2,081-test gate, with the ledger as next work. Page validation: 68 unique IDs and 35 resolved internal anchors. Source baaad19; gate record aeaf18c. Main is unchanged; no stack merge was performed.

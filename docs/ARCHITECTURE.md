@@ -46,11 +46,11 @@ while reserved syntax that round-trips but cannot execute is syntax only.
 
 | Paper construction and source | Template/compiler representation | Execution class | Rule, ledger, direct authority, or guard |
 | --- | --- | --- | --- |
-| Normalization, Part I §2.1 Eqs. (9a–b), Fig. 4; Part II §2.3 Eq. (2a) | Implicit invariant, not a `ConstraintSpec`; compiler plans create normalized beliefs | Exact for every registered family | `_norm_pad` and natural-family normalizers; node energies in `_make_bfe`; `test_fully_observed_marginals_and_bfe` and `test_bfe_equals_negative_loglikelihood` |
-| Marginalization, Part I §2.1 Eq. (9c), Fig. 4; Part II §2.3 Eq. (2b) | Implicit paired edge slots, gather/scatter maps, fixed-point edge products, and interior-edge entropy corrections | Exact density consistency at a fixed point for ordinary registered BP/VMP rules | BP/VMP reductions plus `_make_bfe`; HMM forward-backward and tree `-log Z` tests. The Gaussian-mixture projection below is a named exception, not exact density consistency. |
-| Gaussian-mixture assumed-density projection, repository extension derived in `DERIVATIONS.md` D3 | `gaussian_mixture(_linear)` rules collapse each Gaussian-edge mixture message to the Gaussian with the same mean and covariance | Named assumed-density approximation; only the selected moments, not the full marginal density, agree | `mixg.py`; node terms are exact for held beliefs, while `_make_bfe` uses the collapsed Gaussian edge entropy and reports the bounded ledger described in LIMITATIONS S1d; `test_mixg.py` and switching-KF enumeration tests |
+| Normalization, Part I §2.1 Eqs. (9a–b), Fig. 4; Part II §2.3 Eq. (2a) | Implicit invariant, not a `ConstraintSpec`; compiler plans create normalized beliefs | Exact for every registered family | `_norm_pad` and natural-family normalizers; node energies in `ledger.make_belief_energy`; `test_fully_observed_marginals_and_bfe` and `test_bfe_equals_negative_loglikelihood` |
+| Marginalization, Part I §2.1 Eq. (9c), Fig. 4; Part II §2.3 Eq. (2b) | Implicit paired edge slots, gather/scatter maps, fixed-point edge products, and interior-edge entropy corrections | Exact density consistency at a fixed point for ordinary registered BP/VMP rules | BP/VMP reductions plus `ledger.make_belief_energy`; HMM forward-backward and tree `-log Z` tests. The Gaussian-mixture projection below is a named exception, not exact density consistency. |
+| Gaussian-mixture assumed-density projection, repository extension derived in `DERIVATIONS.md` D3 | `gaussian_mixture(_linear)` rules collapse each Gaussian-edge mixture message to the Gaussian with the same mean and covariance | Named assumed-density approximation; only the selected moments, not the full marginal density, agree | `mixg.py`; node terms are exact for held beliefs, while `ledger.make_belief_energy` uses the collapsed Gaussian edge entropy and reports the bounded ledger described in LIMITATIONS S1d; `test_mixg.py` and switching-KF enumeration tests |
 | Joint node factorization, Part I §5.1 Figs. 5 and 7 | Absence of a factorization bead selects `GroupPlan.mode="bp"` | Exact registered BP on trees; named Bethe approximation on loopy graphs | `BP_UPDATES`, `NODE_ENERGIES`; exhaustive tree and HMM authorities in `test_engine_tree.py` and `test_engine_hmm.py` |
-| Naive mean field, Part I §5.1 Eq. (26), Figs. 5 and 7; Part II §4.1 Eq. (7) | `ConstraintKind.MEAN_FIELD` targets one factor and selects a VMP or Dirichlet-VMP plan | Named mean-field/VMP approximation | `VMP_UPDATES`, `VMP_ENERGIES`, Dirichlet VMP rules, and `_make_bfe`; `test_vmp_exact_in_conjugate_case`, `test_vmp_differs_from_bp_with_two_free_edges`; unsupported factor/family pairs are compile errors |
+| Naive mean field, Part I §5.1 Eq. (26), Figs. 5 and 7; Part II §4.1 Eq. (7) | `ConstraintKind.MEAN_FIELD` targets one factor and selects a VMP or Dirichlet-VMP plan | Named mean-field/VMP approximation | `VMP_UPDATES`, `VMP_ENERGIES`, Dirichlet VMP rules, and `ledger.make_belief_energy`; `test_vmp_exact_in_conjugate_case`, `test_vmp_differs_from_bp_with_two_free_edges`; unsupported factor/family pairs are compile errors |
 | Structured mean field, Part I §5.1 Eq. (27), Fig. 6; Part II §2.4 Fig. 1 | No role-partition syntax. `BoundaryFactorization` is rolling-state metadata, not this node constraint. | Unsupported | No rule or ledger. The enum cannot express the construction, so it cannot be mistaken for executable syntax. |
 | Edge form constraint, Part I §5.2 Eq. (28), Fig. 8 | No generic variational-family bead. `VariableSpec` chooses a model domain/arena and is not a form constraint on `q`. | Unsupported in general; data and optimized δ are the exact special cases below | Unknown constraint kinds fail deserialization; no generic projection or ledger is advertised. |
 | Node form constraint, Part I §5.2 Eq. (29), Fig. 9 | No node-belief family syntax. `FactorType` declares model factor `f`, not a constrained form for `q_a`. | Unsupported | No rule or ledger; the construction is absent from `ConstraintKind`. |
@@ -59,7 +59,7 @@ while reserved syntax that round-trips but cannot execute is syntax only.
 | Fixed model clamp, Part II §2.4 Fig. 1 | `FactorSpec.param_blobs` binds a fixed value to a factor parameter role | Exact for registered factor roles; this is part of the model, not observed data | Parameter packing and each registered rule consume the blob; `test_blob_bound_node_loses_default` and `test_wire_terminals` check the distinct black-square diagram terminal. |
 | Optimized δ/point mass, Part I §5.3 Eq. (30), Fig. 11 and Fig. 29 application | `ConstraintKind.DELTA` on a discrete edge; compiler records `delta_pairs`; the hardening phase projects both slots to the marginal argmax | Exact discrete point-mass coordinate | Ordinary ledger evaluated on the point mass; `test_map_policy_variant`. Dirichlet-parameter, Gaussian, and EF edges are rejected with named compile errors. |
 | Moment matching, Part I §5.4 Eq. (31), Fig. 12 | The paper selects a node endpoint on an incident edge and a sufficient-statistic projection; each end may be selected independently. The legacy factor-only `ConstraintKind.MOMENT_MATCHING` cannot express those choices. | Underspecified legacy syntax only | Serialization and hashing retain the placeholder, but compilation and diagram derivation reject it. `test_legacy_moment_matching_placeholder_round_trips_but_compilation_rejects` and `test_legacy_moment_matching_placeholder_is_rejected` are the guards. EP execution requires a new schema plus migration, factor-specific rules, and a ledger. |
-| P-substitution, Part I §4 Eqs. (20–25), §5.5 Eq. (32), Fig. 13; Part II §3.3.2 Eqs. (4–5), §4.1 Eqs. (6–8) | `ConstraintKind.P_SUBSTITUTION` plus `substituted_role`; compiler derives a discrete, transition-mixture, or hybrid GFE plan only for registered shapes | Exact local Fig. 5 fixed-A composite; named tentative-decision/analytic-moment approximation for uncertain A without functional `mu3`; separately named TM/hybrid extensions; unsupported otherwise | Specialized GFE update/energy functions own the substituted edge term in `_make_bfe`. Compiler rejects unsupported roles, factors, goals, uncertainty modes, and evaluator names. Figure 5 authorities are inventoried below. |
+| P-substitution, Part I §4 Eqs. (20–25), §5.5 Eq. (32), Fig. 13; Part II §3.3.2 Eqs. (4–5), §4.1 Eqs. (6–8) | `ConstraintKind.P_SUBSTITUTION` plus `substituted_role`; compiler derives a discrete, transition-mixture, or hybrid GFE plan only for registered shapes | Exact local Fig. 5 fixed-A composite; named tentative-decision/analytic-moment approximation for uncertain A without functional `mu3`; separately named TM/hybrid extensions; unsupported otherwise | Specialized GFE update/energy functions own the substituted edge term in `ledger.make_belief_energy`. Compiler rejects unsupported roles, factors, goals, uncertainty modes, and evaluator names. Figure 5 authorities are inventoried below. |
 | Trial-time planning bead → data bead, Part II §6.3 Fig. 7 (static contrast in §3.3 Fig. 3) | `RollingAgent` uses immutable planning and filtering templates plus a carried boundary belief; it does not mutate one growing trial graph | Exact window-transformation oracle for the fixed-A binary discrete joint-boundary case; named two-window realization outside that boundary | `test_literal_snapshots_record_the_constraint_change_without_rewriting_variables` checks the immutable before/after declarations. `test_two_window_agent_matches_two_step_enumerator_and_local_ledgers` checks both action posteriors, the filter posterior, boundary carry, local GFE, the derived boundary offset, and the two-structure bound against independent enumeration. Exact-zero and float32 cases are separate authorities in the same file. |
 
 Normalization and marginalization are therefore always-on compiler/runtime
@@ -124,10 +124,10 @@ and review context proportional to the change.
 
 | Ticket shape | Authority | Derived surfaces that must agree | Canonical focused tests | Durable documentation |
 | --- | --- | --- | --- | --- |
-| New IR field | `src/cffg/core/ir.py` (`Template` or its spec dataclass) | `src/cffg/core/validate.py`; `src/cffg/core/serialize.py` (`to_dict`, `from_dict`, `structure_hash`); `src/cffg/core/plates.py` scoping; `src/cffg/core/compose.py` and `src/cffg/core/edits.py` when editable; `src/cffg/topology.py` declaration snapshots/layout, `src/cffg/compiler.py` lowering, and `src/cffg/compiled.py` values when executable; bundle and agent state when persisted | `tests/test_ir.py`, `tests/test_serialize.py`, `tests/test_plates.py`, `tests/test_topology.py`; add `tests/test_edit_codec.py`, `tests/test_edits.py`, `tests/test_agent_spec.py`, or `tests/test_bundle.py` only for the affected boundary | Contract in this document; public construction and migration in `README.md`; unsupported cases in `LIMITATIONS.md` |
-| New factor or rule family | `src/cffg/kernels.py:FactorKernel`, `kernel_bindings.py`, its `src/cffg/core/ir.py:FactorType`, and the family rule module; formal equations are authoritative in code docstrings and `DERIVATIONS.md` | `topology.py` declared role/slot facts; compiler grouping, parameter packing, `Arena`, and `member_of`; shared local calls in `kernel_runtime.py`; synchronous `_make_step`; scheduled batch/registerized/flat scans; `_make_bfe`; support checks, assignment scoring, readouts, schedule classification, serialization manifest, estimator, and public exports as applicable | `tests/test_kernels.py`, `tests/test_discrete_kernels.py`, `tests/test_gaussian_kernels.py`, `tests/test_gaussian_kernel_schedules.py`; family rule and engine-oracle tests; `tests/test_schedule.py`; sparse-support, float32, and uncomfortable-scale cases | Derivation in `DERIVATIONS.md`; integration contract here; approximations in `LIMITATIONS.md`; public modeling API in `README.md` |
-| Runtime numerical or status invariant | `AGENTS.md` numerical contract and `src/cffg/engine.py` (`RunStatus`, `RunResult`, `Engine.run`) | Flooding, colored/mixed, and exact schedules; host `_has_zero_support` and JIT `_make_support_check`; `_make_step`, `_make_exact_unit`, `_make_propagate`, and `_make_bfe`; inner-solver status; `RollingAgent`, `Colony`, estimator, benchmark, and dashboard consumers | `tests/test_runtime_status.py`, `tests/test_schedule.py`, `tests/test_colony.py`, plus the changed rule family's hostile-input tests | Runtime contract here and in `README.md`; any accepted failure mode or approximation in `LIMITATIONS.md` |
-| Learnable or checkpoint feature | `src/cffg/core/ir.py` (`LearnableSpec`, `AgentSpec`, `BeliefBinding`) and `src/cffg/learn.py` (`Family`, `Learnables`) | Validation, JSON/hash, plate scoping, compiler `_resolve_learnables`, `Arena.learn_plans`, `member_of`, engine readouts and parameter writes, agent cadence, checkpoint encode/decode and legacy migration, and bundles | `tests/test_learnables.py`, `tests/test_agent_spec.py`, `tests/test_agent.py`, and `tests/test_bundle.py`; add the contributing factor family's statistic test | Conjugate contract here; statistics beyond the papers in `DERIVATIONS.md`; public cadence/checkpoint API in `README.md`; remaining family gaps in `LIMITATIONS.md` |
+| New IR field | `src/cffg/core/ir.py` (`Template` or its spec dataclass) | `src/cffg/core/validate.py`; `src/cffg/core/serialize.py` (`to_dict`, `from_dict`, `structure_hash`); `src/cffg/core/plates.py` scoping; `src/cffg/core/compose.py` and `src/cffg/core/edits.py` when editable; `src/cffg/topology.py` declaration snapshots/layout, `src/cffg/specialized/` semantic claims/drafts, `src/cffg/registered/` same-arena drafts, `src/cffg/resolution/` arrays/addresses, `src/cffg/assembly.py` arena assembly, and `src/cffg/compiled.py` values when executable; bundle and agent state when persisted | `tests/test_ir.py`, `tests/test_serialize.py`, `tests/test_plates.py`, `tests/test_topology.py`, `tests/test_registered.py`, `tests/test_resolution.py`, `tests/test_assembly.py`; add `tests/test_edit_codec.py`, `tests/test_edits.py`, `tests/test_agent_spec.py`, or `tests/test_bundle.py` only for the affected boundary | Contract in this document; public construction and migration in `README.md`; unsupported cases in `LIMITATIONS.md` |
+| New factor or rule family | `src/cffg/kernels.py:FactorKernel`, `kernel_bindings.py`, its `src/cffg/core/ir.py:FactorType`, and the family rule module; formal equations are authoritative in code docstrings and `DERIVATIONS.md` | `topology.py` declared role/slot facts; `specialized/` named family discovery/completion; `registered/` binding capabilities and same-arena structural lowering; common declarations in `array_requirements.py`; `registered/packing.py` and `specialized/packing.py` family adapters; `resolution/` parameter/observation resolution; `assembly.py`, `Arena`, and `member_of`; typed local updates in `execution/` and `ExecutionDelta`; registered mathematics/readouts/energy in `kernel_runtime.py`; objective assembly in `ledger.py` and specialized local terms in `ledger_terms.py`; `execution/synchronous.py:make_sweep`; `execution/transport.py` and `schedule_program.py` batch/registerized/flat scans; `lifecycle.py` observation binding and `mu3_lifecycle.py` functional state; `ledger.make_belief_energy`; support checks, assignment scoring, `readouts/` posterior/statistic adapters, schedule classification, serialization manifest, estimator, and public exports as applicable | `tests/test_kernels.py`, `tests/test_execution.py`, `tests/test_registered.py`, `tests/test_resolution.py`, `tests/test_assembly.py`, `tests/test_discrete_kernels.py`, `tests/test_gaussian_kernels.py`, `tests/test_gaussian_kernel_schedules.py`; `tests/test_ledger.py`, `tests/test_readout_owners.py`; family rule and engine-oracle tests; `tests/test_schedule.py`, `tests/test_schedule_program.py`; sparse-support, float32, and uncomfortable-scale cases | Derivation in `DERIVATIONS.md`; integration contract here; approximations in `LIMITATIONS.md`; public modeling API in `README.md` |
+| Runtime numerical or status invariant | `AGENTS.md` numerical contract and `src/cffg/runtime_types.py` (state/result/status values) and `src/cffg/iteration.py` (ordinary policy), `exact_strategy.py` and `outer_strategy.py` (distinct run control), and `run_results.py` (public results), plus `ledger.py` and `ledger_terms.py` (objectives) and `readouts/` (posteriors/statistics) | Flooding, colored/mixed, and exact schedules; host `runtime_checks.StateChecks` and `schedule_program.make_support_check`; `execution.synchronous.make_sweep`, `ScheduleProgram`, `make_exact_unit`, `make_propagate`, and `ledger.make_belief_energy`; `StateLifecycle`/`Mu3Lifecycle` initialization, preparation and status forwarding; inner-solver status; `RollingAgent`, `Colony`, estimator, benchmark, and dashboard consumers | `tests/test_runtime_status.py`, `tests/test_schedule.py`, `tests/test_schedule_program.py`, `tests/test_engine_contracts.py`, `tests/test_lifecycle.py`, `tests/test_iteration.py`, `tests/test_ledger.py`, `tests/test_readout_owners.py`, `tests/test_run_strategies.py`, `tests/test_colony.py`, `tests/test_colony_failures.py`, `tests/test_constraint_data.py`, `tests/test_constraint_reconstruction.py`, plus the changed rule family's hostile-input tests | Runtime contract here and in `README.md`; any accepted failure mode or approximation in `LIMITATIONS.md` |
+| Learnable or checkpoint feature | `src/cffg/core/ir.py` (`LearnableSpec`, `AgentSpec`, `BeliefBinding`) and `src/cffg/learn.py` (`Family`, `Learnables`) | Validation, JSON/hash, plate scoping, specialized parameter/objective ownership, `resolution/addresses.py:resolve_learnables` and declared member/parameter requirements, `Arena.learn_plans`, `member_of`, `StateLifecycle` initial arrays and binding, `Mu3Lifecycle` functional parameter state, `readouts/` adapters and `StateLifecycle.with_goal_priors`, agent cadence, checkpoint encode/decode and legacy migration, and bundles | `tests/test_learnables.py`, `tests/test_readout_owners.py`, `tests/test_lifecycle.py`, `tests/test_constraint_reconstruction.py`, `tests/test_resolution.py`, `tests/test_assembly.py`, `tests/test_agent_spec.py`, `tests/test_agent.py`, and `tests/test_bundle.py`; add the contributing factor family's statistic test | Conjugate contract here; statistics beyond the papers in `DERIVATIONS.md`; public cadence/checkpoint API in `README.md`; remaining family gaps in `LIMITATIONS.md` |
 
 Duplicated execution surfaces are deliberate review pairs: host/JIT,
 flooding/scheduled, single-instance/`vmap`, and current/legacy checkpoint
@@ -150,6 +150,22 @@ A pure-Python (dataclass) representation, independent of JAX:
   rejects it before arena construction, and diagram generation rejects it
   rather than drawing the wrong bead. Executable EP requires a new schema and
   migration in addition to factor-specific projection and ledger rules.
+- **P-substitution declaration consistency.** `core/constraint_details.py`
+  checks every declaration and every raw detail key before dictionary conversion
+  can discard a conflicting value. Core validation preserves existing target/
+  role diagnostics and then appends one sorted conflict report per target as
+  `ModelError`. Serialization uses the same targeted check and raises
+  `ValueError` before detail conversion or sorting; it does not perform general
+  model validation. Bundle structure-hash checks also reach that guard.
+  Identical repeated declarations and detail keys remain accepted and are not
+  removed from the template. Equality means identical canonical JSON metadata,
+  ignoring mapping-key order but preserving numeric representations such as
+  `1` versus `1.0`; a missing key differs from an explicit value. Unknown fields
+  participate so another declaration cannot silently discard future meaning.
+  The schema and valid-model hashes are unchanged. Tests live in
+  `tests/test_constraint_details.py`, alongside core/serialization/compiler and
+  current/legacy bundle checks. This does not change other constraint families
+  or the JSON parser's general duplicate-object-key behavior.
 - **Templates with ports.** A template is a CFFG fragment whose boundary edges are
   declared **ports** with roles: `data` (sensor clamp), `goal` (goal prior),
   `prior` (parameter prior), `glue` (connects to the next unrolled slice). A model
@@ -281,9 +297,10 @@ edge's table shape/axis, decide legal observation conditioning, or assign
 observation rows. Parameter carriers already declare their flat cardinality;
 semantic discovery produces new tagged edge records without changing topology.
 Observation rows follow lowered group/member order, not DATA-candidate order.
-Assembly converts these lengths into int64 prefixes at its existing late gate,
-so out-of-range declarations cannot preempt earlier admission or array errors.
-Observation prefixes and entropy exclusions also remain with assembly. The
+Resolution converts these lengths into int64 prefixes at the existing late gate,
+after array validation and before learning validation, so out-of-range declarations
+retain their original error precedence. It also resolves observation prefixes;
+assembly consumes the prefixes and specialized entropy exclusions. The
 module's `prefix_offsets` helper calculates offsets from supplied segment lengths;
 it does not choose observation assignments or interpret factors.
 
@@ -295,6 +312,216 @@ orchestration appends them after factor-admission errors at the existing
 resolution and Dirichlet discovery. Moving structural work does not change the
 error owner or precedence. `tests/test_topology.py` directly protects these
 boundaries and the immutable declaration snapshot.
+
+#### Specialized structural lowering
+
+`src/cffg/specialized/` owns factor semantics that do not fit the ordinary
+same-arena registered-kernel contract. It is an explicit set of lowerers, not a
+fallback for unrecognized factor types. Its two operations are:
+
+1. `discover_specialized(Template, TopologyLayout, semiring, RegistrySnapshot)` returns immutable
+   `SpecializedClaims`: parameter-edge shape/axis tags, composite membership,
+   absorbed factors, equality routes, specialized conditioning restrictions,
+   and deferred diagnostics. It never reads a blob. Raw constraint details are
+   used transiently for the existing diagnostic text; mutable template objects
+   are not retained.
+2. `complete_specialized(claims, OrdinaryMembership)` returns immutable
+   `SpecializedPlanDrafts`. Ordinary categorical BP membership, including
+   structural equalities, completes recurrence components without classifying
+   their factors again. Registered lowering supplies this membership after
+   consuming the specialized claims.
+
+The specialized owners are:
+
+| Responsibility | Owner |
+| --- | --- |
+| Admission traversal, parameter-edge tags, composite claims, domain routing, specialized initializer shapes | `specialized/discovery.py`; registered capability checks delegate to `registered/capabilities.py` at their original per-factor positions |
+| Dirichlet parameter paths, categorical and transition GFE, hybrid GFE, functional μ3 metadata | Named `lower_*` functions in `specialized/composites.py` |
+| Mixture, recurrence, and Gaussian precision plans | Named `lower_*` functions in `specialized/mixed.py`; recurrence incidence classification consumes immutable variable/endpoint mappings in `recurrence_topology.py` |
+| Hard-constraint drafts and family-owned k/table validation | `specialized/constraints.py` |
+| Equality plans, edge DELTA meaning, final semiring restrictions | `specialized/structural.py` |
+| Global learned-goal parameter plan | Completion delegates to `goal_parameters.build_goal_parameter_plans`; runtime count pooling and energy remain in `goal_parameters.py` |
+| Family array validation and representation changes | Named packers in `specialized/packing.py`; hard-constraint payloads remain in `specialized/constraints.py` |
+| Cross-family completion and original-factor/objective ownership map | `specialized/__init__.py`; value contracts in `specialized/contracts.py` |
+
+Drafts reuse existing immutable compiled records when every field is structural.
+They are the same objects passed into `Arena`, without republishing their array
+payloads. `ArrayRequirement` declares ordered factor/role/blob inputs, initializer
+shapes, a named family recipe, and parameter-key or constraint-payload
+destinations. Recipes are identifiers, not serialized callables. Compatibility
+packers consume these declared inputs and destinations. A `ConstraintDraft`
+deliberately has no k/table value until its family validator resolves the payload.
+Generic array resolution does not choose a factor's mathematical meaning.
+Specialized composite shapes come from their family declarations, not an ordinary
+kernel's shape callback. Replacing a built-in kernel must not cause its callback
+to run earlier; registered shape providers retain their initializer/packing gates.
+
+`CompositeOwnership` connects original factors and constraints to their plan,
+absorbed members, ordinary-entropy exclusions, parameter edges, and shared
+parameter/objective owners. Fixed categorical goals remain explicit in this map
+even though the existing `GfePlan.goal_members` compatibility field is empty.
+μ3 and global learned-goal owners are overlays, not duplicate factor execution.
+Transition GFE absorbs no facing factor and retains its output edge entropy;
+categorical/hybrid observation GFE excludes only the substituted output.
+Dirichlet carriers are excluded through their parameter tags, separately from
+GFE output exclusions. Specialized claimed factors and ordinary registered
+factors form a disjoint, exhaustive partition.
+
+Discovery/completion happen before blob resolution, but error publication keeps
+the existing checkpoints: admission, parameter layout, conditioning and prior
+arrays, composite declarations/arrays, remaining-factor grouping, family arrays,
+hard constraints, semiring, DELTA, and assembly. Invalid concentrations still
+produce the original orphan-prior diagnostic. Explicit constraint diagnostics
+become `CompileError`; incidental array-library exceptions retain their original
+class. Numerical packer mathematics now lives beside its family owners;
+`resolution/` sequences source loading, validation, observation/member addresses,
+and learning. Final assembly lives in `assembly.py`. No numerical update, approximation,
+saved-model schema, supported combination, or public compiled-plan field changes.
+
+`tests/test_specialized.py` protects these boundaries, ownership distinctions,
+immutable snapshots, unresolved constraint payloads, registered `any`-domain
+routing, diagnostic timing, and 32 specialized shape groups under float32 and
+serialized reconstruction. Existing family tests remain the mathematical
+authorities. The explicit corrected behavior baseline is `ad028f0`, following
+the global learned-goal and conflicting-declaration fixes.
+
+#### Registered structural lowering
+
+`registered/lowering.py:lower_registered` accepts the expanded `Template`,
+`TopologyLayout`, `SpecializedClaims`, semiring, and a `RegistrySnapshot`.
+It returns immutable `RegisteredPlanDrafts`: ordered discrete, Gaussian, and
+EF group drafts, ordinary BP membership, discrete DATA slot intent, and deferred
+conditioning/grouping diagnostics. This stage reads declarations, never blobs.
+`registered/capabilities.py` captures the binding map once per compilation and
+owns registered constraint-mode and conditioned-output admission checks. Discovery
+and registered lowering share that snapshot; trusted callbacks retain identity,
+not frozen closure state, and are not serialized into templates.
+
+Discrete drafts reuse complete `GroupPlan` records. Gaussian and EF drafts carry
+roles, dimensions/family, member order, gather/scatter arrays, and the frozen
+kernel handle containing message/energy/readout and implementation identity.
+Observation intent records an observed role and member-ordered source references,
+not row IDs. Unobserved is distinct from observed-but-unresolved; an invalid
+conditioning source retains a missing port until its existing diagnostic or
+row-resolution gate. It cannot publish a row under a missing port key.
+`resolution/observations.py` assigns the independent Gaussian and EF row counters and
+publishes final plans without copying already immutable address arrays.
+
+Specialized claims are authoritative exclusions. Equality is not reinterpreted:
+opaque equality references stay interleaved in original group-key order, and
+specialized completion supplies the plans. Discrete equality members contribute
+to BP membership for recurrence completion. Numeric shape keys, not displayed
+group-name strings, determine ordering. Existing `family="any"` declared-domain
+routing is retained for non-equality registered extensions.
+
+`array_requirements.py` is the shared declaration contract. Registered inputs
+record factor/parameter-role/blob identity and an unevaluated `ShapeRequirement`
+(trusted `ParameterSpec` plus shared immutable role sizes); destinations record
+the existing packed parameter paths. `SourceRequirement` records source roles
+for every referenced factor, including absorbed members, in original traversal
+order; covariance checks and historical initializer fallbacks remain distinct
+from canonical packing shapes. `MemberRequirement` and `ParameterRuntime`
+declare row/write eligibility, transforms, and learning form/layout without
+interpreting runtime key suffixes in the learning resolver. Specialized drafts
+also retain prior claims, deferred diagnostics, edge tags and initializer fallback
+facts needed after discovery. `resolution/addresses.py` materializes the declared
+addresses and binds learning sources/targets; `resolution/resolve.py` owns
+the integrated numeric/address checkpoints. `compiler_errors.py` supplies their
+shared `CompileError`, reexported by the public compiler facade.
+
+External shape callbacks still execute only
+at initializer or packing checkpoints. Registered packers retain their complete
+resolved-blob mapping and original callback/key-validation behavior, including
+the legacy EF adapter. Requirements do not narrow this callback input contract.
+`registered/packing.py` owns the adapters that invoke these callbacks and the
+existing abstract-shape checks in `kernel_runtime.py`.
+
+`tests/test_registered.py` checks draft reuse, opaque equality routes, observation
+intent, snapshot isolation, shared registry input, callback timing/input mappings,
+ordered admission and late conditioning errors, and 32 ordered groups with
+float32 source arrays and JSON reconstruction. Existing registered-factor
+enumeration and Gaussian covariance oracles remain the mathematical authorities.
+
+#### Array and learning resolution
+
+`resolution/resolve.py:resolve_compile_data` accepts the expanded `Template`,
+array overrides/root, `TopologyLayout`, and complete registered/specialized
+drafts. It returns one immutable `ResolvedCompileData`, not an `Arena` or a
+schedule. This value contains parameter arrays, final ordinary plans,
+observation/member addresses, writable-member facts, validated hard constraints,
+prefix arrays, learning plans, and the unchanged functional μ3/global-goal plans.
+The compiler facade reuses its published maps, arrays, and plans by identity.
+
+`resolution/sources.py` owns override → existing file → initializer precedence.
+It consumes the ordered source catalog, invokes declared shape providers only
+when an initializer needs them, and checks covariance in the source dtype before
+float64 host packing. Canonical composite packing shapes do not replace the
+historical first-role initializer fallback. Registered packers see every resolved
+model blob; specialized packers consume their declared inputs. Family owners
+retain probability-to-log conversion, concentration interpretation, covariance
+inversion, and constraint-payload meaning; the resolver chooses none of these
+from factor names or runtime key suffixes.
+
+Private builders remain mutable through the ordered validation pass. Existing
+checkpoints run from source loading through conditioning/prior checks, composite
+packing, registered and mixed-domain groups, constraints, semiring/DELTA checks,
+observation lengths, and global-goal validation. Prefix conversion precedes
+learning validation; immutable numeric publication follows it. This preserves
+both overflow-versus-learning failures and the legacy EF callback's late
+object-array rejection. `resolution/addresses.py` consumes declared write and
+statistic-source eligibility plus parameter transforms and learning layouts.
+No learning cadence, inference rule, or serialized schema changes here.
+
+Final edge tagging, interior entropy-ledger tables, and arena construction
+live in `assembly.py`. Assembly consumes the resolved prefixes without
+calculating them again. `tests/test_resolution.py` checks complete data/address
+parity across the compiler characterization models, failure ordering, and reuse
+without mutable aliases; existing family and learning tests remain the numerical
+authorities.
+
+#### Final arena assembly
+
+`assembly.py:assemble_arena` accepts topology, registered and specialized drafts,
+resolved compile data, and the chosen semiring. It joins the declared parameter
+edge tags with raw topology, groups Gaussian/EF interior-edge pairs for the
+entropy ledger, and constructs the immutable `Arena`. It needs no `Template`,
+source files, initializer, numerical packer, or registry lookup. Published
+parameters, prefixes, and plans are reused, not copied. Discrete interior groups
+and schedule fingerprints remain derived by their existing consumers.
+
+`assembly_checks.py` checks the cross-stage joins before publication. Every
+original factor must have exactly one execution owner, either ordinary or
+specialized, including absorbed goals and priors. Equality references bind to
+specialized plans without counting those factors twice. Ownership is joined by
+original member identity, not a globally unique plan name. Declared entropy
+exclusions, parameter-edge tags, and attached constraints must agree with their
+owners. Resolved plan addresses and functional/shared-goal owners must retain
+their published references; prefix lengths must match their logical slot counts.
+
+Parameter-message/objective owners are separate from factor execution. Shared
+goal contributor rows and carrier slots must agree with the completed GFE plans,
+and each original contribution appears once; several groups may reference the
+same shared owner. Functional μ3 rows must match their declared members. These
+checks inspect completed declarations, never choose a factor's rule, rederive
+its energy, or compare numeric parameter values to infer sharing. Mismatches
+raise `CompileError`. Indexes are built once per assembly; no whole-template
+scan is repeated for each plan or member.
+
+`compiler.py:compile_template` checks its public semiring argument, expands
+plates, runs core validation, captures one registry, and sequences topology,
+specialized discovery/admission, registered lowering, specialized completion,
+data resolution, and assembly. `specialized.validate_admission` publishes the
+existing admission/layout errors at their original checkpoint. Lower-level
+owners import compiled values and `CompileError` directly; none imports this
+public facade. Its compiled-value exports and used private compatibility
+helpers remain available.
+
+`tests/test_assembly.py` checks direct assembly after caller templates/arrays are
+discarded, rejects accidental source/packing/prefix callbacks, verifies storage
+reuse, and confirms the facade delegates final construction once. Plan names may
+repeat across execution-family namespaces; they are not globally unique IDs.
+Negative cases remove or duplicate owners and corrupt exclusions, parameter
+references, shared-goal carriers, μ3 rows, prefixes, and resolved group membership.
 
 The compiler characterization baseline is `bf6bbe9527b5e1eea9172a30b8c7c214a08ed9ee`,
 the completed discrete/Gaussian registration foundation. Compiler extraction
@@ -652,9 +879,226 @@ The declared
 log-potential accessor owns ordinary discrete support checks, BP joint
 beliefs and decoded assignment scoring. Max-product does not report BFE.
 
-`kernel_runtime.py` shares local calls across flooding, batch stages,
-registerized scans, fallback scans and the node ledger. It never regathers
-the global arena; scan carry and persistent flat layout remain unchanged.
+`runtime_types.py` owns pure State, result and termination-code declarations.
+`engine.py` preserves its existing public type exports, and `outer.py`
+re-exports the same `OuterTerminationReason` enum. This leaf imports no engine
+or numerical solver. Field schemas, enum values and the top-level facade's
+export list are unchanged; checkpoint data remains arrays and explicit metadata,
+not serialized Python classes.
+
+`iteration_types.py` defines the internal `IterationOutcome`, a typed reason
+and fixed-shape `StepFacts`/`TerminationFacts` array records. An unchecked
+finite/support predicate is distinct from a false predicate. Outcome traces
+are immutable host arrays that retain Python-float precision even when JAX
+x64 is disabled; the public boundary converts them to Python tuples.
+
+`iteration.py` owns ordinary soft/hard iteration and the shared incremental
+`IterationProgress` assessment. It consumes prepared State, `ScheduleProgram`,
+explicit policy/controls and narrow check/objective/functional-update callbacks;
+it does not inspect factor types or import Engine. Engine supplies current
+step/prime handles and callbacks at run entry. Colony retains its vmapped
+transport and per-instance active masks, but uses the same assessment owner.
+Initial rejection precedes priming, stopped batch members remain frozen, and
+FE comparison history resets between soft and hard phases.
+
+`run_results.py` is the public status/result authority for all three run
+strategies. Its `finalize_iteration`, `finalize_exact` and `finalize_outer`
+functions validate their distinct terminal evidence and construct `RunResult`.
+Ordinary initial rejection retains `NOT_RUN`, including in explicit
+legacy-Picard GFE calls; valid zero-budget and later Picard results retain
+their `LEGACY_PICARD` tag. The host convergence loop is not newly jitted.
+`test_iteration.py` protects the owner boundary, immutable/precision-preserving
+traces, transformable facts and shared finalization; existing family and
+failure tests remain the numerical authorities.
+
+`exact_strategy.py:ExactRunStrategy` consumes only the fused exact schedule
+unit, objective mode, finite-state predicate and objective callback. It returns
+`ExactOutcome`: a logical execution count, immutable host traces and certificate
+facts. Exact support rejection after propagation counts one execution even
+though its delta trace is empty. A structural certificate can prove convergence
+with `tol=None`; outer control intentionally retains its different meaning.
+
+`outer_strategy.py:OuterTrustRegionStrategy` owns soft/hard phase budgets,
+functional-coordinate cadence and accumulated solve diagnostics. It receives
+`OuterStructure` (edges, shared-goal plans and segment offsets, without arena
+parameters), hardening rows, eliminated slots, current schedule handles and
+check/ledger/functional callbacks. It returns `OuterOutcome`, not a public
+status. The numerical chart and trust-region algorithms remain in `outer.py`.
+
+`outer_kernels.py:OuterKernelProvider` owns a per-engine lazy derivative cache.
+Its keys retain chart support, dtype and reference metrics plus hard-message
+index dtypes, shapes and bytes. Chart bases, observations, masks, current
+parameters and hard values are passed separately for every solve. The provider
+does not capture an Engine; its schedule handles are refreshed through the
+facade's existing instrumentation aliases. Cache creation timing and reported
+compilation counts are unchanged. These trusted process-local callables are
+derived runtime artifacts, never serialized model or checkpoint data.
+
+`ledger.py:ObjectiveLedger` owns the two distinct objective operations.
+`free_energy` retains the host checks in their original order: reject
+max-product mode, require prepared functional state, reject proven empty
+support with infinite FE, then evaluate the raw belief kernel. Engine supplies
+its current check/readiness/evaluator handles, preserving instrumentation.
+`assignment_energy` receives an already decoded discrete assignment and current
+parameters; it neither decodes beliefs nor performs message updates.
+
+`ledger.py:make_belief_energy` supplies the same raw BFE/GFE computation to
+fused exact schedules, ordinary and outer convergence checks, and direct JAX
+evaluation. `engine._make_bfe` remains a compatibility alias. The raw kernel
+does not replace the host support/readiness checks; exact schedules retain
+their fused support classification. `ledger_terms.py` gives each existing
+specialized local-energy family an explicit adapter. Registered same-arena
+terms still use their declared energy callbacks; legacy EF callback lookup
+retains its trace-time behavior.
+
+Local additions retain their order. The local GFE adapter recomputes predictive
+statistics at the evaluated state, adds one term per shared learned-goal owner,
+and adds one KL contribution per fixed functional parameter group. Interior
+entropy corrections and P-substituted exclusions keep their compiled ownership
+and multiplicity. Discrete delta hardening changes those beliefs; this move
+does not add a separate delta energy. Mixture and recurrence approximation
+labels, current-instance parameter/observation inputs, and objective formulas
+are unchanged. Neither ledger module imports run-control or public agent code.
+
+`readouts/` owns posterior and statistic adapters over current State and typed
+read-only structural views. These protocols expose only the needed compiled
+plans and addressing methods; Arena implements them without per-call copies.
+The shared transport helpers accept the same message, Gaussian and observation
+layout protocols, so readouts do not duplicate segment-index arithmetic.
+
+| Readout surface | Owner |
+| --- | --- |
+| Categorical edge marginals, BP/VMP node beliefs and decoding | `readouts/discrete.py` |
+| Dirichlet parameter/goal beliefs and next-trial prior readout | `readouts/parameters.py` |
+| Gaussian marginals, node statistics and mixture predictives | `readouts/gaussian.py` |
+| Recurrence pair beliefs and coefficient-learning statistics | `readouts/recurrence.py`, using the existing `cffg.recurrence` algebra |
+| Exponential-family edge marginals | `readouts/exponential_family.py` |
+| Hybrid GFE diagnostic channels | `readouts/hybrid.py`, using the existing D5 diagnostic rules |
+| Optional declared kernel readouts | `readouts/registered.py` |
+| Public readout value records and named readout dependencies | `readouts/types.py` |
+
+Engine retains its public signatures, docstrings and value-type import aliases.
+Its readout methods are delegates, with current public readout callbacks passed
+where one readout depends on another. Goal readouts still use
+`dirichlet_marginals`; Gaussian/recurrence learning statistics still use
+`recurrence_pair_beliefs`; decoding still uses `marginals`. This preserves call
+order and instrumentation without capturing an Engine inside a readout owner.
+Existing ordinary/legacy EF callback lookup timing, field order, dtype, support
+and improper-belief outputs are unchanged. No readout vectorization or caching
+is introduced; `cff-3kdk` remains that separate performance work.
+
+`with_goal_priors` is a state replacement, not a readout. Its implementation now
+lives in `StateLifecycle`, retaining the fresh-trial count guard, prior-shape
+and positivity checks, dtype conversion and atomic parameter replacement.
+Functional diagnostics and epoch coordination remain in `Mu3Lifecycle`; they
+are not duplicated by the readout extraction. Engine now only constructs and
+connects owners, validates public controls, selects a run strategy and forwards
+results. It implements no family rule, schedule algorithm, solver loop or
+local objective/readout calculation. Compatibility exports for existing
+transport helpers remain available alongside `_make_bfe`.
+
+`lifecycle.py:StateLifecycle` owns initial array construction and DATA-port
+binding over the immutable arena. It converts defaults at each call, so the
+active JAX precision setting still determines newly initialized dtypes.
+Binding returns a replacement State only after every observation succeeds;
+`None` keeps the existing categorical-uniform or continuous-mask behavior.
+Gaussian validators come from compiled bindings, while EF validator lookup
+retains its existing bind-time behavior.
+
+`mu3_lifecycle.py:Mu3Lifecycle` separately owns functional parameter defaults,
+particle preparation, readiness checks, moment installation and diagnostics.
+It receives immutable functional plans and latent-message indices, not the
+arena. Its numerical State view contains only messages and parameters, and
+current particle-budget/ESS settings are supplied at each call. Ordinary
+models have no functional lifecycle instance. Epoch scoring carries complete
+States opaquely through supplied preparation and run callbacks; the run
+controller remains the authority for convergence. `Engine` preserves the
+public methods as delegates. PRNG split order, parameter keys, observation
+masks and checkpoint schemas are unchanged. `test_lifecycle.py` protects these
+boundaries, precision/settings timing, atomic binding and epoch failure forwarding.
+
+`execution/registered.py` owns the typed local-update boundary for registered
+discrete, Gaussian and exponential-family plans. Flooding, batch stages,
+registerized scans and fallback scans all use these owners, including the
+exponential-family equality and observed-message calls. Inputs are local
+blocks and selected numeric parameters/observations, never a whole arena or
+Engine. Transport retains its existing gather, prefetched carry and scatter.
+`ExecutionDelta` is a JAX-compatible immutable record of outgoing blocks and
+optional numerical solver facts; absent facts are not a convergence claim.
+Exact support stays encoded in the outgoing blocks for downstream checks.
+These registered updates have no local iterative solver diagnostics.
+
+`execution/synchronous.py:make_sweep` owns the global synchronous transport.
+It gathers every local input from the pre-sweep arrays, collects cross-domain
+writes, pools shared-goal predictions once, and applies the existing damping,
+log-zero flooring and delta hardening. The full and restricted mixed-phase
+sweeps use the same constructor. Local factor calculations and parameter
+selection remain with their existing execution owners; current constraint
+values still come from `State.params`. `Engine` injects this factory into the
+schedule program and contains no synchronous transport implementation.
+
+`schedule.py` derives the deterministic declarative schedule. The independent
+`schedule_program.py` owner validates the selected schedule and builds a
+frozen `ScheduleProgram` record: flooding/iterative updates, optional priming and
+forest reconstruction, directed propagation, and exact certification. The
+program consumes the typed `ScheduledExecutors` collection plus the existing
+`execution.synchronous.make_sweep` factory and free-energy callback. It owns ordering, damping
+composition and transport, not parameter meanings, factor rules, ledger
+formulas, outer elimination policy or public termination decisions.
+`schedule_contracts.py` names those callable inputs and outputs. They are
+trusted host handles, never serialized model or runtime-State data.
+
+`execution/transport.py` supplies shared shape-local gathers and scatters.
+Registerized scans still prefetch inputs, carry only cross-step local blocks,
+and scatter once after the scan; flat scans remain the fallback. EF parameter
+prefetch uses the same selector as flooding. The execution support owner
+evaluates factor support from local inputs; the schedule support check combines
+it with edge support. Exact certification calls the supplied objective only
+where the ledger is defined and returns residual/support facts for run control
+to classify. Schedule kinds, fingerprints, numerical formulas and checkpoint
+representations are unchanged. The boundary is exercised in
+`test_schedule_program.py`; existing chain oracles, trace-reuse and local-carry
+checks remain in `test_schedule.py` and the registered-kernel schedule tests.
+
+`execution/cross_domain.py` owns mixture, structured-recurrence and precision
+updates; `execution/composites.py` owns Dirichlet parameter edges and fixed,
+transition and hybrid GFE composites. Named output records distinguish
+categorical, Gaussian, parameter-count and predictive blocks. Parameter
+selection lives in `execution/parameters.py`; categorical cavities remain
+cavities, while recurrence-drive and precision VMP beliefs are assembled by
+their local owners from the supplied edge sides.
+
+The constraint owner accepts explicit numerical threshold/table arguments
+selected from `State.params`. Family validation publishes their initial integer
+arrays in `Arena.log_params`; `ConstraintPlan` retains only structural metadata
+and a family-prefixed `parameter_key`. Updates, free energy, host feasibility
+and decoded-assignment scoring all read the current instance's values. No
+runtime consumer falls back to another instance's compiled defaults.
+
+`execution/functional.py` separates the existing stationary and fixed-particle
+importance calculations. Readiness, base-posterior checks, low-ESS policy and
+moment installation belong to `Mu3Lifecycle`; `Engine` installs the returned
+parameters in the complete State. Shared-goal contributors are
+still pooled once after all local GFE updates and before damping. Objective
+terms and their once-only parameter accounting are unchanged. The exact JAX
+log-zero predicate lives in `execution/support.py`. Host finiteness and exact
+edge/factor support checks live in `runtime_checks.py:StateChecks` and
+`state_is_finite`. The checker keeps immutable edge-cardinality buckets and
+reads each instance's current parameters; it never uses compiled constraint
+defaults in place of runtime values. Public termination classification remains
+outside these numerical checks.
+
+`test_execution.py` checks registered local outputs with distinct runtime
+inputs under jitted batching and the synchronous owner's dependency boundary.
+`test_execution_specialized.py` checks the
+explicit owners, preservation of numerical failure facts, and runtime
+threshold/table arguments. Existing family tests remain the mathematical
+authorities; these tests protect the execution boundary, not a new inference
+approximation.
+
+The owners delegate existing discrete/Gaussian mathematics to
+`kernel_runtime.py`, which also retains the node-ledger/readout calls. It never
+regathers the global arena; scan carry and persistent flat layout remain unchanged.
 Outgoing-message, node-energy and potential shapes are checked by abstract
 JAX evaluation during `compile_template`, after host grouping and packing;
 no callback receives concrete values in this check. Structural registration
@@ -666,8 +1110,8 @@ tests live in `test_gaussian_kernels.py` and `test_gaussian_kernel_schedules.py`
 
 Structural equality, Dirichlet parameter-edge plans, hard constraints and
 GFE composites retain their separate plans. Multi-arena hybrid registration
-remains outside this foundation, as do compiler/engine extraction and new
-nonlinear Gaussian rules.
+remains outside the registration foundation, as do new nonlinear Gaussian
+rules. The compiler and execution extractions preserve those explicit owners.
 
 Compatibility policy (AC6, pre-1.0): the Python registration API
 (`register_kernel`, the `FactorKernel` field set) is internal-unstable and
@@ -676,6 +1120,88 @@ may change in minor releases while built-ins migrate. The serialized surface
 guarantee — is stable from the first release that writes it. External
 kernels must use their own impl-id namespace (`cffg.` is reserved) and bump
 MAJOR whenever message/energy semantics or the parameter schema change.
+
+#### Bounded factor extension paths
+
+The public compiler and Engine are orchestration boundaries, not places to add
+factor-type branches. A new ordinary factor using an existing discrete, Gaussian
+or EF representation registers its declaration and callbacks in its own module.
+Registration is a supported extension *path*, not a stable pre-1.0 Python API and
+not permission to substitute a different variational rule for the same storage.
+
+The matrix below names semantic owners. Shared source loading, assembly and
+transport consume their declarations; those consumers do not rediscover which
+factor a plan represents. A specialized plan is an explicit representation of
+cross-domain, composite or structural semantics, never a fallback for an unknown
+type. Unknown types fail admission.
+
+| Extension class | Classification and structural lowering | Local execution | Objective and public readout |
+| --- | --- | --- | --- |
+| Ordinary discrete | `registered/capabilities.py` admits the declared modes; `registered/lowering.py` builds groups from `DiscreteBinding` | `execution/registered.execute_discrete` → `kernel_runtime.discrete_message` → selected BP/VMP callback | `kernel_runtime.discrete_energy` and the declared potential, assembled by `ledger`; `readouts/discrete.py` and `readouts/registered.py` |
+| Ordinary Gaussian | Same registered owners, using `GaussianBinding` and its declared conditioned role | `execution/registered.execute_gaussian` → `kernel_runtime.gaussian_message` → binding callback | `kernel_runtime.gaussian_energy`, assembled by `ledger_terms.gaussian_energy`; binding statistics/readout through `readouts/gaussian.py` and `readouts/registered.py` |
+| Scalar EF | Same registered owners, using `EFBinding` and edge-family pins | `execution/registered.execute_ef` → registered message callback; the legacy EF lookup timing is retained | Registered energy through `ledger_terms.ef_energy`; `readouts/exponential_family.py` and `readouts/registered.py` |
+| Multi-arena `recurrence_link` | `specialized/discovery.py` claims the factor; `specialized/mixed.lower_recurrence` completes it with ordinary BP membership | `execution/cross_domain.execute_recurrence` → existing structured-recurrence rule | `ledger_terms.recurrence_energy`; `readouts/recurrence.py` uses the existing pair/statistic mathematics |
+| Hybrid P-substitution composite | `specialized/discovery.py` claims mixture + facing goal; `specialized/composites.lower_hybrid_gfe` builds the composite | `execution/composites.execute_hybrid_gfe` → existing prior/linear hybrid-GFE rule | `ledger_terms.hybrid_gfe_energy`; `readouts/hybrid.py` reports the existing diagnostics |
+| Hard constraint (`exactly_k` representative) | `specialized/discovery.py` admits the structural family; `specialized/constraints.lower_constraints` owns its draft and `resolve_constraint` validates its payload | `execution/constraints.execute_constraint` selects the existing combinatorial message rule | `ledger_terms.add_constraint_terms` selects the BFE term; `ledger.constraint_satisfied` scores a decoded assignment. Ordinary discrete posterior/decode needs no separate constraint readout. |
+
+For specialized rows, classification and lowering are two explicit stages with
+one owner each. `specialized/__init__.py` joins them into `CompositeOwnership`;
+`assembly_checks.py` verifies this declaration instead of repeating classification.
+Runtime parameter selection belongs to `execution/parameters.py`; flat and mixed
+sweeps transport its values through `execution/synchronous.py`. Registered
+directed schedules use the same local executors through `ScheduledExecutors`.
+
+| Extension class | Accepted inference meaning; what the representation does **not** enable |
+| --- | --- |
+| Discrete | BP cavities with declared sum/max semirings; optional mean-field VMP consumes both-sided beliefs and supports sum mode only. Max uses the declared potential for assignment scoring, not BFE. No automatic P-substitution or moment matching. |
+| Gaussian | Ordinary information-form BP, optionally conditioning one declared DATA role; sum mode. No Gaussian mean-field, arbitrary nonlinear projection, or P-substitution supplied by registration. |
+| EF | Declared conjugate natural-parameter messages and observation contract; shipped adapters use sum-mode BP. Capability admission uses the binding's declared constraints; adding a declaration alone cannot supply a missing rule or projection. |
+| Recurrence | Existing categorical source/destination pair region and Gaussian drive belief, in sum mode; the D9 structured recurrence approximation and supported topology boundaries remain in force. No P-substitution on the recurrence factor. |
+| Hybrid P-substitution | Existing fixed-goal exterior mixture prior/linear composite with an explicitly substituted output, in sum mode. Interior, arbitrary nonlinear and Gaussian-only variants are unsupported. |
+| Hard constraint | Existing finite-domain support factor with sum/max reductions; no registered VMP/GFE callback is inferred. Delta hardening is a separate form-constraint mechanism, not this factor's energy. |
+
+The following are review surfaces, not a demand to edit every listed consumer.
+For an extension staying within an existing contract, verify the consumer and
+reuse it. Change it only when the new declaration actually requires new behavior.
+
+| Surface | Same-arena registration | Recurrence / hybrid composite / hard constraint |
+| --- | --- | --- |
+| Declarations and validation | External `FactorType` + binding; registry capability/role validation. No new entry in central type-name maps. | Explicit specialized discovery/lowering; change core declarations only for genuinely new serialized structure. |
+| Initializer shape | `ParameterSpec` receives role sizes; `registered/requirements.py` declares source shapes. EF retains its existing scalar-prior fallback. | Family-owned shape intent in `specialized/discovery.py`; payload recipes in the lowerer. Hard-constraint threshold/table validation remains with `specialized/constraints.py`. |
+| Arrays, files and precedence | `resolution/sources.py`: explicit array override → existing file → initializer; registered packer sees the complete resolved mapping. | Same source owner and precedence; `specialized/packing.py` or constraint validator interprets the family payload. No resolver factor-name branch. |
+| Named parameter writes | `ParameterSpec` key/transform declarations → `registered/requirements.py` → `resolution/addresses.py` → `params.py`. A nonlinear pack without a direct-write declaration must recompile raw blobs. | Family declarations supply the same address resolver. Constraint numerical payloads live in each `State.params`; specialized learning-only carriers are not ordinary writable factor rows. |
+| Learning addresses and statistics | Existing learning-family compatibility still applies; binding statistics do not create a new learning family. EF conjugate adapters are distinct from declared `LearnableSpec` families. | Recurrence uses its existing Pólya–Gamma weight statistics/addresses. The fixed-goal hybrid representative and hard-constraint representative have no learned parameter owner; new learning behavior needs its own derivation and address contract. |
+| Objectives and ownership | One registered factor term, plus existing edge-entropy correction. Assignment potential is a distinct max capability. | Recurrence owns its pair-region term; hybrid absorbs its goal and excludes the substituted output entropy; constraint contributes once. The ownership map below identifies shared-parameter overlays. |
+| Flooding and scheduling | Shared registered executors; `schedule.py` classifies topology and `schedule_program.py` transports local blocks. Keep direct/flat/registerized paths on one callback. | Explicit synchronous owners also serve the iterative phase of mixed schedules. These representatives are not automatically directed BP scan nodes. |
+| Colony | Deterministic distinct-input instances share compiled structure; current arrays and active masks remain per instance. Exercise invalid/stopped-neighbor isolation. | The same deterministic batching contract applies. Functional mu3 is a separate overlay that Colony still rejects; per-instance stochastic keys/status batching remains future work. |
+| Persistent bytes and traces | Exact flat slots and declared parameter arrays; estimator counts State leaves. Existing discrete/Gaussian scan tests check bounded local carry, one final scatter and unchanged-shape trace reuse. | Multi-arena shapes remain explicit; constraint values are dynamic State leaves. No speedup or corrected XLA cost-analysis claim follows from this matrix; resource-estimator work remains separate. |
+| Manifest and reconstruction | `kernels.manifest` stores external `(impl, version)` identities; trusted Python callbacks are installed locally, never serialized. JSON/CFFGZ reconstruct through sources and packers. | Shipped specialized plans reconstruct from the template and data, not a serialized callback or arena. A new serialized feature requires the IR/codec change path; there is no general multi-arena plugin ABI. |
+| Checkpoint consumers | Existing runtime-State schemas and `_agent_checkpoint.py` remain the boundary. No schema change is required just for an additional factor under an existing binding; new state/learning fields do require one. | Existing recurrence/hybrid/constraint restoration and supported legacy decoders remain required evidence. `_constraint_checkpoint.py` owns the narrow legacy constraint-data reconstruction; general learning-resume support remains a separate roadmap. |
+| Hostile inputs | Required declaration and executable sparse-support, improper-input, float32 and uncomfortable-scale cases. Representation alone never establishes robustness. | Preserve the existing family tests and loud failure statuses. Source ownership checks are numerical N/A: they add no message rule, solver, floor or inference loop. |
+
+Composite ownership remains tied to original graph identities, not equal numeric
+values or group names. These are the preservation authorities, not new scientific
+validation:
+
+| Plan/overlay | Original factors, exclusions and shared terms | Existing executable authority |
+| --- | --- | --- |
+| Recurrence | Executes the recurrence factor once; no facing prior/goal absorption and no GFE output exclusion. The pair-region objective remains D9. | `test_structured_recurrence_engine.py`, including fixed-drive chain, schedule parity, support and topology boundaries |
+| Hybrid GFE | Executes the emission composite, absorbs its facing Gaussian goal, and excludes the substituted output from ordinary edge entropy. No second mixture plan is published. | `test_specialized.test_hybrid_and_dirichlet_exclusions_keep_their_distinct_meaning`; existing `test_hybrid_gfe.py` rule/engine authorities (D5) |
+| Fixed categorical GFE | Absorbs the categorical goal and excludes only the substituted output; transition GFE instead keeps its facing factor and output entropy. | `test_specialized.test_fixed_goals_and_mu3_overlays_have_distinct_ownership` and `test_transition_gfe_retains_facing_factors_and_output_entropy` |
+| Dirichlet parameter edge | Absorbs its prior; the carrier is a parameter edge, not a categorical entropy contribution. | `test_compiler_contracts.test_parameter_edges_have_count_slots_not_categorical_entropy` and parameter-edge analytic tests |
+| Shared learned goal | One owner per serialized prior blob across shape groups; every contributor appears once. Equal arrays under different blob names stay independent. | `test_shared_goals.py` (D6c), `test_assembly.py` negative ownership cases |
+| Functional mu3 | Overlay on GFE factors, not another factor execution. Tied future slices pool functional weights and contribute one shared KL term per parameter group. | `test_mu3.test_multiple_slices_add_functional_weights_and_parameter_ledger_once` (D6b); `test_ledger.py` off-coordinate KL case |
+| Hard constraint | One execution and one local constraint energy; current threshold/table values feed updates, feasibility and assignment scoring. | `test_constraint_data.py`, `test_constraint_reconstruction.py`, existing combinatorial enumeration tests |
+
+`test_extension_ownership.py` protects the cross-module boundaries: external
+fixture names never appear in production sources, ordinary built-ins do not gain
+a second type-selected numerical adapter, specialized rule/energy calls keep their
+declared owners, and extracted owners neither import the facades nor form a cycle.
+These are targeted regression checks, not a proof against every possible future
+implementation. Existing external factor oracles, compiler/engine characterization,
+Colony failure-isolation tests, and current/legacy reconstruction tests remain the
+behavioral authority. The gate adds no new factor family, inference method,
+performance threshold, paper-faithfulness claim or release-readiness promise.
 
 ### 2f. In-graph Dirichlet parameter edges (cff-fr5c)
 
@@ -780,7 +1306,7 @@ selects among these surfaces:
   compiler component metadata limits exact-chain claims to acyclic ordinary
   categorical components.
 - Every update path has a matching **local free-energy contribution** (average
-  energy plus the appropriate entropy terms). `_make_bfe` adds those node terms
+  energy plus the appropriate entropy terms). `ledger.make_belief_energy` adds those node terms
   and the arena-derived edge-entropy corrections, so the global BFE/GFE follows
   the constrained Bethe ledger rather than a scoring shortcut.
 
@@ -922,6 +1448,10 @@ arena indices are derived addresses and never enter this descriptor.
 The family owns required keys and shapes; generic validation checks complete
 schemas, duplicate keys, compatible roles/forms, and floating dtypes without
 casting. All five registered families implement the contract.
+`resolution/addresses.py:resolve_learnables` checks this schema after parameter
+addresses are resolved and before arena assembly. It retains the logical reader
+name and semantic identity in `LearnTarget` and `LearnPlan`; the compiler facade
+does not duplicate learning resolution.
 
 `state_dict()` keeps the independently encoded `v2:` posterior keys and adds
 `__cffg_learning_manifest__`, a scalar Unicode JSON inventory with schema
@@ -1093,13 +1623,17 @@ discarding a joint correlation. Exact joint rollover remains the separate
   accepted outer residual/merit, merit-gradient norm, trust radius,
   accepted/rejected counts, outer-map/trial/Krylov operation counts, solver
   compilation count, and a machine-readable termination reason. The merit is
-  numerical step-acceptance machinery and never enters `_make_bfe` or policy
+  numerical step-acceptance machinery and never enters `ledger.make_belief_energy` or policy
   scoring. GFE convergence requires a root of the complete
   undamped outer map, converged local solves, unchanged exact support, and a
   finite stationary FE ledger; a nonzero stationary merit is exhaustion.
   Max mode uses its message fixed-point residual and validates the decoded
   objective. Non-finite arenas/residuals are divergence, while proven empty
   exact support is infeasible with FE = +∞.
+  Ordinary Engine and Colony delta reductions preserve NaN from any message
+  representation; a finite change in another block cannot hide it. Their
+  failed-run traces therefore retain the non-finite change as well as reporting
+  divergence. Finite deltas and successful-run stopping rules are unchanged.
   "Proven empty" is decided in log space by exact comparison with the
   reserved `NEG` sentinel, never by exponentiating or applying a magnitude
   threshold. `exp` underflows below about -745, while a threshold merely
@@ -1203,6 +1737,17 @@ discarding a joint correlation. Exact joint rollover remains the separate
   log-normalizer, ledger, and status before atomically mutating the live agent;
   analytic legacy checkpoints remain supported, while a functional legacy
   restore is loud.
+  Legacy analytic envelopes that lack fixed-parameter hashes cannot detect a
+  change to supplied fixed model data. Their initial runtime parameters still
+  come from the supplied template and arrays; strict identity checks belong to
+  the current envelope.
+  Prepared functional caches with the exact older parameter layout, before
+  constraints were stored in State, reconstruct only those fixed arrays from
+  the supplied model data. Their other parameter fields, physical inventory,
+  shapes, dtypes and cached-result checks remain mandatory. The migration lives
+  in `_constraint_checkpoint.py`. New checkpoints use the existing parameter-
+  array encoding for these values; no new envelope version or model field is
+  introduced.
 - Sensor/actuator adapters are plain Python callbacks mapping env observations to
   one-hot data bindings and control marginals to env actions.
 
@@ -1211,15 +1756,41 @@ discarding a joint correlation. Exact joint rollover remains the separate
 `Colony` owns an instance table of `(structure_hash, State)` pairs and caches one
 `Engine` per structure hash. Each `State` is an Equinox pytree containing
 messages, parameters, and conditioned observations; structure remains in the
-cached engine. Ordinary iterative instances with one structure are stacked and
-one scheduled iteration is evaluated under `filter_vmap`, while different
-structures run as separate groups. Mixed-GFE instances reuse the same compiled
+cached engine. Ordinary iterative instances are grouped by structure plus State
+pytree layout, array shapes and dtypes before stacking. Each compatible batch
+evaluates one scheduled iteration under `filter_vmap`; different structures or
+numeric layouts run as separate groups. Different allowed-tuple table lengths
+therefore cannot enter one stack, while same-shaped tables with different
+contents retain vectorized execution. One cached Engine can have several JAX
+shape/dtype specializations; numeric contents do not define its identity.
+Mixed-GFE instances reuse the same compiled
 trust kernels but currently run one host controller per instance so each keeps
 its own trust radius, active support, and termination reason. Inter-instance
 coupling happens through host-side data binding and marginal reads, never by
 merging graphs.
 
-The convergence loop and per-instance status bookkeeping are currently Python
+Initial non-finite and proven empty-support states are classified before
+schedule priming. Rejected members retain their input values and report zero
+iterations. Non-finite input reports both overall and inner divergence, with
+an infinite inner residual, matching standalone `Engine.run`. Healthy peers
+continue through the vmapped updates; a fully rejected group skips priming and
+updates. `tests/test_colony_failures.py` checks complete result/state parity
+across both float precisions, zero/positive budgets and mixed/flood schedules.
+Later divergence or infeasibility reports an infinite public residual, even
+when earlier updates produced a finite residual. Inner-solver facts and FE
+trace entries are retained; a budget stop with a defined ledger keeps its
+existing residual. Controlled-failure tests compare every public result field
+with standalone execution and verify that healthy batch members continue.
+`tests/test_constraint_data.py` additionally checks distinct per-instance limits
+and tables, both spawn orders, all four numeric consumers, and actual batching
+of mixed float precisions and table lengths. `test_constraint_reconstruction.py`
+checks bundles, current and supported legacy agent reconstruction, and strict
+fixed-data mismatch rejection.
+
+Ordinary runs share `IterationProgress` assessment and `finalize_iteration`
+result construction with Engine; Colony owns batching and active-member
+freezing, not a second termination policy. The convergence loop and
+per-instance status bookkeeping are currently Python
 host control flow around the vmapped iteration. The measured 32-instance CPU
 speedup is about 1.5× over sequential execution because dispatch dominates.
 Stochastic `mu3` evaluators are rejected by `Colony`: explicit PRNG preparation,

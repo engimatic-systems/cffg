@@ -1,7 +1,7 @@
 ---
 id: cff-nyad
-status: open
-deps: [cff-ny7f]
+status: closed
+deps: [cff-ny7f, cff-jby3]
 links: [cff-5xdy]
 created: 2026-09-02T04:17:42Z
 type: chore
@@ -90,3 +90,43 @@ schedule program.
   typed execution owners.
 - **Support signal:** Internal evidence that a state has literal zero support;
   public status classification uses the shared runtime result owner.
+
+## Notes
+
+**2026-09-10T03:17:51Z**
+
+Read-only preparation at cff-jby3 source 84aa318; that prerequisite is still awaiting its final gate. Current extraction anchors are engine.py:2816-3439 (batch, scan classification, registerized and flat scans, support, exact unit, propagation) plus constructor schedule selection/program assembly at :359-442. Synchronous _make_step and the free-energy ledger are separate inputs, not family math to duplicate inside schedule builders.
+
+Proposed boundary: one immutable ScheduleProgram from the validated Schedule, a typed collection of registered execution/parameter-selection owners, the existing synchronous sweep factory, and the existing raw free-energy callback. Schedule construction owns kind selection, priming, mixed-phase ordering, certification orchestration and JIT wrapping. Keep public status decisions, outer elimination policy and objective formulas outside. Move shared segmented transport to a leaf module to avoid importing Engine from the schedule owner. The current EF scan prefetch reads kernel param_keys itself; route it through the existing ef_parameters owner. Move the equality/potential-specific support calculation to the execution support owner; the schedule layer combines its results with edge support. These are ownership moves, not new numerical behavior.
+
+Change paths: Runtime numerical or status invariant and New factor or rule family. Flood/batch/registerized/flat updates, host/JIT support, mixed priming/reconstruction, exact certification, solo/vmap and restored-State consumers are checked pairs. IR, schema, checkpoint decoding, readout math, objective formulas and public statuses are N/A to modification. Existing test_schedule.py has empty-support, poisoned input, doctored schedule, float32 missing-phase and T=256 mixed-scale certificates. The discrete/Gaussian kernel schedule tests cover dynamic parameters/observations, trace reuse and local-register carry without full-arena storage. Preserve these assertions; follow moved private instrumentation to its new owner as needed. Plan additional boundary tests for program composition and no direct family-rule imports, plus bounded old/new schedule/result parity. No implementation started; update the published prerequisite base before branching.
+
+**2026-09-10T03:24:40Z**
+
+Starting after cff-jby3 closed and PR #125 was verified at 9cd52b9c4e20ef0ccc1bef74da6fd55dd3eeb1b3. The intended base was pulled with --ff-only before branching. Its final gate passed 1,974 tests at source 84aa318. The preparation note above is the implementation map: use the existing sweep factory and ledger as explicit inputs, extract schedule composition and transport without changing their math, and preserve the listed duplicated surfaces and hostile-input certificates. New schedule code will consume a typed execution-owner collection; it will not import Engine or family numerical modules. Final verification will use existing schedule/family oracles, boundary checks, bounded old/new parity, and one measured default gate.
+
+**2026-09-10T03:37:12Z**
+
+Extraction implemented. schedule_program.py owns validated schedule selection, stage/registerized/flat construction, priming, mixed-phase composition, support combination and exact certification. It returns a frozen ScheduleProgram retained by Engine; existing private callable aliases point into that program. ScheduledExecutors supplies typed registered local updates and parameter/support capabilities. Shared segmented gathers/scatters moved to execution/transport.py. The schedule owner does not import Engine, kernel registries or factor rule modules, and does not inspect family types, bindings or parameter addresses. Synchronous sweep construction, ledger formulas, public run/status control and outer elimination policy remain explicit external responsibilities.
+
+Current evidence: 45 existing schedule/custom-kernel/engine-contract cases passed in 29.32 seconds. Seventeen new boundary cases passed in 2.33 seconds, including float32/float64 program composition, exact sum/max ledger callback ownership, fixed-shape mixed inner-failure transport, forbidden dependency checks and 32-observation EF registerized-versus-flat parity with changed data and trace reuse. Existing private test instrumentation was redirected to the extracted builders without weakening scientific assertions. A bounded comparison script at /tmp/cffg-schedule-parity.py loads trusted baseline Engine source 84aa318 in a separate Python module: 17 models x automatic/flooding x float32/float64, with schedule kind/fingerprint/description/registerization, initial state, three damped updates, numerical status/residual facts, FE, priming, forest reconstruction and exact units where available. All 2,622 array comparisons were bitwise identical, including matched NaNs; one pre-existing scatter dtype warning appears in the functional case. No speedup or new algorithm is claimed.
+
+Ruff/format pass on new modules and tests. Engine lint findings decrease from 23 to 20 with no introduced code/message findings; existing schedule-test findings stay at three. Architecture/change-path owners and dashboard enrollment are updated. The schedule module is 808 physical lines, below the ticket limit. Final source adds only retention of the already-built program after that parity check; the final focused selection and default gate will validate that complete head. No full-suite result yet. Run one final default suite after the source commit, using the measured first-check deadline; publication alone does not require another run.
+
+**2026-09-10T03:39:00Z**
+
+Final combined focused selection passed after retention of the ScheduleProgram: 62 tests in 31.70 seconds across test_schedule_program.py, test_schedule.py, test_gaussian_kernel_schedules.py, test_discrete_kernels.py and test_engine_contracts.py. No assertion weakening, formula change or schema change was needed. Commit this final source, then run the dashboard-backed default gate once. Cached timing: latest wall 1,132.293 seconds; suggested wait 1,440 seconds. First output check is planned at 20 minutes, with a second only at the 24-minute allowance if still running.
+
+**2026-09-10T03:59:27Z**
+
+Final default gate passed: 1,991 tests, zero failures, 41 opt-in slow deselections and four existing Gym deprecation warnings; pytest reported 1,121.93 seconds and measured wall time was 1,135.251 seconds. Completion: 2026-09-10T03:57:56.251866+00:00, recorded against f48def6. The dashboard includes all 17 new boundary cases. Tested code source is 47701a6; the subsequent f48def6 change is ticket-only. The suite was checked once at the scheduled 20-minute deadline, not repeatedly polled. No later source/test changes supersede the gate.
+
+All acceptance criteria are met: schedule construction and certification composition have one typed owner, registerized transport and numeric/status facts match the baseline, the schedule file is below 1,000 lines, existing oracles remain intact and the architecture index is updated. Close this ticket and publish above PR #125. The next ready ticket is cff-7kfk, moving the remaining synchronous transport through the already-defined sweep-factory interface; its source/caller map and downstream lifecycle handoff are recorded. No new user decision is required.
+
+**2026-09-10T04:00:46Z**
+
+Published as PR #126, https://github.com/engimatic-systems/cffg/pull/126, above #125. The shared architecture page now explains the completed schedule owner, preserved local-register transport, exact baseline parity and the cff-7kfk follow-up. HTML validation passed with 62 unique IDs and 35 resolved internal anchors. The dashboard shows 1,991 passing tests. Source 47701a6 and gate/closure edbe8a5 remain authoritative; publication changes no code. Next: verify/update this published branch and execute ready cff-7kfk. The open PR stack remains for review, not merged.
+
+**2026-09-10T05:20:10Z**
+
+Evidence wording correction: the historical 2,622-array comparison used np.array_equal(..., equal_nan=True), not raw-byte comparison. Its result is exact numerical equality with matching NaNs treated as equal; it does not distinguish signed zeros or NaN payload bits. The PR description and shared HTML now say this precisely. No numerical discrepancy was found, and no code or test result changed.

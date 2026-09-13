@@ -892,9 +892,12 @@ colony.run(100)                # grouped by structure
 colony.marginals(ids[0])
 ```
 
-Engines are cached by structure hash — N instances of one template cost one
-compilation, and instances couple only through their ports. Ordinary iterative
-plans use vmapped rule iterations with host status tracking. Mixed-GFE plans
+Engines are cached by structure hash, and instances couple only through their
+ports. Numeric parameters, including hard-constraint limits and allowed-tuple
+tables, belong to each instance. Ordinary iterative plans batch matching State
+shapes and dtypes and use vmapped rule iterations with host status tracking.
+Different table lengths use separate batches; one cached Engine can have
+several JAX shape/dtype specializations. Mixed-GFE plans
 reuse the compiled matrix-free kernels but currently run one trust controller
 per instance so radii, active supports, and termination reasons remain
 independent.
@@ -944,6 +947,8 @@ before one atomic commit. An unknown version, field, structure,
 parameterization, configuration, or shape raises a specific error; legacy
 unversioned analytic checkpoints retain an explicit, completeness-checked
 migration path.
+Legacy formats without fixed-parameter hashes cannot detect a change to supplied
+fixed model data; use the current checkpoint format for that identity check.
 
 ## Register a custom factor
 
@@ -1048,6 +1053,20 @@ without direct-write keys reconstruct from updated raw blobs through
 `compile_template`; registration does not automatically extend learning.
 Python binding fields are internal-unstable before 1.0; serialized
 implementation identities are stable.
+
+Registration is the path for an ordinary factor using one existing message
+representation. It does not turn every factor into the same variational object:
+BP cavities, mean-field beliefs, P-substitution composites and structural support
+constraints have different contracts. Multi-arena factors such as recurrence,
+GFE composites and hard constraints therefore have explicit compiler, execution
+and objective owners. "Specialized" names those declared paths; it is not a
+catch-all for an unrecognized type.
+
+For a new factor, start with the [extension matrix](docs/ARCHITECTURE.md#bounded-factor-extension-paths).
+It names the owners and the checks for initialization, learning, parallel instances
+and reconstruction. Staying within an existing binding requires no factor-name
+branch in the public compiler or Engine. A new representation or variational
+method needs an explicit design and mathematical contract, not just registration.
 
 ## Consume the engine from an experiment harness
 

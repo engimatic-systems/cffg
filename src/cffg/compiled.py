@@ -93,9 +93,10 @@ class ConstraintPlan(ImmutableRecord):
     Carries structural metadata only — NO dense potential is stacked. Edges are
     the variadic roles x0..x{n-1} in order; `gather`/`scatter` are per-edge
     slots (read opposite, write own). `cards` is the per-edge cardinality. The
-    static compile-time detail (`k` for exactly/at_most, `table` [T, n] for
-    table) is baked into the plan. The same plan drives sum-product (BFE) and
-    max-product (MAP): the engine passes the semiring's reduction op."""
+    threshold or allowed-tuple table is numerical data: Arena.log_params holds
+    its initial value and State.params supplies each instance's current value.
+    The same plan drives sum-product (BFE) and max-product (MAP): the engine
+    passes the semiring's reduction op."""
 
     name: str
     type: str
@@ -103,8 +104,14 @@ class ConstraintPlan(ImmutableRecord):
     members: tuple[str, ...]  # single factor name (kept a tuple for symmetry)
     gather: FrozenArray  # [n] slot to read (opposite side)
     scatter: FrozenArray  # [n] slot to write (own side)
-    k: int = 0  # exactly_k / at_most_k threshold
-    table: FrozenArray | None = None  # [T, n] allowed tuples (table)
+    @property
+    def parameter_key(self) -> str | None:
+        """Family-prefixed runtime address; alldifferent has no numeric data."""
+        if self.type in ("exactly_k", "at_most_k"):
+            return f"constraint:{self.name}:k"
+        if self.type == "table":
+            return f"constraint:{self.name}:table"
+        return None
 
 
 @dataclass(frozen=True)

@@ -2,7 +2,7 @@
 id: cff-wbhu
 status: open
 deps: [cff-j4mu, cff-d56d, cff-44we]
-links: [cff-fxmj, cff-5edo, cff-d56d, cff-yl0a, cff-rqqc, cff-weff, cff-lv2w, cff-g7rc, cff-r6bl]
+links: [cff-fxmj, cff-5edo, cff-d56d, cff-yl0a, cff-rqqc, cff-weff, cff-lv2w, cff-g7rc, cff-r6bl, cff-sf29, cff-yglj]
 created: 2026-07-10T03:34:54Z
 type: feature
 priority: 2
@@ -849,3 +849,7 @@ enumerated set of intended meanings in this ticket.
   according to context.
 
 Intelligible-ticket review: complete.
+
+**2026-09-10T00:09:36Z**
+
+cff-yglj isolates the currently reproduced initial-nonfinite Colony result-field mismatch ahead of the shared controller extraction. Its correction and regressions become the reference for this ticket's initial-failure, freezing and per-instance parity criteria; no compiled-loop or throughput work is moved into that bug fix.

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+from collections.abc import Set as AbstractSet
 from typing import NamedTuple
 
-from cffg.core.ir import Template
+from cffg.core.ir import VariableSpec
 
 
 class RecurrenceTopology(NamedTuple):
@@ -16,11 +18,11 @@ class RecurrenceTopology(NamedTuple):
 
 
 def classify_recurrence_components(
-    template: Template,
-    endpoints: dict[str, list[tuple[str, str]]],
-    ordinary_bp: set[str],
-    recurrence_members: set[str],
-    parameter_edges: set[str],
+    variables: Mapping[str, VariableSpec],
+    endpoints: Mapping[str, Sequence[tuple[str, str]]],
+    ordinary_bp: AbstractSet[str],
+    recurrence_members: AbstractSet[str],
+    parameter_edges: AbstractSet[str],
 ) -> tuple[RecurrenceTopology, ...]:
     """Classify ordinary categorical topology around recurrence factors.
 
@@ -31,7 +33,7 @@ def classify_recurrence_components(
     links: list[tuple[str, str]] = []
     adjacency: dict[str, list[str]] = {name: [] for name in eligible}
     for variable_name, ends in sorted(endpoints.items()):
-        variable = template.variables[variable_name]
+        variable = variables[variable_name]
         if (
             variable.dim
             or variable.ef
