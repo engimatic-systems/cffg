@@ -37,5 +37,3 @@ No further work is identified. This follows cff-yy73 to continue reducing repeat
 - Constraint family: exactly_k, at_most_k or table, each with a separate implementation.
 - Immutable: cannot be modified after creation; bytes are suitable for shared archive contents.
 - PR gate: the complete required test selection at the proposed pull-request head.
-
-
