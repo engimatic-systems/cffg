@@ -26,7 +26,9 @@ import datetime
 import html
 import json
 import math
+import os
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -43,6 +45,7 @@ ARTIFACTS = REPO / "tests" / ".artifacts"
 GALLERY = SHARE / "cffg-viz"
 RUNTIME_HISTORY_LIMIT = 3
 SUITE_SELECTION = "not slow"
+SHORT_SUITE_SECONDS = 20 * 60
 
 EPIC_FILES = {
     "M0 · Foundations": ["test_hygiene.py"],
@@ -166,10 +169,21 @@ def run_suite() -> tuple[Path, int, float]:
     with tempfile.NamedTemporaryFile(suffix=".xml", delete=False) as tmp:
         xml_path = Path(tmp.name)
     started = time.monotonic()
-    result = subprocess.run(
-        ["uv", "run", "pytest", "-q", f"--junitxml={xml_path}"], cwd=REPO
+    process = subprocess.Popen(
+        ["uv", "run", "pytest", "-q", "--durations=25", f"--junitxml={xml_path}"],
+        cwd=REPO, start_new_session=True,
     )
-    return xml_path, result.returncode, time.monotonic() - started
+    try:
+        code = process.wait(timeout=max(0, SHORT_SUITE_SECONDS - (time.monotonic() - started)))
+    except (subprocess.TimeoutExpired, KeyboardInterrupt) as error:
+        # The private process group includes pytest's own subprocesses.
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.wait()
+        code = 124 if isinstance(error, subprocess.TimeoutExpired) else 130
+    return xml_path, code, time.monotonic() - started
 
 
 def repository_test_files(repo: Path = REPO) -> set[str]:
@@ -307,7 +321,7 @@ def load_state() -> dict:
 
 
 def record_suite_runtime(
-    tests: list[dict],
+    tests: list[dict] | None,
     *,
     wall_seconds: float,
     pytest_code: int,
@@ -344,19 +358,28 @@ def record_suite_runtime(
     else:
         previous = []
 
-    failed = sum(1 for test in tests if not test["ok"])
+    failed = None if tests is None else sum(1 for test in tests if not test["ok"])
+    if pytest_code == 124:
+        result = "timed_out"
+    elif wall_seconds > SHORT_SUITE_SECONDS:
+        result = "over_budget"
+    elif tests is None:
+        result = "incomplete"
+    else:
+        result = "passed" if pytest_code == 0 and failed == 0 else "failed"
     record = {
         "completed_at": datetime.datetime.now(
             datetime.timezone.utc
         ).isoformat(),
         "commit": git_head(),
-        "test_count": len(tests),
+        "test_count": None if tests is None else len(tests),
         "failed": failed,
         "pytest_exit_code": pytest_code,
-        "result": "passed" if pytest_code == 0 and failed == 0 else "failed",
+        "result": result,
+        "budget_seconds": SHORT_SUITE_SECONDS,
         "selection": SUITE_SELECTION,
         "wall_seconds": round(float(wall_seconds), 3),
-        "case_seconds": round(sum(test["ms"] for test in tests) / 1000, 3),
+        "case_seconds": None if tests is None else round(sum(test["ms"] for test in tests) / 1000, 3),
     }
     previous.append(record)
     previous = previous[-RUNTIME_HISTORY_LIMIT:]
@@ -370,7 +393,7 @@ def record_suite_runtime(
     # Use the slowest comparable measurement, add 25% headroom, and round
     # upward to a human-friendly 30-second polling boundary.
     padded = max(observed) * 1.25
-    suggested_wait = max(60, math.ceil(padded / 30) * 30)
+    suggested_wait = min(SHORT_SUITE_SECONDS, max(60, math.ceil(padded / 30) * 30))
     runtime_state = {
         "schema_version": 2,
         "latest": record,
@@ -600,16 +623,25 @@ def main(argv: list[str] | None = None) -> None:
     if args.run_suite:
         generated_report, pytest_code, wall_seconds = run_suite()
         xml_path = generated_report
+        if pytest_code in (124, 130) or wall_seconds > SHORT_SUITE_SECONDS:
+            record_suite_runtime(None, wall_seconds=wall_seconds, pytest_code=pytest_code)
+            reason = "interrupted" if pytest_code == 130 else "exceeded the 20-minute budget"
+            sys.exit(f"short suite {reason}; no passing result published; report retained at {xml_path}")
     else:
         xml_path = args.junitxml
 
+    published = False
     try:
         tests = load_junit(
             xml_path,
             expected_files=repository_test_files(),
             newest_input=newest_test_input(exclude=xml_path),
         )
+        if pytest_code and all(test["ok"] for test in tests):
+            record_suite_runtime(tests, wall_seconds=wall_seconds, pytest_code=pytest_code)
+            raise DashboardError(f"pytest exited {pytest_code}; report cannot certify a passing suite")
         failed = publish(tests)
+        published = True
         if wall_seconds is not None:
             record_suite_runtime(
                 tests,
@@ -617,9 +649,10 @@ def main(argv: list[str] | None = None) -> None:
                 pytest_code=pytest_code,
             )
     except DashboardError as error:
-        sys.exit(str(error))
+        retained = f"; report retained at {xml_path}" if generated_report is not None else ""
+        sys.exit(f"{error}{retained}")
     finally:
-        if generated_report is not None:
+        if generated_report is not None and published and pytest_code == 0:
             generated_report.unlink(missing_ok=True)
 
     if pytest_code or failed:

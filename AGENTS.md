@@ -94,6 +94,12 @@ This project will span many context windows. The rule that makes that survivable
   changed component.
 - **Final validation for code outside the isolated-tooling exception below**
   requires one passing short-suite run after the final code change.
+  **The short suite has a hard 20-minute (1,200-second) wall-time budget.**
+  Use the budget-enforced runner below for a new gate. A timeout or an
+  over-budget run is a failed gate, even if its completed tests passed.
+  Fix measured runtime costs instead of increasing the budget or silently
+  removing required numerical coverage. Historical slow runs do not justify
+  a longer wait; `suggested_wait_seconds` must be at most 1,200.
   One passing suite at the proposed PR head is
   sufficient to open or update a PR. Before launching or waiting on it, inspect
   only `latest.wall_seconds` and `suggested_wait_seconds` in
@@ -108,10 +114,11 @@ This project will span many context windows. The rule that makes that survivable
   `uv run python tools/dashboard.py --run-suite` to execute the default
   `not slow` pytest selection exactly once
   and refresh both that runtime history and `~/agent-share/cffg-tests.html`
-  (add new test files to `EPIC_FILES`). If the short suite was run directly,
-  preserve and reuse its
-  result: `uv run pytest -q --junitxml=/tmp/cffg-tests.xml`, then
-  `uv run python tools/dashboard.py --junitxml /tmp/cffg-tests.xml`. Opening a
+  (add new test files to `EPIC_FILES`). If a complete report already exists,
+  preserve and reuse it with
+  `uv run python tools/dashboard.py --junitxml /tmp/cffg-tests.xml`.
+  Report reuse does not measure elapsed wall time; a budget claim must come
+  from the recorded timed run. Opening a
   PR, requesting review, or refreshing the dashboard never calls for a second
   unchanged short-suite run. A later change requiring this gate supersedes the
   previous result and gets one fresh final run.
