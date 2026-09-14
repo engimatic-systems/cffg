@@ -1,7 +1,7 @@
 ---
 id: cff-a3wz
 status: open
-deps: [cff-ffsg, cff-ocxl, cff-b0s3, cff-ej67, cff-y15d]
+deps: [cff-ffsg, cff-ocxl, cff-b0s3, cff-ej67, cff-y15d, cdc-ztuf]
 links: []
 created: 2026-09-14T02:43:33Z
 type: task
@@ -162,3 +162,19 @@ Field mapping -> L=T-1 gives 31 or 99 transition regions. TransitionParameters.w
 Question -> how will the native float32 claim be proved? Answer -> use a fresh subprocess, disable jax_enable_x64 before numerical imports, assert the actual configuration is false, and construct explicit float32 inputs. Pytest and the tiny candidate runner enable x64 and cannot establish this consumer claim. Record source/spec hashes, Git revision, versions and leaf path/shape/dtype/element/byte manifests for parameters, fixed metadata, coordinates, evaluation, derivative captures, iteration state and results, including retained correction words. Integer statuses, masks and significand limbs stay integer/bool. The existing hybrid_joint_storage.arrays helper supplies the manifest. Sources -> tests/test_hybrid_precision.py native subprocess mechanism, hybrid_joint_storage.py, and the prior A3WZ dtype handoff. Confidence -> high; no code, compilation or solve was run in this research.
 
 Implementation handoff -> the current Y15D solve wrapper exposes initial_xi and perturb and always calls its feasible initializer. A distinct raw-zero start must therefore be represented explicitly and exercised, not relabeled as an already-initialized start. Prefer a shared solver entry for an explicit accepted initial coordinate/state over copying the iteration or certification equations into the qualification harness. Any necessary ordinary API change is prospective implementation work; preserve prior immutable tiny reports and refresh affected qualification evidence when source hashes change. Finish the bounded harness/API implementation and focused checks, commit, and pause for root review before expensive moderate runs. If API work, harness construction and evidence cannot fit one worker context, split a prerequisite ticket before implementation. Root still owns the short-suite gate; compiler integration and registered recovery remain blocked on a positive A3WZ decision.
+
+**2026-09-14T18:09:57Z**
+
+Setup is split before implementation into cdc-ztuf: a fresh worker owns the shared explicit-coordinate entry, twelve-case native-float32 fixture/specification, and numerical/storage harness. cff-a3wz retains all actual moderate convergence, initialization sensitivity and iteration-memory execution/interpretation, plus the integration decision. Y15D tiny evidence and final short-suite publication finish first. No fixture formula, approximation, supported scope, tolerance, storage requirement or recovery gate changes.
+
+Legend: prerequisite --> dependent. TK records remain authoritative.
+
+[~] cdc-bwta (ready; root final suite gate)
+  --> [~] cff-y15d (author fixes committed; re-review/evidence/gate pending)
+        --> [ ] cdc-ztuf (setup; immediately blocked by Y15D)
+              --> [ ] cff-a3wz (twelve moderate starts and actual storage)
+                    --> [ ] cff-7sw5 (compiler plans)
+                              ^
+[ ] cff-k6g5 (ready; independent declarations) --+
+
+cff-7sw5 and cff-a3wz feed the remaining integration/state/ledger chain before cff-f3jz, learning/composition, cff-x0if's three frozen recovery fits and cff-zov5. This companion comes from tk dep tree --full cff-a3wz, tk ready and tk blocked; no registered recovery fit has run.
