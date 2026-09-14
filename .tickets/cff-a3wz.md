@@ -93,3 +93,7 @@ Roadmap refinement built from tk dep tree --full cff-x0if, tk ready, and tk bloc
                                                    --> [ ] cff-zov5 (epic)
 
 Declaration work is structurally independent of the checkpoint; Cooper’s implementation sequence runs FFSG, then a3wz, then the remaining ready chain sequentially. Research may run alongside an implementer; independent review starts only after that implementer finishes. Documentation/ticket-only refinement: no numerical code or full-suite run; tk dep cycle reports no cycles and git diff --check passes.
+
+**2026-09-14T03:25:56Z**
+
+Numerical representation handoff after cff-b0s3 diagnosis: use its retained Gaussian constructors and fixed separator-label anchors throughout the solver. Anchors are initialized/frozen metadata, not additional unconstrained solve coordinates; preserve internal mean displacements in residuals/projections. The gauge-reduced message unknown count is unchanged, but actual buffer inventory must include O(T*K*d) anchor arrays and any retained physical parameters. State the chosen fixed basis in the pre-run specification and recompute all certificates/objectives/learning from the returned anchored coordinate. A centered FE helper alone is insufficient if tilts/messages still lose label information. b0s3 must pass before this checkpoint starts.
