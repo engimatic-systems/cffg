@@ -114,7 +114,7 @@ This project will span many context windows. The rule that makes that survivable
   `uv run python tools/dashboard.py --run-suite` to execute the default
   `not slow` pytest selection exactly once
   and refresh both that runtime history and `~/agent-share/cffg-tests.html`
-  (add new test files to `EPIC_FILES`). The runner uses three pytest workers,
+  (add new test files to `EPIC_FILES`). The runner uses four pytest workers,
   keeps each file together, and disables retries after a worker crash.
   By default the runner starts with an
   empty temporary JAX compilation cache with a 1-GiB limit and file locking,

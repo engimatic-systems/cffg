@@ -31,7 +31,7 @@ Start with the existing per-file timing report and evaluate four workers on the 
 
 Y15D still requires independent review and its final full gate. A3WZ owns all native float32 moderate-horizon solver and actual-iteration-storage qualification. Compiler integration and registered recovery remain behind their existing dependencies.
 
-## Definitions
+## Dependency handoff
 
 Dependency companion (prerequisite --> dependent; TK records are authoritative):
 
@@ -46,6 +46,8 @@ Dependency companion (prerequisite --> dependent; TK records are authoritative):
                                       ^
 [ ] cff-k6g5 (ready; declarations) -----+
 ```
+
+## Definitions
 
 - Short suite: the default pytest selection, not slow.
 - Executable cache: compiled machine code; passing test results are never cached.
@@ -62,3 +64,7 @@ Runtime numerical or status invariant: test execution and pass/fail reporting on
 **2026-09-14T17:26:17Z**
 
 Prospective implementation: increase the default worker count from three to four on the 12-core/64-GiB M2 Max and update the AGENTS.md runner description. Preserve file grouping, crash-retry prohibition, deadline, cache and all assertions. Root owns this scheduling change; independent reviewers inspect the pinned Y15D source commit 65b2dcd. Y15D remains blocked on this combined final gate. The planning estimate is not a measured four-worker result.
+
+**2026-09-14T17:27:13Z**
+
+Implemented the prospective scheduling change: four workers, with the same 1200-second deadline, loadfile grouping, no worker retries, initially empty locked 1-GiB cache and unchanged numerical selection/assertions. AGENTS.md matches the runner. Focused command: uv run pytest -q -n 4 --dist=loadfile --max-worker-restart=0 tests/test_dashboard.py --junitxml=/tmp/cdc-bwta-focused.xml; 21 passed in 1.98s, log /tmp/cdc-bwta-focused.log. git diff --check passed. The full combined gate is pending completion of both independent Y15D reviews and any resulting author fixes.

@@ -46,7 +46,7 @@ GALLERY = SHARE / "cffg-viz"
 RUNTIME_HISTORY_LIMIT = 3
 SUITE_SELECTION = "not slow"
 SHORT_SUITE_SECONDS = 20 * 60
-SHORT_SUITE_WORKERS = 3
+SHORT_SUITE_WORKERS = 4
 
 EPIC_FILES = {
     "M0 · Foundations": ["test_hygiene.py"],
