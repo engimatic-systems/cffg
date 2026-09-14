@@ -85,3 +85,7 @@ No registered recovery fit or candidate optimizer ran during this work.
 **2026-09-14T15:11:52Z**
 
 The final six stable kernel JIT boundaries passed all 35 tests in test_hybrid_affine.py and test_hybrid_precision.py in 483.94 seconds, with no disk compilation cache configured for this focused run. Command: CFFG_TEST_TIMINGS=/tmp/cff-3uq9-numerical-focused-timings.jsonl uv run pytest -q tests/test_hybrid_affine.py tests/test_hybrid_precision.py --durations=12 -x. Log: /tmp/cff-3uq9-numerical-focused.log. These preserve translated non-binary arithmetic, exact-input precision and derivative references, represented spectral boundaries, repeated eigenvalues, dense condition controls, sparse/status failures, and actual x64-disabled subprocess execution. The full suite budget remains unqualified pending the complete timed run.
+
+**2026-09-14T15:13:15Z**
+
+Checkpoint setup reuse passed all 17 affected configuration/corruption cases in 64.00 pytest seconds (65.984 measured wall seconds), starting with an empty temporary executable cache. Command selected functional_checkpoint_configuration_mismatch or functional_checkpoint_runtime_schema_corruption in tests/test_agent_mu3.py. Every target still acts and observes before restore; the atomicity snapshots/assertions are unchanged. The shared source is a saved file only, and checkpoint_arrays copies each array for each corruption. Evidence /tmp/cff-3uq9-agent-fixture.log and /tmp/cff-3uq9-agent-fixture-timings.jsonl. Root inspected the final diff directly; no performance implementation was delegated.
