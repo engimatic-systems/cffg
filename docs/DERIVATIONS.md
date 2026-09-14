@@ -2844,6 +2844,57 @@ readouts apply `B_i=[[I,c_i],[0,1]]` to the linear statistic and
 is `[w;o+w^T c_i]`. This invertible fixed sufficient-statistic transform leaves
 the D12 stationarity zero set, approximation and qualification gate unchanged.
 
+Projection additionally retains one additive covariance remainder:
+`C = C_hi + C_lo`, with `C_hi` the existing rounded `covariance` readout
+and `C_lo` the optional `covariance_correction`. Absence means exact zero.
+The low word is finite, symmetric, and elementwise bounded by
+`eps*abs(C_hi)`; subnormal words fail explicitly. This is a numerical
+representation of the same D12 conditional covariance, never a second moment
+constraint or an extra stationary unknown. Projection selects an active
+conditional reference covariance `C0` and accumulates
+
+    C = C0 + sum_j p_j (C_j - C0 + (r_j-rbar)(r_j-rbar)^T) / sum_j p_j.
+
+Incoming low words are included in the summand. A compensated final addition
+stores its rounded high result and signed remainder separately. Each word
+shares one computed triangle so backend reduction ordering cannot violate
+exact covariance symmetry. Source and
+destination marginal slices retain both words, as does the ordinary Gaussian
+adapter. The categorical adapter uses the same natural quotient. A covariance
+readout may round away the low word; cancellation-sensitive division does not
+use that readout. With the cavity expressed at the belief origin, it solves
+
+    (C_hi+C_lo) J_out = I - C_hi J_cavity - C_lo J_cavity,
+    (C_hi+C_lo) h_out = rbar - C_hi h_cavity - C_lo h_cavity.
+
+`hybrid_covariance.py` assembles these right sides with compensated matrix
+products and refines the Cholesky solution once using a compensated residual.
+This bounded arithmetic refinement makes no iterative convergence claim.
+A compensated final residual must satisfy the componentwise backward-error
+certificate `abs(rhs-C X) <= 32 d eps * (abs(rhs)+abs(C_hi)abs(X)+abs(C_lo)abs(X))`.
+Each exact-zero right-hand-side column instead requires an exact-zero solution;
+all terms of the certificate must be finite. There is no absolute unit floor:
+`C=1e30, rhs=1e-10` in float32 (or `C=1e300` in float64) has an unsupported
+subnormal result, and two Cholesky solves can both flush it to zero while the
+right-hand side stays normal. Such an unresolved solve returns NaN and
+`NONFINITE` through its consumer, preserving any inherited failure status.
+The certificate neither clamps a message nor changes the qualification budget.
+The canonical density still includes the full label log probability, Gaussian
+log determinant and quadratic normalization, and the quotient fixes only its
+common constant gauge. Writing `b=log p-(d log(2 pi)+logdet C)/2`,
+it assembles `a_out=b-a_cavity-rbar^T(h_cavity+h_out)/2` with the two
+linear terms kept separate until compensated accumulation. Its log determinant uses
+`logdet(C_hi) + sum(log1p(eig(L^-1 C_lo L^-T)))`, where `L L^T=C_hi`.
+The derivative is `tr(C^-1 dC)`, avoiding an artificial eigenvector derivative
+at repeated zero correction eigenvalues. Compensated matrix products expose
+the ordinary real matrix derivative. Solves use the implicit differential
+`dX=C^-1(dR-dC X)`, including higher derivatives, rather than differentiating
+a fixed number of refinement steps. Entropy and natural expectations consume
+both words; physical second moments, source statistics and channel expectations
+round the represented covariance only at their ordinary dtype-valued moment
+readout. No message coefficient is clamped and the existing arithmetic budget
+`512*4*eps` is unchanged. Large prior input rounding remains irreversible.
+
 For T slices, a grouped evaluation costs `O(T K² d³)` and stores
 `O(T K² d²)` region blocks plus `O(T K d²)` separators/messages and
 `O(T K²)` auxiliaries. Recurrence prefixes avoid a K³ stick tensor. The
@@ -2856,6 +2907,34 @@ explicit number of incidences.
 Origin metadata uses `O(T K d)` separator/message entries. Materialized grouped
 belief copies use `O(T K² d)` entries within the existing regional storage
 bound; the executable inventory counts both, including returned message banks.
+Projected covariance remainders add two `T*K*d*d` arrays when both directions
+are retained: at T=100, K=20, d=10, float32, exactly 1,600,000 bytes. Ordinary
+normalized grouped regions and message banks add no retained correction array.
+An explicitly supplied grouped low word would instead have the existing
+`T*K*K*(2d)*(2d)` shape (64,000,000 bytes at these dimensions). The matrix
+product's two accumulator words occupy 1,600,000 logical bytes; its product
+and product-remainder words occupy another 1,600,000 logical bytes. These
+are matrix-sized local workspaces, with allocator reuse; they are not amounts
+to add again to measured temporary allocation.
+
+`uv run python tests/test_hybrid_projection.py` prints a reproducible JSON
+inventory from JAX lowering, without running a solver or recovery fit. On the
+measured CPU backend with x64 enabled and float32 data, both projections use
+70,560,400 compiled argument bytes, 3,553,728 output bytes (including the
+output tuple), and 234,874,216 temporary bytes. The complete input belief tree
+also contains unused log-probability/normalizer arrays: 70,720,800 bytes total.
+Returning both projections and their quotient messages uses 72,497,200
+argument / 5,490,608 output / 258,775,144 temporary bytes; the complete
+input region and cavity trees total 72,657,600 bytes.
+At the same local message-matrix shape, the compensated product uses
+1,600,000 argument / 800,000 output / 4,400,136 temporary bytes, and the
+corrected solve uses 2,400,000 / 800,000 / 14,820,648 bytes. All four
+measurements have zero input/output alias bytes. Arrays are dynamic lowering
+arguments, so fixture constants cannot remove the measured workload. These backend
+allocation figures include the retained words, integer arithmetic, matrix
+carries, Cholesky and refinement temporaries; array dimensions remain within
+`O(T K² d²)` projection and `O(T K d²)` local solve storage. They do not
+measure the complete iterative buffers, which remain the cff-a3wz gate.
 
 For I global iterations, B line-search trials, L local auxiliary iterations,
 and M matrix-free linear iterations, explicitly budget
@@ -2966,7 +3045,8 @@ budget; internal displacement and label checks receive no translation allowance.
 The JAX numerical contract uses bitmask status values: malformed finite
 coordinates, empty support, improper active beliefs, changed quotient support,
 positive-probability underflow, and non-finite arithmetic are distinguishable.
-Static shape/dtype/channel errors raise before execution. Host and JIT return
+Static shape/dtype/channel errors raise before execution. Status words normalize to int32 before local bitwise operations, including
+stacked default Python-zero statuses. Host and JIT return
 the same numerical status; `raise_for_status` converts it to a named host
 exception. Failed beliefs/objectives carry NaN rather than finite substitutes.
 A quotient may restrict its cavity face; reusing an old message on a different
@@ -2993,6 +3073,15 @@ and actual retained-origin storage in a 100-slice float32 local evaluation.
 non-binary recurrence and channel cancellation, exact product remainders,
 forward/reverse derivatives, host/JIT/vmap parity, and an x64-disabled float32
 consumer process running the complete local reproduction.
+`tests/test_hybrid_projection.py` checks the covariance remainder and quotient
+against `tests/hybrid_projection_reference.py`, whose scalar authority is exact
+rational arithmetic and whose matrix authority uses 70-digit decimal arithmetic
+without production helpers. The tests cover both marginal directions, all
+coefficients, off-diagonal covariance, ordinary adapters, retained-word
+matrix/quotient derivatives, and the original float32 counterexample with x64
+disabled. Directly supplied malformed correction fields and inherited failure
+statuses are checked at each local consumer; a failed projection retains NaNs
+on active support. The existing temporal approximation falsifier remains unchanged.
 
 For a stronger approximation falsifier, let adjacent reduced temporal factors be
 

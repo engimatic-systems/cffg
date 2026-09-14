@@ -865,7 +865,13 @@ from physical Gaussian sites or declared initialization before a solve. The
 Gaussian constructor retains full log masses and normalizers; transition
 construction translates original recurrence offsets and affine biases before
 expansion. Beliefs keep mean displacements through projections, quotients,
-ordinary adapters and repeated evaluations. Auxiliary learning statistics
+ordinary adapters and repeated evaluations. Projected beliefs additionally
+retain one low covariance matrix beside the rounded covariance. Both words
+reach source/destination and ordinary-adapter quotients through compensated
+matrix residuals and a refined local Cholesky solve (`hybrid_covariance.py`).
+Canonical normalization, entropy, moments and statistics consume the same
+represented covariance; D12.6 specifies its precise convention and derivatives.
+The low word is derived storage, excluded from stationary unknowns. Auxiliary learning statistics
 retain the same source origin and expose explicit physical-coordinate readouts.
 `hybrid_affine.py` supplies compensated same-dtype affine evaluation for
 non-binary coefficients; construction, auxiliary targets and owned energy use

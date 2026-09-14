@@ -16,6 +16,7 @@ import jax
 import jax.numpy as jnp
 
 from cffg.hybrid_affine import affine
+from cffg import hybrid_covariance as hc
 
 
 class Status(IntFlag):
@@ -76,6 +77,19 @@ class Belief(NamedTuple):
     log_normalizer: jax.Array
     status: jax.Array
     center: jax.Array
+    covariance_correction: jax.Array | None = None
+
+    @property
+    def correction(self):
+        """Low word: represented covariance is covariance + correction."""
+        return (jnp.zeros_like(self.covariance) if self.covariance_correction is None
+                else self.covariance_correction)
+
+    @property
+    def full_covariance(self):
+        """Physical readout, rounded once to the belief dtype."""
+        return (self.covariance if self.covariance_correction is None else
+                self.covariance + self.covariance_correction)
 
     @property
     def mean(self):
@@ -89,31 +103,51 @@ class Belief(NamedTuple):
 
     @property
     def second(self):
-        return self.covariance + self.mean[..., :, None] * self.mean[..., None, :]
+        return self.full_covariance + self.mean[..., :, None] * self.mean[..., None, :]
 
     def entropy(self):
         """Labeled entropy, including the Gaussian constants for every label."""
+        low_status = correction_status(self.covariance, self.covariance_correction)
         active = self.probability > 0
         safe = jnp.where(active[..., None, None], self.covariance,
                          jnp.eye(self.displacement.shape[-1], dtype=self.displacement.dtype))
-        gaussian = (self.displacement.shape[-1] * (1 + jnp.log(2 * jnp.pi))
-                    + jnp.linalg.slogdet(safe)[1]) / 2
+        logdet = (jnp.linalg.slogdet(safe)[1] if self.covariance_correction is None else
+                  hc.logdet(safe, jnp.where(active[..., None, None], self.correction, 0)))
+        gaussian = (self.displacement.shape[-1] * (1 + jnp.log(2 * jnp.pi)) + logdet) / 2
         value = jnp.sum(jnp.where(active, self.probability *
                                  (gaussian - jnp.where(active, self.log_probability, 0)), 0))
-        return jnp.where(self.status == 0, value, jnp.nan)
+        status = jnp.asarray(self.status, jnp.int32) | low_status
+        return jnp.where(status == 0, value, jnp.nan)
 
     def expectation(self, natural):
         check_shapes(natural)
         if natural.linear.shape != self.displacement.shape:
             raise ValueError("belief and potential shapes disagree")
+        low_status = correction_status(self.covariance, self.covariance_correction)
         active = self.probability > 0
         mean = self.relative_mean(natural.origin)
         value = jnp.where(active, natural.constant, 0)
         value += jnp.einsum("...d,...d->...", natural.linear, mean)
-        value -= (jnp.einsum("...ab,...ab->...", natural.precision, self.covariance)
-                  + jnp.einsum("...a,...ab,...b->...", mean, natural.precision, mean)) / 2
+        trace = jnp.einsum("...ab,...ab->...", natural.precision, self.covariance)
+        if self.covariance_correction is not None:
+            trace += jnp.einsum("...ab,...ab->...", natural.precision, self.covariance_correction)
+        value -= (trace + jnp.einsum("...a,...ab,...b->...", mean, natural.precision, mean)) / 2
         value = jnp.sum(jnp.where(active, self.probability * value, 0))
-        return jnp.where((self.status | coordinate_status(natural)) == 0, value, jnp.nan)
+        status = (jnp.asarray(self.status, jnp.int32) | coordinate_status(natural)
+                  | low_status)
+        return jnp.where(status == 0, value, jnp.nan)
+
+
+def correction_status(covariance, correction):
+    """Validate a retained low word, including directly supplied belief fields."""
+    if correction is None:
+        return jnp.int32(0)
+    if correction.shape != covariance.shape or correction.dtype != covariance.dtype:
+        raise ValueError("covariance correction shapes or dtypes disagree")
+    valid = jnp.all(correction == correction.swapaxes(-1, -2))
+    # A low word is bounded by one rounding unit of its high word.
+    valid &= jnp.all(abs(correction) <= jnp.finfo(covariance.dtype).eps * abs(covariance))
+    return failure(~valid, Status.INVALID) | failure(~hc.supported(correction), Status.NONFINITE)
 
 
 def check_shapes(natural):
@@ -141,7 +175,7 @@ def coordinate_status(natural):
     finite &= jnp.all(jnp.isfinite(h)) & jnp.all(jnp.isfinite(matrix))
     finite &= jnp.all(jnp.isfinite(natural.origin))
     symmetric = jnp.all(matrix == matrix.swapaxes(-1, -2))
-    return (natural.status | failure(~finite, Status.NONFINITE)
+    return (jnp.asarray(natural.status, jnp.int32) | failure(~finite, Status.NONFINITE)
             | failure(~symmetric, Status.INVALID)
             | failure(~jnp.any(jnp.isfinite(a)), Status.EMPTY_SUPPORT))
 
@@ -154,6 +188,8 @@ def rebase(natural, center):
     coefficients; initialize near retained sites and freeze origins in a solve.
     """
     check_shapes(natural)
+    # Fixed-width status avoids mixed weak-int batching in backend bitwise OR.
+    natural = natural._replace(status=jnp.asarray(natural.status, jnp.int32))
     result = natural._replace(center=center)
     check_shapes(result)
     if center is None and natural.center is None:
@@ -237,9 +273,16 @@ def from_moments(probability, mean, covariance):
     return from_centered_moments(probability, mean, covariance, jnp.zeros_like(mean))
 
 
-def from_centered_moments(probability, displacement, covariance, center):
-    """Construct moments relative to a retained origin; no world-mean subtraction."""
+def from_centered_moments(probability, displacement, covariance, center, *, covariance_correction=None):
+    """Construct moments relative to a retained origin; no world-mean subtraction.
+
+    The optional low word represents an additive covariance remainder, bounded
+    elementwise by eps*abs(covariance). Both words must be finite and symmetric;
+    this is derived numerical storage, never an independent solve coordinate.
+    """
     check_shapes(Natural(probability, displacement, covariance, center=center))
+    correction = jnp.zeros_like(covariance) if covariance_correction is None else covariance_correction
+    low_status = correction_status(covariance, covariance_correction)
     mean = displacement
     active = probability > 0
     _, _, pd_status = gaussian_blocks(covariance, active)
@@ -247,18 +290,20 @@ def from_centered_moments(probability, displacement, covariance, center):
               & jnp.all(jnp.isfinite(covariance)) & jnp.all(jnp.isfinite(center)))
     world_mean = center + mean
     second = covariance + world_mean[..., :, None] * world_mean[..., None, :]
-    finite &= jnp.all(jnp.isfinite(second))
+    finite &= jnp.all(jnp.isfinite(second)) & jnp.all(jnp.isfinite(correction))
     # Sum roundoff scales with the number of label additions and the dtype.
     tolerance = 32 * probability.size * jnp.finfo(probability.dtype).eps
     valid = jnp.all(probability >= 0) & (abs(probability.sum() - 1) <= tolerance)
     valid &= jnp.all(covariance == covariance.swapaxes(-1, -2))
-    status = (pd_status | failure(~finite, Status.NONFINITE)
+    status = (pd_status | low_status | failure(~finite, Status.NONFINITE)
               | failure(~valid, Status.INVALID) | failure(~jnp.any(active), Status.EMPTY_SUPPORT))
     log_probability = jnp.where(active, jnp.log(jnp.where(active, probability, 1)), -jnp.inf)
     return Belief(jnp.where(status == 0, probability, jnp.nan),
                   jnp.where(active[..., None], jnp.where(status == 0, mean, jnp.nan), 0),
                   jnp.where(active[..., None, None], jnp.where(status == 0, covariance, jnp.nan), 0),
-                  log_probability, jnp.zeros((), probability.dtype), status, center)
+                  log_probability, jnp.zeros((), probability.dtype), status, center,
+                  None if covariance_correction is None else
+                  jnp.where(active[..., None, None], jnp.where(status == 0, correction, jnp.nan), 0))
 
 
 def gaussian_site(log_mass, mean, covariance, *, center=None):
@@ -291,12 +336,20 @@ def gaussian_site(log_mass, mean, covariance, *, center=None):
 def canonical(belief):
     """Normalized hybrid density, retaining label-dependent scales, D12.6."""
     p, mean, covariance = belief.probability, belief.displacement, belief.covariance
+    low_status = correction_status(covariance, belief.covariance_correction)
     active = p > 0
-    precision, logdet, pd_status = gaussian_blocks(covariance, active)
+    _, _, pd_status = gaussian_blocks(covariance, active)
+    eye = jnp.broadcast_to(jnp.eye(mean.shape[-1], dtype=mean.dtype), covariance.shape)
+    safe = jnp.where(active[..., None, None], covariance, eye)
+    correction = jnp.where(active[..., None, None], belief.correction, 0)
+    precision = hc.solve(safe, correction, eye)
+    precision = (precision + precision.swapaxes(-1, -2)) / 2
+    logdet = hc.logdet(safe, correction)
     linear = jnp.einsum("...ab,...b->...a", precision, mean)
     constant = belief.log_probability - (logdet + mean.shape[-1] * jnp.log(2 * jnp.pi)
                                          + jnp.einsum("...d,...d->...", mean, linear)) / 2
-    status = belief.status | pd_status
+    status = (jnp.asarray(belief.status, jnp.int32) | pd_status
+              | low_status)
     status |= failure(jnp.any(active & ~jnp.isfinite(constant))
                       | ~jnp.all(jnp.isfinite(linear)), Status.NONFINITE)
     result = Natural(jnp.where(active, jnp.where(status == 0, constant, jnp.nan), -jnp.inf),
@@ -312,43 +365,87 @@ def quotient(belief, cavity):
     A tilt can restrict a cavity face. It cannot revive a cavity's absent
     label; that requires rebuilding the active inventory. Signed precision
     is preserved and inactive Gaussian coordinates remain zero.
+
+    For C=C_hi+C_lo, solve C J_out=I-C_hi J_c-C_lo J_c and
+    C h_out=mean-C_hi h_c-C_lo h_c. Compensated products retain the
+    small residual before the Cholesky solve; inverse-minus-cavity would
+    lose it. The constant retains the complete labeled normalization.
     """
-    projected = canonical(belief)
-    cavity = rebase(cavity, projected.center)
-    check_shapes(cavity)
+    moments = Natural(belief.probability, belief.displacement, belief.covariance, center=belief.center)
+    check_shapes(moments)
+    cavity = rebase(cavity, belief.center)
     if any(a.shape != b.shape or a.dtype != b.dtype
-           for a, b in zip(projected.arrays(), cavity.arrays())):
+           for a, b in zip(moments.arrays(), cavity.arrays())):
         raise ValueError("quotient shapes or dtypes disagree")
     active = belief.probability > 0
-    status = projected.status | coordinate_status(cavity)
+    _, _, pd_status = gaussian_blocks(belief.covariance, active)
+    status = (jnp.asarray(belief.status, jnp.int32) | pd_status | coordinate_status(cavity)
+              | correction_status(belief.covariance, belief.covariance_correction))
     status |= failure(jnp.any(active & ~jnp.isfinite(cavity.constant)), Status.SUPPORT_CHANGED)
-    values = [a - jnp.where(jnp.isfinite(b), b, 0)
-              for a, b in zip(projected.arrays(), cavity.arrays())]
+    dim = belief.displacement.shape[-1]
+    eye = jnp.broadcast_to(jnp.eye(dim, dtype=belief.covariance.dtype), belief.covariance.shape)
+    base = jnp.where(active[..., None, None], belief.covariance, eye)
+    correction = jnp.where(active[..., None, None], belief.correction, 0)
+    precision_rhs = hc.residual(base, correction, cavity.precision, eye)
+    precision = hc.solve(base, correction, precision_rhs)
+    precision = (precision + precision.swapaxes(-1, -2)) / 2
+    linear_rhs = hc.residual(base, correction, cavity.linear[..., None], belief.displacement[..., None])
+    linear = hc.solve(base, correction, linear_rhs)[..., 0]
+    mean = jnp.where(active[..., None], belief.displacement, 0)
+    constant = affine(jnp.concatenate((-mean / 2, -mean / 2), axis=-1),
+                      jnp.concatenate((cavity.linear, linear), axis=-1),
+                      jnp.where(active, belief.log_probability, 0),
+                      -hc.logdet(base, correction) / 2,
+                      jnp.asarray(-dim * jnp.log(2 * jnp.pi) / 2, mean.dtype),
+                      -jnp.where(jnp.isfinite(cavity.constant), cavity.constant, 0))
     first = jnp.argmax(active.reshape(-1))
-    values[0] -= values[0].reshape(-1)[first]
+    constant = affine(jnp.ones_like(constant)[..., None], constant[..., None],
+                      -constant.reshape(-1)[first])
+    values = [constant, linear, precision]
     outputs = []
     for i, value in enumerate(values):
         mask = active.reshape(active.shape + (1,) * i)
         status |= failure(jnp.any(mask & ~jnp.isfinite(value)), Status.NONFINITE)
         outputs.append(jnp.where(mask, value, -jnp.inf if i == 0 else 0))
-    return Natural(*(jnp.where(status == 0, x, jnp.nan) for x in outputs), status, projected.center)
+    result = Natural(*(jnp.where(status == 0, x, jnp.nan) for x in outputs), status, belief.center)
+    return result._replace(status=coordinate_status(result))
+
+
+def _mix(region, axis, center):
+    """Project one label axis around a retained conditional covariance."""
+    input_status = jnp.asarray(region.status, jnp.int32) | correction_status(region.covariance, region.covariance_correction)
+    probability = region.probability.sum(axis=axis)
+    denominator = jnp.where(probability > 0, probability, 1)
+    relative = region.relative_mean(jnp.expand_dims(center, axis))
+    weights = jnp.moveaxis(region.probability, axis, -1)
+    mean = affine(weights[..., None, :], jnp.moveaxis(relative, axis, -1)) / denominator[..., None]
+    centered = relative - jnp.expand_dims(mean, axis)
+    first = jnp.argmax(region.probability > 0, axis=axis)
+    indices = jnp.expand_dims(first, axis)[..., None, None]
+    base = jnp.take_along_axis(region.covariance, indices, axis=axis).squeeze(axis)
+    difference = region.covariance - jnp.expand_dims(base, axis)
+    variation = affine(centered[..., :, None, None], centered[..., None, :, None],
+                       difference, region.correction)
+    increment = affine(weights[..., None, None, :], jnp.moveaxis(variation, axis, -1))
+    increment /= denominator[..., None, None]
+    covariance, correction = (hc.symmetric(word) for word in hc.combine(base, increment))
+    result = from_centered_moments(probability, mean, covariance, center,
+                                   covariance_correction=correction)
+    status = result.status | input_status
+    active = ~jnp.isneginf(result.log_probability)
+    fields = {}
+    for name, rank in (("probability", 0), ("displacement", 1), ("covariance", 2), ("covariance_correction", 2)):
+        mask = active.reshape(active.shape + (1,) * rank)
+        fields[name] = jnp.where(mask, jnp.where(status == 0, getattr(result, name), jnp.nan), 0)
+    return result._replace(**fields, status=status,
+                           log_normalizer=jnp.where(status == 0, result.log_normalizer, jnp.nan))
 
 
 def collapse_label(region, axis):
-    """Mix one label axis, retaining between-mean conditional covariance."""
+    """Mix one label axis, retaining covariance roundoff until the quotient."""
     if axis not in (0, 1) or region.probability.ndim != 2:
         raise ValueError("collapse requires a pair of label axes")
-    probability = region.probability.sum(axis=axis)
-    denominator = jnp.where(probability > 0, probability, 1)
-    conditional = region.probability / jnp.expand_dims(denominator, axis)
-    center = jnp.take(region.center, 0, axis=axis)
-    relative = region.relative_mean(jnp.expand_dims(center, axis))
-    mean = (conditional[..., None] * relative).sum(axis=axis)
-    centered = relative - jnp.expand_dims(mean, axis)
-    second = region.covariance + centered[..., :, None] * centered[..., None, :]
-    covariance = (conditional[..., None, None] * second).sum(axis=axis)
-    result = from_centered_moments(probability, mean, covariance, center)
-    return result._replace(status=result.status | region.status)
+    return _mix(region, axis, jnp.take(region.center, 0, axis=axis))
 
 
 def marginal(region, side):
@@ -359,7 +456,9 @@ def marginal(region, side):
     selection = slice(side * dim, (side + 1) * dim)
     reduced = region._replace(displacement=region.displacement[..., selection],
                               center=region.center[..., selection],
-                              covariance=region.covariance[..., selection, selection])
+                              covariance=region.covariance[..., selection, selection],
+                              covariance_correction=None if region.covariance_correction is None else
+                              region.covariance_correction[..., selection, selection])
     return collapse_label(reduced, 1 - side)
 
 
@@ -402,15 +501,8 @@ def gaussian_adapter(hybrid_cavity, gaussian_cavity):
                        None if gaussian_cavity.center is None else
                        jnp.broadcast_to(gaussian_cavity.center, hybrid_cavity.linear.shape))
     belief = normalize(hybrid_cavity + embedded)
-    p, covariance = belief.probability, belief.covariance
     center = belief.center[0] if gaussian_cavity.center is None else gaussian_cavity.center
-    mean = belief.relative_mean(center)
-    ordinary_mean = jnp.einsum("k,kd->d", p, mean)
-    centered = mean - ordinary_mean
-    ordinary_covariance = jnp.einsum("k,kab->ab", p, covariance)
-    ordinary_covariance += jnp.einsum("k,ka,kb->ab", p, centered, centered)
-    projected = from_centered_moments(jnp.ones((), p.dtype), ordinary_mean, ordinary_covariance, center)
-    projected = projected._replace(status=projected.status | belief.status)
+    projected = _mix(belief, 0, center)
     return belief, quotient(belief, hybrid_cavity), quotient(projected, gaussian_cavity)
 
 

@@ -14,7 +14,7 @@ import jax.numpy as jnp
 
 from cffg.hybrid_affine import affine, centered_affine
 from cffg.hybrid_natural import (
-    Belief, Natural, Status, coordinate_status, failure, gaussian_blocks,
+    Belief, Natural, Status, coordinate_status, correction_status, failure, gaussian_blocks,
     lift, marginal, normalize, quotient, rebase,
 )
 
@@ -155,7 +155,9 @@ def source_region(region):
         raise ValueError("grouped region needs equal source/destination dimensions")
     dim = region.displacement.shape[-1] // 2
     return region._replace(displacement=region.displacement[..., :dim], center=region.center[..., :dim],
-                           covariance=region.covariance[..., :dim, :dim])
+                           covariance=region.covariance[..., :dim, :dim],
+                           covariance_correction=None if region.covariance_correction is None else
+                           region.covariance_correction[..., :dim, :dim])
 
 
 class Auxiliary(NamedTuple):
@@ -225,12 +227,13 @@ def auxiliary_statistics(region, weights, offsets, xi):
     conditional on exposure, so a rare active source cannot hide a bad xi.
     """
     card, dim = _recurrence_shapes(weights, offsets, xi)
+    low_status = correction_status(region.covariance, region.covariance_correction)
     source = source_region(region)
     if source.displacement.shape != (card, card, dim) or source.displacement.dtype != weights.dtype:
         raise ValueError("auxiliary belief shapes or dtypes disagree")
     center = source.center[:, 0]
     p, mean = source.probability, source.relative_mean(center[:, None])
-    second = source.covariance + mean[..., :, None] * mean[..., None, :]
+    second = source.full_covariance + mean[..., :, None] * mean[..., None, :]
     augmented = jnp.concatenate((mean, jnp.ones((*p.shape, 1), p.dtype)), axis=-1)
     moments = jnp.zeros((*p.shape, dim + 1, dim + 1), p.dtype)
     moments = moments.at[..., :dim, :dim].set(second)
@@ -244,7 +247,7 @@ def auxiliary_statistics(region, weights, offsets, xi):
     exposure = at_risk(p)
     accumulated = at_risk(p[..., None, None] * moments)
     active = exposure > 0
-    _, conditional_mean, conditional_covariance = _conditional_at_risk(p, mean, source.covariance)
+    _, conditional_mean, conditional_covariance = _conditional_at_risk(p, mean, source.full_covariance)
     logit_mean = centered_affine(weights, conditional_mean, center[:, None], offsets)
     logit_variance = jnp.einsum("ila,ilab,ilb->il", weights, conditional_covariance, weights)
     scale = jnp.einsum("ila,ilab,ilb->il", abs(weights), abs(conditional_covariance), abs(weights))
@@ -257,7 +260,7 @@ def auxiliary_statistics(region, weights, offsets, xi):
     precision = pg_mean_xi(xi)[..., None, None] * accumulated
     finite = jnp.all(jnp.isfinite(weights)) & jnp.all(jnp.isfinite(offsets)) & jnp.all(jnp.isfinite(xi))
     finite &= jnp.all(jnp.isfinite(residual)) & jnp.all(jnp.isfinite(linear)) & jnp.all(jnp.isfinite(precision))
-    status = region.status | failure(~valid, Status.INVALID) | failure(~finite, Status.NONFINITE)
+    status = jnp.asarray(region.status, jnp.int32) | low_status | failure(~valid, Status.INVALID) | failure(~finite, Status.NONFINITE)
     return Auxiliary(*(jnp.where(status == 0, x, jnp.nan) for x in
                        (target, residual, exposure, linear, precision)), status, center)
 
@@ -281,7 +284,7 @@ def transition_expectation(region, parameters):
     auxiliary = auxiliary_statistics(region, weights, offsets, xi)
     source = source_region(region)
     mean = source.relative_mean(auxiliary.center[:, None])
-    _, risk_mean, _ = _conditional_at_risk(source.probability, mean, source.covariance)
+    _, risk_mean, _ = _conditional_at_risk(source.probability, mean, source.full_covariance)
     success_mean = centered_affine(weights, mean[:, :-1], auxiliary.center[:, None], offsets)
     risk_logit = centered_affine(weights, risk_mean, auxiliary.center[:, None], offsets)
     linear = source.probability[:, :-1] * success_mean - auxiliary.exposure * risk_logit / 2
@@ -293,7 +296,7 @@ def transition_expectation(region, parameters):
     mean_residual = centered_affine(-matrix[None], source.displacement[..., None, :],
                                     source.center[..., None, :], region.center[..., dim:],
                                     region.displacement[..., dim:], -bias[None])
-    covariance = jnp.where(active[..., None, None], region.covariance, jnp.eye(2 * dim, dtype=weights.dtype))
+    covariance = jnp.where(active[..., None, None], region.full_covariance, jnp.eye(2 * dim, dtype=weights.dtype))
     covariance_root = jnp.linalg.cholesky(covariance)
     transform = jnp.concatenate((-matrix, jnp.broadcast_to(jnp.eye(dim, dtype=weights.dtype), matrix.shape)), axis=-1)
     residual_root = jnp.einsum("jab,ijbc->ijac", transform, covariance_root)
@@ -320,11 +323,13 @@ def moment_residual(projected, separator):
     if projected.displacement.shape != separator.displacement.shape:
         raise ValueError("incidence moment shapes disagree")
     active = projected.probability > 0
-    status = projected.status | separator.status
+    status = jnp.asarray(projected.status, jnp.int32) | jnp.asarray(separator.status, jnp.int32)
+    status |= correction_status(projected.covariance, projected.covariance_correction)
+    status |= correction_status(separator.covariance, separator.covariance_correction)
     status |= failure(jnp.any(active != (separator.probability > 0)), Status.SUPPORT_CHANGED)
     value = jnp.max(abs(projected.probability - separator.probability))
     for rank, a, b in ((1, projected.relative_mean(separator.center), separator.displacement),
-                       (2, projected.covariance, separator.covariance)):
+                       (2, projected.full_covariance, separator.full_covariance)):
         scale = jnp.maximum(1, jnp.maximum(abs(a), abs(b)))
         mask = active.reshape(active.shape + (1,) * rank)
         value = jnp.maximum(value, jnp.max(jnp.where(mask, abs(a - b) / scale, 0)))
