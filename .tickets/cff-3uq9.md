@@ -48,3 +48,13 @@ cff-8ois completes its pending numerical qualification, then cff-y15d and cff-a3
 - D12/A3WZ: the hybrid mathematical contract and complete joint numerical checkpoint.
 
 
+
+## Notes
+
+**2026-09-14T14:44:20Z**
+
+Before implementation: intended published ancestor cff-j191-joint-reference was checked clean and pulled ff-only (unchanged9c55579); this work branch additionally carries the locally reviewed unpublished8OIS repair whose gate was interrupted. This avoids changing or publishing an unqualified numerical branch merely to profile it. Work is performed directly by root as Cooper requested; no performance implementer was delegated.
+
+Planning surfaces: runner process lifetime, deadline accounting, report completeness/failure interpretation, measured runtime history and AGENTS policy are applicable. This is test-execution work and not the isolated-tooling exception. If measured compilation overhead requires changes to pure local JAX compilation boundaries, apply the Runtime numerical or status invariant path: preserve numerical values/derivatives/status with explicit host/JIT and single/vmap checks; compiler selection, scheduling, lifecycle and serialization changes are N/A. Sparse/zero/improper/float32/large-shape assertions and all qualification thresholds stay intact. Performance diagnosis must distinguish cache reuse of machine code from reuse of test results. No default deselection or slow-marker movement is planned.
+
+Baseline evidence: saved completed dashboard75ac1d2 has3174.420 summed test seconds;2526 of2537 test names map uniquely to current modules,11 are ambiguous and kept separate in /tmp/cff-short-suite-baseline.json. Hybrid centering572.766s, projection539.366s, separator kernels374.230s, affine222.661s and separator numerics217.473s total1926.496s. Agent mu3 adds263.650s. Last wall measurement3198.621s. At current numerical source, isolated translated-chain constant-derivative case took132.44s in a fresh process (/tmp/cff-3uq9-profile-baseline.log); default pytest capture hid compile logs, so a targeted logging diagnostic is needed before attributing the repeated-compilation mechanism. This is performance diagnosis, not a candidate optimizer or qualification run.
