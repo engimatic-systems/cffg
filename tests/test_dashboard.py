@@ -208,6 +208,49 @@ def test_nonzero_pytest_exit_cannot_publish_green_report(dashboard, monkeypatch,
     assert json.loads(dashboard.RUNTIMES.read_text())["latest"]["result"] == "failed"
 
 
+@pytest.mark.parametrize("cache_setting", [None, "", "explicit"])
+def test_suite_cache_is_fresh_and_removed_unless_caller_supplies_it(
+    dashboard, monkeypatch, tmp_path, cache_setting
+):
+    inherited = tmp_path / "caller-cache"
+    inherited.mkdir()
+    (inherited / "existing").touch()
+    if cache_setting is None:
+        monkeypatch.delenv("JAX_COMPILATION_CACHE_DIR", raising=False)
+    else:
+        monkeypatch.setenv("JAX_COMPILATION_CACHE_DIR", str(inherited) if cache_setting else "")
+    observations = tmp_path / "observations.json"
+    script = (
+        "import json,os\n"
+        "from pathlib import Path\n"
+        "cache=Path(os.environ['JAX_COMPILATION_CACHE_DIR'])\n"
+        "data={'cache':str(cache),'files':sorted(p.name for p in cache.iterdir())}\n"
+        "Path(os.environ['CFFG_TEST_TIMINGS']).write_text('retained timings')\n"
+        f"Path({str(observations)!r}).write_text(json.dumps(data))\n"
+        "(cache/'compiled').touch()\n"
+    )
+    original = subprocess.Popen
+
+    def start(_command, **kwargs):
+        return original([sys.executable, "-c", script], **kwargs)
+
+    monkeypatch.setattr(dashboard.subprocess, "Popen", start)
+    for _ in range(2):
+        report, code, elapsed = dashboard.run_suite()
+        try:
+            assert code == 0 and elapsed > 0
+            observed = json.loads(observations.read_text())
+            cache = Path(observed["cache"])
+            if cache_setting == "explicit":
+                assert cache == inherited and (cache / "existing").exists()
+            else:
+                assert observed["files"] == [] and not cache.exists()
+            assert report.with_suffix(".timings.jsonl").read_text() == "retained timings"
+        finally:
+            report.unlink(missing_ok=True)
+            report.with_suffix(".timings.jsonl").unlink(missing_ok=True)
+
+
 def test_deadline_stops_pytest_and_its_child_process(dashboard, monkeypatch, tmp_path):
     child_file = tmp_path / "child.pid"
     script = (

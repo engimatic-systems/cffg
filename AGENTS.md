@@ -114,7 +114,12 @@ This project will span many context windows. The rule that makes that survivable
   `uv run python tools/dashboard.py --run-suite` to execute the default
   `not slow` pytest selection exactly once
   and refresh both that runtime history and `~/agent-share/cffg-tests.html`
-  (add new test files to `EPIC_FILES`). If a complete report already exists,
+  (add new test files to `EPIC_FILES`). By default the runner starts with an
+  empty temporary JAX compilation cache, reuses machine code within the run,
+  and removes the cache afterward. It honors and reports an explicit
+  `JAX_COMPILATION_CACHE_DIR`; disclose that override with timing evidence.
+  Every test still executes. Per-test timing logs survive interrupted runs.
+  If a complete report already exists,
   preserve and reuse it with
   `uv run python tools/dashboard.py --junitxml /tmp/cffg-tests.xml`.
   Report reuse does not measure elapsed wall time; a budget claim must come

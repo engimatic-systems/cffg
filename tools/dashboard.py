@@ -166,23 +166,32 @@ class DashboardError(ValueError):
 
 def run_suite() -> tuple[Path, int, float]:
     """Run the default short suite; return its report, status, and wall time."""
+    started = time.monotonic()
     with tempfile.NamedTemporaryFile(suffix=".xml", delete=False) as tmp:
         xml_path = Path(tmp.name)
-    started = time.monotonic()
-    process = subprocess.Popen(
-        ["uv", "run", "pytest", "-q", "--durations=25", f"--junitxml={xml_path}"],
-        cwd=REPO, start_new_session=True,
-    )
-    try:
-        code = process.wait(timeout=max(0, SHORT_SUITE_SECONDS - (time.monotonic() - started)))
-    except (subprocess.TimeoutExpired, KeyboardInterrupt) as error:
-        # The private process group includes pytest's own subprocesses.
+    timings_path = xml_path.with_suffix(".timings.jsonl")
+    environment = dict(os.environ, CFFG_TEST_TIMINGS=str(timings_path))
+    print(f"Short-suite deadline: {SHORT_SUITE_SECONDS:g}s; live timings: {timings_path}", flush=True)
+    with tempfile.TemporaryDirectory(prefix="cffg-suite-cache-") as cache:
+        cache_mode = "caller-provided" if environment.get("JAX_COMPILATION_CACHE_DIR") else "empty at start"
+        if not environment.get("JAX_COMPILATION_CACHE_DIR"):
+            environment["JAX_COMPILATION_CACHE_DIR"] = cache
+        environment.setdefault("JAX_PERSISTENT_CACHE_MIN_COMPILE_TIME_SECS", "0.1")
+        print(f"JAX executable cache: {cache_mode}; all tests execute", flush=True)
+        process = subprocess.Popen(
+            ["uv", "run", "pytest", "-q", "--durations=25", f"--junitxml={xml_path}"],
+            cwd=REPO, start_new_session=True, env=environment,
+        )
         try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        process.wait()
-        code = 124 if isinstance(error, subprocess.TimeoutExpired) else 130
+            code = process.wait(timeout=max(0, SHORT_SUITE_SECONDS - (time.monotonic() - started)))
+        except (subprocess.TimeoutExpired, KeyboardInterrupt) as error:
+            # The private process group includes pytest's own subprocesses.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait()
+            code = 124 if isinstance(error, subprocess.TimeoutExpired) else 130
     return xml_path, code, time.monotonic() - started
 
 
