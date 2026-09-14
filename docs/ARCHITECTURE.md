@@ -860,6 +860,18 @@ chain evaluator keeps original `TransitionParameters` and evaluates its
 regional energy through centered recurrence moments and whitened channel
 residuals. It returns the D12 primal expression, dual, and separately scaled
 conditional-moment and quotient residuals. It supplies no iteration policy.
+Natural potentials and beliefs retain fixed separator-label origins, chosen
+from physical Gaussian sites or declared initialization before a solve. The
+Gaussian constructor retains full log masses and normalizers; transition
+construction translates original recurrence offsets and affine biases before
+expansion. Beliefs keep mean displacements through projections, quotients,
+ordinary adapters and repeated evaluations. Auxiliary learning statistics
+retain the same source origin and expose explicit physical-coordinate readouts.
+Origins are metadata, excluded from message coefficient arrays and stationary
+unknowns. Materialized grouped copies remain within local polynomial storage.
+Already-expanded coefficients keep their stored meaning and cannot recover
+caller-rounded constants. D12.6 specifies rebasing and gauge conventions;
+`test_hybrid_centering.py` checks the independent translated and repeated paths.
 Numerical failures carry the same array status in host/JIT and single/vmap
 execution; `raise_for_status` is the host exception boundary. Exact
 log-zero support is distinct from positive-mass underflow, which fails rather

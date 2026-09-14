@@ -197,7 +197,7 @@ def test_nonfinite_objective_and_residual_never_report_success():
     for value in (result.free_energy, result.dual_energy, result.moment_residual, result.quotient_residual):
         assert not np.isfinite(value)
     good = hn.normalize(site())
-    value, status = hs.moment_residual(good, good._replace(mean=good.mean.at[0, 0].set(jnp.nan)))
+    value, status = hs.moment_residual(good, good._replace(displacement=good.displacement.at[0, 0].set(jnp.nan)))
     assert status & hn.Status.NONFINITE
     assert not np.isfinite(value)
 

@@ -2791,6 +2791,42 @@ are not covered by this derivation.
 
 ### D12.6 Numerical and complexity contract
 
+The local implementation retains a fixed origin `c_ti` per separator label.
+Its potential and normalized Gaussian-site construction are
+
+    log m_i(x) = a_i + h_i^T (x-c_i) - (x-c_i)^T J_i (x-c_i)/2,
+    r_i = mu_i-c_i, J_i=V_i^-1, h_i=J_i r_i,
+    a_i = logmass_i-(d log(2 pi)+logdet(V_i)+r_i^T J_i r_i)/2.
+
+`gaussian_site` retains the supplied log mass, mean and covariance through
+this construction; its default origin is the supplied mean. Callers choose
+nearby shared origins before a solve and freeze them. Origins are metadata,
+not additional stationarity unknowns. `Natural.arrays()` contains only the
+constant, linear and precision coefficients. An absent origin is exactly zero;
+already-expanded input means its stored polynomial, with no inferred original
+Gaussian constants. Rounding before entry is irreversible.
+
+Multiplication and signed quotient add or subtract coefficients in a shared
+basis. Only a common scalar constant is gauge. For `delta=c_new-c_old`, exact
+rebasing gives `h_new=h-J delta` and
+`a_new=a+h^T delta-delta^T J delta/2`. Large rebasing distances can themselves
+lose bits; fixed nearby origins avoid repeating that cancellation. Construct
+transitions from original parameters with offset `o+w^T c_left_i` and affine
+bias `A_j c_left_i+b_j-c_right_j` before quadratic expansion. The latter is
+pair-dependent only in coordinates; physical dynamics remains selected by
+destination. This is the same D12.2 factor, with the same complete normalizer.
+
+Beliefs retain solved displacements `E[x-c_i]` through projection, covariance
+mixing, quotient reuse and ordinary adapters. The physical `mean` readout adds
+the origin once and can round a small displacement at a large world coordinate.
+The retained displacements, labeled entropy, objective and probabilities avoid
+that readout round trip. Xi targets use centered logit moments. Learning
+increments use `[x-c_i;1]`, with retained `Auxiliary.center`; physical-coordinate
+readouts apply `B_i=[[I,c_i],[0,1]]` to the linear statistic and
+`B_i precision B_i^T` to the quadratic statistic. The corresponding coefficient
+is `[w;o+w^T c_i]`. This invertible fixed sufficient-statistic transform leaves
+the D12 stationarity zero set, approximation and qualification gate unchanged.
+
 For T slices, a grouped evaluation costs `O(T K² d³)` and stores
 `O(T K² d²)` region blocks plus `O(T K d²)` separators/messages and
 `O(T K²)` auxiliaries. Recurrence prefixes avoid a K³ stick tensor. The
@@ -2800,6 +2836,9 @@ needs `O(K² d²)` transient memory; evaluating/storing a whole residual uses
 `O(T K² d²)`. No T-by-T continuous covariance or exponential path mixture is
 part of the candidate. Adapter cost is polynomial and adds linearly in its
 explicit number of incidences.
+Origin metadata uses `O(T K d)` separator/message entries. Materialized grouped
+belief copies use `O(T K² d)` entries within the existing regional storage
+bound; the executable inventory counts both, including returned message banks.
 
 For I global iterations, B line-search trials, L local auxiliary iterations,
 and M matrix-free linear iterations, explicitly budget
@@ -2898,13 +2937,14 @@ before adding Gaussian integration terms, and log probabilities normalize on
 centered scores separately from the full log normalizer.
 
 Generic already-expanded `Natural` coefficients cannot recover small terms
-lost during their construction or raw-moment contraction. The parameter-aware
-energy path does not by itself repair tilt assembly: the executable diagnostic
-`tests/hybrid_centering_reproduction.py` currently exposes a remaining float32
-translation defect (mean 100, variance 1e-4, recurrence offset -100 changes
-pair probability by about 0.241 despite OK status). Its assertion deliberately
-fails. This is an unresolved local numerical implementation issue, not a new
-approximation or a passing qualification claim.
+lost during their construction or raw-moment contraction. Retained Gaussian
+sites and fixed origins now preserve the complete tilt as well as its energy.
+The formerly failing translation diagnostic is an asserted regression in
+`tests/test_hybrid_centering.py`: float32 mean 100/variance 1e-4 and mean
+10000/variance 1, and float64 mean 1e8/variance 1, keep the unchanged probability
+budget `512*4*eps`. Full-normalizer checks start from retained physical inputs.
+Only world-mean readouts allow `4*eps*(1+abs(origin))` plus the local arithmetic
+budget; internal displacement and label checks receive no translation allowance.
 
 The JAX numerical contract uses bitmask status values: malformed finite
 coordinates, empty support, improper active beliefs, changed quotient support,
@@ -2925,6 +2965,13 @@ ordinary adapters, and the stationary temporal approximation falsifier.
 signed/vacuous cavities, host/JIT and single/vmap agreement, and float32
 T=100/K=20/d=10 local storage inventories. These local inventories do not claim
 iteration storage or joint-solver convergence; cff-a3wz measures those.
+`tests/hybrid_centering_reference.py` imports no production mathematics and
+independently integrates scalar and two-dimensional centered blocks, including
+off-diagonal covariance and distinct conditional means. The centering tests
+check repeated messages, complete local/chain objectives, every message block,
+xi and same-coordinate dual derivatives, learning-coordinate transforms,
+ordinary adapters, invalid origins and Gaussian inputs, transformed execution,
+and actual retained-origin storage in a 100-slice float32 local evaluation.
 
 For a stronger approximation falsifier, let adjacent reduced temporal factors be
 

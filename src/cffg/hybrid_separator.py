@@ -14,7 +14,7 @@ import jax.numpy as jnp
 
 from cffg.hybrid_natural import (
     Belief, Natural, Status, coordinate_status, failure, gaussian_blocks,
-    lift, marginal, normalize, quotient,
+    lift, marginal, normalize, quotient, rebase,
 )
 
 
@@ -57,9 +57,15 @@ def _jj_base_xi(xi):
     return jnp.where(small, series, direct)
 
 
-def recurrence_potential(weights, offsets, xi):
+def recurrence_potential(weights, offsets, xi, *, center=None):
     """D11.5 polynomial using O(K² d²) prefix storage, no K³ stick tensor."""
     card, dim = _recurrence_shapes(weights, offsets, xi)
+    origin = None
+    if center is not None:
+        if center.shape != (card, dim) or center.dtype != weights.dtype:
+            raise ValueError("recurrence center shapes or dtypes disagree")
+        offsets = offsets + jnp.einsum("ild,id->il", weights, center)
+        origin = jnp.broadcast_to(center[:, None], (card, card, dim))
     finite = jnp.all(jnp.isfinite(weights)) & jnp.all(jnp.isfinite(offsets)) & jnp.all(jnp.isfinite(xi))
     status = failure(~finite, Status.NONFINITE) | failure(jnp.any(xi < 0), Status.INVALID)
     omega = pg_mean_xi(xi)
@@ -75,16 +81,21 @@ def recurrence_potential(weights, offsets, xi):
     linear = prefix_with_final(rejected_h).at[:, :card - 1].add(weights)
     precision = prefix_with_final(rejected_j)
     precision = (precision + precision.swapaxes(-1, -2)) / 2
-    result = Natural(constant, linear, precision, status)
+    status |= failure(~jnp.all(jnp.isfinite(constant)), Status.NONFINITE)
+    result = Natural(jnp.where(jnp.isfinite(constant), constant, jnp.nan), linear, precision, status, origin)
     return result._replace(status=coordinate_status(result))
 
 
-def transition(weights, offsets, xi, matrix, bias, noise, *, channel="destination"):
+def transition(weights, offsets, xi, matrix, bias, noise, *, channel="destination",
+               left_center=None, right_center=None):
     """D12.2 recurrence times normalized N(y; A_j x+b_j,Q_j).
 
     ``channel`` explicitly names the indexing convention. Source/pair-selected
     channels lack D12.3's elimination identity and are rejected, even when
     their raw shapes could match. No Gaussian normalization constant is dropped.
+    Fixed endpoint origins translate offsets to o+w*c_left and channel bias
+    to A_j*c_left_i+b_j-c_right_j before expansion. The translated bias is
+    pair-dependent only because its coordinates differ, not its physical law.
     """
     if channel != "destination":
         raise ValueError("D12 requires the destination-selected affine channel")
@@ -93,26 +104,37 @@ def transition(weights, offsets, xi, matrix, bias, noise, *, channel="destinatio
         raise ValueError("destination channel shapes disagree")
     if any(value.dtype != weights.dtype for value in (matrix, bias, noise)):
         raise ValueError("destination channel dtypes disagree")
-    recurrence = recurrence_potential(weights, offsets, xi)
+    left_center = jnp.zeros((card, dim), weights.dtype) if left_center is None else left_center
+    right_center = jnp.zeros_like(left_center) if right_center is None else right_center
+    for center in (left_center, right_center):
+        if center.shape != (card, dim) or center.dtype != weights.dtype:
+            raise ValueError("transition center shapes or dtypes disagree")
+    centered_bias = (jnp.einsum("jab,ib->ija", matrix, left_center)
+                     + (bias[None] - right_center[None]))
+    recurrence = recurrence_potential(weights, offsets, xi, center=left_center)
     finite = jnp.all(jnp.isfinite(matrix)) & jnp.all(jnp.isfinite(bias)) & jnp.all(jnp.isfinite(noise))
     symmetric = jnp.all(noise == noise.swapaxes(-1, -2))
     inverse, logdet, pd_status = gaussian_blocks(noise, jnp.ones(card, dtype=bool))
     status = recurrence.status | pd_status | failure(~finite, Status.NONFINITE) | failure(~symmetric, Status.INVALID)
+    status |= failure(~jnp.all(jnp.isfinite(left_center)) | ~jnp.all(jnp.isfinite(right_center)), Status.NONFINITE)
     wa = jnp.einsum("jab,jbc->jac", inverse, matrix)
-    wb = jnp.einsum("jab,jb->ja", inverse, bias)
+    wb = jnp.einsum("jab,ijb->ija", inverse, centered_bias)
     atwa = jnp.einsum("jba,jbc->jac", matrix, wa)
-    atwb = jnp.einsum("jba,jb->ja", matrix, wb)
-    constant = recurrence.constant - (dim * jnp.log(2 * jnp.pi) + logdet
-                                      + jnp.einsum("ja,ja->j", bias, wb))[None] / 2
+    atwb = jnp.einsum("jba,ijb->ija", matrix, wb)
+    constant = recurrence.constant - (dim * jnp.log(2 * jnp.pi) + logdet[None]
+                                      + jnp.einsum("ija,ija->ij", centered_bias, wb)) / 2
     linear = jnp.zeros((card, card, 2 * dim), weights.dtype)
-    linear = linear.at[..., :dim].set(recurrence.linear - atwb[None]).at[..., dim:].set(wb[None])
+    linear = linear.at[..., :dim].set(recurrence.linear - atwb).at[..., dim:].set(wb)
     precision = jnp.zeros((card, card, 2 * dim, 2 * dim), weights.dtype)
     precision = precision.at[..., :dim, :dim].set(recurrence.precision + atwa[None])
     precision = precision.at[..., :dim, dim:].set(-wa.swapaxes(-1, -2)[None])
     precision = precision.at[..., dim:, :dim].set(-wa[None])
     precision = precision.at[..., dim:, dim:].set(inverse[None])
     precision = (precision + precision.swapaxes(-1, -2)) / 2
-    result = Natural(constant, linear, precision, status)
+    center = jnp.concatenate((jnp.broadcast_to(left_center[:, None], (card, card, dim)),
+                              jnp.broadcast_to(right_center[None], (card, card, dim))), axis=-1)
+    status |= failure(~jnp.all(jnp.isfinite(constant)), Status.NONFINITE)
+    result = Natural(jnp.where(jnp.isfinite(constant), constant, jnp.nan), linear, precision, status, center)
     return result._replace(status=coordinate_status(result))
 
 
@@ -129,19 +151,38 @@ class TransitionParameters(NamedTuple):
 
 def source_region(region):
     """Recurrence marginal (i,j,x); retains pair probabilities and source moments."""
-    if region.mean.shape[-1] % 2:
+    if region.displacement.shape[-1] % 2:
         raise ValueError("grouped region needs equal source/destination dimensions")
-    dim = region.mean.shape[-1] // 2
-    return region._replace(mean=region.mean[..., :dim], covariance=region.covariance[..., :dim, :dim])
+    dim = region.displacement.shape[-1] // 2
+    return region._replace(displacement=region.displacement[..., :dim], center=region.center[..., :dim],
+                           covariance=region.covariance[..., :dim, :dim])
 
 
 class Auxiliary(NamedTuple):
+    """Learning statistics use the retained feature [x-center_i;1].
+
+    Its weights are [w;o+w*center_i]. Physical readouts apply the exact affine
+    feature transform, with the usual rounding at large world coordinates.
+    """
     target: jax.Array
     residual: jax.Array
     exposure: jax.Array
     linear: jax.Array
     precision: jax.Array
     status: jax.Array
+    center: jax.Array
+
+    @property
+    def physical_linear(self):
+        return self.linear.at[..., :-1].add(self.center[:, None] * self.linear[..., -1:])
+
+    @property
+    def physical_precision(self):
+        dim = self.center.shape[-1]
+        transform = jnp.broadcast_to(jnp.eye(dim + 1, dtype=self.center.dtype),
+                                     (self.center.shape[0], dim + 1, dim + 1))
+        transform = transform.at[..., :dim, dim].set(self.center)
+        return jnp.einsum("iac,ilcd,ibd->ilab", transform, self.precision, transform)
 
 
 def _conditional_at_risk(probability, mean, covariance):
@@ -185,9 +226,11 @@ def auxiliary_statistics(region, weights, offsets, xi):
     """
     card, dim = _recurrence_shapes(weights, offsets, xi)
     source = source_region(region)
-    if source.mean.shape != (card, card, dim) or source.mean.dtype != weights.dtype:
+    if source.displacement.shape != (card, card, dim) or source.displacement.dtype != weights.dtype:
         raise ValueError("auxiliary belief shapes or dtypes disagree")
-    p, mean, second = source.probability, source.mean, source.second
+    center = source.center[:, 0]
+    p, mean = source.probability, source.relative_mean(center[:, None])
+    second = source.covariance + mean[..., :, None] * mean[..., None, :]
     augmented = jnp.concatenate((mean, jnp.ones((*p.shape, 1), p.dtype)), axis=-1)
     moments = jnp.zeros((*p.shape, dim + 1, dim + 1), p.dtype)
     moments = moments.at[..., :dim, :dim].set(second)
@@ -202,7 +245,8 @@ def auxiliary_statistics(region, weights, offsets, xi):
     accumulated = at_risk(p[..., None, None] * moments)
     active = exposure > 0
     _, conditional_mean, conditional_covariance = _conditional_at_risk(p, mean, source.covariance)
-    logit_mean = jnp.einsum("ild,ild->il", weights, conditional_mean) + offsets
+    centered_offset = offsets + jnp.einsum("ild,id->il", weights, center)
+    logit_mean = jnp.einsum("ild,ild->il", weights, conditional_mean) + centered_offset
     logit_variance = jnp.einsum("ila,ilab,ilb->il", weights, conditional_covariance, weights)
     scale = jnp.einsum("ila,ilab,ilb->il", abs(weights), abs(conditional_covariance), abs(weights))
     # Only dtype-sized covariance-contraction roundoff may make variance negative.
@@ -216,7 +260,7 @@ def auxiliary_statistics(region, weights, offsets, xi):
     finite &= jnp.all(jnp.isfinite(residual)) & jnp.all(jnp.isfinite(linear)) & jnp.all(jnp.isfinite(precision))
     status = region.status | failure(~valid, Status.INVALID) | failure(~finite, Status.NONFINITE)
     return Auxiliary(*(jnp.where(status == 0, x, jnp.nan) for x in
-                       (target, residual, exposure, linear, precision)), status)
+                       (target, residual, exposure, linear, precision)), status, center)
 
 
 def transition_expectation(region, parameters):
@@ -232,19 +276,26 @@ def transition_expectation(region, parameters):
     parameters and uses this path as its owned regional expectation.
     """
     weights, offsets, xi, matrix, bias, noise = parameters
-    factor = transition(*parameters)
+    dim = weights.shape[-1]
+    factor = transition(*parameters, left_center=region.center[:, 0, :dim],
+                        right_center=region.center[0, :, dim:])
     auxiliary = auxiliary_statistics(region, weights, offsets, xi)
     source = source_region(region)
-    _, risk_mean, _ = _conditional_at_risk(source.probability, source.mean, source.covariance)
-    success_mean = jnp.einsum("ild,ild->il", weights, source.mean[:, :-1]) + offsets
-    risk_logit = jnp.einsum("ild,ild->il", weights, risk_mean) + offsets
+    mean = source.relative_mean(auxiliary.center[:, None])
+    centered_offset = offsets + jnp.einsum("ild,id->il", weights, auxiliary.center)
+    _, risk_mean, _ = _conditional_at_risk(source.probability, mean, source.covariance)
+    success_mean = jnp.einsum("ild,ild->il", weights, mean[:, :-1]) + centered_offset
+    risk_logit = jnp.einsum("ild,ild->il", weights, risk_mean) + centered_offset
     linear = source.probability[:, :-1] * success_mean - auxiliary.exposure * risk_logit / 2
     recurrence = jnp.sum(linear + auxiliary.exposure *
                          (_jj_base_xi(xi) - pg_mean_xi(xi) * auxiliary.target / 2))
 
     card, _, dim = weights.shape
     active = region.probability > 0
-    mean_residual = region.mean[..., dim:] - jnp.einsum("jab,ijb->ija", matrix, source.mean) - bias[None]
+    centered_bias = (jnp.einsum("jab,ijb->ija", matrix, region.center[..., :dim])
+                     + (bias[None] - region.center[..., dim:]))
+    mean_residual = (region.displacement[..., dim:]
+                     - jnp.einsum("jab,ijb->ija", matrix, source.displacement) - centered_bias)
     covariance = jnp.where(active[..., None, None], region.covariance, jnp.eye(2 * dim, dtype=weights.dtype))
     covariance_root = jnp.linalg.cholesky(covariance)
     transform = jnp.concatenate((-matrix, jnp.broadcast_to(jnp.eye(dim, dtype=weights.dtype), matrix.shape)), axis=-1)
@@ -269,13 +320,13 @@ def moment_residual(projected, separator):
     probability. Coordinate scaling is relative to max(1, both magnitudes).
     Support mismatch requires rebuilding the active inventory.
     """
-    if projected.mean.shape != separator.mean.shape:
+    if projected.displacement.shape != separator.displacement.shape:
         raise ValueError("incidence moment shapes disagree")
     active = projected.probability > 0
     status = projected.status | separator.status
     status |= failure(jnp.any(active != (separator.probability > 0)), Status.SUPPORT_CHANGED)
     value = jnp.max(abs(projected.probability - separator.probability))
-    for rank, a, b in ((1, projected.mean, separator.mean),
+    for rank, a, b in ((1, projected.relative_mean(separator.center), separator.displacement),
                        (2, projected.covariance, separator.covariance)):
         scale = jnp.maximum(1, jnp.maximum(abs(a), abs(b)))
         mask = active.reshape(active.shape + (1,) * rank)
@@ -288,6 +339,8 @@ def natural_residual(message, target):
     """Relative full quotient residual on a fixed supported, gauged face."""
     if message.linear.shape != target.linear.shape:
         raise ValueError("message residual shapes disagree")
+    center = target.center if message.center is None else message.center
+    message, target = rebase(message, center), rebase(target, center)
     active = jnp.isfinite(message.constant)
     status = coordinate_status(message) | coordinate_status(target)
     status |= failure(jnp.any(active != jnp.isfinite(target.constant)), Status.SUPPORT_CHANGED)
@@ -295,6 +348,9 @@ def natural_residual(message, target):
     for rank, (a, b) in enumerate(zip(message.arrays(), target.arrays())):
         mask = active.reshape(active.shape + (1,) * rank)
         a, b = jnp.where(mask, a, 0), jnp.where(mask, b, 0)
+        if rank == 0:
+            first = jnp.argmax(active.reshape(-1))
+            a, b = (jnp.where(mask, x - x.reshape(-1)[first], 0) for x in (a, b))
         scale = jnp.maximum(1, jnp.maximum(abs(a), abs(b)))
         value = jnp.maximum(value, jnp.max(abs(a - b) / scale))
     status |= failure(~jnp.isfinite(value), Status.NONFINITE)
@@ -328,24 +384,26 @@ def evaluate(parameters, sites, messages):
     """
     if not isinstance(parameters, TransitionParameters):
         raise TypeError("D12 evaluation requires original TransitionParameters for stable energy")
-    factors = jax.vmap(lambda p: transition(*p))(parameters)
     left, right = messages
-    count = factors.constant.shape[0]
+    count = parameters.weights.shape[0]
     if count < 1 or sites.constant.shape[0] != count + 1:
         raise ValueError("chain lengths disagree")
     if left.constant.shape != sites.constant[:-1].shape or right.constant.shape != left.constant.shape:
         raise ValueError("message bank shapes disagree")
+    factors = jax.vmap(lambda p, l, r: transition(*p, left_center=l, right_center=r))(
+        parameters, sites.origin[:-1], sites.origin[1:])
 
     def shifted(site, outgoing, at_left):
+        outgoing = rebase(outgoing, site.origin[1:] if at_left else site.origin[:-1])
         edge = 0 if at_left else -1
         arrays = []
         for s, m in zip(site.arrays(), outgoing.arrays()):
             padding = jnp.zeros_like(s[edge:edge + 1] if at_left else s[-1:])
             embedded = jnp.concatenate((padding, m) if at_left else (m, padding), axis=0)
-            arrays.append(s + embedded)
+            arrays.append(embedded)
         padding = jnp.zeros((1,), jnp.int32)
         status = jnp.concatenate((padding, outgoing.status) if at_left else (outgoing.status, padding))
-        return Natural(*arrays, site.status | status)
+        return site + Natural(*arrays, status, site.center)
 
     from_left = shifted(sites, right, True)
     from_right = shifted(sites, left, False)
