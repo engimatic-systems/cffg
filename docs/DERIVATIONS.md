@@ -2749,10 +2749,11 @@ difference; an independently varied symmetric off-diagonal has factor -1.
 At stationarity Phi equals
 D12.4. Away from consistency the separately evaluated primal expression is not
 a feasible variational objective. A residual or a dual slope is never relabeled
-free energy. The executable solve is a bounded fixed-JJ experiment: it uses
+free energy. The original executable solve is a bounded fixed-JJ experiment: it uses
 backtracking on the quotient residual, checks properness, and certifies both
 finite residual and stable finite energy. It does not claim a completed joint
-xi/message optimizer. D12.8 supplies that optimizer's required residual.
+xi/message optimizer. The independent tiny joint reference described in D12.7
+also solves D12.8; candidate and moderate-horizon qualification remain separate.
 
 ### D12.5 Ordinary exterior and the D3 companion
 
@@ -2990,6 +2991,53 @@ and enumeration are confined to this reference. Quadrature refinement checks
 its stated tolerance before comparison. Floating-point equality budgets are
 `512 * terms * finfo(dtype).eps`; approximation limits are separate constants
 fixed before candidate evaluation in each test.
+
+The complete tiny joint reference is `tests/hybrid_joint_reference.py`, with
+iteration in `tests/hybrid_joint_solver_reference.py`. Both import independent
+NumPy/SciPy mathematics only. `evaluate(model, messages, xi)` returns the
+D12.4 primal, D12.9 dual, D12.7 natural and unweighted conditional residuals,
+D12.8 targets, centered and physical moments, and source-conditioned learning
+increments at exactly the supplied coordinate. `Coordinate` removes each
+common message gauge, stores symmetric precision entries and omits inactive
+auxiliaries. Origins and support remain fixed. Coupled T=3 uses local EC
+projection and quotient equations; exact temporal path integration is not its
+objective or closure.
+
+`tests/fixtures/hybrid-joint-reference-spec.json` was committed before the
+checkpoint solves. It freezes tiny fixtures, xi=0/1 starts, initialization,
+backtracking/Newton budgets, all certificates and the unchanged arithmetic
+and moderate-case contract. The original 22 records are in
+`hybrid-joint-reference-attempt-1.json`: 18 valid starts converged and four
+empty-support/positive-underflow starts failed explicitly. Separate diagnostic
+provenance records an extra unregistered tiny-mass solve from the first test
+run; that result is excluded from the frozen checkpoint evidence.
+
+`tests/test_hybrid_joint_reference.py` anchors the complete reference:
+
+- `test_complete_reference_certifies_every_returned_coordinate` recomputes
+  every certificate and comparison array at the returned messages and xi.
+- `test_exact_reductions_at_returned_xi_match_boundaries_energy_and_learning`
+  checks independent T=2 and drive-independent T=3 path integrals at held xi,
+  including boundary coefficients and conditional cross-time moments.
+- D11 mean twins, variance assignments, inactive sources and the conditioned
+  K=3/d=2 fixed-drive reduction have separate tests. Conditioning removes the
+  observed drive before entropy evaluation; it is not a singular Gaussian solve.
+- Fixed-origin rebasing and the off-solution dual-gradient identity check
+  held-coordinate arithmetic separately from iteration. Tiny active mass cannot
+  hide a conditional residual, and a positive auxiliary target that underflows
+  cannot become stationary zero. Exhaustion and divergence remain explicit.
+
+Arithmetic retains `atol=rtol=512*4*eps` and total-energy absolute tolerance
+`512*max(4,5*T)*eps`. Independent solved-coordinate comparisons use the
+prospectively specified local first-order propagation
+`2*tau*max(1, ||Dg (DR)^-1||_infinity)` for scaled outputs and residuals.
+`stopping_allowance` reports each sensitivity and the inverse-coordinate norm;
+this is a local stopping diagnostic, not a global uniqueness proof. Run
+`uv run python tests/hybrid_joint_solver_reference.py --output /tmp/joint-reference.json`
+to reproduce the tiny checkpoint. Dense coordinate derivatives are confined
+to this reference. Float32 iteration, moderate-case storage and production
+activation remain downstream qualification work. The following fixed-auxiliary
+approximation ceilings and temporal falsifier are unchanged.
 
 `src/cffg/experiments/hybrid_separator.py` and
 `tests/test_hybrid_separator_derivation.py` anchor:

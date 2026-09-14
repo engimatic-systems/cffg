@@ -140,6 +140,7 @@ EPIC_FILES = {
         "test_structured_recurrence.py",
         "test_regime_pair_derivation.py",
         "test_hybrid_separator_derivation.py",
+        "test_hybrid_joint_reference.py",
         "test_hybrid_separator_kernels.py",
         "test_hybrid_separator_numerics.py",
         "test_hybrid_centering.py",

@@ -886,6 +886,13 @@ execution; `raise_for_status` is the host exception boundary. Exact
 log-zero support is distinct from positive-mass underflow, which fails rather
 than deleting a label. `experiments/hybrid_separator.py` remains the NumPy
 derivation anchor. Neither local implementation is a second runtime route.
+The independent NumPy/SciPy evaluator `tests/hybrid_joint_reference.py` and
+tiny solver `tests/hybrid_joint_solver_reference.py` solve the complete EC and
+squared-auxiliary equations for frozen T=2 and T=3 cases. Their held-coordinate
+API exposes all messages, conditional moments, both energy expressions and
+learning increments. The test-only dense coordinate Jacobian is confined to
+this tiny reference. Its numerical evidence does not qualify the candidate's
+float32 iteration, moderate-horizon storage or production activation.
 The Derived component coordinate
 row inventories the implementation: cff-k6g5 owns serialized declarations and
 identity; cff-ffsg owns local JAX mathematics; cff-a3wz qualifies joint numerical
