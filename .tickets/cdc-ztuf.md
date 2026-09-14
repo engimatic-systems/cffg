@@ -1,7 +1,7 @@
 ---
 id: cdc-ztuf
 status: open
-deps: [cff-y15d]
+deps: [cff-y15d, cdc-ogj9, cdc-c8kc]
 links: []
 created: 2026-09-14T18:09:57Z
 type: task

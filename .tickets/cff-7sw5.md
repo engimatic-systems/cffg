@@ -60,3 +60,7 @@ cff-f3jz consumes plans; cff-czdq owns learning/checkpoint migration after execu
 **2026-09-14T11:02:30Z**
 
 Declaration boundary handoff from independent k6g5 research: compiled identity transport and the successful fixed-parameter, empty-learning public CFFGZ save/load check are explicitly owned here. K6G5 can preserve codec/hash/scoped references and bundle blob rewriting but cannot demonstrate successful public loading while D12 compilation is intentionally rejected. save_bundle validates through load_bundle; _load_archive compiles the template without executing Engine inference. Sources bundle.py:181/288/336 and learn.py:666; confidence high. Full learned-state bundles/resume remain cff-czdq after F3JZ. This allocates the existing guarantee across dependencies without reducing scope or changing the early numerical gate.
+
+**2026-09-14T20:26:29Z**
+
+Cooper requests an explicit opt-in boundary for D12 compilation and evidence of the feature/cost trade-off. Plans must derive D12 activation from its declared model semantics; ordinary existing models must not invoke the hybrid compilation path. The current unbound solver already performs fixed-parameter inference, with learning-array validity in auxiliary/status dependencies. cdc-ogj9 will measure scaling and output selection. Do not silently substitute D9, freeze xi, omit required certificates, or remove failure checks under a performance flag; such changes require their appropriate contract/scope decision.

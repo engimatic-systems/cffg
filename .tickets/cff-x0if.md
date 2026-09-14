@@ -176,3 +176,7 @@ D12 handoff: cff-ocxl accepts hybrid-regime-ec-v1 as an explicitly approximate m
 **2026-09-14T02:44:32Z**
 
 Early numerical checkpoint cff-a3wz now blocks compiler integration and this qualification ticket. It exercises the complete message/auxiliary solve on independent synthetic fixtures before production integration. The registered three dataset/key pairs, exactly-three-fit limit, observation-only boundary, both 0.150 ceilings, and the single postfailure diagnostic pass remain unchanged. A numerical checkpoint pass does not certify exact temporal inference or source recovery.
+
+**2026-09-14T20:26:29Z**
+
+Cooper requests a basis for judging compilation cost against source-recovery value. Alongside the exactly three existing frozen fits, report honest executable-acquisition/cache context and synchronized execution/fit timing, reusing authorized runs without timing retries, warm-up fits or a fourth fit. Combine those costs with the unchanged sealed recovery results and cdc-ogj9/A3WZ evidence. Distinguish historical baseline numbers from controlled comparisons; report compilation amortization only where executable reuse is observed. No data, initialization, stopping rule, threshold or source-truth sealing condition changes. Recovery worth is not established by the successful tiny inference checkpoint alone.
