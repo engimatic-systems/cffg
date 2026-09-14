@@ -1,7 +1,7 @@
 ---
 id: cff-7sw5
 status: open
-deps: [cff-ocxl, cff-k6g5]
+deps: [cff-ocxl, cff-k6g5, cff-a3wz]
 links: []
 created: 2026-09-14T01:11:24Z
 type: feature
@@ -14,7 +14,7 @@ tags: [rslds, inference, hybrid]
 
 ## Background in Plain English — WHY
 
-Serialized D12 ownership needs a reconstructible component plan. A whole-rSLDS topology recognizer would reproduce the rejected historical integration and cannot preserve composition semantics.
+Serialized D12 ownership needs a reconstructible component plan. A whole-rSLDS topology recognizer would reproduce the rejected historical integration and cannot preserve composition semantics. The complete numerical solver must first pass cff-a3wz so compiler integration starts from measured feasibility.
 
 ## Outcomes / Acceptance Criteria — WHAT
 
@@ -53,5 +53,4 @@ cff-f3jz consumes plans; cff-czdq owns learning/checkpoint migration after execu
 - D9 / D10: the current factor-local recurrence approximation and the retired whole-model candidate.
 - Moment / covariance: an expected feature or product, and its centered second moment.
 - Semantic identity: the versioned meaning of a declaration, executable, or persisted statistic.
-
 

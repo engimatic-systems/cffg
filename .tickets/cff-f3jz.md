@@ -1,7 +1,7 @@
 ---
 id: cff-f3jz
 status: open
-deps: [cff-ocxl, cff-7sw5, cff-ffsg]
+deps: [cff-ocxl, cff-7sw5, cff-ffsg, cff-a3wz]
 links: []
 created: 2026-09-14T01:11:24Z
 type: feature
@@ -14,12 +14,12 @@ tags: [rslds, inference, hybrid]
 
 ## Background in Plain English — WHY
 
-D12 local kernels and compiled ownership are insufficient without a graph solve and a complete objective ledger. The NumPy experiment solves held auxiliaries only; production must solve the joint message/xi residual and report its actual terminal state.
+D12 local kernels and compiled ownership are insufficient without a graph solve and a complete objective ledger. cff-a3wz first qualifies the complete message/xi solver without production binding. This ticket integrates that qualified solver and reports its actual terminal state through the engine.
 
 ## Outcomes / Acceptance Criteria — WHAT
 
 1. Generic engine execution consumes the declared plan without an rSLDS model branch, selecting one approximation and one belief-array authority.
-2. The solver handles D12.7–8 jointly with gauge removal, dtype-scaled properness checks, a feasible initialization strategy, bounded local/global/linear/line-search budgets, and globalization. It distinguishes converged, budget-exhausted, and diverged; non-finite objective/residual is divergence.
+2. Production reuses the solver qualified by cff-a3wz for D12.7–8 jointly, preserving gauge removal, dtype-scaled properness checks, feasible initialization, bounded local/global/linear/line-search budgets, and globalization. Engine integration distinguishes converged, budget-exhausted, and diverged; non-finite objective/residual is divergence. It does not introduce a separate numerical policy or weaken the prerequisite's certificates.
 3. The ledger owns precisely D12 regional energies, labeled entropies, hybrid separator corrections, adapter entropies, and ordinary exterior corrections. It matches the independent tiny objective and stationary dual at the returned coordinate.
 4. Synchronous/scheduled, host/JIT, and single/vmap execution agree on messages, internal readouts, support, FE, and terminal status. Lifecycle initialization, binding, support checks, assignment scoring, schedule classification, and estimator/runtime consumers are included in the handoff.
 5. Sparse support, support changes, inactive xi, signed/vacuous cavities, float32, and 10–100x scale obey D12.6. No dense trajectory covariance/Jacobian or silent budget-to-success conversion is introduced. New long globalization regressions are slow and opt-in.
@@ -55,3 +55,8 @@ cff-czdq owns learning semantics and persisted-state migration. cff-ulbz supplie
 - Semantic identity: the versioned meaning of a declaration, executable, or persisted statistic.
 
 
+## Notes
+
+**2026-09-14T02:44:32Z**
+
+Cooper’s supervised sequence now extracts joint numerical feasibility into cff-a3wz, a prerequisite of this ticket and cff-7sw5. Reuse its local solver, fixed certificates, initialization/globalization evidence, and measured iteration storage. This ticket retains production engine integration, objective ownership, duplicated execution surfaces, lifecycle/readouts/status forwarding, documentation, and the full gate. Split that remaining integration into bounded tickets before assigning it if it cannot fit one worker context.
