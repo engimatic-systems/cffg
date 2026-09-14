@@ -1,6 +1,6 @@
 ---
 id: cff-ej67
-status: open
+status: in_progress
 deps: [cff-ocxl]
 links: [cff-ffsg]
 created: 2026-09-14T04:34:41Z
@@ -81,3 +81,15 @@ The new dependency represents completion order; all predecessor local code is al
 **2026-09-14T04:49:58Z**
 
 Predecessor underflow correction is committed at 2b7fd93, clean tree; independent re-review completed with no findings. Fresh implementation may now start on this bounded projection/quotient repair. Fixed origins and compensated affine code are available in ancestry; use current APIs and preserve their explicit underflow boundary.
+
+**2026-09-14T04:51:55Z**
+
+Preimplementation inventory: applies to ARCHITECTURE change-path rows Derived component coordinate, New factor or rule family, and Runtime numerical or status invariant. Local affected pairs are source/destination projection, canonical/signed quotient, Gaussian/categorical adapters, standalone/batched repeated evaluate, objective/auxiliary/learning consumers, and eager/JIT plus single/vmap plus forward/reverse differentiation. Compiler, synchronous/scheduled execution, production lifecycle, persistence/current-legacy, public learning activation, and recovery fits are N/A because these kernels remain unbound. Preserve Natural coefficient unknowns and fixed origins; covariance correction is a derived representation buffer only. Plan: retain a low covariance word beside the existing rounded physical covariance, sum around one retained conditional covariance, and solve the precision/linear quotient residual before subtraction can erase the increment. Audit all covariance consumers and count retained/transient local arrays at T=100/K=20/d=10. Hostile acceptance: literal log-zero labels remain absent with zero inactive blocks; empty support remains EMPTY_SUPPORT; revived quotient support is SUPPORT_CHANGED; finite log probabilities that exponentiate to zero remain UNDERFLOW; malformed/nonfinite covariance words or residual arithmetic fail with INVALID/NONFINITE; improper complete beliefs remain IMPROPER, while signed/vacuous cavities are legal. Float32 uses no float64 promotion and keeps the unchanged 512*4*eps budget; unsupported subnormal words/products/sums retain explicit failure. Scale checks retain O(T*K*K*d*d) grouped and O(T*K*d*d) message storage without a global covariance/Jacobian or trajectory enumeration. Supervisor already bootstrapped the stacked branch; no branch changes, full suite, review launch, closure, push, or PR in this worker.
+
+**2026-09-14T05:02:33Z**
+
+Independent algebra research (no in-progress code inspected) — Question: how can a retained covariance C=H+L preserve the same quotient and full objective? Answer: with cavity (a,h,J), projected centered mean m and label mass p, solve C*R=I-H*J-L*J and C*v=m-H*h-L*h using retained low products; R and J need not be positive definite. Let b=logp-(d*log(2*pi)+logdetC)/2. Equivalent quotient constant is k=b-a-m^T*(h+v)/2, or evaluate cavity at m and use k=b-g(m)-v^T*m+m^T*R*m/2. Only a common scalar gauge is redundant. Expected cavity energy includes trace(J*H)+trace(J*L).
+
+If H=B*B^T is proper, whiten E=B^-1*L*B^-T. Exact logdetC=logdetH+sum(log1p(eigenvalues(E))); this avoids rounding I+E first. In d=2 the exact correction is log1p(e11+e22+e11*e22-e12^2), so trace alone misses offdiagonal terms. I+E must be positive definite; determinant positivity alone is insufficient. A first-order trace correction can count only as controlled arithmetic if rho=||E||2<1 and its remainder bound ||E||F^2/(2*(1-rho)), plus evaluation/conditioning/label-region accumulation error, fits the existing budget. Entrywise-small L does not imply small whitened E for ill-conditioned H. Gradient error is first order (bounded by rho/(1-rho)); a value bound alone cannot qualify derivatives. Exact differentials include dlogdetC=trace(C^-1*(dH+dL)) and dC^-1=-C^-1*(dH+dL)*C^-1. Repeated eigenvalues leave logdet smooth but can complicate eigenvector-based automatic differentiation.
+
+Source: independent b0s3_implementer mathematical derivation from Gaussian completion of square and matrix identities, Higham matrix-log series https://nhigham.com/2020/11/17/what-is-the-matrix-logarithm/ for the remainder derivation; confidence high. This is research guidance, not review clearance or a requirement for universal exactness. Retained low covariance adds O(d*d) local storage without changing stationarity unknowns. Worker received the completed research before final validation.
