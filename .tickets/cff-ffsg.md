@@ -1,6 +1,6 @@
 ---
 id: cff-ffsg
-status: open
+status: in_progress
 deps: [cff-ocxl]
 links: []
 created: 2026-09-14T01:11:24Z
@@ -55,3 +55,13 @@ cff-f3jz binds these local kernels to cff-7sw5 plans and supplies the joint mess
 - Semantic identity: the versioned meaning of a declaration, executable, or persisted statistic.
 
 
+
+## Notes
+
+**2026-09-14T02:37:52Z**
+
+Preimplementation handoff: applicable ARCHITECTURE change-path rows are Derived component coordinate, New factor or rule family, and Runtime numerical or status invariant. Affected surfaces are local unbound JAX natural/belief normalization, grouped destination-selected channel tilt, moment projection and signed quotient, ordinary identity adapters, labeled objective, tied xi residual, pair-conditioned learning increments, and pure local/batched chain evaluation. Host/JIT and single/vmap pairs apply and must agree. Compiler discovery/grouping/slots/packing/resolution/assembly/Arena/member_of, synchronous/scheduled runtime execution, lifecycle/status consumers, production ledger dispatch, readout/learning state, serialization/checkpoints, estimator, and public exports are checked N/A: downstream tickets own those bindings. Static shape/dtype/channel errors raise before execution; numerical failures use explicit array statuses in host and JIT and a host raising adapter. Hostile acceptance: exact log-zero support produces exact zero weighted moments; empty support, changed quotient faces, positive-support underflow, malformed/non-finite coordinates, improper aggregate/tilted beliefs and non-finite energy/residual are failures, never repaired by a ridge. Signed/vacuous cavities are allowed if their tilt is proper. Inactive xi is fixed to zero with zero learning increments. Float32 and float64 use dimension/dtype-relative spectral and squared-logit guards. Inventory cases T=100, K=20 and d=10 stay polynomial and store only local covariance; no iteration policy or dense Jacobian/trajectory covariance is introduced. Ticket fits a bounded implementation context as two local math modules and focused reference/contract tests. Independent review and the single final full suite are sequenced by the supervisor after implementation.
+
+**2026-09-14T02:56:31Z**
+
+Implementation handoff for independent review: added unbound local JAX hybrid_natural.py and hybrid_separator.py (315 and 283 lines), with exact labeled Gaussian normalizers/entropy, signed quotients and explicit adapter regions, destination-selected grouped transitions, O(K²) stick prefixes, per-source/stick xi=c² stationarity and pair-conditioned learning increments. The pure stacked chain evaluator returns the same beliefs, primal/dual expressions, scaled conditional-moment residual and full quotient residual without an iteration policy. Numerical host/JIT failures are explicit bitmask statuses; raise_for_status is the host exception boundary. Invalid beliefs/objectives are NaN, positive-support underflow retains its finite log probability and fails, and inactive coordinates/learning remain exact zero. Added independent-reference and hostile/transformation/size tests and registered both new test files in dashboard EPIC_FILES. Updated ARCHITECTURE and D12 executable/numerical anchors. Final focused command: uv run pytest -q tests/test_hybrid_separator_kernels.py tests/test_hybrid_separator_numerics.py tests/test_hybrid_separator_derivation.py tests/test_regime_pair_derivation.py — 114 passed in 49.71s. Log: /tmp/cff-ffsg-focused-final.log. git diff --check and tk dep cycle passed. No mathematical contract, supported scope, approximation semantics or thresholds changed. Next: supervisor starts a fresh reviewer, returns feedback to this implementer, and performs the one final short-suite gate after final code changes before closure/PR. Full suite deliberately not launched here. cff-a3wz owns numerical joint-solver feasibility, actual iteration-storage measurement and initialization/globalization policy; these local T=100/K=20/d=10 inventories are not solver qualification.

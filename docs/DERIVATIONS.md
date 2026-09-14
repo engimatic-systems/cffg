@@ -2874,6 +2874,40 @@ unchanged. `R=0` alone does **not** make source-dependent temporal dynamics
 or externally associated learning equal to D9. Identical nonzero source slopes
 do not imply exact Gaussian closure either.
 
+The local JAX implementation is `src/cffg/hybrid_natural.py` and
+`src/cffg/hybrid_separator.py`; neither module selects an engine route.
+`transition` accepts **xi=c²**, including a differentiable analytic limit at
+zero. `auxiliary_statistics` returns per-source/stick targets, residuals,
+exposures and augmented-feature learning increments from the supplied grouped
+belief. `evaluate` accepts stacked factor/site coordinates and two directed
+message banks. It returns labeled primal and dual expressions, moment and
+quotient residuals, and status without running an iterative solver. Its
+conditional mean/covariance residual is unweighted by label probability;
+rare active labels cannot hide an inconsistent conditional covariance.
+Callers must establish moment consistency before treating the primal
+expression as a feasible EC objective. Joint numerical qualification is the
+separate prerequisite cff-a3wz.
+
+The JAX numerical contract uses bitmask status values: malformed finite
+coordinates, empty support, improper active beliefs, changed quotient support,
+positive-probability underflow, and non-finite arithmetic are distinguishable.
+Static shape/dtype/channel errors raise before execution. Host and JIT return
+the same numerical status; `raise_for_status` converts it to a named host
+exception. Failed beliefs/objectives carry NaN rather than finite substitutes.
+A quotient may restrict its cavity face; reusing an old message on a different
+face returns `SUPPORT_CHANGED`. The retained log probabilities distinguish
+underflow from literal zeros. Inactive xi has target zero and exact zero
+learning increments; a stale nonzero inactive xi remains a nonzero residual.
+
+`tests/test_hybrid_separator_kernels.py` checks the independent tiny reference,
+all boundary natural blocks, both D11 mean/variance twins, grouped/alternating
+energy, xi and dual derivatives, fixed-drive/drive-independent reductions,
+ordinary adapters, and the stationary temporal approximation falsifier.
+`tests/test_hybrid_separator_numerics.py` checks hostile inputs, exact support,
+signed/vacuous cavities, host/JIT and single/vmap agreement, and float32
+T=100/K=20/d=10 local storage inventories. These local inventories do not claim
+iteration storage or joint-solver convergence; cff-a3wz measures those.
+
 For a stronger approximation falsifier, let adjacent reduced temporal factors be
 
     f_L(h,i,x)=p_h N(x;a_h,1)/2,

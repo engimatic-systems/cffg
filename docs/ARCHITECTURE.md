@@ -852,8 +852,18 @@ separator corrections follow actual declared incidences. Signed quotient
 messages require proper aggregate and tilted beliefs. The temporal
 counterexample in D12.7 limits the exactness claim even at zero EC residual.
 
-Production remains D9. `experiments/hybrid_separator.py` is an unbound NumPy
-derivation anchor, not a second runtime route. The Derived component coordinate
+Production remains D9. `hybrid_natural.py` and `hybrid_separator.py` implement
+the unbound local JAX mathematics: labeled Gaussian integration, signed natural
+quotients, explicit ordinary adapters, destination-selected grouped tilts, tied
+xi residuals, and pair-conditioned learning increments. Their pure batched
+chain evaluator returns the D12 primal expression, dual, and separately scaled
+conditional-moment and quotient residuals. It supplies no iteration policy.
+Numerical failures carry the same array status in host/JIT and single/vmap
+execution; `raise_for_status` is the host exception boundary. Exact
+log-zero support is distinct from positive-mass underflow, which fails rather
+than deleting a label. `experiments/hybrid_separator.py` remains the NumPy
+derivation anchor. Neither local implementation is a second runtime route.
+The Derived component coordinate
 row inventories the implementation: cff-k6g5 owns serialized declarations and
 identity; cff-ffsg owns local JAX mathematics; cff-7sw5 owns bounded compiler
 plans; cff-f3jz owns execution, joint solver status, and the ledger; cff-czdq owns
