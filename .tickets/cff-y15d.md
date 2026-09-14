@@ -105,3 +105,13 @@ Prospective specification clarification before any candidate solve or held deriv
 **2026-09-14T10:33:43Z**
 
 Before candidate solves, strengthen the declared held-coordinate derivative gate with the qualified cancellation fixture test_hybrid_affine.case(float32,10000,1e-4,[6.7],-67000): fixed source origins, xi=0, right message precision identity so aggregates are proper. Check the complete residual JVP/transpose and assert a nonzero projected covariance correction. This is a held diagnostic, not an additional solve or checkpoint result; existing derivative/arithmetic tolerances stay unchanged.
+
+**2026-09-14T10:38:00Z**
+
+Held derivative gate result: original 11 tests passed in 299.83s. The prospectively added retained-covariance float32 test failed in 72.91s: complete transpose identity and nonzero derived-correction check passed, but natural precision residual element 7 had JVP -0.643678069 versus one-sided finite difference -0.775263309, outside unchanged atol=rtol=64*sqrt(eps32)=0.0220971. Log /tmp/cff-y15d-coordinate-2.log. No candidate checkpoint solve has run.
+
+Bounded diagnosis planned before execution: at this exact held fixture, evaluate JVPs and finite-difference secants with step multipliers 1,2,4,8,16,32 around the declared baseline, recording validity and all errors. Also promote the identical stored float32 parameters/origins/coordinate to float64 and compare its complete derivative and finite differences. This distinguishes f32 evaluation quantization (cavity precision 10000) from a derivative defect; it does not change thresholds, discard the failed test, or qualify an optimizer.
+
+**2026-09-14T10:42:12Z**
+
+Prospective policy mechanism checks (held coordinates only, before execution): coupled_t2 independent one-sweep coordinate; one trial with first packed source precision direction -1e6 must reject improper belief and retain accepted point; one trial at xi=0 with auxiliary direction -1 must reject the zero boundary fraction and retain accepted point. One bounded complete-residual CGLS subproblem at the same held point checks finite N/M storage without an outer solve. Existing full candidate status variants and all numerical thresholds remain unchanged.

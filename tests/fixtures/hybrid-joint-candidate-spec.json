@@ -165,7 +165,24 @@
       "iteration/buffer interface shapes"
     ],
     "attempt_policy": "immutable numbered run records; record source/strategy/budget revisions before reruns; retain failed attempts and disclose incomplete measurements",
-    "dtype": "float64 only; independent propagated stopping allowances apply only to these float64 solved comparisons"
+    "dtype": "float64 only; independent propagated stopping allowances apply only to these float64 solved comparisons",
+    "held_policy_checks": [
+      {
+        "case": "coupled_t2 at the independent one-sweep held coordinate",
+        "action": "one line-search trial with first packed source precision direction -1e6",
+        "expected": "improper trial rejected, accepted coordinate/evaluation unchanged, numerical rejection counted"
+      },
+      {
+        "case": "coupled_t2 at xi=0 held coordinate",
+        "action": "one line-search trial with all active xi direction=-1 and zero message direction",
+        "expected": "zero boundary fraction rejected, accepted coordinate/evaluation unchanged, boundary rejection counted"
+      },
+      {
+        "case": "coupled_t2 at independent one-sweep held coordinate",
+        "action": "bounded CGLS Gauss-Newton linear subproblem only, no outer solve",
+        "expected": "finite N direction with M residual; does not claim nonlinear convergence"
+      }
+    ]
   },
   "moderate_qualification_unchanged": {
     "T": [
