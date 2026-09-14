@@ -1,6 +1,7 @@
 """Bounded numerical policy checks; complete registered solves have saved reports."""
 
 import json
+import hashlib
 from pathlib import Path
 from functools import lru_cache
 
@@ -128,3 +129,84 @@ def test_complete_loop_has_fixed_int32_status_and_counter_shapes():
         assert value.shape == () and value.dtype == jnp.int32
     assert state.rejection_counts.shape == (len(solver.Rejection),)
     assert state.rejection_counts.dtype == jnp.int32
+
+
+@pytest.fixture(scope='module')
+def checkpoint_report():
+    return json.loads((Path(__file__).parent / 'fixtures/hybrid-joint-candidate-results-002.json').read_text())
+
+
+def test_frozen_checkpoint_sources_and_complete_case_inventory(checkpoint_report):
+    root = Path(__file__).resolve().parents[1]
+    spec_path = root / 'tests/fixtures/hybrid-joint-candidate-spec.json'
+    spec = json.loads(spec_path.read_text())
+    assert hashlib.sha256(spec_path.read_bytes()).hexdigest() == checkpoint_report['spec_sha256']
+    for path, expected in checkpoint_report['source_sha256'].items():
+        assert hashlib.sha256((root / path).read_bytes()).hexdigest() == expected, path
+    reference = spec['independent_reference']
+    assert hashlib.sha256((root / reference['path']).read_bytes()).hexdigest() == reference['sha256']
+    expected = {(name, start, perturb) for name in reference['cases']
+                for start in spec['initializations']['xi']
+                for perturb in ([False] if name in spec['initializations']['expected_invalid'] else [False, True])}
+    singles = [r for r in checkpoint_report['records'] if r['execution'] == 'jit']
+    assert {(r['case'], r['initial_xi'], r['perturbation']) for r in singles} == expected
+    assert len(singles) == len(expected)
+    assert all(r['expected_status_passed'] and r['dtype'] == 'float64' for r in singles)
+    assert all(r['budgets'] == vars(solver.Budgets()) for r in singles)
+    assert len(checkpoint_report['records']) == len(expected) + 6
+    groups = checkpoint_report['held_buffer_inventory']['groups']
+    assert all(groups[name] for name in ('derivative_captures', 'linear_state', 'trial_state', 'outer_state'))
+
+
+def test_saved_terminal_certificates_outputs_and_parity(checkpoint_report):
+    from hybrid_joint_reference import load_case
+    fixtures = Path(__file__).parent / 'fixtures'
+    references = {(r['case'], r['initial_xi']): r for r in
+                  json.loads((fixtures / 'hybrid-joint-reference-results.json').read_text())['records']}
+    tau, eps = solver.tolerance(np.float64), np.finfo(np.float64).eps
+    converged = []
+    for record in checkpoint_report['records']:
+        if record['execution'] == 'jit_vmap':
+            assert record['status'] == 'completed'
+            for start, member in zip(record['initial_xi'], record['members'], strict=True):
+                assert member['single_vmap_parity']['passed']
+                converged.append((record['case'], start, member))
+        elif record['status'] == 'converged':
+            if record['execution'] == 'host':
+                assert record['host_jit_parity']['passed']
+            converged.append((record['case'], record['initial_xi'], record))
+        else:
+            assert record['expected_status_passed']
+            if record['execution'] == 'outer_zero':
+                assert record['status'] == 'exhausted' and record['iterations'] == 0
+            else:
+                assert record['status'] == 'diverged'
+                assert record['reason'] == 'invalid_initialization' and record['numerical_status'] != 0
+    assert len(converged) == 40
+    for name, start, record in converged:
+        assert record['all_gates_pass'] and record['proper_active_beliefs']
+        assert record['numerical_status'] == 0 and record['reason'] == 'certified'
+        assert max(record['certificates'].values()) <= tau
+        assert record['relative_energy_change'] <= tau
+        assert np.all(np.isfinite(record['coordinate'])) and np.all(np.asarray(record['xi']) >= 0)
+        assert np.all(np.asarray(record['inactive_xi']) == 0)
+        model = load_case(name)
+        for group, values in record['outputs'].items():
+            assert np.all(np.isfinite(values)), (name, group)
+            arithmetic = record['held_coordinate_arithmetic'][group]
+            assert arithmetic['passed'] and arithmetic['max_allowance_ratio'] <= 1
+            comparison = record['output_comparison_by_group'][group]
+            allowance = references[name, start]['stopping_propagation']['groups'][group]['scaled_allowance']
+            atol = 512 * max(4, 5 * model.shape[0]) * eps if group == 'energy' else 512 * 4 * eps
+            assert comparison['stopping_allowance'] == allowance
+            assert comparison['arithmetic_allowance'] == atol + 512 * 4 * eps
+            assert comparison['passed'] and comparison['scaled_error'] <= allowance + atol + 512 * 4 * eps
+        assert record['outputs']['energy'] == [record['free_energy'], record['dual_energy']]
+        t, k, d = model.shape
+        for region, shape, active in (
+                ('separators', (t, k, d), model.support),
+                ('regions', (t - 1, k, k, 2 * d), model.support[:-1, :, None] & model.support[1:, None, :])):
+            covariance = np.reshape(record['outputs'][region + '_covariance'], (*shape, shape[-1]))
+            probability = np.reshape(record['outputs'][region + '_probability'], shape[:-1])
+            assert np.all(np.linalg.eigvalsh(covariance[active]) > 0)
+            assert np.all(probability[active] > 0) and np.all(probability[~active] == 0)

@@ -341,8 +341,9 @@ not establish source recovery, Gaussian trajectory exactness, or a
 horizon-independent convergence budget. Its signed Gaussian messages also
 require compatible boundary consumers (cff-f3jz and cff-ulbz). The NumPy D12
 experiment solves held auxiliaries and requires proper forward initialization.
-The unbound JAX joint message/auxiliary policy has a separate tiny numerical
-checkpoint. Production still needs moderate float32 convergence and actual
+The unbound JAX joint message/auxiliary policy passes its fixed tiny float64
+numerical checkpoint, including host/JIT and single/vmap parity. Production
+still needs moderate float32 convergence and actual
 iteration-storage qualification, followed by the execution binding. A tiny
 reference comparison does not establish those downstream properties.
 The local JAX evaluator retains precision and covariance rounding remainders

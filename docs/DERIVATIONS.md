@@ -3155,6 +3155,17 @@ strategy, caps, arithmetic/stopping accounting and reporting before solves.
 and transpose identities before checkpoint execution. The candidate report
 command is `uv run python tests/run_hybrid_joint_candidate.py --output PATH`;
 it refuses to replace an existing attempt and preserves incomplete records.
+`hybrid-joint-candidate-results-002.json` records all 36 valid float64
+fixture/start combinations converging within six accepted updates, with a
+largest maximum certificate of `2.679e-11`. All inherited arithmetic and
+independently propagated output allowances passed. Both host starts passed
+full-state JIT parity, and the two vmap members exactly matched single-JIT
+states. Four support/underflow starts and two invalid-input variants diverged
+as expected; the zero-outer-budget variant exhausted. None of these valid
+tiny solves needed the fallback. Held tests separately exercise CGLS
+(conjugate gradients for least squares), improper-trial rejection and the
+nonnegative auxiliary boundary. These results establish only the frozen tiny
+checkpoint, not the moderate float32 or production qualification.
 `hybrid_joint_storage.buffers` inventories logical arrays and derivative
 captures. `programs` exposes the actual enclosing residual, normal product,
 linear step, outer iteration, certification and solve with dynamic arguments;
