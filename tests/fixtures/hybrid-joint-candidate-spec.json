@@ -20,13 +20,16 @@
       "underflow_source_t2",
       "centered_t3"
     ],
-    "unchanged_arithmetic": {},
+    "unchanged_arithmetic": {
+      "local_atol_rtol": "512*4*eps(dtype)",
+      "energy_atol": "512*max(4,5*T)*eps(dtype)"
+    },
     "stopping": "Use each frozen reference output group scaled_allowance from its independent local propagation; add the frozen held-coordinate arithmetic allowance. No candidate-derived tolerance."
   },
   "acceptance": {
     "tau": "64*eps(dtype)**0.75",
-    "local_arithmetic_atol_rtol": "512*4*eps(float64)",
-    "energy_arithmetic_atol": "512*max(4,5*T)*eps(float64)",
+    "local_arithmetic_atol_rtol": "512*4*eps(dtype)",
+    "energy_arithmetic_atol": "512*max(4,5*T)*eps(dtype)",
     "certificates": [
       "natural",
       "label_mass",
@@ -110,7 +113,8 @@
       "retained covariance correction contributes to signed difference"
     ],
     "finite_difference": "eps**(1/3)*(1+norm(x)); one-sided at xi=0; agreement scaled by 64*eps**(1/3) for float64 and 64*sqrt(eps) for float32",
-    "transpose": "abs(<Jv,w>-<v,J^Tw>)/(1+abs(lhs)+abs(rhs)) <= 512*eps"
+    "transpose": "abs(<Jv,w>-<v,J^Tw>)/(1+abs(lhs)+abs(rhs)) <= 512*eps",
+    "dtype": "float64 except the explicitly named float32 coupled_t2 held derivative diagnostic. Held arithmetic uses eps of the executed dtype. No float32 solved-coordinate stopping allowance is asserted."
   },
   "checkpoint_runs": {
     "tiny": "every inherited case at xi=0 and xi=1; valid cases use both declared message initializations; invalid cases zero messages only",
@@ -159,7 +163,8 @@
       "held_coordinate_arithmetic",
       "iteration/buffer interface shapes"
     ],
-    "attempt_policy": "immutable numbered run records; record source/strategy/budget revisions before reruns; retain failed attempts and disclose incomplete measurements"
+    "attempt_policy": "immutable numbered run records; record source/strategy/budget revisions before reruns; retain failed attempts and disclose incomplete measurements",
+    "dtype": "float64 only; independent propagated stopping allowances apply only to these float64 solved comparisons"
   },
   "moderate_qualification_unchanged": {
     "T": [
