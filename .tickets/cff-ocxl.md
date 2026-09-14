@@ -1,6 +1,6 @@
 ---
 id: cff-ocxl
-status: in_progress
+status: closed
 deps: [cff-iur0]
 links: []
 created: 2026-08-31T03:47:35Z
@@ -161,3 +161,7 @@ Built from tk dep tree --full cff-x0if, tk ready, and tk blocked; tk dep cycle r
 **2026-09-14T01:16:24Z**
 
 Independent bounded mathematical review: natural normalizers, signed quotient gauges, primal/dual equality, adapter entropy counting, destination-selected elimination, and the reflected temporal falsifier agree with D12. The review requested explicit precision-coordinate derivative factors (-1/2 diagonal, -1 symmetric off-diagonal); D12.9 now states them and the executable gradient test already checks the diagonal factor. No remaining mathematical blocker was identified. Review does not claim an implemented joint auxiliary solver or empirical recovery.
+
+**2026-09-14T01:43:20Z**
+
+Final validation and landing: uv run python tools/dashboard.py --run-suite passed exactly once after the final code edit: 2,329 passed, 41 deselected, four dependency deprecation warnings, 1,218.79 seconds pytest time. The full 1,560-second quiet wait was honored without process/log polling. The dashboard refreshed at ~/agent-share/cffg-tests.html with 34 new tests; runtime history updated. Focused tests passed 91 before this run. No slow empirical or recovery runs were started. Closing under the positive mathematical outcome: D12 names the approximation and ordinary exterior contract; all six implementation dependencies and cff-ulbz are attached to cff-x0if. Next ready roots are cff-k6g5 (declarations) and cff-ffsg (local kernels); current/legacy learning migration remains mandatory in cff-czdq. The tree and dependency artifacts receive final checks before the stacked PR is published.
