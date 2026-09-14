@@ -2894,6 +2894,12 @@ both words; physical second moments, source statistics and channel expectations
 round the represented covariance only at their ordinary dtype-valued moment
 readout. No message coefficient is clamped and the existing arithmetic budget
 `512*4*eps` is unchanged. Large prior input rounding remains irreversible.
+The physical second-moment readout and both moment-constructor guards share
+the same rounded outer product. Its integer-significand evaluation prevents
+backend multiplication/addition contraction from concealing an overflow;
+the existing compensated-product support and derivative rules apply. The
+covariance guard includes the rounded `C_hi+C_lo` readout before adding that
+outer product, so a finite low word cannot bypass the second-moment check.
 
 For T slices, a grouped evaluation costs `O(T K² d³)` and stores
 `O(T K² d²)` region blocks plus `O(T K d²)` separators/messages and
@@ -2916,6 +2922,10 @@ product's two accumulator words occupy 1,600,000 logical bytes; its product
 and product-remainder words occupy another 1,600,000 logical bytes. These
 are matrix-sized local workspaces, with allocator reuse; they are not amounts
 to add again to measured temporary allocation.
+At the full grouped `T*K*K*(2d)*(2d)` shape, the analogous two-word carry
+and product/remainder pair each contain 128,000,000 logical bytes. The
+compiler may fuse these arrays into their consumer; logical sizes are not
+additional heap allocations.
 
 `uv run python tests/test_hybrid_projection.py` prints a reproducible JSON
 inventory from JAX lowering, without running a solver or recovery fit. On the
@@ -2928,7 +2938,10 @@ argument / 5,490,608 output / 258,775,144 temporary bytes; the complete
 input region and cavity trees total 72,657,600 bytes.
 At the same local message-matrix shape, the compensated product uses
 1,600,000 argument / 800,000 output / 4,400,136 temporary bytes, and the
-corrected solve uses 2,400,000 / 800,000 / 14,820,648 bytes. All four
+corrected solve uses 2,400,000 / 800,000 / 14,820,648 bytes. Grouped
+normalization uses 70,560,400 / 70,720,856 / 131,200,984 bytes, and the
+grouped second-moment readout uses 70,560,000 / 64,000,000 / 0 bytes:
+the latter fuses its work into the output allocation. All six
 measurements have zero input/output alias bytes. Arrays are dynamic lowering
 arguments, so fixture constants cannot remove the measured workload. These backend
 allocation figures include the retained words, integer arithmetic, matrix

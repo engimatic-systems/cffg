@@ -103,7 +103,7 @@ class Belief(NamedTuple):
 
     @property
     def second(self):
-        return self.full_covariance + self.mean[..., :, None] * self.mean[..., None, :]
+        return _second_moment(self.full_covariance, self.mean)
 
     def entropy(self):
         """Labeled entropy, including the Gaussian constants for every label."""
@@ -136,6 +136,12 @@ class Belief(NamedTuple):
         status = (jnp.asarray(self.status, jnp.int32) | coordinate_status(natural)
                   | low_status)
         return jnp.where(status == 0, value, jnp.nan)
+
+
+def _second_moment(covariance, mean):
+    """Share rounded intermediates between the readout and overflow guards."""
+    outer = hc.product(mean[..., :, None], mean[..., None, :])
+    return covariance + outer
 
 
 def correction_status(covariance, correction):
@@ -260,7 +266,7 @@ def normalize(natural):
     status |= failure(jnp.any(active & (probability == 0)), Status.UNDERFLOW)
     status |= failure(~jnp.all(jnp.isfinite(mean)) | ~jnp.all(jnp.isfinite(covariance)), Status.NONFINITE)
     world_mean = natural.origin + mean
-    second = covariance + world_mean[..., :, None] * world_mean[..., None, :]
+    second = _second_moment(covariance, world_mean)
     status |= failure(jnp.any(active[..., None, None] & ~jnp.isfinite(second)), Status.NONFINITE)
     return Belief(jnp.where(active, jnp.where(status == 0, probability, jnp.nan), 0),
                   jnp.where(active[..., None], jnp.where(status == 0, mean, jnp.nan), 0),
@@ -289,7 +295,8 @@ def from_centered_moments(probability, displacement, covariance, center, *, cova
     finite = (jnp.all(jnp.isfinite(probability)) & jnp.all(jnp.isfinite(mean))
               & jnp.all(jnp.isfinite(covariance)) & jnp.all(jnp.isfinite(center)))
     world_mean = center + mean
-    second = covariance + world_mean[..., :, None] * world_mean[..., None, :]
+    represented_covariance = covariance if covariance_correction is None else covariance + correction
+    second = _second_moment(represented_covariance, world_mean)
     finite &= jnp.all(jnp.isfinite(second)) & jnp.all(jnp.isfinite(correction))
     # Sum roundoff scales with the number of label additions and the dtype.
     tolerance = 32 * probability.size * jnp.finfo(probability.dtype).eps

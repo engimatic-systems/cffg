@@ -173,9 +173,10 @@ def test_float32_projection_counterexample_with_x64_disabled():
         import jax
         jax.config.update('jax_enable_x64', False)
         import numpy as np
-        from test_hybrid_projection import stored_case, both_messages, assert_messages, assert_solve_underflow
+        from test_hybrid_projection import stored_case, both_messages, assert_messages, assert_solve_underflow, assert_second_moment_boundary
         import hybrid_projection_reference as ref
         assert_solve_underflow(np.float32)
+        assert_second_moment_boundary(np.float32)
         region, left, right = stored_case(np.float32)
         expected = ref.scalar_precision(region.probability, region.displacement[..., :1], region.covariance[..., :1, :1], left.precision)
         for evaluate in (both_messages, jax.jit(both_messages)):
@@ -409,6 +410,91 @@ def test_unrepresentable_solve_fails_and_exact_zero_remains_valid(dtype):
     assert_solve_underflow(dtype)
 
 
+def _assert_moment_boundary_modes(construct, arguments, expected_second, dtype):
+    size = arguments[0].shape[0]
+    for evaluate, batched in ((construct, False), (jax.jit(construct), False),
+                              (jax.vmap(construct), True), (jax.jit(jax.vmap(construct)), True)):
+        if batched:
+            beliefs, seconds = evaluate(*arguments)
+        else:
+            beliefs, seconds = stack([evaluate(*(x[i] for x in arguments)) for i in range(size)])
+        np.testing.assert_array_equal(beliefs.status, [hn.Status.NONFINITE] + [0] * (size - 1))
+        assert np.isnan(seconds[0]).all() and np.isnan(beliefs.covariance[0]).all()
+        assert np.isfinite(seconds[1:]).all()
+        np.testing.assert_allclose(seconds[1:], expected_second, atol=0, rtol=2*np.finfo(dtype).eps)
+
+
+def assert_second_moment_boundary(dtype):
+    maximum = dtype(np.finfo(dtype).max)
+    fraction = dtype(.75 if dtype == np.float32 else .76)
+    mean = dtype(np.sqrt(maximum * fraction))
+    high = np.nextafter(dtype(maximum - dtype(mean * mean)), dtype(np.inf))
+    low = dtype(high * dtype(np.finfo(dtype).eps))
+    finite_mean = np.nextafter(mean, dtype(0))
+    with np.errstate(over="ignore"):
+        high_only = dtype(high + dtype(mean * mean))
+        represented = dtype(high + low)
+        overflowing = dtype(represented + dtype(mean * mean))
+        finite_second = dtype(represented + dtype(finite_mean * finite_mean))
+    assert np.isfinite(high_only) and np.isfinite(represented)
+    assert np.isinf(overflowing) and np.isfinite(finite_second)
+
+    def construct(covariance, correction, displacement):
+        belief = hn.from_centered_moments(jnp.ones((), dtype), displacement, covariance,
+                                          jnp.zeros(1, dtype), covariance_correction=correction)
+        return belief, belief.second
+
+    arguments = (jnp.full((3, 1, 1), high, dtype),
+                 jnp.asarray([[[low]], [[low]], [[0]]], dtype),
+                 jnp.asarray([[mean], [finite_mean], [mean]], dtype))
+    expected_second = np.asarray([finite_second, high_only], dtype).reshape(2, 1, 1)
+    _assert_moment_boundary_modes(construct, arguments, expected_second, dtype)
+
+    root = dtype(np.sqrt(maximum))
+    finite_center = np.nextafter(root, dtype(0))
+    overflowing_center = np.nextafter(root, dtype(np.inf))
+    def normalize(center):
+        belief = hn.normalize(hn.Natural(jnp.zeros((), dtype), jnp.zeros(1, dtype),
+                                          jnp.ones((1, 1), dtype), center=center))
+        return belief, belief.second
+    arguments = (jnp.asarray([[overflowing_center], [finite_center]], dtype),)
+    expected_second = np.asarray([[[dtype(1) + dtype(finite_center * finite_center)]]], dtype)
+    _assert_moment_boundary_modes(normalize, arguments, expected_second, dtype)
+
+
+@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+def test_second_moment_guard_uses_represented_covariance_at_overflow_boundary(dtype):
+    assert_second_moment_boundary(dtype)
+
+
+@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+def test_second_moment_readout_retains_forward_reverse_and_second_derivatives(dtype):
+    covariance = jnp.eye(2, dtype=dtype)
+    low = covariance * (np.finfo(dtype).eps / 4)
+    mean = jnp.array([.7, -.1], dtype)
+    center = jnp.array([.2, -.3], dtype)
+    direction = jnp.array([-.4, .3], dtype)
+    weight = jnp.array([[.3, .1], [.1, .4]], dtype)
+    def moments(m, correction):
+        return hn.from_centered_moments(jnp.ones((), dtype), m, covariance, center,
+                                         covariance_correction=correction).second
+    def normalized(m, correction):
+        del correction
+        return hn.normalize(hn.Natural(jnp.zeros((), dtype), m, covariance, center=center)).second
+    expected_tangent = jnp.outer(direction, mean + center) + jnp.outer(mean + center, direction)
+    for readout in (moments, normalized):
+        scalar = lambda m: jnp.sum(weight * readout(m, low))
+        np.testing.assert_allclose(jax.jvp(lambda m: readout(m, low), (mean,), (direction,))[1],
+                                   expected_tangent, atol=tolerance(dtype), rtol=tolerance(dtype))
+        for gradient in (jax.jacfwd(scalar), jax.jacrev(scalar)):
+            np.testing.assert_allclose(gradient(mean), 2 * weight @ (mean + center),
+                                       atol=tolerance(dtype), rtol=tolerance(dtype))
+        np.testing.assert_allclose(jax.hessian(scalar)(mean), 2 * weight,
+                                   atol=tolerance(dtype), rtol=tolerance(dtype))
+    np.testing.assert_allclose(jax.grad(lambda correction: jnp.sum(weight * moments(mean, correction)))(low),
+                               weight, atol=tolerance(dtype), rtol=tolerance(dtype))
+
+
 def compiled_inventory(time=100, card=20, dim=10):
     """Reproducible lowered allocation inventory, separate from iterative storage."""
     shape = lambda s: jax.ShapeDtypeStruct(s, jnp.float32)
@@ -425,11 +511,15 @@ def compiled_inventory(time=100, card=20, dim=10):
     matrix = shape((time, card, dim, dim))
     cavity = hn.Natural(shape((time, card)), shape((time, card, dim)), matrix,
                         jax.ShapeDtypeStruct((time,), jnp.int32), shape((time, card, dim)))
+    grouped = hn.Natural(region.probability, region.displacement, region.covariance,
+                         region.status, region.center)
     result = {"shape": {"T": time, "K": card, "d": dim}, "x64_enabled": jax.config.x64_enabled}
     for name, function, arguments in (("both_projections", projections, (region,)),
                                       ("both_projections_and_quotients", incidences, (region, cavity, cavity)),
                                       ("compensated_product", hc.product, (matrix, matrix)),
-                                      ("corrected_solve", hc.solve, (matrix, matrix, matrix))):
+                                      ("corrected_solve", hc.solve, (matrix, matrix, matrix)),
+                                      ("grouped_normalization", jax.vmap(hn.normalize), (grouped,)),
+                                      ("grouped_second_moment", jax.vmap(lambda b: b.second), (region,))):
         memory = jax.jit(function).lower(*arguments).compile().memory_analysis()
         result[name] = {key: getattr(memory, key) for key in
                        ("argument_size_in_bytes", "output_size_in_bytes", "alias_size_in_bytes", "temp_size_in_bytes")}
@@ -439,6 +529,8 @@ def compiled_inventory(time=100, card=20, dim=10):
     result["retained_covariance_correction_bytes"] = 2 * time * card * dim * dim * 4
     result["matrix_accumulator_carry_bytes"] = 2 * time * card * dim * dim * 4
     result["product_high_and_low_bytes"] = 2 * time * card * dim * dim * 4
+    result["grouped_matrix_accumulator_carry_bytes"] = 2 * time * card * card * (2 * dim) ** 2 * 4
+    result["grouped_product_high_and_low_bytes"] = 2 * time * card * card * (2 * dim) ** 2 * 4
     result["grouped_new_correction_bytes"] = result["message_new_correction_bytes"] = 0
     return result
 
