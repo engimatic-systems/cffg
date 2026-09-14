@@ -12,6 +12,7 @@ from cffg.hybrid_natural import Belief, Natural, Status
 from hybrid_joint_candidate import context as make_context, held_coordinate, output_arrays, to_reference
 from hybrid_joint_reference import evaluate as reference_evaluate
 from hybrid_joint_solver_reference import output_arrays as reference_arrays
+from hybrid_joint_report import arithmetic_tolerance
 
 context = lru_cache(maxsize=None)(make_context)
 
@@ -27,10 +28,9 @@ def test_held_independent_arithmetic_and_active_roundtrip(name):
     assert value.residual.shape == value.scales.shape == (c.residual_size,)
     reference = reference_evaluate(model, *to_reference(c, vector))
     expected = reference_arrays(reference)
-    eps = np.finfo(vector.dtype).eps
     for name, actual in output_arrays(c, vector, value).items():
-        atol = 512 * max(4, 5 * c.shape[0]) * eps if name == 'energy' else 512 * 4 * eps
-        np.testing.assert_allclose(actual, expected[name], atol=atol, rtol=512 * 4 * eps, err_msg=name)
+        atol, rtol = arithmetic_tolerance(name, c.shape[0], vector.dtype)
+        np.testing.assert_allclose(actual, expected[name], atol=atol, rtol=rtol, err_msg=name)
     messages, xi = c.unpack(vector)
     for side, message in enumerate(messages):
         active = c.support[side:side + c.shape[0] - 1]

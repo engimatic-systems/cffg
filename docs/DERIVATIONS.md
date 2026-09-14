@@ -3161,8 +3161,16 @@ strategy, caps, arithmetic/stopping accounting and reporting before solves.
 and transpose identities before checkpoint execution. The candidate report
 command is `uv run python tests/run_hybrid_joint_candidate.py --output PATH`;
 it refuses to replace an existing attempt and preserves incomplete records.
+`tests/hybrid_joint_report.py` independently reconstructs saved coordinates with
+NumPy and requires all 19 output groups at the reference shapes. Qualification
+recomputes arithmetic and propagated stopping comparisons; stored error and
+parity summaries are descriptive. Energy arithmetic uses only
+`512*max(4,5*T)*eps(dtype)` absolute error, with no relative term, and adds only
+that absolute contribution to the inherited stopping allowance. Exact host
+starts, positional vmap members and status variants are checked, with saved
+parity recomputed against the corresponding single-JIT state.
 `hybrid-joint-candidate-results-002.json` records all 36 valid float64
-fixture/start combinations converging within six accepted updates, with a
+fixture/start combinations at source `3b1f023` converging within six accepted updates, with a
 largest maximum certificate of `2.679e-11`. All inherited arithmetic and
 independently propagated output allowances passed. Both host starts passed
 full-state JIT parity, and the two vmap members exactly matched single-JIT
@@ -3172,6 +3180,10 @@ tiny solves needed the fallback. Held tests separately exercise CGLS
 (conjugate gradients for least squares), improper-trial rejection and the
 nonnegative auxiliary boundary. These results establish only the frozen tiny
 checkpoint, not the moderate float32 or production qualification.
+Review repairs to metadata packing and report enforcement require a fresh
+source-qualified checkpoint after re-review. Attempt 002 remains immutable;
+independent re-evaluation of its 40 converged outputs passes the stricter
+absolute-only energy check without changing the old report or its source hashes.
 `hybrid_joint_storage.buffers` inventories logical arrays and derivative
 captures. `programs` exposes the actual enclosing residual, normal product,
 linear step, outer iteration, certification and solve with dynamic arguments;

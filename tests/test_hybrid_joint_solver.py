@@ -2,6 +2,7 @@
 
 import json
 import hashlib
+from copy import deepcopy
 from pathlib import Path
 from functools import lru_cache
 
@@ -13,6 +14,7 @@ import pytest
 from cffg import hybrid_joint as joint, hybrid_joint_solver as solver
 from cffg.hybrid_joint_storage import arrays
 from hybrid_joint_candidate import context as make_context, held_coordinate
+from hybrid_joint_report import OUTPUT_GROUPS, arithmetic_tolerance, compare_outputs, validate_inventory, validate_saved_report
 
 context = lru_cache(maxsize=None)(make_context)
 
@@ -136,77 +138,85 @@ def checkpoint_report():
     return json.loads((Path(__file__).parent / 'fixtures/hybrid-joint-candidate-results-002.json').read_text())
 
 
-def test_frozen_checkpoint_sources_and_complete_case_inventory(checkpoint_report):
+def test_frozen_checkpoint_sources(checkpoint_report):
     root = Path(__file__).resolve().parents[1]
     spec_path = root / 'tests/fixtures/hybrid-joint-candidate-spec.json'
     spec = json.loads(spec_path.read_text())
     assert hashlib.sha256(spec_path.read_bytes()).hexdigest() == checkpoint_report['spec_sha256']
+    from run_hybrid_joint_candidate import SOURCE
+    assert set(checkpoint_report['source_sha256']) == set(SOURCE)
     for path, expected in checkpoint_report['source_sha256'].items():
         assert hashlib.sha256((root / path).read_bytes()).hexdigest() == expected, path
     reference = spec['independent_reference']
     assert hashlib.sha256((root / reference['path']).read_bytes()).hexdigest() == reference['sha256']
-    expected = {(name, start, perturb) for name in reference['cases']
-                for start in spec['initializations']['xi']
-                for perturb in ([False] if name in spec['initializations']['expected_invalid'] else [False, True])}
-    singles = [r for r in checkpoint_report['records'] if r['execution'] == 'jit']
-    assert {(r['case'], r['initial_xi'], r['perturbation']) for r in singles} == expected
-    assert len(singles) == len(expected)
-    assert all(r['expected_status_passed'] and r['dtype'] == 'float64' for r in singles)
-    assert all(r['budgets'] == vars(solver.Budgets()) for r in singles)
-    assert len(checkpoint_report['records']) == len(expected) + 6
     groups = checkpoint_report['held_buffer_inventory']['groups']
     assert all(groups[name] for name in ('derivative_captures', 'linear_state', 'trial_state', 'outer_state'))
 
 
-def test_saved_terminal_certificates_outputs_and_parity(checkpoint_report):
-    from hybrid_joint_reference import load_case
+@pytest.fixture(scope='module')
+def checkpoint_context():
     fixtures = Path(__file__).parent / 'fixtures'
+    spec = json.loads((fixtures / 'hybrid-joint-candidate-spec.json').read_text())
     references = {(r['case'], r['initial_xi']): r for r in
                   json.loads((fixtures / 'hybrid-joint-reference-results.json').read_text())['records']}
-    tau, eps = solver.tolerance(np.float64), np.finfo(np.float64).eps
-    converged = []
-    for record in checkpoint_report['records']:
-        if record['execution'] == 'jit_vmap':
-            assert record['status'] == 'completed'
-            for start, member in zip(record['initial_xi'], record['members'], strict=True):
-                assert member['single_vmap_parity']['passed']
-                converged.append((record['case'], start, member))
-        elif record['status'] == 'converged':
-            if record['execution'] == 'host':
-                assert record['host_jit_parity']['passed']
-            converged.append((record['case'], record['initial_xi'], record))
+    return spec, references
+
+
+def test_saved_terminal_certificates_outputs_and_parity(checkpoint_report, checkpoint_context):
+    assert len(validate_saved_report(checkpoint_report, *checkpoint_context)) == 40
+
+
+@pytest.mark.parametrize('mutation', ['learning_value', 'missing_learning', 'shape', 'extra_group', 'coordinate'])
+def test_saved_outputs_require_independent_recomputation(checkpoint_report, checkpoint_context, mutation):
+    report = deepcopy(checkpoint_report)
+    record = report['records'][0]
+    if mutation == 'learning_value':
+        record['outputs']['learning_linear'][0] = 1e9
+    elif mutation == 'missing_learning':
+        for name in OUTPUT_GROUPS:
+            if name.startswith('learning_'):
+                del record['outputs'][name]
+    elif mutation == 'shape':
+        record['outputs']['learning_linear'] = [record['outputs']['learning_linear']]
+    elif mutation == 'extra_group':
+        record['outputs']['unregistered'] = [0.]
+    else:
+        record['coordinate'][0] += .1
+    with pytest.raises(ValueError, match='independent|output groups|shape'):
+        validate_saved_report(report, *checkpoint_context)
+
+
+@pytest.mark.parametrize('mutation', ['duplicate_host', 'vmap_starts', 'duplicate_vmap_member', 'status_variant', 'budget'])
+def test_saved_execution_inventory_requires_exact_starts(checkpoint_report, checkpoint_context, mutation):
+    report = deepcopy(checkpoint_report)
+    records = report['records']
+    batch = next(r for r in records if r['execution'] == 'jit_vmap')
+    if mutation == 'duplicate_host':
+        indices = [i for i, r in enumerate(records) if r['execution'] == 'host']
+        records[indices[1]] = deepcopy(records[indices[0]])
+    elif mutation == 'vmap_starts':
+        batch['initial_xi'] = [0., 0.]
+    elif mutation == 'duplicate_vmap_member':
+        batch['members'][1] = deepcopy(batch['members'][0])
+    elif mutation == 'status_variant':
+        next(r for r in records if r['execution'] == 'negative_xi')['initial_xi'] = 0.
+    else:
+        next(r for r in records if r['execution'] == 'outer_zero')['budgets']['outer'] = 200
+    with pytest.raises(ValueError, match='inventory|starts|parity|budgets'):
+        if mutation == 'duplicate_vmap_member':
+            validate_saved_report(report, *checkpoint_context)
         else:
-            assert record['expected_status_passed']
-            if record['execution'] == 'outer_zero':
-                assert record['status'] == 'exhausted' and record['iterations'] == 0
-            else:
-                assert record['status'] == 'diverged'
-                assert record['reason'] == 'invalid_initialization' and record['numerical_status'] != 0
-    assert len(converged) == 40
-    for name, start, record in converged:
-        assert record['all_gates_pass'] and record['proper_active_beliefs']
-        assert record['numerical_status'] == 0 and record['reason'] == 'certified'
-        assert max(record['certificates'].values()) <= tau
-        assert record['relative_energy_change'] <= tau
-        assert np.all(np.isfinite(record['coordinate'])) and np.all(np.asarray(record['xi']) >= 0)
-        assert np.all(np.asarray(record['inactive_xi']) == 0)
-        model = load_case(name)
-        for group, values in record['outputs'].items():
-            assert np.all(np.isfinite(values)), (name, group)
-            arithmetic = record['held_coordinate_arithmetic'][group]
-            assert arithmetic['passed'] and arithmetic['max_allowance_ratio'] <= 1
-            comparison = record['output_comparison_by_group'][group]
-            allowance = references[name, start]['stopping_propagation']['groups'][group]['scaled_allowance']
-            atol = 512 * max(4, 5 * model.shape[0]) * eps if group == 'energy' else 512 * 4 * eps
-            assert comparison['stopping_allowance'] == allowance
-            assert comparison['arithmetic_allowance'] == atol + 512 * 4 * eps
-            assert comparison['passed'] and comparison['scaled_error'] <= allowance + atol + 512 * 4 * eps
-        assert record['outputs']['energy'] == [record['free_energy'], record['dual_energy']]
-        t, k, d = model.shape
-        for region, shape, active in (
-                ('separators', (t, k, d), model.support),
-                ('regions', (t - 1, k, k, 2 * d), model.support[:-1, :, None] & model.support[1:, None, :])):
-            covariance = np.reshape(record['outputs'][region + '_covariance'], (*shape, shape[-1]))
-            probability = np.reshape(record['outputs'][region + '_probability'], shape[:-1])
-            assert np.all(np.linalg.eigvalsh(covariance[active]) > 0)
-            assert np.all(probability[active] > 0) and np.all(probability[~active] == 0)
+            validate_inventory(report, checkpoint_context[0])
+
+
+def test_energy_arithmetic_is_absolute_even_for_large_objectives():
+    held = {name: np.zeros(2) for name in OUTPUT_GROUPS}
+    held['energy'][:] = 1e6
+    actual = deepcopy(held)
+    actual['energy'][0] += 1e-8
+    reference = {'stopping_propagation': {'groups': {name: {'scaled_allowance': 0.} for name in OUTPUT_GROUPS}}}
+    arithmetic, comparison = compare_outputs(actual, held, held, reference, 2, np.float64)
+    atol, rtol = arithmetic_tolerance('energy', 2, np.float64)
+    assert rtol == 0 and atol == 512 * 10 * np.finfo(np.float64).eps
+    assert not arithmetic['energy']['passed']
+    assert comparison['energy']['arithmetic_allowance'] == atol

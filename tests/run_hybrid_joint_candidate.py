@@ -23,13 +23,14 @@ from cffg import hybrid_joint_storage as storage
 from hybrid_joint_candidate import context, held_coordinate, output_arrays, to_reference
 from hybrid_joint_reference import evaluate as independent_evaluate
 from hybrid_joint_solver_reference import Coordinate as ReferenceCoordinate, output_arrays as independent_arrays
+from hybrid_joint_report import compare_outputs
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / 'tests/fixtures/hybrid-joint-candidate-spec.json'
 REFERENCE = ROOT / 'tests/fixtures/hybrid-joint-reference-results.json'
 SOURCE = ['src/cffg/hybrid_joint.py', 'src/cffg/hybrid_joint_solver.py',
           'src/cffg/hybrid_joint_storage.py', 'tests/hybrid_joint_candidate.py',
-          'tests/run_hybrid_joint_candidate.py']
+          'tests/run_hybrid_joint_candidate.py', 'tests/hybrid_joint_report.py']
 SOURCE += [str(path.relative_to(ROOT)) for path in sorted((ROOT / 'src/cffg').glob('hybrid_*.py'))
            if str(path.relative_to(ROOT)) not in SOURCE]
 
@@ -74,18 +75,7 @@ def describe(coordinate, model, state, reference):
     held = independent_arrays(independent_evaluate(model, *to_reference(coordinate, state.coordinate)))
     reference_value = independent_evaluate(model, *ReferenceCoordinate(model).unpack(np.asarray(reference['message_coordinate'])))
     expected = independent_arrays(reference_value)
-    eps = np.finfo(state.coordinate.dtype).eps
-    arithmetic, comparison = {}, {}
-    for name, actual in outputs.items():
-        atol = 512 * max(4, 5 * model.shape[0]) * eps if name == 'energy' else 512 * 4 * eps
-        rtol = 512 * 4 * eps
-        normalized = np.max(abs(actual - held[name]) / (atol + rtol * abs(held[name])))
-        arithmetic[name] = dict(max_allowance_ratio=float(normalized), passed=bool(normalized <= 1))
-        allowance = reference['stopping_propagation']['groups'][name]['scaled_allowance']
-        error = np.max(abs(actual - expected[name]) / (1 + abs(expected[name])))
-        comparison[name] = dict(scaled_error=float(error), stopping_allowance=allowance,
-                                arithmetic_allowance=atol + rtol,
-                                passed=bool(error <= allowance + atol + rtol))
+    arithmetic, comparison = compare_outputs(outputs, held, expected, reference, model.shape[0], state.coordinate.dtype)
     result['held_coordinate_arithmetic'] = arithmetic
     result['output_comparison_by_group'] = comparison
     result['all_gates_pass'] = (max(float(x) for x in state.evaluation.certificates) <= solver.tolerance(state.coordinate.dtype)
