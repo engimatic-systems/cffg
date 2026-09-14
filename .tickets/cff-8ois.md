@@ -1,7 +1,7 @@
 ---
 id: cff-8ois
 status: in_progress
-deps: [cff-ej67, cff-j191]
+deps: [cff-ej67, cff-j191, cff-3uq9]
 links: []
 created: 2026-09-14T10:54:57Z
 type: bug
@@ -143,3 +143,7 @@ Final production source SHA256 b8cc88e3dd0ac586d3ff9fcb0668588c068af4b17870b4b28
 Targeted independent re-review completed at 9b8973d: P2 is resolved, with no new actionable numerical findings. The original counterexamples now report NONFINITE; the narrowly valid dense float64 control still succeeds; dense condition numbers 3/30/300/3000 retain passing values and derivatives. The reviewer confirmed the spectral-bound proof and isolation of status computations from mathematical gradients. Sources: /tmp/cff-8ois-rereview-derived.json, /tmp/cff-8ois-rereview-boundary.json and /tmp/cff-8ois-rereview-dense.json. The implementer remained paused during re-review.
 
 Supervisor reporting clarification: compiled_inventory(time=100) constructs 100 independent pair regions. The local T/time label counts pair regions, not the state horizon of a complete solver; a 100-state chain has 99 transition regions. All published array sizes, JSON fields and measured bytes remain correct and unchanged. D12.6, LIMITATIONS and the inventory docstring now state this explicitly. This is a text-only clarification, so no numerical tests or memory programs were rerun. git diff --check and tk dep cycle pass. Commit and pause; root owns the final whole-head short suite with the announced 4020-second quiet wait budget, stack publication and subsequent Y15D resumption. cff-8ois remains in_progress until the final gate and landing complete.
+
+**2026-09-14T14:39:06Z**
+
+Cooper interrupted the final gate and requires a real20-minute maximum for the short suite; he explicitly assigned optimization/rule implementation to the supervisor. Gate at850db5f was canceled via SIGINT to its pytest process after1538.52s:1577 passed,41 deselected,4 existing gym warnings. Dashboard correctly rejected the interrupted JUnit count mismatch and did not publish it. This is NOT a completed passing gate. Numerical implementation/re-review remain complete, but qualification and Y15D resumption now depend on cff-3uq9. No numerical source changed during this cancellation. Latest completed dashboard remains2537 passes at75ac1d2; its saved timings support the performance diagnosis.
