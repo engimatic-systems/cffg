@@ -1,7 +1,7 @@
 ---
 id: cff-a3wz
 status: open
-deps: [cff-ffsg, cff-ocxl]
+deps: [cff-ffsg, cff-ocxl, cff-b0s3]
 links: []
 created: 2026-09-14T02:43:33Z
 type: task

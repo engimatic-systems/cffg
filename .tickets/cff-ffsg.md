@@ -1,8 +1,8 @@
 ---
 id: cff-ffsg
 status: in_progress
-deps: [cff-ocxl]
-links: []
+deps: [cff-ocxl, cff-b0s3]
+links: [cff-b0s3]
 created: 2026-09-14T01:11:24Z
 type: feature
 priority: 2
@@ -81,3 +81,7 @@ Bounded stable-energy follow-up completed after review: TransitionParameters ret
 **2026-09-14T03:20:44Z**
 
 UNRESOLVED numerical handoff for a fresh prerequisite worker: tests/hybrid_centering_reproduction.py preserves the exact translated-tilt construction. Run uv run python tests/hybrid_centering_reproduction.py; it deliberately exits 1 (log /tmp/cff-ffsg-translated-tilt.log), outside pytest discovery, with no xfail or relaxed gate. K=2,d=1; uniform source label prior; x prior N(center,variance); recurrence weights=1, offsets=-center, xi=0; destination-selected A=0,b=0,Q=1; right cavity is vacuous. Centering both x and recurrence is the identical local problem. In float32 at center100,variance1e-4, centered pair probabilities are [[0.25,0.25],[0.25,0.25]], while expanded shifted probabilities are [[0.00899310596,0.491006881],[0.00899310596,0.491006881]], maximum gap0.2410068959, despite status0 and equal covariances. Shifted source means minus100 are [5.34057617e-5,-4.57763672e-5] versus centered [4.99987509e-5,-4.99987509e-5]. Float32 center10000,var1 and float64 center1e8,var1 have zero pair gap but ordinary representational mean error. Stable same-belief FE/xi derivatives are repaired separately; they do not repair this remaining tilt-assembly defect. Supervisor explicitly directed this worker not to broaden into coordinate redesign: split bounded local-centering versus already-lost-input diagnosis/implementation to a fresh worker. No D12 mathematical/scope/approximation/qualification revision is inferred or authorized by this finding. FFSG remains in_progress and numerical qualification is incomplete.
+
+**2026-09-14T03:23:28Z**
+
+Newly discovered numerical prerequisite: cff-b0s3 now blocks this ticket’s closure and cff-a3wz. Bounded original review fixes are committed through 38e4fd4 with 125 focused tests passing, but the known translated float32 tilt failure remains unresolved. A fresh implementer will own fixed anchored local representation and repeated-message preservation after independent diagnosis and the current bounded re-review finish. No full-suite gate or positive local qualification is claimed while this defect remains. Existing cff-ffsg source commits are the b0s3 code base; its tk prerequisite is the closed cff-ocxl mathematical gate, avoiding a cycle with this completion gate.
