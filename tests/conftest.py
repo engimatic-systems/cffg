@@ -38,6 +38,8 @@ _TIMING_LOG = None
 
 def pytest_sessionstart(session):
     global _TIMING_LOG
+    if hasattr(session.config, "workerinput"):
+        return
     shutil.rmtree(VIZ_ARTIFACTS, ignore_errors=True)
     if target := os.environ.get("CFFG_TEST_TIMINGS"):
         _TIMING_LOG = open(target, "a", buffering=1)
@@ -45,10 +47,14 @@ def pytest_sessionstart(session):
 
 def pytest_runtest_logreport(report):
     if _TIMING_LOG is not None:
-        _TIMING_LOG.write(json.dumps({
+        record = {
             "nodeid": report.nodeid, "phase": report.when,
             "outcome": report.outcome, "seconds": report.duration, "pid": os.getpid(),
-        }) + "\n")
+            "worker": getattr(report, "worker_id", "main"),
+        }
+        if report.failed:
+            record["failure"] = report.longreprtext
+        _TIMING_LOG.write(json.dumps(record) + "\n")
 
 
 def pytest_sessionfinish(session, exitstatus):

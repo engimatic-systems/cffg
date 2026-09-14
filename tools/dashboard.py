@@ -46,6 +46,7 @@ GALLERY = SHARE / "cffg-viz"
 RUNTIME_HISTORY_LIMIT = 3
 SUITE_SELECTION = "not slow"
 SHORT_SUITE_SECONDS = 20 * 60
+SHORT_SUITE_WORKERS = 3
 
 EPIC_FILES = {
     "M0 · Foundations": ["test_hygiene.py"],
@@ -171,15 +172,18 @@ def run_suite() -> tuple[Path, int, float]:
         xml_path = Path(tmp.name)
     timings_path = xml_path.with_suffix(".timings.jsonl")
     environment = dict(os.environ, CFFG_TEST_TIMINGS=str(timings_path))
-    print(f"Short-suite deadline: {SHORT_SUITE_SECONDS:g}s; live timings: {timings_path}", flush=True)
+    print(f"Short-suite deadline: {SHORT_SUITE_SECONDS:g}s; {SHORT_SUITE_WORKERS} workers; live timings: {timings_path}", flush=True)
     with tempfile.TemporaryDirectory(prefix="cffg-suite-cache-") as cache:
         cache_mode = "caller-provided" if environment.get("JAX_COMPILATION_CACHE_DIR") else "empty at start"
         if not environment.get("JAX_COMPILATION_CACHE_DIR"):
             environment["JAX_COMPILATION_CACHE_DIR"] = cache
         environment.setdefault("JAX_PERSISTENT_CACHE_MIN_COMPILE_TIME_SECS", "0.1")
-        print(f"JAX executable cache: {cache_mode}; all tests execute", flush=True)
+        # A size limit enables JAX's file lock for concurrent cache readers/writers.
+        environment.setdefault("JAX_COMPILATION_CACHE_MAX_SIZE", str(1024 ** 3))
+        print(f"JAX executable cache: {cache_mode}; limit {environment['JAX_COMPILATION_CACHE_MAX_SIZE']} bytes; all tests execute", flush=True)
         process = subprocess.Popen(
-            ["uv", "run", "pytest", "-q", "--durations=25", f"--junitxml={xml_path}"],
+            ["uv", "run", "pytest", "-q", "-n", str(SHORT_SUITE_WORKERS),
+             "--dist=loadfile", "--max-worker-restart=0", "--durations=25", f"--junitxml={xml_path}"],
             cwd=REPO, start_new_session=True, env=environment,
         )
         try:
@@ -386,6 +390,8 @@ def record_suite_runtime(
         "pytest_exit_code": pytest_code,
         "result": result,
         "budget_seconds": SHORT_SUITE_SECONDS,
+        "workers": SHORT_SUITE_WORKERS,
+        "compilation_cache": "caller-provided" if os.environ.get("JAX_COMPILATION_CACHE_DIR") else "empty at start",
         "selection": SUITE_SELECTION,
         "wall_seconds": round(float(wall_seconds), 3),
         "case_seconds": None if tests is None else round(sum(test["ms"] for test in tests) / 1000, 3),
