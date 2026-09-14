@@ -165,3 +165,7 @@ Independent bounded mathematical review: natural normalizers, signed quotient ga
 **2026-09-14T01:43:20Z**
 
 Final validation and landing: uv run python tools/dashboard.py --run-suite passed exactly once after the final code edit: 2,329 passed, 41 deselected, four dependency deprecation warnings, 1,218.79 seconds pytest time. The full 1,560-second quiet wait was honored without process/log polling. The dashboard refreshed at ~/agent-share/cffg-tests.html with 34 new tests; runtime history updated. Focused tests passed 91 before this run. No slow empirical or recovery runs were started. Closing under the positive mathematical outcome: D12 names the approximation and ordinary exterior contract; all six implementation dependencies and cff-ulbz are attached to cff-x0if. Next ready roots are cff-k6g5 (declarations) and cff-ffsg (local kernels); current/legacy learning migration remains mandatory in cff-czdq. The tree and dependency artifacts receive final checks before the stacked PR is published.
+
+**2026-09-14T01:44:19Z**
+
+Published stacked PR #142: https://github.com/engimatic-systems/cffg/pull/142 . Base is cff-iur0-regime-trajectory-derivation (PR #141), as requested. cff-ocxl is closed, all code/doc/ticket work is committed, the single final short-suite result is green, and the next implementation roots are cff-k6g5 and cff-ffsg. No remaining work in this derivation ticket; source-recovery qualification remains blocked on implementation and public composition.
