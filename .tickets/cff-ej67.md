@@ -147,3 +147,7 @@ Completed independent re-review at 07b18fd reports no findings; both P2 second-m
 **2026-09-14T08:43:06Z**
 
 Final combined short-suite gate PASSED at source head 40fd246 (numerical implementation 07b18fd): uv run python tools/dashboard.py --run-suite; 2489 passed, 41 deselected, 4 existing gym deprecation warnings in 3182.41s, exit 0. Log /tmp/cff-ffsg-short-suite.log; dashboard ~/agent-share/cffg-tests.html refreshed and runtime history recorded. The supervisor respected full 1560-second quiet wait windows and did not rerun an unchanged suite. Independent re-review is clear and the final targeted 25-test result is preserved above. This gate closes EJ67 together with the dependent local repairs and FFSG kernels. No required local work remains; complete joint solver reference/candidate/qualification are cff-j191/cff-y15d/cff-a3wz. No registered recovery fit has run.
+
+**2026-09-14T08:44:48Z**
+
+Published with the local-kernel stack in PR #143: https://github.com/engimatic-systems/cffg/pull/143. Final independent review and the combined 2489-pass short-suite gate are recorded above; this ticket is closed.

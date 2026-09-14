@@ -134,3 +134,7 @@ Completed independent re-review at 2b7fd93: no findings; underflow P2 cleared. O
 **2026-09-14T08:43:06Z**
 
 Final handoff: retained origins/displacements and compensated affine arithmetic are implemented and independently reviewed; prerequisite cff-ej67 now supplies retained covariance projection/quotient precision and aligned finite-moment guards. The combined final short suite at 40fd246 passed 2489 tests, 41 deselected, in 3182.41s (exit 0), through uv run python tools/dashboard.py --run-suite. Log /tmp/cff-ffsg-short-suite.log; dashboard and runtime history refreshed. Numerical source is 07b18fd; no subsequent numerical edits. Closing this local repair with its final gate; FFSG and then the separate independent joint reference/candidate/qualification chain may proceed. Fixed origins are metadata, and covariance low words are derived; neither belongs in the solver unknown vector. Full moderate-horizon iterative storage and recovery remain unqualified downstream.
+
+**2026-09-14T08:44:49Z**
+
+Published with the local-kernel stack in PR #143: https://github.com/engimatic-systems/cffg/pull/143. Final independent review and the combined 2489-pass short-suite gate are recorded above; this ticket is closed.
