@@ -1,7 +1,7 @@
 ---
 id: cff-y15d
 status: in_progress
-deps: [cff-j191, cff-ffsg]
+deps: [cff-j191, cff-ffsg, cff-8ois]
 links: []
 created: 2026-09-14T04:40:24Z
 type: task
@@ -115,3 +115,7 @@ Bounded diagnosis planned before execution: at this exact held fixture, evaluate
 **2026-09-14T10:42:12Z**
 
 Prospective policy mechanism checks (held coordinates only, before execution): coupled_t2 independent one-sweep coordinate; one trial with first packed source precision direction -1e6 must reject improper belief and retain accepted point; one trial at xi=0 with auxiliary direction -1 must reject the zero boundary fraction and retain accepted point. One bounded complete-residual CGLS subproblem at the same held point checks finite N/M storage without an outer solve. Existing full candidate status variants and all numerical thresholds remain unchanged.
+
+**2026-09-14T10:56:45Z**
+
+Independent diagnosis completed before candidate execution: analytic/Decimal80 row-7 derivative -0.643678176516749 agrees with nativef32 JVP within1.074e-7 and promotedf64 within~1e-16. Complete independent finite differences at the frozen f64 baseline agree within4.855e-5. The original nativef32 stencil includes +0.00079045 truncation and -0.13237558 native value error. Native source outgoing precision misses the same-coordinate arithmetic budget by1.6321x; promotedf64 misses its stricter budget by5.0698x. This is a local value defect, not evidence to relax the derivative or value requirements. Decimal cancellation-free algebra is needed because generic NumPy inverse-then-subtract also loses precision at this strong cavity. Source/reproduction details and bounded repair criteria are in cff-8ois, now an explicit prerequisite. Y15D implementation is fully paused at85930ec with drafts preserved; no candidate optimizer has run. After qualified repair, prospectively record the derivative-oracle correction under unchanged tolerances, retain the failed native stencil evidence, rerun held gates, then proceed with frozen tiny candidate runs. A3WZ moderate nativef32 and X0IF gates remain untouched.
