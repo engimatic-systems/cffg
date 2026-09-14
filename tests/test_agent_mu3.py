@@ -78,6 +78,15 @@ def make_agent(
     )
 
 
+@pytest.fixture(scope="module")
+def functional_checkpoint(tmp_path_factory):
+    source = make_agent()
+    source.act()
+    path = tmp_path_factory.mktemp("functional-checkpoint") / "source.npz"
+    source.checkpoint(path)
+    return path
+
+
 def make_weight_collapse_agent(*, key=jax.random.PRNGKey(5)) -> RollingAgent:
     return RollingAgent(
         zero_goal_builder,
@@ -398,12 +407,9 @@ def test_agent_version_1_functional_checkpoint_migrates_runtime(tmp_path):
     ("samples", "min_ess", "refresh", "mode"),
 )
 def test_functional_checkpoint_configuration_mismatch_is_atomic(
-    tmp_path, mismatch
+    mismatch, functional_checkpoint
 ):
-    source = make_agent()
-    source.act()
-    path = tmp_path / f"functional-{mismatch}.npz"
-    source.checkpoint(path)
+    path = functional_checkpoint
 
     if mismatch == "samples":
         target = make_agent(samples=64)
@@ -451,13 +457,9 @@ def test_functional_checkpoint_configuration_mismatch_is_atomic(
     ),
 )
 def test_functional_checkpoint_runtime_schema_corruption_is_atomic(
-    tmp_path, corruption
+    tmp_path, corruption, functional_checkpoint
 ):
-    source = make_agent()
-    source.act()
-    good = tmp_path / "functional-good.npz"
-    source.checkpoint(good)
-    arrays = checkpoint_arrays(good)
+    arrays = checkpoint_arrays(functional_checkpoint)
 
     if corruption == "extra_array":
         arrays["mu3:future"] = np.asarray(1)

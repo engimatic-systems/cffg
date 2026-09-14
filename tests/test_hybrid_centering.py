@@ -326,7 +326,9 @@ def test_center_shapes_and_dtypes_are_validated_before_arithmetic():
 
 
 def test_retained_origins_are_polynomial_metadata_in_a_moderate_float32_chain():
-    params, sites, messages = chain_case(np.float32, [10000, -10000], time=100)
+    time, card, dim = 100, 2, 2
+    pairs = time - 1
+    params, sites, messages = chain_case(np.float32, [10000, -10000], time=time)
     result = jax.jit(hs.evaluate)(params, sites, messages)
     hn.raise_for_status(result.status)
     assert result.regions.covariance.shape == (99, 2, 2, 4, 4)
@@ -335,8 +337,22 @@ def test_retained_origins_are_polynomial_metadata_in_a_moderate_float32_chain():
     expected_centers = 100 * 2 * 2 + 4 * 99 * 2 * 2 + 99 * 2 * 2 * 4 + 100 * 2 * 2
     assert center_bytes == expected_centers * 4
     total_bytes = sum(x.nbytes for x in jax.tree.leaves((params, sites, messages, result)))
-    assert total_bytes < 100 * 2 ** 2 * 4 ** 2 * 4 * 5
-    for message in messages:
+    correction_bytes = sum(b.covariance_correction.nbytes for b in (result.regions, result.separators))
+    assert correction_bytes == (pairs * card ** 2 * (2 * dim) ** 2 + time * card * dim ** 2) * 4
+    # Preserve the former-field bound and count the retained inverse words separately.
+    assert total_bytes - correction_bytes < 100 * 2 ** 2 * 4 ** 2 * 4 * 5
+    natural_words = card * (1 + 2 * dim + dim ** 2) + 1
+    parameter_words = card * (card - 1) * (dim + 2) + card * (2 * dim ** 2 + dim)
+
+    def belief_words(labels, dimension):
+        return labels * (2 + 2 * dimension + 2 * dimension ** 2) + 2
+
+    expected_words = (pairs * (parameter_words + 4 * natural_words + belief_words(card ** 2, 2 * dim))
+                      + time * (natural_words + belief_words(card, dim)) + 5)
+    assert total_bytes == expected_words * 4
+    assert sites.precision_correction is None
+    for message in (*messages, *result.targets):
+        assert message.precision_correction is None
         assert len(message.arrays()) == 3
         assert sum(x.size for x in message.arrays()) == 99 * 2 * (1 + 2 + 2 ** 2)
 

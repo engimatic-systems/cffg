@@ -38,13 +38,13 @@ def assert_messages(actual, expected, dtype):
 def test_identical_stored_region_has_exact_scalar_reference_and_transformed_parity(dtype):
     region, left, right = stored_case(dtype)
     expected_precision = ref.scalar_precision(region.probability, region.displacement[..., :1],
-                                              region.covariance[..., :1, :1], left.precision)
+                                              ref.represented(region.covariance, region.correction)[..., :1, :1], left.precision)
     references = []
     for side, cavity in enumerate((left, right)):
         s = slice(side, side + 1)
         moments = ref.project(region.probability, region.displacement[..., s],
-                              region.covariance[..., s, s], 1 - side)
-        references.append(ref.quotient(moments, cavity.arrays()))
+                              ref.represented(region.covariance, region.correction)[..., s, s], 1 - side)
+        references.append(ref.quotient(moments, ref.natural(cavity)))
     batch = stack([region, region]), stack([left, left]), stack([right, right])
     baseline = both_messages(region, left, right)
     for evaluate, inputs in ((both_messages, (region, left, right)),
@@ -61,7 +61,7 @@ def test_identical_stored_region_has_exact_scalar_reference_and_transformed_pari
     projection = hn.marginal(region, 0)
     assert np.any(np.asarray(projection.covariance_correction) != 0)
     represented = ref.array(projection.covariance) + ref.array(projection.correction)
-    exact = ref.project(region.probability, region.displacement[..., :1], region.covariance[..., :1, :1], 1)[2]
+    exact = ref.project(region.probability, region.displacement[..., :1], ref.represented(region.covariance, region.correction)[..., :1, :1], 1)[2]
     error = np.asarray(abs(represented - exact), float)
     rounded_error = np.asarray(abs(ref.array(projection.covariance) - exact), float)
     assert np.all(error <= rounded_error + 4 * np.finfo(dtype).eps ** 2 * abs(np.asarray(exact, float)))
@@ -91,8 +91,8 @@ def test_offdiagonal_both_marginals_all_coefficients_and_canonical_match_stored_
     region, cavity = matrix_case(dtype)
     for side in (0, 1):
         s = slice(2 * side, 2 * side + 2)
-        moments = ref.project(region.probability, region.displacement[..., s], region.covariance[..., s, s], 1 - side)
-        expected = ref.quotient(moments, cavity.arrays())
+        moments = ref.project(region.probability, region.displacement[..., s], ref.represented(region.covariance, region.correction)[..., s, s], 1 - side)
+        expected = ref.quotient(moments, ref.natural(cavity))
         for evaluate in (lambda b, c: hn.quotient(hn.marginal(b, side), c),
                          jax.jit(lambda b, c: hn.quotient(hn.marginal(b, side), c))):
             assert_messages(evaluate(region, cavity), expected, dtype)
@@ -111,13 +111,12 @@ def test_adapters_divide_the_identical_stored_tilt_including_small_increments(dt
     gaussian = cavity._replace(constant=cavity.constant[0], linear=cavity.linear[0], precision=cavity.precision[0])
     for evaluate in (hn.gaussian_adapter, jax.jit(hn.gaussian_adapter)):
         belief, hybrid_message, ordinary_message = evaluate(hybrid, gaussian)
-        p, m, c = (ref.array(x) for x in (belief.probability, belief.displacement, belief.covariance))
+        p, m, c = ref.belief(belief)
         assert_messages(hybrid_message, ref.quotient((p, m, c), hybrid.arrays()), dtype)
         assert_messages(ordinary_message, ref.quotient(ref.project(p, m, c, 0), gaussian.arrays()), dtype)
     for evaluate in (hn.categorical_adapter, jax.jit(hn.categorical_adapter)):
         belief, message, categorical = evaluate(cavity, jnp.log(jnp.array([.2, .3, .5], dtype)))
-        expected = ref.quotient(tuple(ref.array(x) for x in
-                                     (belief.probability, belief.displacement, belief.covariance)), cavity.arrays())
+        expected = ref.quotient(ref.belief(belief), ref.natural(cavity))
         assert_messages(message, expected, dtype)
         assert np.isfinite(categorical).all()
 
@@ -160,7 +159,7 @@ def test_projected_quotient_derivative_agrees_with_independent_finite_difference
     for t in (-step, step):
         mean = ref.array(region.displacement) + t * ref.array(direction)
         moments = ref.project(region.probability, mean[..., :2], region.covariance[..., :2, :2], 1)
-        references.append(np.concatenate([x.ravel() for x in ref.quotient(moments, cavity.arrays())]))
+        references.append(np.concatenate([x.ravel() for x in ref.quotient(moments, ref.natural(cavity))]))
     expected = (references[1] - references[0]) / (2 * step)
     np.testing.assert_allclose(derivative, np.asarray(expected, float), atol=tolerance(dtype), rtol=tolerance(dtype))
     np.testing.assert_allclose(jax.jacrev(output)(jnp.array(0, dtype)), derivative, atol=tolerance(dtype), rtol=tolerance(dtype))
@@ -181,7 +180,7 @@ def test_float32_projection_counterexample_with_x64_disabled():
         assert_second_moment_boundary(np.float32)
         assert_small_mean_readout(np.float32)
         region, left, right = stored_case(np.float32)
-        expected = ref.scalar_precision(region.probability, region.displacement[..., :1], region.covariance[..., :1, :1], left.precision)
+        expected = ref.scalar_precision(region.probability, region.displacement[..., :1], ref.represented(region.covariance, region.correction)[..., :1, :1], left.precision)
         for evaluate in (both_messages, jax.jit(both_messages)):
             outputs = evaluate(region, left, right)
             for message in outputs:
@@ -206,7 +205,7 @@ def test_repeated_chain_targets_match_each_stored_region_with_unchanged_full_obj
             region = jax.tree.map(lambda x: x[time], result.regions)
             parameter = jax.tree.map(lambda x: x[time], params)
             stored = tuple(np.asarray(x, float) for x in
-                           (region.probability, region.displacement, region.covariance, region.log_normalizer))
+                           (region.probability, region.displacement, region.full_covariance, region.log_normalizer))
             factor = centered_ref.factor(parameter, region.center[:, 0, :2], region.center[0, :, 2:])
             references.append(-centered_ref.entropy(stored) - centered_ref.expectation(stored, factor))
             auxiliary = hs.auxiliary_statistics(region, parameter.weights, parameter.offsets, parameter.xi)
@@ -221,14 +220,14 @@ def test_repeated_chain_targets_match_each_stored_region_with_unchanged_full_obj
                     cavity += jax.tree.map(lambda x: x[time + 1], messages[0])
                 selection = slice(2 * side, 2 * side + 2)
                 moments = ref.project(region.probability, region.displacement[..., selection],
-                                      region.covariance[..., selection, selection], 1 - side)
+                                      ref.represented(region.covariance, region.correction)[..., selection, selection], 1 - side)
                 target = jax.tree.map(lambda x: x[time], result.targets[side])
-                assert_messages(target, ref.quotient(moments, cavity.arrays()), dtype)
+                assert_messages(target, ref.quotient(moments, ref.natural(cavity)), dtype)
         expected_fe = sum(references)
         for time in range(3):
             separator = jax.tree.map(lambda x: x[time], result.separators)
             stored = tuple(np.asarray(x, float) for x in
-                           (separator.probability, separator.displacement, separator.covariance, separator.log_normalizer))
+                           (separator.probability, separator.displacement, separator.full_covariance, separator.log_normalizer))
             if time == 1:
                 expected_fe += centered_ref.entropy(stored)
             site = jax.tree.map(lambda x: x[time], sites)
@@ -320,8 +319,8 @@ def test_small_increment_survives_three_composed_local_evaluations(dtype):
         for side, cavity in enumerate((left, right)):
             selection = slice(side, side + 1)
             moments = ref.project(region.probability, region.displacement[..., selection],
-                                  region.covariance[..., selection, selection], 1 - side)
-            assert_messages(messages[side], ref.quotient(moments, cavity.arrays()), dtype)
+                                  ref.represented(region.covariance, region.correction)[..., selection, selection], 1 - side)
+            assert_messages(messages[side], ref.quotient(moments, ref.natural(cavity)), dtype)
         free_energy = -region.entropy() - energy - region.expectation(hn.lift(left, right))
         assert free_energy == pytest.approx(-float(region.log_normalizer), abs=tolerance(dtype))
         left, right = (cavity + message for cavity, message in zip((left, right), messages))
@@ -544,12 +543,12 @@ def test_second_moment_readout_retains_forward_reverse_and_second_derivatives(dt
 
 
 def compiled_inventory(time=100, card=20, dim=10):
-    """Reproducible lowered allocation inventory, separate from iterative storage."""
+    """Lowered local allocation; time counts independent pair regions, not states."""
     shape = lambda s: jax.ShapeDtypeStruct(s, jnp.float32)
     region = hn.Belief(shape((time, card, card)), shape((time, card, card, 2*dim)),
                        shape((time, card, card, 2*dim, 2*dim)), shape((time, card, card)),
                        shape((time,)), jax.ShapeDtypeStruct((time,), jnp.int32),
-                       shape((time, card, card, 2*dim)))
+                       shape((time, card, card, 2*dim)), shape((time, card, card, 2*dim, 2*dim)))
     def projections(value):
         return tuple(jax.vmap(lambda b: hn.marginal(b, side))(value) for side in (0, 1))
     def incidences(value, left, right):
@@ -560,7 +559,7 @@ def compiled_inventory(time=100, card=20, dim=10):
     cavity = hn.Natural(shape((time, card)), shape((time, card, dim)), matrix,
                         jax.ShapeDtypeStruct((time,), jnp.int32), shape((time, card, dim)))
     grouped = hn.Natural(region.probability, region.displacement, region.covariance,
-                         region.status, region.center)
+                         region.status, region.center, region.covariance_correction)
     result = {"shape": {"T": time, "K": card, "d": dim}, "x64_enabled": jax.config.x64_enabled}
     for name, function, arguments in (("both_projections", projections, (region,)),
                                       ("both_projections_and_quotients", incidences, (region, cavity, cavity)),
@@ -577,11 +576,14 @@ def compiled_inventory(time=100, card=20, dim=10):
     result["retained_covariance_correction_bytes"] = 2 * time * card * dim * dim * 4
     result["matrix_accumulator_carry_bytes"] = 2 * time * card * dim * dim * 4
     result["product_high_and_low_bytes"] = 2 * time * card * dim * dim * 4
-    result["grouped_matrix_accumulator_carry_bytes"] = 0
+    result["grouped_matrix_accumulator_carry_bytes"] = 2 * time * card * card * (2 * dim) ** 2 * 4
     result["grouped_rounded_product_bytes"] = time * card * card * (2 * dim) ** 2 * 4
     result["grouped_product_remainder_bytes"] = 0
     result["grouped_integer_significand_limb_bytes"] = 2 * time * card * card * (2 * dim) ** 2 * 4
-    result["grouped_new_correction_bytes"] = result["message_new_correction_bytes"] = 0
+    result["grouped_new_correction_bytes"] = time * card * card * (2 * dim) ** 2 * 4
+    result["assembled_precision_correction_bytes"] = result["grouped_new_correction_bytes"]
+    result["separator_normalization_correction_bytes"] = time * card * dim * dim * 4
+    result["message_new_correction_bytes"] = 0
     return result
 
 

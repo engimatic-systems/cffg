@@ -5,6 +5,9 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import signal
+import subprocess
+import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -171,6 +174,114 @@ def test_run_suite_mode_runs_once_and_removes_its_temporary_report(
     assert '"wall_seconds": 123.25' in timing
     assert '"selection": "not slow"' in timing
     assert '"suggested_wait_seconds": 180' in timing
+
+
+@pytest.mark.parametrize("code,elapsed,result", [
+    (124, 1200.01, "timed_out"), (0, 1200.01, "over_budget"), (130, 12.0, "incomplete"),
+])
+def test_interrupted_or_over_budget_run_preserves_last_dashboard(
+    dashboard, monkeypatch, tmp_path, code, elapsed, result
+):
+    report = valid_report(tmp_path)
+    configure_publish(dashboard, monkeypatch, tmp_path, {"test_alpha.py", "test_beta.py"})
+    dashboard.OUT.write_text("previous dashboard")
+    monkeypatch.setattr(dashboard, "run_suite", lambda: (report, code, elapsed))
+    with pytest.raises(SystemExit, match="no passing result published"):
+        dashboard.main(["--run-suite"])
+    assert dashboard.OUT.read_text() == "previous dashboard"
+    assert report.exists()
+    state = json.loads(dashboard.RUNTIMES.read_text())
+    assert state["latest"]["result"] == result
+    assert state["latest"]["test_count"] is None
+    assert state["suggested_wait_seconds"] <= 1200
+
+
+def test_nonzero_pytest_exit_cannot_publish_green_report(dashboard, monkeypatch, tmp_path):
+    report = valid_report(tmp_path)
+    configure_publish(dashboard, monkeypatch, tmp_path, {"test_alpha.py", "test_beta.py"})
+    dashboard.OUT.write_text("previous dashboard")
+    monkeypatch.setattr(dashboard, "run_suite", lambda: (report, 1, 2.0))
+    with pytest.raises(SystemExit, match="pytest exited 1"):
+        dashboard.main(["--run-suite"])
+    assert dashboard.OUT.read_text() == "previous dashboard"
+    assert report.exists()
+    assert json.loads(dashboard.RUNTIMES.read_text())["latest"]["result"] == "failed"
+
+
+@pytest.mark.parametrize("cache_setting", [None, "", "explicit"])
+def test_suite_cache_is_fresh_and_removed_unless_caller_supplies_it(
+    dashboard, monkeypatch, tmp_path, cache_setting
+):
+    inherited = tmp_path / "caller-cache"
+    inherited.mkdir()
+    (inherited / "existing").touch()
+    if cache_setting is None:
+        monkeypatch.delenv("JAX_COMPILATION_CACHE_DIR", raising=False)
+    else:
+        monkeypatch.setenv("JAX_COMPILATION_CACHE_DIR", str(inherited) if cache_setting else "")
+    observations = tmp_path / "observations.json"
+    script = (
+        "import json,os\n"
+        "from pathlib import Path\n"
+        "cache=Path(os.environ['JAX_COMPILATION_CACHE_DIR'])\n"
+        "data={'cache':str(cache),'files':sorted(p.name for p in cache.iterdir())}\n"
+        "Path(os.environ['CFFG_TEST_TIMINGS']).write_text('retained timings')\n"
+        f"Path({str(observations)!r}).write_text(json.dumps(data))\n"
+        "(cache/'compiled').touch()\n"
+    )
+    original = subprocess.Popen
+
+    def start(_command, **kwargs):
+        return original([sys.executable, "-c", script], **kwargs)
+
+    monkeypatch.setattr(dashboard.subprocess, "Popen", start)
+    for _ in range(2):
+        report, code, elapsed = dashboard.run_suite()
+        try:
+            assert code == 0 and elapsed > 0
+            observed = json.loads(observations.read_text())
+            cache = Path(observed["cache"])
+            if cache_setting == "explicit":
+                assert cache == inherited and (cache / "existing").exists()
+            else:
+                assert observed["files"] == [] and not cache.exists()
+            assert report.with_suffix(".timings.jsonl").read_text() == "retained timings"
+        finally:
+            report.unlink(missing_ok=True)
+            report.with_suffix(".timings.jsonl").unlink(missing_ok=True)
+
+
+def test_deadline_stops_pytest_and_its_child_process(dashboard, monkeypatch, tmp_path):
+    child_file = tmp_path / "child.pid"
+    script = (
+        "import subprocess,sys,time\n"
+        "from pathlib import Path\n"
+        "child=subprocess.Popen([sys.executable,'-c','import time;time.sleep(60)'])\n"
+        f"Path({str(child_file)!r}).write_text(str(child.pid))\n"
+        "time.sleep(60)\n"
+    )
+    original = subprocess.Popen
+
+    def start(_command, **kwargs):
+        return original([sys.executable, "-c", script], **kwargs)
+
+    monkeypatch.setattr(dashboard.subprocess, "Popen", start)
+    monkeypatch.setattr(dashboard, "SHORT_SUITE_SECONDS", 1.0)
+    report, code, elapsed = dashboard.run_suite()
+    monkeypatch.setattr(dashboard.subprocess, "Popen", original)
+    try:
+        assert code == 124
+        assert elapsed < 5.0
+        child = int(child_file.read_text())
+        state = subprocess.run(["ps", "-p", str(child), "-o", "stat="], capture_output=True, text=True)
+        assert state.returncode != 0 or state.stdout.strip().startswith("Z")
+    finally:
+        report.unlink(missing_ok=True)
+        if child_file.exists():
+            try:
+                os.kill(int(child_file.read_text()), signal.SIGKILL)
+            except ProcessLookupError:
+                pass
 
 
 @pytest.mark.parametrize("version,history_key", [(1, "recent"), (2, "previous-3")])

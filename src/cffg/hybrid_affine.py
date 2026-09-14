@@ -141,6 +141,7 @@ def _rounded_product_jvp(primals, tangents):
 
 
 @jax.custom_jvp
+@jax.jit
 def affine(weights, values, *offsets):
     """Evaluate sum(weights*values, axis=-1) plus uncombined offsets.
 

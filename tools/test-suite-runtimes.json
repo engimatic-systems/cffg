@@ -1,38 +1,19 @@
 {
   "latest": {
-    "case_seconds": 3174.42,
-    "commit": "75ac1d2",
-    "completed_at": "2026-09-14T10:03:49.924286+00:00",
+    "budget_seconds": 1200,
+    "case_seconds": 3172.694,
+    "commit": "875013f",
+    "compilation_cache": "empty at start",
+    "completed_at": "2026-09-14T16:03:11.728104+00:00",
     "failed": 0,
     "pytest_exit_code": 0,
     "result": "passed",
     "selection": "not slow",
-    "test_count": 2537,
-    "wall_seconds": 3198.621
+    "test_count": 2564,
+    "wall_seconds": 1084.302,
+    "workers": 3
   },
   "previous-3": [
-    {
-      "case_seconds": 1216.97,
-      "commit": "40fa1fa",
-      "completed_at": "2026-09-14T01:37:04.218982+00:00",
-      "failed": 0,
-      "pytest_exit_code": 0,
-      "result": "passed",
-      "selection": "not slow",
-      "test_count": 2329,
-      "wall_seconds": 1233.077
-    },
-    {
-      "case_seconds": 3172.225,
-      "commit": "40fd246",
-      "completed_at": "2026-09-14T08:16:20.092581+00:00",
-      "failed": 0,
-      "pytest_exit_code": 0,
-      "result": "passed",
-      "selection": "not slow",
-      "test_count": 2489,
-      "wall_seconds": 3204.999
-    },
     {
       "case_seconds": 3174.42,
       "commit": "75ac1d2",
@@ -43,8 +24,34 @@
       "selection": "not slow",
       "test_count": 2537,
       "wall_seconds": 3198.621
+    },
+    {
+      "budget_seconds": 1200,
+      "case_seconds": null,
+      "commit": "d6852c3",
+      "completed_at": "2026-09-14T15:34:28.892932+00:00",
+      "failed": null,
+      "pytest_exit_code": 124,
+      "result": "timed_out",
+      "selection": "not slow",
+      "test_count": null,
+      "wall_seconds": 1200.052
+    },
+    {
+      "budget_seconds": 1200,
+      "case_seconds": 3172.694,
+      "commit": "875013f",
+      "compilation_cache": "empty at start",
+      "completed_at": "2026-09-14T16:03:11.728104+00:00",
+      "failed": 0,
+      "pytest_exit_code": 0,
+      "result": "passed",
+      "selection": "not slow",
+      "test_count": 2564,
+      "wall_seconds": 1084.302,
+      "workers": 3
     }
   ],
   "schema_version": 2,
-  "suggested_wait_seconds": 4020
+  "suggested_wait_seconds": 1200
 }

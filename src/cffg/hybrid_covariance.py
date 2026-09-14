@@ -22,7 +22,72 @@ def symmetric(matrix):
     return jnp.where(indices[:, None] <= indices[None, :], matrix, matrix.swapaxes(-1, -2))
 
 
+@jax.jit
+def resolved(base, correction):
+    """Certify the original spectral resolution of a represented matrix.
+
+    Compensated eigensystem residuals bound the high-word eigenvalues; Weyl's
+    inequality adds the low-word norm. Overlapping intervals are unresolved,
+    not evidence of an improper matrix. This predicate has no differential.
+    """
+    base, correction = jax.lax.stop_gradient((base, correction))
+    dim = base.shape[-1]
+    eps = jnp.finfo(base.dtype).eps
+    identity = jnp.eye(dim, dtype=base.dtype)
+    # Exact power-of-two scaling keeps error bounds normal across physical units.
+    exponent = jnp.frexp(jnp.max(abs(base), axis=(-2, -1)))[1]
+    scale = jnp.ldexp(jnp.ones_like(exponent, dtype=base.dtype), exponent - 1)
+    normalized = tuple(word / scale[..., None, None] for word in (base, correction))
+    retained = jnp.ones(base.shape[:-2], dtype=bool)
+    for original, word in zip((base, correction), normalized):
+        retained &= jnp.all((original == 0) | (word != 0), axis=(-2, -1))
+    base, correction = normalized
+
+    def up(value):
+        return jnp.where(value == 0, value, jnp.nextafter(value, jnp.inf))
+
+    def down(value):
+        return jnp.nextafter(value, -jnp.inf)
+
+    gamma = up((dim * eps) / down(jnp.asarray(1 - dim * eps, base.dtype)))
+
+    def positive_product(left, right):
+        value = jnp.matmul(left, right, precision=jax.lax.Precision.HIGHEST)
+        return up(value / down(1 - gamma))
+
+    def norm_bound(value):
+        rows = up(value.sum(axis=-1) / down(1 - gamma)).max(axis=-1)
+        columns = up(value.sum(axis=-2) / down(1 - gamma)).max(axis=-1)
+        return up(up(jnp.sqrt(rows)) * up(jnp.sqrt(columns)))
+
+    eigenvalues, vectors = jnp.linalg.eigh(base)
+    high, low = _two_product(vectors, eigenvalues[..., None, :])
+    residual = product(base, vectors, -high, -low)
+    gram = product(vectors.swapaxes(-1, -2), vectors, -identity)
+    absolute_vectors = abs(vectors)
+    scale = up(positive_product(abs(base), absolute_vectors)
+               + up(absolute_vectors * abs(eigenvalues[..., None, :])))
+    gram_scale = up(positive_product(absolute_vectors.swapaxes(-1, -2), absolute_vectors) + identity)
+    # Dot2 accumulation error: eps*abs(result) + gamma_n^2*sum(abs(terms)).
+    # n includes both product words, additive offsets and final accumulation.
+    count = 4 * dim + 16
+    accumulation = up((count * eps) / down(jnp.asarray(1 - count * eps, base.dtype)))
+    rounding = up(accumulation * accumulation)
+    error = norm_bound(up(abs(residual) / down(jnp.asarray(1 - eps, base.dtype)) + up(rounding * scale)))
+    orthogonality = norm_bound(up(abs(gram) / down(jnp.asarray(1 - eps, base.dtype)) + up(rounding * gram_scale)))
+    # Bauer-Fike: ||Q||*||Q^-1||^2*||AQ-Q Lambda|| bounds eigenvalue error.
+    denominator = down(1 - orthogonality)
+    factor = up(up(jnp.sqrt(up(1 + orthogonality))) / jnp.where(denominator > 0, denominator, 1))
+    uncertainty = up(up(factor * error) + norm_bound(abs(correction)))
+    lower = down(eigenvalues[..., 0] - uncertainty)
+    upper = up(jnp.max(abs(eigenvalues), axis=-1) + uncertainty)
+    threshold = up(32 * dim * eps * upper)
+    finite = jnp.isfinite(lower) & jnp.isfinite(upper) & jnp.isfinite(orthogonality)
+    return retained & finite & (denominator > 0) & (lower > threshold)
+
+
 @jax.custom_jvp
+@jax.jit
 def product(left, right, *offsets):
     """Compensated matrix product plus separately supplied matrix offsets."""
     shape = jnp.broadcast_shapes(left.shape[:-2], right.shape[:-2])
@@ -52,10 +117,10 @@ def _product_jvp(primals, tangents):
     return product(left, right, *offsets), tangent
 
 
-def combine(base, increment):
+def combine(base, increment, *corrections):
     """Round base+increment once and retain its signed rounding remainder."""
-    high = affine(jnp.ones_like(base)[..., None], increment[..., None], base)
-    low = affine(jnp.ones_like(base)[..., None], increment[..., None], base, -high)
+    high = affine(jnp.ones_like(base)[..., None], increment[..., None], base, *corrections)
+    low = affine(jnp.ones_like(base)[..., None], increment[..., None], base, *corrections, -high)
     return high, low
 
 
@@ -82,6 +147,7 @@ def _refined_solve(base, correction, rhs):
     return jnp.where(accepted[..., None, None], value, jnp.nan)
 
 
+@jax.jit
 def solve(base, correction, rhs):
     """Solve the represented covariance with one compensated refinement.
 
@@ -99,6 +165,41 @@ def solve(base, correction, rhs):
 
 
 @jax.custom_jvp
+@jax.jit
+def inverse(base, correction):
+    """Retain inverse rounding information before a strong-cavity quotient.
+
+    Solve the compensated inverse residual for its low word. Both returned
+    words represent the same inverse; the high word carries its mathematical
+    differential and the derived remainder carries zero differential.
+    """
+    eye = jnp.broadcast_to(jnp.eye(base.shape[-1], dtype=base.dtype), base.shape)
+    chol = jnp.linalg.cholesky(base)
+    high = symmetric(jax.scipy.linalg.cho_solve((chol, True), eye))
+    low = symmetric(jax.scipy.linalg.cho_solve(
+        (chol, True), residual(base, correction, high, eye)))
+    high, low = (symmetric(word) for word in combine(high, low))
+    remainder = product(-base, high, product(-correction, high),
+                        product(-base, low), product(-correction, low), eye)
+    scale = abs(eye) + abs(base) @ abs(high) + abs(correction) @ abs(high)
+    # A once-rounded inverse cannot certify the low bits used by a quotient.
+    allowance = 64 * base.shape[-1] * jnp.finfo(base.dtype).eps ** 2 * scale
+    resolved = jnp.all(jnp.isfinite(remainder) & jnp.isfinite(scale)
+                       & (abs(remainder) <= allowance), axis=(-2, -1))
+    return tuple(jnp.where(resolved[..., None, None], word, jnp.nan) for word in (high, low))
+
+
+@inverse.defjvp
+def _inverse_jvp(primals, tangents):
+    base, correction = primals
+    db, dc = tangents
+    high, low = inverse(base, correction)
+    derivative = -solve(base, correction, solve(base, correction, db + dc).swapaxes(-1, -2))
+    return (high, low), (symmetric(derivative), jnp.zeros_like(low))
+
+
+@jax.custom_jvp
+@jax.jit
 def logdet(base, correction):
     """logdet(base+correction), preserving the small logdet correction."""
     chol = jnp.linalg.cholesky(base)

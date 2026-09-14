@@ -865,17 +865,33 @@ from physical Gaussian sites or declared initialization before a solve. The
 Gaussian constructor retains full log masses and normalizers; transition
 construction translates original recurrence offsets and affine biases before
 expansion. Beliefs keep mean displacements through projections, quotients,
-ordinary adapters and repeated evaluations. Projected beliefs additionally
-retain one low covariance matrix beside the rounded covariance. Both words
+ordinary adapters and repeated evaluations. Local natural sums retain one
+derived precision remainder before Gaussian normalization. Normalized and
+projected beliefs retain one low covariance matrix beside the rounded covariance;
+a compensated inverse residual preserves the information before projection. Both words
 reach source/destination and ordinary-adapter quotients through compensated
 matrix residuals and a refined local Cholesky solve (`hybrid_covariance.py`).
+Represented precision and covariance matrices also receive a conservative
+spectral interval check. It includes the low word without rounding it into
+the high matrix and reports unresolved intervals as `NONFINITE`; the original
+`32 d eps` resolution threshold is unchanged. The complete certificate is
+excluded from differentiation, including at repeated eigenvalues.
 Canonical normalization, entropy, moments and statistics consume the same
 represented covariance; D12.6 specifies its precise convention and derivatives.
-The low word is derived storage, excluded from stationary unknowns. Auxiliary learning statistics
+Both precision and covariance low words are derived storage, excluded from
+stationary unknowns. `Natural.arrays()` still contains only the three message
+coefficient arrays; outgoing quotients return ordinary rounded coefficients.
+Assembly, lift, rebasing, adapters, canonical conversion and expectations
+transport or consume optional precision remainders. Gaussian-site construction
+continues to define its stored precision as an input coordinate. Auxiliary learning statistics
 retain the same source origin and expose explicit physical-coordinate readouts.
 `hybrid_affine.py` supplies compensated same-dtype affine evaluation for
 non-binary coefficients; construction, auxiliary targets and owned energy use
 the same stored-input arithmetic, including with float32 and x64 disabled.
+Compensated affine and covariance kernels use stable JIT boundaries so repeated
+host calls reuse their compiled accumulation loops. Their custom mathematical
+derivatives remain outside those primal compilation boundaries; array values
+remain dynamic, and dtype, shape and batching still select compiled variants.
 Origins are metadata, excluded from message coefficient arrays and stationary
 unknowns. Materialized grouped copies remain within local polynomial storage.
 Already-expanded coefficients keep their stored meaning and cannot recover
