@@ -867,6 +867,9 @@ construction translates original recurrence offsets and affine biases before
 expansion. Beliefs keep mean displacements through projections, quotients,
 ordinary adapters and repeated evaluations. Auxiliary learning statistics
 retain the same source origin and expose explicit physical-coordinate readouts.
+`hybrid_affine.py` supplies compensated same-dtype affine evaluation for
+non-binary coefficients; construction, auxiliary targets and owned energy use
+the same stored-input arithmetic, including with float32 and x64 disabled.
 Origins are metadata, excluded from message coefficient arrays and stationary
 unknowns. Materialized grouped copies remain within local polynomial storage.
 Already-expanded coefficients keep their stored meaning and cannot recover

@@ -2816,6 +2816,20 @@ bias `A_j c_left_i+b_j-c_right_j` before quadratic expansion. The latter is
 pair-dependent only in coordinates; physical dynamics remains selected by
 destination. This is the same D12.2 factor, with the same complete normalizer.
 
+These affine coordinate changes use same-dtype compensated arithmetic in
+`hybrid_affine.py`. Rounding each product before cancellation is insufficient:
+the stored float32 coefficients `[6.7,1.3]`, origin `[10000,10000]`, and offset
+`-80000` have exact affine value `-0.002384185791015625`, not zero. Integer
+significands produce a rounded product and its exact remainder without relying
+on compiler fused multiply-add behavior. Compensated addition retains these
+remainders and receives each additive offset separately. The owned recurrence
+and channel energies apply the same operation to origins and displacements.
+The custom derivative is the ordinary derivative of the real affine expression.
+No float64 promotion supports the float32 path. Product/partial-sum overflow or
+subnormal product/remainder scaling reports non-finite failure; these cases
+receive no clamp. This bounded compensation does not promise exact arithmetic
+under arbitrary nested cancellation or remove the stated large-rebasing limit.
+
 Beliefs retain solved displacements `E[x-c_i]` through projection, covariance
 mixing, quotient reuse and ordinary adapters. The physical `mean` readout adds
 the origin once and can round a small displacement at a large world coordinate.
@@ -2972,6 +2986,10 @@ check repeated messages, complete local/chain objectives, every message block,
 xi and same-coordinate dual derivatives, learning-coordinate transforms,
 ordinary adapters, invalid origins and Gaussian inputs, transformed execution,
 and actual retained-origin storage in a 100-slice float32 local evaluation.
+`tests/test_hybrid_affine.py` adds exact rational stored-input references,
+non-binary recurrence and channel cancellation, exact product remainders,
+forward/reverse derivatives, host/JIT/vmap parity, and an x64-disabled float32
+consumer process running the complete local reproduction.
 
 For a stronger approximation falsifier, let adjacent reduced temporal factors be
 

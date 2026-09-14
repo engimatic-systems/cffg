@@ -12,6 +12,7 @@ from typing import NamedTuple
 import jax
 import jax.numpy as jnp
 
+from cffg.hybrid_affine import affine, centered_affine
 from cffg.hybrid_natural import (
     Belief, Natural, Status, coordinate_status, failure, gaussian_blocks,
     lift, marginal, normalize, quotient, rebase,
@@ -64,7 +65,7 @@ def recurrence_potential(weights, offsets, xi, *, center=None):
     if center is not None:
         if center.shape != (card, dim) or center.dtype != weights.dtype:
             raise ValueError("recurrence center shapes or dtypes disagree")
-        offsets = offsets + jnp.einsum("ild,id->il", weights, center)
+        offsets = affine(weights, center[:, None], offsets)
         origin = jnp.broadcast_to(center[:, None], (card, card, dim))
     finite = jnp.all(jnp.isfinite(weights)) & jnp.all(jnp.isfinite(offsets)) & jnp.all(jnp.isfinite(xi))
     status = failure(~finite, Status.NONFINITE) | failure(jnp.any(xi < 0), Status.INVALID)
@@ -109,8 +110,7 @@ def transition(weights, offsets, xi, matrix, bias, noise, *, channel="destinatio
     for center in (left_center, right_center):
         if center.shape != (card, dim) or center.dtype != weights.dtype:
             raise ValueError("transition center shapes or dtypes disagree")
-    centered_bias = (jnp.einsum("jab,ib->ija", matrix, left_center)
-                     + (bias[None] - right_center[None]))
+    centered_bias = affine(matrix[None], left_center[:, None, None], bias[None], -right_center[None])
     recurrence = recurrence_potential(weights, offsets, xi, center=left_center)
     finite = jnp.all(jnp.isfinite(matrix)) & jnp.all(jnp.isfinite(bias)) & jnp.all(jnp.isfinite(noise))
     symmetric = jnp.all(noise == noise.swapaxes(-1, -2))
@@ -245,8 +245,7 @@ def auxiliary_statistics(region, weights, offsets, xi):
     accumulated = at_risk(p[..., None, None] * moments)
     active = exposure > 0
     _, conditional_mean, conditional_covariance = _conditional_at_risk(p, mean, source.covariance)
-    centered_offset = offsets + jnp.einsum("ild,id->il", weights, center)
-    logit_mean = jnp.einsum("ild,ild->il", weights, conditional_mean) + centered_offset
+    logit_mean = centered_affine(weights, conditional_mean, center[:, None], offsets)
     logit_variance = jnp.einsum("ila,ilab,ilb->il", weights, conditional_covariance, weights)
     scale = jnp.einsum("ila,ilab,ilb->il", abs(weights), abs(conditional_covariance), abs(weights))
     # Only dtype-sized covariance-contraction roundoff may make variance negative.
@@ -282,20 +281,18 @@ def transition_expectation(region, parameters):
     auxiliary = auxiliary_statistics(region, weights, offsets, xi)
     source = source_region(region)
     mean = source.relative_mean(auxiliary.center[:, None])
-    centered_offset = offsets + jnp.einsum("ild,id->il", weights, auxiliary.center)
     _, risk_mean, _ = _conditional_at_risk(source.probability, mean, source.covariance)
-    success_mean = jnp.einsum("ild,ild->il", weights, mean[:, :-1]) + centered_offset
-    risk_logit = jnp.einsum("ild,ild->il", weights, risk_mean) + centered_offset
+    success_mean = centered_affine(weights, mean[:, :-1], auxiliary.center[:, None], offsets)
+    risk_logit = centered_affine(weights, risk_mean, auxiliary.center[:, None], offsets)
     linear = source.probability[:, :-1] * success_mean - auxiliary.exposure * risk_logit / 2
     recurrence = jnp.sum(linear + auxiliary.exposure *
                          (_jj_base_xi(xi) - pg_mean_xi(xi) * auxiliary.target / 2))
 
     card, _, dim = weights.shape
     active = region.probability > 0
-    centered_bias = (jnp.einsum("jab,ijb->ija", matrix, region.center[..., :dim])
-                     + (bias[None] - region.center[..., dim:]))
-    mean_residual = (region.displacement[..., dim:]
-                     - jnp.einsum("jab,ijb->ija", matrix, source.displacement) - centered_bias)
+    mean_residual = centered_affine(-matrix[None], source.displacement[..., None, :],
+                                    source.center[..., None, :], region.center[..., dim:],
+                                    region.displacement[..., dim:], -bias[None])
     covariance = jnp.where(active[..., None, None], region.covariance, jnp.eye(2 * dim, dtype=weights.dtype))
     covariance_root = jnp.linalg.cholesky(covariance)
     transform = jnp.concatenate((-matrix, jnp.broadcast_to(jnp.eye(dim, dtype=weights.dtype), matrix.shape)), axis=-1)

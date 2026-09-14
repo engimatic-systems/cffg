@@ -15,6 +15,8 @@ from typing import NamedTuple
 import jax
 import jax.numpy as jnp
 
+from cffg.hybrid_affine import affine
+
 
 class Status(IntFlag):
     OK = 0
@@ -157,10 +159,13 @@ def rebase(natural, center):
     if center is None and natural.center is None:
         return natural
     delta = result.origin - natural.origin
-    product = jnp.einsum("...ab,...b->...a", natural.precision, delta)
-    constant = natural.constant + jnp.einsum("...d,...d->...", delta, natural.linear - product / 2)
+    linear = affine(-natural.precision, delta[..., None, :], natural.linear)
+    midpoint = affine(-natural.precision / 2, delta[..., None, :], natural.linear)
+    absent = jnp.isneginf(natural.constant)
+    constant = affine(delta, midpoint, jnp.where(absent, 0, natural.constant))
+    constant = jnp.where(absent, -jnp.inf, constant)
     overflow = jnp.isfinite(natural.constant) & ~jnp.isfinite(constant)
-    result = Natural(jnp.where(overflow, jnp.nan, constant), natural.linear - product, natural.precision,
+    result = Natural(jnp.where(overflow, jnp.nan, constant), linear, natural.precision,
                      natural.status | failure(jnp.any(overflow), Status.NONFINITE), center)
     return result._replace(status=coordinate_status(result))
 
