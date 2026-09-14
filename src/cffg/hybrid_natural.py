@@ -259,6 +259,18 @@ def gaussian_blocks(matrix, active):
     return inverse, logdet, status
 
 
+def represented_status(matrix, correction, active, high_status):
+    """Unresolved spectral intervals fail independently of the high-word test."""
+    if correction is None:
+        return jnp.int32(0)
+    active = active & (high_status == 0)
+    finite = jnp.all(jnp.isfinite(matrix), axis=(-2, -1))
+    safe = jnp.where((active & finite)[..., None, None], matrix,
+                     jnp.eye(matrix.shape[-1], dtype=matrix.dtype))
+    low = jnp.where(active[..., None, None], correction, 0)
+    return failure(jnp.any(active & ~hc.resolved(safe, low)), Status.NONFINITE)
+
+
 def normalize(natural):
     """Exact Gaussian integration on a fixed label face, D12.2.
 
@@ -270,6 +282,7 @@ def normalize(natural):
     a, h, matrix = natural.arrays()
     active = ~jnp.isneginf(a)
     covariance, logdet, pd_status = gaussian_blocks(matrix, active)
+    pd_status |= represented_status(matrix, natural.precision_correction, active, pd_status)
     eye = jnp.broadcast_to(jnp.eye(h.shape[-1], dtype=h.dtype), matrix.shape)
     safe = jnp.where((active & (pd_status == 0))[..., None, None], matrix, eye)
     precision_low = jnp.where((active & (pd_status == 0))[..., None, None], natural.correction, 0)
@@ -322,6 +335,7 @@ def from_centered_moments(probability, displacement, covariance, center, *, cova
     mean = displacement
     active = probability > 0
     _, _, pd_status = gaussian_blocks(covariance, active)
+    pd_status |= represented_status(covariance, covariance_correction, active, pd_status)
     finite = (jnp.all(jnp.isfinite(probability)) & jnp.all(jnp.isfinite(mean))
               & jnp.all(jnp.isfinite(covariance)) & jnp.all(jnp.isfinite(center)))
     world_mean = center + mean
@@ -376,6 +390,7 @@ def canonical(belief):
     low_status = correction_status(covariance, belief.covariance_correction)
     active = p > 0
     _, _, pd_status = gaussian_blocks(covariance, active)
+    pd_status |= represented_status(covariance, belief.covariance_correction, active, pd_status)
     eye = jnp.broadcast_to(jnp.eye(mean.shape[-1], dtype=mean.dtype), covariance.shape)
     safe = jnp.where(active[..., None, None], covariance, eye)
     correction = jnp.where(active[..., None, None], belief.correction, 0)
@@ -416,6 +431,7 @@ def quotient(belief, cavity):
         raise ValueError("quotient shapes or dtypes disagree")
     active = belief.probability > 0
     _, _, pd_status = gaussian_blocks(belief.covariance, active)
+    pd_status |= represented_status(belief.covariance, belief.covariance_correction, active, pd_status)
     status = (jnp.asarray(belief.status, jnp.int32) | pd_status | coordinate_status(cavity)
               | correction_status(belief.covariance, belief.covariance_correction))
     status |= failure(jnp.any(active & ~jnp.isfinite(cavity.constant)), Status.SUPPORT_CHANGED)

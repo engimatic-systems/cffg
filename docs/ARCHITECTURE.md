@@ -871,6 +871,11 @@ projected beliefs retain one low covariance matrix beside the rounded covariance
 a compensated inverse residual preserves the information before projection. Both words
 reach source/destination and ordinary-adapter quotients through compensated
 matrix residuals and a refined local Cholesky solve (`hybrid_covariance.py`).
+Represented precision and covariance matrices also receive a conservative
+spectral interval check. It includes the low word without rounding it into
+the high matrix and reports unresolved intervals as `NONFINITE`; the original
+`32 d eps` resolution threshold is unchanged. The complete certificate is
+excluded from differentiation, including at repeated eigenvalues.
 Canonical normalization, entropy, moments and statistics consume the same
 represented covariance; D12.6 specifies its precise convention and derivatives.
 Both precision and covariance low words are derived storage, excluded from

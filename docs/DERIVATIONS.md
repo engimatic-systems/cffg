@@ -2874,6 +2874,45 @@ The high covariance word carries the mathematical differential
 `dC = -J^-1 dJ J^-1`, and the derived low word carries zero differential.
 Canonical conversion uses the same represented inverse convention.
 
+The numerical-resolution test must also apply to the represented matrix.
+Checking only `J_hi` can admit `J_hi+J_lo` below the unchanged strict threshold
+`tau = 32 d eps`: for float64, `J_hi=[[1,1-128 eps],[1-128 eps,1]]` and
+`J_lo=-16384 eps² I` have exact minimum eigenvalue minus threshold
+`-4.03896783473e-28`, although the high matrix passes. Ordinary natural
+addition produces those valid words. The matrix is positive definite but
+does not satisfy the existing numerical-resolution requirement.
+
+For a represented symmetric matrix `A=H+L`, the status check first scales both
+words by the same exact power of two. This keeps error bounds representable
+without changing any eigenvalue ratio. For the computed high-word eigensystem
+`Q,Lambda`, compensated products form `R=H Q-Q Lambda` and `G=Q^T Q-I`.
+Matrix-product error bounds include `eps*abs(result)` and
+`gamma_n²*sum(abs(terms))`, with `gamma_n=n eps/(1-n eps)` and
+`n=4d+16` covering the product words, offsets and compensation. Positive
+products and reductions bound their own rounding; scalar bounds round outward.
+The spectral-norm upper bound `sqrt(norm_1 norm_inf)` is used for these error
+matrices and the low word, not as a surrogate condition number for `A`.
+
+Let `r` and `g` bound the exact residual and orthogonality-error norms, and
+let `l` bound `||L||_2`. When `g<1`, the eigenvector matrix is invertible and
+Bauer-Fike gives high-matrix eigenvalue uncertainty
+`beta = sqrt(1+g)/(1-g) * r`. Weyl's inequality then gives
+
+    lambda_min(A) >= min(Lambda) - beta - l = lower,
+    ||A||_2 <= max(abs(Lambda)) + beta + l = upper.
+
+Only `lower > tau*upper` certifies the original resolution requirement.
+Overlapping intervals return `NONFINITE`, meaning numerically unresolved;
+they do not claim the matrix is mathematically improper. The existing
+high-word failure retains `IMPROPER`. This is conservative near a boundary,
+but does not replace spectral conditioning with a dimension-dependent matrix
+condition bound or increase `tau`. The same predicate covers precision
+normalization and covariance construction/canonical/quotient readers. Its
+inputs are stopped gradients: eigensystem degeneracy and outward rounding
+cannot enter the mathematical inverse JVP or Hessian. The boundary, ordinary
+addition, repeated-eigenvalue and dense condition-number controls live in
+`test_hybrid_precision.py`, including native float32 with x64 disabled.
+
 This preservation must begin before projection. In the exact stored-input
 scalar regression, source precision `10000`, float32 weight `6.7`, origin
 `10000`, offset `-67000` and xi zero give outgoing precision
@@ -2974,16 +3013,16 @@ logical sizes are not additional heap allocations.
 inventory from JAX lowering, without running a solver or recovery fit. On the
 measured CPU backend with x64 enabled and float32 data, both projections use
 134,560,400 compiled argument bytes, 3,553,728 output bytes (including the
-output tuple), and 234,874,216 temporary bytes. The complete input belief tree
+output tuple), and 240,946,984 temporary bytes. The complete input belief tree
 also contains unused log-probability/normalizer arrays: 134,720,800 bytes total.
 Returning both projections and their quotient messages uses 136,497,200
-argument / 5,490,608 output / 265,175,784 temporary bytes; the complete
+argument / 5,490,608 output / 276,441,064 temporary bytes; the complete
 input region and cavity trees total 136,657,600 bytes.
 At the same local message-matrix shape, the compensated product uses
 1,600,000 argument / 800,000 output / 4,400,136 temporary bytes, and the
 corrected solve uses 2,400,000 / 800,000 / 14,820,648 bytes. Grouped
 normalization, including its precision and covariance remainders, uses
-134,560,400 / 134,720,864 / 1,395,362,408 bytes, and the
+134,560,400 / 134,720,864 / 1,527,083,368 bytes, and the
 grouped second-moment readout uses 134,560,000 / 64,000,000 / 0 bytes:
 the latter fuses its work into the output allocation. All six
 measurements have zero input/output alias bytes. Arrays are dynamic lowering
@@ -2993,7 +3032,8 @@ carries, Cholesky and refinement temporaries; array dimensions remain within
 `O(T K² d²)` projection and `O(T K d²)` local solve storage. They do not
 measure the complete iterative buffers, which remain the cff-a3wz gate.
 The inverse repair raises normalization temporary storage from 131,200,984
-to 1,395,362,408 bytes at this inventory size. Its two floating accumulator
+to 1,395,362,408 bytes at this inventory size; the represented spectral
+certificate raises it further to 1,527,083,368 bytes. Its two floating accumulator
 words alone have 128,000,000 logical bytes. This cost must be included in the
 candidate's actual iteration-storage checkpoint; polynomial dimensions alone
 do not establish an acceptable working-memory requirement.

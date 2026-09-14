@@ -281,3 +281,110 @@ def test_inverse_derivatives_and_sparse_status_with_x64_disabled():
             assert np.isfinite(tiny.log_probability[1])
     ''')
     subprocess.run([sys.executable, "-c", program], check=True, capture_output=True, text=True)
+
+
+def resolution_cases(dtype, addition):
+    """Exact 2x2 eigenvalues distinguish strict failure from interval overlap."""
+    eps = np.finfo(dtype).eps
+    if addition:
+        high = np.array([[1, 1-128*eps], [1-128*eps, 1]], dtype)
+        low = -np.eye(2, dtype=dtype)*(16384*eps**2)
+        minimum = Decimal(float(high[0, 0]))+Decimal(float(low[0, 0]))-Decimal(float(high[0, 1]))
+        maximum = Decimal(float(high[0, 0]))+Decimal(float(low[0, 0]))+Decimal(float(high[0, 1]))
+    else:
+        above = np.nextafter(dtype(64*eps), dtype(np.inf))
+        high = np.diag(np.array([above, 1], dtype))
+        low = np.diag(np.array([-eps*above, eps], dtype))
+        minimum = Decimal(float(high[0, 0]))+Decimal(float(low[0, 0]))
+        maximum = Decimal(float(high[1, 1]))+Decimal(float(low[1, 1]))
+    assert minimum > 0
+    assert minimum-64*Decimal(float(eps))*maximum < 0
+    valid = np.diag(np.array([128*eps, 1], dtype))
+    repeated = np.eye(2, dtype=dtype)
+    return jnp.asarray(np.stack([high, valid, repeated])), jnp.asarray(np.stack([
+        low, np.zeros_like(low), repeated*(eps/4)]))
+
+
+@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+def test_represented_spectral_boundary_is_not_certified_from_its_high_word(dtype):
+    with localcontext() as context:
+        context.prec = 100
+        for addition in (False, True):
+            high, low = resolution_cases(dtype, addition)
+            def normalize(matrix, correction):
+                potential = hn.Natural(jnp.zeros((), dtype), jnp.zeros(2, dtype), matrix)
+                if addition:
+                    potential += potential._replace(precision=correction)
+                else:
+                    potential = potential._replace(precision_correction=correction)
+                hn_low_status = hn.correction_status(potential.precision, potential.correction)
+                belief = hn.normalize(potential)
+                return belief.status, belief.log_normalizer, hn_low_status
+            for call in (normalize, jax.jit(normalize)):
+                results = [call(h, l) for h, l in zip(high, low)]
+                assert int(results[0][0]) & hn.Status.NONFINITE
+                assert not int(results[0][0]) & hn.Status.IMPROPER
+                assert np.isnan(results[0][1])
+                assert all(int(r[2]) == 0 for r in results)
+                assert all(int(r[0]) == 0 and np.isfinite(r[1]) for r in results[1:])
+            for call in (jax.vmap(normalize), jax.jit(jax.vmap(normalize))):
+                status, logz, low_status = call(high, low)
+                np.testing.assert_array_equal(status, [hn.Status.NONFINITE, 0, 0])
+                assert status.dtype == jnp.int32 and np.isnan(logz[0])
+                np.testing.assert_array_equal(low_status, 0)
+    # A dense matrix with twice the required spectral margin stays resolvable.
+    eps = np.finfo(dtype).eps
+    dense = jnp.asarray([[1, 1-256*eps], [1-256*eps, 1]], dtype)
+    assert bool(jax.jit(hc.resolved)(dense, -jnp.eye(2, dtype=dtype)*(16384*eps**2)))
+
+
+@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+def test_resolution_certificate_preserves_declared_dense_condition_controls(dtype):
+    rng = np.random.default_rng(8117)
+    q, _ = np.linalg.qr(rng.normal(size=(4, 4)))
+    u = rng.normal(size=(4, 4))
+    increment = ((u+u.T)*.006).astype(dtype)
+    matrices = np.array([q @ np.diag(np.geomspace(10000/c, 10000, 4)) @ q.T
+                         for c in (3, 30, 300, 3000)], dtype)
+    matrices = (matrices+matrices.swapaxes(-1, -2))/2
+    def round_trip(matrix):
+        cavity = hn.Natural(jnp.zeros((), dtype), jnp.zeros(4, dtype), matrix)
+        belief = hn.normalize(cavity+cavity._replace(precision=jnp.asarray(increment)))
+        return hn.quotient(belief, cavity)
+    result = jax.jit(jax.vmap(round_trip))(jnp.asarray(matrices))
+    hn.raise_for_status(result.status)
+    np.testing.assert_allclose(result.precision, np.broadcast_to(increment, matrices.shape),
+                               atol=tolerance(dtype), rtol=tolerance(dtype))
+
+
+@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+def test_repeated_eigenvalue_status_does_not_enter_inverse_derivatives(dtype):
+    eye = jnp.eye(2, dtype=dtype)
+    low = eye*(np.finfo(dtype).eps/4)
+    def covariance(shift):
+        potential = hn.Natural(jnp.zeros((), dtype), jnp.zeros(2, dtype), eye*(1+shift),
+                               precision_correction=low)
+        return hn.normalize(potential).full_covariance.sum()
+    precision = 1+float(low[0, 0])
+    for differentiate, expected in ((jax.grad, -2/precision**2),
+                                    (lambda f: jax.grad(jax.grad(f)), 4/precision**3)):
+        np.testing.assert_allclose(jax.jit(differentiate(covariance))(jnp.zeros((), dtype)),
+                                   expected, atol=0, rtol=tolerance(dtype))
+
+
+def test_represented_resolution_boundary_with_x64_disabled():
+    program = textwrap.dedent('''
+        import sys
+        sys.path.insert(0, 'tests')
+        import jax
+        jax.config.update('jax_enable_x64', False)
+        import numpy as np
+        from test_hybrid_precision import (
+            test_represented_spectral_boundary_is_not_certified_from_its_high_word,
+            test_resolution_certificate_preserves_declared_dense_condition_controls,
+            test_repeated_eigenvalue_status_does_not_enter_inverse_derivatives)
+        test_represented_spectral_boundary_is_not_certified_from_its_high_word(np.float32)
+        test_resolution_certificate_preserves_declared_dense_condition_controls(np.float32)
+        test_repeated_eigenvalue_status_does_not_enter_inverse_derivatives(np.float32)
+    ''')
+    subprocess.run([sys.executable, "-c", program], check=True, capture_output=True, text=True)

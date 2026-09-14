@@ -344,8 +344,10 @@ experiment solves held auxiliaries and requires proper forward initialization;
 production still needs the joint message/auxiliary solver and execution gate.
 The local JAX evaluator retains precision and covariance rounding remainders
 to preserve small outgoing messages under strong cavities. Unsupported or
-unresolved compensated arithmetic fails explicitly. At T=100, K=20, d=10,
-float32 grouped normalization has about 1.40 GB of compiled temporary storage
+unresolved compensated arithmetic fails explicitly. A conservative spectral
+interval can remain unresolved even when the exact matrix narrowly satisfies
+the existing resolution threshold. At T=100, K=20, d=10,
+float32 grouped normalization has about 1.53 GB of compiled temporary storage
 on the measured CPU backend; the complete iteration's memory and numerical
 qualification remain pending. D12.6 records the reproducible local inventory.
 
