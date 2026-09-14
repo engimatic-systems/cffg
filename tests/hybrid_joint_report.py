@@ -142,6 +142,15 @@ def validate_counters(record, budgets):
     require(counts['none'] == 0 and sum(counts.values()) == rejected, 'rejection histogram disagrees with counter')
     last = record['last_rejection']
     require(last in REJECTIONS and (last == 'none' or counts[last] > 0), 'last rejection disagrees with histogram')
+    # The final successful search owns this field; each search resets it.
+    successful_rejections = rejected - fallback * budgets['trials']
+    if iterations == 0:
+        require(last == 'none', 'zero-update state cannot report a last rejection')
+    elif last == 'none':
+        require(successful_rejections <= (iterations - 1) * (budgets['trials'] - 1),
+                'last rejection contradicts successful search totals')
+    else:
+        require(successful_rejections >= 1, 'last rejection contradicts successful search totals')
     if record['status'] == 'diverged' or budgets['outer'] == 0:
         require((iterations, evaluations, rejected, linear, fallback) == (0, 2, 0, 0, 0),
                 'zero-step execution counters disagree with initialization/certification')

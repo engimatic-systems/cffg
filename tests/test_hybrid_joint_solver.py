@@ -399,3 +399,24 @@ def test_saved_certified_initializer_cannot_claim_updates(checkpoint_report, che
     record.update(iterations=1, evaluations=3)
     with pytest.raises(ValueError, match='certified initializer cannot have accepted updates'):
         validate_saved_report(report, *checkpoint_context)
+
+
+@pytest.mark.parametrize('fallback,rejected,last,valid', [
+    (1, 24, 'numerical', False), (0, 115, 'none', False),
+    (1, 24, 'none', True), (1, 25, 'numerical', True),
+    (0, 92, 'none', True), (0, 93, 'none', False), (0, 115, 'numerical', True),
+    (1, 116, 'none', True), (1, 117, 'none', False),
+])
+def test_saved_last_rejection_obeys_successful_search_endpoints(checkpoint_report, checkpoint_context,
+                                                               fallback, rejected, last, valid):
+    report = deepcopy(checkpoint_report)
+    record = next(r for r in report['records'] if r['case'] == 'coupled_t3')
+    # Synthetic aggregate counters; no optimization trajectory is asserted.
+    record.update(iterations=5, gauss_newton_steps=fallback, linear_iterations=fallback,
+                  rejected_trials=rejected, evaluations=2 + 5 + rejected, last_rejection=last)
+    record['rejection_counts']['numerical'] = rejected
+    if valid:
+        assert len(validate_saved_report(report, *checkpoint_context)) == 40
+    else:
+        with pytest.raises(ValueError, match='last rejection contradicts successful search totals'):
+            validate_saved_report(report, *checkpoint_context)

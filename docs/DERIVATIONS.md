@@ -3179,6 +3179,11 @@ Every proper zero-update result must retain its declared initializer, including
 the starting xi and native-coordinate perturbation. An already-certified
 initializer cannot enter the update loop. Each accepted fallback requires at
 least one linear iteration, since a zero CGLS step cannot move the coordinate.
+`last_rejection` belongs to the final successful search, since each search
+resets it. For `m` accepted updates, `g` fallbacks, trial cap `B` and total
+rejections `R`, successful searches contain `s=R-g*B` rejections. A non-`none`
+last rejection requires `s>=1`; `none` requires `s<=(m-1)*(B-1)`, so all such
+rejections fit before the final search. Zero updates require `none` explicitly.
 These checks establish initial-state and counter consistency; they do not prove
 an unrecorded optimization trajectory.
 Report schema 2 declares `all_nan_after_invalid_message` and binds it to the
