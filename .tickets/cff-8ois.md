@@ -1,6 +1,6 @@
 ---
 id: cff-8ois
-status: in_progress
+status: closed
 deps: [cff-ej67, cff-j191, cff-3uq9]
 links: []
 created: 2026-09-14T10:54:57Z
@@ -161,3 +161,9 @@ Acceptance criterion 6 of this repair explicitly permits and requires measuremen
 **2026-09-14T15:42:23Z**
 
 The corrected moderate storage regression passes in 21.94 seconds. It keeps the original bound for former fields, asserts 28,544 exact new covariance-remainder bytes, and asserts the complete 128,124-byte raw total from independent parameter/natural/belief/status formulas. It also checks both input and output message banks contain exactly the original three coefficient arrays and no precision remainders. Command: uv run pytest -q tests/test_hybrid_centering.py::test_retained_origins_are_polynomial_metadata_in_a_moderate_float32_chain -x; log /tmp/cff-8ois-moderate-storage-accounting.log. This fixes accounting for the already-reviewed representation without changing production arithmetic or any solver/recovery acceptance requirement.
+
+**2026-09-14T16:06:35Z**
+
+Final qualification is complete at 875013f with the performance prerequisite: the complete default suite passed 2,564 tests, zero failures, in 1,084.302 measured wall seconds through the enforced 1,200-second runner. Log /tmp/cff-3uq9-short-suite-2.log. Prior independent numerical/surface reviews remain clear; final changes are stable compilation boundaries and explicitly corrected storage accounting, covered by the passing full gate and focused affine/precision/derivative/status checks. Numerical equations, dtype-scaled certificates and original arithmetic tolerances are unchanged. Closing this repair with cff-3uq9; publish both logical changes as separate commits in the same qualified stack entry because the runtime work depends on these unpublished precision kernels.
+
+Y15D handoff: merge this qualified tree before resuming the held-coordinate derivative checks. First retry the original native-float32 finite-difference stencil unchanged: the repaired values may now make it pass, and no derivative-oracle or tolerance replacement is preauthorized. Independent exact-input/Decimal derivative evidence remains in the frozen strong-cavity fixture. Then follow the existing frozen tiny-candidate specification. Quotient unknowns still contain only a/h/J and active xi; precision/covariance correction words remain derived storage. Final local compiled allocation artifact is /tmp/cff-3uq9-compiled-inventory.json at the unchanged final numerical source, with 1,591,083,368 grouped-normalization temporary bytes at 100 independent pair regions, K=20,d=10,float32/x64 enabled. This is not a 100-state complete-iteration measurement. A3WZ still owns all moderate native-float32 convergence, initialization, FE/learning and actual complete-iteration storage requirements; registered recovery remains untouched.

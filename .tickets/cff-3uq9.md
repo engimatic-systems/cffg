@@ -1,6 +1,6 @@
 ---
 id: cff-3uq9
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-09-14T14:38:15Z
@@ -109,3 +109,11 @@ Parallel execution now uses pytest-xdist 3.8.0 with exactly three workers, loadf
 Validation after the worker/cache changes: 51 selected tests passed in 11.20 seconds across runner tests, SVG/bundle artifacts, compensated arithmetic and repeated-eigenvalue derivatives. The JUnit parser accepted all 51 cases and timing records contained exactly 51 distinct calls. Nine SVGs and the representative CFFGZ bundle survived concurrent execution. The initially empty cache contained 11 files and 3,229,345 bytes, including its lock. Log /tmp/cff-3uq9-parallel-final.log; report /tmp/cff-3uq9-parallel-final.xml; timings /tmp/cff-3uq9-parallel-final.jsonl. A final metadata-only edit added worker/cache attribution; all 21 runner tests then passed under three workers in 1.91 seconds, with one timing record per call and the failure-text hook explicitly checked. Source/cache/deadline/selection behavior is ready for the second full budgeted run.
 
 The storage assertion failure is resolved in 5fdeb89 under cff-8ois by independently accounting for the already-required covariance remainder fields. Numerical representation is unchanged from the reviewed repair and final six JIT boundaries. No numerical tolerance, D12 approximation, supported-model scope, A3WZ solver limit, or registered recovery criterion changed.
+
+**2026-09-14T16:06:35Z**
+
+Completed directly by root as Cooper requested. Final default short suite at 875013f passed all 2,564 tests with zero failures in 1,084.302 measured wall seconds (18m04s; pytest 1,083.49s), within the unchanged 1,200-second hard deadline. Command: uv run python tools/dashboard.py --run-suite. Three file-grouped workers used the runner's initially empty, locked 1-GiB temporary executable cache. Worker-reported test times were 1,050.500 / 1,070.901 / 1,051.499 seconds; the live record has exactly 2,564 unique calls, each executed once. The previous complete run was 3,198.621 wall seconds (53m19s), so measured wall time fell by 66.1% despite 27 additional tests. The 67-minute number was the former wait recommendation, not actual pytest duration.
+
+Evidence: /tmp/cff-3uq9-short-suite-2.log; /tmp/cff-3uq9-passing-suite-summary.json; /var/folders/kg/pmjxhgy506n699dj2g96f2wh0000gn/T/tmpotc83fez.timings.jsonl; tools/test-suite-runtimes.json and ~/agent-share/cffg-tests.html (2,564 tests, zero failing, 30 diagrams in 23 galleries). The 12 warnings are the existing gym/distutils deprecations repeated across workers. Cache artifacts were removed. No test selection, slow markers, numerical tolerance, solver scope, approximation contract or recovery threshold changed. Deadline/failure interpretation, warm-versus-cold cache disclosure and raw storage accounting are explicit. Isolated focused tests were never presented as a full gate.
+
+This passing source qualifies the pending 8OIS repair and allows the sequential D12 chain to resume. Subsequent edits here only record results, close tickets or prepare the PR; they do not justify rerunning an unchanged full suite. The 116-second margin is measured on this 12-core, 64-GiB machine. Future overruns remain failed gates and require measured performance fixes rather than extending the budget.
