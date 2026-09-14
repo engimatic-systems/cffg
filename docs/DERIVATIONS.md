@@ -3127,6 +3127,42 @@ to this reference. Float32 iteration, moderate-case storage and production
 activation remain downstream qualification work. The following fixed-auxiliary
 approximation ceilings and temporal falsifier are unchanged.
 
+The unbound candidate coordinate is `cffg.hybrid_joint.Coordinate.from_sites`.
+It fixes support and origins on the host, gathers active message constants
+after removing the common gauge, linear coefficients, independent symmetric
+precision entries, and active squared auxiliaries. Inactive native constants
+are `-inf` support metadata, whereas the independent reference stores zero;
+`tests/hybrid_joint_candidate.py` maps that storage convention explicitly.
+For full support, with `L=T-1` and `s=d*(d+1)/2`, the unknown count is
+`N=2*L*(K*(1+d+s)-1)+L*K*(K-1)`. Retaining every active label-mass,
+conditional-mean and independent covariance equation gives the rectangular
+residual length `M=N+2*L*K*(1+d+s)`.
+
+`hybrid_joint.evaluate` returns signed residual blocks, their dynamic scales,
+separate maximum certificates, both objective expressions and centered learning
+statistics. Covariance differences subtract the retained high and low words
+before rounding. `hybrid_joint.linearize` freezes residual and coordinate
+scales at a proper accepted point; its transpose reuses the same linearized
+JVP. `hybrid_joint_solver.solve` uses bounded backtracking and a matrix-free
+CGLS Gauss-Newton fallback. Maximum certificates are terminal tests, never
+the differentiated residual. The final evaluation owns all reported messages,
+xi, beliefs, energies and learning increments; an unchanged evaluation can
+establish energy stability only after every other certificate passes.
+
+`tests/fixtures/hybrid-joint-candidate-spec.json` freezes candidate starts,
+strategy, caps, arithmetic/stopping accounting and reporting before solves.
+`test_hybrid_joint_coordinate.py` checks complete held-coordinate derivatives
+and transpose identities before checkpoint execution. The candidate report
+command is `uv run python tests/run_hybrid_joint_candidate.py --output PATH`;
+it refuses to replace an existing attempt and preserves incomplete records.
+`hybrid_joint_storage.buffers` inventories logical arrays and derivative
+captures. `programs` exposes the actual enclosing residual, normal product,
+linear step, outer iteration, certification and solve with dynamic arguments;
+`compiled_memory` lowers descriptors without running the optimizer. Logical
+capture inventories extend buffer lifetimes and are not a peak-memory estimate.
+Actual moderate float32 numerical and iteration-storage qualification remains
+owned by cff-a3wz.
+
 `src/cffg/experiments/hybrid_separator.py` and
 `tests/test_hybrid_separator_derivation.py` anchor:
 

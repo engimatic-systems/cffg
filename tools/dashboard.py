@@ -145,6 +145,8 @@ EPIC_FILES = {
         "test_regime_pair_derivation.py",
         "test_hybrid_separator_derivation.py",
         "test_hybrid_joint_reference.py",
+        "test_hybrid_joint_coordinate.py",
+        "test_hybrid_joint_solver.py",
         "test_hybrid_separator_kernels.py",
         "test_hybrid_separator_numerics.py",
         "test_hybrid_centering.py",

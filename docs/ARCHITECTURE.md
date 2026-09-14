@@ -860,6 +860,18 @@ chain evaluator keeps original `TransitionParameters` and evaluates its
 regional energy through centered recurrence moments and whitened channel
 residuals. It returns the D12 primal expression, dual, and separately scaled
 conditional-moment and quotient residuals. It supplies no iteration policy.
+`hybrid_joint.py` builds the host support inventory and fixed-origin active
+message/xi coordinate, and exposes signed natural, label, conditional-mean,
+conditional-covariance and auxiliary residual blocks. `hybrid_joint_solver.py`
+supplies an unbound bounded numerical policy: simultaneous quotient/xi proposals
+with residual backtracking and a matrix-free CGLS Gauss-Newton fallback. The
+coordinate and residual dimensions are distinct. One accepted residual JVP
+supplies its own transpose; no optimizer history or global Jacobian is retained.
+Every returned certificate, energy and learning statistic is recomputed at the
+returned coordinate. Convergence, exhaustion and divergence have int32 outcomes
+and explicit reasons. `hybrid_joint_storage.py` exposes logical leaf inventories
+and enclosing programs for dynamic-argument compiled memory measurements; these
+interfaces alone make no measured complete-iteration storage claim.
 Natural potentials and beliefs retain fixed separator-label origins, chosen
 from physical Gaussian sites or declared initialization before a solve. The
 Gaussian constructor retains full log masses and normalizers; transition
