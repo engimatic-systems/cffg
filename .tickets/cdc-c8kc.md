@@ -1,6 +1,6 @@
 ---
 id: cdc-c8kc
-status: in_progress
+status: closed
 deps: [cdc-bwta]
 links: []
 created: 2026-09-14T20:25:51Z
@@ -70,3 +70,13 @@ Focused command after final edits: uv run pytest -q tests/test_dashboard.py --ju
 Independent review of8bbf347 completed with no actionable findings; fresh persisted Codex CLI reviewer exited0, report /tmp/cdc-c8kc-review.txt. Its synthetic real four-worker run passed25 tests and verified identical worker collections, complete inventory, one execution per item, within-file order, unknown/nested files and slow exclusion. It independently matched the seeded costs against all7977 retained phase records and confirmed unchanged historical time/count/result and a clean tree. Its focused copy passed29 tests; the existing deadline test could not complete because that review sandbox blocked ps. Root's already completed unrestricted final focused run passed all30 tests, including the real deadline/child-process check, in1.26s. No source repair or unchanged test repetition is needed.
 
 Proceed to exactly one final default dashboard gate at the unchanged implementation, four workers and a fresh locked1GiB cache, with measured file ordering and hard1200s deadline. Inspect only the two runtime wait fields before launch, announce and wait the full suggested budget quietly. Actual improved speed and margin remain unverified until this gate; preserve any failure before ordinary diagnosis. No numerical/source/recovery semantics changed.
+
+**2026-09-14T21:41:20Z**
+
+Final default gate passed at b6b355a (implementation 8bbf347): uv run python tools/dashboard.py --run-suite, 2668 passed, zero failures, 1073.76 pytest seconds and 1074.552 measured wall seconds. This is 17m54.552s, with 125.448s of margin under the unchanged hard 1200s deadline and a 124.483s reduction from the retained 1199.035s baseline. Four complete-file workers, measured ordering from 112 file costs, fresh locked 1GiB JAX cache, unchanged not-slow selection and no retries. The 16 warnings are existing gym/distutils deprecations repeated across workers. Root announced the budget and waited the full 1200s before inspecting results; no unchanged rerun is needed for publication.
+
+Root audited all 8004 setup/call/teardown records: 2668 distinct call nodeids, exactly one call each, all phases passed, zero duplicates or missing selected calls. Worker phase totals gw0/gw1/gw2/gw3 were 1042.476/1042.276/1042.660/1042.417 seconds (spread 0.384s), compared with the prior roughly 211s spread. This is measured evidence for this machine/run, not a guarantee that future added tests fit; the enforced deadline remains necessary. No tests/assertions were removed and the nine added focused cases account for the full inventory increase from 2659 to 2668.
+
+Artifacts: /tmp/cdc-c8kc-short-suite.log, /tmp/cdc-c8kc-short-suite-summary.json, and /var/folders/kg/pmjxhgy506n699dj2g96f2wh0000gn/T/tmpi8rnzt0c.timings.jsonl. tools/test-suite-runtimes.json records b6b355a with the measured full result and new JUnit-derived file costs; ~/agent-share/cffg-tests.html was refreshed by the same run. Independent review found no issues, root final focused checks passed all 30, and the review's real four-worker synthetic integration passed 25. Runtime history and this closure are the only post-gate changes.
+
+All acceptance criteria are met. Close and publish a PR stacked on cdc-ogj9-compile-scaling / PR147. Next is cdc-ztuf's shared explicit-start entry and prospective moderate qualification harness, using a fresh implementation worker; cff-a3wz owns actual moderate solves/storage evidence. No recovery fits have run and no numerical, approximation, scope or threshold contract changed.
