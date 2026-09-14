@@ -13,7 +13,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from cffg.hybrid_affine import affine
-from cffg.hybrid_natural import Natural, Status, failure, lift, marginal, normalize, quotient
+from cffg.hybrid_natural import Natural, Status, coordinate_status, failure, lift, marginal, normalize, quotient
 from cffg import hybrid_separator as hs
 
 
@@ -81,7 +81,15 @@ class Coordinate:
         return (2, t - 1, k)
 
     def pack(self, messages, xi):
-        """Gauge each bank before gathering; no status or origin is packed."""
+        """Gather valid message banks, preserving rejection before gauge removal.
+
+        Support and origins must match the inventory and status must be zero.
+        Nonzero precision corrections belong to assembled potentials, not the
+        outgoing message coordinate; quotient messages have no correction word.
+        Invalid numeric input produces NaN coordinates in host/JIT/vmap calls,
+        so downstream evaluation cannot certify it. An empty coordinate already
+        has invalid empty support. No metadata becomes an extra unknown.
+        """
         t, k, d = self.shape
         shapes = ((t - 1, k), (t - 1, k, d), (t - 1, k, d, d))
         if len(messages) != 2 or any(value.shape != shape for message in messages
@@ -93,15 +101,26 @@ class Coordinate:
             raise ValueError("message dtypes disagree with inventory")
         if xi.dtype != self.origin.dtype:
             raise ValueError("auxiliary dtype disagrees with inventory")
+        for message in messages:
+            status = jnp.asarray(message.status)
+            if status.shape not in ((), (t - 1,)) or not jnp.issubdtype(status.dtype, jnp.integer):
+                raise ValueError("message status requires integer scalar or incidence flags")
         a, h, p = (jnp.stack([m.arrays()[rank] for m in messages]) for rank in range(3))
         anchor = jnp.take_along_axis(a, self.first[..., None], axis=-1)
         supported = jnp.stack((self.support[:-1], self.support[1:]))
+        valid = jnp.all(jnp.isneginf(a) == ~supported)
+        for side, message in enumerate(messages):
+            valid &= jnp.all(coordinate_status(message) == 0)
+            valid &= jnp.all(jnp.asarray(message.status) == 0)
+            valid &= jnp.all(message.origin == self.origin[side:side + t - 1])
+            valid &= jnp.all(message.correction == 0)
         a = jnp.where(supported, a - jnp.where(jnp.isfinite(anchor), anchor, 0), 0)
         row, col = jnp.triu_indices(d)
-        return jnp.concatenate((a.reshape(-1)[self.constants],
-                                h.reshape(-1, d)[self.active].reshape(-1),
-                                p.reshape(-1, d, d)[self.active][:, row, col].reshape(-1),
-                                xi.reshape(-1)[self.auxiliary]))
+        vector = jnp.concatenate((a.reshape(-1)[self.constants],
+                                  h.reshape(-1, d)[self.active].reshape(-1),
+                                  p.reshape(-1, d, d)[self.active][:, row, col].reshape(-1),
+                                  xi.reshape(-1)[self.auxiliary]))
+        return jnp.where(valid, vector, jnp.nan)
 
     def unpack(self, vector):
         if vector.shape != (self.size,) or vector.dtype != self.origin.dtype:

@@ -120,6 +120,48 @@ def test_packing_rejects_malformed_shapes_and_mixed_dtypes():
         c.pack((mixed, messages[1]), xi)
     with pytest.raises(ValueError, match='auxiliary dtype'):
         c.pack(messages, xi.astype(jnp.float32))
+    with pytest.raises(ValueError, match='message status'):
+        c.pack((messages[0]._replace(status=jnp.asarray(.5)), messages[1]), xi)
+
+
+@pytest.mark.parametrize('name', ['coupled_t2', 'source_masked_t2'])
+def test_invalid_message_metadata_survives_host_jit_and_vmap_packing(name):
+    from cffg.hybrid_natural import coordinate_status
+    c, p, s, _ = context(name)
+    messages, xi = c.unpack(jnp.zeros(c.size, c.origin.dtype))
+    baseline = tuple(m._replace(precision_correction=jnp.zeros_like(m.precision)) for m in messages)
+    np.testing.assert_array_equal(c.pack(messages, xi), c.pack(baseline, xi))
+    left, right = baseline
+    corrupt = [left._replace(constant=left.constant.at[0, 0].set(value))
+               for value in (jnp.nan, -jnp.inf)]
+    corrupt += [left._replace(center=left.center + 1),
+                left._replace(center=left.center.at[0, 0, 0].set(jnp.nan)),
+                left._replace(status=jnp.full_like(left.status, int(Status.INVALID))),
+                left._replace(status=jnp.full(left.status.shape, 2**32, jnp.int64)),
+                left._replace(linear=left.linear.at[0, 0, 0].set(jnp.nan)),
+                left._replace(precision=left.precision.at[0, 0, 0, 0].set(jnp.nan)),
+                left._replace(precision=left.precision.at[0, 0, 0, 0].set(1.),
+                              precision_correction=left.correction.at[0, 0, 0, 0].set(
+                                  jnp.finfo(c.origin.dtype).eps))]
+    assert np.all(np.asarray(coordinate_status(corrupt[-1])) == 0)
+    if name == 'source_masked_t2':
+        corrupt.append(left._replace(constant=left.constant.at[0, 1].set(0)))
+    banks = [baseline, *((value, right) for value in corrupt)]
+    batch = jax.tree.map(lambda *values: jnp.stack(values), *banks)
+    host = jnp.stack([c.pack(value, xi) for value in banks])
+    single = jax.jit(lambda messages: c.pack(messages, xi))
+    np.testing.assert_array_equal(host, jnp.stack([single(value) for value in banks]))
+    compiled = jax.jit(jax.vmap(lambda messages: c.pack(messages, xi)))(batch)
+    np.testing.assert_array_equal(host, compiled)
+    assert np.all(np.isfinite(host[0])) and np.all(np.isnan(host[1:]))
+    for vector in host[1:]:
+        unpacked, _ = c.unpack(vector)
+        assert any(int(jnp.bitwise_or.reduce(coordinate_status(m))) & int(Status.NONFINITE)
+                   for m in unpacked)
+    status = jax.jit(lambda x: joint.evaluate(c, p, s, x).status)(compiled[1])
+    assert int(status) & int(Status.NONFINITE)
+    host_status = joint.evaluate(c, p, s, host[1]).status
+    assert int(host_status) & int(Status.NONFINITE)
 
 
 def test_represented_covariance_difference_retains_cancelling_low_words():

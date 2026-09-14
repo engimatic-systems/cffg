@@ -862,7 +862,12 @@ residuals. It returns the D12 primal expression, dual, and separately scaled
 conditional-moment and quotient residuals. It supplies no iteration policy.
 `hybrid_joint.py` builds the host support inventory and fixed-origin active
 message/xi coordinate, and exposes signed natural, label, conditional-mean,
-conditional-covariance and auxiliary residual blocks. `hybrid_joint_solver.py`
+conditional-covariance and auxiliary residual blocks. Packing checks support,
+fixed origins, finite coefficients and failure flags before removing the gauge.
+Invalid numerical metadata produces NaN coordinates under host/JIT/vmap, which
+downstream evaluation rejects. Message banks accept absent or zero precision
+corrections; nonzero corrections belong to assembled potentials and are not
+message unknowns. Outgoing quotients have no correction word. `hybrid_joint_solver.py`
 supplies an unbound bounded numerical policy: simultaneous quotient/xi proposals
 with residual backtracking and a matrix-free CGLS Gauss-Newton fallback. The
 coordinate and residual dimensions are distinct. One accepted residual JVP

@@ -25,6 +25,9 @@ def from_reference(coordinate, messages, xi):
                             for rank in range(3)),
                           jnp.zeros((coordinate.shape[0] - 1,), jnp.int32),
                           coordinate.origin[side:side + coordinate.shape[0] - 1]) for side in range(2))
+    banks = tuple(bank._replace(constant=jnp.where(
+        coordinate.support[side:side + coordinate.shape[0] - 1], bank.constant, -jnp.inf))
+        for side, bank in enumerate(banks))
     return coordinate.pack(banks, jnp.asarray(xi, coordinate.origin.dtype))
 
 

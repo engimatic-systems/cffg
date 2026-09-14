@@ -3133,6 +3133,12 @@ after removing the common gauge, linear coefficients, independent symmetric
 precision entries, and active squared auxiliaries. Inactive native constants
 are `-inf` support metadata, whereas the independent reference stores zero;
 `tests/hybrid_joint_candidate.py` maps that storage convention explicitly.
+Packing validates supported constants before discarding their gauge anchors,
+and preserves invalid origins, support or Natural status as a nonfinite packed
+coordinate. It also rejects nonzero precision corrections: those represent
+assembled-potential arithmetic, while the outgoing message bank contains only
+`a/h/J` at the fixed origins. Absent and all-zero correction metadata are
+equivalent; none of these fields add an unknown.
 For full support, with `L=T-1` and `s=d*(d+1)/2`, the unknown count is
 `N=2*L*(K*(1+d+s)-1)+L*K*(K-1)`. Retaining every active label-mass,
 conditional-mean and independent covariance equation gives the rectangular
