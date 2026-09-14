@@ -887,15 +887,22 @@ interfaces alone make no measured complete-iteration storage claim.
 T32/T100, xi0/1, and raw-zero/feasible/fixed-perturbation messages. The opt-in
 `tools/d12_moderate_runner.py` reuses the independent compilation fixture and
 starts sequential native-float32 children with explicit-x64 dtype errors enabled.
-Its `solves` phase retains one complete executable for six starts per horizon;
+Its `solves` phase retains separate initialization and complete-solve executables,
+with six authorized calls to each per horizon;
 its `storage` phase compiles complete solves at independently varied outer/linear
 caps and enclosing iterations, with no executable calls. Abstract buffer trees
 include retained low words and integer captures, plus a T100/K20/d10 shape-only
-inventory. Initial and terminal NPZ snapshots retain all State leaves, natural
+inventory. The complete descriptor contract is bound to producer sources, runtime
+versions and JAX tracing configuration; every captured leaf must match, including
+metadata, context and trial arrays. Initial and terminal NPZ snapshots retain all State leaves, natural
 messages, beliefs and centered/physical source-conditioned learning readouts.
 Reports separate lowering, executable acquisition, synchronized calls, export,
 logical bytes, XLA estimates and process high-water; they reject missing starts
-and preserve the first failure. All-pair comparisons disclose material stationary
+and preserve the first failure. Report validation reconstructs residuals and prescribed
+scales from saved messages, targets, beliefs and xi, preserving covariance low words
+in residual differences. Source-conditioned learning uses the native once-rounded
+covariance view and its defined centered-to-physical transform. Converged energy
+changes must be finite and nonnegative. All-pair comparisons disclose material stationary
 differences without claiming universal uniqueness. This harness is setup, not
 moderate numerical or storage qualification. A3WZ owns both measured phases and
 their interpretation; compiler integration and registered recovery remain gated.

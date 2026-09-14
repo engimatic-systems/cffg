@@ -27,6 +27,7 @@ from d12_moderate_payload import (
 )
 from d12_moderate_report import (
     compare_starts,
+    fixed_metadata,
     program_contract,
     validate_fixture,
     validate_program,
@@ -55,8 +56,7 @@ def test_frozen_formula_and_axis_mapping():
             {
                 **{f"parameters.{k}": v for k, v in p.items()},
                 **{f"sites.{k}": v for k, v in s.items()},
-                "metadata.origin": s["center"],
-                "metadata.support": np.ones((t, 4), bool),
+                **{f"metadata.{k}": v for k, v in fixed_metadata(t).items()},
             },
             t,
         )
@@ -93,7 +93,12 @@ def test_frozen_formula_and_axis_mapping():
 
 
 def synthetic(case, *, initial=False):
-    """Schema data only: no claim that these arrays solve the frozen fixture."""
+    """Analytic independent-label Gaussian controls for report relationships.
+
+    These are internally consistent payloads, not solves of the frozen model.
+    Uniform pair mass, zero means and identity covariance give closed-form
+    projected moments and source-conditioned learning without a report helper.
+    """
     arrays = {
         key: np.zeros(shape, dtype)
         for key, (shape, dtype) in output_contract(
@@ -110,8 +115,29 @@ def synthetic(case, *, initial=False):
         covariance[...] = np.eye(covariance.shape[-1], dtype=np.float32)
         for field in ("full_covariance", "second"):
             arrays[f"{name}.{field}"][...] = covariance
-    arrays["xi"].fill(case["xi"])
-    arrays["state.coordinate"][-arrays["xi"].size :] = case["xi"]
+    parameters, _ = fixture_arrays(case["T"])
+    target = np.sum(parameters["weights"] ** 2, axis=-1) + parameters["offsets"] ** 2
+    arrays["xi"][...] = case["xi"] if initial else target
+    arrays["state.coordinate"][-arrays["xi"].size :] = arrays["xi"].ravel()
+    k, d = case["K"], case["d"]
+    exposure = (k - np.arange(k - 1, dtype=np.float32)) / np.float32(k * k)
+    arrays["state.evaluation.auxiliary.target"][...] = target
+    arrays["state.evaluation.auxiliary.residual"][...] = arrays["xi"] - target
+    arrays["state.evaluation.auxiliary.exposure"][...] = exposure
+    for name in ("state.evaluation.auxiliary.linear", "learning.physical_linear"):
+        arrays[name][..., -1] = np.float32(1 / (k * k)) - exposure / 2
+    xi = arrays["xi"].astype(np.float64)
+    root = np.sqrt(np.where(xi > 0, xi, 1))
+    omega = np.where(xi > 0, np.tanh(root / 2) / (2 * root), 0.25).astype(np.float32)
+    for name in ("state.evaluation.auxiliary.precision", "learning.physical_precision"):
+        arrays[name][...] = (omega * exposure)[..., None, None] * np.eye(
+            d + 1, dtype=np.float32
+        )
+    arrays["state.evaluation.residual"][-xi.size :] = (arrays["xi"] - target).ravel()
+    arrays["state.evaluation.scales"][-xi.size :] = (1 + arrays["xi"]).ravel()
+    arrays["state.evaluation.certificates.auxiliary"][()] = np.max(
+        abs(arrays["xi"] - target) / (1 + arrays["xi"])
+    )
     arrays["state.evaluations"][()] = 1 if initial else 2
     arrays["state.status"][()] = 3 if initial else 0
     arrays["state.reason"][()] = 1 if initial else 0
@@ -272,9 +298,14 @@ def set_messages(arrays, vector):
         precision[..., row, col] = values
         precision[..., col, row] = values
     arrays["state.coordinate"][: vector.size] = vector
+    arrays["state.evaluation.residual"][: vector.size] = -vector
+    arrays["state.evaluation.scales"][: vector.size] = np.maximum(1, abs(vector))
+    arrays["state.evaluation.certificates.natural"][()] = np.max(
+        abs(vector) / np.maximum(1, abs(vector))
+    )
 
 
-def test_complete_report_roundtrip_and_missing_start(tmp_path):
+def complete_report(tmp_path):
     """Synthetic I/O acceptance exercises aggregation, never solver correctness."""
     identity = identities()
     identity["git_status"] = ""
@@ -298,7 +329,7 @@ def test_complete_report_roundtrip_and_missing_start(tmp_path):
             dict(
                 parameters=p,
                 sites=s,
-                metadata=dict(origin=s["center"], support=np.ones((horizon, 4), bool)),
+                metadata=fixed_metadata(horizon),
             ),
         )
         worker = dict(
@@ -351,6 +382,8 @@ def test_complete_report_roundtrip_and_missing_start(tmp_path):
         process = dict(
             exit_code=0,
             stop=None,
+            worker_seconds=1.0,
+            rss_samples=dict(count=0, maximum_bytes=None),
             cache_evidence=dict(log_sha256=digest(folder / "compiler.log")),
             process_high_water=dict(raw_unit="bytes", raw_ru_maxrss=1, bytes=1),
         )
@@ -366,6 +399,13 @@ def test_complete_report_roundtrip_and_missing_start(tmp_path):
     write_json(tmp_path / "report.json", report)
     result = validate_report(tmp_path)
     assert result["complete"] and len(result["comparisons"]) == 30
+    return report
+
+
+def test_complete_report_roundtrip_and_missing_start(tmp_path):
+    report = complete_report(tmp_path)
+    folder = tmp_path / "t100"
+    worker = json.loads((folder / "worker.json").read_text())
     worker["cases"].pop()
     write_json(folder / "worker.json", worker)
     report["jobs"][-1]["worker_sha256"] = digest(folder / "worker.json")

@@ -90,7 +90,10 @@ def logical_inventory(coordinate, parameters, sites):
         vector,
     )
     groups = {name: checked_arrays(value) for name, value in shapes.items()}
+    from d12_moderate_layouts import live_binding
+
     return dict(
+        binding=live_binding(),
         N=coordinate.size,
         M=coordinate.residual_size,
         groups=groups,

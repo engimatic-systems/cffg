@@ -3,6 +3,9 @@
 ``--status`` additionally exercises T2 initialization and certification. Complete
 solver wrappers are host zero-budget calls and abstract traces; compiling their
 full iteration bodies belongs to post-review evidence.
+``--arithmetic`` compares only local projection/learning kernels with report
+reconstruction. ``--projection-probe weighted|rare`` preserves unresolved local
+numerical counterexamples; a failing probe is not qualification evidence.
 """
 
 import argparse
@@ -195,7 +198,12 @@ def check_status(jax):
         else:
             raise AssertionError("malformed coordinate accepted")
     case = dict(T=2, K=2, d=1, xi=0, messages="raw-zero")
-    validate_outputs(flatten(output_values(c, raw_state)), case, initial=True)
+    validate_outputs(
+        flatten(output_values(c, raw_state)),
+        case,
+        initial=True,
+        parameters={name: np.asarray(value) for name, value in p._asdict().items()},
+    )
     return dict(
         native=True,
         host_zero_budget_T2_calls=2,
@@ -209,9 +217,17 @@ def check_status(jax):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--status", action="store_true")
+    parser.add_argument("--arithmetic", action="store_true")
+    parser.add_argument("--projection-probe", choices=("weighted", "rare"))
     args = parser.parse_args()
     jax = native_jax()
-    print(json.dumps(check_status(jax) if args.status else check_native(jax)))
+    if args.arithmetic or args.projection_probe:
+        from d12_moderate_arithmetic import check_arithmetic
+
+        result = check_arithmetic(jax, probe=args.projection_probe)
+    else:
+        result = check_status(jax) if args.status else check_native(jax)
+    print(json.dumps(result))
 
 
 if __name__ == "__main__":

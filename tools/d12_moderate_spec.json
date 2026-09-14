@@ -352,7 +352,12 @@
     "caps": "Outer 400 and linear 256 are independently doubled memory-only variants. Complete solves must be compiled for the outer comparison. All storage executables have zero calls.",
     "program": "All context and initial vector/State arguments are dynamic ShapeDtypeStruct leaves; only support/origin/index metadata and budgets are captured.",
     "forbidden": "No dense global Jacobian, trajectory covariance, path enumeration, or iteration-history arrays. All derivative captures come only from one accepted local evaluation. Limits are explicit outer/trial/linear caps above.",
-    "inventory_process": "A separate shape-only child precedes the ten compilation children, so wide abstract tracing does not contaminate any compiled variant process peak. It has zero complete-program lower/compile/execute calls."
+    "inventory_process": "A separate shape-only child precedes the ten compilation children, so wide abstract tracing does not contaminate any compiled variant process peak. It has zero complete-program lower/compile/execute calls.",
+    "logical_contract": {
+      "path": "tools/d12_moderate_layouts.json.gz",
+      "sha256": "a8a4205509c9cf19b6037338e5fda584258c1ea2c9f5665c1346c4be71b766ac",
+      "meaning": "Complete native-float32 abstract leaf descriptors bound to producer source hashes, runtime versions and tracing configuration. Prospective setup artifact only; zero complete-program lower/compile/execute calls. Regenerate and update this hash if a producer changes before qualification."
+    }
   },
   "runtime": {
     "backend": "cpu",
@@ -360,12 +365,12 @@
     "jax_explicit_x64_dtypes": "error",
     "floating_dtype": "float32",
     "persistent_cache": "disabled via config; XLA auxiliary caches disabled; record actual settings and compiler logs",
-    "processes": "Sequential fresh child per horizon for solves (six starts share one retained complete executable); separate fresh child per storage variant. Stop on first failure, resource stop or nonconvergence. No repeat, warm-up or recovery fit.",
+    "processes": "Sequential fresh child per horizon for solves (six starts share retained initializer and complete-solve executables); a separate shape-only inventory child and ten fresh storage-variant children. Stop on first failure, resource stop or nonconvergence. No repeat, warm-up or recovery fit.",
     "reuse": "Retain Lowered and Compiled during each child. Initialization and solve are separately compiled. Never claim cross-child reuse or reuse of the historical compile-only executables.",
     "timing": "Separate lower, compile acquisition, input synchronization, first authorized call and block_until_ready. Serialization, readout conversion and initialization are outside the solve timer; report their times separately.",
     "memory": "XLA estimates separate from logical leaves and process memory; parent os.wait4 child ru_maxrss gives independent process high-water (Darwin bytes, Linux KiB). ps rss is a sampled current-RSS diagnostic in KiB, not a phase peak.",
     "internal_dtypes": "Actual input/initial/result/readout leaves plus fixed metadata, abstract storage leaves and all StableHLO values must be float32; statuses/masks/limbs stay integer or bool.",
-    "cache_evidence": "Record compiler log and actual disabled settings. Exactly one lower/compile call per process; no full-program in-process reuse is requested. OS/compiler internals may still reuse resources; no repeated-execution speed claim."
+    "cache_evidence": "Record compiler logs and actual disabled settings. Each solve child lowers and compiles initialization once and the complete solve once, retaining both executables for six authorized calls apiece. Each storage child lowers and compiles one complete variant once with zero executable calls. The separate logical-inventory child has zero complete-program lower/compile/execute calls. These counts do not establish cold acquisition: OS/compiler internals may reuse resources. No warm-up, repeat timing solve or cross-child executable reuse is claimed."
   },
   "limits": {
     "lower_seconds": 180,
@@ -382,7 +387,8 @@
     "payload": "Immutable NPZ snapshots for every initial and terminal State, natural messages/xi, all beliefs with low words and physical readouts, and every centered/physical source-conditioned learning group. Exact leaf manifests carry shapes/dtypes/elements/bytes/SHA256.",
     "identity": "Spec, source manifest, git revision and cleanliness, fixture content hashes, Python/JAX/jaxlib/NumPy/platform/configuration, cache/compiler logs, process peaks, timing and compilation call counts.",
     "failure": "Keep the first failure and every preceding case, raw inputs, initialized coordinate/status and any returned terminal outputs, including nonfinite values as NPZ values. No rewriting previous reports/hashes. Incomplete reports cannot qualify.",
-    "policy": "Require complete twelve-case solve report and complete ten-case compiled storage report at the same source/spec, all numerical gates, and reviewed initialization sensitivity for A3WZ. Setup or compilation alone does not qualify."
+    "policy": "Require complete twelve-case solve report and complete ten-case compiled storage report at the same source/spec, all numerical gates, and reviewed initialization sensitivity for A3WZ. Setup or compilation alone does not qualify.",
+    "prospective_revision": "Corrected after independent setup review, before first execution: cache/process counts, complete logical contracts and reconstructed numerical relationships. Original unexecuted specification at commit 7add5e58a1d18fdcc4e4d663053ea1ffdc131e97 has SHA256 6ab49430b1fcb752676e1d7cf8f487fee539f9a43abbebdc4f4601c0c41e51ea. Prior immutable evidence and manifests remain unchanged."
   },
   "scope": {
     "authorized_here": "Implementation and focused checks only; commit and pause for independent review.",

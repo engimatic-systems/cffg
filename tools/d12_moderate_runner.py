@@ -32,11 +32,13 @@ from d12_moderate_plan import ROOT, SCHEMA, MODES, identities, load_spec
 
 
 def runtime_identity(jax):
+    from d12_moderate_layouts import trace_config
     import jaxlib
     import numpy as np
 
     clock = time.get_clock_info("perf_counter")
     return dict(
+        trace_config=trace_config(jax),
         python=sys.version,
         executable=sys.executable,
         platform=platform.platform(),

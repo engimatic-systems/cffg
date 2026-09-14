@@ -9,6 +9,7 @@ import numpy as np
 from d12_compile_fixture import fixture_arrays
 from d12_compile_scaling import digest, rss_bytes
 from d12_moderate_plan import BUDGETS, SCHEMA, identities, load_spec
+from d12_moderate_layouts import expected_inventory, runtime_binding
 from d12_moderate_payload import (
     output_contract,
     read_snapshot,
@@ -159,6 +160,22 @@ def validate_runtime(worker, process):
         process["exit_code"] == 0 and process["stop"] is None,
         "worker failed or hit a resource stop",
     )
+    elapsed = process.get("worker_seconds")
+    require(
+        type(elapsed) in (int, float) and np.isfinite(elapsed) and elapsed >= 0,
+        "missing/invalid process elapsed time",
+    )
+    samples = process.get("rss_samples", {})
+    count, maximum = samples.get("count"), samples.get("maximum_bytes")
+    require(
+        type(count) is int
+        and count >= 0
+        and (
+            (count == 0 and maximum is None)
+            or (count > 0 and type(maximum) is int and maximum > 0)
+        ),
+        "missing/invalid sampled RSS diagnostic",
+    )
     peak = process["process_high_water"]
     system = "Darwin" if peak["raw_unit"] == "bytes" else "Linux"
     require(
@@ -168,23 +185,47 @@ def validate_runtime(worker, process):
         "process high-water unit mismatch",
     )
     require(
-        bool(process["cache_evidence"]["log_sha256"]),
+        len(process["cache_evidence"]["log_sha256"]) == 64
+        and all(
+            c in "0123456789abcdef" for c in process["cache_evidence"]["log_sha256"]
+        ),
         "missing compiler/cache log provenance",
+    )
+
+
+def fixed_metadata(t, k=4, d=2):
+    """The fixed full-support coordinate has no inactive or omitted indices."""
+    active = np.arange(2 * (t - 1) * k, dtype=np.int32)
+    return dict(
+        origin=np.zeros((t, k, d), np.float32),
+        support=np.ones((t, k), bool),
+        active=active,
+        constants=active.reshape(2, t - 1, k)[..., 1:].ravel(),
+        first=np.zeros((2, t - 1), np.int32),
+        auxiliary=np.arange((t - 1) * k * (k - 1), dtype=np.int32),
     )
 
 
 def validate_fixture(arrays, horizon):
     p, s = fixture_arrays(horizon)
-    for group, expected in (("parameters", p), ("sites", s)):
-        for name, value in expected.items():
-            require(
-                np.array_equal(arrays[f"{group}.{name}"], value),
-                f"frozen fixture mismatch: {group}.{name}",
-            )
-    require(
-        np.all(arrays["metadata.origin"] == 0) and np.all(arrays["metadata.support"]),
-        "fixed origin or support changed",
-    )
+    expected = {
+        f"{group}.{name}": value
+        for group, values in (
+            ("parameters", p),
+            ("sites", s),
+            ("metadata", fixed_metadata(horizon)),
+        )
+        for name, value in values.items()
+    }
+    require(arrays.keys() == expected.keys(), "incomplete fixed input inventory")
+    for name, value in expected.items():
+        actual = arrays[name]
+        require(
+            actual.shape == value.shape
+            and actual.dtype == value.dtype
+            and np.array_equal(actual, value),
+            f"frozen fixture mismatch: {name}",
+        )
 
 
 def validate_work(arrays):
@@ -275,82 +316,28 @@ def compare_starts(terminals):
     return rows
 
 
-def validate_logical(inventory, shape):
-    t, k, d = (shape[name] for name in ("T", "K", "d"))
-    n = 2 * (t - 1) * (k * (1 + d + d * (d + 1) // 2) - 1) + (t - 1) * k * (k - 1)
-    m = n + 2 * (t - 1) * k * (1 + d + d * (d + 1) // 2)
-    require(
-        (inventory["N"], inventory["M"]) == (n, m),
-        "coordinate/residual inventory mismatch",
-    )
-    expected = {
-        "metadata",
-        "context",
-        "coordinate",
-        "accepted_evaluation",
-        "coordinate_scales",
-        "residual_scales",
-        "derivative_captures",
-        "linear_state",
-        "linear_products",
-        "trial_state",
-        "outer_state",
-        "terminal_state",
-    }
-    require(
-        set(inventory["groups"]) == expected, "incomplete enclosing logical inventory"
-    )
-    for leaves in inventory["groups"].values():
-        validate_leaves(leaves)
-    state = state_contract(t, k, d)
-    evaluation = {
-        key.removeprefix(".evaluation"): value
-        for key, value in state.items()
-        if key.startswith(".evaluation.")
-    }
-    contracts = {
-        "coordinate": {"": ((n,), "float32")},
-        "coordinate_scales": {"": ((n,), "float32")},
-        "residual_scales": {"": ((m,), "float32")},
-        "accepted_evaluation": evaluation,
-        "outer_state": state,
-        "terminal_state": state,
-        "linear_state": {
-            ".iteration": ((), "int32"),
-            ".step": ((n,), "float32"),
-            ".residual": ((m,), "float32"),
-            ".normal_residual": ((n,), "float32"),
-            ".direction": ((n,), "float32"),
-            ".done": ((), "bool"),
-            ".finite": ((), "bool"),
-        },
-        "linear_products": {"[0]": ((m,), "float32"), "[1]": ((n,), "float32")},
-    }
-    for group, expected in contracts.items():
-        actual = {
-            r["path"]: (tuple(r["shape"]), r["dtype"])
-            for r in inventory["groups"][group]
-        }
-        require(actual == expected, f"incomplete or malformed {group} storage")
-    for name in ("accepted_evaluation", "derivative_captures", "terminal_state"):
-        leaves = inventory["groups"][name]
+def validate_logical(inventory, shape, runtime=None):
+    """Compare every captured leaf with the source/runtime-bound abstract contract."""
+    reference = expected_inventory(shape, inventory.get("binding"))
+    if runtime is not None:
         require(
-            any(x["dtype"] == "float32" for x in leaves), "missing floating buffers"
+            inventory["binding"]["runtime"] == runtime_binding(runtime),
+            "logical inventory does not match worker runtime",
         )
     require(
-        any(
-            "correction" in x["path"]
-            for x in inventory["groups"]["accepted_evaluation"]
-        ),
-        "retained covariance words missing",
+        (inventory["N"], inventory["M"]) == (reference["N"], reference["M"]),
+        "coordinate/residual inventory mismatch",
     )
     require(
-        any(
-            np.dtype(x["dtype"]).kind in "iu"
-            for x in inventory["groups"]["derivative_captures"]
-        ),
-        "derivative integer captures missing",
+        inventory["groups"].keys() == reference["groups"].keys(),
+        "incomplete enclosing logical inventory",
     )
+    for group, leaves in inventory["groups"].items():
+        validate_leaves(leaves)
+        require(
+            leaves == reference["groups"][group],
+            f"incomplete or malformed {group} storage",
+        )
 
 
 def validate_report(directory, *, current_sources=True):
@@ -418,19 +405,25 @@ def validate_report(directory, *, current_sources=True):
                     strict=True,
                 ):
                     require(inventory["shape"] == shape, "logical shape mismatch")
-                    validate_logical(inventory["inventory"], shape)
+                    validate_logical(inventory["inventory"], shape, worker["runtime"])
                 continue
             case = next(c for c in spec["storage"]["cases"] if c["id"] == job["id"])
             require(worker["case"] == case, "storage variant mismatch")
             validate_program(worker["compilation"], case, case["program"], 0)
-            validate_logical(worker["logical"], case)
+            validate_logical(worker["logical"], case, worker["runtime"])
             continue
         cases = [c for c in spec["cases"] if f"t{c['T']}" == job["id"]]
         require(
             [r["case"] for r in worker["cases"]] == cases,
             "exact six-start inventory missing",
         )
-        validate_fixture(read_snapshot(folder, worker["inputs"]), cases[0]["T"])
+        inputs = read_snapshot(folder, worker["inputs"])
+        validate_fixture(inputs, cases[0]["T"])
+        parameters = {
+            name.removeprefix("parameters."): value
+            for name, value in inputs.items()
+            if name.startswith("parameters.")
+        }
         validate_program(
             worker["initialization_compilation"], cases[0], "initialize", 6
         )
@@ -441,10 +434,10 @@ def validate_report(directory, *, current_sources=True):
         for record in worker["cases"]:
             case = record["case"]
             initial = read_snapshot(folder, record["initial"])
-            validate_outputs(initial, case, initial=True)
+            validate_outputs(initial, case, initial=True, parameters=parameters)
             require(int(initial["state.status"]) == 3, "initialization failed")
             terminal = read_snapshot(folder, record["terminal"])
-            validate_outputs(terminal, case)
+            validate_outputs(terminal, case, parameters=parameters)
             validate_work(terminal)
             require(
                 int(terminal["state.status"]) == 0, "moderate solve did not converge"

@@ -204,7 +204,7 @@ def output_contract(t, k=4, d=2):
     return result
 
 
-def validate_outputs(arrays, case, *, initial=False):
+def validate_outputs(arrays, case, *, initial=False, parameters=None):
     contract = output_contract(case["T"], case["K"], case["d"])
     require(set(arrays) == set(contract), "incomplete or unexpected output groups")
     for key, (shape, dtype) in contract.items():
@@ -214,7 +214,7 @@ def validate_outputs(arrays, case, *, initial=False):
         )
     x = arrays["state.coordinate"]
     xi = arrays["xi"]
-    k, d, l = case["K"], case["d"], case["T"] - 1
+    d = case["d"]
     constants, linear, precision = [], [], []
     for side in ("left", "right"):
         bank = {
@@ -307,11 +307,57 @@ def validate_outputs(arrays, case, *, initial=False):
             and np.all(arrays["state.evaluation.auxiliary.status"] == 0),
             "local/auxiliary failure",
         )
-        r, scales = (
-            arrays["state.evaluation.residual"],
-            arrays["state.evaluation.scales"],
+        for side in (0, 1):
+            prefix = f"state.evaluation.local.targets.{side}."
+            precision = arrays[prefix + "precision"]
+            require(
+                np.all(arrays[prefix + "center"] == 0)
+                and np.all(arrays[prefix + "status"] == 0)
+                and np.array_equal(precision, precision.swapaxes(-1, -2)),
+                "target metadata or symmetric coordinate invalid",
+            )
+        from d12_moderate_reconstruct import scaled_blocks, physical_learning
+
+        r, scales, expected, learning = scaled_blocks(arrays, case, parameters)
+        close(arrays["state.evaluation.residual"], r, "reconstructed residual")
+        close(arrays["state.evaluation.scales"], scales, "prescribed residual scales")
+        for field in (
+            "target",
+            "residual",
+            "exposure",
+            "linear",
+            "precision",
+            "center",
+        ):
+            close(
+                arrays[f"state.evaluation.auxiliary.{field}"],
+                learning[field],
+                f"source-conditioned learning {field}",
+            )
+        physical = physical_learning(
+            *(
+                arrays[f"state.evaluation.auxiliary.{field}"]
+                for field in ("linear", "precision", "center")
+            )
         )
-        require(np.all(scales > 0), "invalid residual scales")
+        for field, value in physical.items():
+            close(
+                arrays[f"learning.{field}"],
+                value,
+                f"centered/physical learning {field}",
+            )
+            close(
+                arrays[f"learning.{field}"],
+                learning[field],
+                f"source-conditioned learning {field}",
+            )
+        actual = np.array(
+            [arrays[f"state.evaluation.certificates.{name}"] for name in CERTIFICATES]
+        )
+        close(actual, expected, "reconstructed certificates")
+        # Preserve the original summary-to-saved-residual arithmetic check as
+        # well as the independent reconstruction above.
+        l, k = case["T"] - 1, case["K"]
         widths = (
             x.size - xi.size,
             2 * l * k,
@@ -319,30 +365,39 @@ def validate_outputs(arrays, case, *, initial=False):
             l * k * d * (d + 1),
             xi.size,
         )
-        parts = np.split(r / scales, np.cumsum(widths)[:-1])
-        expected = [np.max(np.abs(p), initial=0) for p in parts]
-        f, dual = (
-            arrays[f"state.evaluation.local.{name}"]
-            for name in ("free_energy", "dual_energy")
+        stored_parts = np.split(
+            arrays["state.evaluation.residual"] / arrays["state.evaluation.scales"],
+            np.cumsum(widths)[:-1],
         )
-        expected.append(abs(f - dual) / (1 + abs(f)))
-        actual = np.array(
-            [arrays[f"state.evaluation.certificates.{name}"] for name in CERTIFICATES]
-        )
+        stored = [np.max(abs(part), initial=0) for part in stored_parts]
+        stored.append(expected[-1])
         require(
-            np.allclose(actual, expected, rtol=8 * np.finfo(np.float32).eps, atol=0),
-            "certificate/residual mismatch",
+            np.allclose(actual, stored, rtol=8 * np.finfo(np.float32).eps, atol=0),
+            "certificate/saved residual summary mismatch",
         )
+        require(np.all(actual >= 0), "negative residual certificate")
         if status == 0:
             tau = 64 * np.finfo(np.float32).eps ** 0.75
+            change = float(arrays["state.relative_energy_change"])
             require(
-                np.max(actual) <= tau
-                and float(arrays["state.relative_energy_change"]) <= tau,
+                np.isfinite(change)
+                and 0 <= change <= tau
+                and np.max(actual) <= tau
+                and np.max(expected) <= tau,
                 "convergence without all terminal certificates",
             )
     elif reason == 3:
         require(numeric != 0, "invalid initialization missing numerical failure flags")
     return counts
+
+
+def close(actual, expected, name):
+    allowance = 512 * 4 * np.finfo(np.float32).eps
+    require(
+        np.all(np.isfinite(expected))
+        and np.allclose(actual, expected, atol=allowance, rtol=allowance),
+        name + " mismatch",
+    )
 
 
 def validate_belief(arrays, name):
@@ -371,10 +426,14 @@ def validate_belief(arrays, name):
         "belief covariance lost symmetry",
     )
     try:
-        np.linalg.cholesky(covariance)
+        np.linalg.cholesky(covariance[probability > 0])
     except np.linalg.LinAlgError as error:
         raise ValueError("saved active covariance is not proper") from error
-    mean = arrays[f"{prefix}.displacement"] + arrays[f"{prefix}.center"]
+    mean = np.where(
+        (probability > 0)[..., None],
+        arrays[f"{prefix}.displacement"] + arrays[f"{prefix}.center"],
+        0,
+    )
     second = covariance + mean[..., None] * mean[..., None, :]
     for field, expected in (
         ("mean", mean),

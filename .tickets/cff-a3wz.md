@@ -1,7 +1,7 @@
 ---
 id: cff-a3wz
 status: open
-deps: [cff-ffsg, cff-ocxl, cff-b0s3, cff-ej67, cff-y15d, cdc-ztuf]
+deps: [cff-ffsg, cff-ocxl, cff-b0s3, cff-ej67, cff-y15d, cdc-ztuf, cdh-urn0]
 links: []
 created: 2026-09-14T02:43:33Z
 type: task
@@ -178,3 +178,7 @@ Legend: prerequisite --> dependent. TK records remain authoritative.
 [ ] cff-k6g5 (ready; independent declarations) --+
 
 cff-7sw5 and cff-a3wz feed the remaining integration/state/ledger chain before cff-f3jz, learning/composition, cff-x0if's three frozen recovery fits and cff-zov5. This companion comes from tk dep tree --full cff-a3wz, tk ready and tk blocked; no registered recovery fit has run.
+
+**2026-09-14T23:05:04Z**
+
+Independent cdc-ztuf report repairs exposed two bounded native covariance-projection discrepancies outside frozen arithmetic allowances. Added cdh-urn0 as an explicit prerequisite. The repaired validator rejects them; two strict expected-failure probes preserve them. No moderate solve/storage compilation or registered fit has run. See cdc-ztuf re-review handoff and cdh-urn0 for evidence, scope and the prerequisite tree.

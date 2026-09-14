@@ -61,6 +61,10 @@ def load_spec():
     for path, expected in (
         (inherited["path"], inherited["sha256"]),
         (fixture["formulas_source"], fixture["formulas_sha256"]),
+        (
+            spec["storage"]["logical_contract"]["path"],
+            spec["storage"]["logical_contract"]["sha256"],
+        ),
     ):
         if digest(ROOT / path) != expected:
             raise ValueError(f"frozen specification changed: {path}")

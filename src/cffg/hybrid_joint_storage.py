@@ -68,7 +68,8 @@ def programs(coordinate, budgets=solver.Budgets()):
     ``linear_step`` takes (parameters, sites, vector, evaluation).
     ``iteration`` and ``certification`` take (parameters, sites, state).
     ``solve`` takes (parameters, sites, initial_xi); its default start is unperturbed.
-    ``solve_from_coordinate`` takes (parameters, sites, vector), without initialization.
+    ``solve_from_coordinate`` takes (parameters, sites, vector), without a feasible
+    initialization sweep. The supplied coordinate is still evaluated and validated.
     Use at multiple horizons and independently varied outer/linear caps. Report
     fixed captured metadata in addition to each compiled argument inventory.
     """

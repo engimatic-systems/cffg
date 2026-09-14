@@ -148,6 +148,7 @@ EPIC_FILES = {
         "test_hybrid_joint_coordinate.py",
         "test_hybrid_joint_solver.py",
         "test_d12_moderate.py",
+        "test_d12_moderate_integrity.py",
         "test_hybrid_separator_kernels.py",
         "test_hybrid_separator_numerics.py",
         "test_hybrid_centering.py",
