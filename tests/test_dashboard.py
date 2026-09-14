@@ -10,6 +10,7 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -22,6 +23,13 @@ def load_dashboard():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def collection_order_hook():
+    spec = importlib.util.spec_from_file_location("cffg_collection_order", Path(__file__).with_name("conftest.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.pytest_collection_modifyitems
 
 
 @pytest.fixture
@@ -349,6 +357,102 @@ def test_runtime_wait_uses_only_comparable_retained_runs(
     state = dashboard.record_suite_runtime(tests, wall_seconds=80.0, pytest_code=0)
     assert [r["wall_seconds"] for r in state["previous-3"]] == [100.0, 90.0, 80.0]
     assert state["suggested_wait_seconds"] == 150
+    assert state["latest"]["file_seconds"] == {"test_alpha.py": 0.125, "test_beta.py": 0.25}
+    assert dashboard.suite_file_seconds() == state["latest"]["file_seconds"]
+
+
+def test_file_costs_ignore_unusable_and_nonpassing_history(dashboard, monkeypatch, tmp_path):
+    monkeypatch.setattr(dashboard, "RUNTIMES", tmp_path / "runtimes.json")
+    assert dashboard.suite_file_seconds() == {}
+    passed = {"selection": "not slow", "result": "passed", "file_seconds": {"test_alpha.py": 12.5}}
+    for unusable in (
+        {"result": "timed_out"}, {"result": "failed"}, {"selection": "slow"},
+        {"file_seconds": []}, {"file_seconds": {"test_alpha.py": float("nan")}},
+        {"file_seconds": {"test_alpha.py": -1}}, {"file_seconds": {"test_alpha.py": True}},
+        {"file_seconds": {"test_alpha.py": 10**400}},
+    ):
+        dashboard.RUNTIMES.write_text(json.dumps({"schema_version": 2, "previous-3": [passed, dict(passed, **unusable)]}))
+        assert dashboard.suite_file_seconds() == passed["file_seconds"]
+    dashboard.RUNTIMES.write_text("incomplete JSON")
+    assert dashboard.suite_file_seconds() == {}
+
+
+@pytest.mark.parametrize("costs", [{}, {"test_alpha.py": 12.5}])
+def test_driver_preserves_file_order_only_with_measured_costs(dashboard, monkeypatch, costs):
+    monkeypatch.setattr(dashboard, "suite_file_seconds", lambda: costs)
+    observed = {}
+
+    def start(command, **kwargs):
+        observed.update(command=command, environment=kwargs["env"])
+        return SimpleNamespace(wait=lambda timeout: 0)
+
+    monkeypatch.setattr(dashboard.subprocess, "Popen", start)
+    report, code, _ = dashboard.run_suite()
+    try:
+        assert code == 0
+        assert "--dist=loadfile" in observed["command"]
+        assert ("--no-loadscope-reorder" in observed["command"]) == bool(costs)
+        assert json.loads(observed["environment"]["CFFG_TEST_FILE_SECONDS"]) == costs
+        assert not any(arg.startswith("tests/") for arg in observed["command"])
+    finally:
+        report.unlink()
+
+
+@pytest.mark.parametrize("encoded", ["[]", "not JSON", '{"bad": -1}', '{"bad": NaN}', '{"bad": true}'])
+def test_collection_order_rejects_invalid_costs(monkeypatch, encoded):
+    monkeypatch.setenv("CFFG_TEST_FILE_SECONDS", encoded)
+    with pytest.raises(pytest.UsageError, match="invalid CFFG_TEST_FILE_SECONDS"):
+        collection_order_hook()([])
+
+
+def test_measured_collection_order_preserves_xdist_file_inventory(monkeypatch):
+    from xdist.scheduler.loadfile import LoadFileScheduling
+
+    items = [SimpleNamespace(path=Path("tests") / name, nodeid=f"tests/{name}::test_{i}")
+             for name, count in (("test_fast.py", 8), ("test_slow.py", 3), ("test_new.py", 3))
+             for i in range(count)]
+    original = [item.nodeid for item in items]
+    monkeypatch.delenv("CFFG_TEST_FILE_SECONDS", raising=False)
+    hook = collection_order_hook()
+    hook(items)
+    assert [item.nodeid for item in items] == original
+    monkeypatch.setenv("CFFG_TEST_FILE_SECONDS", json.dumps({"test_fast.py": 1, "test_slow.py": 100}))
+    hook(items)
+    ordered = [item.nodeid for item in items]
+    assert ordered == original[-3:] + original[8:11] + original[:8]
+
+    class Node:
+        shutting_down = False
+
+        def __init__(self, identifier):
+            self.pending = []
+            self.gateway = SimpleNamespace(id=identifier)
+
+        def send_runtest_some(self, indices):
+            self.pending.extend(indices)
+
+        def shutdown(self):
+            self.shutting_down = True
+
+    config = SimpleNamespace(getvalue=lambda name: ["popen", "popen"],
+                             option=SimpleNamespace(loadscopereorder=False))
+    scheduler = LoadFileScheduling(config)
+    nodes = [Node("gw0"), Node("gw1")]
+    for node in nodes:
+        scheduler.add_node(node)
+        scheduler.add_node_collection(node, ordered)
+    scheduler.schedule()
+    assert [ordered[node.pending[0]].split("::")[0] for node in nodes] == [
+        "tests/test_new.py", "tests/test_slow.py"]
+    completed = []
+    while any(node.pending for node in nodes):
+        for node in nodes:
+            if node.pending:
+                index = node.pending.pop(0)
+                completed.append(index)
+                scheduler.mark_test_complete(node, index)
+    assert sorted(completed) == list(range(len(original)))
+    assert scheduler.tests_finished
 
 
 @pytest.mark.parametrize(

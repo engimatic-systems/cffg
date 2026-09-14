@@ -11,6 +11,7 @@ slices; the data port awaits an observation clamp.
 """
 
 import json
+import math
 import os
 import re
 import shutil
@@ -34,6 +35,28 @@ from cffg.core import (
 # (tools/dashboard.py) picks them up and shows them under the matching test row.
 VIZ_ARTIFACTS = Path(__file__).parent / ".artifacts"
 _TIMING_LOG = None
+
+
+def pytest_collection_modifyitems(items):
+    """Order complete files by measured cost without changing collected items."""
+    if not (encoded := os.environ.get("CFFG_TEST_FILE_SECONDS")):
+        return
+    try:
+        costs = json.loads(encoded)
+        if not isinstance(costs, dict) or any(
+            type(seconds) not in (int, float) or not math.isfinite(seconds) or seconds < 0
+            for seconds in costs.values()
+        ):
+            raise ValueError("expected finite nonnegative file durations")
+    except (ValueError, OverflowError) as error:
+        raise pytest.UsageError(f"invalid CFFG_TEST_FILE_SECONDS: {error}") from error
+    if costs:
+        # Unknown files run first; stable sorting preserves their collected order.
+        def priority(item):
+            name = Path(item.path).name
+            return name in costs, -costs.get(name, 0)
+
+        items.sort(key=priority)
 
 
 def pytest_sessionstart(session):

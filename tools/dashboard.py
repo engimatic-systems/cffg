@@ -167,6 +167,36 @@ class DashboardError(ValueError):
     """A JUnit report cannot truthfully certify the current default suite."""
 
 
+def suite_file_seconds() -> dict[str, float]:
+    """Return usable file costs from the latest passing default-suite record."""
+    try:
+        state = json.loads(RUNTIMES.read_text())
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(state, dict) or state.get("schema_version") != 2:
+        return {}
+    previous = state.get("previous-3")
+    if not isinstance(previous, list):
+        return {}
+    for record in reversed(previous):
+        if not isinstance(record, dict) or record.get("result") != "passed" or record.get("selection") != SUITE_SELECTION:
+            continue
+        costs = record.get("file_seconds")
+        if not isinstance(costs, dict) or not costs:
+            continue
+        try:
+            valid = all(
+                isinstance(name, str) and type(seconds) in (int, float)
+                and math.isfinite(seconds) and seconds >= 0
+                for name, seconds in costs.items()
+            )
+        except OverflowError:
+            valid = False
+        if valid:
+            return costs
+    return {}
+
+
 def run_suite() -> tuple[Path, int, float]:
     """Run the default short suite; return its report, status, and wall time."""
     started = time.monotonic()
@@ -174,7 +204,11 @@ def run_suite() -> tuple[Path, int, float]:
         xml_path = Path(tmp.name)
     timings_path = xml_path.with_suffix(".timings.jsonl")
     environment = dict(os.environ, CFFG_TEST_TIMINGS=str(timings_path))
+    file_seconds = suite_file_seconds()
+    environment["CFFG_TEST_FILE_SECONDS"] = json.dumps(file_seconds, allow_nan=False)
+    ordering = ["--no-loadscope-reorder"] if file_seconds else []
     print(f"Short-suite deadline: {SHORT_SUITE_SECONDS:g}s; {SHORT_SUITE_WORKERS} workers; live timings: {timings_path}", flush=True)
+    print(f"File ordering: measured costs for {len(file_seconds)} files" if file_seconds else "File ordering: default test-count order", flush=True)
     with tempfile.TemporaryDirectory(prefix="cffg-suite-cache-") as cache:
         cache_mode = "caller-provided" if environment.get("JAX_COMPILATION_CACHE_DIR") else "empty at start"
         if not environment.get("JAX_COMPILATION_CACHE_DIR"):
@@ -185,7 +219,7 @@ def run_suite() -> tuple[Path, int, float]:
         print(f"JAX executable cache: {cache_mode}; limit {environment['JAX_COMPILATION_CACHE_MAX_SIZE']} bytes; all tests execute", flush=True)
         process = subprocess.Popen(
             ["uv", "run", "pytest", "-q", "-n", str(SHORT_SUITE_WORKERS),
-             "--dist=loadfile", "--max-worker-restart=0", "--durations=25", f"--junitxml={xml_path}"],
+             "--dist=loadfile", *ordering, "--max-worker-restart=0", "--durations=25", f"--junitxml={xml_path}"],
             cwd=REPO, start_new_session=True, env=environment,
         )
         try:
@@ -398,6 +432,12 @@ def record_suite_runtime(
         "wall_seconds": round(float(wall_seconds), 3),
         "case_seconds": None if tests is None else round(sum(test["ms"] for test in tests) / 1000, 3),
     }
+    if result == "passed":
+        costs = {}
+        for test in tests:
+            costs[test["file"]] = costs.get(test["file"], 0.0) + test["ms"] / 1000
+        record["file_seconds"] = {name: round(seconds, 6) for name, seconds in costs.items()}
+        record["file_seconds_source"] = "JUnit testcase durations"
     previous.append(record)
     previous = previous[-RUNTIME_HISTORY_LIMIT:]
     # Compare like-for-like suite selections so an opt-in slow run cannot

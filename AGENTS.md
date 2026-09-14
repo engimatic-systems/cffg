@@ -116,6 +116,9 @@ This project will span many context windows. The rule that makes that survivable
   and refresh both that runtime history and `~/agent-share/cffg-tests.html`
   (add new test files to `EPIC_FILES`). The runner uses four pytest workers,
   keeps each file together, and disables retries after a worker crash.
+  It orders files by their latest usable measured costs, with new files first,
+  while preserving test order within each file. Without usable cost history it
+  uses xdist's default file ordering.
   By default the runner starts with an
   empty temporary JAX compilation cache with a 1-GiB limit and file locking,
   reuses machine code within the run,
