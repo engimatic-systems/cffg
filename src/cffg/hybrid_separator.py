@@ -42,19 +42,28 @@ def pg_mean_xi(xi):
     return jnp.where(small, series, jnp.tanh(safe / 2) / (2 * safe))
 
 
+def _jj_base_xi(xi):
+    """JJ constant -log(2 cosh(c/2))+omega(c)c²/2 with c²=xi.
+
+    Combining the series before differentiation preserves its zero xi slope
+    at the origin; canceling two separate O(1) slopes would hide small variance.
+    """
+    small = xi <= jnp.sqrt(jnp.finfo(xi.dtype).eps)
+    safe_xi = jnp.where(small, 1, xi)
+    c = jnp.sqrt(safe_xi)
+    series_xi = jnp.where(small, xi, 0)
+    series = -jnp.log(jnp.asarray(2, xi.dtype)) - series_xi ** 2 / 192 + series_xi ** 3 / 1440
+    direct = -jnp.logaddexp(c / 2, -c / 2) + pg_mean_xi(safe_xi) * safe_xi / 2
+    return jnp.where(small, series, direct)
+
+
 def recurrence_potential(weights, offsets, xi):
     """D11.5 polynomial using O(K² d²) prefix storage, no K³ stick tensor."""
     card, dim = _recurrence_shapes(weights, offsets, xi)
     finite = jnp.all(jnp.isfinite(weights)) & jnp.all(jnp.isfinite(offsets)) & jnp.all(jnp.isfinite(xi))
     status = failure(~finite, Status.NONFINITE) | failure(jnp.any(xi < 0), Status.INVALID)
     omega = pg_mean_xi(xi)
-    small = xi <= jnp.sqrt(jnp.finfo(xi.dtype).eps)
-    safe = jnp.sqrt(jnp.where(small, 1, xi))
-    series_xi = jnp.where(small, xi, 0)
-    log_cosh = jnp.where(small, jnp.log(jnp.asarray(2, xi.dtype)) + series_xi / 8
-                        - series_xi * series_xi / 192 + series_xi ** 3 / 2880,
-                        jnp.logaddexp(safe / 2, -safe / 2))
-    rejected_a = -log_cosh + omega * (xi - offsets * offsets) / 2 - offsets / 2
+    rejected_a = _jj_base_xi(xi) - omega * offsets * offsets / 2 - offsets / 2
     rejected_h = -(0.5 + omega * offsets)[..., None] * weights
     rejected_j = omega[..., None, None] * weights[..., :, None] * weights[..., None, :]
 
@@ -105,6 +114,17 @@ def transition(weights, offsets, xi, matrix, bias, noise, *, channel="destinatio
     precision = (precision + precision.swapaxes(-1, -2)) / 2
     result = Natural(constant, linear, precision, status)
     return result._replace(status=coordinate_status(result))
+
+
+class TransitionParameters(NamedTuple):
+    """Original D12 parameters retained for stable energy and xi derivatives."""
+
+    weights: jax.Array
+    offsets: jax.Array
+    xi: jax.Array
+    matrix: jax.Array
+    bias: jax.Array
+    noise: jax.Array
 
 
 def source_region(region):
@@ -199,6 +219,49 @@ def auxiliary_statistics(region, weights, offsets, xi):
                        (target, residual, exposure, linear, precision)), status)
 
 
+def transition_expectation(region, parameters):
+    """Expected log recurrence/channel from the same belief, without expansion.
+
+    Recurrence uses Var[psi]+E[psi]², preserving variance when a large mean
+    cancels an offset. The affine channel whitens its residual mean and its
+    transformed covariance square root. Both are algebraically the original
+    D12 factor energy, including the complete Gaussian normalizer.
+
+    An already-expanded Natural cannot recover small terms lost in its raw
+    coefficients/second moments. The chain evaluator retains these original
+    parameters and uses this path as its owned regional expectation.
+    """
+    weights, offsets, xi, matrix, bias, noise = parameters
+    factor = transition(*parameters)
+    auxiliary = auxiliary_statistics(region, weights, offsets, xi)
+    source = source_region(region)
+    _, risk_mean, _ = _conditional_at_risk(source.probability, source.mean, source.covariance)
+    success_mean = jnp.einsum("ild,ild->il", weights, source.mean[:, :-1]) + offsets
+    risk_logit = jnp.einsum("ild,ild->il", weights, risk_mean) + offsets
+    linear = source.probability[:, :-1] * success_mean - auxiliary.exposure * risk_logit / 2
+    recurrence = jnp.sum(linear + auxiliary.exposure *
+                         (_jj_base_xi(xi) - pg_mean_xi(xi) * auxiliary.target / 2))
+
+    card, _, dim = weights.shape
+    active = region.probability > 0
+    mean_residual = region.mean[..., dim:] - jnp.einsum("jab,ijb->ija", matrix, source.mean) - bias[None]
+    covariance = jnp.where(active[..., None, None], region.covariance, jnp.eye(2 * dim, dtype=weights.dtype))
+    covariance_root = jnp.linalg.cholesky(covariance)
+    transform = jnp.concatenate((-matrix, jnp.broadcast_to(jnp.eye(dim, dtype=weights.dtype), matrix.shape)), axis=-1)
+    residual_root = jnp.einsum("jab,ijbc->ijac", transform, covariance_root)
+    noise_root = jnp.linalg.cholesky(noise)
+    logdet = 2 * jnp.log(jnp.diagonal(noise_root, axis1=-2, axis2=-1)).sum(axis=-1)
+    noise_root = jnp.broadcast_to(noise_root[None], (card, card, dim, dim))
+    whitened_mean = jax.scipy.linalg.solve_triangular(noise_root, mean_residual[..., None], lower=True)
+    whitened_root = jax.scipy.linalg.solve_triangular(noise_root, residual_root, lower=True)
+    quadratic = (whitened_mean ** 2).sum(axis=(-2, -1)) + (whitened_root ** 2).sum(axis=(-2, -1))
+    dynamics = -jnp.sum(jnp.where(active, region.probability *
+                                (dim * jnp.log(2 * jnp.pi) + logdet[None] + quadratic) / 2, 0))
+    value = recurrence + dynamics
+    status = factor.status | auxiliary.status | failure(~jnp.isfinite(value), Status.NONFINITE)
+    return jnp.where(status == 0, value, jnp.nan), status
+
+
 def moment_residual(projected, separator):
     """Scaled label and conditional-moment residual, including tiny active labels.
 
@@ -253,15 +316,19 @@ def _combine_status(value):
     return jnp.bitwise_or.reduce(jnp.asarray(value, jnp.int32).reshape(-1))
 
 
-def evaluate(factors, sites, messages):
+def evaluate(parameters, sites, messages):
     """Pure batched fixed-xi chain evaluation; no iterative policy or Jacobian.
 
-    Inputs are stacked Naturals: factors [T-1,K,K,2d], sites [T,K,d], and
-    the two directed message banks [T-1,K,d]. Status has the same leading
-    stack length. D12.4 energy is a feasible objective only at consistency;
+    Inputs are stacked TransitionParameters, sites [T,K,d], and two directed
+    Natural message banks [T-1,K,d]. Natural status has the same leading
+    stack length. Keeping original parameters avoids cancellation in the owned
+    transition expectation. D12.4 energy is feasible only at consistency;
     D12.9 dual and incidence residuals remain separately named diagnostics.
     Work is O(T K² d³), storage O(T K² d²); only local covariances exist.
     """
+    if not isinstance(parameters, TransitionParameters):
+        raise TypeError("D12 evaluation requires original TransitionParameters for stable energy")
+    factors = jax.vmap(lambda p: transition(*p))(parameters)
     left, right = messages
     count = factors.constant.shape[0]
     if count < 1 or sites.constant.shape[0] != count + 1:
@@ -290,12 +357,13 @@ def evaluate(factors, sites, messages):
     regions = jax.vmap(normalize)(tilted)
     projections = tuple(jax.vmap(lambda b: marginal(b, side))(regions) for side in (0, 1))
     targets = tuple(jax.vmap(quotient)(b, c) for b, c in zip(projections, (left_cavity, right_cavity)))
-    regional_energy = -jax.vmap(Belief.entropy)(regions) - jax.vmap(Belief.expectation)(regions, factors)
+    expectations, energy_status = jax.vmap(transition_expectation)(regions, parameters)
+    regional_energy = -jax.vmap(Belief.entropy)(regions) - expectations
     separator_entropy = jax.vmap(Belief.entropy)(separators)
     site_energy = jax.vmap(Belief.expectation)(separators, sites)
     free_energy = regional_energy.sum() + separator_entropy[1:-1].sum() - site_energy.sum()
     dual_energy = -regions.log_normalizer.sum() + separators.log_normalizer[1:-1].sum()
-    moment_values, natural_values, statuses = [], [], [regions.status, separators.status]
+    moment_values, natural_values, statuses = [], [], [regions.status, separators.status, energy_status]
     for side, projection, message, target in zip((0, 1), projections, messages, targets):
         incident = jax.tree.map(lambda x: x[side:side + count], separators)
         value, status = jax.vmap(moment_residual)(projection, incident)

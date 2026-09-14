@@ -855,8 +855,10 @@ counterexample in D12.7 limits the exactness claim even at zero EC residual.
 Production remains D9. `hybrid_natural.py` and `hybrid_separator.py` implement
 the unbound local JAX mathematics: labeled Gaussian integration, signed natural
 quotients, explicit ordinary adapters, destination-selected grouped tilts, tied
-xi residuals, and pair-conditioned learning increments. Their pure batched
-chain evaluator returns the D12 primal expression, dual, and separately scaled
+xi residuals, and pair-conditioned learning increments. The pure batched
+chain evaluator keeps original `TransitionParameters` and evaluates its
+regional energy through centered recurrence moments and whitened channel
+residuals. It returns the D12 primal expression, dual, and separately scaled
 conditional-moment and quotient residuals. It supplies no iteration policy.
 Numerical failures carry the same array status in host/JIT and single/vmap
 execution; `raise_for_status` is the host exception boundary. Exact
@@ -865,8 +867,10 @@ than deleting a label. `experiments/hybrid_separator.py` remains the NumPy
 derivation anchor. Neither local implementation is a second runtime route.
 The Derived component coordinate
 row inventories the implementation: cff-k6g5 owns serialized declarations and
-identity; cff-ffsg owns local JAX mathematics; cff-7sw5 owns bounded compiler
-plans; cff-f3jz owns execution, joint solver status, and the ledger; cff-czdq owns
+identity; cff-ffsg owns local JAX mathematics; cff-a3wz qualifies joint numerical
+policy before cff-7sw5 supplies bounded compiler plans. Then cff-idhk owns
+component state/lifecycle/transport, cff-brcf owns objective/internal readouts,
+and cff-f3jz activates public execution/status. cff-czdq owns
 learning/readout/persistence semantics; cff-kul2 owns public composition and
 execution parity. cff-ulbz supplies the explicitly selected D11.14 EC binding
 where exterior mixture ports remain; internal affine switching dynamics uses

@@ -7,7 +7,7 @@ import pytest
 
 from cffg import hybrid_natural as hn
 from cffg import hybrid_separator as hs
-from hybrid_kernel_cases import build, case, messages, natural, stack, tolerance, unstack, weighted
+from hybrid_kernel_cases import build, case, messages, natural, parameters, stack, tolerance, unstack, weighted
 from hybrid_separator_reference import conditional_moments, enumerate_chain, recurrence_increments, reflected_mixture_gap
 from regime_trajectory_reference import switched_prior_reference
 
@@ -71,7 +71,7 @@ def test_pure_chain_evaluation_matches_experiment_without_running_a_jax_solver(d
 
     args = case(3, dtype)
     factors, sites = build(args)
-    output = jax.jit(hs.evaluate)(factors, sites, messages(sites))
+    output = jax.jit(hs.evaluate)(parameters(args), sites, messages(sites))
     reference_factors = [experiment.Natural(*(np.asarray(x) for x in n.arrays())) for n in unstack(factors)]
     reference_sites = [experiment.Natural(*(np.asarray(x) for x in n.arrays())) for n in unstack(sites)]
     expected = experiment.evaluate(reference_factors, reference_sites, experiment.initial_messages(reference_sites))
@@ -98,7 +98,7 @@ def test_stationary_local_evaluation_preserves_temporal_gap_and_d9_reduction(ind
     solved = experiment.solve(reference_factors, reference_sites)
     assert solved.status == "converged"
     outgoing = tuple(stack([natural(pair[side]) for pair in solved.messages]) for side in (0, 1))
-    result = hs.evaluate(factors, sites, outgoing)
+    result = hs.evaluate(parameters(args), sites, outgoing)
     hn.raise_for_status(result.status)
     assert result.moment_residual < 1e-7
     assert result.quotient_residual < 1e-7
@@ -116,7 +116,8 @@ def test_stationary_local_evaluation_preserves_temporal_gap_and_d9_reduction(ind
 def test_dual_autodiff_and_independent_difference_equal_incidence_residual(coordinate):
     factors, sites = build(case(3))
     outgoing = messages(sites)
-    base = hs.evaluate(factors, sites, outgoing)
+    params = parameters(case(3))
+    base = hs.evaluate(params, sites, outgoing)
     q = jax.tree.map(lambda x: x[1], base.separators)
     b = hn.marginal(jax.tree.map(lambda x: x[1], base.regions), 0)
     expected = {"constant": q.probability[1] - b.probability[1],
@@ -126,7 +127,7 @@ def test_dual_autodiff_and_independent_difference_equal_incidence_residual(coord
 
     def dual(shift):
         changed = outgoing[1]._replace(**{coordinate: getattr(outgoing[1], coordinate).at[index].add(shift)})
-        return hs.evaluate(factors, sites, (outgoing[0], changed)).dual_energy
+        return hs.evaluate(params, sites, (outgoing[0], changed)).dual_energy
 
     step = np.finfo(np.float64).eps ** (1 / 3)
     assert jax.grad(dual)(0.0) == pytest.approx(float(expected), abs=128 * step ** 2)
@@ -162,18 +163,18 @@ def test_independent_symmetric_precision_coordinate_has_full_off_diagonal_deriva
                            precision=sites.precision * jnp.eye(2))
     args = case(3)
     weights = jnp.stack((jnp.asarray(args["weights"]), jnp.full((2, 2), 0.15)), axis=-1)[:, :, None]
-    factors = jax.vmap(hs.transition)(weights, jnp.asarray(args["offsets"])[..., None], jnp.ones((2, 2, 1)),
-                                      jnp.asarray(args["matrix"])[..., None, None] * jnp.eye(2),
-                                      jnp.zeros((2, 2, 2)), jnp.asarray(args["noise"])[..., None, None] * jnp.eye(2))
+    params = hs.TransitionParameters(weights, jnp.asarray(args["offsets"])[..., None], jnp.ones((2, 2, 1)),
+                                     jnp.asarray(args["matrix"])[..., None, None] * jnp.eye(2),
+                                     jnp.zeros((2, 2, 2)), jnp.asarray(args["noise"])[..., None, None] * jnp.eye(2))
     outgoing = messages(sites)
-    result = hs.evaluate(factors, sites, outgoing)
+    result = hs.evaluate(params, sites, outgoing)
     q = jax.tree.map(lambda x: x[1], result.separators)
     b = hn.marginal(jax.tree.map(lambda x: x[1], result.regions), 0)
     expected = -(q.probability[1] * q.second[1, 0, 1] - b.probability[1] * b.second[1, 0, 1])
 
     def dual(shift):
         matrix = outgoing[1].precision.at[0, 1, 0, 1].add(shift).at[0, 1, 1, 0].add(shift)
-        return hs.evaluate(factors, sites, (outgoing[0], outgoing[1]._replace(precision=matrix))).dual_energy
+        return hs.evaluate(params, sites, (outgoing[0], outgoing[1]._replace(precision=matrix))).dual_energy
 
     step = np.finfo(np.float64).eps ** (1 / 3)
     assert jax.grad(dual)(0.0) == pytest.approx(float(expected), abs=128 * step ** 2)

@@ -2879,14 +2879,32 @@ The local JAX implementation is `src/cffg/hybrid_natural.py` and
 `transition` accepts **xi=c²**, including a differentiable analytic limit at
 zero. `auxiliary_statistics` returns per-source/stick targets, residuals,
 exposures and augmented-feature learning increments from the supplied grouped
-belief. `evaluate` accepts stacked factor/site coordinates and two directed
-message banks. It returns labeled primal and dual expressions, moment and
+belief. `evaluate` accepts stacked `TransitionParameters`, site coordinates
+and two directed message banks. It returns labeled primal and dual expressions, moment and
 quotient residuals, and status without running an iterative solver. Its
 conditional mean/covariance residual is unweighted by label probability;
 rare active labels cannot hide an inconsistent conditional covariance.
 Callers must establish moment consistency before treating the primal
 expression as a feasible EC objective. Joint numerical qualification is the
 separate prerequisite cff-a3wz.
+
+The owned regional expectation retains the original recurrence/channel
+parameters. It evaluates the same D12 factor energy using centered conditional
+variance plus squared affine mean, and whitened channel residuals. This avoids
+losing a small logit variance when a large mean cancels an offset. The JJ
+constant has a combined xi series so its derivative does not cancel two
+separate constant-sized terms at zero. Large common natural gauges are removed
+before adding Gaussian integration terms, and log probabilities normalize on
+centered scores separately from the full log normalizer.
+
+Generic already-expanded `Natural` coefficients cannot recover small terms
+lost during their construction or raw-moment contraction. The parameter-aware
+energy path does not by itself repair tilt assembly: the executable diagnostic
+`tests/hybrid_centering_reproduction.py` currently exposes a remaining float32
+translation defect (mean 100, variance 1e-4, recurrence offset -100 changes
+pair probability by about 0.241 despite OK status). Its assertion deliberately
+fails. This is an unresolved local numerical implementation issue, not a new
+approximation or a passing qualification claim.
 
 The JAX numerical contract uses bitmask status values: malformed finite
 coordinates, empty support, improper active beliefs, changed quotient support,

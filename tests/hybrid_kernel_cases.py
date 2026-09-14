@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from cffg.hybrid_natural import Natural
-from cffg.hybrid_separator import transition
+from cffg.hybrid_separator import TransitionParameters, transition
 
 
 def tolerance(dtype, terms=4):
@@ -48,6 +48,13 @@ def build(args):
                                    arrays["c"][..., None] ** 2, arrays["matrix"][..., None, None],
                                    arrays["bias"][..., None], arrays["noise"][..., None, None])
     return factors, sites
+
+
+def parameters(args):
+    arrays = {key: jnp.asarray(value) for key, value in args.items()}
+    return TransitionParameters(arrays["weights"][..., None, None], arrays["offsets"][..., None],
+                                arrays["c"][..., None] ** 2, arrays["matrix"][..., None, None],
+                                arrays["bias"][..., None], arrays["noise"][..., None, None])
 
 
 def messages(sites):

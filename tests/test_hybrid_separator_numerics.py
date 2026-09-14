@@ -7,7 +7,7 @@ import pytest
 
 from cffg import hybrid_natural as hn
 from cffg import hybrid_separator as hs
-from hybrid_kernel_cases import build, case, messages, stack, tolerance, unstack
+from hybrid_kernel_cases import build, case, messages, parameters, stack, tolerance, unstack
 
 
 def site(dtype=np.float64, card=2, dim=1):
@@ -152,6 +152,26 @@ def test_auxiliary_retains_variance_when_large_affine_mean_cancels(dtype, mean, 
         derivative = jax.grad(target)(weights)
         np.testing.assert_allclose(derivative, 2 * variance, atol=0, rtol=budget)
 
+    params = hs.TransitionParameters(weights, offsets, xi, jnp.zeros((2, 1, 1), dtype),
+                                     jnp.zeros((2, 1), dtype), jnp.ones((2, 1, 1), dtype))
+    expected = -np.log(2) - variance / 8 - (np.log(2 * np.pi) + 1) / 2
+    for expectation in (hs.transition_expectation, jax.jit(hs.transition_expectation)):
+        value, status = expectation(region, params)
+        hn.raise_for_status(status)
+        assert value == pytest.approx(expected, abs=budget * abs(expected))
+
+        def held_energy(coordinate):
+            return -expectation(region, params._replace(xi=coordinate))[0]
+
+        derivative = jax.grad(held_energy)(xi)
+        np.testing.assert_allclose(derivative, result.exposure * result.residual / 96, atol=0, rtol=budget)
+
+
+def test_owned_evaluator_requires_parameters_instead_of_expanded_potentials():
+    factors, sites = build(case(3))
+    with pytest.raises(TypeError, match="original TransitionParameters"):
+        hs.evaluate(factors, sites, messages(sites))
+
 
 @pytest.mark.parametrize("dtype", (np.float32, np.float64))
 def test_at_risk_covariance_retains_small_variance_after_distant_label_is_excluded(dtype):
@@ -172,7 +192,7 @@ def test_nonfinite_objective_and_residual_never_report_success():
     factors, sites = build(case(3))
     outgoing = messages(sites)
     outgoing = (outgoing[0]._replace(linear=outgoing[0].linear.at[0, 0, 0].set(jnp.nan)), outgoing[1])
-    result = jax.jit(hs.evaluate)(factors, sites, outgoing)
+    result = jax.jit(hs.evaluate)(parameters(case(3)), sites, outgoing)
     assert result.status & hn.Status.NONFINITE
     for value in (result.free_energy, result.dual_energy, result.moment_residual, result.quotient_residual):
         assert not np.isfinite(value)
@@ -243,8 +263,8 @@ def test_single_vmap_jit_agree_for_all_local_outputs(dtype):
     for result in (jax.vmap(local)(factors, left, right), jax.jit(jax.vmap(local))(factors, left, right)):
         for actual, expected in zip(jax.tree.leaves(result), jax.tree.leaves(individual)):
             np.testing.assert_allclose(actual, expected, atol=tolerance(dtype), rtol=tolerance(dtype))
-    eager = hs.evaluate(factors, sites, messages(sites))
-    compiled = jax.jit(hs.evaluate)(factors, sites, messages(sites))
+    eager = hs.evaluate(parameters(case(3, dtype)), sites, messages(sites))
+    compiled = jax.jit(hs.evaluate)(parameters(case(3, dtype)), sites, messages(sites))
     for actual, expected in zip(jax.tree.leaves(compiled), jax.tree.leaves(eager)):
         np.testing.assert_allclose(actual, expected, atol=tolerance(dtype), rtol=tolerance(dtype))
 
@@ -268,7 +288,7 @@ def test_float32_polynomial_local_inventory(card, dim):
 
 def test_hundred_slice_float32_evaluation_stores_only_local_covariances():
     factors, sites = build(case(100, np.float32))
-    result = jax.jit(hs.evaluate)(factors, sites, messages(sites))
+    result = jax.jit(hs.evaluate)(parameters(case(100, np.float32)), sites, messages(sites))
     hn.raise_for_status(result.status)
     assert result.regions.covariance.shape == (99, 2, 2, 2, 2)
     assert result.separators.covariance.shape == (100, 2, 1, 1)
