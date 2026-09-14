@@ -68,3 +68,7 @@ Prospective implementation: increase the default worker count from three to four
 **2026-09-14T17:27:13Z**
 
 Implemented the prospective scheduling change: four workers, with the same 1200-second deadline, loadfile grouping, no worker retries, initially empty locked 1-GiB cache and unchanged numerical selection/assertions. AGENTS.md matches the runner. Focused command: uv run pytest -q -n 4 --dist=loadfile --max-worker-restart=0 tests/test_dashboard.py --junitxml=/tmp/cdc-bwta-focused.xml; 21 passed in 1.98s, log /tmp/cdc-bwta-focused.log. git diff --check passed. The full combined gate is pending completion of both independent Y15D reviews and any resulting author fixes.
+
+**2026-09-14T18:10:18Z**
+
+Independent scheduling review is complete at 95f4046: no findings. The fresh read-only reviewer verified that only the worker default changed from three to four and that deadline, grouping, no-retry policy, cache rules, numerical selection/assertions and failure publication remain intact. Report: /tmp/cdc-bwta-review.txt; completed Codex CLI process exited 0. The reviewer ran no tests and made no numerical-solver claim. Focused evidence remains 21 passed in 1.98s. Y15D author repairs are now committed at d5e33ae and independently re-reviewing; the new-source checkpoint and combined final full suite remain pending. No timing estimate has been promoted to a measured four-worker result.
