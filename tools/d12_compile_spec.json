@@ -1,0 +1,65 @@
+{
+  "schema": "cffg.d12-compile-plan.v1",
+  "ticket": "cdc-ogj9",
+  "purpose": "Two compile-only horizon measurements and one bounded output-selection comparison; no solve execution or numerical qualification.",
+  "cases": [
+    {"id": "t32-full", "T": 32, "K": 4, "d": 2, "outputs": "full"},
+    {"id": "t32-inference", "T": 32, "K": 4, "d": 2, "outputs": "inference"},
+    {"id": "t100-full", "T": 100, "K": 4, "d": 2, "outputs": "full"}
+  ],
+  "fixture": {
+    "source": ".tickets/cff-a3wz.md, criterion 7 and frozen formula; indices t=0..T-1, i,j=0..3, l=0..2; L=T-1",
+    "construction": "Evaluate formulas in NumPy float64, round once into stored float32 arrays; no JAX float64 values. Broadcast fixed transition arrays over L.",
+    "weights_il": ["0.12*(i-1.5)+0.04*(l-1)", "-0.08*(i-1.5)+0.03*(l-1)"],
+    "offsets_il": "0.10*(i-1.5)-0.15*(l-1)",
+    "matrix_j": [["0.65+0.04*j", "0.03"], ["-0.02", "0.80-0.03*j"]],
+    "bias_j": ["0.10-0.05*j", "-0.15+0.04*j"],
+    "noise_j_diagonal": ["0.8+0.1*j", "1.1+0.05*j"],
+    "site_constant_ti": "-0.2-0.1*i",
+    "site_linear_ti": ["0.1*(i-1.5)+0.05*(-1)**t", "-0.08*(i-1.5)+0.03*((t%3)-1)"],
+    "site_precision_ti_diagonal": ["0.9+0.1*i", "1.1+0.05*i"],
+    "origins": "fixed zeros [T,K,d]; full support",
+    "parameter_xi": "zeros [L,K,K-1]; replaced by the solver coordinate",
+    "initial_xi": 0.0,
+    "initialization": "existing unperturbed feasible initializer inside complete solve, compiled but never executed"
+  },
+  "budgets": {"outer": 200, "trials": 24, "linear": 128, "backtrack": 0.5, "armijo": 0.0001},
+  "policy": {
+    "source": "qualified Y15D defaults, tests/fixtures/hybrid-joint-candidate-spec.json strategy; no restarts or tuning",
+    "thresholds": "unchanged production tolerance(dtype) = 64*eps(dtype)**0.75; compile-only evidence makes no convergence claim",
+    "program": "hybrid_joint_storage.programs(coordinate, budgets)['solve']",
+    "dynamic_arguments": ["TransitionParameters", "Natural unary sites including status/origins", "scalar initial_xi"],
+    "static_metadata": "Coordinate support, origins, active/gauge/auxiliary index maps; identical fixed layout per T; no dynamic parameter values captured",
+    "inference_outputs": ["coordinate", "free_energy", "dual_energy", "certificates", "evaluation_status", "local_status", "auxiliary_status", "iterations", "evaluations", "rejected_trials", "linear_iterations", "gauss_newton_steps", "relative_energy_change", "rejection_counts", "last_rejection", "status", "reason"],
+    "inference_semantics": "Select fields only after the unchanged complete solver returns. Auxiliary/learning finiteness remains a status dependency. This is not a no-learning mode.",
+    "reporting_excluded": "Physical learning conversion, NumPy export and recovery fitting are absent from both programs. Full means the native complete solver State, including centered learning arrays and beliefs."
+  },
+  "runtime": {
+    "backend": "cpu",
+    "jax_enable_x64": false,
+    "jax_explicit_x64_dtypes": "error",
+    "floating_dtype": "float32",
+    "persistent_cache": "disabled via config; XLA auxiliary caches disabled; record actual settings and compiler logs",
+    "processes": "one fresh subprocess per case, sequential, no repeats; stop sequence on first failure/resource stop",
+    "reuse": "Retain Lowered and Compiled objects through reporting. Never call Compiled. No cross-process executable reuse, timing warm-up or recovery start.",
+    "timing": "perf_counter_ns; lower() and compile() separately, dtype/IR/memory inspection outside both timers; compile() is executable acquisition",
+    "memory": "XLA estimates separate from logical leaves and process memory; parent os.wait4 child ru_maxrss gives independent process high-water (Darwin bytes, Linux KiB). ps rss is a sampled current-RSS diagnostic in KiB, not a phase peak.",
+    "internal_dtypes": "Check floating leaves in arguments/fixed metadata/lowered and compiled output descriptors, and all StableHLO operand/result/block-argument element types. No runtime internal arrays or terminal results are observed.",
+    "cache_evidence": "Record compiler log and actual disabled settings. Exactly one lower/compile call per process; no full-program in-process reuse is requested. OS/compiler internals may still reuse resources; no repeated-execution speed claim."
+  },
+  "limits": {
+    "lower_seconds": 180,
+    "compile_seconds": 900,
+    "worker_seconds": 1200,
+    "rss_bytes": 42949672960,
+    "sample_seconds": 1.0,
+    "terminate_grace_seconds": 5.0,
+    "policy": "Diagnostic soft limits, not allocation guarantees; transient RSS can exceed the sampled limit. Terminate the process group, then kill after grace; preserve logs, samples, last worker checkpoint and wait4 high-water. No automatic retry or continuation."
+  },
+  "interpretation": {
+    "scope": "Two measured horizons, no asymptotic fit. Compare compiler outputs and storage estimates, not numerical accuracy or optimizer runtime.",
+    "current_users": "Unbound D12 has no public compiler/Engine activation; existing public D9 compilation remains independent. D12 holds parameters fixed and does not perform recovery fitting.",
+    "costs": "Shape/static-layout changes can require compilation; compatible dynamic inputs could reuse an executable. Repeated parameter fitting adds inference executions. Moderate execution timing is still needed to assess amortization.",
+    "limits": "Recovery quality remains unestablished. Dropping learning-finiteness checks, changing xi updates, objectives or certification changes failure/inference semantics and is outside this experiment."
+  }
+}
