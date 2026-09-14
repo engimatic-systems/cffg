@@ -877,6 +877,31 @@ returned coordinate. Convergence, exhaustion and divergence have int32 outcomes
 and explicit reasons. `hybrid_joint_storage.py` exposes logical leaf inventories
 and enclosing programs for dynamic-argument compiled memory measurements; these
 interfaces alone make no measured complete-iteration storage claim.
+
+The opt-in developer tool `tools/d12_compile_scaling.py` measures compilation
+of the complete fixed-parameter solve. Its [frozen first measurement](../tools/measurements/d12-compile-001.json)
+used native float32, K=4, d=2, separate CPU processes and disabled persistent
+caches. Each executable was acquired once and never called:
+
+| Horizon and outputs | Lowering (s) | Executable acquisition (s) | XLA temporary bytes | Process high-water (GiB) |
+| --- | ---: | ---: | ---: | ---: |
+| T32, complete State | 10.62 | 192.72 | 5,363,256 | 20.38 |
+| T32, inference fields | 9.15 | 199.90 | 5,506,552 | 20.22 |
+| T100, complete State | 9.26 | 193.09 | 17,190,520 | 18.63 |
+
+These two horizons show similar acquisition times; they do not establish an
+asymptotic law. Process high-water includes compiler memory and is separate
+from XLA's executable storage estimates. Output selection reduced output bytes
+from 157,656 to 7,584 but demonstrated no compilation saving. It also omits
+beliefs and other State payloads, so it does not isolate learning costs. The
+unchanged solver still checks learning-array finiteness as part of inference
+status. Physical learning conversion and export are absent from both programs.
+D12 already holds parameters fixed and performs no recovery fit. There is no
+public D12 no-learning mode. Production remains D9 and incurs no D12 compilation.
+Reusing an executable for compatible inputs can spread compilation cost across
+calls, but moderate execution timing and the unchanged recovery gate are still
+needed to assess that benefit and recovery quality.
+
 Natural potentials and beliefs retain fixed separator-label origins, chosen
 from physical Gaussian sites or declared initialization before a solve. The
 Gaussian constructor retains full log masses and normalizers; transition

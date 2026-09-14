@@ -92,3 +92,47 @@ Resume point: commit this prospective setup and PAUSE for root's independent rev
 Independent review of committed setup1f29011 is complete with no actionable finding. Reviewer reran the seven bounded standalone checks in0.237s (scalar-addition compilation only), checked timing/cache/native-f32 descriptor and StableHLO boundaries, dynamic arguments, wait4 process high-water/resource stops and failure preservation, and confirmed the isolated-tooling rationale: no production/dependency/shared-test/existing-evidence changes. Root independently checked A3WZ fixture formulas/axes and unchanged200/24/128 policy. Output selection also omits beliefs and other State payloads, so any observed saving is a broader output-trim effect, not a measurement of learning/recovery-specific savings. Preserve this caveat in the actual result interpretation.
 
 The original author is now authorized to run exactly the committed three-child sequence, once, with the existing source/specification and soft resource limits: uv run python tools/d12_compile_scaling.py run --output /tmp/cdc-ogj9-compile-001. Commit any prospective execution note before starting. Do not execute any compiled solver, add a warm-up or recovery fit, alter policy/thresholds, change production source, or silently retry. Stop the sequence on the first measurement/resource failure, preserve partial artifacts and report to root for bounded diagnosis. On complete success, validate saved artifacts and report the two-horizon lowering/compile/memory comparison plus the T32 output-selection comparison, with source/cache/process precision and limitations. Commit reproducible compact machine-readable evidence and ticket/canonical documentation, then pause for root artifact review/publication. This isolated developer report uses changed-artifact checks; it is not a fresh full-suite or numerical qualification result. Root retains short-suite performance work.
+
+**2026-09-14T20:59:18Z**
+
+The authorized three-child sequence completed once at execution revision e3fa25b, with unchanged reviewed tool/specification source from 1f29011. Command: uv run python tools/d12_compile_scaling.py run --output /tmp/cdc-ogj9-compile-001. All children exited 0 with no resource stop; each recorded one lower(), one compile(), zero executable calls, and execution='not run'. There was no warm-up, optimizer start, recovery fit, retry, or tuning.
+
+Measured results (lower seconds / executable-acquisition seconds / XLA argument, output, temporary, alias bytes / independent process high-water GiB):
+- T32 complete State: 10.616004708 / 192.716169667 / 14164,157656,5363256,0 / 20.381378174.
+- T32 inference fields: 9.150363958 / 199.900008208 / 14164,7584,5506552,0 / 20.216247559.
+- T100 complete State: 9.258733500 / 193.087596750 / 44900,501736,17190520,0 / 18.631881714.
+
+These two complete-output shapes have acquisition times within 0.2% in single samples; they do not establish an asymptotic law or timing variability. XLA temporary bytes grow 3.205 times. Process high-water covers compiler/setup activity and is not an executable-array estimate or an independent phase peak. Output selection reduces output bytes by 95.19%, but acquisition time is 3.73% longer, temporary bytes are 2.67% higher, and process high-water is only 0.81% lower. It does not establish a reliable compilation-cost saving. Beliefs and other State payloads are omitted alongside learning outputs, so this comparison cannot isolate learning/recovery-specific cost. All original failure dependencies, including learning-array finiteness, remain. Physical learning-coordinate conversion and export are absent from both variants.
+
+Evidence is committed as tools/measurements/d12-compile-001.json and d12-compile-001.tar.gz. The 38042-byte archive preserves all 20 original artifacts: exact plan/summary, three worker records with complete leaf manifests and source/spec/runtime identities, subprocess invocations, compiler logs, current-RSS samples and wait4 process records. The JSON summary gives archive/member hashes, exact measurements, calculated ratios, interpretation and original artifact location /private/tmp/cdc-ogj9-compile-001. The source-matched runtime is Darwin arm64 CPU, Python 3.12.13, JAX/jaxlib 0.10.2 and NumPy 2.5.1. Actual x64=false and explicit-x64=ERROR are recorded; all inspected floating argument, metadata, output-descriptor and nested StableHLO types are float32. Persistent and auxiliary XLA caches were disabled. Each child logged zero persistent hit/miss events and 144 tracing misses including setup. Zero persistent events do not prove a cold backend. Retained Lowered/Compiled objects were released at child exit; no cross-process reuse was measured.
+
+Recommendation: finish root's cdc-c8kc suite-margin work, then prepare cdc-ztuf's moderate harness with executable reuse across compatible authorized starts and full required learning outputs/status checks. Measure actual moderate execution time before claiming compilation amortization or a recovery cost/benefit tradeoff. Current unbound D12 already holds model parameters fixed and performs no parameter-fitting loop. Skipping fitting saves repeated inference calls, not this measured acquisition. Existing public compiler/Engine remains D9; future D12 activation remains explicit. Output trimming is not an implemented no-learning mode. Removing learning-finiteness checks or changing xi/objective/certification would change failure or inference semantics and requires separate review. The registered three-fit recovery gate is unchanged, and recovery quality is not established.
+
+Validation after artifact creation: archive SHA-256/member lengths/member hashes match all original files; the archived summary matches the JSON summary, the archived plan matches the frozen specification, and every recorded source hash matches the current unchanged source. validate_completed passes on all three archived worker/process pairs. Runtime identities and compiler-log hashes/counts match, and T32 fixture hashes, argument manifests and fixed metadata are identical across the output comparison. Reported timing/storage ratios match the raw measurements. Canonical ARCHITECTURE now describes the measured boundary and links the evidence. This is evidence/documentation-only follow-through to the isolated tool: no production/shared-test/dependency/runtime-history or previous numerical report/hash edits, no repeated standalone checks, and no full-suite claim.
+
+Compact reproduction of the core archive/worker checks (does not compile or execute anything):
+
+uv run python - <<'PY'
+import hashlib, json, sys, tarfile
+from pathlib import Path
+sys.path.insert(0, 'tools')
+import d12_compile_scaling as m
+p = Path('tools/measurements/d12-compile-001.json')
+r = json.loads(p.read_text()); raw = r['raw_evidence']; archive = p.with_name(raw['archive'])
+assert m.digest(archive) == raw['sha256']
+with tarfile.open(archive) as tar:
+    data = {x['path']: tar.extractfile(x['path']).read() for x in raw['members']}
+for x in raw['members']:
+    assert len(data[x['path']]) == x['bytes']
+    assert hashlib.sha256(data[x['path']]).hexdigest() == x['sha256']
+assert json.loads(data['spec.json']) == m.load_spec()
+assert json.loads(data['summary.json']) == r['summary']
+for case in r['summary']['cases']:
+    name = case['case']['id']
+    m.validate_completed(json.loads(data[name + '/worker.json']), json.loads(data[name + '/process.json']))
+for name, expected in r['summary']['identity']['sources'].items():
+    assert m.digest(m.ROOT / name) == expected
+print('PASS: archived plan, source hashes and all three complete compile-only measurements')
+PY
+
+Resume point: measurements and evidence are complete; commit and PAUSE for root artifact review, ticket closure and publication. No further measurement is proposed. Root owns subsequent cdc-c8kc implementation, followed by a fresh cdc-ztuf/A3WZ author.

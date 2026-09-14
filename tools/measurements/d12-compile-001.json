@@ -1,0 +1,378 @@
+{
+  "schema": "cffg.d12-compile-evidence.v1",
+  "ticket": "cdc-ogj9",
+  "status": "complete",
+  "execution": "not run",
+  "summary": {
+    "schema": "cffg.d12-compile-measurement.v1",
+    "identity": {
+      "git_revision": "e3fa25bf6b8219124e84c9c133113a5972098388",
+      "git_status": "",
+      "spec_sha256": "4cb114675eec3f15885869434f7dbb52a0ec79a6f4f668d11ab22de9b423a8e7",
+      "sources": {
+        "src/cffg/hybrid_affine.py": "b8715258bc777a2a7ea5df4f310e819c5eccec280a7d93bb833b74682f8728f3",
+        "src/cffg/hybrid_covariance.py": "3928b64c2135ce8a126bc2f53528c85220367d4436c327e7919649215f5634cb",
+        "src/cffg/hybrid_gfe.py": "74130457fa789e308b0f3561dd06dcab69f6d87976c8c00b71e34bfda2ce3814",
+        "src/cffg/hybrid_joint.py": "d39dced160c0890964007d3e0004cf84833c35cd0527592efc9b8644b7c819c6",
+        "src/cffg/hybrid_joint_solver.py": "6105e545e30fa9dc7364287c46ed469c0fb6c6385945ed3aa66ffce9ba5c3a01",
+        "src/cffg/hybrid_joint_storage.py": "f4206b629992a0798c88f267b8e3ac5c56a571e4e9e3bde362e7eb63f1dd663c",
+        "src/cffg/hybrid_learning.py": "710e601d79b6df00a90d026a56a37b38dc337856a1fb4cbe734e1286df8a1258",
+        "src/cffg/hybrid_natural.py": "8f39497667bb4edd889e08fcb2f5e86f05fed1b6db92161aeb7b0001d6f610aa",
+        "src/cffg/hybrid_separator.py": "d505843591de764be241a82f010dc1711e1ec3ffd5204012dd65a03eb278b99c",
+        "tools/d12_compile_checks.py": "78deec357e8d656ef25c623b0ee6030647032324e89823568c2f33f213db8a2a",
+        "tools/d12_compile_fixture.py": "a7f8450adbb7958cca3adfba8b5cb307020d03212c146e59218e304307f3724d",
+        "tools/d12_compile_scaling.py": "1a9ee3f523522e0fecab2d152cad8c55befc3347db7556a52552c5f92a15e1d1",
+        "tools/d12_compile_spec.json": "4cb114675eec3f15885869434f7dbb52a0ec79a6f4f668d11ab22de9b423a8e7",
+        "uv.lock": "0ebcc956bf965a2dc0a9cd193b74b0f1b17bc386e15a59dda4f215ec41701a62",
+        "pyproject.toml": "1de3f72a660eaed6f101990920e102f37858fcc78f0c5466637f16d59d79845f",
+        "src/cffg/__init__.py": "a42ed827e4e8e857ef37069c3db15da8c1389bfd7a8c86e1f47f04767ff929cf",
+        "tests/fixtures/hybrid-joint-candidate-spec.json": "20f0dfab78d7f59f895239ccc95cc4a4bc66b5ba1aa94ed8c12ce0608d82f2db"
+      }
+    },
+    "status": "complete",
+    "execution": "not run",
+    "cases": [
+      {
+        "case": {
+          "id": "t32-full",
+          "T": 32,
+          "K": 4,
+          "d": 2,
+          "outputs": "full"
+        },
+        "process": {
+          "exit_code": 0,
+          "stop": null,
+          "worker_seconds": 211.40634420886636,
+          "cache_evidence": {
+            "log": "compiler.log",
+            "log_sha256": "7132dfc1d4b0ba040ad317101c2ef5abeb054b3e585fe0f855cf004296baa0fd",
+            "observed_log_occurrences": {
+              "persistent_hits": 0,
+              "persistent_misses": 0,
+              "tracing_misses": 144
+            },
+            "meaning": "All worker compilations, including small layout setup; absent log messages do not prove a cold backend"
+          },
+          "process_high_water": {
+            "mechanism": "parent os.wait4 of actual worker PID; process lifetime, not phase peaks",
+            "raw_ru_maxrss": 21884338176,
+            "raw_unit": "bytes",
+            "bytes": 21884338176
+          },
+          "rss_samples": {
+            "count": 209,
+            "maximum_bytes": 21779529728,
+            "meaning": "sampled current RSS; transient peaks may be missed"
+          }
+        },
+        "status": "complete",
+        "lower_seconds": 10.616004708,
+        "compile_seconds": 192.716169667,
+        "xla_memory": {
+          "available": true,
+          "estimates": {
+            "argument_size_in_bytes": 14164,
+            "output_size_in_bytes": 157656,
+            "temp_size_in_bytes": 5363256,
+            "alias_size_in_bytes": 0,
+            "generated_code_size_in_bytes": 0,
+            "host_argument_size_in_bytes": 0,
+            "host_output_size_in_bytes": 0,
+            "host_temp_size_in_bytes": 0,
+            "host_alias_size_in_bytes": 0,
+            "peak_memory_in_bytes": 198575
+          },
+          "meaning": "XLA estimates; backend-specific extra fields are not process RSS"
+        }
+      },
+      {
+        "case": {
+          "id": "t32-inference",
+          "T": 32,
+          "K": 4,
+          "d": 2,
+          "outputs": "inference"
+        },
+        "process": {
+          "exit_code": 0,
+          "stop": null,
+          "worker_seconds": 217.47447999939322,
+          "cache_evidence": {
+            "log": "compiler.log",
+            "log_sha256": "580e3176e4c622c3b1e959a017bcc776667d94814877bed45c6988c3d9c79910",
+            "observed_log_occurrences": {
+              "persistent_hits": 0,
+              "persistent_misses": 0,
+              "tracing_misses": 144
+            },
+            "meaning": "All worker compilations, including small layout setup; absent log messages do not prove a cold backend"
+          },
+          "process_high_water": {
+            "mechanism": "parent os.wait4 of actual worker PID; process lifetime, not phase peaks",
+            "raw_ru_maxrss": 21707030528,
+            "raw_unit": "bytes",
+            "bytes": 21707030528
+          },
+          "rss_samples": {
+            "count": 215,
+            "maximum_bytes": 21707030528,
+            "meaning": "sampled current RSS; transient peaks may be missed"
+          }
+        },
+        "status": "complete",
+        "lower_seconds": 9.150363958,
+        "compile_seconds": 199.900008208,
+        "xla_memory": {
+          "available": true,
+          "estimates": {
+            "argument_size_in_bytes": 14164,
+            "output_size_in_bytes": 7584,
+            "temp_size_in_bytes": 5506552,
+            "alias_size_in_bytes": 0,
+            "generated_code_size_in_bytes": 0,
+            "host_argument_size_in_bytes": 0,
+            "host_output_size_in_bytes": 0,
+            "host_temp_size_in_bytes": 0,
+            "host_alias_size_in_bytes": 0,
+            "peak_memory_in_bytes": 48503
+          },
+          "meaning": "XLA estimates; backend-specific extra fields are not process RSS"
+        }
+      },
+      {
+        "case": {
+          "id": "t100-full",
+          "T": 100,
+          "K": 4,
+          "d": 2,
+          "outputs": "full"
+        },
+        "process": {
+          "exit_code": 0,
+          "stop": null,
+          "worker_seconds": 209.39780866727233,
+          "cache_evidence": {
+            "log": "compiler.log",
+            "log_sha256": "0cc101ba603393efae0252e51cfd923f78f67f87b482f82651b7affd8e7b8c40",
+            "observed_log_occurrences": {
+              "persistent_hits": 0,
+              "persistent_misses": 0,
+              "tracing_misses": 144
+            },
+            "meaning": "All worker compilations, including small layout setup; absent log messages do not prove a cold backend"
+          },
+          "process_high_water": {
+            "mechanism": "parent os.wait4 of actual worker PID; process lifetime, not phase peaks",
+            "raw_ru_maxrss": 20005830656,
+            "raw_unit": "bytes",
+            "bytes": 20005830656
+          },
+          "rss_samples": {
+            "count": 207,
+            "maximum_bytes": 20005814272,
+            "meaning": "sampled current RSS; transient peaks may be missed"
+          }
+        },
+        "status": "complete",
+        "lower_seconds": 9.2587335,
+        "compile_seconds": 193.08759675,
+        "xla_memory": {
+          "available": true,
+          "estimates": {
+            "argument_size_in_bytes": 44900,
+            "output_size_in_bytes": 501736,
+            "temp_size_in_bytes": 17190520,
+            "alias_size_in_bytes": 0,
+            "generated_code_size_in_bytes": 0,
+            "host_argument_size_in_bytes": 0,
+            "host_output_size_in_bytes": 0,
+            "host_temp_size_in_bytes": 0,
+            "host_alias_size_in_bytes": 0,
+            "peak_memory_in_bytes": 615840
+          },
+          "meaning": "XLA estimates; backend-specific extra fields are not process RSS"
+        }
+      }
+    ]
+  },
+  "runtime": {
+    "python": "3.12.13 (main, May 10 2026, 19:20:41) [Clang 22.1.3 ]",
+    "executable": "/Users/ravd/projects/cffg-d12-scaling/.venv/bin/python3",
+    "platform": "macOS-15.7.5-arm64-arm-64bit",
+    "machine": "arm64",
+    "jax": "0.10.2",
+    "jaxlib": "0.10.2",
+    "numpy": "2.5.1",
+    "backend": "cpu",
+    "devices": [
+      "cpu:0"
+    ],
+    "clock": {
+      "implementation": "mach_absolute_time()",
+      "monotonic": true,
+      "adjustable": false,
+      "resolution": 4.166666666666667e-08
+    },
+    "environment": {
+      "JAX_ENABLE_X64": "false",
+      "JAX_PLATFORMS": "cpu",
+      "JAX_EXPLICIT_X64_DTYPES": "error",
+      "JAX_ENABLE_COMPILATION_CACHE": "false",
+      "JAX_COMPILATION_CACHE_DIR": null,
+      "XLA_FLAGS": null
+    },
+    "config": {
+      "jax_explain_cache_misses": true,
+      "jax_raise_persistent_cache_errors": false,
+      "jax_persistent_cache_min_compile_time_secs": 1.0,
+      "jax_persistent_cache_min_entry_size_bytes": 0,
+      "jax_persistent_cache_enable_xla_caches": "",
+      "jax_compilation_cache_include_metadata_in_key": false,
+      "jax_enable_compilation_cache": false,
+      "jax_compilation_cache_dir": null,
+      "jax_compilation_cache_check_contents": false,
+      "jax_compilation_cache_expect_pgle": false,
+      "jax_compilation_cache_max_size": -1,
+      "jax_remove_custom_partitioning_ptr_from_cache_key": false,
+      "jax_explicit_x64_dtypes": "ERROR",
+      "jax_enable_x64": false
+    }
+  },
+  "comparisons": {
+    "t100_full_over_t32_full": {
+      "lower_seconds": 0.8721485864661318,
+      "compile_seconds": 1.0019273270304292,
+      "process_high_water_bytes": 0.9141620137244949,
+      "argument_size_in_bytes": 3.170008472182999,
+      "output_size_in_bytes": 3.18247323286142,
+      "temp_size_in_bytes": 3.2052395037641315
+    },
+    "t32_inference_over_t32_full": {
+      "lower_seconds": 0.8619404577980713,
+      "compile_seconds": 1.0372767814626722,
+      "process_high_water_bytes": 0.9918979661813832,
+      "argument_size_in_bytes": 1.0,
+      "output_size_in_bytes": 0.048104734358349825,
+      "temp_size_in_bytes": 1.0267180981105508
+    }
+  },
+  "interpretation": [
+    "The two complete-output acquisition samples are 192.716169667 s at T32 and 193.08759675 s at T100. These two shapes do not establish an asymptotic law or timing variability.",
+    "T32 output selection removes beliefs and other State payloads as well as centered learning outputs. Output bytes fall 95.19%, acquisition time is 3.73% longer, temporary bytes rise 2.67%, and process high-water is 0.81% lower. With one sample per variant, this does not establish a reliable compilation-cost saving or isolate learning/recovery-specific cost.",
+    "All numerical argument, fixed-metadata, output-descriptor and inspected StableHLO floating types were native float32 with x64 disabled and explicit x64 rejected. No runtime internal arrays, terminal certificates or solver results were observed.",
+    "All persistent and auxiliary XLA caches were disabled; each process recorded zero persistent hit/miss log events and 144 tracing misses including layout setup. The zero persistent log counts are not cold-backend proof. Each complete program had one lower call, one compile call and zero executable calls.",
+    "Process wait4 high-water covers the whole child lifetime, including compilation; XLA estimates describe executable storage, not compiler RSS. The backend-specific peak_memory_in_bytes field has limited semantics and is not used as the process peak.",
+    "Current unbound D12 already holds parameters fixed. No recovery fit or parameter-update loop is compiled here. Physical learning-coordinate conversion, export and recovery fits are absent from both compared programs; learning-array finiteness remains an inference/status dependency.",
+    "Production compiler/Engine remains D9; ordinary existing users do not compile this unbound D12 solver. Future public activation remains explicit. Compatible shapes/dtypes/static layouts may reuse executables, but no cross-process reuse or execution amortization was measured.",
+    "Proceed to the reviewed moderate harness after the suite-margin prerequisite. Retain compatible executables across its authorized starts; keep full required learning outputs and all failure checks. Measure synchronized moderate execution time before claiming amortization or recovery cost/benefit. The registered three-fit recovery gate remains unchanged and recovery quality is not established."
+  ],
+  "raw_evidence": {
+    "archive": "d12-compile-001.tar.gz",
+    "sha256": "8066b06e8b6180fdcabff4a3947d4f32db31fbf195aa829cb65fca6d69b07832",
+    "bytes": 38042,
+    "original_directory": "/private/tmp/cdc-ogj9-compile-001",
+    "members": [
+      {
+        "path": "spec.json",
+        "bytes": 6063,
+        "sha256": "da6a7c2858cbf1285d821dd9d52f1c0d92083a16e0b4455b3bd7079503575b82"
+      },
+      {
+        "path": "summary.json",
+        "bytes": 7563,
+        "sha256": "32a7bec1d59092b4ac40dfbab786e3558d16e597839d47f75e2c4b6b97da1177"
+      },
+      {
+        "path": "t100-full/compiler.log",
+        "bytes": 53889,
+        "sha256": "0cc101ba603393efae0252e51cfd923f78f67f87b482f82651b7affd8e7b8c40"
+      },
+      {
+        "path": "t100-full/invocation.json",
+        "bytes": 734,
+        "sha256": "98842904ce4bb760ee6de222752fade9bf821cad908c18e0b0da713369515410"
+      },
+      {
+        "path": "t100-full/process.json",
+        "bytes": 815,
+        "sha256": "6b08e55435230fbca9fab7a3838ecc5a2e5b4383b73d8c527e60b483563b9096"
+      },
+      {
+        "path": "t100-full/rss-samples.jsonl",
+        "bytes": 15892,
+        "sha256": "803ed75681cafe80e1163cd5e44bd26c2c7274a9f9228e65a85abf9c392d92fe"
+      },
+      {
+        "path": "t100-full/stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "t100-full/worker.json",
+        "bytes": 31717,
+        "sha256": "b02d4283e17889f667184feab8ea35cc43e72caf0fc06633f5196fb895fd6727"
+      },
+      {
+        "path": "t32-full/compiler.log",
+        "bytes": 53878,
+        "sha256": "7132dfc1d4b0ba040ad317101c2ef5abeb054b3e585fe0f855cf004296baa0fd"
+      },
+      {
+        "path": "t32-full/invocation.json",
+        "bytes": 732,
+        "sha256": "eb117a7ab03ba3226960a8d7dc1314962711fb254061c54c5ed2bd9636be9bba"
+      },
+      {
+        "path": "t32-full/process.json",
+        "bytes": 815,
+        "sha256": "776a39e97cf2f8fb3a101ed948e6503fa6d1a9c95552d75c9c1c0cd19f034a06"
+      },
+      {
+        "path": "t32-full/rss-samples.jsonl",
+        "bytes": 16045,
+        "sha256": "4a84a9be35283d678e7b79fadd7e11ea5e3b92b92b5eae516113bbcb7b7054d2"
+      },
+      {
+        "path": "t32-full/stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "t32-full/worker.json",
+        "bytes": 31614,
+        "sha256": "e24f8325566539f7c400fb5b044408837f99818f0568ea757f58033b74132447"
+      },
+      {
+        "path": "t32-inference/compiler.log",
+        "bytes": 53875,
+        "sha256": "580e3176e4c622c3b1e959a017bcc776667d94814877bed45c6988c3d9c79910"
+      },
+      {
+        "path": "t32-inference/invocation.json",
+        "bytes": 742,
+        "sha256": "79c5d98253fb9a4190d16fd6d4c6ecb986c1ffeb723b0ae56cc0d7364a38dd62"
+      },
+      {
+        "path": "t32-inference/process.json",
+        "bytes": 815,
+        "sha256": "a8cf07f785754c449a30c5017031e066e5df9f6d8e6e9e63736a4844fe89dcd7"
+      },
+      {
+        "path": "t32-inference/rss-samples.jsonl",
+        "bytes": 16503,
+        "sha256": "9fa3506615e4ccbd952305b375c2a342dbc97d3464607369b067773775068b86"
+      },
+      {
+        "path": "t32-inference/stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "t32-inference/worker.json",
+        "bytes": 16352,
+        "sha256": "ed875c9dfa284ef792799eda2e9fadb45321105a6765c1c5971370f6f7006799"
+      }
+    ]
+  }
+}
