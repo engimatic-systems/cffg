@@ -1,6 +1,6 @@
 ---
 id: cdc-bwta
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-09-14T17:25:15Z
@@ -72,3 +72,7 @@ Implemented the prospective scheduling change: four workers, with the same 1200-
 **2026-09-14T18:10:18Z**
 
 Independent scheduling review is complete at 95f4046: no findings. The fresh read-only reviewer verified that only the worker default changed from three to four and that deadline, grouping, no-retry policy, cache rules, numerical selection/assertions and failure publication remain intact. Report: /tmp/cdc-bwta-review.txt; completed Codex CLI process exited 0. The reviewer ran no tests and made no numerical-solver claim. Focused evidence remains 21 passed in 1.98s. Y15D author repairs are now committed at d5e33ae and independently re-reviewing; the new-source checkpoint and combined final full suite remain pending. No timing estimate has been promoted to a measured four-worker result.
+
+**2026-09-14T20:27:13Z**
+
+Final gate passed at 96276c8 after the last code/test change e962d2c: uv run python tools/dashboard.py --run-suite. Exactly 2659 distinct tests executed once and passed, with zero failures, in 1198.26 pytest seconds / 1199.035 measured wall seconds. Four loadfile workers, no retries, initially empty locked 1-GiB executable cache, unchanged not-slow selection and hard 1200-second deadline. All 16 warnings are existing gym distutils deprecations repeated across four workers. Dashboard/runtime history refreshed. Log /tmp/cff-y15d-short-suite.log; call-count and file/worker audit /tmp/cff-y15d-short-suite-summary.json; original timings /var/folders/kg/pmjxhgy506n699dj2g96f2wh0000gn/T/tmpo6cnf5i8.timings.jsonl. Margin is only 0.965 seconds; do not claim robust headroom. Worker phase totals 974.80/993.47/977.02/1185.42 seconds support the root-owned follow-up cdc-c8kc before further harness growth. The current acceptance criteria pass; preserve this result for PR publication without an unchanged rerun.

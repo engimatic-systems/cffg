@@ -1,6 +1,6 @@
 ---
 id: cff-y15d
-status: in_progress
+status: closed
 deps: [cff-j191, cff-ffsg, cff-8ois, cdc-bwta]
 links: []
 created: 2026-09-14T04:40:24Z
@@ -285,3 +285,7 @@ The monitor sampled the largest process RSS in the child process tree every 15 s
 The focused fixture now reads attempt 003. Historical schema/source and distinguishable failed-payload swap regressions explicitly retain immutable attempt 002; current sentinel tests use actual attempt 003 payloads. Canonical DERIVATIONS/LIMITATIONS now state the measured current-source outcome and retain the downstream limits. Final focused command after the test edits: env JAX_COMPILATION_CACHE_DIR=/tmp/cffg-y15d-resume-cache uv run pytest -q tests/test_hybrid_joint_solver.py -k 'saved or energy_arithmetic or frozen_checkpoint_sources' --junitxml=/tmp/cff-y15d-candidate-003-validation.xml; 70 passed, 10 deselected in 5.45s. Log: /tmp/cff-y15d-candidate-003-validation.log. No unchanged 552-second held gate or full suite was repeated.
 
 Durable checkpoint: tests/fixtures/hybrid-joint-candidate-results-003.json, SHA256 3cfa37ede07bba2a872c7938f66c208207a2f9a7059d758e92685ecb9bc75bee. Temporary evidence: /tmp/cff-y15d-candidate-003.log, -observations.jsonl, -summary.json, -summary.log, -source-audit.json and /tmp/cff-y15d-monitor-003.py, /tmp/cff-y15d-summarize-003.py. The source audit confirms all 12 manifest files still match the executed commit and verifies byte-identical frozen spec plus attempts 001/002. Attempt 001 remains the historical compilation failure with zero optimizer steps; attempt 002 remains historical success at its old source, without relabeling either artifact. Commit this evidence/docs/tests/ticket and pause for root's artifact review, single final four-worker short-suite gate and PR. No runtime machinery, push, PR or reviewer launch was performed by this worker.
+
+**2026-09-14T20:27:13Z**
+
+Root artifact review at e962d2c found no remaining issue in the final evidence/docs/test-pointer changes. Independently checked the 003 report SHA 3cfa37ede07bba2a872c7938f66c208207a2f9a7059d758e92685ecb9bc75bee, all 12 source-manifest hashes and the 46-record inventory: 40 converged outputs with proper beliefs/finite primal and dual FE, six expected divergences and one zero-update exhaustion. The author's final source/report corruption gate passed 70 tests in 5.45s. The complete post-review short suite then passed at 96276c8: 2659 tests, zero failures, 1198.26 pytest / 1199.035 wall seconds, four workers and a fresh locked 1-GiB cache under the hard1200 limit. Root audited one call per distinct test. Logs and timings are in cdc-bwta's final note; no unchanged rerun is needed for this publication. cdc-bwta closes with this measured result. Y15D is qualified only for its bounded delivery and frozen tiny checkpoint. Cooper's new early compilation-scaling request is cdc-ogj9; the 0.965-second suite margin is tracked in root-owned cdc-c8kc; both precede cdc-ztuf. Native-float32 moderate convergence, actual iteration storage and all production/recovery work remain downstream. No registered recovery fit has run.
