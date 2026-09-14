@@ -15,6 +15,31 @@ def site(dtype=np.float64, card=2, dim=1):
                       jnp.broadcast_to(jnp.eye(dim, dtype=dtype), (card, dim, dim)), jnp.int32(0))
 
 
+@pytest.mark.parametrize("dtype,shift", ((np.float32, 1e8), (np.float64, 1e16)))
+@pytest.mark.parametrize("precisions", ((1, 1), (1, 4)))
+def test_large_common_gauge_preserves_normalized_mass_and_gaussian_scales(dtype, shift, precisions):
+    value = site(dtype)._replace(precision=jnp.asarray(precisions, dtype)[:, None, None])
+    reference = hn.normalize(value)
+    shifted = value._replace(constant=jnp.full(2, shift, dtype))
+    expected = np.reciprocal(np.sqrt(np.asarray(precisions, dtype)))
+    expected /= expected.sum()
+    budget = 32 * np.finfo(dtype).eps
+    for normalize in (hn.normalize, jax.jit(hn.normalize)):
+        result = normalize(shifted)
+        hn.raise_for_status(result.status)
+        np.testing.assert_allclose(result.probability, expected, atol=budget, rtol=budget)
+        np.testing.assert_allclose(result.log_probability, reference.log_probability, atol=budget, rtol=budget)
+        assert result.probability.sum() == pytest.approx(1, abs=budget)
+        assert result.entropy() == pytest.approx(float(reference.entropy()), abs=budget)
+        assert result.log_normalizer == dtype(shift + float(reference.log_normalizer))
+
+        def log_normalizer(constant):
+            return normalize(shifted._replace(constant=constant)).log_normalizer
+
+        derivative = jax.grad(log_normalizer)(shifted.constant)
+        np.testing.assert_allclose(derivative, expected, atol=budget, rtol=budget)
+
+
 @pytest.mark.parametrize("dtype", (np.float32, np.float64))
 @pytest.mark.parametrize("kind,flag", (("empty", hn.Status.EMPTY_SUPPORT), ("singular", hn.Status.IMPROPER),
                                       ("negative", hn.Status.IMPROPER), ("nan", hn.Status.NONFINITE),

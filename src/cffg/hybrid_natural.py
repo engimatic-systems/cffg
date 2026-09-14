@@ -152,9 +152,16 @@ def normalize(natural):
     mean = jnp.einsum("...ab,...b->...a", covariance, jnp.where(active[..., None], h, 0))
     mass = (h.shape[-1] * jnp.log(2 * jnp.pi) - logdet
             + jnp.einsum("...d,...d->...", h, mean)) / 2
-    scores = jnp.where(active, a + mass, -jnp.inf)
-    normalizer = jax.scipy.special.logsumexp(scores)
-    log_probability = jnp.where(active, scores - normalizer, -jnp.inf)
+    # Remove the common gauge before it can erase label-dependent integrals.
+    constant_shift = jnp.max(jnp.where(active, a, -jnp.inf))
+    constant_shift = jnp.where(jnp.any(active), constant_shift, 0)
+    scores = jnp.where(active, a - constant_shift + mass, -jnp.inf)
+    score_shift = jnp.max(scores)
+    score_shift = jnp.where(jnp.isfinite(score_shift), score_shift, 0)
+    centered = scores - score_shift
+    log_total = jax.scipy.special.logsumexp(centered)
+    log_probability = jnp.where(active, centered - log_total, -jnp.inf)
+    normalizer = constant_shift + (score_shift + log_total)
     probability = jnp.where(active, jnp.exp(log_probability), 0)
     status |= pd_status | failure(~jnp.isfinite(normalizer), Status.NONFINITE)
     status |= failure(jnp.any(active & (probability == 0)), Status.UNDERFLOW)
