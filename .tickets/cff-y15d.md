@@ -1,7 +1,7 @@
 ---
 id: cff-y15d
 status: open
-deps: [cff-j191, cff-ffsg]
+deps: [cff-j191, cff-ffsg, cff-8ois]
 links: []
 created: 2026-09-14T04:40:24Z
 type: task
@@ -89,3 +89,7 @@ Reproducible future measurement: dynamic ShapeDtypeStruct coordinate/context/sca
 Independent-reference prerequisite J191 is complete: implementation 336a2bf, independently reviewed with no findings, final short suite at 75ac1d2 passed 2537 tests (41 deselected) in 3176.36s. Frozen specification tests/fixtures/hybrid-joint-reference-spec.json remains byte-identical to its pre-solve commit 2ee434c. tests/hybrid_joint_reference.py provides load_case, independent Model/Natural/Belief and evaluate(model,messages,xi); tests/hybrid_joint_solver_reference.py provides Coordinate.pack/unpack, solve, output_arrays and stopping_allowance. Use these test-only references for candidate comparisons; candidate production code must not depend on tests. Source hashes and all 22 frozen case/start records are in hybrid-joint-reference-results.json: 18 valid converged, four expected support/underflow divergences, at most 8 updates, worst certificate 5.274e-15. Independent quadrature and fixed-drive checks passed unchanged arithmetic budgets; local inverse-coordinate norm <=2.413 and scaled output sensitivity <=9. The allowance is local, not global uniqueness or approximation error.
 
 J191 also transparently records one extra unfrozen -600 diagnostic solve, excluded from all checkpoint evidence, with missing per-solve details explicitly disclosed. Do not count it as a registered result or invent missing coordinates/certificates. Later rare-label/underflow/signed-cavity checks are held-coordinate diagnostics. Your candidate fixtures, direction strategy, linearization/scales, iteration/globalization/linear/storage budgets and reports must be committed BEFORE candidate checkpoint solves; inherit the original fixed thresholds/moderate formulas and distinguish arithmetic/stopping/approximation errors. No candidate or moderate solve has run at this handoff. Implementation remains sequential with a fresh worker, independent review only after commit/pause, then one final short-suite gate.
+
+**2026-09-14T10:55:50Z**
+
+Candidate execution is blocked on new prerequisite cff-8ois. Independent Decimal diagnosis confirmed correct JVP but outgoing source-precision values outside unchanged arithmetic budgets. The original failed derivative-stencil evidence remains in Y15D; 8OIS owns physical-input local arithmetic repair and compact preserved reproduction. Candidate drafts are paused at 85930ec in the separate chain worktree; no optimizer has run. All A3WZ numerical/storage and X0IF recovery gates remain unchanged.
