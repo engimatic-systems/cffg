@@ -131,6 +131,8 @@ This project will span many context windows. The rule that makes that survivable
 - **Ticket- and documentation-only changes** do not require the short test suite.
   Validate the artifacts they change, including `tk dep cycle` and
   `git diff --check` for ticket-only work.
+- **The PR body** should be written for an undergrad-level audience -- simpler
+  explanations than those found in the documentation.
 - **End of session**: leave `main` green and the tree clean. Update the ticket
   with a handoff comment — what's done, what's next, any gotcha — then close it
   or leave it `in_progress` with that comment as the resume point. A session
