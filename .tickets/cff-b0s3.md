@@ -86,3 +86,7 @@ Dependency refinement from tk dep tree --full cff-a3wz, tk ready, and tk blocked
                                       --> [ ] cff-zov5
 
 The existing FFSG implementation is available in committed branch ancestry through 38e4fd4; FFSG remains a completion gate, not an additional prerequisite of its own numerical repair. Compiler integration and registered recovery remain blocked. No dependency cycles; git diff --check validates this ticket-only refinement.
+
+**2026-09-14T03:24:21Z**
+
+Predecessor review is complete at 38e4fd4: original gauge normalization, centered auxiliary targets and parameter-aware actual energy were independently cleared with no additional actionable findings. Reviewer checked K=3,d=2 expectations and gradients across all six physical parameter blocks in dense/sparse f32/f64; maximum discrepancies about 1.5e-8 and 5.6e-17. The known tilt defect remains this ticket. Independent no-production-import reference is /tmp/cff-b0s3-reference.py; uv run python /tmp/cff-b0s3-reference.py passed its raw-input nonidentifiability, anchored JIT/vmap probability, and analytic local-normalizer assertions. Preserve the useful independent calculation in an appropriate executable test anchor, not a markdown report.
