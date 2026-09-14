@@ -1,7 +1,7 @@
 ---
 id: cff-a3wz
 status: open
-deps: [cff-ffsg, cff-ocxl, cff-b0s3, cff-ej67]
+deps: [cff-ffsg, cff-ocxl, cff-b0s3, cff-ej67, cff-y15d]
 links: []
 created: 2026-09-14T02:43:33Z
 type: task
@@ -101,3 +101,24 @@ Numerical representation handoff after cff-b0s3 diagnosis: use its retained Gaus
 **2026-09-14T03:54:34Z**
 
 Concrete local API handoff from b0s3 implementation a5a4747 (independent review pending): hybrid_natural.gaussian_site retains log mass/mean/covariance and optional fixed center; Natural.arrays() returns only a/h/J. Belief stores displacement+center and exposes world mean/second as readouts. hybrid_separator.evaluate takes stacked TransitionParameters, sites and two message banks. Auxiliary.linear/precision are now explicitly statistics for [x-center_i;1]; physical_linear/physical_precision transform them with B=[[I,center],[0,1]]. Use the physical views for original-coordinate independent references and also inspect retained centered statistics so a raw large second moment cannot hide small covariance. Freeze origins before packing solver unknowns and preserve their metadata on reconstruction; never flatten the entire NamedTuple as if status/origin fields were optimization variables.
+
+**2026-09-14T04:41:18Z**
+
+Bounded implementation split before starting: cff-j191 owns independent tiny EC+xi reference mathematics and the executable tiny specification; cff-y15d owns candidate packing, differentiation, initialization/globalization/status, complete certificates and tiny parity; this ticket retains all final qualification criteria, moderate runs, initialization sensitivity, actual buffers/compiled memory, larger K/d inventory and the positive/negative decision. No criterion or threshold is removed. Each stage commits its execution budgets and stopping accounting before its first applicable checkpoint solve; later phases inherit the fixed fixtures/tolerances and record their own prospective execution budgets before running. Earlier failed attempts remain evidence. Closing either prerequisite is not a claim that the numerical checkpoint passed.
+
+Research question -> can reference, solver and moderate evidence fit one worker context? Answer -> they are three substantial correctness boundaries; use the sequential split above with a fresh worker per bounded ticket. Source -> independent solver_checkpoint_research audit of current local APIs and D12 checkpoint requirements; confidence high. No additional mathematics/scope/approximation decision is required by the split.
+
+Dependency tree built from tk dep tree --full cff-a3wz, tk ready, and tk blocked. Legend: prerequisite --> dependent; tk records are authoritative.
+
+[x] cff-ocxl
+  +--> [ ] cff-ej67 (ready; next local numerical repair)
+  |       --> [~] cff-b0s3 --> [~] cff-ffsg
+  |            --> [ ] cff-j191 (independent tiny reference)
+  |                 --> [ ] cff-y15d (candidate solver)
+  |                      --> [ ] cff-a3wz (moderate qualification)
+  +--> [ ] cff-k6g5 (parallel ready declarations, implementation deferred)
+       a3wz + k6g5 --> [ ] cff-7sw5 --> [ ] cff-idhk --> [ ] cff-brcf
+           --> [ ] cff-f3jz --> learning/composition --> [ ] cff-x0if
+                --> [ ] cff-zov5
+
+All implementation remains sequential, and compiler work still waits for complete local message+auxiliary qualification. Ticket-only artifact checks are tk dep cycle and git diff --check.
