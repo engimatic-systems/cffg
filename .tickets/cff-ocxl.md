@@ -1,6 +1,6 @@
 ---
 id: cff-ocxl
-status: open
+status: in_progress
 deps: [cff-iur0]
 links: []
 created: 2026-08-31T03:47:35Z
@@ -119,3 +119,9 @@ whole-trajectory sampling are separate work.
   on the declared active support.
 - D11.15 twins: two switched priors with opposite source-conditioned means
   but identical separate regime and Gaussian boundary moments.
+
+## Notes
+
+**2026-09-14T00:53:37Z**
+
+Planning handoff (stacked on PR #141): apply New factor or rule family for mathematical region/message/objective ownership and Runtime numerical or status invariant for the experimental solve. Production compiler grouping, slots, packing, Arena/member_of, synchronous/scheduled execution, ledger, readouts, serialized identity, plate scoping, edits/composition, learning/checkpoints, estimator, public exports, host/JIT, single/vmap, and current/legacy persistence are N/A under criterion 12. Candidate: adjacent hybrid states with per-pair joint Gaussian regions and per-regime moment-consistent separators. Before coding: literal zeros restrict a fixed active support without floors; empty regions fail; inactive auxiliary coordinates equal zero; changed support rebuilds the active coordinates; signed or vacuous cavities are allowed only when aggregate and tilted beliefs are proper; invalid shapes/asymmetry/non-finite coordinates fail; float32 uses finfo-derived resolution guards; non-finite objective/residual is divergence; iteration budgets distinguish convergence/exhaustion/divergence and proposed steps use damping/backtracking. Independent reference remains K=2, scalar, T<=6; candidate inventory will be checked at 10–100x horizon and separately higher dimension. No exactness claim for source-homogeneous nonzero slopes or global evidence bound. Exterior attachment counting and mixture projection remain explicit decision gates.
