@@ -1,7 +1,7 @@
 ---
 id: cff-f3jz
 status: open
-deps: [cff-ocxl, cff-7sw5, cff-ffsg, cff-a3wz]
+deps: [cff-ocxl, cff-7sw5, cff-ffsg, cff-a3wz, cff-brcf, cff-idhk]
 links: []
 created: 2026-09-14T01:11:24Z
 type: feature
@@ -14,13 +14,13 @@ tags: [rslds, inference, hybrid]
 
 ## Background in Plain English — WHY
 
-D12 local kernels and compiled ownership are insufficient without a graph solve and a complete objective ledger. cff-a3wz first qualifies the complete message/xi solver without production binding. This ticket integrates that qualified solver and reports its actual terminal state through the engine.
+D12 local kernels and compiled ownership are insufficient without a graph solve and a complete objective ledger. cff-a3wz first qualifies the complete message/xi solver without production binding. cff-idhk then supplies accepted-coordinate storage and transport, and cff-brcf supplies objective/readout ownership. This final integration ticket activates their public execution and reports the actual terminal state through the engine.
 
 ## Outcomes / Acceptance Criteria — WHAT
 
 1. Generic engine execution consumes the declared plan without an rSLDS model branch, selecting one approximation and one belief-array authority.
 2. Production reuses the solver qualified by cff-a3wz for D12.7–8 jointly, preserving gauge removal, dtype-scaled properness checks, feasible initialization, bounded local/global/linear/line-search budgets, and globalization. Engine integration distinguishes converged, budget-exhausted, and diverged; non-finite objective/residual is divergence. It does not introduce a separate numerical policy or weaken the prerequisite's certificates.
-3. The ledger owns precisely D12 regional energies, labeled entropies, hybrid separator corrections, adapter entropies, and ordinary exterior corrections. It matches the independent tiny objective and stationary dual at the returned coordinate.
+3. Public execution uses the cff-brcf ledger with precisely D12 regional energies, labeled entropies, hybrid separator corrections, adapter entropies, and ordinary exterior corrections. It matches the independent tiny objective and stationary dual at the returned coordinate, without repeating ledger construction or introducing another owner.
 4. Synchronous/scheduled, host/JIT, and single/vmap execution agree on messages, internal readouts, support, FE, and terminal status. Lifecycle initialization, binding, support checks, assignment scoring, schedule classification, and estimator/runtime consumers are included in the handoff.
 5. Sparse support, support changes, inactive xi, signed/vacuous cavities, float32, and 10–100x scale obey D12.6. No dense trajectory covariance/Jacobian or silent budget-to-success conversion is introduced. New long globalization regressions are slow and opt-in.
 6. The Derived component coordinate and Runtime numerical or status invariant inventories include every duplicated execution surface. README/ARCHITECTURE/LIMITATIONS describe the approximation and solver limits; focused tests and one final short-suite gate pass.
@@ -68,3 +68,25 @@ Research question → after cff-a3wz, can production integration fit one worker 
 **2026-09-14T02:51:53Z**
 
 Two concrete integration hazards from that research: runtime_checks.state_is_finite currently checks every leaf while D12 uses literal negative-infinity support; define a lawful representation/check and mirror it in schedule_program.make_support_check. D9 recurrence readouts reconstruct from ordinary inputs; D12 must explicitly select accepted component moments rather than rerun D9. Current/legacy learning and checkpoint identity remain cff-czdq across Learnables.replace, learning_checkpoint.py, learning_schema.py, core/learning_identity.py, and bundle.py. GFE/Mu3 mathematics remains outside D12, but shared state forwarding still needs review.
+
+**2026-09-14T03:06:47Z**
+
+Bounded split adopted before implementation from the independent ownership research. cff-idhk owns accepted-coordinate state, lifecycle and mechanical transport; cff-brcf owns objective exclusions and internal readouts; cff-f3jz retains public scheduling/status/consumer activation and final integration parity. These tickets add no parallel implementation authorization and all remain blocked behind cff-a3wz. Exact component types/fields are chosen only from the qualified solver and compiler plan when their implementer starts.
+
+Legend: prerequisite --> dependent. Based on tk dep tree --full cff-x0if, tk ready, and tk blocked. Multiple inputs require all prerequisites; tk remains authoritative.
+
+[x] cff-ocxl
+  +--> [~] cff-ffsg (review repairs; only active implementation)
+  |       --> [ ] cff-a3wz (joint numerical gate; next)
+  +--> [ ] cff-k6g5 (ready declarations; independent research only in parallel)
+         a3wz + k6g5 --> [ ] cff-7sw5 (compiler plans)
+                             --> [ ] cff-idhk (state/transport)
+                                   --> [ ] cff-brcf (objective/readouts)
+                                         --> [ ] cff-f3jz (public execution)
+                                               +--> [ ] cff-czdq (learning)
+                                               +--> [ ] cff-ulbz (mixtures)
+                                      czdq + ulbz --> [ ] cff-kul2 (composition)
+                                                        --> [ ] cff-x0if (recovery)
+                                                              --> [ ] cff-zov5 (epic)
+
+Validation: no dependency cycles; documentation/ticket-only change with no runtime surface modified. Full-suite validation is not required for this split; git diff --check covers changed artifacts.
