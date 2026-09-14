@@ -2,7 +2,7 @@
 id: cff-ffsg
 status: in_progress
 deps: [cff-ocxl, cff-b0s3]
-links: [cff-b0s3]
+links: [cff-b0s3, cff-ej67]
 created: 2026-09-14T01:11:24Z
 type: feature
 priority: 2

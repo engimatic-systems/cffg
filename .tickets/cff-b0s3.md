@@ -1,7 +1,7 @@
 ---
 id: cff-b0s3
 status: in_progress
-deps: [cff-ocxl]
+deps: [cff-ocxl, cff-ej67]
 links: [cff-ffsg]
 created: 2026-09-14T03:21:20Z
 type: bug
@@ -114,3 +114,11 @@ Separate same-input eager/JIT evidence retained for supervisor review, not waive
 **2026-09-14T04:24:55Z**
 
 Compensated-affine correction final validation after the last code change: uv run pytest -q tests/test_hybrid_separator_derivation.py tests/test_hybrid_separator_kernels.py tests/test_hybrid_separator_numerics.py tests/test_hybrid_centering.py tests/test_hybrid_affine.py tests/test_dashboard.py --maxfail=3 -> 174 passed in 372.67s. New coverage verifies exact rational product remainders, all five non-binary review cases, channel bias cancellation, analytic forward/reverse/xi derivatives, eager/JIT/vmap, explicit overflow/subnormal-word failure, and the complete float32 reproduction in a subprocess with x64 disabled and asserted float32 output dtypes. All original review reproduction scripts now have zero probability and owned-energy translation gaps in eager/JIT. git diff --check and tk dep cycle passed. Implementation is bounded to hybrid_affine.py plus the existing local construction/statistics/energy/rebase surfaces, canonical documentation and dashboard registration; no compiler or runtime route activates it. Natural rebasing still has the declared large-distance quadratic rounding limit; the affine correction does not promise universal exactness. The separate same-input projection/canonical quotient-precision parity failure recorded above remains UNRESOLVED despite the focused suite passing; supervisor explicitly requires independent review of compensation and that boundary, with no threshold/scope change, full suite or closure yet. Worker is committing this correction and pausing for that review; ticket remains in_progress.
+
+**2026-09-14T04:34:32Z**
+
+Preimplementation underflow follow-up: completed review cleared the translated affine fix but found unsupported addition/offset underflow returning a valid zero. With both products normal, tiny plus negative nextafter(tiny,+inf) loses the exact negative smallest-subnormal result; a standalone smallest-subnormal offset also flushes. This bounded repair changes only hybrid_affine addition/subtraction checks, mechanism regressions, and the existing D12 numerical-boundary documentation. Existing Derived component coordinate/New factor or rule family/Runtime numerical invariant inventory remains applicable locally; eager/JIT/single-vmap and x64-disabled f32 must agree. Production integration, iteration policy, learning persistence, and recovery remain N/A. Subnormals remain unsupported arithmetic results, now explicitly rejected rather than silently returned as zero; no scope or tolerance revision. The projection/quotient parity defect remains unresolved and is delegated to a separate fresh-worker prerequisite.
+
+**2026-09-14T04:35:11Z**
+
+Both reviews completed at 8e201c3, implementer notified only afterward. Prior mixed non-binary affine cancellation cleared. Independent helper audit passed 5,135 f32 and 5,166 f64 exact rational product cases, including x64-disabled f32; broadcasts through1000 and first/second derivatives passed. One P2 underflow finding: affine(ones, [finfo.tiny, -nextafter(finfo.tiny,+inf)]) silently returns finite zero though the exact stored-input result is negative smallest subnormal. Subnormal offsets likewise flush. Worker is fixing explicit failure behavior under this ticket, not adding subnormal support or changing tolerance. Source /tmp/cff-affine-underflow-review.py; confidence high. The separately completed projection/quotient review is now bounded prerequisite cff-ej67 for a fresh worker; its working arithmetic prototype supports an ordinary repair. This ticket stays blocked until ej67 and combined final validation pass. No short suite or recovery fit has run.
