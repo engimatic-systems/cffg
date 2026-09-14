@@ -1,8 +1,8 @@
 ---
 id: cdc-ztuf
 status: in_progress
-deps: [cff-y15d, cdc-ogj9, cdc-c8kc]
-links: [cdh-urn0]
+deps: [cff-y15d, cdc-ogj9, cdc-c8kc, cdh-m75a, cdh-urn0]
+links: [cdh-urn0, cdh-m75a]
 created: 2026-09-14T18:09:57Z
 type: task
 priority: 2
@@ -140,3 +140,39 @@ Legend: prerequisite --> dependent; closed ancestry is compressed.
 The two current A3WZ blockers are setup/re-review and the new numerical diagnosis; other integration/recovery prerequisites remain recorded in tk.
 
 PAUSE after this commit for root's re-review. Leave cdc-ztuf in_progress. No reviewer/implementation worker was spawned. No moderate solver, moderate storage compilation, recovery fit, new tiny checkpoint, full suite, runtime-history change, push, PR or external message ran. The unchanged 203s status and 89s coordinate suites were not repeated. A NEW immutable source-matched tiny checkpoint remains required after review and root's explicit authorization because current solver/storage source differs from attempt003; attempts001/002/003 and stored manifests were never rewritten. Root should assess cdh-urn0 before subsequent qualification. The attempt004 draft and monitor were not executed. Root owns final gate/publication; published PR148's 2668 passes in 1074.552s remain historical suite evidence, not a new gate for this repair.
+
+**2026-09-14T23:24:33Z**
+
+Independent background research during harness repair, using published d22a43a only (not a concurrent review of active code). Question: which identities must connect saved regional beliefs, auxiliary outputs and learning arrays? Answer: all are functions of the same returned pair belief and xi. For rho[t,i,j], source-relative delta = displacement_x + (pair_origin_x - source_center[t,i]), with source_center taken from destination zero, form u=[delta,1] and M=[[C+delta delta^T,delta],[delta^T,1]]. C is the source/source covariance block, respecting the published once-rounded high+low readout. For gate l, b[j,l]=1[j>=l], k[j,l]=1[j=l]-b/2, exposure e=sum_j b*rho, centered learning a=sum_j k*rho*u, and P=omega(xi)*sum_j b*rho*M. These are mass-weighted, not exposure-normalized. With B=[[I,center],[0,1]], physical a=B*a and P=B*P*B^T. Scalar checks include a[-1]=rho[t,i,l]-e/2 and P[-1,-1]=omega*e.
+
+PG omega(xi)=tanh(sqrt(xi)/2)/(2sqrt(xi)), omega(0)=1/4; the published small-xi branch is1/4-xi/48+xi^2/480 for xi<=sqrt(eps). A JJ 'lambda' would be omega/2 (limit1/8), but Auxiliary has no lambda field. Precision uses omega at returned xi, not recomputed target. Target q is the exposure-conditioned sum of theta'^T M theta', theta'=[w,offset+w.center]; residual is xi-q, and xi=q is stationarity rather than an arbitrary-iterate identity. Equivalent suffix-covariance reconstruction must include between-destination mean variation.
+
+Sparse semantics: exact log-zero pairs contribute zero; zero exposure gives zero target/learning and requires inactive xi=0. Finite log probabilities that underflow are failure, not structural inactivity. Proper conditional covariances and PSD learning-information increments have different positivity requirements: do not impose strict positive-definite Gaussian thresholds on a learning increment. Low words are finite symmetric dtype/shape-matched corrections bounded by eps*abs(high), not independently PSD. Physical readouts and full_covariance round in float32; use the existing declared arithmetic allowances rather than bitwise exactness or new tolerances. Existing negative logit-variance guard32*(d+1)*eps*max(contraction_scale,1) is not a general PSD tolerance.
+
+Sources: hybrid_separator.py:38,157,168,195,226; hybrid_natural.py:87,165; docs/DERIVATIONS.md:2181,2235,2721 in /Users/ravd/projects/cffg-d12-scaling. Axes: rho[L,K,K], pair moments[L,K,K,2d], xi/target/exposure/omega[L,K,K-1], a[L,K,K-1,d+1], P[L,K,K-1,d+1,d+1], center[L,K,d]. Confidence high for published formulas/axes/rounding and masks; 'lambda' naming in any new schema must be explicit. No edits, tests, compilation or numerical solves ran. Root should distill this into cdc-ztuf after the author pauses, and use it in re-review without relaxing the existing contract.
+
+**2026-09-14T23:24:33Z**
+
+Independent read-only research on published d22a43a, not the active harness repair. Question: how do complete conditional-moment certificates reconstruct endpoint projections from pair beliefs? Answer: source incidence retains label i and first d coordinates, collapses destination j and compares separator[t,i]; destination incidence retains j and last d coordinates, collapses i and compares separator[t+1,j]. Every interior separator has two separate comparisons; cross-state covariance C_xy is not an endpoint covariance input.
+
+For retained label a/collapsed label b, rho_ab gives marginal p_a=sum_b rho_ab and conditional alpha_ab=rho_ab/p_a. Projection origin cP_a is pair origin at collapsed index zero. Set z_ab=displacement_ab+(origin_ab-cP_a), mP_a=sum_b alpha_ab*z_ab, and CP_a=sum_b alpha_ab*(C_ab+(z_ab-mP_a)(z_ab-mP_a)^T), using the represented source/source or destination/destination high+low covariance block. Between-mean variation is essential. Zero origins do not imply zero means; raw second moment E[xx^T]=C+mu*mu^T is not covariance. Belief.second is a once-rounded world second moment, not the complete covariance certificate input.
+
+Against separator origin cQ, displacement mQ, covariance HQ+LQ: recentered mP=mP+(cP-cQ); label residual pP-pQ has unit scale; mean residual mP-mQ uses max(1,abs(mP),abs(mQ)); covariance residual is (HP-HQ)+(LP-LQ), preserving words before subtraction, with scale max(1,abs(round_dtype(HP+LP)),abs(round_dtype(HQ+LQ))). Projected covariance may be independently reconstructed by the mixture identity without reproducing the native high/low split bit-for-bit; use existing arithmetic allowances. Do not substitute the older local moment_residual, which subtracts once-rounded covariance readouts.
+
+Stack all source incidences then all destination incidences, axes[side,time,label]; select coordinate.active from exact support stack(support[:-1],support[1:]), never a tiny-probability cutoff. Retain every active label (no moment gauge), every mean entry and upper-triangle covariance entries in np.triu_indices order without doubling/sqrt2 weighting. Complete residual order: natural messages, label mass, conditional means, conditional covariance, auxiliaries. Certificates are elementwise scaled absolute maxima with no label-mass weighting. Inactive coordinates are omitted and support failures remain separate.
+
+Sources: hybrid_natural.py:104,470,507; hybrid_covariance.py:120; hybrid_joint.py:39,172,230,240; hybrid_separator.py:321 in /Users/ravd/projects/cffg-d12-scaling. Confidence high for equations/order/published arithmetic distinctions; no numerical probe was executed by this researcher, so it does not independently confirm the newly reported native discrepancy. No edits, tests, compilation or numerical runs occurred. Distill into the current harness/numerical-blocker ticket after the author pauses, and use as independent handoff/re-review context.
+
+**2026-09-14T23:24:33Z**
+
+Completed independent re-review at af90a8988aa5d650255158ef30895757a2efa824, reviewer paused/exited before any author resumption. Original four reproductions reject; adjacent paired message/target, equal absolute-energy shifts, changed regional normalizers, invalid covariance low words, finite-log probability underflow and impossible XLA alias-byte profiles still pass accepted controls with refreshed aggregate hashes. Root additionally proved zero accepted updates can claim a changed initial/terminal coordinate. Independent mixture arithmetic also confirms cdh-urn0: weighted 0.050000001 versus0.0625, rare-source0.076171875 versus0.078125, native status0; cause is not yet established.
+
+Original harness author will repair bounded representation/support, counter-history and XLA byte-relationship validation, keeping existing allowances and controls valid. Paired targets, beliefs, normalizers and absolute energies move to cdh-m75a for a fresh independent-reference implementer. The core covariance repair stays in cdh-urn0 with a fresh numerical implementer. Sequential order: finish/review original harness repairs; fresh core repair/review; fresh reference adapter/review. cdh-urn0 and cdh-m75a are independent ready tickets, both now prerequisites of completing cdc-ztuf. This records genuine closure dependencies without making the independent adapter depend on a kernel implementation. Setup remains in_progress until the combined reviewed source receives the new immutable tiny checkpoint and one final short-suite gate. No moderate or registered fit is authorized by these repairs.
+
+Legend: prerequisite --> dependent; closed ancestry compressed.
+[x] cff-j191 --> [ ] cdh-m75a (ready independent reference) --+
+[ ] cdh-urn0 (ready local numerical repair) ------------------+--> [~] cdc-ztuf
+[x] Y15D / OGJ9 / C8KC --------------------------------------+          |
+                                                                      +--> [ ] cff-a3wz
+[ ] cff-k6g5 (ready declarations) -------------------------------------+--> [ ] cff-7sw5
+A3WZ and compiler/integration descendants feed F3JZ, learning/composition and cff-x0if's three frozen fits, then cff-zov5. Actual TK dependencies remain authoritative. No fit has run.

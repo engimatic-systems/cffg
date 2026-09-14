@@ -39,3 +39,15 @@ This ticket is an explicit prerequisite of cff-a3wz moderate qualification. cdc-
 D12 is the complete hybrid message/auxiliary solve. T2 describes two time points; K is label count and d is continuous dimension. A covariance low word retains the rounding remainder alongside its primary float32 word. eps32 is float32 machine epsilon. A source-conditioned marginal is the projected Gaussian mixture for one source label. JIT means just-in-time compilation; vmap is JAX batching. An expected-failure regression keeps a known defect visible without claiming it passed.
 
 
+
+## Notes
+
+**2026-09-14T23:24:33Z**
+
+Independent published-source scope audit at d22a43a, not an arithmetic diagnosis. Question: do existing public D9 models or fit_rslds reach the questioned D12 endpoint projection/covariance mixer? Answer: built-in public D9/fit_rslds paths do not. fit_rslds builds Engine(compile_template(...)) and calls engine.run; recurrence execution/readout uses recurrence.structured_recurrence_update and recurrence.weight_stats. Public hybrid_gfe/hybrid_learning modules are separate implementations. This establishes call-path isolation, not a claim about explicit external users of unbound D12 modules.
+
+Affected D12 reachability: marginal -> collapse_label -> _mix -> hc.combine; gaussian_adapter also calls _mix. Local hybrid_separator.evaluate projects both endpoints for message targets and consistency. Joint evaluate/initialize therefore reach it, as do feasible initialization, trials, residual linearization/CGLS fallback and terminal certification. Storage buffers evaluates/linearizes, and exposed residual/iteration/certification/complete-solve programs inherit those paths; arrays alone inventories leaves. Eager/JIT and single/vmap are applicable verification pairs, not proof the discrepancy occurs in every mode/dtype. The independent NumPy reference has its own projection.
+
+Repair-boundary caution: if hc.combine is changed, verify its broader D12 users in natural addition, transition precision assembly and retained inverse-word normalization/canonical conversion, not only mixtures. Standalone auxiliary_statistics uses a different suffix mixer and does not directly call _mix, although solver-returned learning statistics depend on the affected inference path.
+
+Sources in /Users/ravd/projects/cffg-d12-scaling: models/rslds_fit.py:334,478; execution/cross_domain.py:72; readouts/recurrence.py:93; hybrid_natural.py:73,470,548; hybrid_separator.py:131,195,430; hybrid_joint.py:210,260; hybrid_joint_solver.py:142; hybrid_joint_storage.py:29; hybrid_covariance.py:169. Confidence high for published call-path scope. No active harness inspection, edits, tests, compilation or numerical calls ran, and this report does not independently establish the affected input range or arithmetic root cause. Distill into cdh-urn0 after the current author pauses, for a fresh bounded implementer's planning and honest CFFG impact statement.
