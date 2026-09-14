@@ -324,13 +324,24 @@ multimodal joint posterior can remain inaccurate even when the coordinate
 residual converges. D11 evaluates a pair-conditioned Gaussian candidate with
 explicit moment consistency and rejects it as a sufficient repair: separate
 source and drive boundaries lose association inferred by external switching
-factors even when the local JJ bound is exact. cff-ocxl must derive a hybrid
-separator or grouping before production implementation. The candidate's JJ energy
+factors even when the local JJ bound is exact. D12 now derives hybrid
+regime/state separators that repair that association loss, with production
+integration still pending in the bounded cff-ocxl follow-up tickets. D12 keeps
+one conditional Gaussian per regime at a boundary; histories sharing that
+regime can remain multimodal. Its temporal reflected-mixture example has
+exact JJ factors and zero EC residual yet opposite exact learning biases that
+the approximation returns as zero. This is not an exact source-learning
+guarantee. Destination-selected affine dynamics, declared hybrid ownership,
+and stationary ordinary adapters define its accepted scope; cutting an
+externally inferred regime/state association into two singleton ports is
+unsupported. The candidate's JJ energy
 upper-bounds the literal-factor EC energy at the same feasible region beliefs,
 but neither has a general bound against true negative log evidence. It does
 not establish source recovery, Gaussian trajectory exactness, or a
 horizon-independent convergence budget. Its signed Gaussian messages also
-require compatible boundary consumers (cff-ocxl).
+require compatible boundary consumers (cff-f3jz and cff-ulbz). The NumPy D12
+experiment solves held auxiliaries and requires proper forward initialization;
+production still needs the joint message/auxiliary solver and execution gate.
 
 The current v1 requires equal regime cardinalities
 `K >= 2`, a proper Gaussian drive, finite fixed

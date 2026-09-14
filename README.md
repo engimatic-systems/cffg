@@ -663,6 +663,15 @@ engine.marginals(state)["u1"]   # posteriors by variable name
 engine.bfe(state)               # model-declared BFE, GFE, approximation, or bound
 ```
 
+D12 derives a proposed hybrid regime/state approximation that preserves
+source-conditioned moments across declared regions. It is currently an
+experiment, with no public template selection or checkpoint format. Production
+continues to use D9. The proposed construction, ordinary boundary adapters,
+unsupported association cuts, and remaining temporal-mixture error are recorded
+in [D12](docs/DERIVATIONS.md#d12--hybrid-regimestate-separators-cff-ocxl).
+Implementation and persisted-state migration are tracked separately before
+source-recovery qualification.
+
 For hybrid regime epistemics, place a `P_SUBSTITUTION` constraint with
 `substituted_role="out"` on a `gaussian_mixture` or
 `gaussian_mixture_linear` factor whose output faces a fixed `gaussian` goal.

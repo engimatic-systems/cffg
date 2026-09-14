@@ -2561,3 +2561,348 @@ composable source-association construction; no claim is made that the larger
 candidate satisfies criteria 4–8. The negative decision and rewritten
 downstream gate are the deliverable. Production selection, engine paths,
 public factors, readouts, and checkpoints remain D9 in this ticket.
+
+## D12 — Hybrid regime/state separators (cff-ocxl)
+
+### D12.1 Decision and plain-English companion
+
+**Positive mathematical decision: `hybrid-regime-ec-v1`.** This names the
+approximation below, not a shipped executable or checkpoint version. Production
+integration requires the separate implementation tickets recorded in cff-ocxl.
+D9 remains the public runtime. No source-recovery result is claimed.
+
+A boundary now carries a probability, mean, and covariance **for each regime**.
+The switched priors in D11.15 consequently send different boundaries: the two
+sources keep their positive and negative positions instead of sharing a zero
+mean. Recurrence learning uses those positions with the inferred source and
+next-regime pair. The variance twins also retain their different second moments.
+
+This fixes the identified missing association. It still merges different
+histories that end in the same regime into one conditional Gaussian. Those
+histories can matter to a later observation or learning update. D12.7 gives a
+counterexample with exact JJ factors and zero stationarity residual where the
+remaining learning error changes sign. The accepted contract is an explicit
+expectation-consistent (EC) approximation, not exact temporal inference.
+
+The sufficient-statistic EC construction has the same source basis as D11:
+[Part I §5.4](https://biaslab.github.io/pdf/arxiv/2306.08014.pdf) and
+[Opper and Winther (2005)](https://www.jmlr.org/papers/volume6/opper05a/opper05a.pdf).
+The scopes, elimination identity, adapters, and counterexamples here are our
+derivations. Existing D3 collapse-first outputs do not implement these equations.
+
+### D12.2 Smallest scopes, coordinates, and local integration
+
+Let `Y_t=(z_t,x_t)`, `z_t` have K states, and `x_t` have dimension d.
+Initially restrict the dynamics to the destination-selected affine channel
+`D_t(j,x,y)=N(y;A_tj x+b_tj,Q_tj)` with positive definite noise.
+The smallest scopes among the D11 candidates that preserve the required
+association form an alternating cluster chain:
+
+    Y_t=(i,x) -- R_t(i,j,x) -- H_t=(j,x)
+                                 -- D_t(j,x,y) -- Y_{t+1}=(j,y).
+
+The duplicated x or j at a region's ports is one internal variable. Region
+entropy uses the reduced coordinates, not the entropy of continuous copies
+with a Dirac equality density. This cluster chain has running intersection.
+A construction that attaches separate recurrence and dynamics regions only
+to both endpoint Y separators instead introduces a four-cycle and is a
+different objective. Singleton categorical/Gaussian ports fail D11.15.
+
+`R` retains `rho_ij N(x;m_ij,S_ij)`, `D` retains `pi_j N([x;y];m_j,S_j)`,
+and both H and Y retain `pi_i N(x;mu_i,V_i)`. At every hybrid incidence match
+`1_i`, `1_i x`, and the independent symmetric entries of `1_i xx^T`.
+Conditional covariance, not just raw second moment, must be positive definite.
+All beliefs normalize on their declared active support. There is no independent
+unconditional Gaussian trajectory belief. Source/destination pair probabilities,
+weighted first/second source moments, and conditional cross-time covariance
+are retained; all other readouts are derived from these beliefs.
+
+For evaluation, analytically eliminate D and H to obtain a grouped region
+
+    b_t(i,j,u)=rho_tij N(u;m_tij,S_tij), u=[x;y].             (D12.1)
+
+With D11.5 coefficients `(a,h,P)` and `W_j=Q_j^-1`, its log potential is
+`kappa_ij+g_ij^T u-u^T B_ij u/2`, where
+
+    B_ij = [[P_ij+A_j^T W_j A_j, -A_j^T W_j],
+            [-W_j A_j,           W_j       ]],
+    g_ij = [h_ij-A_j^T W_j b_j; W_j b_j],
+    kappa_ij = a_ij-(b_j^T W_j b_j+logdet Q_j+d log(2 pi))/2. (D12.2)
+
+Every Gaussian normalizing constant contributes to label masses and energy.
+Given hybrid cavities `(a_Li,eta_Li,J_Li)` and `(a_Rj,eta_Rj,J_Rj)`, add their
+block-diagonal precisions and concatenated linear terms to B and g. Call the
+result J and eta. Each active block has `S=J^-1`, `m=S eta`, and log mass
+
+    kappa_ij+a_Li+a_Rj+d log(2 pi)-logdet J_ij/2+eta_ij^T m_ij/2.
+
+Normalize over active pairs using logsumexp. This is exact Gaussian integration
+for fixed cavities and fixed JJ auxiliaries. It enumerates pairs, never paths.
+
+Why elimination adds no approximation here: for a held right hybrid cavity,
+
+    C_j=(W_j+J_Rj)^-1, L_j=C_j W_j A_j,
+    d_j=C_j(W_j b_j+eta_Rj),
+    b(y|x,i,j)=N(y;L_j x+d_j,C_j).
+
+This conditional is independent of i. Projecting the x mixture conditional on j
+preserves all joint moments through that affine conditional and hence preserves
+the quadratic dynamics energy. On the resulting feasible lifted beliefs,
+
+    H(b_D)-H(q_H)=sum_j pi_j G(C_j)=H(b_group)-H(b_R),
+    F_R+F_D+H(q_H)=F_group.                                 (D12.3)
+
+The stationary recurrence belief, auxiliary, learning moments, endpoint
+messages, and objective agree. The grouped experiment therefore evaluates the
+smaller alternating scopes by elimination. This argument requires the stated
+destination-selected affine channel; a source- or pair-selected channel needs
+its own scope declaration/derivation and cannot reuse this identity silently.
+Larger trajectory mixtures or dense covariance are unnecessary for the declared
+moments. This is minimality within the compared conditional-Gaussian scopes,
+not a theorem that this family is optimal among every possible approximation.
+
+### D12.3 One constrained objective and its bound direction
+
+For hybrid unary canonical potentials `s_t(i,x)` counted once, and `d_t`
+incident transition regions, the grouped objective is
+
+    F_EC^JJ = sum_t[-H(b_t)-E_bt log(f_t^JJ D_t)]
+             +sum_t(d_t-1)H(q_t)-sum_t E_qt log s_t.        (D12.4)
+
+`H(b)=H(rho)+sum rho G(S)` and `H(q)=H(pi)+sum pi G(V)` use the
+**labeled** entropy; `G` is D11's Gaussian entropy. Region counting numbers are
++1; separator counting numbers are `1-d_t`. An interior chain separator adds
+`+H(q_t)`, and an endpoint adds none. No separate z or x edge correction is
+added for those same incidences. Unary-site entropy cancels its own additional
+separator incidence, leaving the expectation shown. D12.3 establishes the
+identical alternating-region ledger. Adapters below are extra named regions
+with their own ports and counts, not unrecorded entropy corrections.
+
+At identical feasible beliefs and auxiliaries,
+
+    F_EC^JJ-F_EC^literal=sum_t E_bt[log f_t-log f_t^JJ]>=0.   (D12.5)
+
+This also compares infima over the same feasible set. Neither EC objective
+has a general bound against true negative log evidence. One isolated grouped
+region has the stronger local identity `F=-log Z_JJ` at its tilted optimum,
+and `-log Z_JJ>=-log Z_literal`. Local JJ exactness does not extend that statement
+to a temporal graph with projected separators.
+
+### D12.4 Stationarity, gauges, and learning
+
+Write a hybrid message as `a_i+eta_i^T x-x^T J_i x/2`. The natural coordinates
+of its normalized projected belief are
+
+    J_i=V_i^-1, eta_i=J_i mu_i,
+    a_i=log pi_i-logdet(V_i)/2-d log(2 pi)/2-mu_i^T J_i mu_i/2. (D12.6)
+
+Only a **common** additive shift of a is gauge. Dropping different Gaussian
+normalizers per regime changes the probabilities. Fix one active a coordinate
+per directed message to zero. Symmetric precision uses its independent entries;
+there is no extra Gaussian gauge. Fixed installed parameters give no regime-label
+gauge. Absent labels have no Gaussian coordinates, and no residual divides by
+their zero mass.
+
+For region f and separator v, let `theta_fv` be the outgoing natural message,
+`chi_fv=s_v+sum_{g!=f}theta_gv`, and `nat(q_v)=s_v+sum_g theta_gv`.
+The complete fixed-auxiliary stationarity equations are
+
+    R_fv=E_bf phi_v-E_qv phi_v=0,
+    theta_fv=nat(Proj_v b_f)-chi_fv,                        (D12.7)
+
+where `phi=(1_i,1_i x,1_i vech(xx^T))`, dropping one active indicator for
+normalization. Projection includes the covariance **between** pair means at
+each fixed endpoint label. Scale conditional moment residuals as well as label
+masses; a tiny active label must not hide an unconverged conditional covariance.
+The complete natural quotient has the same zero set on proper, fixed support;
+the experiment measures that quotient residual with relative coordinate scaling.
+Individual message/cavity precisions may be signed. They are never clamped.
+
+There is one tied auxiliary `xi_til=c_til²>=0` for each source/stick. Using the
+source x-block of D12.1 and augmented feature `h=[x;1]`, add
+
+    e_til=sum_j b_jl rho_tij,
+    R_xi=xi_til-sum_j b_jl rho_tij theta_il^T M_tij theta_il/e_til. (D12.8)
+
+Here `b_jl=1(j>=l)` and `M_tij=E[hh^T|i,j]`. Zero exposure fixes xi to zero
+and gives zero learning increments. At xi=0 the derivative/KKT condition is
+D11.11: `dF/dxi=(e/2)(dw/dxi)(E[psi²]-xi)`, with `dw/dxi=-1/48`.
+A zero derivative with respect to c alone does not certify stationarity.
+Learning uses D11.1 with these same pair-conditioned M and first moments.
+It never multiplies rho by an unconditional state moment. Reusing D9's
+unconditional auxiliary with the new moments changes the meaning again.
+
+Varying normalized regional beliefs in the constrained Lagrangian gives the
+tilted densities in D12.2; varying separators gives the message sums above;
+varying xi gives D12.8. These, positivity, support, and normalization are the
+full stationarity system. No independent component belief may become a second
+production state authority.
+
+For fixed auxiliaries, the dual diagnostic on a chain is
+
+    Phi=-sum_t log Z_bt+sum_interior log Z_qt.              (D12.9)
+
+Its derivative in an internal directed natural coordinate is the separator
+canonical-statistic moment minus the opposite incident region's moment. For
+the stored precision J, a diagonal derivative is -1/2 times the xx moment
+difference; an independently varied symmetric off-diagonal has factor -1.
+At stationarity Phi equals
+D12.4. Away from consistency the separately evaluated primal expression is not
+a feasible variational objective. A residual or a dual slope is never relabeled
+free energy. The executable solve is a bounded fixed-JJ experiment: it uses
+backtracking on the quotient residual, checks properness, and certifies both
+finite residual and stable finite energy. It does not claim a completed joint
+xi/message optimizer. D12.8 supplies that optimizer's required residual.
+
+### D12.5 Ordinary exterior and the D3 companion
+
+Fixed categorical or Gaussian evidence broadcasts into the hybrid unary site.
+An ordinary live neighbor instead connects through an explicit identity adapter
+from `Y=(i,x)` to an ordinary **copy** `u=x` or `v=i`. The adapter uses reduced
+belief `a(i,x)` on the equality support, owns zero factor energy and `-H(a)`,
+and matches hybrid moments at Y and ordinary moments at the copy. It never
+computes differential entropy of a delta distribution.
+
+For a Gaussian port the tilt is `a(i,x) proportional to m_Y(i,x)m_u(x)`.
+Its hybrid output is the Gaussian cavity broadcast across regimes. Its ordinary
+output is `nat(Proj_G a)-nat(m_u)`, projecting the full tilt before dividing.
+The categorical adapter similarly sends `log sum_x a(i,x)-log m_v(i)` and
+broadcasts its categorical cavity into the hybrid output. Both are closed
+stationary equations under D12.4's generic region/port counting.
+
+With n hybrid neighbors and m ordinary neighbors, the adapter adds one
+incidence at each port: its `-H(a)` cancels the extra `+H(q_Y)` at consistency,
+leaving `(n-1)H(q_Y)+m H(q_u)` before the ordinary neighbors' own terms.
+This explicit accounting prevents double-counting nested z, x, and Y entropy.
+A mixture `N(+/-2,1)` with a unit Gaussian cavity has tilted variance 3/2;
+its required Gaussian quotient precision is -1/3, not D3's collapsed result.
+
+Ordinary linear-Gaussian and categorical factors can use these ordinary ports
+with their stationary rules. An exterior mixture requires the full tilted
+D11.14 EC binding tracked by cff-ulbz. Grouped internal switching dynamics
+eliminates that internal D3 port, but does not remove the need for the companion
+at exterior mixture ports. A factor that supplies association between the same
+regime and state must enter through a hybrid port or be explicitly grouped;
+splitting both its legs into singleton adapters repeats D11.15. Such a cut is
+outside the accepted construction and must fail with the named boundary.
+General nonconjugate neighbors need their own stationary tilted belief rule.
+GFE/P-substitution, nonlinear channels, and unstated constraint combinations
+are not covered by this derivation.
+
+### D12.6 Numerical and complexity contract
+
+For T slices, a grouped evaluation costs `O(T K² d³)` and stores
+`O(T K² d²)` region blocks plus `O(T K d²)` separators/messages and
+`O(T K²)` auxiliaries. Recurrence prefixes avoid a K³ stick tensor. The
+alternating representation uses `K²` d-dimensional and K 2d-dimensional
+blocks per transition; D12.3 permits either evaluator. One isolated evaluation
+needs `O(K² d²)` transient memory; evaluating/storing a whole residual uses
+`O(T K² d²)`. No T-by-T continuous covariance or exponential path mixture is
+part of the candidate. Adapter cost is polynomial and adds linearly in its
+explicit number of incidences.
+
+For I global iterations, B line-search trials, L local auxiliary iterations,
+and M matrix-free linear iterations, explicitly budget
+`O(I B L (1+M) T K² d³)` work. This is a budget expression, not a
+horizon-independent convergence theorem. A forward/adjoint directional
+linearization visits local blocks with the same asymptotic work; an adjoint
+tape stores local blocks linearly in T. A restarted Krylov solver with restart
+r adds `O(r T K d²)` vector storage and at most `O(M r T K d²)` orthogonalization
+work per solve. Dense global Jacobians, dense trajectory covariance, and
+unbounded differentiation through optimization iterations are excluded.
+Finite-difference checks in the tiny oracle do not authorize a dense runtime
+Jacobian. The fixed-JJ experiment has L=1, M=0; its forward initialization
+requires proper successive tilted blocks and is not a general feasible-start
+algorithm. Production must implement the declared budget/status contract.
+
+| Input | Required behavior before numerical work |
+| --- | --- |
+| Literal log-zero labels | Restrict the fixed active face, omit inactive Gaussian coordinates, keep weighted moments exactly zero. |
+| Empty support | Error naming the supported region; no uniform fallback. |
+| Support changes | Rebuild the active coordinate inventory; never reuse an old quotient or inactive xi. |
+| Tiny positive labels | Keep log mass; the NumPy experiment fails on probability underflow rather than turning a positive label into a structural zero. |
+| Inactive auxiliaries | xi=0 and zero learning increments; no zero-exposure division. |
+| Signed/vacuous cavity | Allowed when required aggregate and active tilted beliefs are proper; otherwise error, never a ridge. |
+| Float32 | Relative spectral resolution `32 d eps * spectral_scale`; squared-logit roundoff guards use D11's finfo rule. No absolute floor. |
+| Shape, dtype, asymmetry, NaN/Inf | Reject before claiming a belief. Active non-finite objective or residual is divergence/error. Improper trial steps can be backtracked. |
+| Iteration or line-search budget | Return exhaustion separately from convergence. The experiment raises for invalid/non-finite active states; it never returns them as successful results. |
+
+### D12.7 Independent anchors and remaining temporal error
+
+`tests/hybrid_separator_reference.py` imports neither the candidate nor any
+production recurrence implementation. It enumerates K=2 scalar paths for
+2<=T<=6, integrates fixed-JJ Gaussian paths independently, and also integrates
+literal logistic paths by Gauss-Hermite quadrature for T<=3. Dense covariance
+and enumeration are confined to this reference. Quadrature refinement checks
+its stated tolerance before comparison. Floating-point equality budgets are
+`512 * terms * finfo(dtype).eps`; approximation limits are separate constants
+fixed before candidate evaluation in each test.
+
+`src/cffg/experiments/hybrid_separator.py` and
+`tests/test_hybrid_separator_derivation.py` anchor:
+
+- `test_one_group_all_moments_messages_objective_and_learning_match_reference`:
+  every hybrid natural message block, weighted moments, learning increments,
+  node/endpoint energy, and dual equality, in float32 and float64.
+- `test_d11_twins_cross_hybrid_boundary_with_opposite_learning`: both signs
+  of the prior-mean twin and both source-variance assignments, including exact
+  zero destination support and vacuous receiving cavities.
+- `test_temporal_decoupled_reduction_matches_exact_chain`: a temporal Gaussian
+  chain with nonzero cross-time covariance, regime-independent dynamics/state
+  evidence and initial independence, and drive-independent recurrence.
+- `test_temporal_coupled_case_reports_projection_gap_separately_from_stationarity`:
+  T=3 coupled fixed-JJ reference; maximum pair/first/second errors approximately
+  `8.08e-6`, `2.78e-5`, `3.79e-4`; objective error `1.21e-5`, with a quotient
+  residual below `8e-11` in float64. These are approximation errors.
+- `test_dual_gradient_is_incidence_moment_residual` and
+  `test_auxiliary_xi_gradient_and_false_zero_at_c_zero`: independent finite
+  differences of the complete dual and held-belief energy, respectively.
+- `test_alternating_scopes_and_grouped_elimination_have_identical_energy`:
+  D12.3 conditional covariance, entropy cancellation, and channel energy.
+- `test_ordinary_gaussian_adapter_uses_full_tilt_and_signed_quotient`: D11.14
+  projection order, signed output, and extra hybrid entropy cancellation.
+- `test_local_jj_gap_is_separate_from_hybrid_projection_gap`: literal versus
+  fixed-JJ local moments and the isolated evidence inequality.
+- Hostile-coordinate, support rebuild, vacuous/signed cavity, exhaustion,
+  T=100, K=20, and d=10 tests pin the numerical and storage inventory.
+
+D9 reductions remain local: a fixed drive is conditioned out before Gaussian
+entropy evaluation and gives the exact categorical recurrence table; a
+source-independent Gaussian cavity with drive-independent logits recovers
+D9's recurrence messages. The existing D11/D9 executable reductions remain
+unchanged. `R=0` alone does **not** make source-dependent temporal dynamics
+or externally associated learning equal to D9. Identical nonzero source slopes
+do not imply exact Gaussian closure either.
+
+For a stronger approximation falsifier, let adjacent reduced temporal factors be
+
+    f_L(h,i,x)=p_h N(x;a_h,1)/2,
+    f_R(i,j,x)=N(x;b_j,1/2)/2,
+    a=(2,-1), p_0=e/(e+2 exp(1/4)), b=(1,-1)/sqrt(2).
+
+All recurrence logits are zero, so JJ is exact. At the stationary hybrid
+separator `q(i,x)=N(x;0,1)/2`, right-to-left precision is 1 and left-to-right
+precision is 0. The left tilt has conditional weights `(1/3,2/3)`, means
+`(1,-1/2)`, variance 1/2. The right tilt has equal weights, means
+`+/-1/sqrt(2)`, variance 1/2. Both match all retained hybrid moments.
+Reflecting a preserves those messages and zero residuals. Exact integration
+of the four products nevertheless gives:
+
+| Quantity | Original exact | Reflected exact | EC, both |
+| --- | ---: | ---: | ---: |
+| E[x] | -0.010630665 | +0.010630665 | 0 |
+| P(j=0) | 0.480735496 | 0.519264504 | 0.5 |
+| E[x²] | 1.029089989 | 1.029089989 | 1 |
+| Per-source learning slope A | 0.183824595 | 0.183824595 | 0.176776695 |
+| Per-source learning bias A | -0.009632252 | +0.009632252 | 0 |
+
+`B_i=(1/8)[[E x²,E x],[E x,1]]` also loses its signed off-diagonal. This has
+an affine temporal realization: a previous hidden label generates x with
+means a; a Gaussian transition of variance 1/4 and a destination-conditioned
+Gaussian observation of variance 1/4 produce f_R after integration. The
+reflected-mixture reference and stationary-cavity tests reproduce the gap.
+It is not a collapse-first error, a JJ error, or a failure to solve EC.
+Retaining arbitrary conditional history mixtures would violate the chosen
+bounded inventory. The positive decision accepts this disclosed approximation;
+cff-x0if must judge source recovery empirically after implementation, and can
+reject it without reinterpreting D12's mathematical guarantees.
