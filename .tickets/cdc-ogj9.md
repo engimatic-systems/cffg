@@ -1,6 +1,6 @@
 ---
 id: cdc-ogj9
-status: in_progress
+status: closed
 deps: [cff-y15d]
 links: []
 created: 2026-09-14T20:25:51Z
@@ -136,3 +136,7 @@ print('PASS: archived plan, source hashes and all three complete compile-only me
 PY
 
 Resume point: measurements and evidence are complete; commit and PAUSE for root artifact review, ticket closure and publication. No further measurement is proposed. Root owns subsequent cdc-c8kc implementation, followed by a fresh cdc-ztuf/A3WZ author.
+
+**2026-09-14T21:01:34Z**
+
+Root artifact review of3f7770e is complete with no findings. Independently checked the exact20-member archive and every recorded byte count/hash, equality of archived/current specification and summary, exact three-case inventory, all saved worker/process completion checks and identities, all source hashes, and zero executable calls. Canonical explanation correctly separates process high-water from XLA estimates, limits two-point scaling inference, and treats output selection as a broader payload trim rather than isolated recovery cost. cdc-ogj9 is complete: full T32/T100 lower10.616/9.259s, compile192.716/193.088s, process high-water20.381/18.632GiB; T32 reduced-output compile199.900s. Temporary XLA estimates grow3.205x with horizon. No resource stop, retry, solver execution, recovery fit, numerical/source policy change or full-suite run. This is reviewed isolated developer reporting; seven bounded checks plus the actual report/archive validation are its gate. Root proceeds to cdc-c8kc, then the existing cdc-ztuf/A3WZ chain. Recovery quality and moderate execution/convergence remain unestablished.
