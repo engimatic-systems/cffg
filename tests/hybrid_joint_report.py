@@ -83,6 +83,32 @@ def native_order(coordinate):
                    *coordinate.entries[i][3]))
 
 
+def independent_initializer(model, initial_xi, perturb):
+    coordinate = Coordinate(model)
+    xi = np.where(model.auxiliary_support, initial_xi, 0.)
+    _, _, _, messages = tilted(model, zero_messages(model), xi)
+    independent = coordinate.pack(messages, xi)
+    vector = np.concatenate((independent[native_order(coordinate)], independent[coordinate.message_size:]))
+    if perturb:
+        vector[:coordinate.message_size] += .01 * np.sin(np.arange(coordinate.message_size) + 1)
+    return vector
+
+
+def validate_initial_work(record, model, initial_xi, perturb):
+    """Check the initial loop guard and the unchanged zero-update coordinate."""
+    wanted = independent_initializer(model, initial_xi, perturb)
+    if record['iterations'] != 0:
+        initial = evaluate_native_coordinate(model, wanted)
+        require(max(initial['certificates'].values()) > 64 * np.finfo(np.float64).eps**.75,
+                'certified initializer cannot have accepted updates')
+        return
+    vector = np.asarray(record['coordinate'], dtype=np.float64)
+    atol, rtol = arithmetic_tolerance('messages', model.shape[0], np.float64)
+    require(vector.shape == wanted.shape and np.all(np.isfinite(vector))
+            and np.all(abs(vector - wanted) <= atol + rtol * abs(wanted)),
+            'zero-update coordinate disagrees with independent initializer')
+
+
 def validate_report_policy(report):
     schema = report.get('report_schema', 1)
     require(type(schema) is int and schema in PACKING_POLICIES, 'unsupported report schema')
@@ -103,7 +129,8 @@ def validate_counters(record, budgets):
             'counters must be nonnegative integers')
     iterations, evaluations, rejected, linear, fallback = (record[name] for name in COUNTERS)
     require(iterations <= budgets['outer'], 'iterations exceed the outer budget')
-    require(fallback <= iterations and linear <= fallback * budgets['linear'],
+    # An accepted fallback must move from the zero-initialized CGLS step.
+    require(fallback <= iterations and fallback <= linear <= fallback * budgets['linear'],
             'fallback or linear counters exceed their budgets')
     require(fallback * budgets['trials'] <= rejected <= (iterations + fallback) * budgets['trials'] - iterations,
             'rejected trials disagree with the direction budgets')
@@ -163,13 +190,8 @@ def validate_terminal_variant(record, model, schema):
     if record['execution'] == 'outer_zero':
         require(record['proper_active_beliefs'] and np.all(np.isfinite(certificates)) and np.all(certificates >= 0),
                 'zero-budget state must have proper finite certificates')
-        start = np.where(model.auxiliary_support, record['initial_xi'], 0.)
-        _, _, _, messages = tilted(model, zero_messages(model), start)
-        independent = coordinate.pack(messages, start)
-        wanted = np.concatenate((independent[native_order(coordinate)], independent[coordinate.message_size:]))
+        validate_initial_work(record, model, record['initial_xi'], record['perturbation'])
         atol, rtol = arithmetic_tolerance('messages', model.shape[0], np.float64)
-        require(np.all(np.isfinite(vector)) and np.all(abs(vector - wanted) <= atol + rtol * abs(wanted)),
-                'zero-budget coordinate disagrees with independent initializer')
         held = evaluate_native_coordinate(model, vector)
         expected_certificates = np.asarray([held['certificates'][name + '_residual'] for name in CERTIFICATES])
         require(np.all(abs(certificates - expected_certificates) <= atol + rtol * abs(expected_certificates)),
@@ -288,10 +310,12 @@ def validate_saved_report(report, spec, references):
         if record['execution'] == 'jit_vmap':
             for start, member in zip(record['initial_xi'], record['members'], strict=True):
                 validate_state_fields(member, model)
+                validate_initial_work(member, model, start, False)
                 converged.append((record['case'], start, member))
                 parities.append((member, singles[record['case'], start, False]))
         elif record['status'] == 'converged':
             validate_state_fields(record, model)
+            validate_initial_work(record, model, record['initial_xi'], record['perturbation'])
             converged.append((record['case'], record['initial_xi'], record))
             if record['execution'] == 'host':
                 parities.append((record, singles[record['case'], record['initial_xi'], False]))

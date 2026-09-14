@@ -17,6 +17,7 @@ from hybrid_joint_candidate import context as make_context, held_coordinate
 from hybrid_joint_report import (
     OUTPUT_GROUPS, REPORT_SCHEMA, FAILED_COORDINATE_POLICY, arithmetic_tolerance,
     compare_outputs, validate_inventory, validate_report_policy, validate_saved_report, validate_terminal_variant,
+    validate_initial_work,
 )
 
 context = lru_cache(maxsize=None)(make_context)
@@ -265,7 +266,7 @@ def test_saved_terminal_variants_require_consistent_payloads(checkpoint_report, 
         negative['certificates']['auxiliary'] = 0.
     else:
         del nonfinite['free_energy']
-    with pytest.raises(ValueError, match='zero-budget|failed|proper-belief|saved xi|missing required'):
+    with pytest.raises(ValueError, match='zero-budget|zero-update|failed|proper-belief|saved xi|missing required'):
         validate_saved_report(report, *checkpoint_context)
 
 
@@ -344,3 +345,57 @@ def test_saved_current_failure_policy_accepts_only_the_declared_sentinel(checkpo
     record['coordinate'][0] = 0.
     with pytest.raises(ValueError, match='failed message coordinate'):
         validate_terminal_variant(record, model, REPORT_SCHEMA)
+
+
+@pytest.mark.parametrize('execution,start,perturb', [
+    ('jit', 0., False), ('jit', 0., True), ('jit', 1., False), ('jit', 1., True),
+    ('host', 0., False), ('host', 1., False), ('jit_vmap', 0., False), ('jit_vmap', 1., False),
+])
+def test_saved_zero_update_claims_require_the_declared_initializer(checkpoint_report, checkpoint_context,
+                                                                  execution, start, perturb):
+    report = deepcopy(checkpoint_report)
+    if execution == 'jit_vmap':
+        record = next(r for r in report['records'] if r['execution'] == execution)['members'][int(start)]
+    else:
+        name = 'coupled_t3' if execution == 'jit' else 'coupled_t2'
+        record = next(r for r in report['records'] if r['execution'] == execution and r['case'] == name
+                      and r['initial_xi'] == start and r['perturbation'] == perturb)
+    record.update(iterations=0, evaluations=2, rejected_trials=0, linear_iterations=0,
+                  gauss_newton_steps=0, last_rejection='none')
+    record['rejection_counts'] = dict.fromkeys(record['rejection_counts'], 0)
+    with pytest.raises(ValueError, match='zero-update coordinate'):
+        validate_saved_report(report, *checkpoint_context)
+
+
+@pytest.mark.parametrize('start,perturb', [(0., False), (0., True), (1., False), (1., True)])
+def test_saved_zero_update_initializer_preserves_start_and_perturbation(start, perturb):
+    c, _, _, model = context('source_masked_t2')
+    record = dict(iterations=0, coordinate=np.asarray(held_coordinate(c, model, start, perturb)))
+    validate_initial_work(record, model, start, perturb)
+    with pytest.raises(ValueError, match='zero-update coordinate'):
+        validate_initial_work(record, model, 1 - start, perturb)
+    with pytest.raises(ValueError, match='zero-update coordinate'):
+        validate_initial_work(record, model, start, not perturb)
+
+
+@pytest.mark.parametrize('fallback,linear', [(1, 0), (2, 1)])
+def test_saved_accepted_fallbacks_require_linear_work(checkpoint_report, checkpoint_context, fallback, linear):
+    report = deepcopy(checkpoint_report)
+    record = next(r for r in report['records'] if r['case'] == 'coupled_t3')
+    rejected = fallback * record['budgets']['trials']
+    record.update(gauss_newton_steps=fallback, linear_iterations=linear, rejected_trials=rejected,
+                  evaluations=2 + record['iterations'] + rejected)
+    record['rejection_counts']['numerical'] = rejected
+    with pytest.raises(ValueError, match='fallback or linear counters'):
+        validate_saved_report(report, *checkpoint_context)
+
+
+@pytest.mark.parametrize('name', ['mean_forward', 'mean_reverse', 'variance_forward', 'variance_reverse'])
+def test_saved_certified_initializer_cannot_claim_updates(checkpoint_report, checkpoint_context, name):
+    report = deepcopy(checkpoint_report)
+    record = next(r for r in report['records'] if r['case'] == name and r['initial_xi'] == 0.
+                  and r['perturbation'] is False)
+    assert record['iterations'] == 0
+    record.update(iterations=1, evaluations=3)
+    with pytest.raises(ValueError, match='certified initializer cannot have accepted updates'):
+        validate_saved_report(report, *checkpoint_context)

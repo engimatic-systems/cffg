@@ -3175,6 +3175,12 @@ independent one-sweep initializer; unresolved certificates retain the initial
 positive-infinity energy-change sentinel. Integer counters obey the frozen
 outer, trial and linear caps, with evaluations equal to initialization plus
 final certification plus accepted and rejected trials.
+Every proper zero-update result must retain its declared initializer, including
+the starting xi and native-coordinate perturbation. An already-certified
+initializer cannot enter the update loop. Each accepted fallback requires at
+least one linear iteration, since a zero CGLS step cannot move the coordinate.
+These checks establish initial-state and counter consistency; they do not prove
+an unrecorded optimization trajectory.
 Report schema 2 declares `all_nan_after_invalid_message` and binds it to the
 packing source hash. Historical schema 1 retains active starting xi after
 failed messages; its source identity and payload are checked separately.
