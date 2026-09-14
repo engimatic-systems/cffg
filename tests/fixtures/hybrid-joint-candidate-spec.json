@@ -1,0 +1,224 @@
+{
+  "schema": 1,
+  "ticket": "cff-y15d",
+  "approximation": "hybrid-regime-ec-v1",
+  "revision": 1,
+  "independent_reference": {
+    "path": "tests/fixtures/hybrid-joint-reference-spec.json",
+    "sha256": "875037afad07a15fd9661ecf69669beb5dc24f8b3d352641485279cf25496b9d",
+    "results": "tests/fixtures/hybrid-joint-reference-results.json",
+    "cases": [
+      "coupled_t2",
+      "coupled_t3",
+      "independent_t3",
+      "mean_forward",
+      "mean_reverse",
+      "variance_forward",
+      "variance_reverse",
+      "source_masked_t2",
+      "empty_source_t2",
+      "underflow_source_t2",
+      "centered_t3"
+    ],
+    "unchanged_arithmetic": {},
+    "stopping": "Use each frozen reference output group scaled_allowance from its independent local propagation; add the frozen held-coordinate arithmetic allowance. No candidate-derived tolerance."
+  },
+  "acceptance": {
+    "tau": "64*eps(dtype)**0.75",
+    "local_arithmetic_atol_rtol": "512*4*eps(float64)",
+    "energy_arithmetic_atol": "512*max(4,5*T)*eps(float64)",
+    "certificates": [
+      "natural",
+      "label_mass",
+      "conditional_mean",
+      "conditional_covariance",
+      "auxiliary",
+      "primal_dual",
+      "relative_energy_change"
+    ],
+    "natural_moments": "max(1,abs(current),abs(target)); conditional moments unweighted by label mass; independent symmetric covariance entries",
+    "auxiliary": "abs(xi-target)/(1+abs(xi))",
+    "energy": "abs(F-D)/(1+abs(F)); abs(F-F_previous)/(1+abs(F))",
+    "properness": "all active aggregates and tilts proper, residual and both objectives finite, unchanged support"
+  },
+  "coordinate": {
+    "order": "all active gauge-reduced constants, all active linear coefficients, all active upper-triangle symmetric precision entries, then active xi; banks ordered side,time,label",
+    "gauge": "first supported constant per incidence is zero",
+    "inactive": "fixed -inf constant support metadata, zero linear/precision; inactive xi exact zero",
+    "origins": "fixed declared reference origins or moderate zero origins; not unknowns",
+    "corrections": "derived high+low covariance, preserve both in cancellation-sensitive differences, not unknowns",
+    "full_support_N": "2*(T-1)*(K*(1+d+d*(d+1)/2)-1)+(T-1)*K*(K-1)",
+    "full_support_M": "N+2*(T-1)*K*(1+d+d*(d+1)/2)",
+    "label_mass": "retain every supported label equation"
+  },
+  "initializations": {
+    "xi": [
+      0.0,
+      1.0
+    ],
+    "messages": [
+      "zero",
+      "perturbed"
+    ],
+    "feasible_initializer": "one simultaneous quotient sweep from unary cavities at chosen xi; invalid tilt diverges before iteration; inactive xi forced zero",
+    "perturbed": "after feasible initializer add 0.01*sin(arange(message_size)+1) to packed message coefficients only, xi unchanged; certify feasibility explicitly",
+    "expected_invalid": [
+      "empty_source_t2",
+      "underflow_source_t2"
+    ]
+  },
+  "strategy": {
+    "directions": [
+      "simultaneous quotient and auxiliary-target coordinate update",
+      "if all fixed-point trials fail, matrix-free CGLS Gauss-Newton step then identical backtracking"
+    ],
+    "max_outer_iterations": 200,
+    "line_search_trials_per_direction": 24,
+    "backtrack_factor": 0.5,
+    "armijo": 0.0001,
+    "max_linear_iterations": 128,
+    "linear_restarts": 0,
+    "linear_target": "sqrt(eps)*initial_normal_residual_norm; zero or unresolved curvature stops the linear solve without a convergence claim",
+    "linearization": "one jax.linearize of the complete signed residual with frozen scales and coordinate scales; jax.linear_transpose of this same JVP; never scalar certificates or optimizer history",
+    "residual_scales": "frozen per accepted coordinate: natural and conditional max(1,abs(current),abs(target)), unit label mass, 1+abs(xi); same scales for derivative and every trial",
+    "coordinate_scales": "1+abs(accepted coordinate); linear unknown is step divided by this scale",
+    "merit": "sum(square(signed complete residual/frozen residual scales))/2; rectangular M residuals, N unknowns",
+    "xi_boundary": "first trial fraction shortened to the nonnegative xi boundary; subsequent halves stay feasible",
+    "internal_target": "tau(dtype); stable unchanged re-evaluation permitted only when every other exact certificate passes",
+    "failure": "invalid initialization/accepted value -> diverged; no accepted direction, stationary nonzero residual or finite outer budget -> exhausted; invalid trials rejected with counted reason"
+  },
+  "storage": {
+    "linear_vectors": "CGLS carries step[N], normal_residual[N], direction[N], residual[M]; products use Jp[M], transpose[N]. No restart basis. Accepted/trial coordinate and evaluation coexist. No candidate bank.",
+    "history": "fixed scalar counters, reason histogram, last rejection code; no retained coordinate/evaluation/optimizer tape",
+    "limits": "No dense global Jacobian, trajectory covariance, path enumeration, or iteration-history arrays. All derivative captures come only from one accepted local evaluation. Limits are explicit outer/trial/linear caps above.",
+    "measurement_interface": "shape/dtype/element/byte inventory of layout, context, coordinate, evaluation, frozen scales, derivative closure, linear/outer states; dynamic-argument lower/compile memory_analysis for residual, linearization/normal product, full step/iteration and final certificates; A3WZ owns actual moderate measurements"
+  },
+  "pre_solve_checks": {
+    "classification": "held-coordinate evaluation/derivative diagnostics only; no candidate checkpoint solve",
+    "cases": [
+      "centered_t3 at xi=0",
+      "source_masked_t2 at xi=0",
+      "variance_forward repaired covariance",
+      "coupled_t2 float32 at xi=0"
+    ],
+    "perturbation": "for diagnostic held coordinates only: 0.01*sin(arange(packed_size)+1); xi perturbation kept nonnegative",
+    "checks": [
+      "pack roundtrip/gauge/support and full-support N/M",
+      "same-coordinate independent arithmetic",
+      "complete JVP finite difference of frozen-scale residual",
+      "transpose inner-product identity reusing the linearized JVP",
+      "retained covariance correction contributes to signed difference"
+    ],
+    "finite_difference": "eps**(1/3)*(1+norm(x)); one-sided at xi=0; agreement scaled by 64*eps**(1/3) for float64 and 64*sqrt(eps) for float32",
+    "transpose": "abs(<Jv,w>-<v,J^Tw>)/(1+abs(lhs)+abs(rhs)) <= 512*eps"
+  },
+  "checkpoint_runs": {
+    "tiny": "every inherited case at xi=0 and xi=1; valid cases use both declared message initializations; invalid cases zero messages only",
+    "parity": "every returned certificate and all output groups; JIT single solves all starts, host solve and vmap compare coupled_t2 zero and one starts",
+    "status_variants": [
+      {
+        "case": "coupled_t2",
+        "max_outer_iterations": 0,
+        "expected": "exhausted unless complete certificates already pass"
+      },
+      {
+        "case": "coupled_t2",
+        "xi": -1.0,
+        "expected": "diverged invalid initialization"
+      },
+      {
+        "case": "coupled_t2",
+        "site_linear": "nan in first active coefficient",
+        "expected": "diverged nonfinite input"
+      }
+    ],
+    "reporting": [
+      "case",
+      "dtype",
+      "start",
+      "perturbation",
+      "spec_sha256",
+      "source_sha256",
+      "status",
+      "reason",
+      "coordinate",
+      "xi",
+      "iterations",
+      "evaluations",
+      "rejected_trials",
+      "rejection_counts",
+      "linear_iterations",
+      "gauss_newton_steps",
+      "elapsed_seconds",
+      "all final certificates",
+      "free_energy",
+      "dual_energy",
+      "proper_active_beliefs",
+      "inactive_xi",
+      "output_comparison_by_group",
+      "held_coordinate_arithmetic",
+      "iteration/buffer interface shapes"
+    ],
+    "attempt_policy": "immutable numbered run records; record source/strategy/budget revisions before reruns; retain failed attempts and disclose incomplete measurements"
+  },
+  "moderate_qualification_unchanged": {
+    "T": [
+      32,
+      100
+    ],
+    "K": 4,
+    "d": 2,
+    "dtype": "float32",
+    "indices": "i,j=0..3; l=0..2",
+    "W_il": [
+      "0.12*(i-1.5)+0.04*(l-1)",
+      "-0.08*(i-1.5)+0.03*(l-1)"
+    ],
+    "offset_il": "0.10*(i-1.5)-0.15*(l-1)",
+    "A_j": [
+      [
+        "0.65+0.04*j",
+        0.03
+      ],
+      [
+        -0.02,
+        "0.80-0.03*j"
+      ]
+    ],
+    "bias_j": [
+      "0.10-0.05*j",
+      "-0.15+0.04*j"
+    ],
+    "Q_j_diagonal": [
+      "0.8+0.1*j",
+      "1.1+0.05*j"
+    ],
+    "unary_a_ti": "-0.2-0.1*i",
+    "unary_eta_ti": [
+      "0.1*(i-1.5)+0.05*(-1)**t",
+      "-0.08*(i-1.5)+0.03*((t mod 3)-1)"
+    ],
+    "unary_J_ti_diagonal": [
+      "0.9+0.1*i",
+      "1.1+0.05*i"
+    ],
+    "initializations": "xi=0 and xi=1, zero messages plus declared feasible initializer, fixed non-oracle message perturbation; candidate budgets frozen separately before execution"
+  },
+  "boundaries": {
+    "applies": [
+      "Derived component coordinate: local host/JIT and single/vmap packing, evaluation, iteration, certification",
+      "Runtime numerical or status invariant: input/trial/accepted/terminal status",
+      "in-place documentation and dashboard registration"
+    ],
+    "N/A": [
+      "compiler/IR/model selection",
+      "synchronous/scheduled runtime execution",
+      "lifecycle",
+      "ledger runtime ownership",
+      "persistence/serialization",
+      "public learning activation",
+      "source-recovery fits"
+    ],
+    "moderate_solves": "A3WZ only; no T32/T100 qualification solves in Y15D"
+  }
+}
