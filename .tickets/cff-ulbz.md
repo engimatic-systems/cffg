@@ -1,7 +1,7 @@
 ---
 id: cff-ulbz
 status: open
-deps: [cff-ocxl]
+deps: [cff-ocxl, cff-f3jz]
 links: []
 created: 2026-09-13T18:07:15Z
 type: feature
@@ -24,8 +24,10 @@ Gaussian cavities. Those operations do not generally satisfy D11's moment
 constraints. Merely connecting the existing message arrays would therefore
 not make the complete model stationary for D11.7.
 
-If cff-ocxl accepts a hybrid region design needing EC mixture boundaries,
-keep the existing mixture region scope and add an explicitly selected EC
+D12 accepts hybrid-regime-ec-v1 with explicit ordinary adapters. Internal
+destination-selected affine dynamics is eliminated under D12.3, so its D3
+port is unnecessary. Exterior mixture factors still need the EC binding:
+keep their existing mixture region scope and add an explicitly selected EC
 binding. It projects the full tilted marginal and then divides by the
 receiving cavity. D11.14 derives this local companion, but it does not itself
 solve the source-association obstruction. The existing D3 binding retains
@@ -34,10 +36,10 @@ mathematical decision and its required protocol dependency.
 
 ## Outcomes / Acceptance Criteria — WHAT
 
-1. Before implementation, a positive cff-ocxl decision confirms this binding
-   and the ticket depends on the separate region-protocol implementation
-   ticket created by that decision. Otherwise this ticket is rewritten or
-   closed as unnecessary. The handoff inventories New factor or rule family,
+1. The binding follows D12.5 for exterior mixture ports and depends on
+   cff-f3jz (declared region execution), transitively including cff-k6g5
+   declarations and cff-7sw5 plans. Internal eliminated dynamics do not gain
+   a redundant mixture port. The handoff inventories New factor or rule family,
    New IR field, Runtime numerical or status invariant, and Learnable or
    checkpoint feature, using that accepted generic region protocol.
    Host/JIT, flooding/scheduled, single/vmap, and current/legacy persisted
@@ -105,3 +107,7 @@ empirical recovery runs are outside this ticket.
 **2026-09-13T18:13:29Z**
 
 Dependency correction after the decisive D11.15 falsifier: cff-ocxl is now a mathematical gate, not an accepted implementation protocol. This ticket remains blocked and conditional on its decision; no production EC binding is authorized yet. D11.14 fixes the projection-order mismatch but does not transmit E[1_i x] across separate singleton boundaries. Reassess the binding and its dependencies after the hybrid separator/grouping is derived.
+
+**2026-09-14T01:15:18Z**
+
+D12.5 confirms this companion for ordinary exterior mixture ports after cff-f3jz implements the declared region protocol and execution. D12.3 eliminates the internal destination-selected affine switching channel, so no redundant internal D3 port is needed. The Gaussian identity adapter test reproduces variance 3/2 and signed quotient precision -1/3 from the full tilt. cff-kul2 consumes this binding in its public composition gate; existing D3 semantics remain separate.
