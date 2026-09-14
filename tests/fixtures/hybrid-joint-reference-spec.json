@@ -1,0 +1,508 @@
+{
+  "schema": 1,
+  "ticket": "cff-j191",
+  "approximation": "hybrid-regime-ec-v1",
+  "dtype": "float64",
+  "fixture_sources": ["tests/test_hybrid_separator_derivation.py:fixture and D11 twins (values copied; module never imported)", "tests/test_regime_pair_derivation.py:test_fixed_drive_and_multistick_learning_contract (values copied)"],
+  "cases": {
+    "coupled_t2": {
+      "site_constant": [
+        [-0.2, -0.4],
+        [-0.2, -0.4]
+      ],
+      "site_linear": [
+        [0.2, -0.3],
+        [0.2, -0.3]
+      ],
+      "site_precision": [
+        [0.9, 1.2],
+        [0.9, 1.2]
+      ],
+      "weights": [
+        [0.35, -0.25]
+      ],
+      "offsets": [
+        [-0.2, 0.3]
+      ],
+      "matrix": [
+        [0.65, 0.85]
+      ],
+      "bias": [
+        [0.1, -0.15]
+      ],
+      "noise": [
+        [0.8, 1.1]
+      ],
+      "origins": [
+        [0.0, 0.0],
+        [0.0, 0.0]
+      ]
+    },
+    "coupled_t3": {
+      "site_constant": [
+        [-0.2, -0.4],
+        [-0.2, -0.4],
+        [-0.2, -0.4]
+      ],
+      "site_linear": [
+        [0.2, -0.3],
+        [0.2, -0.3],
+        [0.2, -0.3]
+      ],
+      "site_precision": [
+        [0.9, 1.2],
+        [0.9, 1.2],
+        [0.9, 1.2]
+      ],
+      "weights": [
+        [0.35, -0.25],
+        [0.35, -0.25]
+      ],
+      "offsets": [
+        [-0.2, 0.3],
+        [-0.2, 0.3]
+      ],
+      "matrix": [
+        [0.65, 0.85],
+        [0.65, 0.85]
+      ],
+      "bias": [
+        [0.1, -0.15],
+        [0.1, -0.15]
+      ],
+      "noise": [
+        [0.8, 1.1],
+        [0.8, 1.1]
+      ],
+      "origins": [
+        [0.0, 0.0],
+        [0.0, 0.0],
+        [0.0, 0.0]
+      ]
+    },
+    "independent_t3": {
+      "site_constant": [
+        [-0.2, -0.4],
+        [-0.2, -0.4],
+        [-0.2, -0.4]
+      ],
+      "site_linear": [
+        [0.2, 0.2],
+        [0.2, 0.2],
+        [0.2, 0.2]
+      ],
+      "site_precision": [
+        [0.9, 0.9],
+        [0.9, 0.9],
+        [0.9, 0.9]
+      ],
+      "weights": [
+        [0.0, 0.0],
+        [0.0, 0.0]
+      ],
+      "offsets": [
+        [-0.2, 0.3],
+        [-0.2, 0.3]
+      ],
+      "matrix": [
+        [0.65, 0.65],
+        [0.65, 0.65]
+      ],
+      "bias": [
+        [0.1, 0.1],
+        [0.1, 0.1]
+      ],
+      "noise": [
+        [0.8, 0.8],
+        [0.8, 0.8]
+      ],
+      "origins": [
+        [0.0, 0.0],
+        [0.0, 0.0],
+        [0.0, 0.0]
+      ]
+    },
+    "mean_forward": {
+      "site_constant": [
+        [-3.612085713764618, -3.612085713764618],
+        [0.0, "-inf"]
+      ],
+      "site_linear": [
+        [2.0, -2.0],
+        [0.0, 0.0]
+      ],
+      "site_precision": [
+        [1.0, 1.0],
+        [0.0, 0.0]
+      ],
+      "weights": [
+        [0.0, 0.0]
+      ],
+      "offsets": [
+        [0.0, 0.0]
+      ],
+      "matrix": [
+        [0.65, 0.85]
+      ],
+      "bias": [
+        [0.1, -0.15]
+      ],
+      "noise": [
+        [0.8, 1.1]
+      ],
+      "origins": [
+        [0.0, 0.0],
+        [0.0, 0.0]
+      ],
+      "known_source_mean": [2.0, -2.0],
+      "known_source_variance": [1.0, 1.0]
+    },
+    "mean_reverse": {
+      "site_constant": [
+        [-3.612085713764618, -3.612085713764618],
+        [0.0, "-inf"]
+      ],
+      "site_linear": [
+        [-2.0, 2.0],
+        [0.0, 0.0]
+      ],
+      "site_precision": [
+        [1.0, 1.0],
+        [0.0, 0.0]
+      ],
+      "weights": [
+        [0.0, 0.0]
+      ],
+      "offsets": [
+        [0.0, 0.0]
+      ],
+      "matrix": [
+        [0.65, 0.85]
+      ],
+      "bias": [
+        [0.1, -0.15]
+      ],
+      "noise": [
+        [0.8, 1.1]
+      ],
+      "origins": [
+        [0.0, 0.0],
+        [0.0, 0.0]
+      ],
+      "known_source_mean": [-2.0, 2.0],
+      "known_source_variance": [1.0, 1.0]
+    },
+    "variance_forward": {
+      "site_constant": [
+        [-1.612085713764618, -2.7106980024327276],
+        [0.0, "-inf"]
+      ],
+      "site_linear": [
+        [0.0, 0.0],
+        [0.0, 0.0]
+      ],
+      "site_precision": [
+        [1.0, 0.1111111111111111],
+        [0.0, 0.0]
+      ],
+      "weights": [
+        [0.0, 0.0]
+      ],
+      "offsets": [
+        [0.0, 0.0]
+      ],
+      "matrix": [
+        [0.65, 0.85]
+      ],
+      "bias": [
+        [0.1, -0.15]
+      ],
+      "noise": [
+        [0.8, 1.1]
+      ],
+      "origins": [
+        [0.0, 0.0],
+        [0.0, 0.0]
+      ],
+      "known_source_mean": [0.0, 0.0],
+      "known_source_variance": [1.0, 9.0]
+    },
+    "variance_reverse": {
+      "site_constant": [
+        [-2.7106980024327276, -1.612085713764618],
+        [0.0, "-inf"]
+      ],
+      "site_linear": [
+        [0.0, 0.0],
+        [0.0, 0.0]
+      ],
+      "site_precision": [
+        [0.1111111111111111, 1.0],
+        [0.0, 0.0]
+      ],
+      "weights": [
+        [0.0, 0.0]
+      ],
+      "offsets": [
+        [0.0, 0.0]
+      ],
+      "matrix": [
+        [0.65, 0.85]
+      ],
+      "bias": [
+        [0.1, -0.15]
+      ],
+      "noise": [
+        [0.8, 1.1]
+      ],
+      "origins": [
+        [0.0, 0.0],
+        [0.0, 0.0]
+      ],
+      "known_source_mean": [0.0, 0.0],
+      "known_source_variance": [9.0, 1.0]
+    },
+    "source_masked_t2": {
+      "site_constant": [
+        [-0.2, "-inf"],
+        [-0.2, -0.4]
+      ],
+      "site_linear": [
+        [0.2, -0.3],
+        [0.2, -0.3]
+      ],
+      "site_precision": [
+        [0.9, 1.2],
+        [0.9, 1.2]
+      ],
+      "weights": [
+        [0.35, -0.25]
+      ],
+      "offsets": [
+        [-0.2, 0.3]
+      ],
+      "matrix": [
+        [0.65, 0.85]
+      ],
+      "bias": [
+        [0.1, -0.15]
+      ],
+      "noise": [
+        [0.8, 1.1]
+      ],
+      "origins": [
+        [0.0, 0.0],
+        [0.0, 0.0]
+      ]
+    },
+    "empty_source_t2": {
+      "site_constant": [
+        ["-inf", "-inf"],
+        [-0.2, -0.4]
+      ],
+      "site_linear": [
+        [0.2, -0.3],
+        [0.2, -0.3]
+      ],
+      "site_precision": [
+        [0.9, 1.2],
+        [0.9, 1.2]
+      ],
+      "weights": [
+        [0.35, -0.25]
+      ],
+      "offsets": [
+        [-0.2, 0.3]
+      ],
+      "matrix": [
+        [0.65, 0.85]
+      ],
+      "bias": [
+        [0.1, -0.15]
+      ],
+      "noise": [
+        [0.8, 1.1]
+      ],
+      "origins": [
+        [0.0, 0.0],
+        [0.0, 0.0]
+      ]
+    },
+    "underflow_source_t2": {
+      "site_constant": [
+        [-0.2, -1000.0],
+        [-0.2, -0.4]
+      ],
+      "site_linear": [
+        [0.2, -0.3],
+        [0.2, -0.3]
+      ],
+      "site_precision": [
+        [0.9, 1.2],
+        [0.9, 1.2]
+      ],
+      "weights": [
+        [0.35, -0.25]
+      ],
+      "offsets": [
+        [-0.2, 0.3]
+      ],
+      "matrix": [
+        [0.65, 0.85]
+      ],
+      "bias": [
+        [0.1, -0.15]
+      ],
+      "noise": [
+        [0.8, 1.1]
+      ],
+      "origins": [
+        [0.0, 0.0],
+        [0.0, 0.0]
+      ]
+    },
+    "centered_t3": {
+      "site_constant": [
+        [-0.2, -0.4],
+        [-0.2, -0.4],
+        [-0.2, -0.4]
+      ],
+      "site_linear": [
+        [0.2, -0.3],
+        [0.2, -0.3],
+        [0.2, -0.3]
+      ],
+      "site_precision": [
+        [0.9, 1.2],
+        [0.9, 1.2],
+        [0.9, 1.2]
+      ],
+      "weights": [
+        [0.35, -0.25],
+        [0.35, -0.25]
+      ],
+      "offsets": [
+        [-0.2, 0.3],
+        [-0.2, 0.3]
+      ],
+      "matrix": [
+        [0.65, 0.85],
+        [0.65, 0.85]
+      ],
+      "bias": [
+        [0.1, -0.15],
+        [0.1, -0.15]
+      ],
+      "noise": [
+        [0.8, 1.1],
+        [0.8, 1.1]
+      ],
+      "origins": [
+        [0.25, -0.375],
+        [-0.125, 0.5],
+        [0.375, -0.25]
+      ]
+    }
+  },
+  "fixed_drive": {
+    "weights": [
+      [
+        [-0.7, -0.5571428571428572],
+        [-0.41428571428571426, -0.2714285714285714]
+      ],
+      [
+        [-0.12857142857142856, 0.014285714285714346],
+        [0.15714285714285714, 0.30000000000000004]
+      ],
+      [
+        [0.44285714285714284, 0.5857142857142859],
+        [0.7285714285714286, 0.8714285714285714]
+      ]
+    ],
+    "offsets": [
+      [-0.4, -0.2],
+      [0.0, 0.19999999999999996],
+      [0.4, 0.6]
+    ],
+    "drive": [0.3, -0.6],
+    "source_log_site": [0.0, 0.0, 0.0],
+    "destination_log_site": [0.0, "-inf", -0.2]
+  },
+  "coordinate": {
+    "messages": "two outgoing banks per transition, constant/linear/symmetric precision, fixed separator origins",
+    "gauge": "first supported label constant is zero per message; absent labels have zero stored message coefficients and no unknowns",
+    "xi": "squared auxiliary, one per source/stick; omit zero exposure coordinates and force them to exact zero",
+    "site_input": "physical zero-origin scalar coefficients; analytically rebase once to frozen origins",
+    "support": "finite unary constants declare support; only -inf masks; no support changes within a solve"
+  },
+  "initializations": {
+    "xi": [0.0, 1.0],
+    "messages": "all zero on supported labels",
+    "feasible_initializer": "one simultaneous outgoing quotient sweep from unary cavities at initial xi before aggregate certification; fails explicitly if any active local tilt is improper",
+    "fixed_perturbation": "for diagnostic held coordinates only: 0.01*sin(arange(packed_size)+1); xi perturbation kept nonnegative"
+  },
+  "solver": {
+    "max_iterations": 200,
+    "line_search_trials": 24,
+    "backtrack_factor": 0.5,
+    "armijo": 0.0001,
+    "directions": ["simultaneous quotient and auxiliary-target fixed-point step", "if all fixed-point trials fail: dense central finite-difference Newton least-squares step, then the same line search"],
+    "jacobian_step": "eps**(1/3)*(1+abs(coordinate)); one-sided difference when nonnegative xi or properness prevents central difference",
+    "least_squares_cutoff": "eps*max(jacobian.shape)",
+    "merit": "Euclidean norm of packed quotient/auxiliary residual scaled by 1+abs(current coordinate); trial uses the same scaling as its current point",
+    "internal_target": "32*eps for natural, unweighted conditional mean/covariance, label mass, auxiliary, FE stability and primal/dual scaled certificates",
+    "acceptance_target": "64*eps**0.75",
+    "stable_energy": "abs(F_new-F_old)/(1+abs(F_new)); re-evaluation at an unchanged coordinate can establish stability only if every other certificate already passes",
+    "failure": "invalid inputs/active improper beliefs/nonfinite certificates -> diverged; no accepted direction or finite iteration cap -> exhausted; never infer convergence from a nonzero stationary residual",
+    "no_silent_retries": true
+  },
+  "comparison": {
+    "array_atol": "512*4*eps",
+    "array_rtol": "512*4*eps",
+    "free_energy_atol": "512*max(4,5*T)*eps",
+    "stopping": "Arithmetic compares evaluators at the identical messages and xi. Exact T2 and separated T3 path checks use the same returned xi. Different solved coordinates use residual propagation described below, never an approximation allowance.",
+    "propagation": "For a scaled output g and packed residual R, use 2*tau*max(1, norm(Dg @ inverse(DR), infinity)) as a local first-order stopping allowance. Freeze this formula now; compute derivatives from independent reference mathematics, not observed candidate discrepancies. Report conditioning and scope; it is not a global uniqueness proof. Arithmetic budgets remain separate.",
+    "finite_difference_step": "eps**(1/3)*(1+abs(coordinate))",
+    "fixed_auxiliary_approximation_ceilings": {
+      "pair": 0.002,
+      "first_and_second_moments": 0.01,
+      "free_energy": 0.002,
+      "learning": 0.0001
+    },
+    "temporal_falsifier": "existing reflected_mixture_gap and tests unchanged; report separately, no universal exactness claim"
+  },
+  "hostile": {
+    "literal_log_zeros": "retain exact support; inactive moments/messages stored as zeros, inactive xi and learning exactly zero",
+    "empty_support": "diverged with reason",
+    "vacuous_or_signed_cavity": "allowed if complete active tilts and returned aggregates are proper; no precision clamp",
+    "improper_complete_belief": "diverged at initialization; reject improper trials",
+    "invalid": "shape, NaN, +inf, nonsymmetric/nonpositive noise, negative/nonfinite xi: explicit failure",
+    "tiny_positive_underflow": "finite log mass producing zero or subnormal probability fails explicitly, never becomes a mask",
+    "float32_and_moderate": "N/A for this tiny float64 reference; candidate and qualification own them"
+  },
+  "reporting": ["spec_sha256", "numpy/scipy versions", "case", "initial_xi", "status", "reason", "iterations", "evaluations", "rejected_trials", "newton_steps", "elapsed_seconds", "message_coordinate", "xi", "natural_residual", "conditional_mean_residual", "conditional_covariance_residual", "label_mass_residual", "auxiliary_residual", "free_energy", "dual_energy", "relative_energy_change", "primal_dual_residual", "proper_active_beliefs", "inactive_xi", "learning statistics", "fixed_auxiliary_approximation_context"],
+  "moderate_qualification_unchanged": {
+    "T": [32, 100],
+    "K": 4,
+    "d": 2,
+    "dtype": "float32",
+    "indices": "i,j=0..3; l=0..2",
+    "W_il": ["0.12*(i-1.5)+0.04*(l-1)", "-0.08*(i-1.5)+0.03*(l-1)"],
+    "offset_il": "0.10*(i-1.5)-0.15*(l-1)",
+    "A_j": [
+      ["0.65+0.04*j", 0.03],
+      [-0.02, "0.80-0.03*j"]
+    ],
+    "bias_j": ["0.10-0.05*j", "-0.15+0.04*j"],
+    "Q_j_diagonal": ["0.8+0.1*j", "1.1+0.05*j"],
+    "unary_a_ti": "-0.2-0.1*i",
+    "unary_eta_ti": ["0.1*(i-1.5)+0.05*(-1)**t", "-0.08*(i-1.5)+0.03*((t mod 3)-1)"],
+    "unary_J_ti_diagonal": ["0.9+0.1*i", "1.1+0.05*i"],
+    "initializations": "xi=0 and xi=1, zero messages plus declared feasible initializer, fixed non-oracle message perturbation; candidate budgets frozen separately before execution"
+  },
+  "boundaries": {
+    "applies": ["Derived component coordinate: independent reference local/chain evaluation, iteration and certification", "Runtime numerical or status invariant: reference status and hostile-input tests", "test registration and dashboard", "D12 executable documentation anchors"],
+    "N/A": ["production host/JIT", "production single/vmap", "compiler/IR/serialization", "synchronous/scheduled execution", "lifecycle", "ledger runtime ownership", "persistence", "public learning activation", "recovery fits"],
+    "reference_dense_storage": "tiny local coordinate Jacobian permitted; no candidate or moderate storage claim"
+  }
+}

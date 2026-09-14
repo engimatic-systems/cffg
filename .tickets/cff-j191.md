@@ -1,6 +1,6 @@
 ---
 id: cff-j191
-status: open
+status: in_progress
 deps: [cff-ffsg]
 links: []
 created: 2026-09-14T04:40:24Z
@@ -65,3 +65,11 @@ Prospective fixture-to-claim map: (1) T2 coupled fixture(2) values for complete 
 The fixed-drive check CONDITIONS OUT the observed drive before Gaussian entropy evaluation. It is an algebraic D9 reduction, not a singular zero-covariance continuous EC solve; supported D12 scope is unchanged. Reference validation must distinguish intentional -inf support from NaN/+inf, and expose active conditional moments independently of weighted statistics: existing conditional_moments and path skipping are not sufficient for these hostile-input checks. All fixture numbers, gauges/origins, initializations, stopping propagation and bounded solve strategies remain to be frozen by the implementer BEFORE executing checkpoint solves.
 
 Source -> independent b0s3 research report; tests/hybrid_separator_reference.py:14, tests/test_hybrid_separator_derivation.py:23, tests/regime_trajectory_reference.py:65, tests/test_regime_pair_derivation.py:118, docs/DERIVATIONS.md D11.1 and D12.2-.4/.9. Confidence -> high for formulas, independence boundaries and coverage. This note is implementation planning, not reference/candidate qualification evidence. No reference solve, moderate checkpoint or registered recovery fit has run.
+
+**2026-09-14T08:48:29Z**
+
+Implementation plan and prospective numerical specification: tests/fixtures/hybrid-joint-reference-spec.json freezes copied tiny inputs, both xi starts, zero messages plus one local quotient initialization sweep, fixed zero and nonzero origins, active-label gauges, 200 iterations, 24 backtracking trials, fixed-point direction followed only on failure by dense finite-difference Newton, and every final certificate. The same-coordinate arithmetic and moderate formulas from cff-a3wz are unchanged. Stopping error is accounted for separately by the frozen local residual-sensitivity propagation formula; no discrepancy determines a tolerance. No reference checkpoint solve has run before this specification commit.
+
+Applicable architecture paths: Derived component coordinate and Runtime numerical or status invariant. Affected surfaces: independent NumPy/SciPy reference evaluation/iteration/certification, focused tests, dashboard registration, and canonical D12 anchors. Checked N/A pairs: production host/JIT and single/vmap, synchronous/scheduled runtime, compiler/IR/serialization, lifecycle, persistence, runtime ledger ownership, public learning activation, and registered recovery fits. Float32 and moderate K/d/T qualification remain in cff-y15d/cff-a3wz.
+
+Hostile-input plan: exact -inf support masks remain masks, absent message coordinates are omitted, inactive xi and learning are exactly zero; empty support and invalid active objectives fail explicitly. Signed/vacuous cavities are allowed if the complete active Gaussian blocks and returned aggregate beliefs are proper. Improper trials are rejected without precision clamping. NaN/+inf, malformed inputs, negative xi, and tiny-positive mass underflow cannot report success. Masked-source and empty-source companions are distinct from the D11 destination-masked twins. Fixed observed drive uses conditioned categorical entropy, never a singular Gaussian EC solve. Existing temporal falsifier and fixed-auxiliary approximation ceilings stay separate and unchanged.
