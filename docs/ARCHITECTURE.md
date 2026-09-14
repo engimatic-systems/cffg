@@ -897,12 +897,16 @@ versions and JAX tracing configuration; every captured leaf must match, includin
 metadata, context and trial arrays. Initial and terminal NPZ snapshots retain all State leaves, natural
 messages, beliefs and centered/physical source-conditioned learning readouts.
 Reports separate lowering, executable acquisition, synchronized calls, export,
-logical bytes, XLA estimates and process high-water; they reject missing starts
-and preserve the first failure. Report validation reconstructs residuals and prescribed
+logical bytes, XLA estimates and process high-water; aliases cannot exceed either
+XLA argument or output storage, and logical totals are checked separately. Reports
+reject missing starts and preserve the first failure. Before reconstruction, belief
+words must satisfy native symmetry and low-word bounds, exact inactive log-zero
+support, and finite-log underflow guards. Report validation reconstructs residuals and prescribed
 scales from saved messages, targets, beliefs and xi, preserving covariance low words
 in residual differences. Source-conditioned learning uses the native once-rounded
 covariance view and its defined centered-to-physical transform. Converged energy
-changes must be finite and nonnegative. All-pair comparisons disclose material stationary
+changes must be finite and nonnegative. Zero accepted updates must preserve the
+initial coordinate; exactly one accepted update must move it. All-pair comparisons disclose material stationary
 differences without claiming universal uniqueness. This harness is setup, not
 moderate numerical or storage qualification. A3WZ owns both measured phases and
 their interpretation; compiler integration and registered recovery remain gated.

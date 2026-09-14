@@ -405,6 +405,46 @@ def validate_belief(arrays, name):
     prefix = f"state.evaluation.local.{name}"
     probability = arrays[f"{prefix}.probability"]
     logs = arrays[f"{prefix}.log_probability"]
+    high = arrays[f"{prefix}.covariance"]
+    low = arrays[f"{prefix}.covariance_correction"]
+    require(
+        high.ndim == probability.ndim + 2
+        and high.shape[:-2] == probability.shape
+        and high.shape[-1] == high.shape[-2]
+        and low.shape == high.shape
+        and logs.shape == probability.shape
+        and high.dtype
+        == low.dtype
+        == probability.dtype
+        == logs.dtype
+        == np.dtype("float32"),
+        "belief word shape/dtype mismatch",
+    )
+    for word in (high, low):
+        require(
+            np.all(np.isfinite(word)) and np.array_equal(word, word.swapaxes(-1, -2)),
+            "belief covariance words must be finite and symmetric",
+        )
+    info = np.finfo(high.dtype)
+    require(
+        np.all(abs(low) <= info.eps * abs(high))
+        and np.all((low == 0) | (abs(low) >= info.tiny)),
+        "invalid covariance low word",
+    )
+    active = np.isfinite(logs)
+    require(
+        np.all(active | np.isneginf(logs)) and np.array_equal(probability > 0, active),
+        "belief support/finite-log underflow mismatch",
+    )
+    with np.errstate(under="ignore"):
+        normalized = np.exp(logs)
+    require(
+        np.all(probability[active] >= info.tiny)
+        and np.all(normalized[active] >= info.tiny),
+        "native probability underflow",
+    )
+    for value in (high, low, arrays[f"{prefix}.displacement"]):
+        require(np.all(value[~active] == 0), "nonzero inactive belief coordinates")
     allowance = 512 * 4 * np.finfo(np.float32).eps
     label_axes = tuple(range(1, probability.ndim))
     require(
@@ -413,12 +453,10 @@ def validate_belief(arrays, name):
         "belief probabilities do not normalize",
     )
     require(
-        np.allclose(np.exp(logs), probability, atol=allowance, rtol=allowance),
+        np.allclose(normalized, probability, atol=allowance, rtol=allowance),
         "belief log masses disagree",
     )
-    covariance = (
-        arrays[f"{prefix}.covariance"] + arrays[f"{prefix}.covariance_correction"]
-    )
+    covariance = high + low
     require(
         np.allclose(
             covariance, covariance.swapaxes(-1, -2), atol=allowance, rtol=allowance

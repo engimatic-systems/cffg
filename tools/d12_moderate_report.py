@@ -44,10 +44,18 @@ def validate_compile(record, calls):
             "temp_size_in_bytes",
             "alias_size_in_bytes",
         ):
-            value = memory["estimates"][name]
+            value = memory["estimates"].get(name)
             require(
                 type(value) is int and value >= 0, "missing/invalid XLA byte estimate"
             )
+        estimates = memory["estimates"]
+        require(
+            estimates["alias_size_in_bytes"]
+            <= min(
+                estimates["argument_size_in_bytes"], estimates["output_size_in_bytes"]
+            ),
+            "XLA alias bytes exceed argument or output storage",
+        )
     else:
         require(
             bool(memory["substitute"]),
@@ -228,7 +236,8 @@ def validate_fixture(arrays, horizon):
         )
 
 
-def validate_work(arrays):
+def validate_work(arrays, initial=None):
+    """Check bounded work and, when supplied, the initial/terminal point history."""
     n = {
         name: int(arrays[f"state.{name}"])
         for name in (
@@ -259,6 +268,16 @@ def validate_work(arrays):
         require(
             r <= (i + fallback) * BUDGETS["trials"] - i,
             "successful trial budget mismatch",
+        )
+    if initial is not None and i in (0, 1):
+        unchanged = np.array_equal(
+            initial["state.coordinate"], arrays["state.coordinate"]
+        )
+        require(
+            unchanged if i == 0 else not unchanged,
+            "zero accepted updates changed coordinate"
+            if i == 0
+            else "one accepted update did not move coordinate",
         )
 
 
@@ -438,7 +457,7 @@ def validate_report(directory, *, current_sources=True):
             require(int(initial["state.status"]) == 3, "initialization failed")
             terminal = read_snapshot(folder, record["terminal"])
             validate_outputs(terminal, case, parameters=parameters)
-            validate_work(terminal)
+            validate_work(terminal, initial)
             require(
                 int(terminal["state.status"]) == 0, "moderate solve did not converge"
             )

@@ -96,6 +96,7 @@ def synthetic(case, *, initial=False):
     """Analytic independent-label Gaussian controls for report relationships.
 
     These are internally consistent payloads, not solves of the frozen model.
+    Terminal records model one accepted update and the final certification.
     Uniform pair mass, zero means and identity covariance give closed-form
     projected moments and source-conditioned learning without a report helper.
     """
@@ -138,7 +139,8 @@ def synthetic(case, *, initial=False):
     arrays["state.evaluation.certificates.auxiliary"][()] = np.max(
         abs(arrays["xi"] - target) / (1 + arrays["xi"])
     )
-    arrays["state.evaluations"][()] = 1 if initial else 2
+    arrays["state.iterations"][()] = 0 if initial else 1
+    arrays["state.evaluations"][()] = 1 if initial else 3
     arrays["state.status"][()] = 3 if initial else 0
     arrays["state.reason"][()] = 1 if initial else 0
     if initial:
