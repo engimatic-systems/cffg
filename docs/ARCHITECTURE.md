@@ -874,9 +874,31 @@ coordinate and residual dimensions are distinct. One accepted residual JVP
 supplies its own transpose; no optimizer history or global Jacobian is retained.
 Every returned certificate, energy and learning statistic is recomputed at the
 returned coordinate. Convergence, exhaustion and divergence have int32 outcomes
-and explicit reasons. `hybrid_joint_storage.py` exposes logical leaf inventories
+and explicit reasons. `solve_from_coordinate` evaluates exactly the supplied
+message/xi vector; zero messages remain zero. It and the existing feasible-start
+`solve` share one loop and terminal certification. Failed feasible construction
+retains its initializer flags, while explicit numerical failures retain the
+supplied coordinate. Neither entry changes fixed support or origins.
+`hybrid_joint_storage.py` exposes logical leaf inventories
 and enclosing programs for dynamic-argument compiled memory measurements; these
 interfaces alone make no measured complete-iteration storage claim.
+
+`tools/d12_moderate_spec.json` prospectively fixes the twelve A3WZ starts:
+T32/T100, xi0/1, and raw-zero/feasible/fixed-perturbation messages. The opt-in
+`tools/d12_moderate_runner.py` reuses the independent compilation fixture and
+starts sequential native-float32 children with explicit-x64 dtype errors enabled.
+Its `solves` phase retains one complete executable for six starts per horizon;
+its `storage` phase compiles complete solves at independently varied outer/linear
+caps and enclosing iterations, with no executable calls. Abstract buffer trees
+include retained low words and integer captures, plus a T100/K20/d10 shape-only
+inventory. Initial and terminal NPZ snapshots retain all State leaves, natural
+messages, beliefs and centered/physical source-conditioned learning readouts.
+Reports separate lowering, executable acquisition, synchronized calls, export,
+logical bytes, XLA estimates and process high-water; they reject missing starts
+and preserve the first failure. All-pair comparisons disclose material stationary
+differences without claiming universal uniqueness. This harness is setup, not
+moderate numerical or storage qualification. A3WZ owns both measured phases and
+their interpretation; compiler integration and registered recovery remain gated.
 
 The opt-in developer tool `tools/d12_compile_scaling.py` measures compilation
 of the complete fixed-parameter solve. Its [frozen first measurement](../tools/measurements/d12-compile-001.json)

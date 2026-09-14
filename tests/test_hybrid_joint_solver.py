@@ -123,7 +123,8 @@ def test_held_complete_gauss_newton_step_and_storage_interfaces():
     assert direction.shape == (c.size,)
     assert linear.residual.shape == (c.residual_size,)
     assert int(linear.iteration) <= 128
-    assert set(storage.programs(c)) == {'residual', 'normal_product', 'linear_step', 'iteration', 'certification', 'solve'}
+    assert set(storage.programs(c)) == {'residual', 'normal_product', 'linear_step', 'iteration',
+                                       'certification', 'solve', 'solve_from_coordinate'}
 
 
 def test_complete_loop_has_fixed_int32_status_and_counter_shapes():

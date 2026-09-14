@@ -26,7 +26,7 @@ def arrays(value):
     return records
 
 
-def buffers(coordinate, parameters, sites, vector):
+def buffer_values(coordinate, parameters, sites, vector):
     """Held-point logical inventory, including the accepted JVP's captures.
 
     This evaluates and linearizes one coordinate; it performs no optimizer step.
@@ -45,11 +45,17 @@ def buffers(coordinate, parameters, sites, vector):
                          jnp.asarray(jnp.inf, vector.dtype), trial.rejection_counts,
                          jnp.int32(0), jnp.int32(solver.Outcome.RUNNING),
                          jnp.int32(solver.Reason.OUTER_BUDGET))
-    groups = dict(metadata=coordinate.metadata(), context=(parameters, sites), coordinate=vector,
+    return dict(metadata=coordinate.metadata(), context=(parameters, sites), coordinate=vector,
                   accepted_evaluation=value, coordinate_scales=1 + abs(vector),
-                  residual_scales=value.scales, derivative_captures=forward,
+                  residual_scales=value.scales, derivative_captures=jax.tree.leaves(forward),
                   linear_state=linear, linear_products=(zero_m, zero_n),
-                  trial_state=trial, outer_state=outer)
+                  trial_state=trial, outer_state=outer,
+                  terminal_state=solver.certify(coordinate, parameters, sites, outer))
+
+
+def buffers(coordinate, parameters, sites, vector):
+    """Logical leaves at a held point; see ``buffer_values`` for the actual trees."""
+    groups = buffer_values(coordinate, parameters, sites, vector)
     return dict(N=coordinate.size, M=coordinate.residual_size,
                 groups={name: arrays(group) for name, group in groups.items()})
 
@@ -62,6 +68,7 @@ def programs(coordinate, budgets=solver.Budgets()):
     ``linear_step`` takes (parameters, sites, vector, evaluation).
     ``iteration`` and ``certification`` take (parameters, sites, state).
     ``solve`` takes (parameters, sites, initial_xi); its default start is unperturbed.
+    ``solve_from_coordinate`` takes (parameters, sites, vector), without initialization.
     Use at multiple horizons and independently varied outer/linear caps. Report
     fixed captured metadata in addition to each compiled argument inventory.
     """
@@ -74,7 +81,8 @@ def programs(coordinate, budgets=solver.Budgets()):
                 linear_step=lambda p, s, x, e: solver.gauss_newton(coordinate, p, s, x, e, budgets),
                 iteration=lambda p, s, state: solver.iteration(coordinate, p, s, state, budgets),
                 certification=lambda p, s, state: solver.certify(coordinate, p, s, state),
-                solve=lambda p, s, xi: solver.solve(coordinate, p, s, xi, budgets=budgets))
+                solve=lambda p, s, xi: solver.solve(coordinate, p, s, xi, budgets=budgets),
+                solve_from_coordinate=lambda p, s, x: solver.solve_from_coordinate(coordinate, p, s, x, budgets=budgets))
 
 
 def compiled_memory(function, *arguments):

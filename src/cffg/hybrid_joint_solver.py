@@ -185,6 +185,20 @@ def line_search(coordinate, parameters, sites, vector, evaluation, direction, bu
 
 def initial_state(coordinate, parameters, sites, initial_xi=0., *, perturb=False):
     vector, value = joint.initialize(coordinate, parameters, sites, initial_xi, perturb=perturb)
+    return _initial_state(vector, value)
+
+
+def initial_state_from_coordinate(coordinate, parameters, sites, vector):
+    """Evaluate exactly the supplied coordinate, without a quotient sweep.
+
+    Zero message coefficients remain zero. Shape/dtype errors raise at tracing;
+    invalid numerical coordinates or changed support return DIVERGED with the
+    original coordinate and the evaluation's failure flags, under host/JIT/vmap.
+    """
+    return _initial_state(vector, joint.evaluate(coordinate, parameters, sites, vector))
+
+
+def _initial_state(vector, value):
     value = value._replace(status=value.status | failure(~jnp.isfinite(_merit(value, value.scales)), Status.NONFINITE))
     valid = value.status == 0
     return State(vector, value, _integer(0), _integer(1), _integer(0), _integer(0), _integer(0),
@@ -260,6 +274,20 @@ def solve(coordinate, parameters, sites, initial_xi=0., *, perturb=False, budget
     EXHAUSTED and DIVERGED carry distinct reasons and rejected-trial counts.
     """
     state = initial_state(coordinate, parameters, sites, initial_xi, perturb=perturb)
+    return _solve(coordinate, parameters, sites, state, budgets)
+
+
+def solve_from_coordinate(coordinate, parameters, sites, vector, *, budgets=Budgets()):
+    """Joint bounded solve from explicit gauged messages and active squared xi.
+
+    Uses the feasible-start API's iteration and returned-point certification.
+    Fixed support/origins remain in ``coordinate``; they are never unknowns.
+    """
+    state = initial_state_from_coordinate(coordinate, parameters, sites, vector)
+    return _solve(coordinate, parameters, sites, state, budgets)
+
+
+def _solve(coordinate, parameters, sites, state, budgets):
     tau = tolerance(state.coordinate.dtype)
 
     def condition(state):

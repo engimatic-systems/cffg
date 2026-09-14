@@ -1,0 +1,392 @@
+{
+  "schema": "cffg.d12-moderate-plan.v1",
+  "ticket": "cdc-ztuf",
+  "qualification_owner": "cff-a3wz",
+  "approximation": "hybrid-regime-ec-v1",
+  "cases": [
+    {
+      "id": "t32-xi0-raw-zero",
+      "T": 32,
+      "K": 4,
+      "d": 2,
+      "xi": 0,
+      "messages": "raw-zero"
+    },
+    {
+      "id": "t32-xi0-feasible",
+      "T": 32,
+      "K": 4,
+      "d": 2,
+      "xi": 0,
+      "messages": "feasible"
+    },
+    {
+      "id": "t32-xi0-perturbed",
+      "T": 32,
+      "K": 4,
+      "d": 2,
+      "xi": 0,
+      "messages": "perturbed"
+    },
+    {
+      "id": "t32-xi1-raw-zero",
+      "T": 32,
+      "K": 4,
+      "d": 2,
+      "xi": 1,
+      "messages": "raw-zero"
+    },
+    {
+      "id": "t32-xi1-feasible",
+      "T": 32,
+      "K": 4,
+      "d": 2,
+      "xi": 1,
+      "messages": "feasible"
+    },
+    {
+      "id": "t32-xi1-perturbed",
+      "T": 32,
+      "K": 4,
+      "d": 2,
+      "xi": 1,
+      "messages": "perturbed"
+    },
+    {
+      "id": "t100-xi0-raw-zero",
+      "T": 100,
+      "K": 4,
+      "d": 2,
+      "xi": 0,
+      "messages": "raw-zero"
+    },
+    {
+      "id": "t100-xi0-feasible",
+      "T": 100,
+      "K": 4,
+      "d": 2,
+      "xi": 0,
+      "messages": "feasible"
+    },
+    {
+      "id": "t100-xi0-perturbed",
+      "T": 100,
+      "K": 4,
+      "d": 2,
+      "xi": 0,
+      "messages": "perturbed"
+    },
+    {
+      "id": "t100-xi1-raw-zero",
+      "T": 100,
+      "K": 4,
+      "d": 2,
+      "xi": 1,
+      "messages": "raw-zero"
+    },
+    {
+      "id": "t100-xi1-feasible",
+      "T": 100,
+      "K": 4,
+      "d": 2,
+      "xi": 1,
+      "messages": "feasible"
+    },
+    {
+      "id": "t100-xi1-perturbed",
+      "T": 100,
+      "K": 4,
+      "d": 2,
+      "xi": 1,
+      "messages": "perturbed"
+    }
+  ],
+  "fixture": {
+    "factory": "tools/d12_compile_fixture.py:context",
+    "formulas_source": "tools/d12_compile_spec.json",
+    "formulas_sha256": "4cb114675eec3f15885869434f7dbb52a0ec79a6f4f668d11ab22de9b423a8e7",
+    "construction": "Evaluate formulas in NumPy float64, round once into stored float32 arrays; no JAX float64 values. Broadcast fixed transition arrays over L.",
+    "semantics": "Exact A3WZ formula; Q is covariance, unary J is precision; L=T-1; full support and fixed zero origins."
+  },
+  "inherited_spec": {
+    "path": "tests/fixtures/hybrid-joint-candidate-spec.json",
+    "sha256": "20f0dfab78d7f59f895239ccc95cc4a4bc66b5ba1aa94ed8c12ce0608d82f2db"
+  },
+  "coordinate": {
+    "order": "all active gauge-reduced constants, all active linear coefficients, all active upper-triangle symmetric precision entries, then active xi; banks ordered side,time,label",
+    "gauge": "first supported constant per incidence is zero",
+    "inactive": "fixed -inf constant support metadata, zero linear/precision; inactive xi exact zero",
+    "origins": "fixed declared reference origins or moderate zero origins; not unknowns",
+    "corrections": "derived high+low covariance, preserve both in cancellation-sensitive differences, not unknowns",
+    "full_support_N": "2*(T-1)*(K*(1+d+d*(d+1)/2)-1)+(T-1)*K*(K-1)",
+    "full_support_M": "N+2*(T-1)*K*(1+d+d*(d+1)/2)",
+    "label_mass": "retain every supported label equation"
+  },
+  "acceptance": {
+    "tau": "64*eps(dtype)**0.75",
+    "local_arithmetic_atol_rtol": "512*4*eps(dtype)",
+    "energy_arithmetic_atol": "512*max(4,5*T)*eps(dtype)",
+    "certificates": [
+      "natural",
+      "label_mass",
+      "conditional_mean",
+      "conditional_covariance",
+      "auxiliary",
+      "primal_dual",
+      "relative_energy_change"
+    ],
+    "natural_moments": "max(1,abs(current),abs(target)); conditional moments unweighted by label mass; independent symmetric covariance entries",
+    "auxiliary": "abs(xi-target)/(1+abs(xi))",
+    "energy": "abs(F-D)/(1+abs(F)); abs(F-F_previous)/(1+abs(F))",
+    "properness": "all active aggregates and tilts proper, residual and both objectives finite, unchanged support"
+  },
+  "strategy": {
+    "directions": [
+      "simultaneous quotient and auxiliary-target coordinate update",
+      "if all fixed-point trials fail, matrix-free CGLS Gauss-Newton step then identical backtracking"
+    ],
+    "max_outer_iterations": 200,
+    "line_search_trials_per_direction": 24,
+    "backtrack_factor": 0.5,
+    "armijo": 0.0001,
+    "max_linear_iterations": 128,
+    "linear_restarts": 0,
+    "linear_target": "sqrt(eps)*initial_normal_residual_norm; zero or unresolved curvature stops the linear solve without a convergence claim",
+    "linearization": "one jax.linearize of the complete signed residual with frozen scales and coordinate scales; jax.linear_transpose of this same JVP; never scalar certificates or optimizer history",
+    "residual_scales": "frozen per accepted coordinate: natural and conditional max(1,abs(current),abs(target)), unit label mass, 1+abs(xi); same scales for derivative and every trial",
+    "coordinate_scales": "1+abs(accepted coordinate); linear unknown is step divided by this scale",
+    "merit": "sum(square(signed complete residual/frozen residual scales))/2; rectangular M residuals, N unknowns",
+    "xi_boundary": "first trial fraction shortened to the nonnegative xi boundary; subsequent halves stay feasible",
+    "internal_target": "tau(dtype); stable unchanged re-evaluation permitted only when every other exact certificate passes",
+    "failure": "invalid initialization/accepted value -> diverged; no accepted direction, stationary nonzero residual or finite outer budget -> exhausted; invalid trials rejected with counted reason"
+  },
+  "budgets": {
+    "outer": 200,
+    "trials": 24,
+    "linear": 128,
+    "backtrack": 0.5,
+    "armijo": 0.0001
+  },
+  "starts": {
+    "raw_zero": "All packed message coefficients exactly zero, all active squared xi equal the named start. No feasible sweep.",
+    "feasible": "one simultaneous quotient sweep from unary cavities at chosen xi; invalid tilt diverges before iteration; inactive xi forced zero",
+    "perturbed": "after feasible initializer add 0.01*sin(arange(message_size)+1) to packed message coefficients only, xi unchanged; certify feasibility explicitly",
+    "checks": "Store each initial State and unpacked natural messages/xi before a solve. Failed initialization stops the sequence before an optimizer call. Signed messages are not clamped."
+  },
+  "comparison": {
+    "groups": [
+      "messages",
+      "xi",
+      "energy",
+      "regions",
+      "separators",
+      "learning"
+    ],
+    "metric": "max(abs(a-b)/(1+maximum(abs(a),abs(b)))) on each floating output leaf, then maximum by group",
+    "material_threshold": "tau(float32)",
+    "pairs": "All 15 pairs of the six starts at each horizon; 30 pairs total.",
+    "policy": "A material difference is a disclosure/diagnosis flag, not a universal uniqueness requirement. A3WZ must diagnose flagged stationary outputs before a positive checkpoint."
+  },
+  "storage": {
+    "cases": [
+      {
+        "id": "t32-solve_from_coordinate-o200-l128",
+        "T": 32,
+        "K": 4,
+        "d": 2,
+        "program": "solve_from_coordinate",
+        "budgets": {
+          "outer": 200,
+          "trials": 24,
+          "linear": 128,
+          "backtrack": 0.5,
+          "armijo": 0.0001
+        }
+      },
+      {
+        "id": "t32-solve_from_coordinate-o400-l128",
+        "T": 32,
+        "K": 4,
+        "d": 2,
+        "program": "solve_from_coordinate",
+        "budgets": {
+          "outer": 400,
+          "trials": 24,
+          "linear": 128,
+          "backtrack": 0.5,
+          "armijo": 0.0001
+        }
+      },
+      {
+        "id": "t32-solve_from_coordinate-o200-l256",
+        "T": 32,
+        "K": 4,
+        "d": 2,
+        "program": "solve_from_coordinate",
+        "budgets": {
+          "outer": 200,
+          "trials": 24,
+          "linear": 256,
+          "backtrack": 0.5,
+          "armijo": 0.0001
+        }
+      },
+      {
+        "id": "t32-iteration-o200-l128",
+        "T": 32,
+        "K": 4,
+        "d": 2,
+        "program": "iteration",
+        "budgets": {
+          "outer": 200,
+          "trials": 24,
+          "linear": 128,
+          "backtrack": 0.5,
+          "armijo": 0.0001
+        }
+      },
+      {
+        "id": "t32-iteration-o200-l256",
+        "T": 32,
+        "K": 4,
+        "d": 2,
+        "program": "iteration",
+        "budgets": {
+          "outer": 200,
+          "trials": 24,
+          "linear": 256,
+          "backtrack": 0.5,
+          "armijo": 0.0001
+        }
+      },
+      {
+        "id": "t100-solve_from_coordinate-o200-l128",
+        "T": 100,
+        "K": 4,
+        "d": 2,
+        "program": "solve_from_coordinate",
+        "budgets": {
+          "outer": 200,
+          "trials": 24,
+          "linear": 128,
+          "backtrack": 0.5,
+          "armijo": 0.0001
+        }
+      },
+      {
+        "id": "t100-solve_from_coordinate-o400-l128",
+        "T": 100,
+        "K": 4,
+        "d": 2,
+        "program": "solve_from_coordinate",
+        "budgets": {
+          "outer": 400,
+          "trials": 24,
+          "linear": 128,
+          "backtrack": 0.5,
+          "armijo": 0.0001
+        }
+      },
+      {
+        "id": "t100-solve_from_coordinate-o200-l256",
+        "T": 100,
+        "K": 4,
+        "d": 2,
+        "program": "solve_from_coordinate",
+        "budgets": {
+          "outer": 200,
+          "trials": 24,
+          "linear": 256,
+          "backtrack": 0.5,
+          "armijo": 0.0001
+        }
+      },
+      {
+        "id": "t100-iteration-o200-l128",
+        "T": 100,
+        "K": 4,
+        "d": 2,
+        "program": "iteration",
+        "budgets": {
+          "outer": 200,
+          "trials": 24,
+          "linear": 128,
+          "backtrack": 0.5,
+          "armijo": 0.0001
+        }
+      },
+      {
+        "id": "t100-iteration-o200-l256",
+        "T": 100,
+        "K": 4,
+        "d": 2,
+        "program": "iteration",
+        "budgets": {
+          "outer": 200,
+          "trials": 24,
+          "linear": 256,
+          "backtrack": 0.5,
+          "armijo": 0.0001
+        }
+      }
+    ],
+    "logical_shapes": [
+      {
+        "T": 32,
+        "K": 4,
+        "d": 2
+      },
+      {
+        "T": 100,
+        "K": 4,
+        "d": 2
+      },
+      {
+        "T": 100,
+        "K": 20,
+        "d": 10
+      }
+    ],
+    "logical": "Abstract evaluation of actual parameter/metadata/coordinate/evaluation/derivative/linear/trial/outer/terminal trees, including retained low words and integer limbs. Logical bytes can double-count aliases.",
+    "wide": "T100 K20 d10 uses abstract parameter descriptors and identity unary placeholders for shapes only; it is not an extension of the fixed numerical formula or a solve.",
+    "caps": "Outer 400 and linear 256 are independently doubled memory-only variants. Complete solves must be compiled for the outer comparison. All storage executables have zero calls.",
+    "program": "All context and initial vector/State arguments are dynamic ShapeDtypeStruct leaves; only support/origin/index metadata and budgets are captured.",
+    "forbidden": "No dense global Jacobian, trajectory covariance, path enumeration, or iteration-history arrays. All derivative captures come only from one accepted local evaluation. Limits are explicit outer/trial/linear caps above.",
+    "inventory_process": "A separate shape-only child precedes the ten compilation children, so wide abstract tracing does not contaminate any compiled variant process peak. It has zero complete-program lower/compile/execute calls."
+  },
+  "runtime": {
+    "backend": "cpu",
+    "jax_enable_x64": false,
+    "jax_explicit_x64_dtypes": "error",
+    "floating_dtype": "float32",
+    "persistent_cache": "disabled via config; XLA auxiliary caches disabled; record actual settings and compiler logs",
+    "processes": "Sequential fresh child per horizon for solves (six starts share one retained complete executable); separate fresh child per storage variant. Stop on first failure, resource stop or nonconvergence. No repeat, warm-up or recovery fit.",
+    "reuse": "Retain Lowered and Compiled during each child. Initialization and solve are separately compiled. Never claim cross-child reuse or reuse of the historical compile-only executables.",
+    "timing": "Separate lower, compile acquisition, input synchronization, first authorized call and block_until_ready. Serialization, readout conversion and initialization are outside the solve timer; report their times separately.",
+    "memory": "XLA estimates separate from logical leaves and process memory; parent os.wait4 child ru_maxrss gives independent process high-water (Darwin bytes, Linux KiB). ps rss is a sampled current-RSS diagnostic in KiB, not a phase peak.",
+    "internal_dtypes": "Actual input/initial/result/readout leaves plus fixed metadata, abstract storage leaves and all StableHLO values must be float32; statuses/masks/limbs stay integer or bool.",
+    "cache_evidence": "Record compiler log and actual disabled settings. Exactly one lower/compile call per process; no full-program in-process reuse is requested. OS/compiler internals may still reuse resources; no repeated-execution speed claim."
+  },
+  "limits": {
+    "lower_seconds": 180,
+    "compile_seconds": 900,
+    "worker_seconds": 3600,
+    "storage_worker_seconds": 1200,
+    "rss_bytes": 42949672960,
+    "sample_seconds": 1.0,
+    "terminate_grace_seconds": 5.0,
+    "rationale": "Compiler limits inherit the independent PR147 preflight. A horizon child allows one hour for setup, two compilations and six bounded solves; the numerical budgets are unchanged. These are diagnostic resource stops, not permission to retry."
+  },
+  "reports": {
+    "schema": "cffg.d12-moderate-report.v1",
+    "payload": "Immutable NPZ snapshots for every initial and terminal State, natural messages/xi, all beliefs with low words and physical readouts, and every centered/physical source-conditioned learning group. Exact leaf manifests carry shapes/dtypes/elements/bytes/SHA256.",
+    "identity": "Spec, source manifest, git revision and cleanliness, fixture content hashes, Python/JAX/jaxlib/NumPy/platform/configuration, cache/compiler logs, process peaks, timing and compilation call counts.",
+    "failure": "Keep the first failure and every preceding case, raw inputs, initialized coordinate/status and any returned terminal outputs, including nonfinite values as NPZ values. No rewriting previous reports/hashes. Incomplete reports cannot qualify.",
+    "policy": "Require complete twelve-case solve report and complete ten-case compiled storage report at the same source/spec, all numerical gates, and reviewed initialization sensitivity for A3WZ. Setup or compilation alone does not qualify."
+  },
+  "scope": {
+    "authorized_here": "Implementation and focused checks only; commit and pause for independent review.",
+    "after_review": "New immutable source-matched tiny evidence if source manifest changes. Root owns final short suite and publication. A3WZ owns actual moderate solve/storage execution and decision.",
+    "unchanged": "No approximation/scope/threshold changes, public compiler/Engine activation, no-learning semantics or registered source-recovery fits. K6G5/7SW5/X0IF retain opt-in and compilation/functionality trade-offs."
+  }
+}
