@@ -1,6 +1,6 @@
 ---
 id: cff-ej67
-status: in_progress
+status: closed
 deps: [cff-ocxl]
 links: [cff-ffsg]
 created: 2026-09-14T04:34:41Z
@@ -143,3 +143,7 @@ Final six-program allocation refresh passed with uv run python tests/test_hybrid
 **2026-09-14T07:22:47Z**
 
 Completed independent re-review at 07b18fd reports no findings; both P2 second-moment defects are resolved. Reviewer independently verified small-mean OK/finite beliefs through both constructors in eager/JIT/vmap/JIT-vmap and x64-disabled float32, while original overflow cases remain NONFINITE in both dtypes. Strict products matched the previous implementation across 256 varied cases per dtype and retained required-subnormal-remainder rejection; rounded values/derivatives and all six storage records were consistent. Evidence: /tmp/cff-ej67-review-small-mean-fixed.log, /tmp/cff-ej67-review-second-overflow-rounded.log, /tmp/cff-ej67-review-rounded-product.log. All diagnostic processes finished before this note; completed findings were sent to the implementer, who remains paused. Numerical source is unchanged from its passing 25-test focused run. Supervisor now owns the single combined final short suite for EJ67, B0S3 and FFSG; none is closed yet and no complete message-plus-auxiliary checkpoint or recovery fit has run.
+
+**2026-09-14T08:43:06Z**
+
+Final combined short-suite gate PASSED at source head 40fd246 (numerical implementation 07b18fd): uv run python tools/dashboard.py --run-suite; 2489 passed, 41 deselected, 4 existing gym deprecation warnings in 3182.41s, exit 0. Log /tmp/cff-ffsg-short-suite.log; dashboard ~/agent-share/cffg-tests.html refreshed and runtime history recorded. The supervisor respected full 1560-second quiet wait windows and did not rerun an unchanged suite. Independent re-review is clear and the final targeted 25-test result is preserved above. This gate closes EJ67 together with the dependent local repairs and FFSG kernels. No required local work remains; complete joint solver reference/candidate/qualification are cff-j191/cff-y15d/cff-a3wz. No registered recovery fit has run.

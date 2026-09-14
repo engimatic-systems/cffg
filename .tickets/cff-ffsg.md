@@ -1,6 +1,6 @@
 ---
 id: cff-ffsg
-status: in_progress
+status: closed
 deps: [cff-ocxl, cff-b0s3]
 links: [cff-b0s3, cff-ej67]
 created: 2026-09-14T01:11:24Z
@@ -85,3 +85,9 @@ UNRESOLVED numerical handoff for a fresh prerequisite worker: tests/hybrid_cente
 **2026-09-14T03:23:28Z**
 
 Newly discovered numerical prerequisite: cff-b0s3 now blocks this ticket’s closure and cff-a3wz. Bounded original review fixes are committed through 38e4fd4 with 125 focused tests passing, but the known translated float32 tilt failure remains unresolved. A fresh implementer will own fixed anchored local representation and repeated-message preservation after independent diagnosis and the current bounded re-review finish. No full-suite gate or positive local qualification is claimed while this defect remains. Existing cff-ffsg source commits are the b0s3 code base; its tk prerequisite is the closed cff-ocxl mathematical gate, avoiding a cycle with this completion gate.
+
+**2026-09-14T08:43:06Z**
+
+Local-kernel completion: FFSG plus bounded B0S3 and EJ67 repairs are committed, independently reviewed, and pass one combined final short suite after the final numerical change. Command uv run python tools/dashboard.py --run-suite at 40fd246 (numerical head 07b18fd): 2489 passed, 41 deselected, 4 existing gym deprecation warnings in 3182.41s, exit 0. Log /tmp/cff-ffsg-short-suite.log; ~/agent-share/cffg-tests.html and tracked runtime history refreshed. Latest targeted repair checks passed 25/25 in 245.66s; older 201/201 evidence is historical, not claimed as a fresh run. All completed review findings were sent to their implementers and resolved; no source edit occurred during review or final gate.
+
+Handoff: cff-j191 is the next bounded ticket for independently implemented tiny complete EC+xi reference mathematics and a committed pre-run specification. It precedes cff-y15d candidate solver and cff-a3wz complete numerical/storage qualification. Their authoritative dependencies remain intact; compiler activation, supported model scope, D12 approximation, all numerical and recovery thresholds are unchanged. Use Natural.arrays for message coefficients only, fixed origins as metadata, and derived retained covariance words in cancellation-sensitive calculations. Local compiled counts are reproducible via uv run python tests/test_hybrid_projection.py; they are not complete-iteration memory. No complete joint solver checkpoint or registered recovery fit has run. No FFSG local implementation work remains.

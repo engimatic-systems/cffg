@@ -1,6 +1,6 @@
 ---
 id: cff-b0s3
-status: in_progress
+status: closed
 deps: [cff-ocxl, cff-ej67]
 links: [cff-ffsg]
 created: 2026-09-14T03:21:20Z
@@ -130,3 +130,7 @@ Addition-underflow correction final evidence: _checked_sum now inspects integer 
 **2026-09-14T04:49:58Z**
 
 Completed independent re-review at 2b7fd93: no findings; underflow P2 cleared. Original normal-product cancellation and subnormal-offset cases now return NaN in eager/JIT/vmap and x64-disabled f32; exact cancellation/signed zeros remain valid. Exact rational add/sub audit covered 3,556 f32 and 3,572 f64 operand pairs without false rejection or incorrect classification. Ordinary broadcast arithmetic and forward/reverse derivative interfaces passed; targeted checked-in tests 3 passed, 13 deselected in15.95s. Source: affine_fix_reviewer and /tmp/cff-affine-underflow-rereview.py; confidence high for this bounded correction. Implementer was notified only after the completed review. Remaining local blocker is cff-ej67; no full suite, closure, downstream solver, or recovery run yet.
+
+**2026-09-14T08:43:06Z**
+
+Final handoff: retained origins/displacements and compensated affine arithmetic are implemented and independently reviewed; prerequisite cff-ej67 now supplies retained covariance projection/quotient precision and aligned finite-moment guards. The combined final short suite at 40fd246 passed 2489 tests, 41 deselected, in 3182.41s (exit 0), through uv run python tools/dashboard.py --run-suite. Log /tmp/cff-ffsg-short-suite.log; dashboard and runtime history refreshed. Numerical source is 07b18fd; no subsequent numerical edits. Closing this local repair with its final gate; FFSG and then the separate independent joint reference/candidate/qualification chain may proceed. Fixed origins are metadata, and covariance low words are derived; neither belongs in the solver unknown vector. Full moderate-horizon iterative storage and recovery remain unqualified downstream.
