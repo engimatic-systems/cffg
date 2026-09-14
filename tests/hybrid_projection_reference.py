@@ -18,6 +18,19 @@ def array(value):
     return np.vectorize(lambda x: x if isinstance(x, Decimal) else Decimal(float(x)), otypes=[object])(value)
 
 
+def represented(high, low):
+    """Add stored words only after converting each to exact decimal values."""
+    return array(high) + array(low)
+
+
+def natural(value):
+    return value.constant, value.linear, represented(value.precision, value.correction)
+
+
+def belief(value):
+    return array(value.probability), array(value.displacement), represented(value.covariance, value.correction)
+
+
 def log(value):
     return np.vectorize(lambda x: x.ln(), otypes=[object])(array(value))
 
@@ -72,11 +85,12 @@ def scalar_precision(probability, mean, covariance, cavity_precision):
     for probabilities, means, covariances, precision in zip(probability, mean, covariance, cavity_precision):
         p = [Fraction(float(x)) for x in probabilities]
         m = [Fraction(float(x)) for x in np.asarray(means).ravel()]
-        c = [Fraction(float(x)) for x in np.asarray(covariances).ravel()]
+        c = [Fraction(x if isinstance(x, Decimal) else float(x)) for x in np.asarray(covariances).ravel()]
         mass = sum(p)
         mu = sum(w * x for w, x in zip(p, m)) / mass
         variance = sum(w * (v + (x - mu) ** 2) for w, x, v in zip(p, m, c)) / mass
-        results.append(float(1 / variance - Fraction(float(np.asarray(precision).item()))))
+        precision = np.asarray(precision).item()
+        results.append(float(1 / variance - Fraction(precision if isinstance(precision, Decimal) else float(precision))))
     return np.array(results)
 
 

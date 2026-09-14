@@ -13,6 +13,7 @@ import jax
 import jax.numpy as jnp
 
 from cffg.hybrid_affine import affine, centered_affine
+from cffg import hybrid_covariance as hc
 from cffg.hybrid_natural import (
     Belief, Natural, Status, coordinate_status, correction_status, failure, gaussian_blocks,
     lift, marginal, normalize, quotient, rebase,
@@ -126,7 +127,10 @@ def transition(weights, offsets, xi, matrix, bias, noise, *, channel="destinatio
     linear = jnp.zeros((card, card, 2 * dim), weights.dtype)
     linear = linear.at[..., :dim].set(recurrence.linear - atwb).at[..., dim:].set(wb)
     precision = jnp.zeros((card, card, 2 * dim, 2 * dim), weights.dtype)
-    precision = precision.at[..., :dim, :dim].set(recurrence.precision + atwa[None])
+    source_precision, source_low = (hc.symmetric(word) for word in
+                                    hc.combine(recurrence.precision, atwa[None]))
+    precision = precision.at[..., :dim, :dim].set(source_precision)
+    precision_low = jnp.zeros_like(precision).at[..., :dim, :dim].set(source_low)
     precision = precision.at[..., :dim, dim:].set(-wa.swapaxes(-1, -2)[None])
     precision = precision.at[..., dim:, :dim].set(-wa[None])
     precision = precision.at[..., dim:, dim:].set(inverse[None])
@@ -134,7 +138,8 @@ def transition(weights, offsets, xi, matrix, bias, noise, *, channel="destinatio
     center = jnp.concatenate((jnp.broadcast_to(left_center[:, None], (card, card, dim)),
                               jnp.broadcast_to(right_center[None], (card, card, dim))), axis=-1)
     status |= failure(~jnp.all(jnp.isfinite(constant)), Status.NONFINITE)
-    result = Natural(jnp.where(jnp.isfinite(constant), constant, jnp.nan), linear, precision, status, center)
+    result = Natural(jnp.where(jnp.isfinite(constant), constant, jnp.nan), linear, precision,
+                     status, center, precision_low)
     return result._replace(status=coordinate_status(result))
 
 
@@ -354,7 +359,9 @@ def natural_residual(message, target):
             first = jnp.argmax(active.reshape(-1))
             a, b = (jnp.where(mask, x - x.reshape(-1)[first], 0) for x in (a, b))
         scale = jnp.maximum(1, jnp.maximum(abs(a), abs(b)))
-        value = jnp.maximum(value, jnp.max(abs(a - b) / scale))
+        difference = a - b if rank != 2 else affine(
+            jnp.ones_like(a)[..., None], a[..., None], -b, message.correction, -target.correction)
+        value = jnp.maximum(value, jnp.max(jnp.where(mask, abs(difference) / scale, 0)))
     status |= failure(~jnp.isfinite(value), Status.NONFINITE)
     return jnp.where(status == 0, value, jnp.nan), status
 
@@ -405,7 +412,12 @@ def evaluate(parameters, sites, messages):
             arrays.append(embedded)
         padding = jnp.zeros((1,), jnp.int32)
         status = jnp.concatenate((padding, outgoing.status) if at_left else (outgoing.status, padding))
-        return site + Natural(*arrays, status, site.center)
+        correction = None
+        if outgoing.precision_correction is not None:
+            padding = jnp.zeros_like(outgoing.correction[:1])
+            correction = jnp.concatenate((padding, outgoing.correction) if at_left else
+                                         (outgoing.correction, padding))
+        return site + Natural(*arrays, status, site.center, correction)
 
     from_left = shifted(sites, right, True)
     from_right = shifted(sites, left, False)

@@ -1,6 +1,7 @@
 """D12 hybrid natural coordinates and moment projections, without engine binding.
 
 One label block represents ``exp(a + h @ (x-c) - (x-c) @ J @ (x-c) / 2)``.
+J includes the optional derived ``precision_correction`` beside ``precision``.
 The retained origin c is fixed during a solve, never a stationary unknown.
 Absent origins mean zero: already-expanded inputs keep their stored polynomial
 meaning and cannot recover coefficients rounded away by their caller. Only
@@ -47,6 +48,13 @@ class Natural(NamedTuple):
     precision: jax.Array
     status: jax.Array = 0
     center: jax.Array | None = None
+    precision_correction: jax.Array | None = None
+
+    @property
+    def correction(self):
+        """Derived low word of assembled precision; never a message unknown."""
+        return (jnp.zeros_like(self.precision) if self.precision_correction is None
+                else self.precision_correction)
 
     @property
     def origin(self):
@@ -60,12 +68,19 @@ class Natural(NamedTuple):
             raise ValueError("natural coordinate shapes or dtypes disagree")
         center = other.center if self.center is None else self.center
         left, right = (rebase(value, center) for value in (self, other))
-        constant, linear, precision = (a + b for a, b in zip(left.arrays(), right.arrays()))
+        constant = left.constant + right.constant
+        linear = left.linear + right.linear
+        precision, correction = hc.combine(left.precision, right.precision,
+                                             left.correction, right.correction)
+        low_status = correction_status(left.precision, left.precision_correction, name="precision")
+        low_status |= correction_status(right.precision, right.precision_correction, name="precision")
         overflow = jnp.isfinite(left.constant) & jnp.isfinite(right.constant) & ~jnp.isfinite(constant)
         return Natural(jnp.where(overflow, jnp.nan, constant), linear, precision,
-                       left.status | right.status | failure(jnp.any(overflow), Status.NONFINITE), center)
+                       left.status | right.status | low_status | failure(jnp.any(overflow), Status.NONFINITE),
+                       center, correction)
 
     def arrays(self):
+        """Three message coefficient arrays; derived precision storage is separate."""
         return self.constant, self.linear, self.precision
 
 
@@ -131,7 +146,10 @@ class Belief(NamedTuple):
         trace = jnp.einsum("...ab,...ab->...", natural.precision, self.covariance)
         if self.covariance_correction is not None:
             trace += jnp.einsum("...ab,...ab->...", natural.precision, self.covariance_correction)
-        value -= (trace + jnp.einsum("...a,...ab,...b->...", mean, natural.precision, mean)) / 2
+        trace += jnp.einsum("...ab,...ab->...", natural.correction, self.full_covariance)
+        quadratic = affine(natural.precision, mean[..., None, :],
+                           affine(natural.correction, mean[..., None, :]))
+        value -= (trace + jnp.einsum("...a,...a->...", mean, quadratic)) / 2
         value = jnp.sum(jnp.where(active, self.probability * value, 0))
         status = (jnp.asarray(self.status, jnp.int32) | coordinate_status(natural)
                   | low_status)
@@ -144,12 +162,12 @@ def _second_moment(covariance, mean):
     return covariance + outer
 
 
-def correction_status(covariance, correction):
+def correction_status(covariance, correction, *, name="covariance"):
     """Validate a retained low word, including directly supplied belief fields."""
     if correction is None:
         return jnp.int32(0)
     if correction.shape != covariance.shape or correction.dtype != covariance.dtype:
-        raise ValueError("covariance correction shapes or dtypes disagree")
+        raise ValueError(f"{name} correction shapes or dtypes disagree")
     valid = jnp.all(correction == correction.swapaxes(-1, -2))
     # A low word is bounded by one rounding unit of its high word.
     valid &= jnp.all(abs(correction) <= jnp.finfo(covariance.dtype).eps * abs(covariance))
@@ -183,6 +201,7 @@ def coordinate_status(natural):
     symmetric = jnp.all(matrix == matrix.swapaxes(-1, -2))
     return (jnp.asarray(natural.status, jnp.int32) | failure(~finite, Status.NONFINITE)
             | failure(~symmetric, Status.INVALID)
+            | correction_status(matrix, natural.precision_correction, name="precision")
             | failure(~jnp.any(jnp.isfinite(a)), Status.EMPTY_SUPPORT))
 
 
@@ -201,14 +220,17 @@ def rebase(natural, center):
     if center is None and natural.center is None:
         return natural
     delta = result.origin - natural.origin
-    linear = affine(-natural.precision, delta[..., None, :], natural.linear)
-    midpoint = affine(-natural.precision / 2, delta[..., None, :], natural.linear)
+    linear = affine(-natural.precision, delta[..., None, :], natural.linear,
+                    affine(-natural.correction, delta[..., None, :]))
+    midpoint = affine(-natural.precision / 2, delta[..., None, :], natural.linear,
+                      affine(-natural.correction / 2, delta[..., None, :]))
     absent = jnp.isneginf(natural.constant)
     constant = affine(delta, midpoint, jnp.where(absent, 0, natural.constant))
     constant = jnp.where(absent, -jnp.inf, constant)
     overflow = jnp.isfinite(natural.constant) & ~jnp.isfinite(constant)
     result = Natural(jnp.where(overflow, jnp.nan, constant), linear, natural.precision,
-                     natural.status | failure(jnp.any(overflow), Status.NONFINITE), center)
+                     natural.status | failure(jnp.any(overflow), Status.NONFINITE), center,
+                     natural.precision_correction)
     return result._replace(status=coordinate_status(result))
 
 
@@ -248,7 +270,13 @@ def normalize(natural):
     a, h, matrix = natural.arrays()
     active = ~jnp.isneginf(a)
     covariance, logdet, pd_status = gaussian_blocks(matrix, active)
-    mean = jnp.einsum("...ab,...b->...a", covariance, jnp.where(active[..., None], h, 0))
+    eye = jnp.broadcast_to(jnp.eye(h.shape[-1], dtype=h.dtype), matrix.shape)
+    safe = jnp.where((active & (pd_status == 0))[..., None, None], matrix, eye)
+    precision_low = jnp.where((active & (pd_status == 0))[..., None, None], natural.correction, 0)
+    covariance, correction = hc.inverse(safe, precision_low)
+    logdet = hc.logdet(safe, precision_low)
+    mean = hc.product(covariance, jnp.where(active[..., None], h, 0)[..., None],
+                      hc.product(correction, jnp.where(active[..., None], h, 0)[..., None]))[..., 0]
     mass = (h.shape[-1] * jnp.log(2 * jnp.pi) - logdet
             + jnp.einsum("...d,...d->...", h, mean)) / 2
     # Remove the common gauge before it can erase label-dependent integrals.
@@ -262,16 +290,18 @@ def normalize(natural):
     log_probability = jnp.where(active, centered - log_total, -jnp.inf)
     normalizer = constant_shift + (score_shift + log_total)
     probability = jnp.where(active, jnp.exp(log_probability), 0)
-    status |= pd_status | failure(~jnp.isfinite(normalizer), Status.NONFINITE)
+    status |= pd_status | correction_status(covariance, correction)
+    status |= failure(~jnp.isfinite(normalizer), Status.NONFINITE)
     status |= failure(jnp.any(active & (probability == 0)), Status.UNDERFLOW)
     status |= failure(~jnp.all(jnp.isfinite(mean)) | ~jnp.all(jnp.isfinite(covariance)), Status.NONFINITE)
     world_mean = natural.origin + mean
-    second = _second_moment(covariance, world_mean)
+    second = _second_moment(covariance + correction, world_mean)
     status |= failure(jnp.any(active[..., None, None] & ~jnp.isfinite(second)), Status.NONFINITE)
     return Belief(jnp.where(active, jnp.where(status == 0, probability, jnp.nan), 0),
                   jnp.where(active[..., None], jnp.where(status == 0, mean, jnp.nan), 0),
                   jnp.where(active[..., None, None], jnp.where(status == 0, covariance, jnp.nan), 0),
-                  log_probability, jnp.where(status == 0, normalizer, jnp.nan), status, natural.origin)
+                  log_probability, jnp.where(status == 0, normalizer, jnp.nan), status, natural.origin,
+                  jnp.where(active[..., None, None], jnp.where(status == 0, correction, jnp.nan), 0))
 
 
 def from_moments(probability, mean, covariance):
@@ -349,10 +379,9 @@ def canonical(belief):
     eye = jnp.broadcast_to(jnp.eye(mean.shape[-1], dtype=mean.dtype), covariance.shape)
     safe = jnp.where(active[..., None, None], covariance, eye)
     correction = jnp.where(active[..., None, None], belief.correction, 0)
-    precision = hc.solve(safe, correction, eye)
-    precision = (precision + precision.swapaxes(-1, -2)) / 2
+    precision, precision_low = hc.inverse(safe, correction)
     logdet = hc.logdet(safe, correction)
-    linear = jnp.einsum("...ab,...b->...a", precision, mean)
+    linear = hc.product(precision, mean[..., None], hc.product(precision_low, mean[..., None]))[..., 0]
     constant = belief.log_probability - (logdet + mean.shape[-1] * jnp.log(2 * jnp.pi)
                                          + jnp.einsum("...d,...d->...", mean, linear)) / 2
     status = (jnp.asarray(belief.status, jnp.int32) | pd_status
@@ -362,7 +391,8 @@ def canonical(belief):
     result = Natural(jnp.where(active, jnp.where(status == 0, constant, jnp.nan), -jnp.inf),
                      jnp.where(active[..., None], jnp.where(status == 0, linear, jnp.nan), 0),
                      jnp.where(active[..., None, None], jnp.where(status == 0, precision, jnp.nan), 0),
-                     status, belief.center)
+                     status, belief.center,
+                     jnp.where(active[..., None, None], jnp.where(status == 0, precision_low, jnp.nan), 0))
     return result._replace(status=coordinate_status(result))
 
 
@@ -393,7 +423,10 @@ def quotient(belief, cavity):
     eye = jnp.broadcast_to(jnp.eye(dim, dtype=belief.covariance.dtype), belief.covariance.shape)
     base = jnp.where(active[..., None, None], belief.covariance, eye)
     correction = jnp.where(active[..., None, None], belief.correction, 0)
-    precision_rhs = hc.residual(base, correction, cavity.precision, eye)
+    precision_rhs = hc.product(-base, cavity.precision,
+                               hc.product(-correction, cavity.precision),
+                               hc.product(-base, cavity.correction),
+                               hc.product(-correction, cavity.correction), eye)
     precision = hc.solve(base, correction, precision_rhs)
     precision = (precision + precision.swapaxes(-1, -2)) / 2
     linear_rhs = hc.residual(base, correction, cavity.linear[..., None], belief.displacement[..., None])
@@ -483,13 +516,17 @@ def lift(left, right):
     linear = linear.at[..., :dim].set(left.linear[:, None]).at[..., dim:].set(right.linear[None])
     matrix = matrix.at[..., :dim, :dim].set(left.precision[:, None])
     matrix = matrix.at[..., dim:, dim:].set(right.precision[None])
+    correction = None
+    if left.precision_correction is not None or right.precision_correction is not None:
+        correction = jnp.zeros_like(matrix).at[..., :dim, :dim].set(left.correction[:, None])
+        correction = correction.at[..., dim:, dim:].set(right.correction[None])
     center = jnp.concatenate((jnp.broadcast_to(left.origin[:, None], (card, card, dim)),
                               jnp.broadcast_to(right.origin[None], (card, card, dim))), axis=-1)
     constant = left.constant[:, None] + right.constant[None]
     overflow = jnp.isfinite(left.constant[:, None]) & jnp.isfinite(right.constant[None]) & ~jnp.isfinite(constant)
     return Natural(jnp.where(overflow, jnp.nan, constant), linear, matrix,
                    coordinate_status(left) | coordinate_status(right)
-                   | failure(jnp.any(overflow), Status.NONFINITE), center)
+                   | failure(jnp.any(overflow), Status.NONFINITE), center, correction)
 
 
 def gaussian_adapter(hybrid_cavity, gaussian_cavity):
@@ -506,7 +543,9 @@ def gaussian_adapter(hybrid_cavity, gaussian_cavity):
     embedded = Natural(*(jnp.broadcast_to(x, y.shape) for x, y in
                          zip(gaussian_cavity.arrays(), hybrid_cavity.arrays())), gaussian_cavity.status,
                        None if gaussian_cavity.center is None else
-                       jnp.broadcast_to(gaussian_cavity.center, hybrid_cavity.linear.shape))
+                       jnp.broadcast_to(gaussian_cavity.center, hybrid_cavity.linear.shape),
+                       None if gaussian_cavity.precision_correction is None else
+                       jnp.broadcast_to(gaussian_cavity.precision_correction, hybrid_cavity.precision.shape))
     belief = normalize(hybrid_cavity + embedded)
     center = belief.center[0] if gaussian_cavity.center is None else gaussian_cavity.center
     projected = _mix(belief, 0, center)

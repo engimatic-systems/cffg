@@ -52,10 +52,10 @@ def _product_jvp(primals, tangents):
     return product(left, right, *offsets), tangent
 
 
-def combine(base, increment):
+def combine(base, increment, *corrections):
     """Round base+increment once and retain its signed rounding remainder."""
-    high = affine(jnp.ones_like(base)[..., None], increment[..., None], base)
-    low = affine(jnp.ones_like(base)[..., None], increment[..., None], base, -high)
+    high = affine(jnp.ones_like(base)[..., None], increment[..., None], base, *corrections)
+    low = affine(jnp.ones_like(base)[..., None], increment[..., None], base, *corrections, -high)
     return high, low
 
 
@@ -96,6 +96,39 @@ def solve(base, correction, rhs):
     return jax.lax.custom_linear_solve(
         lambda value: base @ value + correction @ value, rhs,
         solve=lambda _, value: _refined_solve(base, correction, value), symmetric=True)
+
+
+@jax.custom_jvp
+def inverse(base, correction):
+    """Retain inverse rounding information before a strong-cavity quotient.
+
+    Solve the compensated inverse residual for its low word. Both returned
+    words represent the same inverse; the high word carries its mathematical
+    differential and the derived remainder carries zero differential.
+    """
+    eye = jnp.broadcast_to(jnp.eye(base.shape[-1], dtype=base.dtype), base.shape)
+    chol = jnp.linalg.cholesky(base)
+    high = symmetric(jax.scipy.linalg.cho_solve((chol, True), eye))
+    low = symmetric(jax.scipy.linalg.cho_solve(
+        (chol, True), residual(base, correction, high, eye)))
+    high, low = (symmetric(word) for word in combine(high, low))
+    remainder = product(-base, high, product(-correction, high),
+                        product(-base, low), product(-correction, low), eye)
+    scale = abs(eye) + abs(base) @ abs(high) + abs(correction) @ abs(high)
+    # A once-rounded inverse cannot certify the low bits used by a quotient.
+    allowance = 64 * base.shape[-1] * jnp.finfo(base.dtype).eps ** 2 * scale
+    resolved = jnp.all(jnp.isfinite(remainder) & jnp.isfinite(scale)
+                       & (abs(remainder) <= allowance), axis=(-2, -1))
+    return tuple(jnp.where(resolved[..., None, None], word, jnp.nan) for word in (high, low))
+
+
+@inverse.defjvp
+def _inverse_jvp(primals, tangents):
+    base, correction = primals
+    db, dc = tangents
+    high, low = inverse(base, correction)
+    derivative = -solve(base, correction, solve(base, correction, db + dc).swapaxes(-1, -2))
+    return (high, low), (symmetric(derivative), jnp.zeros_like(low))
 
 
 @jax.custom_jvp

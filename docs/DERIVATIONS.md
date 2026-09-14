@@ -2845,13 +2845,47 @@ readouts apply `B_i=[[I,c_i],[0,1]]` to the linear statistic and
 is `[w;o+w^T c_i]`. This invertible fixed sufficient-statistic transform leaves
 the D12 stationarity zero set, approximation and qualification gate unchanged.
 
-Projection additionally retains one additive covariance remainder:
+Canonical addition retains a derived precision remainder
+`J = J_hi + J_lo` before inversion. `Natural.precision_correction` is optional;
+absence means zero, and the same finite, symmetric, elementwise low-word bound
+below applies. Compensated addition preserves the sum of both incoming words.
+Lift, rebase, ordinary adapters, expectation and local cavity assembly transport
+or consume it. `Natural.arrays()` remains the three floating message coefficient
+arrays; the remainder is excluded from stationary unknowns. Gaussian-site
+construction still defines its returned, stored precision as the input coordinate:
+it cannot infer an earlier caller's unrounded physical input.
+
+Normalization and projection retain one additive covariance remainder:
 `C = C_hi + C_lo`, with `C_hi` the existing rounded `covariance` readout
 and `C_lo` the optional `covariance_correction`. Absence means exact zero.
 The low word is finite, symmetric, and elementwise bounded by
 `eps*abs(C_hi)`; subnormal words fail explicitly. This is a numerical
 representation of the same D12 conditional covariance, never a second moment
-constraint or an extra stationary unknown. Projection selects an active
+constraint or an extra stationary unknown. Normalization first obtains a
+Cholesky inverse `H` of `J_hi`, then solves
+`J_hi L = I - J_hi H - J_lo H` with the compensated residual on the right.
+A compensated addition normalizes `H+L` into the two covariance words.
+The represented inverse must satisfy
+`abs(I-J C) <= 64 d eps² (abs(I)+abs(J_hi)abs(C_hi)+abs(J_lo)abs(C_hi))`,
+computed with both matrix words and finite terms. An unresolved inverse fails
+with `NONFINITE`. This arithmetic check protects the second word; it does not
+replace D12's positive-definiteness guard or change any acceptance allowance.
+The high covariance word carries the mathematical differential
+`dC = -J^-1 dJ J^-1`, and the derived low word carries zero differential.
+Canonical conversion uses the same represented inverse convention.
+
+This preservation must begin before projection. In the exact stored-input
+scalar regression, source precision `10000`, float32 weight `6.7`, origin
+`10000`, offset `-67000` and xi zero give outgoing precision
+`0.0125764053902527907` by Decimal80 Gaussian integration. A once-rounded
+regional covariance produced `0.012979879975318909` in float32, missing the
+unchanged `512*4*eps` allowance. The committed input and failed stencil evidence
+are in `tests/fixtures/hybrid-strong-cavity.json`; `test_hybrid_precision.py`
+checks the original held coordinate and frozen perturbations against physical
+inputs, independently of the saved regional covariance. The native finite
+difference failure included value error; its analytic JVP already agreed.
+
+Projection selects an active
 conditional reference covariance `C0` and accumulates
 
     C = C0 + sum_j p_j (C_j - C0 + (r_j-rbar)(r_j-rbar)^T) / sum_j p_j.
@@ -2865,9 +2899,10 @@ adapter. The categorical adapter uses the same natural quotient. A covariance
 readout may round away the low word; cancellation-sensitive division does not
 use that readout. With the cavity expressed at the belief origin, it solves
 
-    (C_hi+C_lo) J_out = I - C_hi J_cavity - C_lo J_cavity,
+    (C_hi+C_lo) J_out = I - (C_hi+C_lo) (J_cavity_hi+J_cavity_lo),
     (C_hi+C_lo) h_out = rbar - C_hi h_cavity - C_lo h_cavity.
 
+All four precision products remain separate until compensated accumulation.
 `hybrid_covariance.py` assembles these right sides with compensated matrix
 products and refines the Cholesky solution once using a compensated residual.
 This bounded arithmetic refinement makes no iterative convergence claim.
@@ -2919,10 +2954,12 @@ Origin metadata uses `O(T K d)` separator/message entries. Materialized grouped
 belief copies use `O(T K² d)` entries within the existing regional storage
 bound; the executable inventory counts both, including returned message banks.
 Projected covariance remainders add two `T*K*d*d` arrays when both directions
-are retained: at T=100, K=20, d=10, float32, exactly 1,600,000 bytes. Ordinary
-normalized grouped regions and message banks add no retained correction array.
-An explicitly supplied grouped low word would instead have the existing
-`T*K*K*(2d)*(2d)` shape (64,000,000 bytes at these dimensions). The matrix
+are retained: at T=100, K=20, d=10, float32, exactly 1,600,000 bytes.
+Normalized separators add one such array, 800,000 bytes. Normalized grouped
+regions now retain a `T*K*K*(2d)*(2d)` covariance remainder, 64,000,000 bytes
+at these dimensions. Assembled grouped precision carries another matrix of
+that size until normalization; it is a local temporary, not a solver unknown.
+Outgoing quotient message banks add no correction array. The matrix
 product's two accumulator words occupy 1,600,000 logical bytes; its product
 and product-remainder words occupy another 1,600,000 logical bytes. These
 are matrix-sized local workspaces, with allocator reuse; they are not amounts
@@ -2936,17 +2973,18 @@ logical sizes are not additional heap allocations.
 `uv run python tests/test_hybrid_projection.py` prints a reproducible JSON
 inventory from JAX lowering, without running a solver or recovery fit. On the
 measured CPU backend with x64 enabled and float32 data, both projections use
-70,560,400 compiled argument bytes, 3,553,728 output bytes (including the
+134,560,400 compiled argument bytes, 3,553,728 output bytes (including the
 output tuple), and 234,874,216 temporary bytes. The complete input belief tree
-also contains unused log-probability/normalizer arrays: 70,720,800 bytes total.
-Returning both projections and their quotient messages uses 72,497,200
-argument / 5,490,608 output / 258,775,144 temporary bytes; the complete
-input region and cavity trees total 72,657,600 bytes.
+also contains unused log-probability/normalizer arrays: 134,720,800 bytes total.
+Returning both projections and their quotient messages uses 136,497,200
+argument / 5,490,608 output / 265,175,784 temporary bytes; the complete
+input region and cavity trees total 136,657,600 bytes.
 At the same local message-matrix shape, the compensated product uses
 1,600,000 argument / 800,000 output / 4,400,136 temporary bytes, and the
 corrected solve uses 2,400,000 / 800,000 / 14,820,648 bytes. Grouped
-normalization uses 70,560,400 / 70,720,856 / 131,200,984 bytes, and the
-grouped second-moment readout uses 70,560,000 / 64,000,000 / 0 bytes:
+normalization, including its precision and covariance remainders, uses
+134,560,400 / 134,720,864 / 1,395,362,408 bytes, and the
+grouped second-moment readout uses 134,560,000 / 64,000,000 / 0 bytes:
 the latter fuses its work into the output allocation. All six
 measurements have zero input/output alias bytes. Arrays are dynamic lowering
 arguments, so fixture constants cannot remove the measured workload. These backend
@@ -2954,6 +2992,11 @@ allocation figures include the retained words, integer arithmetic, matrix
 carries, Cholesky and refinement temporaries; array dimensions remain within
 `O(T K² d²)` projection and `O(T K d²)` local solve storage. They do not
 measure the complete iterative buffers, which remain the cff-a3wz gate.
+The inverse repair raises normalization temporary storage from 131,200,984
+to 1,395,362,408 bytes at this inventory size. Its two floating accumulator
+words alone have 128,000,000 logical bytes. This cost must be included in the
+candidate's actual iteration-storage checkpoint; polynomial dimensions alone
+do not establish an acceptable working-memory requirement.
 
 For I global iterations, B line-search trials, L local auxiliary iterations,
 and M matrix-free linear iterations, explicitly budget
