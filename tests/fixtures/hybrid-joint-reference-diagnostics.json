@@ -18,6 +18,11 @@
       "base": "fixed_drive specification",
       "change": "source_log_site[1] = -inf",
       "execution": "conditioned categorical algebra only; inactive xi and learning exactly zero"
+    },
+    "auxiliary_underflow": {
+      "base": "coupled_t2 frozen reference result",
+      "change": "all weights=1e-200 and all offsets=0",
+      "execution": "held evaluate only; mathematically positive squared logit below float64 range must fail explicitly"
     }
   },
   "first_focused_run": {
