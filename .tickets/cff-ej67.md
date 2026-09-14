@@ -77,3 +77,7 @@ Dependency refinement built from tk dep tree --full cff-a3wz, tk ready, and tk b
                                  --> [ ] cff-x0if --> [ ] cff-zov5
 
 The new dependency represents completion order; all predecessor local code is already committed in the shared branch. Implementation remains sequential. No numerical code changed in this refinement; tk dep cycle and git diff --check are the artifact checks.
+
+**2026-09-14T04:49:58Z**
+
+Predecessor underflow correction is committed at 2b7fd93, clean tree; independent re-review completed with no findings. Fresh implementation may now start on this bounded projection/quotient repair. Fixed origins and compensated affine code are available in ancestry; use current APIs and preserve their explicit underflow boundary.
