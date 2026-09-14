@@ -2825,10 +2825,13 @@ on compiler fused multiply-add behavior. Compensated addition retains these
 remainders and receives each additive offset separately. The owned recurrence
 and channel energies apply the same operation to origins and displacements.
 The custom derivative is the ordinary derivative of the real affine expression.
-No float64 promotion supports the float32 path. Product/partial-sum overflow or
-subnormal product/remainder scaling reports non-finite failure; these cases
-receive no clamp. This bounded compensation does not promise exact arithmetic
-under arbitrary nested cancellation or remove the stated large-rebasing limit.
+No float64 promotion supports the float32 path. Product/partial-sum overflow,
+subnormal product/remainder scaling, subnormal additive offsets, and nonzero
+subnormal intermediate/final sums report non-finite failure. Addition uses
+integer sign/exponent bits to distinguish exact cancellation from a nonzero
+result flushed to zero; these cases receive no clamp. This bounded compensation
+does not promise exact arithmetic under arbitrary nested cancellation or remove
+the stated large-rebasing limit.
 
 Beliefs retain solved displacements `E[x-c_i]` through projection, covariance
 mixing, quotient reuse and ordinary adapters. The physical `mean` readout adds

@@ -143,11 +143,33 @@ def test_unrepresentable_product_words_and_partial_sum_overflow_fail_explicitly(
             assert np.isnan(value)
 
 
+@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+def test_normal_product_cancellation_and_subnormal_offsets_fail_without_losing_support(dtype):
+    tiny = dtype(np.finfo(dtype).tiny)
+    above = np.nextafter(tiny, dtype(np.inf))
+    smallest = np.nextafter(dtype(0), dtype(1))
+    assert Fraction(float(tiny)) - Fraction(float(above)) == -Fraction(float(smallest))
+    values = jnp.array([[tiny, -above], [-tiny, above], [tiny, -tiny]], dtype)
+    weights = jnp.ones_like(values)
+    high, low = _two_product(weights, values)
+    np.testing.assert_array_equal(high, values)
+    np.testing.assert_array_equal(low, 0)
+    for evaluate in (affine, jax.jit(affine), jax.vmap(affine), jax.jit(jax.vmap(affine))):
+        result = np.asarray(evaluate(weights, values))
+        assert np.all(np.isnan(result[:2]))
+        assert result[2] == 0
+        result = np.asarray(evaluate(jnp.zeros_like(weights), jnp.zeros_like(values),
+                                     jnp.array([smallest, -smallest, 0], dtype)))
+        assert np.all(np.isnan(result[:2]))
+        assert result[2] == 0
+
+
 def test_float32_consumer_mode_without_x64_preserves_complete_review_reproduction():
     source = textwrap.dedent("""
         import jax
         jax.config.update('jax_enable_x64', False)
         import jax.numpy as jnp
+        import numpy as np
         from cffg.hybrid_affine import affine
         from cffg import hybrid_natural as hn, hybrid_separator as hs
         w = jnp.array([6.7, 1.3], jnp.float32)
@@ -178,6 +200,15 @@ def test_float32_consumer_mode_without_x64_preserves_complete_review_reproductio
             assert jnp.max(abs(a[0] - b[0])) <= 512 * 4 * jnp.finfo(jnp.float32).eps
             assert abs(a[1] - b[1]) <= 512 * 4 * jnp.finfo(jnp.float32).eps
         assert not jax.config.x64_enabled
+        tiny = np.float32(np.finfo(np.float32).tiny)
+        above = np.nextafter(tiny, np.float32(np.inf))
+        smallest = np.nextafter(np.float32(0), np.float32(1))
+        for evaluate in (affine, jax.jit(affine)):
+            value = evaluate(jnp.ones(2, jnp.float32), jnp.array([tiny, -above], jnp.float32))
+            assert value.dtype == jnp.float32 and np.isnan(value)
+            value = evaluate(jnp.zeros(1, jnp.float32), jnp.zeros(1, jnp.float32),
+                             jnp.asarray(smallest, jnp.float32))
+            assert value.dtype == jnp.float32 and np.isnan(value)
     """)
     result = subprocess.run([sys.executable, "-c", source], text=True, capture_output=True, timeout=90)
     assert result.returncode == 0, result.stderr

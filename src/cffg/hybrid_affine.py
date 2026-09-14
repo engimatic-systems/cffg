@@ -6,8 +6,8 @@ boundaries have optimization barriers. Integer product decomposition avoids
 compiler FMA contraction and splitter overflow.
 
 This is compensated precision, not arbitrary precision or universal exactness.
-Unrepresentable or subnormal products/residuals and overflowing partial sums fail
-with NaN so the owning hybrid kernel reports NONFINITE. No precision floor is
+Unrepresentable products, subnormal addends/results and overflowing partial sums
+fail with NaN so the owning hybrid kernel reports NONFINITE. No precision floor is
 inserted. Derivatives are those of the declared real affine expression, not
 derivatives of its floating-point decomposition.
 
@@ -21,12 +21,33 @@ import jax
 import jax.numpy as jnp
 
 
+def _checked_sum(left, right, *, subtract=False):
+    result = jax.lax.optimization_barrier(left - right if subtract else left + right)
+    info = jnp.finfo(result.dtype)
+    width = 32 if info.nmant == 23 else 64
+    unsigned = jnp.uint32 if width == 32 else jnp.uint64
+    sign = jnp.asarray(1 << (width - 1), unsigned)
+    smallest_normal = jnp.asarray(1 << info.nmant, unsigned)
+    left_bits, right_bits, result_bits = (jax.lax.bitcast_convert_type(x, unsigned)
+                                          for x in (left, right, result))
+    left_magnitude, right_magnitude, result_magnitude = (x & ~sign for x in
+                                                        (left_bits, right_bits, result_bits))
+    subnormal_input = ((left_magnitude != 0) & (left_magnitude < smallest_normal)
+                       | (right_magnitude != 0) & (right_magnitude < smallest_normal))
+    different_signs = ((left_bits ^ right_bits) & sign) != 0
+    cancellation = ~different_signs if subtract else different_signs
+    # Unequal opposing normal magnitudes cannot sum exactly to zero. Inspect
+    # bits because floating comparisons can flush a subnormal result/addend.
+    lost = cancellation & (left_magnitude != right_magnitude) & (result_magnitude < smallest_normal)
+    return jnp.where(subnormal_input | lost, jnp.nan, result)
+
+
 def _add(left, right):
-    return jax.lax.optimization_barrier(left + right)
+    return _checked_sum(left, right)
 
 
 def _subtract(left, right):
-    return jax.lax.optimization_barrier(left - right)
+    return _checked_sum(left, right, subtract=True)
 
 
 def _two_sum(left, right):
