@@ -342,13 +342,17 @@ horizon-independent convergence budget. Its signed Gaussian messages also
 require compatible boundary consumers (cff-f3jz and cff-ulbz). The NumPy D12
 experiment solves held auxiliaries and requires proper forward initialization.
 The unbound JAX joint message/auxiliary policy passed its fixed tiny float64
-numerical checkpoint at source `3b1f023`, including host/JIT and single/vmap
-parity. Subsequent packing and report-enforcement repairs await re-review and a
-fresh source-qualified checkpoint; re-evaluation of the old saved coordinates
-already passes the original absolute-only energy allowance. Production
-still needs moderate float32 convergence and actual
-iteration-storage qualification, followed by the execution binding. A tiny
-reference comparison does not establish those downstream properties.
+numerical checkpoint in attempt 003 at source `9ec70fe`, including host/JIT and
+single/vmap parity. Its 40 converged outputs pass independent saved-state
+evaluation under the original absolute-only energy allowance; all declared
+invalid-input and zero-budget outcomes also pass. This evidence includes the
+reviewed packing and report-enforcement repairs. The 299.76–358.30 second
+first JIT calls and 28.65 GiB largest sampled process memory describe these
+tiny layouts on the measured backend; they do not establish moderate-scale
+costs or actual iteration storage. Production still needs moderate float32
+convergence and actual iteration-storage qualification, followed by the
+execution binding. A tiny reference comparison does not establish those
+downstream properties.
 The local JAX evaluator retains precision and covariance rounding remainders
 to preserve small outgoing messages under strong cavities. Unsupported or
 unresolved compensated arithmetic fails explicitly. A conservative spectral

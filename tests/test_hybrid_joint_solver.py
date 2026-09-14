@@ -139,6 +139,11 @@ def test_complete_loop_has_fixed_int32_status_and_counter_shapes():
 
 @pytest.fixture(scope='module')
 def checkpoint_report():
+    return json.loads((Path(__file__).parent / 'fixtures/hybrid-joint-candidate-results-003.json').read_text())
+
+
+@pytest.fixture(scope='module')
+def historical_checkpoint_report():
     return json.loads((Path(__file__).parent / 'fixtures/hybrid-joint-candidate-results-002.json').read_text())
 
 
@@ -231,8 +236,10 @@ def test_energy_arithmetic_is_absolute_even_for_large_objectives():
     'outer_fabricated_convergence', 'swapped_failures', 'failed_finite_message', 'failed_energy',
     'failed_status', 'failed_auxiliary', 'missing_field',
 ])
-def test_saved_terminal_variants_require_consistent_payloads(checkpoint_report, checkpoint_context, mutation):
-    report = deepcopy(checkpoint_report)
+def test_saved_terminal_variants_require_consistent_payloads(checkpoint_report, historical_checkpoint_report,
+                                                           checkpoint_context, mutation):
+    # Current canonical failure sentinels coincide; historical starts remain distinguishable.
+    report = deepcopy(historical_checkpoint_report if mutation == 'swapped_failures' else checkpoint_report)
     variants = {r['execution']: r for r in report['records'] if r['execution'] != 'jit'}
     outer, negative, nonfinite = (variants[name] for name in ('outer_zero', 'negative_xi', 'nonfinite_site'))
     if mutation == 'outer_nan_coordinate':
@@ -311,18 +318,19 @@ def test_saved_counters_obey_execution_budgets(checkpoint_report, checkpoint_con
         validate_saved_report(report, *checkpoint_context)
 
 
-def test_saved_failure_policy_is_explicit_and_bound_to_packing_source(checkpoint_report):
+def test_saved_failure_policy_is_explicit_and_bound_to_packing_source(checkpoint_report, historical_checkpoint_report):
     from run_hybrid_joint_candidate import hashes
     metadata = dict(report_schema=REPORT_SCHEMA, failed_coordinate_policy=FAILED_COORDINATE_POLICY,
                     source_sha256=hashes())
     assert validate_report_policy(metadata) == REPORT_SCHEMA
-    assert validate_report_policy(checkpoint_report) == 1
+    assert validate_report_policy(checkpoint_report) == REPORT_SCHEMA
+    assert validate_report_policy(historical_checkpoint_report) == 1
     for key, value in (('report_schema', 3), ('failed_coordinate_policy', 'unspecified')):
         changed = deepcopy(metadata)
         changed[key] = value
         with pytest.raises(ValueError, match='schema|policy'):
             validate_report_policy(changed)
-    changed = deepcopy(checkpoint_report)
+    changed = deepcopy(historical_checkpoint_report)
     changed.update(report_schema=REPORT_SCHEMA, failed_coordinate_policy=FAILED_COORDINATE_POLICY)
     with pytest.raises(ValueError, match='packing source'):
         validate_report_policy(changed)
@@ -336,11 +344,6 @@ def test_saved_current_failure_policy_accepts_only_the_declared_sentinel(checkpo
     from hybrid_joint_reference import load_case
     model = load_case(name)
     record = deepcopy(next(r for r in checkpoint_report['records'] if r['case'] == name and r['execution'] == execution))
-    # Synthetic schema input, not a new solve or a rewritten historical report.
-    record['coordinate'] = np.full(record['N'], np.nan).tolist()
-    xi = np.zeros_like(model.offsets)
-    xi[model.auxiliary_support] = np.nan
-    record['xi'] = xi.tolist()
     validate_terminal_variant(record, model, REPORT_SCHEMA)
     record['coordinate'][0] = 0.
     with pytest.raises(ValueError, match='failed message coordinate'):
