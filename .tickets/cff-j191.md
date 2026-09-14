@@ -1,6 +1,6 @@
 ---
 id: cff-j191
-status: in_progress
+status: closed
 deps: [cff-ffsg]
 links: []
 created: 2026-09-14T04:40:24Z
@@ -95,3 +95,7 @@ Evidence limits: ordinary backtracking/Newton fallback is implemented but was no
 Independent review complete at 336a2bf with no actionable findings. Reviewer reran the focused 82 tests (all passed in 1.46s), checked imports and D12 equations, and independently integrated local densities with 96-point Gaussian quadrature at held perturbed T2, coupled T3 and centered T3 coordinates. Moments, auxiliary targets, learning and both objectives agreed within 2.08e-15 scaled error, below unchanged arithmetic budgets. Conditioned K3 fixed-drive logistic products agreed within 2.23e-16; Gaussian entropy is correctly excluded. The original spec is byte-identical to 2ee434c and source hashes match; all 18 successful saved coordinates recertify, alongside four expected divergences, max 8 updates and worst certificate 5.274e-15. An independent larger finite-difference stencil corroborated local stopping sensitivities; no global bound or uniqueness claim is made.
 
 The disclosed extra -600 diagnostic remains excluded and distinguished from all 22 pre-specified records. Frozen valid cases did not need rejection/Newton fallback; branches were reviewed structurally without performance claims. Reviewer made no edits and finished all processes. Completed review was sent to the implementer, who remains paused. Supervisor now runs the single final short suite; candidate, float32/moderate iteration, storage and registered recovery qualification remain downstream.
+
+**2026-09-14T10:18:45Z**
+
+Final short-suite gate PASSED at 75ac1d2 (reference implementation 336a2bf): uv run python tools/dashboard.py --run-suite; 2537 passed, 41 deselected, 4 existing gym deprecation warnings in 3176.36s, exit 0. Log /tmp/cff-j191-short-suite.log; dashboard ~/agent-share/cffg-tests.html and tracked runtime history refreshed. Supervisor waited the full recorded 4020-second budget quietly before checking completion; no unchanged suite rerun. Independent review and the 82-pass focused result are recorded above. No reference numerical source changed during review or final gate. Closing J191: the independent reference, frozen specification, exact held-coordinate checks, local stopping sensitivity API and transparent provenance are complete. cff-y15d is now the next ready implementation; its candidate and cff-a3wz moderate/storage qualification remain unrun. Registered recovery remains untouched.
