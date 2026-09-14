@@ -99,3 +99,7 @@ The disclosed extra -600 diagnostic remains excluded and distinguished from all 
 **2026-09-14T10:18:45Z**
 
 Final short-suite gate PASSED at 75ac1d2 (reference implementation 336a2bf): uv run python tools/dashboard.py --run-suite; 2537 passed, 41 deselected, 4 existing gym deprecation warnings in 3176.36s, exit 0. Log /tmp/cff-j191-short-suite.log; dashboard ~/agent-share/cffg-tests.html and tracked runtime history refreshed. Supervisor waited the full recorded 4020-second budget quietly before checking completion; no unchanged suite rerun. Independent review and the 82-pass focused result are recorded above. No reference numerical source changed during review or final gate. Closing J191: the independent reference, frozen specification, exact held-coordinate checks, local stopping sensitivity API and transparent provenance are complete. cff-y15d is now the next ready implementation; its candidate and cff-a3wz moderate/storage qualification remain unrun. Registered recovery remains untouched.
+
+**2026-09-14T10:19:50Z**
+
+Published PR #144: https://github.com/engimatic-systems/cffg/pull/144, stacked on #143 (cff-ffsg-hybrid-kernels). Independent review, the 2537-pass final short suite, frozen reference results and the excluded diagnostic provenance are included. cff-y15d is the next ready bounded implementation; no candidate/moderate/recovery solve has run.
