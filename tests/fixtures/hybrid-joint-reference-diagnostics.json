@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "ticket": "cff-j191",
+  "checkpoint_spec": "hybrid-joint-reference-spec.json",
+  "scope": "held-coordinate diagnostics only, excluded from frozen solved checkpoint records",
+  "prospective_diagnostics": {
+    "tiny_active_source": {
+      "base": "coupled_t2, xi=0-start frozen reference result",
+      "change": "site_constant[0,1] = -600; left outgoing linear[1,0] += 0.01",
+      "execution": "evaluate only, no solve; assert source-incidence label mass is tiny and source conditional mean residual is visible"
+    },
+    "signed_cavity": {
+      "base": "coupled_t2 frozen reference result",
+      "change": "site_precision[0,0,0,0] = -0.01",
+      "execution": "held evaluate only; complete beliefs must remain proper without precision clamp"
+    },
+    "fixed_drive_inactive_source": {
+      "base": "fixed_drive specification",
+      "change": "source_log_site[1] = -inf",
+      "execution": "conditioned categorical algebra only; inactive xi and learning exactly zero"
+    }
+  },
+  "first_focused_run": {
+    "command": "uv run pytest -q tests/test_hybrid_joint_reference.py > /tmp/cff-j191-focused-1.log 2>&1",
+    "result": "44 passed, 1 failed in 1.23s",
+    "failure": "test_reference_imports_and_approximation_contract_stay_separate: TypeError from indexing reflected_mixture_gap tuple with string gap; test wiring only",
+    "pre_spec_deviation": {
+      "command_context": "test_tiny_active_mass_does_not_hide_conditional_residuals in first focused run",
+      "inputs": "copied coupled_t2; site_constant[0,1] changed from -0.4 to -600.0; default xi=0; declared 200-iteration solver; then source outgoing linear[1,0] += 0.01 for held evaluation",
+      "observed": "solve returned converged and hostile conditional-residual assertions passed; individual certificates/coordinate were not printed or retained by that run",
+      "qualification": "excluded from frozen checkpoint evidence; no retroactive qualification or rerun as a solved checkpoint"
+    }
+  },
+  "evidence": "22 records in hybrid-joint-reference-attempt-1.json use the original committed specification; no strategy/threshold/fixture changes to those records"
+}
