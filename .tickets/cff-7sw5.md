@@ -22,7 +22,7 @@ Serialized D12 ownership needs a reconstructible component plan. A whole-rSLDS t
 2. The plan is bounded and reconstructible from template plus data, includes hybrid/ordinary identity adapters, and leaves exactly one runtime array authority for beliefs and learned statistics.
 3. Compiler grouping, slot addressing, parameter packing, Arena/member_of, topology, specialized/registered lowering, resolution, and assembly agree. Renaming, factor reordering, extra Gaussian/categorical attachments, and a compatible non-rSLDS boundary factor preserve membership.
 4. Unsupported association cuts, duplicate entropy owners, malformed shapes, empty supported regions, and stale support declarations fail with named boundaries. No D9 or D10 fallback is selected.
-5. The Derived component coordinate, New IR field, and New factor or rule family handoff classifies scheduling/readout/ledger consumers for the execution ticket. Numerical host/JIT/single-vmap and checkpoint payload changes are N/A; executable identity is applicable.
+5. The Derived component coordinate, New IR field, and New factor or rule family handoff classifies scheduling/readout/ledger consumers for the execution ticket. Declaration identity is preserved in the compiled executable and a successful fixed-parameter, empty-learning public CFFGZ save/load round-trip reconstructs the declared plan. Numerical host/JIT/single-vmap and learning checkpoint payload changes are N/A; cff-czdq owns full learned-state bundle/resume qualification.
 6. Estimator inventory includes component arrays and linear-horizon/polynomial local storage. ARCHITECTURE records plan ownership, focused structural tests pass, and one final short-suite gate passes.
 
 ## Methodological Suggestions — HOW
@@ -54,3 +54,9 @@ cff-f3jz consumes plans; cff-czdq owns learning/checkpoint migration after execu
 - Moment / covariance: an expected feature or product, and its centered second moment.
 - Semantic identity: the versioned meaning of a declaration, executable, or persisted statistic.
 
+
+## Notes
+
+**2026-09-14T11:02:30Z**
+
+Declaration boundary handoff from independent k6g5 research: compiled identity transport and the successful fixed-parameter, empty-learning public CFFGZ save/load check are explicitly owned here. K6G5 can preserve codec/hash/scoped references and bundle blob rewriting but cannot demonstrate successful public loading while D12 compilation is intentionally rejected. save_bundle validates through load_bundle; _load_archive compiles the template without executing Engine inference. Sources bundle.py:181/288/336 and learn.py:666; confidence high. Full learned-state bundles/resume remain cff-czdq after F3JZ. This allocates the existing guarantee across dependencies without reducing scope or changing the early numerical gate.
