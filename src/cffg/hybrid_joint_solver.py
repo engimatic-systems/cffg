@@ -225,7 +225,8 @@ def iteration(coordinate, parameters, sites, state, budgets=Budgets()):
     reason = jnp.where(~linear_finite, _integer(Reason.INVALID_DERIVATIVE), reason)
     reason = jnp.where(~valid, _integer(Reason.INVALID_ACCEPTED), reason)
     return State(second.coordinate, second.evaluation, state.iterations + accepted.astype(jnp.int32),
-                 state.evaluations + added_evaluations, state.rejected_trials + jnp.sum(added_counts),
+                 state.evaluations + added_evaluations,
+                 state.rejected_trials + jnp.sum(added_counts, dtype=jnp.int32),
                  state.linear_iterations + linear_count, state.gauss_newton_steps + fallback_used.astype(jnp.int32),
                  jnp.where(accepted, difference, state.relative_energy_change), state.rejection_counts + added_counts,
                  second.last_rejection, status, reason)

@@ -117,3 +117,14 @@ def test_held_complete_gauss_newton_step_and_storage_interfaces():
     assert linear.residual.shape == (c.residual_size,)
     assert int(linear.iteration) <= 128
     assert set(storage.programs(c)) == {'residual', 'normal_product', 'linear_step', 'iteration', 'certification', 'solve'}
+
+
+def test_complete_loop_has_fixed_int32_status_and_counter_shapes():
+    c, p, s, _ = context('coupled_t2')
+    state = jax.eval_shape(lambda p, s: solver.solve(c, p, s), p, s)
+    for name in ('iterations', 'evaluations', 'rejected_trials', 'linear_iterations',
+                 'gauss_newton_steps', 'last_rejection', 'status', 'reason'):
+        value = getattr(state, name)
+        assert value.shape == () and value.dtype == jnp.int32
+    assert state.rejection_counts.shape == (len(solver.Rejection),)
+    assert state.rejection_counts.dtype == jnp.int32
