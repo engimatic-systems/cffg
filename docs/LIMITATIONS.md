@@ -347,7 +347,7 @@ to preserve small outgoing messages under strong cavities. Unsupported or
 unresolved compensated arithmetic fails explicitly. A conservative spectral
 interval can remain unresolved even when the exact matrix narrowly satisfies
 the existing resolution threshold. For 100 independent pair regions, K=20,
-d=10, float32 grouped normalization has about 1.53 GB of compiled temporary
+d=10, float32 grouped normalization has about 1.59 GB of compiled temporary
 storage on the measured CPU backend. This local inventory is not a 100-state
 chain, which has 99 transition regions; the complete iteration's memory and numerical
 qualification remain pending. D12.6 records the reproducible local inventory.

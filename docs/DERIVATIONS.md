@@ -3019,13 +3019,13 @@ measured CPU backend with x64 enabled and float32 data, both projections use
 output tuple), and 240,946,984 temporary bytes. The complete input belief tree
 also contains unused log-probability/normalizer arrays: 134,720,800 bytes total.
 Returning both projections and their quotient messages uses 136,497,200
-argument / 5,490,608 output / 276,441,064 temporary bytes; the complete
+argument / 5,490,608 output / 276,449,064 temporary bytes; the complete
 input region and cavity trees total 136,657,600 bytes.
 At the same local message-matrix shape, the compensated product uses
 1,600,000 argument / 800,000 output / 4,400,136 temporary bytes, and the
 corrected solve uses 2,400,000 / 800,000 / 14,820,648 bytes. Grouped
 normalization, including its precision and covariance remainders, uses
-134,560,400 / 134,720,864 / 1,527,083,368 bytes, and the
+134,560,400 / 134,720,864 / 1,591,083,368 bytes, and the
 grouped second-moment readout uses 134,560,000 / 64,000,000 / 0 bytes:
 the latter fuses its work into the output allocation. All six
 measurements have zero input/output alias bytes. Arrays are dynamic lowering
@@ -3036,7 +3036,9 @@ carries, Cholesky and refinement temporaries; array dimensions remain within
 measure the complete iterative buffers, which remain the cff-a3wz gate.
 The inverse repair raises normalization temporary storage from 131,200,984
 to 1,395,362,408 bytes at this inventory size; the represented spectral
-certificate raises it further to 1,527,083,368 bytes. Its two floating accumulator
+certificate raises it further to 1,527,083,368 bytes; stable JIT boundaries
+materialize another 64,000,000-byte matrix, for 1,591,083,368 total temporary
+bytes. Its two floating accumulator
 words alone have 128,000,000 logical bytes. This cost must be included in the
 candidate's actual iteration-storage checkpoint; polynomial dimensions alone
 do not establish an acceptable working-memory requirement.
