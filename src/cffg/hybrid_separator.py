@@ -124,6 +124,37 @@ class Auxiliary(NamedTuple):
     status: jax.Array
 
 
+def _conditional_at_risk(probability, mean, covariance):
+    """Stable suffix mixture moments, with O(K² d²) work and storage.
+
+    Merge centered covariances instead of subtracting two large raw second
+    moments. Each source/stick suffix includes within-pair covariance and
+    between-pair means, even when its affine logit mean cancels an offset.
+    """
+    initial = (jnp.zeros_like(probability[:, 0]), jnp.zeros_like(mean[:, 0]),
+               jnp.zeros_like(covariance[:, 0]))
+
+    def merge(previous, component):
+        exposure, old_mean, old_covariance = previous
+        p, m, s = component
+        total = exposure + p
+        denominator = jnp.where(total > 0, total, 1)
+        old_fraction, new_fraction = exposure / denominator, p / denominator
+        delta = m - old_mean
+        mixed_mean = old_mean + new_fraction[..., None] * delta
+        mixed_mean = jnp.where((exposure > 0)[..., None], mixed_mean, m)
+        mixed_covariance = old_fraction[..., None, None] * old_covariance
+        mixed_covariance += new_fraction[..., None, None] * s
+        mixed_covariance += ((old_fraction * new_fraction)[..., None, None]
+                             * delta[..., :, None] * delta[..., None, :])
+        result = (total, mixed_mean, mixed_covariance)
+        return result, result
+
+    _, suffixes = jax.lax.scan(merge, initial,
+                              tuple(x.swapaxes(0, 1) for x in (probability, mean, covariance)), reverse=True)
+    return tuple(x.swapaxes(0, 1)[:, :-1] for x in suffixes)
+
+
 def auxiliary_statistics(region, weights, offsets, xi):
     """D12.8 xi residual and D11.1 learning from the same pair belief.
 
@@ -150,14 +181,14 @@ def auxiliary_statistics(region, weights, offsets, xi):
     exposure = at_risk(p)
     accumulated = at_risk(p[..., None, None] * moments)
     active = exposure > 0
-    conditional = accumulated / jnp.where(active, exposure, 1)[..., None, None]
-    theta = jnp.concatenate((weights, offsets[..., None]), axis=-1)
-    raw_target = jnp.einsum("ila,ilab,ilb->il", theta, conditional, theta)
-    scale = jnp.einsum("ila,ilab,ilb->il", abs(theta), abs(conditional), abs(theta))
-    # Only dtype-sized contraction roundoff may make a squared logit negative.
+    _, conditional_mean, conditional_covariance = _conditional_at_risk(p, mean, source.covariance)
+    logit_mean = jnp.einsum("ild,ild->il", weights, conditional_mean) + offsets
+    logit_variance = jnp.einsum("ila,ilab,ilb->il", weights, conditional_covariance, weights)
+    scale = jnp.einsum("ila,ilab,ilb->il", abs(weights), abs(conditional_covariance), abs(weights))
+    # Only dtype-sized covariance-contraction roundoff may make variance negative.
     tolerance = 32 * (dim + 1) * jnp.finfo(p.dtype).eps * jnp.maximum(scale, 1)
-    valid = jnp.all(raw_target >= -tolerance) & jnp.all(xi >= 0)
-    target = jnp.where(active, jnp.maximum(raw_target, 0), 0)
+    valid = jnp.all(logit_variance >= -tolerance) & jnp.all(xi >= 0)
+    target = jnp.where(active, jnp.maximum(logit_variance, 0) + logit_mean ** 2, 0)
     residual = xi - target
     linear = first[:, :-1] - at_risk(first) / 2
     precision = pg_mean_xi(xi)[..., None, None] * accumulated

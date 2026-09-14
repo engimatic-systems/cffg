@@ -129,6 +129,45 @@ def test_inactive_auxiliaries_and_learning_are_zero_without_exposure_division():
     assert stale.target[1, 0] == 0
 
 
+@pytest.mark.parametrize("dtype,mean,variance", ((np.float32, 100, 1e-4), (np.float32, 10000, 1),
+                                               (np.float64, 10000, 1e-10), (np.float64, 1e8, 1)))
+def test_auxiliary_retains_variance_when_large_affine_mean_cancels(dtype, mean, variance):
+    probability = jnp.full((2, 2), 0.25, dtype)
+    means = jnp.zeros((2, 2, 2), dtype).at[..., 0].set(mean)
+    covariance = jnp.broadcast_to(jnp.eye(2, dtype=dtype), (2, 2, 2, 2)).at[..., 0, 0].set(variance)
+    region = hn.from_moments(probability, means, covariance)
+    weights, offsets, xi = jnp.ones((2, 1, 1), dtype), jnp.full((2, 1), -mean, dtype), jnp.zeros((2, 1), dtype)
+    budget = 64 * np.finfo(dtype).eps
+    for statistics in (hs.auxiliary_statistics, jax.jit(hs.auxiliary_statistics)):
+        result = statistics(region, weights, offsets, xi)
+        hn.raise_for_status(result.status)
+        np.testing.assert_allclose(result.target, variance, atol=0, rtol=budget)
+        np.testing.assert_allclose(result.residual, -variance, atol=0, rtol=budget)
+        assert np.all(result.target > 0)
+
+        def target(w):
+            return statistics(region, w, offsets, xi).target.sum()
+
+        # At a zero affine mean, only the variance contributes: dE[psi²]/dw=2wV.
+        derivative = jax.grad(target)(weights)
+        np.testing.assert_allclose(derivative, 2 * variance, atol=0, rtol=budget)
+
+
+@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+def test_at_risk_covariance_retains_small_variance_after_distant_label_is_excluded(dtype):
+    # Stick 1 excludes a distant destination; a single common centering point
+    # would still lose the small suffix covariance through subtraction.
+    probability = jnp.full((3, 3), 1 / 9, dtype)
+    source_mean = jnp.asarray([0, 10000, 10000], dtype)
+    means = jnp.zeros((3, 3, 2), dtype).at[..., 0].set(source_mean)
+    covariance = jnp.broadcast_to(jnp.eye(2, dtype=dtype), (3, 3, 2, 2))
+    region = hn.from_moments(probability, means, covariance)
+    result = jax.jit(hs.auxiliary_statistics)(region, jnp.ones((3, 2, 1), dtype),
+                                             jnp.full((3, 2), -10000, dtype), jnp.zeros((3, 2), dtype))
+    hn.raise_for_status(result.status)
+    np.testing.assert_allclose(result.target[:, 1], 1, atol=0, rtol=64 * np.finfo(dtype).eps)
+
+
 def test_nonfinite_objective_and_residual_never_report_success():
     factors, sites = build(case(3))
     outgoing = messages(sites)
