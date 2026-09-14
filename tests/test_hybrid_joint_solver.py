@@ -14,7 +14,10 @@ import pytest
 from cffg import hybrid_joint as joint, hybrid_joint_solver as solver
 from cffg.hybrid_joint_storage import arrays
 from hybrid_joint_candidate import context as make_context, held_coordinate
-from hybrid_joint_report import OUTPUT_GROUPS, arithmetic_tolerance, compare_outputs, validate_inventory, validate_saved_report
+from hybrid_joint_report import (
+    OUTPUT_GROUPS, REPORT_SCHEMA, FAILED_COORDINATE_POLICY, arithmetic_tolerance,
+    compare_outputs, validate_inventory, validate_report_policy, validate_saved_report, validate_terminal_variant,
+)
 
 context = lru_cache(maxsize=None)(make_context)
 
@@ -220,3 +223,124 @@ def test_energy_arithmetic_is_absolute_even_for_large_objectives():
     assert rtol == 0 and atol == 512 * 10 * np.finfo(np.float64).eps
     assert not arithmetic['energy']['passed']
     assert comparison['energy']['arithmetic_allowance'] == atol
+
+
+@pytest.mark.parametrize('mutation', [
+    'outer_nan_coordinate', 'outer_energy', 'outer_xi', 'outer_flag', 'outer_certificates', 'outer_sentinel',
+    'outer_fabricated_convergence', 'swapped_failures', 'failed_finite_message', 'failed_energy',
+    'failed_status', 'failed_auxiliary', 'missing_field',
+])
+def test_saved_terminal_variants_require_consistent_payloads(checkpoint_report, checkpoint_context, mutation):
+    report = deepcopy(checkpoint_report)
+    variants = {r['execution']: r for r in report['records'] if r['execution'] != 'jit'}
+    outer, negative, nonfinite = (variants[name] for name in ('outer_zero', 'negative_xi', 'nonfinite_site'))
+    if mutation == 'outer_nan_coordinate':
+        outer['coordinate'][0] = 'nan'
+    elif mutation == 'outer_energy':
+        outer['free_energy'] = 'nan'
+    elif mutation == 'outer_xi':
+        outer['xi'][0][0][0] = -1.
+    elif mutation == 'outer_flag':
+        outer['proper_active_beliefs'] = False
+    elif mutation == 'outer_certificates':
+        outer['certificates']['auxiliary'] = 0.
+    elif mutation == 'outer_sentinel':
+        outer['relative_energy_change'] = 0.
+    elif mutation == 'outer_fabricated_convergence':
+        baseline = report['records'][0]
+        identity = {'case', 'dtype', 'initial_xi', 'perturbation', 'execution', 'budgets', 'elapsed_seconds'}
+        outer.update({key: deepcopy(value) for key, value in baseline.items() if key not in identity})
+        outer.update(iterations=0, evaluations=2)
+    elif mutation == 'swapped_failures':
+        for key in ('coordinate', 'xi', 'certificates', 'relative_energy_change', 'free_energy', 'dual_energy',
+                    'proper_active_beliefs', 'inactive_xi', 'N', 'M', 'numerical_status'):
+            negative[key], nonfinite[key] = nonfinite[key], negative[key]
+    elif mutation == 'failed_finite_message':
+        negative['coordinate'][0] = 0.
+    elif mutation == 'failed_energy':
+        nonfinite['dual_energy'] = 0.
+    elif mutation == 'failed_status':
+        next(r for r in report['records'] if r['case'] == 'underflow_source_t2')['numerical_status'] = 39
+    elif mutation == 'failed_auxiliary':
+        negative['certificates']['auxiliary'] = 0.
+    else:
+        del nonfinite['free_energy']
+    with pytest.raises(ValueError, match='zero-budget|failed|proper-belief|saved xi|missing required'):
+        validate_saved_report(report, *checkpoint_context)
+
+
+@pytest.mark.parametrize('mutation', [
+    'outer_cap', 'boolean', 'negative', 'fractional', 'evaluation_accounting', 'linear_cap', 'fallback_cap',
+    'trial_cap', 'histogram_negative', 'histogram_accounting', 'zero_step', 'vmap_cap',
+])
+def test_saved_counters_obey_execution_budgets(checkpoint_report, checkpoint_context, mutation):
+    report = deepcopy(checkpoint_report)
+    record = next(r for r in report['records'] if r['case'] == 'coupled_t3')
+    if mutation == 'outer_cap':
+        record['iterations'] = 201
+    elif mutation == 'boolean':
+        record['iterations'] = True
+    elif mutation == 'negative':
+        record['evaluations'] = -1
+    elif mutation == 'fractional':
+        record['rejected_trials'] = .5
+    elif mutation == 'evaluation_accounting':
+        record['evaluations'] += 1
+    elif mutation == 'linear_cap':
+        record.update(gauss_newton_steps=1, linear_iterations=129, rejected_trials=24,
+                      evaluations=2 + record['iterations'] + 24)
+        record['rejection_counts']['numerical'] = 24
+    elif mutation == 'fallback_cap':
+        record['gauss_newton_steps'] = record['iterations'] + 1
+    elif mutation == 'trial_cap':
+        rejected = record['iterations'] * (record['budgets']['trials'] - 1) + 1
+        record.update(rejected_trials=rejected, evaluations=2 + record['iterations'] + rejected)
+        record['rejection_counts']['numerical'] = rejected
+    elif mutation == 'histogram_negative':
+        record['rejection_counts']['numerical'] = -1
+    elif mutation == 'histogram_accounting':
+        record['rejection_counts']['numerical'] = 1
+    elif mutation == 'zero_step':
+        record = next(r for r in report['records'] if r['execution'] == 'negative_xi')
+        record.update(iterations=1, evaluations=3)
+    else:
+        batch = next(r for r in report['records'] if r['execution'] == 'jit_vmap')
+        batch['members'][0]['iterations'] = 201
+    with pytest.raises(ValueError, match='counter|budget|histogram'):
+        validate_saved_report(report, *checkpoint_context)
+
+
+def test_saved_failure_policy_is_explicit_and_bound_to_packing_source(checkpoint_report):
+    from run_hybrid_joint_candidate import hashes
+    metadata = dict(report_schema=REPORT_SCHEMA, failed_coordinate_policy=FAILED_COORDINATE_POLICY,
+                    source_sha256=hashes())
+    assert validate_report_policy(metadata) == REPORT_SCHEMA
+    assert validate_report_policy(checkpoint_report) == 1
+    for key, value in (('report_schema', 3), ('failed_coordinate_policy', 'unspecified')):
+        changed = deepcopy(metadata)
+        changed[key] = value
+        with pytest.raises(ValueError, match='schema|policy'):
+            validate_report_policy(changed)
+    changed = deepcopy(checkpoint_report)
+    changed.update(report_schema=REPORT_SCHEMA, failed_coordinate_policy=FAILED_COORDINATE_POLICY)
+    with pytest.raises(ValueError, match='packing source'):
+        validate_report_policy(changed)
+
+
+@pytest.mark.parametrize('name,execution', [
+    ('coupled_t2', 'negative_xi'), ('coupled_t2', 'nonfinite_site'),
+    ('empty_source_t2', 'jit'), ('underflow_source_t2', 'jit'),
+])
+def test_saved_current_failure_policy_accepts_only_the_declared_sentinel(checkpoint_report, name, execution):
+    from hybrid_joint_reference import load_case
+    model = load_case(name)
+    record = deepcopy(next(r for r in checkpoint_report['records'] if r['case'] == name and r['execution'] == execution))
+    # Synthetic schema input, not a new solve or a rewritten historical report.
+    record['coordinate'] = np.full(record['N'], np.nan).tolist()
+    xi = np.zeros_like(model.offsets)
+    xi[model.auxiliary_support] = np.nan
+    record['xi'] = xi.tolist()
+    validate_terminal_variant(record, model, REPORT_SCHEMA)
+    record['coordinate'][0] = 0.
+    with pytest.raises(ValueError, match='failed message coordinate'):
+        validate_terminal_variant(record, model, REPORT_SCHEMA)

@@ -23,7 +23,7 @@ from cffg import hybrid_joint_storage as storage
 from hybrid_joint_candidate import context, held_coordinate, output_arrays, to_reference
 from hybrid_joint_reference import evaluate as independent_evaluate
 from hybrid_joint_solver_reference import Coordinate as ReferenceCoordinate, output_arrays as independent_arrays
-from hybrid_joint_report import compare_outputs
+from hybrid_joint_report import REPORT_SCHEMA, FAILED_COORDINATE_POLICY, compare_outputs
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / 'tests/fixtures/hybrid-joint-candidate-spec.json'
@@ -128,6 +128,7 @@ def run(output):
     spec = json.loads(SPEC.read_text())
     references = {(r['case'], r['initial_xi']): r for r in json.loads(REFERENCE.read_text())['records']}
     report = dict(spec_sha256=hashlib.sha256(SPEC.read_bytes()).hexdigest(), source_sha256=hashes(),
+                  report_schema=REPORT_SCHEMA, failed_coordinate_policy=FAILED_COORDINATE_POLICY,
                   git_head=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
                   versions=dict(jax=jax.__version__, numpy=np.__version__),
                   compilation_cache=os.environ.get('JAX_COMPILATION_CACHE_DIR'),

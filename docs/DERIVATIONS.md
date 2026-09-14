@@ -3169,6 +3169,18 @@ parity summaries are descriptive. Energy arithmetic uses only
 that absolute contribution to the inherited stopping allowance. Exact host
 starts, positional vmap members and status variants are checked, with saved
 parity recomputed against the corresponding single-JIT state.
+Nonconverged records also require complete, consistent state fields. The
+zero-budget coordinate, certificates and energies are checked against an
+independent one-sweep initializer; unresolved certificates retain the initial
+positive-infinity energy-change sentinel. Integer counters obey the frozen
+outer, trial and linear caps, with evaluations equal to initialization plus
+final certification plus accepted and rejected trials.
+Report schema 2 declares `all_nan_after_invalid_message` and binds it to the
+packing source hash. Historical schema 1 retains active starting xi after
+failed messages; its source identity and payload are checked separately.
+The new all-NaN coordinate can legitimately make negative-xi and nonfinite-site
+failure outputs identical. Their declared inputs and status expectations remain
+distinct; no numerical difference is inferred between identical sentinels.
 `hybrid-joint-candidate-results-002.json` records all 36 valid float64
 fixture/start combinations at source `3b1f023` converging within six accepted updates, with a
 largest maximum certificate of `2.679e-11`. All inherited arithmetic and
