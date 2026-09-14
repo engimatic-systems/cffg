@@ -888,6 +888,10 @@ retain the same source origin and expose explicit physical-coordinate readouts.
 `hybrid_affine.py` supplies compensated same-dtype affine evaluation for
 non-binary coefficients; construction, auxiliary targets and owned energy use
 the same stored-input arithmetic, including with float32 and x64 disabled.
+Compensated affine and covariance kernels use stable JIT boundaries so repeated
+host calls reuse their compiled accumulation loops. Their custom mathematical
+derivatives remain outside those primal compilation boundaries; array values
+remain dynamic, and dtype, shape and batching still select compiled variants.
 Origins are metadata, excluded from message coefficient arrays and stationary
 unknowns. Materialized grouped copies remain within local polynomial storage.
 Already-expanded coefficients keep their stored meaning and cannot recover

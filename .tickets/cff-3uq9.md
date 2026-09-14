@@ -81,3 +81,7 @@ Legend: prerequisite --> dependent; tk records remain authoritative.
 [ ] k6g5 (independently ready) ------> [ ] 7sw5
 
 No registered recovery fit or candidate optimizer ran during this work.
+
+**2026-09-14T15:11:52Z**
+
+The final six stable kernel JIT boundaries passed all 35 tests in test_hybrid_affine.py and test_hybrid_precision.py in 483.94 seconds, with no disk compilation cache configured for this focused run. Command: CFFG_TEST_TIMINGS=/tmp/cff-3uq9-numerical-focused-timings.jsonl uv run pytest -q tests/test_hybrid_affine.py tests/test_hybrid_precision.py --durations=12 -x. Log: /tmp/cff-3uq9-numerical-focused.log. These preserve translated non-binary arithmetic, exact-input precision and derivative references, represented spectral boundaries, repeated eigenvalues, dense condition controls, sparse/status failures, and actual x64-disabled subprocess execution. The full suite budget remains unqualified pending the complete timed run.

@@ -22,6 +22,7 @@ def symmetric(matrix):
     return jnp.where(indices[:, None] <= indices[None, :], matrix, matrix.swapaxes(-1, -2))
 
 
+@jax.jit
 def resolved(base, correction):
     """Certify the original spectral resolution of a represented matrix.
 
@@ -86,6 +87,7 @@ def resolved(base, correction):
 
 
 @jax.custom_jvp
+@jax.jit
 def product(left, right, *offsets):
     """Compensated matrix product plus separately supplied matrix offsets."""
     shape = jnp.broadcast_shapes(left.shape[:-2], right.shape[:-2])
@@ -145,6 +147,7 @@ def _refined_solve(base, correction, rhs):
     return jnp.where(accepted[..., None, None], value, jnp.nan)
 
 
+@jax.jit
 def solve(base, correction, rhs):
     """Solve the represented covariance with one compensated refinement.
 
@@ -162,6 +165,7 @@ def solve(base, correction, rhs):
 
 
 @jax.custom_jvp
+@jax.jit
 def inverse(base, correction):
     """Retain inverse rounding information before a strong-cavity quotient.
 
@@ -195,6 +199,7 @@ def _inverse_jvp(primals, tangents):
 
 
 @jax.custom_jvp
+@jax.jit
 def logdet(base, correction):
     """logdet(base+correction), preserving the small logdet correction."""
     chol = jnp.linalg.cholesky(base)
