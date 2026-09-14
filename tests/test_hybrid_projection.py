@@ -543,7 +543,7 @@ def test_second_moment_readout_retains_forward_reverse_and_second_derivatives(dt
 
 
 def compiled_inventory(time=100, card=20, dim=10):
-    """Reproducible lowered allocation inventory, separate from iterative storage."""
+    """Lowered local allocation; time counts independent pair regions, not states."""
     shape = lambda s: jax.ShapeDtypeStruct(s, jnp.float32)
     region = hn.Belief(shape((time, card, card)), shape((time, card, card, 2*dim)),
                        shape((time, card, card, 2*dim, 2*dim)), shape((time, card, card)),

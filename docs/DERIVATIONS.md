@@ -2980,7 +2980,7 @@ words and retain their strict subnormal-word failure checks. The
 covariance guard includes the rounded `C_hi+C_lo` readout before adding that
 outer product, so a finite low word cannot bypass the second-moment check.
 
-For T slices, a grouped evaluation costs `O(T K² d³)` and stores
+For T pair regions, a grouped evaluation costs `O(T K² d³)` and stores
 `O(T K² d²)` region blocks plus `O(T K d²)` separators/messages and
 `O(T K²)` auxiliaries. Recurrence prefixes avoid a K³ stick tensor. The
 alternating representation uses `K²` d-dimensional and K 2d-dimensional
@@ -3010,7 +3010,10 @@ accumulator. The compiler may fuse these arrays into their consumer;
 logical sizes are not additional heap allocations.
 
 `uv run python tests/test_hybrid_projection.py` prints a reproducible JSON
-inventory from JAX lowering, without running a solver or recovery fit. On the
+inventory from JAX lowering, without running a solver or recovery fit. Here
+`T` and the inventory function's `time=100` count independent pair regions;
+a 100-state chain has 99 transition regions. These local dimensions do not
+describe the complete solver's horizon or memory. On the
 measured CPU backend with x64 enabled and float32 data, both projections use
 134,560,400 compiled argument bytes, 3,553,728 output bytes (including the
 output tuple), and 240,946,984 temporary bytes. The complete input belief tree
