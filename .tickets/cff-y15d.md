@@ -101,3 +101,7 @@ Prospective candidate specification: tests/fixtures/hybrid-joint-candidate-spec.
 **2026-09-14T10:27:20Z**
 
 Prospective specification clarification before any candidate solve or held derivative execution: candidate tiny solved comparisons use float64 only, matching the independent propagated stopping allowances. The separately named float32 held diagnostic uses its executed dtype for inherited arithmetic and derivative budgets and makes no solved-coordinate allowance claim. Serialized arithmetic fields now explicitly carry 512*4*eps(dtype) and 512*max(4,5*T)*eps(dtype); no numerical threshold changed.
+
+**2026-09-14T10:33:43Z**
+
+Before candidate solves, strengthen the declared held-coordinate derivative gate with the qualified cancellation fixture test_hybrid_affine.case(float32,10000,1e-4,[6.7],-67000): fixed source origins, xi=0, right message precision identity so aggregates are proper. Check the complete residual JVP/transpose and assert a nonzero projected covariance correction. This is a held diagnostic, not an additional solve or checkpoint result; existing derivative/arithmetic tolerances stay unchanged.

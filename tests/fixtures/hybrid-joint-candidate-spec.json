@@ -102,7 +102,8 @@
       "centered_t3 at xi=0",
       "source_masked_t2 at xi=0",
       "variance_forward repaired covariance",
-      "coupled_t2 float32 at xi=0"
+      "coupled_t2 float32 at xi=0",
+      "retained_covariance_t2: existing test_hybrid_affine.case(float32,10000,1e-4,[6.7],-67000), fixed source origins, xi=0, held right message precision=identity; complete residual JVP/transpose and nonzero derived covariance correction"
     ],
     "perturbation": "for diagnostic held coordinates only: 0.01*sin(arange(packed_size)+1); xi perturbation kept nonnegative",
     "checks": [
