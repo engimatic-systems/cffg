@@ -173,10 +173,13 @@ def test_float32_projection_counterexample_with_x64_disabled():
         import jax
         jax.config.update('jax_enable_x64', False)
         import numpy as np
-        from test_hybrid_projection import stored_case, both_messages, assert_messages, assert_solve_underflow, assert_second_moment_boundary
+        from test_hybrid_projection import (
+            stored_case, both_messages, assert_messages, assert_solve_underflow,
+            assert_second_moment_boundary, assert_small_mean_readout)
         import hybrid_projection_reference as ref
         assert_solve_underflow(np.float32)
         assert_second_moment_boundary(np.float32)
+        assert_small_mean_readout(np.float32)
         region, left, right = stored_case(np.float32)
         expected = ref.scalar_precision(region.probability, region.displacement[..., :1], region.covariance[..., :1, :1], left.precision)
         for evaluate in (both_messages, jax.jit(both_messages)):
@@ -467,6 +470,51 @@ def test_second_moment_guard_uses_represented_covariance_at_overflow_boundary(dt
     assert_second_moment_boundary(dtype)
 
 
+def assert_small_mean_readout(dtype):
+    from fractions import Fraction
+    from cffg.hybrid_affine import rounded_product
+
+    small = dtype(1e-16 if dtype == np.float32 else 1e-150)
+    tiny_mean = dtype(1e-20 if dtype == np.float32 else 1e-160)
+    rounded = dtype(small * small)
+    remainder = Fraction(float(small)) ** 2 - Fraction(float(rounded))
+    assert rounded >= np.finfo(dtype).tiny
+    assert 0 < abs(remainder) < Fraction(float(np.finfo(dtype).tiny))
+    point = jnp.asarray([small], dtype)
+    for product in (rounded_product, jax.jit(rounded_product)):
+        np.testing.assert_array_equal(product(point, point), [rounded])
+    for product in (hc.product, jax.jit(hc.product)):
+        assert np.isnan(product(point[:, None], point[None, :])).all()
+
+    def moments(mean):
+        belief = hn.from_centered_moments(jnp.ones((), dtype), mean, jnp.ones((1, 1), dtype),
+                                          jnp.zeros(1, dtype))
+        return belief.status, belief.second
+    def normalized(mean):
+        belief = hn.normalize(hn.Natural(jnp.zeros((), dtype), mean, jnp.ones((1, 1), dtype)))
+        return belief.status, belief.second
+    values = jnp.asarray([[small], [tiny_mean], [0], [.125]], dtype)
+    expected = np.asarray([1, 1, 1, 1.015625], dtype).reshape(4, 1, 1)
+    for constructor in (moments, normalized):
+        for evaluate, batched in ((constructor, False), (jax.jit(constructor), False),
+                                  (jax.vmap(constructor), True), (jax.jit(jax.vmap(constructor)), True)):
+            status, second = (evaluate(values) if batched else
+                              stack([evaluate(value) for value in values]))
+            np.testing.assert_array_equal(status, np.zeros(4, np.int32))
+            np.testing.assert_array_equal(second, expected)
+        scalar = lambda m: constructor(m)[1].sum()
+        tangent = jax.jvp(scalar, (point,), (jnp.ones_like(point),))[1]
+        np.testing.assert_allclose(tangent, 2 * small, atol=0, rtol=16*np.finfo(dtype).eps)
+        for gradient in (jax.jacfwd(scalar), jax.jacrev(scalar), jax.jit(jax.grad(scalar))):
+            np.testing.assert_allclose(gradient(point), 2 * point, atol=0, rtol=16*np.finfo(dtype).eps)
+        np.testing.assert_allclose(jax.hessian(scalar)(point), [[2]], atol=0, rtol=16*np.finfo(dtype).eps)
+
+
+@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+def test_second_moment_does_not_require_an_unused_subnormal_remainder(dtype):
+    assert_small_mean_readout(dtype)
+
+
 @pytest.mark.parametrize("dtype", (np.float32, np.float64))
 def test_second_moment_readout_retains_forward_reverse_and_second_derivatives(dtype):
     covariance = jnp.eye(2, dtype=dtype)
@@ -529,8 +577,10 @@ def compiled_inventory(time=100, card=20, dim=10):
     result["retained_covariance_correction_bytes"] = 2 * time * card * dim * dim * 4
     result["matrix_accumulator_carry_bytes"] = 2 * time * card * dim * dim * 4
     result["product_high_and_low_bytes"] = 2 * time * card * dim * dim * 4
-    result["grouped_matrix_accumulator_carry_bytes"] = 2 * time * card * card * (2 * dim) ** 2 * 4
-    result["grouped_product_high_and_low_bytes"] = 2 * time * card * card * (2 * dim) ** 2 * 4
+    result["grouped_matrix_accumulator_carry_bytes"] = 0
+    result["grouped_rounded_product_bytes"] = time * card * card * (2 * dim) ** 2 * 4
+    result["grouped_product_remainder_bytes"] = 0
+    result["grouped_integer_significand_limb_bytes"] = 2 * time * card * card * (2 * dim) ** 2 * 4
     result["grouped_new_correction_bytes"] = result["message_new_correction_bytes"] = 0
     return result
 

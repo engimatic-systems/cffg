@@ -15,7 +15,7 @@ from typing import NamedTuple
 import jax
 import jax.numpy as jnp
 
-from cffg.hybrid_affine import affine
+from cffg.hybrid_affine import affine, rounded_product
 from cffg import hybrid_covariance as hc
 
 
@@ -140,7 +140,7 @@ class Belief(NamedTuple):
 
 def _second_moment(covariance, mean):
     """Share rounded intermediates between the readout and overflow guards."""
-    outer = hc.product(mean[..., :, None], mean[..., None, :])
+    outer = rounded_product(mean[..., :, None], mean[..., None, :])
     return covariance + outer
 
 

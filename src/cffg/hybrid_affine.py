@@ -57,7 +57,7 @@ def _two_sum(left, right):
     return total, error
 
 
-def _two_product(left, right):
+def _product_words(left, right):
     """Round an exact two-limb significand product and retain its remainder.
 
     Floating multiply/subtract expansions can contract after HLO optimization
@@ -105,13 +105,39 @@ def _two_product(left, right):
     error = jnp.ldexp(remainder.astype(left.dtype), power)
     product = jnp.where((a_sign ^ b_sign) != 0, -product, product)
     error = jnp.where((a_sign ^ b_sign) != 0, -error, error)
+    return product, error, rounded == 0, remainder == 0
+
+
+def _two_product(left, right):
+    """Require both product words for compensated arithmetic."""
+    info = jnp.finfo(left.dtype)
+    product, error, zero_product, zero_error = _product_words(left, right)
     # Subnormal scaling can double-round or flush a word; fail rather than
     # claim an error-free product when the dtype cannot retain its two words.
-    normal_product = (rounded == 0) | (abs(product) >= info.tiny)
-    normal_error = (remainder == 0) | (abs(error) >= info.tiny)
+    normal_product = zero_product | (abs(product) >= info.tiny)
+    normal_error = zero_error | (abs(error) >= info.tiny)
     valid = jnp.isfinite(left) & jnp.isfinite(right) & jnp.isfinite(product) & jnp.isfinite(error)
     valid &= normal_product & normal_error
     return jnp.where(valid, product, jnp.nan), jnp.where(valid, error, jnp.nan)
+
+
+@jax.custom_jvp
+def rounded_product(left, right):
+    """Round the product before later addition, without requiring its remainder.
+
+    Integer significands prevent contraction with a later addition. This
+    ordinary readout needs only the high word; subnormal outputs keep the
+    backend scaling behavior, and overflow remains nonfinite.
+    """
+    product, _, _, _ = _product_words(left, right)
+    return jnp.where(jnp.isfinite(left) & jnp.isfinite(right), product, left * right)
+
+
+@rounded_product.defjvp
+def _rounded_product_jvp(primals, tangents):
+    left, right = primals
+    dl, dr = tangents
+    return rounded_product(left, right), dl * right + left * dr
 
 
 @jax.custom_jvp

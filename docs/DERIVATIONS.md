@@ -2897,7 +2897,11 @@ readout. No message coefficient is clamped and the existing arithmetic budget
 The physical second-moment readout and both moment-constructor guards share
 the same rounded outer product. Its integer-significand evaluation prevents
 backend multiplication/addition contraction from concealing an overflow;
-the existing compensated-product support and derivative rules apply. The
+only the rounded product is required, so an unused subnormal remainder does
+not invalidate this ordinary readout. Subnormal rounded outputs keep the
+backend scaling behavior; the derivative is the ordinary product derivative.
+Compensated covariance, quotient and affine arithmetic still require both
+words and retain their strict subnormal-word failure checks. The
 covariance guard includes the rounded `C_hi+C_lo` readout before adding that
 outer product, so a finite low word cannot bypass the second-moment check.
 
@@ -2922,10 +2926,11 @@ product's two accumulator words occupy 1,600,000 logical bytes; its product
 and product-remainder words occupy another 1,600,000 logical bytes. These
 are matrix-sized local workspaces, with allocator reuse; they are not amounts
 to add again to measured temporary allocation.
-At the full grouped `T*K*K*(2d)*(2d)` shape, the analogous two-word carry
-and product/remainder pair each contain 128,000,000 logical bytes. The
-compiler may fuse these arrays into their consumer; logical sizes are not
-additional heap allocations.
+At the full grouped `T*K*K*(2d)*(2d)` shape, the rounded outer product
+contains one 64,000,000-byte floating word and two integer significand limbs
+totaling 128,000,000 logical bytes. It needs no floating remainder or matrix
+accumulator. The compiler may fuse these arrays into their consumer;
+logical sizes are not additional heap allocations.
 
 `uv run python tests/test_hybrid_projection.py` prints a reproducible JSON
 inventory from JAX lowering, without running a solver or recovery fit. On the
