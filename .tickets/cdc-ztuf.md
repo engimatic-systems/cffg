@@ -219,3 +219,39 @@ Independent scoped re-review is complete at8a9c9a0ed5fe824de6e6af2ab4f6c5315a3ae
 Evidence: author final focused101passed/2deselected/2strict expected failures42.05s, instrumentation7passed0.268s. Reviewer lightweight99passed/6deselected12.74s; refreshed-hash coordinate-history and impossible-alias corruptions reject from valid controls. One native-float32 exponential call checked19boundary values:8normal cases accepted,11underflow cases rejected; x64false, explicit-x64error. No optimizer or complete-program compile was used. Zero accepted updates preserve endpoints, one accepted update must move, multiple updates may share endpoints. Signed low words are valid without requiring the correction itself to be positive definite. Source/spec/descriptors and historical runtime/measurement/checkpoint artifacts are unchanged.
 
 Original author's bounded harness repairs are now reviewed. cdc-ztuf remains in_progress and blocked on cdh-urn0 plus cdh-m75a; known numerical and independent model-point/absolute-energy gaps are not waived. Root will notify the original author of the completed review, then use a fresh sequential numerical implementer for cdh-urn0 and subsequently a fresh independent-reference implementer for cdh-m75a. The combined reviewed source receives one newly required immutable tiny checkpoint and one final short-suite gate before ticket closure/publication. No moderate solve/storage execution or registered recovery fit has run.
+
+**2026-09-15T01:13:10Z**
+
+Prospective immutable tiny checkpoint 004 is authorized after the completed combined reviews at clean bb7bfe38e418d64f8daeff5a873b20d4b1374510. Reviewed changes include harness 7add5e5, report repairs af90a89/8a9c9a0, compensated-centering core b7647fb, independent model/coordinate/absolute-energy anchor 6011fc7, tiny-validator/local-summary repairs b59f77b and residual sign guard a2947910. This is the existing source-evidence gate for cdc-ztuf/cdh-urn0/cdh-m75a; no new numerical or harness algorithm is planned. All three tickets stay in_progress pending root artifact review and the shared final suite.
+
+The runner requires tests/test_hybrid_joint_coordinate.py to pass first. Current ticket evidence contains an earlier selected coordinate/status subset before the core repair, but no complete current-source coordinate-file result. Run exactly once now: env JAX_COMPILATION_CACHE_DIR=/tmp/cffg-y15d-resume-cache uv run pytest -q tests/test_hybrid_joint_coordinate.py --junitxml=/tmp/cdc-ztuf-attempt004-coordinate.xml, retaining /tmp/cdc-ztuf-attempt004-coordinate.log. Any failure is preserved and returned to root before optimizer execution. Record/commit its pass before starting 004; do not repeat unchanged broad, held or native status suites.
+
+After that prerequisite, execute env JAX_COMPILATION_CACHE_DIR=/tmp/cffg-y15d-resume-cache uv run python tests/run_hybrid_joint_candidate.py --output tests/fixtures/hybrid-joint-candidate-results-004.json through the inspected /tmp/cff-ztuf-monitor-004.py. The monitor supplies the same absolute output path, retains /tmp/cff-y15d-candidate-004.log and -observations.jsonl, and saves -resource-stop.json only on a diagnostic stop. Its stdout goes to /tmp/cff-ztuf-monitor-004.log. All these paths were confirmed absent. Reused temporary compilation cache is disclosed; first acquisition/execution times and subsequent synchronized calls are distinct. Sample maximum individual descendant RSS every15 seconds; stop the owned process group at47 GiB or an active call around590 seconds. These existing limits approach the ten-minute/48-GiB diagnostic boundary. Sampled memory is not true peak, summed process-tree memory or iteration allocation. Never silently retry or change limits after a failure.
+
+The unchanged schema2 policy is all_nan_after_invalid_message. The exact46 top-level inventory requires36 valid JIT starts,4 expected JIT divergences,2 host starts,1 vmap record with2 members, and3 special variants:40 converged outputs,6 expected divergences and1 zero-budget exhaustion. Xi=0/1 and frozen zero/perturbed initializations, outer200/trials24/linear128/backtrack0.5/Armijo0.0001, all equations/thresholds/absolute-only energy and propagated allowances stay unchanged. Independent19-group output/shape checks, complete certificates, counters/rejection identities and host/JIT/single/vmap parity remain mandatory. Prior001 compilation failure and002/003 historical successes remain immutable and are never relabeled as current-source results.
+
+Architecture rows remain Derived component coordinate and Runtime numerical or status invariant. This task only refreshes source-bound evidence and its test/documentation pointer. Host/JIT and single/vmap, initial/terminal and historical/current report surfaces are checked. Compiler/schedule/lifecycle/public-model/serialization edits are N/A. Exact sparse support, underflow, invalid metadata and float32 complete derivatives remain in the inherited coordinate prerequisite; optimizer execution here stays tiny float64. Moderate numerical/storage qualification, execution binding and all registered recovery fits remain downstream. No moderate spec or descriptor change is authorized; the reviewed1026-leaf descriptor and unexecuted moderate spec retain their existing hashes.
+
+Source and historical SHA256 freeze (also /tmp/cdc-ztuf-attempt004-freeze.json):
+
+source_sha256:
+src/cffg/hybrid_joint.py: d39dced160c0890964007d3e0004cf84833c35cd0527592efc9b8644b7c819c6
+src/cffg/hybrid_joint_solver.py: 903c2313a84958cb33be813e064f4005213b23da9021f9451b39278b43b91068
+src/cffg/hybrid_joint_storage.py: 250e00e859f9b51352d54dda7fa9f977be1d5b066995502ac9334fa32d4cd44d
+tests/hybrid_joint_candidate.py: 3396d873f45616bc5bdee02eafc5b1b0f150a052167e0bbca40fd46600f4d109
+tests/run_hybrid_joint_candidate.py: a8631a87bccd652906447433b257bbafed92cfe8c233f7fdaba0a3b2d12db202
+tests/hybrid_joint_report.py: 8e13cce705256a5d8d520911323cab3e21dbb5b5642e30b9727bab0ebacdfa92
+src/cffg/hybrid_affine.py: b8715258bc777a2a7ea5df4f310e819c5eccec280a7d93bb833b74682f8728f3
+src/cffg/hybrid_covariance.py: 3928b64c2135ce8a126bc2f53528c85220367d4436c327e7919649215f5634cb
+src/cffg/hybrid_gfe.py: 74130457fa789e308b0f3561dd06dcab69f6d87976c8c00b71e34bfda2ce3814
+src/cffg/hybrid_learning.py: 710e601d79b6df00a90d026a56a37b38dc337856a1fb4cbe734e1286df8a1258
+src/cffg/hybrid_natural.py: 655f1262828eba6cfe49facaa9efc653af326928752e90e925ec33e5a9d114c2
+src/cffg/hybrid_separator.py: d505843591de764be241a82f010dc1711e1ec3ffd5204012dd65a03eb278b99c
+
+historical_sha256:
+tests/fixtures/hybrid-joint-candidate-spec.json: 20f0dfab78d7f59f895239ccc95cc4a4bc66b5ba1aa94ed8c12ce0608d82f2db
+tests/fixtures/hybrid-joint-candidate-results-001.json: 488f26fa20d3cea369334d4b26ac3f5c341905b029cf6165aca4aae8003c8666
+tests/fixtures/hybrid-joint-candidate-results-002.json: 01841f8ae1751a934d702941e561858e3a2daa8fc547fdb9ce79f53f833aedc4
+tests/fixtures/hybrid-joint-candidate-results-003.json: 3cfa37ede07bba2a872c7938f66c208207a2f9a7059d758e92685ecb9bc75bee
+
+After full success, use the inspected /tmp/cff-y15d-summarize-004.py to independently validate saved coordinates/outputs/statuses and compute new metrics. Update only current checkpoint pointer, relevant canonical docs and TK; preserve all SOURCE files and historical artifacts. Run affected lightweight saved/source/corruption checks, commit evidence/tests/docs/TK cleanly and pause. Root owns final artifact review, capped short suite, closure and PR. No full suite, runtime-history edit, publication, external message, reviewer spawn or qualification run occurs in this worker task.
