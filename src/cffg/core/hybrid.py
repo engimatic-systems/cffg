@@ -165,6 +165,58 @@ def hybrid_problems(t: Template) -> list[str]:
     return problems
 
 
+def _scope_consistency_problems(separators, regions):
+    """D12.2 pairs R/H/D scopes and preserves each shared physical coordinate.
+
+    A coordinate's induced region graph must connect all separators carrying
+    it. Connectivity through a scope that drops the coordinate cannot enforce
+    its consistency. Ordinary exterior graphs are outside this check.
+    """
+    problems = []
+    recurrence_outputs = {}
+    dynamics_inputs = {}
+    coordinate_neighbors = {}
+    for name, coordinates in separators.items():
+        for coordinate in coordinates:
+            coordinate_neighbors.setdefault(coordinate, {})[name] = set()
+    for region in regions:
+        if region.kind == "recurrence":
+            recurrence_outputs.setdefault(region.ports[1], []).append(region.name)
+        elif region.kind == "dynamics":
+            dynamics_inputs.setdefault(region.ports[0], []).append(region.name)
+        if len(region.ports) == 2:
+            left, right = region.ports
+            shared = set(separators[left]) & set(separators[right])
+            for coordinate in shared:
+                neighbors = coordinate_neighbors[coordinate]
+                neighbors[left].add(right)
+                neighbors[right].add(left)
+    for middle in recurrence_outputs.keys() | dynamics_inputs.keys():
+        recurrences = recurrence_outputs.get(middle, [])
+        dynamics = dynamics_inputs.get(middle, [])
+        if len(recurrences) != 1 or len(dynamics) != 1:
+            problems.append(
+                f"separator {middle!r}: destination-selected R/H/D construction "
+                "requires exactly one recurrence output and one dynamics input; "
+                f"got recurrence regions {recurrences!r}, dynamics regions {dynamics!r}"
+            )
+    for coordinate, neighbors in coordinate_neighbors.items():
+        remaining = set(neighbors)
+        pending = [next(iter(remaining))]
+        while pending:
+            name = pending.pop()
+            if name not in remaining:
+                continue
+            remaining.remove(name)
+            pending.extend(neighbors[name] & remaining)
+        if remaining:
+            problems.append(
+                f"coordinate {coordinate!r}: separators {sorted(remaining)!r} "
+                "have no consistency route through regions carrying that coordinate"
+            )
+    return problems
+
+
 def _component_problems(t, spec):
     problems = []
     if not spec.separators or not spec.regions:
@@ -190,6 +242,7 @@ def _component_problems(t, spec):
                 parent[root(variable)] = root(variables[0])
 
     separators = {}
+    separator_domains = {}
     support_by_regime = {}
     for s in spec.separators:
         if not isinstance(s.regime, str) or not isinstance(s.state, str):
@@ -211,6 +264,7 @@ def _component_problems(t, spec):
             problems.append(f"separator {s.name!r}: shared regime has inconsistent fixed active support")
         support_by_regime[zr] = frozenset(support)
         separators[s.name] = (zr, xr)
+        separator_domains[s.name] = (z.cardinality, x.dim)
     if len(separators) != len(spec.separators):
         return problems, set()
     if len(set(separators.values())) != len(separators):
@@ -224,6 +278,7 @@ def _component_problems(t, spec):
             problems.append(f"equality {name!r}: lies outside declared hybrid scopes")
 
     incidence = {name: [] for name in separators}
+    scope_regions = []
     for region in spec.regions:
         factor = t.factors.get(region.factor)
         if factor is None:
@@ -258,14 +313,17 @@ def _component_problems(t, spec):
             }.get(factor.type)
         if expected is None:
             problems.append(f"region {region.name!r}: unsupported {region.kind!r} scope/type {factor.type!r}")
-        elif expected != edges:
-            problems.append(f"region {region.name!r}: factor incidence differs from declared {region.kind} ports; source/pair-selected channels are unsupported")
-        domains = {(t.variables[s.regime].cardinality, t.variables[s.state].dim) for s in spec.separators if s.name in region.ports}
+        else:
+            scope_regions.append(region)
+            if expected != edges:
+                problems.append(f"region {region.name!r}: factor incidence differs from declared {region.kind} ports; source/pair-selected channels are unsupported")
+        domains = {separator_domains[port] for port in region.ports}
         if len(domains) > 1:
             problems.append(f"region {region.name!r}: separator regime counts and state dimensions must agree")
     for name, uses in incidence.items():
         if not uses:
             problems.append(f"separator {name!r}: has no factor region")
+    problems.extend(_scope_consistency_problems(separators, scope_regions))
 
     adapters_by_variable = {}
     for a in spec.adapters:

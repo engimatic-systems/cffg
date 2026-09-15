@@ -1076,7 +1076,12 @@ active-label support, named `HybridSeparatorSpec` boundaries, ordered
 `HybridRegionSpec` ports and factor owners, named `HybridAdapterSpec` ordinary
 copies, and owned equality wiring. Recurrence ports are `(Y, H)` and affine
 channel ports are `(H, next Y)`; core validation checks these scopes against
-factor roles and explicitly owned equality incidence. Unary regions own
+factor roles and explicitly owned equality incidence. Each H pairs exactly
+one recurrence output with one dynamics input. The induced region graph for
+each equality-identified physical coordinate connects every separator carrying
+that coordinate; a route through a scope that drops it cannot establish
+consistency. These checks use declared region/coordinate incidence, independent
+of separator names and ordinary exterior connectivity. Unary regions own
 categorical, Gaussian, or regime-selected Gaussian site energy. Adapters own
 zero energy and the reduced entropy from D12.5; separator corrections replace
 the old singleton edge corrections. Factor names and model classes never

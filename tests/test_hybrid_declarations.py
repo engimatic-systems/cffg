@@ -190,6 +190,108 @@ def test_source_selected_channel_nonlinear_scope_and_constraints_reject_by_name(
         assert any("association" in problem for problem in check_edits(t, [AddConstraint(ConstraintSpec(kind, "r"))]))
 
 
+def assert_rejected_template_and_document(t, message):
+    from cffg.core.hybrid import component_to_dict
+
+    document_template = copy.deepcopy(t)
+    document_template.hybrid_components.clear()
+    document = to_dict(document_template)
+    document["hybrid_components"] = {
+        name: component_to_dict(spec) for name, spec in t.hybrid_components.items()
+    }
+    # The underlying FFG remains well formed; only its declared D12 scopes fail.
+    validate(document_template)
+    with pytest.raises(ModelError, match=message):
+        validate(t)
+    with pytest.raises(ValueError, match=message):
+        from_json(json.dumps(document))
+
+
+def test_source_selected_dynamics_cannot_relabel_both_factor_and_ports():
+    t = declared()
+    spec = t.hybrid_components["association"]
+    t.variables.update({name: VariableSpec(name, cardinality=3) for name in ("z0d", "z0p")})
+    t.factors["source_copies"] = FactorSpec("source_copies", "equality", {"a": "z0", "b": "z0d", "c": "z0p"})
+    t.factors["pz"] = replace(t.factors["pz"], edges={"out": "z0p"})
+    t.factors["d"] = replace(t.factors["d"], edges={**t.factors["d"].edges, "selector": "z0d"})
+    t.ports["next_label"] = PortSpec("next_label", "z1", PortRole.GLUE)
+    update(
+        t,
+        separators=(*spec.separators[:2], replace(spec.separators[2], regime="z0d")),
+        regions=(spec.regions[0], replace(spec.regions[1], ports=("left", "right")), *spec.regions[2:]),
+        adapters=(*spec.adapters, HybridAdapterSpec("next_label", "middle", "z1")),
+        equalities=(*spec.equalities, "source_copies"),
+    )
+    assert_rejected_template_and_document(t, "association.*destination-selected R/H/D")
+
+
+def test_detached_unary_cannot_repeat_coordinates_without_consistency():
+    t = declared()
+    spec = t.hybrid_components["association"]
+    t.factors["observe"] = FactorSpec("observe", "gaussian", {"out": "y"}, param_blobs={"mean": "m", "cov": "V"})
+    del t.variables["observation"]
+    del t.ports["sensor"]
+    update(
+        t,
+        separators=(*spec.separators, HybridSeparatorSpec("detached_site", "z0", "y", (0, 2))),
+        regions=(*spec.regions, HybridRegionSpec("detached_energy", "unary", "observe", ("detached_site",))),
+        adapters=(),
+    )
+    assert_rejected_template_and_document(t, "association.*coordinate.*no consistency route")
+
+
+def test_connected_region_graph_cannot_drop_and_reintroduce_a_coordinate():
+    t = declared()
+    spec = t.hybrid_components["association"]
+    del t.factors["observe"]
+    del t.variables["observation"]
+    del t.ports["sensor"]
+    t.variables.update({name: VariableSpec(name, cardinality=3) for name in ("z1d", "z1r", "z2")})
+    t.variables.update({name: VariableSpec(name, dim=2) for name in ("xbranch", "xreturn", "yr", "yd")})
+    t.factors["eq"] = replace(t.factors["eq"], edges={"a": "xr", "b": "xd", "c": "xbranch"})
+    t.factors["d"] = replace(t.factors["d"], edges={**t.factors["d"].edges, "selector": "z1d"})
+    for name, edges in (
+        ("x_copies", ("xbranch", "xp", "xreturn")),
+        ("y_copies", ("y", "yr", "yd")),
+        ("z1_copies", ("z1", "z1d", "z1r")),
+    ):
+        t.factors[name] = FactorSpec(name, "equality", dict(zip(("a", "b", "c"), edges, strict=True)))
+    t.factors["r2"] = replace(t.factors["r"], name="r2", edges={"in": "z1r", "out": "z2", "drive": "yr"})
+    t.factors["d2"] = replace(t.factors["d"], name="d2", edges={"in": "yd", "out": "xreturn", "selector": "z2"})
+    update(
+        t,
+        separators=(
+            *spec.separators,
+            HybridSeparatorSpec("middle2", "z2", "yd", (0, 2)),
+            HybridSeparatorSpec("right2", "z2", "xreturn", (0, 2)),
+        ),
+        regions=(
+            *spec.regions,
+            HybridRegionSpec("switch2", "recurrence", "r2", ("right", "middle2")),
+            HybridRegionSpec("channel2", "dynamics", "d2", ("middle2", "right2")),
+        ),
+        adapters=(),
+        equalities=(*spec.equalities, "x_copies", "y_copies", "z1_copies"),
+    )
+    # The complete region graph is a connected R/D/R/D chain. Its final state
+    # is wired back to the initial state, absent from the intervening scopes.
+    assert_rejected_template_and_document(t, "association.*coordinate.*no consistency route")
+    # Restoring a distinct final state makes the same two-transition chain
+    # valid, including an ordinary exterior port on that state.
+    del t.factors["x_copies"]
+    del t.variables["xbranch"]
+    t.factors["eq"] = replace(t.factors["eq"], edges={"a": "xr", "b": "xd", "c": "xp"})
+    t.ports["final_state"] = PortSpec("final_state", "xreturn", PortRole.GLUE)
+    current = t.hybrid_components["association"]
+    update(
+        t,
+        equalities=tuple(name for name in current.equalities if name != "x_copies"),
+        adapters=(HybridAdapterSpec("final_state", "right2", "xreturn"),),
+    )
+    validate(t)
+    assert to_json(from_json(to_json(t))) == to_json(t)
+
+
 def test_transactional_edits_preserve_or_reject_references():
     t = declared()
     original = to_json(t)

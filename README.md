@@ -709,7 +709,11 @@ file does not inspect parameter arrays.
 Separator references identify graph edges and their explicitly owned equality
 copies. Region port order matters. Recurrence uses `(left, middle)`, dynamics
 uses `(middle, right)`, and unary regions have one separator. Each original
-factor has one owner. An adapter explicitly connects a hybrid separator to one
+factor has one owner. Each recurrence output pairs with one dynamics input
+at the same intermediate separator, so the channel selects the destination
+regime. Every physical coordinate shared by multiple separators must have a
+consistency route through regions that carry that coordinate throughout.
+An adapter explicitly connects a hybrid separator to one
 ordinary categorical or Gaussian copy, including an exposed composition port.
 Ordinary categorical and linear-Gaussian attachments can be scoped, merged,
 and bonded; these operations preserve and revalidate every declaration.
