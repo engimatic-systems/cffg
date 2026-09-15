@@ -12,8 +12,9 @@ from dataclasses import dataclass
 from typing import Literal
 
 from cffg._immutable import ImmutableRecord
-from cffg.array_requirements import ArrayRequirement
+from cffg.array_requirements import ArrayRecipe, ArrayRequirement, ParameterRuntime
 from cffg.compiled_hybrid import HybridComponentPlan
+from cffg.core.ir import FACTOR_TYPES
 from cffg.specialized.contracts import HybridComponentDraft
 
 
@@ -177,6 +178,39 @@ class IncidenceContract(ImmutableRecord):
         return self.message_size + sum(a.size for a in self.auxiliaries)
 
 
+def _parameter_problem(region, requirement):
+    """Check structural role authority and the draft's own address intentions.
+
+    Drafts retain region kind and array recipe, not the original factor type.
+    Registered unary inputs therefore admit either unary role signature. No
+    shape callback, numerical transform or address construction runs here.
+    """
+    families = {
+        ("recurrence", ArrayRecipe.RECURRENCE): ("recurrence_link",),
+        ("dynamics", ArrayRecipe.MIXTURE): ("gaussian_mixture_linear",),
+        ("unary", ArrayRecipe.MIXTURE): ("gaussian_mixture",),
+        ("unary", ArrayRecipe.REGISTERED): ("categorical", "gaussian"),
+    }.get((region.kind, requirement.recipe), ())
+    signatures = tuple(frozenset(FACTOR_TYPES[name].param_roles) for name in families)
+    roles = {source.role for source in requirement.inputs}
+    if roles not in signatures:
+        return f"source roles {sorted(roles)!r} disagree with required factor signatures {[sorted(s) for s in signatures]!r}"
+    member, = requirement.members
+    if set(member.runtime) != roles:
+        return "source roles and member runtime roles disagree"
+    if not all(isinstance(value, ParameterRuntime) and isinstance(value.key, str) and value.key
+               for value in member.runtime.values()):
+        return "member runtime requires named parameter keys"
+    if not all(destination.kind == "parameter" and isinstance(destination.name, str) and destination.name
+               for destination in requirement.destinations):
+        return "factor inputs require named parameter-only destinations"
+    keys = tuple(value.key for value in member.runtime.values())
+    destinations = tuple(destination.name for destination in requirement.destinations)
+    if len(set(keys)) != len(keys) or set(keys) != set(destinations):
+        return "member runtime keys must match parameter destinations one-to-one"
+    return None
+
+
 def from_draft(draft: HybridComponentDraft) -> IncidenceContract:
     """Describe a reviewed draft without resolving arrays or invoking callbacks.
 
@@ -203,6 +237,7 @@ def from_draft(draft: HybridComponentDraft) -> IncidenceContract:
     if (len(draft.objectives) != len(expected)
             or {(o.name, o.kind, o.factor) for o in draft.objectives} != expected):
         fail("objective ownership disagrees with declaration")
+    declared_factors = {region.factor: region for region in plan.declaration.regions}
     parameters, parameter_owners, destinations = {}, set(), set()
     for requirement in draft.arrays:
         if not isinstance(requirement, ArrayRequirement) or len(requirement.members) != 1:
@@ -219,11 +254,15 @@ def from_draft(draft: HybridComponentDraft) -> IncidenceContract:
         if (requirement.owner in parameter_owners or len(set(roles)) != len(roles)
                 or len(set(keys)) != len(keys) or destinations.intersection(keys)):
             fail(f"parameter member {member.member!r} has duplicate owner/source/destination intentions")
+        problem = _parameter_problem(declared_factors[member.member], requirement)
+        if problem is not None:
+            fail(f"factor {member.member!r}: {problem}")
         parameter_owners.add(requirement.owner)
         destinations.update(keys)
         parameters[member.member] = requirement
     if set(parameters) != set(plan.parameter_members):
-        fail("parameter inputs do not cover every declared factor")
+        missing = sorted(set(plan.parameter_members) - parameters.keys())
+        fail(f"parameter inputs do not cover every declared factor: missing {missing!r}")
 
     specs = {s.name: s for s in plan.declaration.separators}
     separators = {s.name: s for s in plan.separators}

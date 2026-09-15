@@ -308,3 +308,51 @@ def test_metadata_never_resolves_calls_shapes_or_runs_numerics(monkeypatch):
         value.regions[0].parameters.members[0].runtime["new"] = None
     with pytest.raises(FrozenInstanceError):
         boundary.dtype = "float64"
+
+
+@pytest.mark.parametrize("factor", ["r", "d", "pz", "px", "hsite"])
+@pytest.mark.parametrize("defect", [
+    "empty_sources", "partial_sources", "partial_runtime", "matching_omission",
+    "empty_destinations", "partial_destinations", "payload_destination", "undeclared_key",
+])
+def test_complete_parameter_roles_and_addresses_are_required(factor, defect):
+    _, _, drafts = stages(intermediate_unary())
+    draft, = drafts.hybrid_components
+    requirement, = [a for a in draft.arrays if a.members[0].member == factor]
+    member, = requirement.members
+    first = requirement.inputs[0]
+    if defect == "empty_sources":
+        broken = replace(requirement, inputs=())
+    elif defect == "partial_sources":
+        broken = replace(requirement, inputs=requirement.inputs[1:])
+    elif defect in ("partial_runtime", "matching_omission"):
+        runtime = {role: value for role, value in member.runtime.items() if role != first.role}
+        broken = replace(requirement, members=(replace(member, runtime=runtime),))
+        if defect == "matching_omission":
+            broken = replace(broken, inputs=requirement.inputs[1:])
+    elif defect == "empty_destinations":
+        broken = replace(requirement, destinations=())
+    elif defect == "partial_destinations":
+        broken = replace(requirement, destinations=requirement.destinations[1:])
+    elif defect == "payload_destination":
+        broken = replace(requirement, destinations=(replace(requirement.destinations[0], kind="payload"), *requirement.destinations[1:]))
+    else:
+        runtime = {**member.runtime, first.role: replace(member.runtime[first.role], key="undeclared")}
+        broken = replace(requirement, members=(replace(member, runtime=runtime),))
+    arrays = tuple(broken if a is requirement else a for a in draft.arrays)
+    with pytest.raises(ValueError, match=f"hybrid component 'association': factor '{factor}':"):
+        from_draft(replace(draft, arrays=arrays))
+
+
+@pytest.mark.parametrize("factor", ["r", "d", "px", "hsite"])
+def test_two_runtime_roles_cannot_alias_one_parameter_destination(factor):
+    _, _, drafts = stages(intermediate_unary())
+    draft, = drafts.hybrid_components
+    requirement, = [a for a in draft.arrays if a.members[0].member == factor]
+    member, = requirement.members
+    first_key = next(iter(member.runtime.values())).key
+    runtime = {role: replace(value, key=first_key) for role, value in member.runtime.items()}
+    broken = replace(requirement, members=(replace(member, runtime=runtime),))
+    arrays = tuple(broken if a is requirement else a for a in draft.arrays)
+    with pytest.raises(ValueError, match=f"association.*factor '{factor}'.*one-to-one"):
+        from_draft(replace(draft, arrays=arrays))

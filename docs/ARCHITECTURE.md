@@ -1150,7 +1150,10 @@ sizes. The branching fixture is admitted graph structure; any later mapping to
 the qualified numerical interface must preserve or explicitly address it.
 
 `incidence_contract.from_draft` consumes these reviewed drafts into a separate,
-immutable unbound contract. Ordered region ports and adapter hybrid ports each
+immutable unbound contract. It checks complete source-role coverage against core
+factor signatures and requires matching member runtime roles and one-to-one
+parameter destinations, preserving the draft's existing address conventions.
+Ordered region ports and adapter hybrid ports each
 own one directed outgoing message. Active constants omit only the first active
 label's common gauge; linear coefficients and the upper precision triangle
 retain every active label's original identity. Fixed per-label origins are
