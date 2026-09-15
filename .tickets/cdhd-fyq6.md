@@ -64,3 +64,11 @@ Final focused validation after the source edit:
 - git diff --check passed; tk dep cycle reports no dependency cycles.
 
 Handoff: implementation is ready for an atomic cdhd-fyq6 commit and a clean pause. Root owns independent review, one combined final short-suite run after all relevant edits under the unchanged 1200-second cap, ticket closure and publication. This ticket remains in_progress pending that gate. No full suite, array loading, numerical program, qualification program or recovery fit was run by this worker; all three recovery fits remain unused. Downstream numerical source/layout generalization remains separate work.
+
+**2026-09-15T07:36:02Z**
+
+Root independently reviewed committed repair 72a8878fd8d8b714c7863a1e09dfbb8bd09699e2 after the fresh author's clean pause. Accepted with no findings. The only behavior change is the metadata constructor's minimum cardinality from two to one, matching existing declaration admission. Actual core-to-draft unary coverage preserves support, ownership, adapters and unresolved parameter intentions. Positive integral dimensions/cardinalities and exact nonempty, unique, in-range support remain required. Numerical layout restrictions, public compiler/bundle/runtime guards and qualified sources are unchanged.
+
+Root independently ran uv run pytest -q tests/test_hybrid_discovery.py tests/test_hybrid_plans.py -k 'one_label or separator_sizes': 16 passed, 63 deselected in 0.14s; log /tmp/cdhd-fyq6-root-review.log. git diff --check and tk dep cycle passed. Base-relative changed-path audit found no numerical hybrid source, frozen qualification source/specification or measurement changes. Prior 12/17/32 source-name/hash audit remains applicable because this repair changes only compiled_hybrid.py and metadata tests.
+
+Root notifies the author after this completed review and will run the one combined final short suite for cdpf-gzix and cdhd-fyq6 under the unchanged 1200-second cap. Neither ticket closes until that gate passes. No recovery fit has run; all three remain reserved. General graph-incidence numerical qualification is explicitly downstream work, not established by this metadata repair.
