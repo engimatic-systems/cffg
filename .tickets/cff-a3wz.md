@@ -1,6 +1,6 @@
 ---
 id: cff-a3wz
-status: in_progress
+status: closed
 deps: [cff-ffsg, cff-ocxl, cff-b0s3, cff-ej67, cff-y15d, cdc-ztuf, cdh-urn0]
 links: []
 created: 2026-09-14T02:43:33Z
@@ -224,3 +224,30 @@ Storage outcome: the separate abstract child matched all 1,026 declared leaves a
 Cost and exact call accounting: each horizon lowered and compiled its initializer once and its explicit-coordinate complete solve once, retained all four objects, then made six distinct authorized calls to each. Totals are 12 initializer calls and 12 solve calls. Storage made ten lowers and ten compiles with zero executable calls; the separate abstract inventory and preflight made zero complete-program calls. No warmup or timing repeat was added. Initializer compilation took 53.85/52.30 seconds; complete-solve compilation 195.57/191.45 seconds; synchronized authorized solves 0.110-0.138/0.221-0.272 seconds, with exports timed separately. Both solve StableHLO inventories reported 145,990 f32 value-type occurrences; this is not an IR byte-size measurement. Lowered IR bytes are unavailable. The raw backend generated-code byte field is zero, which supplies no meaningful executable-size measurement. Persistent and XLA auxiliary caches were disabled. Historical PR147 uses a full-solve entry including initialization and different arguments, so differences cannot be attributed solely to source repairs. The two moderate horizons establish no scaling result for registered T6400/train5120. No registered dataset, recovery fit, fit warmup or restart was touched. These moderate cases also add no fallback execution or changing-parameter callable-reuse evidence.
 
 Validation and handoff: the reviewed validate_report independently rechecked both complete saved reports; the reviewed NumPy evaluate adapter was used only for fixed-coordinate arithmetic summaries, with no optimizer calls. Canonical ARCHITECTURE, DERIVATIONS and LIMITATIONS now state the measured boundary. Final artifact checks verify every archived file, source/spec hashes, summary field identities, tk dep cycle and git diff --check. This is evidence/documentation/ticket-only work; accepted focused tests and the unchanged 2,832-pass short suite are reused, with no new full-suite claim. Root explicitly owns independent artifact review, closure and publication. After that review, compiler activation, parameter-update reuse and registered recovery remain owned by the named downstream tickets. The author remains available for review feedback.
+
+**2026-09-15T04:15:27Z**
+
+Independent supervisor artifact review accepted at author commit ad98537c110b3bbb4017b49b10f15f8180dcc4a9; no findings. Review began only after the author committed and paused. Root notified the author after completion; no author repair was needed.
+
+Root read and hashed every one of the 101 archived files, extracted a separate review copy, and revalidated both saved phases from that copy. The audit independently checked all 24 initial/terminal model-point energies, all twelve statuses/certificates/work records, all 30 initialization comparisons, the ten compile-only records and cap comparisons, all three logical inventories and nineteen output-group mappings, and the twelve numerical/storage process records. All summary claims matched the raw evidence. All 32 numerical/harness source hashes match the frozen executed revision 298790bf857753d4a9393015b299e9e90ca1ac84, current source, and the previously passing short-suite code revision 144fb21466894bfd91d2040ff2d5e1d003cc82e9. The specification, raw archive and numerical payloads are unchanged. Review commands/results live in /tmp/cff-a3wz-root-audit.py, /tmp/cff-a3wz-root-audit.log and /tmp/cff-a3wz-root-audit.json; the archived evidence remains reproducible through the committed runner validate command.
+
+Decision: A3WZ passes its bounded pre-integration numerical and storage checkpoint. All required tiny/host/JIT/vmap and hostile-input evidence is inherited from the accepted source-matched prerequisites; the current moderate run supplies the missing native float32 convergence, independent initial/terminal arithmetic, initialization sensitivity and actual enclosing-program allocation evidence. No change to D12 mathematics, supported scope, approximation, acceptance thresholds or registered recovery gate is needed. This is evidence/documentation/ticket-only work, so the existing 2,832-pass final code gate (1,126.534 seconds under the 1,200-second cap) is reused; no new full-suite run is claimed. Root's artifact checks, git diff --check and tk dep cycle passed.
+
+Handoff: close this prerequisite and publish the stacked evidence PR on PR149. The next fresh sequential author takes ready K6G5 declarations; compiler integration remains blocked on that ticket. The current D9 path still avoids unselected D12 compilation. The two moderate horizons do not establish registered long-horizon scaling, changing-parameter reuse, universal convergence or recovery. All three registered recovery fits remain unused. The separate affine-input audit cdh-kvy5 is nonblocking.
+
+Dependency companion from tk dep tree --full cff-zov5, tk ready and tk blocked; TK records remain authoritative and include additional direct prerequisites. Legend: prerequisite --> dependent; joined inputs are all required.
+
+[x] kernels/reference/solver/harness --> [x] A3WZ numerical checkpoint --+
+[x] OCXL ---------------------------> [ ] K6G5 (ready; next author) ---+--> [ ] 7SW5
+                                                                         |
+                                                                    [ ] IDHK --> [ ] BRCF
+                                                                                       |
+                                                                                    [ ] F3JZ
+                                                                                     /     \
+                                                                               [ ] CZDQ   [ ] ULBZ
+                                                                                     \     /
+                                                                                    [ ] KUL2
+                                                                                       |
+                                                                                    [ ] X0IF --> [ ] ZOV5
+
+K6G5 was structurally parallel to the checkpoint, but implementation remains sequential as Cooper requested. 7SW5 is immediately blocked by K6G5; downstream execution, learning and public composition remain required before X0IF's registered fits. A3WZ closure is not a recovery claim.

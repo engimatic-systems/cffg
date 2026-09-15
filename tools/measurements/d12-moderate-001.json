@@ -4,7 +4,7 @@
   "attempt": "001",
   "qualification": {
     "frozen_numerical_and_storage_gates": "passed",
-    "independent_artifact_review": "pending",
+    "independent_artifact_review": "passed",
     "production_integration": "not performed",
     "registered_recovery_fits": 0
   },
