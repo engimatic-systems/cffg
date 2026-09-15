@@ -14,6 +14,7 @@ from cffg._immutable import ImmutableRecord, freeze
 from cffg.compiled import EdgeInfo
 from cffg.core.ir import (
     ConstraintSpec,
+    HybridComponentSpec,
     PortRole,
     PortSpec,
     Template,
@@ -56,6 +57,7 @@ class TopologyLayout(ImmutableRecord):
     snapshot never acquires those tags or observation-row assignments.
     """
 
+    hybrid_components: Mapping[str, HybridComponentSpec]
     variables: Mapping[str, VariableSpec]
     factors: Mapping[str, FactorDeclaration]
     constraints: tuple[ConstraintSpec, ...]
@@ -156,7 +158,10 @@ def build_topology(template: Template) -> TopologyLayout:
         elif not edge.ef:
             message_lengths.extend((edge.card, edge.card))
 
+    from cffg.core.hybrid import map_component
+
     return TopologyLayout(
+        hybrid_components={name: map_component(c) for name, c in template.hybrid_components.items()},
         variables=template.variables, factors=factors, constraints=constraints,
         ports=template.ports, endpoints=endpoints, degrees=degrees,
         ports_by_variable=ports_by_variable, edges=edges, slot_of=slot_of,

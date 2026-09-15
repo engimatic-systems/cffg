@@ -85,6 +85,11 @@ def _plate_from_dict(d: dict[str, Any]) -> PlateSpec:
 
 
 def to_dict(t: Template) -> dict[str, Any]:
+    from cffg.core.hybrid import component_to_dict, hybrid_problems
+
+    problems = hybrid_problems(t)
+    if problems:
+        raise ValueError("\n".join(problems))
     conflicts = p_substitution_conflicts(t.constraints)
     if conflicts:
         raise ValueError(
@@ -126,6 +131,11 @@ def to_dict(t: Template) -> dict[str, Any]:
             for b in _sorted(t.blobs)
         },
     }
+    if t.hybrid_components:
+        d["hybrid_components"] = {
+            name: component_to_dict(t.hybrid_components[name])
+            for name in sorted(t.hybrid_components)
+        }
     # Additive: templates without plates serialize byte-identically to before.
     if t.plates:
         d["plates"] = {name: _plate_to_dict(t.plates[name]) for name in sorted(t.plates)}
@@ -194,7 +204,10 @@ def to_dict(t: Template) -> dict[str, Any]:
 
 def from_dict(d: dict[str, Any]) -> Template:
     from cffg.core.learning_identity import declaration_identity
+    from cffg.core.hybrid import component_from_dict, hybrid_problems
 
+    if not isinstance(d.get("hybrid_components", {}), dict):
+        raise ValueError("hybrid_components must be a named declaration mapping")
     learning_version = d.get("learning_schema_version")
     if learning_version not in (None, "1"):
         raise ValueError(f"unknown learning schema version {learning_version!r}")
@@ -203,7 +216,7 @@ def from_dict(d: dict[str, Any]) -> Template:
             f"schema version {d.get('schema_version')!r} != supported {SCHEMA_VERSION!r}"
         )
     _check_kernel_requirements(d)
-    return Template(
+    template = Template(
         name=d["name"],
         variables={
             name: VariableSpec(
@@ -274,7 +287,15 @@ def from_dict(d: dict[str, Any]) -> Template:
             else None
         ),
         schema_version=d["schema_version"],
+        hybrid_components={
+            name: component_from_dict(name, spec)
+            for name, spec in d.get("hybrid_components", {}).items()
+        },
     )
+    problems = hybrid_problems(template)
+    if problems:
+        raise ValueError("\n".join(problems))
+    return template
 
 
 def _check_kernel_requirements(d: dict[str, Any]) -> None:
@@ -353,9 +374,28 @@ def structure_hash(t: Template) -> str:
 def document_structure_hash(document: dict[str, Any]) -> str:
     """Hash the stored model before declaration migration, without changing it."""
     d = deepcopy(document)
+    _canonicalize_hybrid(d)
     _erase_blob_data(d)
     canonical = json.dumps(d, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def _canonicalize_hybrid(document: dict[str, Any]) -> None:
+    """Canonicalize D12 sets without migrating legacy learning declarations."""
+    from cffg.core.hybrid import component_from_dict, component_to_dict
+
+    declarations = document.get("hybrid_components", {})
+    if not isinstance(declarations, dict):
+        raise ValueError("hybrid_components must be a named declaration mapping")
+    if declarations:
+        document["hybrid_components"] = {
+            name: component_to_dict(component_from_dict(name, spec))
+            for name, spec in declarations.items()
+        }
+    else:
+        document.pop("hybrid_components", None)
+    for plate in document.get("plates", {}).values():
+        _canonicalize_hybrid(plate["fragment"])
 
 
 def _erase_blob_data(d: dict[str, Any]) -> None:
@@ -371,6 +411,8 @@ def legacy_learning_structure_hash(t: Template) -> str | None:
     from cffg.core.learning_identity import LEGACY_IDENTITIES
 
     def erase_identity(document):
+        if document.get("hybrid_components"):
+            return False
         for spec in document.get("learnables", {}).values():
             if spec["semantic_identity"] != LEGACY_IDENTITIES.get(spec["family"]):
                 return False

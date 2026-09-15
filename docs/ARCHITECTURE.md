@@ -124,7 +124,7 @@ and review context proportional to the change.
 
 | Ticket shape | Authority | Derived surfaces that must agree | Canonical focused tests | Durable documentation |
 | --- | --- | --- | --- | --- |
-| Derived component coordinate | Serialized explicit region/constraint semantics and approximation identity; D12 equations in `docs/DERIVATIONS.md` (production protocol pending) | New IR field validation/JSON/hash/scoping/edits/composition; topology and specialized/registered ownership; compiler grouping, slots, parameter packing, resolution, assembly, `Arena` and `member_of`; component/boundary indexes and schedule stages; synchronous and scheduled local/batch/scan execution; lifecycle and host/JIT support/status checks; ledger region/separator/adapter ownership; readouts and `Learnables.replace`; learnable/executable/checkpoint/CFFGZ semantic identity and legacy rejection/migration; estimator and public exports | `tests/test_hybrid_separator_derivation.py` mathematical oracle; affected IR/serialize/plates/edits/topology/resolution/assembly, kernel/ledger/runtime/schedule, learnable/readout/checkpoint/bundle tests from the rows below; public composition fixtures and host/JIT, synchronous/scheduled, single/vmap, current/legacy parity | D12 derivation and anchors; ownership here; construction/migration in README; approximation and unsupported compositions in LIMITATIONS |
+| Derived component coordinate | Serialized explicit region/constraint semantics and approximation identity; D12 equations in `docs/DERIVATIONS.md` (declarations available; production protocol pending) | New IR field validation/JSON/hash/scoping/edits/composition; topology and specialized/registered ownership; compiler grouping, slots, parameter packing, resolution, assembly, `Arena` and `member_of`; component/boundary indexes and schedule stages; synchronous and scheduled local/batch/scan execution; lifecycle and host/JIT support/status checks; ledger region/separator/adapter ownership; readouts and `Learnables.replace`; learnable/executable/checkpoint/CFFGZ semantic identity and legacy rejection/migration; estimator and public exports | `tests/test_hybrid_separator_derivation.py` mathematical oracle; affected IR/serialize/plates/edits/topology/resolution/assembly, kernel/ledger/runtime/schedule, learnable/readout/checkpoint/bundle tests from the rows below; public composition fixtures and host/JIT, synchronous/scheduled, single/vmap, current/legacy parity | D12 derivation and anchors; ownership here; construction/migration in README; approximation and unsupported compositions in LIMITATIONS |
 | New IR field | `src/cffg/core/ir.py` (`Template` or its spec dataclass) | `src/cffg/core/validate.py`; `src/cffg/core/serialize.py` (`to_dict`, `from_dict`, `structure_hash`); `src/cffg/core/plates.py` scoping; `src/cffg/core/compose.py` and `src/cffg/core/edits.py` when editable; `src/cffg/topology.py` declaration snapshots/layout, `src/cffg/specialized/` semantic claims/drafts, `src/cffg/registered/` same-arena drafts, `src/cffg/resolution/` arrays/addresses, `src/cffg/assembly.py` arena assembly, and `src/cffg/compiled.py` values when executable; bundle and agent state when persisted | `tests/test_ir.py`, `tests/test_serialize.py`, `tests/test_plates.py`, `tests/test_topology.py`, `tests/test_registered.py`, `tests/test_resolution.py`, `tests/test_assembly.py`; add `tests/test_edit_codec.py`, `tests/test_edits.py`, `tests/test_agent_spec.py`, or `tests/test_bundle.py` only for the affected boundary | Contract in this document; public construction and migration in `README.md`; unsupported cases in `LIMITATIONS.md` |
 | New factor or rule family | `src/cffg/kernels.py:FactorKernel`, `kernel_bindings.py`, its `src/cffg/core/ir.py:FactorType`, and the family rule module; formal equations are authoritative in code docstrings and `DERIVATIONS.md` | `topology.py` declared role/slot facts; `specialized/` named family discovery/completion; `registered/` binding capabilities and same-arena structural lowering; common declarations in `array_requirements.py`; `registered/packing.py` and `specialized/packing.py` family adapters; `resolution/` parameter/observation resolution; `assembly.py`, `Arena`, and `member_of`; typed local updates in `execution/` and `ExecutionDelta`; registered mathematics/readouts/energy in `kernel_runtime.py`; objective assembly in `ledger.py` and specialized local terms in `ledger_terms.py`; `execution/synchronous.py:make_sweep`; `execution/transport.py` and `schedule_program.py` batch/registerized/flat scans; `lifecycle.py` observation binding and `mu3_lifecycle.py` functional state; `ledger.make_belief_energy`; support checks, assignment scoring, `readouts/` posterior/statistic adapters, schedule classification, serialization manifest, estimator, and public exports as applicable | `tests/test_kernels.py`, `tests/test_execution.py`, `tests/test_registered.py`, `tests/test_resolution.py`, `tests/test_assembly.py`, `tests/test_discrete_kernels.py`, `tests/test_gaussian_kernels.py`, `tests/test_gaussian_kernel_schedules.py`; `tests/test_ledger.py`, `tests/test_readout_owners.py`; family rule and engine-oracle tests; `tests/test_schedule.py`, `tests/test_schedule_program.py`; sparse-support, float32, and uncomfortable-scale cases | Derivation in `DERIVATIONS.md`; integration contract here; approximations in `LIMITATIONS.md`; public modeling API in `README.md` |
 | Runtime numerical or status invariant | `AGENTS.md` numerical contract and `src/cffg/runtime_types.py` (state/result/status values) and `src/cffg/iteration.py` (ordinary policy), `exact_strategy.py` and `outer_strategy.py` (distinct run control), and `run_results.py` (public results), plus `ledger.py` and `ledger_terms.py` (objectives) and `readouts/` (posteriors/statistics) | Flooding, colored/mixed, and exact schedules; host `runtime_checks.StateChecks` and `schedule_program.make_support_check`; `execution.synchronous.make_sweep`, `ScheduleProgram`, `make_exact_unit`, `make_propagate`, and `ledger.make_belief_energy`; `StateLifecycle`/`Mu3Lifecycle` initialization, preparation and status forwarding; inner-solver status; `RollingAgent`, `Colony`, estimator, benchmark, and dashboard consumers | `tests/test_runtime_status.py`, `tests/test_schedule.py`, `tests/test_schedule_program.py`, `tests/test_engine_contracts.py`, `tests/test_lifecycle.py`, `tests/test_iteration.py`, `tests/test_ledger.py`, `tests/test_readout_owners.py`, `tests/test_run_strategies.py`, `tests/test_colony.py`, `tests/test_colony_failures.py`, `tests/test_constraint_data.py`, `tests/test_constraint_reconstruction.py`, plus the changed rule family's hostile-input tests | Runtime contract here and in `README.md`; any accepted failure mode or approximation in `LIMITATIONS.md` |
@@ -1067,8 +1067,42 @@ learning/readout/persistence semantics; cff-kul2 owns public composition and
 execution parity. cff-ulbz supplies the explicitly selected D11.14 EC binding
 where exterior mixture ports remain; internal affine switching dynamics uses
 D12.3's elimination and does not need a D3 port. Existing D3 collapse-first
-messages are not assumed stationary for EC. No production selection, API,
-learned-statistic meaning, or checkpoint version changed in this derivation.
+messages are not assumed stationary for EC. D12 production execution, learned-statistic meaning, and checkpoint versions
+remain pending.
+
+`Template.hybrid_components` is the serialized authority for D12 selection.
+Each immutable `HybridComponentSpec` declares `hybrid-regime-ec-v1`, fixed
+active-label support, named `HybridSeparatorSpec` boundaries, ordered
+`HybridRegionSpec` ports and factor owners, named `HybridAdapterSpec` ordinary
+copies, and owned equality wiring. Recurrence ports are `(Y, H)` and affine
+channel ports are `(H, next Y)`; core validation checks these scopes against
+factor roles and explicitly owned equality incidence. Unary regions own
+categorical, Gaussian, or regime-selected Gaussian site energy. Adapters own
+zero energy and the reduced entropy from D12.5; separator corrections replace
+the old singleton edge corrections. Factor names and model classes never
+activate the approximation. Shared regime copies must declare identical
+nonempty support, and overlapping factor/component owners are invalid.
+
+The JAX-free `core/hybrid.py` owns identity encoding, reference mapping and
+structural validation. It checks ordinary neighbors through equality wiring,
+rejecting association cuts and unsupported constraints by component/boundary
+name. JSON explicitly writes every field, canonicalizes unordered collections,
+and preserves ordered region ports. Absent declarations are omitted, retaining
+D9 documents and hashes; legacy learning migration never invents D12 meaning.
+Compact expansion, both scoping paths, supported flat composition and
+transactional edits preserve these references. Direct bonding validates a
+candidate before mutating its input. Topology snapshots copy immutable nested
+specs, and recursive bundle path rewriting carries the declaration unchanged.
+
+The compiler rejects declared components after expansion/validation and before
+topology or specialized discovery. Bundle save/load rejects them during
+preflight, before any destination replacement. Templates without declarations
+continue through their ordinary compilation path without D12 lowering.
+Declaration tests in `tests/test_hybrid_declarations.py` cover this boundary;
+resolved array shapes and support, specialized/registered ownership, resolution,
+assembly, executable identity and successful compiled bundles belong to the
+compiler-plan ticket. Runtime schedules, host/JIT, single/vmap, numerical dtype
+and scale, and learning resume are not implemented by these declarations.
 
 ### 2e. Executable factor registration (`cffg.kernels`)
 

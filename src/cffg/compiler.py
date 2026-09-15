@@ -119,6 +119,10 @@ def compile_template(
         raise CompileError(f"semiring must be 'sum' or 'max', got {semiring!r}")
     t = expand_plates(t)
     validate(t)
+    if t.hybrid_components:
+        from cffg.core.hybrid import require_no_hybrid
+
+        require_no_hybrid(t, CompileError)
     topology = build_topology(t)
     registry = snapshot_registry()
     claims = discover_specialized(t, topology, semiring, registry)

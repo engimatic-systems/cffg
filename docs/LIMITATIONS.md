@@ -326,7 +326,10 @@ explicit moment consistency and rejects it as a sufficient repair: separate
 source and drive boundaries lose association inferred by external switching
 factors even when the local JJ bound is exact. D12 now derives hybrid
 regime/state separators that repair that association loss, with production
-integration still pending in the bounded cff-ocxl follow-up tickets. D12 keeps
+integration still pending in the bounded cff-ocxl follow-up tickets.
+`Template.hybrid_components` can serialize and validate explicit D12 ownership,
+but production compilation and bundle publication reject it by declaration
+name. Undeclared templates retain D9 semantics and avoid D12 lowering. D12 keeps
 one conditional Gaussian per regime at a boundary; histories sharing that
 regime can remain multimodal. Its temporal reflected-mixture example has
 exact JJ factors and zero EC residual yet opposite exact learning biases that

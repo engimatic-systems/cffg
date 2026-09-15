@@ -10,6 +10,7 @@ report the complete damage, not the first symptom.
 from __future__ import annotations
 
 from cffg.core.constraint_details import p_substitution_conflicts
+from cffg.core.hybrid import hybrid_problems
 from cffg.core.ir import (
     EDGE_CONSTRAINTS,
     EF_EDGE_FAMILIES,
@@ -44,6 +45,7 @@ def validate(t: Template) -> None:
     problems += _check_plates(t)
     problems += _check_learnables(t)
     problems += _check_agent(t)
+    problems += hybrid_problems(t)
 
     if problems:
         raise ModelError(t.name, problems)

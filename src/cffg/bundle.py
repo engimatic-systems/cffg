@@ -132,6 +132,7 @@ def _rewrite_blob_paths(
         learnables=dict(template.learnables),
         agent=template.agent,
         schema_version=template.schema_version,
+        hybrid_components=dict(template.hybrid_components),
     )
 
 
@@ -198,6 +199,10 @@ def save_bundle(
         arrays = {name: np.asarray(value).copy() for name, value in arrays.items()}
         expanded = expand_plates(template)
         validate(expanded)
+        if expanded.hybrid_components:
+            from cffg.core.hybrid import require_no_hybrid
+
+            require_no_hybrid(expanded, BundleError)
         _point_arrays(expanded, arrays)
         validate_learning_declarations(expanded, arrays)
         if expanded.learnables and learnables is None:
@@ -348,6 +353,10 @@ def _load_archive(archive):
     try:
         expanded = expand_plates(template)
         validate(expanded)
+        if expanded.hybrid_components:
+            from cffg.core.hybrid import require_no_hybrid
+
+            require_no_hybrid(expanded, BundleError)
     except (ValueError, KeyError) as error:
         raise BundleError(f"invalid bundled plate structure: {error}") from error
     paths = manifest.get("blob_paths")

@@ -7,6 +7,11 @@ accelerator stack. JAX enters at the compiler boundary (cffg.compile).
 
 from cffg.core.ir import (
     FACTOR_TYPES,
+    HybridSeparatorSpec,
+    HybridRegionSpec,
+    HybridComponentSpec,
+    HybridAdapterSpec,
+    HYBRID_APPROXIMATION,
     AgentSpec,
     BeliefBinding,
     BlobRef,
@@ -31,6 +36,11 @@ from cffg.core.validate import ModelError, validate
 
 __all__ = [
     "FACTOR_TYPES",
+    "HybridSeparatorSpec",
+    "HybridRegionSpec",
+    "HybridComponentSpec",
+    "HybridAdapterSpec",
+    "HYBRID_APPROXIMATION",
     "AgentSpec",
     "BeliefBinding",
     "BlobRef",

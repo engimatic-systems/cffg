@@ -663,14 +663,67 @@ engine.marginals(state)["u1"]   # posteriors by variable name
 engine.bfe(state)               # model-declared BFE, GFE, approximation, or bound
 ```
 
-D12 derives a proposed hybrid regime/state approximation that preserves
-source-conditioned moments across declared regions. It is currently an
-experiment, with no public template selection or checkpoint format. Production
-continues to use D9. The proposed construction, ordinary boundary adapters,
-unsupported association cuts, and remaining temporal-mixture error are recorded
-in [D12](docs/DERIVATIONS.md#d12--hybrid-regimestate-separators-cff-ocxl).
-Implementation and persisted-state migration are tracked separately before
-source-recovery qualification.
+D12's `hybrid-regime-ec-v1` approximation preserves source-conditioned
+moments across explicitly declared regions. Templates can now describe this
+choice through `hybrid_components`. Production compilation and CFFGZ publication
+reject these declarations by name until the execution implementation is ready.
+Templates without declarations keep their existing D9 meaning and compilation
+path; they do not lower or compile a D12 solve.
+
+For an existing graph with recurrence factor `r`, destination-selected affine
+factor `d`, categorical prior `pz`, Gaussian prior `px`, and equality factor
+`eq` joining the state copies `xr`, `xd`, and `xp`, declare its ownership as:
+
+```python
+from cffg.core import (
+    HybridAdapterSpec, HybridComponentSpec, HybridRegionSpec,
+    HybridSeparatorSpec, validate,
+)
+
+template.hybrid_components["step"] = HybridComponentSpec(
+    "step",
+    separators=(
+        HybridSeparatorSpec("left", "z0", "xr", (0, 2)),
+        HybridSeparatorSpec("middle", "z1", "xd", (0, 2)),
+        HybridSeparatorSpec("right", "z1", "y", (0, 2)),
+    ),
+    regions=(
+        HybridRegionSpec("switch", "recurrence", "r", ("left", "middle")),
+        HybridRegionSpec("channel", "dynamics", "d", ("middle", "right")),
+        HybridRegionSpec("label_prior", "unary", "pz", ("left",)),
+        HybridRegionSpec("state_prior", "unary", "px", ("left",)),
+    ),
+    adapters=(HybridAdapterSpec("readout", "right", "y"),),
+    equalities=("eq",),
+)
+validate(template)
+```
+
+Here `r` connects `(z0, z1, xr)`, `d` connects `(z1, xd, y)`, and `y`
+faces an ordinary linear-Gaussian neighbor. The declared active labels are
+exactly 0 and 2, requiring regime cardinality at least 3. These fixed supports
+are structural: they must agree for every copy of the same regime. Resolved
+parameter/support agreement belongs to the future compiler; loading a JSON
+file does not inspect parameter arrays.
+
+Separator references identify graph edges and their explicitly owned equality
+copies. Region port order matters. Recurrence uses `(left, middle)`, dynamics
+uses `(middle, right)`, and unary regions have one separator. Each original
+factor has one owner. An adapter explicitly connects a hybrid separator to one
+ordinary categorical or Gaussian copy, including an exposed composition port.
+Ordinary categorical and linear-Gaussian attachments can be scoped, merged,
+and bonded; these operations preserve and revalidate every declaration.
+Source- or pair-selected dynamics, nonlinear or GFE constraints, overlapping
+owners, and factors supplying regime/state association through separate ordinary
+ports are rejected. Exterior mixture adapters need the separate D11.14
+implementation. Expand compact plates before direct composition; nested plate
+grounding remains unsupported.
+
+JSON round-trips and structure hashes include all declaration semantics.
+Collection reordering preserves identity; scoped renaming changes the
+name-sensitive hash. No public D12 checkpoint or cheaper no-learning mode is
+available. The accepted approximation and remaining temporal-mixture error are
+recorded in [D12](docs/DERIVATIONS.md#d12--hybrid-regimestate-separators-cff-ocxl).
 
 For hybrid regime epistemics, place a `P_SUBSTITUTION` constraint with
 `substituted_role="out"` on a `gaussian_mixture` or

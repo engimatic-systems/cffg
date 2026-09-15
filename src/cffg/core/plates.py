@@ -25,6 +25,7 @@ import dataclasses
 import numpy as np
 
 from cffg.core.compose import SCOPE_SEP, ComposeError, bond
+from cffg.core.hybrid import map_component
 from cffg.core.ir import (
     BlobRef,
     Broadcast,
@@ -70,9 +71,12 @@ def expand_plates(t: Template) -> Template:
         learnables=dict(t.learnables),
         agent=t.agent,
         schema_version=t.schema_version,
+        hybrid_components=dict(t.hybrid_components),
     )
     for pname in sorted(t.plates):
         _expand_one(out, pname, t.plates[pname])
+    if out.hybrid_components:
+        validate(out)
     return out
 
 
@@ -86,7 +90,7 @@ def _prefix(plate: str, idx: tuple[int, ...]) -> str:
 
 def _scope_copy(
     frag: Template, prefix: str, index: tuple[int, ...], per_copy: frozenset[str]
-) -> tuple[dict, dict, list, dict, dict]:
+) -> tuple[dict, dict, list, dict, dict, dict, dict]:
     """Scope one fragment copy under `prefix/`. Tied blob names stay unscoped
     (copies reference the same parent blob entry); per-copy blob names are
     scoped and given their own indexed parent entry."""
@@ -135,7 +139,8 @@ def _scope_copy(
         for ln in frag.learnables.values()
         if set(ln.blobs) <= per_copy
     }
-    return variables, factors, constraints, ports, per_copy_blobs, per_copy_learnables
+    components = {s(c.name): map_component(c, s) for c in frag.hybrid_components.values()}
+    return variables, factors, constraints, ports, per_copy_blobs, per_copy_learnables, components
 
 
 def _expand_one(out: Template, plate: str, spec: PlateSpec) -> None:
@@ -179,7 +184,7 @@ def _expand_one(out: Template, plate: str, spec: PlateSpec) -> None:
     # disjoint, so a clash means the plate name collides with existing content).
     for idx in idxs:
         prefix = _prefix(plate, idx)
-        variables, factors, constraints, ports, pblobs, plearn = _scope_copy(
+        variables, factors, constraints, ports, pblobs, plearn, components = _scope_copy(
             frag, prefix, idx, per_copy
         )
         for kind, new in (
@@ -188,6 +193,7 @@ def _expand_one(out: Template, plate: str, spec: PlateSpec) -> None:
             ("ports", ports),
             ("blobs", pblobs),
             ("learnables", plearn),
+            ("hybrid_components", components),
         ):
             clash = set(getattr(out, kind)) & set(new)
             if clash:
@@ -264,6 +270,10 @@ def _apply_broadcast(out: Template, plate: str, spec: PlateSpec, rule: Broadcast
 
 
 def _rename_variable(out: Template, old: str, new: str, proto: VariableSpec) -> None:
+    out.hybrid_components = {
+        name: map_component(c, variable=lambda v: new if v == old else v)
+        for name, c in out.hybrid_components.items()
+    }
     out.variables.pop(old, None)
     out.variables[new] = dataclasses.replace(proto, name=new)
     for fname, f in out.factors.items():

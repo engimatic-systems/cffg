@@ -504,6 +504,7 @@ class Template:
     learnables: dict[str, LearnableSpec] = field(default_factory=dict)
     agent: AgentSpec | None = None
     schema_version: str = "1"
+    hybrid_components: dict[str, HybridComponentSpec] = field(default_factory=dict)
 
     def degree(self, variable: str) -> int:
         """Number of factor endpoints attached to an edge (FFG max is 2)."""
@@ -513,3 +514,77 @@ class Template:
 
     def ports_of(self, variable: str) -> list[PortSpec]:
         return [p for p in self.ports.values() if p.variable == variable]
+
+
+HYBRID_APPROXIMATION = "hybrid-regime-ec-v1"
+
+
+@dataclass(frozen=True)
+class HybridSeparatorSpec:
+    """D12 labeled Gaussian boundary, on an explicit, fixed set of labels.
+
+    ``regime`` and ``state`` name representative graph edges. Only explicitly
+    owned equality factors identify their copies. Absent labels have no
+    Gaussian coordinates; support changes require a new declaration/plan.
+    """
+
+    name: str
+    regime: str
+    state: str
+    active_support: tuple[int, ...]
+
+    def __post_init__(self):
+        object.__setattr__(self, "active_support", tuple(self.active_support))
+
+
+@dataclass(frozen=True)
+class HybridRegionSpec:
+    """One D12 factor-energy/region-entropy owner.
+
+    ``kind`` is recurrence, dynamics, or unary. Recurrence ports are (Y, H),
+    dynamics ports are (H, next Y), and unary has one separator. Port order
+    is semantic; factor names never select the approximation.
+    """
+
+    name: str
+    kind: str
+    factor: str
+    ports: tuple[str, ...]
+
+    def __post_init__(self):
+        object.__setattr__(self, "ports", tuple(self.ports))
+
+
+@dataclass(frozen=True)
+class HybridAdapterSpec:
+    """D12 identity region from a separator to one ordinary graph-edge copy.
+
+    The variable's domain selects categorical or Gaussian moment matching.
+    This region owns zero factor energy and its reduced labeled entropy.
+    """
+
+    name: str
+    separator: str
+    variable: str
+
+
+@dataclass(frozen=True)
+class HybridComponentSpec:
+    """Explicit opt-in to the D12 regional objective; never inferred by shape.
+
+    ``equalities`` own the graph's copy wiring, whose entropy is replaced by
+    the declared region/separator/adapter counts. Other factor owners are
+    listed individually in ``regions``. Parameter blobs remain factor fields.
+    """
+
+    name: str
+    separators: tuple[HybridSeparatorSpec, ...]
+    regions: tuple[HybridRegionSpec, ...]
+    adapters: tuple[HybridAdapterSpec, ...] = ()
+    equalities: tuple[str, ...] = ()
+    approximation: str = HYBRID_APPROXIMATION
+    support_semantics: str = "fixed"
+
+    def __post_init__(self):
+        for field_name in ("separators", "regions", "adapters", "equalities"):
+            object.__setattr__(self, field_name, tuple(getattr(self, field_name)))

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import dataclasses
 
+from cffg.core.hybrid import hybrid_problems, map_component
 from cffg.core.ir import (
     AgentSpec,
     BeliefBinding,
@@ -35,6 +36,13 @@ class ComposeError(ValueError):
     pass
 
 
+def _validate_hybrid(template):
+    problems = hybrid_problems(template)
+    if problems:
+        raise ComposeError("\n".join(problems))
+    return template
+
+
 def _require_flat(template: Template) -> None:
     if template.plates:
         names = sorted({
@@ -50,12 +58,13 @@ def scoped(template: Template, prefix: str) -> Template:
     """A copy of `template` with every name under `prefix/`. Blob names are
     scoped too (their *paths* are not — two scopes may share a parameter file)."""
     _require_flat(template)
+    _validate_hybrid(template)
     p = prefix + SCOPE_SEP
 
     def s(name: str) -> str:
         return p + name
 
-    return Template(
+    return _validate_hybrid(Template(
         name=s(template.name),
         variables={s(v.name): dataclasses.replace(v, name=s(v.name)) for v in template.variables.values()},
         factors={
@@ -117,14 +126,15 @@ def scoped(template: Template, prefix: str) -> Template:
             else None
         ),
         schema_version=template.schema_version,
-    )
+        hybrid_components={s(c.name): map_component(c, s) for c in template.hybrid_components.values()},
+    ))
 
 
 def merge(a: Template, b: Template, name: str) -> Template:
     """Disjoint union; caller is responsible for prior scoping."""
     _require_flat(a)
     _require_flat(b)
-    for kind in ("variables", "factors", "ports", "blobs", "learnables"):
+    for kind in ("variables", "factors", "ports", "blobs", "learnables", "hybrid_components"):
         clash = set(getattr(a, kind)) & set(getattr(b, kind))
         if clash:
             raise ComposeError(f"{kind} name clash: {sorted(clash)} (scope the operands)")
@@ -133,7 +143,7 @@ def merge(a: Template, b: Template, name: str) -> Template:
             "cannot merge two AgentSpec declarations; compose one complete "
             "agent model with fragments that do not declare a runtime interface"
         )
-    return Template(
+    return _validate_hybrid(Template(
         name=name,
         variables={**a.variables, **b.variables},
         factors={**a.factors, **b.factors},
@@ -142,7 +152,8 @@ def merge(a: Template, b: Template, name: str) -> Template:
         blobs={**a.blobs, **b.blobs},
         learnables={**a.learnables, **b.learnables},
         agent=a.agent if a.agent is not None else b.agent,
-    )
+        hybrid_components={**a.hybrid_components, **b.hybrid_components},
+    ))
 
 
 def bond(t: Template, port_a: str, port_b: str) -> Template:
@@ -162,6 +173,11 @@ def bond(t: Template, port_a: str, port_b: str) -> Template:
     if va.name == vb.name:
         raise ComposeError(f"bond {port_a!r}~{port_b!r}: ports share variable {va.name!r}")
 
+    original = t
+    if t.hybrid_components:
+        import copy
+
+        t = copy.deepcopy(t)
     # Keep a's variable; rewire every reference to b's variable onto it.
     for fname, f in t.factors.items():
         t.factors[fname] = FactorSpec(
@@ -175,10 +191,17 @@ def bond(t: Template, port_a: str, port_b: str) -> Template:
         dataclasses.replace(c, target=va.name) if c.target == vb.name else c
         for c in t.constraints
     ]
+    t.hybrid_components = {
+        name: map_component(c, variable=lambda v: va.name if v == vb.name else v)
+        for name, c in t.hybrid_components.items()
+    }
     del t.variables[vb.name]
     del t.ports[port_a]
     del t.ports[port_b]
-    return t
+    _validate_hybrid(t)
+    if original is not t:
+        original.__dict__.update(t.__dict__)
+    return original
 
 
 def compose(
