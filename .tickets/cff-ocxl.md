@@ -169,3 +169,7 @@ Final validation and landing: uv run python tools/dashboard.py --run-suite passe
 **2026-09-14T01:44:19Z**
 
 Published stacked PR #142: https://github.com/engimatic-systems/cffg/pull/142 . Base is cff-iur0-regime-trajectory-derivation (PR #141), as requested. cff-ocxl is closed, all code/doc/ticket work is committed, the single final short-suite result is green, and the next implementation roots are cff-k6g5 and cff-ffsg. No remaining work in this derivation ticket; source-recovery qualification remains blocked on implementation and public composition.
+
+**2026-09-15T13:20:19Z**
+
+D12 source-regime recovery was deferred at Cooper's direction after implementing local kernels, an independent reference, and a joint solver that passed the moderate-horizon numerical checkpoint. Compilation remained expensive, and substantial general-graph and production integration work remained before testing recovery. None of the three registered recovery fits ran, so the recovery benefit remains unproven. We chose to prioritize other epics. Detailed implementation, tickets, and qualification evidence remain on the branches associated with PRs 143–154 and cdic-ikhw-recurrence-payload (be76da72); this PR142-based branch retains the derivation and closes its outstanding D12 work as not pursuing.

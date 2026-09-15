@@ -1,6 +1,6 @@
 ---
 id: cff-k6g5
-status: open
+status: closed
 deps: [cff-ocxl]
 links: []
 created: 2026-09-14T01:11:24Z
@@ -55,3 +55,9 @@ cff-7sw5 consumes these declarations. Local kernels (cff-ffsg), execution (cff-f
 - Semantic identity: the versioned meaning of a declaration, executable, or persisted statistic.
 
 
+
+## Notes
+
+**2026-09-15T13:20:19Z**
+
+Closed as not pursuing D12 on this PR142-based branch at Cooper's direction; see cff-ocxl for the deferral summary. Serialized declarations and their transport/identity checks were implemented on the preserved PR151 branch, but that implementation is not incorporated here. This closure does not claim the acceptance criteria are delivered on this branch or activate a D12 runtime.

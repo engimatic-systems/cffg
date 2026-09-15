@@ -1,6 +1,6 @@
 ---
 id: cff-x0if
-status: open
+status: closed
 deps: [cff-ocxl, cff-ulbz, cff-k6g5, cff-ffsg, cff-7sw5, cff-f3jz, cff-czdq, cff-kul2]
 links: []
 created: 2026-08-31T03:47:35Z
@@ -172,3 +172,7 @@ cff-iur0 used its negative outcome: cff-ocxl is now a hybrid-separator derivatio
 **2026-09-14T01:15:18Z**
 
 D12 handoff: cff-ocxl accepts hybrid-regime-ec-v1 as an explicitly approximate mathematical contract. All six implementation tickets (cff-k6g5, cff-ffsg, cff-7sw5, cff-f3jz, cff-czdq, cff-kul2) and the confirmed exterior-mixture companion cff-ulbz are now dependencies. The D12 temporal mixture counterexample remains a known approximation gap even at zero EC residual; it neither weakens the fixed 0.150 recovery thresholds nor authorizes extra fits. Production identity comes from cff-czdq and public composition is certified by cff-kul2 before this ticket starts.
+
+**2026-09-15T13:20:19Z**
+
+Closed as not pursuing at Cooper's direction with the D12 recovery path; see cff-ocxl. None of the three registered fits ran: dataset seeds 5101–5103 and initializer keys 7101–7103 remain unused. There is no D12 source-recovery RMSE, passing or failing recovery gate, or recovery diagnostic result. The moderate synthetic solver checkpoint is a separate numerical result. The fixed 0.150 source and contrast ceilings remain recorded unchanged; any future resumption must explicitly restore the prerequisites and the registered protocol.

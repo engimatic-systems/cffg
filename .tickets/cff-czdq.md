@@ -1,6 +1,6 @@
 ---
 id: cff-czdq
-status: open
+status: closed
 deps: [cff-ocxl, cff-f3jz]
 links: []
 created: 2026-09-14T01:11:24Z
@@ -55,3 +55,9 @@ cff-kul2 validates the integrated public composition contract. cff-x0if alone ow
 - Semantic identity: the versioned meaning of a declaration, executable, or persisted statistic.
 
 
+
+## Notes
+
+**2026-09-15T13:20:19Z**
+
+Closed as not pursuing at Cooper's direction with the D12 recovery path; see cff-ocxl. Local solver checkpoints checked learning statistics, but versioned production D12 learning state, parameter replacement, persistence and D9 migration were not delivered. Shape-compatible local arrays do not establish checkpoint compatibility or a working public learner. This closure leaves those acceptance criteria unmet.

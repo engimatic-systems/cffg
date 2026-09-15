@@ -1,6 +1,6 @@
 ---
 id: cff-7sw5
-status: open
+status: closed
 deps: [cff-ocxl, cff-k6g5]
 links: []
 created: 2026-09-14T01:11:24Z
@@ -55,3 +55,9 @@ cff-f3jz consumes plans; cff-czdq owns learning/checkpoint migration after execu
 - Semantic identity: the versioned meaning of a declaration, executable, or persisted statistic.
 
 
+
+## Notes
+
+**2026-09-15T13:20:19Z**
+
+Closed as not pursuing at Cooper's direction with the D12 recovery path; see cff-ocxl. Preserved PRs 152–154 contain immutable compiler metadata, execution guards, declaration discovery, and general incidence/evaluator contracts. General numerical evaluation, complete graph qualification and production compiler integration remained unfinished. Metadata coverage does not establish executable model support; this closure does not claim the acceptance criteria were met.

@@ -1,6 +1,6 @@
 ---
 id: cff-ffsg
-status: open
+status: closed
 deps: [cff-ocxl]
 links: []
 created: 2026-09-14T01:11:24Z
@@ -55,3 +55,9 @@ cff-f3jz binds these local kernels to cff-7sw5 plans and supplies the joint mess
 - Semantic identity: the versioned meaning of a declaration, executable, or persisted statistic.
 
 
+
+## Notes
+
+**2026-09-15T13:20:19Z**
+
+Closed as not pursuing D12 on this PR142-based branch at Cooper's direction; see cff-ocxl for the deferral summary. The preserved PR143 branch contains implemented and qualified local JAX kernels, including auxiliary stationarity and numerical repairs. Later branches add the independent joint reference and solver. Those results remain valid for their recorded sources; no implementation is incorporated here and local qualification is not a source-recovery result.

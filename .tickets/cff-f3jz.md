@@ -1,6 +1,6 @@
 ---
 id: cff-f3jz
-status: open
+status: closed
 deps: [cff-ocxl, cff-7sw5, cff-ffsg]
 links: []
 created: 2026-09-14T01:11:24Z
@@ -55,3 +55,9 @@ cff-czdq owns learning semantics and persisted-state migration. cff-ulbz supplie
 - Semantic identity: the versioned meaning of a declaration, executable, or persisted statistic.
 
 
+
+## Notes
+
+**2026-09-15T13:20:19Z**
+
+Closed as not pursuing at Cooper's direction with the D12 recovery path; see cff-ocxl. The preserved branches contain an unbound joint message/auxiliary solver and a passing twelve-start moderate float32 chain checkpoint. For the tested T=32 and T=100 chains, complete-solve compilation took about 191–196 seconds, with little reduction from the shorter horizon. General graph and ordinary-port coupling, production execution, and complete objective/readout integration remained unfinished. The checkpoint is evidence for its recorded chain sources, not general graph convergence or source recovery; this closure does not claim the production acceptance criteria were met.
