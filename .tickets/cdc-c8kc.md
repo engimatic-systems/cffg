@@ -2,7 +2,7 @@
 id: cdc-c8kc
 status: closed
 deps: [cdc-bwta]
-links: []
+links: [cdc-ztuf, cdh-wi2b]
 created: 2026-09-14T20:25:51Z
 type: task
 priority: 1

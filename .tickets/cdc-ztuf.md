@@ -1,8 +1,8 @@
 ---
 id: cdc-ztuf
 status: in_progress
-deps: [cff-y15d, cdc-ogj9, cdc-c8kc, cdh-m75a, cdh-urn0]
-links: [cdh-urn0, cdh-m75a]
+deps: [cff-y15d, cdc-ogj9, cdc-c8kc, cdh-m75a, cdh-urn0, cdh-wi2b]
+links: [cdh-urn0, cdh-m75a, cdh-wi2b, cdc-c8kc]
 created: 2026-09-14T18:09:57Z
 type: task
 priority: 2
@@ -285,3 +285,7 @@ Durable report tests/fixtures/hybrid-joint-candidate-results-004.json SHA256b127
 Independent artifact review after the author committed and paused at 76156ba7f620c90af228e7d0a58bf1b71cd03def: no findings. Root inspected the changed-path list before the documentation/test/ticket diff and independently ran /tmp/cdc-ztuf-attempt004-root-audit.py. The audit re-evaluated all 40 converged outputs through the independent NumPy saved-report validator, verified the exact 46-record / 47-output inventory with 40 converged, six expected diverged and one exhausted result, and bound all 12 source hashes to both the actual run commit aecd8191751ed87dff3c6ce93144b606fbd94077 and the current files. Report SHA256 b127d35227a32851ccfcd7721cc54fdab09c8311c63b47f9f63547520dd9a900 matches the author handoff. Root confirmed the immutable tiny specification and historical reports, unchanged unexecuted moderate specification/descriptor, monitor exit 0 and the documented timing/memory interpretation. The prerequisite and focused XML files contain 15 and 70 passing cases with no failure, error or skip. git diff --check passes and the tree was clean. Audit output: /tmp/cdc-ztuf-attempt004-root-audit.json.
 
 Root notified the author only after finishing review. All source repairs and the immutable current-source checkpoint are accepted. cdc-ztuf, cdh-urn0 and cdh-m75a remain in_progress solely for the shared final short-suite gate and publication handoff. The author remains paused. Before the suite, root inspected only latest.wall_seconds=1074.552 and suggested_wait_seconds=1200 in tools/test-suite-runtimes.json. Next run is exactly uv run python tools/dashboard.py --run-suite, with its existing 1200-second hard limit and unchanged selection, followed by the full quiet suggested wait. No moderate optimizer/storage run or registered recovery fit has run.
+
+**2026-09-15T02:42:06Z**
+
+Final gate at c8beaf4 failed: 2831 passed, one native-process abstract-storage runtime-binding failure in 1142.379 seconds, within the 1200-second cap. Log /tmp/cdc-ztuf-short-suite.log; runtime history and dashboard retain the failed result. The numerical attempt004 remains independently accepted. Root isolated two inherited disabled-cache configuration differences without tracing or solving: /tmp/cdc-ztuf-cache-binding-diagnosis.jsonl. New bounded prerequisite cdh-wi2b owns the short-suite environment repair, strict descriptor refresh and focused regression. No unchanged full-suite retry; a fresh final gate follows the reviewed repair.
