@@ -105,6 +105,7 @@ EPIC_FILES = {
     "M9 · Gaussian": [
         "test_gauss_rules.py", "test_kalman.py", "test_gaussian_kernels.py",
         "test_nonlinear_rules.py", "test_nonlinear_schema.py", "test_nonlinear_engine.py",
+        "test_neural.py",
         "test_gaussian_kernel_schedules.py",
     ],
     "L1 · B-learning": ["test_b_learning.py", "test_learnables.py", "test_learning_schema.py"],

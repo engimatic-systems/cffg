@@ -28,6 +28,7 @@ class MeanImplementation:
     version: str
     parameter_shape: Callable
     evaluate: Callable
+    work: Callable | None = None
 
 
 MEAN_IMPLEMENTATIONS: dict[str, MeanImplementation] = {}
@@ -37,6 +38,8 @@ def register_mean_function(implementation: MeanImplementation):
     FunctionSpec(implementation.impl_id, implementation.version)
     if not callable(implementation.parameter_shape) or not callable(implementation.evaluate):
         raise TypeError("mean implementation requires shape and evaluation callbacks")
+    if implementation.work is not None and not callable(implementation.work):
+        raise TypeError("mean work declaration must be callable")
     if implementation.impl_id in MEAN_IMPLEMENTATIONS:
         raise ValueError(f"mean implementation {implementation.impl_id!r} is already registered")
     MEAN_IMPLEMENTATIONS[implementation.impl_id] = implementation
@@ -81,3 +84,10 @@ def _cubic(x, parameters, configuration):
 
 register_mean_function(MeanImplementation("cffg.mean.affine", "1.0.0", _affine_shape, _affine))
 register_mean_function(MeanImplementation("cffg.mean.cubic", "1.0.0", _cubic_shape, _cubic))
+
+from cffg import neural_schema as _neural_schema
+
+register_mean_function(MeanImplementation(
+    "cffg.mean.mlp", "1.0.0", _neural_schema.parameter_shape, _neural_schema.evaluate,
+    _neural_schema.work,
+))

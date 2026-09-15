@@ -1,7 +1,7 @@
 ---
 id: cff-1o72
-status: open
-deps: [cff-o7hs]
+status: in_progress
+deps: [cff-o7hs, cff-n60h, cff-v53k, cff-ll6y, cff-3zzo]
 links: [cff-fxmj, cff-o7hs, cff-ri8m, cff-l6i5, cff-209l, cff-cz6v, cff-u06e]
 created: 2026-07-08T16:50:10Z
 type: feature
@@ -106,3 +106,17 @@ Intelligible-ticket review: complete.
 **2026-09-15T17:58:09Z**
 
 Implementation handoff from bounded GPT-6 Astra xhigh code research: reuse gaussian_nonlinear plus a neural MeanImplementation and portable FunctionSpec configuration. Factor parameters have canonical blob/role ownership in member_of; build a JAX-only injection plan that scatters one trainable vector per tied blob to every packed reader. set_params is host validation, not differentiable. Extract the existing chart unpack, exact-forest reconstruction, full adaptive update and raw ledger composition from OuterKernelProvider into one shared root-program owner. For R_u transpose lambda = E_u, use a matrix-free adjoint solve and explicitly certify its original residual; JAX GMRES info alone does not certify convergence. Total gradient is E_theta minus R_theta transpose lambda, including all adaptive coefficient and reconstruction dependence. Gate on a matching certified result and finite energy; changing observations/weights invalidates a prior certificate. Existing Learnables persistence is conjugate-family-specific, so optimizer state needs a separate versioned array checkpoint with structure, fixed-parameter and target-layout identity, atomic restoration, and explicit PRNG/data-position state if owned. Amortization can be a deterministic learned proposal from certified targets; importance sampling is then N/A. Preserve exact support, reject improper proposals without floors, and verify held-out paired final-root agreement plus the requested95% sweep-reduction interval. Sources: params.py, compiled member addresses, outer_kernels.py, outer.py, runtime_types.py, learning_schema.py, _agent_checkpoint.py, and installed JAX GMRES. Confidence high for code ownership and observed API behavior; training/benchmark evidence remains to be implemented.
+
+**2026-09-15T18:35:51Z**
+
+Bounded implementation plan (tk dependencies are authoritative). Legend: prerequisite --> dependent.
+
+[x] cff-o7hs (PR156)
+  +--> [x] cff-n60h (portable neural mean)
+         +--> [ ] cff-v53k (ready: complete fixed-point derivative)
+                +--> [ ] cff-ll6y (optimizer and continuation)
+                +--> [ ] cff-3zzo (deterministic amortized initialization)
+                       |
+        completed children --> [ ] cff-1o72 --> [ ] cff-ahps
+
+Optimizer and amortizer work can proceed independently once the shared derivative/root boundary is available. Exact-zero-noise derivation cff-u06e remains independently ready and is outside this implementation.

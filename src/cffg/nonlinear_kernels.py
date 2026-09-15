@@ -87,12 +87,20 @@ def configure(factor, sizes):
     def energy(*args):
         return results(*args)["energy"]
 
+    work = {
+        "mean_value_evaluations": 1 if spec.method == "linearization" else 2 * sizes["in"] + 1,
+        "jacobian_forward_directions": sizes["in"] if spec.method == "linearization" else 0,
+    }
+    if implementation.work is not None:
+        work.update(implementation.work(sizes["in"], sizes["out"], config))
+
     return GaussianBinding(
         ("out", "in"), _parameters(shape), ("theta", "W"), _pack, message, energy,
         conditioning=GaussianConditioning("out", validate_observation),
         statistics=results, readout=results,
         moment_projections=frozenset({"gaussian_first_second"}), iterative=True,
         objective=f"{spec.method}_frozen_gaussian_bethe",
+        work=work,
     )
 
 

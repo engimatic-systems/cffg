@@ -940,6 +940,17 @@ batched callbacks. The nonlinear factor's structural roles are `out,in` and
 its numeric parameter roles are `parameters,cov`. No conjugate-learning family
 is implied by the statistic callback.
 
+`neural_schema.py` declares `cffg.mean.mlp` through the same mean registry.
+Layer widths include input and output; hidden activation is `tanh` or
+`identity`, and the output is affine. Every layer packs its row-major matrix
+then bias. The architecture validator and shape/work declarations import no
+JAX. `neural.py` evaluates dynamic flat weights and initializes them from an
+explicit JAX key. No Equinox module or Python callable is serialized.
+The compiled nonlinear binding therefore retains ordinary `member_of` blob
+tying, covariance guards, objective labels and both scheduling routes.
+`Estimate.declared_work` carries per-member network counts plus member count,
+separately from exact persistent bytes and backend cost analysis.
+
 An iterative Gaussian binding is excluded from directed exact nodes in
 `schedule.py`. Its neighbors may still form exact batch/scan islands; the
 mixed synchronous phase executes the adaptive group through the same

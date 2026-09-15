@@ -56,8 +56,8 @@ def _sigma_geometry(mean, covariance):
 
 def approximation(evaluate, mean, covariance, noise, parameters, method):
     """Return the affine conditional matching the declared cavity approximation."""
-    value = evaluate(mean, parameters)
     if method == "linearization":
+        value = evaluate(mean, parameters)
         matrix = jax.jacfwd(evaluate, argnums=0)(mean, parameters)
         return matrix, value - matrix @ mean, noise
     if method != "sigma_point":

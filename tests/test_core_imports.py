@@ -30,6 +30,10 @@ t = Template('nonlinear',
     blobs={b: BlobRef(b, b+'.npy') for b in ('theta', 'noise')})
 validate(t)
 assert structure_hash(from_json(to_json(t))) == structure_hash(t)
+from cffg import neural_mean
+from dataclasses import replace
+t.factors['f'] = replace(t.factors['f'], function=neural_mean((1, 2, 1)))
+assert structure_hash(from_json(to_json(t))) == structure_hash(t)
 assert not {'jax', 'jaxlib', 'equinox'} & sys.modules.keys()
 """], check=True)
 

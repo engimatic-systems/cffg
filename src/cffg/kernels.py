@@ -248,6 +248,12 @@ def register_kernel(k: FactorKernel) -> FactorKernel:
             problems.append("Gaussian iterative must be a boolean")
         if not isinstance(b.objective, str) or not b.objective:
             problems.append("Gaussian objective requires a nonempty label")
+        if any(
+            not isinstance(key, str) or not key or not isinstance(value, int)
+            or isinstance(value, bool) or value < 0
+            for key, value in b.work.items()
+        ):
+            problems.append("Gaussian work declarations require named nonnegative integer counts")
         for callback_name, callback in (
             ("statistics", b.statistics),
             ("readout", b.readout),

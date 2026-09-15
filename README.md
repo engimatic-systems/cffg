@@ -455,6 +455,23 @@ neutral dependent messages; invalid final beliefs have infinite energy and
 NaN moments. A missing DATA observation is marginalized. Exact zero noise,
 continuous-to-discrete means, and nonlinear P-substitution/GFE are excluded.
 
+#### Neural mean architecture
+
+Use `neural_mean((input_dim, hidden_width, output_dim), method="sigma_point")`
+as the factor's `function`. This declares the `cffg.mean.mlp` implementation.
+`initialize_neural_parameters(function, key, dtype=...)` creates a flat weight
+array using the supplied JAX random key; store that array in the factor's
+`parameters` blob. The positive `cov` blob still describes output noise.
+
+Each layer stores its row-major weight matrix followed by its bias vector.
+Hidden layers apply `tanh` by default; `activation="identity"` is also
+supported. The output layer is affine. Architecture data stays in JSON and
+weights stay in blobs; loading/editing the declaration imports no JAX or
+Equinox. `estimate(engine, calibrate=False).declared_work` reports member count,
+network parameter count, scalar dense products and hidden activations per
+mean evaluation, and the method's value evaluations/Jacobian directions.
+These are declared operation counts, separate from backend FLOP estimates.
+
 ### Recurrent switching state-space models
 
 The model helper assembles a complete rSLDS with state-dependent regime
