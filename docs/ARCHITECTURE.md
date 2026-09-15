@@ -255,7 +255,9 @@ A pure-Python (dataclass) representation, independent of JAX:
   helper. Their focused modules remain canonical owners. Before 1.0, rule
   tables, compiled arenas/group plans, kernel registration objects, and private
   helpers are internal-unstable; serialized schemas retain their explicit
-  version contracts.
+  version contracts. The facade resolves exports on first access, so importing
+  `cffg.core` does not import JAX or Equinox. Fresh-process tests forbid those
+  runtime imports while validating and round-tripping a template.
 
 ### 2. Compiler (`cffg.compiler`)
 
