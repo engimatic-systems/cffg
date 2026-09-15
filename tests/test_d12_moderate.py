@@ -362,7 +362,9 @@ def test_incomplete_report_never_qualifies(tmp_path, status, jobs):
         validate_report(tmp_path)
 
 
-def test_native_process_setup_and_abstract_storage():
+def test_native_process_setup_and_abstract_storage(monkeypatch):
+    monkeypatch.setenv("JAX_COMPILATION_CACHE_MAX_SIZE", str(1024**3))
+    monkeypatch.setenv("JAX_PERSISTENT_CACHE_MIN_COMPILE_TIME_SECS", "0.1")
     result = subprocess.run(
         [sys.executable, str(ROOT / "tools/d12_moderate_checks.py")],
         cwd=ROOT,

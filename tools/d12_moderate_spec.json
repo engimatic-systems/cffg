@@ -355,12 +355,12 @@
     "inventory_process": "A separate shape-only child precedes the ten compilation children, so wide abstract tracing does not contaminate any compiled variant process peak. It has zero complete-program lower/compile/execute calls.",
     "logical_contract": {
       "path": "tools/d12_moderate_layouts.json.gz",
-      "sha256": "e2ab3a4ce574b67fa3243ecb08744971408efc35581a67802b18259dc797605c",
+      "sha256": "1b98bcfa48a3aeb8d6de3a6ca14c2c963f5e900faf019faa3f831935244672f9",
       "meaning": "Complete native-float32 abstract leaf descriptors bound to producer source hashes, runtime versions and tracing configuration. Prospective setup artifact only; zero complete-program lower/compile/execute calls. Regenerate and update this hash if a producer changes before qualification.",
       "previous_revision": {
-        "sha256": "a8a4205509c9cf19b6037338e5fda584258c1ea2c9f5665c1346c4be71b766ac",
-        "commit": "8a9c9a0",
-        "reason": "cdh-urn0 changes native mixture centering, invalidating the producer source binding. Regenerated only the prospective abstract contract: eight additional local derivative captures per shape, other leaf groups unchanged, zero complete-program lower/compile/execute calls. Historical tiny evidence and compile reports remain unchanged."
+        "sha256": "e2ab3a4ce574b67fa3243ecb08744971408efc35581a67802b18259dc797605c",
+        "commit": "c8beaf4",
+        "reason": "cdh-wi2b removes two inherited, inactive short-suite cache settings from disabled-cache children. Only the d12_compile_scaling.py producer hash changes in the prospective abstract contract; all runtime values, 1026 leaves per shape, shapes/dtypes/bytes and zero complete-program lower/compile/execute counts remain identical. No moderate qualification or historical evidence is changed."
       }
     }
   },

@@ -39,3 +39,28 @@ This repair blocks closure of cdc-ztuf. cff-a3wz retains all twelve moderate sol
 - Persistent cache: stored compiled programs reused by later processes; disabled in these qualification children.
 
 
+
+## Notes
+
+**2026-09-15T02:44:47Z**
+
+Root implementation complete; paused for independent review before any fresh full-suite run. child_environment now removes only the two demonstrated inactive cache controls alongside its existing cache-directory removal. Explicit CPU, x64=false, restrictive float64 policy, disabled persistent caching, XLA-cache setting and logging stay unchanged. The existing native-process test injects the real suite values (1 GiB cache maximum, 0.1-second minimum compile time), so it reproduces the failure mechanism even outside the full suite. No descriptor comparison was weakened.
+
+Prospective descriptor generation: uv run python tools/d12_moderate_layouts.py, exit 0, log /tmp/cdh-wi2b-layout-generation.log. A recursive comparison against /tmp/cdh-wi2b-layouts-before.json.gz found exactly four changed scalar fields: only the tools/d12_compile_scaling.py producer hash at the root and each of three inventory bindings. All 1026 leaves per shape, runtime values and complete-program lower/compile/execute counts (0/0/0) are identical. Comparison artifact /tmp/cdh-wi2b-descriptor-diff.json. New descriptor SHA256 1b98bcfa48a3aeb8d6de3a6ca14c2c963f5e900faf019faa3f831935244672f9; new UNEXECUTED moderate spec SHA256 3a6bab37fcbab2b3e3ffdac4bc6892f17e2be244c4f2e65754b4b3c3ee660c3b. The previous descriptor hash and reason are recorded in the plan. Numerical formulas, cases, budgets, thresholds and scope are unchanged.
+
+Focused command: uv run pytest -q tests/test_d12_moderate.py tests/test_d12_moderate_integrity.py -k 'native_process_setup or source_and_runtime_binding or complete_inventory' --junitxml=/tmp/cdh-wi2b-focused.xml. Result: 8 passed, 97 deselected in 20.89 seconds; /tmp/cdh-wi2b-focused.log. This includes the native float32 three-shape inventory and rejection of altered source/runtime/worker identities. All 12 tiny checkpoint source hashes and immutable attempt004 SHA b127d35227a32851ccfcd7721cc54fdab09c8311c63b47f9f63547520dd9a900 still match; no candidate requalification is needed because none of its sources changed. git diff --check and tk dep cycle pass.
+
+Dependency companion from tk dep tree --full cdc-ztuf, tk ready and tk blocked; complete output retained at /tmp/cdh-wi2b-dep-tree.txt. Legend: prerequisite --> dependent.
+
+[ ] cdh-wi2b (ready; repair reviewed next, shared suite pending)
+[ ] cdh-urn0 (reviewed; shared suite pending)
+[ ] cdh-m75a (reviewed; shared suite pending)
+    +--> [ ] cdc-ztuf (immediately blocked by these three gates)
+             +--> [ ] cff-a3wz (moderate numerical/storage qualification)
+                        |
+[ ] cff-k6g5 (ready independently) --> [ ] cff-7sw5
+                                           +--> [ ] remaining D12 integration
+                                                    +--> [ ] cff-x0if (three recovery fits)
+                                                             +--> [ ] cff-zov5
+
+The tree abbreviates downstream dependencies; tk remains authoritative. Cooper's existing short-suite exception assigns this environment interaction repair to root; normal bounded D12 implementation remains delegated sequentially. No fresh short suite, moderate optimizer/storage compilation, source recovery fit or publication has run since this repair.

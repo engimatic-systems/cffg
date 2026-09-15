@@ -75,7 +75,10 @@ def child_environment():
     env.update(JAX_ENABLE_X64='false', JAX_EXPLICIT_X64_DTYPES='error', JAX_PLATFORMS='cpu',
                JAX_ENABLE_COMPILATION_CACHE='false', JAX_PERSISTENT_CACHE_ENABLE_XLA_CACHES='',
                JAX_LOG_COMPILES='true', JAX_EXPLAIN_CACHE_MISSES='true')
-    env.pop('JAX_COMPILATION_CACHE_DIR', None)
+    # Disabled-cache children keep the same runtime under suite cache settings.
+    for name in ('JAX_COMPILATION_CACHE_DIR', 'JAX_COMPILATION_CACHE_MAX_SIZE',
+                 'JAX_PERSISTENT_CACHE_MIN_COMPILE_TIME_SECS'):
+        env.pop(name, None)
     return env
 
 
