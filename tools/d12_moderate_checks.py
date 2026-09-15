@@ -4,8 +4,10 @@
 solver wrappers are host zero-budget calls and abstract traces; compiling their
 full iteration bodies belongs to post-review evidence.
 ``--arithmetic`` compares only local projection/learning kernels with report
-reconstruction. ``--projection-probe weighted|rare`` preserves unresolved local
-numerical counterexamples; a failing probe is not qualification evidence.
+reconstruction. ``--projection-probe weighted|rare`` preserves the weighted/rare
+projection regressions. Disagreement with reconstruction or a failed local
+assertion makes the probe fail. Passing these local checks does not qualify a
+complete solve.
 """
 
 import argparse
