@@ -279,3 +279,7 @@ First full short suite at58185b4:2395 passed,1 failed,44 deselected; pytest1290.
 **2026-09-15T18:27:00Z**
 
 Implementation and validation complete. Delivered endpoint-specific Gaussian moment constraints and migration, portable configured positive-noise nonlinear means, Taylor and sigma-point rules, normalized frozen-Gaussian Bethe node terms, full adaptive residual globalization, explicit numerical failures, objective labels, and all documented transport surfaces. Independent curved-grid and mutually changing-cavity root oracles pass. Attached exact scan islands, float32 units, local dimension32/JIT/vmap, bundle reconstruction, parameter ownership, and exact persistent-byte accounting are covered. Final full short suite at f966cb9: 2384 passed, 56 deselected; pytest 1099.56 seconds and dashboard-measured wall 1113.339 seconds. Final code/test changes are included in that run; subsequent work only records validation and ticket status. Next: cff-1o72 adds neural architecture, complete fixed-point gradients, training/checkpoint state, and deterministic amortized initialization. Exact zero noise remains independent cff-u06e.
+
+**2026-09-15T18:27:47Z**
+
+Published PR156: https://github.com/engimatic-systems/cffg/pull/156, based on cff-ocxl-defer-d12 (PR155). Final passing short-suite evidence is unchanged; no further code or selection edits were made after certification. The tree is clean before starting the dependent neural branch.
