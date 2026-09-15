@@ -146,6 +146,7 @@ EPIC_FILES = {
         "test_hybrid_separator_derivation.py",
         "test_hybrid_plans.py",
         "test_hybrid_discovery.py",
+        "test_incidence_contract.py",
         "test_hybrid_joint_reference.py",
         "test_hybrid_joint_coordinate.py",
         "test_hybrid_joint_solver.py",

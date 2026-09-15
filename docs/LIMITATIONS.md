@@ -333,6 +333,14 @@ name. Immutable ownership plans and metadata-only array inventories are availabl
 for compiler integration; constructing a plan does not certify graph/array
 assembly or enable inference. Engine and standalone execution factories reject
 published D12 components before tracing, including supplied flooding schedules.
+The unbound incidence/evaluator contracts preserve branching, unary-only and
+intermediate-H unary scopes, sparse label identities and ordinary adapter ports.
+They execute no numerical evaluator. The unchanged qualified chain API requires
+one directed homogeneous path of private R/H/D pairs; other admitted graphs need
+new numerical implementation and qualification. Even a structural chain mapping
+with held ordinary cavities does not qualify the coupled exterior objective or
+adapter stationarity. Parameter values, fixed origins, evaluator payloads and
+coupled exterior dimensions remain unresolved.
 Future coordinate/scratch requirements can remain unknown. Ordinary future-State
 counts cover only the eight nonparameter buffers; runtime `State.params`,
 complete State storage, and physical/compiled peak allocation remain unavailable.

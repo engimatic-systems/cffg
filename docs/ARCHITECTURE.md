@@ -1149,6 +1149,54 @@ and branching incidence with independently enlarged graph, label and dimension
 sizes. The branching fixture is admitted graph structure; any later mapping to
 the qualified numerical interface must preserve or explicitly address it.
 
+`incidence_contract.from_draft` consumes these reviewed drafts into a separate,
+immutable unbound contract. Ordered region ports and adapter hybrid ports each
+own one directed outgoing message. Active constants omit only the first active
+label's common gauge; linear coefficients and the upper precision triangle
+retain every active label's original identity. Fixed per-label origins are
+future inputs, not unknowns. Each recurrence owns its squared JJ auxiliary
+block, indexed by original source labels and at-risk destination sticks. The
+internal coordinate contains messages followed by these nonnegative auxiliary
+blocks. It allocates no coefficient, parameter or runtime arrays. Its original
+objective inventory retains each region's energy and negative entropy, each
+separator's full degree-minus-one entropy coefficient, adapter reduced entropy
+and two ports, and zero-energy equality wiring. The adapter's ordinary entropy
+increment is explicit; the full exterior degree remains unknown.
+
+`chain_applicability` reports an internal mapping separately from admission.
+Private R/H/D pairs may contract under D12.3 only into one directed path with
+homogeneous total K>=2 and d>=1, at least two endpoint sites, and preserved
+direction. Two outward links cannot be reversed merely because their undirected
+graph is a path. Cycles, disconnected paths, unary-only components and additional
+H inputs remain named general-evaluator requirements. An H unary does not by
+itself disprove D12.3's conditional identity; the unchanged grouped API lacks
+its input and objective ownership. Transporting even a separable H unary is
+unimplemented and unqualified. Mapped endpoint unary sites preserve every
+original normalizer/energy owner. Endpoint adapters retain their ordinary
+incoming/outgoing slots and named site placement. Holding their incoming
+cavities defines only a conditional internal solve: both port equations,
+ordinary/exterior objective ownership and coupled stationarity remain separate
+obligations. A structural mapping establishes no new numerical qualification.
+
+`evaluator_contract.describe_evaluator` describes future inputs/outputs and
+the evaluator protocol without implementing it. Inputs distinguish original
+factor parameters, fixed support/origins, internal coordinates, ordinary incoming
+cavities, ordinary port beliefs and current outgoing messages. Outputs include
+the simultaneous complete internal target, rectangular residual and scales,
+primal/dual energies, properness/status flags, all applicable certificate
+families, and named beliefs, objective terms and learning statistics. Derivative
+forward/transpose actions share one accepted capture and frozen scaling. The
+binding must preserve the existing solver's generated/explicit start semantics,
+fixed evaluation structure, status replacement and complete returned-point
+certification; it must address auxiliary partitions explicitly if exterior
+unknowns are added. No policy, threshold or numerical source is copied here.
+Float32/float64 logical interface counts are explicit; input/output counts are
+not accepted State or scratch inventories. Payloads, derivative captures,
+coupled exterior dimensions and runtime retention remain unavailable until
+specified. Future numerical producers require complete source inventories and
+new qualification regardless of their filenames. `tests/test_incidence_contract.py`
+covers these boundaries using admitted graph fixtures and forbidden callbacks.
+
 `execution_availability.require_execution_available` rejects any published D12
 component by name and approximation before runtime construction or tracing.
 Engine, StateLifecycle, synchronous sweeps, schedule construction and programs,
