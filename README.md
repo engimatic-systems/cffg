@@ -666,9 +666,15 @@ engine.bfe(state)               # model-declared BFE, GFE, approximation, or bou
 D12's `hybrid-regime-ec-v1` approximation preserves source-conditioned
 moments across explicitly declared regions. Templates can now describe this
 choice through `hybrid_components`. Production compilation and CFFGZ publication
-reject these declarations by name until the execution implementation is ready.
+currently reject these declarations by name while compiler integration is pending.
 Templates without declarations keep their existing D9 meaning and compilation
 path; they do not lower or compile a D12 solve.
+
+Immutable hybrid plan records now describe ownership and parameter-address
+references for the compiler. They can be inspected, but Engine and standalone
+execution factories reject them by component name and approximation. Publishing
+a plan does not enable execution; runtime state, objectives and scheduling still
+need their D12 integration.
 
 For an existing graph with recurrence factor `r`, destination-selected affine
 factor `d`, categorical prior `pz`, Gaussian prior `px`, and equality factor
@@ -988,7 +994,20 @@ template, arrays, manifest = load_bundle("model.cffgz")  # hash-verified
 from cffg.estimate import estimate
 print(estimate(engine).summary())
 # state 9.1 KiB (messages 2.8, params 6.4) · 2.76e+04 flops/sweep · 0.203 ms/sweep
+
+from cffg.inventory import analytic_inventory
+inventory = analytic_inventory(engine.arena, dtype="float32")
+print(inventory.stored_plan_bytes, inventory.stored_parameter_bytes)
 ```
+
+`analytic_inventory` inspects an Arena or immutable hybrid plan without building
+an Engine or running numerical code. It reports stored metadata and parameter
+defaults separately from declared future State and scratch requirements. Unknown
+hybrid requirements are `None`. The explicit dtype applies to future floating
+buffers; stored arrays keep their actual dtype. Counts describe logical array
+bytes, with repeated references counted once. Physical and compiled peak memory
+remain unavailable. The existing `estimate(engine)` also constructs state and
+attempts compilation, even with calibration disabled.
 
 Schema-2 `.cffgz` bundles contain the template, point-parameter arrays, and
 complete declared-learning state: immutable priors and current posteriors.

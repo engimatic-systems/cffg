@@ -10,6 +10,7 @@ import numpy as np
 from cffg import kernels
 from cffg._immutable import FrozenMap
 from cffg.compiled import NEG, Arena
+from cffg.execution_availability import require_execution_available
 from cffg.runtime_types import State, _replace
 
 
@@ -21,6 +22,7 @@ class StateLifecycle:
     gaussian_validators: Mapping[str, Callable] = field(init=False, repr=False)
 
     def __post_init__(self):
+        require_execution_available(self.arena, operation="StateLifecycle")
         validators = {
             int(row): group.kernel.binding.conditioning.validate
             for group in self.arena.gauss_groups

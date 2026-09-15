@@ -46,6 +46,7 @@ from cffg import (
 from cffg.compiled import NEG as NEG  # noqa: PLC0414
 from cffg.compiled import Arena
 from cffg.exact_strategy import ExactRunStrategy
+from cffg.execution_availability import require_execution_available
 from cffg.execution import (
     parameters as _parameters,
 )
@@ -121,6 +122,7 @@ class Engine:
         mu3_samples: int = 256,
         mu3_min_ess_fraction: float = 0.1,
     ):
+        require_execution_available(arena, operation="Engine")
         if mu3_samples <= 0:
             raise ValueError("mu3_samples must be positive")
         if not 0.0 < mu3_min_ess_fraction <= 1.0:

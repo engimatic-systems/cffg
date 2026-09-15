@@ -10,6 +10,7 @@ import numpy as np
 from cffg import efrules
 from cffg import ledger_terms as terms
 from cffg.compiled import Arena, ConstraintPlan
+from cffg.execution_availability import require_execution_available
 from cffg.execution import parameters as _parameters
 from cffg.execution.transport import _disc_both, _disc_rows
 from cffg.kernel_runtime import discrete_energy as _disc_energy
@@ -31,6 +32,9 @@ class ObjectiveLedger:
 
     arena: Arena
     belief_kernel: FreeEnergy
+
+    def __post_init__(self):
+        require_execution_available(self.arena, operation="ObjectiveLedger")
 
     def free_energy(
         self,
@@ -112,6 +116,7 @@ def constraint_satisfied(
 
 def make_belief_energy(arena: Arena) -> FreeEnergy:
     """Build the existing ordered BFE/GFE sum for raw JIT and schedule use."""
+    require_execution_available(arena, operation="make_belief_energy")
     groups = arena.groups
 
     def bfe(

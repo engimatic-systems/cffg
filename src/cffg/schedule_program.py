@@ -15,6 +15,7 @@ import numpy as np
 from jax.scipy.special import logsumexp
 
 from cffg.compiled import NEG, Arena
+from cffg.execution_availability import require_execution_available
 from cffg.execution.owners import SCHEDULED_EXECUTORS, ScheduledExecutors
 from cffg.execution.support import log_support as _jax_log_support
 from cffg.execution.transport import (
@@ -51,6 +52,7 @@ def build_schedule_program(
     free_energy: FreeEnergy,
 ) -> ScheduleProgram:
     """Compose existing sweeps and local executors without owning their math."""
+    require_execution_available(arena, operation="build_schedule_program")
     raw_step = make_sweep(arena, False)
     step = eqx.filter_jit(raw_step)
     if isinstance(selection, Schedule):
@@ -699,6 +701,7 @@ def make_support_check(
     empty exact support. Semantics are identical to the NumPy check: NEG is
     the one reserved zero sentinel and every other finite log value has
     support, irrespective of magnitude."""
+    require_execution_available(arena, operation="make_support_check")
     if arena.constraint_groups:  # combinatorial feasibility is host-side
         raise ValueError("jitted support check requires a constraint-free model")
     by_card: dict[int, list[list[int]]] = {}
@@ -743,6 +746,7 @@ def make_exact_unit(
 
     The unjitted stage pipeline and callbacks form one XLA computation.
     """
+    require_execution_available(arena, operation="make_exact_unit")
     support_bad = make_support_check(arena, executors)
     is_max = arena.semiring == "max"
 
@@ -785,6 +789,7 @@ def make_propagate(
     the pre-sweep arrays (synchronous flooding). Iterative structures (vmp,
     GFE, constraints, hybrid, prec) never appear as stages — they run in the
     restricted synchronous step of the mixed loop."""
+    require_execution_available(arena, operation="make_propagate")
     op = jnp.max if arena.semiring == "max" else logsumexp
     stage_fns = [
         _batch_stage_fn(arena, s, op, executors)

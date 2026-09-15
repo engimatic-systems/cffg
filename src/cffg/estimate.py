@@ -18,6 +18,7 @@ from dataclasses import dataclass
 import jax
 
 from cffg.engine import Engine, RunStatus, State
+from cffg.inventory import analytic_inventory as analytic_inventory
 
 
 @dataclass

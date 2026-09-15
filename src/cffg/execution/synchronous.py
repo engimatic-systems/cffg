@@ -10,6 +10,7 @@ import jax.numpy as jnp
 from jax.scipy.special import logsumexp
 
 from cffg.compiled import NEG, Arena
+from cffg.execution_availability import require_execution_available
 from cffg.execution import (
     composites as _composites,
 )
@@ -219,6 +220,7 @@ def make_sweep(arena: Arena, skip_scheduled: bool = False) -> Sweep:
     every iterative structure (vmp beads, GFE composites, constraints,
     hybrid mixtures, gaussian_prec) still fires and damps exactly as in
     flooding."""
+    require_execution_available(arena, operation="make_sweep")
     groups = (
         [g for g in arena.groups if g.mode != "bp"] if skip_scheduled else arena.groups
     )

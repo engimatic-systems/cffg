@@ -9,11 +9,15 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from cffg import kernels
 from cffg._immutable import FrozenArray, ImmutableRecord
+
+if TYPE_CHECKING:
+    from cffg.hybrid_plans import HybridComponentPlan
 
 NEG = -1.0e30  # Reserved log-space zero sentinel.
 
@@ -507,6 +511,22 @@ class Arena(ImmutableRecord):
     # direct named-write entry points.
     learn_plans: tuple[LearnPlan, ...] = field(default_factory=tuple)
     # Declared learnables resolved to stat sources and write targets (cff-x0sv).
+    hybrid_components: tuple[HybridComponentPlan, ...] = ()
+    # Derived D12 ownership only; publication does not imply runtime support.
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.hybrid_components:
+            from cffg.hybrid_plans import HybridComponentPlan
+
+            names = set()
+            for plan in self.hybrid_components:
+                name = getattr(plan, "name", "<unnamed>")
+                if not isinstance(plan, HybridComponentPlan):
+                    raise ValueError(f"hybrid component {name!r}: requires a HybridComponentPlan")
+                if name in names:
+                    raise ValueError(f"hybrid component {name!r}: duplicate compiled identity")
+                names.add(name)
 
     @property
     def interior_slot_pairs(self) -> np.ndarray:

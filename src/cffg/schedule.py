@@ -56,6 +56,7 @@ from dataclasses import dataclass, field, replace
 import numpy as np
 
 from cffg.compiled import Arena
+from cffg.execution_availability import require_execution_available
 
 # Rounds shorter than this unroll as batch stages; longer uniform runs
 # become one lax.scan (trace/compile cost O(1) in the run length).
@@ -516,6 +517,7 @@ def build_schedule(arena: Arena, mode: str = "auto") -> Schedule:
     mode "flood" always floods. mode "two_pass" requires the exact directed
     schedule and raises ``ValueError`` when the model is outside its
     contract."""
+    require_execution_available(arena, operation="build_schedule")
     if mode not in ("auto", "flood", "two_pass"):
         raise ValueError(f"schedule mode must be auto|flood|two_pass, got {mode!r}")
 

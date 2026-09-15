@@ -1099,15 +1099,55 @@ transactional edits preserve these references. Direct bonding validates a
 candidate before mutating its input. Topology snapshots copy immutable nested
 specs, and recursive bundle path rewriting carries the declaration unchanged.
 
-The compiler rejects declared components after expansion/validation and before
+`hybrid_plans.py` defines the immutable compiled ownership contract.
+`HybridComponentPlan.declaration` snapshots the complete serialized identity;
+separator records name the equality-identified regime/state copies, region
+index arrays preserve declared port order, and adapter records address ordinary
+categorical/Gaussian gather/scatter slots. Regions and equalities are the
+component's factor owners; named separators and adapters retain their distinct
+entropy ownership. Parameter-member names refer to the existing
+`Arena.member_of` addresses into `Arena.log_params`, without a second parameter
+or learning authority. The constructor checks identity and local index
+consistency. It does not certify graph admission, resolved arrays/support,
+exclusive assembly, or a mapping into the qualified numerical coordinate.
+`Arena.hybrid_components` defaults to an empty tuple for ordinary models.
+Schedule stages and execution remain deferred; the plan stores no accepted
+coordinate, belief, derivative capture, or learned statistic.
+
+`execution_availability.require_execution_available` rejects any published D12
+component by name and approximation before runtime construction or tracing.
+Engine, StateLifecycle, synchronous sweeps, schedule construction and programs,
+support checks, exact/propagation factories and both objective-ledger entry
+points share the check. It precedes supplied callbacks and JIT wrappers,
+including a caller-supplied flooding schedule. Availability follows implemented
+runtime support; no plan flag enables an ordinary D9 fallback.
+
+`inventory.analytic_inventory(arena_or_plan, dtype=...)` reads only published
+array shapes/dtypes and scalar layout metadata. It separates stored plan arrays
+from parameter defaults, ordinary future State requirements, and declared
+future hybrid coordinate/scratch shapes. None means an unknown requirement;
+an empty tuple explicitly declares none. Future floating requirements use the
+requested float32/float64 dtype; stored arrays retain their actual dtype.
+Repeated references to the same published array are counted once with aliases
+reported. These logical counts exclude container overhead and are not physical
+allocation or a compiled peak; both peak fields remain unavailable. A standalone
+plan has no parameter-array inventory. The inventory owner imports no numerical
+runtime, does not call Coordinate.from_sites or hybrid_joint_storage.buffer_values, and
+does not initialize, evaluate, differentiate, lower or compile a model. The
+existing `estimate(engine)` calibration API retains its separate behavior.
+`tests/test_hybrid_plans.py` covers immutable metadata, named direct-factory
+rejection, no-runtime inspection, sparse support, explicit dtype accounting and
+large shape-only requirements.
+
+The compiler still rejects declared components after expansion/validation and before
 topology or specialized discovery. Bundle save/load rejects them during
 preflight, before any destination replacement. Templates without declarations
 continue through their ordinary compilation path without D12 lowering.
 Declaration tests in `tests/test_hybrid_declarations.py` cover this boundary;
 resolved array shapes and support, specialized/registered ownership, resolution,
-assembly, executable identity and successful compiled bundles belong to the
-compiler-plan ticket. Runtime schedules, host/JIT, single/vmap, numerical dtype
-and scale, and learning resume are not implemented by these declarations.
+assembly, derived plan publication and successful compiled bundles belong to the
+compiler-plan ticket. D12 runtime schedules, host/JIT and single/vmap numerical
+behavior, numerical dtype/scale qualification, and learning resume remain deferred.
 
 ### 2e. Executable factor registration (`cffg.kernels`)
 
