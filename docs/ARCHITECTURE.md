@@ -1117,17 +1117,21 @@ coordinate, belief, derivative capture, or learned statistic.
 `execution_availability.require_execution_available` rejects any published D12
 component by name and approximation before runtime construction or tracing.
 Engine, StateLifecycle, synchronous sweeps, schedule construction and programs,
-support checks, exact/propagation factories and both objective-ledger entry
-points share the check. It precedes supplied callbacks and JIT wrappers,
+StateChecks and make_support_check, exact/propagation factories and both
+objective-ledger entry points share the check. It precedes supplied callbacks and JIT wrappers,
 including a caller-supplied flooding schedule. Availability follows implemented
 runtime support; no plan flag enables an ordinary D9 fallback.
 
 `inventory.analytic_inventory(arena_or_plan, dtype=...)` reads only published
 array shapes/dtypes and scalar layout metadata. It separates stored plan arrays
-from parameter defaults, ordinary future State requirements, and declared
-future hybrid coordinate/scratch shapes. None means an unknown requirement;
-an empty tuple explicitly declares none. Future floating requirements use the
-requested float32/float64 dtype; stored arrays retain their actual dtype.
+from parameter defaults, eight ordinary nonparameter State buffers, and declared
+future hybrid coordinate/scratch shapes. The
+`ordinary_nonparameter_state_requirements` collection covers `messages`, `g_eta`,
+`g_lam`, `g_obs`, `g_mask`, `ef_eta`, `ef_obs` and `ef_mask`. It excludes
+`State.params`: `runtime_parameter_bytes` and `complete_state_bytes` remain None,
+even when stored defaults are known. None means an unknown requirement; an empty
+tuple explicitly declares none. Future floating requirements require an explicit
+float32/float64 dtype (None is rejected); stored arrays retain their actual dtype.
 Repeated references to the same published array are counted once with aliases
 reported. These logical counts exclude container overhead and are not physical
 allocation or a compiled peak; both peak fields remain unavailable. A standalone

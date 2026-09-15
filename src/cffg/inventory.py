@@ -4,6 +4,8 @@ Stored arrays are counted once per published object, with aliases listed.
 Logical bytes exclude Python/container overhead and imply neither device
 allocation nor physical or compiled peak memory. Future State and scratch
 requirements are separate declarations, not storage owned by a compiled plan.
+Only the eight ordinary nonparameter State buffers are counted; runtime
+parameters and complete State storage remain unavailable.
 """
 
 from __future__ import annotations
@@ -53,12 +55,17 @@ class HybridStorageInventory(ImmutableRecord):
 
 @dataclass(frozen=True)
 class AnalyticInventory(ImmutableRecord):
-    """Stored metadata/defaults and declared future buffers, never a peak."""
+    """Stored defaults and partial future buffers, never a complete State or peak.
+
+    The ordinary nonparameter subset contains messages, g_eta, g_lam, g_obs,
+    g_mask, ef_eta, ef_obs and ef_mask. Stored defaults do not specify runtime
+    State.params storage.
+    """
 
     dtype: str
     stored_plan_arrays: tuple[ArrayInventory, ...]
     stored_parameter_arrays: tuple[ArrayInventory, ...] | None
-    ordinary_state_requirements: tuple[ArrayInventory, ...] | None
+    ordinary_nonparameter_state_requirements: tuple[ArrayInventory, ...] | None
     hybrid_requirements: tuple[HybridStorageInventory, ...]
 
     @property
@@ -68,6 +75,14 @@ class AnalyticInventory(ImmutableRecord):
     @property
     def stored_parameter_bytes(self) -> int | None:
         return _bytes(self.stored_parameter_arrays)
+
+    @property
+    def runtime_parameter_bytes(self) -> None:
+        return None
+
+    @property
+    def complete_state_bytes(self) -> None:
+        return None
 
     @property
     def physical_peak_bytes(self) -> None:
@@ -88,9 +103,13 @@ def analytic_inventory(value: Arena | HybridComponentPlan, *, dtype) -> Analytic
     Stored arrays keep their actual dtypes. The requested float32/float64 dtype
     applies only to declared future floating buffers, independent of JAX's
     precision setting. A standalone plan has no available parameter inventory.
+    The ordinary State requirements cover its eight nonparameter buffers only;
+    runtime parameter and complete State byte counts remain unavailable.
     Unknown coordinate/scratch layouts remain None. No solver-layout builder,
     engine, state, numerical evaluation, differentiation or compilation runs.
     """
+    if dtype is None:
+        raise ValueError("analytic inventory requires explicit float32 or float64 dtype")
     dtype = np.dtype(dtype)
     if dtype not in (np.dtype("float32"), np.dtype("float64")):
         raise ValueError("analytic inventory requires explicit float32 or float64 dtype")
@@ -115,7 +134,7 @@ def analytic_inventory(value: Arena | HybridComponentPlan, *, dtype) -> Analytic
             for index, child in enumerate(item):
                 visit(child, f"{path}[{index}]", category)
 
-    ordinary = None
+    ordinary_nonparameter = None
     if isinstance(value, Arena):
         visit(value.log_params, "arena.log_params", "parameters")
         for field in fields(value):
@@ -132,8 +151,10 @@ def analytic_inventory(value: Arena | HybridComponentPlan, *, dtype) -> Analytic
             "ef_obs": (value.n_ef_obs,),
             "ef_mask": (value.n_ef_obs,),
         }
-        ordinary = tuple(ArrayInventory(f"state.{name}", shape, dtype.name)
-                         for name, shape in counts.items())
+        ordinary_nonparameter = tuple(
+            ArrayInventory(f"state.{name}", shape, dtype.name)
+            for name, shape in counts.items()
+        )
     else:
         visit(value, "plan", "plan")
         plans = (value,)
@@ -154,7 +175,7 @@ def analytic_inventory(value: Arena | HybridComponentPlan, *, dtype) -> Analytic
     return AnalyticInventory(
         dtype.name, stored("plan"),
         stored("parameters") if isinstance(value, Arena) else None,
-        ordinary,
+        ordinary_nonparameter,
         tuple(HybridStorageInventory(plan.name, plan.approximation,
                                      requirements(plan, "coordinate"),
                                      requirements(plan, "scratch")) for plan in plans),

@@ -333,9 +333,11 @@ name. Immutable ownership plans and metadata-only array inventories are availabl
 for compiler integration; constructing a plan does not certify graph/array
 assembly or enable inference. Engine and standalone execution factories reject
 published D12 components before tracing, including supplied flooding schedules.
-Future coordinate/scratch requirements can remain unknown; logical inventories
-do not measure physical or compiled peak allocation. Undeclared templates retain
-D9 semantics and avoid D12 lowering. D12 keeps
+Future coordinate/scratch requirements can remain unknown. Ordinary future-State
+counts cover only the eight nonparameter buffers; runtime `State.params`,
+complete State storage, and physical/compiled peak allocation remain unavailable.
+Stored parameter defaults remain a separate inventory. Undeclared
+templates retain D9 semantics and avoid D12 lowering. D12 keeps
 one conditional Gaussian per regime at a boundary; histories sharing that
 regime can remain multimodal. Its temporal reflected-mixture example has
 exact JJ factors and zero EC residual yet opposite exact learning biases that

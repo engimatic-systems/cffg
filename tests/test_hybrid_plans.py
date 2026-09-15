@@ -180,7 +180,7 @@ def test_inventory_separates_actual_storage_from_future_requirements(dtype, item
     assert report.stored_plan_bytes == 6 * 4 + 4 * 8
     assert report.stored_parameter_bytes == 12 * 4
     assert sum(a.elements for a in report.stored_plan_arrays) == 10
-    assert all(a.elements == 0 for a in report.ordinary_state_requirements)
+    assert all(a.elements == 0 for a in report.ordinary_nonparameter_state_requirements)
     hybrid, = report.hybrid_requirements
     assert hybrid.component == "association"
     assert hybrid.coordinate_bytes == 19 * itemsize
@@ -192,7 +192,7 @@ def test_inventory_separates_actual_storage_from_future_requirements(dtype, item
 
 def test_unknown_empty_and_large_shape_only_requirements():
     unknown = analytic_inventory(plan_fixture(), dtype="float32")
-    assert unknown.stored_parameter_arrays is unknown.ordinary_state_requirements is None
+    assert unknown.stored_parameter_arrays is unknown.ordinary_nonparameter_state_requirements is None
     assert unknown.stored_parameter_bytes is None
     assert unknown.hybrid_requirements[0].coordinate_bytes is None
     assert unknown.hybrid_requirements[0].scratch_bytes is None
@@ -204,10 +204,29 @@ def test_unknown_empty_and_large_shape_only_requirements():
     assert report.hybrid_requirements[0].coordinate_bytes == 2**40 * 100 * 8
     assert report.hybrid_requirements[0].scratch_bytes == 0
     assert report.stored_plan_bytes == unknown.stored_plan_bytes == 24
-    with pytest.raises(ValueError, match="float32 or float64"):
-        analytic_inventory(plan, dtype="float16")
     with pytest.raises(TypeError, match="dtype"):
         analytic_inventory(plan)
+
+
+@pytest.mark.parametrize("dtype", [None, "float16"])
+def test_inventory_requires_an_explicit_supported_dtype(dtype):
+    with pytest.raises(ValueError, match="explicit float32 or float64"):
+        analytic_inventory(plan_fixture(), dtype=dtype)
+
+
+def test_stored_defaults_do_not_imply_complete_future_state_storage():
+    arena = Arena(
+        "parameters", 0, np.zeros(1, np.int64), {}, (), {},
+        log_params={"weights": np.zeros((100, 100), np.float64)},
+    )
+    report = analytic_inventory(arena, dtype="float32")
+    assert report.stored_parameter_bytes == 80_000
+    assert {a.path for a in report.ordinary_nonparameter_state_requirements} == {
+        "state.messages", "state.g_eta", "state.g_lam", "state.g_obs",
+        "state.g_mask", "state.ef_eta", "state.ef_obs", "state.ef_mask",
+    }
+    assert sum(a.logical_bytes for a in report.ordinary_nonparameter_state_requirements) == 0
+    assert report.runtime_parameter_bytes is report.complete_state_bytes is None
 
 
 def test_shared_published_arrays_are_counted_once_and_aliases_are_reported():
@@ -231,7 +250,7 @@ def test_ordinary_models_keep_execution_and_inventory_paths(schedule, monkeypatc
     assert arena.hybrid_components == ()
     report = analytic_inventory(arena, dtype="float32")
     assert report.hybrid_requirements == ()
-    assert report.ordinary_state_requirements[0].logical_bytes == 4 * 4
+    assert report.ordinary_nonparameter_state_requirements[0].logical_bytes == 4 * 4
     engine = Engine(arena, schedule)
     state = engine.step(engine.init_state())
     np.testing.assert_allclose(engine.marginals(state)["z"], [0.25, 0.75])

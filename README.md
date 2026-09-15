@@ -1002,12 +1002,17 @@ print(inventory.stored_plan_bytes, inventory.stored_parameter_bytes)
 
 `analytic_inventory` inspects an Arena or immutable hybrid plan without building
 an Engine or running numerical code. It reports stored metadata and parameter
-defaults separately from declared future State and scratch requirements. Unknown
-hybrid requirements are `None`. The explicit dtype applies to future floating
-buffers; stored arrays keep their actual dtype. Counts describe logical array
-bytes, with repeated references counted once. Physical and compiled peak memory
-remain unavailable. The existing `estimate(engine)` also constructs state and
-attempts compilation, even with calibration disabled.
+defaults separately from future buffer requirements.
+`ordinary_nonparameter_state_requirements` covers eight ordinary State buffers:
+messages, Gaussian natural parameters/observations/masks, and exponential-family
+messages/observations/masks. It excludes `State.params`; `runtime_parameter_bytes`
+and `complete_state_bytes` remain `None`. Declared hybrid coordinate and scratch
+requirements are separate; unknown requirements are `None`. The required explicit
+float32/float64 dtype applies to future floating buffers; stored arrays keep their
+actual dtype. Counts describe logical array bytes, with repeated references
+counted once. Physical and compiled peak memory remain unavailable. The existing
+`estimate(engine)` also constructs state and attempts compilation, even with
+calibration disabled.
 
 Schema-2 `.cffgz` bundles contain the template, point-parameter arrays, and
 complete declared-learning state: immutable priors and current posteriors.
