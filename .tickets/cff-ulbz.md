@@ -1,6 +1,6 @@
 ---
 id: cff-ulbz
-status: open
+status: closed
 deps: [cff-ocxl, cff-f3jz]
 links: []
 created: 2026-09-13T18:07:15Z
@@ -111,3 +111,7 @@ Dependency correction after the decisive D11.15 falsifier: cff-ocxl is now a mat
 **2026-09-14T01:15:18Z**
 
 D12.5 confirms this companion for ordinary exterior mixture ports after cff-f3jz implements the declared region protocol and execution. D12.3 eliminates the internal destination-selected affine switching channel, so no redundant internal D3 port is needed. The Gaussian identity adapter test reproduces variance 3/2 and signed quotient precision -1/3 from the full tilt. cff-kul2 consumes this binding in its public composition gate; existing D3 semantics remain separate.
+
+**2026-09-15T13:20:19Z**
+
+Closed as not pursuing at Cooper's direction with the D12 recovery path; see cff-ocxl. The derivation and preserved local-kernel branches establish the full-tilt projection and signed quotient needed by an ordinary Gaussian mixture boundary. A complete coupled solve with ordinary neighbors and a production binding remained unfinished. Existing D3 semantics are not replaced by this closure, and no composition or integration acceptance is claimed.

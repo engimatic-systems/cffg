@@ -1,6 +1,6 @@
 ---
 id: cff-kul2
-status: open
+status: closed
 deps: [cff-ocxl, cff-czdq, cff-f3jz, cff-ulbz]
 links: []
 created: 2026-09-14T01:11:24Z
@@ -55,3 +55,9 @@ cff-x0if performs the only end-to-end empirical source-recovery qualification au
 - Semantic identity: the versioned meaning of a declaration, executable, or persisted statistic.
 
 
+
+## Notes
+
+**2026-09-15T13:20:19Z**
+
+Closed as not pursuing at Cooper's direction with the D12 recovery path; see cff-ocxl. Declaration and compiler-metadata checks on preserved branches do not satisfy this ticket's public composed-model execution, schedule parity, learning or persistence gates. Those gates remained pending behind the general graph solver and production integration. This closure is cancellation of the work, not a passing qualification result.
