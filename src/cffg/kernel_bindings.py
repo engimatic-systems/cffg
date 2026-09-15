@@ -132,6 +132,9 @@ class GaussianBinding(ImmutableRecord):
     A missing observation means marginalization of its role, not necessarily
     deletion of the remaining factor. The callback owns that mathematical
     distinction and the node's normalization constant.
+
+    ``moment_projections`` advertises endpoint projections implemented by
+    these callbacks. Declaring a projection does not add an update rule.
     """
 
     roles: tuple[str, ...]
@@ -143,8 +146,12 @@ class GaussianBinding(ImmutableRecord):
     conditioning: GaussianConditioning | None = None
     statistics: Callable | None = None
     readout: Callable | None = None
+    moment_projections: frozenset[str] = frozenset()
     arena: str = field(default="gaussian", init=False)
-    constraint_modes: frozenset[str] = field(default=frozenset(), init=False)
+
+    @property
+    def constraint_modes(self) -> frozenset[str]:
+        return frozenset({"moment_matching"}) if self.moment_projections else frozenset()
 
     @property
     def message_roles(self) -> tuple[str, ...]:

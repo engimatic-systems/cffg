@@ -176,7 +176,8 @@ def _render_item(item, s: SvgStyle) -> str:
                 f'font-style="italic" stroke="none" fill="{s.stroke}">'
                 f"{_mathify(item.label, s.label_size)}</text>"
             )
-        return f'<path d="{d}"/>{label}'
+        dash = ' stroke-dasharray="4 3"' if item.dashed else ""
+        return f'<path d="{d}"{dash}/>{label}'
     if isinstance(item, Box):
         title = f"<title>{escape(item.name)}</title>"
         gx, gy = item.glyph_at or (item.x, item.y)

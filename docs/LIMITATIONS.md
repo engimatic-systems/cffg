@@ -120,7 +120,10 @@ every item below will be implemented:
 - *Hybrid discrete–continuous (switching KF, mixture collapse)* — cff-pksr;
   the first place exact FE meets a necessary approximation (mixture entropy).
 - *Nonlinear continuous factors* — cff-o7hs: EP/moment-matching or sigma-point
-  messages with controlled FE accounting.
+  messages with controlled FE accounting. Endpoint/projection declarations,
+  explicit legacy migration, and Figure 12 diagrams are available. Numerical
+  moment projection currently executes only on registered Gaussian prior and
+  linear factors, where it is equivalent to exact Gaussian inference.
 - *Gaussian/continuous GFE messages* — RESOLVED as a position, 2026-07-12
   (cff-dfpi, DERIVATIONS.md D5): none will be added, and that is a theorem,
   not a gap. Additive-control linear-Gaussian models provably have

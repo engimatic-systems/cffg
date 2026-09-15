@@ -14,8 +14,7 @@ ConstraintSpec, port, and parameter binding then perturbs that default:
 - ``MEAN_FIELD``       -> one bead per q-edge instead of the joint bead
 - ``P_SUBSTITUTION``   -> the substituted role's bead becomes a square (Fig 13)
 - ``DELTA`` on an edge -> the on-wire bead carries a delta symbol (Fig 11)
-- ``MOMENT_MATCHING``  -> rejected: the legacy factor-only target cannot select
-                          the paper's node/edge endpoint pair (Fig 12)
+- ``MOMENT_MATCHING``  -> an E edge bead and a dashed selected half-edge (Fig 12)
 - ``param_blobs``      -> black-square pointmass terminal (Fig 10 discussion);
                           the role drops out of q, so the node loses its
                           default factorisation (the f_d case, Fig 16)
@@ -28,6 +27,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from cffg.core.moment_matching import moment_matching_endpoint
 
 from cffg.core.ir import (
     ConstraintKind,
@@ -103,6 +103,7 @@ class WireView:
     label: str  # variable name; empty for parameter wires (terminal is labeled)
     ends: tuple[NodeEnd | TerminalEnd, NodeEnd | TerminalEnd]
     bead: str | None = None  # None: no bead in q (pointmass wires); "": empty
+    moment_endpoints: tuple[tuple[NodeEnd, str], ...] = ()
     # bead symbols: "" (default normalisation), "delta" (point mass)
 
     def node_ends(self) -> list[NodeEnd]:
@@ -126,6 +127,7 @@ class NodeView:
     groups: tuple[BeadGroup, ...]  # factorisation of q(s_a) over q-roles
     pointmass_roles: tuple[str, ...]  # roles absent from q (blobs, data clamps)
     default_factorisation: bool  # joint over *all* edges: nothing to draw
+    moment_roles: tuple[str, ...] = ()
     # when compressed (steps 2-3 of the p.19 recipe apply to this node)
 
 
@@ -162,12 +164,22 @@ def derive(template: Template) -> Diagram:
 
     node_constraints: dict[str, list[ConstraintSpec]] = {}
     edge_constraints: dict[str, list[ConstraintSpec]] = {}
+    moment_endpoints: dict[str, list[tuple[NodeEnd, str]]] = {}
     for c in template.constraints:
         if c.kind is ConstraintKind.MOMENT_MATCHING:
-            raise ValueError(
-                "cannot diagram MOMENT_MATCHING: the legacy factor-only syntax "
-                "does not identify an incident edge endpoint or projection"
-            )
+            if not c.detail:
+                raise ValueError(
+                    "cannot diagram MOMENT_MATCHING: the legacy factor-only syntax "
+                    "does not identify an incident edge endpoint or projection"
+                )
+            endpoint = moment_matching_endpoint(c, template)
+            variable = template.factors[c.target].edges[endpoint.role]
+            mark = (NodeEnd(c.target, endpoint.role), endpoint.projection.value)
+            marks = moment_endpoints.setdefault(variable, [])
+            if mark not in marks:
+                marks.append(mark)
+            node_constraints.setdefault(c.target, []).append(c)
+            continue
         bucket = edge_constraints if c.target in template.variables else node_constraints
         bucket.setdefault(c.target, []).append(c)
 
@@ -186,7 +198,7 @@ def derive(template: Template) -> Diagram:
 
     for var, ends in endpoints.items():
         diagram.wires[f"var:{var}"] = _variable_wire(
-            template, var, ends, edge_constraints.get(var, [])
+            template, var, ends, edge_constraints.get(var, []), moment_endpoints.get(var, [])
         )
     for f in template.factors.values():
         for role, blob in sorted(f.param_blobs.items()):
@@ -246,7 +258,14 @@ def _node_view(
         glyph=GLYPHS.get(f.type, f.type[:3]),  # 3-char cap; tooltip has the name
         groups=tuple(groups),
         pointmass_roles=pointmass,
-        default_factorisation=not mean_field and psub is None and not pointmass,
+        default_factorisation=(
+            not mean_field and psub is None and not pointmass
+            and not any(c.kind is ConstraintKind.MOMENT_MATCHING for c in constraints)
+        ),
+        moment_roles=tuple(sorted({
+            c.detail_dict()["role"] for c in constraints
+            if c.kind is ConstraintKind.MOMENT_MATCHING
+        })),
     )
 
 
@@ -255,6 +274,7 @@ def _variable_wire(
     var: str,
     ends: list[NodeEnd],
     constraints: list[ConstraintSpec],
+    moment_endpoints: list[tuple[NodeEnd, str]],
 ) -> WireView:
     symbol = ""
     bead: str | None = ""
@@ -278,7 +298,12 @@ def _variable_wire(
         pair = (ends[0], TerminalEnd(TerminalKind.OPEN, label=var))
     else:
         raise ValueError(f"variable {var!r} is connected to no factor")
-    return WireView(id=f"var:{var}", label=var, ends=pair, bead=symbol if bead == "" else bead)
+    if moment_endpoints:
+        symbol, bead = "E", ""
+    return WireView(
+        id=f"var:{var}", label=var, ends=pair, bead=symbol if bead == "" else bead,
+        moment_endpoints=tuple(moment_endpoints),
+    )
 
 
 def _detect_composites(

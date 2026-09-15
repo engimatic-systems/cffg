@@ -42,6 +42,7 @@ class Path:
     kind: str = "wire"  # "wire" | "internal"
     label: str = ""
     label_at: tuple[float, float] | None = None
+    dashed: bool = False
 
 
 @dataclass(frozen=True)

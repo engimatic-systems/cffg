@@ -85,6 +85,11 @@ def _plate_from_dict(d: dict[str, Any]) -> PlateSpec:
 
 
 def to_dict(t: Template) -> dict[str, Any]:
+    from cffg.core.moment_matching import moment_matching_problems
+
+    problems = moment_matching_problems(t)
+    if problems:
+        raise ValueError("cannot serialize invalid moment matching: " + "; ".join(problems))
     conflicts = p_substitution_conflicts(t.constraints)
     if conflicts:
         raise ValueError(

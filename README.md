@@ -159,7 +159,7 @@ plus **constraint beads** that pick the variational objective, plus typed
 |---|---|
 | `VariableSpec` | a discrete random variable (an edge; connects ≤ 2 factors) |
 | `FactorSpec` | a distribution node: `categorical`, `matrix_cat`, `transition_mixture`, `equality`, `dirichlet` |
-| `ConstraintSpec` | a bead: `P_SUBSTITUTION` (adds the epistemic/GFE drive), `DELTA` (MAP readout), `MEAN_FIELD` (VMP); the legacy factor-only `MOMENT_MATCHING` placeholder round-trips, but compilation and diagrams reject it because executable EP needs endpoint- and projection-aware schema |
+| `ConstraintSpec` | a bead: `P_SUBSTITUTION` (adds the epistemic/GFE drive), `DELTA` (MAP readout), `MEAN_FIELD` (VMP), or `MOMENT_MATCHING` with an explicit factor endpoint and moment projection |
 | `PortSpec` | a dangling edge with a role: `data` (sensor), `goal`, `prior`, `glue` (composition) |
 | `AgentSpec` | serialized action, sensor, actuator, and rolling-boundary bindings for `RollingAgent` |
 
@@ -360,6 +360,33 @@ mean as the Gaussian drive message. Exact-zero pair exposure contributes exact
 zero natural statistics, so an unexposed source/stick retains its prior. The
 rollover is an empirical-Bayes point estimate; it does not claim to carry
 weight uncertainty inside inference.
+
+### Gaussian moment constraints
+
+Moment matching selects one factor's attachment to an edge and the moments
+that must agree there. To select Gaussian mean and covariance at the `in`
+role of a Gaussian factor named `sensor`:
+
+```python
+from cffg.core import MomentProjection, moment_matching
+
+template.constraints.append(
+    moment_matching("sensor", "in", MomentProjection.GAUSSIAN)
+)
+```
+
+The serialized projection records first and second moments, which determine
+Gaussian mean and covariance. Select the other factor's endpoint separately
+if both ends should be constrained. Diagrams use the paper's `E` edge bead
+and dash only the selected half-edges.
+
+The analytic Gaussian prior and linear conditional accept this projection;
+their inference and free energy are unchanged because those moments determine
+the entire Gaussian density. Other bindings must declare a compatible rule.
+An old factor-only `MOMENT_MATCHING` declaration can be loaded, but compilation
+and drawing reject it. Use `migrate_moment_matching(old, template, role=...,
+projection=...)` with explicit choices; migration never guesses either value.
+Nonlinear projected inference remains under implementation.
 
 ### Recurrent switching state-space models
 

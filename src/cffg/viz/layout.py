@@ -266,7 +266,16 @@ def _emit(
             wire, anchors, centers, sides, style, (pitch_x, pitch_y)
         )
         label_at = _label_pos(pts, style) if wire.label else None
-        wires.append(Path(wire.id, pts, label=wire.label, label_at=label_at))
+        if wire.moment_endpoints:
+            selected = {end for end, _ in wire.moment_endpoints}
+            left, right = _split_at_bead(pts)
+            wires.extend((
+                Path(wire.id, left, label=wire.label, label_at=label_at,
+                     dashed=wire.ends[0] in selected),
+                Path(wire.id, right, dashed=wire.ends[1] in selected),
+            ))
+        else:
+            wires.append(Path(wire.id, pts, label=wire.label, label_at=label_at))
         if term_item:
             terminals.append(term_item)
         if ellipsis_item:
@@ -402,6 +411,16 @@ def _midpoint(pts) -> tuple[float, float]:
     return (x1 + x2) / 2, (y1 + y2) / 2
 
 
+def _split_at_bead(pts):
+    """Split a wire at its edge bead, preserving bends on both half-edges."""
+    index = max(
+        range(len(pts) - 1),
+        key=lambda i: abs(pts[i][0] - pts[i + 1][0]) + abs(pts[i][1] - pts[i + 1][1]),
+    )
+    midpoint = _midpoint(pts)
+    return (*pts[:index + 1], midpoint), (midpoint, *pts[index + 1:])
+
+
 def _label_pos(pts, style) -> tuple[float, float]:
     """Above a horizontal run, right of a vertical one (the papers' habit)."""
     best, best_len = pts[:2], -1.0
@@ -423,6 +442,10 @@ def _node_marginals(name, node, directive, anchors, center, style):
     domes: list[Dome] = []
     cx, cy = center
     ref = f"factor:{name}"
+    moment_points = {
+        anchors[(name, role)][:2] for role in node.moment_roles
+        if (name, role) in anchors
+    }
 
     for group in directive.groups:
         pts = [anchors.get((name, r)) for r in group.roles]
@@ -442,12 +465,18 @@ def _node_marginals(name, node, directive, anchors, center, style):
                 bx, by = x - dx * style.bead_r * 1.9, y - dy * style.bead_r * 1.9
                 beads.append(Bead(ref, bx, by, group.shape, group.symbol))
                 if directive.internal_edges:
-                    internal.append(Path(ref, ((x, y), (bx, by)), kind="internal"))
+                    internal.append(Path(
+                        ref, ((x, y), (bx, by)), kind="internal",
+                        dashed=(x, y) in moment_points,
+                    ))
             else:
                 beads.append(Bead(ref, cx, cy, group.shape, group.symbol))
                 if directive.internal_edges:
                     for x, y, _ in pts:
-                        internal.append(Path(ref, ((x, y), (cx, cy)), kind="internal"))
+                        internal.append(Path(
+                            ref, ((x, y), (cx, cy)), kind="internal",
+                            dashed=(x, y) in moment_points,
+                        ))
     return beads, internal, domes
 
 
