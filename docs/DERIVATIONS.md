@@ -3225,8 +3225,30 @@ captures. `programs` exposes the actual enclosing residual, normal product,
 linear step, outer iteration, certification and solve with dynamic arguments;
 `compiled_memory` lowers descriptors without running the optimizer. Logical
 capture inventories extend buffer lifetimes and are not a peak-memory estimate.
-Actual moderate float32 numerical and iteration-storage qualification remains
-owned by cff-a3wz.
+The separate [moderate attempt 001](../tools/measurements/d12-moderate-001.json)
+at clean source `298790b` completed the twelve frozen T32/T100, K4, d2 native
+float32 starts. All initial and terminal outputs passed the model-point NumPy
+reference and the shared reconstruction checks. The largest terminal certificate
+was `1.6627e-4` against `tau(float32)=4.1059e-4`; all thirty within-horizon
+initialization comparisons stayed below that same material-difference threshold.
+Maximum absolute energy arithmetic errors across initial and terminal points
+were `2.6054e-5` at T32 and `7.0033e-5` at T100, within the original absolute-only
+allowances `0.009765625` and `0.030517578125`. These comparisons hold the returned
+coordinate fixed; they do not measure temporal approximation error. Energy
+stability uses the declared unchanged re-evaluation only after every other
+certificate passes. Every raw-zero start took six accepted updates; all other
+starts took five, with no rejected trials or fallback work.
+
+Ten separate zero-call compilations measured complete solves at independently
+doubled outer/linear caps and the actual enclosing iteration. All four reported
+argument/output/temporary/alias totals were unchanged across each program's cap
+variants. Complete-solve temporary estimates were 5,363,128/17,209,912 bytes at
+T32/T100; enclosing-iteration estimates were 3,844,272/12,389,488 bytes. Logical
+inventories include every declared low word and capture and may double-count
+aliases; child process high-water is a separate lifetime measurement. The wider
+T100/K20/d10 inventory is abstract-only. These two moderate horizons establish no
+T6400/train5120 scaling or recovery result. A3WZ owns interpretation of these
+measurements; production integration remains downstream.
 
 `src/cffg/experiments/hybrid_separator.py` and
 `tests/test_hybrid_separator_derivation.py` anchor:

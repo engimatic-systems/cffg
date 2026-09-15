@@ -349,10 +349,18 @@ invalid-input and zero-budget outcomes also pass. This evidence includes the
 reviewed compensated mixture centering and current solver/storage source.
 The 310.75–380.10 second first JIT calls and 29.29 GiB largest sampled process
 memory describe these tiny layouts on the measured backend; they do not
-establish moderate-scale costs or actual iteration storage. Production still needs moderate float32
-convergence and actual iteration-storage qualification, followed by the
-execution binding. A tiny reference comparison does not establish those
-downstream properties.
+establish moderate-scale costs or actual iteration storage.
+[Moderate attempt 001](../tools/measurements/d12-moderate-001.json) separately
+records all twelve frozen T32/T100 native-float32 starts converging, independent
+saved-output validation, and actual enclosing-program XLA storage estimates.
+All thirty initialization comparisons stayed below their fixed threshold.
+The ten storage compilations made zero executable calls; their logical arrays,
+XLA estimates and process high-water are distinct measurements. The moderate
+solves used no fallback steps, so they do not add execution evidence for that
+path. Production binding remains pending.
+Neither these two horizons nor the tiny checkpoint establish scaling at the
+registered T6400/train5120 workload, parameter-update reuse, universal convergence
+or source recovery. None of the three registered recovery fits has run.
 The local JAX evaluator retains precision and covariance rounding remainders
 to preserve small outgoing messages under strong cavities. Unsupported or
 unresolved compensated arithmetic fails explicitly. A conservative spectral
@@ -360,8 +368,10 @@ interval can remain unresolved even when the exact matrix narrowly satisfies
 the existing resolution threshold. For 100 independent pair regions, K=20,
 d=10, float32 grouped normalization has about 1.59 GB of compiled temporary
 storage on the measured CPU backend. This local inventory is not a 100-state
-chain, which has 99 transition regions; the complete iteration's memory and numerical
-qualification remain pending. D12.6 records the reproducible local inventory.
+chain, which has 99 transition regions. The moderate complete-program measurements
+are recorded in ARCHITECTURE; T100/K20/d10 has only an abstract inventory and no
+complete numerical solve or compiled enclosing-memory measurement. D12.6 records
+the reproducible local inventory.
 
 The current v1 requires equal regime cardinalities
 `K >= 2`, a proper Gaussian drive, finite fixed

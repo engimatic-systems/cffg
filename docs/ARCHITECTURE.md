@@ -932,9 +932,52 @@ retains high/low words through subtraction. Quotient residuals remove each incid
 common scalar gauge and scale all natural coefficients by their compared magnitudes.
 Zero accepted updates must preserve the
 initial coordinate; exactly one accepted update must move it. All-pair comparisons disclose material stationary
-differences without claiming universal uniqueness. This harness is setup, not
-moderate numerical or storage qualification. A3WZ owns both measured phases and
-their interpretation; compiler integration and registered recovery remain gated.
+differences without claiming universal uniqueness.
+
+[Moderate attempt 001](../tools/measurements/d12-moderate-001.json), executed at
+clean source `298790b`, completed all twelve frozen native-float32 starts and
+passed independent validation of every initial and terminal snapshot. Raw-zero
+starts took six accepted updates; feasible and perturbed starts took five.
+All had zero rejected trials and zero Gauss–Newton or linear iterations. The
+largest terminal certificate was `1.6627e-4`, below the fixed `4.1059e-4`
+threshold. All thirty initialization comparisons passed their material-difference
+threshold; the largest scaled difference was `2.9257e-5` in messages. These are
+fixed-model results; they do not establish universal uniqueness or convergence.
+The summary indexes the [lossless raw archive](../tools/measurements/d12-moderate-001.tar.gz)
+and maps all nineteen output groups to their saved leaves.
+
+The separate storage phase compiled ten actual enclosing programs with zero
+executable calls. Complete solves used outer/linear caps 200/128, 400/128 and
+200/256; enclosing iterations used linear caps 128 and 256. Within each horizon
+and program, every variant reported identical argument/output/temporary/alias
+bytes, with zero aliases:
+
+| Horizon | Complete-solve temporary bytes | Enclosing-iteration temporary bytes | Logical derivative-capture bytes |
+| --- | ---: | ---: | ---: |
+| 32 | 5,363,128 | 3,844,272 | 1,946,638 |
+| 100 | 17,209,912 | 12,389,488 | 6,202,758 |
+
+The logical inventory matched all 1,026 declared leaves at each shape, including
+retained low words and integer captures. Its separate T100/K20/d10 case has
+2,205,902,774 derivative-capture bytes; it was abstract-only. Logical sums may
+repeat aliases, and XLA estimates do not measure physical allocation during an
+iteration. Independent child-lifetime high-water was 22.09/22.71 GiB in the two
+solve workers, which retained both initializer and solve executables.
+
+The T32/T100 initializers compiled in 53.85/52.30 seconds; the separate complete
+solves compiled in 195.57/191.45 seconds. Their six authorized synchronized
+solve calls took 0.110–0.138/0.221–0.272 seconds, with export timed separately.
+Each horizon reused its retained objects for the six starts at fixed parameters.
+Persistent and XLA auxiliary caches were disabled; no warmups or extra complete
+calls occurred. Both complete solves recorded 145,990 StableHLO f32 value-type
+occurrences, which are neither IR bytes nor a count of unique buffers.
+Lowered IR byte size was unavailable; the backend reported generated-code bytes
+as zero, which does not establish a meaningful executable-size measurement.
+The historical PR147 full-solve entry includes initialization and has different
+arguments, so timing differences cannot be attributed solely to source repairs.
+These two horizons do not establish scaling at the registered T6400/train5120
+workload. A3WZ owns interpretation of these measurements; compiler activation,
+parameter-update reuse and registered recovery belong to the downstream tickets.
 
 The opt-in developer tool `tools/d12_compile_scaling.py` measures compilation
 of the complete fixed-parameter solve. Its [frozen first measurement](../tools/measurements/d12-compile-001.json)

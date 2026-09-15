@@ -1,0 +1,3752 @@
+{
+  "schema": "cffg.d12-moderate-evidence-summary.v1",
+  "ticket": "cff-a3wz",
+  "attempt": "001",
+  "qualification": {
+    "frozen_numerical_and_storage_gates": "passed",
+    "independent_artifact_review": "pending",
+    "production_integration": "not performed",
+    "registered_recovery_fits": 0
+  },
+  "boundaries": [
+    "Fixed native-float32 full-support T32/T100 K4 d2 model, not universal convergence or recovery.",
+    "Separate T100 K20 d10 abstract inventory is not an executed solve.",
+    "Logical bytes may double-count aliases; XLA statistics and process high-water are separate.",
+    "Executable acquisitions use explicitly disabled caches; no claim about every OS/compiler reuse.",
+    "Historical PR147 full-solve entry includes initialization; this run separately compiles an initializer and an explicit-coordinate solve. Timing differences cannot be attributed solely to source changes.",
+    "No lowered IR byte size was recorded. Backend generated_code_size_in_bytes reports zero; meaningful executable byte size is unavailable.",
+    "The two measured moderate horizons do not establish scaling at the registered T6400/train5120 workload; none of its three registered recovery fits has run.",
+    "Every moderate solve used the fixed-point direction; no fallback execution or changing-parameter callable reuse was exercised by these cases."
+  ],
+  "identity": {
+    "git_revision": "298790bf857753d4a9393015b299e9e90ca1ac84",
+    "git_status": "",
+    "spec_sha256": "3a6bab37fcbab2b3e3ffdac4bc6892f17e2be244c4f2e65754b4b3c3ee660c3b",
+    "sources": {
+      "pyproject.toml": "1de3f72a660eaed6f101990920e102f37858fcc78f0c5466637f16d59d79845f",
+      "src/cffg/__init__.py": "a42ed827e4e8e857ef37069c3db15da8c1389bfd7a8c86e1f47f04767ff929cf",
+      "src/cffg/experiments/__init__.py": "cbf336ea77321df2c1bcc4230cfc5c2f8dbf4c33062bc0df9eb5da3819e51569",
+      "src/cffg/experiments/hybrid_separator.py": "86e13f297f6cd26c096bd70f1e5f6da0a72efa4eddfe99375a6a691fa5a34a85",
+      "src/cffg/experiments/regime_pair.py": "86dc70b5a030f984b89b148f84ab3bb6b978e9c09aced9b5e2af1708857fa9aa",
+      "src/cffg/hybrid_affine.py": "b8715258bc777a2a7ea5df4f310e819c5eccec280a7d93bb833b74682f8728f3",
+      "src/cffg/hybrid_covariance.py": "3928b64c2135ce8a126bc2f53528c85220367d4436c327e7919649215f5634cb",
+      "src/cffg/hybrid_gfe.py": "74130457fa789e308b0f3561dd06dcab69f6d87976c8c00b71e34bfda2ce3814",
+      "src/cffg/hybrid_joint.py": "d39dced160c0890964007d3e0004cf84833c35cd0527592efc9b8644b7c819c6",
+      "src/cffg/hybrid_joint_solver.py": "903c2313a84958cb33be813e064f4005213b23da9021f9451b39278b43b91068",
+      "src/cffg/hybrid_joint_storage.py": "250e00e859f9b51352d54dda7fa9f977be1d5b066995502ac9334fa32d4cd44d",
+      "src/cffg/hybrid_learning.py": "710e601d79b6df00a90d026a56a37b38dc337856a1fb4cbe734e1286df8a1258",
+      "src/cffg/hybrid_natural.py": "655f1262828eba6cfe49facaa9efc653af326928752e90e925ec33e5a9d114c2",
+      "src/cffg/hybrid_separator.py": "d505843591de764be241a82f010dc1711e1ec3ffd5204012dd65a03eb278b99c",
+      "tests/fixtures/hybrid-joint-candidate-spec.json": "20f0dfab78d7f59f895239ccc95cc4a4bc66b5ba1aa94ed8c12ce0608d82f2db",
+      "tools/d12_compile_fixture.py": "a7f8450adbb7958cca3adfba8b5cb307020d03212c146e59218e304307f3724d",
+      "tools/d12_compile_scaling.py": "c81f5e103f09b1f76ab75d909bfb4c123572d57db5836c711ef015b43a1c29bd",
+      "tools/d12_compile_spec.json": "4cb114675eec3f15885869434f7dbb52a0ec79a6f4f668d11ab22de9b423a8e7",
+      "tools/d12_moderate_anchor_checks.py": "0abb86d261f6d0657576add0d59480c75ec47ec8b4ed4233e9ff40c39cbbc06b",
+      "tools/d12_moderate_arithmetic.py": "ca1394cbfed1c768152a65f7af9f33cc2c6f44fec6ec2dee232fa4f31cb492c6",
+      "tools/d12_moderate_checks.py": "b6b71b94a7669a9617f7f21642dde8df2c743805106d03dd8c39d2ad1a6f5560",
+      "tools/d12_moderate_layouts.json.gz": "1b98bcfa48a3aeb8d6de3a6ca14c2c963f5e900faf019faa3f831935244672f9",
+      "tools/d12_moderate_layouts.py": "c40079604a2fdb7ef09d479514cab5dd525888471068a2abf521ca20d8017184",
+      "tools/d12_moderate_payload.py": "ef1aee07667f71021a0e7c6bd34e76205ff7cfd4d0efba29e7297c510828ec8a",
+      "tools/d12_moderate_plan.py": "745c23815a0791d840124cc4c3843fd6e4108987a14c5c893e1101e1619d3f2d",
+      "tools/d12_moderate_reconstruct.py": "1f261b9793511e4e4eae938359eb08a8fd4157d1845e83acf0ae13066721bc36",
+      "tools/d12_moderate_reference.py": "36d69e0c700e987ab3ff1634f005794ec2110ac911c984d8836469d81bb961cb",
+      "tools/d12_moderate_report.py": "27ebe953f5eb1faa76824e8f883aa97ce9250638ff3a90f072521dfd21502d48",
+      "tools/d12_moderate_runner.py": "2da839fe1bab04d393ba25dbbe7cd7253065e04ca462f897f8994f419017a885",
+      "tools/d12_moderate_spec.json": "3a6bab37fcbab2b3e3ffdac4bc6892f17e2be244c4f2e65754b4b3c3ee660c3b",
+      "tools/d12_moderate_workload.py": "749fd67a3b943be755691b301400f453135b7fc0480c1f1593c20895229dce25",
+      "uv.lock": "0ebcc956bf965a2dc0a9cd193b74b0f1b17bc386e15a59dda4f215ec41701a62"
+    }
+  },
+  "independent_saved_report_validation": {
+    "solves": {
+      "phase": "solves",
+      "complete": true,
+      "comparisons": [
+        {
+          "left": "t32-xi0-raw-zero",
+          "right": "t32-xi0-feasible",
+          "scaled_maximum": {
+            "messages": 6.946226826953166e-07,
+            "xi": 5.348987644915024e-08,
+            "energy": 0.0,
+            "regions": 2.530649967076244e-07,
+            "separators": 3.4915156605887153e-07,
+            "learning": 1.1931624821702748e-07
+          },
+          "material": false
+        },
+        {
+          "left": "t32-xi0-raw-zero",
+          "right": "t32-xi0-perturbed",
+          "scaled_maximum": {
+            "messages": 2.459381891433538e-05,
+            "xi": 2.835332942439879e-06,
+            "energy": 1.129269768996576e-07,
+            "regions": 1.3112734102982818e-05,
+            "separators": 1.1350788550665904e-05,
+            "learning": 3.7028967321556365e-06
+          },
+          "material": false
+        },
+        {
+          "left": "t32-xi0-raw-zero",
+          "right": "t32-xi1-raw-zero",
+          "scaled_maximum": {
+            "messages": 7.810087210060189e-07,
+            "xi": 1.1995607288581638e-07,
+            "energy": 1.129259184519031e-07,
+            "regions": 3.8650333433692276e-07,
+            "separators": 4.2670518895824356e-07,
+            "learning": 1.2201053746447023e-07
+          },
+          "material": false
+        },
+        {
+          "left": "t32-xi0-raw-zero",
+          "right": "t32-xi1-feasible",
+          "scaled_maximum": {
+            "messages": 2.90556358128527e-06,
+            "xi": 5.382016458445531e-07,
+            "energy": 3.3878096895648346e-07,
+            "regions": 1.5728384709705765e-06,
+            "separators": 2.005397165228636e-06,
+            "learning": 4.5448400099342754e-07
+          },
+          "material": false
+        },
+        {
+          "left": "t32-xi0-raw-zero",
+          "right": "t32-xi1-perturbed",
+          "scaled_maximum": {
+            "messages": 2.7312362723351286e-05,
+            "xi": 3.252630473060038e-06,
+            "energy": 3.387808541839774e-07,
+            "regions": 1.393924830454657e-05,
+            "separators": 1.286190752949522e-05,
+            "learning": 4.067969572749873e-06
+          },
+          "material": false
+        },
+        {
+          "left": "t32-xi0-feasible",
+          "right": "t32-xi0-perturbed",
+          "scaled_maximum": {
+            "messages": 2.4710544935358403e-05,
+            "xi": 2.888703915474042e-06,
+            "energy": 1.129269768996576e-07,
+            "regions": 1.334631063155189e-05,
+            "separators": 1.1235655443928738e-05,
+            "learning": 3.67309474638376e-06
+          },
+          "material": false
+        },
+        {
+          "left": "t32-xi0-feasible",
+          "right": "t32-xi1-raw-zero",
+          "scaled_maximum": {
+            "messages": 6.703723236136557e-07,
+            "xi": 9.99633960700497e-08,
+            "energy": 1.129259184519031e-07,
+            "regions": 3.733708197636376e-07,
+            "separators": 4.4588507149643774e-07,
+            "learning": 1.1386058812808098e-07
+          },
+          "material": false
+        },
+        {
+          "left": "t32-xi0-feasible",
+          "right": "t32-xi1-feasible",
+          "scaled_maximum": {
+            "messages": 2.774618935463369e-06,
+            "xi": 5.249127232930552e-07,
+            "energy": 3.3878096895648346e-07,
+            "regions": 1.4649107811961283e-06,
+            "separators": 1.755850425412128e-06,
+            "learning": 4.246712320115506e-07
+          },
+          "material": false
+        },
+        {
+          "left": "t32-xi0-feasible",
+          "right": "t32-xi1-perturbed",
+          "scaled_maximum": {
+            "messages": 2.71991246001028e-05,
+            "xi": 3.2192360171865795e-06,
+            "energy": 3.387808541839774e-07,
+            "regions": 1.3831349554238264e-05,
+            "separators": 1.261350159008437e-05,
+            "learning": 4.038167597857932e-06
+          },
+          "material": false
+        },
+        {
+          "left": "t32-xi0-perturbed",
+          "right": "t32-xi1-raw-zero",
+          "scaled_maximum": {
+            "messages": 2.524465491034253e-05,
+            "xi": 2.935403516878934e-06,
+            "energy": 1.129269768996576e-07,
+            "regions": 1.3261331509531346e-05,
+            "separators": 1.1067881358825599e-05,
+            "learning": 3.6507432570548527e-06
+          },
+          "material": false
+        },
+        {
+          "left": "t32-xi0-perturbed",
+          "right": "t32-xi1-feasible",
+          "scaled_maximum": {
+            "messages": 2.744122639686666e-05,
+            "xi": 3.349028557893693e-06,
+            "energy": 4.517079075986304e-07,
+            "regions": 1.4187742470068657e-05,
+            "separators": 1.1196354591206913e-05,
+            "learning": 3.948725545477505e-06
+          },
+          "material": false
+        },
+        {
+          "left": "t32-xi0-perturbed",
+          "right": "t32-xi1-perturbed",
+          "scaled_maximum": {
+            "messages": 2.8545394302922645e-06,
+            "xi": 5.249126081968638e-07,
+            "energy": 2.2585390278931829e-07,
+            "regions": 1.501632361249887e-06,
+            "separators": 1.8028382102200103e-06,
+            "learning": 4.395814975528349e-07
+          },
+          "material": false
+        },
+        {
+          "left": "t32-xi1-raw-zero",
+          "right": "t32-xi1-feasible",
+          "scaled_maximum": {
+            "messages": 2.2508400092445823e-06,
+            "xi": 4.4705648501972103e-07,
+            "energy": 3.3878096895648346e-07,
+            "regions": 1.252781169624372e-06,
+            "separators": 1.6542838568384371e-06,
+            "learning": 3.72526856597299e-07
+          },
+          "material": false
+        },
+        {
+          "left": "t32-xi1-raw-zero",
+          "right": "t32-xi1-perturbed",
+          "scaled_maximum": {
+            "messages": 2.6632933599163464e-05,
+            "xi": 3.152447098748502e-06,
+            "energy": 3.387808541839774e-07,
+            "regions": 1.3619209570483927e-05,
+            "separators": 1.2579000765166196e-05,
+            "learning": 4.015816116688977e-06
+          },
+          "material": false
+        },
+        {
+          "left": "t32-xi1-feasible",
+          "right": "t32-xi1-perturbed",
+          "scaled_maximum": {
+            "messages": 2.4784890969170626e-05,
+            "xi": 2.902047955895489e-06,
+            "energy": 6.775617083679548e-07,
+            "regions": 1.3368124911450828e-05,
+            "separators": 1.124261936170688e-05,
+            "learning": 3.680543899154647e-06
+          },
+          "material": false
+        },
+        {
+          "left": "t100-xi0-raw-zero",
+          "right": "t100-xi0-feasible",
+          "scaled_maximum": {
+            "messages": 6.946377209584704e-07,
+            "xi": 5.3467934581206756e-08,
+            "energy": 8.200910834161796e-07,
+            "regions": 3.691854219014083e-07,
+            "separators": 3.4226171579593195e-07,
+            "learning": 8.540951458576105e-08
+          },
+          "material": false
+        },
+        {
+          "left": "t100-xi0-raw-zero",
+          "right": "t100-xi0-perturbed",
+          "scaled_maximum": {
+            "messages": 2.644086308721593e-05,
+            "xi": 2.2378632732276336e-06,
+            "energy": 6.834092361801497e-08,
+            "regions": 1.381789212367866e-05,
+            "separators": 2.3425316007116206e-05,
+            "learning": 2.682144288231808e-06
+          },
+          "material": false
+        },
+        {
+          "left": "t100-xi0-raw-zero",
+          "right": "t100-xi1-raw-zero",
+          "scaled_maximum": {
+            "messages": 7.671270336520385e-07,
+            "xi": 1.1986308279778174e-07,
+            "energy": 2.733636944720599e-07,
+            "regions": 3.841004650989596e-07,
+            "separators": 4.1188359248677603e-07,
+            "learning": 1.8730725147287185e-07
+          },
+          "material": false
+        },
+        {
+          "left": "t100-xi0-raw-zero",
+          "right": "t100-xi1-feasible",
+          "scaled_maximum": {
+            "messages": 2.8772511468756694e-06,
+            "xi": 5.393838725900179e-07,
+            "energy": 6.834092361801497e-08,
+            "regions": 1.578562993343446e-06,
+            "separators": 2.0459102392736587e-06,
+            "learning": 4.619345549450925e-07
+          },
+          "material": false
+        },
+        {
+          "left": "t100-xi0-raw-zero",
+          "right": "t100-xi1-perturbed",
+          "scaled_maximum": {
+            "messages": 2.9256505497573642e-05,
+            "xi": 2.7373863252873734e-06,
+            "energy": 6.834091894753344e-08,
+            "regions": 1.4429844570190487e-05,
+            "separators": 2.514424901982176e-05,
+            "learning": 2.9801991988986136e-06
+          },
+          "material": false
+        },
+        {
+          "left": "t100-xi0-feasible",
+          "right": "t100-xi0-perturbed",
+          "scaled_maximum": {
+            "messages": 2.634182299832937e-05,
+            "xi": 2.1912412238624384e-06,
+            "energy": 7.517502111734684e-07,
+            "regions": 1.3943452816841103e-05,
+            "separators": 2.316208929363422e-05,
+            "learning": 2.704495430185015e-06
+          },
+          "material": false
+        },
+        {
+          "left": "t100-xi0-feasible",
+          "right": "t100-xi1-raw-zero",
+          "scaled_maximum": {
+            "messages": 6.945852104980998e-07,
+            "xi": 8.007682998144847e-08,
+            "energy": 5.467275383995795e-07,
+            "regions": 3.7301254254674313e-07,
+            "separators": 4.4588507149643774e-07,
+            "learning": 1.4978765727235928e-07
+          },
+          "material": false
+        },
+        {
+          "left": "t100-xi0-feasible",
+          "right": "t100-xi1-feasible",
+          "scaled_maximum": {
+            "messages": 2.8064702594966806e-06,
+            "xi": 5.191464989289242e-07,
+            "energy": 7.517502111734684e-07,
+            "regions": 1.4565689911521494e-06,
+            "separators": 1.7698412406936868e-06,
+            "learning": 4.1723122956977926e-07
+          },
+          "material": false
+        },
+        {
+          "left": "t100-xi0-feasible",
+          "right": "t100-xi1-perturbed",
+          "scaled_maximum": {
+            "messages": 2.9157465687555926e-05,
+            "xi": 2.6907642992110187e-06,
+            "energy": 8.884319463179348e-07,
+            "regions": 1.4219481120379993e-05,
+            "separators": 2.4890085910424357e-05,
+            "learning": 2.942946708912381e-06
+          },
+          "material": false
+        },
+        {
+          "left": "t100-xi0-perturbed",
+          "right": "t100-xi1-raw-zero",
+          "scaled_maximum": {
+            "messages": 2.595988983990105e-05,
+            "xi": 2.2196004571203818e-06,
+            "energy": 2.050227848654914e-07,
+            "regions": 1.4201987281318829e-05,
+            "separators": 2.3089432903548253e-05,
+            "learning": 2.756648090856916e-06
+          },
+          "material": false
+        },
+        {
+          "left": "t100-xi0-perturbed",
+          "right": "t100-xi1-feasible",
+          "scaled_maximum": {
+            "messages": 2.8114957030808865e-05,
+            "xi": 2.6328594010887413e-06,
+            "energy": 1.366805301728421e-07,
+            "regions": 1.5396433304608953e-05,
+            "separators": 2.4150299434270477e-05,
+            "learning": 3.114266188922339e-06
+          },
+          "material": false
+        },
+        {
+          "left": "t100-xi0-perturbed",
+          "right": "t100-xi1-perturbed",
+          "scaled_maximum": {
+            "messages": 2.89501326073565e-06,
+            "xi": 5.060889863323277e-07,
+            "energy": 1.3668183789506689e-07,
+            "regions": 1.520503678127825e-06,
+            "separators": 1.8905690683792162e-06,
+            "learning": 4.3958378687142193e-07
+          },
+          "material": false
+        },
+        {
+          "left": "t100-xi1-raw-zero",
+          "right": "t100-xi1-feasible",
+          "scaled_maximum": {
+            "messages": 2.204832312221696e-06,
+            "xi": 4.4705648501972103e-07,
+            "energy": 2.050227848654914e-07,
+            "regions": 1.2546100357716207e-06,
+            "separators": 1.650919101990949e-06,
+            "learning": 3.72526856597299e-07
+          },
+          "material": false
+        },
+        {
+          "left": "t100-xi1-raw-zero",
+          "right": "t100-xi1-perturbed",
+          "scaled_maximum": {
+            "messages": 2.8641043503187657e-05,
+            "xi": 2.644142268787425e-06,
+            "energy": 3.417045947376672e-07,
+            "regions": 1.4297460675051124e-05,
+            "separators": 2.4804171619923827e-05,
+            "learning": 2.928045712917888e-06
+          },
+          "material": false
+        },
+        {
+          "left": "t100-xi1-feasible",
+          "right": "t100-xi1-perturbed",
+          "scaled_maximum": {
+            "messages": 2.6440937535441026e-05,
+            "xi": 2.204562911068978e-06,
+            "energy": 1.3668183789506689e-07,
+            "regions": 1.3988838830356713e-05,
+            "separators": 2.3248608934900423e-05,
+            "learning": 2.741746309864643e-06
+          },
+          "material": false
+        }
+      ],
+      "material_differences": 0,
+      "qualification": "A3WZ requires both phases and diagnosis of material differences; no recovery evidence"
+    },
+    "storage": {
+      "phase": "storage",
+      "complete": true,
+      "comparisons": [],
+      "material_differences": 0,
+      "qualification": "A3WZ requires both phases and diagnosis of material differences; no recovery evidence"
+    }
+  },
+  "solve_workers": [
+    {
+      "T": 32,
+      "initialization_compilation": {
+        "lower_seconds": 7.225363416,
+        "stablehlo_dtypes": {
+          "value_type_occurrences": {
+            "f32": 56256
+          },
+          "meaning": "Occurrences, not unique buffers or bytes; includes nested operands/results/block arguments"
+        },
+        "compile_seconds": 53.847739042,
+        "xla_memory": {
+          "available": true,
+          "estimates": {
+            "argument_size_in_bytes": 14168,
+            "output_size_in_bytes": 157656,
+            "temp_size_in_bytes": 2409056,
+            "alias_size_in_bytes": 0,
+            "generated_code_size_in_bytes": 0,
+            "host_argument_size_in_bytes": 0,
+            "host_output_size_in_bytes": 0,
+            "host_temp_size_in_bytes": 0,
+            "host_alias_size_in_bytes": 0,
+            "peak_memory_in_bytes": 181223
+          },
+          "meaning": "XLA estimates; backend-specific extra fields are not process RSS"
+        },
+        "calls": {
+          "lower": 1,
+          "compile": 1,
+          "execute": 6
+        }
+      },
+      "solve_compilation": {
+        "lower_seconds": 5.346965291,
+        "stablehlo_dtypes": {
+          "value_type_occurrences": {
+            "f32": 145990
+          },
+          "meaning": "Occurrences, not unique buffers or bytes; includes nested operands/results/block arguments"
+        },
+        "compile_seconds": 195.571380125,
+        "xla_memory": {
+          "available": true,
+          "estimates": {
+            "argument_size_in_bytes": 21352,
+            "output_size_in_bytes": 157656,
+            "temp_size_in_bytes": 5363128,
+            "alias_size_in_bytes": 0,
+            "generated_code_size_in_bytes": 0,
+            "host_argument_size_in_bytes": 0,
+            "host_output_size_in_bytes": 0,
+            "host_temp_size_in_bytes": 0,
+            "host_alias_size_in_bytes": 0,
+            "peak_memory_in_bytes": 205246
+          },
+          "meaning": "XLA estimates; backend-specific extra fields are not process RSS"
+        },
+        "calls": {
+          "lower": 1,
+          "compile": 1,
+          "execute": 6
+        }
+      },
+      "process": {
+        "exit_code": 0,
+        "stop": null,
+        "worker_seconds": 276.6901817917824,
+        "cache_evidence": {
+          "log": "compiler.log",
+          "log_sha256": "f9c51ced6c2c15fe04121933d77773b3644051682fa37dc91f2092f9feac4778",
+          "observed_log_occurrences": {
+            "persistent_hits": 0,
+            "persistent_misses": 0,
+            "tracing_misses": 160
+          },
+          "meaning": "All worker compilations, including small layout setup; absent log messages do not prove a cold backend"
+        },
+        "process_high_water": {
+          "mechanism": "parent os.wait4 of actual worker PID; process lifetime, not phase peaks",
+          "raw_ru_maxrss": 23717445632,
+          "raw_unit": "bytes",
+          "bytes": 23717445632
+        },
+        "rss_samples": {
+          "count": 273,
+          "maximum_bytes": 23717412864,
+          "meaning": "sampled current RSS; transient peaks may be missed"
+        }
+      },
+      "retained_objects": 4,
+      "runtime": {
+        "python": "3.12.13 (main, May 10 2026, 19:20:41) [Clang 22.1.3 ]",
+        "executable": "/Users/ravd/projects/cffg-d12-moderate/.venv/bin/python3",
+        "platform": "macOS-15.7.5-arm64-arm-64bit",
+        "machine": "arm64",
+        "jax": "0.10.2",
+        "jaxlib": "0.10.2",
+        "numpy": "2.5.1",
+        "backend": "cpu",
+        "devices": [
+          "cpu:0"
+        ],
+        "environment": {
+          "JAX_ENABLE_X64": "false",
+          "JAX_EXPLICIT_X64_DTYPES": "error",
+          "JAX_PLATFORMS": "cpu",
+          "JAX_ENABLE_COMPILATION_CACHE": "false",
+          "JAX_COMPILATION_CACHE_DIR": null,
+          "XLA_FLAGS": null
+        }
+      }
+    },
+    {
+      "T": 100,
+      "initialization_compilation": {
+        "lower_seconds": 5.743260625,
+        "stablehlo_dtypes": {
+          "value_type_occurrences": {
+            "f32": 56256
+          },
+          "meaning": "Occurrences, not unique buffers or bytes; includes nested operands/results/block arguments"
+        },
+        "compile_seconds": 52.303113833,
+        "xla_memory": {
+          "available": true,
+          "estimates": {
+            "argument_size_in_bytes": 44904,
+            "output_size_in_bytes": 501736,
+            "temp_size_in_bytes": 7627872,
+            "alias_size_in_bytes": 0,
+            "generated_code_size_in_bytes": 0,
+            "host_argument_size_in_bytes": 0,
+            "host_output_size_in_bytes": 0,
+            "host_temp_size_in_bytes": 0,
+            "host_alias_size_in_bytes": 0,
+            "peak_memory_in_bytes": 570188
+          },
+          "meaning": "XLA estimates; backend-specific extra fields are not process RSS"
+        },
+        "calls": {
+          "lower": 1,
+          "compile": 1,
+          "execute": 6
+        }
+      },
+      "solve_compilation": {
+        "lower_seconds": 5.528325084,
+        "stablehlo_dtypes": {
+          "value_type_occurrences": {
+            "f32": 145990
+          },
+          "meaning": "Occurrences, not unique buffers or bytes; includes nested operands/results/block arguments"
+        },
+        "compile_seconds": 191.445660291,
+        "xla_memory": {
+          "available": true,
+          "estimates": {
+            "argument_size_in_bytes": 67864,
+            "output_size_in_bytes": 501736,
+            "temp_size_in_bytes": 17209912,
+            "alias_size_in_bytes": 0,
+            "generated_code_size_in_bytes": 0,
+            "host_argument_size_in_bytes": 0,
+            "host_output_size_in_bytes": 0,
+            "host_temp_size_in_bytes": 0,
+            "host_alias_size_in_bytes": 0,
+            "peak_memory_in_bytes": 638284
+          },
+          "meaning": "XLA estimates; backend-specific extra fields are not process RSS"
+        },
+        "calls": {
+          "lower": 1,
+          "compile": 1,
+          "execute": 6
+        }
+      },
+      "process": {
+        "exit_code": 0,
+        "stop": null,
+        "worker_seconds": 269.4350863341242,
+        "cache_evidence": {
+          "log": "compiler.log",
+          "log_sha256": "e7f12c392340ed473441a7f5d18aaa0334bdc5ae88f721d8dc15243403947cf6",
+          "observed_log_occurrences": {
+            "persistent_hits": 0,
+            "persistent_misses": 0,
+            "tracing_misses": 160
+          },
+          "meaning": "All worker compilations, including small layout setup; absent log messages do not prove a cold backend"
+        },
+        "process_high_water": {
+          "mechanism": "parent os.wait4 of actual worker PID; process lifetime, not phase peaks",
+          "raw_ru_maxrss": 24379850752,
+          "raw_unit": "bytes",
+          "bytes": 24379850752
+        },
+        "rss_samples": {
+          "count": 266,
+          "maximum_bytes": 24379834368,
+          "meaning": "sampled current RSS; transient peaks may be missed"
+        }
+      },
+      "retained_objects": 4,
+      "runtime": {
+        "python": "3.12.13 (main, May 10 2026, 19:20:41) [Clang 22.1.3 ]",
+        "executable": "/Users/ravd/projects/cffg-d12-moderate/.venv/bin/python3",
+        "platform": "macOS-15.7.5-arm64-arm-64bit",
+        "machine": "arm64",
+        "jax": "0.10.2",
+        "jaxlib": "0.10.2",
+        "numpy": "2.5.1",
+        "backend": "cpu",
+        "devices": [
+          "cpu:0"
+        ],
+        "environment": {
+          "JAX_ENABLE_X64": "false",
+          "JAX_EXPLICIT_X64_DTYPES": "error",
+          "JAX_PLATFORMS": "cpu",
+          "JAX_ENABLE_COMPILATION_CACHE": "false",
+          "JAX_COMPILATION_CACHE_DIR": null,
+          "XLA_FLAGS": null
+        }
+      }
+    }
+  ],
+  "cases": [
+    {
+      "case": {
+        "id": "t32-xi0-raw-zero",
+        "T": 32,
+        "K": 4,
+        "d": 2,
+        "xi": 0,
+        "messages": "raw-zero"
+      },
+      "initialization_seconds": 0.021552166,
+      "initial_status": {
+        "outcome": 3,
+        "reason": 1,
+        "numerical": 0
+      },
+      "solve_seconds": 0.1383655,
+      "export_seconds": 3.202041833,
+      "terminal_status": {
+        "outcome": 0,
+        "reason": 0,
+        "numerical": 0
+      },
+      "energy_arithmetic": {
+        "initial": {
+          "free_energy": {
+            "actual": 55.13752746582031,
+            "reference": 55.13751154019682,
+            "absolute_error": 1.5925623493728835e-05
+          },
+          "dual_energy": {
+            "actual": 35.06134033203125,
+            "reference": 35.06133324416867,
+            "absolute_error": 7.087862577748183e-06
+          }
+        },
+        "terminal": {
+          "free_energy": {
+            "actual": 32.780208587646484,
+            "reference": 32.78022253268175,
+            "absolute_error": 1.3945035263418504e-05
+          },
+          "dual_energy": {
+            "actual": 32.78052520751953,
+            "reference": 32.78052267810798,
+            "absolute_error": 2.529411553098271e-06
+          }
+        }
+      },
+      "work": {
+        "iterations": 6,
+        "evaluations": 8,
+        "rejected_trials": 0,
+        "linear_iterations": 0,
+        "gauss_newton_steps": 0,
+        "rejection_counts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "last_rejection": 0
+      },
+      "certificates": {
+        "natural": 0.000135861337184906,
+        "label_mass": 1.1324882507324219e-05,
+        "conditional_mean": 0.00010626018047332764,
+        "conditional_covariance": 2.475222117936937e-06,
+        "auxiliary": 2.4538006982766092e-05,
+        "primal_dual": 9.37294043978909e-06,
+        "relative_energy_change": 0.0
+      },
+      "output_group_element_counts": {
+        "messages": 1736,
+        "xi": 372,
+        "energy": 2,
+        "regions_probability": 496,
+        "regions_displacement": 1984,
+        "regions_mean": 1984,
+        "regions_covariance": 7936,
+        "regions_second": 7936,
+        "separators_probability": 128,
+        "separators_displacement": 256,
+        "separators_mean": 256,
+        "separators_covariance": 512,
+        "separators_second": 512,
+        "learning_target": 372,
+        "learning_exposure": 372,
+        "learning_centered_linear": 1116,
+        "learning_centered_precision": 3348,
+        "learning_linear": 1116,
+        "learning_precision": 3348
+      },
+      "snapshot_leaves": {
+        "initial": 77,
+        "terminal": 77
+      },
+      "floating_snapshot_dtypes": [
+        "float32"
+      ]
+    },
+    {
+      "case": {
+        "id": "t32-xi0-feasible",
+        "T": 32,
+        "K": 4,
+        "d": 2,
+        "xi": 0,
+        "messages": "feasible"
+      },
+      "initialization_seconds": 0.032499125,
+      "initial_status": {
+        "outcome": 3,
+        "reason": 1,
+        "numerical": 0
+      },
+      "solve_seconds": 0.11361925,
+      "export_seconds": 0.026319166999999997,
+      "terminal_status": {
+        "outcome": 0,
+        "reason": 0,
+        "numerical": 0
+      },
+      "energy_arithmetic": {
+        "initial": {
+          "free_energy": {
+            "actual": 33.88405990600586,
+            "reference": 33.88404455298655,
+            "absolute_error": 1.5353019307440263e-05
+          },
+          "dual_energy": {
+            "actual": 32.78778076171875,
+            "reference": 32.78777764593547,
+            "absolute_error": 3.115783279383777e-06
+          }
+        },
+        "terminal": {
+          "free_energy": {
+            "actual": 32.780208587646484,
+            "reference": 32.780221532269366,
+            "absolute_error": 1.294462288115028e-05
+          },
+          "dual_energy": {
+            "actual": 32.78052520751953,
+            "reference": 32.780522678375675,
+            "absolute_error": 2.529143856122573e-06
+          }
+        }
+      },
+      "work": {
+        "iterations": 5,
+        "evaluations": 7,
+        "rejected_trials": 0,
+        "linear_iterations": 0,
+        "gauss_newton_steps": 0,
+        "rejection_counts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "last_rejection": 0
+      },
+      "certificates": {
+        "natural": 0.00013594329357147217,
+        "label_mass": 1.1324882507324219e-05,
+        "conditional_mean": 0.00010594725608825684,
+        "conditional_covariance": 2.4552091417717747e-06,
+        "auxiliary": 2.4531364033464342e-05,
+        "primal_dual": 9.37294043978909e-06,
+        "relative_energy_change": 0.0
+      },
+      "output_group_element_counts": {
+        "messages": 1736,
+        "xi": 372,
+        "energy": 2,
+        "regions_probability": 496,
+        "regions_displacement": 1984,
+        "regions_mean": 1984,
+        "regions_covariance": 7936,
+        "regions_second": 7936,
+        "separators_probability": 128,
+        "separators_displacement": 256,
+        "separators_mean": 256,
+        "separators_covariance": 512,
+        "separators_second": 512,
+        "learning_target": 372,
+        "learning_exposure": 372,
+        "learning_centered_linear": 1116,
+        "learning_centered_precision": 3348,
+        "learning_linear": 1116,
+        "learning_precision": 3348
+      },
+      "snapshot_leaves": {
+        "initial": 77,
+        "terminal": 77
+      },
+      "floating_snapshot_dtypes": [
+        "float32"
+      ]
+    },
+    {
+      "case": {
+        "id": "t32-xi0-perturbed",
+        "T": 32,
+        "K": 4,
+        "d": 2,
+        "xi": 0,
+        "messages": "perturbed"
+      },
+      "initialization_seconds": 0.028023959,
+      "initial_status": {
+        "outcome": 3,
+        "reason": 1,
+        "numerical": 0
+      },
+      "solve_seconds": 0.112191083,
+      "export_seconds": 0.030440709,
+      "terminal_status": {
+        "outcome": 0,
+        "reason": 0,
+        "numerical": 0
+      },
+      "energy_arithmetic": {
+        "initial": {
+          "free_energy": {
+            "actual": 33.88627624511719,
+            "reference": 33.88628290651247,
+            "absolute_error": 6.661395282492322e-06
+          },
+          "dual_energy": {
+            "actual": 32.787628173828125,
+            "reference": 32.78762489663878,
+            "absolute_error": 3.277189343009468e-06
+          }
+        },
+        "terminal": {
+          "free_energy": {
+            "actual": 32.78021240234375,
+            "reference": 32.78022312507501,
+            "absolute_error": 1.0722731261125773e-05
+          },
+          "dual_energy": {
+            "actual": 32.78052520751953,
+            "reference": 32.7805226776676,
+            "absolute_error": 2.52985193327504e-06
+          }
+        }
+      },
+      "work": {
+        "iterations": 5,
+        "evaluations": 7,
+        "rejected_trials": 0,
+        "linear_iterations": 0,
+        "gauss_newton_steps": 0,
+        "rejection_counts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "last_rejection": 0
+      },
+      "certificates": {
+        "natural": 0.00016298145055770874,
+        "label_mass": 1.2874603271484375e-05,
+        "conditional_mean": 0.00011236965656280518,
+        "conditional_covariance": 2.6656898626242764e-06,
+        "auxiliary": 2.366465560044162e-05,
+        "primal_dual": 9.260012120648753e-06,
+        "relative_energy_change": 0.0
+      },
+      "output_group_element_counts": {
+        "messages": 1736,
+        "xi": 372,
+        "energy": 2,
+        "regions_probability": 496,
+        "regions_displacement": 1984,
+        "regions_mean": 1984,
+        "regions_covariance": 7936,
+        "regions_second": 7936,
+        "separators_probability": 128,
+        "separators_displacement": 256,
+        "separators_mean": 256,
+        "separators_covariance": 512,
+        "separators_second": 512,
+        "learning_target": 372,
+        "learning_exposure": 372,
+        "learning_centered_linear": 1116,
+        "learning_centered_precision": 3348,
+        "learning_linear": 1116,
+        "learning_precision": 3348
+      },
+      "snapshot_leaves": {
+        "initial": 77,
+        "terminal": 77
+      },
+      "floating_snapshot_dtypes": [
+        "float32"
+      ]
+    },
+    {
+      "case": {
+        "id": "t32-xi1-raw-zero",
+        "T": 32,
+        "K": 4,
+        "d": 2,
+        "xi": 1,
+        "messages": "raw-zero"
+      },
+      "initialization_seconds": 0.0148135,
+      "initial_status": {
+        "outcome": 3,
+        "reason": 1,
+        "numerical": 0
+      },
+      "solve_seconds": 0.128247208,
+      "export_seconds": 0.025063459,
+      "terminal_status": {
+        "outcome": 0,
+        "reason": 0,
+        "numerical": 0
+      },
+      "energy_arithmetic": {
+        "initial": {
+          "free_energy": {
+            "actual": 55.33709716796875,
+            "reference": 55.33712322146564,
+            "absolute_error": 2.6053496888778227e-05
+          },
+          "dual_energy": {
+            "actual": 35.259544372558594,
+            "reference": 35.25954360874037,
+            "absolute_error": 7.638182211167077e-07
+          }
+        },
+        "terminal": {
+          "free_energy": {
+            "actual": 32.780208587646484,
+            "reference": 32.7802204387974,
+            "absolute_error": 1.1851150915731523e-05
+          },
+          "dual_energy": {
+            "actual": 32.7805290222168,
+            "reference": 32.78052267726345,
+            "absolute_error": 6.344953348502713e-06
+          }
+        }
+      },
+      "work": {
+        "iterations": 6,
+        "evaluations": 8,
+        "rejected_trials": 0,
+        "linear_iterations": 0,
+        "gauss_newton_steps": 0,
+        "rejection_counts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "last_rejection": 0
+      },
+      "certificates": {
+        "natural": 0.0001363903284072876,
+        "label_mass": 1.138448715209961e-05,
+        "conditional_mean": 0.00010609626770019531,
+        "conditional_covariance": 2.4520311399101047e-06,
+        "auxiliary": 2.4604454665677622e-05,
+        "primal_dual": 9.485866939940024e-06,
+        "relative_energy_change": 1.1292699042542154e-07
+      },
+      "output_group_element_counts": {
+        "messages": 1736,
+        "xi": 372,
+        "energy": 2,
+        "regions_probability": 496,
+        "regions_displacement": 1984,
+        "regions_mean": 1984,
+        "regions_covariance": 7936,
+        "regions_second": 7936,
+        "separators_probability": 128,
+        "separators_displacement": 256,
+        "separators_mean": 256,
+        "separators_covariance": 512,
+        "separators_second": 512,
+        "learning_target": 372,
+        "learning_exposure": 372,
+        "learning_centered_linear": 1116,
+        "learning_centered_precision": 3348,
+        "learning_linear": 1116,
+        "learning_precision": 3348
+      },
+      "snapshot_leaves": {
+        "initial": 77,
+        "terminal": 77
+      },
+      "floating_snapshot_dtypes": [
+        "float32"
+      ]
+    },
+    {
+      "case": {
+        "id": "t32-xi1-feasible",
+        "T": 32,
+        "K": 4,
+        "d": 2,
+        "xi": 1,
+        "messages": "feasible"
+      },
+      "initialization_seconds": 0.027207416,
+      "initial_status": {
+        "outcome": 3,
+        "reason": 1,
+        "numerical": 0
+      },
+      "solve_seconds": 0.111448583,
+      "export_seconds": 0.025590500000000002,
+      "terminal_status": {
+        "outcome": 0,
+        "reason": 0,
+        "numerical": 0
+      },
+      "energy_arithmetic": {
+        "initial": {
+          "free_energy": {
+            "actual": 34.0916748046875,
+            "reference": 34.091678303934145,
+            "absolute_error": 3.499246645333187e-06
+          },
+          "dual_energy": {
+            "actual": 32.995296478271484,
+            "reference": 32.99529741603089,
+            "absolute_error": 9.377594025750113e-07
+          }
+        },
+        "terminal": {
+          "free_energy": {
+            "actual": 32.78019714355469,
+            "reference": 32.78021649172513,
+            "absolute_error": 1.934817044002557e-05
+          },
+          "dual_energy": {
+            "actual": 32.78052520751953,
+            "reference": 32.78052267529008,
+            "absolute_error": 2.5322294519014577e-06
+          }
+        }
+      },
+      "work": {
+        "iterations": 5,
+        "evaluations": 7,
+        "rejected_trials": 0,
+        "linear_iterations": 0,
+        "gauss_newton_steps": 0,
+        "rejection_counts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "last_rejection": 0
+      },
+      "certificates": {
+        "natural": 0.00013790279626846313,
+        "label_mass": 1.1622905731201172e-05,
+        "conditional_mean": 0.00010538101196289062,
+        "conditional_covariance": 2.3226909888762748e-06,
+        "auxiliary": 2.4910110369091853e-05,
+        "primal_dual": 9.7117244877154e-06,
+        "relative_energy_change": 0.0
+      },
+      "output_group_element_counts": {
+        "messages": 1736,
+        "xi": 372,
+        "energy": 2,
+        "regions_probability": 496,
+        "regions_displacement": 1984,
+        "regions_mean": 1984,
+        "regions_covariance": 7936,
+        "regions_second": 7936,
+        "separators_probability": 128,
+        "separators_displacement": 256,
+        "separators_mean": 256,
+        "separators_covariance": 512,
+        "separators_second": 512,
+        "learning_target": 372,
+        "learning_exposure": 372,
+        "learning_centered_linear": 1116,
+        "learning_centered_precision": 3348,
+        "learning_linear": 1116,
+        "learning_precision": 3348
+      },
+      "snapshot_leaves": {
+        "initial": 77,
+        "terminal": 77
+      },
+      "floating_snapshot_dtypes": [
+        "float32"
+      ]
+    },
+    {
+      "case": {
+        "id": "t32-xi1-perturbed",
+        "T": 32,
+        "K": 4,
+        "d": 2,
+        "xi": 1,
+        "messages": "perturbed"
+      },
+      "initialization_seconds": 0.027209416,
+      "initial_status": {
+        "outcome": 3,
+        "reason": 1,
+        "numerical": 0
+      },
+      "solve_seconds": 0.110033667,
+      "export_seconds": 0.03082675,
+      "terminal_status": {
+        "outcome": 0,
+        "reason": 0,
+        "numerical": 0
+      },
+      "energy_arithmetic": {
+        "initial": {
+          "free_energy": {
+            "actual": 34.09391784667969,
+            "reference": 34.09391758298783,
+            "absolute_error": 2.636918594589588e-07
+          },
+          "dual_energy": {
+            "actual": 32.99514389038086,
+            "reference": 32.995143456019406,
+            "absolute_error": 4.343614534718654e-07
+          }
+        },
+        "terminal": {
+          "free_energy": {
+            "actual": 32.78022003173828,
+            "reference": 32.78021804988906,
+            "absolute_error": 1.981849223398058e-06
+          },
+          "dual_energy": {
+            "actual": 32.78052520751953,
+            "reference": 32.78052267458629,
+            "absolute_error": 2.532933244481228e-06
+          }
+        }
+      },
+      "work": {
+        "iterations": 5,
+        "evaluations": 7,
+        "rejected_trials": 0,
+        "linear_iterations": 0,
+        "gauss_newton_steps": 0,
+        "rejection_counts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "last_rejection": 0
+      },
+      "certificates": {
+        "natural": 0.0001650303602218628,
+        "label_mass": 1.2993812561035156e-05,
+        "conditional_mean": 0.00011186301708221436,
+        "conditional_covariance": 2.5076351448660716e-06,
+        "auxiliary": 2.4011204004636966e-05,
+        "primal_dual": 9.03415639186278e-06,
+        "relative_energy_change": 0.0
+      },
+      "output_group_element_counts": {
+        "messages": 1736,
+        "xi": 372,
+        "energy": 2,
+        "regions_probability": 496,
+        "regions_displacement": 1984,
+        "regions_mean": 1984,
+        "regions_covariance": 7936,
+        "regions_second": 7936,
+        "separators_probability": 128,
+        "separators_displacement": 256,
+        "separators_mean": 256,
+        "separators_covariance": 512,
+        "separators_second": 512,
+        "learning_target": 372,
+        "learning_exposure": 372,
+        "learning_centered_linear": 1116,
+        "learning_centered_precision": 3348,
+        "learning_linear": 1116,
+        "learning_precision": 3348
+      },
+      "snapshot_leaves": {
+        "initial": 77,
+        "terminal": 77
+      },
+      "floating_snapshot_dtypes": [
+        "float32"
+      ]
+    },
+    {
+      "case": {
+        "id": "t100-xi0-raw-zero",
+        "T": 100,
+        "K": 4,
+        "d": 2,
+        "xi": 0,
+        "messages": "raw-zero"
+      },
+      "initialization_seconds": 0.038407,
+      "initial_status": {
+        "outcome": 3,
+        "reason": 1,
+        "numerical": 0
+      },
+      "solve_seconds": 0.271787917,
+      "export_seconds": 3.1344454589999997,
+      "terminal_status": {
+        "outcome": 0,
+        "reason": 0,
+        "numerical": 0
+      },
+      "energy_arithmetic": {
+        "initial": {
+          "free_energy": {
+            "actual": 182.2239990234375,
+            "reference": 182.22393733347232,
+            "absolute_error": 6.168996517885716e-05
+          },
+          "dual_energy": {
+            "actual": 118.10523986816406,
+            "reference": 118.10522831029044,
+            "absolute_error": 1.1557873619949532e-05
+          }
+        },
+        "terminal": {
+          "free_energy": {
+            "actual": 110.63727569580078,
+            "reference": 110.63725691671321,
+            "absolute_error": 1.8779087568532304e-05
+          },
+          "dual_energy": {
+            "actual": 110.63834381103516,
+            "reference": 110.63834473578733,
+            "absolute_error": 9.247521717270502e-07
+          }
+        }
+      },
+      "work": {
+        "iterations": 6,
+        "evaluations": 8,
+        "rejected_trials": 0,
+        "linear_iterations": 0,
+        "gauss_newton_steps": 0,
+        "rejection_counts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "last_rejection": 0
+      },
+      "certificates": {
+        "natural": 0.0001358315348625183,
+        "label_mass": 1.1444091796875e-05,
+        "conditional_mean": 0.00010626018047332764,
+        "conditional_covariance": 2.475222117936937e-06,
+        "auxiliary": 2.4052524167927913e-05,
+        "primal_dual": 9.567729648551904e-06,
+        "relative_energy_change": 0.0
+      },
+      "output_group_element_counts": {
+        "messages": 5544,
+        "xi": 1188,
+        "energy": 2,
+        "regions_probability": 1584,
+        "regions_displacement": 6336,
+        "regions_mean": 6336,
+        "regions_covariance": 25344,
+        "regions_second": 25344,
+        "separators_probability": 400,
+        "separators_displacement": 800,
+        "separators_mean": 800,
+        "separators_covariance": 1600,
+        "separators_second": 1600,
+        "learning_target": 1188,
+        "learning_exposure": 1188,
+        "learning_centered_linear": 3564,
+        "learning_centered_precision": 10692,
+        "learning_linear": 3564,
+        "learning_precision": 10692
+      },
+      "snapshot_leaves": {
+        "initial": 77,
+        "terminal": 77
+      },
+      "floating_snapshot_dtypes": [
+        "float32"
+      ]
+    },
+    {
+      "case": {
+        "id": "t100-xi0-feasible",
+        "T": 100,
+        "K": 4,
+        "d": 2,
+        "xi": 0,
+        "messages": "feasible"
+      },
+      "initialization_seconds": 0.064326625,
+      "initial_status": {
+        "outcome": 3,
+        "reason": 1,
+        "numerical": 0
+      },
+      "solve_seconds": 0.222040792,
+      "export_seconds": 0.031158625000000002,
+      "terminal_status": {
+        "outcome": 0,
+        "reason": 0,
+        "numerical": 0
+      },
+      "energy_arithmetic": {
+        "initial": {
+          "free_energy": {
+            "actual": 114.23326110839844,
+            "reference": 114.23321183936629,
+            "absolute_error": 4.9269032146526115e-05
+          },
+          "dual_energy": {
+            "actual": 110.66290283203125,
+            "reference": 110.66292307733701,
+            "absolute_error": 2.024530576250072e-05
+          }
+        },
+        "terminal": {
+          "free_energy": {
+            "actual": 110.6371841430664,
+            "reference": 110.63725417513811,
+            "absolute_error": 7.003207170441783e-05
+          },
+          "dual_energy": {
+            "actual": 110.63835144042969,
+            "reference": 110.63834473695971,
+            "absolute_error": 6.7034699782198e-06
+          }
+        }
+      },
+      "work": {
+        "iterations": 5,
+        "evaluations": 7,
+        "rejected_trials": 0,
+        "linear_iterations": 0,
+        "gauss_newton_steps": 0,
+        "rejection_counts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "last_rejection": 0
+      },
+      "certificates": {
+        "natural": 0.00013595819473266602,
+        "label_mass": 1.1444091796875e-05,
+        "conditional_mean": 0.00010593235492706299,
+        "conditional_covariance": 2.478457417964819e-06,
+        "auxiliary": 2.407250394753646e-05,
+        "primal_dual": 1.0456169547978789e-05,
+        "relative_energy_change": 0.0
+      },
+      "output_group_element_counts": {
+        "messages": 5544,
+        "xi": 1188,
+        "energy": 2,
+        "regions_probability": 1584,
+        "regions_displacement": 6336,
+        "regions_mean": 6336,
+        "regions_covariance": 25344,
+        "regions_second": 25344,
+        "separators_probability": 400,
+        "separators_displacement": 800,
+        "separators_mean": 800,
+        "separators_covariance": 1600,
+        "separators_second": 1600,
+        "learning_target": 1188,
+        "learning_exposure": 1188,
+        "learning_centered_linear": 3564,
+        "learning_centered_precision": 10692,
+        "learning_linear": 3564,
+        "learning_precision": 10692
+      },
+      "snapshot_leaves": {
+        "initial": 77,
+        "terminal": 77
+      },
+      "floating_snapshot_dtypes": [
+        "float32"
+      ]
+    },
+    {
+      "case": {
+        "id": "t100-xi0-perturbed",
+        "T": 100,
+        "K": 4,
+        "d": 2,
+        "xi": 0,
+        "messages": "perturbed"
+      },
+      "initialization_seconds": 0.054091,
+      "initial_status": {
+        "outcome": 3,
+        "reason": 1,
+        "numerical": 0
+      },
+      "solve_seconds": 0.224243917,
+      "export_seconds": 0.055922,
+      "terminal_status": {
+        "outcome": 0,
+        "reason": 0,
+        "numerical": 0
+      },
+      "energy_arithmetic": {
+        "initial": {
+          "free_energy": {
+            "actual": 114.24478912353516,
+            "reference": 114.24481001607326,
+            "absolute_error": 2.08925381031122e-05
+          },
+          "dual_energy": {
+            "actual": 110.66587829589844,
+            "reference": 110.66588600930979,
+            "absolute_error": 7.71341134964132e-06
+          }
+        },
+        "terminal": {
+          "free_energy": {
+            "actual": 110.63726806640625,
+            "reference": 110.63725452245366,
+            "absolute_error": 1.3543952590566732e-05
+          },
+          "dual_energy": {
+            "actual": 110.63833618164062,
+            "reference": 110.6383447473955,
+            "absolute_error": 8.565754868072872e-06
+          }
+        }
+      },
+      "work": {
+        "iterations": 5,
+        "evaluations": 7,
+        "rejected_trials": 0,
+        "linear_iterations": 0,
+        "gauss_newton_steps": 0,
+        "rejection_counts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "last_rejection": 0
+      },
+      "certificates": {
+        "natural": 0.00016417354345321655,
+        "label_mass": 1.3113021850585938e-05,
+        "conditional_mean": 0.00010438263416290283,
+        "conditional_covariance": 2.4416722226305865e-06,
+        "auxiliary": 2.5557494154782034e-05,
+        "primal_dual": 9.567729648551904e-06,
+        "relative_energy_change": 0.0
+      },
+      "output_group_element_counts": {
+        "messages": 5544,
+        "xi": 1188,
+        "energy": 2,
+        "regions_probability": 1584,
+        "regions_displacement": 6336,
+        "regions_mean": 6336,
+        "regions_covariance": 25344,
+        "regions_second": 25344,
+        "separators_probability": 400,
+        "separators_displacement": 800,
+        "separators_mean": 800,
+        "separators_covariance": 1600,
+        "separators_second": 1600,
+        "learning_target": 1188,
+        "learning_exposure": 1188,
+        "learning_centered_linear": 3564,
+        "learning_centered_precision": 10692,
+        "learning_linear": 3564,
+        "learning_precision": 10692
+      },
+      "snapshot_leaves": {
+        "initial": 77,
+        "terminal": 77
+      },
+      "floating_snapshot_dtypes": [
+        "float32"
+      ]
+    },
+    {
+      "case": {
+        "id": "t100-xi1-raw-zero",
+        "T": 100,
+        "K": 4,
+        "d": 2,
+        "xi": 1,
+        "messages": "raw-zero"
+      },
+      "initialization_seconds": 0.030276166,
+      "initial_status": {
+        "outcome": 3,
+        "reason": 1,
+        "numerical": 0
+      },
+      "solve_seconds": 0.253163792,
+      "export_seconds": 0.029631875,
+      "terminal_status": {
+        "outcome": 0,
+        "reason": 0,
+        "numerical": 0
+      },
+      "energy_arithmetic": {
+        "initial": {
+          "free_energy": {
+            "actual": 182.86138916015625,
+            "reference": 182.8614193085837,
+            "absolute_error": 3.0148427441645254e-05
+          },
+          "dual_energy": {
+            "actual": 118.73825073242188,
+            "reference": 118.73824205639875,
+            "absolute_error": 8.676023128373345e-06
+          }
+        },
+        "terminal": {
+          "free_energy": {
+            "actual": 110.63724517822266,
+            "reference": 110.637250904973,
+            "absolute_error": 5.726750345047549e-06
+          },
+          "dual_energy": {
+            "actual": 110.63835144042969,
+            "reference": 110.63834473190282,
+            "absolute_error": 6.708526868237641e-06
+          }
+        }
+      },
+      "work": {
+        "iterations": 6,
+        "evaluations": 8,
+        "rejected_trials": 0,
+        "linear_iterations": 0,
+        "gauss_newton_steps": 0,
+        "rejection_counts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "last_rejection": 0
+      },
+      "certificates": {
+        "natural": 0.0001363903284072876,
+        "label_mass": 1.138448715209961e-05,
+        "conditional_mean": 0.00010611116886138916,
+        "conditional_covariance": 2.4562220914958743e-06,
+        "auxiliary": 2.4119117369991727e-05,
+        "primal_dual": 9.909436812449712e-06,
+        "relative_energy_change": 6.8340945347245e-08
+      },
+      "output_group_element_counts": {
+        "messages": 5544,
+        "xi": 1188,
+        "energy": 2,
+        "regions_probability": 1584,
+        "regions_displacement": 6336,
+        "regions_mean": 6336,
+        "regions_covariance": 25344,
+        "regions_second": 25344,
+        "separators_probability": 400,
+        "separators_displacement": 800,
+        "separators_mean": 800,
+        "separators_covariance": 1600,
+        "separators_second": 1600,
+        "learning_target": 1188,
+        "learning_exposure": 1188,
+        "learning_centered_linear": 3564,
+        "learning_centered_precision": 10692,
+        "learning_linear": 3564,
+        "learning_precision": 10692
+      },
+      "snapshot_leaves": {
+        "initial": 77,
+        "terminal": 77
+      },
+      "floating_snapshot_dtypes": [
+        "float32"
+      ]
+    },
+    {
+      "case": {
+        "id": "t100-xi1-feasible",
+        "T": 100,
+        "K": 4,
+        "d": 2,
+        "xi": 1,
+        "messages": "feasible"
+      },
+      "initialization_seconds": 0.054423083,
+      "initial_status": {
+        "outcome": 3,
+        "reason": 1,
+        "numerical": 0
+      },
+      "solve_seconds": 0.221443625,
+      "export_seconds": 0.029508417000000002,
+      "terminal_status": {
+        "outcome": 0,
+        "reason": 0,
+        "numerical": 0
+      },
+      "energy_arithmetic": {
+        "initial": {
+          "free_energy": {
+            "actual": 114.89700317382812,
+            "reference": 114.89706069696514,
+            "absolute_error": 5.752313701634648e-05
+          },
+          "dual_energy": {
+            "actual": 111.32633209228516,
+            "reference": 111.32632958738019,
+            "absolute_error": 2.5049049696690417e-06
+          }
+        },
+        "terminal": {
+          "free_energy": {
+            "actual": 110.63726806640625,
+            "reference": 110.637239586336,
+            "absolute_error": 2.8480070255909595e-05
+          },
+          "dual_energy": {
+            "actual": 110.63835144042969,
+            "reference": 110.63834472310788,
+            "absolute_error": 6.7173218099014775e-06
+          }
+        }
+      },
+      "work": {
+        "iterations": 5,
+        "evaluations": 7,
+        "rejected_trials": 0,
+        "linear_iterations": 0,
+        "gauss_newton_steps": 0,
+        "rejection_counts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "last_rejection": 0
+      },
+      "certificates": {
+        "natural": 0.0001378878951072693,
+        "label_mass": 1.1563301086425781e-05,
+        "conditional_mean": 0.00010542571544647217,
+        "conditional_covariance": 2.324085926375119e-06,
+        "auxiliary": 2.441878677927889e-05,
+        "primal_dual": 9.704412150313146e-06,
+        "relative_energy_change": 0.0
+      },
+      "output_group_element_counts": {
+        "messages": 5544,
+        "xi": 1188,
+        "energy": 2,
+        "regions_probability": 1584,
+        "regions_displacement": 6336,
+        "regions_mean": 6336,
+        "regions_covariance": 25344,
+        "regions_second": 25344,
+        "separators_probability": 400,
+        "separators_displacement": 800,
+        "separators_mean": 800,
+        "separators_covariance": 1600,
+        "separators_second": 1600,
+        "learning_target": 1188,
+        "learning_exposure": 1188,
+        "learning_centered_linear": 3564,
+        "learning_centered_precision": 10692,
+        "learning_linear": 3564,
+        "learning_precision": 10692
+      },
+      "snapshot_leaves": {
+        "initial": 77,
+        "terminal": 77
+      },
+      "floating_snapshot_dtypes": [
+        "float32"
+      ]
+    },
+    {
+      "case": {
+        "id": "t100-xi1-perturbed",
+        "T": 100,
+        "K": 4,
+        "d": 2,
+        "xi": 1,
+        "messages": "perturbed"
+      },
+      "initialization_seconds": 0.053754417,
+      "initial_status": {
+        "outcome": 3,
+        "reason": 1,
+        "numerical": 0
+      },
+      "solve_seconds": 0.222290667,
+      "export_seconds": 0.056678292000000005,
+      "terminal_status": {
+        "outcome": 0,
+        "reason": 0,
+        "numerical": 0
+      },
+      "energy_arithmetic": {
+        "initial": {
+          "free_energy": {
+            "actual": 114.90870666503906,
+            "reference": 114.9086649663371,
+            "absolute_error": 4.1698701963355234e-05
+          },
+          "dual_energy": {
+            "actual": 111.32929992675781,
+            "reference": 111.32929360791881,
+            "absolute_error": 6.318838998708998e-06
+          }
+        },
+        "terminal": {
+          "free_energy": {
+            "actual": 110.63728332519531,
+            "reference": 110.63723910392996,
+            "absolute_error": 4.422126535530424e-05
+          },
+          "dual_energy": {
+            "actual": 110.63835144042969,
+            "reference": 110.63834473368678,
+            "absolute_error": 6.706742908590968e-06
+          }
+        }
+      },
+      "work": {
+        "iterations": 5,
+        "evaluations": 7,
+        "rejected_trials": 0,
+        "linear_iterations": 0,
+        "gauss_newton_steps": 0,
+        "rejection_counts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "last_rejection": 0
+      },
+      "certificates": {
+        "natural": 0.00016626715660095215,
+        "label_mass": 1.341104507446289e-05,
+        "conditional_mean": 0.00010387599468231201,
+        "conditional_covariance": 2.2909202925802674e-06,
+        "auxiliary": 2.5910438125720248e-05,
+        "primal_dual": 9.567728739057202e-06,
+        "relative_energy_change": 0.0
+      },
+      "output_group_element_counts": {
+        "messages": 5544,
+        "xi": 1188,
+        "energy": 2,
+        "regions_probability": 1584,
+        "regions_displacement": 6336,
+        "regions_mean": 6336,
+        "regions_covariance": 25344,
+        "regions_second": 25344,
+        "separators_probability": 400,
+        "separators_displacement": 800,
+        "separators_mean": 800,
+        "separators_covariance": 1600,
+        "separators_second": 1600,
+        "learning_target": 1188,
+        "learning_exposure": 1188,
+        "learning_centered_linear": 3564,
+        "learning_centered_precision": 10692,
+        "learning_linear": 3564,
+        "learning_precision": 10692
+      },
+      "snapshot_leaves": {
+        "initial": 77,
+        "terminal": 77
+      },
+      "floating_snapshot_dtypes": [
+        "float32"
+      ]
+    }
+  ],
+  "nineteen_output_groups": {
+    "messages": [
+      "messages.left.constant",
+      "messages.left.linear",
+      "messages.left.precision",
+      "messages.right.constant",
+      "messages.right.linear",
+      "messages.right.precision"
+    ],
+    "xi": [
+      "xi"
+    ],
+    "energy": [
+      "state.evaluation.local.free_energy",
+      "state.evaluation.local.dual_energy"
+    ],
+    "regions_probability": [
+      "state.evaluation.local.regions.probability"
+    ],
+    "regions_displacement": [
+      "state.evaluation.local.regions.displacement"
+    ],
+    "regions_mean": [
+      "regions.mean"
+    ],
+    "regions_covariance": [
+      "regions.full_covariance"
+    ],
+    "regions_second": [
+      "regions.second"
+    ],
+    "separators_probability": [
+      "state.evaluation.local.separators.probability"
+    ],
+    "separators_displacement": [
+      "state.evaluation.local.separators.displacement"
+    ],
+    "separators_mean": [
+      "separators.mean"
+    ],
+    "separators_covariance": [
+      "separators.full_covariance"
+    ],
+    "separators_second": [
+      "separators.second"
+    ],
+    "learning_target": [
+      "state.evaluation.auxiliary.target"
+    ],
+    "learning_exposure": [
+      "state.evaluation.auxiliary.exposure"
+    ],
+    "learning_centered_linear": [
+      "state.evaluation.auxiliary.linear"
+    ],
+    "learning_centered_precision": [
+      "state.evaluation.auxiliary.precision"
+    ],
+    "learning_linear": [
+      "learning.physical_linear"
+    ],
+    "learning_precision": [
+      "learning.physical_precision"
+    ]
+  },
+  "maximum_terminal_certificates": {
+    "natural": 0.00016626715660095215,
+    "label_mass": 1.341104507446289e-05,
+    "conditional_mean": 0.00011236965656280518,
+    "conditional_covariance": 2.6656898626242764e-06,
+    "auxiliary": 2.5910438125720248e-05,
+    "primal_dual": 1.0456169547978789e-05,
+    "relative_energy_change": 1.1292699042542154e-07
+  },
+  "maximum_absolute_energy_errors_initial_and_terminal": {
+    "32": {
+      "free_energy": 2.6053496888778227e-05,
+      "dual_energy": 7.087862577748183e-06
+    },
+    "100": {
+      "free_energy": 7.003207170441783e-05,
+      "dual_energy": 2.024530576250072e-05
+    }
+  },
+  "thresholds": {
+    "tau_float32": 0.0004105939588043839,
+    "local_arithmetic_atol_rtol": 0.000244140625,
+    "absolute_energy_atol_by_T": {
+      "32": 0.009765625,
+      "100": 0.030517578125
+    },
+    "energy_relative_tolerance": 0
+  },
+  "logical_inventory": [
+    {
+      "shape": {
+        "T": 32,
+        "K": 4,
+        "d": 2
+      },
+      "N": 1798,
+      "M": 3286,
+      "groups": {
+        "accepted_evaluation": {
+          "leaves": 47,
+          "elements": 37487,
+          "bytes": 149948,
+          "dtype_bytes": {
+            "float32": 149316,
+            "int32": 632
+          }
+        },
+        "context": {
+          "leaves": 11,
+          "elements": 3912,
+          "bytes": 15648,
+          "dtype_bytes": {
+            "float32": 15520,
+            "int32": 128
+          }
+        },
+        "coordinate": {
+          "leaves": 1,
+          "elements": 1798,
+          "bytes": 7192,
+          "dtype_bytes": {
+            "float32": 7192
+          }
+        },
+        "coordinate_scales": {
+          "leaves": 1,
+          "elements": 1798,
+          "bytes": 7192,
+          "dtype_bytes": {
+            "float32": 7192
+          }
+        },
+        "derivative_captures": {
+          "leaves": 781,
+          "elements": 570451,
+          "bytes": 1946638,
+          "dtype_bytes": {
+            "bool": 111722,
+            "float32": 1802532,
+            "int32": 32384
+          }
+        },
+        "linear_products": {
+          "leaves": 2,
+          "elements": 5084,
+          "bytes": 20336,
+          "dtype_bytes": {
+            "float32": 20336
+          }
+        },
+        "linear_state": {
+          "leaves": 7,
+          "elements": 8683,
+          "bytes": 34726,
+          "dtype_bytes": {
+            "bool": 2,
+            "float32": 34720,
+            "int32": 4
+          }
+        },
+        "metadata": {
+          "leaves": 6,
+          "elements": 1252,
+          "bytes": 4624,
+          "dtype_bytes": {
+            "bool": 128,
+            "float32": 1024,
+            "int32": 3472
+          }
+        },
+        "outer_state": {
+          "leaves": 58,
+          "elements": 39298,
+          "bytes": 157192,
+          "dtype_bytes": {
+            "float32": 156512,
+            "int32": 680
+          }
+        },
+        "residual_scales": {
+          "leaves": 1,
+          "elements": 3286,
+          "bytes": 13144,
+          "dtype_bytes": {
+            "float32": 13144
+          }
+        },
+        "terminal_state": {
+          "leaves": 58,
+          "elements": 39298,
+          "bytes": 157192,
+          "dtype_bytes": {
+            "float32": 156512,
+            "int32": 680
+          }
+        },
+        "trial_state": {
+          "leaves": 53,
+          "elements": 39293,
+          "bytes": 157169,
+          "dtype_bytes": {
+            "bool": 1,
+            "float32": 156508,
+            "int32": 660
+          }
+        }
+      },
+      "total_leaf_count": 1026,
+      "logical_sum_bytes_aliases_may_repeat": 2671001
+    },
+    {
+      "shape": {
+        "T": 100,
+        "K": 4,
+        "d": 2
+      },
+      "N": 5742,
+      "M": 10494,
+      "groups": {
+        "accepted_evaluation": {
+          "leaves": 47,
+          "elements": 119563,
+          "bytes": 478252,
+          "dtype_bytes": {
+            "float32": 476260,
+            "int32": 1992
+          }
+        },
+        "context": {
+          "leaves": 11,
+          "elements": 12412,
+          "bytes": 49648,
+          "dtype_bytes": {
+            "float32": 49248,
+            "int32": 400
+          }
+        },
+        "coordinate": {
+          "leaves": 1,
+          "elements": 5742,
+          "bytes": 22968,
+          "dtype_bytes": {
+            "float32": 22968
+          }
+        },
+        "coordinate_scales": {
+          "leaves": 1,
+          "elements": 5742,
+          "bytes": 22968,
+          "dtype_bytes": {
+            "float32": 22968
+          }
+        },
+        "derivative_captures": {
+          "leaves": 781,
+          "elements": 1817979,
+          "bytes": 6202758,
+          "dtype_bytes": {
+            "bool": 356386,
+            "float32": 5743268,
+            "int32": 103104
+          }
+        },
+        "linear_products": {
+          "leaves": 2,
+          "elements": 16236,
+          "bytes": 64944,
+          "dtype_bytes": {
+            "float32": 64944
+          }
+        },
+        "linear_state": {
+          "leaves": 7,
+          "elements": 27723,
+          "bytes": 110886,
+          "dtype_bytes": {
+            "bool": 2,
+            "float32": 110880,
+            "int32": 4
+          }
+        },
+        "metadata": {
+          "leaves": 6,
+          "elements": 3972,
+          "bytes": 14688,
+          "dtype_bytes": {
+            "bool": 400,
+            "float32": 3200,
+            "int32": 11088
+          }
+        },
+        "outer_state": {
+          "leaves": 58,
+          "elements": 125318,
+          "bytes": 501272,
+          "dtype_bytes": {
+            "float32": 499232,
+            "int32": 2040
+          }
+        },
+        "residual_scales": {
+          "leaves": 1,
+          "elements": 10494,
+          "bytes": 41976,
+          "dtype_bytes": {
+            "float32": 41976
+          }
+        },
+        "terminal_state": {
+          "leaves": 58,
+          "elements": 125318,
+          "bytes": 501272,
+          "dtype_bytes": {
+            "float32": 499232,
+            "int32": 2040
+          }
+        },
+        "trial_state": {
+          "leaves": 53,
+          "elements": 125313,
+          "bytes": 501249,
+          "dtype_bytes": {
+            "bool": 1,
+            "float32": 499228,
+            "int32": 2020
+          }
+        }
+      },
+      "total_leaf_count": 1026,
+      "logical_sum_bytes_aliases_may_repeat": 8512881
+    },
+    {
+      "shape": {
+        "T": 100,
+        "K": 20,
+        "d": 10
+      },
+      "N": 298782,
+      "M": 560142,
+      "groups": {
+        "accepted_evaluation": {
+          "leaves": 47,
+          "elements": 40485851,
+          "bytes": 161943404,
+          "dtype_bytes": {
+            "float32": 161941412,
+            "int32": 1992
+          }
+        },
+        "context": {
+          "leaves": 11,
+          "elements": 1109340,
+          "bytes": 4437360,
+          "dtype_bytes": {
+            "float32": 4436960,
+            "int32": 400
+          }
+        },
+        "coordinate": {
+          "leaves": 1,
+          "elements": 298782,
+          "bytes": 1195128,
+          "dtype_bytes": {
+            "float32": 1195128
+          }
+        },
+        "coordinate_scales": {
+          "leaves": 1,
+          "elements": 298782,
+          "bytes": 1195128,
+          "dtype_bytes": {
+            "float32": 1195128
+          }
+        },
+        "derivative_captures": {
+          "leaves": 781,
+          "elements": 641325467,
+          "bytes": 2205902774,
+          "dtype_bytes": {
+            "bool": 119799698,
+            "float32": 2080265060,
+            "int32": 5838016
+          }
+        },
+        "linear_products": {
+          "leaves": 2,
+          "elements": 858924,
+          "bytes": 3435696,
+          "dtype_bytes": {
+            "float32": 3435696
+          }
+        },
+        "linear_state": {
+          "leaves": 7,
+          "elements": 1456491,
+          "bytes": 5825958,
+          "dtype_bytes": {
+            "bool": 2,
+            "float32": 5825952,
+            "int32": 4
+          }
+        },
+        "metadata": {
+          "leaves": 6,
+          "elements": 67540,
+          "bytes": 264160,
+          "dtype_bytes": {
+            "bool": 2000,
+            "float32": 80000,
+            "int32": 182160
+          }
+        },
+        "outer_state": {
+          "leaves": 58,
+          "elements": 40784646,
+          "bytes": 163138584,
+          "dtype_bytes": {
+            "float32": 163136544,
+            "int32": 2040
+          }
+        },
+        "residual_scales": {
+          "leaves": 1,
+          "elements": 560142,
+          "bytes": 2240568,
+          "dtype_bytes": {
+            "float32": 2240568
+          }
+        },
+        "terminal_state": {
+          "leaves": 58,
+          "elements": 40784646,
+          "bytes": 163138584,
+          "dtype_bytes": {
+            "float32": 163136544,
+            "int32": 2040
+          }
+        },
+        "trial_state": {
+          "leaves": 53,
+          "elements": 40784641,
+          "bytes": 163138561,
+          "dtype_bytes": {
+            "bool": 1,
+            "float32": 163136540,
+            "int32": 2020
+          }
+        }
+      },
+      "total_leaf_count": 1026,
+      "logical_sum_bytes_aliases_may_repeat": 2875855905
+    }
+  ],
+  "storage_workers": [
+    {
+      "id": "t32-solve_from_coordinate-o200-l128",
+      "case": {
+        "id": "t32-solve_from_coordinate-o200-l128",
+        "T": 32,
+        "K": 4,
+        "d": 2,
+        "program": "solve_from_coordinate",
+        "budgets": {
+          "outer": 200,
+          "trials": 24,
+          "linear": 128,
+          "backtrack": 0.5,
+          "armijo": 0.0001
+        }
+      },
+      "compilation": {
+        "lower_seconds": 5.142401542,
+        "stablehlo_dtypes": {
+          "value_type_occurrences": {
+            "f32": 145990
+          },
+          "meaning": "Occurrences, not unique buffers or bytes; includes nested operands/results/block arguments"
+        },
+        "compile_seconds": 191.100389875,
+        "xla_memory": {
+          "available": true,
+          "estimates": {
+            "argument_size_in_bytes": 21352,
+            "output_size_in_bytes": 157656,
+            "temp_size_in_bytes": 5363128,
+            "alias_size_in_bytes": 0,
+            "generated_code_size_in_bytes": 0,
+            "host_argument_size_in_bytes": 0,
+            "host_output_size_in_bytes": 0,
+            "host_temp_size_in_bytes": 0,
+            "host_alias_size_in_bytes": 0,
+            "peak_memory_in_bytes": 205246
+          },
+          "meaning": "XLA estimates; backend-specific extra fields are not process RSS"
+        },
+        "calls": {
+          "lower": 1,
+          "compile": 1,
+          "execute": 0
+        }
+      },
+      "process": {
+        "exit_code": 0,
+        "stop": null,
+        "worker_seconds": 208.79124166630208,
+        "cache_evidence": {
+          "log": "compiler.log",
+          "log_sha256": "ff0abcb423d8671d214a56362633172ed0ae37c5e52a459a6245fc24d263b075",
+          "observed_log_occurrences": {
+            "persistent_hits": 0,
+            "persistent_misses": 0,
+            "tracing_misses": 158
+          },
+          "meaning": "All worker compilations, including small layout setup; absent log messages do not prove a cold backend"
+        },
+        "process_high_water": {
+          "mechanism": "parent os.wait4 of actual worker PID; process lifetime, not phase peaks",
+          "raw_ru_maxrss": 20732870656,
+          "raw_unit": "bytes",
+          "bytes": 20732870656
+        },
+        "rss_samples": {
+          "count": 206,
+          "maximum_bytes": 20731822080,
+          "meaning": "sampled current RSS; transient peaks may be missed"
+        }
+      },
+      "retained_objects": 2
+    },
+    {
+      "id": "t32-solve_from_coordinate-o400-l128",
+      "case": {
+        "id": "t32-solve_from_coordinate-o400-l128",
+        "T": 32,
+        "K": 4,
+        "d": 2,
+        "program": "solve_from_coordinate",
+        "budgets": {
+          "outer": 400,
+          "trials": 24,
+          "linear": 128,
+          "backtrack": 0.5,
+          "armijo": 0.0001
+        }
+      },
+      "compilation": {
+        "lower_seconds": 5.2267,
+        "stablehlo_dtypes": {
+          "value_type_occurrences": {
+            "f32": 145990
+          },
+          "meaning": "Occurrences, not unique buffers or bytes; includes nested operands/results/block arguments"
+        },
+        "compile_seconds": 191.929592416,
+        "xla_memory": {
+          "available": true,
+          "estimates": {
+            "argument_size_in_bytes": 21352,
+            "output_size_in_bytes": 157656,
+            "temp_size_in_bytes": 5363128,
+            "alias_size_in_bytes": 0,
+            "generated_code_size_in_bytes": 0,
+            "host_argument_size_in_bytes": 0,
+            "host_output_size_in_bytes": 0,
+            "host_temp_size_in_bytes": 0,
+            "host_alias_size_in_bytes": 0,
+            "peak_memory_in_bytes": 205246
+          },
+          "meaning": "XLA estimates; backend-specific extra fields are not process RSS"
+        },
+        "calls": {
+          "lower": 1,
+          "compile": 1,
+          "execute": 0
+        }
+      },
+      "process": {
+        "exit_code": 0,
+        "stop": null,
+        "worker_seconds": 209.90966579318047,
+        "cache_evidence": {
+          "log": "compiler.log",
+          "log_sha256": "ae5e698f5227f243646942ebc77c358ff4d73eb0faf4d38ca4cd46312b339f7b",
+          "observed_log_occurrences": {
+            "persistent_hits": 0,
+            "persistent_misses": 0,
+            "tracing_misses": 158
+          },
+          "meaning": "All worker compilations, including small layout setup; absent log messages do not prove a cold backend"
+        },
+        "process_high_water": {
+          "mechanism": "parent os.wait4 of actual worker PID; process lifetime, not phase peaks",
+          "raw_ru_maxrss": 20904361984,
+          "raw_unit": "bytes",
+          "bytes": 20904361984
+        },
+        "rss_samples": {
+          "count": 207,
+          "maximum_bytes": 20904345600,
+          "meaning": "sampled current RSS; transient peaks may be missed"
+        }
+      },
+      "retained_objects": 2
+    },
+    {
+      "id": "t32-solve_from_coordinate-o200-l256",
+      "case": {
+        "id": "t32-solve_from_coordinate-o200-l256",
+        "T": 32,
+        "K": 4,
+        "d": 2,
+        "program": "solve_from_coordinate",
+        "budgets": {
+          "outer": 200,
+          "trials": 24,
+          "linear": 256,
+          "backtrack": 0.5,
+          "armijo": 0.0001
+        }
+      },
+      "compilation": {
+        "lower_seconds": 5.13355025,
+        "stablehlo_dtypes": {
+          "value_type_occurrences": {
+            "f32": 145990
+          },
+          "meaning": "Occurrences, not unique buffers or bytes; includes nested operands/results/block arguments"
+        },
+        "compile_seconds": 192.118054,
+        "xla_memory": {
+          "available": true,
+          "estimates": {
+            "argument_size_in_bytes": 21352,
+            "output_size_in_bytes": 157656,
+            "temp_size_in_bytes": 5363128,
+            "alias_size_in_bytes": 0,
+            "generated_code_size_in_bytes": 0,
+            "host_argument_size_in_bytes": 0,
+            "host_output_size_in_bytes": 0,
+            "host_temp_size_in_bytes": 0,
+            "host_alias_size_in_bytes": 0,
+            "peak_memory_in_bytes": 205246
+          },
+          "meaning": "XLA estimates; backend-specific extra fields are not process RSS"
+        },
+        "calls": {
+          "lower": 1,
+          "compile": 1,
+          "execute": 0
+        }
+      },
+      "process": {
+        "exit_code": 0,
+        "stop": null,
+        "worker_seconds": 209.71852108091116,
+        "cache_evidence": {
+          "log": "compiler.log",
+          "log_sha256": "4d566b5b272a441bad9d28502724d3f5aab960ad608933f62572dee7fc1248d4",
+          "observed_log_occurrences": {
+            "persistent_hits": 0,
+            "persistent_misses": 0,
+            "tracing_misses": 158
+          },
+          "meaning": "All worker compilations, including small layout setup; absent log messages do not prove a cold backend"
+        },
+        "process_high_water": {
+          "mechanism": "parent os.wait4 of actual worker PID; process lifetime, not phase peaks",
+          "raw_ru_maxrss": 20213055488,
+          "raw_unit": "bytes",
+          "bytes": 20213055488
+        },
+        "rss_samples": {
+          "count": 207,
+          "maximum_bytes": 20213055488,
+          "meaning": "sampled current RSS; transient peaks may be missed"
+        }
+      },
+      "retained_objects": 2
+    },
+    {
+      "id": "t32-iteration-o200-l128",
+      "case": {
+        "id": "t32-iteration-o200-l128",
+        "T": 32,
+        "K": 4,
+        "d": 2,
+        "program": "iteration",
+        "budgets": {
+          "outer": 200,
+          "trials": 24,
+          "linear": 128,
+          "backtrack": 0.5,
+          "armijo": 0.0001
+        }
+      },
+      "compilation": {
+        "lower_seconds": 3.929683875,
+        "stablehlo_dtypes": {
+          "value_type_occurrences": {
+            "f32": 112041
+          },
+          "meaning": "Occurrences, not unique buffers or bytes; includes nested operands/results/block arguments"
+        },
+        "compile_seconds": 107.998317791,
+        "xla_memory": {
+          "available": true,
+          "estimates": {
+            "argument_size_in_bytes": 171340,
+            "output_size_in_bytes": 157656,
+            "temp_size_in_bytes": 3844272,
+            "alias_size_in_bytes": 0,
+            "generated_code_size_in_bytes": 0,
+            "host_argument_size_in_bytes": 0,
+            "host_output_size_in_bytes": 0,
+            "host_temp_size_in_bytes": 0,
+            "host_alias_size_in_bytes": 0,
+            "peak_memory_in_bytes": 349998
+          },
+          "meaning": "XLA estimates; backend-specific extra fields are not process RSS"
+        },
+        "calls": {
+          "lower": 1,
+          "compile": 1,
+          "execute": 0
+        }
+      },
+      "process": {
+        "exit_code": 0,
+        "stop": null,
+        "worker_seconds": 123.68547424674034,
+        "cache_evidence": {
+          "log": "compiler.log",
+          "log_sha256": "25d99601831c9e4f11a810421612bc9a7869ec8ecc58545133967b7a65c83066",
+          "observed_log_occurrences": {
+            "persistent_hits": 0,
+            "persistent_misses": 0,
+            "tracing_misses": 154
+          },
+          "meaning": "All worker compilations, including small layout setup; absent log messages do not prove a cold backend"
+        },
+        "process_high_water": {
+          "mechanism": "parent os.wait4 of actual worker PID; process lifetime, not phase peaks",
+          "raw_ru_maxrss": 14751219712,
+          "raw_unit": "bytes",
+          "bytes": 14751219712
+        },
+        "rss_samples": {
+          "count": 122,
+          "maximum_bytes": 14751203328,
+          "meaning": "sampled current RSS; transient peaks may be missed"
+        }
+      },
+      "retained_objects": 2
+    },
+    {
+      "id": "t32-iteration-o200-l256",
+      "case": {
+        "id": "t32-iteration-o200-l256",
+        "T": 32,
+        "K": 4,
+        "d": 2,
+        "program": "iteration",
+        "budgets": {
+          "outer": 200,
+          "trials": 24,
+          "linear": 256,
+          "backtrack": 0.5,
+          "armijo": 0.0001
+        }
+      },
+      "compilation": {
+        "lower_seconds": 3.878668833,
+        "stablehlo_dtypes": {
+          "value_type_occurrences": {
+            "f32": 112041
+          },
+          "meaning": "Occurrences, not unique buffers or bytes; includes nested operands/results/block arguments"
+        },
+        "compile_seconds": 108.870358292,
+        "xla_memory": {
+          "available": true,
+          "estimates": {
+            "argument_size_in_bytes": 171340,
+            "output_size_in_bytes": 157656,
+            "temp_size_in_bytes": 3844272,
+            "alias_size_in_bytes": 0,
+            "generated_code_size_in_bytes": 0,
+            "host_argument_size_in_bytes": 0,
+            "host_output_size_in_bytes": 0,
+            "host_temp_size_in_bytes": 0,
+            "host_alias_size_in_bytes": 0,
+            "peak_memory_in_bytes": 349998
+          },
+          "meaning": "XLA estimates; backend-specific extra fields are not process RSS"
+        },
+        "calls": {
+          "lower": 1,
+          "compile": 1,
+          "execute": 0
+        }
+      },
+      "process": {
+        "exit_code": 0,
+        "stop": null,
+        "worker_seconds": 123.85278799943626,
+        "cache_evidence": {
+          "log": "compiler.log",
+          "log_sha256": "efd68be04c50dc736d3ee826e6a53e42040567f6280813ca04383805b1ece676",
+          "observed_log_occurrences": {
+            "persistent_hits": 0,
+            "persistent_misses": 0,
+            "tracing_misses": 154
+          },
+          "meaning": "All worker compilations, including small layout setup; absent log messages do not prove a cold backend"
+        },
+        "process_high_water": {
+          "mechanism": "parent os.wait4 of actual worker PID; process lifetime, not phase peaks",
+          "raw_ru_maxrss": 15017279488,
+          "raw_unit": "bytes",
+          "bytes": 15017279488
+        },
+        "rss_samples": {
+          "count": 122,
+          "maximum_bytes": 15017263104,
+          "meaning": "sampled current RSS; transient peaks may be missed"
+        }
+      },
+      "retained_objects": 2
+    },
+    {
+      "id": "t100-solve_from_coordinate-o200-l128",
+      "case": {
+        "id": "t100-solve_from_coordinate-o200-l128",
+        "T": 100,
+        "K": 4,
+        "d": 2,
+        "program": "solve_from_coordinate",
+        "budgets": {
+          "outer": 200,
+          "trials": 24,
+          "linear": 128,
+          "backtrack": 0.5,
+          "armijo": 0.0001
+        }
+      },
+      "compilation": {
+        "lower_seconds": 5.343920667,
+        "stablehlo_dtypes": {
+          "value_type_occurrences": {
+            "f32": 145990
+          },
+          "meaning": "Occurrences, not unique buffers or bytes; includes nested operands/results/block arguments"
+        },
+        "compile_seconds": 187.68408225,
+        "xla_memory": {
+          "available": true,
+          "estimates": {
+            "argument_size_in_bytes": 67864,
+            "output_size_in_bytes": 501736,
+            "temp_size_in_bytes": 17209912,
+            "alias_size_in_bytes": 0,
+            "generated_code_size_in_bytes": 0,
+            "host_argument_size_in_bytes": 0,
+            "host_output_size_in_bytes": 0,
+            "host_temp_size_in_bytes": 0,
+            "host_alias_size_in_bytes": 0,
+            "peak_memory_in_bytes": 638284
+          },
+          "meaning": "XLA estimates; backend-specific extra fields are not process RSS"
+        },
+        "calls": {
+          "lower": 1,
+          "compile": 1,
+          "execute": 0
+        }
+      },
+      "process": {
+        "exit_code": 0,
+        "stop": null,
+        "worker_seconds": 205.5428958311677,
+        "cache_evidence": {
+          "log": "compiler.log",
+          "log_sha256": "2cf0b8a6731c71c2803f9a89c95fb52583a3562fa6e17edae4eb7d3d980cecce",
+          "observed_log_occurrences": {
+            "persistent_hits": 0,
+            "persistent_misses": 0,
+            "tracing_misses": 158
+          },
+          "meaning": "All worker compilations, including small layout setup; absent log messages do not prove a cold backend"
+        },
+        "process_high_water": {
+          "mechanism": "parent os.wait4 of actual worker PID; process lifetime, not phase peaks",
+          "raw_ru_maxrss": 20737638400,
+          "raw_unit": "bytes",
+          "bytes": 20737638400
+        },
+        "rss_samples": {
+          "count": 203,
+          "maximum_bytes": 20737622016,
+          "meaning": "sampled current RSS; transient peaks may be missed"
+        }
+      },
+      "retained_objects": 2
+    },
+    {
+      "id": "t100-solve_from_coordinate-o400-l128",
+      "case": {
+        "id": "t100-solve_from_coordinate-o400-l128",
+        "T": 100,
+        "K": 4,
+        "d": 2,
+        "program": "solve_from_coordinate",
+        "budgets": {
+          "outer": 400,
+          "trials": 24,
+          "linear": 128,
+          "backtrack": 0.5,
+          "armijo": 0.0001
+        }
+      },
+      "compilation": {
+        "lower_seconds": 5.441456708,
+        "stablehlo_dtypes": {
+          "value_type_occurrences": {
+            "f32": 145990
+          },
+          "meaning": "Occurrences, not unique buffers or bytes; includes nested operands/results/block arguments"
+        },
+        "compile_seconds": 188.125766792,
+        "xla_memory": {
+          "available": true,
+          "estimates": {
+            "argument_size_in_bytes": 67864,
+            "output_size_in_bytes": 501736,
+            "temp_size_in_bytes": 17209912,
+            "alias_size_in_bytes": 0,
+            "generated_code_size_in_bytes": 0,
+            "host_argument_size_in_bytes": 0,
+            "host_output_size_in_bytes": 0,
+            "host_temp_size_in_bytes": 0,
+            "host_alias_size_in_bytes": 0,
+            "peak_memory_in_bytes": 638284
+          },
+          "meaning": "XLA estimates; backend-specific extra fields are not process RSS"
+        },
+        "calls": {
+          "lower": 1,
+          "compile": 1,
+          "execute": 0
+        }
+      },
+      "process": {
+        "exit_code": 0,
+        "stop": null,
+        "worker_seconds": 206.6924593746662,
+        "cache_evidence": {
+          "log": "compiler.log",
+          "log_sha256": "f85aa87b54ffedcdbecaf5a08aabf9d002b0a1c1573fd8191a0a93ba534cb02c",
+          "observed_log_occurrences": {
+            "persistent_hits": 0,
+            "persistent_misses": 0,
+            "tracing_misses": 158
+          },
+          "meaning": "All worker compilations, including small layout setup; absent log messages do not prove a cold backend"
+        },
+        "process_high_water": {
+          "mechanism": "parent os.wait4 of actual worker PID; process lifetime, not phase peaks",
+          "raw_ru_maxrss": 20788609024,
+          "raw_unit": "bytes",
+          "bytes": 20788609024
+        },
+        "rss_samples": {
+          "count": 204,
+          "maximum_bytes": 20788609024,
+          "meaning": "sampled current RSS; transient peaks may be missed"
+        }
+      },
+      "retained_objects": 2
+    },
+    {
+      "id": "t100-solve_from_coordinate-o200-l256",
+      "case": {
+        "id": "t100-solve_from_coordinate-o200-l256",
+        "T": 100,
+        "K": 4,
+        "d": 2,
+        "program": "solve_from_coordinate",
+        "budgets": {
+          "outer": 200,
+          "trials": 24,
+          "linear": 256,
+          "backtrack": 0.5,
+          "armijo": 0.0001
+        }
+      },
+      "compilation": {
+        "lower_seconds": 5.254647917,
+        "stablehlo_dtypes": {
+          "value_type_occurrences": {
+            "f32": 145990
+          },
+          "meaning": "Occurrences, not unique buffers or bytes; includes nested operands/results/block arguments"
+        },
+        "compile_seconds": 189.214441666,
+        "xla_memory": {
+          "available": true,
+          "estimates": {
+            "argument_size_in_bytes": 67864,
+            "output_size_in_bytes": 501736,
+            "temp_size_in_bytes": 17209912,
+            "alias_size_in_bytes": 0,
+            "generated_code_size_in_bytes": 0,
+            "host_argument_size_in_bytes": 0,
+            "host_output_size_in_bytes": 0,
+            "host_temp_size_in_bytes": 0,
+            "host_alias_size_in_bytes": 0,
+            "peak_memory_in_bytes": 638284
+          },
+          "meaning": "XLA estimates; backend-specific extra fields are not process RSS"
+        },
+        "calls": {
+          "lower": 1,
+          "compile": 1,
+          "execute": 0
+        }
+      },
+      "process": {
+        "exit_code": 0,
+        "stop": null,
+        "worker_seconds": 207.71404258161783,
+        "cache_evidence": {
+          "log": "compiler.log",
+          "log_sha256": "38fcdbec67e8e63784607f95c751694b0b1627408bc207ac4d03a7beeda0f30f",
+          "observed_log_occurrences": {
+            "persistent_hits": 0,
+            "persistent_misses": 0,
+            "tracing_misses": 158
+          },
+          "meaning": "All worker compilations, including small layout setup; absent log messages do not prove a cold backend"
+        },
+        "process_high_water": {
+          "mechanism": "parent os.wait4 of actual worker PID; process lifetime, not phase peaks",
+          "raw_ru_maxrss": 20556365824,
+          "raw_unit": "bytes",
+          "bytes": 20556365824
+        },
+        "rss_samples": {
+          "count": 205,
+          "maximum_bytes": 20556349440,
+          "meaning": "sampled current RSS; transient peaks may be missed"
+        }
+      },
+      "retained_objects": 2
+    },
+    {
+      "id": "t100-iteration-o200-l128",
+      "case": {
+        "id": "t100-iteration-o200-l128",
+        "T": 100,
+        "K": 4,
+        "d": 2,
+        "program": "iteration",
+        "budgets": {
+          "outer": 200,
+          "trials": 24,
+          "linear": 128,
+          "backtrack": 0.5,
+          "armijo": 0.0001
+        }
+      },
+      "compilation": {
+        "lower_seconds": 4.068023416,
+        "stablehlo_dtypes": {
+          "value_type_occurrences": {
+            "f32": 112041
+          },
+          "meaning": "Occurrences, not unique buffers or bytes; includes nested operands/results/block arguments"
+        },
+        "compile_seconds": 106.523995625,
+        "xla_memory": {
+          "available": true,
+          "estimates": {
+            "argument_size_in_bytes": 546156,
+            "output_size_in_bytes": 501736,
+            "temp_size_in_bytes": 12389488,
+            "alias_size_in_bytes": 0,
+            "generated_code_size_in_bytes": 0,
+            "host_argument_size_in_bytes": 0,
+            "host_output_size_in_bytes": 0,
+            "host_temp_size_in_bytes": 0,
+            "host_alias_size_in_bytes": 0,
+            "peak_memory_in_bytes": 1104262
+          },
+          "meaning": "XLA estimates; backend-specific extra fields are not process RSS"
+        },
+        "calls": {
+          "lower": 1,
+          "compile": 1,
+          "execute": 0
+        }
+      },
+      "process": {
+        "exit_code": 0,
+        "stop": null,
+        "worker_seconds": 121.55272245965898,
+        "cache_evidence": {
+          "log": "compiler.log",
+          "log_sha256": "dfccd9221d8fa2bb6b7a0b9b9ac821fa298045121112d7d9ac38ff9482351ff0",
+          "observed_log_occurrences": {
+            "persistent_hits": 0,
+            "persistent_misses": 0,
+            "tracing_misses": 154
+          },
+          "meaning": "All worker compilations, including small layout setup; absent log messages do not prove a cold backend"
+        },
+        "process_high_water": {
+          "mechanism": "parent os.wait4 of actual worker PID; process lifetime, not phase peaks",
+          "raw_ru_maxrss": 14648688640,
+          "raw_unit": "bytes",
+          "bytes": 14648688640
+        },
+        "rss_samples": {
+          "count": 120,
+          "maximum_bytes": 14647640064,
+          "meaning": "sampled current RSS; transient peaks may be missed"
+        }
+      },
+      "retained_objects": 2
+    },
+    {
+      "id": "t100-iteration-o200-l256",
+      "case": {
+        "id": "t100-iteration-o200-l256",
+        "T": 100,
+        "K": 4,
+        "d": 2,
+        "program": "iteration",
+        "budgets": {
+          "outer": 200,
+          "trials": 24,
+          "linear": 256,
+          "backtrack": 0.5,
+          "armijo": 0.0001
+        }
+      },
+      "compilation": {
+        "lower_seconds": 3.893884958,
+        "stablehlo_dtypes": {
+          "value_type_occurrences": {
+            "f32": 112041
+          },
+          "meaning": "Occurrences, not unique buffers or bytes; includes nested operands/results/block arguments"
+        },
+        "compile_seconds": 106.086056042,
+        "xla_memory": {
+          "available": true,
+          "estimates": {
+            "argument_size_in_bytes": 546156,
+            "output_size_in_bytes": 501736,
+            "temp_size_in_bytes": 12389488,
+            "alias_size_in_bytes": 0,
+            "generated_code_size_in_bytes": 0,
+            "host_argument_size_in_bytes": 0,
+            "host_output_size_in_bytes": 0,
+            "host_temp_size_in_bytes": 0,
+            "host_alias_size_in_bytes": 0,
+            "peak_memory_in_bytes": 1104262
+          },
+          "meaning": "XLA estimates; backend-specific extra fields are not process RSS"
+        },
+        "calls": {
+          "lower": 1,
+          "compile": 1,
+          "execute": 0
+        }
+      },
+      "process": {
+        "exit_code": 0,
+        "stop": null,
+        "worker_seconds": 121.69322929158807,
+        "cache_evidence": {
+          "log": "compiler.log",
+          "log_sha256": "63a730481d25218334140a5933a5cc7c8340b5fbb9987721d08b242da9ed3777",
+          "observed_log_occurrences": {
+            "persistent_hits": 0,
+            "persistent_misses": 0,
+            "tracing_misses": 154
+          },
+          "meaning": "All worker compilations, including small layout setup; absent log messages do not prove a cold backend"
+        },
+        "process_high_water": {
+          "mechanism": "parent os.wait4 of actual worker PID; process lifetime, not phase peaks",
+          "raw_ru_maxrss": 14338883584,
+          "raw_unit": "bytes",
+          "bytes": 14338883584
+        },
+        "rss_samples": {
+          "count": 120,
+          "maximum_bytes": 14338867200,
+          "meaning": "sampled current RSS; transient peaks may be missed"
+        }
+      },
+      "retained_objects": 2
+    }
+  ],
+  "cap_comparisons": [
+    {
+      "T": 32,
+      "program": "solve_from_coordinate",
+      "cases": [
+        "t32-solve_from_coordinate-o200-l128",
+        "t32-solve_from_coordinate-o400-l128",
+        "t32-solve_from_coordinate-o200-l256"
+      ],
+      "identical_reported_memory_fields": {
+        "argument_size_in_bytes": true,
+        "output_size_in_bytes": true,
+        "temp_size_in_bytes": true,
+        "alias_size_in_bytes": true
+      }
+    },
+    {
+      "T": 32,
+      "program": "iteration",
+      "cases": [
+        "t32-iteration-o200-l128",
+        "t32-iteration-o200-l256"
+      ],
+      "identical_reported_memory_fields": {
+        "argument_size_in_bytes": true,
+        "output_size_in_bytes": true,
+        "temp_size_in_bytes": true,
+        "alias_size_in_bytes": true
+      }
+    },
+    {
+      "T": 100,
+      "program": "solve_from_coordinate",
+      "cases": [
+        "t100-solve_from_coordinate-o200-l128",
+        "t100-solve_from_coordinate-o400-l128",
+        "t100-solve_from_coordinate-o200-l256"
+      ],
+      "identical_reported_memory_fields": {
+        "argument_size_in_bytes": true,
+        "output_size_in_bytes": true,
+        "temp_size_in_bytes": true,
+        "alias_size_in_bytes": true
+      }
+    },
+    {
+      "T": 100,
+      "program": "iteration",
+      "cases": [
+        "t100-iteration-o200-l128",
+        "t100-iteration-o200-l256"
+      ],
+      "identical_reported_memory_fields": {
+        "argument_size_in_bytes": true,
+        "output_size_in_bytes": true,
+        "temp_size_in_bytes": true,
+        "alias_size_in_bytes": true
+      }
+    }
+  ],
+  "call_accounting": {
+    "solves": {
+      "initialization_compilation": {
+        "lower": 2,
+        "compile": 2,
+        "execute": 12
+      },
+      "solve_compilation": {
+        "lower": 2,
+        "compile": 2,
+        "execute": 12
+      }
+    },
+    "storage": {
+      "lower": 10,
+      "compile": 10,
+      "execute": 0
+    },
+    "abstract_inventory": {
+      "lower": 0,
+      "compile": 0,
+      "execute": 0
+    },
+    "preflight": {
+      "lower": 0,
+      "compile": 0,
+      "execute": 0
+    }
+  },
+  "source_manifest_sha256": "595ca4a3e3dba8644800ce1187183dde3320b1f00770dad079b4794a760a694c",
+  "source_manifest_encoding": "UTF-8 json.dumps(sources, sort_keys=True, separators=(',', ':'))",
+  "raw_archive": {
+    "path": "tools/measurements/d12-moderate-001.tar.gz",
+    "sha256": "aa3d006f53f560ae30a6679bf595ccb4fbfb5c32f234716f383ec5b7b4bb53b7",
+    "bytes": 4249018,
+    "files": [
+      {
+        "path": "solves/report.json",
+        "bytes": 4161,
+        "sha256": "a767da69c35d4a3a8c804e0623166a01869a51f784aeac8c10ec40837f2f009f"
+      },
+      {
+        "path": "solves/spec.json",
+        "bytes": 17076,
+        "sha256": "3a6bab37fcbab2b3e3ffdac4bc6892f17e2be244c4f2e65754b4b3c3ee660c3b"
+      },
+      {
+        "path": "solves/t100/compiler.log",
+        "bytes": 144830,
+        "sha256": "e7f12c392340ed473441a7f5d18aaa0334bdc5ae88f721d8dc15243403947cf6"
+      },
+      {
+        "path": "solves/t100/inputs.npz",
+        "bytes": 8110,
+        "sha256": "73cc4ff1da2682d148e7fefc2d2bcfa7fe35128f5f89fcc6094d76b13dfcfaff"
+      },
+      {
+        "path": "solves/t100/process.json",
+        "bytes": 814,
+        "sha256": "3f2fa68d604e0e500773410eeaf293f80a04451dcf79dbb68bdb377fedba6c4e"
+      },
+      {
+        "path": "solves/t100/rss-samples.jsonl",
+        "bytes": 20556,
+        "sha256": "1983cb016880abe5c764c664f3fdeb879b4bb54fdbad8b3ec1048a1494f1746f"
+      },
+      {
+        "path": "solves/t100/stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "solves/t100/t100-xi0-feasible-initial.npz",
+        "bytes": 70481,
+        "sha256": "2a613f4dce3e2df4909048df065f1719f73bfadd220638b0bada49f2da21c848"
+      },
+      {
+        "path": "solves/t100/t100-xi0-feasible-terminal.npz",
+        "bytes": 124956,
+        "sha256": "37b9acadcc84bd6883c2a39b55e4f0f2ac2662bdc007aba56edec7f76c96e532"
+      },
+      {
+        "path": "solves/t100/t100-xi0-perturbed-initial.npz",
+        "bytes": 569085,
+        "sha256": "7e743655130b53ea9b96d8df7c68e0213def6b36e9961062ce0e1f20a8f71233"
+      },
+      {
+        "path": "solves/t100/t100-xi0-perturbed-terminal.npz",
+        "bytes": 515079,
+        "sha256": "a4f81a3af559d6418cad009491278135dcc7d80b4ad02dcc54ff29d7e2a74993"
+      },
+      {
+        "path": "solves/t100/t100-xi0-raw-zero-initial.npz",
+        "bytes": 45204,
+        "sha256": "a6d04243983dcb7ec8058d14a430b4f00ffe9f4a0ff92929f3a05d5ebc7b7989"
+      },
+      {
+        "path": "solves/t100/t100-xi0-raw-zero-terminal.npz",
+        "bytes": 124929,
+        "sha256": "0d4bb44fe5b8f0978719ba06e394392f03ee7c306346651bf520df1bddad5382"
+      },
+      {
+        "path": "solves/t100/t100-xi1-feasible-initial.npz",
+        "bytes": 70487,
+        "sha256": "bda64a4331ce981b1bd0518b621a2068036dc61ce316797ee1fb93779827c5f2"
+      },
+      {
+        "path": "solves/t100/t100-xi1-feasible-terminal.npz",
+        "bytes": 124999,
+        "sha256": "2fdea7c18e0c8db36c3e15f22e158e74fb97512b2257da92d0679e89dc3ba645"
+      },
+      {
+        "path": "solves/t100/t100-xi1-perturbed-initial.npz",
+        "bytes": 568167,
+        "sha256": "8eb067adf4e1cf117aa8ae35eec9311fd97c4cf70bfd3e99b0d809cc6c9bca59"
+      },
+      {
+        "path": "solves/t100/t100-xi1-perturbed-terminal.npz",
+        "bytes": 514752,
+        "sha256": "8c0add974f219fee59f754cf2c63707b34e85cf28ac19b586a1ada37c3bb1171"
+      },
+      {
+        "path": "solves/t100/t100-xi1-raw-zero-initial.npz",
+        "bytes": 45184,
+        "sha256": "183556bd803a0b0b794bd03f7f9770ac992d1d30193ba857f704068ec0301d87"
+      },
+      {
+        "path": "solves/t100/t100-xi1-raw-zero-terminal.npz",
+        "bytes": 124857,
+        "sha256": "a5fb646618bf16749bf2223406e74a3cf2df5c298e835ead897d7ad8057444ab"
+      },
+      {
+        "path": "solves/t100/worker.json",
+        "bytes": 355027,
+        "sha256": "17bad23dfb9ca62105a07c8c184e56998aeebf18a29bb506fc399b9385430759"
+      },
+      {
+        "path": "solves/t32/compiler.log",
+        "bytes": 144705,
+        "sha256": "f9c51ced6c2c15fe04121933d77773b3644051682fa37dc91f2092f9feac4778"
+      },
+      {
+        "path": "solves/t32/inputs.npz",
+        "bytes": 5402,
+        "sha256": "4a9358d4291d51bb8c5c29c454e1c42826cd6e7a1be7b47c3de0b2c23198ece3"
+      },
+      {
+        "path": "solves/t32/process.json",
+        "bytes": 814,
+        "sha256": "4d406c126e58769d79089bd399cdc6d581c4f31a3ee159128c8996f967151b8d"
+      },
+      {
+        "path": "solves/t32/rss-samples.jsonl",
+        "bytes": 21114,
+        "sha256": "797ef41fad7177afdb914db957cbc2de64f1c3ffcadc65522d48b432a64f51e5"
+      },
+      {
+        "path": "solves/t32/stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "solves/t32/t32-xi0-feasible-initial.npz",
+        "bytes": 66137,
+        "sha256": "9418f5b41f984c37ccd46c858b93b644f30ec4ce05af8104c91ed8e5359b0e60"
+      },
+      {
+        "path": "solves/t32/t32-xi0-feasible-terminal.npz",
+        "bytes": 119832,
+        "sha256": "c6796e11037587808665309f381509fd3361a02ab7d62a94950382a45a2db49f"
+      },
+      {
+        "path": "solves/t32/t32-xi0-perturbed-initial.npz",
+        "bytes": 193190,
+        "sha256": "d6d9a039b2142734395ac0a39ba729fcea8ed1534cfd63816dbeea47f7ee210a"
+      },
+      {
+        "path": "solves/t32/t32-xi0-perturbed-terminal.npz",
+        "bytes": 186375,
+        "sha256": "5f360795f52f1c476976c63bff843706f10dc04ae54c9c2a13b3d8e3c0462a4a"
+      },
+      {
+        "path": "solves/t32/t32-xi0-raw-zero-initial.npz",
+        "bytes": 41698,
+        "sha256": "9a9b9153e19f6541c9f37e473c451a5998e273e7e35054af130ec2b9850641b8"
+      },
+      {
+        "path": "solves/t32/t32-xi0-raw-zero-terminal.npz",
+        "bytes": 119854,
+        "sha256": "08ab6b65bc091e51bd33e0013276f484024f08d18a859f9869b182da57977870"
+      },
+      {
+        "path": "solves/t32/t32-xi1-feasible-initial.npz",
+        "bytes": 66131,
+        "sha256": "05dcf1295aefb0abf70ef0ee5e3e2e33f4f1d4ef0981c10085a1a422d8e49bb9"
+      },
+      {
+        "path": "solves/t32/t32-xi1-feasible-terminal.npz",
+        "bytes": 119926,
+        "sha256": "e9bdb14e083bf697fab610faa520d45c3cea050a95d9c11b94c6eb1da5872768"
+      },
+      {
+        "path": "solves/t32/t32-xi1-perturbed-initial.npz",
+        "bytes": 192825,
+        "sha256": "92d366b22d5e4940f17322aaa2f8b7e52f60df484936802716b6de1b01741964"
+      },
+      {
+        "path": "solves/t32/t32-xi1-perturbed-terminal.npz",
+        "bytes": 186371,
+        "sha256": "fbc09bc96ade6550dbf1351d9afde48cf59ea3fe0018e976a3326b045ad9edd6"
+      },
+      {
+        "path": "solves/t32/t32-xi1-raw-zero-initial.npz",
+        "bytes": 41664,
+        "sha256": "784891efd62814cf711808c6ac7dbe602e2c096f8283e648e7ed589db91c2ce0"
+      },
+      {
+        "path": "solves/t32/t32-xi1-raw-zero-terminal.npz",
+        "bytes": 119838,
+        "sha256": "1ca517d4da089db45a08a4192af473b2ca8e2b3cfd7d765f2a99f6cc9a1fb1f8"
+      },
+      {
+        "path": "solves/t32/worker.json",
+        "bytes": 354031,
+        "sha256": "c0071fcc3116dc085fa78fbe797a4ee8b27c81a018d22175dc013aba6218a164"
+      },
+      {
+        "path": "solves/validation.json",
+        "bytes": 12042,
+        "sha256": "007f2e5d38e509f1e99544cb5b5d8edaea861b43d8413552e9825aa265585c9f"
+      },
+      {
+        "path": "solves.stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "solves.stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "storage/inventory/compiler.log",
+        "bytes": 115533,
+        "sha256": "72eac96834ab4e693c7fc8b7563874b20d5f32ab62f6825402b33018dd750030"
+      },
+      {
+        "path": "storage/inventory/process.json",
+        "bytes": 808,
+        "sha256": "2a7fb24fc324b993dc2d6c7c67c20d77a3e65b38fa0048b26d7b1936287d1b34"
+      },
+      {
+        "path": "storage/inventory/rss-samples.jsonl",
+        "bytes": 1541,
+        "sha256": "d33f969ae9cb30bbed0988498d5f172f449c37960cc40876721bc2e0339c60db"
+      },
+      {
+        "path": "storage/inventory/stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "storage/inventory/worker.json",
+        "bytes": 822145,
+        "sha256": "ea4555dff60636dea2a34e9f1d324f9501d3e0f03427f5f7d5c6588478c1f613"
+      },
+      {
+        "path": "storage/report.json",
+        "bytes": 6370,
+        "sha256": "9f12e5c26736f71451dcdcb4f0a8058b7981779ab03ae6a8d10f63be45fb40ed"
+      },
+      {
+        "path": "storage/spec.json",
+        "bytes": 17076,
+        "sha256": "3a6bab37fcbab2b3e3ffdac4bc6892f17e2be244c4f2e65754b4b3c3ee660c3b"
+      },
+      {
+        "path": "storage/t100-iteration-o200-l128/compiler.log",
+        "bytes": 59844,
+        "sha256": "dfccd9221d8fa2bb6b7a0b9b9ac821fa298045121112d7d9ac38ff9482351ff0"
+      },
+      {
+        "path": "storage/t100-iteration-o200-l128/process.json",
+        "bytes": 815,
+        "sha256": "7abe2690ceaad72568848ea2e37db798ecdcc4750f778b38286aafcf63f88563"
+      },
+      {
+        "path": "storage/t100-iteration-o200-l128/rss-samples.jsonl",
+        "bytes": 9186,
+        "sha256": "a24122ba6a4b39ef824a67c0383a06fcee6e000adb693ddd457a79f525550867"
+      },
+      {
+        "path": "storage/t100-iteration-o200-l128/stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "storage/t100-iteration-o200-l128/worker.json",
+        "bytes": 272790,
+        "sha256": "be4847d2be1b998ae62e341be4b7deaad4eaffe92cca2370176e2a1d3db56516"
+      },
+      {
+        "path": "storage/t100-iteration-o200-l256/compiler.log",
+        "bytes": 59844,
+        "sha256": "63a730481d25218334140a5933a5cc7c8340b5fbb9987721d08b242da9ed3777"
+      },
+      {
+        "path": "storage/t100-iteration-o200-l256/process.json",
+        "bytes": 815,
+        "sha256": "37c8303fec0b239ef65b57a4baa5bdc1fab131e47727cdf07c2d18358e4f6bf9"
+      },
+      {
+        "path": "storage/t100-iteration-o200-l256/rss-samples.jsonl",
+        "bytes": 9182,
+        "sha256": "992c50e2aa288ec68980002fd3beb40e9f5ce35e76dc8f31d90657ad69c3fd4c"
+      },
+      {
+        "path": "storage/t100-iteration-o200-l256/stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "storage/t100-iteration-o200-l256/worker.json",
+        "bytes": 272790,
+        "sha256": "4296a937571e72c0e5fa9e5f2df9eaaacdd447eea273376c61a103d9af417395"
+      },
+      {
+        "path": "storage/t100-solve_from_coordinate-o200-l128/compiler.log",
+        "bytes": 58841,
+        "sha256": "2cf0b8a6731c71c2803f9a89c95fb52583a3562fa6e17edae4eb7d3d980cecce"
+      },
+      {
+        "path": "storage/t100-solve_from_coordinate-o200-l128/process.json",
+        "bytes": 814,
+        "sha256": "3d140ecceb10b96fc4f46f6d792a33d6798dd2ecd9e5e06c0ef5a09301f53204"
+      },
+      {
+        "path": "storage/t100-solve_from_coordinate-o200-l128/rss-samples.jsonl",
+        "bytes": 15589,
+        "sha256": "b979c349498c1f908cd2d533551cb3f58316782d0b657563b2ac123ba734b771"
+      },
+      {
+        "path": "storage/t100-solve_from_coordinate-o200-l128/stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "storage/t100-solve_from_coordinate-o200-l128/worker.json",
+        "bytes": 261802,
+        "sha256": "ca191a348f391e539ce27713abe2e6127f21a55d66ed366cbe37f50707561801"
+      },
+      {
+        "path": "storage/t100-solve_from_coordinate-o200-l256/compiler.log",
+        "bytes": 58841,
+        "sha256": "38fcdbec67e8e63784607f95c751694b0b1627408bc207ac4d03a7beeda0f30f"
+      },
+      {
+        "path": "storage/t100-solve_from_coordinate-o200-l256/process.json",
+        "bytes": 815,
+        "sha256": "2949bd86513204350cab7fd31a1504b0063b86bd768cac4beba0f138a7ac58b2"
+      },
+      {
+        "path": "storage/t100-solve_from_coordinate-o200-l256/rss-samples.jsonl",
+        "bytes": 15736,
+        "sha256": "8f4c6a0db09d6ca577842cbf8dcdc2d7508cf34922a5466fe8358c4ebffaa91d"
+      },
+      {
+        "path": "storage/t100-solve_from_coordinate-o200-l256/stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "storage/t100-solve_from_coordinate-o200-l256/worker.json",
+        "bytes": 261803,
+        "sha256": "ae4b6acd51ba1f445e12bb7a44aae1344bd0a6cf85530c05da2d0a82bb5d7f84"
+      },
+      {
+        "path": "storage/t100-solve_from_coordinate-o400-l128/compiler.log",
+        "bytes": 58841,
+        "sha256": "f85aa87b54ffedcdbecaf5a08aabf9d002b0a1c1573fd8191a0a93ba534cb02c"
+      },
+      {
+        "path": "storage/t100-solve_from_coordinate-o400-l128/process.json",
+        "bytes": 814,
+        "sha256": "066eb2c46e293fded29ee041ca84ccd3bf5aa630b02ad6f40cc261af302d2505"
+      },
+      {
+        "path": "storage/t100-solve_from_coordinate-o400-l128/rss-samples.jsonl",
+        "bytes": 15664,
+        "sha256": "987bfe4892e5cde4be29084eef65b53874f1d5ca6b4c16e94927641c377145bb"
+      },
+      {
+        "path": "storage/t100-solve_from_coordinate-o400-l128/stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "storage/t100-solve_from_coordinate-o400-l128/worker.json",
+        "bytes": 261803,
+        "sha256": "f08830b9904bc5fd0fefddcf28eeed7727c2a16b0bfe962e41d525dfcdb4a02e"
+      },
+      {
+        "path": "storage/t32-iteration-o200-l128/compiler.log",
+        "bytes": 59823,
+        "sha256": "25d99601831c9e4f11a810421612bc9a7869ec8ecc58545133967b7a65c83066"
+      },
+      {
+        "path": "storage/t32-iteration-o200-l128/process.json",
+        "bytes": 815,
+        "sha256": "3caa042168420852412fd567f0a2d2b5410b1519c23818d2706e6135199cea45"
+      },
+      {
+        "path": "storage/t32-iteration-o200-l128/rss-samples.jsonl",
+        "bytes": 9343,
+        "sha256": "9e21f7d360088e8443d3337d7f4da1e6271dcb284ada1df4bb1f634a0d80791b"
+      },
+      {
+        "path": "storage/t32-iteration-o200-l128/stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "storage/t32-iteration-o200-l128/worker.json",
+        "bytes": 271591,
+        "sha256": "7a51937269a0884e7b62d598ab2a21fc8ca72f1de9f74f04d97afdc0cb961f6c"
+      },
+      {
+        "path": "storage/t32-iteration-o200-l256/compiler.log",
+        "bytes": 59823,
+        "sha256": "efd68be04c50dc736d3ee826e6a53e42040567f6280813ca04383805b1ece676"
+      },
+      {
+        "path": "storage/t32-iteration-o200-l256/process.json",
+        "bytes": 815,
+        "sha256": "e3e68896efc6fb576e376b05311e7d2ccc676bee319ff2791892bd7cfad7bd7b"
+      },
+      {
+        "path": "storage/t32-iteration-o200-l256/rss-samples.jsonl",
+        "bytes": 9337,
+        "sha256": "53932c814523f78d5470bcc5629a098aa129ccd27dd2e3f98622b619ff134220"
+      },
+      {
+        "path": "storage/t32-iteration-o200-l256/stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "storage/t32-iteration-o200-l256/worker.json",
+        "bytes": 271591,
+        "sha256": "d29b66f3892da6295e42041ea614c5296d4ee2201f3c6ad8b27eb47375e6773f"
+      },
+      {
+        "path": "storage/t32-solve_from_coordinate-o200-l128/compiler.log",
+        "bytes": 58830,
+        "sha256": "ff0abcb423d8671d214a56362633172ed0ae37c5e52a459a6245fc24d263b075"
+      },
+      {
+        "path": "storage/t32-solve_from_coordinate-o200-l128/process.json",
+        "bytes": 815,
+        "sha256": "a7f168d791eb0861392cdf98c86186cb0b4982f3b2251bffb63cc9e8758a4339"
+      },
+      {
+        "path": "storage/t32-solve_from_coordinate-o200-l128/rss-samples.jsonl",
+        "bytes": 15813,
+        "sha256": "52fc1e72213f82229aa053cc8dd7407df2479a2bc1419b193af7987a220fb7dc"
+      },
+      {
+        "path": "storage/t32-solve_from_coordinate-o200-l128/stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "storage/t32-solve_from_coordinate-o200-l128/worker.json",
+        "bytes": 260645,
+        "sha256": "1390d64de22cbb1d876e5ef8989c67aab71b5afd2f1e70b8890ab5b6cbb9cc0e"
+      },
+      {
+        "path": "storage/t32-solve_from_coordinate-o200-l256/compiler.log",
+        "bytes": 58830,
+        "sha256": "4d566b5b272a441bad9d28502724d3f5aab960ad608933f62572dee7fc1248d4"
+      },
+      {
+        "path": "storage/t32-solve_from_coordinate-o200-l256/process.json",
+        "bytes": 815,
+        "sha256": "c2fa0a55cbafac2b35e61b88e97941318f19bc9cee6558ebeccd866c90661189"
+      },
+      {
+        "path": "storage/t32-solve_from_coordinate-o200-l256/rss-samples.jsonl",
+        "bytes": 15906,
+        "sha256": "dc7e9b0c17b646c1bbdd208656770d87e2deef7b54e16186f7f34425ec4c2469"
+      },
+      {
+        "path": "storage/t32-solve_from_coordinate-o200-l256/stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "storage/t32-solve_from_coordinate-o200-l256/worker.json",
+        "bytes": 260641,
+        "sha256": "2f506cadda79c5d80de30ba853881fed13363a4de55fc2792ed13ee6b4c71d73"
+      },
+      {
+        "path": "storage/t32-solve_from_coordinate-o400-l128/compiler.log",
+        "bytes": 58830,
+        "sha256": "ae5e698f5227f243646942ebc77c358ff4d73eb0faf4d38ca4cd46312b339f7b"
+      },
+      {
+        "path": "storage/t32-solve_from_coordinate-o400-l128/process.json",
+        "bytes": 815,
+        "sha256": "d9db2ed152efddd77e1a77dc4749d346fb15df16e33889c954088a8f2f388902"
+      },
+      {
+        "path": "storage/t32-solve_from_coordinate-o400-l128/rss-samples.jsonl",
+        "bytes": 15896,
+        "sha256": "b4d3777b88c72ed478481e58ed517b57053af52f9ca3e5751ad1934fefabb5ff"
+      },
+      {
+        "path": "storage/t32-solve_from_coordinate-o400-l128/stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "storage/t32-solve_from_coordinate-o400-l128/worker.json",
+        "bytes": 260640,
+        "sha256": "ab865c3bf0a7056d31ba2d3386b2b9f0cabf48b5bf892441f3480a08256daca3"
+      },
+      {
+        "path": "storage/validation.json",
+        "bytes": 203,
+        "sha256": "3d6dd1a6da4ee457c5289271b1c0a44a77667680d8c8919d7348b15e138dbce8"
+      },
+      {
+        "path": "storage.stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "storage.stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "verification": "Every archived byte stream matches the original file length and SHA256; all original paths remain preserved outside the checkout."
+  },
+  "commands": {
+    "solves": "uv run python tools/d12_moderate_runner.py run --phase solves --output /tmp/cff-a3wz-solves-001",
+    "storage": "uv run python tools/d12_moderate_runner.py run --phase storage --output /tmp/cff-a3wz-storage-001",
+    "validate_solves": "uv run python tools/d12_moderate_runner.py validate /tmp/cff-a3wz-solves-001",
+    "validate_storage": "uv run python tools/d12_moderate_runner.py validate /tmp/cff-a3wz-storage-001"
+  },
+  "maximum_initialization_comparison_by_group": {
+    "messages": 2.9256505497573642e-05,
+    "xi": 3.349028557893693e-06,
+    "energy": 8.884319463179348e-07,
+    "regions": 1.5396433304608953e-05,
+    "separators": 2.514424901982176e-05,
+    "learning": 4.067969572749873e-06
+  },
+  "inventory_process": {
+    "exit_code": 0,
+    "stop": null,
+    "worker_seconds": 21.238821875303984,
+    "cache_evidence": {
+      "log": "compiler.log",
+      "log_sha256": "72eac96834ab4e693c7fc8b7563874b20d5f32ab62f6825402b33018dd750030",
+      "observed_log_occurrences": {
+        "persistent_hits": 0,
+        "persistent_misses": 0,
+        "tracing_misses": 294
+      },
+      "meaning": "All worker compilations, including small layout setup; absent log messages do not prove a cold backend"
+    },
+    "process_high_water": {
+      "mechanism": "parent os.wait4 of actual worker PID; process lifetime, not phase peaks",
+      "raw_ru_maxrss": 572145664,
+      "raw_unit": "bytes",
+      "bytes": 572145664
+    },
+    "rss_samples": {
+      "count": 21,
+      "maximum_bytes": 572145664,
+      "meaning": "sampled current RSS; transient peaks may be missed"
+    }
+  },
+  "summary_method": "Reviewed validate_report independently rechecked both saved phases without optimizer calls; read_snapshot verified all payload hashes; the reviewed NumPy evaluate adapter recomputed each initial/terminal absolute energy. Scalar certificates/work are copied from saved terminal leaves. Logical group counts/bytes sum the archived leaf manifests, allowing repeated aliases. Nineteen-group mappings point directly to saved leaves. Full source/runtime/leaf/call/IR/cache records remain in the archive."
+}
