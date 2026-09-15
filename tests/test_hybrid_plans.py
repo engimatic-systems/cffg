@@ -121,6 +121,26 @@ def test_malformed_contracts_fail_by_component(change, message):
         replace(plan, **change(plan))
 
 
+@pytest.mark.parametrize("field", ["cardinality", "dim"])
+@pytest.mark.parametrize("value", [0, -1, 1.5, True])
+def test_separator_sizes_require_positive_integers(field, value):
+    plan = plan_fixture()
+    separators = (replace(plan.separators[0], **{field: value}), *plan.separators[1:])
+    with pytest.raises(ValueError, match="association.*left.*invalid cardinality or dimension"):
+        replace(plan, separators=separators)
+
+
+@pytest.mark.parametrize("support", [(), (0, 0), (1,), (-1,), (0.5,), (True,)])
+def test_one_label_separator_retains_fixed_support_validation(support):
+    plan = plan_fixture()
+    declaration = replace(plan.declaration, separators=(
+        replace(plan.declaration.separators[0], active_support=support), *plan.declaration.separators[1:],
+    ))
+    separators = (replace(plan.separators[0], cardinality=1), *plan.separators[1:])
+    with pytest.raises(ValueError, match="association.*left.*invalid fixed label support"):
+        replace(plan, declaration=declaration, separators=separators)
+
+
 def test_duplicate_and_untyped_arena_identities_are_rejected():
     arena = arena_fixture()
     with pytest.raises(ValueError, match="association.*duplicate compiled identity"):

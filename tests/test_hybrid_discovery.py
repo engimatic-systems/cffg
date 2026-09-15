@@ -47,6 +47,25 @@ def stages(template, registry=None):
     return claims, registered, drafts
 
 
+def one_label_unary():
+    return Template(
+        "one_label",
+        variables={"z": VariableSpec("z", cardinality=1), "x": VariableSpec("x", dim=1)},
+        factors={"site": FactorSpec("site", "gaussian_mixture", {"selector": "z", "out": "x"},
+                                    param_blobs={"mean": "m", "cov": "V"})},
+        blobs={name: BlobRef(name, "absent.npy") for name in ("m", "V")},
+        ports={name: PortSpec(name, variable, PortRole.GLUE)
+               for name, variable in (("label", "z"), ("state", "x"))},
+        hybrid_components={"singleton": HybridComponentSpec(
+            "singleton",
+            separators=(HybridSeparatorSpec("only", "z", "x", (0,)),),
+            regions=(HybridRegionSpec("site_owner", "unary", "site", ("only",)),),
+            adapters=(HybridAdapterSpec("label_input", "only", "z"),
+                      HybridAdapterSpec("state_input", "only", "x")),
+        )},
+    )
+
+
 def ordinary_members(registered):
     return {member for draft in (*registered.discrete, *registered.gaussian, *registered.ef)
             for member in (draft.plan if isinstance(draft, DiscreteDraft) else draft).members}
@@ -236,6 +255,46 @@ def test_selected_gaussian_unary_preserves_mixture_roles():
     assert [(s.role, s.initializer_shape) for s in arrays.inputs] == [("mean", (3, 2)), ("cov", (3, 2, 2))]
 
 
+def test_admitted_one_label_unary_preserves_claim_draft_and_parameter_intentions():
+    template = one_label_unary()
+    claims, registered, drafts = stages(template)
+    claim, = claims.hybrid_components
+    component, = drafts.hybrid_components
+    assert component.plan is claim.plan
+    assert component.plan.declaration == template.hybrid_components["singleton"]
+    separator, = component.plan.separators
+    assert (separator.name, separator.cardinality, separator.dim) == ("only", 1, 1)
+    assert (separator.regime_variables, separator.state_variables) == (("z",), ("x",))
+    assert component.plan.declaration.separators[0].active_support == (0,)
+    assert tuple(component.plan.regions[0].separator_indices) == (0,)
+    assert component.plan.members == component.plan.parameter_members == ("site",)
+    assert component.ownership == claim.ownership
+    assert component.objectives == claim.objectives
+    assert claims.consumed == {"site"}
+    assert not claims.mixtures and not drafts.mixtures and not ordinary_members(registered)
+    assert drafts.ownership_problem is None
+    assert {a.domain for a in component.plan.adapters} == {"categorical", "gaussian"}
+    assert_adapter_slots(claims, component)
+    assert component.plan.coordinate_requirements is component.plan.scratch_requirements is None
+    assert component.plan.schedule_stage == "deferred"
+    arrays, = component.arrays
+    assert arrays.recipe is ArrayRecipe.MIXTURE
+    assert [(s.factor, s.role, s.blob, s.initializer_shape) for s in arrays.inputs] == [
+        ("site", "mean", "m", (1, 1)), ("site", "cov", "V", (1, 1, 1)),
+    ]
+    assert [(s.factor, s.role, s.blob) for s in registered.sources] == [
+        ("site", "mean", "m"), ("site", "cov", "V"),
+    ]
+    member, = arrays.members
+    assert (member.member, member.index) == ("site", 0)
+    assert not member.writable and not member.statistic_source
+    assert {role: (parameter.key, parameter.transform) for role, parameter in member.runtime.items()} == {
+        "mean": ("hybrid:factor:site:m", "identity"),
+        "cov": ("hybrid:factor:site:W", "covariance_to_precision"),
+    }
+    assert {d.name for d in arrays.destinations} == {p.key for p in member.runtime.values()}
+
+
 def branched(branches=2, cardinality=3, dim=2):
     """Several R/H/D pairs share one Y; equality trees keep FFG degree two."""
     template = Template("branched")
@@ -338,7 +397,8 @@ def test_direct_stage_rejects_malformed_graph_declarations_by_name(defect, diagn
         validate_admission(template.name, claims)
 
 
-def test_snapshots_are_immutable_and_do_not_resolve_or_execute(monkeypatch):
+@pytest.mark.parametrize("template_factory", [declared, one_label_unary])
+def test_snapshots_are_immutable_and_do_not_resolve_or_execute(monkeypatch, template_factory):
     import equinox as eqx
     import jax
     from cffg import Engine, inits
@@ -361,7 +421,7 @@ def test_snapshots_are_immutable_and_do_not_resolve_or_execute(monkeypatch):
                          (eqx, "filter_jit"), (jax, "jit"), (jax, "grad"), (jax, "value_and_grad"),
                          (jax, "jacfwd"), (jax, "jacrev"), (jax, "eval_shape")):
         monkeypatch.setattr(target, name, forbidden)
-    template = declared()
+    template = template_factory()
     claims, registered, drafts = stages(template, registry)
     template.factors.clear()
     template.variables.clear()

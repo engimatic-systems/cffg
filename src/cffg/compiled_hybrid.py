@@ -151,7 +151,7 @@ class HybridComponentPlan(ImmutableRecord):
         separator_specs = {s.name: s for s in spec.separators}
         for plan in self.separators:
             declared = separator_specs[plan.name]
-            if not _integer(plan.cardinality, 2) or not _integer(plan.dim, 1):
+            if not _integer(plan.cardinality, 1) or not _integer(plan.dim, 1):
                 fail(f"separator {plan.name!r}: invalid cardinality or dimension")
             support = declared.active_support
             if (not support or not all(_integer(i) and i < plan.cardinality for i in support)

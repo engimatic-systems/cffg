@@ -1,6 +1,6 @@
 ---
 id: cdhd-fyq6
-status: open
+status: in_progress
 deps: [cdd-ziiw]
 links: []
 created: 2026-09-15T07:10:33Z
@@ -45,3 +45,22 @@ cdpf-gzix retains graph discovery review, closure and publication. cff-7sw5/IDHK
 - D12: the accepted hybrid-regime-ec-v1 approximation; its runtime implementation remains guarded.
 
 
+
+## Notes
+
+**2026-09-15T07:27:12Z**
+
+Implementation handoff: applicable ARCHITECTURE change-path row is Derived component coordinate, limited to the local plan-identity boundary. Affected pair: admitted core declaration -> compiled plan and specialized claim/draft. Serialization schema, array/support resolution, assembly, State/ledger/readouts, host/JIT, synchronous/scheduled, single/vmap numerical execution, current/legacy checkpoints, and learned persistence are N/A. Preserve existing core admission and all execution guards. Hostile-input coverage is unary K=1/support (0,), plus invalid cardinality and support rejection; cavity/FE/convergence arithmetic is N/A. Focused metadata checks only in this worker; root owns independent review, the combined final short-suite gate and closure.
+
+**2026-09-15T07:29:46Z**
+
+Implemented the bounded metadata repair: HybridComponentPlan now accepts positive separator cardinality, including K=1. No core admission, compiler/bundle/runtime guard, numerical Coordinate.from_sites, numerical source, specification, qualification or evidence artifact changed. This restores the existing documented declaration-to-plan contract; it makes no runtime qualification claim.
+
+Regression evidence: an actual gaussian_mixture unary template with z cardinality 1, x dimension 1, separator support (0,), and categorical/Gaussian GLUE adapters passes core.validate and now produces consistent immutable specialized claims/drafts. Assertions cover region ownership, ordinary gather/scatter slots, unresolved mean/covariance source shapes, destination keys, member index and transforms, disabled writes/statistics, and unavailable coordinate/scratch requirements. The new regression failed before the repair specifically at the compiled minimum-cardinality check. Existing no-resolution/no-execution and immutable-snapshot checks now also cover this unary fixture. Direct plan checks retain named errors for zero/negative/nonintegral/bool cardinality or dimension and empty/duplicate/out-of-range/negative/nonintegral/bool support.
+
+Final focused validation after the source edit:
+- uv run pytest -q tests/test_hybrid_discovery.py tests/test_hybrid_plans.py -k 'not ordinary_models_keep_execution_and_inventory_paths' -> 77 passed, 2 deselected in 0.31s. The two excluded tests execute ordinary numerical models, outside this worker's metadata-only authorization.
+- uv run pytest -q tests/test_hybrid_declarations.py -k 'compile_and_bundle_guards_precede_lowering_and_destination_changes or bundle_load_rejects_a_declared_plan_before_array_resolution' -> 2 passed, 33 deselected in 0.02s.
+- git diff --check passed; tk dep cycle reports no dependency cycles.
+
+Handoff: implementation is ready for an atomic cdhd-fyq6 commit and a clean pause. Root owns independent review, one combined final short-suite run after all relevant edits under the unchanged 1200-second cap, ticket closure and publication. This ticket remains in_progress pending that gate. No full suite, array loading, numerical program, qualification program or recovery fit was run by this worker; all three recovery fits remain unused. Downstream numerical source/layout generalization remains separate work.
