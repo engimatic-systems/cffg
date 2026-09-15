@@ -1,7 +1,7 @@
 ---
 id: cff-7sw5
 status: open
-deps: [cff-ocxl, cff-k6g5, cff-a3wz, cdd-ziiw]
+deps: [cff-ocxl, cff-k6g5, cff-a3wz, cdd-ziiw, cdpf-gzix]
 links: []
 created: 2026-09-14T01:11:24Z
 type: feature
@@ -119,3 +119,27 @@ inventory.analytic_inventory inspects stored metadata and parameter defaults plu
 The first final suite exposed filename-based qualification inventory contamination from naming compiler metadata hybrid_plans.py. Root moved its byte-identical contents to compiled_hybrid.py. All 12 tiny, 17 descriptor and 32 moderate accepted source hashes still match exactly; source checks, numerical files and accepted artifacts were preserved. Keep compiler metadata outside the frozen numerical hybrid_*.py family; an actual numerical producer change still needs its proper qualification assessment. No numerical rerun was claimed for metadata-only changes.
 
 7SW5 is now ready through its authoritative TK dependencies. Next fresh author must complete the architecture/duplicated-surface and hostile-input handoff before implementation, and split further before starting if the remaining real discovery/resolution/assembly/bundle scope cannot fit one bounded worker context. All original acceptance remains: semantic membership, ownership-certified assembly, address/support/shape checks, opt-in D12 and unchanged ordinary path, useful analytic inventory, and successful declared fixed-parameter empty-learning CFFGZ reconstruction while execution stays unavailable. IDHK/BRCF/F3JZ/CZDQ/ULBZ/KUL2 retain downstream State/objective/runtime/learning/composition. No work has started on 7SW5 yet.
+
+**2026-09-15T06:53:46Z**
+
+Bounded pre-edit assessment from fresh cff-7sw5 worker (no edits, tests or numerical calls): can the remaining discovery/resolution/assembly/bundle work fit one reviewable worker context? Answer: split declaration-only graph interpretation from actual numerical data resolution and public publication. Root created ready child cdpf-gzix, Lower declared hybrid ownership into compiler claims and drafts, depending on closed cdd-ziiw, K6G5 and A3WZ. Added it as a 7SW5 prerequisite without removing any existing dependency. A fresh implementation worker will own cdpf-gzix; the assessing worker ended without implementing either ticket.
+
+The prerequisite derives equality-copy membership, ordered region/separator/adapter indexes, consumed factors, immutable drafts, parameter-role requirement intentions and graph-derived ownership/exclusion declarations below the current compiler guard. These declarations are not final assembly certificates. It keeps registered blob source roles/order and ordinary exterior addresses intact. 7SW5 retains actual blob/value/support validation, address packing, cross-owner certification, real Arena publication, useful analytic inventory and successful fixed-parameter empty-learning bundles; runtime guards remain until the existing execution tickets. Admitted general incidence must not be silently converted to a chain because Coordinate.from_sites expects [T,K,d]. All original acceptance remains required; no model scope, approximation, mathematical, qualification or recovery change.
+
+Sources -> specialized.discovery.discover_specialized currently discovers ordinary families; registered.lowering excludes claims.consumed while registered.requirements.source_requirements retains original consumed-factor sources; resolution.resolve owns packing/addresses; assembly_checks owns cross-owner certification; compiled_hybrid records supply the immutable contract. Confidence -> high for those concrete interfaces and ownership boundaries, medium for worker-context sizing. Detailed pre-implementation architecture and hostile-input handoff is in cdpf-gzix. Reuse the earlier bounded compiler research in this ticket rather than repeating it.
+
+Legend: prerequisite --> dependent. Companion from tk dep tree --full cff-7sw5, tk ready and tk blocked. Additional existing direct dependencies are retained; no dependency cycles.
+
+[x] K6G5 + [x] A3WZ --> [x] cdd-ziiw --> [ ] cdpf-gzix (ready)
+                                               |
+[x] OCXL + retained original dependencies --> [ ] 7SW5
+                                               |
+                                           [ ] IDHK --> [ ] BRCF --> [ ] F3JZ
+                                                                      /   \
+                                                                [ ] CZDQ [ ] ULBZ
+                                                                      \   /
+                                                                    [ ] KUL2
+                                                                        |
+                                                                    [ ] X0IF --> [ ] ZOV5
+
+cdpf-gzix is the immediate blocker and next sequential implementation root; cdh-kvy5 remains independent nonblocking work. All three registered recovery fits remain unused. This refinement changes tickets only, so validate dependency cycles and diffs rather than repeating the unchanged passing short suite from PR152.
