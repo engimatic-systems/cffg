@@ -169,6 +169,7 @@ def test_colony_keeps_independent_adaptive_run_certificates():
     assert not np.allclose(results[ids[0]].state.g_eta, results[ids[1]].state.g_eta)
 
 
+@pytest.mark.slow
 def test_exact_scan_island_attached_to_adaptive_factor_matches_flooding():
     from dataclasses import replace
     from cffg.core import BlobRef, FactorSpec, VariableSpec

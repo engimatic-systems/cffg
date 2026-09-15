@@ -617,6 +617,7 @@ def test_float32_fitter_survives_tenfold_horizon():
     assert all(np.all(np.isfinite(value)) for value in result.parameters.values())
 
 
+@pytest.mark.slow
 def test_structured_nascar_coordinates_avoid_the_legacy_finite_cycle():
     observations = _nascar_observations()
     key = jax.random.split(
