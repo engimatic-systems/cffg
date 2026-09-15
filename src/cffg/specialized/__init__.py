@@ -17,6 +17,7 @@ from .contracts import (
     SpecializedPlanDrafts,
 )
 from .discovery import discover_specialized, initializer_fallbacks
+from .hybrid import lower_hybrid_components
 from .mixed import lower_mixtures, lower_precision, lower_recurrence
 from .structural import lower_delta, lower_equalities
 
@@ -59,7 +60,7 @@ def _ownership(
     parameter_refs = {}
     for overlay in mu3:
         parameter_refs.setdefault(overlay.gfe_name, []).append(overlay.name)
-    records = []
+    records = [component.ownership for component in claims.hybrid_components]
     beads_by_factor = {}
     for index, constraint in enumerate(topology.constraints):
         beads_by_factor.setdefault(constraint.target, []).append(
@@ -203,4 +204,5 @@ def complete_specialized(
         ownership_problem=ownership_problem,
         delta_pairs=delta_pairs,
         delta_problem=delta_problem,
+        hybrid_components=lower_hybrid_components(claims) if claims.hybrid_components else (),
     )

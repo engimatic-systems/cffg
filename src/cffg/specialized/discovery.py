@@ -27,6 +27,7 @@ from .contracts import (
     SpecializedClaims,
     TransitionGfeClaim,
 )
+from .hybrid import discover_hybrid_components
 
 
 def _admission(t, constraints, registry):
@@ -195,10 +196,11 @@ def _parameter_claims(t, layouts, psub):
     return tuple(claims)
 
 
-def _composites(t, psub, parameters):
+def _composites(t, psub, parameters, consumed=()):
     endpoints = t.endpoints
     problems = []
-    consumed = set()
+    previously_claimed = frozenset(consumed)
+    consumed = set(previously_claimed)
     gfe_goal_dirichlet = {
         claim.layout.likelihood: claim
         for claim in parameters
@@ -210,6 +212,8 @@ def _composites(t, psub, parameters):
     tm_buckets: dict[tuple, list[str]] = {}
     hybrid_gfe_buckets: dict[tuple, list[tuple[str, str]]] = {}
     for fname, detail in sorted(psub.items()):
+        if fname in previously_claimed:
+            continue
         f = t.factors[fname]
         if f.type == "transition_mixture" and detail.get("substituted_role") == "out":
             cards3 = tuple(
@@ -508,7 +512,11 @@ def discover_specialized(
     reference escapes. Diagnostics are data until the compiler's existing gates.
     """
     registry = snapshot_registry() if registry is None else registry
+    components, component_problems = (
+        discover_hybrid_components(topology) if topology.hybrid_components else ((), ())
+    )
     mean_field, psub, admission = _admission(topology, template.constraints, registry)
+    admission = component_problems + admission
     layouts, layout_problems = ({}, ()) if admission else _parameter_layouts(topology)
     parameters = (
         ()
@@ -535,8 +543,10 @@ def discover_specialized(
         shapes = {}
     else:
         gfe, transition, hybrid, consumed, excluded, composite_problems = _composites(
-            topology, psub, parameters
+            topology, psub, parameters,
+            consumed=(member for component in components for member in component.ownership.executed),
         )
+        excluded.update(edge for component in components for edge in component.ownership.excluded_edges)
         consumed.update(
             name
             for claim in parameters
@@ -586,4 +596,5 @@ def discover_specialized(
         grouping_problems=grouping_problems,
         conditioning_problems=conditioning,
         initializer_shapes=shapes,
+        hybrid_components=components,
     )

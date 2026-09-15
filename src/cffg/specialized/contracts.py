@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Literal
 
 from cffg._immutable import FrozenArray, ImmutableRecord
 from cffg.array_requirements import ArrayRequirement
+from cffg.compiled_hybrid import HybridComponentPlan
 from cffg.compiled import (
     DirichletGroupPlan,
     EfGroupPlan,
@@ -110,6 +111,7 @@ class SpecializedClaims(ImmutableRecord):
     grouping_problems: Mapping[str, str]
     conditioning_problems: Mapping[str, str]
     initializer_shapes: Mapping[tuple[str, str], tuple[int, ...] | None]
+    hybrid_components: tuple[HybridComponentClaim, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -146,6 +148,41 @@ class CompositeOwnership(ImmutableRecord):
 
 
 @dataclass(frozen=True)
+class HybridObjectiveOwner(ImmutableRecord):
+    """A named objective term inside a component, not another execution owner.
+
+    Regions own their factor energy and labeled entropy. Separators own entropy
+    corrections; adapters own zero energy and their reduced identity entropy.
+    Owned equalities have zero factor energy under the enclosing component.
+    """
+
+    name: str
+    kind: Literal["region", "separator", "adapter"]
+    factor: str | None = None
+
+
+@dataclass(frozen=True)
+class HybridComponentClaim(ImmutableRecord):
+    """Graph-derived declarations, without resolved assembly certification.
+
+    ``ownership.executed`` declares exclusive execution and factor-energy
+    ownership, including equality wiring. Final cross-owner and entropy-table
+    checks must compare the resolved component with the assembled arena.
+    """
+
+    plan: HybridComponentPlan
+    ownership: CompositeOwnership
+    objectives: tuple[HybridObjectiveOwner, ...]
+
+
+@dataclass(frozen=True)
+class HybridComponentDraft(HybridComponentClaim):
+    """Per-factor array/address intentions, without values or learning targets."""
+
+    arrays: tuple[ArrayRequirement, ...]
+
+
+@dataclass(frozen=True)
 class SpecializedPlanDrafts(ImmutableRecord):
     semiring: str
     parameters: tuple[ParameterClaim, ...]
@@ -172,3 +209,4 @@ class SpecializedPlanDrafts(ImmutableRecord):
     ownership_problem: str | None
     delta_pairs: FrozenArray
     delta_problem: str | None
+    hybrid_components: tuple[HybridComponentDraft, ...] = ()

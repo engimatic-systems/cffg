@@ -1,10 +1,11 @@
-"""Immutable D12 ownership contracts, without discovery or numerical state.
+"""Immutable D12 ownership contracts, without numerical state.
 
 Serialized declarations select the approximation. These derived records map
 their named owners to indexes and ordinary slots. Parameter members refer to
 ``Arena.member_of`` and its existing addresses into ``Arena.log_params``;
 accepted beliefs and learning statistics belong only to future runtime State.
 Construction checks record identity, not graph admission or resolved arrays.
+Declaration-only graph lowering lives in specialized.hybrid.
 """
 
 from __future__ import annotations

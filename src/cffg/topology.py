@@ -77,6 +77,10 @@ class TopologyLayout(ImmutableRecord):
     data_candidates: tuple[DataCandidate, ...]
     port_problems: tuple[str, ...]
 
+    def ports_of(self, variable: str) -> tuple[PortSpec, ...]:
+        """Read the declared boundary ports without reconstructing a template."""
+        return self.ports_by_variable.get(variable, ())
+
 
 def prefix_offsets(lengths: tuple[int, ...] | np.ndarray) -> np.ndarray:
     """Offsets for consecutive variable-width segments, including the end."""

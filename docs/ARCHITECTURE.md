@@ -359,6 +359,7 @@ The specialized owners are:
 | Responsibility | Owner |
 | --- | --- |
 | Admission traversal, parameter-edge tags, composite claims, domain routing, specialized initializer shapes | `specialized/discovery.py`; registered capability checks delegate to `registered/capabilities.py` at their original per-factor positions |
+| Declared D12 component membership, boundary slots, objective declarations and per-factor array intentions | `specialized/hybrid.py`, before ordinary composite/group discovery; graph checks reuse `core/hybrid.py` on the immutable topology snapshot |
 | Dirichlet parameter paths, categorical and transition GFE, hybrid GFE, functional μ3 metadata | Named `lower_*` functions in `specialized/composites.py` |
 | Mixture, recurrence, and Gaussian precision plans | Named `lower_*` functions in `specialized/mixed.py`; recurrence incidence classification consumes immutable variable/endpoint mappings in `recurrence_topology.py` |
 | Hard-constraint drafts and family-owned k/table validation | `specialized/constraints.py` |
@@ -1114,6 +1115,37 @@ exclusive assembly, or a mapping into the qualified numerical coordinate.
 Schedule stages and execution remain deferred; the plan stores no accepted
 coordinate, belief, derivative capture, or learned statistic.
 
+Below the public compiler guard, `specialized/hybrid.py` derives immutable
+`HybridComponentClaim` and `HybridComponentDraft` records from topology snapshots.
+Only explicitly owned equality incidence identifies regime/state copies.
+Sorted owner indexes preserve each region's declared port order; no chain shape
+or numerical coordinate is inferred. Component factors and equalities enter
+`claims.consumed` before ordinary composites, recurrence/mixture discovery and
+registered grouping. Each component declares one execution/factor-energy owner
+through `CompositeOwnership`, with separate named region, separator and adapter
+objective terms. Its ordinary entropy exclusions are precisely the edges whose
+two factor endpoints belong to that component. Adapter-facing edges retain their
+ordinary slots and exterior factor connections, including exposed ports.
+
+Each region factor receives an unresolved `ArrayRequirement` and
+`MemberRequirement` using existing categorical, Gaussian, mixture and recurrence
+parameter roles and transforms. Inputs preserve original factor/blob-role
+traversal, initializer shapes and unevaluated registered shape providers;
+registered source requirements still include every consumed source. Draft member
+keys/indexes are intentions for later packing, with writes and statistic sources
+disabled. They neither create addresses nor certify fixed-parameter bundles.
+These are graph-derived ownership declarations, not final assembly certificates:
+resolved values/support, cross-owner checks, both ordinary entropy tables and
+parameter publication must still be checked before an Arena can be published.
+The stage loads no arrays, invokes no initializers or numerical callbacks, and
+leaves coordinate/scratch requirements unavailable. Undeclared models skip D12
+discovery and draft lowering. `tests/test_hybrid_discovery.py` checks immutable
+no-runtime stages, source/order preservation, ordinary categorical/Gaussian
+attachments, multiple components, named malformed cuts, sparse labels with gaps
+and branching incidence with independently enlarged graph, label and dimension
+sizes. The branching fixture is admitted graph structure; any later mapping to
+the qualified numerical interface must preserve or explicitly address it.
+
 `execution_availability.require_execution_available` rejects any published D12
 component by name and approximation before runtime construction or tracing.
 Engine, StateLifecycle, synchronous sweeps, schedule construction and programs,
@@ -1148,9 +1180,9 @@ topology or specialized discovery. Bundle save/load rejects them during
 preflight, before any destination replacement. Templates without declarations
 continue through their ordinary compilation path without D12 lowering.
 Declaration tests in `tests/test_hybrid_declarations.py` cover this boundary;
-resolved array shapes and support, specialized/registered ownership, resolution,
-assembly, derived plan publication and successful compiled bundles belong to the
-compiler-plan ticket. D12 runtime schedules, host/JIT and single/vmap numerical
+resolved array shapes and support, packed addresses, final assembled ownership,
+derived plan publication and successful compiled bundles remain compiler-plan
+work. D12 runtime schedules, host/JIT and single/vmap numerical
 behavior, numerical dtype/scale qualification, and learning resume remain deferred.
 
 ### 2e. Executable factor registration (`cffg.kernels`)
