@@ -1,6 +1,6 @@
 ---
 id: cdh-urn0
-status: in_progress
+status: closed
 deps: []
 links: [cdc-ztuf, cdh-kvy5]
 created: 2026-09-14T22:56:19Z
@@ -127,3 +127,7 @@ Updated the tools/d12_moderate_checks.py module docstring to describe the preser
 Artifact validation results: the probe's parsed executable statements are identical before/after the docstring edit; all three new tickets retain exactly one final newline after this handoff; git diff --check and tk dep cycle pass. Landing checks staged whitespace and the actual combined committed diff from d5e009876e3ab8ad3db0a7138437f429dc61128e and 53c95db after the final commit, then verifies a clean tree. Source kernels, spec, descriptor and historical artifacts remain unchanged. No numerical tests or numerical gates were rerun for this documentation/ticket cleanup.
 
 Remain in_progress and pause after the cleanup commit for root's artifact inspection. Fresh cdh-m75a implementation follows; root owns the shared new tiny checkpoint and final full gate after all source work.
+
+**2026-09-15T03:12:53Z**
+
+Done: compensated affine centering repairs the weighted and rare-source float32 covariance discrepancy without changing message semantics or qualification tolerances. Independent numerical review and hostile-input/derivative coverage passed. Immutable tiny attempt004 at sourceaecd819 independently passes40 converged outputs,6expected divergences and1budget exhaustion; its hash is b127d35227a32851ccfcd7721cc54fdab09c8311c63b47f9f63547520dd9a900. The shared final short suite passed at 144fb21466894bfd91d2040ff2d5e1d003cc82e9 after all code and independent reviews: uv run python tools/dashboard.py --run-suite; 2832 passed, zero failures, pytest exit0, pytest1125.74 seconds and measured wall1126.534 seconds. The unchanged1200-second cap has73.466 seconds of margin. Four loadfile workers used an initially empty1GiB cache. Root waited quietly for the full suggested1200 seconds before retrieving the result. Phase audit verifies8496 phase records,2832 distinct call cases exactly once and no duplicate phase. Runtime history and ~/agent-share/cffg-tests.html were refreshed by this single passing run; no unchanged repeat is needed for publication. Log /tmp/cdh-wi2b-short-suite.log; summary /tmp/cdh-wi2b-short-suite-summary.json. The preceding failed gate remains recorded; the ordinary cache-environment defect was repaired and independently reviewed before this new run. Close this prerequisite. cdh-kvy5 remains a nonblocking audit; actual moderate convergence/storage remains cff-a3wz, and no registered recovery fit has run.
