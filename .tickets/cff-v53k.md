@@ -1,6 +1,6 @@
 ---
 id: cff-v53k
-status: open
+status: in_progress
 deps: [cff-n60h]
 links: []
 created: 2026-09-15T18:28:19Z
@@ -34,3 +34,11 @@ cff-ll6y applies certified gradients; cff-3zzo learns proposals from certified r
 ## Definitions
 
 Adjoint: an auxiliary linear solve for the derivative of a scalar objective. Gauge: equivalent message coordinates removed before solving. Matrix-free: derivative-vector products without a whole-graph Jacobian.
+
+## Notes
+
+**2026-09-15T18:42:38Z**
+
+Shared RootProgram extraction is complete: it owns chart decoding, exact-island reconstruction, adaptive update, support-preserving hard values, residual and raw energy composition. Existing outer inference consumes it. Focused compatibility validation passed 47 tests with 1 slow deselection in 101.66 seconds. A first scalar neural derivative smoke check converged with adjoint relative residual 5.15e-16; full independent finite-difference qualification is next.
+
+Freeze gradient qualification before that comparison: two noisy tanh neural sensors share one scalar latent prior N(0,1) through equality; sensor/evidence variances are0.2, evidence means +/-0.3. Both sensors share four parameters [0.8,0.15,1.1,-0.05] in a1-1-1 network (matrix,bias,matrix,bias). Test Taylor and sigma methods against central differences of independently re-solved complete engine energy. Use float64 root tolerance1e-10, parameter step h=2e-4*(1+abs(theta)), and acceptance atol2e-5 plus rtol2e-3. The step keeps root-error/step and roundoff below acceptance while limiting second-order truncation; smaller-step sensitivity will be reported. Tying must sum both reader contributions. This fixture changes cavities and therefore tests coefficient dependence, unlike a single fixed-cavity sensor.

@@ -958,7 +958,13 @@ mixed synchronous phase executes the adaptive group through the same
 residual/status facts through that route. `Engine.run` and `Colony.run` select
 the existing matrix-free outer trust solver for any such binding. Approximation
 coefficients are rebuilt inside its complete residual map, including JVP/VJP
-derivatives. The dimensionless Gaussian chart uses unit residual weights;
+derivatives.
+`fixed_point.RootProgram` owns the shared chart decoding, forest
+reconstruction, complete update, residual and raw energy composition. Its
+typed `RootContext` keeps parameters, observations, masks and hard values
+dynamic. `OuterKernelProvider` builds its cached trust and diagnostic kernels
+from this program, so training can use the same equations.
+The dimensionless Gaussian chart uses unit residual weights;
 initially satisfied equations do not acquire artificially large weights.
 Failed auxiliary proposals clear their acceleration history before any
 least-squares solve. The solver certifies finite surrogate change and full
