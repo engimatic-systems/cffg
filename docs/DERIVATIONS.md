@@ -3135,3 +3135,45 @@ against independently re-solved central energy differences on two coupled,
 tied four-parameter tanh sensors. Halving a difference step preserves agreement.
 It also checks original-adjoint budget exhaustion, stale states, tied reader
 sums and a float32 difference with dtype-scaled error tolerances.
+
+
+### D14.2 Reproducible training and recognition qualification
+
+The regression authority in `test_neural_training.py` uses 17 input centers
+from -1.6 to 1.6, positive input standard deviation 0.04, generating mean
+`tanh(2x)`, and output standard deviation 0.08. Threefry keys 3101 and 3102
+generate independent latent and observation noise. A seven-parameter 1-2-1
+tanh mean starts from key 71. The frozen rule is 32 full-batch Adam steps with
+learning rate 0.03, betas 0.9/0.999 and denominator epsilon `sqrt(dtype eps)`.
+The objective and gradient are divided by 17. Every update uses D14.1.
+
+For this fixed-input-cavity fixture, an independent scalar evidence formula is
+`mean[log(2*pi*S)/2 + (y-g(c))^2/(2*S)]`, where
+`S = 0.08^2 + 0.04^2*g'(c)^2`. The affine baseline minimizes that same
+objective by comparing all real stationary slopes, rather than ignoring input
+uncertainty. On 16 held-out midpoint centers, the production engine reduced
+mean-function RMSE from 0.1721923 to 0.04896684; the affine baseline was
+0.2341921. Mean energy changed from 0.6313725 to -1.1958261. These are
+fixture-specific results, not a guarantee about arbitrary networks or data.
+
+The sparse complete-graph authority is `test_neural_gfe.py`: a neural mean
+feeds an admitted hybrid GFE input with two active regimes and one exactly
+excluded regime. Independent re-solved energy differences agree with its total
+derivative. Local forward/reverse checks also cover float32 with 32 regimes
+and a transition-mixture output row with exactly zero predictive mass.
+Inactive logarithm operands are finite before masking; no mass is added.
+The optional pairwise entropy-bound diagnostic is outside this trained energy
+path; its separate sparse derivative follow-up is cff-1et5.
+
+The paired recognition authority is `test_amortization.py`. It learns an
+affine output layer over powers 0 through 7 of a scaled observation average,
+using 17 certified roots of two noisy tanh sensors sharing one Gaussian
+latent variable. A single reference chart is fixed at the central case.
+The held-out 32 observation pairs come from Threefry key 3201, and every pair
+must converge with matching Gaussian means, covariances and ledger values.
+The primary work measure is complete outer map evaluations; solver iterations
+are also recorded. The predeclared 95% interval uses 10,000 bootstrap
+resamples of whole paired differences with NumPy seed 3202, without dropping
+failed pairs. The measured mean reduction was 20.3125 map evaluations, with interval
+[17.4375, 23.40625]; mean iteration reduction was 1.4375. A positive lower
+endpoint qualifies only this bounded domain.

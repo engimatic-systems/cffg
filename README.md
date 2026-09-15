@@ -478,6 +478,66 @@ network parameter count, scalar dense products and hidden activations per
 mean evaluation, and the method's value evaluations/Jacobian directions.
 These are declared operation counts, separate from backend FLOP estimates.
 
+#### Training and learned initialization
+
+`NeuralTrainer` performs deterministic full-batch Adam updates of the canonical
+weight blobs. Build one graph containing the training examples and share their
+weight blob; use `objective_scale=1 / example_count` to optimize mean energy.
+
+```python
+from cffg import NeuralTrainer, TrainingConfig
+
+trainer = NeuralTrainer(template, arrays, observations,
+                        config=TrainingConfig(objective_scale=1 / example_count))
+optimizer = trainer.initial_state()
+for _ in range(32):
+    update = trainer.step(optimizer)
+    optimizer = update.require_applied()
+trainer.save_checkpoint("optimizer.npz", optimizer)
+trainer.save_bundle("trained.cffgz", optimizer)
+```
+
+Every update requires certified inference and an independently certified
+adjoint solve. `update.objective` is the scaled energy **before** that update;
+`trainer.infer(optimizer)` evaluates the new weights. A refused update retains
+the original optimizer state. For restart, recreate the trainer with the
+original template, initial blobs, observations and settings, then call
+`trainer.load_checkpoint("optimizer.npz")`. The versioned continuation binds
+those inputs, dtype, tied parameter layout, optimizer moments and step count.
+It owns no random stream or minibatch position. The model bundle contains the
+trained point parameters for inference. These states are separate from
+conjugate `Learnables` posteriors.
+
+Smooth, deterministic GFE factors already admitted by the complete graph use
+their existing ledger and equations; the neural node remains a Gaussian
+surrogate. Nonlinear P-substitution, stochastic mu3 updates and discrete
+point-mass optimization are outside neural training's domain.
+
+`GaussianAmortizer.fit(template, arrays, training_observations, features=...)`
+trains an affine recognition output layer over `PolynomialFeatures`: powers
+of a declared weighted combination of scalar Gaussian observations. It fits
+only certified teacher roots in one fixed Gaussian chart. Feature scaling,
+output normalization, coefficients, reference messages, coordinate schema and
+model identity have versioned `save`/`load` persistence.
+
+```python
+from cffg import GaussianAmortizer, PolynomialFeatures
+
+recognition = GaussianAmortizer.fit(
+    template, arrays, training_observations,
+    features=PolynomialFeatures(("y",), (1.0,), scale=0.4, degree=3),
+)
+proposal, result = recognition.run(held_out_observations)
+state = result.require_converged()
+recognition.save("recognition.npz")
+```
+
+A proposal changes Gaussian starting messages only. Invalid or improper
+proposals are rejected without covariance floors; `run` then uses the supplied
+neutral start. Normal inference still certifies the final root. This API has
+no importance particles. Different roots remain possible in general nonlinear
+models; the paired benchmark checks final beliefs and energy as well as work.
+
 ### Recurrent switching state-space models
 
 The model helper assembles a complete rSLDS with state-dependent regime

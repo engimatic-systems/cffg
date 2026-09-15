@@ -120,3 +120,19 @@ Bounded implementation plan (tk dependencies are authoritative). Legend: prerequ
         completed children --> [ ] cff-1o72 --> [ ] cff-ahps
 
 Optimizer and amortizer work can proceed independently once the shared derivative/root boundary is available. Exact-zero-noise derivation cff-u06e remains independently ready and is outside this implementation.
+
+**2026-09-15T19:16:17Z**
+
+Implementation is complete across the bounded child tickets; the final short-suite gate remains pending. Architecture change paths: New factor or rule family, Runtime numerical or status invariant, and Learnable or checkpoint feature. Duplicated-surface audit: core JSON/hash/bundle and lazy import; parameter tying/injection; mixed/flood/exact-island reconstruction; local JIT/vmap and host run control; raw complete energy; dtype and exact support; checkpoint save/load and public facade are covered. Existing Colony uses the same neural rule and host adaptive solve. Training/amortizer own no RollingAgent cadence, conjugate posterior, particles, PRNG continuation or minibatch cursor; those pairs are N/A.
+
+Legend: prerequisite --> dependent (only this ticket's immediate work shown)
+
+[x] cff-o7hs --> [x] cff-n60h --> [x] cff-v53k
+                                    |       |
+                                    |       +--> [x] cff-3zzo --+
+                                    +--> [x] cff-ll6y ---------+--> [ ] cff-1o72 (final gate)
+[x] cff-6kwo ---------------------> cff-ll6y                         |
+                                                                   +--> [ ] cff-ahps (other blockers remain)
+
+cff-u06e remains independent future work for exact zero noise. cff-1et5 tracks derivatives of an optional entropy-bound diagnostic outside the training energy. tk ready confirms cff-1o72 has no open prerequisites; tk dep cycle passes. Frozen regression and paired-recognition benchmarks passed; both code and validation details are in the child tickets and D14.
+
