@@ -37,6 +37,7 @@ class OuterTrustRegionStrategy:
     prime: Propagation | None
     reconstruct: Propagation | None
     services: OuterServices
+    adaptive_gaussian: bool = False
 
     def run(
         self,
@@ -224,8 +225,9 @@ class OuterTrustRegionStrategy:
                         chart, state, hard_blocks
                     ),
                     candidate_limit=(
-                        0 if self.services.update_functional is not None else 128
+                        0 if self.adaptive_gaussian or self.services.update_functional is not None else 128
                     ),
+                    adaptive_gaussian=self.adaptive_gaussian,
                 )
                 state = as_state(reconstruct(solved.arrays))
                 consumed = max(solved.iterations, 1)

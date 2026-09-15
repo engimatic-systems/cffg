@@ -386,7 +386,74 @@ the entire Gaussian density. Other bindings must declare a compatible rule.
 An old factor-only `MOMENT_MATCHING` declaration can be loaded, but compilation
 and drawing reject it. Use `migrate_moment_matching(old, template, role=...,
 projection=...)` with explicit choices; migration never guesses either value.
-Nonlinear projected inference remains under implementation.
+
+### Nonlinear Gaussian means
+
+`gaussian_nonlinear` represents `Y | X ~ N(g(X), V)` with positive-definite
+noise covariance `V`. Its `FunctionSpec` records the portable mean identity,
+configuration, version, and approximation method. For example, this noisy
+cubic sensor uses `g(x) = x + 0.3 x^3`:
+
+```python
+import numpy as np
+from cffg import Engine, compile_template
+from cffg.core import (
+    BlobRef, FactorSpec, FunctionSpec, MomentProjection, PortRole, PortSpec,
+    Template, VariableSpec, moment_matching,
+)
+
+arrays = {"m": np.array([0.25]), "P": np.array([[0.5]]),
+          "theta": np.array([0.3]), "V": np.array([[0.16]])}
+template = Template(
+    "cubic-sensor",
+    variables={v: VariableSpec(v, dim=1) for v in ("x", "y")},
+    factors={
+        "prior": FactorSpec("prior", "gaussian", {"out": "x"},
+                            param_blobs={"mean": "m", "cov": "P"}),
+        "sensor": FactorSpec("sensor", "gaussian_nonlinear", {"in": "x", "out": "y"},
+                             param_blobs={"parameters": "theta", "cov": "V"},
+                             function=FunctionSpec("cffg.mean.cubic", "1.0.0", method="sigma_point")),
+    },
+    ports={"y": PortSpec("y", "y", PortRole.DATA)},
+    blobs={name: BlobRef(name, name + ".npy") for name in arrays},
+    constraints=[moment_matching("sensor", "in", MomentProjection.GAUSSIAN)],
+)
+engine = Engine(compile_template(template, arrays=arrays))
+state = engine.bind_data(engine.init_state(), {"y": np.array([0.8])})
+result = engine.run(state, 40, tol=1e-8)
+state = result.require_converged()
+print(engine.gaussian_marginals(state)["x"])
+print(engine.objective_metadata["sensor"])
+```
+
+`linearization` uses the current input-cavity mean and Jacobian. `sigma_point`
+uses a fixed scaled unscented rule with `alpha=1, beta=2, kappa=0`; its residual
+covariance includes curvature. Neither method adds a numerical noise floor.
+The built-in `cffg.mean.affine` takes a flattened row-major matrix followed by
+its offset. Register another mean with `MeanImplementation(impl_id, version,
+parameter_shape, evaluate)` and `register_mean_function`. The shape callback
+receives `(input_dim, output_dim, configuration)`; the JAX-compatible evaluation
+callback receives `(x, flat_parameters, configuration)` and returns one output
+vector. Install the registration before loading a saved model. Arrays stay in
+blobs; JSON and `.cffgz` store the function declaration and required version.
+
+Adaptive factors use trust-region inference, including on trees. The solver
+rebuilds approximations as cavities change and checks both the full fixed-point
+residual and the energy change. `outer_residual`, `rejected_steps`, and
+`termination_reason` expose that certificate; `residual` retains the existing
+energy-change meaning. Manual Picard runs and fixed damping are rejected for
+these factors. One `step` evaluates messages without certifying convergence.
+Local callbacks and trust kernels support JIT/vmap; full run control is on the
+host, including per-instance Colony runs.
+
+`engine.bfe(state)` includes normalized **frozen Gaussian Bethe surrogate**
+terms. `objective_metadata` labels their method, conditional stationarity, and
+unproved evidence bound; `objective_contract` labels the whole energy as approximate. A fixed point is not a claim that the total changing
+surrogate is stationary. `gaussian_node_stats` and `kernel_readouts` report
+`proper` and a `cffg.nonlinear.NonlinearFailure` code. Vacuous inputs return
+neutral dependent messages; invalid final beliefs have infinite energy and
+NaN moments. A missing DATA observation is marginalized. Exact zero noise,
+continuous-to-discrete means, and nonlinear P-substitution/GFE are excluded.
 
 ### Recurrent switching state-space models
 

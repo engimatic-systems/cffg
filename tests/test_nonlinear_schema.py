@@ -33,9 +33,11 @@ def test_json_bundle_and_edit_identity(tmp_path):
     for name, value in arrays.items():
         np.testing.assert_array_equal(loaded.arrays[name], value)
     arenas = [compile_template(t, arrays=a) for t, a in ((template, arrays), (loaded.template, loaded.arrays))]
-    states = [Engine(arena).init_state() for arena in arenas]
+    engines = [Engine(arena) for arena in arenas]
+    states = [engine.step(engine.init_state()) for engine in engines]
     for a, b in zip(jax.tree.leaves(states[0]), jax.tree.leaves(states[1]), strict=True):
         np.testing.assert_array_equal(a, b)
+    np.testing.assert_allclose(engines[0].bfe(states[0]), engines[1].bfe(states[1]), atol=1e-12)
 
 
 def test_missing_and_incompatible_implementations_fail_on_load(tmp_path, monkeypatch):

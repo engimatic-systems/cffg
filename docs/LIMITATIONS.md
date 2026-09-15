@@ -119,11 +119,18 @@ every item below will be implemented:
   declared adapter and hostile-input contract.
 - *Hybrid discrete–continuous (switching KF, mixture collapse)* — cff-pksr;
   the first place exact FE meets a necessary approximation (mixture entropy).
-- *Nonlinear continuous factors* — cff-o7hs: EP/moment-matching or sigma-point
-  messages with controlled FE accounting. Endpoint/projection declarations,
-  explicit legacy migration, and Figure 12 diagrams are available. Numerical
-  moment projection currently executes only on registered Gaussian prior and
-  linear factors, where it is equivalent to exact Gaussian inference.
+- *Nonlinear continuous factors* — `gaussian_nonlinear` supports positive-noise
+  Gaussian conditionals with registered deterministic means, Taylor or fixed
+  sigma-point approximations, and endpoint moment constraints. Its normalized
+  frozen Gaussian Bethe energy has conditional stationarity only. The adaptive
+  fixed point also enforces coefficient/cavity consistency; no stationarity of
+  the total adaptive energy or bound on original nonlinear evidence is claimed.
+  The full residual and finite energy change certify convergence. Difficult
+  graphs may exhaust their budgets. Singular noise, invalid beliefs, and
+  unrepresentable sigma-point spread fail explicitly; no ridge repairs them.
+  Negative sites are permitted when combined beliefs remain proper. Full run
+  control is host-side; local updates and trust kernels support JIT/vmap.
+  Zero noise, nonlinear GFE, and continuous-to-discrete means remain excluded.
 - *Gaussian/continuous GFE messages* — RESOLVED as a position, 2026-07-12
   (cff-dfpi, DERIVATIONS.md D5): none will be added, and that is a theorem,
   not a gap. Additive-control linear-Gaussian models provably have

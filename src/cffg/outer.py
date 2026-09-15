@@ -249,7 +249,7 @@ def build_outer_chart(
             for index in lam_indices
         )
         aggregate = 0.5 * (aggregate + aggregate.T)
-        operator_scale = max(float(np.linalg.norm(aggregate, ord=2)), 1.0)
+        operator_scale = float(np.linalg.norm(aggregate, ord=2))
         rank_floor = np.finfo(dtype).eps * dim * operator_scale
         if np.linalg.eigvalsh(aggregate).min(initial=np.inf) > rank_floor:
             whitening = np.linalg.cholesky(aggregate)
@@ -676,6 +676,7 @@ def solve_outer(
     eliminated: dict[str, frozenset[int]] | None = None,
     kernel_factory: Callable[[OuterChart], OuterKernelPlan] | None = None,
     candidate_limit: int = 128,
+    adaptive_gaussian: bool = False,
     _support_restarts: int = 0,
 ) -> OuterSolveResult:
     """Globalize one fixed-support deterministic outer map."""
@@ -712,6 +713,9 @@ def solve_outer(
         ),
         1,
     )
+    if adaptive_gaussian:
+        # Proper information can travel at most one edge per flooding update.
+        restart_limit += 2 * sum(bool(edge.dim) for edge in arena.edges.values())
     while True:
         chart = build_outer_chart(arena, current, eliminated)
         coordinates = chart_coordinates(chart, current)
@@ -767,6 +771,9 @@ def solve_outer(
     residual_fn = lambda value: evaluate(value)[0] - value
     initial_residual = mapped_coordinates - coordinates
     residual_scale = chart.residual_scale(initial_residual)
+    if adaptive_gaussian:
+        # Gaussian whitening already fixes units; initial residuals must not reweight equations.
+        residual_scale = jnp.ones_like(initial_residual)
     radius = max(float(jnp.linalg.norm(initial_residual)), 1.0)
     radius_ceiling = (
         max(
@@ -893,6 +900,7 @@ def solve_outer(
                 eliminated=eliminated,
                 kernel_factory=kernel_factory,
                 candidate_limit=candidate_limit,
+                adaptive_gaussian=adaptive_gaussian,
                 _support_restarts=restarts,
             )
             return OuterSolveResult(
@@ -933,6 +941,9 @@ def solve_outer(
     inner_code = int(local_code)
     initial_residual = mapped_coordinates - coordinates
     residual_scale = chart.residual_scale(initial_residual)
+    if adaptive_gaussian:
+        # Whitened coordinates are dimensionless; initially exact rows retain unit weight.
+        residual_scale = jnp.maximum(residual_scale, 1.0)
     radius = max(float(jnp.linalg.norm(initial_residual)), 1.0)
     radius_ceiling = (
         max(
@@ -1009,6 +1020,7 @@ def solve_outer(
                 eliminated=eliminated,
                 kernel_factory=kernel_factory,
                 candidate_limit=candidate_limit,
+                adaptive_gaussian=adaptive_gaussian,
                 _support_restarts=restarts,
             )
             return OuterSolveResult(
@@ -1151,6 +1163,18 @@ def solve_outer(
                 linear_iterations,
                 solver_compilations,
             )
+        if not (
+            int(shadow_code) == 0
+            and np.isfinite(float(shadow_inner))
+            and np.isfinite(shadow_residual).all()
+            and np.isfinite(shadow_energy)
+            and np.isfinite(shadow_mapped_energy)
+        ):
+            # A rejected auxiliary proposal cannot enter the least-squares history.
+            shadow_coordinates = host_coordinates.copy()
+            shadow_residual = np.asarray(residual).copy()
+            shadow_history_coordinates.clear()
+            shadow_history_residuals.clear()
         shadow_history_coordinates.append(shadow_coordinates.copy())
         shadow_history_residuals.append(shadow_residual.copy())
         shadow_history_coordinates = shadow_history_coordinates[-6:]

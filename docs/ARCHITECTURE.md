@@ -940,6 +940,32 @@ batched callbacks. The nonlinear factor's structural roles are `out,in` and
 its numeric parameter roles are `parameters,cov`. No conjugate-learning family
 is implied by the statistic callback.
 
+An iterative Gaussian binding is excluded from directed exact nodes in
+`schedule.py`. Its neighbors may still form exact batch/scan islands; the
+mixed synchronous phase executes the adaptive group through the same
+`execute_gaussian` callback used by flooding. `ExecutionDelta` carries local
+residual/status facts through that route. `Engine.run` and `Colony.run` select
+the existing matrix-free outer trust solver for any such binding. Approximation
+coefficients are rebuilt inside its complete residual map, including JVP/VJP
+derivatives. The dimensionless Gaussian chart uses unit residual weights;
+initially satisfied equations do not acquire artificially large weights.
+Failed auxiliary proposals clear their acceleration history before any
+least-squares solve. The solver certifies finite surrogate change and full
+fixed-point residual, and reports rejected trials and exhausted budgets.
+
+`ObjectiveLedger.metadata`, exposed through `Engine.objective_metadata`, labels
+each Gaussian node's energy convention; `Engine.objective_contract` labels
+the whole energy as approximate when adaptive terms are present. These terms claim only
+frozen-coefficient stationarity and no established nonlinear evidence bound.
+Node readouts carry `proper`, method-independent moment fields, and local
+failure codes. The estimator counts persistent `theta` and `W` alongside all
+Gaussian arena arrays; coefficients and solver workspace are temporary.
+Persistent storage is linear in factor count and quadratic in incident
+Gaussian dimension, plus the declared mean parameter vectors. Existing XLA
+cost-analysis/calibration limitations remain separate from exact byte counts.
+`test_nonlinear_rules`, `test_nonlinear_schema`, and `test_nonlinear_engine`
+cover the local, transport, and solver contracts. See DERIVATIONS D13.
+
 `ParameterSpec` supplies serialized shape inference and optional writable
 packed-row metadata. The packer declares every output key; the compiler
 checks keys, shapes and member axes. Existing built-ins keep their bare

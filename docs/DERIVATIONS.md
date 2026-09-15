@@ -3037,3 +3037,59 @@ cancellation and unrepresentable sigma points, and compares the frozen cubic
 posterior with refined dense-grid quadrature. That selected fixture has
 Hellinger limits 0.16 for Taylor and 0.10 for sigma points; this is not a claim
 that sigma points are more accurate for every nonlinear model.
+
+### D13.5 Adaptive residual globalization and certification
+
+Let `s` be the gauge-reduced Gaussian message coordinates of D7. Information
+vectors and independent symmetric precision entries are whitened by a fixed
+proper reference belief. A complete update `T(s;theta)` rebuilds every local
+coefficient from the current cavity, reconstructs attached exact islands, and
+returns all replacement sites. The adaptive equations and merit are
+
+```text
+R(s;theta) = T(s;theta) - s = 0,
+Phi(s) = 1/2 ||R(s;theta)||^2.                              (D13.7)
+```
+
+The Gaussian chart is already dimensionless, so these equations retain unit
+weights. In particular an initially zero residual does not receive inverse
+machine-epsilon weight. D7's trust-region method computes Jacobian-vector and
+transpose-Jacobian-vector products of this full map, using truncated conjugate
+gradients and a Cauchy fallback. It forms no dense whole-graph Jacobian. Trial
+steps are accepted only with finite proper candidate beliefs and sufficient
+actual/predicted residual-merit reduction. A failed auxiliary proposal cannot
+enter acceleration history. Plain fixed damping is not a substitute for this
+globalization, and the surrogate itself is not assumed to decrease.
+
+Initialization propagates actual messages to obtain a proper reference; a
+vacuous factor supplies no invented approximation point. Gaussian discovery
+is bounded by graph size (two directed incidences per edge plus the existing
+support-discovery bound). Run iterations count outer solves; map-evaluation
+counts include discovery and trial work. When a proper reference cannot be
+found, the solver returns a non-converged machine-readable termination reason.
+
+Certification requires both
+
+```text
+max_i |R_i| / (1+|s_i|) <= tau,
+|F(T(s))-F(s)| <= tau (1+|F(s)|),                            (D13.8)
+```
+
+with finite values and `tau=max(requested_tol,64 eps(dtype))`. These are full
+adaptive residual and surrogate-change checks, not a small accepted-step test.
+Neither a stationary non-root of the residual merit nor an exhausted trial
+budget is convergence. Conditioning, failure facts, and exact-island
+reconstruction are shared by flooding and mixed schedules. Whole-run control
+is host-side; local maps and the trust kernel remain JIT/vmap compatible.
+
+`test_mutually_changing_cavities_match_independent_site_root` uses a prior
+`N(0,1)`, two cubic sensors `g(x)=x+0.3x^3` with variance 0.2, and conflicting
+Gaussian evidence centered at +/-0.3 with variance 0.2. Each input cavity
+contains the other sensor's site. Independent four-site root equations give
+latent variance 0.156421040551 for Taylor and 0.139520070577 for sigma points;
+the engine checks both schedule routes against these values.
+`test_rejected_trials_cannot_poison_acceleration_or_claim_small_step_convergence`
+uses evidence +/-1.5 and variances 0.05 to exercise rejected proposals and
+honest budget exhaustion. Affine full-ledger parity, float32 coordinate units,
+distinct per-instance parameters/observations, and Colony certificates have
+separate anchors in `test_nonlinear_engine.py`.
