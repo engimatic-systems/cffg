@@ -30,6 +30,7 @@ from cffg.hybrid_plans import (
 from cffg.inventory import analytic_inventory
 from cffg.ledger import ObjectiveLedger, make_belief_energy
 from cffg.lifecycle import StateLifecycle
+from cffg.runtime_checks import StateChecks
 from cffg.schedule import Schedule, build_schedule
 from cffg.schedule_program import (
     build_schedule_program,
@@ -136,6 +137,7 @@ def _forbidden(*args, **kwargs):
     lambda a: Engine(a),
     lambda a: Engine(a, Schedule(kind="flood", reason="supplied")),
     lambda a: StateLifecycle(a),
+    lambda a: StateChecks(a),
     lambda a: make_sweep(a),
     lambda a: make_sweep(a, True),
     lambda a: build_schedule(a),

@@ -8,6 +8,7 @@ import numpy as np
 from cffg._immutable import FrozenArray
 from cffg.compiled import NEG, Arena
 from cffg.execution import parameters as _parameters
+from cffg.execution_availability import require_execution_available
 from cffg.kernel_runtime import (
     discrete_potential as _disc_potential,
 )
@@ -45,6 +46,7 @@ class StateChecks:
     edge_groups: tuple[tuple[int, FrozenArray], ...] = field(init=False, repr=False)
 
     def __post_init__(self):
+        require_execution_available(self.arena, operation="StateChecks")
         by_card: dict[int, list[list[int]]] = {}
         for edge in self.arena.edges.values():
             if not edge.dim and not edge.ef and not edge.param_shape:
