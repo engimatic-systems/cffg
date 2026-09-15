@@ -365,7 +365,12 @@ numerical checkpoint in attempt 004 at source `aecd819`, including host/JIT and
 single/vmap parity. Its 40 converged outputs pass independent saved-state
 evaluation under the original absolute-only energy allowance; all declared
 invalid-input and zero-budget outcomes also pass. This evidence includes the
-reviewed compensated mixture centering and current solver/storage source.
+reviewed compensated mixture centering and the solver/storage source recorded
+by that attempt.
+That attempt qualifies its recorded source only. The separate recurrence
+statistics/expectation extraction has focused held-belief coverage; new
+source-bound tiny evidence and prospective descriptors remain required before
+its final gate. It adds no general incidence evaluator or production binding.
 The 310.75–380.10 second first JIT calls and 29.29 GiB largest sampled process
 memory describe these tiny layouts on the measured backend; they do not
 establish moderate-scale costs or actual iteration storage.

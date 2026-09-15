@@ -856,9 +856,19 @@ counterexample in D12.7 limits the exactness claim even at zero EC residual.
 Production remains D9. `hybrid_natural.py` and `hybrid_separator.py` implement
 the unbound local JAX mathematics: labeled Gaussian integration, signed natural
 quotients, explicit ordinary adapters, destination-selected grouped tilts, tied
-xi residuals, and pair-conditioned learning increments. The pure batched
-chain evaluator keeps original `TransitionParameters` and evaluates its
-regional energy through centered recurrence moments and whitened channel
+xi residuals, and pair-conditioned learning increments. The
+`recurrence_auxiliary_statistics` and `recurrence_expectation` APIs consume
+checked `R(i,j,x)` beliefs directly, retaining original label positions,
+fixed origins and covariance corrections. `Auxiliary.active` names the
+at-risk sticks; its existing tuple fields and centered/physical learning
+readouts are shared with grouped callers. `auxiliary_statistics` reduces
+the grouped `[x;y]` belief through `source_region` before delegation, while
+retaining validation of the complete grouped covariance correction.
+`transition_expectation` delegates its stable recurrence term to the same
+original-parameter expectation; expanded-potential subtraction supplies no
+energy authority. These local APIs do not activate the general evaluator.
+The pure batched chain evaluator keeps original `TransitionParameters` and
+evaluates its regional energy through centered recurrence moments and whitened channel
 residuals. It returns the D12 primal expression, dual, and separately scaled
 conditional-moment and quotient residuals. It supplies no iteration policy.
 `hybrid_joint.py` builds the host support inventory and fixed-origin active

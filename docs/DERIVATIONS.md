@@ -2732,6 +2732,16 @@ Learning uses D11.1 with these same pair-conditioned M and first moments.
 It never multiplies rho by an unconditional state moment. Reusing D9's
 unconditional auxiliary with the new moments changes the meaning again.
 
+`hybrid_separator.recurrence_auxiliary_statistics` applies these equations
+directly to a checked `R(i,j,x)` belief. Its `active` mask is `e_til>0`, and
+`recurrence_expectation` evaluates the same JJ factor from retained logit
+means and variances with original weights, offsets and xi. Grouped callers
+first take their source marginal and share these formulas. The held-belief
+oracles in `tests/test_recurrence_payload.py` enumerate individual pair/stick
+terms independently and check learning gradients, the xi=0 derivative,
+moment JVP/VJP actions, sparse labels, covariance corrections and native
+float32 with independently enlarged label and state dimensions.
+
 Varying normalized regional beliefs in the constrained Lagrangian gives the
 tilted densities in D12.2; varying separators gives the message sums above;
 varying xi gives D12.8. These, positivity, support, and normalization are the

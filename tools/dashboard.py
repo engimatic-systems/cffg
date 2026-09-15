@@ -156,6 +156,7 @@ EPIC_FILES = {
         "test_d12_moderate_summaries.py",
         "test_hybrid_separator_kernels.py",
         "test_hybrid_separator_numerics.py",
+        "test_recurrence_payload.py",
         "test_hybrid_centering.py",
         "test_hybrid_affine.py",
         "test_hybrid_projection.py",

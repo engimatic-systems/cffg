@@ -180,6 +180,11 @@ class Auxiliary(NamedTuple):
     center: jax.Array
 
     @property
+    def active(self):
+        """At-risk sticks on the fixed label face; use only with OK status."""
+        return self.exposure > 0
+
+    @property
     def physical_linear(self):
         return self.linear.at[..., :-1].add(self.center[:, None] * self.linear[..., -1:])
 
@@ -224,21 +229,31 @@ def _conditional_at_risk(probability, mean, covariance):
 
 
 def auxiliary_statistics(region, weights, offsets, xi):
-    """D12.8 xi residual and D11.1 learning from the same pair belief.
+    """Grouped [x;y] compatibility interface for recurrence statistics."""
+    low_status = correction_status(region.covariance, region.covariance_correction)
+    source = source_region(region)
+    source = source._replace(status=jnp.asarray(source.status, jnp.int32) | low_status)
+    return recurrence_auxiliary_statistics(source, weights, offsets, xi)
+
+
+def recurrence_auxiliary_statistics(region, weights, offsets, xi):
+    """D12.8 xi residual and D11.1 learning from a checked R(i,j,x) belief.
 
     Reverse prefix moments sum destinations at risk without a K³ tensor.
     Zero exposure fixes xi to zero and produces exact zero learning. A stale
     nonzero inactive xi has a nonzero residual until rebuilt. The residual is
     conditional on exposure, so a rare active source cannot hide a bad xi.
+    Original label positions, source origins and covariance corrections remain
+    intact. Signed/vacuous incoming messages are allowed when their tilt is
+    proper; failed belief status propagates to every numerical statistic.
     """
     card, dim = _recurrence_shapes(weights, offsets, xi)
     low_status = correction_status(region.covariance, region.covariance_correction)
-    source = source_region(region)
-    if source.displacement.shape != (card, card, dim) or source.displacement.dtype != weights.dtype:
+    if region.displacement.shape != (card, card, dim) or region.displacement.dtype != weights.dtype:
         raise ValueError("auxiliary belief shapes or dtypes disagree")
-    center = source.center[:, 0]
-    p, mean = source.probability, source.relative_mean(center[:, None])
-    second = source.full_covariance + mean[..., :, None] * mean[..., None, :]
+    center = region.center[:, 0]
+    p, mean = region.probability, region.relative_mean(center[:, None])
+    second = region.full_covariance + mean[..., :, None] * mean[..., None, :]
     augmented = jnp.concatenate((mean, jnp.ones((*p.shape, 1), p.dtype)), axis=-1)
     moments = jnp.zeros((*p.shape, dim + 1, dim + 1), p.dtype)
     moments = moments.at[..., :dim, :dim].set(second)
@@ -252,7 +267,7 @@ def auxiliary_statistics(region, weights, offsets, xi):
     exposure = at_risk(p)
     accumulated = at_risk(p[..., None, None] * moments)
     active = exposure > 0
-    _, conditional_mean, conditional_covariance = _conditional_at_risk(p, mean, source.full_covariance)
+    _, conditional_mean, conditional_covariance = _conditional_at_risk(p, mean, region.full_covariance)
     logit_mean = centered_affine(weights, conditional_mean, center[:, None], offsets)
     logit_variance = jnp.einsum("ila,ilab,ilb->il", weights, conditional_covariance, weights)
     scale = jnp.einsum("ila,ilab,ilb->il", abs(weights), abs(conditional_covariance), abs(weights))
@@ -268,6 +283,26 @@ def auxiliary_statistics(region, weights, offsets, xi):
     status = jnp.asarray(region.status, jnp.int32) | low_status | failure(~valid, Status.INVALID) | failure(~finite, Status.NONFINITE)
     return Auxiliary(*(jnp.where(status == 0, x, jnp.nan) for x in
                        (target, residual, exposure, linear, precision)), status, center)
+
+
+def recurrence_expectation(region, weights, offsets, xi):
+    """Expected JJ log recurrence from a checked R(i,j,x) and original parameters.
+
+    D12.8's conditional target retains Var[psi] + E[psi]² when a large
+    affine mean cancels its offset. Expanded natural coefficients cannot
+    recover those canceled terms. This owns the recurrence energy for both
+    separate R scopes and D12.3 grouped transitions, with no entropy term.
+    """
+    auxiliary = recurrence_auxiliary_statistics(region, weights, offsets, xi)
+    mean = region.relative_mean(auxiliary.center[:, None])
+    _, risk_mean, _ = _conditional_at_risk(region.probability, mean, region.full_covariance)
+    success_mean = centered_affine(weights, mean[:, :-1], auxiliary.center[:, None], offsets)
+    risk_logit = centered_affine(weights, risk_mean, auxiliary.center[:, None], offsets)
+    linear = region.probability[:, :-1] * success_mean - auxiliary.exposure * risk_logit / 2
+    value = jnp.sum(linear + auxiliary.exposure *
+                    (_jj_base_xi(xi) - pg_mean_xi(xi) * auxiliary.target / 2))
+    status = auxiliary.status | failure(~jnp.isfinite(value), Status.NONFINITE)
+    return jnp.where(status == 0, value, jnp.nan), status
 
 
 def transition_expectation(region, parameters):
@@ -286,15 +321,10 @@ def transition_expectation(region, parameters):
     dim = weights.shape[-1]
     factor = transition(*parameters, left_center=region.center[:, 0, :dim],
                         right_center=region.center[0, :, dim:])
-    auxiliary = auxiliary_statistics(region, weights, offsets, xi)
+    low_status = correction_status(region.covariance, region.covariance_correction)
     source = source_region(region)
-    mean = source.relative_mean(auxiliary.center[:, None])
-    _, risk_mean, _ = _conditional_at_risk(source.probability, mean, source.full_covariance)
-    success_mean = centered_affine(weights, mean[:, :-1], auxiliary.center[:, None], offsets)
-    risk_logit = centered_affine(weights, risk_mean, auxiliary.center[:, None], offsets)
-    linear = source.probability[:, :-1] * success_mean - auxiliary.exposure * risk_logit / 2
-    recurrence = jnp.sum(linear + auxiliary.exposure *
-                         (_jj_base_xi(xi) - pg_mean_xi(xi) * auxiliary.target / 2))
+    source = source._replace(status=jnp.asarray(source.status, jnp.int32) | low_status)
+    recurrence, recurrence_status = recurrence_expectation(source, weights, offsets, xi)
 
     card, _, dim = weights.shape
     active = region.probability > 0
@@ -314,7 +344,7 @@ def transition_expectation(region, parameters):
     dynamics = -jnp.sum(jnp.where(active, region.probability *
                                 (dim * jnp.log(2 * jnp.pi) + logdet[None] + quadratic) / 2, 0))
     value = recurrence + dynamics
-    status = factor.status | auxiliary.status | failure(~jnp.isfinite(value), Status.NONFINITE)
+    status = factor.status | recurrence_status | failure(~jnp.isfinite(value), Status.NONFINITE)
     return jnp.where(status == 0, value, jnp.nan), status
 
 
