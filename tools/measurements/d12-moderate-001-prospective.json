@@ -1,0 +1,72 @@
+{
+  "schema": "cffg.d12-moderate-prospective-execution.v1",
+  "ticket": "cff-a3wz",
+  "attempt": "001",
+  "base_identity": {
+    "git_revision": "58fd5363846cec397d29af44cdc8e6a86920784a",
+    "git_status": "",
+    "spec_sha256": "3a6bab37fcbab2b3e3ffdac4bc6892f17e2be244c4f2e65754b4b3c3ee660c3b",
+    "sources": {
+      "pyproject.toml": "1de3f72a660eaed6f101990920e102f37858fcc78f0c5466637f16d59d79845f",
+      "src/cffg/__init__.py": "a42ed827e4e8e857ef37069c3db15da8c1389bfd7a8c86e1f47f04767ff929cf",
+      "src/cffg/experiments/__init__.py": "cbf336ea77321df2c1bcc4230cfc5c2f8dbf4c33062bc0df9eb5da3819e51569",
+      "src/cffg/experiments/hybrid_separator.py": "86e13f297f6cd26c096bd70f1e5f6da0a72efa4eddfe99375a6a691fa5a34a85",
+      "src/cffg/experiments/regime_pair.py": "86dc70b5a030f984b89b148f84ab3bb6b978e9c09aced9b5e2af1708857fa9aa",
+      "src/cffg/hybrid_affine.py": "b8715258bc777a2a7ea5df4f310e819c5eccec280a7d93bb833b74682f8728f3",
+      "src/cffg/hybrid_covariance.py": "3928b64c2135ce8a126bc2f53528c85220367d4436c327e7919649215f5634cb",
+      "src/cffg/hybrid_gfe.py": "74130457fa789e308b0f3561dd06dcab69f6d87976c8c00b71e34bfda2ce3814",
+      "src/cffg/hybrid_joint.py": "d39dced160c0890964007d3e0004cf84833c35cd0527592efc9b8644b7c819c6",
+      "src/cffg/hybrid_joint_solver.py": "903c2313a84958cb33be813e064f4005213b23da9021f9451b39278b43b91068",
+      "src/cffg/hybrid_joint_storage.py": "250e00e859f9b51352d54dda7fa9f977be1d5b066995502ac9334fa32d4cd44d",
+      "src/cffg/hybrid_learning.py": "710e601d79b6df00a90d026a56a37b38dc337856a1fb4cbe734e1286df8a1258",
+      "src/cffg/hybrid_natural.py": "655f1262828eba6cfe49facaa9efc653af326928752e90e925ec33e5a9d114c2",
+      "src/cffg/hybrid_separator.py": "d505843591de764be241a82f010dc1711e1ec3ffd5204012dd65a03eb278b99c",
+      "tests/fixtures/hybrid-joint-candidate-spec.json": "20f0dfab78d7f59f895239ccc95cc4a4bc66b5ba1aa94ed8c12ce0608d82f2db",
+      "tools/d12_compile_fixture.py": "a7f8450adbb7958cca3adfba8b5cb307020d03212c146e59218e304307f3724d",
+      "tools/d12_compile_scaling.py": "c81f5e103f09b1f76ab75d909bfb4c123572d57db5836c711ef015b43a1c29bd",
+      "tools/d12_compile_spec.json": "4cb114675eec3f15885869434f7dbb52a0ec79a6f4f668d11ab22de9b423a8e7",
+      "tools/d12_moderate_anchor_checks.py": "0abb86d261f6d0657576add0d59480c75ec47ec8b4ed4233e9ff40c39cbbc06b",
+      "tools/d12_moderate_arithmetic.py": "ca1394cbfed1c768152a65f7af9f33cc2c6f44fec6ec2dee232fa4f31cb492c6",
+      "tools/d12_moderate_checks.py": "b6b71b94a7669a9617f7f21642dde8df2c743805106d03dd8c39d2ad1a6f5560",
+      "tools/d12_moderate_layouts.json.gz": "1b98bcfa48a3aeb8d6de3a6ca14c2c963f5e900faf019faa3f831935244672f9",
+      "tools/d12_moderate_layouts.py": "c40079604a2fdb7ef09d479514cab5dd525888471068a2abf521ca20d8017184",
+      "tools/d12_moderate_payload.py": "ef1aee07667f71021a0e7c6bd34e76205ff7cfd4d0efba29e7297c510828ec8a",
+      "tools/d12_moderate_plan.py": "745c23815a0791d840124cc4c3843fd6e4108987a14c5c893e1101e1619d3f2d",
+      "tools/d12_moderate_reconstruct.py": "1f261b9793511e4e4eae938359eb08a8fd4157d1845e83acf0ae13066721bc36",
+      "tools/d12_moderate_reference.py": "36d69e0c700e987ab3ff1634f005794ec2110ac911c984d8836469d81bb961cb",
+      "tools/d12_moderate_report.py": "27ebe953f5eb1faa76824e8f883aa97ce9250638ff3a90f072521dfd21502d48",
+      "tools/d12_moderate_runner.py": "2da839fe1bab04d393ba25dbbe7cd7253065e04ca462f897f8994f419017a885",
+      "tools/d12_moderate_spec.json": "3a6bab37fcbab2b3e3ffdac4bc6892f17e2be244c4f2e65754b4b3c3ee660c3b",
+      "tools/d12_moderate_workload.py": "749fd67a3b943be755691b301400f453135b7fc0480c1f1593c20895229dce25",
+      "uv.lock": "0ebcc956bf965a2dc0a9cd193b74b0f1b17bc386e15a59dda4f215ec41701a62"
+    }
+  },
+  "source_manifest_sha256": "595ca4a3e3dba8644800ce1187183dde3320b1f00770dad079b4794a760a694c",
+  "source_manifest_encoding": "UTF-8 json.dumps(sources,sort_keys=True,separators=(comma,colon))",
+  "runtime_binding_matches_reviewed_descriptor": true,
+  "tiny_source_hashes_current": 12,
+  "preflight_complete_program_calls": {
+    "lower": 0,
+    "compile": 0,
+    "execute": 0
+  },
+  "commands": [
+    "uv run python tools/d12_moderate_runner.py run --phase solves --output /tmp/cff-a3wz-solves-001",
+    "uv run python tools/d12_moderate_runner.py run --phase storage --output /tmp/cff-a3wz-storage-001"
+  ],
+  "parent_logs": {
+    "solves": [
+      "/tmp/cff-a3wz-solves-001.stdout.log",
+      "/tmp/cff-a3wz-solves-001.stderr.log"
+    ],
+    "storage": [
+      "/tmp/cff-a3wz-storage-001.stdout.log",
+      "/tmp/cff-a3wz-storage-001.stderr.log"
+    ]
+  },
+  "phase_dependency": "Storage launches only after successful solves and saved-report validation. First failure stops qualification without retry.",
+  "spec_path": "tools/d12_moderate_spec.json",
+  "spec_sha256": "3a6bab37fcbab2b3e3ffdac4bc6892f17e2be244c4f2e65754b4b3c3ee660c3b",
+  "descriptor_path": "tools/d12_moderate_layouts.json.gz",
+  "descriptor_sha256": "1b98bcfa48a3aeb8d6de3a6ca14c2c963f5e900faf019faa3f831935244672f9"
+}
