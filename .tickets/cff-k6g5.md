@@ -148,3 +148,7 @@ Dependency companion from tk dep tree --full cff-7sw5, tk ready and tk blocked; 
                                                                 [ ] X0IF --> [ ] ZOV5
 
 The two independent ready roots have completed sequentially. 7SW5 was immediately blocked by K6G5 and is now ready; the remaining runtime, learning and composition work still precedes the registered three-fit gate. No mathematical contract, supported scope, approximation or qualification threshold changed.
+
+**2026-09-15T05:13:00Z**
+
+Published as PR151: https://github.com/engimatic-systems/cffg/pull/151, base cff-a3wz-moderate-qualification (PR150), head cff-k6g5-hybrid-declarations. Code, independent review/re-review and the final short gate pass; ticket closed. A bounded read-only compiler-boundary study justified extracting ready cdd-ziiw before 7SW5 implementation, preserving every original compiler/runtime/recovery requirement. Root will assign a fresh sequential author after publishing this ticket-only handoff. No merge performed; all three registered recovery fits remain unused.
