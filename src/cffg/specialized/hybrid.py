@@ -5,6 +5,7 @@ to a numerical chain or calls an initializer, packer, solver or array loader.
 """
 
 from dataclasses import replace
+from urllib.parse import quote
 
 import numpy as np
 
@@ -127,7 +128,8 @@ def discover_hybrid_components(topology):
 
 
 def _factor_requirement(claims, factor, sources):
-    owner = f"hybrid:factor:{factor.name}"
+    # Escape the factor segment so names cannot masquerade as parameter suffixes.
+    owner = f"hybrid:factor:{quote(factor.name, safe='')}"
     if factor.type in ("categorical", "gaussian"):
         kernel = claims.registry.bindings[factor.type]
         paths = parameter_paths(kernel, owner)

@@ -1133,7 +1133,9 @@ parameter roles and transforms. Inputs preserve original factor/blob-role
 traversal, initializer shapes and unevaluated registered shape providers;
 registered source requirements still include every consumed source. Draft member
 keys/indexes are intentions for later packing, with writes and statistic sources
-disabled. They neither create addresses nor certify fixed-parameter bundles.
+disabled. Factor-name segments in these keys are percent-encoded before adding
+parameter suffixes, keeping delimiter-bearing names distinct from roles and
+literal escape sequences. They neither create addresses nor certify fixed-parameter bundles.
 These are graph-derived ownership declarations, not final assembly certificates:
 resolved values/support, cross-owner checks, both ordinary entropy tables and
 parameter publication must still be checked before an Arena can be published.

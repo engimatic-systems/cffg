@@ -134,6 +134,43 @@ def test_sources_keep_original_roles_order_shapes_and_parameter_conventions():
         assert {p.key for p in member.runtime.values()} == {d.name for d in arrays.destinations}
 
 
+@pytest.mark.parametrize("gaussian_name,categorical_name", [
+    ("px", "px:W"),
+    ("scope/px", "scope/px:W"),
+    ("px:W", "px:W:W"),
+    ("px%3AW", "px:W"),
+    ("état/π", "état/π:W"),
+])
+def test_delimiter_bearing_factor_names_keep_parameter_intentions_distinct(gaussian_name, categorical_name):
+    template = declared()
+    names = {"px": gaussian_name, "pz": categorical_name}
+    template.factors = {
+        names.get(name, name): replace(factor, name=names.get(name, name))
+        for name, factor in template.factors.items()
+    }
+    spec = template.hybrid_components["association"]
+    update(template, regions=tuple(replace(region, factor=names.get(region.factor, region.factor))
+                                   for region in spec.regions))
+    claims, registered, drafts = stages(template)
+    assert not claims.admission_problems and drafts.ownership_problem is None
+    arrays = drafts.hybrid_components[0].arrays
+    assert len(arrays) == len({requirement.owner for requirement in arrays})
+    destinations = [destination.name for requirement in arrays for destination in requirement.destinations]
+    members = {requirement.members[0].member: requirement.members[0] for requirement in arrays}
+    member_keys = [parameter.key for member in members.values() for parameter in member.runtime.values()]
+    assert len(destinations) == len(set(destinations))
+    assert len(member_keys) == len(set(member_keys))
+    assert set(member_keys) == set(destinations)
+    covariance = members[gaussian_name].runtime["cov"]
+    statistic = members[categorical_name].runtime["statistic"]
+    assert covariance.key != statistic.key
+    assert covariance.transform == "covariance_to_precision"
+    assert (statistic.transform, statistic.probability_axis) == ("probability_to_log", 0)
+    assert [(s.factor, s.role, s.blob) for requirement in arrays for s in requirement.inputs] == [
+        (source.factor, source.role, source.blob) for source in registered.sources if source.factor in claims.consumed
+    ]
+
+
 def test_reordering_and_arbitrary_renaming_do_not_choose_membership():
     original = declared()
     claims, _, drafts = stages(original)
