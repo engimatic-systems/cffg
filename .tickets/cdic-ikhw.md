@@ -59,3 +59,13 @@ Direct dependent tickets: cdic-1w3r, cdic-7y77. Parent checkpoint: cdhd-hzw0; pr
 - Prospective descriptor: input/output and storage metadata fixed before its qualification run.
 
 
+
+## Notes
+
+**2026-09-15T09:29:24Z**
+
+Published as PR154, https://github.com/engimatic-systems/cffg/pull/154, stacked on PR153 with base cdpf-gzix-hybrid-discovery and head cdhd-mfc9-incidence-contract. cdhd-mfc9 is closed. Final code gate at942f8c8 passed3009tests in1152.682seconds under the unchanged1200-second cap; later commits only record tickets/runtime/publication evidence. Historical numerical producers and accepted artifacts remain unchanged. No unchanged suite is required for publication.
+
+Next ready D12 implementation root is cdic-ikhw (separate R auxiliary/statistic and stable-energy extraction), using the published PR154 branch as its intended base. A fresh author must update that base before branching, complete the pre-edit architecture/hostile-input handoff and assess scope before code. The extraction may change protected numerical producers; plan truthful new current tiny evidence and regenerated prospective descriptors rather than editing historical hashes or claiming A3 qualifies changed code. Review the committed code after the author pauses before expensive complete qualification; then resume the same bounded author as appropriate for its qualification/report handoff. Root owns final short-suite gate and PR publication. Registered recovery data, exactly-three-fit allowance and all thresholds remain untouched.
+
+The explicit numerical chain is cdic-ikhw -> cdic-1w3r -> cdic-7y77 -> cdic-3e79 -> cdic-nuel -> cdic-za1z -> cdic-w79t -> cdhd-hzw0 -> cff-7sw5, retaining additional direct dependencies. Ordinary-port definition and numerical coupling are deliberately separate. All three registered recovery fits remain unused. Current moderate evidence remains the accepted A3 homogeneous-chain checkpoint, not source recovery or newly generalized graph qualification.
