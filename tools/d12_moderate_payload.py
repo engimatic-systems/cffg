@@ -384,7 +384,9 @@ def validate_outputs(arrays, case, *, initial=False, parameters=None):
         from d12_moderate_reconstruct import local_summaries
 
         for name, value in local_summaries(arrays, case).items():
-            close(arrays[f"state.evaluation.local.{name}"], value, f"local {name}")
+            summary = arrays[f"state.evaluation.local.{name}"]
+            require(summary >= 0, f"negative local {name}")
+            close(summary, value, f"local {name}")
         if status == 0:
             tau = 64 * np.finfo(np.float32).eps ** 0.75
             change = float(arrays["state.relative_energy_change"])

@@ -9,6 +9,7 @@ from test_d12_moderate import complete_report
 from d12_moderate_controls import analytic_model, refresh_arithmetic, synthetic  # noqa: F401
 from d12_compile_scaling import digest, write_json
 from d12_moderate_payload import (
+    close,
     output_contract,
     read_snapshot,
     validate_outputs,
@@ -125,6 +126,44 @@ def test_local_summary_corruption_from_valid_point(field, initial):
     arrays["state.evaluation.local." + field][()] = 100
     with pytest.raises(ValueError, match="local " + field):
         validate_moderate_outputs(arrays, case, initial=initial)
+
+
+@pytest.mark.usefixtures("analytic_model")
+@pytest.mark.parametrize("field", ["moment_residual", "quotient_residual"])
+@pytest.mark.parametrize(
+    "value", [-1e-5, 0.0, -0.0], ids=["negative", "zero", "signed-zero"]
+)
+def test_local_summary_sign_inside_arithmetic_allowance(field, value):
+    case = solve_cases()[0]
+    arrays = synthetic(case)
+    validate_moderate_outputs(arrays, case)
+    summary = arrays["state.evaluation.local." + field]
+    summary[()] = np.float32(value)
+    close(summary, local_summaries(arrays, case)[field], "local " + field)
+    if value < 0:
+        with pytest.raises(ValueError, match="negative local " + field):
+            validate_moderate_outputs(arrays, case)
+    else:
+        validate_moderate_outputs(arrays, case)
+
+
+@pytest.mark.usefixtures("analytic_model")
+@pytest.mark.parametrize("field", ["moment_residual", "quotient_residual"])
+def test_negative_local_summary_aggregate_with_refreshed_hashes(tmp_path, field):
+    report = complete_report(tmp_path)
+    folder = tmp_path / "t32"
+    worker = json.loads((folder / "worker.json").read_text())
+    row = worker["cases"][0]
+    arrays = read_snapshot(folder, row["terminal"])
+    summary = arrays["state.evaluation.local." + field]
+    summary[()] = np.float32(-1e-5)
+    close(summary, local_summaries(arrays, row["case"])[field], "local " + field)
+    row["terminal"] = write_snapshot(folder, "negative-summary", arrays)
+    write_json(folder / "worker.json", worker)
+    report["jobs"][0]["worker_sha256"] = digest(folder / "worker.json")
+    write_json(tmp_path / "report.json", report)
+    with pytest.raises(ValueError, match="negative local " + field):
+        validate_report(tmp_path)
 
 
 @pytest.mark.usefixtures("analytic_model")
