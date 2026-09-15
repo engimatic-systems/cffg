@@ -3192,8 +3192,8 @@ failed messages; its source identity and payload are checked separately.
 The new all-NaN coordinate can legitimately make negative-xi and nonfinite-site
 failure outputs identical. Their declared inputs and status expectations remain
 distinct; no numerical difference is inferred between identical sentinels.
-`hybrid-joint-candidate-results-003.json` records all 36 valid float64
-fixture/start combinations at source `9ec70fe` converging within six accepted
+`hybrid-joint-candidate-results-004.json` records all 36 valid float64
+fixture/start combinations at source `aecd819` converging within six accepted
 updates, with a largest terminal certificate of `2.679e-11`. Independent
 saved-state re-evaluation passed all inherited arithmetic and propagated
 output comparisons, including the absolute-only energy check. Maximum allowance
@@ -3206,17 +3206,19 @@ tiny solves needed the fallback. Held tests separately exercise CGLS
 (conjugate gradients for least squares), improper-trial rejection and the
 nonnegative auxiliary boundary. These results establish only the frozen tiny
 checkpoint, not the moderate float32 or production qualification.
-Attempt 003 uses the reviewed packing and report enforcement, with schema 2
-and a manifest of the executed source. Attempts 001 and 002 remain immutable:
-the first failed during compilation before any optimizer step; the second
-passed at its historical source and failure-coordinate policy.
+Attempt 004 covers the reviewed compensated mixture centering and current
+solver/storage source, with schema 2 and a manifest of the executed source.
+All 15 required coordinate tests passed before execution, including native
+float32 complete derivatives. Attempts 001–003 remain immutable: the first
+failed during compilation before any optimizer step; the other two passed at
+their historical source and declared failure-coordinate policies.
 With the disclosed temporary compilation cache, synchronized first JIT calls
-for the six layouts took 299.76–336.21 seconds; the 34 reused calls took
-2.26–26.58 milliseconds. Host starts took 234.86 and 36.04 seconds, with an
+for the six layouts took 310.75–361.38 seconds; the 34 reused calls took
+3.20–35.57 milliseconds. Host starts took 242.44 and 41.10 seconds, with an
 unchanged compiled while-loop cache entry on the second call. These inclusive
 timings do not separate setup, compilation and execution phases. The vmap call
-took 304.05 seconds and the zero-budget call 358.30 seconds. Fifteen-second
-process samples reached 28.65 GiB without triggering the resource guard;
+took 316.67 seconds and the zero-budget call 380.10 seconds. Fifteen-second
+process samples reached 29.29 GiB without triggering the resource guard;
 sampled process memory is neither a peak nor an iteration-storage measurement.
 `hybrid_joint_storage.buffers` inventories logical arrays and derivative
 captures. `programs` exposes the actual enclosing residual, normal product,

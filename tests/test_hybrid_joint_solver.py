@@ -140,7 +140,7 @@ def test_complete_loop_has_fixed_int32_status_and_counter_shapes():
 
 @pytest.fixture(scope='module')
 def checkpoint_report():
-    return json.loads((Path(__file__).parent / 'fixtures/hybrid-joint-candidate-results-003.json').read_text())
+    return json.loads((Path(__file__).parent / 'fixtures/hybrid-joint-candidate-results-004.json').read_text())
 
 
 @pytest.fixture(scope='module')
