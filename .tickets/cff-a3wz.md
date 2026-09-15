@@ -251,3 +251,7 @@ Dependency companion from tk dep tree --full cff-zov5, tk ready and tk blocked; 
                                                                                     [ ] X0IF --> [ ] ZOV5
 
 K6G5 was structurally parallel to the checkpoint, but implementation remains sequential as Cooper requested. 7SW5 is immediately blocked by K6G5; downstream execution, learning and public composition remain required before X0IF's registered fits. A3WZ closure is not a recovery claim.
+
+**2026-09-15T04:16:23Z**
+
+Published reviewed evidence as PR150: https://github.com/engimatic-systems/cffg/pull/150, base cdc-ztuf-moderate-harness (PR149), head cff-a3wz-moderate-qualification. Numerical checkpoint accepted; ticket closed. Archive and executed source remain immutable. Root proceeds to ready K6G5 with a fresh sequential implementation agent; all three registered recovery fits remain unused. No merge performed.
