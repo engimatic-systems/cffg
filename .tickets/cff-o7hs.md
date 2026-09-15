@@ -1,7 +1,7 @@
 ---
 id: cff-o7hs
 status: in_progress
-deps: [cff-4e5z, cff-ri8m, cff-cfqg]
+deps: [cff-4e5z, cff-ri8m, cff-cfqg, cff-2dzo, cff-gsd5, cff-gvwc]
 links: [cff-1o72, cff-fxmj, cff-ri8m, cff-l6i5, cff-pksr, cff-lquu, cff-k9ws, cff-209l, cff-8a5m, cff-u06e]
 created: 2026-07-08T16:49:34Z
 type: feature
@@ -83,7 +83,7 @@ links, or epistemic GFE scoring through nonlinear nodes.
    4.7. Every accepted cavity-plus-site belief is symmetric positive definite and finite.
    4.8. Every accepted tilted covariance is symmetric positive definite and finite.
    4.9. Damping, backtracking, or another declared globalization rule accepts an update only when the combined belief remains proper.
-   4.10. The globalization derivation names and justifies its acceptance metric, such as decreasing stationarity residual or another scalar merit function tied to the EP stationary equations.
+   4.10. The globalization derivation uses the fully recomputed fixed-point residual, including cavity-dependent approximation coefficients, to define and justify its scalar merit function.
    4.11. The globalization rule does not add an absolute ridge.
    4.12. The globalization rule does not clamp the site precision to positive semidefinite.
    4.13. A rejected site update is not reported as convergence.
@@ -96,14 +96,16 @@ links, or epistemic GFE scoring through nonlinear nodes.
    5.3. The ledger labels the global objective as approximate when it contains the nonlinear node.
    5.4. The ledger does not claim the exact linear-Gaussian tree identity for a graph containing the nonlinear node.
    5.5. Linear-Gaussian terms elsewhere in the graph retain their analytic labels.
-   5.6. The derivation states the surrogate's mathematical target.
+   5.6. The derivation states the frozen-factor Gaussian Bethe surrogate target and the local approximate conditional density used by each message method.
    5.7. The derivation states the surrogate's normalization convention.
-   5.8. The derivation states the surrogate's stationary equations.
+   5.8. The derivation states the surrogate stationary equations with approximation coefficients held fixed and the separate coefficient/cavity self-consistency equations defining the adaptive inference fixed point.
    5.9. If the derivation proves a bound direction, the ledger reports that direction.
    5.10. If no bound direction is proved, the ledger and limitations documentation state that fact.
    5.11. The surrogate is finite only when the required beliefs and covariances are proper.
    5.12. Convergence requires a finite dtype-scaled surrogate change below its declared tolerance.
-   5.13. Convergence requires a finite stationarity residual below its declared tolerance.
+   5.13. Convergence requires a finite full fixed-point residual below its declared tolerance, including the recomputed approximation coefficients.
+   5.14. The ledger and derivation distinguish conditional frozen-factor stationarity from stationarity of the total adaptive energy; no total-energy stationarity or bound on the original nonlinear evidence is claimed without proof.
+   5.15. Unselected endpoint density constraints apply to the declared Gaussian surrogate factor; the approximation does not claim to retain the original nonlinear node marginal exactly.
 6. The rule satisfies the numerical robustness contract.
    6.1. Sparse discrete support is structurally irrelevant because this factor has only nondegenerate Gaussian edges.
    6.2. Singular noise and deterministic limits follow criterion 2.11 rather than a numeric floor.
@@ -162,7 +164,7 @@ These suggestions are optional. Another method is acceptable if it satisfies the
 
 ## Future work
 
-- cff-1o72 builds deterministic neural factors, free-energy-gradient training, and amortized message initialization on this ticket's nonlinear Gaussian and surrogate-ledger contracts.
+- cff-1o72 builds Gaussian factors with deterministic neural means and positive noise, full-fixed-point gradient training, and amortized message initialization on this ticket's nonlinear Gaussian and surrogate-ledger contracts.
 - cff-ahps uses this ticket and cff-1o72 to close the nonlinear and neural branches of the universal factor-library roadmap after its other prerequisites are satisfied.
 - Continuous-to-discrete nonlinear links use declared hybrid subclasses with proved variational bounds. cff-k9ws delivered the recurrent stick-breaking link; this ticket does not replace or generalize it.
 - Nonlinear or Gaussian-only GFE messages remain excluded. cff-dfpi and cff-izjd delivered the bounded discrete-regime epistemic route; expanding that scope requires a separate ticket and a new derivation.
@@ -258,3 +260,14 @@ Built from tk dep tree --full for cff-1o72, cff-u06e, and cff-ahps, plus tk read
 Change-path review: this commit edits tickets only. The planned factor work uses New factor or rule family; the exact-factor handoff must also consider New IR field and Runtime numerical or status invariant. Host/JIT, flooding/scheduled, single-instance/vmap, and current/legacy decoding are each N/A for these ticket edits because no executable or serialized model behavior changes. Validation: tk dep cycle and git diff --check pass; the short suite is not required for ticket-only work.
 
 Handoff: preparation is complete on cff-o7hs. cff-o7hs remains in_progress; next split its schema, derivation, numerical evidence, and integration work into bounded implementation tickets. cff-1o72 and cff-u06e remain open. Complete cff-o7hs before the cff-1o72 implementation branch and keep their PRs separate.
+
+**2026-09-15T16:43:13Z**
+
+Research question: can cavity-dependent Taylor or sigma-point statistical linear regression updates be treated as stationary points of one ordinary EP free-energy scalar? Answer: not in general. With frozen affine coefficients, normalized Gaussian factors have a valid Bethe/expectation-consistent surrogate and partial stationarity means endpoint moment consistency. Recomputing coefficients from the cavity adds a chain-rule term to the derivative of the reported scalar; the matching fixed point need not make that term zero. A scalar g(x)=x^2 example at input cavity mean=variance=1 and output mean=1, with total output variance=1, gives frozen tilted mean shift zero but total log-normalizer derivative -0.8. A coupled fixed-point contract can be honest if it explicitly separates frozen-factor stationarity from coefficient self-consistency, globalizes the fully recomputed residual, and differentiates the complete root for neural training. It cannot claim ordinary adaptive EP-energy stationarity or use an envelope/stop-gradient shortcut. Cooper has been asked to select that explicitly named approximation contract or a separate consistent tilted-integral method; acceptance criteria remain unchanged pending that choice.
+Sources: Wilkinson, Särkkä and Solin (2023), section 4.3.2, https://jmlr.org/papers/volume24/21-1298/21-1298.pdf; Opper and Winther (2005), section 3, equations 13–19, https://www.jmlr.org/papers/volume6/opper05a/opper05a.pdf; independent algebra and finite-difference counterexample. Confidence: high on derivative mismatch; conditional-surrogate scope requires an explicit decision. Research performed by GPT-6 Astra at xhigh, reviewed at top level.
+
+Compiler-seam research: reuse GaussianBinding batched callbacks and leading-member-axis State.params arrays. Callable identity/version and architecture require pure-data FactorSpec metadata, a host configured-binding resolver, configuration-aware shape declarations and grouping, and collision-safe parameter addresses. Sync/scheduled executors are shared, but Gaussian execution currently discards diagnostics and all Gaussian groups enter exact directed scheduling, so nonlinear status/residual propagation and iterative capability classification need explicit shared contracts. The ledger also needs approximation metadata. Sources: kernel_bindings.GaussianBinding, registered/lowering._group_keys and lower_registered, registered/requirements.source_requirements, kernel_runtime.gaussian_message/gaussian_energy, execution/registered.execute_gaussian, schedule._island_nodes_and_links, ledger_terms.gaussian_energy. Confidence: high; read-only source audit by GPT-6 Astra xhigh.
+
+**2026-09-15T16:51:37Z**
+
+Cooper selected the explicit adaptive fixed-point and approximate-energy contract. The ticket criteria now name frozen-coefficient Gaussian Bethe stationarity, separate approximation/cavity self-consistency, the fully recomputed residual for globalization and convergence, and the absence of a total adaptive-energy stationarity claim. cff-1o72 differentiates the complete coupled fixed point and the total reported energy. cff-314c and cff-2dzo are implemented and closed. cff-gsd5 now owns configured nonlinear means and local rules; cff-gvwc owns measured short-suite budgeting. Final short-suite validation remains due after the parent implementation changes.
