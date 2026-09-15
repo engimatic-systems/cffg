@@ -1,6 +1,6 @@
 ---
 id: cff-o7hs
-status: open
+status: in_progress
 deps: [cff-4e5z, cff-ri8m, cff-cfqg]
 links: [cff-1o72, cff-fxmj, cff-ri8m, cff-l6i5, cff-pksr, cff-lquu, cff-k9ws, cff-209l, cff-8a5m]
 created: 2026-07-08T16:49:34Z
@@ -227,3 +227,13 @@ cff-yl0a remains an independent discrete-HMM performance ticket.
 ```
 
 Checked against tk dep tree --full cff-1o72, tk ready and tk blocked; tk dep cycle and git diff --check pass. This is a readiness handoff only. The ticket remains open; no numerical implementation, new dependency, qualification run or D12 resumption was started.
+
+**2026-09-15T15:27:10Z**
+
+Preparation at Cooper's request: AGENTS.md now contains one new line imposing a hard 20-minute (1,200-second) wall-time limit on default short-suite runs. Overruns are failed validation; agents may optimize tests, move expensive cases to the opt-in slow suite, or remove lower-value tests while retaining required correctness and numerical robustness coverage. This is an agent instruction only; this change does not modify the dashboard runner or prune tests. It supersedes the previous handoff's suggestion to restore test tooling as part of this preparation.
+
+Change-path review: documentation/ticket-only preparation; no architecture implementation row applies yet. Host/JIT, flooding/scheduled, single-instance/vmap, and current/legacy decoding are each N/A because execution and transport are unchanged. Validation: tk dep cycle and git diff --check pass; the documentation-only exception applies, so no test suite was run.
+
+Research question: can a deterministic neural network reuse this ticket's positive-noise Gaussian rule? Answer: yes, as the mean in y | x,theta ~ N(f_theta(x), V), with positive-definite V. Deterministic evaluation of the mean does not impose exact equality on the modeled output. Exact equality instead has a delta conditional, and substituting V=0 into ordinary Gaussian log-density/entropy formulas makes the inverse/log-determinant terms undefined; message and free-energy rules for constrained support need separate justification. Noise V is conditional output variation, distinct from uncertainty propagated from x or uncertainty in network weights. Sources: independently verified primary reference Rasmussen and Williams, Gaussian Processes for Machine Learning, chapter 2 equations 2.1-2.3 (https://gaussianprocess.org/gpml/chapters/RW2.pdf), Appendix A equations A.4/A.20 (https://gaussianprocess.org/gpml/chapters/RWA.pdf); local criteria 2.1/2.3/2.11 and cff-1o72 criteria 2/3/6.1. Confidence: high; CFFG scope implication is an inference from these mathematical facts and ticket contracts.
+
+Handoff: cff-o7hs is in_progress for preparation and design discussion. Recommend clarifying cff-1o72 as a deterministic neural mean with positive Gaussian noise; Cooper's scope decision is pending, so neither ticket's mathematical acceptance criteria have changed. Next, branch from the committed cff-o7hs-readiness base to cff-o7hs, split implementation into bounded work as the previous note requires, and complete the nonlinear contract before branching for cff-1o72; keep separate PRs for the two tickets. The readiness base has no matching remote branch to fast-forward. The independent issue about indefinite site messages versus proper combined beliefs remains for the implementation handoff.

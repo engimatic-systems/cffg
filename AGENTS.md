@@ -124,6 +124,7 @@ This project will span many context windows. The rule that makes that survivable
   still require the full gate. If isolation is uncertain, use the full gate.
   Validate after the final relevant edit; never publish focused results as if
   they were a fresh full-suite result.
+- **Short-suite time limit:** Every default short-suite run has a hard 20-minute (1,200-second) wall-time limit; terminate overruns as failed validation, and optimize tests, move expensive cases to the opt-in slow suite, or remove lower-value tests as needed while retaining required correctness and numerical robustness coverage.
 - **Slow tests are opt-in.** Mark long behavioral, multi-trial, and globalization
   regressions with `@pytest.mark.slow`; pytest excludes them by default. Run
   them explicitly with `uv run pytest -m slow` only when the changed behavior
