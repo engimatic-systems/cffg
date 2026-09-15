@@ -20,7 +20,6 @@ from d12_compile_scaling import child_environment, digest, write_json
 from d12_moderate_plan import identities, load_spec, solve_cases, storage_cases
 from d12_moderate_payload import (
     CERTIFICATES,
-    output_contract,
     read_snapshot,
     validate_outputs,
     write_snapshot,
@@ -34,6 +33,9 @@ from d12_moderate_report import (
     validate_report,
     validate_work,
 )
+
+
+from d12_moderate_controls import analytic_model, synthetic  # noqa: F401
 
 
 def test_prospective_inventory_and_frozen_defaults():
@@ -92,62 +94,7 @@ def test_frozen_formula_and_axis_mapping():
         )
 
 
-def synthetic(case, *, initial=False):
-    """Analytic independent-label Gaussian controls for report relationships.
-
-    These are internally consistent payloads, not solves of the frozen model.
-    Terminal records model one accepted update and the final certification.
-    Uniform pair mass, zero means and identity covariance give closed-form
-    projected moments and source-conditioned learning without a report helper.
-    """
-    arrays = {
-        key: np.zeros(shape, dtype)
-        for key, (shape, dtype) in output_contract(
-            case["T"], case["K"], case["d"]
-        ).items()
-    }
-    arrays["state.evaluation.scales"].fill(1)
-    for name in ("regions", "separators"):
-        prefix = f"state.evaluation.local.{name}"
-        probability = arrays[f"{prefix}.probability"]
-        probability.fill(1 / np.prod(probability.shape[1:]))
-        arrays[f"{prefix}.log_probability"][...] = np.log(probability)
-        covariance = arrays[f"{prefix}.covariance"]
-        covariance[...] = np.eye(covariance.shape[-1], dtype=np.float32)
-        for field in ("full_covariance", "second"):
-            arrays[f"{name}.{field}"][...] = covariance
-    parameters, _ = fixture_arrays(case["T"])
-    target = np.sum(parameters["weights"] ** 2, axis=-1) + parameters["offsets"] ** 2
-    arrays["xi"][...] = case["xi"] if initial else target
-    arrays["state.coordinate"][-arrays["xi"].size :] = arrays["xi"].ravel()
-    k, d = case["K"], case["d"]
-    exposure = (k - np.arange(k - 1, dtype=np.float32)) / np.float32(k * k)
-    arrays["state.evaluation.auxiliary.target"][...] = target
-    arrays["state.evaluation.auxiliary.residual"][...] = arrays["xi"] - target
-    arrays["state.evaluation.auxiliary.exposure"][...] = exposure
-    for name in ("state.evaluation.auxiliary.linear", "learning.physical_linear"):
-        arrays[name][..., -1] = np.float32(1 / (k * k)) - exposure / 2
-    xi = arrays["xi"].astype(np.float64)
-    root = np.sqrt(np.where(xi > 0, xi, 1))
-    omega = np.where(xi > 0, np.tanh(root / 2) / (2 * root), 0.25).astype(np.float32)
-    for name in ("state.evaluation.auxiliary.precision", "learning.physical_precision"):
-        arrays[name][...] = (omega * exposure)[..., None, None] * np.eye(
-            d + 1, dtype=np.float32
-        )
-    arrays["state.evaluation.residual"][-xi.size :] = (arrays["xi"] - target).ravel()
-    arrays["state.evaluation.scales"][-xi.size :] = (1 + arrays["xi"]).ravel()
-    arrays["state.evaluation.certificates.auxiliary"][()] = np.max(
-        abs(arrays["xi"] - target) / (1 + arrays["xi"])
-    )
-    arrays["state.iterations"][()] = 0 if initial else 1
-    arrays["state.evaluations"][()] = 1 if initial else 3
-    arrays["state.status"][()] = 3 if initial else 0
-    arrays["state.reason"][()] = 1 if initial else 0
-    if initial:
-        arrays["state.relative_energy_change"][()] = np.inf
-    return arrays
-
-
+@pytest.mark.usefixtures("analytic_model")
 def test_lossless_snapshots_and_tampering(tmp_path):
     arrays = synthetic(solve_cases()[0], initial=True)
     record = write_snapshot(tmp_path, "initial", arrays)
@@ -182,6 +129,7 @@ def test_lossless_snapshots_and_tampering(tmp_path):
         "status",
     ),
 )
+@pytest.mark.usefixtures("analytic_model")
 def test_malformed_or_inconsistent_outputs_rejected(mutation):
     case = solve_cases()[0]
     initial = mutation in ("raw_feasible", "xi")
@@ -215,6 +163,7 @@ def test_malformed_or_inconsistent_outputs_rejected(mutation):
         validate_work(arrays)
 
 
+@pytest.mark.usefixtures("analytic_model")
 def test_start_comparisons_include_all_groups_and_all_pairs():
     terminals = {c["id"]: synthetic(c) for c in solve_cases()}
     rows = compare_starts(terminals)
@@ -282,31 +231,6 @@ def test_complete_compilation_descriptors_and_call_counts(program):
         validate_program(bad, case, program, 0)
 
 
-def set_messages(arrays, vector):
-    """Populate gauge-reduced schema arrays for the synthetic serialization test."""
-    l, k, d = arrays["messages.left.linear"].shape
-    nc, nh, np_ = l * (k - 1), l * k * d, l * k * d * (d + 1) // 2
-    parts = np.split(vector, [2 * nc, 2 * nc + 2 * nh])
-    row, col = np.triu_indices(d)
-    for index, side in enumerate(("left", "right")):
-        arrays[f"messages.{side}.constant"][:, 1:] = parts[0][
-            index * nc : (index + 1) * nc
-        ].reshape(l, k - 1)
-        arrays[f"messages.{side}.linear"][...] = parts[1][
-            index * nh : (index + 1) * nh
-        ].reshape(l, k, d)
-        precision = arrays[f"messages.{side}.precision"]
-        values = parts[2][index * np_ : (index + 1) * np_].reshape(l, k, -1)
-        precision[..., row, col] = values
-        precision[..., col, row] = values
-    arrays["state.coordinate"][: vector.size] = vector
-    arrays["state.evaluation.residual"][: vector.size] = -vector
-    arrays["state.evaluation.scales"][: vector.size] = np.maximum(1, abs(vector))
-    arrays["state.evaluation.certificates.natural"][()] = np.max(
-        abs(vector) / np.maximum(1, abs(vector))
-    )
-
-
 def complete_report(tmp_path):
     """Synthetic I/O acceptance exercises aggregation, never solver correctness."""
     identity = identities()
@@ -362,12 +286,6 @@ def complete_report(tmp_path):
         )
         for case in cases:
             initial = synthetic(case, initial=True)
-            if case["messages"] == "perturbed":
-                size = initial["state.coordinate"].size - initial["xi"].size
-                set_messages(
-                    initial,
-                    np.float32(0.01) * np.sin(np.arange(size, dtype=np.float32) + 1),
-                )
             worker["cases"].append(
                 dict(
                     case=case,
@@ -404,6 +322,7 @@ def complete_report(tmp_path):
     return report
 
 
+@pytest.mark.usefixtures("analytic_model")
 def test_complete_report_roundtrip_and_missing_start(tmp_path):
     report = complete_report(tmp_path)
     folder = tmp_path / "t100"

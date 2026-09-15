@@ -87,6 +87,9 @@ def source_paths():
             "uv.lock",
             "pyproject.toml",
             "src/cffg/__init__.py",
+            "src/cffg/experiments/__init__.py",
+            "src/cffg/experiments/hybrid_separator.py",
+            "src/cffg/experiments/regime_pair.py",
             "tests/fixtures/hybrid-joint-candidate-spec.json",
         )
     ]

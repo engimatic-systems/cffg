@@ -376,6 +376,9 @@ def validate_outputs(arrays, case, *, initial=False, parameters=None):
             "certificate/saved residual summary mismatch",
         )
         require(np.all(actual >= 0), "negative residual certificate")
+        from d12_moderate_reference import validate_reference
+
+        validate_reference(arrays, case)
         if status == 0:
             tau = 64 * np.finfo(np.float32).eps ** 0.75
             change = float(arrays["state.relative_energy_change"])

@@ -905,7 +905,25 @@ support, and finite-log underflow guards. Report validation reconstructs residua
 scales from saved messages, targets, beliefs and xi, preserving covariance low words
 in residual differences. Source-conditioned learning uses the native once-rounded
 covariance view and its defined centered-to-physical transform. Converged energy
-changes must be finite and nonnegative. Zero accepted updates must preserve the
+changes must be finite and nonnegative. The independent fixed-coordinate adapter
+`tools/d12_moderate_reference.py` also binds every valid initial/terminal point to
+the frozen native-float32 model inputs promoted to NumPy float64. It decodes only
+the supplied coordinate, builds transitions with `c=sqrt(xi)`, and calls the local
+EC mathematics in `experiments/hybrid_separator.py` and `experiments/regime_pair.py`.
+The prospective report source identity includes all three modules. Saved beliefs,
+targets, normalizers and energies are comparison outputs, never reference inputs.
+Regional/separator moments and log normalizers use the existing local arithmetic
+allowance; each absolute energy uses `512*max(4,5*T)*eps(float32)` with no relative
+enlargement. Covariances compare represented high-plus-low words; readouts retain
+their separate once-rounded checks, and target constants retain their common gauge.
+The dual energy must also equal the saved normalizer sum at the absolute-energy
+allowance; allowed local differences cannot accumulate into an unchecked energy shift.
+The adapter is restricted to the frozen zero-origin, full-support T32/T100 K4 d2
+models, uses local O(T K² d³) work, and neither optimizes nor enumerates temporal
+paths. The tiny joint reference's T2/T3 restriction is unchanged. Analytic model
+injection in report tests is explicitly test-only and cannot qualify a frozen
+moderate run; valid nonstationary point checks establish arithmetic, not convergence.
+Zero accepted updates must preserve the
 initial coordinate; exactly one accepted update must move it. All-pair comparisons disclose material stationary
 differences without claiming universal uniqueness. This harness is setup, not
 moderate numerical or storage qualification. A3WZ owns both measured phases and

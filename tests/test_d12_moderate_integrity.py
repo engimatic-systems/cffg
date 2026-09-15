@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from test_d12_moderate import ROOT, complete_report, synthetic
+from d12_moderate_controls import analytic_model  # noqa: F401
 from d12_compile_scaling import child_environment, digest, write_json
 from d12_moderate_layouts import contract
 from d12_moderate_plan import solve_cases
@@ -95,6 +96,7 @@ CORRUPTIONS = (
 
 
 @pytest.mark.parametrize("kind", CORRUPTIONS)
+@pytest.mark.usefixtures("analytic_model")
 def test_saved_relationship_corruption(kind):
     case = solve_cases()[0]
     arrays = synthetic(case)
@@ -107,6 +109,7 @@ def test_saved_relationship_corruption(kind):
 
 
 @pytest.mark.parametrize("field", ["center", "status", "precision"])
+@pytest.mark.usefixtures("analytic_model")
 def test_target_coordinate_metadata(field):
     case = solve_cases()[0]
     arrays = synthetic(case)
@@ -121,6 +124,7 @@ def test_target_coordinate_metadata(field):
 
 
 @pytest.mark.parametrize("change", [-np.inf, -1, np.nan, np.inf])
+@pytest.mark.usefixtures("analytic_model")
 def test_terminal_energy_is_finite_nonnegative_but_initial_infinity_is_valid(change):
     case = solve_cases()[0]
     validate_outputs(synthetic(case, initial=True), case, initial=True)
@@ -132,6 +136,7 @@ def test_terminal_energy_is_finite_nonnegative_but_initial_infinity_is_valid(cha
 
 
 @pytest.mark.parametrize("kind", CORRUPTIONS)
+@pytest.mark.usefixtures("analytic_model")
 def test_aggregate_cannot_certify_corrupt_terminal(tmp_path, kind):
     report = complete_report(
         tmp_path
@@ -212,6 +217,7 @@ def test_inventory_source_and_runtime_binding(kind):
         validate_logical(inventory, shape, runtime)
 
 
+@pytest.mark.usefixtures("analytic_model")
 def test_fixed_input_inventory_and_process_diagnostics(tmp_path):
     complete_report(tmp_path)
     folder = tmp_path / "t32"
@@ -272,8 +278,8 @@ def test_native_projection_matches_saved_input_covariance(probe):
 
 
 def sparse_control(case):
-    """Analytic independent-label control with exact inactive support."""
-    from d12_compile_fixture import fixture_arrays
+    """Exact inactive support for representation checks, outside the full-support model."""
+    from d12_moderate_payload import validate_belief
 
     arrays = synthetic(case)
     q = np.float32([0, 0.25, 0.25, 0.5])
@@ -284,32 +290,12 @@ def sparse_control(case):
         arrays[prefix + "log_probability"][...] = np.log(np.where(p > 0, p, 1))
         arrays[prefix + "log_probability"][p == 0] = -np.inf
         arrays[prefix + "covariance"][p == 0] = 0
+        arrays[prefix + "covariance_correction"][p == 0] = 0
         for field in ("full_covariance", "second"):
-            arrays[name + "." + field][...] = arrays[prefix + "covariance"]
-    p = arrays["state.evaluation.local.regions.probability"]
-    exposure = np.cumsum(p[:, :, ::-1], axis=2, dtype=np.float32)[:, :, ::-1][:, :, :-1]
-    parameters, _ = fixture_arrays(case["T"])
-    target = np.where(
-        exposure > 0,
-        np.sum(parameters["weights"] ** 2, axis=-1) + parameters["offsets"] ** 2,
-        np.float32(0),
-    )
-    arrays["xi"][...] = target
-    arrays["state.coordinate"][-target.size :] = target.ravel()
-    arrays["state.evaluation.scales"][-target.size :] = (1 + target).ravel()
-    arrays["state.evaluation.auxiliary.target"][...] = target
-    arrays["state.evaluation.auxiliary.exposure"][...] = exposure
-    for name in ("state.evaluation.auxiliary.linear", "learning.physical_linear"):
-        arrays[name][..., -1] = p[:, :, :-1] - exposure / 2
-    roots = np.sqrt(np.where(target > 0, target, 1).astype(np.float64))
-    omega = np.where(target > 0, np.tanh(roots / 2) / (2 * roots), 0.25).astype(
-        np.float32
-    )
-    for name in ("state.evaluation.auxiliary.precision", "learning.physical_precision"):
-        arrays[name][...] = (omega * exposure)[..., None, None] * np.eye(
-            case["d"] + 1, dtype=np.float32
-        )
-    validate_outputs(arrays, case)
+            arrays[name + "." + field][...] = (
+                arrays[prefix + "covariance"] + arrays[prefix + "covariance_correction"]
+            )
+        validate_belief(arrays, name)
     return arrays
 
 
@@ -324,6 +310,7 @@ def replace_terminal(directory, report, folder, worker, arrays, name):
 @pytest.mark.parametrize(
     "kind", ["oversized_low_word", "finite_log_zero", "zero_updates"]
 )
+@pytest.mark.usefixtures("analytic_model")
 def test_rereview_corruptions_reject_from_valid_aggregate(tmp_path, kind):
     from d12_moderate_report import validate_work
 
@@ -331,13 +318,7 @@ def test_rereview_corruptions_reject_from_valid_aggregate(tmp_path, kind):
     folder = tmp_path / "t32"
     worker = json.loads((folder / "worker.json").read_text())
     case = worker["cases"][0]["case"]
-    arrays = sparse_control(case) if kind == "finite_log_zero" else synthetic(case)
-    if kind == "finite_log_zero":
-        # Start comparisons require the same exact support face within a horizon.
-        for row in worker["cases"][1:]:
-            row["terminal"] = write_snapshot(
-                folder, "sparse-" + row["case"]["id"], sparse_control(row["case"])
-            )
+    arrays = synthetic(case)
     replace_terminal(tmp_path, report, folder, worker, arrays, "positive-control")
     assert validate_report(tmp_path)["complete"]
     if kind == "oversized_low_word":
@@ -350,9 +331,8 @@ def test_rereview_corruptions_reject_from_valid_aggregate(tmp_path, kind):
     elif kind == "finite_log_zero":
         for name in ("regions", "separators"):
             prefix = "state.evaluation.local." + name + "."
-            arrays[prefix + "log_probability"][
-                arrays[prefix + "probability"] == 0
-            ] = -1000
+            # A valid full-support model point cannot acquire zero mass at finite log p.
+            arrays[prefix + "probability"].flat[0] = 0
         message = "support/finite-log underflow"
     else:
         arrays["state.iterations"][()] = 0
@@ -368,6 +348,7 @@ def test_rereview_corruptions_reject_from_valid_aggregate(tmp_path, kind):
         validate_report(tmp_path)
 
 
+@pytest.mark.usefixtures("analytic_model")
 def test_signed_correction_words_are_valid_without_being_positive_definite():
     case = solve_cases()[0]
     arrays = synthetic(case)
@@ -375,7 +356,12 @@ def test_signed_correction_words_are_valid_without_being_positive_definite():
     for name in ("regions", "separators"):
         low = arrays[f"state.evaluation.local.{name}.covariance_correction"]
         signs = np.resize(np.float32([-1, 1]), low.shape[-1])
-        low[...] = np.diag(signs * np.finfo(np.float32).eps / 4)
+        low[...] = (
+            arrays[f"state.evaluation.local.{name}.covariance"]
+            * signs
+            * np.finfo(np.float32).eps
+            / 4
+        )
     validate_outputs(arrays, case)
 
 
@@ -390,6 +376,7 @@ def test_signed_correction_words_are_valid_without_being_positive_definite():
         ("covariance_correction", "shape"),
     ],
 )
+@pytest.mark.usefixtures("analytic_model")
 def test_belief_word_validity(field, kind):
     from d12_moderate_payload import validate_belief
 
@@ -422,6 +409,7 @@ def test_belief_word_validity(field, kind):
 @pytest.mark.parametrize(
     "logs", [-1000, -100, np.float32(np.log(np.finfo(np.float32).tiny))]
 )
+@pytest.mark.usefixtures("analytic_model")
 def test_positive_probability_cannot_hide_native_exp_underflow(logs):
     from d12_moderate_payload import validate_belief
 
@@ -438,6 +426,7 @@ def test_positive_probability_cannot_hide_native_exp_underflow(logs):
         validate_belief(arrays, "separators")
 
 
+@pytest.mark.usefixtures("analytic_model")
 def test_unchanged_zero_update_and_single_update_coordinate_history():
     from d12_moderate_report import validate_work
 
