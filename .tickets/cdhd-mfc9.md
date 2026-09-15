@@ -1,6 +1,6 @@
 ---
 id: cdhd-mfc9
-status: in_progress
+status: closed
 deps: [cdpf-gzix, cff-a3wz]
 links: []
 created: 2026-09-15T08:02:15Z
@@ -181,3 +181,11 @@ Legend: prerequisite --> dependent. Built from tk dep tree --full cdhd-hzw0, tk 
                                                                                             [ ] X0IF --> [ ] ZOV5
 
 cdhd-mfc9 is the ready D12 root awaiting its final short suite; cdic-ikhw is next after closure. cdh-kvy5 remains an independent nonblocking audit/research branch. Implementation stays sequential; independent research/review can proceed in parallel only under the established author-pause rule for review. All three registered recovery fits remain unused. Prior A3 chain results remain valid for their exact source/layouts and do not certify these new graph layouts. This roadmap addition records missing implementation and qualification, not a mathematical defect or scope revision.
+
+**2026-09-15T09:28:18Z**
+
+Final code gate passed at 942f8c88e2331d8110721b61bd6241d41164a62d: uv run python tools/dashboard.py --run-suite returned3009passed, zero failures and16warnings. Pytest time1151.90seconds; measured wall1152.682seconds (19m12.682s), leaving47.318seconds below the unchanged1200-second cap. Four workers, unchanged not-slow selection, initially empty compilation cache. Root announced once and waited quietly for the full suggested1200seconds with no polling. All9027phase records passed,3009distinct test calls and zero duplicates. Runtime history and ~/agent-share/cffg-tests.html refreshed. Log /tmp/cdhd-mfc9-final-short-suite.log; audited summary /tmp/cdhd-mfc9-final-gate-summary.json.
+
+Independent review and the parameter-coverage re-review are accepted. Required bounded numerical children now exist with explicit dependencies under cdhd-hzw0, fulfilling the metadata ticket's planning handoff. Root closes cdhd-mfc9 in this resolving session. Subsequent ticket/runtime/PR evidence changes alone do not require another unchanged suite. Numerical sources, all accepted qualification/source/specification artifacts and compiler/bundle/runtime guards remain unchanged; this gate does not qualify the new general numerical evaluator, which is not implemented. No new complete qualification program or registered recovery fit ran; all three registered fits remain unused.
+
+Next ready D12 root is cdic-ikhw, separate R-scope auxiliary/statistic and stable-energy extraction, depending on this now-complete contract. It receives a fresh sequential author after this increment is published on PR153. The author must assess its bounded numerical/source-qualification scope before editing and preserve all existing policy/threshold/source-evidence requirements. Same-label D, general internal/coupled evaluation, shared policy and moderate qualification remain explicit later children. cdhd-hzw0 remains open and continues to block real cff-7sw5 integration; no mathematical, scope, approximation or threshold decision has been made.
