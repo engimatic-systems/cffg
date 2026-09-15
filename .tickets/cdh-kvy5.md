@@ -39,3 +39,19 @@ cdh-urn0 owns the narrow weighted/rare projection repair and independent review.
 
 Affine means a weighted sum plus offsets. A mantissa holds a floating-point number's significant binary digits; the exponent scales them by a power of two. A binade is the range between two adjacent powers of two. JIT is just-in-time compilation, and vmap is JAX batching. A fusion combines compiler operations into one execution kernel. A stored word is one float32 value with a single consistent bit pattern.
 
+
+## Notes
+
+**2026-09-15T00:10:10Z**
+
+Independent source inventory at published d22a43a, accounting for the active branch's compensated _mix centering repair. Question: which actual D12 paths outside that repaired subtraction feed generated values into weighted/compensated products? Answer: there are bounded candidates, but this read-only inventory establishes no additional failure.
+
+Priority1: hybrid_separator._conditional_at_risk.merge (205) divides to obtain mixture fractions, subtracts m-old_mean, and forms ordinary f_old*f_new*delta*delta.T. The updated mean later enters centered_affine in auxiliary_statistics (255) and transition_energy (291). The square itself is ordinary multiplication, not integer-significand _two_product. This path affects xi targets, auxiliary certificates and FE even without learning output.
+
+Priority2: hybrid_natural._mix's divided projected mean enters from_centered_moments (341), where center+mean is squared by _second_moment (159) through rounded_product. This is a finiteness/status check, not the repaired projected covariance; the same helper supports Belief.second readouts. A composed evaluation may retain the preceding mean division in the same program.
+
+Priority3: rebase (222) computes new_origin-old_origin before precision contractions through affine. Belief.relative_mean (115) computes displacement+(center-requested_center) before expectation's compensated precision contraction (143). These reach cavities/messages and site FE; fixed-origin cases can have exactly zero origin differences, so displaced-origin cases are the useful separate boundary.
+
+Lower priority: hybrid_covariance.resolved (38) divides covariance words by power-of-two scaling before compensated matrix products in spectral checks; quotient (451) passes -mean/2 into affine. Such binary scaling differs materially from subtractive cancellation. Remaining _mix covariance subtraction is an additive offset; divided increments enter combine via multiplication by one, neither is the repaired centered self-product. Learning precision (hybrid_separator239) uses an ordinary outer product of source-relative means and does not directly consume the suffix covariance.
+
+Separately executed kernels receive materialized arrays; nested Python/jit helpers alone do not establish that boundary inside joint.evaluate (hybrid_joint219). Sources above are src/cffg files in cffg-d12-scaling. Confidence high for reachability and distinctions, untested for numerical/compiler failure. No edits, tests or probes occurred. Use this to bound the separate audit or independent fixed-coordinate checks; it is not evidence by itself for revising scope, tolerances or blocking qualification.
