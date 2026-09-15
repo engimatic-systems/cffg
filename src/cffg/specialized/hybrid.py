@@ -127,7 +127,7 @@ def discover_hybrid_components(topology):
     return (() if problems else tuple(claims)), problems
 
 
-def _factor_requirement(claims, factor, sources):
+def _factor_requirement(claims, factor, region, sources):
     # Escape the factor segment so names cannot masquerade as parameter suffixes.
     owner = f"hybrid:factor:{quote(factor.name, safe='')}"
     if factor.type in ("categorical", "gaussian"):
@@ -139,7 +139,7 @@ def _factor_requirement(claims, factor, sources):
                         ))
         keys, recipe = tuple(paths.values()), ArrayRecipe.REGISTERED
     else:
-        if factor.type == "recurrence_link":
+        if region.kind == "recurrence":
             roles = {"weights": ("weights", "identity"), "offsets": ("offsets", "identity")}
             recipe = ArrayRecipe.RECURRENCE
         elif factor.type == "gaussian_mixture":
@@ -176,10 +176,10 @@ def lower_hybrid_components(claims):
         sources.setdefault(source.factor, []).append(source)
     drafts = []
     for component in claims.hybrid_components:
-        members = set(component.plan.parameter_members)
+        regions = {region.factor: region for region in component.plan.declaration.regions}
         arrays = tuple(
-            _factor_requirement(claims, factor, sources.get(factor.name, ()))
-            for factor in claims.topology.factors.values() if factor.name in members
+            _factor_requirement(claims, factor, regions[factor.name], sources.get(factor.name, ()))
+            for factor in claims.topology.factors.values() if factor.name in regions
         )
         drafts.append(HybridComponentDraft(
             component.plan, component.ownership, component.objectives, arrays,

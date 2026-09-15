@@ -1129,7 +1129,8 @@ ordinary slots and exterior factor connections, including exposed ports.
 
 Each region factor receives an unresolved `ArrayRequirement` and
 `MemberRequirement` using existing categorical, Gaussian, mixture and recurrence
-parameter roles and transforms. Inputs preserve original factor/blob-role
+parameter roles and transforms. Recurrence requirements consume the validated
+region kind; they do not classify recurrence factors again. Inputs preserve original factor/blob-role
 traversal, initializer shapes and unevaluated registered shape providers;
 registered source requirements still include every consumed source. Draft member
 keys/indexes are intentions for later packing, with writes and statistic sources

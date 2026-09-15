@@ -1,7 +1,7 @@
 ---
 id: cdpf-gzix
 status: in_progress
-deps: [cdd-ziiw, cff-k6g5, cff-a3wz, cdhd-fyq6]
+deps: [cdd-ziiw, cff-k6g5, cff-a3wz, cdhd-fyq6, cdhd-0ios]
 links: []
 created: 2026-09-15T06:53:01Z
 type: task
@@ -129,3 +129,11 @@ Root independently reviewed committed repair 72a8878fd8d8b714c7863a1e09dfbb8bd09
 Root independently ran uv run pytest -q tests/test_hybrid_discovery.py tests/test_hybrid_plans.py -k 'one_label or separator_sizes': 16 passed, 63 deselected in 0.14s; log /tmp/cdhd-fyq6-root-review.log. git diff --check and tk dep cycle passed. Base-relative changed-path audit found no numerical hybrid source, frozen qualification source/specification or measurement changes. Prior 12/17/32 source-name/hash audit remains applicable because this repair changes only compiled_hybrid.py and metadata tests.
 
 Root notifies the author after this completed review and will run the one combined final short suite for cdpf-gzix and cdhd-fyq6 under the unchanged 1200-second cap. Neither ticket closes until that gate passes. No recovery fit has run; all three remain reserved. General graph-incidence numerical qualification is explicitly downstream work, not established by this metadata repair.
+
+**2026-09-15T07:59:52Z**
+
+Root completed the bounded repair after recording its pre-edit architecture and hostile-input handoff. Requirement lowering now receives each already validated region and selects the recurrence recipe from region.kind. Factor/source traversal and all parameter keys, transforms and member roles are preserved. The canonical ownership documentation names this boundary. No test or test-selection change was needed; the unchanged single-classification-owner assertion now passes.
+
+After the final source edit, uv run pytest -q tests/test_extension_ownership.py tests/test_hybrid_discovery.py tests/test_hybrid_declarations.py tests/test_hybrid_plans.py tests/test_topology.py tests/test_specialized.py tests/test_registered.py --junitxml=/tmp/cdhd-0ios-focused.xml passed 203 tests in 3.36 seconds. Log: /tmp/cdhd-0ios-focused.log. No numerical source, qualification artifact, execution guard or recovery attempt changed. Root commits and pauses for independent review before any new full suite.
+
+Preserved failed combined gate: at 407299d, 2945 passed and one unchanged architectural ownership assertion failed; wall 1152.414 seconds under the 1200-second cap. Runtime history records the failure; complete log /tmp/cdpf-gzix-final-short-suite.log and phase summary /tmp/cdpf-gzix-first-gate-summary.json. No duplicate test calls. This was not a source-recovery failure. All three registered fits remain unused. After review, one fresh passing final gate is required because the source changed.
