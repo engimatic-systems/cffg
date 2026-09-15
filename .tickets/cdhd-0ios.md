@@ -1,6 +1,6 @@
 ---
 id: cdhd-0ios
-status: in_progress
+status: closed
 deps: [cdd-ziiw]
 links: []
 created: 2026-09-15T07:58:45Z
@@ -57,3 +57,11 @@ Preserved failed combined gate: at 407299d, 2945 passed and one unchanged archit
 Independent review of root-authored cdhd-0ios completed at clean source commit 7317bbe after root paused implementation. The previous unary metadata author served only as reviewer for this separate root repair after its own author/review cycle ended; a fresh reviewer spawn had hit thread capacity. No self-review is claimed. Accepted with no findings. Core validation already enforces declared region/factor pairing, so selecting the recurrence recipe from region.kind preserves unique ownership, traversal order and all parameter roles/keys/transforms. The unchanged ownership test now passes. Independent focused review: 24 passed in 0.29s; no edits or numerical program. Root notified the reviewer after completion.
 
 The failed gate remains recorded; no interpretation or selection changed. Root will now run one fresh combined final short suite after this source repair under the unchanged 1200-second cap. Later ticket-only dependency refinement does not change the reviewed code. Close cdhd-0ios, cdhd-fyq6 and cdpf-gzix only after that gate passes. All three registered recovery fits remain unused.
+
+**2026-09-15T08:26:36Z**
+
+Combined final code gate passed at 8d71a976281fb94ffd290f3d7e722bd9dcca8ce2: uv run python tools/dashboard.py --run-suite completed with 2946 passed, zero failures and 16 warnings. Pytest time 1127.49 seconds; measured wall 1128.324 seconds (18m48.324s), leaving 71.676 seconds beneath the unchanged 1200-second cap. Four workers, unchanged not-slow selection and initially empty compilation cache. Root announced once and waited quietly for the full suggested 1200 seconds without polling. All 8838 phase records passed, 2946 distinct test calls, zero duplicates. Runtime history and ~/agent-share/cffg-tests.html are refreshed. Log /tmp/cdpf-gzix-repaired-short-suite.log; summary /tmp/cdpf-gzix-final-gate-summary.json. The earlier failed gate remains truthfully retained in runtime history and /tmp/cdpf-gzix-first-gate-summary.json.
+
+Independent graph review/re-review and the separate unary/ownership repairs are accepted. The final gate includes the unchanged numerical-source integrity checks; no qualified numerical producer, frozen source inventory/specification or recovery artifact changed. No complete new qualification program or registered recovery fit was executed by this metadata work; all three registered fits remain unused. Root closes cdhd-fyq6, cdhd-0ios and cdpf-gzix in this resolving session. Follow-up ticket/evidence publication alone does not require another unchanged suite.
+
+Next: publish this stack increment on PR152. cdhd-mfc9 is the next fresh sequential implementation ticket, defining general graph incidence/evaluator inputs; parent cdhd-hzw0 blocks real cff-7sw5 publication until corresponding numerical qualification is complete. The source-backed interface audit and dependency companion are in TK. Public compiler/bundle/runtime guards remain active; actual support/value resolution, final assembly, accepted runtime state and recovery remain downstream. No mathematical, declaration scope, approximation or threshold revision.
