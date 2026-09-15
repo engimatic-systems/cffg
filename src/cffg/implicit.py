@@ -106,12 +106,8 @@ class FixedPointDifferentiator:
 
         @jax.jit
         def certificate(coordinates, weights, context):
-            mapped, local_residual, local_status = program.update(coordinates, context)
-            mapped_coordinates = chart_coordinates(chart, mapped)
-            root = mapped_coordinates - coordinates
-            root_size = jnp.max(jnp.abs(root) / (1 + jnp.abs(coordinates)), initial=0.)
-            return (energy(coordinates, weights, context), energy(mapped_coordinates, weights, context),
-                    root_size, local_residual, local_status, mapped.messages)
+            context = context._replace(params=parameters.inject(weights, context.params))
+            return program.certificate(coordinates, context, engine._ledger.belief_kernel)
 
         @jax.jit
         def differentiate(coordinates, weights, context):
@@ -186,6 +182,10 @@ def fixed_point_gradient(engine, result, *, factors=None, tolerance=None, max_it
         return refused
     if max_iterations <= 0:
         return FixedPointGradient(GradientStatus.ADJOINT_BUDGET, "positive adjoint iteration budget required")
+    try:
+        NeuralParameters.from_engine(engine, result.state.params, factors)
+    except (ValueError, KeyError) as error:
+        return FixedPointGradient(GradientStatus.UNSUPPORTED, str(error))
     try:
         derivative = FixedPointDifferentiator(engine, result, factors=factors, tolerance=tolerance,
                                              max_iterations=max_iterations, krylov_dimension=krylov_dimension)

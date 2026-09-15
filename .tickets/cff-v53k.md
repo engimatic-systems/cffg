@@ -46,3 +46,7 @@ Freeze gradient qualification before that comparison: two noisy tanh neural sens
 **2026-09-15T18:57:07Z**
 
 Implemented canonical tied-weight injection and the complete implicit derivative with a reusable fixed coordinate chart, dynamic observations/weights, JAX JVP/VJP operators, and GMRES with an independently recomputed original adjoint residual. Frozen qualification passed for both changing-cavity methods, half-step sensitivity, actual adjoint budget exhaustion, stale states, tying, and float32. Final focused validation: uv run pytest -q tests/test_fixed_point_gradients.py tests/test_public_api.py —12 passed in63.94s. D14 states the local isolated differentiable-root assumption: residual and amplification certificates detect numerical failure but do not prove nonsingularity in every unprobed direction or global root uniqueness. Exact support changes refuse reuse; stochastic mu3 and discrete delta decisions are explicitly unsupported. Architecture/README and dashboard inventory updated. Parent PR still requires one final short suite after training and amortizer land.
+
+**2026-09-15T19:12:52Z**
+
+Follow-up integration: moved the shared root/energy certificate into RootProgram so differentiation and persisted recognition references use one equation owner. Reusable derivative compilation still keeps all model context dynamic. Combined final focused neural validation after the refactor passed10 tests with2 opt-in deselections in118.42s. Unsupported trainable-factor selection now returns an explicit unsupported gradient result.
