@@ -1099,7 +1099,7 @@ transactional edits preserve these references. Direct bonding validates a
 candidate before mutating its input. Topology snapshots copy immutable nested
 specs, and recursive bundle path rewriting carries the declaration unchanged.
 
-`hybrid_plans.py` defines the immutable compiled ownership contract.
+`compiled_hybrid.py` defines the immutable compiled ownership contract.
 `HybridComponentPlan.declaration` snapshots the complete serialized identity;
 separator records name the equality-identified regime/state copies, region
 index arrays preserve declared port order, and adapter records address ordinary

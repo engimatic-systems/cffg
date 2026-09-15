@@ -20,7 +20,7 @@ from cffg.engine import Engine
 from cffg.execution.owners import SCHEDULED_EXECUTORS
 from cffg.execution.synchronous import make_sweep
 from cffg.execution_availability import ExecutionUnavailableError
-from cffg.hybrid_plans import (
+from cffg.compiled_hybrid import (
     HybridAdapterPlan,
     HybridBufferRequirement,
     HybridComponentPlan,
@@ -279,7 +279,7 @@ sys.meta_path.insert(0, NoRuntime())
 import numpy as np
 from cffg.compiled import Arena
 from cffg.core.ir import HybridComponentSpec, HybridRegionSpec, HybridSeparatorSpec
-from cffg.hybrid_plans import HybridComponentPlan, HybridRegionPlan, HybridSeparatorPlan
+from cffg.compiled_hybrid import HybridComponentPlan, HybridRegionPlan, HybridSeparatorPlan
 from cffg.inventory import analytic_inventory
 arena = Arena('empty', 0, np.zeros(1, np.int64), {}, (), {})
 report = analytic_inventory(arena, dtype='float32')

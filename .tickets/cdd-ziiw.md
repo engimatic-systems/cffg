@@ -1,7 +1,7 @@
 ---
 id: cdd-ziiw
 status: in_progress
-deps: [cff-k6g5, cff-a3wz]
+deps: [cff-k6g5, cff-a3wz, cdpf-0p7z]
 links: []
 created: 2026-09-15T05:11:58Z
 type: task
@@ -114,3 +114,20 @@ Root independently re-reviewed the completed repair range ae0955e..edafd3be35fab
 Independent focused command: uv run pytest -q tests/test_hybrid_plans.py -k 'standalone_execution_factories or explicit_supported_dtype or stored_defaults or ordinary_models or imports_and_runs' --junitxml=/tmp/cdd-ziiw-root-rereview.xml. All 22 selected tests passed in 0.23 seconds; log /tmp/cdd-ziiw-root-rereview.log. No stale ordinary_state_requirements references remain in source/tests/canonical docs. git diff --check and tk dep cycle passed. Root notifies the repair author after this completed re-review; the original author thread could not be resumed/notified because the service rejected its activation at the thread limit, so the durable TK note preserves the same handoff. Root's independent re-review maintains separation from the repair author.
 
 No D12 lower/compile/solve or registered recovery fit ran. Next: root's single final short-suite gate after this final code state, under the existing 1200-second cap, followed by closure and stacked PR publication if it passes. This remains a foundation only; cff-7sw5 retains real discovery, array/support resolution, ownership-certified assembly and fixed-parameter bundle reconstruction, with runtime integration deferred to its existing dependencies.
+
+**2026-09-15T06:20:11Z**
+
+The final short suite at cfd3c19c2388125808a1e46f537763c25c3cc775 failed within the cap: 2893 passed, 16 failed, 1146.079 seconds, 4 workers, unchanged not-slow selection and an empty initial executable cache. Phase audit records 8727 phases and 2909 distinct calls, zero duplicates. Log /tmp/cdd-ziiw-short-suite.log; audit /tmp/cdd-ziiw-first-gate-summary.json. The dashboard and runtime history truthfully show failure. This is not an accepted final gate.
+
+Diagnosis: all 16 failures trace to the new compiler-only hybrid_plans.py being included by the qualification tools' hybrid_*.py source-family scan. Comparison with the registered tiny and descriptor maps shows exactly one added file, no removed files and no changed existing hashes. The native abstract-storage subprocess ends at the same descriptor producer mismatch; tracing-cache messages in its stderr are not the failing assertion. No numerical qualification result or registered recovery fit changed.
+
+Root created cdpf-0p7z as a bounded required repair, under Cooper's instruction that root handle short-suite work personally. Move the new metadata module to compiled_hybrid.py and update imports; preserve the numerical source discovery/checks, frozen specifications, descriptors and accepted evidence byte-for-byte. Independent review follows root's committed pause, then one fresh final suite after this relevant edit. The original failed result remains recorded.
+
+Legend: prerequisite --> dependent. Based on tk dep tree --full cff-7sw5, tk ready, tk blocked; no dependency cycles.
+
+[x] A3WZ + [x] K6G5 ----+
+[ ] cdpf-0p7z (ready) ---+--> [ ] cdd-ziiw --> [ ] 7SW5 --> [ ] IDHK
+                                                              |
+                                       remaining TK chain --> [ ] X0IF --> [ ] ZOV5
+
+cdpf-0p7z is the immediate landing blocker; cdh-kvy5 remains an independent nonblocking audit. Existing direct dependencies and the downstream runtime/learning/composition chain remain authoritative in TK. Implementation stays sequential. All three registered recovery fits remain unused.

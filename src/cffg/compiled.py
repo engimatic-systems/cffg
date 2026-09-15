@@ -17,7 +17,7 @@ from cffg import kernels
 from cffg._immutable import FrozenArray, ImmutableRecord
 
 if TYPE_CHECKING:
-    from cffg.hybrid_plans import HybridComponentPlan
+    from cffg.compiled_hybrid import HybridComponentPlan
 
 NEG = -1.0e30  # Reserved log-space zero sentinel.
 
@@ -517,7 +517,7 @@ class Arena(ImmutableRecord):
     def __post_init__(self):
         super().__post_init__()
         if self.hybrid_components:
-            from cffg.hybrid_plans import HybridComponentPlan
+            from cffg.compiled_hybrid import HybridComponentPlan
 
             names = set()
             for plan in self.hybrid_components:

@@ -18,7 +18,7 @@ import numpy as np
 
 from cffg._immutable import FrozenArray, ImmutableRecord
 from cffg.compiled import Arena
-from cffg.hybrid_plans import HybridComponentPlan
+from cffg.compiled_hybrid import HybridComponentPlan
 
 
 @dataclass(frozen=True)
