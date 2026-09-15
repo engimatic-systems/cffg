@@ -1,6 +1,6 @@
 ---
 id: cff-v53k
-status: in_progress
+status: closed
 deps: [cff-n60h]
 links: []
 created: 2026-09-15T18:28:19Z
@@ -42,3 +42,7 @@ Adjoint: an auxiliary linear solve for the derivative of a scalar objective. Gau
 Shared RootProgram extraction is complete: it owns chart decoding, exact-island reconstruction, adaptive update, support-preserving hard values, residual and raw energy composition. Existing outer inference consumes it. Focused compatibility validation passed 47 tests with 1 slow deselection in 101.66 seconds. A first scalar neural derivative smoke check converged with adjoint relative residual 5.15e-16; full independent finite-difference qualification is next.
 
 Freeze gradient qualification before that comparison: two noisy tanh neural sensors share one scalar latent prior N(0,1) through equality; sensor/evidence variances are0.2, evidence means +/-0.3. Both sensors share four parameters [0.8,0.15,1.1,-0.05] in a1-1-1 network (matrix,bias,matrix,bias). Test Taylor and sigma methods against central differences of independently re-solved complete engine energy. Use float64 root tolerance1e-10, parameter step h=2e-4*(1+abs(theta)), and acceptance atol2e-5 plus rtol2e-3. The step keeps root-error/step and roundoff below acceptance while limiting second-order truncation; smaller-step sensitivity will be reported. Tying must sum both reader contributions. This fixture changes cavities and therefore tests coefficient dependence, unlike a single fixed-cavity sensor.
+
+**2026-09-15T18:57:07Z**
+
+Implemented canonical tied-weight injection and the complete implicit derivative with a reusable fixed coordinate chart, dynamic observations/weights, JAX JVP/VJP operators, and GMRES with an independently recomputed original adjoint residual. Frozen qualification passed for both changing-cavity methods, half-step sensitivity, actual adjoint budget exhaustion, stale states, tying, and float32. Final focused validation: uv run pytest -q tests/test_fixed_point_gradients.py tests/test_public_api.py —12 passed in63.94s. D14 states the local isolated differentiable-root assumption: residual and amplification certificates detect numerical failure but do not prove nonsingularity in every unprobed direction or global root uniqueness. Exact support changes refuse reuse; stochastic mu3 and discrete delta decisions are explicitly unsupported. Architecture/README and dashboard inventory updated. Parent PR still requires one final short suite after training and amortizer land.

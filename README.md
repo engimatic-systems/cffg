@@ -457,6 +457,12 @@ continuous-to-discrete means, and nonlinear P-substitution/GFE are excluded.
 
 #### Neural mean architecture
 
+`fixed_point_gradient(engine, result).require_valid()` returns the total weight
+derivative of a certified inference result. It includes changing cavities and
+local approximation coefficients; the objective remains the declared Gaussian
+surrogate. Stale, failed or exhausted solves cannot supply an applicable
+gradient. See DERIVATIONS D14 for the local isolated-root assumption.
+
 Use `neural_mean((input_dim, hidden_width, output_dim), method="sigma_point")`
 as the factor's `function`. This declares the `cffg.mean.mlp` implementation.
 `initialize_neural_parameters(function, key, dtype=...)` creates a flat weight

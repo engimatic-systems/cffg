@@ -23,7 +23,7 @@ def neural_model(method="linearization", *, width=2):
     template, arrays = model(method, observed=True)
     function = neural_mean((1, width, 1), method=method)
     template.factors["sensor"] = replace(template.factors["sensor"], function=function)
-    arrays["theta"] = np.asarray(initialize_neural_parameters(function, jax.random.key(71), dtype=jnp.float64))
+    arrays["theta"] = np.asarray(initialize_neural_parameters(function, jax.random.key(71), dtype=jnp.float64 if jax.config.x64_enabled else jnp.float32))
     return template, arrays
 
 

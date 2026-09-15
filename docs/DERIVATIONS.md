@@ -3093,3 +3093,45 @@ uses evidence +/-1.5 and variances 0.05 to exercise rejected proposals and
 honest budget exhaustion. Affine full-ledger parity, float32 coordinate units,
 distinct per-instance parameters/observations, and Colony certificates have
 separate anchors in `test_nonlinear_engine.py`.
+
+
+## D14 — Total derivatives of an adaptive neural fixed point
+
+The network is the conditional mean in D13, with positive Gaussian output
+noise. Training minimizes the reported, recomputed approximate energy at a
+certified inference root. In plain English, changing a weight changes the
+predicted output, the messages, and the Gaussian approximation used by the
+messages. All three effects belong in the derivative.
+
+Let `u` be the gauge-reduced message coordinates, `theta` the unique serialized
+weight blobs, and `R(u,theta) = T(u,theta)-u` the complete update residual.
+At a locally isolated differentiable root with nonsingular `R_u`,
+
+```text
+R_u du/dtheta + R_theta = 0,
+R_u^T lambda = E_u,
+dE/dtheta = E_theta - R_theta^T lambda.                      (D14.1)
+```
+
+`E` is the complete ledger, including adaptive coefficients and interior edge
+entropy corrections. No frozen-factor envelope argument applies to its total
+derivative. Fixed Gaussian whitening matrices only change coordinates; they
+do not freeze the approximation coefficients. `fixed_point.RootProgram`
+provides the same reconstruction, update and energy composition to inference
+and differentiation. `trainable.NeuralParameters` injects each unique weight
+blob into every packed reader; reverse differentiation sums tied contributions.
+
+`implicit.py` uses JAX derivative-vector products and restarted GMRES without
+materializing a graph Jacobian. It recomputes the original transposed-system
+residual, rejecting non-finite or exhausted solves and excessive adjoint
+amplification relative to dtype resolution. A fresh residual and energy-change
+certificate rejects stale weights and observations. Numerical certificates do
+not establish global uniqueness, or prove nonsingularity in unprobed directions;
+the local isolated-root assumption remains part of the derivative contract.
+Stochastic mu3 updates and discrete point-mass decisions are outside this API.
+
+Executable authority: `test_fixed_point_gradients.py` compares both methods
+against independently re-solved central energy differences on two coupled,
+tied four-parameter tanh sensors. Halving a difference step preserves agreement.
+It also checks original-adjoint budget exhaustion, stale states, tied reader
+sums and a float32 difference with dtype-scaled error tolerances.

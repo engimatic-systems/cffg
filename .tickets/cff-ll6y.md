@@ -34,3 +34,9 @@ cff-3zzo provides deterministic amortized initialization; exact zero noise remai
 ## Definitions
 
 Optimizer continuation: weights, moment arrays, step count and any owned stochastic/data-position state needed to reproduce the next update. Held-out data: examples not used to fit the weights.
+
+## Notes
+
+**2026-09-15T18:56:17Z**
+
+Freeze production qualification before running it: h(x)=tanh(2x); 17 float64 train centers linspace(-1.6,1.6), independent Threefry2x32 JAX keys3101/3102 for latent sigma0.04 and output sigma0.08 noise. Hold out16 midpoint centers linspace(-1.5,1.5) against the noise-free mean. Neural(1,2,1), linearization, initialization key71, seven tied parameters. Run32 full-batch Adam updates, lr0.03, betas0.9/0.999, epsilon=sqrt(dtype eps), dividing energy and gradient by17. Every update requires a certified root and original adjoint residual. Acceptance: held-out RMSE<=0.075 and <=half each untrained and affine baseline RMSE; mean training energy drop>=1 nat. Fit affine baseline to the same positive-input-uncertainty Gaussian evidence objective by evaluating every real root of P^2*a^3+P*C*a^2+(V*(P+M)-P*Q)*a-V*C=0, where M,C,Q are centered input second moment, cross moment, output second moment. Research question: can this fixture distinguish useful training? Answer: analytic exploratory screen predicts RMSE0.04897 vs0.17219/0.23419 and energy drop1.8272; source /tmp/cffg_neural_benchmark_astra.py and independent Gaussian evidence algebra; confidence high for screening, production qualification still required.
