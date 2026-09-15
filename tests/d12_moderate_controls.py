@@ -16,7 +16,7 @@ import pytest
 
 from d12_compile_fixture import fixture_arrays as frozen_fixture
 from d12_moderate_payload import CERTIFICATES, output_contract
-from d12_moderate_reconstruct import scaled_blocks
+from d12_moderate_reconstruct import local_summaries, scaled_blocks
 import d12_moderate_reference as anchor
 
 _evaluate = anchor.evaluate
@@ -73,9 +73,9 @@ def set_messages(arrays, vector):
             )
 
 
-def refresh_arithmetic(arrays, case):
+def refresh_arithmetic(arrays, case, parameters=None):
     """Recompute saved internal relationships after a deliberate test mutation."""
-    r, scale, certificates, learning = scaled_blocks(arrays, case)
+    r, scale, certificates, learning = scaled_blocks(arrays, case, parameters)
     arrays["state.evaluation.residual"][...] = r
     arrays["state.evaluation.scales"][...] = scale
     # Summaries follow the once-stored residual, as they do in native output.
@@ -96,10 +96,12 @@ def refresh_arithmetic(arrays, case):
         arrays["state.evaluation.auxiliary." + name][...] = learning[name]
     for name in ("physical_linear", "physical_precision"):
         arrays["learning." + name][...] = learning[name]
+    for name, value in local_summaries(arrays, case).items():
+        arrays["state.evaluation.local." + name][()] = value
 
 
 def populate(arrays, case):
-    """Save one independent fixed point, with native represented/readout semantics."""
+    """Save a supplied coordinate's outputs with native represented/readout semantics."""
     regions, separators, targets, primal, dual = anchor.evaluate(
         arrays["state.coordinate"], case["T"]
     )

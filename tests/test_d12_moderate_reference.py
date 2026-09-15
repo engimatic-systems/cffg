@@ -16,7 +16,8 @@ from d12_moderate_controls import (
     synthetic,
 )  # noqa: F401
 from d12_compile_scaling import child_environment, digest, write_json
-from d12_moderate_payload import read_snapshot, validate_outputs, write_snapshot
+from d12_moderate_payload import read_snapshot, write_snapshot
+from d12_moderate_reference import validate_moderate_outputs as validate_outputs
 from d12_moderate_plan import identities, solve_cases
 from d12_moderate_reference import decode, evaluate
 from d12_moderate_report import validate_report
@@ -230,7 +231,7 @@ def test_frozen_reference_scope_and_properness(monkeypatch):
         anchor.evaluate(vector, 32)
 
 
-def test_native_frozen_fixed_points_and_reference_overhead():
+def test_native_frozen_supplied_points_and_reference_overhead():
     result = subprocess.run(
         [sys.executable, str(ROOT / "tools/d12_moderate_anchor_checks.py")],
         cwd=ROOT,
@@ -243,5 +244,5 @@ def test_native_frozen_fixed_points_and_reference_overhead():
     record = json.loads(result.stdout.splitlines()[-1])
     assert record["native"] and record["optimizer_calls"] == 0
     assert record["complete_program_calls"] == dict(lower=0, compile=0, execute=0)
-    assert [row["T"] for row in record["fixed_points"]] == [32, 100]
-    assert all(row["reference_seconds"] >= 0 for row in record["fixed_points"])
+    assert [row["T"] for row in record["supplied_points"]] == [32, 100]
+    assert all(row["reference_seconds"] >= 0 for row in record["supplied_points"])

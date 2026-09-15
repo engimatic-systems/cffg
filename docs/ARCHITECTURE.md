@@ -923,6 +923,13 @@ models, uses local O(T K² d³) work, and neither optimizes nor enumerates tempo
 paths. The tiny joint reference's T2/T3 restriction is unchanged. Analytic model
 injection in report tests is explicitly test-only and cannot qualify a frozen
 moderate run; valid nonstationary point checks establish arithmetic, not convergence.
+The aggregate always uses `validate_moderate_outputs` for both initial and terminal
+records. The shared `validate_outputs` representation/status checks also serve the
+tiny status probe and make no model qualification claim. Both retained local scalar
+diagnostics are reconstructed independently from saved outputs: moment residuals
+compare rounded covariance readouts, while the solver's separate covariance block
+retains high/low words through subtraction. Quotient residuals remove each incidence's
+common scalar gauge and scale all natural coefficients by their compared magnitudes.
 Zero accepted updates must preserve the
 initial coordinate; exactly one accepted update must move it. All-pair comparisons disclose material stationary
 differences without claiming universal uniqueness. This harness is setup, not

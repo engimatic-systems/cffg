@@ -14,8 +14,8 @@ from d12_moderate_payload import (
     output_contract,
     read_snapshot,
     require,
-    validate_outputs,
 )
+from d12_moderate_reference import validate_moderate_outputs
 
 
 def validate_compile(record, calls):
@@ -453,10 +453,12 @@ def validate_report(directory, *, current_sources=True):
         for record in worker["cases"]:
             case = record["case"]
             initial = read_snapshot(folder, record["initial"])
-            validate_outputs(initial, case, initial=True, parameters=parameters)
+            validate_moderate_outputs(
+                initial, case, initial=True, parameters=parameters
+            )
             require(int(initial["state.status"]) == 3, "initialization failed")
             terminal = read_snapshot(folder, record["terminal"])
-            validate_outputs(terminal, case, parameters=parameters)
+            validate_moderate_outputs(terminal, case, parameters=parameters)
             validate_work(terminal, initial)
             require(
                 int(terminal["state.status"]) == 0, "moderate solve did not converge"

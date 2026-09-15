@@ -61,7 +61,7 @@ def check():
         )
     return dict(
         native=not jax.config.x64_enabled,
-        fixed_points=rows,
+        supplied_points=rows,
         complete_program_calls=dict(lower=0, compile=0, execute=0),
         optimizer_calls=0,
     )

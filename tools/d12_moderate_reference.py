@@ -18,7 +18,7 @@ import sys
 import numpy as np
 
 from d12_compile_fixture import fixture_arrays
-from d12_moderate_payload import close, require
+from d12_moderate_payload import close, require, validate_outputs
 
 
 def _load_reference():
@@ -36,6 +36,22 @@ def _load_reference():
 
 
 reference = _load_reference()
+
+
+def validate_moderate_outputs(arrays, case, *, initial=False, parameters=None):
+    """Mandatory model-specific entry for every moderate evidence payload.
+
+    The shared validator also serves tiny status mechanisms; it makes no model
+    qualification claim. This entry has no option to disable the frozen anchor.
+    """
+    require(
+        case["T"] in (32, 100) and (case["K"], case["d"]) == (4, 2),
+        "independent reference shape outside contract",
+    )
+    counts = validate_outputs(arrays, case, initial=initial, parameters=parameters)
+    if int(arrays["state.status"]) != 2:
+        validate_reference(arrays, case)
+    return counts
 
 
 def decode(vector, horizon):

@@ -205,6 +205,11 @@ def output_contract(t, k=4, d=2):
 
 
 def validate_outputs(arrays, case, *, initial=False, parameters=None):
+    """Validate shared representation/status arithmetic, not model qualification.
+
+    Tiny mechanism callers supply their own parameters. Actual moderate evidence
+    must use validate_moderate_outputs, which also enforces the frozen model.
+    """
     contract = output_contract(case["T"], case["K"], case["d"])
     require(set(arrays) == set(contract), "incomplete or unexpected output groups")
     for key, (shape, dtype) in contract.items():
@@ -376,9 +381,10 @@ def validate_outputs(arrays, case, *, initial=False, parameters=None):
             "certificate/saved residual summary mismatch",
         )
         require(np.all(actual >= 0), "negative residual certificate")
-        from d12_moderate_reference import validate_reference
+        from d12_moderate_reconstruct import local_summaries
 
-        validate_reference(arrays, case)
+        for name, value in local_summaries(arrays, case).items():
+            close(arrays[f"state.evaluation.local.{name}"], value, f"local {name}")
         if status == 0:
             tau = 64 * np.finfo(np.float32).eps ** 0.75
             change = float(arrays["state.relative_energy_change"])

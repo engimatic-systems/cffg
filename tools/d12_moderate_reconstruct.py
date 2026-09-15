@@ -249,6 +249,53 @@ def packed_messages(banks):
     )
 
 
+def local_summaries(arrays, case):
+    """Reconstruct the native local scalar diagnostics, not solver certificates.
+
+    Each summary is a maximum over both sides, all incidences and active labels.
+    Moment comparisons use absolute label differences and unweighted conditional
+    means/covariances scaled by max(1, both magnitudes). The native scalar compares
+    once-rounded physical covariances, unlike the solver's retained-word block.
+    Quotients compare each full natural coefficient after removing the scalar
+    gauge per incidence. Saved messages/targets have zero origins and no low word.
+    No saved residual, scale, certificate or scalar summary enters this calculation.
+    """
+    region = fields(arrays, "state.evaluation.local.regions")
+    separators = fields(arrays, "state.evaluation.local.separators")
+    moment, quotient = np.float32(0), np.float32(0)
+    scale = lambda a, b: np.maximum(np.float32(1), np.maximum(abs(a), abs(b)))
+    for side, name in enumerate(("left", "right")):
+        projection = project(region, side)
+        incident = {
+            key: value[side : side + case["T"] - 1] for key, value in separators.items()
+        }
+        active = projection["probability"] > 0
+        if not np.array_equal(active, incident["probability"] > 0):
+            raise ValueError("local moment summary support mismatch")
+        moment = np.maximum(
+            moment, np.max(abs(projection["probability"] - incident["probability"]))
+        )
+        mean = projection["displacement"] + (projection["center"] - incident["center"])
+        for a, b in (
+            (mean, incident["displacement"]),
+            (physical_covariance(projection), physical_covariance(incident)),
+        ):
+            moment = np.maximum(
+                moment,
+                np.max(
+                    abs(a[active] - b[active]) / scale(a[active], b[active]), initial=0
+                ),
+            )
+        current = fields(arrays, "messages." + name)
+        target = fields(arrays, f"state.evaluation.local.targets.{side}")
+        for field in ("constant", "linear", "precision"):
+            a, b = current[field], target[field]
+            if field == "constant":
+                a, b = a - a[:, :1], b - b[:, :1]
+            quotient = np.maximum(quotient, np.max(abs(a - b) / scale(a, b), initial=0))
+    return dict(moment_residual=moment, quotient_residual=quotient)
+
+
 def scaled_blocks(arrays, case, parameters=None):
     """Reconstruct each residual and scale; never read saved residual/scales."""
     if parameters is None:
