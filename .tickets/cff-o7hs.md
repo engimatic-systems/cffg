@@ -1,6 +1,6 @@
 ---
 id: cff-o7hs
-status: in_progress
+status: closed
 deps: [cff-4e5z, cff-ri8m, cff-cfqg, cff-2dzo, cff-gsd5, cff-gvwc, cff-4ejb]
 links: [cff-1o72, cff-fxmj, cff-ri8m, cff-l6i5, cff-pksr, cff-lquu, cff-k9ws, cff-209l, cff-8a5m, cff-u06e]
 created: 2026-07-08T16:49:34Z
@@ -275,3 +275,7 @@ Cooper selected the explicit adaptive fixed-point and approximate-energy contrac
 **2026-09-15T17:58:09Z**
 
 First full short suite at58185b4:2395 passed,1 failed,44 deselected; pytest1290.46 seconds, dashboard-measured wall1305.784 seconds. Failure was the pre-existing topology snapshot fixture using an unspecified moment projection without an endpoint. Updated that fixture to copy a mean-field detail payload; tests/test_topology.py now13 passed in0.51 seconds. Production validation remains strict. A fresh passing full run is required for this fixture correction.
+
+**2026-09-15T18:27:00Z**
+
+Implementation and validation complete. Delivered endpoint-specific Gaussian moment constraints and migration, portable configured positive-noise nonlinear means, Taylor and sigma-point rules, normalized frozen-Gaussian Bethe node terms, full adaptive residual globalization, explicit numerical failures, objective labels, and all documented transport surfaces. Independent curved-grid and mutually changing-cavity root oracles pass. Attached exact scan islands, float32 units, local dimension32/JIT/vmap, bundle reconstruction, parameter ownership, and exact persistent-byte accounting are covered. Final full short suite at f966cb9: 2384 passed, 56 deselected; pytest 1099.56 seconds and dashboard-measured wall 1113.339 seconds. Final code/test changes are included in that run; subsequent work only records validation and ticket status. Next: cff-1o72 adds neural architecture, complete fixed-point gradients, training/checkpoint state, and deterministic amortized initialization. Exact zero noise remains independent cff-u06e.

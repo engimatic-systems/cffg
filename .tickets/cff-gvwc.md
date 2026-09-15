@@ -1,6 +1,6 @@
 ---
 id: cff-gvwc
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-09-15T16:45:09Z
@@ -44,3 +44,7 @@ AGENTS.md now uses Cooper's measured-run protocol: let the suite finish; if it p
 **2026-09-15T17:58:09Z**
 
 Measured current suite wall1305.784 seconds. Per-case timings recovered from the generated dashboard identify12 additional opt-in cases totaling184.805 seconds: the39.402-second NASCAR globalization regression,35.970-second attached nonlinear scan-island regression, and10 repetitive functional-checkpoint corruption variants. Missing PRNG key, non-finite state, and invalid importance weights remain in the short selection; all demoted cases remain available with -m slow and passed the completed run. Estimated remaining wall1120.979 seconds (18m40.979s), below1200. Collect-only confirms12 additional deselections (61/74 selected across touched files,13 deselected including one pre-existing slow case). No rerun is needed solely for this pruning; the independent topology fixture failure requires a fresh full run before publication.
+
+**2026-09-15T18:27:00Z**
+
+Final measured short-suite wall time is 1113.339 seconds (18 minutes 33.339 seconds), below the 1200-second budget. Pytest reports 2384 passed and 56 deselected in 1099.56 seconds. The prior timing-based estimate was 1120.979 seconds. The fresh run was required by the independent topology fixture correction; there was no run solely to recheck pruning. The dashboard and runtime history are refreshed. No additional budget work remains.
