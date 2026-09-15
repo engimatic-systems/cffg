@@ -81,7 +81,7 @@ These are suggested ways to reach the outcomes. An implementer may choose a diff
   and compiler-to-ledger execution of the `MOMENT_MATCHING` constraint.
   cff-cfqg is its immediate implementation prerequisite; cff-209l supplies the
   same-arena kernel foundation inside that architecture program.
-- cff-1o72 follows cff-o7hs and owns deterministic neural-network factors, free-energy-gradient training, solver-gradient evidence, and amortized message initialization.
+- cff-1o72 follows cff-o7hs and owns Gaussian factors with deterministic neural means and positive noise covariance, free-energy-gradient training, solver-gradient evidence, and amortized message initialization.
 - cff-wbhu owns the JIT-compiled sweep loop and its single-engine and batched-runtime throughput and status contracts.
 - cff-5edo follows cff-wbhu and owns depth-aware long-rollout convergence and warm-started replanning without changing action choices.
 - cff-9xmq follows cff-wbhu and owns balanced broadcast expansion, logarithmic message-passing diameter, and marginal agreement with chain expansion at `1e-10`.

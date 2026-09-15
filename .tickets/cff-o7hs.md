@@ -2,7 +2,7 @@
 id: cff-o7hs
 status: in_progress
 deps: [cff-4e5z, cff-ri8m, cff-cfqg]
-links: [cff-1o72, cff-fxmj, cff-ri8m, cff-l6i5, cff-pksr, cff-lquu, cff-k9ws, cff-209l, cff-8a5m]
+links: [cff-1o72, cff-fxmj, cff-ri8m, cff-l6i5, cff-pksr, cff-lquu, cff-k9ws, cff-209l, cff-8a5m, cff-u06e]
 created: 2026-07-08T16:49:34Z
 type: feature
 priority: 2
@@ -237,3 +237,24 @@ Change-path review: documentation/ticket-only preparation; no architecture imple
 Research question: can a deterministic neural network reuse this ticket's positive-noise Gaussian rule? Answer: yes, as the mean in y | x,theta ~ N(f_theta(x), V), with positive-definite V. Deterministic evaluation of the mean does not impose exact equality on the modeled output. Exact equality instead has a delta conditional, and substituting V=0 into ordinary Gaussian log-density/entropy formulas makes the inverse/log-determinant terms undefined; message and free-energy rules for constrained support need separate justification. Noise V is conditional output variation, distinct from uncertainty propagated from x or uncertainty in network weights. Sources: independently verified primary reference Rasmussen and Williams, Gaussian Processes for Machine Learning, chapter 2 equations 2.1-2.3 (https://gaussianprocess.org/gpml/chapters/RW2.pdf), Appendix A equations A.4/A.20 (https://gaussianprocess.org/gpml/chapters/RWA.pdf); local criteria 2.1/2.3/2.11 and cff-1o72 criteria 2/3/6.1. Confidence: high; CFFG scope implication is an inference from these mathematical facts and ticket contracts.
 
 Handoff: cff-o7hs is in_progress for preparation and design discussion. Recommend clarifying cff-1o72 as a deterministic neural mean with positive Gaussian noise; Cooper's scope decision is pending, so neither ticket's mathematical acceptance criteria have changed. Next, branch from the committed cff-o7hs-readiness base to cff-o7hs, split implementation into bounded work as the previous note requires, and complete the nonlinear contract before branching for cff-1o72; keep separate PRs for the two tickets. The readiness base has no matching remote branch to fast-forward. The independent issue about indefinite site messages versus proper combined beliefs remains for the implementation handoff.
+
+**2026-09-15T15:33:55Z**
+
+Neural-factor scope: cff-1o72 uses y | x,theta ~ N(f_theta(x), V), with a deterministic neural mean and explicit finite symmetric positive-definite noise covariance. Its schema, round-trip, invalid-noise, gradient-fixture, documentation, and robustness criteria express that contract. Finite indefinite sites follow cff-o7hs; accepted combined beliefs must remain proper. cff-u06e owns the separate exact zero-noise derivation and is linked to both tickets without adding a prerequisite. The cff-ahps neural-work description uses the same positive-noise scope.
+
+Legend: prerequisite --> dependent; closed foundations and unrelated epic branches are abbreviated. The two ready roots can proceed independently.
+
+```text
+[x] Gaussian + registration + compiler/runtime foundations
+  --> [ ] cff-o7hs (ready, in_progress)
+        --> [ ] cff-1o72 (blocked by cff-o7hs)
+              --> [ ] cff-ahps (other prerequisite branches also pending)
+
+[ ] cff-u06e (ready; independent exact-factor derivation)
+```
+
+Built from tk dep tree --full for cff-1o72, cff-u06e, and cff-ahps, plus tk ready and tk blocked. The epic also directly depends on cff-o7hs. No dependency changes were needed.
+
+Change-path review: this commit edits tickets only. The planned factor work uses New factor or rule family; the exact-factor handoff must also consider New IR field and Runtime numerical or status invariant. Host/JIT, flooding/scheduled, single-instance/vmap, and current/legacy decoding are each N/A for these ticket edits because no executable or serialized model behavior changes. Validation: tk dep cycle and git diff --check pass; the short suite is not required for ticket-only work.
+
+Handoff: preparation is complete on cff-o7hs. cff-o7hs remains in_progress; next split its schema, derivation, numerical evidence, and integration work into bounded implementation tickets. cff-1o72 and cff-u06e remain open. Complete cff-o7hs before the cff-1o72 implementation branch and keep their PRs separate.
