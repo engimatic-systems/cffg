@@ -946,6 +946,11 @@ projected beliefs retain one low covariance matrix beside the rounded covariance
 a compensated inverse residual preserves the information before projection. Both words
 reach source/destination and ordinary-adapter quotients through compensated
 matrix residuals and a refined local Cholesky solve (`hybrid_covariance.py`).
+Mixture centering also uses compensated affine evaluation before its covariance
+products. This avoids the observed native float32 discrepancy when ordinary
+mean subtraction is recomputed across compiled product uses near a power of two;
+`test_hybrid_weighted_projection.py` checks weighted and rare-source mixtures,
+retained words, physical covariance, derivatives and exact support.
 Represented precision and covariance matrices also receive a conservative
 spectral interval check. It includes the low word without rounding it into
 the high matrix and reports unresolved intervals as `NONFINITE`; the original

@@ -250,17 +250,8 @@ def test_native_local_reconstruction_rounding():
     assert record["retained_low_word"] > 0 and record["local_cases"] == 2
 
 
-class ProjectionDiscrepancy(AssertionError):
-    pass
-
-
-@pytest.mark.xfail(
-    strict=True,
-    raises=ProjectionDiscrepancy,
-    reason="cdh-urn0: native marginal disagrees with saved-input covariance replay",
-)
 @pytest.mark.parametrize("probe", ["weighted", "rare"])
-def test_native_projection_discrepancy_remains_visible(probe):
+def test_native_projection_matches_saved_input_covariance(probe):
     result = subprocess.run(
         [
             sys.executable,
@@ -274,9 +265,10 @@ def test_native_projection_discrepancy_remains_visible(probe):
         text=True,
         timeout=90,
     )
-    if result.returncode:
-        assert "ValueError: projection covariance," in result.stderr, result.stderr
-        raise ProjectionDiscrepancy(result.stderr.splitlines()[-1])
+    assert result.returncode == 0, result.stdout + result.stderr
+    record = json.loads(result.stdout.splitlines()[-1])
+    assert record["native"] and record["complete_program_calls"] == 0
+    assert record["retained_low_word"] > 0 and record["local_cases"] == 2
 
 
 def sparse_control(case):

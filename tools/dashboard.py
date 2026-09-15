@@ -154,6 +154,7 @@ EPIC_FILES = {
         "test_hybrid_centering.py",
         "test_hybrid_affine.py",
         "test_hybrid_projection.py",
+        "test_hybrid_weighted_projection.py",
         "test_hybrid_precision.py",
         "test_structured_recurrence_engine.py",
         "test_structured_recurrence_learning.py",

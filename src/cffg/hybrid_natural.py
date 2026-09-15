@@ -468,14 +468,21 @@ def quotient(belief, cavity):
 
 
 def _mix(region, axis, center):
-    """Project one label axis around a retained conditional covariance."""
+    """Project one label axis around a retained conditional covariance.
+
+    Compensated centering keeps the conditional mean division separate from
+    the differences consumed by integer-significand covariance products.
+    Ordinary subtraction can be recomputed differently across compiled uses
+    near a power of two; the weighted projection tests exercise this boundary.
+    """
     input_status = jnp.asarray(region.status, jnp.int32) | correction_status(region.covariance, region.covariance_correction)
     probability = region.probability.sum(axis=axis)
     denominator = jnp.where(probability > 0, probability, 1)
     relative = region.relative_mean(jnp.expand_dims(center, axis))
     weights = jnp.moveaxis(region.probability, axis, -1)
     mean = affine(weights[..., None, :], jnp.moveaxis(relative, axis, -1)) / denominator[..., None]
-    centered = relative - jnp.expand_dims(mean, axis)
+    centered = affine(jnp.ones_like(relative)[..., None], relative[..., None],
+                      -jnp.expand_dims(mean, axis))
     first = jnp.argmax(region.probability > 0, axis=axis)
     indices = jnp.expand_dims(first, axis)[..., None, None]
     base = jnp.take_along_axis(region.covariance, indices, axis=axis).squeeze(axis)
