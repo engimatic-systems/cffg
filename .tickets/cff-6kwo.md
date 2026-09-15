@@ -1,8 +1,8 @@
 ---
 id: cff-6kwo
-status: in_progress
+status: closed
 deps: []
-links: []
+links: [cff-1et5]
 created: 2026-09-15T19:10:07Z
 type: bug
 priority: 2
@@ -32,3 +32,13 @@ This unblocks cff-ll6y and the cff-1o72 neural training PR. No separate future w
 ## Definitions
 
 Fixed support: probabilities that are exactly zero stay excluded. Reverse differentiation: computing parameter gradients by propagating output derivatives backward. GFE: Generalised free energy.
+
+## Notes
+
+**2026-09-15T19:15:01Z**
+
+Research question: do existing deterministic GFE callbacks differentiate the complete equations? Answer: fixed-A and fixed-goal hybrid custom JVPs restore full cavity/parameter dependence after stopping solver history. Two unsafe inactive logarithms poisoned reverse mode: hybrid entropy and transition-mixture zero predictive rows. Both now evaluate finite inactive log operands without changing exact support or adding mass. Source: rules.py _implicit_gfe_solution_jvp and gfe_tm_update; hybrid_gfe.py _implicit_solution_jvp and _discrete_entropy; confidence high from forward/reverse probes and independent complete-energy finite differences. Optional pairwise entropy-bound diagnostic differentiation is outside training and tracked separately as cff-1et5. Focused regression passed5 tests in32.21s, including local float32 K32, sparse TM JVP/VJP, complete neural-to-hybrid directional finite differences and stale-state refusal. A final stronger three-regime fixture retains two active regimes plus one exact zero; final parent suite follows.
+
+**2026-09-15T19:15:19Z**
+
+Final strengthened focused check: uv run pytest -q tests/test_neural_gfe.py tests/test_amortization.py —6 passed,1 slow deselection in47.60s. The complete gradient fixture uses three regimes with two positive probabilities and one exact zero. Recognition tests also carry a separate discrete exact-zero island and preserve its messages bit-for-bit through proposal publication.

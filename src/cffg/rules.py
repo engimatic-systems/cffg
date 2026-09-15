@@ -978,7 +978,9 @@ def gfe_tm_update(
         # cavity zero, while positive/0 is a genuinely infeasible edge belief.
         md_support = jnp.exp(md) > 0
         feasible = jnp.all(~qw_support | md_support)
-        to_out = jnp.where(qw_support & md_support, jnp.log(qw) - md, NEG)
+        # Inactive log operands must also be finite under reverse differentiation.
+        log_qw = jnp.log(jnp.where(qw_support, qw, 1.0))
+        to_out = jnp.where(qw_support & md_support, log_qw - md, NEG)
         to_out = jnp.where(feasible, to_out, jnp.nan)
         return to_out, to_in, to_sel, solved.residual, solved.status
 
