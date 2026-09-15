@@ -1,6 +1,6 @@
 ---
 id: cdd-ziiw
-status: in_progress
+status: closed
 deps: [cff-k6g5, cff-a3wz, cdpf-0p7z]
 links: []
 created: 2026-09-15T05:11:58Z
@@ -131,3 +131,11 @@ Legend: prerequisite --> dependent. Based on tk dep tree --full cff-7sw5, tk rea
                                        remaining TK chain --> [ ] X0IF --> [ ] ZOV5
 
 cdpf-0p7z is the immediate landing blocker; cdh-kvy5 remains an independent nonblocking audit. Existing direct dependencies and the downstream runtime/learning/composition chain remain authoritative in TK. Implementation stays sequential. All three registered recovery fits remain unused.
+
+**2026-09-15T06:45:46Z**
+
+Final gate passed at 2bfba267709d47605369a773491692783f60b0b8 after all implementation, review repairs and the source-family module move: 2909 passed, zero failures, 16 warnings; measured wall 1126.198 seconds (18m46.198s), 73.802 seconds below the unchanged 1200-second cap. Four workers, unchanged not-slow selection, empty initial executable cache. Phase audit verifies 8727 records, 2909 distinct calls, zero duplicates, every phase passed. Log /tmp/cdd-ziiw-final-short-suite.log; audit /tmp/cdd-ziiw-final-gate-summary.json. Dashboard and runtime history are refreshed. Root announced once and waited quietly for the full 1200-second suggested budget without polling. The earlier failed source-inventory gate remains recorded; this passing result follows a relevant import-name edit and is not an unchanged rerun.
+
+cdd-ziiw and its bounded suite repair cdpf-0p7z are complete. Final foundation: immutable compiled_hybrid plan records, empty-by-default Arena component inventory, shared named execution guards including host/JIT support factories, and no-runtime analytic inventory with explicit dtype and honest partial/unavailable storage categories. Current compiler/bundle D12 rejection remains intact. Independent initial review, repair re-review and separate root-authored source-boundary repair review are accepted. The renamed metadata module is byte-identical; all 12 tiny, 17 descriptor and 32 moderate accepted source hashes remain exact. No qualification artifact, numerical requirement or recovery threshold changed.
+
+Next: publish the stacked foundation PR on cff-k6g5-hybrid-declarations, then assign a fresh sequential author to cff-7sw5 from the published head. 7SW5 owns real semantic discovery, resolved shapes/support/parameter addresses, exclusive assembly, declared plan publication and successful fixed-parameter empty-learning bundles. IDHK/BRCF/F3JZ retain accepted State, objective/readout ownership and runtime activation; CZDQ/ULBZ/KUL2 retain learning/resume and composition before X0IF. Keep the new compiled_hybrid module outside the numerical hybrid_*.py source family; do not regenerate accepted evidence for metadata-only integration. All three registered recovery fits remain unused. No merge is authorized or performed.
