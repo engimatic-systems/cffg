@@ -1,6 +1,6 @@
 ---
 id: cff-k6g5
-status: in_progress
+status: closed
 deps: [cff-ocxl]
 links: []
 created: 2026-09-14T01:11:24Z
@@ -127,3 +127,24 @@ Independent-review repair handoff: both P2 structural admission gaps are fixed. 
 **2026-09-15T04:43:35Z**
 
 Root independent re-review accepted author repair commit 8663b20 with no remaining findings. The R/H/D pairing now rejects the selector-plus-declaration bypass, and indexed coordinate connectivity rejects both disconnected and globally connected broken-consistency examples. The positive two-transition chain and ordinary adapters remain valid. Scope filtering protects malformed declarations before indexing; the direct separator-domain lookup preserves validation while avoiding a per-region global scan. Documentation matches accepted D12.2. Root independently ran the six repair/composition/guard regressions: 6 passed, 29 deselected in 0.03 seconds; /tmp/cff-k6g5-root-rereview.log and .xml. git diff --check and tk dep cycle passed. The author was notified only after re-review completed and has ended edits. Root now owns the one final short-suite gate under the existing 1200-second cap; ticket closure and publication remain pending that result. No numerical qualification or recovery run occurred during review.
+
+**2026-09-15T05:08:21Z**
+
+Final code gate passed at c2af46ece957bb76783540419ae619959f156931: 2,867 passed, zero failures, 16 warnings; pytest 1,144.23 seconds and measured wall 1,145.056 seconds. The unchanged 1,200-second hard cap retained 54.944 seconds of headroom. Four workers used the unchanged not-slow selection with the executable cache empty at start and bounded at 1 GiB. Root announced the launch and waited quietly for the full recorded 1,200-second wait budget without polling. This is the only final short-suite run for K6G5. The timing audit found 8,601 phase records, 2,867 distinct call cases, no duplicates and no non-passing phases. Runtime history and ~/agent-share/cffg-tests.html were refreshed by that run. Evidence: /tmp/cff-k6g5-short-suite.log, /tmp/cff-k6g5-short-suite-summary.json and /var/folders/kg/pmjxhgy506n699dj2g96f2wh0000gn/T/tmp3g9rh4df.timings.jsonl.
+
+Independent review and re-review are accepted; all ticket outcomes pass. Close K6G5 and publish its stacked PR on PR150. Subsequent changes are ticket/runtime-evidence only and do not require another unchanged suite. Production execution remains guarded, and no registered source-recovery fit has run. The next fresh sequential implementation author takes 7SW5 compiler plans, including fixed-parameter bundle reconstruction and prevention of D9 fallback before runtime integration. Current declarations preserve ordinary-model semantics and the explicit D12 activation boundary.
+
+Dependency companion from tk dep tree --full cff-7sw5, tk ready and tk blocked; arrows mean prerequisite --> dependent, and TK retains additional direct dependencies:
+
+[x] A3WZ numerical checkpoint --+
+[x] K6G5 declarations ----------+--> [ ] 7SW5 (ready; next author)
+[x] OCXL contract -------------+          |
+                                      [ ] IDHK --> [ ] BRCF --> [ ] F3JZ
+                                                                  /   \
+                                                            [ ] CZDQ [ ] ULBZ
+                                                                  \   /
+                                                                [ ] KUL2
+                                                                    |
+                                                                [ ] X0IF --> [ ] ZOV5
+
+The two independent ready roots have completed sequentially. 7SW5 was immediately blocked by K6G5 and is now ready; the remaining runtime, learning and composition work still precedes the registered three-fit gate. No mathematical contract, supported scope, approximation or qualification threshold changed.
