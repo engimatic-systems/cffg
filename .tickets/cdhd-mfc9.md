@@ -136,3 +136,48 @@ Root independently re-reviewed committed repair 6c6117003eb5cf5a5770e77961393460
 Root independently ran uv run pytest -q tests/test_incidence_contract.py tests/test_extension_ownership.py --junitxml=/tmp/cdhd-mfc9-root-rereview.xml: 93 passed in1.62seconds; log /tmp/cdhd-mfc9-root-rereview.log. The unchanged single-owner architecture checks pass. Base-relative audit /tmp/cdhd-mfc9-source-audit.json found no protected numerical, experiment, source/specification/evidence, public compiler/bundle or execution-guard changes. git diff --check and tk dep cycle passed. Earlier independent review also verified12 asymmetric source/destination at-risk inventories without numerical evaluation.
 
 Root now notifies the original author after completed re-review. Before closure, root will create the documented bounded numerical children (separating coupled-exterior definition from numerical binding) and run one final short suite after all relevant source edits under the unchanged1200-second cap. Defining metadata alone does not close cdhd-hzw0. No numerical qualification program or recovery fit has run in this ticket; all three registered attempts remain unused.
+
+**2026-09-15T09:03:52Z**
+
+Adopted bounded numerical split from the reviewed cdhd-mfc9 interface and two independent stable-source audits, before closing the metadata prerequisite. Explicit children now exist under cdhd-hzw0:
+- cdic-ikhw: separate R auxiliary/statistics and stable energy, depending on cdhd-mfc9.
+- cdic-1w3r: same-label D construction, energy and projection, depending on cdic-ikhw.
+- cdic-7y77: general internal evaluator/derivatives, depending on both R and D.
+- cdic-3e79: coupled ordinary-port metadata and objective ownership, depending on the internal evaluator.
+- cdic-nuel: numerical ordinary/exterior coupling, depending on that definition and the internal evaluator.
+- cdic-za1z: one shared iterative policy and new complete tiny qualification, depending on internal and coupled evaluation.
+- cdic-w79t: prospective moderate float32 graph solves and actual storage/compilation evidence, depending on the shared-policy qualification.
+
+The coupled-exterior definition and numerical binding are separate bounded assignments. Moderate harness preparation must be split before implementation if the later concrete case/evaluator scope requires it. Every future author checks scope before editing; no entire checkpoint epic is assigned to one worker. Protected-source R/D or policy changes include a new truthful current tiny report and prospective descriptor regeneration before their final code gate, preserving historical evidence. New moderate source-bound evidence remains explicit downstream work. No coefficient, probability, approximation, stopping, qualification or recovery threshold is changed here.
+
+Legend: prerequisite --> dependent. Built from tk dep tree --full cdhd-hzw0, tk ready and tk blocked; retained original direct dependencies remain authoritative. No cycles.
+
+[x] FFSG + [x] A3WZ + [x] K6G5 + [x] cdd-ziiw --> [x] cdpf-gzix (PR153)
+                                                               |
+                                                    [~] cdhd-mfc9 (reviewed; gate pending)
+                                                               |
+                                                        [ ] cdic-ikhw (R)
+                                                               |
+                                                        [ ] cdic-1w3r (D)
+                                                               |
+                                                        [ ] cdic-7y77 (internal evaluator)
+                                                               |
+                                                        [ ] cdic-3e79 (ordinary contract)
+                                                               |
+                                                        [ ] cdic-nuel (coupled evaluator)
+                                                               |
+                                                        [ ] cdic-za1z (shared policy/tiny)
+                                                               |
+                                                        [ ] cdic-w79t (moderate evidence)
+                                                               |
+                                                        [ ] cdhd-hzw0
+                                                               |
+                                                        [ ] 7SW5 --> [ ] IDHK --> [ ] BRCF --> [ ] F3JZ
+                                                                                              /   \
+                                                                                        [ ] CZDQ [ ] ULBZ
+                                                                                              \   /
+                                                                                            [ ] KUL2
+                                                                                                |
+                                                                                            [ ] X0IF --> [ ] ZOV5
+
+cdhd-mfc9 is the ready D12 root awaiting its final short suite; cdic-ikhw is next after closure. cdh-kvy5 remains an independent nonblocking audit/research branch. Implementation stays sequential; independent research/review can proceed in parallel only under the established author-pause rule for review. All three registered recovery fits remain unused. Prior A3 chain results remain valid for their exact source/layouts and do not certify these new graph layouts. This roadmap addition records missing implementation and qualification, not a mathematical defect or scope revision.

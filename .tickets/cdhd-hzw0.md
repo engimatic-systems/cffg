@@ -1,7 +1,7 @@
 ---
 id: cdhd-hzw0
 status: open
-deps: [cdhd-mfc9]
+deps: [cdhd-mfc9, cdic-w79t]
 links: []
 created: 2026-09-15T08:02:15Z
 type: epic
@@ -83,3 +83,48 @@ Legend: prerequisite --> dependent. Companion built from tk dep tree --full cff-
                                                                                          [ ] X0IF --> [ ] ZOV5
 
 Ready D12 roots are the two reviewed repairs awaiting the combined final gate; cdpf-gzix is their immediate dependent. cdhd-mfc9 is next after discovery closure. cdh-kvy5 remains an independent nonblocking research/audit branch. Implementation remains sequential with a fresh author per bounded ticket; the general checkpoint epic is not one worker assignment. No registered source-recovery fit has run.
+
+**2026-09-15T09:03:52Z**
+
+Adopted bounded numerical split from the reviewed cdhd-mfc9 interface and two independent stable-source audits, before closing the metadata prerequisite. Explicit children now exist under cdhd-hzw0:
+- cdic-ikhw: separate R auxiliary/statistics and stable energy, depending on cdhd-mfc9.
+- cdic-1w3r: same-label D construction, energy and projection, depending on cdic-ikhw.
+- cdic-7y77: general internal evaluator/derivatives, depending on both R and D.
+- cdic-3e79: coupled ordinary-port metadata and objective ownership, depending on the internal evaluator.
+- cdic-nuel: numerical ordinary/exterior coupling, depending on that definition and the internal evaluator.
+- cdic-za1z: one shared iterative policy and new complete tiny qualification, depending on internal and coupled evaluation.
+- cdic-w79t: prospective moderate float32 graph solves and actual storage/compilation evidence, depending on the shared-policy qualification.
+
+The coupled-exterior definition and numerical binding are separate bounded assignments. Moderate harness preparation must be split before implementation if the later concrete case/evaluator scope requires it. Every future author checks scope before editing; no entire checkpoint epic is assigned to one worker. Protected-source R/D or policy changes include a new truthful current tiny report and prospective descriptor regeneration before their final code gate, preserving historical evidence. New moderate source-bound evidence remains explicit downstream work. No coefficient, probability, approximation, stopping, qualification or recovery threshold is changed here.
+
+Legend: prerequisite --> dependent. Built from tk dep tree --full cdhd-hzw0, tk ready and tk blocked; retained original direct dependencies remain authoritative. No cycles.
+
+[x] FFSG + [x] A3WZ + [x] K6G5 + [x] cdd-ziiw --> [x] cdpf-gzix (PR153)
+                                                               |
+                                                    [~] cdhd-mfc9 (reviewed; gate pending)
+                                                               |
+                                                        [ ] cdic-ikhw (R)
+                                                               |
+                                                        [ ] cdic-1w3r (D)
+                                                               |
+                                                        [ ] cdic-7y77 (internal evaluator)
+                                                               |
+                                                        [ ] cdic-3e79 (ordinary contract)
+                                                               |
+                                                        [ ] cdic-nuel (coupled evaluator)
+                                                               |
+                                                        [ ] cdic-za1z (shared policy/tiny)
+                                                               |
+                                                        [ ] cdic-w79t (moderate evidence)
+                                                               |
+                                                        [ ] cdhd-hzw0
+                                                               |
+                                                        [ ] 7SW5 --> [ ] IDHK --> [ ] BRCF --> [ ] F3JZ
+                                                                                              /   \
+                                                                                        [ ] CZDQ [ ] ULBZ
+                                                                                              \   /
+                                                                                            [ ] KUL2
+                                                                                                |
+                                                                                            [ ] X0IF --> [ ] ZOV5
+
+cdhd-mfc9 is the ready D12 root awaiting its final short suite; cdic-ikhw is next after closure. cdh-kvy5 remains an independent nonblocking audit/research branch. Implementation stays sequential; independent research/review can proceed in parallel only under the established author-pause rule for review. All three registered recovery fits remain unused. Prior A3 chain results remain valid for their exact source/layouts and do not certify these new graph layouts. This roadmap addition records missing implementation and qualification, not a mathematical defect or scope revision.
