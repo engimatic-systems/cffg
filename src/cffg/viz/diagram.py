@@ -51,6 +51,7 @@ GLYPHS = {
     "dirichlet": "Dir",
     "gaussian": "𝒩",
     "gaussian_linear": "𝒩A",
+    "gaussian_nonlinear": "𝒩g",
     "gaussian_mixture": "𝒩M",
     "gaussian_mixture_linear": "𝒩MA",
     "recurrence_link": "Rσ",

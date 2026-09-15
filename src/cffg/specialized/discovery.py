@@ -46,7 +46,7 @@ def _admission(t, constraints, registry):
             except ValueError as exc:
                 problems.append(str(exc))
                 continue
-            kernel = registry.bindings.get(t.factors[constraint.target].type)
+            kernel = registry.for_factor(t.factors[constraint.target])
             projections = getattr(getattr(kernel, "binding", None), "moment_projections", ())
             if endpoint.projection.value not in projections:
                 problems.append(

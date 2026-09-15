@@ -13,6 +13,7 @@ import numpy as np
 from jax.scipy.special import logsumexp
 
 from cffg import efrules
+from cffg.execution.contracts import ExecutionDelta
 from cffg.rules import bp_equality, energy_equality
 
 
@@ -122,7 +123,7 @@ def validate_discrete_shapes(group, packed, semiring):
             jax.eval_shape(partial(discrete_readout, plan), inc, params)
 
 
-def gaussian_message(group, eta, precision, params, observation=None, mask=None):
+def gaussian_update(group, eta, precision, params, observation=None, mask=None):
     if group.kernel is None:
         from cffg import gauss
 
@@ -139,6 +140,8 @@ def gaussian_message(group, eta, precision, params, observation=None, mask=None)
             observation,
             mask,
         )
+    delta = outputs if isinstance(outputs, ExecutionDelta) else ExecutionDelta(outputs)
+    outputs = delta.outgoing
     if len(outputs) != len(group.roles):
         raise ValueError(
             f"group {group.name!r}: outgoing message needs one pair per role"
@@ -149,7 +152,11 @@ def gaussian_message(group, eta, precision, params, observation=None, mask=None)
             raise ValueError(
                 f"group {group.name!r}: outgoing message shape for {role!r} must be [M,{dim}] and [M,{dim},{dim}]"
             )
-    return outputs
+    return delta
+
+
+def gaussian_message(group, eta, precision, params, observation=None, mask=None):
+    return gaussian_update(group, eta, precision, params, observation, mask).outgoing
 
 
 def gaussian_energy(group, eta, precision, params, observation=None, mask=None):

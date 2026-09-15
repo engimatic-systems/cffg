@@ -135,6 +135,11 @@ class GaussianBinding(ImmutableRecord):
 
     ``moment_projections`` advertises endpoint projections implemented by
     these callbacks. Declaring a projection does not add an update rule.
+    ``configure(factor, sizes)`` specializes a portable function declaration.
+    ``iterative`` excludes adaptive factors from exact directed schedules and
+    requires residual globalization. Messages may wrap outgoing pairs in an
+    ExecutionDelta to carry local numerical status. ``objective`` names the
+    node energy convention exposed by the ledger.
     """
 
     roles: tuple[str, ...]
@@ -147,6 +152,9 @@ class GaussianBinding(ImmutableRecord):
     statistics: Callable | None = None
     readout: Callable | None = None
     moment_projections: frozenset[str] = frozenset()
+    configure: Callable | None = None
+    iterative: bool = False
+    objective: str = "analytic"
     arena: str = field(default="gaussian", init=False)
 
     @property

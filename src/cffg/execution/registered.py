@@ -34,10 +34,13 @@ def execute_gaussian(
     observation: jax.Array | None = None,
     mask: jax.Array | None = None,
 ) -> ExecutionDelta[GaussianMessages]:
-    outgoing = kernel_runtime.gaussian_message(
+    delta = kernel_runtime.gaussian_update(
         plan, eta, precision, params, observation, mask
     )
-    return ExecutionDelta(tuple(GaussianMessage(e, p) for e, p in outgoing))
+    return ExecutionDelta(
+        tuple(GaussianMessage(e, p) for e, p in delta.outgoing),
+        delta.residual, delta.status,
+    )
 
 
 def ef_parameters(

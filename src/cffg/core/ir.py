@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from cffg.core.functions import FunctionSpec
 
 
 class PortRole(str, Enum):
@@ -211,6 +212,7 @@ class FactorSpec:
     edges: dict[str, str] = field(default_factory=dict)  # role -> variable
     param_edges: dict[str, str] = field(default_factory=dict)  # role -> variable
     param_blobs: dict[str, str] = field(default_factory=dict)  # role -> blob name
+    function: FunctionSpec | None = None
 
     def all_edges(self) -> dict[str, str]:
         """All connected variables by role, structural and parameter alike."""
@@ -269,6 +271,7 @@ class FactorType:
     symmetric_domain: bool = False  # all structural edges share one domain
     family: str = "discrete"  # "discrete" | "gaussian" | "any" | "constraint"
     variadic: bool = False  # edges are x0..x{n-1} for a runtime-chosen n
+    requires_function: bool = False
     # (hard-constraint factors: alldifferent over any arity — cff-e8zk)
 
 
@@ -337,6 +340,13 @@ register_factor_type(
         edge_roles=("out", "in"),
         param_roles=("matrix", "offset", "cov"),
         family="gaussian",
+    )
+)
+
+register_factor_type(
+    FactorType(
+        "gaussian_nonlinear", edge_roles=("out", "in"),
+        param_roles=("parameters", "cov"), family="gaussian", requires_function=True,
     )
 )
 

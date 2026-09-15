@@ -27,6 +27,7 @@ from cffg.core.ir import (
     register_factor_type,
 )
 from cffg.core.plates import expand_plates, plate_observations
+from cffg.core.functions import FunctionSpec
 from cffg.core.moment_matching import (
     MomentMatchingEndpoint,
     MomentProjection,
@@ -49,6 +50,7 @@ __all__ = [
     "Expose",
     "FactorSpec",
     "FactorType",
+    "FunctionSpec",
     "LearnableSpec",
     "ModelError",
     "MomentMatchingEndpoint",

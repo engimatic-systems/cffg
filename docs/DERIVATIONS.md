@@ -2906,3 +2906,134 @@ Retaining arbitrary conditional history mixtures would violate the chosen
 bounded inventory. The positive decision accepts this disclosed approximation;
 cff-x0if must judge source recovery empirically after implementation, and can
 reject it without reinterpreting D12's mathematical guarantees.
+
+## D13 — Adaptive nonlinear Gaussian conditionals
+
+### D13.1 Plain-English contract and portable model
+
+A nonlinear sensor predicts an output from an input, then adds Gaussian noise:
+`Y | X, theta ~ N(g_theta(X), V)`, with positive-definite `V`. The deterministic
+function is the conditional mean. It does not remove the observation noise.
+`FunctionSpec` names that function and a local approximation method; parameter
+arrays and `V` are separate serialized blobs.
+
+Both methods replace the curved sensor locally with a straight Gaussian model.
+Taylor uses the slope at the current input estimate. Sigma points evaluate a
+small, spread-out set of inputs to account for some of the curvature. When
+neighboring factors change the input estimate, the approximation changes too.
+Inference must settle both the messages and those changing approximations.
+The reported energy belongs to the resulting Gaussian approximation. It has
+no established upper or lower bound on the original nonlinear evidence.
+
+### D13.2 Local approximation
+
+Let the proper input cavity be `N(m,P)`. Write the approximate normalized
+conditional as `f_c(y|x)=N(y; Ax+b, Omega)`, where `c=(A,b,Omega)`.
+Taylor sets
+
+```text
+A = Dg_theta(m),    b = g_theta(m) - A m,    Omega = V.       (D13.1)
+```
+
+For input dimension `d`, the scaled unscented rule fixes `alpha=1, beta=2,
+kappa=0`. Its points are `m` and `m +/- sqrt(d) chol(P)[:,i]`. The mean weights
+are `w0=0`, `wi=1/(2d)`; the covariance weight at the center is two. With
+`gbar=sum wi g(xi)`, cross covariance `C=sum wi (xi-m)(g(xi)-gbar)^T`, and
+residuals `ri=g(xi)-gbar-A(xi-m)`, use
+
+```text
+A = C^T P^-1,   b = gbar - A m,
+Omega = V + sum wi ri ri^T + 2 r0 r0^T.                     (D13.2)
+```
+
+This outer-product expression equals the regression residual covariance of
+the declared sigma rule. Its weights are nonnegative; it avoids subtracting
+two nearly equal covariance matrices. There is no ridge or clipping. A point
+set whose perturbations cannot survive floating-point addition to `m` fails
+with `UNREPRESENTABLE_SIGMA_POINTS`; it cannot silently report lost variance.
+Affine functions recover the ordinary linear Gaussian factor under both
+methods, within representable arithmetic.
+
+### D13.3 Tilted moments and replacement sites
+
+Let incoming cavity natural parameters be `(eta_x,Lambda_x)` and
+`(eta_y,Lambda_y)`, and `W=Omega^-1`. For unobserved output, the normalized
+Gaussian tilted belief has information vector and precision
+
+```text
+h = [eta_x - A^T W b; eta_y + W b],
+Q = [[Lambda_x + A^T W A, -A^T W],
+     [-W A,                Lambda_y + W]].                  (D13.3)
+```
+
+Its mean is `Q^-1 h`, covariance `Q^-1`. Each replacement site is the marginal
+natural parameter minus its cavity parameter. This is the EP cavity convention;
+adding the old site again would double count evidence. Finite individual sites
+may have negative precision. The tilted belief and combined edge beliefs must
+remain proper.
+
+The implementation evaluates the same subtraction by Schur elimination,
+preventing a very strong input cavity from numerically erasing a weak site:
+
+```text
+S = W + Lambda_y,
+Lambda_site,x = A^T sym(W S^-1 Lambda_y) A,
+eta_site,x = A^T W S^-1 (eta_y - Lambda_y b).               (D13.4)
+```
+
+The forward site is the predictive Gaussian with mean `A m+b` and covariance
+`Omega+A P A^T`. For observed `y`, the input site is exactly
+`(A^T W(y-b), A^T W A)`; its tilted covariance is
+`(Lambda_x+A^T W A)^-1`. The DATA predictive excludes its own observation.
+The zero output covariance in an observed node readout represents conditioning,
+not a singular latent Gaussian belief. Missing observations use (D13.3).
+
+A vacuous input returns neutral dependent messages without choosing a mean.
+Its final energy is infinite. Invalid noise, required cavity, function value,
+Jacobian, tilted covariance, or unrepresentable output returns explicit failure
+facts and shape-preserving NaNs. All computed moments and messages are checked,
+not merely the matrix before solving. No invalid final belief certifies success.
+
+### D13.4 Energy and conditional stationarity
+
+For fixed coefficients `c`, the node contributes
+
+```text
+F_f(q_f;c) = E_qf[log q_f - log N(y; A x+b, Omega)].         (D13.5)
+```
+
+Every Gaussian normalization constant is included. For observed output the
+entropy is over the latent input only. For an unobserved joint of dimension
+`n=di+do`, mean `mu`, covariance `Cq`, and residual map `B=[-A,I]`, this is
+
+```text
+F_f = 1/2 [-log det Cq - n(1+log(2 pi))
+            + do log(2 pi) + log det Omega
+            + (B mu-b)^T W(B mu-b) + tr(W B Cq B^T)].       (D13.6)
+```
+
+The full frozen Gaussian Bethe energy sums node terms and adds `H(q_e)` on
+each interior Forney edge, correcting the duplicated negative edge entropy.
+At a selected moment endpoint the constraints equate the first and second
+moments of node and edge beliefs. Variation of this constrained functional
+with fixed `c` gives a Gaussian node density proportional to its conditional
+and incoming sites; variations of the moment multipliers give the endpoint
+moment equations. Thus (D13.3) plus marginal cavity subtraction implements
+conditional frozen-factor stationarity. Unselected density constraints are
+also constraints on this declared Gaussian surrogate; they do not preserve
+the original curved node density exactly.
+
+Adaptive inference additionally requires `c_f=C_f(cavity_f)` by (D13.1) or
+(D13.2). These coefficient equations are separate from frozen-factor energy
+stationarity. In particular the total derivative of `F(q;C(q))` contains the
+coefficient derivative, and need not vanish at the adaptive fixed point.
+Implicit gradients must differentiate all of this dependence; an envelope or
+stop-gradient shortcut is not justified.
+
+Executable local anchors: `test_nonlinear_rules.py` compares both methods and
+both dtypes with analytic linear Gaussian messages/energy, checks the nonzero
+sigma residual covariance, permits negative sites, tests strong-cavity
+cancellation and unrepresentable sigma points, and compares the frozen cubic
+posterior with refined dense-grid quadrature. That selected fixture has
+Hellinger limits 0.16 for Taylor and 0.10 for sigma points; this is not a claim
+that sigma points are more accurate for every nonlinear model.

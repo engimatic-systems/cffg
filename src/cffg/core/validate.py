@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from cffg.core.constraint_details import p_substitution_conflicts
 from cffg.core.moment_matching import moment_matching_problems
+from cffg.core.functions import FunctionSpec
 from cffg.core.ir import (
     EDGE_CONSTRAINTS,
     EF_EDGE_FAMILIES,
@@ -57,6 +58,10 @@ def _check_factors(t: Template) -> list[str]:
         if ft is None:
             problems.append(f"factor {f.name!r}: unknown type {f.type!r}")
             continue
+        if ft.requires_function and not isinstance(f.function, FunctionSpec):
+            problems.append(f"factor {f.name!r}: requires a portable mean FunctionSpec")
+        if not ft.requires_function and f.function is not None:
+            problems.append(f"factor {f.name!r}: this type does not accept a mean function")
         if ft.variadic:
             n = len(f.edges)
             want = {f"x{i}" for i in range(n)}

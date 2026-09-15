@@ -237,6 +237,7 @@ def _spec_to_dict(spec) -> dict:
             "edges": dict(spec.edges),
             "param_edges": dict(spec.param_edges),
             "param_blobs": dict(spec.param_blobs),
+            **({"function": spec.function.to_dict()} if spec.function is not None else {}),
         }
     if isinstance(spec, ConstraintSpec):
         return {"kind": spec.kind.value, "target": spec.target, "detail": dict(spec.detail)}
@@ -271,6 +272,8 @@ def action_from_dict(d: dict) -> EditAction:
     if cls is AddVariable:
         return cls(VS(d["spec"]["name"], d["spec"].get("cardinality", 0), d["spec"].get("dim", 0)))
     if cls in (AddFactor, ReplaceFactor):
+        from cffg.core.functions import FunctionSpec
+
         s = d["spec"]
         return cls(
             FactorSpec(
@@ -278,6 +281,7 @@ def action_from_dict(d: dict) -> EditAction:
                 edges=dict(s.get("edges", {})),
                 param_edges=dict(s.get("param_edges", {})),
                 param_blobs=dict(s.get("param_blobs", {})),
+                function=FunctionSpec.from_dict(s["function"]) if "function" in s else None,
             )
         )
     if cls in (AddConstraint, RemoveConstraint):

@@ -918,6 +918,28 @@ its existing operation order and learning schemas, including cross-covariance,
 propriety and missing-row masks. It is separate from JAX message/energy
 callbacks; registration does not imply a new conjugate-learning family.
 
+`FactorSpec.function` is an optional, immutable `FunctionSpec`: a namespaced
+mean implementation, required semantic version, JSON configuration, and
+`linearization` or `sigma_point` method. It contains no arrays or executable
+objects. Core validation, editing, JSON, hashing, scoping, and plates preserve
+it without importing JAX. `mean_functions.py` resolves its host registration;
+the installed version must share its major version and meet its minimum
+version. Missing implementations fail on loading. Numeric parameters and
+positive noise covariance retain ordinary blob ownership and bundle storage.
+
+`GaussianBinding.configure` specializes a binding from this declaration and
+incident dimensions before source-shape inference. Registry snapshots retain
+the resulting binding by factor name. Grouping includes the canonical function
+declaration; members with equal configuration share a group while their
+`theta` and noise precision `W` retain separate leading rows. Configuration
+changes therefore cannot alias parameter addresses. Named writes use existing
+parameter ownership and covariance validation. `nonlinear.py` owns both local
+approximations, tilted moments, replacement sites, and normalized node energy
+(DERIVATIONS D13); `nonlinear_kernels.py` owns configured shape/packing and
+batched callbacks. The nonlinear factor's structural roles are `out,in` and
+its numeric parameter roles are `parameters,cov`. No conjugate-learning family
+is implied by the statistic callback.
+
 `ParameterSpec` supplies serialized shape inference and optional writable
 packed-row metadata. The packer declares every output key; the compiler
 checks keys, shapes and member axes. Existing built-ins keep their bare
