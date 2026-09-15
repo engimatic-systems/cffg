@@ -205,3 +205,25 @@ Intelligible-ticket review: complete.
 **2026-09-01T14:30:25Z**
 
 Independent-review correction, 2026-09-01. The ticket now owns an endpoint- and projection-aware moment-matching schema and migration before EP execution. The legacy factor-only payload stays rejected; migration must not infer absent information. Capability owners are core.ir schema, validation, JSON/hash and bundle migration, diagram derivation, compiler grouping, the nonlinear Gaussian FactorKernel and rules, synchronous and scheduled execution, ledger, readouts, estimator, public exports, and the named documentation/tests. The wiggle scan was rerun after the rewrite. New or changed retained matches mean: current = the legacy payload present at PR base d6e006d; factor-only/only = a payload naming a factor and no endpoint, or an explicit acceptance gate; sufficient and match = the paper-defined sufficient-statistic equality; public = the supported template schema; register = future executable compiler/runtime dispatch; implement = planned schema/rule integration; exact = affine-reference analytic equality; all/every = the locally enumerated endpoints or execution surfaces. Earlier retained matches keep the meanings recorded in the prior two audit notes.
+
+**2026-09-15T15:17:27Z**
+
+Readiness question: after deferring D12, can cff-o7hs and cff-1o72 start, or does another ready ticket provide a missing foundation? Answer: tk ready includes cff-o7hs. Its Gaussian arena, numerical propriety, executable registration/Gaussian binding and compiler/runtime extension foundations (cff-4e5z, cff-3hgi, cff-ri8m, cff-209l, cff-cfqg) are completed on this branch. cff-1o72 depends on the nonlinear contract. No D12 implementation is a prerequisite. Before implementation, split the large ticket into bounded work with the endpoint/projection schema and message/site/objective derivations first, followed by local numerical evidence and production integration.
+
+Independent read-only research found cff-j7mm the strongest optional foundation: it repairs incomplete executable cost analysis and distinguishes persistent storage, compiler temporary buffers, compilation and execution timings. Existing persistent arena-byte accounting already exists, so the whole estimator ticket is not a mathematical prerequisite. cff-wbhu can help repeated/batched inference after the rule is established, but its benchmark target is not a promised nonlinear speedup. cff-b2fz matters when composing repeated modules; cff-1xig matters before promising stable historical bundle compatibility, while this ticket still owes its own explicit schema migration/rejection. cff-yl0a concerns discrete HMM fusion and excludes an LGSSM fast path. None needs to be added as a blanket blocker. Sources: their WHY/WHAT/Future-work sections; ARCHITECTURE.md bounded extension paths and compact plate composition; this ticket's schema, resource and globalization criteria. Confidence is high on dependency/scope conclusions and moderate on performance priorities until a nonlinear workload is measured. No tests or numerical programs were run for this assessment.
+
+Top-level planning checks: cff-1o72 describes y=f_theta(x), while this ticket requires positive Gaussian observation noise. Clarify whether the neural network is the deterministic mean of that noisy factor before promising a zero-noise factor. Align its improper-site wording with this ticket's permitted indefinite site messages and proper combined beliefs. These are unresolved handoff details, not a changed mathematical contract. Also, the PR142 baseline predates the later short-suite cap: tools/dashboard.py:157 runs pytest without a timeout, and the restored runtime record is 1233.077 seconds (suggested wait 1560). Cooper's 20-minute requirement still applies. Restore the independent test tooling in bounded work before new code validation; do not restore D12 numerics or copy later ticket history to do so.
+
+Legend: prerequisite --> dependent. Existing tk dependencies remain authoritative and unchanged; closed foundational subgraphs and redundant direct edges are abbreviated.
+
+```text
+[x] Gaussian + registration + compiler/runtime foundations
+  --> [ ] cff-o7hs (ready)
+        --> [ ] cff-1o72 (blocked by cff-o7hs)
+              --> [ ] cff-ahps (other branches also pending)
+
+Optional ready work in parallel: cff-j7mm, cff-wbhu, cff-b2fz, cff-1xig.
+cff-yl0a remains an independent discrete-HMM performance ticket.
+```
+
+Checked against tk dep tree --full cff-1o72, tk ready and tk blocked; tk dep cycle and git diff --check pass. This is a readiness handoff only. The ticket remains open; no numerical implementation, new dependency, qualification run or D12 resumption was started.
