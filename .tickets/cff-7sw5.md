@@ -143,3 +143,7 @@ Legend: prerequisite --> dependent. Companion from tk dep tree --full cff-7sw5, 
                                                                     [ ] X0IF --> [ ] ZOV5
 
 cdpf-gzix is the immediate blocker and next sequential implementation root; cdh-kvy5 remains independent nonblocking work. All three registered recovery fits remain unused. This refinement changes tickets only, so validate dependency cycles and diffs rather than repeating the unchanged passing short suite from PR152.
+
+**2026-09-15T07:14:21Z**
+
+Independent cdpf-gzix graph review found a downstream conditioning boundary to preserve during real compilation: an otherwise valid declaration with a DATA port directly on hybrid dynamics d/out retains topology and its adapter draft, but registered conditioning diagnostics still report the ordinary observed-mixture limitation. The same exposed adapter using GLUE has no diagnostic. resolve_compile_data at resolution/resolve.py consumes the diagnostic before plan publication. No draft information is lost and gzix keeps public compilation/runtime guarded, so this is a 7SW5/appropriate later binding handoff, not a request to implement observation semantics in structural discovery. Determine the lawful supported conditioning boundary from the declared contract before changing the diagnostic; do not clear it just to publish a plan. The existing ordinary Gaussian emission attachment remains covered. Source: completed independent metadata-only review at5a923b3; confidence high for the reproduced boundary, no numerical conditioning claim.

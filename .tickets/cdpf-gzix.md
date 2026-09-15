@@ -1,7 +1,7 @@
 ---
 id: cdpf-gzix
 status: in_progress
-deps: [cdd-ziiw, cff-k6g5, cff-a3wz]
+deps: [cdd-ziiw, cff-k6g5, cff-a3wz, cdhd-fyq6]
 links: []
 created: 2026-09-15T06:53:01Z
 type: task
@@ -97,3 +97,15 @@ Implementation completed for independent review; worker is pausing at a clean co
 **2026-09-15T07:08:12Z**
 
 Separate pre-existing contract mismatch found by declaration-only reproduction; no admission or constructor semantics changed. Question: does the current core/compiled boundary agree for a unary-only one-label component? Answer: core.validate accepts z(cardinality=1), x(dim=1), one gaussian_mixture unary factor, one separator with support (0,), and categorical/Gaussian GLUE adapters. Discovery then reaches the existing HybridComponentPlan constructor and raises ValueError: hybrid component unary: separator scope: invalid cardinality or dimension. Sources: core/ir.py VariableSpec accepts positive cardinality, core/hybrid.py checks valid fixed labels and unary scope incidence, while compiled_hybrid.py requires _integer(plan.cardinality, 2). Ordinary recurrence grouping separately requires K>=2; that does not establish the general unary-only D12 scope. Confidence: high for the reproduced interface mismatch; no explicit general D12 minimum was found in the bounded contract reads. Root directed the worker to leave this outside implementation scope, record the evidence, commit and pause. Root must determine whether this is an unintended constructor restriction or a supported-scope decision and track any required repair before closure. No mathematical decision or numerical execution was made.
+
+**2026-09-15T07:14:21Z**
+
+Independent review completed at 5a923b354e1595eaa31da0736e85d0a77112ce66 after the author's clean committed pause. A fresh reviewer checked graph/equality membership, ordered ports, adapter slots, early consumed-factor grouping, entropy exclusions and guard preservation. No additional actionable graph findings: 93 focused tests passed, plus metadata probes for two components sharing an ordinary Gaussian factor and an exterior equality fan-out. No source edits or numerical programs ran during review.
+
+Root found one P2 within this ticket's requirement identity boundary. specialized/hybrid.py:_factor_requirement constructs owner = hybrid:factor:{factor.name}, then appends parameter suffixes. Rename the accepted fixture's categorical prior pz to px:W and update its region.factor: core/stages accept, but both Gaussian px's covariance and categorical px:W's statistic publish destination hybrid:factor:px:W; admission_problems is empty and ownership_problem is None. Thus a valid factor rename aliases two different future parameter addresses. Use an unambiguous factor/role identity so delimiter-bearing names cannot collide; preserve parameter roles/transforms, source ordering and separate address intentions. Add a regression using the real declaration-to-draft stage path that proves distinct destination/member keys for these factors. Do not restrict otherwise valid factor names or wait for numerical assembly to discover the collision.
+
+The pre-existing unary K=1 metadata inconsistency is separately tracked as ready prerequisite cdhd-fyq6, depending on closed cdd-ziiw; cdpf-gzix now depends on that repair. Core admission remains authoritative, and the repair must not alter numerical Coordinate.from_sites or claim new runtime qualification. It will receive a fresh implementation worker after current review repairs and their pause. No existing dependencies were removed.
+
+One nonblocking downstream observation: exposing hybrid d/out directly through a DATA port preserves core admission, topology and the adapter draft, but carries the existing ordinary observed-mixture conditioning diagnostic. resolve_compile_data in resolution/resolve.py consumes it before publication. 7SW5 must resolve the correct declaration/conditioning boundary rather than blindly clearing the diagnostic; this review does not claim direct D12 conditioning is implemented or expand gzix into runtime binding.
+
+The independent reviewer is finished. Root now notifies the original author of the completed review and requests only the bounded key-identity repair, focused final checks and a committed clean pause. Root re-reviews afterward. No full suite or registered recovery fit ran; all three registered attempts remain unused. Keep the final combined short suite until every relevant repair is reviewed.
