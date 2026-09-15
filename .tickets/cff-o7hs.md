@@ -271,3 +271,7 @@ Compiler-seam research: reuse GaussianBinding batched callbacks and leading-memb
 **2026-09-15T16:51:37Z**
 
 Cooper selected the explicit adaptive fixed-point and approximate-energy contract. The ticket criteria now name frozen-coefficient Gaussian Bethe stationarity, separate approximation/cavity self-consistency, the fully recomputed residual for globalization and convergence, and the absence of a total adaptive-energy stationarity claim. cff-1o72 differentiates the complete coupled fixed point and the total reported energy. cff-314c and cff-2dzo are implemented and closed. cff-gsd5 now owns configured nonlinear means and local rules; cff-gvwc owns measured short-suite budgeting. Final short-suite validation remains due after the parent implementation changes.
+
+**2026-09-15T17:58:09Z**
+
+First full short suite at58185b4:2395 passed,1 failed,44 deselected; pytest1290.46 seconds, dashboard-measured wall1305.784 seconds. Failure was the pre-existing topology snapshot fixture using an unspecified moment projection without an endpoint. Updated that fixture to copy a mean-field detail payload; tests/test_topology.py now13 passed in0.51 seconds. Production validation remains strict. A fresh passing full run is required for this fixture correction.
