@@ -14,12 +14,12 @@ tags: [rslds, inference, hybrid]
 
 ## Background in Plain English — WHY
 
-D12 local kernels and compiled ownership are insufficient without a graph solve and a complete objective ledger. cff-a3wz first qualifies the complete message/xi solver without production binding. cff-idhk then supplies accepted-coordinate storage and transport, and cff-brcf supplies objective/readout ownership. This final integration ticket activates their public execution and reports the actual terminal state through the engine.
+D12 local kernels and compiled ownership are insufficient without a graph solve and a complete objective ledger. cff-a3wz first qualifies the complete message/xi solver for the recorded chain layouts without production binding; cdhd-hzw0 extends the evaluator interface and qualification to the remaining declared incidence. cff-idhk then supplies accepted-coordinate storage and transport, and cff-brcf supplies objective/readout ownership. This final integration ticket activates their public execution and reports the actual terminal state through the engine.
 
 ## Outcomes / Acceptance Criteria — WHAT
 
 1. Generic engine execution consumes the declared plan without an rSLDS model branch, selecting one approximation and one belief-array authority.
-2. Production reuses the solver qualified by cff-a3wz for D12.7–8 jointly, preserving gauge removal, dtype-scaled properness checks, feasible initialization, bounded local/global/linear/line-search budgets, and globalization. Engine integration distinguishes converged, budget-exhausted, and diverged; non-finite objective/residual is divergence. It does not introduce a separate numerical policy or weaken the prerequisite's certificates.
+2. Production reuses the numerical policy qualified by cff-a3wz and the applicable evaluator/interface qualified by cdhd-hzw0 for D12.7–8 jointly, preserving gauge removal, dtype-scaled properness checks, feasible initialization, bounded local/global/linear/line-search budgets, and globalization. Engine integration distinguishes converged, budget-exhausted, and diverged; non-finite objective/residual is divergence. It does not introduce a separate numerical policy or weaken the prerequisite's certificates.
 3. Public execution uses the cff-brcf ledger with precisely D12 regional energies, labeled entropies, hybrid separator corrections, adapter entropies, and ordinary exterior corrections. It matches the independent tiny objective and stationary dual at the returned coordinate, without repeating ledger construction or introducing another owner.
 4. Synchronous/scheduled, host/JIT, and single/vmap execution agree on messages, internal readouts, support, FE, and terminal status. Lifecycle initialization, binding, support checks, assignment scoring, schedule classification, and estimator/runtime consumers are included in the handoff.
 5. Sparse support, support changes, inactive xi, signed/vacuous cavities, float32, and 10–100x scale obey D12.6. No dense trajectory covariance/Jacobian or silent budget-to-success conversion is introduced. New long globalization regressions are slow and opt-in.
@@ -90,3 +90,30 @@ Legend: prerequisite --> dependent. Based on tk dep tree --full cff-x0if, tk rea
                                                               --> [ ] cff-zov5 (epic)
 
 Validation: no dependency cycles; documentation/ticket-only change with no runtime surface modified. Full-suite validation is not required for this split; git diff --check covers changed artifacts.
+
+**2026-09-15T08:03:56Z**
+
+Added cdhd-hzw0 as the explicit general-incidence numerical checkpoint before cff-7sw5 publishes real plans. Its first bounded implementation is cdhd-mfc9, depending on reviewed discovery and accepted A3WZ. The complete source-backed question/answer/confidence audit is recorded in cdhd-mfc9. Existing A3WZ qualifies tested homogeneous chains; branching, unary-only, intermediate H unary and live adapter interfaces require additional implementation and evidence. All original math, declaration scope, approximation and qualification thresholds remain required. IDHK/F3JZ will consume the appropriately qualified generalized interface through the same numerical policy, rather than assuming the unchanged chain API already represents every declaration. This refines the earlier chain-interface handoff; it does not invalidate or rewrite historical A3 evidence.
+
+Legend: prerequisite --> dependent. Companion built from tk dep tree --full cff-7sw5, tk ready and tk blocked; original direct dependencies are retained. No cycles.
+
+[x] A3WZ + [x] K6G5 + [x] cdd-ziiw
+      +--> [~] cdhd-fyq6 (reviewed; final gate pending) --+
+      +--> [~] cdhd-0ios (reviewed; final gate pending) -+--> [~] cdpf-gzix
+[x] A3WZ -----------------------------------------------------+      |
+                                                             +--> [ ] cdhd-mfc9
+                                                                   |
+                                         [ ] cdhd-hzw0 (additional bounded
+                                             evaluator/qualification children required)
+                                                                   |
+[x] OCXL + retained dependencies -----------------------------> [ ] 7SW5
+                                                                   |
+                                                               [ ] IDHK --> [ ] BRCF --> [ ] F3JZ
+                                                                                           /   \
+                                                                                     [ ] CZDQ [ ] ULBZ
+                                                                                           \   /
+                                                                                         [ ] KUL2
+                                                                                             |
+                                                                                         [ ] X0IF --> [ ] ZOV5
+
+Ready D12 roots are the two reviewed repairs awaiting the combined final gate; cdpf-gzix is their immediate dependent. cdhd-mfc9 is next after discovery closure. cdh-kvy5 remains an independent nonblocking research/audit branch. Implementation remains sequential with a fresh author per bounded ticket; the general checkpoint epic is not one worker assignment. No registered source-recovery fit has run.

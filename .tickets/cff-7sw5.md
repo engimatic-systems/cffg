@@ -1,7 +1,7 @@
 ---
 id: cff-7sw5
 status: open
-deps: [cff-ocxl, cff-k6g5, cff-a3wz, cdd-ziiw, cdpf-gzix]
+deps: [cff-ocxl, cff-k6g5, cff-a3wz, cdd-ziiw, cdpf-gzix, cdhd-hzw0]
 links: []
 created: 2026-09-14T01:11:24Z
 type: feature
@@ -14,7 +14,7 @@ tags: [rslds, inference, hybrid]
 
 ## Background in Plain English — WHY
 
-Serialized D12 ownership needs a reconstructible component plan. A whole-rSLDS topology recognizer would reproduce the rejected historical integration and cannot preserve composition semantics. The complete numerical solver must first pass cff-a3wz so compiler integration starts from measured feasibility.
+Serialized D12 ownership needs a reconstructible component plan. A whole-rSLDS topology recognizer would reproduce the rejected historical integration and cannot preserve composition semantics. The complete numerical solver must first pass cff-a3wz for the recorded chain layouts and cdhd-hzw0 for the remaining declared graph incidence, so compiler integration starts from measured feasibility.
 
 ## Outcomes / Acceptance Criteria — WHAT
 
@@ -147,3 +147,30 @@ cdpf-gzix is the immediate blocker and next sequential implementation root; cdh-
 **2026-09-15T07:14:21Z**
 
 Independent cdpf-gzix graph review found a downstream conditioning boundary to preserve during real compilation: an otherwise valid declaration with a DATA port directly on hybrid dynamics d/out retains topology and its adapter draft, but registered conditioning diagnostics still report the ordinary observed-mixture limitation. The same exposed adapter using GLUE has no diagnostic. resolve_compile_data at resolution/resolve.py consumes the diagnostic before plan publication. No draft information is lost and gzix keeps public compilation/runtime guarded, so this is a 7SW5/appropriate later binding handoff, not a request to implement observation semantics in structural discovery. Determine the lawful supported conditioning boundary from the declared contract before changing the diagnostic; do not clear it just to publish a plan. The existing ordinary Gaussian emission attachment remains covered. Source: completed independent metadata-only review at5a923b3; confidence high for the reproduced boundary, no numerical conditioning claim.
+
+**2026-09-15T08:03:56Z**
+
+Added cdhd-hzw0 as the explicit general-incidence numerical checkpoint before cff-7sw5 publishes real plans. Its first bounded implementation is cdhd-mfc9, depending on reviewed discovery and accepted A3WZ. The complete source-backed question/answer/confidence audit is recorded in cdhd-mfc9. Existing A3WZ qualifies tested homogeneous chains; branching, unary-only, intermediate H unary and live adapter interfaces require additional implementation and evidence. All original math, declaration scope, approximation and qualification thresholds remain required. IDHK/F3JZ will consume the appropriately qualified generalized interface through the same numerical policy, rather than assuming the unchanged chain API already represents every declaration. This refines the earlier chain-interface handoff; it does not invalidate or rewrite historical A3 evidence.
+
+Legend: prerequisite --> dependent. Companion built from tk dep tree --full cff-7sw5, tk ready and tk blocked; original direct dependencies are retained. No cycles.
+
+[x] A3WZ + [x] K6G5 + [x] cdd-ziiw
+      +--> [~] cdhd-fyq6 (reviewed; final gate pending) --+
+      +--> [~] cdhd-0ios (reviewed; final gate pending) -+--> [~] cdpf-gzix
+[x] A3WZ -----------------------------------------------------+      |
+                                                             +--> [ ] cdhd-mfc9
+                                                                   |
+                                         [ ] cdhd-hzw0 (additional bounded
+                                             evaluator/qualification children required)
+                                                                   |
+[x] OCXL + retained dependencies -----------------------------> [ ] 7SW5
+                                                                   |
+                                                               [ ] IDHK --> [ ] BRCF --> [ ] F3JZ
+                                                                                           /   \
+                                                                                     [ ] CZDQ [ ] ULBZ
+                                                                                           \   /
+                                                                                         [ ] KUL2
+                                                                                             |
+                                                                                         [ ] X0IF --> [ ] ZOV5
+
+Ready D12 roots are the two reviewed repairs awaiting the combined final gate; cdpf-gzix is their immediate dependent. cdhd-mfc9 is next after discovery closure. cdh-kvy5 remains an independent nonblocking research/audit branch. Implementation remains sequential with a fresh author per bounded ticket; the general checkpoint epic is not one worker assignment. No registered source-recovery fit has run.
