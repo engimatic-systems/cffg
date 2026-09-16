@@ -146,3 +146,7 @@ Final validation at production code head 10e0615: uv run python tools/dashboard.
 Following Cooper's explicit protocol, cff-domd moved nine already-passing lower-priority cases to slow, totaling 105.936 measured seconds. Estimated remaining wall time is 1,174.039 seconds (19m34.039s), not a new measured result. Collection confirms exactly those nine removals, no additions, and 2,395 selected tests. Production code is unchanged after the passing gate; no suite rerun was performed for selection-only pruning. Runtime history and dashboard retain the measured result. All required neural gradients, exact-support, float32 and scale checks remain short. git diff --check and tk dep cycle pass after ticket whitespace cleanup.
 
 Landing: cff-1o72 branches from cff-o7hs / PR #156; publish as its own stacked PR. No implementation work remains for this ticket.
+
+**2026-09-16T00:27:21Z**
+
+Published PR #157: https://github.com/engimatic-systems/cffg/pull/157 . Base is cff-o7hs / PR #156. Both requested implementations are complete in separate reviewable PRs; all implementation and budget tickets are closed. The passing suite and post-run selection estimate are recorded above. No required implementation or validation work remains.
