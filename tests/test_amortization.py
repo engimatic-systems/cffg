@@ -18,7 +18,7 @@ from nonlinear_fixture import adaptive_pair
 from test_neural import neural_model
 
 
-@pytest.mark.parametrize("x64", [False, True])
+@pytest.mark.parametrize("x64", [False, pytest.param(True, marks=pytest.mark.slow)])
 def test_recognition_replay_batching_and_invalid_proposals(tmp_path, x64):
     with jax.enable_x64(x64):
         template, arrays = neural_model()

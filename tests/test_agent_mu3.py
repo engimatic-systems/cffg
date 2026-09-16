@@ -240,6 +240,7 @@ def test_public_rollout_wrappers_preserve_serialized_evaluator(builder, kwargs):
     assert len(plan.rows) == 2
 
 
+@pytest.mark.slow
 def test_trial_loop_matches_direct_engines_and_checkpoint_replays(tmp_path):
     key0 = jax.random.PRNGKey(7)
     agent = make_agent(key=key0)
@@ -395,7 +396,8 @@ def test_agent_version_1_functional_checkpoint_migrates_runtime(tmp_path):
 
 @pytest.mark.parametrize(
     "mismatch",
-    ("samples", "min_ess", "refresh", "mode"),
+    ("samples", pytest.param("min_ess", marks=pytest.mark.slow),
+     pytest.param("refresh", marks=pytest.mark.slow), "mode"),
 )
 def test_functional_checkpoint_configuration_mismatch_is_atomic(
     tmp_path, mismatch

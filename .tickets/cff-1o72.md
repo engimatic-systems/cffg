@@ -1,7 +1,7 @@
 ---
 id: cff-1o72
 status: in_progress
-deps: [cff-o7hs, cff-n60h, cff-v53k, cff-ll6y, cff-3zzo]
+deps: [cff-o7hs, cff-n60h, cff-v53k, cff-ll6y, cff-3zzo, cff-domd]
 links: [cff-fxmj, cff-o7hs, cff-ri8m, cff-l6i5, cff-209l, cff-cz6v, cff-u06e]
 created: 2026-07-08T16:50:10Z
 type: feature
