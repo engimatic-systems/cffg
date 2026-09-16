@@ -31,5 +31,3 @@ No further work is identified. This ticket does not block cff-1o72.
 ## Definitions
 
 Entropy bound: a computable limit on mixture uncertainty. Fixed support: exactly zero probabilities remain excluded. Reverse differentiation: gradients propagated backward from a scalar output.
-
-

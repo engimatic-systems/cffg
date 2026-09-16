@@ -1,6 +1,6 @@
 ---
 id: cff-1o72
-status: in_progress
+status: closed
 deps: [cff-o7hs, cff-n60h, cff-v53k, cff-ll6y, cff-3zzo, cff-domd]
 links: [cff-fxmj, cff-o7hs, cff-ri8m, cff-l6i5, cff-209l, cff-cz6v, cff-u06e]
 created: 2026-07-08T16:50:10Z
@@ -136,3 +136,13 @@ Legend: prerequisite --> dependent (only this ticket's immediate work shown)
 
 cff-u06e remains independent future work for exact zero noise. cff-1et5 tracks derivatives of an optional entropy-bound diagnostic outside the training energy. tk ready confirms cff-1o72 has no open prerequisites; tk dep cycle passes. Frozen regression and paired-recognition benchmarks passed; both code and validation details are in the child tickets and D14.
 
+
+**2026-09-16T00:26:38Z**
+
+Completed neural Gaussian means, total certified fixed-point gradients, full-batch Adam continuation, deterministic learned message initialization, and sparse GFE reverse-mode repairs. All child implementation tickets are closed. The exact zero-noise factor remains the independent future ticket cff-u06e; optional diagnostic-bound derivatives remain cff-1et5.
+
+Final validation at production code head 10e0615: uv run python tools/dashboard.py --run-suite passed 2,404 tests with 58 slow deselections. Pytest time 1,265.83 seconds; measured whole-suite wall 1,279.975 seconds (21m19.975s). Log: /tmp/cffg-neural-short.log; dashboard: /Users/ravd/agent-share/cffg-tests.html. The frozen regression and paired initializer benchmarks passed separately, as recorded in cff-ll6y and cff-3zzo.
+
+Following Cooper's explicit protocol, cff-domd moved nine already-passing lower-priority cases to slow, totaling 105.936 measured seconds. Estimated remaining wall time is 1,174.039 seconds (19m34.039s), not a new measured result. Collection confirms exactly those nine removals, no additions, and 2,395 selected tests. Production code is unchanged after the passing gate; no suite rerun was performed for selection-only pruning. Runtime history and dashboard retain the measured result. All required neural gradients, exact-support, float32 and scale checks remain short. git diff --check and tk dep cycle pass after ticket whitespace cleanup.
+
+Landing: cff-1o72 branches from cff-o7hs / PR #156; publish as its own stacked PR. No implementation work remains for this ticket.
