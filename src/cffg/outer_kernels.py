@@ -6,14 +6,12 @@ from typing import Protocol
 import jax
 import numpy as np
 
+from cffg.fixed_point import RootProgram, root_context
 from cffg.outer import (
-    OuterArrays,
     OuterChart,
     OuterKernelPlan,
     _make_root_diagnostics,
     _make_trust_kernel,
-    chart_arrays,
-    chart_coordinates,
     outer_chart_signature,
 )
 from cffg.runtime_types import State
@@ -64,60 +62,11 @@ class OuterKernelProvider:
         if compiled:
             static_indices = tuple((i0, i1) for i0, i1, _ in hard_blocks)
 
-            def residual(value, context):
-                (
-                    base,
-                    g_obs,
-                    g_mask,
-                    ef_obs,
-                    ef_mask,
-                    params,
-                    hard_values,
-                ) = context
-                arrays = chart_arrays(chart, value, base)
-                if self.reconstruct is not None:
-                    messages, g_eta, g_lam, ef_eta = self.reconstruct(
-                        arrays.messages,
-                        arrays.g_eta,
-                        arrays.g_lam,
-                        arrays.ef_eta,
-                        g_obs,
-                        g_mask,
-                        ef_obs,
-                        ef_mask,
-                        params,
-                    )
-                    arrays = OuterArrays(messages, g_eta, g_lam, ef_eta)
-                messages, g_eta, g_lam, ef_eta, _, _ = self.iter_step(
-                    arrays.messages,
-                    arrays.g_eta,
-                    arrays.g_lam,
-                    g_obs,
-                    g_mask,
-                    arrays.ef_eta,
-                    ef_obs,
-                    ef_mask,
-                    params,
-                    0.0,
-                    False,
-                )
-                for (i0, i1), hot in zip(static_indices, hard_values):
-                    messages = messages.at[i0].set(hot).at[i1].set(hot)
-                mapped = OuterArrays(messages, g_eta, g_lam, ef_eta)
-                return chart_coordinates(chart, mapped) - value
-
+            program = RootProgram(chart, self.iter_step, self.reconstruct, static_indices)
             self.cache[key] = (
-                _make_trust_kernel(residual, chart.size),
-                _make_root_diagnostics(residual),
+                _make_trust_kernel(program.residual, chart.size),
+                _make_root_diagnostics(program.residual),
             )
         trust, root_diagnostics = self.cache[key]
-        context = (
-            chart.base,
-            state.g_obs,
-            state.g_mask,
-            state.ef_obs,
-            state.ef_mask,
-            state.params,
-            tuple(hot for _, _, hot in hard_blocks),
-        )
+        context = root_context(chart, state, tuple(hot for _, _, hot in hard_blocks))
         return OuterKernelPlan(trust, root_diagnostics, context, compiled)

@@ -455,6 +455,89 @@ neutral dependent messages; invalid final beliefs have infinite energy and
 NaN moments. A missing DATA observation is marginalized. Exact zero noise,
 continuous-to-discrete means, and nonlinear P-substitution/GFE are excluded.
 
+#### Neural mean architecture
+
+`fixed_point_gradient(engine, result).require_valid()` returns the total weight
+derivative of a certified inference result. It includes changing cavities and
+local approximation coefficients; the objective remains the declared Gaussian
+surrogate. Stale, failed or exhausted solves cannot supply an applicable
+gradient. See DERIVATIONS D14 for the local isolated-root assumption.
+
+Use `neural_mean((input_dim, hidden_width, output_dim), method="sigma_point")`
+as the factor's `function`. This declares the `cffg.mean.mlp` implementation.
+`initialize_neural_parameters(function, key, dtype=...)` creates a flat weight
+array using the supplied JAX random key; store that array in the factor's
+`parameters` blob. The positive `cov` blob still describes output noise.
+
+Each layer stores its row-major weight matrix followed by its bias vector.
+Hidden layers apply `tanh` by default; `activation="identity"` is also
+supported. The output layer is affine. Architecture data stays in JSON and
+weights stay in blobs; loading/editing the declaration imports no JAX or
+Equinox. `estimate(engine, calibrate=False).declared_work` reports member count,
+network parameter count, scalar dense products and hidden activations per
+mean evaluation, and the method's value evaluations/Jacobian directions.
+These are declared operation counts, separate from backend FLOP estimates.
+
+#### Training and learned initialization
+
+`NeuralTrainer` performs deterministic full-batch Adam updates of the canonical
+weight blobs. Build one graph containing the training examples and share their
+weight blob; use `objective_scale=1 / example_count` to optimize mean energy.
+
+```python
+from cffg import NeuralTrainer, TrainingConfig
+
+trainer = NeuralTrainer(template, arrays, observations,
+                        config=TrainingConfig(objective_scale=1 / example_count))
+optimizer = trainer.initial_state()
+for _ in range(32):
+    update = trainer.step(optimizer)
+    optimizer = update.require_applied()
+trainer.save_checkpoint("optimizer.npz", optimizer)
+trainer.save_bundle("trained.cffgz", optimizer)
+```
+
+Every update requires certified inference and an independently certified
+adjoint solve. `update.objective` is the scaled energy **before** that update;
+`trainer.infer(optimizer)` evaluates the new weights. A refused update retains
+the original optimizer state. For restart, recreate the trainer with the
+original template, initial blobs, observations and settings, then call
+`trainer.load_checkpoint("optimizer.npz")`. The versioned continuation binds
+those inputs, dtype, tied parameter layout, optimizer moments and step count.
+It owns no random stream or minibatch position. The model bundle contains the
+trained point parameters for inference. These states are separate from
+conjugate `Learnables` posteriors.
+
+Smooth, deterministic GFE factors already admitted by the complete graph use
+their existing ledger and equations; the neural node remains a Gaussian
+surrogate. Nonlinear P-substitution, stochastic mu3 updates and discrete
+point-mass optimization are outside neural training's domain.
+
+`GaussianAmortizer.fit(template, arrays, training_observations, features=...)`
+trains an affine recognition output layer over `PolynomialFeatures`: powers
+of a declared weighted combination of scalar Gaussian observations. It fits
+only certified teacher roots in one fixed Gaussian chart. Feature scaling,
+output normalization, coefficients, reference messages, coordinate schema and
+model identity have versioned `save`/`load` persistence.
+
+```python
+from cffg import GaussianAmortizer, PolynomialFeatures
+
+recognition = GaussianAmortizer.fit(
+    template, arrays, training_observations,
+    features=PolynomialFeatures(("y",), (1.0,), scale=0.4, degree=3),
+)
+proposal, result = recognition.run(held_out_observations)
+state = result.require_converged()
+recognition.save("recognition.npz")
+```
+
+A proposal changes Gaussian starting messages only. Invalid or improper
+proposals are rejected without covariance floors; `run` then uses the supplied
+neutral start. Normal inference still certifies the final root. This API has
+no importance particles. Different roots remain possible in general nonlinear
+models; the paired benchmark checks final beliefs and energy as well as work.
+
 ### Recurrent switching state-space models
 
 The model helper assembles a complete rSLDS with state-dependent regime

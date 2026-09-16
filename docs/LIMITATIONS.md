@@ -35,8 +35,8 @@ but that is model *comparison* wrapped around the engine, not learning within it
 **H4. Tabular representation → combinatorial state walls.** Discrete variables are
 one-hot; joint states are Kronecker products. The T-maze is 4 positions × 2 reward
 contexts = 8 states; every new orthogonal feature multiplies. A matrices are
-|X|×|Z|, controlled transitions |Z|²×|U|. There is no representation learning and
-no amortization: raw pixels, audio, or text cannot be consumed without a
+|X|×|Z|, controlled transitions |Z|²×|U|. The tabular path has no representation learning or amortization: raw pixels,
+audio, or text cannot be consumed without a
 hand-built (or externally learned) discretization/featurization front-end. This is
 tabular RL's scaling wall, inherited intact. Neural hybrid nodes (S5) can push it
 back but change the free-energy semantics at the boundary.
@@ -545,11 +545,31 @@ structured (non-mean-field) constraints over control sequences, or explicit
 branching on future observations, trade compute for policy expressiveness.
 Receding-horizon replanning already recovers most practical value cheaply.
 
-**S5. Neural hybrid nodes.** Deterministic NN factors with learned amortized
-messages (extended-VMP style) are the known escape hatch from H4's tabular wall —
-JAX makes the plumbing natural. Research-grade: the FE contribution of such nodes
-is approximate, so they must be quarantined behind explicit "surrogate" bead
-types to keep the exact-FE guarantee for the rest of the graph.
+**S5. Neural Gaussian means and recognition.** Dense neural means now enter
+positive-noise Gaussian conditionals through Taylor linearization or fixed
+sigma points (DERIVATIONS D13). Their labeled frozen Gaussian Bethe terms
+claim conditional stationarity only. Rebuilding coefficients as cavities
+change adds a fixed-point consistency condition; the resulting adaptive root
+need not make the total reported energy stationary, and that energy has no
+established nonlinear evidence bound. Exact zero noise remains cff-u06e;
+arbitrary nonlinear P-substitution and Gaussian-only GFE are unsupported.
+
+Neural training differentiates the complete adaptive root and approximate
+ledger under a local isolated differentiable-root assumption (D14). Root and
+original-adjoint residual checks detect failed or exhausted numerical solves;
+they do not prove nonsingularity in every direction, global uniqueness or a
+minimum. Stochastic mu3 and discrete point-mass decisions are rejected.
+Adam continuation is deterministic and full-batch; it binds the original
+training initialization and data. It does not provide weight uncertainty,
+minibatch scheduling or conjugate posterior learning.
+
+The learned initializer is an affine recognition output layer over declared
+polynomial features of scalar Gaussian observations. It predicts Gaussian
+messages only, requires proper proposed beliefs without clipping, and leaves
+final certification to the normal solver. The bounded paired benchmark
+checks matching roots and a positive work-reduction confidence interval;
+there is no universal speedup or same-root theorem for multiple-root models.
+This deterministic API has no particles or importance sampling.
 
 **S6. Structure search as an outer loop.** Free energy is a model-comparison
 score, so propose-and-score topology search (add state, split factor, compare FE

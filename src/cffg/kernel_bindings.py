@@ -155,6 +155,7 @@ class GaussianBinding(ImmutableRecord):
     configure: Callable | None = None
     iterative: bool = False
     objective: str = "analytic"
+    work: Mapping[str, int] = field(default_factory=dict)
     arena: str = field(default="gaussian", init=False)
 
     @property

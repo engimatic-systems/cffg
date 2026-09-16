@@ -84,9 +84,16 @@ def _run(engine, data, learning=None):
     return result
 
 
-@pytest.mark.parametrize("kind", ("rslds", "gaussian"))
-@pytest.mark.parametrize("dtype", (np.float32, np.float64))
-@pytest.mark.parametrize("cadence", ("accumulate", "replace"))
+@pytest.mark.parametrize("cadence,dtype,kind", [
+    pytest.param("accumulate", np.float32, "rslds", marks=pytest.mark.slow),
+    ("accumulate", np.float32, "gaussian"),
+    pytest.param("accumulate", np.float64, "rslds", marks=pytest.mark.slow),
+    ("accumulate", np.float64, "gaussian"),
+    ("replace", np.float32, "rslds"),
+    ("replace", np.float32, "gaussian"),
+    ("replace", np.float64, "rslds"),
+    ("replace", np.float64, "gaussian"),
+])
 def test_all_families_resume_identical_next_update(tmp_path, kind, dtype, cadence):
     with jax.enable_x64(dtype == np.float64):
         template, arrays, engine, learning, first, later = _fixture(kind, dtype)
@@ -221,6 +228,7 @@ def test_recurrence_bundle_restore_requires_current_complete_state(tmp_path, cor
     _same_arrays(learning.state_dict(), before)
 
 
+@pytest.mark.slow
 def test_fitted_rslds_exports_complete_state_and_resumes(tmp_path):
     from test_rslds_fit import _fit, _observations
 

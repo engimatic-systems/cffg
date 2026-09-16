@@ -1,7 +1,7 @@
 ---
 id: cff-1o72
-status: open
-deps: [cff-o7hs]
+status: closed
+deps: [cff-o7hs, cff-n60h, cff-v53k, cff-ll6y, cff-3zzo, cff-domd]
 links: [cff-fxmj, cff-o7hs, cff-ri8m, cff-l6i5, cff-209l, cff-cz6v, cff-u06e]
 created: 2026-07-08T16:50:10Z
 type: feature
@@ -106,3 +106,47 @@ Intelligible-ticket review: complete.
 **2026-09-15T17:58:09Z**
 
 Implementation handoff from bounded GPT-6 Astra xhigh code research: reuse gaussian_nonlinear plus a neural MeanImplementation and portable FunctionSpec configuration. Factor parameters have canonical blob/role ownership in member_of; build a JAX-only injection plan that scatters one trainable vector per tied blob to every packed reader. set_params is host validation, not differentiable. Extract the existing chart unpack, exact-forest reconstruction, full adaptive update and raw ledger composition from OuterKernelProvider into one shared root-program owner. For R_u transpose lambda = E_u, use a matrix-free adjoint solve and explicitly certify its original residual; JAX GMRES info alone does not certify convergence. Total gradient is E_theta minus R_theta transpose lambda, including all adaptive coefficient and reconstruction dependence. Gate on a matching certified result and finite energy; changing observations/weights invalidates a prior certificate. Existing Learnables persistence is conjugate-family-specific, so optimizer state needs a separate versioned array checkpoint with structure, fixed-parameter and target-layout identity, atomic restoration, and explicit PRNG/data-position state if owned. Amortization can be a deterministic learned proposal from certified targets; importance sampling is then N/A. Preserve exact support, reject improper proposals without floors, and verify held-out paired final-root agreement plus the requested95% sweep-reduction interval. Sources: params.py, compiled member addresses, outer_kernels.py, outer.py, runtime_types.py, learning_schema.py, _agent_checkpoint.py, and installed JAX GMRES. Confidence high for code ownership and observed API behavior; training/benchmark evidence remains to be implemented.
+
+**2026-09-15T18:35:51Z**
+
+Bounded implementation plan (tk dependencies are authoritative). Legend: prerequisite --> dependent.
+
+[x] cff-o7hs (PR156)
+  +--> [x] cff-n60h (portable neural mean)
+         +--> [ ] cff-v53k (ready: complete fixed-point derivative)
+                +--> [ ] cff-ll6y (optimizer and continuation)
+                +--> [ ] cff-3zzo (deterministic amortized initialization)
+                       |
+        completed children --> [ ] cff-1o72 --> [ ] cff-ahps
+
+Optimizer and amortizer work can proceed independently once the shared derivative/root boundary is available. Exact-zero-noise derivation cff-u06e remains independently ready and is outside this implementation.
+
+**2026-09-15T19:16:17Z**
+
+Implementation is complete across the bounded child tickets; the final short-suite gate remains pending. Architecture change paths: New factor or rule family, Runtime numerical or status invariant, and Learnable or checkpoint feature. Duplicated-surface audit: core JSON/hash/bundle and lazy import; parameter tying/injection; mixed/flood/exact-island reconstruction; local JIT/vmap and host run control; raw complete energy; dtype and exact support; checkpoint save/load and public facade are covered. Existing Colony uses the same neural rule and host adaptive solve. Training/amortizer own no RollingAgent cadence, conjugate posterior, particles, PRNG continuation or minibatch cursor; those pairs are N/A.
+
+Legend: prerequisite --> dependent (only this ticket's immediate work shown)
+
+[x] cff-o7hs --> [x] cff-n60h --> [x] cff-v53k
+                                    |       |
+                                    |       +--> [x] cff-3zzo --+
+                                    +--> [x] cff-ll6y ---------+--> [ ] cff-1o72 (final gate)
+[x] cff-6kwo ---------------------> cff-ll6y                         |
+                                                                   +--> [ ] cff-ahps (other blockers remain)
+
+cff-u06e remains independent future work for exact zero noise. cff-1et5 tracks derivatives of an optional entropy-bound diagnostic outside the training energy. tk ready confirms cff-1o72 has no open prerequisites; tk dep cycle passes. Frozen regression and paired-recognition benchmarks passed; both code and validation details are in the child tickets and D14.
+
+
+**2026-09-16T00:26:38Z**
+
+Completed neural Gaussian means, total certified fixed-point gradients, full-batch Adam continuation, deterministic learned message initialization, and sparse GFE reverse-mode repairs. All child implementation tickets are closed. The exact zero-noise factor remains the independent future ticket cff-u06e; optional diagnostic-bound derivatives remain cff-1et5.
+
+Final validation at production code head 10e0615: uv run python tools/dashboard.py --run-suite passed 2,404 tests with 58 slow deselections. Pytest time 1,265.83 seconds; measured whole-suite wall 1,279.975 seconds (21m19.975s). Log: /tmp/cffg-neural-short.log; dashboard: /Users/ravd/agent-share/cffg-tests.html. The frozen regression and paired initializer benchmarks passed separately, as recorded in cff-ll6y and cff-3zzo.
+
+Following Cooper's explicit protocol, cff-domd moved nine already-passing lower-priority cases to slow, totaling 105.936 measured seconds. Estimated remaining wall time is 1,174.039 seconds (19m34.039s), not a new measured result. Collection confirms exactly those nine removals, no additions, and 2,395 selected tests. Production code is unchanged after the passing gate; no suite rerun was performed for selection-only pruning. Runtime history and dashboard retain the measured result. All required neural gradients, exact-support, float32 and scale checks remain short. git diff --check and tk dep cycle pass after ticket whitespace cleanup.
+
+Landing: cff-1o72 branches from cff-o7hs / PR #156; publish as its own stacked PR. No implementation work remains for this ticket.
+
+**2026-09-16T00:27:21Z**
+
+Published PR #157: https://github.com/engimatic-systems/cffg/pull/157 . Base is cff-o7hs / PR #156. Both requested implementations are complete in separate reviewable PRs; all implementation and budget tickets are closed. The passing suite and post-run selection estimate are recorded above. No required implementation or validation work remains.

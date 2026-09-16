@@ -58,7 +58,7 @@ while reserved syntax that round-trips but cannot execute is syntax only.
 | Known data constraint, non-terminating form, Part I §5.3 Fig. 10 | No representation: degree-two variables cannot carry ports | Unsupported | `_check_degrees_and_ports` rejects a port on a fully connected variable. Supporting the paper's information-blocking bead on an interior edge requires separate IR and execution semantics. |
 | Fixed model clamp, Part II §2.4 Fig. 1 | `FactorSpec.param_blobs` binds a fixed value to a factor parameter role | Exact for registered factor roles; this is part of the model, not observed data | Parameter packing and each registered rule consume the blob; `test_blob_bound_node_loses_default` and `test_wire_terminals` check the distinct black-square diagram terminal. |
 | Optimized δ/point mass, Part I §5.3 Eq. (30), Fig. 11 and Fig. 29 application | `ConstraintKind.DELTA` on a discrete edge; compiler records `delta_pairs`; the hardening phase projects both slots to the marginal argmax | Exact discrete point-mass coordinate | Ordinary ledger evaluated on the point mass; `test_map_policy_variant`. Dirichlet-parameter, Gaussian, and EF edges are rejected with named compile errors. |
-| Moment matching, Part I §5.4 Eq. (31), Fig. 12 | `MOMENT_MATCHING` names a factor and records `role` plus `projection` in its details. `gaussian_first_second` selects E[X] and E[XXᵀ]; each endpoint is independent. | Exact Gaussian prior/linear rules accept Gaussian moments; nonlinear EP remains pending | `core/moment_matching.py` validates and explicitly migrates declarations; registered Gaussian capabilities gate execution. Figure 12 diagrams retain one E edge bead and dash only selected half-edges. Factor-only legacy payloads round-trip but cannot compile or draw. `test_moment_matching_schema.py` covers both endpoints, transport, admission, and diagrams. |
+| Moment matching, Part I §5.4 Eq. (31), Fig. 12 | `MOMENT_MATCHING` names a factor and records `role` plus `projection` in its details. `gaussian_first_second` selects E[X] and E[XXᵀ]; each endpoint is independent. | Exact Gaussian prior/linear rules accept Gaussian moments; adaptive nonlinear conditionals use the named D13 Gaussian surrogate | `core/moment_matching.py` validates and explicitly migrates declarations; registered Gaussian capabilities gate execution. Figure 12 diagrams retain one E edge bead and dash only selected half-edges. Factor-only legacy payloads round-trip but cannot compile or draw. `test_moment_matching_schema.py` covers both endpoints, transport, admission, and diagrams. |
 | P-substitution, Part I §4 Eqs. (20–25), §5.5 Eq. (32), Fig. 13; Part II §3.3.2 Eqs. (4–5), §4.1 Eqs. (6–8) | `ConstraintKind.P_SUBSTITUTION` plus `substituted_role`; compiler derives a discrete, transition-mixture, or hybrid GFE plan only for registered shapes | Exact local Fig. 5 fixed-A composite; named tentative-decision/analytic-moment approximation for uncertain A without functional `mu3`; separately named TM/hybrid extensions; unsupported otherwise | Specialized GFE update/energy functions own the substituted edge term in `ledger.make_belief_energy`. Compiler rejects unsupported roles, factors, goals, uncertainty modes, and evaluator names. Figure 5 authorities are inventoried below. |
 | Trial-time planning bead → data bead, Part II §6.3 Fig. 7 (static contrast in §3.3 Fig. 3) | `RollingAgent` uses immutable planning and filtering templates plus a carried boundary belief; it does not mutate one growing trial graph | Exact window-transformation oracle for the fixed-A binary discrete joint-boundary case; named two-window realization outside that boundary | `test_literal_snapshots_record_the_constraint_change_without_rewriting_variables` checks the immutable before/after declarations. `test_two_window_agent_matches_two_step_enumerator_and_local_ledgers` checks both action posteriors, the filter posterior, boundary carry, local GFE, the derived boundary offset, and the two-structure bound against independent enumeration. Exact-zero and float32 cases are separate authorities in the same file. |
 
@@ -128,7 +128,7 @@ and review context proportional to the change.
 | New IR field | `src/cffg/core/ir.py` (`Template` or its spec dataclass) | `src/cffg/core/validate.py`; `src/cffg/core/serialize.py` (`to_dict`, `from_dict`, `structure_hash`); `src/cffg/core/plates.py` scoping; `src/cffg/core/compose.py` and `src/cffg/core/edits.py` when editable; `src/cffg/topology.py` declaration snapshots/layout, `src/cffg/specialized/` semantic claims/drafts, `src/cffg/registered/` same-arena drafts, `src/cffg/resolution/` arrays/addresses, `src/cffg/assembly.py` arena assembly, and `src/cffg/compiled.py` values when executable; bundle and agent state when persisted | `tests/test_ir.py`, `tests/test_serialize.py`, `tests/test_plates.py`, `tests/test_topology.py`, `tests/test_registered.py`, `tests/test_resolution.py`, `tests/test_assembly.py`; add `tests/test_edit_codec.py`, `tests/test_edits.py`, `tests/test_agent_spec.py`, or `tests/test_bundle.py` only for the affected boundary | Contract in this document; public construction and migration in `README.md`; unsupported cases in `LIMITATIONS.md` |
 | New factor or rule family | `src/cffg/kernels.py:FactorKernel`, `kernel_bindings.py`, its `src/cffg/core/ir.py:FactorType`, and the family rule module; formal equations are authoritative in code docstrings and `DERIVATIONS.md` | `topology.py` declared role/slot facts; `specialized/` named family discovery/completion; `registered/` binding capabilities and same-arena structural lowering; common declarations in `array_requirements.py`; `registered/packing.py` and `specialized/packing.py` family adapters; `resolution/` parameter/observation resolution; `assembly.py`, `Arena`, and `member_of`; typed local updates in `execution/` and `ExecutionDelta`; registered mathematics/readouts/energy in `kernel_runtime.py`; objective assembly in `ledger.py` and specialized local terms in `ledger_terms.py`; `execution/synchronous.py:make_sweep`; `execution/transport.py` and `schedule_program.py` batch/registerized/flat scans; `lifecycle.py` observation binding and `mu3_lifecycle.py` functional state; `ledger.make_belief_energy`; support checks, assignment scoring, `readouts/` posterior/statistic adapters, schedule classification, serialization manifest, estimator, and public exports as applicable | `tests/test_kernels.py`, `tests/test_execution.py`, `tests/test_registered.py`, `tests/test_resolution.py`, `tests/test_assembly.py`, `tests/test_discrete_kernels.py`, `tests/test_gaussian_kernels.py`, `tests/test_gaussian_kernel_schedules.py`; `tests/test_ledger.py`, `tests/test_readout_owners.py`; family rule and engine-oracle tests; `tests/test_schedule.py`, `tests/test_schedule_program.py`; sparse-support, float32, and uncomfortable-scale cases | Derivation in `DERIVATIONS.md`; integration contract here; approximations in `LIMITATIONS.md`; public modeling API in `README.md` |
 | Runtime numerical or status invariant | `AGENTS.md` numerical contract and `src/cffg/runtime_types.py` (state/result/status values) and `src/cffg/iteration.py` (ordinary policy), `exact_strategy.py` and `outer_strategy.py` (distinct run control), and `run_results.py` (public results), plus `ledger.py` and `ledger_terms.py` (objectives) and `readouts/` (posteriors/statistics) | Flooding, colored/mixed, and exact schedules; host `runtime_checks.StateChecks` and `schedule_program.make_support_check`; `execution.synchronous.make_sweep`, `ScheduleProgram`, `make_exact_unit`, `make_propagate`, and `ledger.make_belief_energy`; `StateLifecycle`/`Mu3Lifecycle` initialization, preparation and status forwarding; inner-solver status; `RollingAgent`, `Colony`, estimator, benchmark, and dashboard consumers | `tests/test_runtime_status.py`, `tests/test_schedule.py`, `tests/test_schedule_program.py`, `tests/test_engine_contracts.py`, `tests/test_lifecycle.py`, `tests/test_iteration.py`, `tests/test_ledger.py`, `tests/test_readout_owners.py`, `tests/test_run_strategies.py`, `tests/test_colony.py`, `tests/test_colony_failures.py`, `tests/test_constraint_data.py`, `tests/test_constraint_reconstruction.py`, plus the changed rule family's hostile-input tests | Runtime contract here and in `README.md`; any accepted failure mode or approximation in `LIMITATIONS.md` |
-| Learnable or checkpoint feature | `src/cffg/core/ir.py` (`LearnableSpec`, `AgentSpec`, `BeliefBinding`) and `src/cffg/learn.py` (`Family`, `Learnables`) | Validation, JSON/hash, plate scoping, specialized parameter/objective ownership, `resolution/addresses.py:resolve_learnables` and declared member/parameter requirements, `Arena.learn_plans`, `member_of`, `StateLifecycle` initial arrays and binding, `Mu3Lifecycle` functional parameter state, `readouts/` adapters and `StateLifecycle.with_goal_priors`, agent cadence, checkpoint encode/decode and legacy migration, and bundles | `tests/test_learnables.py`, `tests/test_readout_owners.py`, `tests/test_lifecycle.py`, `tests/test_constraint_reconstruction.py`, `tests/test_resolution.py`, `tests/test_assembly.py`, `tests/test_agent_spec.py`, `tests/test_agent.py`, and `tests/test_bundle.py`; add the contributing factor family's statistic test | Conjugate contract here; statistics beyond the papers in `DERIVATIONS.md`; public cadence/checkpoint API in `README.md`; remaining family gaps in `LIMITATIONS.md` |
+| Learnable or checkpoint feature | `src/cffg/core/ir.py` (`LearnableSpec`, `AgentSpec`, `BeliefBinding`) and `src/cffg/learn.py` (`Family`, `Learnables`); neural point training in `training.py` and recognition in `amortization.py` | Validation, JSON/hash, plate scoping, specialized parameter/objective ownership, `resolution/addresses.py:resolve_learnables` and declared member/parameter requirements, `Arena.learn_plans`, `member_of`, `StateLifecycle` initial arrays and binding, `Mu3Lifecycle` functional parameter state, `readouts/` adapters and `StateLifecycle.with_goal_priors`, agent cadence, checkpoint encode/decode and legacy migration, and bundles | `tests/test_learnables.py`, `tests/test_readout_owners.py`, `tests/test_lifecycle.py`, `tests/test_constraint_reconstruction.py`, `tests/test_resolution.py`, `tests/test_assembly.py`, `tests/test_agent_spec.py`, `tests/test_agent.py`, and `tests/test_bundle.py`; add the contributing factor family's statistic test | Conjugate contract here; statistics beyond the papers in `DERIVATIONS.md`; public cadence/checkpoint API in `README.md`; remaining family gaps in `LIMITATIONS.md` |
 
 Duplicated execution surfaces are deliberate review pairs: host/JIT,
 flooding/scheduled, single-instance/`vmap`, and current/legacy checkpoint
@@ -940,6 +940,17 @@ batched callbacks. The nonlinear factor's structural roles are `out,in` and
 its numeric parameter roles are `parameters,cov`. No conjugate-learning family
 is implied by the statistic callback.
 
+`neural_schema.py` declares `cffg.mean.mlp` through the same mean registry.
+Layer widths include input and output; hidden activation is `tanh` or
+`identity`, and the output is affine. Every layer packs its row-major matrix
+then bias. The architecture validator and shape/work declarations import no
+JAX. `neural.py` evaluates dynamic flat weights and initializes them from an
+explicit JAX key. No Equinox module or Python callable is serialized.
+The compiled nonlinear binding therefore retains ordinary `member_of` blob
+tying, covariance guards, objective labels and both scheduling routes.
+`Estimate.declared_work` carries per-member network counts plus member count,
+separately from exact persistent bytes and backend cost analysis.
+
 An iterative Gaussian binding is excluded from directed exact nodes in
 `schedule.py`. Its neighbors may still form exact batch/scan islands; the
 mixed synchronous phase executes the adaptive group through the same
@@ -947,7 +958,33 @@ mixed synchronous phase executes the adaptive group through the same
 residual/status facts through that route. `Engine.run` and `Colony.run` select
 the existing matrix-free outer trust solver for any such binding. Approximation
 coefficients are rebuilt inside its complete residual map, including JVP/VJP
-derivatives. The dimensionless Gaussian chart uses unit residual weights;
+derivatives.
+`fixed_point.RootProgram` owns the shared chart decoding, forest
+reconstruction, complete update, residual and raw energy composition. Its
+typed `RootContext` keeps parameters, observations, masks and hard values
+dynamic. `OuterKernelProvider` builds its cached trust and diagnostic kernels
+from this program, so training uses the same equations.
+`implicit.py` differentiates the complete root and raw energy with a matrix-free
+transposed solve (DERIVATIONS D14). Its result exposes a gradient only after
+fresh root and original-adjoint residual certificates. `trainable.py` owns
+canonical weight coordinates and differentiable injection into all tied readers.
+`FixedPointDifferentiator` reuses a fixed coordinate metric across training
+updates while passing all numerical context dynamically. `training.py` owns
+full-batch Adam state and applies only certified gradients. Its versioned
+`neural_artifacts.py` checkpoint binds the original model/initialization, data,
+settings, dtype, target layout, moments and step count before publishing a
+restored immutable state. It has no owned stochastic/data-position state.
+Point exports use the ordinary bundle owner; conjugate learning is separate.
+`amortization.py` learns an affine map of declared polynomial observation
+features into selected Gaussian coordinates. One certified reference fixes
+the chart for every target and proposal. It preserves all other message
+arenas, parameters, observations and masks, checks proper candidate beliefs
+and local updates, and delegates final root certification to `Engine.run`.
+Its versioned artifact contains the feature and coordinate schemas,
+normalizers, trained output layer and numeric reference. Host proposal
+admission wraps a JAX/vmap-compatible recognition map. No particles or
+importance-weight semantics are implied.
+The dimensionless Gaussian chart uses unit residual weights;
 initially satisfied equations do not acquire artificially large weights.
 Failed auxiliary proposals clear their acceleration history before any
 least-squares solve. The solver certifies finite surrogate change and full
@@ -2179,7 +2216,7 @@ land as docstrings; delegation guidance lives in the epic:
   are coupled to a Gaussian drive with source-specific logistic sticks and a
   Pólya–Gamma/JJ VMP update, supplying the transition primitive needed by the
   rSLDS graph without materializing a state-dependent transition tensor.
-- **M12 — Nonlinear factors** (cff-o7hs): Jacobian linearization and
+- **M12 — Nonlinear factors** (cff-o7hs, implemented): Jacobian linearization and
   sigma-point moment matching; builds on the endpoint- and projection-aware
   `MOMENT_MATCHING` schema and explicit legacy migration.
 - **M13 — Exponential-family abstraction** (cff-8s6a, cff-l6i5, landed):
@@ -2190,9 +2227,10 @@ land as docstrings; delegation guidance lives in the epic:
   on the existing arenas + combinatorial hard-constraint messages
   (alldifferent, cardinality, linear inequalities); the ledger API must
   distinguish FE (sum-product) from objective value (min-sum).
-- **M15 — Neural factors** (cff-1o72): NN nodes via Equinox, FE-gradient
-  training through the (implicitly differentiated) fixed point, amortized
-  message initialization.
+- **M15 — Neural factors** (cff-1o72, implemented): portable dense neural
+  Gaussian means, total approximate-energy gradients through certified
+  inference roots, versioned Adam continuation and deterministic recognition
+  of Gaussian starting messages.
 - **Hybrid GFE epistemics** (cff-dfpi/cff-izjd, landed): continuous curiosity
   is channelled through discrete regime variables with a declared
   collapse-entropy bound; arbitrary Gaussian-only/nonlinear GFE remains open.
