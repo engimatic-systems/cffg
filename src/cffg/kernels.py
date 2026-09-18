@@ -242,6 +242,12 @@ def register_kernel(k: FactorKernel) -> FactorKernel:
             problems.append(
                 "Gaussian binding requires message and node-energy callbacks"
             )
+        if b.configure is not None and not callable(b.configure):
+            problems.append("Gaussian configure must be callable when declared")
+        if not isinstance(b.iterative, bool):
+            problems.append("Gaussian iterative must be a boolean")
+        if not isinstance(b.objective, str) or not b.objective:
+            problems.append("Gaussian objective requires a nonempty label")
         for callback_name, callback in (
             ("statistics", b.statistics),
             ("readout", b.readout),
@@ -691,5 +697,17 @@ _install_gaussian(
         improper_messages="Vacuous messages are neutral; improper required beliefs report infinite energy and false propriety.",
         float32="Information-form rules and covariance validation use dtype-scaled guards.",
         scale="Local dimension padding only; tested at dimension100 and above.",
+    ),
+)
+
+from cffg.nonlinear_kernels import install as _install_nonlinear
+
+_install_nonlinear(
+    register_kernel, FactorKernel,
+    HostileInputs(
+        sparse_support="N/A: positive-noise Gaussian conditional on continuous Gaussian edges.",
+        improper_messages="Vacuous input has no anchor and sends neutral messages; improper required beliefs or nonfinite functions report failure and infinite energy.",
+        float32="Propriety and symmetry use dtype and matrix scale; sigma-point covariance uses nonnegative residual outer products without a ridge.",
+        scale="Only incident Gaussian matrices and member-batched parameters are stored; no whole-graph Jacobian.",
     ),
 )

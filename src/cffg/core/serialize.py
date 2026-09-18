@@ -85,6 +85,11 @@ def _plate_from_dict(d: dict[str, Any]) -> PlateSpec:
 
 
 def to_dict(t: Template) -> dict[str, Any]:
+    from cffg.core.moment_matching import moment_matching_problems
+
+    problems = moment_matching_problems(t)
+    if problems:
+        raise ValueError("cannot serialize invalid moment matching: " + "; ".join(problems))
     conflicts = p_substitution_conflicts(t.constraints)
     if conflicts:
         raise ValueError(
@@ -108,6 +113,7 @@ def to_dict(t: Template) -> dict[str, Any]:
                 "edges": dict(sorted(f.edges.items())),
                 "param_edges": dict(sorted(f.param_edges.items())),
                 "param_blobs": dict(sorted(f.param_blobs.items())),
+                **({"function": f.function.to_dict()} if f.function is not None else {}),
             }
             for f in _sorted(t.factors)
         },
@@ -193,6 +199,9 @@ def to_dict(t: Template) -> dict[str, Any]:
 
 
 def from_dict(d: dict[str, Any]) -> Template:
+    from cffg.core.functions import FunctionSpec
+    from cffg.mean_functions import resolve_mean_function
+
     from cffg.core.learning_identity import declaration_identity
 
     learning_version = d.get("learning_schema_version")
@@ -202,6 +211,9 @@ def from_dict(d: dict[str, Any]) -> Template:
         raise ValueError(
             f"schema version {d.get('schema_version')!r} != supported {SCHEMA_VERSION!r}"
         )
+    for factor in d.get("factors", {}).values():
+        if "function" in factor:
+            resolve_mean_function(FunctionSpec.from_dict(factor["function"]))
     _check_kernel_requirements(d)
     return Template(
         name=d["name"],
@@ -218,6 +230,7 @@ def from_dict(d: dict[str, Any]) -> Template:
                 edges=dict(spec["edges"]),
                 param_edges=dict(spec.get("param_edges", {})),
                 param_blobs=dict(spec.get("param_blobs", {})),
+                function=FunctionSpec.from_dict(spec["function"]) if "function" in spec else None,
             )
             for name, spec in d["factors"].items()
         },

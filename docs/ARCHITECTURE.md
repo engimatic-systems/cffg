@@ -58,7 +58,7 @@ while reserved syntax that round-trips but cannot execute is syntax only.
 | Known data constraint, non-terminating form, Part I §5.3 Fig. 10 | No representation: degree-two variables cannot carry ports | Unsupported | `_check_degrees_and_ports` rejects a port on a fully connected variable. Supporting the paper's information-blocking bead on an interior edge requires separate IR and execution semantics. |
 | Fixed model clamp, Part II §2.4 Fig. 1 | `FactorSpec.param_blobs` binds a fixed value to a factor parameter role | Exact for registered factor roles; this is part of the model, not observed data | Parameter packing and each registered rule consume the blob; `test_blob_bound_node_loses_default` and `test_wire_terminals` check the distinct black-square diagram terminal. |
 | Optimized δ/point mass, Part I §5.3 Eq. (30), Fig. 11 and Fig. 29 application | `ConstraintKind.DELTA` on a discrete edge; compiler records `delta_pairs`; the hardening phase projects both slots to the marginal argmax | Exact discrete point-mass coordinate | Ordinary ledger evaluated on the point mass; `test_map_policy_variant`. Dirichlet-parameter, Gaussian, and EF edges are rejected with named compile errors. |
-| Moment matching, Part I §5.4 Eq. (31), Fig. 12 | The paper selects a node endpoint on an incident edge and a sufficient-statistic projection; each end may be selected independently. The legacy factor-only `ConstraintKind.MOMENT_MATCHING` cannot express those choices. | Underspecified legacy syntax only | Serialization and hashing retain the placeholder, but compilation and diagram derivation reject it. `test_legacy_moment_matching_placeholder_round_trips_but_compilation_rejects` and `test_legacy_moment_matching_placeholder_is_rejected` are the guards. EP execution requires a new schema plus migration, factor-specific rules, and a ledger. |
+| Moment matching, Part I §5.4 Eq. (31), Fig. 12 | `MOMENT_MATCHING` names a factor and records `role` plus `projection` in its details. `gaussian_first_second` selects E[X] and E[XXᵀ]; each endpoint is independent. | Exact Gaussian prior/linear rules accept Gaussian moments; nonlinear EP remains pending | `core/moment_matching.py` validates and explicitly migrates declarations; registered Gaussian capabilities gate execution. Figure 12 diagrams retain one E edge bead and dash only selected half-edges. Factor-only legacy payloads round-trip but cannot compile or draw. `test_moment_matching_schema.py` covers both endpoints, transport, admission, and diagrams. |
 | P-substitution, Part I §4 Eqs. (20–25), §5.5 Eq. (32), Fig. 13; Part II §3.3.2 Eqs. (4–5), §4.1 Eqs. (6–8) | `ConstraintKind.P_SUBSTITUTION` plus `substituted_role`; compiler derives a discrete, transition-mixture, or hybrid GFE plan only for registered shapes | Exact local Fig. 5 fixed-A composite; named tentative-decision/analytic-moment approximation for uncertain A without functional `mu3`; separately named TM/hybrid extensions; unsupported otherwise | Specialized GFE update/energy functions own the substituted edge term in `ledger.make_belief_energy`. Compiler rejects unsupported roles, factors, goals, uncertainty modes, and evaluator names. Figure 5 authorities are inventoried below. |
 | Trial-time planning bead → data bead, Part II §6.3 Fig. 7 (static contrast in §3.3 Fig. 3) | `RollingAgent` uses immutable planning and filtering templates plus a carried boundary belief; it does not mutate one growing trial graph | Exact window-transformation oracle for the fixed-A binary discrete joint-boundary case; named two-window realization outside that boundary | `test_literal_snapshots_record_the_constraint_change_without_rewriting_variables` checks the immutable before/after declarations. `test_two_window_agent_matches_two_step_enumerator_and_local_ledgers` checks both action posteriors, the filter posterior, boundary carry, local GFE, the derived boundary offset, and the two-structure bound against independent enumeration. Exact-zero and float32 cases are separate authorities in the same file. |
 
@@ -142,15 +142,20 @@ A pure-Python (dataclass) representation, independent of JAX:
 - `VariableSpec` supports discrete cardinalities, Gaussian dimensions, and
   scalar exponential-family tags. `FactorSpec` holds a type plus parameter
   references. Default normalization and marginalization are implicit;
-  `ConstraintSpec` holds discrete δ, naive mean-field, legacy moment-matching,
+  `ConstraintSpec` holds discrete δ, naive mean-field, endpoint moment-matching,
   and P-substitution beads. GFE composites are derived
   compiler plans detected from factors and constraints; they are not a separate
-  serialized IR node. `MOMENT_MATCHING` is an underspecified factor-only legacy
-  placeholder: it cannot identify the paper's incident edge endpoint or
-  sufficient-statistic projection. Compilation names the target factor and
-  rejects it before arena construction, and diagram generation rejects it
-  rather than drawing the wrong bead. Executable EP requires a new schema and
-  migration in addition to factor-specific projection and ledger rules.
+  serialized IR node. `moment_matching(factor, role, projection)` identifies
+  one structural endpoint; Gaussian projection selects first and second
+  moments. Role names remain local when templates are scoped, composed or
+  expanded into plates. `migrate_moment_matching` requires the caller to
+  supply the missing role and projection for a legacy factor-only payload;
+  compilation and diagram generation continue to reject that legacy syntax.
+  Gaussian bindings declare their supported `moment_projections`. For the
+  analytic Gaussian prior and linear conditional, first/second-moment
+  consistency is equivalent to full Gaussian density consistency, so their
+  existing messages and node energies remain exact. Nonlinear projected
+  messages and their objective still require their own numerical contract.
 - **P-substitution declaration consistency.** `core/constraint_details.py`
   checks every declaration and every raw detail key before dictionary conversion
   can discard a conflicting value. Core validation preserves existing target/
@@ -255,7 +260,9 @@ A pure-Python (dataclass) representation, independent of JAX:
   helper. Their focused modules remain canonical owners. Before 1.0, rule
   tables, compiled arenas/group plans, kernel registration objects, and private
   helpers are internal-unstable; serialized schemas retain their explicit
-  version contracts.
+  version contracts. The facade resolves exports on first access, so importing
+  `cffg.core` does not import JAX or Equinox. Fresh-process tests forbid those
+  runtime imports while validating and round-tripping a template.
 
 ### 2. Compiler (`cffg.compiler`)
 
@@ -911,6 +918,54 @@ its existing operation order and learning schemas, including cross-covariance,
 propriety and missing-row masks. It is separate from JAX message/energy
 callbacks; registration does not imply a new conjugate-learning family.
 
+`FactorSpec.function` is an optional, immutable `FunctionSpec`: a namespaced
+mean implementation, required semantic version, JSON configuration, and
+`linearization` or `sigma_point` method. It contains no arrays or executable
+objects. Core validation, editing, JSON, hashing, scoping, and plates preserve
+it without importing JAX. `mean_functions.py` resolves its host registration;
+the installed version must share its major version and meet its minimum
+version. Missing implementations fail on loading. Numeric parameters and
+positive noise covariance retain ordinary blob ownership and bundle storage.
+
+`GaussianBinding.configure` specializes a binding from this declaration and
+incident dimensions before source-shape inference. Registry snapshots retain
+the resulting binding by factor name. Grouping includes the canonical function
+declaration; members with equal configuration share a group while their
+`theta` and noise precision `W` retain separate leading rows. Configuration
+changes therefore cannot alias parameter addresses. Named writes use existing
+parameter ownership and covariance validation. `nonlinear.py` owns both local
+approximations, tilted moments, replacement sites, and normalized node energy
+(DERIVATIONS D13); `nonlinear_kernels.py` owns configured shape/packing and
+batched callbacks. The nonlinear factor's structural roles are `out,in` and
+its numeric parameter roles are `parameters,cov`. No conjugate-learning family
+is implied by the statistic callback.
+
+An iterative Gaussian binding is excluded from directed exact nodes in
+`schedule.py`. Its neighbors may still form exact batch/scan islands; the
+mixed synchronous phase executes the adaptive group through the same
+`execute_gaussian` callback used by flooding. `ExecutionDelta` carries local
+residual/status facts through that route. `Engine.run` and `Colony.run` select
+the existing matrix-free outer trust solver for any such binding. Approximation
+coefficients are rebuilt inside its complete residual map, including JVP/VJP
+derivatives. The dimensionless Gaussian chart uses unit residual weights;
+initially satisfied equations do not acquire artificially large weights.
+Failed auxiliary proposals clear their acceleration history before any
+least-squares solve. The solver certifies finite surrogate change and full
+fixed-point residual, and reports rejected trials and exhausted budgets.
+
+`ObjectiveLedger.metadata`, exposed through `Engine.objective_metadata`, labels
+each Gaussian node's energy convention; `Engine.objective_contract` labels
+the whole energy as approximate when adaptive terms are present. These terms claim only
+frozen-coefficient stationarity and no established nonlinear evidence bound.
+Node readouts carry `proper`, method-independent moment fields, and local
+failure codes. The estimator counts persistent `theta` and `W` alongside all
+Gaussian arena arrays; coefficients and solver workspace are temporary.
+Persistent storage is linear in factor count and quadratic in incident
+Gaussian dimension, plus the declared mean parameter vectors. Existing XLA
+cost-analysis/calibration limitations remain separate from exact byte counts.
+`test_nonlinear_rules`, `test_nonlinear_schema`, and `test_nonlinear_engine`
+cover the local, transport, and solver contracts. See DERIVATIONS D13.
+
 `ParameterSpec` supplies serialized shape inference and optional writable
 packed-row metadata. The packer declares every output key; the compiler
 checks keys, shapes and member axes. Existing built-ins keep their bare
@@ -1199,7 +1254,7 @@ directed schedules use the same local executors through `ScheduledExecutors`.
 | Extension class | Accepted inference meaning; what the representation does **not** enable |
 | --- | --- |
 | Discrete | BP cavities with declared sum/max semirings; optional mean-field VMP consumes both-sided beliefs and supports sum mode only. Max uses the declared potential for assignment scoring, not BFE. No automatic P-substitution or moment matching. |
-| Gaussian | Ordinary information-form BP, optionally conditioning one declared DATA role; sum mode. No Gaussian mean-field, arbitrary nonlinear projection, or P-substitution supplied by registration. |
+| Gaussian | Ordinary information-form BP, optionally conditioning one declared DATA role; sum mode. Declared Gaussian first/second-moment endpoints are exact for prior/linear bindings. No Gaussian mean-field, arbitrary nonlinear projection, or P-substitution supplied by registration. |
 | EF | Declared conjugate natural-parameter messages and observation contract; shipped adapters use sum-mode BP. Capability admission uses the binding's declared constraints; adding a declaration alone cannot supply a missing rule or projection. |
 | Recurrence | Existing categorical source/destination pair region and Gaussian drive belief, in sum mode; the D9 structured recurrence approximation and supported topology boundaries remain in force. No P-substitution on the recurrence factor. |
 | Hybrid P-substitution | Existing fixed-goal exterior mixture prior/linear composite with an explicitly substituted output, in sum mode. Interior, arbitrary nonlinear and Gaussian-only variants are unsupported. |
@@ -2125,8 +2180,8 @@ land as docstrings; delegation guidance lives in the epic:
   Pólya–Gamma/JJ VMP update, supplying the transition primitive needed by the
   rSLDS graph without materializing a state-dependent transition tensor.
 - **M12 — Nonlinear factors** (cff-o7hs): Jacobian linearization and
-  sigma-point moment matching; replaces the legacy factor-only
-  `MOMENT_MATCHING` placeholder with endpoint- and projection-aware EP syntax.
+  sigma-point moment matching; builds on the endpoint- and projection-aware
+  `MOMENT_MATCHING` schema and explicit legacy migration.
 - **M13 — Exponential-family abstraction** (cff-8s6a, cff-l6i5, landed):
   natural parameters + log-partitions as the message contract;
   Gamma/Beta/Poisson/Wishart as table entries. Cat/Dir/Gaussian re-expressed

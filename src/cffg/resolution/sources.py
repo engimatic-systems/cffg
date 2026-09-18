@@ -54,7 +54,7 @@ def resolve_arrays(
     the already captured requirements and never repeats family discovery here.
     """
     if sources is None:
-        sources = source_requirements(t, snapshot_registry())
+        sources = source_requirements(t, snapshot_registry(t))
     if fallbacks is None:
         fallbacks = initializer_fallbacks(t)
     needed = {source.blob for source in sources}
@@ -100,7 +100,7 @@ def _blob_shape(t: Template, blob_name: str) -> tuple[int, ...] | None:
     """Compatibility entry; stage consumers already hold these declarations."""
     return infer_blob_shape(
         blob_name,
-        source_requirements(t, snapshot_registry()),
+        source_requirements(t, snapshot_registry(t)),
         initializer_fallbacks(t),
     )
 

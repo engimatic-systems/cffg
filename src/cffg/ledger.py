@@ -32,6 +32,36 @@ class ObjectiveLedger:
     arena: Arena
     belief_kernel: FreeEnergy
 
+    @property
+    def contract(self) -> dict[str, str | bool | None]:
+        adaptive = any(
+            g.kernel is not None and g.kernel.binding.iterative
+            for g in self.arena.gauss_groups
+        )
+        return {
+            "objective": "energy_with_adaptive_gaussian_surrogates" if adaptive else "declared_bethe_or_generalised_energy",
+            "approximate": True if adaptive else None,
+            "evidence_bound": None,
+            "stationarity": "frozen Gaussian coefficients only" if adaptive else "declared factor contract",
+        }
+
+    @property
+    def metadata(self) -> dict[str, dict[str, str | bool | None]]:
+        """Gaussian node objective meaning; no bound is inferred for a surrogate."""
+        result = {}
+        for group in self.arena.gauss_groups:
+            binding = group.kernel.binding if group.kernel is not None else None
+            adaptive = binding is not None and binding.iterative
+            for name in group.members:
+                result[name] = {
+                    "objective": binding.objective if binding is not None else "analytic",
+                    "approximate": adaptive,
+                    "normalization": "normalized Gaussian conditional" if adaptive else "analytic factor",
+                    "stationarity": "frozen coefficients only" if adaptive else "Bethe stationary equations",
+                    "evidence_bound": None,
+                }
+        return result
+
     def free_energy(
         self,
         state: State,

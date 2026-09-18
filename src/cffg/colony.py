@@ -101,7 +101,7 @@ class Colony:
         for (key, _signature), iids in by_key.items():
             engine = self.engines[key]
             states = [self.instances[i].state for i in iids]
-            if engine.arena.gfe_groups or engine.arena.gfe_tm_groups:
+            if engine.arena.gfe_groups or engine.arena.gfe_tm_groups or engine.has_adaptive_gaussian:
                 if damp != 0.0:
                     raise ValueError(
                         "damp does not apply to mixed-GFE trust-region "

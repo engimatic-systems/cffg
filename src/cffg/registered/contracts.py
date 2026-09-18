@@ -1,7 +1,7 @@
 """Registered structural plans, before observation rows and arrays resolve."""
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from cffg._immutable import FrozenArray, ImmutableRecord
 from cffg.array_requirements import ArrayRequirement, SourceRequirement
@@ -13,6 +13,10 @@ from cffg.kernels import FactorKernel
 class RegistrySnapshot(ImmutableRecord):
     bindings: Mapping[str, FactorKernel]
     conditioned_out_types: frozenset[str]
+    configured: Mapping[str, FactorKernel] = field(default_factory=dict)
+
+    def for_factor(self, factor):
+        return self.configured.get(factor.name, self.bindings.get(factor.type))
 
 
 @dataclass(frozen=True)

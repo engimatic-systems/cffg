@@ -10,6 +10,7 @@ import numpy as np
 
 from cffg import ef
 from cffg.core.ir import FACTOR_TYPES, ConstraintKind, Template
+from cffg.core.moment_matching import moment_matching_endpoint
 from cffg.registered.capabilities import (
     conditioned_output_problems,
     constraint_problems,
@@ -40,10 +41,18 @@ def _admission(t, constraints, registry):
     }
     for constraint in constraints:
         if constraint.kind is ConstraintKind.MOMENT_MATCHING:
-            problems.append(
-                f"factor {constraint.target!r}: legacy moment-matching syntax "
-                "does not identify an incident edge endpoint or projection"
-            )
+            try:
+                endpoint = moment_matching_endpoint(constraint, t)
+            except ValueError as exc:
+                problems.append(str(exc))
+                continue
+            kernel = registry.for_factor(t.factors[constraint.target])
+            projections = getattr(getattr(kernel, "binding", None), "moment_projections", ())
+            if endpoint.projection.value not in projections:
+                problems.append(
+                    f"factor {constraint.target!r}: no registered moment-matching rule "
+                    f"for projection {endpoint.projection.value!r} at role {endpoint.role!r}"
+                )
 
     for f in t.factors.values():
         if f.param_edges:

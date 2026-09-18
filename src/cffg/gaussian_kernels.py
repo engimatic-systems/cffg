@@ -218,6 +218,7 @@ def install(register, kernel, hostile):
                     energy,
                     conditioning,
                     stats,
+                    moment_projections=frozenset({"gaussian_first_second"}),
                 ),
             )
         )

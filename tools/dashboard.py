@@ -45,7 +45,7 @@ RUNTIME_HISTORY_LIMIT = 3
 SUITE_SELECTION = "not slow"
 
 EPIC_FILES = {
-    "M0 · Foundations": ["test_hygiene.py"],
+    "M0 · Foundations": ["test_hygiene.py", "test_core_imports.py", "test_moment_matching_schema.py"],
     "M1 · Core IR": ["test_ir.py", "test_serialize.py", "test_edits.py", "test_compose.py", "test_inits.py", "test_compiler_contracts.py", "test_compiled.py", "test_topology.py", "test_constraint_details.py", "test_specialized.py", "test_registered.py", "test_resolution.py", "test_assembly.py"],
     "M2 · BP Engine": ["test_engine_tree.py", "test_engine_hmm.py", "test_schedule.py", "test_discrete_kernels.py"],
     "M3 · VMP + GFE": [
@@ -104,6 +104,7 @@ EPIC_FILES = {
     ],
     "M9 · Gaussian": [
         "test_gauss_rules.py", "test_kalman.py", "test_gaussian_kernels.py",
+        "test_nonlinear_rules.py", "test_nonlinear_schema.py", "test_nonlinear_engine.py",
         "test_gaussian_kernel_schedules.py",
     ],
     "L1 · B-learning": ["test_b_learning.py", "test_learnables.py", "test_learning_schema.py"],

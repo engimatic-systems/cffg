@@ -1,8 +1,8 @@
 ---
 id: cff-o7hs
-status: open
-deps: [cff-4e5z, cff-ri8m, cff-cfqg]
-links: [cff-1o72, cff-fxmj, cff-ri8m, cff-l6i5, cff-pksr, cff-lquu, cff-k9ws, cff-209l, cff-8a5m]
+status: closed
+deps: [cff-4e5z, cff-ri8m, cff-cfqg, cff-2dzo, cff-gsd5, cff-gvwc, cff-4ejb]
+links: [cff-1o72, cff-fxmj, cff-ri8m, cff-l6i5, cff-pksr, cff-lquu, cff-k9ws, cff-209l, cff-8a5m, cff-u06e]
 created: 2026-07-08T16:49:34Z
 type: feature
 priority: 2
@@ -83,7 +83,7 @@ links, or epistemic GFE scoring through nonlinear nodes.
    4.7. Every accepted cavity-plus-site belief is symmetric positive definite and finite.
    4.8. Every accepted tilted covariance is symmetric positive definite and finite.
    4.9. Damping, backtracking, or another declared globalization rule accepts an update only when the combined belief remains proper.
-   4.10. The globalization derivation names and justifies its acceptance metric, such as decreasing stationarity residual or another scalar merit function tied to the EP stationary equations.
+   4.10. The globalization derivation uses the fully recomputed fixed-point residual, including cavity-dependent approximation coefficients, to define and justify its scalar merit function.
    4.11. The globalization rule does not add an absolute ridge.
    4.12. The globalization rule does not clamp the site precision to positive semidefinite.
    4.13. A rejected site update is not reported as convergence.
@@ -96,14 +96,16 @@ links, or epistemic GFE scoring through nonlinear nodes.
    5.3. The ledger labels the global objective as approximate when it contains the nonlinear node.
    5.4. The ledger does not claim the exact linear-Gaussian tree identity for a graph containing the nonlinear node.
    5.5. Linear-Gaussian terms elsewhere in the graph retain their analytic labels.
-   5.6. The derivation states the surrogate's mathematical target.
+   5.6. The derivation states the frozen-factor Gaussian Bethe surrogate target and the local approximate conditional density used by each message method.
    5.7. The derivation states the surrogate's normalization convention.
-   5.8. The derivation states the surrogate's stationary equations.
+   5.8. The derivation states the surrogate stationary equations with approximation coefficients held fixed and the separate coefficient/cavity self-consistency equations defining the adaptive inference fixed point.
    5.9. If the derivation proves a bound direction, the ledger reports that direction.
    5.10. If no bound direction is proved, the ledger and limitations documentation state that fact.
    5.11. The surrogate is finite only when the required beliefs and covariances are proper.
    5.12. Convergence requires a finite dtype-scaled surrogate change below its declared tolerance.
-   5.13. Convergence requires a finite stationarity residual below its declared tolerance.
+   5.13. Convergence requires a finite full fixed-point residual below its declared tolerance, including the recomputed approximation coefficients.
+   5.14. The ledger and derivation distinguish conditional frozen-factor stationarity from stationarity of the total adaptive energy; no total-energy stationarity or bound on the original nonlinear evidence is claimed without proof.
+   5.15. Unselected endpoint density constraints apply to the declared Gaussian surrogate factor; the approximation does not claim to retain the original nonlinear node marginal exactly.
 6. The rule satisfies the numerical robustness contract.
    6.1. Sparse discrete support is structurally irrelevant because this factor has only nondegenerate Gaussian edges.
    6.2. Singular noise and deterministic limits follow criterion 2.11 rather than a numeric floor.
@@ -162,7 +164,7 @@ These suggestions are optional. Another method is acceptable if it satisfies the
 
 ## Future work
 
-- cff-1o72 builds deterministic neural factors, free-energy-gradient training, and amortized message initialization on this ticket's nonlinear Gaussian and surrogate-ledger contracts.
+- cff-1o72 builds Gaussian factors with deterministic neural means and positive noise, full-fixed-point gradient training, and amortized message initialization on this ticket's nonlinear Gaussian and surrogate-ledger contracts.
 - cff-ahps uses this ticket and cff-1o72 to close the nonlinear and neural branches of the universal factor-library roadmap after its other prerequisites are satisfied.
 - Continuous-to-discrete nonlinear links use declared hybrid subclasses with proved variational bounds. cff-k9ws delivered the recurrent stick-breaking link; this ticket does not replace or generalize it.
 - Nonlinear or Gaussian-only GFE messages remain excluded. cff-dfpi and cff-izjd delivered the bounded discrete-regime epistemic route; expanding that scope requires a separate ticket and a new derivation.
@@ -205,3 +207,79 @@ Intelligible-ticket review: complete.
 **2026-09-01T14:30:25Z**
 
 Independent-review correction, 2026-09-01. The ticket now owns an endpoint- and projection-aware moment-matching schema and migration before EP execution. The legacy factor-only payload stays rejected; migration must not infer absent information. Capability owners are core.ir schema, validation, JSON/hash and bundle migration, diagram derivation, compiler grouping, the nonlinear Gaussian FactorKernel and rules, synchronous and scheduled execution, ledger, readouts, estimator, public exports, and the named documentation/tests. The wiggle scan was rerun after the rewrite. New or changed retained matches mean: current = the legacy payload present at PR base d6e006d; factor-only/only = a payload naming a factor and no endpoint, or an explicit acceptance gate; sufficient and match = the paper-defined sufficient-statistic equality; public = the supported template schema; register = future executable compiler/runtime dispatch; implement = planned schema/rule integration; exact = affine-reference analytic equality; all/every = the locally enumerated endpoints or execution surfaces. Earlier retained matches keep the meanings recorded in the prior two audit notes.
+
+**2026-09-15T15:17:27Z**
+
+Readiness question: after deferring D12, can cff-o7hs and cff-1o72 start, or does another ready ticket provide a missing foundation? Answer: tk ready includes cff-o7hs. Its Gaussian arena, numerical propriety, executable registration/Gaussian binding and compiler/runtime extension foundations (cff-4e5z, cff-3hgi, cff-ri8m, cff-209l, cff-cfqg) are completed on this branch. cff-1o72 depends on the nonlinear contract. No D12 implementation is a prerequisite. Before implementation, split the large ticket into bounded work with the endpoint/projection schema and message/site/objective derivations first, followed by local numerical evidence and production integration.
+
+Independent read-only research found cff-j7mm the strongest optional foundation: it repairs incomplete executable cost analysis and distinguishes persistent storage, compiler temporary buffers, compilation and execution timings. Existing persistent arena-byte accounting already exists, so the whole estimator ticket is not a mathematical prerequisite. cff-wbhu can help repeated/batched inference after the rule is established, but its benchmark target is not a promised nonlinear speedup. cff-b2fz matters when composing repeated modules; cff-1xig matters before promising stable historical bundle compatibility, while this ticket still owes its own explicit schema migration/rejection. cff-yl0a concerns discrete HMM fusion and excludes an LGSSM fast path. None needs to be added as a blanket blocker. Sources: their WHY/WHAT/Future-work sections; ARCHITECTURE.md bounded extension paths and compact plate composition; this ticket's schema, resource and globalization criteria. Confidence is high on dependency/scope conclusions and moderate on performance priorities until a nonlinear workload is measured. No tests or numerical programs were run for this assessment.
+
+Top-level planning checks: cff-1o72 describes y=f_theta(x), while this ticket requires positive Gaussian observation noise. Clarify whether the neural network is the deterministic mean of that noisy factor before promising a zero-noise factor. Align its improper-site wording with this ticket's permitted indefinite site messages and proper combined beliefs. These are unresolved handoff details, not a changed mathematical contract. Also, the PR142 baseline predates the later short-suite cap: tools/dashboard.py:157 runs pytest without a timeout, and the restored runtime record is 1233.077 seconds (suggested wait 1560). Cooper's 20-minute requirement still applies. Restore the independent test tooling in bounded work before new code validation; do not restore D12 numerics or copy later ticket history to do so.
+
+Legend: prerequisite --> dependent. Existing tk dependencies remain authoritative and unchanged; closed foundational subgraphs and redundant direct edges are abbreviated.
+
+```text
+[x] Gaussian + registration + compiler/runtime foundations
+  --> [ ] cff-o7hs (ready)
+        --> [ ] cff-1o72 (blocked by cff-o7hs)
+              --> [ ] cff-ahps (other branches also pending)
+
+Optional ready work in parallel: cff-j7mm, cff-wbhu, cff-b2fz, cff-1xig.
+cff-yl0a remains an independent discrete-HMM performance ticket.
+```
+
+Checked against tk dep tree --full cff-1o72, tk ready and tk blocked; tk dep cycle and git diff --check pass. This is a readiness handoff only. The ticket remains open; no numerical implementation, new dependency, qualification run or D12 resumption was started.
+
+**2026-09-15T15:27:10Z**
+
+Preparation at Cooper's request: AGENTS.md now contains one new line imposing a hard 20-minute (1,200-second) wall-time limit on default short-suite runs. Overruns are failed validation; agents may optimize tests, move expensive cases to the opt-in slow suite, or remove lower-value tests while retaining required correctness and numerical robustness coverage. This is an agent instruction only; this change does not modify the dashboard runner or prune tests. It supersedes the previous handoff's suggestion to restore test tooling as part of this preparation.
+
+Change-path review: documentation/ticket-only preparation; no architecture implementation row applies yet. Host/JIT, flooding/scheduled, single-instance/vmap, and current/legacy decoding are each N/A because execution and transport are unchanged. Validation: tk dep cycle and git diff --check pass; the documentation-only exception applies, so no test suite was run.
+
+Research question: can a deterministic neural network reuse this ticket's positive-noise Gaussian rule? Answer: yes, as the mean in y | x,theta ~ N(f_theta(x), V), with positive-definite V. Deterministic evaluation of the mean does not impose exact equality on the modeled output. Exact equality instead has a delta conditional, and substituting V=0 into ordinary Gaussian log-density/entropy formulas makes the inverse/log-determinant terms undefined; message and free-energy rules for constrained support need separate justification. Noise V is conditional output variation, distinct from uncertainty propagated from x or uncertainty in network weights. Sources: independently verified primary reference Rasmussen and Williams, Gaussian Processes for Machine Learning, chapter 2 equations 2.1-2.3 (https://gaussianprocess.org/gpml/chapters/RW2.pdf), Appendix A equations A.4/A.20 (https://gaussianprocess.org/gpml/chapters/RWA.pdf); local criteria 2.1/2.3/2.11 and cff-1o72 criteria 2/3/6.1. Confidence: high; CFFG scope implication is an inference from these mathematical facts and ticket contracts.
+
+Handoff: cff-o7hs is in_progress for preparation and design discussion. Recommend clarifying cff-1o72 as a deterministic neural mean with positive Gaussian noise; Cooper's scope decision is pending, so neither ticket's mathematical acceptance criteria have changed. Next, branch from the committed cff-o7hs-readiness base to cff-o7hs, split implementation into bounded work as the previous note requires, and complete the nonlinear contract before branching for cff-1o72; keep separate PRs for the two tickets. The readiness base has no matching remote branch to fast-forward. The independent issue about indefinite site messages versus proper combined beliefs remains for the implementation handoff.
+
+**2026-09-15T15:33:55Z**
+
+Neural-factor scope: cff-1o72 uses y | x,theta ~ N(f_theta(x), V), with a deterministic neural mean and explicit finite symmetric positive-definite noise covariance. Its schema, round-trip, invalid-noise, gradient-fixture, documentation, and robustness criteria express that contract. Finite indefinite sites follow cff-o7hs; accepted combined beliefs must remain proper. cff-u06e owns the separate exact zero-noise derivation and is linked to both tickets without adding a prerequisite. The cff-ahps neural-work description uses the same positive-noise scope.
+
+Legend: prerequisite --> dependent; closed foundations and unrelated epic branches are abbreviated. The two ready roots can proceed independently.
+
+```text
+[x] Gaussian + registration + compiler/runtime foundations
+  --> [ ] cff-o7hs (ready, in_progress)
+        --> [ ] cff-1o72 (blocked by cff-o7hs)
+              --> [ ] cff-ahps (other prerequisite branches also pending)
+
+[ ] cff-u06e (ready; independent exact-factor derivation)
+```
+
+Built from tk dep tree --full for cff-1o72, cff-u06e, and cff-ahps, plus tk ready and tk blocked. The epic also directly depends on cff-o7hs. No dependency changes were needed.
+
+Change-path review: this commit edits tickets only. The planned factor work uses New factor or rule family; the exact-factor handoff must also consider New IR field and Runtime numerical or status invariant. Host/JIT, flooding/scheduled, single-instance/vmap, and current/legacy decoding are each N/A for these ticket edits because no executable or serialized model behavior changes. Validation: tk dep cycle and git diff --check pass; the short suite is not required for ticket-only work.
+
+Handoff: preparation is complete on cff-o7hs. cff-o7hs remains in_progress; next split its schema, derivation, numerical evidence, and integration work into bounded implementation tickets. cff-1o72 and cff-u06e remain open. Complete cff-o7hs before the cff-1o72 implementation branch and keep their PRs separate.
+
+**2026-09-15T16:43:13Z**
+
+Research question: can cavity-dependent Taylor or sigma-point statistical linear regression updates be treated as stationary points of one ordinary EP free-energy scalar? Answer: not in general. With frozen affine coefficients, normalized Gaussian factors have a valid Bethe/expectation-consistent surrogate and partial stationarity means endpoint moment consistency. Recomputing coefficients from the cavity adds a chain-rule term to the derivative of the reported scalar; the matching fixed point need not make that term zero. A scalar g(x)=x^2 example at input cavity mean=variance=1 and output mean=1, with total output variance=1, gives frozen tilted mean shift zero but total log-normalizer derivative -0.8. A coupled fixed-point contract can be honest if it explicitly separates frozen-factor stationarity from coefficient self-consistency, globalizes the fully recomputed residual, and differentiates the complete root for neural training. It cannot claim ordinary adaptive EP-energy stationarity or use an envelope/stop-gradient shortcut. Cooper has been asked to select that explicitly named approximation contract or a separate consistent tilted-integral method; acceptance criteria remain unchanged pending that choice.
+Sources: Wilkinson, Särkkä and Solin (2023), section 4.3.2, https://jmlr.org/papers/volume24/21-1298/21-1298.pdf; Opper and Winther (2005), section 3, equations 13–19, https://www.jmlr.org/papers/volume6/opper05a/opper05a.pdf; independent algebra and finite-difference counterexample. Confidence: high on derivative mismatch; conditional-surrogate scope requires an explicit decision. Research performed by GPT-6 Astra at xhigh, reviewed at top level.
+
+Compiler-seam research: reuse GaussianBinding batched callbacks and leading-member-axis State.params arrays. Callable identity/version and architecture require pure-data FactorSpec metadata, a host configured-binding resolver, configuration-aware shape declarations and grouping, and collision-safe parameter addresses. Sync/scheduled executors are shared, but Gaussian execution currently discards diagnostics and all Gaussian groups enter exact directed scheduling, so nonlinear status/residual propagation and iterative capability classification need explicit shared contracts. The ledger also needs approximation metadata. Sources: kernel_bindings.GaussianBinding, registered/lowering._group_keys and lower_registered, registered/requirements.source_requirements, kernel_runtime.gaussian_message/gaussian_energy, execution/registered.execute_gaussian, schedule._island_nodes_and_links, ledger_terms.gaussian_energy. Confidence: high; read-only source audit by GPT-6 Astra xhigh.
+
+**2026-09-15T16:51:37Z**
+
+Cooper selected the explicit adaptive fixed-point and approximate-energy contract. The ticket criteria now name frozen-coefficient Gaussian Bethe stationarity, separate approximation/cavity self-consistency, the fully recomputed residual for globalization and convergence, and the absence of a total adaptive-energy stationarity claim. cff-1o72 differentiates the complete coupled fixed point and the total reported energy. cff-314c and cff-2dzo are implemented and closed. cff-gsd5 now owns configured nonlinear means and local rules; cff-gvwc owns measured short-suite budgeting. Final short-suite validation remains due after the parent implementation changes.
+
+**2026-09-15T17:58:09Z**
+
+First full short suite at58185b4:2395 passed,1 failed,44 deselected; pytest1290.46 seconds, dashboard-measured wall1305.784 seconds. Failure was the pre-existing topology snapshot fixture using an unspecified moment projection without an endpoint. Updated that fixture to copy a mean-field detail payload; tests/test_topology.py now13 passed in0.51 seconds. Production validation remains strict. A fresh passing full run is required for this fixture correction.
+
+**2026-09-15T18:27:00Z**
+
+Implementation and validation complete. Delivered endpoint-specific Gaussian moment constraints and migration, portable configured positive-noise nonlinear means, Taylor and sigma-point rules, normalized frozen-Gaussian Bethe node terms, full adaptive residual globalization, explicit numerical failures, objective labels, and all documented transport surfaces. Independent curved-grid and mutually changing-cavity root oracles pass. Attached exact scan islands, float32 units, local dimension32/JIT/vmap, bundle reconstruction, parameter ownership, and exact persistent-byte accounting are covered. Final full short suite at f966cb9: 2384 passed, 56 deselected; pytest 1099.56 seconds and dashboard-measured wall 1113.339 seconds. Final code/test changes are included in that run; subsequent work only records validation and ticket status. Next: cff-1o72 adds neural architecture, complete fixed-point gradients, training/checkpoint state, and deterministic amortized initialization. Exact zero noise remains independent cff-u06e.
+
+**2026-09-15T18:27:47Z**
+
+Published PR156: https://github.com/engimatic-systems/cffg/pull/156, based on cff-ocxl-defer-d12 (PR155). Final passing short-suite evidence is unchanged; no further code or selection edits were made after certification. The tree is clean before starting the dependent neural branch.

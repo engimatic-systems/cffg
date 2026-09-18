@@ -212,6 +212,23 @@ class Engine:
         )
         return _replace(state, params=updated.params), delta, code, residual
 
+    @property
+    def has_adaptive_gaussian(self) -> bool:
+        return any(
+            g.kernel is not None and g.kernel.binding.iterative
+            for g in self.arena.gauss_groups
+        )
+
+    @property
+    def objective_metadata(self):
+        """Per-Gaussian-factor energy conventions, including adaptive surrogates."""
+        return self._ledger.metadata
+
+    @property
+    def objective_contract(self):
+        """Global energy label, including the presence of adaptive Gaussian terms."""
+        return self._ledger.contract
+
     def hybrid_gfe_diagnostics(
         self, state: State
     ) -> dict[str, dict[str, np.ndarray | float | str]]:
@@ -354,14 +371,16 @@ class Engine:
             or self.arena.gfe_tm_groups
             or self.arena.hybrid_gfe_groups
         )
-        use_trust_region = has_gfe and outer_solver != "picard"
-        if outer_solver == "trust_region" and not has_gfe:
-            raise ValueError("outer_solver='trust_region' requires a GFE plan")
+        adaptive = self.has_adaptive_gaussian
+        if adaptive and outer_solver == "picard":
+            raise ValueError("adaptive Gaussian inference requires residual globalization")
+        use_trust_region = (has_gfe or adaptive) and outer_solver != "picard"
+        if outer_solver == "trust_region" and not (has_gfe or adaptive):
+            raise ValueError("outer_solver='trust_region' requires a GFE or adaptive Gaussian plan")
         if use_trust_region:
             if damp != 0.0:
                 raise ValueError(
-                    "damp does not apply to mixed-GFE trust-region inference; "
-                    "omit it or select outer_solver='picard' explicitly"
+                    "damp does not apply to trust-region inference; omit it"
                 )
             return self._run_outer_trust_region(
                 state, n_iters, tol=tol, harden_last=harden_last
@@ -439,6 +458,7 @@ class Engine:
             iter_step=self._iter_step,
             prime=self._prime,
             reconstruct=self._reconstruct,
+            adaptive_gaussian=self.has_adaptive_gaussian,
             services=OuterServices(
                 self._state_is_finite,
                 self._has_zero_support,

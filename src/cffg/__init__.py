@@ -1,20 +1,42 @@
 """Supported pre-1.0 facade for the documented newcomer workflow."""
 
-from cffg.agent import RollingAgent
-from cffg.bundle import LoadedBundle, load_bundle, save_bundle
-from cffg.compiler import compile_template
-from cffg.engine import Engine, RunStatus
-from cffg.models.gridworld import CorridorEnv, build_gridworld
-from cffg.params import set_params
-from cffg.learning_schema import (
-    PersistentArray, PersistentParameter, PersistentStateDescriptor,
-    PersistentTarget, resolve_persistent_state,
-)
-from cffg.kernels import FactorKernel, HostileInputs, register_kernel
-from cffg.kernel_bindings import (
-    DiscreteBinding, DiscreteMode, EFBinding, GaussianBinding,
-    GaussianConditioning, ParameterSpec,
-)
+from importlib import import_module
+
+
+_EXPORT_MODULES = {
+    "agent": ("RollingAgent",),
+    "bundle": ("LoadedBundle", "load_bundle", "save_bundle"),
+    "compiler": ("compile_template",),
+    "core.functions": ("FunctionSpec",),
+    "mean_functions": ("MeanImplementation", "register_mean_function"),
+    "engine": ("Engine", "RunStatus"),
+    "models.gridworld": ("CorridorEnv", "build_gridworld"),
+    "params": ("set_params",),
+    "learning_schema": (
+        "PersistentArray", "PersistentParameter", "PersistentStateDescriptor",
+        "PersistentTarget", "resolve_persistent_state",
+    ),
+    "kernels": ("FactorKernel", "HostileInputs", "register_kernel"),
+    "kernel_bindings": (
+        "DiscreteBinding", "DiscreteMode", "EFBinding", "GaussianBinding",
+        "GaussianConditioning", "ParameterSpec",
+    ),
+}
+_EXPORTS = {name: module for module, names in _EXPORT_MODULES.items() for name in names}
+
+
+def __getattr__(name):
+    """Keep core imports independent of JAX while retaining the public facade."""
+    module = _EXPORTS.get(name)
+    if module is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(import_module(f"cffg.{module}"), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__():
+    return sorted(set(globals()) | set(__all__))
 
 __all__ = [
     "CorridorEnv",
@@ -23,10 +45,12 @@ __all__ = [
     "EFBinding",
     "Engine",
     "FactorKernel",
+    "FunctionSpec",
     "GaussianBinding",
     "GaussianConditioning",
     "HostileInputs",
     "LoadedBundle",
+    "MeanImplementation",
     "ParameterSpec",
     "PersistentArray",
     "PersistentParameter",
@@ -39,6 +63,7 @@ __all__ = [
     "load_bundle",
     "save_bundle",
     "register_kernel",
+    "register_mean_function",
     "resolve_persistent_state",
     "set_params",
 ]

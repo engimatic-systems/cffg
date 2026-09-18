@@ -151,12 +151,15 @@ def _prec_sweep(arena, g_eta, g_lam, ef_eta, params):
     return gauss_writes, ef_writes
 
 
-def _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params):
+def _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params, *, only_iterative=False):
     """One synchronous flooding sweep over the Gaussian groups; returns the
     fully rewritten flat (eta, Lambda) arrays. Dims are static per group, so
     every rule call sees a shape-local block."""
     new_eta, new_lam = g_eta, g_lam
+    residual, status = jnp.asarray(0.0, g_eta.dtype), jnp.asarray(0)
     for g in arena.gauss_groups:
+        if only_iterative and not (g.kernel is not None and g.kernel.binding.iterative):
+            continue
         inc_e, inc_l = _gauss_rows(arena, g_eta, g_lam, g.gather, g.dims)
         y = mk = None
         if g.obs_rows is not None:
@@ -164,14 +167,18 @@ def _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params):
                 _obs_rows(arena, g_obs, g.obs_rows, g.observed_dim),
                 g_mask[jnp.asarray(g.obs_rows)],
             )
-        outs = _execute_gaussian(
+        delta = _execute_gaussian(
             g, inc_e, inc_l, _kernel_params(g, params), y, mk
-        ).outgoing
-        for r, (oe, ol) in enumerate(outs):
+        )
+        if delta.residual is not None:
+            residual = jnp.maximum(residual, jnp.max(delta.residual))
+        if delta.status is not None:
+            status = jnp.maximum(status, jnp.max(delta.status))
+        for r, (oe, ol) in enumerate(delta.outgoing):
             new_eta, new_lam = _set_gauss_block(
                 arena, new_eta, new_lam, g.scatter[:, r], g.dims[r], oe, ol
             )
-    return new_eta, new_lam
+    return new_eta, new_lam, residual, status
 
 
 def _ef_group_out(g, inc, params, rows=None, obs=None, mask=None):
@@ -353,8 +360,13 @@ def make_sweep(arena: Arena, skip_scheduled: bool = False) -> Sweep:
         # damping of the Gaussian family (log of a Gaussian is its (eta,
         # Lambda) quadratic), so one damp knob covers both arenas.
         new_eta, new_lam = g_eta, g_lam
-        if arena.gauss_groups and not skip_scheduled:
-            new_eta, new_lam = _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params)
+        if arena.gauss_groups:
+            new_eta, new_lam, gaussian_residual, gaussian_status = _gauss_sweep(
+                arena, g_eta, g_lam, g_obs, g_mask, params,
+                only_iterative=skip_scheduled,
+            )
+            inner_residual = jnp.maximum(inner_residual, gaussian_residual)
+            inner_status = jnp.maximum(inner_status, gaussian_status)
         for scatter, dim, oe, ol in [
             *recurrence_gauss,
             *hybrid_gauss,
