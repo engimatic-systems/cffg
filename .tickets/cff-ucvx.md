@@ -1,6 +1,6 @@
 ---
 id: cff-ucvx
-status: in_progress
+status: closed
 deps: [cff-rbsy]
 links: []
 created: 2026-09-22T19:18:13Z
@@ -76,3 +76,7 @@ Implementation and editorial pass complete on cff-ucvx-readme-capability-map. Re
 The install section now gives the complete sibling-project commands `uv init --python 3.12` and `uv add --editable ../cffg`, plus an import smoke test and optional x64 invocation. Static tests pin all four facade inventories, all built-in factors/constraints, 22 capability labels, local links, the eight example links, the complete uv command, and facade-only syntax for the marked quickstart. The delegated examples remain the executable model workflows and the newcomer example still runs in float32 and x64.
 
 Focused validation: marked quickstart executed successfully; uv run pytest -q tests/test_readme.py tests/test_facades.py tests/test_examples.py tests/test_public_api.py tests/test_bundle_resume.py::test_learning_bundle_example_saves_loads_updates_and_resaves tests/test_hygiene.py (32 passed in 27.27s); git diff --check.
+
+**2026-09-22T21:31:10Z**
+
+Final default-suite gate after the README and drift-test edit: uv run python tools/dashboard.py --run-suite passed 2416 tests, deselected 67 opt-in slow tests, and emitted four existing Gym deprecation warnings in 1180.69 seconds (1194.466 dashboard wall seconds). The refreshed dashboard is /Users/ravd/agent-share/cffg-tests.html. This remains inside the 1200-second short-suite budget. No slow suite was required.
