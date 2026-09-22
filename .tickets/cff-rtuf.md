@@ -71,3 +71,7 @@ Confidence: High. All eight entry points reject unfinished inference; focused te
 Completed on cff-rtuf-standalone-examples. Added eight status-gated standalone experiment programs for discrete agents, discrete rollouts, linear Gaussian inference, exponential-family inference, hard-constraint marginals and MAP, nonlinear Gaussian inference, declared learning with bundle continuation, and hybrid rSLDS inference. Migrated both README-scraping tests to executable example files.
 
 Validation: uv run pytest -q tests/test_examples.py tests/test_public_api.py tests/test_bundle_resume.py::test_learning_bundle_example_saves_loads_updates_and_resaves (23 passed); git diff --check; uv run python tools/dashboard.py --run-suite (2411 passed, 67 deselected, 4 warnings in 1181.60s). No engine or numerical behavior changed.
+
+**2026-09-22T20:37:18Z**
+
+Pull request: https://github.com/engimatic-systems/cffg/pull/159 (stacked on #158).
