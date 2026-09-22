@@ -1,6 +1,6 @@
 ---
 id: cff-odag
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-09-22T19:16:26Z
@@ -53,3 +53,11 @@ These suggestions are optional. Another sound design is acceptable.
 - Linear Gaussian state-space model: A time-series model with linear transitions and Gaussian noise, also called an LGSSM.
 - Public facade: The supported names available from a package such as cffg or cffg.models.
 
+
+## Notes
+
+**2026-09-22T19:49:53Z**
+
+Completion handoff, 2026-09-22. Replaced the duplicated top-level export declarations with one ordered lazy name-to-owner mapping, preserving all 37 existing top-level imports. Expanded cffg.models into the complete supported model catalogue: generic rollout, gridworld and CorridorEnv, T-maze, LGSSM, factored rollout, and rSLDS construction/fitting/learning. Added an exact facade identity test. Export decision for downstream docs: cffg is the lazy common runtime and extension facade; cffg.core owns JAX-free graph construction; cffg.models is the complete built-in model catalogue; cffg.viz owns rendering. Runtime result types remain publicly importable from cffg.engine and canonically owned by cffg.runtime_types. No numerical, inference, objective, serialization, or checkpoint behavior changed.
+
+Validation: uv run pytest -q tests/test_facades.py tests/test_public_api.py::test_top_level_facade_reexports_only_canonical_owners tests/test_core_imports.py -> 4 passed. Final dashboard short suite after the last code change -> 2396 passed, 67 deselected, 0 failed, 4 dependency warnings in 1160.95 pytest seconds (1174.865 dashboard wall seconds), under the 1200-second budget. git diff --check passed.
