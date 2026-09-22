@@ -1,6 +1,6 @@
 ---
 id: cff-ucvx
-status: open
+status: in_progress
 deps: [cff-rbsy]
 links: []
 created: 2026-09-22T19:18:13Z
@@ -66,3 +66,13 @@ These suggestions are optional. Another structure is acceptable if it meets the 
 - Status gating: Refusing to use a result unless its status satisfies the API contract.
 - uv add: The uv command that records a project dependency and its source.
 
+
+## Notes
+
+**2026-09-22T21:03:22Z**
+
+Implementation and editorial pass complete on cff-ucvx-readme-capability-map. Replaced the 1,402-line, 8,006-word guide with a 493-line newcomer guide organized around install, one workflow, a 22-row capability map, mental model, exact current facades, build/run/read semantics, learning, persistence, constraints, extensions, experiment metadata, and runnable examples. The capability rows include hidden LGSSM, scalar EF, hard-constraint/MAP, hybrid/rSLDS, nonlinear/neural, Colony, rendering, partial estimation, and the research-only behavioral oracle. Long model programs, contributor test policy, ticket history, and benchmark postmortems were removed.
+
+The install section now gives the complete sibling-project commands `uv init --python 3.12` and `uv add --editable ../cffg`, plus an import smoke test and optional x64 invocation. Static tests pin all four facade inventories, all built-in factors/constraints, 22 capability labels, local links, the eight example links, the complete uv command, and facade-only syntax for the marked quickstart. The delegated examples remain the executable model workflows and the newcomer example still runs in float32 and x64.
+
+Focused validation: marked quickstart executed successfully; uv run pytest -q tests/test_readme.py tests/test_facades.py tests/test_examples.py tests/test_public_api.py tests/test_bundle_resume.py::test_learning_bundle_example_saves_loads_updates_and_resaves tests/test_hygiene.py (32 passed in 27.27s); git diff --check.
