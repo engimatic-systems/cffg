@@ -62,3 +62,7 @@ These suggestions are optional. Another clear organization is acceptable.
 Completed on cff-rbsy-limitations. Replaced the pre-implementation status with a 2026-09-22 implementation review; defined named approximation, unsupported feature, and known defect; reconciled executable endpoint-aware moment matching with rejected legacy payloads; explicitly marked the D12 production chain as not delivered after not-pursuing closures; and bounded EF, hybrid, recurrence, neural, persistence, compact plates, Colony, resource estimation, rendering, fixed GFE inputs, and fixed mu3 particles. The final summary now matches the implemented discrete/continuous/hybrid envelope and points newcomers back to the README capability table.
 
 Validation: uv run pytest -q tests/test_hygiene.py (3 passed); tk dep cycle (none); git diff --check. Runtime tests are N/A because this branch changes canonical documentation and ticket state only.
+
+**2026-09-22T20:44:00Z**
+
+Pull request: https://github.com/engimatic-systems/cffg/pull/160 (stacked on #159).
