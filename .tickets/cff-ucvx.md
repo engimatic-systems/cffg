@@ -80,3 +80,7 @@ Focused validation: marked quickstart executed successfully; uv run pytest -q te
 **2026-09-22T21:31:10Z**
 
 Final default-suite gate after the README and drift-test edit: uv run python tools/dashboard.py --run-suite passed 2416 tests, deselected 67 opt-in slow tests, and emitted four existing Gym deprecation warnings in 1180.69 seconds (1194.466 dashboard wall seconds). The refreshed dashboard is /Users/ravd/agent-share/cffg-tests.html. This remains inside the 1200-second short-suite budget. No slow suite was required.
+
+**2026-09-22T21:31:48Z**
+
+Pull request: https://github.com/engimatic-systems/cffg/pull/161 (stacked on #160).
