@@ -139,7 +139,7 @@ def check_later_failure(
         state = _replace(state, messages=jnp.zeros_like(state.messages))
         origin_state = state
         if engine._prime is not None:
-            msgs, eta, lam, ef_eta = engine._prime(
+            msgs, eta, lam, ef_eta, *_ = engine._prime(
                 state.messages,
                 state.g_eta,
                 state.g_lam,

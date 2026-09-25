@@ -44,11 +44,11 @@ class RootProgram:
         return OuterArrays(*self.reconstruct(
             arrays.messages, arrays.g_eta, arrays.g_lam, arrays.ef_eta,
             context.g_obs, context.g_mask, context.ef_obs, context.ef_mask, context.params,
-        ))
+        )[:4])
 
     def update(self, value, context: RootContext):
         arrays = self.arrays(value, context)
-        messages, g_eta, g_lam, ef_eta, residual, status = self.iter_step(
+        messages, g_eta, g_lam, ef_eta, residual, status, *_ = self.iter_step(
             arrays.messages, arrays.g_eta, arrays.g_lam, context.g_obs, context.g_mask,
             arrays.ef_eta, context.ef_obs, context.ef_mask, context.params, 0.0, False,
         )

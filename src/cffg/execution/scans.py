@@ -5,6 +5,8 @@ import jax.numpy as jnp
 import numpy as np
 
 from cffg.compiled import NEG, Arena
+from cffg.execution.failures import FailureIndex
+from cffg.failure_facts import empty_failure, first_failure
 from cffg.execution.owners import SCHEDULED_EXECUTORS
 
 
@@ -111,6 +113,7 @@ def _registerized_scan_fn(
     hand-written ``lax.scan`` smoother costs — no dynamic gather/scatter on
     the flat arena inside the loop."""
     elems = stage.elems
+    failures = FailureIndex(arena)
     metas = []
     for ei, elem in enumerate(elems):
         g = _scan_group_of(arena, elem)
@@ -143,7 +146,7 @@ def _registerized_scan_fn(
     def fn(messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params):
         xs = []
         for ei, (elem, g, ga, _) in enumerate(metas):
-            x = {}
+            x = {"failure_ids": failures.ids(g, elem.rows)}
             for r, plan in enumerate(plans[ei]):
                 if plan[0] == "direct":
                     continue
@@ -197,7 +200,8 @@ def _registerized_scan_fn(
                 init[f"{we}:{wr}:e"] = g_eta[jnp.asarray(arena.g_eta_indices(slots, d))]
                 init[f"{we}:{wr}:l"] = g_lam[jnp.asarray(arena.g_lam_indices(slots, d))]
 
-        def body(prev, x_t):
+        def body(carry, x_t):
+            prev, failure = carry
             cur: dict = {}
             ys = {}
 
@@ -261,8 +265,8 @@ def _registerized_scan_fn(
                         for key, value in x_t[ei].items()
                         if key.startswith("p")
                     }
-                    out = executors.discrete(g, inc, gp, op).outgoing
-                    out = jnp.maximum(out, NEG)
+                    delta = executors.discrete(g, inc, gp, op)
+                    out = jnp.maximum(delta.outgoing, NEG)
                     for r, card in enumerate(g.cards):
                         block = out[:, r, :card]
                         cur[f"{ei}:{r}"] = block
@@ -272,10 +276,10 @@ def _registerized_scan_fn(
                         [read(ei, r, False) for r in range(len(g.roles))], axis=-2
                     )
                     gp = {k[1:]: v for k, v in x_t[ei].items() if k.startswith("p")}
-                    out = executors.exponential_family(
+                    delta = executors.exponential_family(
                         g, inc, gp, x_t[ei].get("ov"), x_t[ei].get("om")
-                    ).outgoing
-                    out = out.astype(inc.dtype)
+                    )
+                    out = delta.outgoing.astype(inc.dtype)
                     for r in range(len(g.roles)):
                         block = out[:, r]
                         cur[f"{ei}:{r}"] = block
@@ -292,16 +296,22 @@ def _registerized_scan_fn(
                     y = mk = None
                     if g.obs_rows is not None:
                         y, mk = x_t[ei]["ov"], x_t[ei]["om"]
-                    outs = executors.gaussian(g, inc_e, inc_l, par, y, mk).outgoing
-                    for r, (oe, ol) in enumerate(outs):
+                    delta = executors.gaussian(g, inc_e, inc_l, par, y, mk)
+                    for r, (oe, ol) in enumerate(delta.outgoing):
                         d = g.dims[r]
                         oe, ol = oe[..., :d], ol[..., :d, :d]
                         cur[f"{ei}:{r}:e"], cur[f"{ei}:{r}:l"] = oe, ol
                         ys[f"{ei}:{r}:e"], ys[f"{ei}:{r}:l"] = oe, ol
+                failure = first_failure(
+                    failure, failures.delta(
+                        g, delta, elem.kind, ids=x_t[ei]["failure_ids"],
+                        discrete_dtype=messages.dtype, ef_dtype=ef_eta.dtype,
+                        gaussian_dtypes=(g_eta.dtype, g_lam.dtype))
+                )
             new_carry = {k: cur[k] for k in prev}
-            return new_carry, ys
+            return (new_carry, failure), ys
 
-        _, ys = jax.lax.scan(body, init, xs)
+        (_, failure), ys = jax.lax.scan(body, (init, empty_failure()), xs)
 
         for ei, (elem, g, _, sc) in enumerate(metas):
             if elem.kind == "disc":
@@ -317,7 +327,7 @@ def _registerized_scan_fn(
                     li_idx = jnp.asarray(arena.g_lam_indices(sc[:, :, r], d))
                     g_eta = g_eta.at[ei_idx].set(ys[f"{ei}:{r}:e"])
                     g_lam = g_lam.at[li_idx].set(ys[f"{ei}:{r}:l"])
-        return messages, g_eta, g_lam, ef_eta
+        return messages, g_eta, g_lam, ef_eta, failure
 
     return fn
 
@@ -342,6 +352,7 @@ def _flat_scan_fn(arena: Arena, stage, op, executors=SCHEDULED_EXECUTORS):
     trace/compile cost is O(1) in S while the executed work stays the same
     as the unrolled rounds."""
     metas, xs = [], []
+    failures = FailureIndex(arena)
     for elem in stage.elems:
         if elem.kind == "disc":
             g = arena.groups[elem.group]
@@ -398,7 +409,7 @@ def _flat_scan_fn(arena: Arena, stage, op, executors=SCHEDULED_EXECUTORS):
 
     def fn(messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params):
         def body(carry, x_t):
-            messages, g_eta, g_lam, ef_eta = carry
+            messages, g_eta, g_lam, ef_eta, failure = carry
             for (kind, g), x in zip(metas, x_t):
                 if kind == "disc":
                     k_local = max(g.cards)
@@ -411,22 +422,23 @@ def _flat_scan_fn(arena: Arena, stage, op, executors=SCHEDULED_EXECUTORS):
                         for r, card in enumerate(g.cards)
                     ]
                     inc = jnp.stack(blocks, axis=-2)
-                    out = executors.discrete(
+                    delta = executors.discrete(
                         g, inc, executors.parameters(g, params, x["rows"]), op
-                    ).outgoing
-                    out = jnp.maximum(out, NEG)
+                    )
+                    out = jnp.maximum(delta.outgoing, NEG)
                     for r, card in enumerate(g.cards):
                         messages = messages.at[x["sv"][r]].set(out[:, r, :card])
                 elif kind == "ef":
                     obs = ef_obs[x["or"]] if "or" in x else None
                     mask = ef_mask[x["or"]] if "or" in x else None
-                    out = executors.exponential_family(
+                    delta = executors.exponential_family(
                         g,
                         ef_eta[x["gs"]],
                         executors.ef_parameters(g, params, x["rows"]),
                         obs,
                         mask,
-                    ).outgoing.astype(ef_eta.dtype)
+                    )
+                    out = delta.outgoing.astype(ef_eta.dtype)
                     ef_eta = ef_eta.at[x["ss"]].set(out)
                 else:
                     width = max(g.dims)
@@ -446,16 +458,19 @@ def _flat_scan_fn(arena: Arena, stage, op, executors=SCHEDULED_EXECUTORS):
                     y = mk = None
                     if g.obs_rows is not None:
                         y, mk = g_obs[x["ov"]], g_mask[x["mr"]]
-                    outs = executors.gaussian(g, inc_e, inc_l, par, y, mk).outgoing
-                    for r, (oe, ol) in enumerate(outs):
+                    delta = executors.gaussian(g, inc_e, inc_l, par, y, mk)
+                    for r, (oe, ol) in enumerate(delta.outgoing):
                         d = g.dims[r]
                         g_eta = g_eta.at[x["se"][r]].set(oe[..., :d])
                         g_lam = g_lam.at[x["sl"][r]].set(ol[..., :d, :d])
-            return (messages, g_eta, g_lam, ef_eta), None
+                failure = first_failure(failure, failures.delta(
+                    g, delta, kind, rows=x["rows"], discrete_dtype=messages.dtype,
+                    ef_dtype=ef_eta.dtype, gaussian_dtypes=(g_eta.dtype, g_lam.dtype)))
+            return (messages, g_eta, g_lam, ef_eta, failure), None
 
-        (messages, g_eta, g_lam, ef_eta), _ = jax.lax.scan(
-            body, (messages, g_eta, g_lam, ef_eta), xs
+        result, _ = jax.lax.scan(
+            body, (messages, g_eta, g_lam, ef_eta, empty_failure()), xs
         )
-        return messages, g_eta, g_lam, ef_eta
+        return result
 
     return fn

@@ -15,6 +15,7 @@ import numpy as np
 from jax.scipy.special import logsumexp
 
 from cffg.compiled import NEG, Arena
+from cffg.execution.failures import FailureIndex
 from cffg.execution.owners import SCHEDULED_EXECUTORS, ScheduledExecutors
 from cffg.execution.scans import _flat_scan_fn as _flat_scan_fn
 from cffg.execution.scans import _scan_stage_fn
@@ -27,6 +28,7 @@ from cffg.execution.transport import (
     _set_gauss_block,
 )
 from cffg.schedule import BatchStage, Schedule, _fingerprint, build_schedule
+from cffg.failure_facts import FailurePhase, empty_failure, first_failure, in_phase
 from cffg.schedule_contracts import ExactUnit, FreeEnergy, Propagation, Sweep
 
 
@@ -111,7 +113,7 @@ def build_schedule_program(
             damp=0.0,
             harden=True,
         ):
-            messages, g_eta, g_lam, ef_eta, ir, ic = phase_step(
+            messages, g_eta, g_lam, ef_eta, ir, ic, failure = phase_step(
                 messages,
                 g_eta,
                 g_lam,
@@ -124,7 +126,7 @@ def build_schedule_program(
                 damp,
                 harden,
             )
-            messages, g_eta, g_lam, ef_eta = island(
+            messages, g_eta, g_lam, ef_eta, island_failure = island(
                 messages,
                 g_eta,
                 g_lam,
@@ -135,7 +137,7 @@ def build_schedule_program(
                 ef_mask,
                 params,
             )
-            return messages, g_eta, g_lam, ef_eta, ir, ic
+            return messages, g_eta, g_lam, ef_eta, ir, ic, first_failure(failure, island_failure)
     else:
 
         def iter_step(
@@ -152,7 +154,7 @@ def build_schedule_program(
             harden=True,
         ):
             """One colored sweep, with damping after all stage writes."""
-            m2, e2, l2, f2 = island(
+            m2, e2, l2, f2, failure = island(
                 messages,
                 g_eta,
                 g_lam,
@@ -168,7 +170,7 @@ def build_schedule_program(
             l2 = damp * g_lam + (1.0 - damp) * l2
             f2 = damp * ef_eta + (1.0 - damp) * f2
             zero = jnp.asarray(0.0, dtype=m2.dtype)
-            return m2, e2, l2, f2, zero, jnp.asarray(0)
+            return m2, e2, l2, f2, zero, jnp.asarray(0), failure
 
     return ScheduleProgram(
         schedule,
@@ -184,6 +186,7 @@ def _batch_stage_fn(arena: Arena, stage, op, executors=SCHEDULED_EXECUTORS):
     """Executor for one BatchStage: fire a member subset of one group,
     reading the *current* arrays (sequential semantics — the whole point of
     a directed schedule) and scattering all of its outgoing roles."""
+    failures = FailureIndex(arena)
     if stage.kind == "disc":
         g = arena.groups[stage.group]
         rows = stage.rows
@@ -191,12 +194,13 @@ def _batch_stage_fn(arena: Arena, stage, op, executors=SCHEDULED_EXECUTORS):
 
         def fn(messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params):
             inc = _disc_rows(arena, messages, gather, g.cards)
-            out = executors.discrete(
+            delta = executors.discrete(
                 g, inc, executors.parameters(g, params, rows), op
-            ).outgoing
-            out = jnp.maximum(out, NEG)
+            )
+            failure = failures.delta(g, delta, "disc", rows=rows, discrete_dtype=messages.dtype)
+            out = jnp.maximum(delta.outgoing, NEG)
             messages = _set_disc_rows(arena, messages, scatter, g.cards, out)
-            return messages, g_eta, g_lam, ef_eta
+            return messages, g_eta, g_lam, ef_eta, failure
 
         return fn
 
@@ -209,12 +213,13 @@ def _batch_stage_fn(arena: Arena, stage, op, executors=SCHEDULED_EXECUTORS):
         def fn(messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params):
             obs = ef_obs[obs_rows] if obs_rows is not None else None
             mask = ef_mask[obs_rows] if obs_rows is not None else None
-            out = executors.exponential_family(
+            delta = executors.exponential_family(
                 g, ef_eta[gather], executors.ef_parameters(g, params, rows), obs, mask
-            ).outgoing
-            out = out.astype(ef_eta.dtype)
+            )
+            failure = failures.delta(g, delta, "ef", rows=rows, ef_dtype=ef_eta.dtype)
+            out = delta.outgoing.astype(ef_eta.dtype)
             ef_eta = ef_eta.at[scatter.reshape(-1)].set(out.reshape(-1, out.shape[-1]))
-            return messages, g_eta, g_lam, ef_eta
+            return messages, g_eta, g_lam, ef_eta, failure
 
         return fn
 
@@ -228,14 +233,15 @@ def _batch_stage_fn(arena: Arena, stage, op, executors=SCHEDULED_EXECUTORS):
         y = mk = None
         if g.obs_rows is not None:
             y, mk = _obs_rows(arena, g_obs, obs_rows, g.observed_dim), g_mask[obs_rows]
-        outs = executors.gaussian(
+        delta = executors.gaussian(
             g, inc_e, inc_l, executors.parameters(g, params, rows), y, mk
-        ).outgoing
-        for r, (oe, ol) in enumerate(outs):
+        )
+        failure = failures.delta(g, delta, "gauss", rows=rows, gaussian_dtypes=(g_eta.dtype, g_lam.dtype))
+        for r, (oe, ol) in enumerate(delta.outgoing):
             g_eta, g_lam = _set_gauss_block(
                 arena, g_eta, g_lam, scatter[:, r], g.dims[r], oe, ol
             )
-        return messages, g_eta, g_lam, ef_eta
+        return messages, g_eta, g_lam, ef_eta, failure
 
     return fn
 
@@ -299,11 +305,15 @@ def make_exact_unit(
         messages, g_eta, g_lam, g_obs, g_mask, ef_eta, ef_obs, ef_mask, params
     ):
         pre_bad = support_bad(messages, params)
-        m, e, l, f = propagate(
+        m, e, l, f, failure = propagate(
             messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params
         )
-        vm, ve, vl, vf, _, _ = raw_step(
+        vm, ve, vl, vf, _, _, certificate_failure = raw_step(
             m, e, l, g_obs, g_mask, f, ef_obs, ef_mask, params, 0.0, False
+        )
+        failure = first_failure(
+            in_phase(failure, FailurePhase.PROPAGATION),
+            in_phase(certificate_failure, FailurePhase.CERTIFICATION),
         )
         delta = jnp.asarray(0.0, dtype=m.dtype)
         rel = jnp.asarray(0.0, dtype=m.dtype)
@@ -319,7 +329,7 @@ def make_exact_unit(
             if is_max
             else raw_bfe(m, e, l, g_obs, g_mask, f, ef_obs, ef_mask, params)
         )
-        return m, e, l, f, delta, rel, fe, pre_bad, support_bad(m, params)
+        return m, e, l, f, delta, rel, fe, pre_bad, support_bad(m, params), failure
 
     return exact_unit
 
@@ -345,11 +355,13 @@ def make_propagate(
     def propagate(
         messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params
     ):
+        failure = empty_failure()
         for fn in stage_fns:
-            messages, g_eta, g_lam, ef_eta = fn(
+            messages, g_eta, g_lam, ef_eta, stage_failure = fn(
                 messages, g_eta, g_lam, ef_eta, g_obs, g_mask, ef_obs, ef_mask, params
             )
-        return messages, g_eta, g_lam, ef_eta
+            failure = first_failure(failure, stage_failure)
+        return messages, g_eta, g_lam, ef_eta, failure
 
     propagate.scan_registerized = tuple(
         fn.registerized for fn in stage_fns if hasattr(fn, "registerized")

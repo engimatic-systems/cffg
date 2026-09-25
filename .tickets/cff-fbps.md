@@ -60,3 +60,11 @@ The implementer may choose another sound method. Keep the four existing run stat
 **2026-09-25T04:56:47Z**
 
 Pre-implementation handoff: Runtime numerical or status invariant; affected host/JIT, flooding/batch/registerized/flat scheduling, exact propagation/certification, single/vmap and derivative consumers. Checkpoint N/A. schedule_program.py was already 808 lines, so first move its unchanged scan executors to execution/scans.py, retaining existing private import aliases. Focused extraction parity: 35 passed in 17.64s across schedule_program, Gaussian schedule and discrete kernel tests. This commit is a pure ownership refactor; diagnostic transport follows separately.
+
+**2026-09-25T05:06:09Z**
+
+Research question: do provenance checks match every local output and scatter? Answer: constraints omit a member axis; EF storage casts can overflow finite f64 updates in f32 arenas. Fixed singleton handling and destination-dtype checks for categorical/count, Gaussian and EF blocks; mechanism regressions cover both. Sources: execution/contracts.py, compiled.ConstraintPlan, execution/registered.py, execution/{synchronous,scans}.py and schedule_program.py. Confidence: high, read-only reviewer plus focused tests. No status or message-update policy changed.
+
+**2026-09-25T05:07:54Z**
+
+Implementation: immutable model-local factor ranks plus typed outgoing-block checks (including storage casts), synchronous rank reduction, chronological batch/registerized/flat scan transport, exact propagation/certification phases, and numeric-only derivative consumers. Focused validation: 69 schedule/discrete/Gaussian/constraint/shared-goal tests passed; 133 iteration/strategy/gradient/Colony/schedule/execution tests passed (2 slow deselected); final dedicated failure transport mechanisms 20 passed in 10.23s. Reviewer gaps addressed with a dependent lower-rank downstream NaN case and actual hybrid nonfinite-output case. Public exposure remains cff-lhbm; no inference policy changes. Full short-suite gate pending.

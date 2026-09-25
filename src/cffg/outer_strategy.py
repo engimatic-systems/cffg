@@ -68,7 +68,7 @@ class OuterTrustRegionStrategy:
             )
 
         if self.prime is not None and n_iters >= 1:
-            msgs, g_eta, g_lam, ef_eta = self.prime(
+            msgs, g_eta, g_lam, ef_eta, *_ = self.prime(
                 state.messages,
                 state.g_eta,
                 state.g_lam,
@@ -155,7 +155,7 @@ class OuterTrustRegionStrategy:
                 ) -> OuterArrays:
                     if self.reconstruct is None:
                         return arrays
-                    messages, g_eta, g_lam, ef_eta = self.reconstruct(
+                    messages, g_eta, g_lam, ef_eta, *_ = self.reconstruct(
                         arrays.messages,
                         arrays.g_eta,
                         arrays.g_lam,
@@ -176,7 +176,7 @@ class OuterTrustRegionStrategy:
                     params=params,
                 ):
                     arrays = reconstruct(arrays)
-                    messages, g_eta, g_lam, ef_eta, inner_r, inner_code = (
+                    messages, g_eta, g_lam, ef_eta, inner_r, inner_code, *_ = (
                         self.iter_step(
                             arrays.messages,
                             arrays.g_eta,

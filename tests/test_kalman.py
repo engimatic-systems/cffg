@@ -110,7 +110,7 @@ def test_vmap_batch_equals_sequential():
     batched = jax.tree_util.tree_map(lambda *xs: jnp.stack(xs), *states)
 
     def one(st):
-        msgs, g_eta, g_lam, ef_eta, _, _ = engine._step(
+        msgs, g_eta, g_lam, ef_eta, _, _, *_ = engine._step(
             st.messages, st.g_eta, st.g_lam, st.g_obs, st.g_mask,
             st.ef_eta, st.ef_obs, st.ef_mask, st.params,
         )

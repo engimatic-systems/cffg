@@ -30,7 +30,7 @@ class ScheduledExecutors:
 
     These are the same local owners used by flooding. The schedule transports
     their inputs and outputs; parameter meanings and factor mathematics stay
-    behind these capabilities. Registered updates have no inner solver facts.
+    behind these capabilities. Optional local facts do not decide termination.
     """
 
     discrete: Callable[
