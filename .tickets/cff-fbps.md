@@ -72,3 +72,7 @@ Implementation: immutable model-local factor ranks plus typed outgoing-block che
 **2026-09-25T05:36:31Z**
 
 Complete: PR-head numerical change 67ab75f passed the full default suite: 2461 passed, 69 deselected, pytest 1300.24s; measured wall 1316.738s. Dashboard refreshed. cff-98gj then moved 13 long replay cases to slow with unchanged assertions; estimated default wall 1188.262s. Passing full result reused per the explicit selection-change exception (no unchanged rerun). Final focused batch: 100 passed in 118.81s; dedicated provenance file: 20 passed in 10.23s. No numerical/status/gradient formula changes. Next: cff-lhbm exposes ordinary/exact/Colony diagnostics; cff-d57a handles adaptive outer terminal provenance. Gotcha: preserve storage-dtype casts, constraint singleton shapes and separate count/log-support semantics.
+
+**2026-09-25T05:36:51Z**
+
+Published stacked PR #165: https://github.com/engimatic-systems/cffg/pull/165 (base cff-failure-facts / PR #164). All required implementation and validation recorded; tree clean after publication note.
