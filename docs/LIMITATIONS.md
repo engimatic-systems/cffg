@@ -277,12 +277,16 @@ appears at sweep 15. Its agreement with the independent approximate-rule
 oracle is not an exact-posterior or useful-planning claim. No automatic retry
 or extra covariance floor is introduced.
 
-Float32 convergence also does not imply float64-level posterior accuracy. In a
-retained three-step neighbor, selector scores near 9,849 lose precision when
-common Gaussian constants cancel: posterior error is about 6.04e-5 despite a
-zero fresh update residual. Mean/covariance errors are much smaller. Stable
-selector evidence is tracked in cff-d8jj; the current test records a separate,
-fixture-specific rounding allowance instead of loosening the solver certificate.
+Float32 convergence does not imply float64-level posterior accuracy. Selector
+updates, node-energy weights and learning responsibilities now share centered
+relative evidence for proper Gaussian inputs; the retained three-step test no
+longer allows error from subtracting large common Gaussian constants. Improper
+inputs whose combined joint is integrable retain the canonical joint formula
+and its potential cancellation. No general condition-number or posterior-error
+certificate is supplied. Extremely scaled but finite inputs can still overflow
+the whitened evidence system; this is reported as invalid evidence, not repaired
+by a floor or accepted as a finite posterior. These numerical changes do not
+repair the partial-goal planning limitation above.
 
 **S1e. Gaussian parameter learning is EM-rollover; flooding VMP is not
 strictly monotone.** Continuous conjugate learning (cff-7c5o, DERIVATIONS.md

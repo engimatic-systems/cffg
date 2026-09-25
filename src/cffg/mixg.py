@@ -38,7 +38,7 @@ from cffg.compiled import NEG
 from cffg.gaussian_components import backward_component, forward_component
 from cffg.mixture_evidence import joint_blocks as _joint_blocks
 from cffg.mixture_evidence import log_z as _log_z
-from cffg.mixture_evidence import node_constant as _node_const
+from cffg.mixture_evidence import linear_evidence, prior_evidence
 
 _LOG2PI = 1.8378770664093453
 
@@ -189,9 +189,10 @@ def mixlin_stats(eta_o, lam_o, eta_i, lam_i, log_mu_e, a, b, w):
             lam_j,
             jnp.eye(lam_j.shape[-1], dtype=lam_j.dtype)[None],
         )
-        log_score = le + _log_z(eta_j, safe_lam) + _node_const(bb, safe_w)
+        evidence = linear_evidence(eo, lo, ei, li, A, bb, safe_w)
+        log_score = le + evidence.score
         responsibility, selector_ok = _exact_probability(le, log_score)
-        proper = selector_ok & jnp.all(w_ok) & jnp.all(joint_ok)
+        proper = selector_ok & evidence.valid & jnp.all(w_ok) & jnp.all(joint_ok)
 
         covariance = gauss._pd_inverse(safe_lam)
         mean = jnp.einsum("kij,kj->ki", covariance, eta_j)
@@ -289,8 +290,9 @@ def mixlin_to_selector(eta_o, lam_o, eta_i, lam_i, a, b, w):
     def one(eo, lo, ei, li, A, bb, W):
         eta_j, lam_j = _joint_blocks(eo, lo, ei, li, A, bb, W)
         ok = gauss._pd_ok(W).all() & gauss._pd_ok(lam_j).all()
-        logmu = _log_z(eta_j, lam_j) + _node_const(bb, W)
-        return jnp.where(ok, logmu - logmu.max(), jnp.zeros_like(logmu))
+        evidence = linear_evidence(eo, lo, ei, li, A, bb, W)
+        logmu = _nan_unless(evidence.valid, evidence.score - evidence.score.max())
+        return jnp.where(ok, logmu, jnp.zeros_like(logmu))
 
     return jax.vmap(one)(eta_o, lam_o, eta_i, lam_i, a, b, w)
 
@@ -355,10 +357,10 @@ def mixlin_energy(eta_o, lam_o, eta_i, lam_i, log_mu_e, a, b, w):
         eta_j, lam_j = _joint_blocks(eo, lo, ei, li, A, bb, W)
         ok = gauss._pd_ok(W).all() & gauss._pd_ok(lam_j).all()
         d = lam_j.shape[-1]
-        log_rho = le + _log_z(eta_j, lam_j) + _node_const(bb, W)
-        rho = jax.nn.softmax(log_rho)
-        log_rho_n = jax.nn.log_softmax(log_rho)
-        h_s = -(rho * log_rho_n).sum()
+        evidence = linear_evidence(eo, lo, ei, li, A, bb, W)
+        rho, selector_ok = _exact_probability(le, le + evidence.score)
+        h_s = -(rho * jnp.log(jnp.where(rho > 0., rho, 1.))).sum()
+        ok &= evidence.valid & selector_ok
         logdet_j = gauss._pd_logdet(lam_j)
         h_gauss = 0.5 * d * (1.0 + _LOG2PI) - 0.5 * logdet_j  # [K]
 
@@ -401,16 +403,8 @@ def mix_stats(eta_o, lam_o, log_mu_e, mean, w):
             lam_q,
             jnp.eye(lam_q.shape[-1], dtype=lam_q.dtype)[None],
         )
-        log_score = (
-            le
-            + _log_z(eta_q, safe_lam)
-            - 0.5
-            * jnp.einsum(
-                "ki,kij,kj->k", component_mean, safe_w, component_mean
-            )
-            + 0.5 * gauss._pd_logdet(safe_w)
-            - 0.5 * component_mean.shape[-1] * _LOG2PI
-        )
+        evidence = prior_evidence(eo, lo, component_mean, safe_w)
+        log_score = le + evidence.score
         responsibility, selector_ok = _exact_probability(le, log_score)
         covariance = gauss._pd_inverse(safe_lam)
         belief_mean = jnp.einsum("kij,kj->ki", covariance, eta_q)
@@ -421,6 +415,7 @@ def mix_stats(eta_o, lam_o, log_mu_e, mean, w):
         weighted_second = responsibility[:, None, None] * second
         proper = (
             selector_ok
+            & evidence.valid
             & jnp.all(w_ok)
             & jnp.all(belief_ok)
             & jnp.all(jnp.isfinite(weighted_mean))
@@ -473,18 +468,13 @@ def mix_predictive(log_mu_e, mean, w):
 
 
 def mix_to_selector(eta_o, lam_o, mean, w):
-    """→ selector, exact and always proper: W_s + Λ_o ≻ 0."""
+    """→ selector, exact when every W_s and W_s + Λ_o is proper."""
 
     def one(eo, lo, m, W):
-        wm = jnp.einsum("kij,kj->ki", W, m)
-        logmu = (
-            _log_z(wm + eo[None], W + lo[None])
-            - 0.5 * jnp.einsum("ki,kij,kj->k", m, W, m)
-            + 0.5 * gauss._pd_logdet(W)
-            - 0.5 * m.shape[-1] * _LOG2PI
-        )
+        evidence = prior_evidence(eo, lo, m, W)
+        logmu = _nan_unless(evidence.valid, evidence.score - evidence.score.max())
         ok = gauss._pd_ok(W).all() & gauss._pd_ok(W + lo[None]).all()
-        return jnp.where(ok, logmu - logmu.max(), jnp.zeros_like(logmu))
+        return jnp.where(ok, logmu, jnp.zeros_like(logmu))
 
     return jax.vmap(one)(eta_o, lam_o, mean, w)
 
@@ -510,14 +500,9 @@ def mix_energy(eta_o, lam_o, log_mu_e, mean, w):
         eta_q = jnp.einsum("kij,kj->ki", W, m) + eo[None]
         lam_q = W + lo[None]
         d = lam_q.shape[-1]
-        log_rho = (
-            le + _log_z(eta_q, lam_q)
-            - 0.5 * jnp.einsum("ki,kij,kj->k", m, W, m)
-            + 0.5 * gauss._pd_logdet(W)
-            - 0.5 * d * _LOG2PI
-        )
-        rho = jax.nn.softmax(log_rho)
-        h_s = -(rho * jax.nn.log_softmax(log_rho)).sum()
+        evidence = prior_evidence(eo, lo, m, W)
+        rho, selector_ok = _exact_probability(le, le + evidence.score)
+        h_s = -(rho * jnp.log(jnp.where(rho > 0., rho, 1.))).sum()
         logdet_q = gauss._pd_logdet(lam_q)
         h_gauss = 0.5 * d * (1.0 + _LOG2PI) - 0.5 * logdet_q
         sig_q = gauss._pd_inverse(lam_q)
@@ -530,6 +515,7 @@ def mix_energy(eta_o, lam_o, log_mu_e, mean, w):
             - 0.5 * (jnp.einsum("ki,kij,kj->k", r, W, r) + jnp.einsum("kij,kji->k", W, sig_q))
         )
         ok = gauss._pd_ok(W).all() & gauss._pd_ok(lam_q).all()
+        ok &= evidence.valid & selector_ok
         f = -h_s - (rho * h_gauss).sum() - (rho * e_logf).sum()
         return jnp.where(ok, f, jnp.inf)
 
