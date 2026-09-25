@@ -64,3 +64,7 @@ Independent review found no correctness or failure-isolation defect. It identifi
 **2026-09-25T04:20:13Z**
 
 Complete: focused runtime/schedule set passed 118 tests (3 deselected), final exact-colony file passed 16 tests after independent review, and dashboard-backed full short suite at 2226bea passed 2,432 tests (67 deselected, no failures). Actual measured wall time was 1,233.520s. cff-rnn1 subsequently moved two already-passing exhaustive gradient cases to opt-in slow; no numerical code/assertions changed, and the estimated remaining suite is 1,194.450s. Reused the passing result per the explicit selection-change exception. Original supplied reproduction now reports all three paths converged. No scientific objective, certificate threshold, serialization or checkpoint change. Next chain ticket is cff-04mb; cff-qtub cached spawning is now unblocked. Exact-member vectorization remains cff-wbhu performance work.
+
+**2026-09-25T04:21:48Z**
+
+Implementation PR: https://github.com/engimatic-systems/cffg/pull/163, based on roadmap PR #162. Closed with passing numerical validation; marker-only budget correction is separately tracked in cff-rnn1. Repository clean after publishing.
