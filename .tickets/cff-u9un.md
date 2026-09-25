@@ -1,6 +1,6 @@
 ---
 id: cff-u9un
-status: in_progress
+status: closed
 deps: [cff-vxza, cff-03dn, cff-04mb, cff-2q3i]
 links: []
 created: 2026-09-25T07:25:11Z
@@ -74,3 +74,7 @@ Independent-oracle review (failure_provenance): correct for the retained rank1-g
 **2026-09-25T09:27:33Z**
 
 Final focused integration validation:13 passed including both opt-in slow tests (H150 and genuine H15 batched Colony). Shared iteration/run-strategy boundaries:38 passed. Mean/covariance/FE and fresh undamped residual checks retain their original bounds; only the binary float32 selector comparison gets an explicitly measured cancellation allowance, independently computed from Gaussian normalizers and stable likelihoods (two log-odds ULPs, sigmoid derivative bound1/4, plus rounding). Direct log-odds checks make that allowance observable; cff-d8jj owns stable evaluation and tightening it. No production convergence threshold, damping default or mathematical objective was changed. Partial-goal scope is explicitly documented and independently tracked in cff-c5qf pending user decision. Final short-suite gate follows.
+
+**2026-09-25T09:56:03Z**
+
+Complete numerical integration: final-code short suite 2,565 passed / 96 deselected. Explicit full focused file including both slow cases: 13 passed. Bounded initialization, default/explicit damping, fixed/zero budgets, invalid/empty initial state, mixed/flood, f32/f64, sparse/neighbor cases, independent moment/BFE oracle, fresh residual, singleton/batched Colony and H150 covered. No new retry owner was necessary. cff-2q3i preserves all numerical checks while moving seven unchanged replays (33.628s): measured 1,226.516s, estimated default 1,192.888s. Reused passing gate after marker-only adjustment. Separate unresolved issues: cff-d8jj float32 selector cancellation, cff-c5qf partial-goal planning scope (awaiting user decision). This closes convergence/initialization work, not those accuracy or planning-capability claims. Canonical docs and Engine.run docstring are explicit.
