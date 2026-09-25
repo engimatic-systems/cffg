@@ -70,3 +70,7 @@ Research question: which adaptive-map failures are terminal rather than speculat
 **2026-09-25T06:52:28Z**
 
 Implemented in c661cce (pure owner extraction) and ec78156 (terminal provenance). Focused validation: 47 passed/5 deselected extraction; 61 passed/3 deselected solver/nonlinear/gradient checks; 38 diagnostic tests passed. Final short suite: 2486 passed, 82 deselected, pytest 1189.27s; measured 1204.745s. Budget follow-up cff-8jqy moves one 7.721s manifest-only case to slow, estimated 1197.024s, with the passing run reused under project rules. New coverage proves discovery/candidate/trust terminal numbering, recursive/controller offsets, invalid-trial recovery, conservative collapse attribution, generic derivative failure, real improper cavities in f32/f64, scheduled reconstruction recovery, reconstruction first cause, and priming/functional order. Numerical/status/FE/gradient policy and checkpoint schemas unchanged. No remaining implementation work in this ticket.
+
+**2026-09-25T06:52:51Z**
+
+Published PR #167: https://github.com/engimatic-systems/cffg/pull/167, based on cff-lhbm-public-failures (#166). Working tree clean after publication.
