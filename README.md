@@ -130,11 +130,11 @@ as `cffg.learn`, `cffg.conj`, `cffg.colony`, `cffg.csp`, and `cffg.estimate`
 expose the specialized workflows named in the capability map.
 
 <details>
-<summary><code>cffg</code> — daily workflow and extension primitives (37)</summary>
+<summary><code>cffg</code> — daily workflow and extension primitives (38)</summary>
 
 <!-- facade-cffg:start -->
 `CorridorEnv`, `DiscreteBinding`, `DiscreteMode`, `EFBinding`, `Engine`,
-`FactorKernel`, `FixedPointDifferentiator`, `FixedPointGradient`, `FunctionSpec`,
+`FactorKernel`, `FailureDiagnostic`, `FixedPointDifferentiator`, `FixedPointGradient`, `FunctionSpec`,
 `GaussianAmortizer`, `GaussianBinding`, `GaussianConditioning`, `GradientStatus`,
 `HostileInputs`, `LoadedBundle`, `MeanImplementation`, `NeuralTrainer`,
 `ParameterSpec`, `PersistentArray`, `PersistentParameter`,
@@ -238,6 +238,31 @@ Never consume `result.state` as if the iteration budget implied success. Use
 | `BUDGET_EXHAUSTED` | The state may be useful diagnostically, but the requested certificate did not pass |
 | `DIVERGED` | A non-finite or failed numerical path invalidated the solve |
 | `INFEASIBLE` | The declared support or constraints admit no valid solution under the solver contract |
+
+On an unsuccessful run, inspect `result.failure`: an immutable
+`FailureDiagnostic(reason, factor, phase, iteration)`. For example,
+`reason="improper_cavity"` identifies an invalid local Gaussian input;
+`factor` is its serialized model-local name, not a compiled group name.
+If only a global check found the problem, `factor=None`: reasons include
+`nonfinite_state`, `empty_support`, `nonfinite_objective`,
+`undefined_objective`, `iteration_budget`, and `exact_certificate`.
+Local codes also distinguish `local_budget`, `local_divergence`,
+`nonfinite_output`, `invalid_noise`, `nonfinite_function`, `improper_tilt`,
+`unrepresentable_sigma_points`, and `nonfinite_shared_goal`.
+Functional parameter updates use `functional_budget` or `functional_divergence`.
+
+The first failing update wins; simultaneous failures choose the
+alphabetically first factor name. Initialization and priming are iteration
+0; message-update attempts start at 1 across soft/hard phases. Exact
+propagation and certification both belong to iteration 1. A functional
+parameter failure can precede its numbered message-update attempt.
+`phase` distinguishes these stages from the `ledger` check.
+Adaptive outer solves currently report generic `outer_*` terminal reasons;
+rejected trials that recover do not become run failures.
+
+Converged results have `failure=None`. Diagnostics are run-local and are not
+saved in agent checkpoints: a restored cached unsuccessful result can also
+have `failure=None`. Always use `status` to decide whether inference succeeded.
 
 Readouts are family-specific on purpose:
 

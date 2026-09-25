@@ -10,6 +10,7 @@ _EXPORTS = {
     "EFBinding": "kernel_bindings",
     "Engine": "engine",
     "FactorKernel": "kernels",
+    "FailureDiagnostic": "runtime_types",
     "FixedPointDifferentiator": "implicit",
     "FixedPointGradient": "implicit",
     "FunctionSpec": "core.functions",

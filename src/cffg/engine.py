@@ -56,6 +56,7 @@ from cffg.execution.transport import _disc_rows as _disc_rows  # noqa: PLC0414
 from cffg.execution.transport import _gauss_rows as _gauss_rows  # noqa: PLC0414
 from cffg.execution.transport import _obs_rows as _obs_rows  # noqa: PLC0414
 from cffg.iteration import IterationPolicy, IterationServices, run_iterations
+from cffg.execution.failures import FailureIndex
 from cffg.ledger import ObjectiveLedger, constraint_satisfied
 from cffg.ledger import make_belief_energy as _make_bfe
 from cffg.lifecycle import StateLifecycle
@@ -126,6 +127,7 @@ class Engine:
         if not 0.0 < mu3_min_ess_fraction <= 1.0:
             raise ValueError("mu3_min_ess_fraction must be in (0, 1]")
         self.arena = arena
+        self._failure_names = FailureIndex(arena).names
         self._state_lifecycle = StateLifecycle(arena)
         for group in arena.groups:
             if group.kernel is not None and arena.semiring not in group.kernel.binding.semirings:
@@ -404,6 +406,7 @@ class Engine:
         ess, log_normalizers, mu3_statuses = self._mu3_result_diagnostics(outcome.state)
         return run_results.finalize_iteration(
             outcome,
+            factor_names=self._failure_names,
             legacy_picard=has_gfe,
             mu3_ess=ess,
             mu3_log_normalizers=log_normalizers,
@@ -484,7 +487,7 @@ class Engine:
         outcome = ExactRunStrategy(
             self._exact_unit, self.arena.semiring, self._state_is_finite, self.objective
         ).run(state, tol)
-        return run_results.finalize_exact(outcome)
+        return run_results.finalize_exact(outcome, factor_names=self._failure_names)
     @staticmethod
     def _state_is_finite(state: State) -> bool:
         return state_is_finite(state)

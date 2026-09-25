@@ -59,12 +59,14 @@ class OuterTrustRegionStrategy:
                 OuterTerminationReason.NONFINITE_EVALUATION,
                 inner_code=2,
                 inner_residual=float("inf"),
+                initial_rejection=True,
             )
         if self.services.zero_support(state):
             return OuterOutcome(
                 state,
                 OuterTerminationReason.INFEASIBLE,
                 free_energies=(float("inf"),),
+                initial_rejection=True,
             )
 
         if self.prime is not None and n_iters >= 1:

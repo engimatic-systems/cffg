@@ -3,6 +3,7 @@
 import numpy as np
 
 from cffg.exact_strategy import ExactOutcome, ExactReason
+from cffg.failure_diagnostics import exact_diagnostic, iteration_diagnostic, outer_diagnostic
 from cffg.iteration_types import IterationOutcome, IterationReason
 from cffg.outer_outcome import OuterOutcome
 from cffg.runtime_types import OuterTerminationReason, RunResult, RunStatus
@@ -34,7 +35,7 @@ _EXACT_STATUS_BY_REASON = {
 }
 
 
-def finalize_exact(outcome: ExactOutcome) -> RunResult:
+def finalize_exact(outcome: ExactOutcome, *, factor_names=()) -> RunResult:
     """Preserve exact logical counts and the structural tolerance exception."""
     status = _EXACT_STATUS_BY_REASON[outcome.reason]
     deltas = np.asarray(outcome.message_deltas)
@@ -58,6 +59,7 @@ def finalize_exact(outcome: ExactOutcome) -> RunResult:
         residual=outcome.residual,
         inner_status=RunStatus.DIVERGED if initial_nonfinite else RunStatus.CONVERGED,
         inner_residual=float("inf") if initial_nonfinite else 0.0,
+        failure=None if status is RunStatus.CONVERGED else exact_diagnostic(outcome, factor_names),
     )
 
 
@@ -68,6 +70,7 @@ def finalize_iteration(
     mu3_ess: tuple[float, ...] = (),
     mu3_log_normalizers: tuple[float, ...] = (),
     mu3_statuses: tuple[RunStatus, ...] = (),
+    factor_names: tuple[str, ...] = (),
 ) -> RunResult:
     """Validate terminal evidence and preserve the public result field schema."""
     if outcome.reason is IterationReason.RUNNING:
@@ -113,6 +116,7 @@ def finalize_iteration(
             if legacy_picard and not outcome.initial_rejection
             else OuterTerminationReason.NOT_RUN
         ),
+        failure=None if status is RunStatus.CONVERGED else iteration_diagnostic(outcome, factor_names),
     )
 
 
@@ -198,5 +202,6 @@ def finalize_outer(
         outer_map_evaluations=outcome.outer_map_evaluations,
         trial_evaluations=outcome.trial_evaluations,
         linear_iterations=outcome.linear_iterations,
+        failure=None if status is RunStatus.CONVERGED else outer_diagnostic(outcome),
         solver_compilations=outcome.solver_compilations,
     )

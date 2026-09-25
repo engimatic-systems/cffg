@@ -64,6 +64,23 @@ class InferenceError(RuntimeError):
 
 
 @dataclass(frozen=True)
+class FailureDiagnostic:
+    """Run-local explanation, not a replacement for the authoritative status.
+
+    ``reason`` and ``phase`` are stable lowercase codes. ``factor`` is the
+    serialized model-local name, or None when ownership is unknown.
+    Initialization and priming use iteration zero; update attempts start at
+    one. A functional failure can precede that attempt's message update.
+    Diagnostics are not persisted in agent checkpoints.
+    """
+
+    reason: str
+    factor: str | None
+    phase: str
+    iteration: int
+
+
+@dataclass(frozen=True)
 class RunResult:
     """Status-bearing result of an inference run.
 
@@ -95,6 +112,7 @@ class RunResult:
     trial_evaluations: int = 0
     linear_iterations: int = 0
     solver_compilations: int = 0
+    failure: FailureDiagnostic | None = None
 
     @property
     def delta_trace(self) -> tuple[float, ...]:

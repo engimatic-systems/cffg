@@ -1,6 +1,6 @@
 """Internal iteration outcomes and array-valued facts, without public statuses."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import NamedTuple
 
@@ -8,6 +8,7 @@ import jax
 import numpy as np
 
 from cffg._immutable import FrozenArray
+from cffg.failure_facts import FailureAt, FailurePhase, empty_failure_at
 from cffg.runtime_types import State
 
 type ScalarArray = jax.Array | np.ndarray
@@ -60,6 +61,8 @@ class IterationOutcome:
     inner_residual: float
     state_finite: bool | None
     zero_support: bool | None
+    failure: FailureAt = field(default_factory=empty_failure_at)
+    phase: FailurePhase = FailurePhase.SOFT
 
     def __post_init__(self):
         object.__setattr__(self, "reason", IterationReason(self.reason))

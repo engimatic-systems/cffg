@@ -6,7 +6,7 @@ from functools import partial
 import jax
 import numpy as np
 import pytest
-from test_agent_mu3 import ALPHA0, assert_result_exact, binary_builder
+from test_agent_mu3 import ALPHA0, assert_restored_result, binary_builder
 from test_agent_spec import _two_block_builder
 from test_constraint_data import constraint_model, examples
 
@@ -170,7 +170,7 @@ def test_prepared_mu3_cache_rebuilds_pre_constraint_parameter_layout(
     source, arrays, path = prepared_checkpoint(kind, tmp_path)
     restored = functional_agent(kind)
     restored.restore(path)
-    assert_result_exact(restored.last_plan_result, source.last_plan_result)
+    assert_restored_result(restored.last_plan_result, source.last_plan_result)
     omit_old_constraint_fields(source, arrays)
     if envelope == "agent_v1":
         arrays = {
@@ -184,7 +184,7 @@ def test_prepared_mu3_cache_rebuilds_pre_constraint_parameter_layout(
     else:
         write_current(path, arrays)
     restored.restore(path)
-    assert_result_exact(restored.last_plan_result, source.last_plan_result)
+    assert_restored_result(restored.last_plan_result, source.last_plan_result)
     np.testing.assert_array_equal(
         restored.planning_key_cursor, source.planning_key_cursor
     )

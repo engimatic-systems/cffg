@@ -1171,8 +1171,7 @@ breaks simultaneous failures. Structured reasons require a failed status;
 vacuous successful updates are not failures. Non-finite output checks allow
 categorical negative infinity as exact zero support, but not as a Gaussian
 information coordinate. These auxiliary facts do not change convergence or
-derivative calculations. Public factor attribution remains unavailable until
-the result transport stages of cff-04mb are complete.
+derivative calculations.
 
 `execution/failures.py` assigns ranks from all executing plans' serialized
 member/prior names, not just parameter-bearing factors. Sweeps, propagation
@@ -1184,8 +1183,27 @@ prior blocks retain their own factor names; a non-finite pooled shared-goal
 count reports unknown ownership rather than inventing one contributor.
 Flooding reduces simultaneous failures by rank, while ordered stages and
 scan steps retain their first cause. Exact units distinguish propagation
-from certification. Run controllers currently discard these auxiliary facts;
-root/adjoint programs exclude them from differentiated message coordinates.
+from certification. Root/adjoint programs exclude these auxiliary facts from
+differentiated message coordinates.
+
+Ordinary iteration and Colony retain the first cause plus its logical
+iteration in a fixed-shape `FailureAt`, without reading factor-level facts
+back to the host each sweep. Exact control retains propagation/certification
+facts. Public finalization decodes the record against the Engine's cached
+name table once, producing an immutable `RunResult.failure` diagnostic.
+Successful results omit it; unsuccessful global checks use explicit generic
+reason codes and unknown factor ownership. Initialization and priming use
+iteration zero; soft/hard message attempts share one-based numbering, and
+functional failure can precede its numbered message attempt. Exact propagation
+and certification both belong to iteration one. Adaptive outer results
+currently retain only generic terminal reasons, not rejected-trial causes;
+local outer provenance remains cff-d57a.
+
+Diagnostics are run-local rather than persisted inference state. Functional
+agent checkpoint field whitelists and current/legacy versions are unchanged;
+restored cached results have `failure=None`, including unsuccessful results.
+Their statuses and saved numerical diagnostics remain authoritative. Fresh
+runs regain provenance; restore never recomputes it or forces a cached rerun.
 
 `execution/synchronous.py:make_sweep` owns the global synchronous transport.
 It gathers every local input from the pre-sweep arrays, collects cross-domain

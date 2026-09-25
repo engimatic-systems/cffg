@@ -7,6 +7,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from cffg.iteration_types import IterationOutcome, IterationReason, StepFacts
+from cffg.failure_facts import FailurePhase, FailureReason, empty_failure, empty_failure_at, record_failure
 from cffg.runtime_types import State, _replace
 from cffg.schedule_program import ScheduleProgram
 
@@ -70,6 +71,8 @@ class IterationProgress:
         self.previous_fe: float | None = None
         self.state_finite: bool | None = None
         self.zero_support: bool | None = None
+        self.failure = empty_failure_at()
+        self.phase = FailurePhase.INITIALIZATION
 
     @property
     def stopped(self) -> bool:
@@ -98,11 +101,24 @@ class IterationProgress:
             self.reason = IterationReason.INITIAL_EMPTY_SUPPORT
             self.energies.append(float("inf"))
 
-    def begin_phase(self) -> None:
+    def begin_phase(self, phase=FailurePhase.SOFT) -> None:
         self.reason = IterationReason.RUNNING
         self.previous_fe = None
+        self.phase = phase
+
+    def record_failure(self, fact, *, phase=None, iteration=None) -> None:
+        self.failure = record_failure(
+            self.failure, fact,
+            self.phase if phase is None else phase,
+            len(self.deltas) + 1 if iteration is None else iteration,
+        )
 
     def reject_functional(self, code: int, residual: float) -> None:
+        reason = FailureReason.FUNCTIONAL_BUDGET if code == 1 else FailureReason.FUNCTIONAL_DIVERGENCE
+        self.record_failure(
+            empty_failure()._replace(reason=jnp.asarray(reason, jnp.int32)),
+            phase=FailurePhase.FUNCTIONAL,
+        )
         self.invalidate_checks()
         self.inner_code = 1 if code == 1 else 2
         self.inner_residual = residual
@@ -204,6 +220,8 @@ class IterationProgress:
             self.inner_residual,
             self.state_finite,
             self.zero_support,
+            self.failure,
+            self.phase,
         )
 
 
@@ -224,7 +242,7 @@ def run_iterations(
         return progress.finish(state)
 
     if program.prime is not None and n_iters >= 1:
-        msgs, eta, lam, ef_eta, *_ = program.prime(
+        msgs, eta, lam, ef_eta, *auxiliary = program.prime(
             state.messages,
             state.g_eta,
             state.g_lam,
@@ -237,9 +255,13 @@ def run_iterations(
         )
         state = _replace(state, messages=msgs, g_eta=eta, g_lam=lam, ef_eta=ef_eta)
         progress.invalidate_checks()
+        progress.record_failure(
+            auxiliary[0] if auxiliary else empty_failure(),
+            phase=FailurePhase.PRIMING, iteration=0,
+        )
 
     def phase(current: State, count: int, *, harden: bool) -> State:
-        progress.begin_phase()
+        progress.begin_phase(FailurePhase.HARD if harden else FailurePhase.SOFT)
         for _ in range(count):
             current, functional_delta, code, residual = services.update_functional(
                 current
@@ -247,7 +269,7 @@ def run_iterations(
             if code:
                 progress.reject_functional(code, residual)
                 return current
-            msgs, eta, lam, ef_eta, inner_residual, inner_code, *_ = program.iter_step(
+            msgs, eta, lam, ef_eta, inner_residual, inner_code, *auxiliary = program.iter_step(
                 current.messages,
                 current.g_eta,
                 current.g_lam,
@@ -271,6 +293,7 @@ def run_iterations(
                 functional_delta=functional_delta,
             )
             current = candidate
+            progress.record_failure(auxiliary[0] if auxiliary else empty_failure())
             progress.consume(current, facts, services)
             if progress.stopped:
                 break

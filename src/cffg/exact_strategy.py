@@ -1,12 +1,13 @@
 """One exact schedule execution and its fixed-point certificate."""
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import IntEnum
 
 import numpy as np
 
 from cffg._immutable import FrozenArray
+from cffg.failure_facts import FailureAt, FailurePhase, empty_failure_at, record_failure
 from cffg.runtime_types import State, _replace
 from cffg.schedule_contracts import ExactUnit
 
@@ -33,6 +34,7 @@ class ExactOutcome:
     residual: float = float("inf")
     structural: bool = False
     by_tolerance: bool = False
+    failure: FailureAt = field(default_factory=empty_failure_at)
 
     def __post_init__(self):
         object.__setattr__(self, "reason", ExactReason(self.reason))
@@ -62,7 +64,7 @@ class ExactRunStrategy:
         if not self.finite(state):
             return ExactOutcome(state, ExactReason.INITIAL_NONFINITE, 0)
 
-        msgs, g_eta, g_lam, ef_eta, delta_dev, rel_dev, fe_dev, pre_bad, post_bad, *_ = (
+        msgs, g_eta, g_lam, ef_eta, delta_dev, rel_dev, fe_dev, pre_bad, post_bad, *auxiliary = (
             self.unit(
                 state.messages,
                 state.g_eta,
@@ -83,9 +85,12 @@ class ExactRunStrategy:
                 free_energies=(float("inf"),),
             )
         st = _replace(state, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta)
+        failure = empty_failure_at()
+        if auxiliary:
+            failure = record_failure(failure, auxiliary[0], FailurePhase.PROPAGATION, 1)
         delta, rel = float(delta_dev), float(rel_dev)
         if not np.isfinite(delta) or not np.isfinite(rel) or not self.finite(st):
-            return ExactOutcome(st, ExactReason.UPDATE_NONFINITE, 1, (delta,))
+            return ExactOutcome(st, ExactReason.UPDATE_NONFINITE, 1, (delta,), failure=failure)
         if bool(post_bad):
             # Empty support discards the fused sentinel-valued ledger.
             return ExactOutcome(
@@ -93,6 +98,7 @@ class ExactRunStrategy:
                 ExactReason.POST_EMPTY_SUPPORT,
                 1,
                 free_energies=(float("inf"),),
+                failure=failure,
             )
 
         eps = float(np.finfo(np.asarray(st.messages).dtype).eps)
@@ -102,13 +108,13 @@ class ExactRunStrategy:
         reason = ExactReason.CERTIFIED if certified else ExactReason.BUDGET
         if self.semiring == "max":
             if certified and not np.isfinite(self.objective(st)):
-                return ExactOutcome(st, ExactReason.OBJECTIVE_NONFINITE, 1, (delta,))
+                return ExactOutcome(st, ExactReason.OBJECTIVE_NONFINITE, 1, (delta,), failure=failure)
             energies = ()
         else:
             fe = float(fe_dev)
             if not np.isfinite(fe):
-                return ExactOutcome(st, ExactReason.OBJECTIVE_NONFINITE, 1, (delta,))
+                return ExactOutcome(st, ExactReason.OBJECTIVE_NONFINITE, 1, (delta,), failure=failure)
             energies = (fe,)
         return ExactOutcome(
-            st, reason, 1, (delta,), energies, delta, structural, by_tol
+            st, reason, 1, (delta,), energies, delta, structural, by_tol, failure
         )

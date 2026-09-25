@@ -98,6 +98,8 @@ def assert_result_equal(actual, expected):
             assert_state_equal(left, right)
         elif isinstance(left, Enum):
             assert left is right, field.name
+        elif field.name == "failure":
+            assert left == right
         else:
             np.testing.assert_allclose(
                 left, right, atol=1e-13, rtol=1e-13, equal_nan=True, err_msg=field.name

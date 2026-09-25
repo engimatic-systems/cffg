@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import functools
 import json
-from dataclasses import fields
+from dataclasses import fields, replace
 
 import jax
 import jax.numpy as jnp
@@ -113,10 +113,18 @@ def assert_result_exact(actual: RunResult, expected: RunResult) -> None:
     for field in fields(RunResult):
         # Kernel-cache compilation count depends on whether the otherwise
         # identical direct or agent run reaches the shared Engine first.
-        if field.name not in {"state", "solver_compilations"}:
+        if field.name == "failure":
+            assert actual.failure == expected.failure
+        elif field.name not in {"state", "solver_compilations"}:
             np.testing.assert_equal(
                 getattr(actual, field.name), getattr(expected, field.name)
             )
+
+
+def assert_restored_result(actual: RunResult, expected: RunResult) -> None:
+    """Check every persisted field; run-local provenance is intentionally absent."""
+    assert actual.failure is None
+    assert_result_exact(actual, replace(expected, failure=None))
 
 
 def checkpoint_arrays(path) -> dict[str, np.ndarray]:
@@ -627,13 +635,13 @@ def test_weight_collapse_checkpoint_replays_and_advances_exactly(tmp_path):
 
     restored = make_weight_collapse_agent(key=jax.random.PRNGKey(999))
     restored.restore(path)
-    assert_result_exact(restored.last_plan_result, source_result)
+    assert_restored_result(restored.last_plan_result, source_result)
     np.testing.assert_array_equal(restored.planning_key_cursor, source_key)
     assert restored.planning_epoch == source_epoch
 
     with pytest.raises(InferenceError) as replayed:
         restored.act()
-    assert_result_exact(replayed.value.result, source_result)
+    assert_restored_result(replayed.value.result, source_result)
     np.testing.assert_array_equal(restored.planning_key_cursor, source_key)
     assert restored.planning_epoch == source_epoch
 
