@@ -51,3 +51,7 @@ Pre-implementation handoff: Runtime numerical/status invariant row plus New fact
 **2026-09-25T07:55:28Z**
 
 Completed: Gaussian and EF equality callbacks share exclusive prefix/suffix sums with linear storage and no recipient contamination, ridge or floor. Focused checks:45 local Gaussian/EF/schedule tests passed;69 execution/schedule/Kalman/hybrid/Colony tests passed (3 slow deselected). Final short suite:2508 passed,83 deselected, pytest1181.76s, measured1197.103s (within1200s). New tests exercise dominant/weak eta and precision, the6.0834e-16 planning-scale mechanism, exact vacuity, nonfinite other legs, f32/f64,300 legs,JIT/vmap,and forward/reverse Jacobians. tk dep cycle and git diff --check pass. This repairs one amplifier only; cff-03dn and cff-u9un still block complete hybrid planning repair.
+
+**2026-09-25T07:55:39Z**
+
+Published PR #170: https://github.com/engimatic-systems/cffg/pull/170, based on #169.
