@@ -1,6 +1,6 @@
 ---
 id: cff-d8jj
-status: in_progress
+status: closed
 deps: [cff-u9un, cff-aqpz]
 links: []
 created: 2026-09-25T09:24:47Z
@@ -83,3 +83,7 @@ Final independent review: no accepted-output discrepancy found. Moderate singula
 **2026-09-25T10:13:00Z**
 
 Focused validation after integration: test_mixg plus original planning checks24passed; tightened evidence/planning45passed2deselected; additional cavity/covariance derivative checks3passed; hybrid_readouts, hybrid_learnables, mixture_collapse, mixture_rank, neural_gfe and switching_kf94passed207.47s. Exact selector support, learning weights, D3 ledger, improper-input fallback and independent derivatives passed. Full final short-suite gate remains before PR publication.
+
+**2026-09-25T10:41:30Z**
+
+Final gate after the last numerical edit passed:2595 tests,103 deselected,4 third-party Gym deprecation warnings; wall1272.832s. cff-aqpz moved15 unchanged expensive replays to slow using saved timings, estimating1190.517s; gate reused without numerical changes. Dependency and whitespace checks pass. Completed stable evidence across six consumers, independent overlap/derivative/hostile-input regressions, strict retained float32 accuracy checks and canonical docs. Remaining partial-goal scope is cff-c5qf, not part of this numerical repair.
