@@ -78,3 +78,7 @@ Final focused integration validation:13 passed including both opt-in slow tests 
 **2026-09-25T09:56:03Z**
 
 Complete numerical integration: final-code short suite 2,565 passed / 96 deselected. Explicit full focused file including both slow cases: 13 passed. Bounded initialization, default/explicit damping, fixed/zero budgets, invalid/empty initial state, mixed/flood, f32/f64, sparse/neighbor cases, independent moment/BFE oracle, fresh residual, singleton/batched Colony and H150 covered. No new retry owner was necessary. cff-2q3i preserves all numerical checks while moving seven unchanged replays (33.628s): measured 1,226.516s, estimated default 1,192.888s. Reused passing gate after marker-only adjustment. Separate unresolved issues: cff-d8jj float32 selector cancellation, cff-c5qf partial-goal planning scope (awaiting user decision). This closes convergence/initialization work, not those accuracy or planning-capability claims. Canonical docs and Engine.run docstring are explicit.
+
+**2026-09-25T09:57:55Z**
+
+Published stacked PR https://github.com/engimatic-systems/cffg/pull/173, based on #172. Next ready numerical ticket is cff-d8jj; cff-c5qf remains a separate scope decision.
