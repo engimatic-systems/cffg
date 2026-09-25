@@ -68,3 +68,7 @@ Refined dependency map from tk dep tree --full, tk ready and tk blocked. Legend:
 Both arithmetic tickets and cff-u9un are explicit prerequisites of cff-ectw. Other independent PCGym roots remain ready. tk dep cycle reports no cycles.
 
 Follow-up research: actual dyn_j full-rank input first arrives after j-1 mixed sweeps (dyn1 at priming0, dyn15 at14; diagnostic threshold16*d*eps*lambda_max). Existing prime/reconstruct traverse exact islands, not mixture factors. Correct rank exclusion should leave the early ledger undefined until proper prior information arrives; importantly, IterationProgress already allows initial undefined Gaussian FE while previous_fe=None, so no new initialization policy is justified until arithmetic repair is tested. Source: pcgym_numerics_review traced saved graph and inspected iteration.py/mixed schedule. Measured rank-arrival confidence high; behavior after corrected arithmetic remains an inference to validate in cff-u9un.
+
+**2026-09-25T07:26:21Z**
+
+Published refinement PR #169: https://github.com/engimatic-systems/cffg/pull/169, based on #168. Numerical investigation is complete; implementation starts with independent cff-vxza while rank/collapse contract review informs cff-03dn.
