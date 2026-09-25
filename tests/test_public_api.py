@@ -201,7 +201,7 @@ def test_top_level_facade_reexports_only_canonical_owners():
 
 @pytest.mark.parametrize(
     ("jax_enable_x64", "expected_dtype"),
-    (("0", "float32"), ("1", "float64")),
+    (("0", "float32"), pytest.param("1", "float64", marks=pytest.mark.slow)),
 )
 def test_newcomer_example_uses_only_the_facade_and_runs_in_configured_precision(
     tmp_path,
@@ -446,6 +446,7 @@ def test_checkpoint_rejects_version_structure_shape_and_fields_atomically(tmp_pa
     _assert_agent_snapshot(target, expected)
 
 
+@pytest.mark.slow
 def test_checkpoint_rejects_goal_corruption_atomically(tmp_path):
     source = _make_agent(learn_goal=True)
     action = source.act()
