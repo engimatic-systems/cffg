@@ -1,7 +1,7 @@
 ---
 id: cff-61ag
 status: in_progress
-deps: [cff-fkuj]
+deps: [cff-fkuj, cff-q6zc]
 links: []
 created: 2026-09-25T07:56:07Z
 type: bug

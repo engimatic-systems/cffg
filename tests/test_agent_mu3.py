@@ -360,6 +360,7 @@ def test_functional_checkpoint_has_one_exact_outer_and_runtime_manifest(tmp_path
     }
 
 
+@pytest.mark.slow
 def test_agent_version_1_functional_checkpoint_migrates_runtime(tmp_path):
     source = make_agent()
     action = source.act()
@@ -711,6 +712,7 @@ def test_weight_collapse_checkpoint_rejects_invalid_failure_state(
     assert_used_agent_unchanged(target, snapshot)
 
 
+@pytest.mark.slow
 def test_posterior_refresh_policy_reuses_particles_for_context_only_changes():
     agent = make_agent(refresh="posterior")
     agent.act()
@@ -731,6 +733,7 @@ def test_posterior_refresh_policy_reuses_particles_for_context_only_changes():
     )
 
 
+@pytest.mark.slow
 def test_cached_epoch_is_invalidated_by_runtime_configuration_changes():
     agent = make_agent()
     agent.act()
@@ -752,6 +755,7 @@ def test_cached_epoch_is_invalidated_by_runtime_configuration_changes():
     np.testing.assert_array_equal(agent.planning_key_cursor, first_key)
 
 
+@pytest.mark.slow
 def test_typed_jax_key_checkpoint_preserves_representation(tmp_path):
     agent = make_agent(key=jax.random.key(12))
     agent.act()

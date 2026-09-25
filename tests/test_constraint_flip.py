@@ -287,6 +287,7 @@ def test_literal_snapshots_record_the_constraint_change_without_rewriting_variab
     }
 
 
+@pytest.mark.slow
 def test_two_window_agent_matches_two_step_enumerator_and_local_ledgers(monkeypatch):
     parameters = _parameters()
     compile_calls = []
