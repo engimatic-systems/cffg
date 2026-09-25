@@ -47,7 +47,9 @@ def test_example_has_a_documented_standalone_public_entrypoint(filename):
 @pytest.mark.parametrize(
     ("filename", "expected"),
     [
-        item
+        pytest.param(*item, marks=pytest.mark.slow)
+        if item[0] in {"discrete_rollout.py", "linear_gaussian.py", "nonlinear_gaussian.py", "hybrid_rslds.py"}
+        else item
         for item in EXPECTED_OUTPUT.items()
         if item[0] != "discrete_agent.py"
     ],

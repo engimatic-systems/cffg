@@ -9,6 +9,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 from cffg.compiler import CompileError, compile_template
 from cffg.core.serialize import from_json, to_json
@@ -86,6 +87,7 @@ def test_improper_edge_readout_is_explicit_nan():
     assert np.isnan(mean).all() and np.isnan(cov).all()
 
 
+@pytest.mark.slow
 def test_serialization_round_trip_compiles_and_agrees():
     t, arrays = lgssm(T, F, Q, H, R, M0, P0)
     back = from_json(to_json(t))
