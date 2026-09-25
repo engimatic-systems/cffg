@@ -1,7 +1,7 @@
 ---
 id: cff-toqa
 status: open
-deps: [cff-7kpx]
+deps: [cff-7kpx, cff-fc2y, cff-36x7, cff-qw7x]
 links: []
 created: 2026-09-25T03:46:25Z
 type: feature
@@ -61,3 +61,15 @@ Required independent authorities before implementation: (1) affine chain with pr
 **2026-09-25T11:22:42Z**
 
 Implementation-boundary research: use a separate startup sweep controlled once by OuterTrustRegionStrategy, leaving strict local_result and the differentiated ordinary residual map unchanged. Neutral-site ownership is at GaussGroupPlan.scatter across BOTH roles; gather contains only incoming cavities. Initial eligibility plus run-local admission latches prevent re-deferring established factors. Neutral-at-entry is an explicit convention, not evidence of never-run state; State has no history flag. schedule._nodes_and_links excludes iterative Gaussian factors from directed nodes, so flood and mixed both reach execution.synchronous._gauss_sweep; flat/registerized scans remain unchanged exact-neighbor transports. A dedicated startup result can carry member readiness without broadening every normal Sweep/Propagation ABI. JIT execution must genuinely skip deferred callbacks: vmapped cond alone can evaluate inactive arithmetic. Adaptive Colony already delegates each member to Engine.run. Preserve zero budget, account and bound startup work, prioritize genuine failures, and never reopen startup during support/hard-phase restarts. Sources: failure_provenance bounded owner review of nonlinear_kernels, synchronous execution, schedule_program, outer_strategy and fixed_point; high confidence.
+
+**2026-09-25T11:24:22Z**
+
+Split before implementation into three bounded tickets using the intelligible-ticket skill. Source of truth is tk dependencies; snapshot built from tk dep tree --full, tk ready and tk blocked. Legend: prerequisite --> dependent.
+
+[x] cff-7kpx investigation
+  --> [ready] cff-fc2y input-readiness classification
+        --> [blocked] cff-36x7 bounded startup execution
+              --> [blocked] cff-qw7x reactor integration
+                    --> [blocked] cff-toqa --> cff-wt1c --> cff-xa6z
+
+cff-toqa directly requires all three children. Parallel ready roots include cff-qu2j and cff-ees0. cff-c5qf is a separate scope decision, not authorization to revive the abandoned partial-goal EC solver. tk dep cycle passes.

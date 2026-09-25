@@ -77,3 +77,7 @@ Final spectrum-grid checks:8 passed,13 deselected in76.41s. Across both dtypes a
 **2026-09-25T11:22:42Z**
 
 Final gate after all relevant edits:2584 passed,135 deselected,4 existing Gym warnings; pytest1181.67s, dashboard wall1196.023s, within1200-second budget. All21 CSTR investigation cases passed explicitly including17 opt-in integration cases; tightened48-case spectrum grid rerun8passed. Docs distinguish missing incident provenance, partial-input startup obstruction, and RK4/sigma-moment overflow. cff-toqa has mathematical admission and execution-owner handoffs. No production fix is claimed in this investigation.
+
+**2026-09-25T11:24:22Z**
+
+Published stacked PR #175: https://github.com/engimatic-systems/cffg/pull/175, base cff-d8jj-selector-evidence (#174). Downstream cff-toqa is split into cff-fc2y readiness, cff-36x7 startup runtime and cff-qw7x reactor validation. No merge performed.
