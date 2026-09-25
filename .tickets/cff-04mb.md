@@ -1,7 +1,7 @@
 ---
 id: cff-04mb
 status: open
-deps: []
+deps: [cff-gsq5, cff-fbps, cff-lhbm, cff-d57a]
 links: []
 created: 2026-09-25T03:46:24Z
 type: feature
@@ -48,3 +48,18 @@ These are suggestions; another method is acceptable if it satisfies the outcomes
 Cavity: the incoming information used to update a factor after excluding its own outgoing message. IMPROPER_CAVITY: a local update cannot use that incoming distribution. Provenance: where a failure originated. JIT: just-in-time compilation. vmap: JAX batching over independent instances.
 
 Shared terms: CFFG means constrained Forney-style factor graph; JAX is the numerical array/compiler library; dtype is a numeric storage type; free energy is the model's inference objective; host/JIT compares Python-side and compiled execution; single/vmap compares one instance with vectorized instances; N/A means not applicable.
+
+## Notes
+
+**2026-09-25T04:23:04Z**
+
+Research question -> answer -> source -> confidence: Can the first failed factor be recovered safely from final-state readouts? No. nonlinear.local_result already supplies per-member failure_code but nonlinear_kernels.configure and execution.registered drop it; synchronous reduction drops member identity and scheduled propagation returns messages only. Carry small integer auxiliary facts on the actual path, decode once at finalization. Source: nonlinear.py:28, nonlinear_kernels.py:75, execution/registered.py:28, execution/synchronous.py:227, schedule_program.py batch/registerized/flat/ExactUnit, iteration.py, outer_strategy.py and outer.py. Confidence: high code-level evidence. VACUOUS_INPUT has status zero and is not a failure. Raw categorical -inf can mean exact zero support. Rejected outer trials may recover and must not poison terminal provenance; fixed_point derivative consumers must exclude auxiliary integers from residual mathematics.
+
+Split before implementation. Legend prerequisite --> dependent:
+[R] cff-gsq5 local facts
+  --> [B] cff-fbps schedule transport
+    --> [B] cff-lhbm ordinary/exact public results
+      --> [B] cff-d57a outer terminal provenance
+        --> cff-04mb completion --> cff-7kpx / cff-ectw --> cff-xa6z roadmap
+
+Every stage is also an explicit prerequisite of cff-04mb. The split is serial because each stage consumes the previous interface; other PCGym ready roots remain independent. Derived from tk dep tree --full, tk ready and tk blocked; tk dep cycle reports no cycles. No new persisted State/schema is intended.
