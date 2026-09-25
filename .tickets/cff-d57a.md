@@ -1,7 +1,7 @@
 ---
 id: cff-d57a
 status: in_progress
-deps: [cff-lhbm]
+deps: [cff-lhbm, cff-8jqy]
 links: []
 created: 2026-09-25T04:22:00Z
 type: feature
