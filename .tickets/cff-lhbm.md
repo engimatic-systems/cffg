@@ -82,3 +82,7 @@ Review complete: preserved functional budget provenance in a separate device rec
 **2026-09-25T06:13:59Z**
 
 Complete: full default suite at e0e9758 passed 2468 tests, 82 slow deselected, pytest 1175.82s; measured wall 1191.413s, within the 1200-second budget. Dashboard refreshed. git diff --check and tk dep cycle pass. Run-local diagnostics are public for ordinary/exact/Colony results, with honest generic outer terminal fallback. Checkpoint schemas remain unchanged; restored cached results intentionally lack failure provenance. Next is cff-d57a: retain only terminal adaptive-outer cause, never a recovered rejected-trial failure. No code changes after this passing full gate.
+
+**2026-09-25T06:14:56Z**
+
+Published stacked PR #166: https://github.com/engimatic-systems/cffg/pull/166 (base cff-fbps-failure-transport / PR #165). Complete and validated; cff-d57a is now ready.
