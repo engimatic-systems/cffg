@@ -163,6 +163,13 @@ that every gap below will be implemented:
   unrepresentable sigma-point spread fail explicitly; no ridge repairs them.
   Negative sites are permitted when combined beliefs remain proper. Full run
   control is host-side; local updates and trust kernels support JIT/vmap.
+  The current initializer only defers exactly vacuous input cavities. A partial
+  observation can reach a nonlinear input before its forward prior and cause
+  `improper_cavity`, even in an affine chain with a proper global posterior.
+  The reconstructed CSTR fixture in `tests/test_cstr_planning.py` distinguishes
+  this missing-information failure from RK4 evaluations or sigma-point moments
+  exceeding floating-point range. The original failed CSTR invocation was not
+  retained, so these tests are mechanism reproductions, not incident replay.
   Zero noise, nonlinear GFE, and continuous-to-discrete means remain excluded.
 - *Gaussian/continuous GFE messages* — RESOLVED as a position, 2026-07-12
   (cff-dfpi, DERIVATIONS.md D5): none will be added, and that is a theorem,
