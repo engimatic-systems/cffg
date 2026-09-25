@@ -1,6 +1,6 @@
 ---
 id: cff-lhbm
-status: in_progress
+status: closed
 deps: [cff-fbps]
 links: []
 created: 2026-09-25T04:22:00Z
@@ -78,3 +78,7 @@ Read-only review found zero-budget delta-constrained Colony mislabeled its gener
 **2026-09-25T05:46:05Z**
 
 Review complete: preserved functional budget provenance in a separate device record even when the existing finalizer reclassifies status as undefined-ledger divergence; added that mechanism and direct generic outer fallback tests. Final focused batch after the last implementation edit: 63 passed in 12.33s (public diagnostics, iteration, run strategies, README). Dedicated public file now has 20 cases. Prior checkpoint/exact batch passed 56 with 23 slow deselected; runtime/lifecycle/transport batch 57 passed. Review found no remaining numerical/status/FE/gradient policy change. Full short-suite validation pending.
+
+**2026-09-25T06:13:59Z**
+
+Complete: full default suite at e0e9758 passed 2468 tests, 82 slow deselected, pytest 1175.82s; measured wall 1191.413s, within the 1200-second budget. Dashboard refreshed. git diff --check and tk dep cycle pass. Run-local diagnostics are public for ordinary/exact/Colony results, with honest generic outer terminal fallback. Checkpoint schemas remain unchanged; restored cached results intentionally lack failure provenance. Next is cff-d57a: retain only terminal adaptive-outer cause, never a recovered rejected-trial failure. No code changes after this passing full gate.
