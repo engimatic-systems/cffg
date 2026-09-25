@@ -1,6 +1,6 @@
 ---
 id: cff-7kpx
-status: in_progress
+status: closed
 deps: [cff-04mb]
 links: []
 created: 2026-09-25T03:46:25Z
@@ -73,3 +73,7 @@ Final investigation selection: all17 full reactor/affine/grid/long-horizon behav
 **2026-09-25T10:54:43Z**
 
 Final spectrum-grid checks:8 passed,13 deselected in76.41s. Across both dtypes and both schedules, all Qp scales(.01,1,100) give Taylor first failure tr10 improper_cavity. T variance.01 gives eigenvalues[0,1,100,2500];T variance1 gives[0,1,1,2500]. Every sigma-point case first fails tr1 nonfinite_function with proper input eigenvalues[1,1,1,10000]. Failures occur within three iterations. Thus this reconstruction explains two concrete failure mechanisms but not the reported goal-variance pass/fail boundary. The missing original observations/configuration prohibit that claim.
+
+**2026-09-25T11:22:42Z**
+
+Final gate after all relevant edits:2584 passed,135 deselected,4 existing Gym warnings; pytest1181.67s, dashboard wall1196.023s, within1200-second budget. All21 CSTR investigation cases passed explicitly including17 opt-in integration cases; tightened48-case spectrum grid rerun8passed. Docs distinguish missing incident provenance, partial-input startup obstruction, and RK4/sigma-moment overflow. cff-toqa has mathematical admission and execution-owner handoffs. No production fix is claimed in this investigation.
