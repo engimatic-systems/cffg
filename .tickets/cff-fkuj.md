@@ -1,6 +1,6 @@
 ---
 id: cff-fkuj
-status: in_progress
+status: closed
 deps: [cff-04mb, cff-5o7r]
 links: []
 created: 2026-09-25T07:56:07Z
@@ -51,3 +51,7 @@ Pre-implementation handoff: Runtime numerical/status invariant and New factor/ru
 **2026-09-25T08:03:43Z**
 
 Review question -> answer -> source -> confidence: Can inactive extreme components contaminate backward scores or shared-cavity gradients? Yes in the initial patch; fixed by retaining original selector support and borrowing an active component solely for masked arithmetic before component construction. Both NEG and literal -inf now have caller-level forward/backward/prior and jacrev regressions. Admission explicitly concerns active support, so an inactive rank-deficient component no longer discards valid active information. Independent read-only review found no remaining placeholder escape inside _collapse. Upstream component-construction inverses remain cff-61ag, explicitly recorded in its acceptance criteria; checked-collapse validity cannot certify an upstream hidden placeholder. Source: failure_provenance review and bounded float32 two-component reproductions. Confidence high.
+
+**2026-09-25T08:32:36Z**
+
+Implemented in a9b4842: checked CollapseResult validates computed moments and output; all three callers preserve exact selector support before component/score/gradient arithmetic. Known non-normalizable active components retain vacuous initialization; arithmetic collapse failure surfaces nonfinite outgoing evidence, not an inverse placeholder. Review confirms no remaining leak inside collapse. Final focused83 tests passed, including independent multidimensional moments,K32/d30,f32/f64,overflow,literal/sentinel zeros,vmap,forward/reverse derivatives,public Engine/Colony attribution,quadrature/switching parity and neural hybrid gradients. Final full gate2535 passed,83 deselected; pytest1210.25s,measured1226.099s. cff-5o7r moves four behavioral cases to slow, estimated1196.045s/2531tests, reusing the passing result per policy. No remaining work in checked-collapse scope. Next ready:cff-61ag producer-rank and intermediate-validity admission; cff-03dn and cff-ectw intentionally stay open.
