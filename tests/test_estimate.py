@@ -3,6 +3,7 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 from cffg.compiler import compile_template
 from cffg.core.ir import BlobRef, FactorSpec, PortRole, PortSpec, Template, VariableSpec
@@ -36,6 +37,7 @@ def test_analytic_memory_is_exact():
     )
 
 
+@pytest.mark.slow
 def test_calibration_and_prediction():
     engine = make_engine()
     est = estimate(engine, sample_iters=5)

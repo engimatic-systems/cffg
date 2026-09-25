@@ -293,6 +293,7 @@ def test_float32_sparse_zero_mass_and_uncomfortable_observation_scale():
         assert np.isfinite(engine.bfe(result.state))
 
 
+@pytest.mark.slow
 def test_rolling_agent_rolls_once_at_episode_boundary_and_checkpoints_pending(tmp_path):
     builder = functools.partial(build_gridworld, k=4)
     agent = RollingAgent(
