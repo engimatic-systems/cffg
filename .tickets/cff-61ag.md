@@ -1,6 +1,6 @@
 ---
 id: cff-61ag
-status: in_progress
+status: closed
 deps: [cff-fkuj, cff-q6zc]
 links: []
 created: 2026-09-25T07:56:07Z
@@ -60,3 +60,7 @@ Second review mechanism: an SPD noise matrix can rotate a subtractively formed G
 **2026-09-25T08:46:24Z**
 
 Final read-only review passed: randomized exact-null scans across64 SPD noise matrices in each dtype had zero false admissions/invalid results; singular mixed-scale incoming precisions admitted proper outgoing components; proper d2 matrix and precision gradients finite both directions. Congruence equilibration applies only to rank analysis. Focused validation:30 new rank cases; earlier53 mixture/collapse/hybrid tests,57 rank/collapse/neural tests and56 Gaussian/hybrid/readout/schedule tests passed during development. Independent covariance, nullspace and Jacobian oracles retained. Full short-suite gate follows final code.
+
+**2026-09-25T09:14:18Z**
+
+Complete: rank evidence and producer intermediate checks implemented with independent proper moments, rotated/aligned nullspaces, singular informed subspaces, congruence-rescaled units and scalar/matrix derivatives. Full final code gate2561passed/87deselected, dashboard wall1254.886s; cff-q6zc moves7 unchanged behavioral cases totaling59.300s, estimated default1195.586s, preserving all30 new numerical cases. No rerun after marker-only adjustment. Canonical architecture/derivations/limitations updated; no shared propriety cutoff or model covariance changes. Handoff: cff-u9un owns retained H15 integration, neighboring/f32/Colony/horizon checks; bounded research already finds undamped convergence16. PR is next link after#171.
