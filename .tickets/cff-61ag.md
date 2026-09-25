@@ -64,3 +64,7 @@ Final read-only review passed: randomized exact-null scans across64 SPD noise ma
 **2026-09-25T09:14:18Z**
 
 Complete: rank evidence and producer intermediate checks implemented with independent proper moments, rotated/aligned nullspaces, singular informed subspaces, congruence-rescaled units and scalar/matrix derivatives. Full final code gate2561passed/87deselected, dashboard wall1254.886s; cff-q6zc moves7 unchanged behavioral cases totaling59.300s, estimated default1195.586s, preserving all30 new numerical cases. No rerun after marker-only adjustment. Canonical architecture/derivations/limitations updated; no shared propriety cutoff or model covariance changes. Handoff: cff-u9un owns retained H15 integration, neighboring/f32/Colony/horizon checks; bounded research already finds undamped convergence16. PR is next link after#171.
+
+**2026-09-25T09:14:51Z**
+
+Published as stacked PR https://github.com/engimatic-systems/cffg/pull/172, base cff-03dn-checked-collapse (#171). Working tree clean after publishing; next ticket cff-u9un.
