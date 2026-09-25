@@ -87,3 +87,7 @@ Focused validation after integration: test_mixg plus original planning checks24p
 **2026-09-25T10:41:30Z**
 
 Final gate after the last numerical edit passed:2595 tests,103 deselected,4 third-party Gym deprecation warnings; wall1272.832s. cff-aqpz moved15 unchanged expensive replays to slow using saved timings, estimating1190.517s; gate reused without numerical changes. Dependency and whitespace checks pass. Completed stable evidence across six consumers, independent overlap/derivative/hostile-input regressions, strict retained float32 accuracy checks and canonical docs. Remaining partial-goal scope is cff-c5qf, not part of this numerical repair.
+
+**2026-09-25T10:41:54Z**
+
+Published stacked PR #174: https://github.com/engimatic-systems/cffg/pull/174, base cff-u9un-hybrid-planning (#173). Four atomic commits separate extraction, behavior, budget selection and final validation. Tree clean at publication; no merge performed.
