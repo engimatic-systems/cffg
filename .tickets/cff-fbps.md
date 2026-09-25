@@ -1,7 +1,7 @@
 ---
 id: cff-fbps
 status: in_progress
-deps: [cff-gsq5]
+deps: [cff-gsq5, cff-98gj]
 links: []
 created: 2026-09-25T04:22:00Z
 type: feature

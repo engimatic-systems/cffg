@@ -13,7 +13,8 @@ from neural_training_fixture import affine_baseline, mean_values, regression_mod
 from test_fixed_point_gradients import coupled_neural_model
 
 
-@pytest.mark.parametrize("x64", [pytest.param(True, marks=pytest.mark.slow), False])
+@pytest.mark.slow
+@pytest.mark.parametrize("x64", [True, False])
 def test_optimizer_continuation_and_bundle_are_replayable_and_strict(tmp_path, x64):
     with jax.enable_x64(x64):
         template, arrays, observations, _, _ = regression_model(2)
