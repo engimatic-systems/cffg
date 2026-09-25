@@ -13,11 +13,15 @@ class ExecutionDelta[T](NamedTuple):
     remains encoded in the outgoing blocks; a successful solver status does
     not replace downstream support checks. The output structure is static for
     each compiled plan, including rules that return no solver diagnostics.
+    ``failure_reason`` optionally carries one ``FailureReason`` code per
+    member. It is auxiliary provenance, meaningful only for a failed status;
+    it never replaces the status or a support check.
     """
 
     outgoing: T
     residual: jax.Array | None = None
     status: jax.Array | None = None
+    failure_reason: jax.Array | None = None
 
 
 class GaussianMessage(NamedTuple):

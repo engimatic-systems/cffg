@@ -1,6 +1,6 @@
 ---
 id: cff-gsq5
-status: open
+status: in_progress
 deps: []
 links: []
 created: 2026-09-25T04:22:00Z
@@ -54,3 +54,9 @@ The implementer may choose another sound method. Keep the four existing run stat
 - Root/adjoint: the inference fixed point and the derivative calculation through it.
 - Phase: a distinct initialization, propagation, soft, hard or outer-solver stage.
 - N/A: not applicable.
+
+## Notes
+
+**2026-09-25T04:27:44Z**
+
+Implemented the bounded local-facts stage: ExecutionDelta gains optional per-member failure_reason; configured nonlinear kernels map only true failure codes to the shared reason vocabulary, and execute_gaussian preserves them. New failure_facts.py defines fixed-shape int32 facts, chronological merge, phase tagging, stable-factor selection and domain-aware nonfinite checks. It does not change numerical status, updates, objective or public RunResult. Current schedule consumers still ignore the auxiliary field. Focused tests: uv run pytest -q tests/test_failure_facts.py tests/test_execution.py tests/test_nonlinear_engine.py -> 43 passed, 1 deselected in 86.54s. Independent read-only review found no actionable issue; float32/64, both approximation methods, sparse/vacuous input and 30-40 member JIT/vmap checks are covered. git diff --check passes. Final short-suite gate pending.

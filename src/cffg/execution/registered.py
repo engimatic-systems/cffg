@@ -39,7 +39,7 @@ def execute_gaussian(
     )
     return ExecutionDelta(
         tuple(GaussianMessage(e, p) for e, p in delta.outgoing),
-        delta.residual, delta.status,
+        delta.residual, delta.status, delta.failure_reason,
     )
 
 

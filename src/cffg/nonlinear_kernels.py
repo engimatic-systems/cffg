@@ -75,13 +75,25 @@ def configure(factor, sizes):
     def message(*args):
         import jax.numpy as jnp
         from cffg.execution.contracts import ExecutionDelta
+        from cffg.failure_facts import FailureReason
+        from cffg.nonlinear import NonlinearFailure
 
         value = results(*args)
         status = value["status"]
+        reasons = jnp.zeros_like(value["failure_code"])
+        for local, shared in (
+            (NonlinearFailure.IMPROPER_CAVITY, FailureReason.IMPROPER_CAVITY),
+            (NonlinearFailure.INVALID_NOISE, FailureReason.INVALID_NOISE),
+            (NonlinearFailure.NONFINITE_FUNCTION, FailureReason.NONFINITE_FUNCTION),
+            (NonlinearFailure.IMPROPER_TILT, FailureReason.IMPROPER_TILT),
+            (NonlinearFailure.UNREPRESENTABLE_SIGMA_POINTS,
+             FailureReason.UNREPRESENTABLE_SIGMA_POINTS),
+        ):
+            reasons = jnp.where(value["failure_code"] == local, shared, reasons)
         return ExecutionDelta(
             ((value["eta_out"], value["precision_out"]),
              (value["eta_in"], value["precision_in"])),
-            jnp.where(status == 0, 0.0, jnp.inf), status,
+            jnp.where(status == 0, 0.0, jnp.inf), status, reasons,
         )
 
     def energy(*args):
