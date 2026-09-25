@@ -99,3 +99,7 @@ The independent [R] rows can proceed in parallel; all children gate cff-xa6z.
 cff-wt1c's exact fan-in is cff-toqa, cff-iplr, cff-fl7h, cff-wdhj, cff-csmz, cff-4yr6, cff-qtub, cff-21vm, cff-qu2j, cff-3kdk, cff-wbhu. cff-mjku remains linked fan-out work owned by the existing roadmap, not a new prerequisite of this comparison. The final arrow to cff-ahps denotes the parent roadmap contribution, not a newly added dependency edge.
 
 Built from tk dep tree --full, tk ready and tk blocked; tk dep cycle reports no cycles. No implementation or numerical tests yet.
+
+**2026-09-25T03:48:29Z**
+
+Roadmap PR: https://github.com/engimatic-systems/cffg/pull/162 (base #161). Ticket-only validation passed: tk dep cycle and git diff --check. Next implementation ticket: cff-v6th. The epic remains open until its child outcomes and final matched comparison are complete.
