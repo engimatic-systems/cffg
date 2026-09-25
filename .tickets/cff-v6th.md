@@ -1,6 +1,6 @@
 ---
 id: cff-v6th
-status: in_progress
+status: closed
 deps: [cff-rnn1]
 links: []
 created: 2026-09-25T03:46:24Z
@@ -60,3 +60,7 @@ Implementation: Engine validates then discards hardening phases when there are n
 **2026-09-25T03:52:05Z**
 
 Independent review found no correctness or failure-isolation defect. It identified one coverage gap: irrelevant partial hardening also reset convergence history on ordinary mixed graphs. Added a regression comparing complete default and harden_last=1 results on the existing no-delta mixed fixture; implementation unchanged.
+
+**2026-09-25T04:20:13Z**
+
+Complete: focused runtime/schedule set passed 118 tests (3 deselected), final exact-colony file passed 16 tests after independent review, and dashboard-backed full short suite at 2226bea passed 2,432 tests (67 deselected, no failures). Actual measured wall time was 1,233.520s. cff-rnn1 subsequently moved two already-passing exhaustive gradient cases to opt-in slow; no numerical code/assertions changed, and the estimated remaining suite is 1,194.450s. Reused the passing result per the explicit selection-change exception. Original supplied reproduction now reports all three paths converged. No scientific objective, certificate threshold, serialization or checkpoint change. Next chain ticket is cff-04mb; cff-qtub cached spawning is now unblocked. Exact-member vectorization remains cff-wbhu performance work.
