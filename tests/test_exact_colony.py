@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from test_engine_contracts import assert_result_equal, assert_state_equal
+from test_engine_contracts import assert_result_equal, assert_state_equal, ordinary_case
 from test_schedule import unit_categorical
 
 from cffg import Engine, RunStatus, compile_template
@@ -111,6 +111,18 @@ def test_colony_matches_distinct_gaussian_engines(size, budget, damp):
         if budget and not damp:
             assert actual[iid].status is RunStatus.CONVERGED
             assert actual[iid].iterations == 1
+
+
+def test_irrelevant_partial_phase_preserves_mixed_convergence_history():
+    template, arrays, observations = ordinary_case(0)
+    engine = Engine(compile_template(template, arrays=arrays))
+    assert engine.schedule.kind == "mixed"
+    assert not len(engine.arena.delta_pairs)
+    state = engine.bind_data(engine.init_state(), observations)
+    reference = engine.run(state, 20, tol=1e-12)
+    assert reference.status is RunStatus.CONVERGED
+    actual = engine.run(state, 20, tol=1e-12, harden_last=1)
+    assert_result_equal(actual, reference)
 
 
 @pytest.mark.parametrize("failure", ["nonfinite_gaussian", "empty_support"])

@@ -56,3 +56,7 @@ Research handoff (question -> answer -> source -> confidence): Why does Colony f
 **2026-09-25T03:51:39Z**
 
 Implementation: Engine validates then discards hardening phases when there are no delta constraints. Engine and Colony share exact eligibility; singleton and multi-member exact groups reuse Engine propagation/certification, while ordinary iterative groups remain vmapped and genuine Colony delta constraints remain fully hardened. This is a correctness repair, not an exact-batch throughput claim. Added self-contained Gaussian goal-chain regression (2 and 20 slices; f32/f64), distinct parameters/observations, zero budget/damping, initial failure isolation and real phase flags. Updated the old no-delta HMM assertion that codified the defect. Architecture/README/LIMITATIONS explain per-instance exact execution. Focused command: uv run pytest -q tests/test_exact_colony.py tests/test_engine_contracts.py tests/test_iteration.py tests/test_colony_failures.py tests/test_colony.py tests/test_schedule.py -> 118 passed, 3 deselected in 52.26s. Original external repro now prints converged for plain/harden/Colony. git diff --check and tk dep cycle pass. Final short-suite gate pending.
+
+**2026-09-25T03:52:05Z**
+
+Independent review found no correctness or failure-isolation defect. It identified one coverage gap: irrelevant partial hardening also reset convergence history on ordinary mixed graphs. Added a regression comparing complete default and harden_last=1 results on the existing no-delta mixed fixture; implementation unchanged.
