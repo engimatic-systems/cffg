@@ -1,6 +1,6 @@
 ---
 id: cff-0kyl
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-09-25T03:46:25Z
@@ -55,3 +55,7 @@ Pre-implementation handoff: layout.py visits only one rail-connected component; 
 **2026-09-25T06:54:48Z**
 
 Implemented independent component scenes ordered by natural factor name, packed vertically by complete framed extents; connected component rail/sides/geometry are unchanged. Empty direct layout yields the defined empty frame. Template/Scene SVG entry points now raise actionable TypeErrors and README shows both routes. Focused final check: 52 visualization tests passed, including all connected SVG goldens, 1/2/30 Gaussian components at levels 0/4, mixed-size GFE composite fragments, empty layout, and wrong-input messages. Full gate next.
+
+**2026-09-25T07:23:05Z**
+
+Completed validation: 52 focused visualization tests passed, including unchanged connected SVG goldens. Final short suite: 2496 passed, 83 deselected; pytest 1180.71s, measured 1196.129s (under 1200s). tk dep cycle and git diff --check pass. All acceptance criteria complete; no numerical or persistence surfaces changed. Next: continue cff-xa6z PR chain.
