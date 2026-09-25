@@ -1,6 +1,6 @@
 ---
 id: cff-fbps
-status: in_progress
+status: closed
 deps: [cff-gsq5, cff-98gj]
 links: []
 created: 2026-09-25T04:22:00Z
@@ -68,3 +68,7 @@ Research question: do provenance checks match every local output and scatter? An
 **2026-09-25T05:07:54Z**
 
 Implementation: immutable model-local factor ranks plus typed outgoing-block checks (including storage casts), synchronous rank reduction, chronological batch/registerized/flat scan transport, exact propagation/certification phases, and numeric-only derivative consumers. Focused validation: 69 schedule/discrete/Gaussian/constraint/shared-goal tests passed; 133 iteration/strategy/gradient/Colony/schedule/execution tests passed (2 slow deselected); final dedicated failure transport mechanisms 20 passed in 10.23s. Reviewer gaps addressed with a dependent lower-rank downstream NaN case and actual hybrid nonfinite-output case. Public exposure remains cff-lhbm; no inference policy changes. Full short-suite gate pending.
+
+**2026-09-25T05:36:31Z**
+
+Complete: PR-head numerical change 67ab75f passed the full default suite: 2461 passed, 69 deselected, pytest 1300.24s; measured wall 1316.738s. Dashboard refreshed. cff-98gj then moved 13 long replay cases to slow with unchanged assertions; estimated default wall 1188.262s. Passing full result reused per the explicit selection-change exception (no unchanged rerun). Final focused batch: 100 passed in 118.81s; dedicated provenance file: 20 passed in 10.23s. No numerical/status/gradient formula changes. Next: cff-lhbm exposes ordinary/exact/Colony diagnostics; cff-d57a handles adaptive outer terminal provenance. Gotcha: preserve storage-dtype casts, constraint singleton shapes and separate count/log-support semantics.
