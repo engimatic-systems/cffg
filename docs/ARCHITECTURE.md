@@ -1060,7 +1060,9 @@ functional-coordinate cadence and accumulated solve diagnostics. It receives
 `OuterStructure` (edges, shared-goal plans and segment offsets, without arena
 parameters), hardening rows, eliminated slots, current schedule handles and
 check/ledger/functional callbacks. It returns `OuterOutcome`, not a public
-status. The numerical chart and trust-region algorithms remain in `outer.py`.
+status. `outer.py` owns host trust-region control; `outer_chart.py` owns chart
+geometry and `outer_trust.py` owns compiled trust steps and root diagnostics.
+Their existing imports from `outer.py` remain available.
 
 `outer_kernels.py:OuterKernelProvider` owns a per-engine lazy derivative cache.
 Its keys retain chart support, dtype and reference metrics plus hard-message
@@ -1195,9 +1197,22 @@ Successful results omit it; unsuccessful global checks use explicit generic
 reason codes and unknown factor ownership. Initialization and priming use
 iteration zero; soft/hard message attempts share one-based numbering, and
 functional failure can precede its numbered message attempt. Exact propagation
-and certification both belong to iteration one. Adaptive outer results
-currently retain only generic terminal reasons, not rejected-trial causes;
-local outer provenance remains cff-d57a.
+and certification both belong to iteration one.
+
+Adaptive outer maps return auxiliary facts alongside numerical arrays, residual
+and status. `outer_evidence.py` supports legacy numerical triples and translates
+terminal attempt numbers through recursive support restarts and phase budgets.
+Only terminal host decisions retain a map's evidence. Discovery advancement
+expires priming evidence even when it consumes no logical iteration. A failed
+current-map evaluation belongs to the next logical attempt; map-call counts
+include derivative probes and are never diagnostic iteration numbers.
+Reconstruction precedes soft/hard updates and retains its own phase. A failed
+shadow or rejected trial cannot contaminate a recovered solve or an ordinary
+iteration-budget result. Trust-region collapse retains the selected trial's
+fact only if every trial at that step was invalid; otherwise ownership remains
+unknown. Controller retries replace the preceding solve's evidence, and public
+converged results always omit it. Derivative programs still consume only the
+numerical message coordinates, with no provenance latch in traced functions.
 
 Diagnostics are run-local rather than persisted inference state. Functional
 agent checkpoint field whitelists and current/legacy versions are unchanged;

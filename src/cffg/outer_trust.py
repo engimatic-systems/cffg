@@ -7,6 +7,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+
 @dataclass(frozen=True)
 class TrustStep:
     step: jax.Array

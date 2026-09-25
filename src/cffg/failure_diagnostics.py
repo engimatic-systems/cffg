@@ -62,12 +62,15 @@ def exact_diagnostic(outcome, names):
     return FailureDiagnostic(reason, None, phase, outcome.iterations)
 
 
-def outer_diagnostic(outcome):
+def outer_diagnostic(outcome, names=()):
     """Only terminal evidence is known here; never invent a rejected-trial cause."""
     if outcome.initial_rejection:
         reason = ("empty_support" if outcome.reason is OuterTerminationReason.INFEASIBLE
                   else "nonfinite_state")
         return FailureDiagnostic(reason, None, "initialization", 0)
+    local = local_diagnostic(outcome.failure, names)
+    if local is not None:
+        return local
     if outcome.functional_failure:
         reason = "functional_budget" if outcome.inner_code == 1 else "functional_divergence"
         return FailureDiagnostic(reason, None, "functional", outcome.iterations + 1)

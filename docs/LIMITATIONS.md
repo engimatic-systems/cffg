@@ -15,8 +15,12 @@ capability table is the entry map; this document qualifies its claims.
 
 Failure attribution is diagnostic, not a repair or an accuracy certificate.
 Ordinary and exact runs retain the first observed local failure; global checks
-can report a reason without a known factor. Adaptive outer solves currently
-report generic terminal reasons rather than local trial provenance. Agent
+can report a reason without a known factor. Adaptive outer solves report
+terminal local evidence when available; derivative-kernel failures and budget
+exhaustion can still have unknown ownership. Rejected trial/shadow failures
+are discarded after recovery. A trust-region collapse attributes its selected
+trial only when every trial at that step was invalid, not whenever a rejected
+trial happened to fail. This is attribution, not a full evaluation history. Agent
 checkpoints omit these run-local records, so a restored cached unsuccessful
 result can have `failure=None`; its `status` remains authoritative.
 

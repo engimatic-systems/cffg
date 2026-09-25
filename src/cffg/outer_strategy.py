@@ -9,7 +9,11 @@ import numpy as np
 
 from cffg._immutable import FrozenArray
 from cffg.compiled import NEG
+from cffg.failure_facts import (
+    FailurePhase, empty_failure, empty_failure_at, first_failure, in_phase,
+)
 from cffg.outer import OuterArrays, solve_outer
+from cffg.outer_evidence import offset_failure, terminal_failure
 from cffg.outer_kernels import KernelPlanProvider
 from cffg.outer_outcome import OuterOutcome
 from cffg.outer_structure import OuterStructure
@@ -69,8 +73,9 @@ class OuterTrustRegionStrategy:
                 initial_rejection=True,
             )
 
+        priming_fact = empty_failure()
         if self.prime is not None and n_iters >= 1:
-            msgs, g_eta, g_lam, ef_eta, *_ = self.prime(
+            msgs, g_eta, g_lam, ef_eta, *auxiliary = self.prime(
                 state.messages,
                 state.g_eta,
                 state.g_lam,
@@ -84,6 +89,8 @@ class OuterTrustRegionStrategy:
             state = _replace(
                 state, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta
             )
+            if auxiliary:
+                priming_fact = in_phase(auxiliary[0], FailurePhase.PRIMING)
 
         if self.services.update_functional is not None:
             state, _, mu3_code, mu3_residual = self.services.update_functional(state)
@@ -95,6 +102,7 @@ class OuterTrustRegionStrategy:
                     inner_code=mu3_code,
                     inner_residual=mu3_residual,
                     functional_failure=True,
+                    failure=terminal_failure(priming_fact, 0),
                 )
 
         all_deltas: list[float] = []
@@ -128,6 +136,7 @@ class OuterTrustRegionStrategy:
             else:
                 phases.append((harden_last, []))
         solved = None
+        failure = empty_failure_at()
         hard_blocks: list[tuple[np.ndarray, np.ndarray, jax.Array]] = []
         for budget, new_hard_rows in phases:
             if budget == 0:
@@ -151,13 +160,14 @@ class OuterTrustRegionStrategy:
             remaining = budget
             while remaining > 0:
                 params = state.params
+                phase = FailurePhase.HARD if hard_blocks else FailurePhase.SOFT
 
-                def reconstruct(
+                def reconstruct_with_fact(
                     arrays: OuterArrays, *, state=state, params=params
-                ) -> OuterArrays:
+                ):
                     if self.reconstruct is None:
-                        return arrays
-                    messages, g_eta, g_lam, ef_eta, *_ = self.reconstruct(
+                        return arrays, empty_failure()
+                    messages, g_eta, g_lam, ef_eta, *auxiliary = self.reconstruct(
                         arrays.messages,
                         arrays.g_eta,
                         arrays.g_lam,
@@ -168,17 +178,25 @@ class OuterTrustRegionStrategy:
                         state.ef_mask,
                         params,
                     )
-                    return OuterArrays(messages, g_eta, g_lam, ef_eta)
+                    fact = auxiliary[0] if auxiliary else empty_failure()
+                    return (
+                        OuterArrays(messages, g_eta, g_lam, ef_eta),
+                        in_phase(fact, FailurePhase.RECONSTRUCTION),
+                    )
+
+                def reconstruct(arrays, *, reconstruct_with_fact=reconstruct_with_fact):
+                    return reconstruct_with_fact(arrays)[0]
 
                 def outer_map(
                     arrays: OuterArrays,
                     *,
-                    reconstruct=reconstruct,
+                    reconstruct_with_fact=reconstruct_with_fact,
                     state=state,
                     params=params,
+                    phase=phase,
                 ):
-                    arrays = reconstruct(arrays)
-                    messages, g_eta, g_lam, ef_eta, inner_r, inner_code, *_ = (
+                    arrays, reconstruction_fact = reconstruct_with_fact(arrays)
+                    messages, g_eta, g_lam, ef_eta, inner_r, inner_code, *auxiliary = (
                         self.iter_step(
                             arrays.messages,
                             arrays.g_eta,
@@ -199,6 +217,10 @@ class OuterTrustRegionStrategy:
                         OuterArrays(messages, g_eta, g_lam, ef_eta),
                         inner_r,
                         inner_code,
+                        first_failure(
+                            reconstruction_fact,
+                            in_phase(auxiliary[0] if auxiliary else empty_failure(), phase),
+                        ),
                     )
 
                 def as_state(arrays: OuterArrays, *, state=state) -> State:
@@ -230,8 +252,18 @@ class OuterTrustRegionStrategy:
                         0 if self.adaptive_gaussian or self.services.update_functional is not None else 128
                     ),
                     adaptive_gaussian=self.adaptive_gaussian,
+                    initial_failure=(
+                        terminal_failure(priming_fact, 0)
+                        if total_iterations == 0 else None
+                    ),
                 )
-                state = as_state(reconstruct(solved.arrays))
+                final_arrays, reconstruction_fact = reconstruct_with_fact(solved.arrays)
+                state = as_state(final_arrays)
+                failure = offset_failure(solved.failure, total_iterations)
+                if int(failure.fact.reason) == 0:
+                    failure = terminal_failure(
+                        reconstruction_fact, total_iterations + solved.iterations + 1,
+                    )
                 consumed = max(solved.iterations, 1)
                 remaining -= consumed
                 total_iterations += consumed
@@ -313,4 +345,5 @@ class OuterTrustRegionStrategy:
             trial_evaluations=trial_evaluations,
             linear_iterations=linear_iterations,
             solver_compilations=solver_compilations,
+            failure=failure,
         )
