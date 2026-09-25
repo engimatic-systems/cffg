@@ -1899,6 +1899,13 @@ numeric layouts run as separate groups. Different allowed-tuple table lengths
 therefore cannot enter one stack, while same-shaped tables with different
 contents retain vectorized execution. One cached Engine can have several JAX
 shape/dtype specializations; numeric contents do not define its identity.
+Exact-eligible instances reuse `Engine.run` propagation and certification
+individually, including initial failure checks. Engine and Colony share the
+exact-dispatch predicate. A valid hardening request has no effect when there
+are no delta constraints; actual Colony delta constraints still harden for
+the whole requested budget. Damping and zero budgets retain their ordinary
+iteration behavior. Exact-member vectorization is separate performance work;
+`tests/test_exact_colony.py` checks exact results and failed-member isolation.
 Mixed-GFE instances reuse the same compiled
 trust kernels but currently run one host controller per instance so each keeps
 its own trust radius, active support, and termination reason. Inter-instance

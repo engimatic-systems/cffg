@@ -91,8 +91,9 @@ class Colony:
     ) -> dict[int, RunResult]:
         """Run each structure batch and return one truthful result per instance.
 
-        Rule evaluation remains vmapped.  Termination is tracked per instance
-        on the host until cff-wbhu moves this status carry into ``lax.scan``.
+        Ordinary iterative rule evaluation remains vmapped. Exact schedules
+        reuse Engine's per-instance propagation and certification. Termination
+        is tracked on the host until the controller loop is compiled.
         """
         by_key: dict[tuple, list[int]] = {}
         for iid, inst in self.instances.items():
@@ -117,12 +118,13 @@ class Colony:
                     self.instances[iid].state = result.state
                     self.last_results[iid] = result
                 continue
-            if len(states) == 1:
-                result = engine.run(
-                    states[0], n_iters, tol=tol, damp=damp, harden_last=n_iters
-                )
-                self.instances[iids[0]].state = result.state
-                self.last_results[iids[0]] = result
+            if len(states) == 1 or engine._can_run_exact(n_iters, damp, n_iters):
+                for iid, state in zip(iids, states, strict=True):
+                    result = engine.run(
+                        state, n_iters, tol=tol, damp=damp, harden_last=n_iters
+                    )
+                    self.instances[iid].state = result.state
+                    self.last_results[iid] = result
                 continue
             n = len(states)
             policy = engine._iteration_policy(states[0], tol)

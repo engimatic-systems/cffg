@@ -1,6 +1,6 @@
 ---
 id: cff-v6th
-status: open
+status: in_progress
 deps: []
 links: []
 created: 2026-09-25T03:46:24Z
@@ -52,3 +52,7 @@ Shared terms: CFFG means constrained Forney-style factor graph; JAX is the numer
 **2026-09-25T03:47:40Z**
 
 Research handoff (question -> answer -> source -> confidence): Why does Colony fail on an exact Gaussian graph without delta constraints? Engine.run treats explicit harden_last as a phase even when arena.delta_pairs is empty; multi-instance Colony bypasses the exact strategy altogether. Validate the argument, then normalize irrelevant hardening and reuse the exact Engine policy for each eligible Colony member. Preserve actual delta full-hardening behavior and damping/zero-budget semantics. Sources: engine.py:358-367, colony.py:121-176; supplied harden_last_gaussian_chain.py reproduces plain=converged, explicit harden=budget_exhausted, singleton Colony=budget_exhausted. Confidence: reproduced defect and source-confirmed cause. Focused regressions: tests/test_schedule.py:421 currently codifies the defect; extend test_engine_contracts and test_colony_failures for singleton/multiple distinct parameter and observation cases plus bad-member isolation. A sequential exact-member correctness path is allowed here; cff-wbhu owns compiled controller throughput.
+
+**2026-09-25T03:51:39Z**
+
+Implementation: Engine validates then discards hardening phases when there are no delta constraints. Engine and Colony share exact eligibility; singleton and multi-member exact groups reuse Engine propagation/certification, while ordinary iterative groups remain vmapped and genuine Colony delta constraints remain fully hardened. This is a correctness repair, not an exact-batch throughput claim. Added self-contained Gaussian goal-chain regression (2 and 20 slices; f32/f64), distinct parameters/observations, zero budget/damping, initial failure isolation and real phase flags. Updated the old no-delta HMM assertion that codified the defect. Architecture/README/LIMITATIONS explain per-instance exact execution. Focused command: uv run pytest -q tests/test_exact_colony.py tests/test_engine_contracts.py tests/test_iteration.py tests/test_colony_failures.py tests/test_colony.py tests/test_schedule.py -> 118 passed, 3 deselected in 52.26s. Original external repro now prints converged for plain/harden/Colony. git diff --check and tk dep cycle pass. Final short-suite gate pending.
