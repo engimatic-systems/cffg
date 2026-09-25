@@ -64,3 +64,7 @@ Implemented the bounded local-facts stage: ExecutionDelta gains optional per-mem
 **2026-09-25T04:54:10Z**
 
 Completed final validation at e344b11: uv run python tools/dashboard.py --run-suite -> 2,441 passed, 69 deselected, no failures. Measured wall time 1,193.265s (pytest 1,179.22s), within the 1,200s short-suite limit. No code or selection edits followed this run. Runtime history and dashboard refreshed. Focused checks and independent review were already green. Next child cff-fbps carries these local facts through schedules; public RunResult attribution is not claimed by this stage.
+
+**2026-09-25T04:55:50Z**
+
+Implementation PR: https://github.com/engimatic-systems/cffg/pull/164, based on #163. All numerical validation is recorded above; next ready prerequisite is cff-fbps. Public failure attribution remains pending the three downstream stages.
