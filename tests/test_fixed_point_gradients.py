@@ -24,6 +24,7 @@ def coupled_neural_model(method):
     return template, arrays
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("method", ["linearization", "sigma_point"])
 def test_complete_tied_neural_gradient_matches_resolved_central_differences(method):
     template, arrays = coupled_neural_model(method)

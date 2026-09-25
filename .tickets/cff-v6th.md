@@ -1,7 +1,7 @@
 ---
 id: cff-v6th
 status: in_progress
-deps: []
+deps: [cff-rnn1]
 links: []
 created: 2026-09-25T03:46:24Z
 type: bug

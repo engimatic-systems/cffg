@@ -1,7 +1,7 @@
 ---
 id: cff-xa6z
 status: open
-deps: [cff-v6th, cff-04mb, cff-ectw, cff-qu2j, cff-7kpx, cff-toqa, cff-0kyl, cff-4yr6, cff-qtub, cff-3wsw, cff-5k0n, cff-csmz, cff-ees0, cff-wi2o, cff-iplr, cff-nd1q, cff-fl7h, cff-21vm, cff-fj4v, cff-3nr4, cff-wdhj, cff-wt1c]
+deps: [cff-v6th, cff-04mb, cff-ectw, cff-qu2j, cff-7kpx, cff-toqa, cff-0kyl, cff-4yr6, cff-qtub, cff-3wsw, cff-5k0n, cff-csmz, cff-ees0, cff-wi2o, cff-iplr, cff-nd1q, cff-fl7h, cff-21vm, cff-fj4v, cff-3nr4, cff-wdhj, cff-wt1c, cff-rnn1]
 links: [cff-wbhu, cff-mjku, cff-3kdk]
 created: 2026-09-25T03:43:40Z
 type: epic
@@ -103,3 +103,7 @@ Built from tk dep tree --full, tk ready and tk blocked; tk dep cycle reports no 
 **2026-09-25T03:48:29Z**
 
 Roadmap PR: https://github.com/engimatic-systems/cffg/pull/162 (base #161). Ticket-only validation passed: tk dep cycle and git diff --check. Next implementation ticket: cff-v6th. The epic remains open until its child outcomes and final matched comparison are complete.
+
+**2026-09-25T04:19:55Z**
+
+Validation follow-up: added cff-rnn1 after the first implementation suite exceeded the short-suite budget. Legend prerequisite --> dependent: [closed] cff-rnn1 (retain exhaustive gradient checks as opt-in slow) --> cff-v6th --> cff-qtub / cff-wdhj. The 22 original capability/fix tickets are unchanged; this is an additional test-budget child. tk dep cycle remains clean.
