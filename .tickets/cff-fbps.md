@@ -1,6 +1,6 @@
 ---
 id: cff-fbps
-status: open
+status: in_progress
 deps: [cff-gsq5]
 links: []
 created: 2026-09-25T04:22:00Z
@@ -54,3 +54,9 @@ The implementer may choose another sound method. Keep the four existing run stat
 - Root/adjoint: the inference fixed point and the derivative calculation through it.
 - Phase: a distinct initialization, propagation, soft, hard or outer-solver stage.
 - N/A: not applicable.
+
+## Notes
+
+**2026-09-25T04:56:47Z**
+
+Pre-implementation handoff: Runtime numerical or status invariant; affected host/JIT, flooding/batch/registerized/flat scheduling, exact propagation/certification, single/vmap and derivative consumers. Checkpoint N/A. schedule_program.py was already 808 lines, so first move its unchanged scan executors to execution/scans.py, retaining existing private import aliases. Focused extraction parity: 35 passed in 17.64s across schedule_program, Gaussian schedule and discrete kernel tests. This commit is a pure ownership refactor; diagnostic transport follows separately.
