@@ -74,6 +74,7 @@ EPIC_FILES = {
         "test_equality_cavities.py",
         "test_mixture_collapse.py",
         "test_mixture_rank.py",
+        "test_hybrid_planning.py",
         "test_execution.py",
         "test_execution_specialized.py",
         "test_schedule_program.py",

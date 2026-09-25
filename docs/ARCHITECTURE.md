@@ -1847,6 +1847,17 @@ discarding a joint correlation. Exact joint rollover remains the separate
   Max mode uses its message fixed-point residual and validates the decoded
   objective. Non-finite arenas/residuals are divergence, while proven empty
   exact support is infeasible with FE = +∞.
+  Ordinary sum-mode Gaussian/EF initialization may start with an undefined ledger while
+  proper information propagates, provided state and local updates stay valid.
+  This consumes the caller's existing sweep budget. Two finite energies and a
+  small message delta are required for convergence; a positive budget ending
+  without any finite energy reports `undefined_objective`/divergence. Once the
+  ledger becomes finite, a later nonfinite value fails immediately. Zero budget
+  remains budget exhaustion. Engine and iterative Colony share this policy;
+  no hidden damping/retry loop is layered over hardening, functional updates,
+  recurrence fitting, or the separate adaptive/GFE controller. The retained
+  hybrid planning fixture pins initialization and the declared approximation's
+  partial-goal limitation in `tests/test_hybrid_planning.py`.
   Ordinary Engine and Colony delta reductions preserve NaN from any message
   representation; a finite change in another block cannot hide it. Their
   failed-run traces therefore retain the non-finite change as well as reporting
