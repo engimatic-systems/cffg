@@ -1,6 +1,6 @@
 ---
 id: cff-d57a
-status: open
+status: in_progress
 deps: [cff-lhbm]
 links: []
 created: 2026-09-25T04:22:00Z
@@ -56,3 +56,9 @@ The implementer may choose another sound method. Keep the four existing run stat
 - Root/adjoint: the inference fixed point and the derivative calculation through it.
 - Phase: a distinct initialization, propagation, soft, hard or outer-solver stage.
 - N/A: not applicable.
+
+## Notes
+
+**2026-09-25T06:15:40Z**
+
+Pre-implementation handoff: Runtime numerical/status invariant plus derivative consumers. Affected host/JIT, flood/mixed reconstruction, exact initialization within outer control, Engine/per-instance Colony; outer-controller vmap is unsupported (generic map/kernel batching remains relevant). Current/legacy checkpoint schemas remain unchanged and omission compatibility is already covered by cff-lhbm. outer.py is 1401 lines, so first extract unchanged chart geometry and compiled trust kernels into outer_chart.py and outer_trust.py, retaining existing outer import aliases; then carry auxiliary provenance without altering numerical decisions. Rejected trial/shadow facts must never be latched into a recovered successful result.
