@@ -1,6 +1,6 @@
 ---
 id: cff-d57a
-status: in_progress
+status: closed
 deps: [cff-lhbm, cff-8jqy]
 links: []
 created: 2026-09-25T04:22:00Z
@@ -66,3 +66,7 @@ Pre-implementation handoff: Runtime numerical/status invariant plus derivative c
 **2026-09-25T06:22:46Z**
 
 Research question: which adaptive-map failures are terminal rather than speculative? Answer: retain checked discovery/current-map evidence, offset through recursive and controller restarts, and retain a selected invalid trial only when all trials were invalid at terminal trust collapse; discard rejected shadow/trial facts after recovery and on plain budget exhaustion. Priming expires after discovery advances, even if iteration count stays zero. Source: outer.py and outer_strategy.py control-flow review by failure_provenance sub-agent; confidence high. No numerical policy or derivative coordinates changed. Review found two priming edge cases (immediate functional failure; zero-count discovery advancement), both now covered by mechanism tests.
+
+**2026-09-25T06:52:28Z**
+
+Implemented in c661cce (pure owner extraction) and ec78156 (terminal provenance). Focused validation: 47 passed/5 deselected extraction; 61 passed/3 deselected solver/nonlinear/gradient checks; 38 diagnostic tests passed. Final short suite: 2486 passed, 82 deselected, pytest 1189.27s; measured 1204.745s. Budget follow-up cff-8jqy moves one 7.721s manifest-only case to slow, estimated 1197.024s, with the passing run reused under project rules. New coverage proves discovery/candidate/trust terminal numbering, recursive/controller offsets, invalid-trial recovery, conservative collapse attribution, generic derivative failure, real improper cavities in f32/f64, scheduled reconstruction recovery, reconstruction first cause, and priming/functional order. Numerical/status/FE/gradient policy and checkpoint schemas unchanged. No remaining implementation work in this ticket.
