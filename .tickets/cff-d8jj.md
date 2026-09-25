@@ -1,6 +1,6 @@
 ---
 id: cff-d8jj
-status: open
+status: in_progress
 deps: [cff-u9un]
 links: []
 created: 2026-09-25T09:24:47Z
@@ -57,3 +57,13 @@ Dependency snapshot from tk dep tree --full, tk ready and tk blocked; no cycles.
   +--> [blocked] cff-c5qf scope decision -----------+--> cff-wt1c --> cff-xa6z
 
 The two follow-ups can proceed independently after the integration baseline. cff-c5qf additionally awaits Cooper decision. Parallel ready roots include cff-7kpx, cff-qu2j, cff-ees0 and cff-nd1q.
+
+**2026-09-25T09:57:57Z**
+
+Pre-implementation handoff: New factor/rule family and Runtime numerical/status rows. Assess both linear and prior-mixture selector updates plus their duplicated responsibility calculations in node energies and public learning statistics; shared scoring must preserve their mathematical agreement. Host/JIT, flood/scheduled, Engine/Colony, single/vmap and forward/reverse derivatives apply. Checkpoint/serialization schema N/A. Preserve mathematically valid improper-input fallback, exact-zero support and existing D3 approximation. Drop only selector-independent normalizers; no covariance floors or tolerance relaxation. Hostile cases planned: displaced means and tight incoming precision, sparse selector support, vacuous/improper cavities, f32/f64, K>=32/d>=20, invalid computed covariance and gradients. Derive a centered Gaussian overlap/information-potential calculation before patching; stage stable score ownership separately from integration if necessary.
+
+**2026-09-25T10:02:13Z**
+
+Research owner map (pcgym_numerics_review): six relative-score consumers are mixlin_to_selector/mixlin_stats/mixlin_energy and mix_to_selector/mix_stats/mix_energy. Only their responsibility scores may drop component-common constants; node entropies and expected log factors remain absolute. Forward/predictive weights stay incoming selector probabilities. Backward collapse log_c+log_Z is a distinct absolute-mass reconstruction and is not replaced piecemeal. D5 hybrid GFE is different mathematics and N/A. Neural differentiation indirectly consumes update/ledger. Source: mixg.py, execution/cross_domain.py, ledger_terms.py, readouts/gaussian.py; high confidence read-only inventory.
+
+Derivation review (failure_provenance): for predictive N(m,C), C=L L.T, common finite anchor a, r=eo-Lo*a, delta=m-a, G=I+L.T Lo L, solve u=G^-1(L^-1 delta+L.T r), t=G^-1 L.T(r-Lo delta), p=L u. Relative log evidence r.T p-.5 p.T Lo p-.5 t.T t-.5 logdet G is exact up to potential(a), common to all components. Compute u and t with two RHS to avoid cancellation in either posterior location or movement. Choose stopped-gradient output pseudomode clipped to component mean bounds: an unbounded mode can be far from a weakly observed predictive cloud and erase component differences. Gauge invariance preserves normalized-weight derivatives. Proper C/G and all computed intermediates are required. For improper input Li, retain integrable-joint fallback: scalar Li=0,Lo=W=1,A=1vs2 has evidence ratio2:1 via Jacobian1/abs(A). Source: algebra and bounded local counterexample; high confidence. Sanitize unused branches before decompositions/products, not only after.

@@ -36,6 +36,9 @@ import jax.numpy as jnp
 from cffg import gauss
 from cffg.compiled import NEG
 from cffg.gaussian_components import backward_component, forward_component
+from cffg.mixture_evidence import joint_blocks as _joint_blocks
+from cffg.mixture_evidence import log_z as _log_z
+from cffg.mixture_evidence import node_constant as _node_const
 
 _LOG2PI = 1.8378770664093453
 
@@ -76,36 +79,6 @@ class CollapseResult(NamedTuple):
     eta: jax.Array
     precision: jax.Array
     valid: jax.Array
-
-
-def _log_z(eta: jnp.ndarray, lam: jnp.ndarray) -> jnp.ndarray:
-    """log ∫ exp(−½yᵀΛy + ηᵀy) dy = ½ηᵀΛ⁻¹η + d/2·log2π − ½·logdet Λ.
-    Caller guarantees Λ ≻ 0 (guarded upstream); branch-safe helpers keep an
-    untaken invalid path finite without perturbing an accepted matrix."""
-    d = lam.shape[-1]
-    sol = gauss._pd_solve(lam, eta[..., None])[..., 0]
-    logdet = gauss._pd_logdet(lam)
-    return 0.5 * (eta * sol).sum(-1) + 0.5 * d * _LOG2PI - 0.5 * logdet
-
-
-def _joint_blocks(eta_o, lam_o, eta_i, lam_i, a, b, w):
-    """Per-regime joint (η_J, Λ_J) over (y, x) of node × μ_o × μ_i — the
-    same blocks as gauss.linear_energy, vectorized over the K axis."""
-    wa = jnp.einsum("kij,kjl->kil", w, a)  # [K, do, di]
-    top = jnp.concatenate([w + lam_o[None], -wa], axis=-1)
-    bot = jnp.concatenate([-wa.swapaxes(-1, -2), jnp.einsum("kji,kjl->kil", a, wa) + lam_i[None]], axis=-1)
-    lam_j = jnp.concatenate([top, bot], axis=-2)  # [K, do+di, do+di]
-    wb = jnp.einsum("kij,kj->ki", w, b)
-    eta_j = jnp.concatenate(
-        [wb + eta_o[None], -jnp.einsum("kji,kj->ki", a, wb) + eta_i[None]], axis=-1
-    )
-    return eta_j, lam_j
-
-
-def _node_const(b, w):
-    """Per-regime constant of log f_s: −½ b_sᵀW_s b_s + ½ logdet W_s − ½ d_y log2π."""
-    logdet_w = gauss._pd_logdet(w)
-    return -0.5 * jnp.einsum("ki,kij,kj->k", b, w, b) + 0.5 * logdet_w - 0.5 * b.shape[-1] * _LOG2PI
 
 
 def _selector_support(log_weights):
