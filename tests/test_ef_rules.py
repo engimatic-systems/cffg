@@ -102,7 +102,7 @@ def test_improper_beliefs_are_plus_inf():
     np.testing.assert_allclose(float(efrules.edge_entropy(efrules.BETA, vac, vac)[0]), 0.0)
 
 
-def test_equality_messages_sum_minus_self():
+def test_equality_messages_sum_other_legs():
     eta = jnp.asarray(np.random.default_rng(0).normal(size=(4, 3, 2)))
     out = efrules.equality_messages(eta)
     np.testing.assert_allclose(

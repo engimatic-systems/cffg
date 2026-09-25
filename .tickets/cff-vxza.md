@@ -1,6 +1,6 @@
 ---
 id: cff-vxza
-status: open
+status: in_progress
 deps: []
 links: []
 created: 2026-09-25T07:25:11Z
@@ -41,3 +41,9 @@ An exclusive prefix/suffix sum is one possible linear-storage method. Natural-pa
 A cavity message excludes information from its recipient. Eta and precision are Gaussian natural parameters. A natural parameter is an additive coordinate of an exponential-family distribution. A Jacobian records how outputs change with inputs. Arity is the number of incoming legs. A vacuous message contributes no information. JIT is compiled execution; vmap batches independent instances; dtype is numeric storage precision.
 
 
+
+## Notes
+
+**2026-09-25T07:26:43Z**
+
+Pre-implementation handoff: Runtime numerical/status invariant row plus New factor/rule family mathematical-message validation. Local owners: gauss.equality_messages and efrules.equality_messages; dispatched by kernel_runtime.gaussian_outputs and execution.registered, hence shared by flood/scheduled/exact Engine and Colony. Use one private additive exclusion helper, not separate arithmetic fixes. Host/JIT, single/vmap and derivative paths required. Current/legacy checkpoints N/A (no schema/state change); scalar objective/energy equations unchanged. Hostile inputs preregistered: exact zeros preserved, weak positive information beside a dominant recipient must survive; mixed-sign eta; other-leg nonfinite remains nonfinite; f32/f64; arity300 and linear-storage implementation. Direct NumPy exclusion and analytic Jacobian are independent oracles.
