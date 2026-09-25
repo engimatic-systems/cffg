@@ -59,3 +59,7 @@ Implemented independent component scenes ordered by natural factor name, packed 
 **2026-09-25T07:23:05Z**
 
 Completed validation: 52 focused visualization tests passed, including unchanged connected SVG goldens. Final short suite: 2496 passed, 83 deselected; pytest 1180.71s, measured 1196.129s (under 1200s). tk dep cycle and git diff --check pass. All acceptance criteria complete; no numerical or persistence surfaces changed. Next: continue cff-xa6z PR chain.
+
+**2026-09-25T07:23:36Z**
+
+Published PR #168: https://github.com/engimatic-systems/cffg/pull/168, based on cff-d57a-outer-provenance (#167).
