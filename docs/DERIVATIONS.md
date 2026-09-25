@@ -336,7 +336,12 @@ incoming selector log-message alone. Moment match:
     m̄ = Σ w_s m_s,   C̄ = Σ w_s (C_s + m_s m_sᵀ) − m̄ m̄ᵀ,
     (m_s, C_s) = (Λ_f⁻¹η_f, Λ_f⁻¹);   message = (C̄⁻¹ m̄, C̄⁻¹).
 
-Guard: every supported Λ_f(s) ≻ 0 (needs Λ_i ≻ 0), else vacuous.
+Guard: every supported component must be normalizable, else vacuous. For
+proper incoming Λ_i, compute the predictive covariance V_s + A_s Λ_i⁻¹ A_sᵀ
+and check each computed covariance and precision. Otherwise the Schur
+projection's retained eigenvalues, not positivity of its rounded reconstructed
+matrix, certify full output rank. An explicitly discarded null direction
+cannot become information merely because matrix multiplication rounds it up.
 
 **→ in (collapsed backward, the weight trap).** Component s: scale-free
 (η_b(s), Λ_b(s)) = `linear_backward`(μ_o; A_s, b_s, W_s), plus the scale the
@@ -347,8 +352,35 @@ engine's convention dropped:
                + ½ log det W_s − ½ d_y log 2π.
 
 Weights w̃_s ∝ exp(μ_e(s)) · c̃_s · Z(η_b(s), Λ_b(s)); moment match as above.
-Guard: every supported Λ_b(s) ≻ 0 (needs Λ_o ≻ 0 and rank(A_s) = d_x),
-else vacuous. Components outside exact selector support do not take part in
+Guard: every supported component must inform all d_x input directions,
+else vacuous. For proper W, G = W(W + Λ_o)⁻¹Λ_o has exactly the same
+nullspace as Λ_o. Consequently rank(A_sᵀ G A_s) equals rank(U₊ᵀ A_s),
+where U₊ spans the retained informed subspace of Λ_o. Use this incoming
+subspace, not eigenvectors contaminated by the Schur subtraction. For this
+rank-only calculation, first equilibrate Λ_o = D C D by its positive diagonal
+entries and transform A_s to D A_s. This congruence preserves the rank question
+without letting unrelated coordinate units erase an informed direction.
+When Λ_o
+is proper, the question reduces to rank(A_s); no eigenvalue cutoff is applied
+to its weak but proper information. Singular Λ_o is allowed when its informed
+subspace still spans every input direction.
+
+Before equilibration, the U₊ᵀ A_s projection is screened against dtype-relative
+roundoff in these equilibrated coordinates: 16 d_y eps(dtype) times the
+componentwise product |U₊ᵀ| |D A_s|,
+plus an eigenspace-uncertainty allowance proportional to
+scale(C)/λ_j times each transformed input column's norm for retained eigenvalue λ_j.
+This prevents both cancellation and uncertain spectral directions from being
+amplified into information. Unresolved near-null directions remain vacuous.
+Rank analysis then equilibrates columns and rows and compares singular values
+with 16 max(d_y,d_x) eps(dtype) times the largest; it is auxiliary and
+nondifferentiated. This numerical-rank decision does not add a precision floor
+or tighten the shared Gaussian propriety predicate. Invalid computed
+covariances or precisions produce nonfinite failure evidence, not the vacuous
+initialization fallback. `tests/test_mixture_rank.py` pins rotated nullspaces,
+proportional columns, retained subspaces, coordinate scales, overflow and
+proper-branch derivatives in both supported floating precisions.
+Components outside exact selector support do not take part in
 moment or score arithmetic, nor in these component-admission guards.
 
 **Node energy (exact for the held beliefs).** ρ_s = softmax over s of
@@ -362,7 +394,8 @@ tr(W_s J_s Σ_J J_sᵀ)), r_s = J_s m_J − b_s, J_s = [I, −A_s] — the
 the Gaussian edges keep their standard interior +H corrections; the Gaussian
 ones use collapsed beliefs, which is the ledger's one bounded term (D3.1.3).
 
-Checks: K = 1 reduces every rule to the plain `gaussian_linear` rules and
+Checks: for normalizable, numerically valid components, K = 1 reduces every
+rule to the plain `gaussian_linear` rules and
 the energy to `linear_energy`. Vacuous μ_e ⇒ w_s uniform in the forward
 collapse. A_s ≡ A, b_s ≡ b, V_s ≡ V across s ⇒ collapse is exact (mixture
 of identical Gaussians) and F_a reduces to linear_energy + H-cancellation

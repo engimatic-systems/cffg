@@ -256,10 +256,15 @@ the input precisions. If an admitted component calculation overflows or loses
 propriety, it emits nonfinite messages and the run fails with local attribution;
 an internal collapse safe-inverse placeholder is not a valid approximation. This differs
 from the vacuous fallback for components not yet normalizable during
-initialization. Producer-side rank evidence remains incomplete near singular
-Schur/Gram reconstructions and producer covariance intermediates (cff-61ag);
-checked collapse alone does not resolve
-the retained PCGym planner's rank-boundary behavior.
+initialization. Component producers retain Schur rank evidence before matrix
+reconstruction and test backward rank before forming a Gram matrix; a rounded
+null direction is not accepted as information. Proper-input covariance-form
+branches check their computed intermediates without imposing a global
+condition-number cutoff. Backward numerical-rank tests use equilibrated
+coordinates and can still classify unresolved near-dependencies as vacuous
+(`tests/test_mixture_rank.py`). These arithmetic guards alone do not promise
+convergence of the retained PCGym planner; initialization and safeguarded
+solver behavior remain tracked in cff-u9un.
 
 **S1e. Gaussian parameter learning is EM-rollover; flooding VMP is not
 strictly monotone.** Continuous conjugate learning (cff-7c5o, DERIVATIONS.md
