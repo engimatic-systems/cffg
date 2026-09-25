@@ -55,3 +55,7 @@ Review question -> answer -> source -> confidence: Can inactive extreme componen
 **2026-09-25T08:32:36Z**
 
 Implemented in a9b4842: checked CollapseResult validates computed moments and output; all three callers preserve exact selector support before component/score/gradient arithmetic. Known non-normalizable active components retain vacuous initialization; arithmetic collapse failure surfaces nonfinite outgoing evidence, not an inverse placeholder. Review confirms no remaining leak inside collapse. Final focused83 tests passed, including independent multidimensional moments,K32/d30,f32/f64,overflow,literal/sentinel zeros,vmap,forward/reverse derivatives,public Engine/Colony attribution,quadrature/switching parity and neural hybrid gradients. Final full gate2535 passed,83 deselected; pytest1210.25s,measured1226.099s. cff-5o7r moves four behavioral cases to slow, estimated1196.045s/2531tests, reusing the passing result per policy. No remaining work in checked-collapse scope. Next ready:cff-61ag producer-rank and intermediate-validity admission; cff-03dn and cff-ectw intentionally stay open.
+
+**2026-09-25T08:34:07Z**
+
+Published PR #171: https://github.com/engimatic-systems/cffg/pull/171, based on #170.
