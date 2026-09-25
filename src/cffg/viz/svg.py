@@ -62,6 +62,9 @@ def render_svg(
 def build_scene(
     template: Template, *, level: int = FULL_COMPRESSION, style: LayoutStyle = LayoutStyle()
 ) -> Scene:
+    """Lay out a Template; use to_svg to serialize the resulting Scene."""
+    if not isinstance(template, Template):
+        raise TypeError("build_scene expects a Template; use to_svg(scene) for a Scene")
     diagram = derive(template)
     if diagram.nodes:
         scene = layout(diagram, present(diagram, level), style)
@@ -128,6 +131,12 @@ def save_png(
 
 
 def to_svg(scene: Scene, style: SvgStyle = SvgStyle()) -> str:
+    """Serialize a laid-out Scene; use render_svg for a Template."""
+    if not isinstance(scene, Scene):
+        raise TypeError(
+            "to_svg expects a Scene; use render_svg(template) or "
+            "to_svg(build_scene(template)) for a Template"
+        )
     s = style
     parts = [
         (

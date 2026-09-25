@@ -79,9 +79,51 @@ def natural_key(value: str) -> tuple[object, ...]:
 def layout(
     diagram: Diagram, presentation: Presentation, style: LayoutStyle = LayoutStyle()
 ) -> Scene:
+    components = _component_diagrams(diagram)
+    if not components:
+        return _framed(diagram.name, [], style)
+    scenes = [_layout_connected(component, presentation, style) for component in components]
+    if len(scenes) == 1:
+        return scenes[0]
+    items = []
+    height = 0.0
+    for scene in scenes:
+        items.extend(_shift(item, 0.0, height) for item in scene.items)
+        height += scene.height
+    return Scene(diagram.name, max(scene.width for scene in scenes), height, items)
+
+
+def _layout_connected(diagram, presentation, style) -> Scene:
     grid, rail = _place_factors(diagram)
     sides = _assign_sides(diagram, grid, rail)
     return _emit(diagram, presentation, style, grid, sides)
+
+
+def _component_diagrams(diagram: Diagram) -> list[Diagram]:
+    """Partition by structural wires, ordered by each component's first name."""
+    adjacency = _adjacency(diagram)
+    owner: dict[str, int] = {}
+    components: list[Diagram] = []
+    for start in sorted(diagram.nodes, key=natural_key):
+        if start in owner:
+            continue
+        index = len(components)
+        components.append(Diagram(diagram.name))
+        owner[start] = index
+        queue = deque([start])
+        while queue:
+            for neighbor, _ in adjacency[queue.popleft()]:
+                if neighbor not in owner:
+                    owner[neighbor] = index
+                    queue.append(neighbor)
+    # Preserve declaration order within each component, including glue ports.
+    for name, node in diagram.nodes.items():
+        components[owner[name]].nodes[name] = node
+    for name, wire in diagram.wires.items():
+        components[owner[wire.node_ends()[0].factor]].wires[name] = wire
+    for composite in diagram.composites:
+        components[owner[composite.members[0]]].composites.append(composite)
+    return components
 
 
 # --------------------------------------------------------------------------
