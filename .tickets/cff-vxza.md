@@ -1,6 +1,6 @@
 ---
 id: cff-vxza
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-09-25T07:25:11Z
@@ -47,3 +47,7 @@ A cavity message excludes information from its recipient. Eta and precision are 
 **2026-09-25T07:26:43Z**
 
 Pre-implementation handoff: Runtime numerical/status invariant row plus New factor/rule family mathematical-message validation. Local owners: gauss.equality_messages and efrules.equality_messages; dispatched by kernel_runtime.gaussian_outputs and execution.registered, hence shared by flood/scheduled/exact Engine and Colony. Use one private additive exclusion helper, not separate arithmetic fixes. Host/JIT, single/vmap and derivative paths required. Current/legacy checkpoints N/A (no schema/state change); scalar objective/energy equations unchanged. Hostile inputs preregistered: exact zeros preserved, weak positive information beside a dominant recipient must survive; mixed-sign eta; other-leg nonfinite remains nonfinite; f32/f64; arity300 and linear-storage implementation. Direct NumPy exclusion and analytic Jacobian are independent oracles.
+
+**2026-09-25T07:55:28Z**
+
+Completed: Gaussian and EF equality callbacks share exclusive prefix/suffix sums with linear storage and no recipient contamination, ridge or floor. Focused checks:45 local Gaussian/EF/schedule tests passed;69 execution/schedule/Kalman/hybrid/Colony tests passed (3 slow deselected). Final short suite:2508 passed,83 deselected, pytest1181.76s, measured1197.103s (within1200s). New tests exercise dominant/weak eta and precision, the6.0834e-16 planning-scale mechanism, exact vacuity, nonfinite other legs, f32/f64,300 legs,JIT/vmap,and forward/reverse Jacobians. tk dep cycle and git diff --check pass. This repairs one amplifier only; cff-03dn and cff-u9un still block complete hybrid planning repair.
