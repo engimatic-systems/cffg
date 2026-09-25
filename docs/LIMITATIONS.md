@@ -250,7 +250,16 @@ mixture-Bethe value at the same moments (bound direction pinned in
 are rejected at compile time in v1 — route observations through a plain
 `gaussian_linear` emission node; (5) rank-deficient per-regime backward
 messages have no well-defined collapse and fall back to vacuous — full-rank
-A_s per regime is the supported envelope.
+A_s on active selector support is the supported envelope.
+Numerical moment collapse checks its computed covariances and output, not just
+the input precisions. If an admitted component calculation overflows or loses
+propriety, it emits nonfinite messages and the run fails with local attribution;
+an internal collapse safe-inverse placeholder is not a valid approximation. This differs
+from the vacuous fallback for components not yet normalizable during
+initialization. Producer-side rank evidence remains incomplete near singular
+Schur/Gram reconstructions and producer covariance intermediates (cff-61ag);
+checked collapse alone does not resolve
+the retained PCGym planner's rank-boundary behavior.
 
 **S1e. Gaussian parameter learning is EM-rollover; flooding VMP is not
 strictly monotone.** Continuous conjugate learning (cff-7c5o, DERIVATIONS.md

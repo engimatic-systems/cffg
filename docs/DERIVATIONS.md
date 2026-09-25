@@ -306,9 +306,14 @@ difference between folklore and a correct implementation:
 
 Incoming: μ_o = (η_o, Λ_o) on out, μ_i = (η_i, Λ_i) on in (information form,
 scale-free), μ_e(s) selector log-message. Z(η, Λ) := (2π)^{d/2}
-det(Λ)^{−1/2} exp(½ηᵀΛ⁻¹η) is the unnormalized-Gaussian mass; all propriety
-guards below fall back to the vacuous message mid-flooding and to +inf in
-ledger terms (the engine-wide loudness convention).
+det(Λ)^{−1/2} exp(½ηᵀΛ⁻¹η) is the unnormalized-Gaussian mass. Components
+not yet normalizable fall back to a vacuous message mid-flooding; improper
+ledger beliefs give +inf. After admission, collapse also verifies its computed
+component covariances, means, collapsed covariance and final precision.
+Arithmetic failure there emits nonfinite messages, not a dummy inverse or
+invented regularization. Exact-zero selector components are masked before
+moment products. `tests/test_mixture_collapse.py` pins this distinction with
+independent multidimensional moments, overflow, support and derivative cases.
 
 **→ selector (exact).** Per regime, the joint over (y, x) of node × μ_o × μ_i
 has (same blocks as `gauss.linear_energy`):
@@ -331,7 +336,7 @@ incoming selector log-message alone. Moment match:
     m̄ = Σ w_s m_s,   C̄ = Σ w_s (C_s + m_s m_sᵀ) − m̄ m̄ᵀ,
     (m_s, C_s) = (Λ_f⁻¹η_f, Λ_f⁻¹);   message = (C̄⁻¹ m̄, C̄⁻¹).
 
-Guard: every Λ_f(s) ≻ 0 (needs Λ_i ≻ 0), else vacuous.
+Guard: every supported Λ_f(s) ≻ 0 (needs Λ_i ≻ 0), else vacuous.
 
 **→ in (collapsed backward, the weight trap).** Component s: scale-free
 (η_b(s), Λ_b(s)) = `linear_backward`(μ_o; A_s, b_s, W_s), plus the scale the
@@ -342,7 +347,9 @@ engine's convention dropped:
                + ½ log det W_s − ½ d_y log 2π.
 
 Weights w̃_s ∝ exp(μ_e(s)) · c̃_s · Z(η_b(s), Λ_b(s)); moment match as above.
-Guard: every Λ_b(s) ≻ 0 (needs Λ_o ≻ 0 and rank(A_s) = d_x), else vacuous.
+Guard: every supported Λ_b(s) ≻ 0 (needs Λ_o ≻ 0 and rank(A_s) = d_x),
+else vacuous. Components outside exact selector support do not take part in
+moment or score arithmetic, nor in these component-admission guards.
 
 **Node energy (exact for the held beliefs).** ρ_s = softmax over s of
 [μ_e(s) + log μ(s)-integrand above]; q(y,x|s) is Gaussian with (η_J, Λ_J):

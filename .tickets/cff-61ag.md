@@ -26,6 +26,7 @@ The shared Gaussian propriety predicate deliberately supports valid widely scale
 4. Rotated exact nullspace, proportional-column maps and coordinate-rescaled proper cases agree with independent algebraic/moment oracles in float32/float64.
 5. Exact-zero selector support, vacuous inputs and at least tenfold dimension/component scale have explicit outcomes; supported JIT/vmap and proper-branch gradients remain sound.
 6. No global covariance floor, model-parameter change or shared propriety cutoff is introduced. Checked-collapse outcomes distinguish initialization from arithmetic failure.
+6.1. Component producers validate actual computed covariance/precision intermediates before admitting a component, including the proper-input covariance-form branches. A safe inverse placeholder from an invalid predicted covariance cannot reach checked collapse as plausible component information.
 7. Update canonical derivation/limitation contracts and executable anchors. The retained planning fixture is handed to cff-u9un; this ticket does not claim complete planner convergence by itself.
 
 ## Methodological Suggestions
@@ -40,5 +41,4 @@ Another sound approach is acceptable. Consider returning retained spectral facto
 ## Definitions
 
 Rank counts independent informed directions. A Schur complement eliminates Gaussian variables. A Gram matrix is a factor multiplied by its transpose. Equilibration rescales coordinates for numerical analysis, not the probabilistic model. JIT is compiled execution; vmap batches instances; dtype is numeric storage precision.
-
 

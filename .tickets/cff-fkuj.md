@@ -21,7 +21,7 @@ This ticket establishes checked collapse. Producer-side numerical-rank admission
 ## Outcomes / Acceptance Criteria
 
 1. Moment collapse returns explicit validity with its output information vector and precision. Checks cover normalized supported weights, admitted component moments, collapsed covariance and final finite proper output.
-2. Prior-mixture, linear-forward and linear-backward callers all consume that validity; no safe inverse placeholder becomes an accepted outgoing message.
+2. Prior-mixture, linear-forward and linear-backward callers all consume that validity; no safe inverse placeholder produced inside moment collapse becomes an accepted outgoing message. Producer-side intermediate validity belongs to cff-61ag.
 3. Preserve the existing vacuous fallback when components are known not to be normalizable yet. A failed numerical collapse of otherwise admitted components is distinguishable from this legitimate initialization case and surfaces a truthful failure.
 4. Independent multidimensional moment oracles verify ordinary proper mixtures in float32/float64, including exact zero selector support and diffuse but proper components.
 5. Nonfinite means, invalid covariance calculations and representational overflow cannot return plausible positive precision. Host/JIT and single/vmap agree; at least tenfold component count and differentiable proper-case gradients are covered.
@@ -47,3 +47,7 @@ Moment collapse replaces a mixture by one Gaussian with matching first two momen
 **2026-09-25T07:56:22Z**
 
 Pre-implementation handoff: Runtime numerical/status invariant and New factor/rule family rows. One local checked-collapse owner used by mix_forward, mixlin_forward and mixlin_backward; their registered cross-domain execution covers host/JIT, flood/mixed, Engine/Colony and vmap. New auxiliary internal validity, not a persisted schema. Known non-normalizable components retain existing vacuous fallback; numerical failure after admission must become nonfinite outgoing evidence, tagged by existing failure transport. Tests will cover actual public factor attribution, proper independent moments and JVP/VJP finite behavior, literal/sentinel zero weights, malformed values, float32 overflow and K32/dimension-scale. No objective or default-run policy changes.
+
+**2026-09-25T08:03:43Z**
+
+Review question -> answer -> source -> confidence: Can inactive extreme components contaminate backward scores or shared-cavity gradients? Yes in the initial patch; fixed by retaining original selector support and borrowing an active component solely for masked arithmetic before component construction. Both NEG and literal -inf now have caller-level forward/backward/prior and jacrev regressions. Admission explicitly concerns active support, so an inactive rank-deficient component no longer discards valid active information. Independent read-only review found no remaining placeholder escape inside _collapse. Upstream component-construction inverses remain cff-61ag, explicitly recorded in its acceptance criteria; checked-collapse validity cannot certify an upstream hidden placeholder. Source: failure_provenance review and bounded float32 two-component reproductions. Confidence high.
