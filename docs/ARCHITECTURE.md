@@ -1914,8 +1914,11 @@ discarding a joint correlation. Exact joint rollover remains the separate
   new solve with a newly frozen scale. Hard δ support is selected once per
   hard phase rather than changing inside a trust model; multiple δ variables
   activate in deterministic sequential phases so later decisions condition
-  on earlier commitments. The compiled matrix-free JVP/VJP and Steihaug
-  kernels accept per-instance coordinates, scales, and radii under `vmap`;
+  on earlier commitments. Successful candidate, trust and auxiliary paths
+  return the point whose residual and energy change were certified, not its
+  unchecked successor. Eliminated slots are reconstructed at that point;
+  the final solve energy entry belongs to it. The compiled matrix-free JVP/VJP
+  and Steihaug kernels accept per-instance coordinates, scales, and radii under `vmap`;
   the host controller owns active-set and status transitions until cff-wbhu
   moves that carry into a compiled scan.
   A bounded shadow Anderson/Picard sequence may supply candidates, but a

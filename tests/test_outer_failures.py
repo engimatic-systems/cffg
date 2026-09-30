@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import pytest
 from nonlinear_fixture import model
 from test_failure_diagnostics import fact
@@ -61,6 +62,86 @@ def mapped(arrays, value, failed=False):
     return (arrays._replace(messages=jnp.full_like(arrays.messages, value)),
             jnp.asarray(0.), jnp.asarray(2 if failed else 0),
             fact() if failed else empty_failure())
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("compiled", [False, True])
+@pytest.mark.parametrize("path", ["candidate", "trust", "auxiliary"])
+def test_success_returns_the_certified_point_not_its_expansive_successor(scalar_chart, dtype, compiled, path):
+    tolerance = max(1e-6, 64 * np.finfo(dtype).eps)
+    center = .5 if path == "auxiliary" else 0.
+    delta = tolerance * (1 + center) / 2
+
+    def mapping(arrays):
+        x = arrays.messages
+        value = center + delta + 16 * (x - center)
+        if path == "auxiliary":
+            value = jnp.where((x > .25) & (x < .75), value, x + 1)
+        return arrays._replace(messages=value), jnp.asarray(0.), jnp.asarray(0), empty_failure()
+
+    update = jax.jit(mapping) if compiled else mapping
+    energy = lambda arrays: float(arrays.messages[0])
+    result = outer.solve_outer(
+        scalar_arrays(jnp.array([0.], dtype=dtype)), SimpleNamespace(edges={}),
+        update, energy, lambda _: False,
+        n_iters=30, tol=1e-6, candidate_limit=128 if path == "candidate" else 0,
+        kernel_factory=lambda _: plan(),
+    )
+    assert result.reason is Reason.ROOT_CONVERGED
+    np.testing.assert_array_equal(result.arrays.messages, np.array([center], dtype=dtype))
+    assert result.iterations == (1 if path == "auxiliary" else 0)
+    assert result.accepted_steps == (1 if path == "auxiliary" else 0)
+    assert result.rejected_steps == (1 if path == "auxiliary" else 0)
+    assert int(result.failure.fact.reason) == 0 and result.inner_code == 0
+    assert result.free_energies[-1] == energy(result.arrays)
+    successor = update(result.arrays)[0]
+    residual = float(jnp.max(jnp.abs(successor.messages - result.arrays.messages) / (1 + jnp.abs(result.arrays.messages))))
+    assert residual == pytest.approx(result.outer_residual)
+    assert residual <= tolerance
+    assert abs(energy(successor) - energy(result.arrays)) <= tolerance * (1 + abs(energy(result.arrays)))
+    next_successor = update(successor)[0]
+    successor_residual = float(jnp.max(jnp.abs(next_successor.messages - successor.messages) / (1 + jnp.abs(successor.messages))))
+    assert successor_residual > tolerance
+
+
+@pytest.mark.slow
+def test_float32_reactor_returned_state_satisfies_its_frozen_chart_certificate(monkeypatch):
+    from cstr_planning_fixture import planning_fixture
+    from cffg.outer_chart import chart_coordinates
+    from cffg.runtime_types import _replace
+
+    charts = []
+    original = outer.build_outer_chart
+
+    def capture(*args, **kwargs):
+        chart = original(*args, **kwargs)
+        charts.append(chart)
+        return chart
+
+    monkeypatch.setattr(outer, "build_outer_chart", capture)
+    with jax.enable_x64(False):
+        template, arrays, data = planning_fixture("sigma_point", past=0, horizon=2, dtype=np.float32)
+        arrays["P0"] = np.diag(np.array([.01, .001, 1e-4, .1], dtype=np.float32))
+        engine = Engine(compile_template(template, arrays=arrays), schedule="flood")
+        result = engine.run(engine.bind_data(engine.init_state(), data), 60, tol=1e-6)
+        state = result.require_converged()
+        values = engine._iter_step(
+            state.messages, state.g_eta, state.g_lam, state.g_obs, state.g_mask,
+            state.ef_eta, state.ef_obs, state.ef_mask, state.params, 0., False,
+        )
+        assert int(values[6].reason) == 0
+        mapped = _replace(state, messages=values[0], g_eta=values[1], g_lam=values[2], ef_eta=values[3])
+        before = OuterArrays(state.messages, state.g_eta, state.g_lam, state.ef_eta)
+        after = OuterArrays(mapped.messages, mapped.g_eta, mapped.g_lam, mapped.ef_eta)
+        u, v = np.asarray(chart_coordinates(charts[-1], before)), np.asarray(chart_coordinates(charts[-1], after))
+        tolerance = 64 * np.finfo(np.float32).eps
+        residual = np.max(np.abs(v - u) / (1 + np.abs(u)))
+        assert result.outer_residual <= tolerance and residual <= tolerance
+        energy, mapped_energy = float(engine.bfe(state)), float(engine.bfe(mapped))
+        assert np.isfinite([energy, mapped_energy]).all()
+        assert abs(mapped_energy - energy) <= tolerance * (1 + abs(energy))
+        assert result.free_energies[-1] == energy
+        assert result.failure is None
 
 
 @pytest.mark.parametrize("stage,attempt", [("discovery", 1), ("candidate", 2), ("trust", 1)])
