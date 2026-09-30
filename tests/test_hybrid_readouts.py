@@ -3,6 +3,7 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 from numpy.polynomial.hermite import hermgauss
 
 from cffg import conj, gauss, mixg
@@ -327,6 +328,7 @@ def test_linear_mixture_stats_match_independent_d3_joint():
     np.testing.assert_allclose(actual["Syy"].sum(axis=0), syy.sum(axis=0))
 
 
+@pytest.mark.slow
 def test_single_regime_stats_reduce_to_gaussian_linear():
     mixture_template, mixture_arrays = _linear_template(
         mixture=True, regimes=1, dimension=2

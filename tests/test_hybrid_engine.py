@@ -218,6 +218,7 @@ def _converge(arena):
     return engine, state
 
 
+@pytest.mark.slow
 def test_written_messages_match_mixg_calls():
     t, arrays = mixlin_template(K=3, do=2, di=1, seed=7)
     arena = compile_template(t, arrays=arrays)
@@ -379,6 +380,7 @@ def test_k1_reduces_to_gaussian_linear():
 # --- (d) vmap / colony contract -----------------------------------------------
 
 
+@pytest.mark.slow
 def test_vmap_batch_equals_sequential():
     t, arrays = mixlin_template(K=3, do=2, di=1, seed=5)
     engine = Engine(compile_template(t, arrays=arrays))
