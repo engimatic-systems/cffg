@@ -1,6 +1,6 @@
 ---
 id: cff-qw7x
-status: in_progress
+status: closed
 deps: [cff-36x7, cff-pl0v]
 links: []
 created: 2026-09-25T11:23:56Z
@@ -92,3 +92,7 @@ Complete relevant envelope opt-ins: uv run pytest -q -m slow tests/test_cstr_env
 **2026-09-30T20:32:36Z**
 
 First final gate4986508:1 stale README catalogue failure,2636passed172deselected,pytest1176.31s,wall1190.777s (within1200). New README links correctly include cstr_planning.py but test_readme.EXAMPLES inventory omitted it. Fix is expected artifact inventory only; numerical/source behavior unchanged. Update catalogue and focused docs checks, then one corrected gate because the previous full gate did not pass. No marker-only rerun; no budget trimming needed.
+
+**2026-09-30T20:59:47Z**
+
+Corrected final gate d4bcc5c: uv run python tools/dashboard.py --run-suite —2637passed172deselected,4 existing Gym deprecation warnings,pytest1174.64s,wall1188.941s (within1200). Dashboard refreshed green. Catalogue correction focused26passed36deselected15.06s. Complete: public shared recipe, source ownership/portable identity/trusted fresh-process boundary, all24 ratio cases and8 cold/warm schedule-method-dtype cases, affine bothdtypes/methods and retained partial/wide/H150 mechanisms verified. Canonical docs update exact scope and startup truth. No original threshold/exact nonlinear posterior/hard-action/closed-loop claim. Close and publish on base#178; reuse passing gate for ticket/history/PR bookkeeping, no further unchanged suite.
