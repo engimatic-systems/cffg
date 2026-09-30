@@ -1,7 +1,7 @@
 ---
 id: cff-36x7
 status: in_progress
-deps: [cff-fc2y]
+deps: [cff-fc2y, cff-71oc]
 links: []
 created: 2026-09-25T11:23:56Z
 type: feature
@@ -57,3 +57,7 @@ Independent design/implementation review: question — can initial failures lose
 **2026-09-30T17:13:21Z**
 
 Implementation: GaussianBinding admission capability is optional; guarded startup uses shared synchronous transport and mixed island order, scalar member control flow and sequential_vmap for outer batching. Both-role eligibility is exact at stored subnormal resolution; admission is run-local and latched. Outer startup runs once, charges sweeps to n_iters, requires all adaptive cavities READY plus proper chart, and reports pending local_budget without FE. Removed adaptive uncounted reference-discovery propagation from solve_outer. Ordinary strict rules and residual derivatives are unchanged. Fresh affine f64 Taylor/sigma runs converge from neutral initialization and match dense evidence; default f32 affine dense check passes. Retained reactor failure grid now explicitly calls strict sweeps without startup/trust discovery (8 grid cases passed after harness update); it is not a public fresh-run claim. Review fixes and regressions cover nonfinite attribution, unrelated corruption, functional accounting and external bindings without optional diagnostics. Broader final focused/default gate remains pending.
+
+**2026-09-30T17:49:40Z**
+
+Final attempted default gate: 2,627 passed, one stale ownership assertion failed, wall 1,234.901 seconds. The Gaussian transport now uses an injectable executor whose default is the same registered owner; static direct-call counting missed that identity. Updated ownership regression to verify both default callable identities and the guarded startup call. Focused ownership file: 30 passed. No production numerical change was needed. cff-71oc restores measured runtime headroom before one corrected full gate.
