@@ -77,6 +77,7 @@ EPIC_FILES = {
         "test_mixture_evidence.py",
         "test_hybrid_planning.py",
         "test_cstr_planning.py",
+        "test_gaussian_readiness.py",
         "test_execution.py",
         "test_execution_specialized.py",
         "test_schedule_program.py",

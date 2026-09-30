@@ -3043,6 +3043,67 @@ with `UNREPRESENTABLE_SIGMA_POINTS`; it cannot silently report lost variance.
 Affine functions recover the ordinary linear Gaussian factor under both
 methods, within representable arithmetic.
 
+**Input-readiness metadata, not a solver relaxation.**
+`gaussian_readiness.input_readiness` distinguishes the existing proper-input
+admission from numerical partial-information consistency and invalid/unresolved
+inputs. It returns only an integer classification, never moments or a message.
+The current nonlinear rule and solver do not yet consume this helper.
+
+For a symmetric positive-semidefinite precision, a flat uninformed direction
+has no quadratic term. Its linear term must also vanish to describe partial
+Gaussian information. In exact arithmetic this is
+`eta in Range(Lambda)`. Such a potential still has infinite integral over its
+uninformed directions. A pseudoinverse covariance would instead declare zero
+variance there, the opposite of missing information.
+
+READY is exactly finite `eta` plus the existing strict propriety predicate.
+The fallback checks finite symmetric information, nonnegative diagonals, and
+exactly zero rows/columns and `eta` entries wherever a diagonal is zero.
+Set `D_ii=sqrt(Lambda_ii)` on positive diagonals, using a dummy divisor one on
+zero rows. The congruence `C=D^-1 Lambda D^-1` and transformed vector
+`D^-1 eta` preserve the range question under coordinate-unit changes. Successive
+division avoids overflowing `D_ii D_jj`. Mantissa/exponent scaling normalizes
+the transformed vector `z` without overflowing the ratios or subtracting
+large logarithms. If only coordinate directions are missing and the informed
+principal block passes strict propriety, their range condition is structural;
+no spectral cutoff is applied to weak proper directions in that block.
+Fallback candidates containing subnormal information or precision entries are
+INVALID: some JAX backends flush these values to zero during comparisons and
+scaling. Integer bit checks distinguish them from exact signed zeros. This
+conservative refusal does not change the existing READY predicate.
+
+For other fallback candidates, symmetrize C and compute `C=V diag(lambda) V^T`
+numerically. With dimension d, `eps=finfo(dtype).eps`, `s=||C||_infinity`, use
+
+```text
+E = ||C V - V diag(lambda)||_F
+    + s (||V^T V - I||_F + 8 d eps).
+```
+
+This working error envelope includes decomposition residual, orthogonality
+error and congruence/symmetrization rounding. Directions with `lambda>E` are
+retained; require `lambda_min>=-E` and a nonempty proper retained subspace.
+Let `gap` separate the smallest retained and largest discarded eigenvalues.
+Require `gap>2E` and `u=E/(gap-2E)<=sqrt(eps)`; otherwise refuse the fallback,
+rather than widening its compatibility band to a substantial fraction of the
+information vector. For each discarded coordinate j require
+
+```text
+|v_j^T z| <= 16 d eps (|V|^T |z|)_j + (u + 4 eps) ||z||_2.
+```
+
+The terms cover null-dot rounding, eigenbasis uncertainty and transformed-vector
+division error. All classifications are nondifferentiated metadata. INVALID
+includes unresolved numerical cases; it does not prove the complete model has
+no posterior. PARTIAL is **numerical consistency at this resolution**, not an
+exact-rank theorem: `C=[[1,1+2eps],[1+2eps,1]]` has tiny negative curvature,
+and `C=ones(2,2), eta=[1+eps,1-eps]` has a tiny incompatible linear term, yet
+both can lie inside the rounding band. This metadata cannot authorize a finite
+Gaussian approximation or certify convergence. Noise, parameters, output
+potentials and admitted function evaluations remain separate obligations.
+`tests/test_gaussian_readiness.py` pins these limits, structural zeros, rotated
+nullspaces, mixed units, weak-gap refusal and batched float32/float64 behavior.
+
 ### D13.3 Tilted moments and replacement sites
 
 Let incoming cavity natural parameters be `(eta_x,Lambda_x)` and

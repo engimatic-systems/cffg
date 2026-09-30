@@ -1208,6 +1208,14 @@ categorical negative infinity as exact zero support, but not as a Gaussian
 information coordinate. These auxiliary facts do not change convergence or
 derivative calculations.
 
+`gaussian_readiness.py` owns internal, nondifferentiated input-admission metadata:
+existing proper Gaussian information, numerically compatible partial information,
+or invalid/unresolved information. It never creates moments, changes messages,
+or admits an invalid physical function. D13 defines its coordinate scaling,
+range checks and numerical-resolution limit; `test_gaussian_readiness.py` checks
+the contract. This classifier-only foundation is not yet used by the nonlinear
+solver, whose current vacuous-input and failure behavior is unchanged.
+
 `execution/failures.py` assigns ranks from all executing plans' serialized
 member/prior names, not just parameter-bearing factors. Sweeps, propagation
 and exact units append one `FailureFact` to their numerical outputs. Checks
