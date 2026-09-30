@@ -68,3 +68,7 @@ Mixed/eliminated follow-up validation: uv run pytest -q tests/test_nonlinear_eng
 **2026-09-30T19:37:01Z**
 
 Final gate at1695f20: uv run python tools/dashboard.py --run-suite —2631 passed,157 deselected,4 existing Gym deprecation warnings,pytest1168.19s,wall1182.696s (within1200s budget). Dashboard refreshed at /Users/ravd/agent-share/cffg-tests.html. Complete: all3 success points and final solve-energy handoffs corrected; independent host/JIT/dtype maps, real f32 reactor and mixed reconstruction verified. No new message/energy equation or schema. Close with validation commit; next cff-qw7x restores retained recipe integration and assesses the remaining declared grid. Full gate reused for bookkeeping; no second unchanged run.
+
+**2026-09-30T19:38:17Z**
+
+Published PR chain link: https://github.com/engimatic-systems/cffg/pull/178, base#177 cff-36x7-bounded-startup. Proposed implementation head1695f20 passed the gate; later commits record ticket/history only. No merge requested. Next ready ticket cff-qw7x.
