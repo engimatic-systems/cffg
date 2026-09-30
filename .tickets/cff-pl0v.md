@@ -52,3 +52,15 @@ Dependency refinement, built from tk dep tree --full cff-toqa, tk ready and tk b
 **2026-09-30T19:06:11Z**
 
 Focused validation after the final runtime edit: uv run pytest -q tests/test_outer_failures.py tests/test_run_strategies.py tests/test_nonlinear_engine.py tests/test_adaptive_startup.py tests/test_runtime_status.py —97 passed,13 deselected in94.57s. Relevant opt-in uv run pytest -q -m slow tests/test_outer_failures.py -k float32_reactor —1 passed,30 deselected in28.21s; actual returned-point residual and FE certificate pass in the frozen chart, without changing tau. All12 independent scalar combinations (3 success paths x2dtypes xhost/JIT) verify residual/energy identity, counters and a successor above tolerance. Full gate pending; no claim yet that reactor envelope is complete.
+
+**2026-09-30T19:06:51Z**
+
+Independent bounded review question—does returning the certified point preserve reconstruction/counters/energy across all3 paths? Answer—yes: outer strategy reconstructs solved.arrays and certificate FE uses that same reconstruction; evaluation counts still include the successor used for certification and no extra accepted update is implied. Source outer.py and outer_strategy.py; confidence high. Remaining targeted coverage suggestion is a successful mixed-schedule return with eliminated slots; no defect identified. Scalar/JIT and real-flood regressions remain independent authorities.
+
+**2026-09-30T19:07:53Z**
+
+Review follow-up addresses the mixed/eliminated-slot gap in the existing curved-sensor oracle tests: both Taylor/sigma auto cases assert a real Gaussian elimination set, returned state unchanged by exact reconstruction, no reconstruction failure and final energy equality. No new expensive default replay; strengthen existing tests in place. Runtime equations and counters unchanged.
+
+**2026-09-30T19:09:15Z**
+
+Mixed/eliminated follow-up validation: uv run pytest -q tests/test_nonlinear_engine.py -k curved_sensor —2 passed,18 deselected in11.17s after final test edits. Full gate will run once at proposed PR head; latest measured1182.688s, prescribed wait1590s. No repeat is planned for later ticket/runtime-history bookkeeping or marker-only budget adjustments.
