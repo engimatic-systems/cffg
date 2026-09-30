@@ -1,6 +1,6 @@
 ---
 id: cff-qu2j
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-09-25T03:46:25Z
@@ -71,3 +71,11 @@ Bounded accuracy contract chosen independently of maxima: 1% posterior-standard-
 **2026-09-30T21:35:43Z**
 
 Current validation: default retained precision/mechanism + README checks 8 passed,12 deselected (19.75s before helper split); equality/Gaussian/schedule/README focused checks 58 passed,3 deselected (25.43s). First opt-in hostile run found a real all-missing f32 energy error, not a certification error: .204666 absolute vs analyticalzero. It is explicitly excluded from conditioned energy guarantees and retained as strict expected failure in cff-d63w. The cff-qu2j PR will include the discovery ticket but not implement or close its independent accuracy work; one primary ticket/PR as just requested.
+
+**2026-09-30T21:37:23Z**
+
+After final helper/trace check: uv run pytest -q tests/test_first_order_precision.py tests/test_readme.py -> 8 passed,13 deselected in22.65s. Retained-source replay and opt-in ablation do not require the removed detached historical worktree anymore; fce60bd remains recoverable in Git. Atomic commits89a2837 (oracles/hostile regressions/ticket discovery),3bf2c22 (precision contract docs). No production message rule or solver threshold changed in this ticket.
+
+**2026-09-30T22:05:02Z**
+
+Final short gate at3bf2c22: uv run python tools/dashboard.py --run-suite ->2640 passed,185 deselected,0 failures; pytest1195.71s,wall1210.236s. Full configured quiet wait1500s honored; refreshed /Users/ravd/agent-share/cffg-tests.html. Required <=1200s budget exceeded10.236s. Per-case timings from passing dashboard: retained f64 replay9.078s; exact-Colony size1 zero/undamped/damped replays .160+6.061+1.651s; batch3 damped replay3.740s. Move those five lower-value replay cases to opt-in slow, retaining default f32 exact/controller oracle, batch3 zero/undamped Colony correctness, existing f64 Kalman/energy tests and hostile schedule protections. Removed measured20.690s; estimated remaining wall1189.546s <1200s. Marker-only changes; passing suite result reused per repository rule and explicit user instruction, no rerun. Final opt-in regression batch before these markers:12 passed,3 deselected,1 strict known xfailed in151.31s. Focused final default+README8 passed,13 deselected22.65s. Known energy accuracy issue remains cff-d63w; no certificate tolerance or production math changed.
