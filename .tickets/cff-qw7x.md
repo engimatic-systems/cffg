@@ -60,3 +60,7 @@ Preregistered physical-integration comparison for declared prior and solved cavi
 **2026-09-30T18:59:11Z**
 
 Integration discovery split into prerequisite cff-pl0v: f32 sigma/flood reports root residual1.950e-6 but next-map residual of returned state is6.617e-5 in the SAME frozen solver chart, above64eps7.629e-6; physical point clouds pass independent ODE checks. The solver certifies current but returns mapped in3 success paths. New-chart measurement is not used as proof. Public recipe/test work is retained while the independent return-point defect is repaired. Before rerunning integration, use the captured solver chart and reconstruct mixed owned slots; no tolerance relaxation.
+
+**2026-09-30T19:37:02Z**
+
+Prerequisite cff-pl0v complete: all3 outer success paths now return the certified point. Focused97pass, real f32 reactor frozen-chart certificate passes, mixed reconstruction2pass, final default gate2631pass157deselected wall1182.696s. Resume retained recipe/example from named stash on a branch based on the certified-return PR. Re-run relevant envelope opt-ins after this behavior change; the newly defined default-suite tests need one final gate at the envelope head. Continue actual cavity physics checks and truthful grid assessment; original missing incident remains unavailable.

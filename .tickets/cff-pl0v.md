@@ -1,6 +1,6 @@
 ---
 id: cff-pl0v
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-09-30T18:57:13Z
@@ -64,3 +64,7 @@ Review follow-up addresses the mixed/eliminated-slot gap in the existing curved-
 **2026-09-30T19:09:15Z**
 
 Mixed/eliminated follow-up validation: uv run pytest -q tests/test_nonlinear_engine.py -k curved_sensor —2 passed,18 deselected in11.17s after final test edits. Full gate will run once at proposed PR head; latest measured1182.688s, prescribed wait1590s. No repeat is planned for later ticket/runtime-history bookkeeping or marker-only budget adjustments.
+
+**2026-09-30T19:37:01Z**
+
+Final gate at1695f20: uv run python tools/dashboard.py --run-suite —2631 passed,157 deselected,4 existing Gym deprecation warnings,pytest1168.19s,wall1182.696s (within1200s budget). Dashboard refreshed at /Users/ravd/agent-share/cffg-tests.html. Complete: all3 success points and final solve-energy handoffs corrected; independent host/JIT/dtype maps, real f32 reactor and mixed reconstruction verified. No new message/energy equation or schema. Close with validation commit; next cff-qw7x restores retained recipe integration and assesses the remaining declared grid. Full gate reused for bookkeeping; no second unchanged run.
