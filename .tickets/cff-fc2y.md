@@ -1,6 +1,6 @@
 ---
 id: cff-fc2y
-status: in_progress
+status: closed
 deps: [cff-7kpx, cff-xrut]
 links: []
 created: 2026-09-25T11:23:56Z
@@ -55,3 +55,7 @@ Independent review: question — can fallback arithmetic erase real information?
 **2026-09-30T16:04:05Z**
 
 Implemented internal classifier with strict READY parity, coordinate equilibration, frexp-scaled information direction, exact missing-coordinate checks, residual/orthogonality-aware eigenspace resolution and conservative subnormal fallback refusal. The helper remains unused by the solver until cff-36x7. Focused validation after numerical changes: uv run pytest -q tests/test_gaussian_readiness.py tests/test_nonlinear_rules.py tests/test_cstr_planning.py — 54 passed, 17 deselected; final readiness-file check after added guard assertions — 26 passed. D13 and ARCHITECTURE describe the numerical band and ownership. Final default-suite gate remains pending.
+
+**2026-09-30T16:35:31Z**
+
+Final validation: default suite 2,610 passed, 135 deselected, wall 1,254.848 seconds; dashboard refreshed at /Users/ravd/agent-share/cffg-tests.html. cff-xrut marker-only deferral estimates 1,188.602 seconds and reuses the passing result; no unchanged rerun. Independent review found no additional normal-input defect after subnormal guard, including mixed-unit JIT/vmap dimensions 4/40. Classifier complete; next work cff-36x7 consumes metadata, controls once-only bounded startup and must explicitly exercise the deferred nonlinear integration regressions relevant to its change.
