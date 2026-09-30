@@ -84,3 +84,11 @@ Both float32 grid blocks have passed all6 Qp/temperature-goal pairs in the curre
 **2026-09-30T20:01:56Z**
 
 The float64 Taylor grid block also passes its six enumerated combinations; only float64 sigma grid remains. Source/API and tests committed as d2f7f79 (default-focused checks passing; numerical equations unchanged). README/ARCHITECTURE/LIMITATIONS describe exact input scope, separate DATA reconstruction, clipping vs actuator bounds and approximate objective. D13 stale pre-startup text corrected to budgeted startup and frozen-chart certified-point handoff. No claim of original failure-threshold reproduction.
+
+**2026-09-30T20:05:36Z**
+
+Complete relevant envelope opt-ins: uv run pytest -q -m slow tests/test_cstr_envelope.py -x (original collection) —10 passed4deselected in1592.53s. Contains2 f32 affine oracle cases,4 flood cold/warm cases and4 six-pair auto grids (all24 grid inputs), including actual returned-point finite beliefs, frozen-chart residual/FE checks and DOP853 comparisons of solved cavity point clouds. Additional4 auto cold/warm cases passed separately after adding schedule coverage. Final code ownership edit preserves identical numerical theta values and focused ownership/local/source tests pass after it. Final default gate proposed head4986508, measured latestwall1182.696s and wait1560s; no repeated unchanged gate planned.
+
+**2026-09-30T20:32:36Z**
+
+First final gate4986508:1 stale README catalogue failure,2636passed172deselected,pytest1176.31s,wall1190.777s (within1200). New README links correctly include cstr_planning.py but test_readme.EXAMPLES inventory omitted it. Fix is expected artifact inventory only; numerical/source behavior unchanged. Update catalogue and focused docs checks, then one corrected gate because the previous full gate did not pass. No marker-only rerun; no budget trimming needed.
