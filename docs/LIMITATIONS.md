@@ -163,12 +163,20 @@ that every gap below will be implemented:
   unrepresentable sigma-point spread fail explicitly; no ridge repairs them.
   Negative sites are permitted when combined beliefs remain proper. Full run
   control is host-side; local updates and trust kernels support JIT/vmap.
-  The current initializer only defers exactly vacuous input cavities. A partial
-  observation can reach a nonlinear input before its forward prior and cause
-  `improper_cavity`, even in an affine chain with a proper global posterior.
+  Bounded startup can wait for numerically compatible partial inputs at
+  neutral-at-entry, not-yet-admitted sites. Its sweeps consume `n_iters`; no
+  approximation point, physical evaluation, finite energy or convergence is
+  claimed while waiting. It cannot defer established sites or a loss of
+  readiness after admission. Unresolved inputs exhaust truthfully with a
+  pending factor diagnostic. Readiness has the stated D13 numerical-resolution
+  band and conservatively refuses subnormal fallback entries; it is not an
+  exact PSD/rank proof. Run-local admission does not change checkpoints.
   The reconstructed CSTR fixture in `tests/test_cstr_planning.py` distinguishes
   this missing-information failure from RK4 evaluations or sigma-point moments
-  exceeding floating-point range. The original failed CSTR invocation was not
+  exceeding floating-point range. Its strict-update tests call sweeps without
+  startup; fresh affine partial-goal chains now pass the dense Gaussian oracle.
+  This does not establish a general reactor planning envelope. The original
+  failed CSTR invocation was not
   retained, so these tests are mechanism reproductions, not incident replay.
   Zero noise, nonlinear GFE, and continuous-to-discrete means remain excluded.
 - *Gaussian/continuous GFE messages* — RESOLVED as a position, 2026-07-12

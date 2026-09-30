@@ -34,6 +34,7 @@ class FailurePhase(IntEnum):
     RECONSTRUCTION = 8
     LEDGER = 9
     FUNCTIONAL = 10
+    STARTUP = 11
 
 
 class FailureFact(NamedTuple):

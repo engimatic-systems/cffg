@@ -473,6 +473,7 @@ class Engine:
             prime=self._prime,
             reconstruct=self._reconstruct,
             adaptive_gaussian=self.has_adaptive_gaussian,
+            startup=self._schedule_program.startup,
             services=OuterServices(
                 self._state_is_finite,
                 self._has_zero_support,

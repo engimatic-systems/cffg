@@ -140,6 +140,9 @@ class GaussianBinding(ImmutableRecord):
     requires residual globalization. Messages may wrap outgoing pairs in an
     ExecutionDelta to carry local numerical status. ``objective`` names the
     node energy convention exposed by the ledger.
+    Optional ``admission`` returns input readiness and validation reasons
+    without evaluating a mean function or constructing moments. Only the
+    separate startup program may use it to defer a neutral, unadmitted site.
     """
 
     roles: tuple[str, ...]
@@ -156,6 +159,7 @@ class GaussianBinding(ImmutableRecord):
     iterative: bool = False
     objective: str = "analytic"
     work: Mapping[str, int] = field(default_factory=dict)
+    admission: Callable | None = None
     arena: str = field(default="gaussian", init=False)
 
     @property

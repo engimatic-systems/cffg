@@ -1213,8 +1213,21 @@ existing proper Gaussian information, numerically compatible partial information
 or invalid/unresolved information. It never creates moments, changes messages,
 or admits an invalid physical function. D13 defines its coordinate scaling,
 range checks and numerical-resolution limit; `test_gaussian_readiness.py` checks
-the contract. This classifier-only foundation is not yet used by the nonlinear
-solver, whose current vacuous-input and failure behavior is unchanged.
+the contract. `execution/startup.py` consumes this metadata only through a
+binding's optional `admission` capability. It freezes eligibility from every
+outgoing site coordinate, carries run-local admission latches and guards each
+member's callback with scalar control flow. Sequential batching of the complete
+startup step keeps those guards effective under an outer vmap. Ordinary sweep,
+energy and differentiated residual semantics stay strict.
+
+`ScheduleProgram.startup` composes this guarded sweep with the ordinary flood
+transport or mixed phase/island order. `outer_startup.py` controls one bounded
+phase before `OuterTrustRegionStrategy`'s hard/soft trust solves. Every startup
+sweep consumes the requested budget; no ledger evaluation or convergence claim
+is made while an adaptive input or chart reference is pending. Startup never
+reopens in ordinary trust maps or support restarts. Eligibility/latches are not
+State fields or checkpoint data: a new run uses the explicit neutral-at-entry
+convention, and established outgoing sites cannot be silently replaced.
 
 `execution/failures.py` assigns ranks from all executing plans' serialized
 member/prior names, not just parameter-bearing factors. Sweeps, propagation

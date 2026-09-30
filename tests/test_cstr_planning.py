@@ -8,11 +8,13 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from cffg import Engine, RunStatus, compile_template, set_params
+from cffg import Engine, FailureDiagnostic, RunStatus, compile_template, set_params
 from cffg.core import BlobRef
 from cffg.execution.transport import _gauss_rows
+from cffg.execution.failures import FailureIndex
+from cffg.failure_facts import FailureReason
 from cffg.nonlinear import NonlinearFailure, local_result
-from cffg.runtime_types import _replace
+from cffg.runtime_types import RunResult, _replace
 from cstr_planning_fixture import CONFIGURATION, NOMINAL_PARAMETERS, cstr_rk4, planning_fixture
 
 
@@ -35,15 +37,34 @@ def assert_partial_cavity(engine, result):
     return eta, precision
 
 
+def strict_failure(engine, state, budget):
+    """Expose strict local-update failures, without admission or trust discovery."""
+    if engine._prime is not None:
+        values = engine._prime(state.messages, state.g_eta, state.g_lam, state.ef_eta,
+                               state.g_obs, state.g_mask, state.ef_obs, state.ef_mask, state.params)
+        state = _replace(state, messages=values[0], g_eta=values[1], g_lam=values[2], ef_eta=values[3])
+    names = FailureIndex(engine.arena).names
+    for iteration in range(1, budget + 1):
+        values = engine._iter_step(state.messages, state.g_eta, state.g_lam, state.g_obs, state.g_mask,
+                                   state.ef_eta, state.ef_obs, state.ef_mask, state.params, 0., False)
+        if int(values[6].reason) != 0:
+            fact = values[6]
+            diagnostic = FailureDiagnostic(FailureReason(int(fact.reason)).name.lower(),
+                                            names[int(fact.factor)], "soft", iteration)
+            return RunResult(state, RunStatus.DIVERGED, iteration, (), (), float("inf"), failure=diagnostic)
+        state = _replace(state, messages=values[0], g_eta=values[1], g_lam=values[2], ef_eta=values[3])
+    raise AssertionError("strict update fixture did not reproduce a local failure")
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize("method", ["linearization", "sigma_point"])
 @pytest.mark.parametrize("dtype", [np.float32, np.float64])
-def test_partial_goal_rejects_before_a_forward_prior_arrives(method, dtype):
+def test_strict_updates_reject_partial_goals_before_a_forward_prior_arrives(method, dtype):
     with jax.enable_x64(dtype is np.float64):
         template, arrays, data = planning_fixture(method, past=0, horizon=2, dtype=dtype)
         engine = Engine(compile_template(template, arrays=arrays))
         initial = engine.bind_data(engine.init_state(), data)
-        result = engine.run(initial, 20, tol=1e-6)
+        result = strict_failure(engine, initial, 20)
         eta, precision = assert_partial_cavity(engine, result)
         assert result.failure.factor == "tr2"
         # Goal observes concentration and action, never the disturbance coordinate.
@@ -100,7 +121,7 @@ def test_retained_rk4_exceeds_sigma_transform_range_at_a_wide_prior(dtype):
 @pytest.mark.parametrize("method", ["linearization", "sigma_point"])
 @pytest.mark.parametrize("dtype", [np.float32, np.float64])
 @pytest.mark.parametrize("schedule", ["auto", "flood"])
-def test_reconstructed_precision_grid_records_distinct_failure_mechanisms(method, dtype, schedule):
+def test_strict_precision_grid_records_distinct_failure_mechanisms(method, dtype, schedule):
     with jax.enable_x64(dtype is np.float64):
         template, arrays, data = planning_fixture(method, temperature_variance=1., dtype=dtype)
         engine = Engine(compile_template(template, arrays=arrays), schedule=schedule)
@@ -111,7 +132,7 @@ def test_reconstructed_precision_grid_records_distinct_failure_mechanisms(method
                 changes.update({f"em{index}": {"cov": np.diag([4e-4, temperature_variance, 1.]).astype(dtype)}
                                for index in range(5, 20)})
                 state = _replace(initial, params=set_params(engine, initial.params, changes))
-                result = engine.run(state, 20, tol=1e-6)
+                result = strict_failure(engine, state, 20)
                 if method == "linearization":
                     _, precision = assert_partial_cavity(engine, result)
                     assert result.failure.factor == "tr10"
@@ -191,7 +212,7 @@ def affine_reference(arrays, data):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("method", ["linearization", "sigma_point"])
-def test_affine_limit_agrees_after_exact_proper_initialization(method):
+def test_affine_limit_agrees_from_fresh_and_exact_proper_initialization(method):
     template, arrays, data = planning_fixture(method, past=0, horizon=2, affine=True)
     linear_template, linear_arrays = linear_equivalent(template, arrays)
     reference = Engine(compile_template(linear_template, arrays=linear_arrays))
@@ -205,7 +226,13 @@ def test_affine_limit_agrees_after_exact_proper_initialization(method):
         np.testing.assert_allclose(actual_covariance, covariance[index*4:(index+1)*4, index*4:(index+1)*4], atol=1e-8)
     nonlinear = Engine(compile_template(template, arrays=arrays))
     initial = nonlinear.bind_data(nonlinear.init_state(), data)
-    assert_partial_cavity(nonlinear, nonlinear.run(initial, 20, tol=1e-9))
+    fresh = nonlinear.run(initial, 20, tol=1e-9)
+    fresh.require_converged()
+    np.testing.assert_allclose(nonlinear.bfe(fresh.state), energy, atol=1e-8)
+    for index in range(3):
+        actual_mean, actual_covariance = nonlinear.gaussian_marginals(fresh.state)[f"s{index}"]
+        np.testing.assert_allclose(actual_mean, mean[index*4:(index+1)*4], atol=1e-8)
+        np.testing.assert_allclose(actual_covariance, covariance[index*4:(index+1)*4, index*4:(index+1)*4], atol=1e-8)
     seeded = transfer_messages(reference, expected.state, nonlinear, initial)
     result = nonlinear.run(seeded, 30, tol=1e-9)
     result.require_converged()
@@ -218,9 +245,9 @@ def test_affine_limit_agrees_after_exact_proper_initialization(method):
 
 
 @pytest.mark.slow
-def test_tenfold_horizon_exposes_the_same_partial_input_contract():
+def test_tenfold_horizon_preserves_strict_partial_input_validation():
     template, arrays, data = planning_fixture(past=0, horizon=150)
     engine = Engine(compile_template(template, arrays=arrays))
-    result = engine.run(engine.bind_data(engine.init_state(), data), 4, tol=1e-6)
+    result = strict_failure(engine, engine.bind_data(engine.init_state(), data), 4)
     assert_partial_cavity(engine, result)
     assert result.iterations == 1

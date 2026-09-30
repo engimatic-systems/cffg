@@ -99,6 +99,37 @@ def configure(factor, sizes):
     def energy(*args):
         return results(*args)["energy"]
 
+    def admission(eta, precision, params, dims, observed_role, observation, mask):
+        import jax.numpy as jnp
+        from cffg.failure_facts import FailureReason
+        from cffg.gaussian_readiness import InputReadiness, input_readiness
+        from cffg import gauss
+
+        do, di = dims
+        if observation is None:
+            observation = jnp.zeros((eta.shape[0], do), eta.dtype)
+            mask = jnp.zeros(eta.shape[0], eta.dtype)
+
+        def one(e, p, theta, w, y, present):
+            readiness = input_readiness(e[1, :di], p[1, :di, :di])
+            eo, lo = e[0, :do], p[0, :do, :do]
+            noise = jnp.linalg.solve(w, jnp.eye(do, dtype=w.dtype))
+            noise_ok = gauss._pd_ok(w) & gauss._pd_ok(noise)
+            output_ok = jnp.all(jnp.isfinite(eo)) & jnp.all(jnp.isfinite(lo))
+            output_ok &= gauss._symmetry_ok(lo)
+            observed = (present > 0) if observed_role is not None else jnp.asarray(False)
+            observation_ok = ~observed | jnp.all(jnp.isfinite(y))
+            # Required principal block: sigma regression can only increase noise.
+            tilt_possible = observed | gauss._pd_ok(w + lo)
+            reason = jnp.where(tilt_possible, FailureReason.NONE, FailureReason.IMPROPER_TILT)
+            reason = jnp.where(output_ok & observation_ok, reason, FailureReason.IMPROPER_CAVITY)
+            reason = jnp.where(readiness != InputReadiness.INVALID, reason, FailureReason.IMPROPER_CAVITY)
+            reason = jnp.where(noise_ok, reason, FailureReason.INVALID_NOISE)
+            reason = jnp.where(jnp.all(jnp.isfinite(theta)), reason, FailureReason.NONFINITE_FUNCTION)
+            return readiness, reason.astype(jnp.int32)
+
+        return jax.vmap(one)(eta, precision, params["theta"], params["W"], observation, mask)
+
     work = {
         "mean_value_evaluations": 1 if spec.method == "linearization" else 2 * sizes["in"] + 1,
         "jacobian_forward_directions": sizes["in"] if spec.method == "linearization" else 0,
@@ -113,6 +144,7 @@ def configure(factor, sizes):
         moment_projections=frozenset({"gaussian_first_second"}), iterative=True,
         objective=f"{spec.method}_frozen_gaussian_bethe",
         work=work,
+        admission=admission,
     )
 
 
