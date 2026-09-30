@@ -64,3 +64,23 @@ Integration discovery split into prerequisite cff-pl0v: f32 sigma/flood reports 
 **2026-09-30T19:37:02Z**
 
 Prerequisite cff-pl0v complete: all3 outer success paths now return the certified point. Focused97pass, real f32 reactor frozen-chart certificate passes, mixed reconstruction2pass, final default gate2631pass157deselected wall1182.696s. Resume retained recipe/example from named stash on a branch based on the certified-return PR. Re-run relevant envelope opt-ins after this behavior change; the newly defined default-suite tests need one final gate at the envelope head. Continue actual cavity physics checks and truthful grid assessment; original missing incident remains unavailable.
+
+**2026-09-30T19:44:13Z**
+
+Resume on cff-qw7x-supported-reactor from current published PR#178 ac6d2bc after ff-only bootstrap. Restored source/example work; public builder defines narrow P0 while the original investigation wrapper retains its old defaults. Actual certificate uses captured fixed chart and mixed-slot reconstruction. Fresh-process bundle check confirms absent mean rejected, explicit trusted installation enables load/compile; installation must precede load_bundle, not just a later compile call. New default-focused selection21passed36deselected in18.99s; full relevant opt-ins running. Default suite not yet rerun for this separate implementation head.
+
+**2026-09-30T19:50:21Z**
+
+Relevant completed opt-ins after cff-pl0v: default auto cold/warm bothmethods xbothdtypes —4 passed15deselected in444.86s; initial slow batch has completed both f32 affine-oracle cases and all4 flood cold/warm cases before its grid. Retained affine fresh/exact-seeded, wide RK4, strict missing-information and H150 strict/budgeted startup checks —10 passed41deselected in209.98s. Standalone public recipe subprocess —1 passed16deselected in108.82s. No broad speed claim; cold compile/control is expensive and remains the measured-runtime roadmap. Grid still running; canonical prose is conditional on passing exact enumerated checks.
+
+**2026-09-30T19:53:14Z**
+
+Final bounded review question—do extraction/docs match exact inputs and honest scope? Answer—yes conditional on pending grid: P0/Qp/observations/goals/6 ratios/budget/dtype floor match; no incident/exact-posterior/actuator/closed-loop claim. Source example, original wrapper diff and canonical doc hunks; confidence high. Physics/topology/wide-prior defaults retained. Intentional callback identity is now cffg.example.cstr_rk4; previously saved INTERNAL test fixtures naming cffg.test.cstr_rk4 still need that old trusted registration, not automatic alias/migration. Current bundle schema unchanged. Arrays now own a copy of nominal theta so caller parameter edits cannot contaminate future recipe builds; focused ownership check added.
+
+**2026-09-30T19:58:10Z**
+
+Both float32 grid blocks have passed all6 Qp/temperature-goal pairs in the current opt-in run, with actual frozen-chart residual/FE checks and DOP853 comparisons of solved cavity sigma points. No tau relaxation, noise floor, physical clipping change or caller-side linearization. Float64 grid blocks still running. All remaining default checks after theta ownership change pass21/36deselected; no runtime changes in this envelope PR.
+
+**2026-09-30T20:01:56Z**
+
+The float64 Taylor grid block also passes its six enumerated combinations; only float64 sigma grid remains. Source/API and tests committed as d2f7f79 (default-focused checks passing; numerical equations unchanged). README/ARCHITECTURE/LIMITATIONS describe exact input scope, separate DATA reconstruction, clipping vs actuator bounds and approximate objective. D13 stale pre-startup text corrected to budgeted startup and frozen-chart certified-point handoff. No claim of original failure-threshold reproduction.

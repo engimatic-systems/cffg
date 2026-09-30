@@ -3234,9 +3234,10 @@ not a degenerate Gaussian with covariance equal to its pseudoinverse. Taylor
 and sigma-point propagation therefore cannot use that pseudoinverse as an input
 belief. A proper global posterior does not imply every cavity is initially
 proper: partial goal information can arrive before a forward prior. The affine
-limit agrees with independent dense Gaussian conditioning after supplying a
-proper exact initialization, but the current fresh nonlinear run rejects the
-partial cavity. Broad proper input beliefs pose a separate problem: the retained
+limit agrees with independent dense Gaussian conditioning from both a fresh
+neutral state admitted by D13.2 startup and a proper exact initialization.
+Strict local updates without startup still reject the partial cavity. Broad
+proper input beliefs pose a separate problem: the retained
 fixed-step RK4 function can return nonfinite values or values too large to form
 second moments. No change to message normalization fixes that physical-function
 evaluation. The fixture labels all reconstructed choices; the original failed
@@ -3265,12 +3266,14 @@ actual/predicted residual-merit reduction. A failed auxiliary proposal cannot
 enter acceleration history. Plain fixed damping is not a substitute for this
 globalization, and the surrogate itself is not assumed to decrease.
 
-Initialization propagates actual messages to obtain a proper reference; a
-vacuous factor supplies no invented approximation point. Gaussian discovery
-is bounded by graph size (two directed incidences per edge plus the existing
-support-discovery bound). Run iterations count outer solves; map-evaluation
-counts include discovery and trial work. When a proper reference cannot be
-found, the solver returns a non-converged machine-readable termination reason.
+Initialization uses the budgeted startup program of D13.2 to propagate actual
+messages to obtain a proper reference. A waiting partial input supplies no
+invented approximation point or finite energy. Every composed startup sweep
+consumes `n_iters`; the remaining budget covers outer solves. There is no
+uncounted adaptive priming or later admission retry. Discrete support changes
+retain their graph-size-bounded chart restarts. Map-evaluation counts include
+discovery and trial work. If startup cannot obtain a proper reference within
+budget, it returns a non-converged machine-readable termination reason.
 
 Certification requires both
 

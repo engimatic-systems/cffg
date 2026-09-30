@@ -89,7 +89,7 @@ example.
 | [Run scalar exponential-family inference](#continuous-exponential-family-and-hybrid-models) | `gamma`, `beta`, `poisson_obs`, `bernoulli_obs`; `ef_marginals` | Conjugate Gamma–Poisson and Beta–Bernoulli BP | Standard parameters, mean, `proper`, BFE | Exact registered tree messages and ledger | [exponential_family.py](examples/exponential_family.py) | **Ready:** conditioned observations only; predictive outputs leave the shipped family |
 | [Run hybrid mixture and recurrence inference](#continuous-exponential-family-and-hybrid-models) | `gaussian_mixture(_linear)`; `recurrence_link`; `gaussian_prec` | Assumed-density mixtures, structured recurrence, Gamma precision | Mixture predictives, pair beliefs, sufficient statistics | Mixture moment collapse and recurrence JJ bound are explicit approximations | [hybrid_rslds.py](examples/hybrid_rslds.py) | **Bounded:** no exact switching trajectory posterior; partial goals can lose backward influence |
 | [Build or fit an rSLDS](#continuous-exponential-family-and-hybrid-models) | `rslds`; `fit_rslds`; `PCAARHMMInitializer`; rSLDS learning classes | Recurrent switching LDS inference, learning, observed-only fitting | Fit status, attempts, marginals, FE/residual traces | Empirical-Bayes variational fit with declared hybrid/JJ approximations | [hybrid_rslds.py](examples/hybrid_rslds.py) | **Bounded:** budget exhaustion is preserved; no broad recovery-superiority claim |
-| [Use nonlinear Gaussian factors](#nonlinear-and-neural-gaussian-models) | `FunctionSpec`; `register_mean_function`; `moment_matching` | Taylor or fixed sigma-point positive-noise Gaussian factors | Gaussian marginals, `objective_metadata`, `objective_contract` | Frozen-Gaussian surrogate; adaptive consistency is not an evidence bound | [nonlinear_gaussian.py](examples/nonlinear_gaussian.py) | **Bounded:** zero noise, nonlinear GFE, and continuous-to-discrete means are unsupported |
+| [Use nonlinear Gaussian factors](#nonlinear-and-neural-gaussian-models) | `FunctionSpec`; `register_mean_function`; `moment_matching` | Taylor or fixed sigma-point positive-noise Gaussian factors | Gaussian marginals, `objective_metadata`, `objective_contract` | Frozen-Gaussian surrogate; adaptive consistency is not an evidence bound | [Sensor](examples/nonlinear_gaussian.py), [reactor planning](examples/cstr_planning.py) | **Bounded:** declared reactor inputs; zero noise, nonlinear GFE, and continuous-to-discrete means are unsupported |
 | [Use neural means and fixed-point gradients](#nonlinear-and-neural-gaussian-models) | `neural_mean`; `initialize_neural_parameters`; `FixedPointDifferentiator`; `fixed_point_gradient` | Dense MLP mean inside a positive-noise nonlinear Gaussian factor | Gradient status, adjoint/root residuals, parameter gradient | Local derivative of the certified adaptive root and surrogate ledger | [API pattern](#nonlinear-and-neural-gaussian-models) | **Bounded:** local isolated-root assumption; no weight uncertainty or stochastic mu3 |
 | [Train or amortize neural inference](#nonlinear-and-neural-gaussian-models) | `NeuralTrainer`; `TrainingConfig`; `GaussianAmortizer`; `PolynomialFeatures` | Deterministic full-batch Adam and Gaussian recognition initialization | Training/continuation state and proposed Gaussian messages | Optimizes the same approximate adaptive objective | [API pattern](#nonlinear-and-neural-gaussian-models) | **Bounded:** no minibatching, discrete point decisions, or universal speedup claim |
 | [Use hard constraints or MAP](#hard-constraints-and-map) | Constraint factors; `compile_template(..., semiring="max")`; `cffg.csp` | Sum-product CSP marginals or discrete max-product | Marginals/BFE, or `decode` and `objective` | Exact tree partition/MAP identities; loopy max-product is bounded | [hard_constraint.py](examples/hard_constraint.py) | **Ready:** max mode is discrete-only; `alldifferent` is capped at `n, K <= 10` |
@@ -381,6 +381,19 @@ bounded startup; those sweeps count toward `n_iters`. Invalid models and
 established sites remain strict. Unresolved startup reports budget exhaustion
 with the pending factor, not convergence or a fabricated Gaussian belief.
 
+For physical-model planning, run
+`uv run python examples/cstr_planning.py --method sigma_point --dtype float32`.
+The registered RK4 reactor mean is evaluated by CFFG; no caller-side
+linearization is needed. This declared two-step example starts from a narrow
+prior and observes the current concentration/temperature. It reports status,
+adaptive residual, approximate energy, failure attribution and planned coolant
+moments. Both methods, precisions and schedules have cold/warm-start checks;
+the temperature-goal noise grid is specified in `LIMITATIONS.md`. Other
+priors/horizons need validation. Evaluation clipping is not a hard actuator
+constraint. Use `--save model.cffgz` to save sources and arrays, then install the
+trusted callback with `install_mean()` before `load_bundle()`; supply DATA
+bindings separately.
+
 `neural_mean` creates a portable dense MLP specification and
 `initialize_neural_parameters` creates its arrays. `FixedPointDifferentiator`
 or `fixed_point_gradient` differentiates the certified adaptive root and
@@ -534,6 +547,7 @@ unfinished result and asserts the quantity an experiment should inspect.
 | [exponential_family.py](examples/exponential_family.py) | Gamma–Poisson conjugate inference | Exact registered tree posterior and BFE |
 | [hard_constraint.py](examples/hard_constraint.py) | All-different marginals and max-product MAP | Exact bounded tree CSP identities |
 | [nonlinear_gaussian.py](examples/nonlinear_gaussian.py) | Sigma-point nonlinear Gaussian inference | Declared approximate objective metadata |
+| [cstr_planning.py](examples/cstr_planning.py) | Registered reactor physics, partial goals, status-bearing plans, portable source bundle | Declared short-horizon Gaussian approximation; no hard actuator bounds |
 | [learning_bundle.py](examples/learning_bundle.py) | Declared learning, save/load, later-trial continuation | Current-schema immutable prior plus posterior state |
 | [hybrid_rslds.py](examples/hybrid_rslds.py) | Small recurrent switching LDS | Declared mixture/JJ approximation |
 

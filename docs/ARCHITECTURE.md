@@ -1036,6 +1036,20 @@ cost-analysis/calibration limitations remain separate from exact byte counts.
 `test_nonlinear_rules`, `test_nonlinear_schema`, and `test_nonlinear_engine`
 cover the local, transport, and solver contracts. See DERIVATIONS D13.
 
+`examples/cstr_planning.py` owns the shared reconstructed reactor mean and
+source-model builder; the investigation wrapper keeps the original wide-prior
+inputs. The builder returns a `Template`, external arrays and separate DATA
+bindings. Its `FunctionSpec` names a locally installed trusted implementation;
+`install_mean()` must precede `load_bundle()`, which resolves and compiles it.
+No callback or compiled arena is serialized. The explicitly declared narrow
+prior, current observations and two-step topology are a new finite-physics
+candidate, not a reconstruction of missing incident settings. Integration
+tests use the solver's frozen chart and actual reconstructed update/energy,
+independent dense affine conditioning and DOP853 integration of solved cavity
+point clouds. `test_cstr_envelope.py` carries the declared dtype/schedule/noise
+checks; long grids and warm-start solves are opt-in slow tests. Approximation,
+clipping and tested inputs belong to the nonlinear scope entry in LIMITATIONS.
+
 `ParameterSpec` supplies serialized shape inference and optional writable
 packed-row metadata. The packer declares every output key; the compiler
 checks keys, shapes and member axes. Existing built-ins keep their bare
