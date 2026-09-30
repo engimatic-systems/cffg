@@ -1,7 +1,7 @@
 ---
 id: cff-qu2j
 status: closed
-deps: []
+deps: [cff-vxza]
 links: []
 created: 2026-09-25T03:46:25Z
 type: bug
