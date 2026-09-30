@@ -65,3 +65,7 @@ Final attempted default gate: 2,627 passed, one stale ownership assertion failed
 **2026-09-30T18:17:58Z**
 
 Completed validation at proposed PR head: 231 focused passed, 8 deselected; 8 strict-grid opt-in cases passed; 8 fresh/seeded affine, strict partial-input and tenfold-horizon opt-in checks passed. Independent bounded review confirmed attribution/accounting/optional-diagnostic fixes and found no further issue. Corrected default gate: 2,619 passed, 156 deselected, wall 1,182.688 seconds (within 1,200); refreshed /Users/ravd/agent-share/cffg-tests.html. Reused this gate for publication; no extra suite for review/dashboard. Startup implementation complete. Next cff-qw7x establishes finite reactor physics envelope; neither this ticket nor affine success claims replay of the missing original invocation.
+
+**2026-09-30T18:19:26Z**
+
+Published PR https://github.com/engimatic-systems/cffg/pull/177, base cff-fc2y-input-readiness (#176). cff-qw7x is now ready; tree clean after publication.
