@@ -59,3 +59,7 @@ Implemented internal classifier with strict READY parity, coordinate equilibrati
 **2026-09-30T16:35:31Z**
 
 Final validation: default suite 2,610 passed, 135 deselected, wall 1,254.848 seconds; dashboard refreshed at /Users/ravd/agent-share/cffg-tests.html. cff-xrut marker-only deferral estimates 1,188.602 seconds and reuses the passing result; no unchanged rerun. Independent review found no additional normal-input defect after subnormal guard, including mixed-unit JIT/vmap dimensions 4/40. Classifier complete; next work cff-36x7 consumes metadata, controls once-only bounded startup and must explicitly exercise the deferred nonlinear integration regressions relevant to its change.
+
+**2026-09-30T16:36:34Z**
+
+Published PR https://github.com/engimatic-systems/cffg/pull/176, base cff-7kpx-nonlinear-reproduction (#175). Next ready implementation is cff-36x7.
