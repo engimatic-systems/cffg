@@ -96,3 +96,7 @@ First final gate4986508:1 stale README catalogue failure,2636passed172deselected
 **2026-09-30T20:59:47Z**
 
 Corrected final gate d4bcc5c: uv run python tools/dashboard.py --run-suite —2637passed172deselected,4 existing Gym deprecation warnings,pytest1174.64s,wall1188.941s (within1200). Dashboard refreshed green. Catalogue correction focused26passed36deselected15.06s. Complete: public shared recipe, source ownership/portable identity/trusted fresh-process boundary, all24 ratio cases and8 cold/warm schedule-method-dtype cases, affine bothdtypes/methods and retained partial/wide/H150 mechanisms verified. Canonical docs update exact scope and startup truth. No original threshold/exact nonlinear posterior/hard-action/closed-loop claim. Close and publish on base#178; reuse passing gate for ticket/history/PR bookkeeping, no further unchanged suite.
+
+**2026-09-30T21:00:37Z**
+
+Published PR chain link: https://github.com/engimatic-systems/cffg/pull/179, base#178 cff-pl0v-certified-return. Green final gate atd4bcc5c; later commits record tickets/history only. cff-qw7x and integration parent cff-toqa closed; overall cff-xa6z remains open. Next ready issue cff-qu2j exact float32 first-order certification. Retained example stash is now redundant with committed source/tests.
