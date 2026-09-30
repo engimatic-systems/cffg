@@ -56,7 +56,7 @@ def run_model(dtype, *, candidate="v3a2", horizon=15, schedule="auto", source_dt
     return engine, result, template, arrays, data
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_retained_controller_certifies_without_relaxing_precision(dtype):
     with jax.enable_x64(dtype is np.float64):
         engine, result, template, arrays, data = run_model(dtype)
