@@ -1,6 +1,6 @@
 ---
 id: cff-36x7
-status: in_progress
+status: closed
 deps: [cff-fc2y, cff-71oc]
 links: []
 created: 2026-09-25T11:23:56Z
@@ -61,3 +61,7 @@ Implementation: GaussianBinding admission capability is optional; guarded startu
 **2026-09-30T17:49:40Z**
 
 Final attempted default gate: 2,627 passed, one stale ownership assertion failed, wall 1,234.901 seconds. The Gaussian transport now uses an injectable executor whose default is the same registered owner; static direct-call counting missed that identity. Updated ownership regression to verify both default callable identities and the guarded startup call. Focused ownership file: 30 passed. No production numerical change was needed. cff-71oc restores measured runtime headroom before one corrected full gate.
+
+**2026-09-30T18:17:58Z**
+
+Completed validation at proposed PR head: 231 focused passed, 8 deselected; 8 strict-grid opt-in cases passed; 8 fresh/seeded affine, strict partial-input and tenfold-horizon opt-in checks passed. Independent bounded review confirmed attribution/accounting/optional-diagnostic fixes and found no further issue. Corrected default gate: 2,619 passed, 156 deselected, wall 1,182.688 seconds (within 1,200); refreshed /Users/ravd/agent-share/cffg-tests.html. Reused this gate for publication; no extra suite for review/dashboard. Startup implementation complete. Next cff-qw7x establishes finite reactor physics envelope; neither this ticket nor affine success claims replay of the missing original invocation.
