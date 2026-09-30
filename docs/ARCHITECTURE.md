@@ -639,6 +639,13 @@ information next to a strong recipient. Storage grows linearly with the
 number of legs, with no regularization or change to the message equations.
 Direct exclusion, exact vacuous inputs, float32/float64, 300-leg batching and
 analytic Jacobians are checked in `tests/test_equality_cavities.py`.
+The retained first-order controller in `tests/test_first_order_precision.py`
+also checks exact-pass certification separately from posterior/energy accuracy.
+Replacing only exclusive equality sums with total-minus-recipient recreates
+the historical float32 failure: reverse-message rounding must not change its
+outgoing cavity. Certificate thresholds remain unchanged. Independent dense
+conditioning accounts for source covariance inversion before runtime casting;
+the retained precision limits are recorded in `LIMITATIONS.md`.
 Factor groups key on their full cardinality/dimension signature (`equality` is
 polymorphic and routes by family); the VM gathers transient dense blocks only
 to that group's local maximum and scatters exact segments back. Thus rule calls

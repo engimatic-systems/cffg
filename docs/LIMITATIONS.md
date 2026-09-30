@@ -246,6 +246,37 @@ non-finite beliefs make node/edge energy terms `+inf`; marginal readouts return
 NaNs, and sufficient-statistic readouts also carry `proper=False` — deliberate
 loudness, not a plausible negative covariance.
 
+Exact-tree certification checks a fresh message recomputation at each entry's
+own scale. It is not an accuracy guarantee for posterior moments or evidence.
+Gaussian equality cavities exclude the recipient before summing; the older
+total-minus-recipient arithmetic caused the retained PCGym first-order chain
+to fail certification in float32. Restoring only that old rule reproduces the
+reported residual of `0.0006103515625`; the current rule certifies without
+changing certificate tolerances.
+
+The three-dimensional, past-4/horizon-15 retained fixture and its constant-goal
+horizon-150 scale variant are checked against independent dense conditioning
+in both precisions (`tests/test_first_order_precision.py`). The float32 fixture
+contract permits a mean error below 1% of posterior standard deviation, a
+covariance error below 1% in any posterior-scaled direction, and an evidence
+error below 0.001 nat per observed scalar. These are bounded fixture checks,
+not guarantees for arbitrary Gaussian graphs. Source covariance inversion
+before runtime precision casting is included in the reference, so input
+rounding is distinguished from inference error.
+
+Float32 information-form and readout arithmetic still lose avoidable accuracy
+on this controller (cff-d63w): the retained candidates have mean errors of
+order `1e-4`, while float64 agrees to about `1e-12` on the original horizon.
+Use `JAX_ENABLE_X64=1 uv run python experiment.py`, or configure
+`jax.config.update("jax_enable_x64", True)` **before constructing arrays,
+compiling or initializing** when tighter accuracy is required. Increasing the
+iteration budget or enabling x64 after a float32 solve does not restore lost
+precision. There is no blanket float32 ban or relaxed global certificate.
+The fully unobserved variant also loses the zero-energy identity in float32
+(about `-0.205` instead of zero); its moment checks pass, but its energy check
+is a strict expected failure tracked by cff-d63w. The conditioned fixture's
+evidence bound must not be extended to that variant.
+
 **S1c. Dynamics curiosity is an optimistic bound.** The GFE-TM composite
 (cff-fk2u, `epistemic_b=True`; derivation in docs/DERIVATIONS.md D1) gives
 transition learning an epistemic channel: the parameter-novelty term is
