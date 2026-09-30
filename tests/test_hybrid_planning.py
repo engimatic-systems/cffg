@@ -105,7 +105,7 @@ def test_partial_goal_limitation_is_not_misrepresented_as_full_horizon_planning(
 
 
 @pytest.mark.parametrize("dtype", [np.float32, np.float64])
-@pytest.mark.parametrize("schedule", ["auto", "flood"])
+@pytest.mark.parametrize("schedule", [pytest.param("auto", marks=pytest.mark.slow), "flood"])
 def test_neighboring_noise_and_sparse_actions_have_truthful_results(dtype, schedule):
     with jax.enable_x64(dtype is np.float64):
         template, arrays, observations = planning_fixture(3, dtype, noise_scale=2., habit=[.4, .6, 0.])

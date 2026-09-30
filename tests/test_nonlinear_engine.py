@@ -10,7 +10,7 @@ from cffg.engine import Engine, RunStatus
 
 
 @pytest.mark.parametrize("method", ["linearization", "sigma_point"])
-@pytest.mark.parametrize("schedule", ["auto", "flood"])
+@pytest.mark.parametrize("schedule", ["auto", pytest.param("flood", marks=pytest.mark.slow)])
 def test_curved_sensor_fixed_point_and_energy_contract(method, schedule):
     template, arrays = model(method)
     engine = Engine(compile_template(template, arrays=arrays), schedule=schedule)
@@ -113,6 +113,7 @@ def test_improper_runtime_cavity_is_a_machine_readable_failure():
     assert engine.run(state, 5, tol=1e-8).status == RunStatus.DIVERGED
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("method, variance", [
     ("linearization", .15642104055141876), ("sigma_point", .1395200705766338),
 ])
