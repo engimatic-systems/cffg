@@ -3127,6 +3127,21 @@ posterior with refined dense-grid quadrature. That selected fixture has
 Hellinger limits 0.16 for Taylor and 0.10 for sigma points; this is not a claim
 that sigma points are more accurate for every nonlinear model.
 
+The reconstructed reactor investigation (`tests/test_cstr_planning.py`) makes
+the proper-input requirement explicit. A finite positive-semidefinite precision
+with a null direction describes an unnormalized partial-information potential,
+not a degenerate Gaussian with covariance equal to its pseudoinverse. Taylor
+and sigma-point propagation therefore cannot use that pseudoinverse as an input
+belief. A proper global posterior does not imply every cavity is initially
+proper: partial goal information can arrive before a forward prior. The affine
+limit agrees with independent dense Gaussian conditioning after supplying a
+proper exact initialization, but the current fresh nonlinear run rejects the
+partial cavity. Broad proper input beliefs pose a separate problem: the retained
+fixed-step RK4 function can return nonfinite values or values too large to form
+second moments. No change to message normalization fixes that physical-function
+evaluation. The fixture labels all reconstructed choices; the original failed
+caller and its process/goal precision settings are unavailable.
+
 ### D13.5 Adaptive residual globalization and certification
 
 Let `s` be the gauge-reduced Gaussian message coordinates of D7. Information
