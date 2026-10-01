@@ -714,9 +714,14 @@ All three mixture-message directions consume checked outputs. Known
 non-normalizable components retain the vacuous initialization fallback;
 arithmetic failure after admission emits nonfinite messages so ordinary
 execution diagnostics identify the factor. Safe inverse placeholders inside
-moment collapse are never accepted messages. Producer-side rank and
-intermediate-validity admission remains separate work. Independent moment and
-derivative anchors are in `tests/test_mixture_collapse.py`.
+moment collapse are never accepted messages. `gaussian_components.py` owns
+linear-mixture component admission: retained Schur eigenvalues certify forward
+rank, a cancellation-aware generating-factor test certifies backward rank
+before Gram reconstruction, and actual computed covariance/precision
+intermediates carry separate validity. It does not tighten the shared Gaussian
+propriety predicate or regularize the model. Independent moment, rank and
+derivative anchors are in `tests/test_mixture_collapse.py` and
+`tests/test_mixture_rank.py`.
 
 The public learning boundary reads the same D3 local belief, not separately
 reported endpoint marginals. `Engine.gaussian_node_stats` exposes each soft

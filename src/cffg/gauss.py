@@ -74,6 +74,8 @@ beliefs surface as +inf, deliberately loud.
 
 from __future__ import annotations
 
+from typing import NamedTuple
+
 import jax
 import jax.numpy as jnp
 
@@ -111,7 +113,18 @@ def _psd_pinv(mat: jnp.ndarray) -> jnp.ndarray:
     return jnp.linalg.pinv(sym, rtol=rtol, hermitian=True)
 
 
-def _project_psd(mat: jnp.ndarray, reference: jnp.ndarray) -> jnp.ndarray:
+class _PSDProjection(NamedTuple):
+    matrix: jax.Array
+    eigenvalues: jax.Array
+    eigenvectors: jax.Array
+    valid: jax.Array
+
+    @property
+    def full_rank(self):
+        return jnp.all(self.eigenvalues > 0, axis=-1)
+
+
+def _project_psd_with_rank(mat: jnp.ndarray, reference: jnp.ndarray) -> _PSDProjection:
     """Remove only roundoff-scale Schur-complement eigenvalues.
 
     Invariant protected: algebraically vacuous messages are represented by
@@ -121,8 +134,15 @@ def _project_psd(mat: jnp.ndarray, reference: jnp.ndarray) -> jnp.ndarray:
     sym = 0.5 * (mat + mat.swapaxes(-1, -2))
     eig, vec = jnp.linalg.eigh(sym)
     tol = 4.0 * mat.shape[-1] * jnp.finfo(mat.dtype).eps * _matrix_scale(reference)
+    valid = jnp.all(jnp.isfinite(eig), axis=-1) & (eig[..., 0] >= -tol)
     eig = jnp.where(eig > tol[..., None], eig, 0.0)
-    return (vec * eig[..., None, :]) @ vec.swapaxes(-1, -2)
+    matrix = (vec * eig[..., None, :]) @ vec.swapaxes(-1, -2)
+    return _PSDProjection(matrix, eig, vec, valid)
+
+
+def _project_psd(mat: jnp.ndarray, reference: jnp.ndarray) -> jnp.ndarray:
+    """Preserve the ordinary Gaussian matrix API; mixture admission also uses rank."""
+    return _project_psd_with_rank(mat, reference).matrix
 
 
 def _neg_entropy(lam_q: jnp.ndarray) -> jnp.ndarray:

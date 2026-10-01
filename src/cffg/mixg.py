@@ -35,6 +35,7 @@ import jax.numpy as jnp
 
 from cffg import gauss
 from cffg.compiled import NEG
+from cffg.gaussian_components import backward_component, forward_component
 
 _LOG2PI = 1.8378770664093453
 
@@ -327,29 +328,11 @@ def mixlin_forward(eta_i, lam_i, log_mu_e, a, b, w):
 
     def one(ei, li, le, A, bb, W):
         support, (A, bb, W) = _active_components(le, A, bb, W)
-        def fwd(Ak, bk, Wk):
-            s = Ak.T @ Wk @ Ak + li
-            s_inv = gauss._psd_pinv(s)
-            lam = gauss._project_psd(Wk - Wk @ Ak @ s_inv @ Ak.T @ Wk, Wk)
-            eta = lam @ bk + Wk @ Ak @ (s_inv @ ei)
-            proper_i = gauss._pd_ok(li)
-            cov_i = gauss._pd_inverse(li)
-            mean_i = gauss._pd_solve(li, ei)
-            pred_cov = gauss._pd_inverse(Wk) + Ak @ cov_i @ Ak.T
-            lam_proper = gauss._pd_inverse(pred_cov)
-            eta_proper = lam_proper @ (bk + Ak @ mean_i)
-            lam = jnp.where(proper_i, lam_proper, lam)
-            eta = jnp.where(proper_i, eta_proper, eta)
-            return eta, lam
-
-        eta_f, lam_f = jax.vmap(fwd)(A, bb, W)  # [K, do], [K, do, do]
-        ok = (
-            gauss._pd_ok(W).all()
-            & gauss._psd_ok(li)
-            & gauss._pd_ok(lam_f).all()
+        components = jax.vmap(forward_component, in_axes=(None, None, 0, 0, 0))(
+            ei, li, A, bb, W,
         )
-        collapsed = _collapse(le, eta_f, lam_f, support=support)
-        return jnp.where(ok, collapsed.eta, 0.0), jnp.where(ok, collapsed.precision, 0.0)
+        collapsed = _collapse(le, components.eta, components.precision, support=support)
+        return _component_message(components, collapsed)
 
     return jax.vmap(one)(eta_i, lam_i, log_mu_e, a, b, w)
 
@@ -362,35 +345,31 @@ def mixlin_backward(eta_o, lam_o, log_mu_e, a, b, w):
     def one(eo, lo, le, A, bb, W):
         support, (A, bb, W) = _active_components(le, A, bb, W)
         def bwd(Ak, bk, Wk):
-            k = gauss._pd_solve(Wk + lo, Wk)
-            g = gauss._project_psd(Wk - Wk @ k, Wk)
-            lam = Ak.T @ g @ Ak
-            eta = Ak.T @ (k.T @ eo - g @ bk)
-            proper_o = gauss._pd_ok(lo)
-            cov_o = gauss._pd_inverse(lo)
-            mean_o = gauss._pd_solve(lo, eo)
-            g_proper = gauss._pd_inverse(gauss._pd_inverse(Wk) + cov_o)
-            lam_proper = Ak.T @ g_proper @ Ak
-            eta_proper = Ak.T @ (g_proper @ (mean_o - bk))
-            lam = jnp.where(proper_o, lam_proper, lam)
-            eta = jnp.where(proper_o, eta_proper, eta)
+            component = backward_component(eo, lo, Ak, bk, Wk)
             # log c̃: mass of ∫ N(y; b_k, V_k) μ_o(y) dy (D3)
             log_c = _log_z(Wk @ bk + eo, Wk + lo) - 0.5 * bk @ Wk @ bk
             logdet_w = gauss._pd_logdet(Wk)
             log_c = log_c + 0.5 * logdet_w - 0.5 * bk.shape[-1] * _LOG2PI
-            return eta, lam, log_c
+            return component, log_c
 
-        eta_b, lam_b, log_c = jax.vmap(bwd)(A, bb, W)
-        ok = (
-            gauss._pd_ok(W).all()
-            & gauss._psd_ok(lo)
-            & gauss._pd_ok(lam_b).all()
+        components, log_c = jax.vmap(bwd)(A, bb, W)
+        ok = jnp.all(components.valid & components.normalizable)
+        log_w = le + log_c + jnp.where(
+            ok, _log_z(components.eta, components.precision), 0.0,
         )
-        log_w = le + log_c + jnp.where(ok, _log_z(eta_b, lam_b), 0.0)
-        collapsed = _collapse(log_w, eta_b, lam_b, support=support)
-        return jnp.where(ok, collapsed.eta, 0.0), jnp.where(ok, collapsed.precision, 0.0)
+        collapsed = _collapse(log_w, components.eta, components.precision, support=support)
+        return _component_message(components, collapsed)
 
     return jax.vmap(one)(eta_o, lam_o, log_mu_e, a, b, w)
+
+
+def _component_message(components, collapsed):
+    normalizable = jnp.all(components.normalizable)
+    valid = jnp.all(components.valid)
+    return (
+        _nan_unless(valid, jnp.where(normalizable, collapsed.eta, 0.0)),
+        _nan_unless(valid, jnp.where(normalizable, collapsed.precision, 0.0)),
+    )
 
 
 def mixlin_energy(eta_o, lam_o, eta_i, lam_i, log_mu_e, a, b, w):

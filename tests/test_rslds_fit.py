@@ -157,6 +157,7 @@ def test_pca_arhmm_initializer_is_seeded_finite_and_dtype_scaled():
     )
 
 
+@pytest.mark.slow
 def test_fit_replaces_one_sequence_coordinates_and_reuses_one_engine(monkeypatch):
     observations = _observations(8)
     engine_ids = []

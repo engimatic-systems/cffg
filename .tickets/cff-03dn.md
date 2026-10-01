@@ -1,6 +1,6 @@
 ---
 id: cff-03dn
-status: open
+status: closed
 deps: [cff-04mb, cff-fkuj, cff-61ag]
 links: []
 created: 2026-09-25T07:25:11Z
@@ -53,3 +53,7 @@ Contract review (failure_provenance sub-agent): keep shared strict _pd_ok unchan
 **2026-09-25T07:56:22Z**
 
 Split before implementation into cff-fkuj checked collapse (ready) and cff-61ag producer-side rank admission (blocked by checked collapse). Legend prerequisite --> dependent: [x] cff-04mb --> [R] cff-fkuj --> [B] cff-61ag --> [B] cff-03dn --> cff-u9un --> cff-ectw --> cff-xa6z. Parent also directly depends on both children; independent cff-vxza is complete. Built from tk dep tree --full, tk ready and tk blocked; no cycles. The split keeps three-caller validation separate from the more subtle backward Gram-rank/coordinate-scale derivation.
+
+**2026-09-25T09:14:18Z**
+
+Complete through cff-fkuj checked collapse and cff-61ag producer-rank/intermediate validation. Independent local regressions cover the original rank/safe-inverse mechanism plus derivative, support, float32 and scale failures. Full gate at final arithmetic code2561passed. Parent cff-ectw and cff-u9un remain open for complete planning policy and integration certification. No blanket convergence claim.
