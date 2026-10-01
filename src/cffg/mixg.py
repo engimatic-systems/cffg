@@ -14,8 +14,11 @@ convention drops (the "weight trap").
 
 Conventions match cffg.gauss: batched over group members ([M, ...] leading
 axis) via vmap, per-member parameter stacks carry the regime axis K
-([M, K, ...]); dims and K are static per group. Propriety guards fall back
-to the *vacuous* message mid-flooding (never NaN); ledger terms go +inf on
+([M, K, ...]); dims and K are static per group. Non-normalizable components
+fall back to a *vacuous* message mid-flooding. Numerical collapse failures
+after component admission return NaN messages for runtime failure attribution;
+safe-inverse placeholders inside collapse never become accepted information.
+Ledger terms go +inf on
 improper beliefs, while public belief/predictive reads return shape-preserving
 NaNs with ``proper=False``. Guards are scale-relative per the robustness
 contract: proper systems are solved without regularization, while singular
@@ -66,6 +69,14 @@ class MixturePredictive(NamedTuple):
     proper: jax.Array
 
 
+class CollapseResult(NamedTuple):
+    """Checked moment projection; invalid outputs are nonfinite, never a ridge."""
+
+    eta: jax.Array
+    precision: jax.Array
+    valid: jax.Array
+
+
 def _log_z(eta: jnp.ndarray, lam: jnp.ndarray) -> jnp.ndarray:
     """log ∫ exp(−½yᵀΛy + ηᵀy) dy = ½ηᵀΛ⁻¹η + d/2·log2π − ½·logdet Λ.
     Caller guarantees Λ ≻ 0 (guarded upstream); branch-safe helpers keep an
@@ -96,17 +107,57 @@ def _node_const(b, w):
     return -0.5 * jnp.einsum("ki,kij,kj->k", b, w, b) + 0.5 * logdet_w - 0.5 * b.shape[-1] * _LOG2PI
 
 
-def _collapse(log_w: jnp.ndarray, eta: jnp.ndarray, lam: jnp.ndarray):
-    """Moment-match Σ_s softmax(log_w)_s · N(η_s, Λ_s) → one (η, Λ).
-    All components must be proper (guarded by callers)."""
-    w_s = jax.nn.softmax(log_w)  # [K]
-    cov = gauss._pd_inverse(lam)  # [K, d, d]
-    m = jnp.einsum("kij,kj->ki", cov, eta)
+def _selector_support(log_weights):
+    return ((log_weights != jnp.asarray(NEG, log_weights.dtype))
+            & ~jnp.isneginf(log_weights))
+
+
+def _active_components(log_weights, *parameters):
+    """Keep zero-weight components out of unstable arithmetic and its derivatives.
+
+    Inactive components borrow the first active component only for computation;
+    their probability remains exactly zero. No substituted value is published.
+    """
+    support = _selector_support(log_weights)
+    first = jnp.argmax(support)
+    return support, tuple(
+        jnp.where(support.reshape((-1,) + (1,) * (value.ndim - 1)), value, value[first])
+        for value in parameters
+    )
+
+
+def _collapse(log_w: jnp.ndarray, eta: jnp.ndarray, lam: jnp.ndarray,
+              *, support=None) -> CollapseResult:
+    """Moment-match supported proper components and validate every inverse result.
+
+    Strict component propriety cannot certify a later covariance calculation.
+    Inactive components are sanitized before arithmetic; exact zero support
+    must not multiply an overflowing moment by zero after the fact.
+    """
+    support = _selector_support(log_w) if support is None else support
+    weights_valid = jnp.any(support) & jnp.all(jnp.where(support, jnp.isfinite(log_w), True))
+    logits = jnp.where(support, log_w, -jnp.inf)
+    w_s = jnp.where(support, jax.nn.softmax(jnp.where(weights_valid, logits, 0.0)), 0.0)
+    safe_eta = jnp.where(support[:, None], eta, 0.0)
+    safe_lam = jnp.where(support[:, None, None], lam, jnp.eye(lam.shape[-1], dtype=lam.dtype))
+    cov = gauss._pd_inverse(safe_lam)
+    m = jnp.einsum("kij,kj->ki", cov, safe_eta)
     m_bar = jnp.einsum("k,ki->i", w_s, m)
-    spread = m - m_bar[None]
+    spread = jnp.where(support[:, None], m - m_bar[None], 0.0)
     c_bar = jnp.einsum("k,kij->ij", w_s, cov) + jnp.einsum("k,ki,kj->ij", w_s, spread, spread)
     lam_out = gauss._pd_inverse(c_bar)
-    return lam_out @ m_bar, lam_out
+    eta_out = lam_out @ m_bar
+    valid = (
+        weights_valid
+        & jnp.all(jnp.isfinite(w_s))
+        & jnp.all(gauss._pd_ok(safe_lam))
+        & jnp.all(jnp.isfinite(m))
+        & jnp.all(gauss._pd_ok(cov))
+        & gauss._pd_ok(c_bar)
+        & gauss._pd_ok(lam_out)
+        & jnp.all(jnp.isfinite(eta_out))
+    )
+    return CollapseResult(_nan_unless(valid, eta_out), _nan_unless(valid, lam_out), valid)
 
 
 def _exact_probability(log_message: jax.Array, log_score: jax.Array):
@@ -275,6 +326,7 @@ def mixlin_forward(eta_i, lam_i, log_mu_e, a, b, w):
     incoming selector message alone (component masses are s-independent)."""
 
     def one(ei, li, le, A, bb, W):
+        support, (A, bb, W) = _active_components(le, A, bb, W)
         def fwd(Ak, bk, Wk):
             s = Ak.T @ Wk @ Ak + li
             s_inv = gauss._psd_pinv(s)
@@ -296,8 +348,8 @@ def mixlin_forward(eta_i, lam_i, log_mu_e, a, b, w):
             & gauss._psd_ok(li)
             & gauss._pd_ok(lam_f).all()
         )
-        eta, lam = _collapse(le, eta_f, lam_f)
-        return jnp.where(ok, eta, 0.0), jnp.where(ok, lam, 0.0)
+        collapsed = _collapse(le, eta_f, lam_f, support=support)
+        return jnp.where(ok, collapsed.eta, 0.0), jnp.where(ok, collapsed.precision, 0.0)
 
     return jax.vmap(one)(eta_i, lam_i, log_mu_e, a, b, w)
 
@@ -308,6 +360,7 @@ def mixlin_backward(eta_o, lam_o, log_mu_e, a, b, w):
     message convention drops must be rebuilt here (the weight trap)."""
 
     def one(eo, lo, le, A, bb, W):
+        support, (A, bb, W) = _active_components(le, A, bb, W)
         def bwd(Ak, bk, Wk):
             k = gauss._pd_solve(Wk + lo, Wk)
             g = gauss._project_psd(Wk - Wk @ k, Wk)
@@ -334,8 +387,8 @@ def mixlin_backward(eta_o, lam_o, log_mu_e, a, b, w):
             & gauss._pd_ok(lam_b).all()
         )
         log_w = le + log_c + jnp.where(ok, _log_z(eta_b, lam_b), 0.0)
-        eta, lam = _collapse(log_w - log_w.max(), eta_b, lam_b)
-        return jnp.where(ok, eta, 0.0), jnp.where(ok, lam, 0.0)
+        collapsed = _collapse(log_w, eta_b, lam_b, support=support)
+        return jnp.where(ok, collapsed.eta, 0.0), jnp.where(ok, collapsed.precision, 0.0)
 
     return jax.vmap(one)(eta_o, lam_o, log_mu_e, a, b, w)
 
@@ -489,9 +542,10 @@ def mix_forward(log_mu_e, mean, w):
     weights (masses are all 1 — no trap in this direction)."""
 
     def one(le, m, W):
-        eta, lam = _collapse(le, jnp.einsum("kij,kj->ki", W, m), W)
+        support, (m, W) = _active_components(le, m, W)
+        collapsed = _collapse(le, jnp.einsum("kij,kj->ki", W, m), W, support=support)
         ok = gauss._pd_ok(W).all()
-        return jnp.where(ok, eta, 0.0), jnp.where(ok, lam, 0.0)
+        return jnp.where(ok, collapsed.eta, 0.0), jnp.where(ok, collapsed.precision, 0.0)
 
     return jax.vmap(one)(log_mu_e, mean, w)
 

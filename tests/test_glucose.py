@@ -42,6 +42,7 @@ def test_benchmark_is_nontrivial():
     assert floor.tir < 0.50, f"benchmark too easy: basal-only TIR {floor.tir:.1%}"
 
 
+@pytest.mark.slow
 def test_benchmark_is_deterministic():
     a = run_patient("adult#002", "reactive")
     b = run_patient("adult#002", "reactive")

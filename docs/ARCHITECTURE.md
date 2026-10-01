@@ -706,6 +706,18 @@ exhaustive regime-sequence enumeration (measured gap with headroom — never
 pretending assumed-density equals exact). Observed mixture outputs are a
 compile error in v1; emissions route through plain `gaussian_linear` nodes.
 
+`mixg._collapse` owns an internal `CollapseResult` with numerical validity.
+It checks supported weights, actual computed component moments, the collapsed
+covariance and the final information-form output. Exact-zero components are
+masked before moment arithmetic, not after a potentially overflowing product.
+All three mixture-message directions consume checked outputs. Known
+non-normalizable components retain the vacuous initialization fallback;
+arithmetic failure after admission emits nonfinite messages so ordinary
+execution diagnostics identify the factor. Safe inverse placeholders inside
+moment collapse are never accepted messages. Producer-side rank and
+intermediate-validity admission remains separate work. Independent moment and
+derivative anchors are in `tests/test_mixture_collapse.py`.
+
 The public learning boundary reads the same D3 local belief, not separately
 reported endpoint marginals. `Engine.gaussian_node_stats` exposes each soft
 selector responsibility and responsibility-weighted component moments; for a
