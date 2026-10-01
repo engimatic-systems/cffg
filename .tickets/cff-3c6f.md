@@ -1,6 +1,6 @@
 ---
 id: cff-3c6f
-status: open
+status: closed
 deps: [cff-ucvx]
 links: []
 created: 2026-09-22T19:16:00Z
@@ -69,3 +69,14 @@ Legend: prerequisite --> dependent
                                     +--> [cff-3c6f] newcomer epic
 
 Ready root: cff-odag. Immediate blocker for every later layer: the preceding ticket in this linear review chain. Parallel work: none by design, because the final README must describe the exact facade, examples, and limitations already present below it. Downstream result: cff-3c6f closes only after the complete newcomer guide lands. tk dependency records remain authoritative. tk dep cycle reports no cycles.
+
+**2026-09-22T21:31:48Z**
+
+Completed as the requested linear PR chain above cff-1o72 / PR #157:
+
+- #158 cff-odag: one lazy top-level export map plus complete cffg.models catalogue.
+- #159 cff-rtuf: eight standalone, status-gated experiment examples and migrated executable-doc tests.
+- #160 cff-rbsy: current limitations, executable versus legacy moment matching, known defects, partial surfaces, and not-pursuing research clarified.
+- #161 cff-ucvx: complete uv add path, 22-row capability map, exact facade inventories, centralized result/objective guidance, and concise links to examples.
+
+All four child tickets are closed. Final proposed head validation: marked quickstart executed; 32 focused documentation/facade/example tests passed; default suite passed 2416 tests with 67 slow tests deselected and four existing warnings in 1180.69 seconds; git diff --check and tk dep cycle pass. The work changes no inference mathematics. Package publication, real vendoring, stable compatibility, and existing mathematical/performance gaps remain deferred exactly as scoped.

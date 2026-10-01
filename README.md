@@ -1,1402 +1,505 @@
-# cffg
+# CFFG
 
-Constrained Forney-style Factor Graphs (CFFG) and Lagrangian Active Inference
-(LAIF) in JAX — an engine for building **white-box probabilistic agents**:
-models you can read, edit, checkpoint, and ship, whose exploration comes from
-their objective (Generalised Free Energy) rather than bolted-on noise.
+CFFG is a JAX library for building and running constrained Forney-style factor
+graphs and Lagrangian active-inference models. It is useful when an experiment
+has an explicit state ontology and auditable local factors: tabular agents,
+linear or nonlinear state-space models, conjugate exponential-family models,
+hard discrete constraints, and declared hybrid approximations.
 
-Implements a registered subset of Koudahl, van de Laar & de Vries,
-*Realising Synthetic Active Inference Agents* Parts I & II
-(arXiv:2306.08014). The fixed-A discrete paper core is validated to 1.7e-6
-against the authors' Julia T-maze reference; the source-ordered constraint and
-Figure 5 coverage ledger is in `docs/ARCHITECTURE.md`.
+It is not a general probabilistic-programming system, a structure learner, or a
+raw-sensor representation learner. Exactness depends on the graph, factor
+family, constraint, and objective; convergence never turns an approximate
+model into an exact one. Start with the [capability map](#capability-map), and
+use [Known Limitations](docs/LIMITATIONS.md) to qualify experiment claims.
+
+CFFG is currently version 0.1 and requires Python 3.12 or newer.
+
+## Install from a sibling experiment
+
+The repository is not published as a package yet. From an experiment project
+next to a checkout named `cffg`, add the complete editable dependency with uv:
 
 ```sh
-uv sync          # install
-uv run pytest tests/test_engine_tree.py  # focused iteration
-uv run python tools/dashboard.py --run-suite  # short default suite + dashboard
-uv run pytest -m slow  # opt-in long-running regressions
+mkdir my-cffg-experiment
+cd my-cffg-experiment
+uv init --python 3.12
+uv add --editable ../cffg
+uv run python -c 'import cffg; print(cffg.Engine, len(cffg.__all__))'
 ```
 
-Run focused tests as often as useful while changing code. Outside the isolated
-tooling exception below, one passing short suite after the final code change is
-sufficient to open or update a PR. Pytest excludes `slow` tests by default. The
-dashboard command above runs pytest exactly once and renders that result.
-Before starting or waiting on it, read only `latest.wall_seconds` and
-`suggested_wait_seconds` from `tools/test-suite-runtimes.json`.
+That command records both the `cffg` dependency and its local source in the
+experiment's `pyproject.toml`; no hand-written `[tool.uv.sources]` fragment is
+needed.
 
-Isolated tooling changes use focused tests and changed-artifact checks;
-record the isolation rationale, commands, and results in the ticket and PR.
-Changes affecting engine/model/numerical/serialization behavior, shared
-dependencies, test discovery/selection/execution, or pass/fail interpretation
-still require the full short suite, even when their files are under `tools/`.
-If isolation is uncertain, use the full gate. Do not label focused results as a
-fresh full-suite result. Ticket- and documentation-only changes also use their
-relevant artifact validation instead of the short suite. Run slow regressions
-explicitly when changing the behavior they cover; they are not part of the
-default PR gate. `AGENTS.md` defines the contributor validation policy.
+JAX uses its normal platform defaults. Ordinary use does not require x64. When
+an experiment needs 64-bit numerical comparisons, configure it before Python
+imports JAX:
 
-## Quickstart: build, run, checkpoint, continue
+```sh
+JAX_ENABLE_X64=1 uv run python experiment.py
+```
 
-This is the supported pre-1.0 newcomer path. It uses a two-cell deterministic
-corridor so the standalone inference graph is a tree: its reported value is
-exact Bethe free energy, `-log p(observation | action)`. That statement is
-specific to this registered tree construction. For other models, `Engine.bfe`
-may instead be a Bethe approximation, a ledger containing the exact local
-fixed-A Figure 5 discrete GFE composite under its stated assumptions, or a
-declared bound; local exactness does not make loopy inference globally exact.
+## Five-minute workflow
 
-<!-- public-quickstart:start -->
+Every workflow has the same spine: build a serializable `Template`, compile its
+static structure, initialize and bind a runtime state, run inference, reject an
+unfinished status, then use the readout whose semantics match the model.
+
+<!-- executable-quickstart:start -->
 ```python
-from functools import partial
-from pathlib import Path
+from cffg import Engine, build_gridworld, compile_template
 
-import numpy as np
-
-from cffg import (
-    CorridorEnv,
-    Engine,
-    RollingAgent,
-    RunStatus,
-    build_gridworld,
-    compile_template,
-    load_bundle,
-    save_bundle,
-)
-
-# Build and serialize one perception template with its parameter arrays.
 template, arrays = build_gridworld(past=1, steps=1, k=2, acc=1.0)
-model_path = Path("corridor.cffgz")
-save_bundle(model_path, template, arrays)
-template, arrays, manifest = load_bundle(model_path)
-assert manifest["structure_hash"]
-
-# Compile, bind DATA ports, run, and refuse every unfinished status.
 engine = Engine(compile_template(template, arrays=arrays))
-state = engine.bind_data(
-    engine.init_state(),
-    {"act1": 1, "obs1": 0},  # action 1 is STAY; sensor is deterministic
-)
+state = engine.bind_data(engine.init_state(), {"act1": 1, "obs1": 0})
+
 result = engine.run(state, 20, tol=1e-6)
-assert result.status is RunStatus.CONVERGED
 state = result.require_converged()
-state_posterior = engine.marginals(state)["zm1"]
-exact_bethe_free_energy = engine.bfe(state)
-np.testing.assert_allclose(state_posterior, [1.0, 0.0], atol=2e-6)
-np.testing.assert_allclose(
-    exact_bethe_free_energy, -np.log(arrays["d"][0]), rtol=2e-6
-)
-assert state.messages.dtype in (np.dtype(np.float32), np.dtype(np.float64))
 
-# Use the corresponding rolling model and checkpoint after one real step.
-builder = partial(build_gridworld, k=2, acc=1.0)
-initial_b_counts = np.ones((3, 2, 2))
-
-
-def make_agent():
-    return RollingAgent(
-        builder,
-        horizon=1,
-        learn_b=True,
-        initial_b_counts=initial_b_counts,
-        n_sweeps=100,
-        select="sample",
-        seed=7,
-    )
-
-
-environment = CorridorEnv(k=2, acc=1.0, seed=11)
-agent = make_agent()
-agent.step(environment.step)
-checkpoint_path = Path("agent.npz")
-agent.checkpoint(checkpoint_path)
-
-# Restore into a fresh agent with the same declaration.
-resumed = make_agent()
-resumed.restore(checkpoint_path)
-np.testing.assert_array_equal(resumed.belief, agent.belief)
-np.testing.assert_array_equal(resumed.b_counts, agent.b_counts)
-assert resumed.tick == agent.tick
-assert resumed.episode_tick == agent.episode_tick
-
-# Environment state is external to the agent checkpoint. Two equivalent
-# environments isolate the restored agent belief, learning, cadence, and RNG.
-control_environment = CorridorEnv(
-    k=2, acc=1.0, start=environment.pos, seed=13
-)
-resumed_environment = CorridorEnv(
-    k=2, acc=1.0, start=environment.pos, seed=13
-)
-assert resumed.step(resumed_environment.step) == agent.step(control_environment.step)
-np.testing.assert_array_equal(resumed.belief, agent.belief)
-np.testing.assert_array_equal(resumed.b_counts, agent.b_counts)
-assert resumed.tick == agent.tick
-assert resumed.episode_tick == agent.episode_tick
+posterior = engine.marginals(state)["zm1"]
+energy = engine.bfe(state)
+print(posterior, energy, engine.objective_contract)
 ```
-<!-- public-quickstart:end -->
+<!-- executable-quickstart:end -->
 
-The supported top-level names are `CorridorEnv`, `Engine`, `RollingAgent`,
-`RunStatus`, `build_gridworld`, `compile_template`, `LoadedBundle`, `load_bundle`,
-`save_bundle`, and the compatibility helper `set_params`. Their canonical
-implementations remain in the focused modules; `cffg` only re-exports them.
-Before 1.0, deeper rule tables, compiled arenas, group plans, kernel
-registration objects, and private helpers remain internal-unstable. Model JSON
-and `.cffgz` schemas retain their own explicit version contracts.
+The complete version also saves a bundle, runs a rolling agent, and proves
+checkpoint continuation: [examples/discrete_agent.py](examples/discrete_agent.py).
 
-The bounded paper/public claim covers the registered fixed-A discrete core and
-this newcomer workflow. Functional `mu3(A)` remains finite-sample importance
-sampling, and the literal constraint-flip equivalence covers only the tested
-fixed-A binary discrete joint-boundary construction. This is not a universal
-solver or a claim that every construction in the papers executes.
+## Capability map
+
+“Ready” means the row is usable inside its stated envelope, not that every
+graph assembled from those parts is exact. “Bounded” means the approximation
+or fit claim is part of the API contract. “Pre-1.0” marks an intentionally
+unstable extension surface. Every row links to its explanation or a runnable
+example.
+
+| Task | Import or entry point | Model and mode | Primary result | Objective or approximation | Runnable example | Main limit |
+|---|---|---|---|---|---|---|
+| [Build the graph IR, compose, plate, and edit](#build-and-compose-models) | `cffg.core`; `cffg.core.compose`; `cffg.core.edits` | Typed variables, factors, ports, constraints, compact plates, transactions | Validated `Template` plus external arrays | Declaration only; compilation selects executable rules | [discrete_agent.py](examples/discrete_agent.py) | **Ready:** only registered factor/constraint combinations execute; expand compact plates before composition |
+| [Build a corridor agent](#discrete-planning-and-rolling-agents) | `cffg.build_gridworld`; `CorridorEnv` | Tabular discrete BP/GFE | State/action marginals, BFE/GFE, actions | Exact on eligible ordinary trees; declared GFE for P-substituted planning | [discrete_agent.py](examples/discrete_agent.py) | **Ready:** finite horizon, designed state space, fixed factorization |
+| [Build a general discrete rollout](#discrete-planning-and-rolling-agents) | `cffg.models.build_rollout`; `build_tmaze` | Finite-horizon POMDP/LAIF, fixed or learned A/C/B | `marginals`, `node_beliefs`, goal/parameter readouts | Bethe or declared GFE by construction | [discrete_rollout.py](examples/discrete_rollout.py) | **Ready/bounded:** functional mu3 and transition novelty require their diagnostics |
+| [Build a factored rollout](#discrete-planning-and-rolling-agents) | `build_factored_rollout`; `StateBlockSpec`; `CouplingSpec` | Mean-field state blocks with declared couplings | Per-block and joint-boundary marginals | Same BP/GFE contracts as the selected rollout | [discrete_rollout.py](examples/discrete_rollout.py) | **Ready:** couplings and joint sensors can still scale as Cartesian products |
+| [Compile, run, and swap parameters](#compile-run-and-read-results) | `compile_template`; `Engine`; `set_params`; `RunStatus` | Exact two-pass trees or iterative scheduled graphs | Status, traces, family readouts, energy | Depends on the objective contract below | [discrete_agent.py](examples/discrete_agent.py) | **Ready:** static shapes compile separately; loopy convergence is not an accuracy certificate |
+| [Use GFE and parameter epistemics](#discrete-planning-and-rolling-agents) | `ConstraintKind.P_SUBSTITUTION`; `prepare_mu3`; `score_mu3_epochs`; builder flags | Observation epistemics, learned goals, finite-sample mu3(A), transition novelty | Policy posterior, ESS/support facts, specialized diagnostics | GFE; transition novelty is an optimistic bound | [discrete_rollout.py](examples/discrete_rollout.py) | **Bounded:** explicit PRNG keys; open validation defects are listed in `LIMITATIONS.md` |
+| [Run a receding-horizon agent](#discrete-planning-and-rolling-agents) | `RollingAgent` | Plan, act, observe, learn, roll a fixed-memory boundary | Action, beliefs, learning state, checkpoint | Replans a finite-horizon factorized policy each tick | [discrete_agent.py](examples/discrete_agent.py) | **Ready:** environment state is external; deep plans need status/trace checks |
+| [Run the costly-cue behavioral oracle](#discrete-planning-and-rolling-agents) | `cffg.experiments.behavioral_epistemics.run_benchmark` | Fixed active-inference versus BFE-ablation task | `BehavioralReport` | Bounded scientific regression, not a general inference objective | [API pattern](#discrete-planning-and-rolling-agents) | **Research-only:** fixed task and no supported package facade or reuse guarantee |
+| [Learn declared parameters](#learn-and-swap-parameters) | `cffg.learn.Learnables`; `cffg.conj`; `LearnableSpec` | Dirichlet, NIW, MNIW, component-MNIW, Pólya–Gamma | `expected`, `rollover`, persistent posterior state | Between-trial conjugate or empirical-Bayes updates | [learning_bundle.py](examples/learning_bundle.py) | **Ready:** `accumulate` and `replace` have different trial semantics; not full joint VB |
+| [Persist and continue](#persist-and-resume) | `save_bundle`; `load_bundle`; agent checkpoints | Template, arrays, declared learning, or rolling-agent runtime | `LoadedBundle`, restored agent | Serialization preserves declared identity; no inference objective | [learning_bundle.py](examples/learning_bundle.py) | **Ready/current schema:** a bundle is not a mid-run snapshot; stable historical migration is open |
+| [Run linear-Gaussian inference](#continuous-exponential-family-and-hybrid-models) | `cffg.models.lgssm` | Gaussian and linear-Gaussian BP with missing observations | `gaussian_marginals`, node statistics, BFE | Exact Kalman/RTS marginals and evidence identity on a tree | [linear_gaussian.py](examples/linear_gaussian.py) | **Ready:** positive-definite covariance contract; scaled readout is still host-loop bound |
+| [Run scalar exponential-family inference](#continuous-exponential-family-and-hybrid-models) | `gamma`, `beta`, `poisson_obs`, `bernoulli_obs`; `ef_marginals` | Conjugate Gamma–Poisson and Beta–Bernoulli BP | Standard parameters, mean, `proper`, BFE | Exact registered tree messages and ledger | [exponential_family.py](examples/exponential_family.py) | **Ready:** conditioned observations only; predictive outputs leave the shipped family |
+| [Run hybrid mixture and recurrence inference](#continuous-exponential-family-and-hybrid-models) | `gaussian_mixture(_linear)`; `recurrence_link`; `gaussian_prec` | Assumed-density mixtures, structured recurrence, Gamma precision | Mixture predictives, pair beliefs, sufficient statistics | Mixture moment collapse and recurrence JJ bound are explicit approximations | [hybrid_rslds.py](examples/hybrid_rslds.py) | **Bounded:** no exact switching trajectory posterior or general evidence bound |
+| [Build or fit an rSLDS](#continuous-exponential-family-and-hybrid-models) | `rslds`; `fit_rslds`; `PCAARHMMInitializer`; rSLDS learning classes | Recurrent switching LDS inference, learning, observed-only fitting | Fit status, attempts, marginals, FE/residual traces | Empirical-Bayes variational fit with declared hybrid/JJ approximations | [hybrid_rslds.py](examples/hybrid_rslds.py) | **Bounded:** budget exhaustion is preserved; no broad recovery-superiority claim |
+| [Use nonlinear Gaussian factors](#nonlinear-and-neural-gaussian-models) | `FunctionSpec`; `register_mean_function`; `moment_matching` | Taylor or fixed sigma-point positive-noise Gaussian factors | Gaussian marginals, `objective_metadata`, `objective_contract` | Frozen-Gaussian surrogate; adaptive consistency is not an evidence bound | [nonlinear_gaussian.py](examples/nonlinear_gaussian.py) | **Bounded:** zero noise, nonlinear GFE, and continuous-to-discrete means are unsupported |
+| [Use neural means and fixed-point gradients](#nonlinear-and-neural-gaussian-models) | `neural_mean`; `initialize_neural_parameters`; `FixedPointDifferentiator`; `fixed_point_gradient` | Dense MLP mean inside a positive-noise nonlinear Gaussian factor | Gradient status, adjoint/root residuals, parameter gradient | Local derivative of the certified adaptive root and surrogate ledger | [API pattern](#nonlinear-and-neural-gaussian-models) | **Bounded:** local isolated-root assumption; no weight uncertainty or stochastic mu3 |
+| [Train or amortize neural inference](#nonlinear-and-neural-gaussian-models) | `NeuralTrainer`; `TrainingConfig`; `GaussianAmortizer`; `PolynomialFeatures` | Deterministic full-batch Adam and Gaussian recognition initialization | Training/continuation state and proposed Gaussian messages | Optimizes the same approximate adaptive objective | [API pattern](#nonlinear-and-neural-gaussian-models) | **Bounded:** no minibatching, discrete point decisions, or universal speedup claim |
+| [Use hard constraints or MAP](#hard-constraints-and-map) | Constraint factors; `compile_template(..., semiring="max")`; `cffg.csp` | Sum-product CSP marginals or discrete max-product | Marginals/BFE, or `decode` and `objective` | Exact tree partition/MAP identities; loopy max-product is bounded | [hard_constraint.py](examples/hard_constraint.py) | **Ready:** max mode is discrete-only; `alldifferent` is capped at `n, K <= 10` |
+| [Batch matching structures](#batch-extend-render-and-estimate) | `cffg.colony.Colony` | Vmapped ordinary same-structure states | One `RunResult` per instance | Each instance keeps its normal engine objective/status | [API pattern](#batch-extend-render-and-estimate) | **Ready/partial:** functional mu3 rejected; mixed controllers and CPU loop remain host-bound |
+| [Register an ordinary custom factor](#batch-extend-render-and-estimate) | `FactorKernel`; binding classes; `register_kernel` | Single-arena discrete BP/VMP, Gaussian, or scalar EF | Generic marginals, energy, optional `kernel_readouts` | Extension author supplies mathematically valid messages and ledger | [API pattern](#batch-extend-render-and-estimate) | **Pre-1.0 unstable:** specialized/multi-arena variational objects need dedicated engine paths |
+| [Render a model](#batch-extend-render-and-estimate) | `cffg.viz` | Deterministic scene, SVG, or PNG from a template | `Scene`, SVG text, image file | Visualization only; no compile or inference certificate | [API pattern](#batch-extend-render-and-estimate) | **Ready:** PNG needs the `viz` extra; legacy moment syntax is rejected |
+| [Estimate resources](#batch-extend-render-and-estimate) | `cffg.estimate.estimate` | Static state bytes, optional cost analysis and calibration | `Estimate`, summary, predicted seconds | Measurement/planning aid, not a probabilistic objective | [API pattern](#batch-extend-render-and-estimate) | **Partial:** persistent arena bytes are useful; current XLA FLOP/traffic analysis is defective |
 
 ## The mental model
 
-A model is a **Template**: a factor graph (square factors, edges = variables)
-plus **constraint beads** that pick the variational objective, plus typed
-**ports** where the world plugs in.
+A CFFG experiment has four layers:
 
-| Piece | Meaning |
+1. `Template` is the serialized source of truth. It names variables, factors,
+   external array references, ports, constraints, plates, learnables, and
+   optional agent boundaries.
+2. `compile_template(template, arrays=...)` validates that declaration and
+   lowers its fixed shapes into JAX arenas, schedules, message rules, parameter
+   addresses, and ledger terms.
+3. `Engine.init_state()` creates dynamic messages, parameters, observations,
+   masks, and specialized solver state. Bind observations and update named
+   parameters here; do not rewrite the template for each same-shaped trial.
+4. `Engine.run(...)` returns a `RunResult`. Its status and diagnostics decide
+   whether the state is usable; the engine's readout and objective contract
+   decide what the numbers mean.
+
+Variables are edges in the factor graph. Factors own local probability or
+energy terms. Ports identify runtime data, goals, priors, and graph boundaries.
+Constraints select a variational interpretation such as mean field,
+P-substitution, or endpoint moment matching. Array blobs stay outside the
+template so the same serialized structure can be reconstructed with its data.
+
+## Supported facades
+
+These four package facades are the current newcomer import surfaces and are
+checked against the implementation. The project is still pre-1.0, so they are
+not yet a permanent cross-version compatibility promise. Focused modules such
+as `cffg.learn`, `cffg.conj`, `cffg.colony`, `cffg.csp`, and `cffg.estimate`
+expose the specialized workflows named in the capability map.
+
+<details>
+<summary><code>cffg</code> — daily workflow and extension primitives (37)</summary>
+
+<!-- facade-cffg:start -->
+`CorridorEnv`, `DiscreteBinding`, `DiscreteMode`, `EFBinding`, `Engine`,
+`FactorKernel`, `FixedPointDifferentiator`, `FixedPointGradient`, `FunctionSpec`,
+`GaussianAmortizer`, `GaussianBinding`, `GaussianConditioning`, `GradientStatus`,
+`HostileInputs`, `LoadedBundle`, `MeanImplementation`, `NeuralTrainer`,
+`ParameterSpec`, `PersistentArray`, `PersistentParameter`,
+`PersistentStateDescriptor`, `PersistentTarget`, `PolynomialFeatures`,
+`RollingAgent`, `RunStatus`, `TrainingConfig`, `build_gridworld`,
+`compile_template`, `fixed_point_gradient`, `initialize_neural_parameters`,
+`load_bundle`, `neural_mean`, `save_bundle`, `register_kernel`,
+`register_mean_function`, `resolve_persistent_state`, `set_params`
+<!-- facade-cffg:end -->
+
+</details>
+
+<details>
+<summary><code>cffg.core</code> — serialized graph language (29)</summary>
+
+<!-- facade-core:start -->
+`FACTOR_TYPES`, `AgentSpec`, `BeliefBinding`, `BlobRef`, `BoundaryFactorization`,
+`Broadcast`, `Chain`, `ConstraintKind`, `ConstraintSpec`, `Expose`, `FactorSpec`,
+`FactorType`, `FunctionSpec`, `LearnableSpec`, `ModelError`,
+`MomentMatchingEndpoint`, `MomentProjection`, `PlateSpec`, `PortRole`, `PortSpec`,
+`Template`, `VariableSpec`, `expand_plates`, `plate_observations`,
+`migrate_moment_matching`, `moment_matching`, `moment_matching_endpoint`,
+`register_factor_type`, `validate`
+<!-- facade-core:end -->
+
+</details>
+
+<details>
+<summary><code>cffg.models</code> — supported model catalogue (22)</summary>
+
+<!-- facade-models:start -->
+`CorridorEnv`, `CouplingSpec`, `ObservationSpec`, `PCAARHMMInitializer`,
+`RSLDSFitPriors`, `RSLDSFitPhase`, `RSLDSFitResult`, `RSLDSInitialization`,
+`RSLDSInferenceAttempt`, `RSLDSInitializer`, `RSLDSLearning`, `StateBlockSpec`,
+`build_factored_corridor`, `build_factored_rollout`, `build_gridworld`,
+`build_rollout`, `build_tmaze`, `fit_rslds`, `lgssm`, `rslds`,
+`vague_rslds_fit_priors`, `vague_rslds_learning`
+<!-- facade-models:end -->
+
+</details>
+
+<details>
+<summary><code>cffg.viz</code> — diagram scene and rendering API (22)</summary>
+
+<!-- facade-viz:start -->
+`BeadGroup`, `BeadShape`, `CompositeView`, `Diagram`, `FULL_COMPRESSION`,
+`LayoutStyle`, `NodeEnd`, `NodeView`, `Presentation`, `Scene`, `SvgStyle`,
+`TerminalEnd`, `TerminalKind`, `WireView`, `build_scene`, `derive`, `layout`,
+`present`, `render_svg`, `save_png`, `save_svg`, `to_svg`
+<!-- facade-viz:end -->
+
+</details>
+
+## Build and compose models
+
+Use `cffg.models` when a supported builder matches the experiment. Use
+`cffg.core` when the graph itself is the experiment. Builders return
+`(template, arrays)`; they do not hide a compiled engine or mutable global
+state.
+
+The shipped factor vocabulary is:
+
+| Family | Built-in factors | What is represented |
+|---|---|---|
+| Discrete | `categorical`, `matrix_cat`, `transition_mixture`, `dirichlet`, `equality` | Priors, transitions, controlled transitions, parameter edges, copies |
+| Hard constraint | `alldifferent`, `exactly_k`, `at_most_k`, `table` | Exact indicator potentials with combinatorial message rules |
+| Gaussian | `gaussian`, `gaussian_linear`, `gaussian_nonlinear` | Priors, affine conditionals, registered nonlinear means |
+| Scalar exponential family | `gamma`, `beta`, `poisson_obs`, `bernoulli_obs` | Conjugate positive-rate and probability models with conditioned observations |
+| Hybrid | `gaussian_mixture`, `gaussian_mixture_linear`, `recurrence_link`, `gaussian_prec` | Switching Gaussian factors, recurrent logits, uncertain precision |
+
+The four serialized constraint kinds are `delta`, `mean_field`,
+`p_substitution`, and `moment_matching`. Endpoint moment matching must name the
+factor role and `MomentProjection.GAUSSIAN`; factor-only legacy payloads can be
+loaded for explicit migration but cannot compile or render.
+
+For reusable structure:
+
+- `cffg.core.compose` scopes, merges, and chains templates.
+- `PlateSpec`, `expand_plates`, and `plate_observations` declare repeated
+  fragments. Plate fragments cannot nest, and compact plates must be expanded
+  before scoping or merging.
+- `cffg.core.edits` applies validated all-or-nothing graph edits rather than
+  leaving a half-mutated template after a failure.
+- `validate(template)` reports structural problems before compilation, while
+  compilation additionally checks executable factor/constraint ownership and
+  numeric arrays.
+
+## Compile, run, and read results
+
+Compile once for a fixed template shape. Observations and same-shaped parameter
+values are runtime inputs; a changed horizon, cardinality, dimension, dtype, or
+schedule selects another JAX executable. `set_params` performs validated named
+writes into `state.params` and preserves serialized parameter tying.
+
+Never consume `result.state` as if the iteration budget implied success. Use
+`result.require_converged()` or branch explicitly on `result.status`:
+
+| Status | Meaning |
 |---|---|
-| `VariableSpec` | a discrete random variable (an edge; connects ≤ 2 factors) |
-| `FactorSpec` | a distribution node: `categorical`, `matrix_cat`, `transition_mixture`, `equality`, `dirichlet` |
-| `ConstraintSpec` | a bead: `P_SUBSTITUTION` (adds the epistemic/GFE drive), `DELTA` (MAP readout), `MEAN_FIELD` (VMP), or `MOMENT_MATCHING` with an explicit factor endpoint and moment projection |
-| `PortSpec` | a dangling edge with a role: `data` (sensor), `goal`, `prior`, `glue` (composition) |
-| `AgentSpec` | serialized action, sensor, actuator, and rolling-boundary bindings for `RollingAgent` |
+| `CONVERGED` | The selected engine certificate passed for the returned state |
+| `BUDGET_EXHAUSTED` | The state may be useful diagnostically, but the requested certificate did not pass |
+| `DIVERGED` | A non-finite or failed numerical path invalidated the solve |
+| `INFEASIBLE` | The declared support or constraints admit no valid solution under the solver contract |
 
-The load-bearing invariant: every variable is either fully connected or
-exposed through exactly one port — so "no dangling edges" and "models
-compose" are the same rule.
+Readouts are family-specific on purpose:
 
-The papers' constraint language is broader than this executor. A construction
-is usable only when its factor family, bead combination, message rule, and
-free-energy owner are registered together. The architecture inventory marks
-each paper construction exact, a named approximation, syntax only, or
-unsupported; serialized syntax alone is never evidence of execution.
-
-**The one bead that matters most:** `P_SUBSTITUTION` on an observation factor
-facing a goal factor turns that pair into a GFE composite — the agent then
-*values information* about that observation. Without it you get a KL-control
-agent that never explores (we test this: same graph, one bead, 90% vs 0% on
-the T-maze).
-
-## Build a model
-
-For the common case — a discrete POMDP over a time window — one call:
-
-```python
-import numpy as np
-from cffg.models.rollout import build_rollout
-
-template, arrays = build_rollout(
-    "my_world",
-    steps=3,          # slices in the window
-    past=0,           # slices 1..past are perception (data ports act{k}/obs{k})
-    d=d,              # prior over the initial state          [K]
-    A=A,              # observation model, column-stochastic   [M, K]
-    c=c,              # goal prior over observations           [M]
-    e=e,              # control prior                          [U]
-    Bs=Bs,            # per-control transitions, col-stochastic [U, K, K]
-    gfe=True,         # P-beads on future observations (curiosity on)
-)
-```
-
-`cffg.models.tmaze` and `cffg.models.gridworld` are two worked instances of
-this. When a joint state would make every controlled transition quadratic in
-the full Cartesian cardinality, declare named blocks and only the products
-the model actually uses:
-
-```python
-from cffg.models import (
-    CouplingSpec, ObservationSpec, StateBlockSpec, build_factored_rollout,
-)
-
-template, arrays = build_factored_rollout(
-    "position-and-mode",
-    steps=3,
-    blocks=(
-        StateBlockSpec(
-            "position", d_position, B_position_by_mode_and_action,
-            selector="mode_parent",
-            transition_learnable="position_transition",
-        ),  # B shape [K_mode, U, K_pos, K_pos]
-        StateBlockSpec(
-            "mode", d_mode, B_mode,
-            transition_learnable="mode_transition",
-        ),  # B shape [U, K_mode, K_mode]
-    ),
-    couplings=(
-        CouplingSpec("mode_parent", ("mode",)),
-        CouplingSpec("joint_sensor", ("position", "mode")),
-    ),
-    actions=e,
-    observation=ObservationSpec(
-        "sensor", "joint_sensor", A_joint, c,
-    ),
-)
-```
-
-Component order is explicit and uses NumPy/C flattening (rightmost component
-fastest). The builder serializes one mean-field `BeliefBinding` per block,
-ties each declared parameter blob across time, and lowers products/fan-out to
-existing deterministic `transition_mixture`/equality nodes. It does not add a
-flat joint transition table. `build_factored_corridor` is the ready-made
-position × mode example; pass `observation_matrix=` and
-`observation_source="position" | "mode" | "state"` for identifying or
-aliased sensors.
-
-For other custom topologies, build the `Template` by hand (see
-`tests/conftest.py` for a hand-built HMM slice) and grow big models from
-small ones:
-
-```python
-from cffg.core.compose import unroll, compose
-chain = unroll(slice_template, 10, {"tail": "head"})     # glue-port chaining
-model = compose(prior_template, chain, {"attach": "t0/head"}, name="hmm10")
-```
-
-An uncertain categorical table can also live inside the graph. Bind the
-likelihood's parameter role through `param_edges`, face that edge with a
-`dirichlet` prior, and put a `MEAN_FIELD` bead on the likelihood. The carrier
-cardinality is the flattened table size; the prior blob retains its canonical
-shape:
-
-```python
-from cffg.core import ConstraintKind, ConstraintSpec, FactorSpec, VariableSpec
-
-variables["A_edge"] = VariableSpec("A_edge", M * K)
-factors["A_prior"] = FactorSpec(
-    "A_prior", "dirichlet",
-    edges={"out": "A_edge"},
-    param_blobs={"counts": "alpha_A"},       # alpha_A.shape == (M, K), all > 0
-)
-factors["obs"] = FactorSpec(
-    "obs", "matrix_cat",
-    edges={"out": "x", "in": "z"},
-    param_edges={"matrix": "A_edge"},
-)
-constraints.append(ConstraintSpec(ConstraintKind.MEAN_FIELD, "obs"))
-```
-
-The likelihood sends fractional state counts into the posterior and consumes
-`E[log A]` in return. After inference,
-`engine.dirichlet_marginals(state)["A_edge"]` reports `alpha`, `mean`,
-`expected_log`, and `proper`. An unconstrained latent parameter edge is
-rejected because exact sum-product is not Dirichlet-closed.
-
-A recurrent switching model can make its regime transition depend on a
-Gaussian drive without discretizing that drive. Add a `recurrence_link` whose
-two categorical edges have the same `K >= 2` cardinality:
-
-```python
-factors["switch"] = FactorSpec(
-    "switch", "recurrence_link",
-    edges={"out": "z_next", "in": "z_prev", "drive": "x"},
-    param_blobs={"weights": "switch_weights", "offsets": "switch_offsets"},
-)
-arrays["switch_weights"] = weights  # [K, K - 1, d], source/stick/drive
-arrays["switch_offsets"] = offsets  # [K, K - 1]
-```
-
-For source regime `i`, stick `l` has logit
-`weights[i,l] @ x + offsets[i,l]`; destination `j < K - 1` accepts stick `j`
-after rejecting earlier sticks, and the last destination rejects them all.
-Inference uses a structured source/destination pair belief. Current Gaussian
-moments define a Pólya–Gamma/Jaakkola–Jordan expected-log transition table;
-log-space sum-product sends both categorical messages, and the same pair gives
-the Gaussian-drive message. On an acyclic ordinary categorical recurrence
-component this is exact inference for the bounded table. A categorical loop
-uses local Bethe beliefs and carries no exact-chain claim. The reported VFE is
-a documented upper bound on the exact-transition VFE at the same Gaussian
-belief. Exact regime zeros stay exact, while an improper Gaussian drive is
-divergence. `engine.arena.recurrence_components` records the derived component
-membership and `acyclic` classification.
-
-Hybrid learning and forecasting use factor-local readouts rather than products
-of endpoint marginals:
-
-```python
-stats = engine.gaussian_node_stats(state)
-transition = stats["transition"]
-transition["responsibility"]   # [K], soft regime belief
-transition["Syy"]              # [K, dy, dy], already responsibility-weighted
-transition["Syx"]              # [K, dy, dx + 1], offset column included
-transition["Sxx"]              # [K, dx + 1, dx + 1]
-
-forecast = engine.gaussian_mixture_predictives(state)["transition"]
-forecast["component_mean"]       # [K, dy]
-forecast["component_covariance"] # [K, dy, dy]
-forecast["mean"], forecast["covariance"]
-```
-
-`gaussian_mixture_predictives` is a one-step factor-to-output cavity
-predictive, not the posterior output marginal: it uses the selector and input
-messages but excludes downstream evidence facing `out`. Prior-mixture
-statistics name their arrays `weighted_mean` and `weighted_second` to make the
-weighting explicit. `recurrence_pair_beliefs` exposes a `recurrence_link`'s
-normalized `[source, destination]` pair, its two marginals, literal support,
-direct Gaussian drive moments, and the at-risk/signed-success masses shared by
-inference and learning. `gaussian_node_stats` includes that same record, with
-`in_probability`/`out_probability` compatibility aliases. The pair is derived
-from current factor cavities; it is not independently persisted.
-Every hybrid record has `proper`; consumers must reject a false value and its
-shape-preserving NaNs.
-
-The between-trial recurrence update is deliberately short and remains outside
-JIT, like NIW/MNIW learning:
-
-```python
-from cffg.conj import vague_pg_weights
-
-posterior = vague_pg_weights(regimes=K, dimension=d)
-stats = engine.recurrence_weight_stats(state)["switch"]
-if not stats["proper"]:
-    raise ValueError("improper recurrence belief")
-posterior = posterior.update(stats["linear"], stats["quadratic"])
-weights, offsets = posterior.rollover()  # next trial's parameter arrays
-```
-
-`linear` and `quadratic` use the same structured pair and coordinate-optimal PG
-mean as the Gaussian drive message. Exact-zero pair exposure contributes exact
-zero natural statistics, so an unexposed source/stick retains its prior. The
-rollover is an empirical-Bayes point estimate; it does not claim to carry
-weight uncertainty inside inference.
-
-### Gaussian moment constraints
-
-Moment matching selects one factor's attachment to an edge and the moments
-that must agree there. To select Gaussian mean and covariance at the `in`
-role of a Gaussian factor named `sensor`:
-
-```python
-from cffg.core import MomentProjection, moment_matching
-
-template.constraints.append(
-    moment_matching("sensor", "in", MomentProjection.GAUSSIAN)
-)
-```
-
-The serialized projection records first and second moments, which determine
-Gaussian mean and covariance. Select the other factor's endpoint separately
-if both ends should be constrained. Diagrams use the paper's `E` edge bead
-and dash only the selected half-edges.
-
-The analytic Gaussian prior and linear conditional accept this projection;
-their inference and free energy are unchanged because those moments determine
-the entire Gaussian density. Other bindings must declare a compatible rule.
-An old factor-only `MOMENT_MATCHING` declaration can be loaded, but compilation
-and drawing reject it. Use `migrate_moment_matching(old, template, role=...,
-projection=...)` with explicit choices; migration never guesses either value.
-
-### Nonlinear Gaussian means
-
-`gaussian_nonlinear` represents `Y | X ~ N(g(X), V)` with positive-definite
-noise covariance `V`. Its `FunctionSpec` records the portable mean identity,
-configuration, version, and approximation method. For example, this noisy
-cubic sensor uses `g(x) = x + 0.3 x^3`:
-
-```python
-import numpy as np
-from cffg import Engine, compile_template
-from cffg.core import (
-    BlobRef, FactorSpec, FunctionSpec, MomentProjection, PortRole, PortSpec,
-    Template, VariableSpec, moment_matching,
-)
-
-arrays = {"m": np.array([0.25]), "P": np.array([[0.5]]),
-          "theta": np.array([0.3]), "V": np.array([[0.16]])}
-template = Template(
-    "cubic-sensor",
-    variables={v: VariableSpec(v, dim=1) for v in ("x", "y")},
-    factors={
-        "prior": FactorSpec("prior", "gaussian", {"out": "x"},
-                            param_blobs={"mean": "m", "cov": "P"}),
-        "sensor": FactorSpec("sensor", "gaussian_nonlinear", {"in": "x", "out": "y"},
-                             param_blobs={"parameters": "theta", "cov": "V"},
-                             function=FunctionSpec("cffg.mean.cubic", "1.0.0", method="sigma_point")),
-    },
-    ports={"y": PortSpec("y", "y", PortRole.DATA)},
-    blobs={name: BlobRef(name, name + ".npy") for name in arrays},
-    constraints=[moment_matching("sensor", "in", MomentProjection.GAUSSIAN)],
-)
-engine = Engine(compile_template(template, arrays=arrays))
-state = engine.bind_data(engine.init_state(), {"y": np.array([0.8])})
-result = engine.run(state, 40, tol=1e-8)
-state = result.require_converged()
-print(engine.gaussian_marginals(state)["x"])
-print(engine.objective_metadata["sensor"])
-```
-
-`linearization` uses the current input-cavity mean and Jacobian. `sigma_point`
-uses a fixed scaled unscented rule with `alpha=1, beta=2, kappa=0`; its residual
-covariance includes curvature. Neither method adds a numerical noise floor.
-The built-in `cffg.mean.affine` takes a flattened row-major matrix followed by
-its offset. Register another mean with `MeanImplementation(impl_id, version,
-parameter_shape, evaluate)` and `register_mean_function`. The shape callback
-receives `(input_dim, output_dim, configuration)`; the JAX-compatible evaluation
-callback receives `(x, flat_parameters, configuration)` and returns one output
-vector. Install the registration before loading a saved model. Arrays stay in
-blobs; JSON and `.cffgz` store the function declaration and required version.
-
-Adaptive factors use trust-region inference, including on trees. The solver
-rebuilds approximations as cavities change and checks both the full fixed-point
-residual and the energy change. `outer_residual`, `rejected_steps`, and
-`termination_reason` expose that certificate; `residual` retains the existing
-energy-change meaning. Manual Picard runs and fixed damping are rejected for
-these factors. One `step` evaluates messages without certifying convergence.
-Local callbacks and trust kernels support JIT/vmap; full run control is on the
-host, including per-instance Colony runs.
-
-`engine.bfe(state)` includes normalized **frozen Gaussian Bethe surrogate**
-terms. `objective_metadata` labels their method, conditional stationarity, and
-unproved evidence bound; `objective_contract` labels the whole energy as approximate. A fixed point is not a claim that the total changing
-surrogate is stationary. `gaussian_node_stats` and `kernel_readouts` report
-`proper` and a `cffg.nonlinear.NonlinearFailure` code. Vacuous inputs return
-neutral dependent messages; invalid final beliefs have infinite energy and
-NaN moments. A missing DATA observation is marginalized. Exact zero noise,
-continuous-to-discrete means, and nonlinear P-substitution/GFE are excluded.
-
-#### Neural mean architecture
-
-`fixed_point_gradient(engine, result).require_valid()` returns the total weight
-derivative of a certified inference result. It includes changing cavities and
-local approximation coefficients; the objective remains the declared Gaussian
-surrogate. Stale, failed or exhausted solves cannot supply an applicable
-gradient. See DERIVATIONS D14 for the local isolated-root assumption.
-
-Use `neural_mean((input_dim, hidden_width, output_dim), method="sigma_point")`
-as the factor's `function`. This declares the `cffg.mean.mlp` implementation.
-`initialize_neural_parameters(function, key, dtype=...)` creates a flat weight
-array using the supplied JAX random key; store that array in the factor's
-`parameters` blob. The positive `cov` blob still describes output noise.
-
-Each layer stores its row-major weight matrix followed by its bias vector.
-Hidden layers apply `tanh` by default; `activation="identity"` is also
-supported. The output layer is affine. Architecture data stays in JSON and
-weights stay in blobs; loading/editing the declaration imports no JAX or
-Equinox. `estimate(engine, calibrate=False).declared_work` reports member count,
-network parameter count, scalar dense products and hidden activations per
-mean evaluation, and the method's value evaluations/Jacobian directions.
-These are declared operation counts, separate from backend FLOP estimates.
-
-#### Training and learned initialization
-
-`NeuralTrainer` performs deterministic full-batch Adam updates of the canonical
-weight blobs. Build one graph containing the training examples and share their
-weight blob; use `objective_scale=1 / example_count` to optimize mean energy.
-
-```python
-from cffg import NeuralTrainer, TrainingConfig
-
-trainer = NeuralTrainer(template, arrays, observations,
-                        config=TrainingConfig(objective_scale=1 / example_count))
-optimizer = trainer.initial_state()
-for _ in range(32):
-    update = trainer.step(optimizer)
-    optimizer = update.require_applied()
-trainer.save_checkpoint("optimizer.npz", optimizer)
-trainer.save_bundle("trained.cffgz", optimizer)
-```
-
-Every update requires certified inference and an independently certified
-adjoint solve. `update.objective` is the scaled energy **before** that update;
-`trainer.infer(optimizer)` evaluates the new weights. A refused update retains
-the original optimizer state. For restart, recreate the trainer with the
-original template, initial blobs, observations and settings, then call
-`trainer.load_checkpoint("optimizer.npz")`. The versioned continuation binds
-those inputs, dtype, tied parameter layout, optimizer moments and step count.
-It owns no random stream or minibatch position. The model bundle contains the
-trained point parameters for inference. These states are separate from
-conjugate `Learnables` posteriors.
-
-Smooth, deterministic GFE factors already admitted by the complete graph use
-their existing ledger and equations; the neural node remains a Gaussian
-surrogate. Nonlinear P-substitution, stochastic mu3 updates and discrete
-point-mass optimization are outside neural training's domain.
-
-`GaussianAmortizer.fit(template, arrays, training_observations, features=...)`
-trains an affine recognition output layer over `PolynomialFeatures`: powers
-of a declared weighted combination of scalar Gaussian observations. It fits
-only certified teacher roots in one fixed Gaussian chart. Feature scaling,
-output normalization, coefficients, reference messages, coordinate schema and
-model identity have versioned `save`/`load` persistence.
-
-```python
-from cffg import GaussianAmortizer, PolynomialFeatures
-
-recognition = GaussianAmortizer.fit(
-    template, arrays, training_observations,
-    features=PolynomialFeatures(("y",), (1.0,), scale=0.4, degree=3),
-)
-proposal, result = recognition.run(held_out_observations)
-state = result.require_converged()
-recognition.save("recognition.npz")
-```
-
-A proposal changes Gaussian starting messages only. Invalid or improper
-proposals are rejected without covariance floors; `run` then uses the supplied
-neutral start. Normal inference still certifies the final root. This API has
-no importance particles. Different roots remain possible in general nonlinear
-models; the paired benchmark checks final beliefs and energy as well as work.
-
-### Recurrent switching state-space models
-
-The model helper assembles a complete rSLDS with state-dependent regime
-transitions, per-regime linear dynamics, and shared linear-Gaussian emissions.
-It returns an ordinary serializable `Template`; parameters remain arrays and
-can be replaced between runs without recompilation:
-
-```python
-from cffg.compiler import compile_template
-from cffg.engine import Engine
-from cffg.models import rslds, vague_rslds_learning
-
-template, arrays = rslds(
-    n_steps=T,
-    dynamics_matrix=A,                 # [K, d, d]
-    dynamics_offset=b,                 # [K, d]
-    dynamics_covariance=Q,             # [K, d, d]
-    recurrence_weights=Rz,             # [K, K - 1, d]
-    recurrence_offsets=rz,             # [K, K - 1]
-    emission_matrix=H,                 # [dy, d]
-    emission_covariance=V,             # [dy, dy]
-    initial_state_mean=m0,             # [d]
-    initial_state_covariance=P0,        # [d, d]
-    initial_regime_probability=pi,     # [K]
-)
-engine = Engine(compile_template(template, arrays=arrays))
-learning = vague_rslds_learning(K, d)
-
-state = engine.init_state()  # first trial uses the arrays supplied above
-state = engine.bind_data(
-    state, {f"y{t}": observation for t, observation in enumerate(ys)}
-)
-result = engine.run(state, 200, tol=1e-7)
-result.require_converged()
-learning = learning.update(engine, result)
-
-# A later trial reuses the compiled engine with learned point parameters.
-next_state = learning.install(engine, engine.init_state())
-```
-
-The template declares all four fitted families: the initial-regime
-Dirichlet, component-MNIW dynamics, PG recurrence block, and tied emission
-MNIW. `RSLDSLearning` is the compatibility facade for the historical
-distinct-trial API: `install` accepts a fresh state and writes the current
-initial-regime, dynamics, and recurrence point parameters, while `update`
-accumulates a status-bearing result into those three posteriors. Its generic
-checkpoint is available through `state_dict(engine)` and
-`load_state_dict(engine, data)`. The facade deliberately leaves emission
-fixed; use `Learnables` directly when a distinct-trial application also
-learns emission. The recurrence offsets
-already represent the ordinary source-specific transition baseline; multiplying
-a separate `matrix_cat` into the same transition would require a new normalized
-factor and free-energy derivation.
-
-Recurrence checkpoints include a scalar manifest naming
-`cffg.recurrence.d9-structured-pair/1.0.0`, the contributing factor sources,
-parameter blobs, hyperparameter dtypes, and shapes. A pre-manifest `v2:` or
-slash-key checkpoint may contain D8 singleton-product statistics and is
-therefore rejected for recurrence, even though its array keys and shapes still
-fit. `vague_rslds_learning` and direct `RSLDSLearning(...)` construction define
-fresh priors; `update` and `load_state_dict` return objects explicitly marked
-with the D9 identity. To carry an old posterior forward as a prior, construct a
-new prior deliberately and rerun inference; do not relabel the old checkpoint
-as a D9 posterior. That is a new D9 run, not checkpoint resume; CFFG provides
-no D8-posterior migration. Per-array digests bind the manifest to the exact
-persisted values.
-
-For one-sequence observed-only fitting, use the host-side coordinate loop. It
-chooses latent coordinates from the observations, compiles one engine, and
-estimates every rSLDS parameter family without accepting generating states,
-regimes, or parameters:
-
-```python
-import jax
-
-from cffg.models import (
-    PCAARHMMInitializer,
-    fit_rslds,
-    vague_rslds_fit_priors,
-)
-
-fit = fit_rslds(
-    observations,                         # [T, dy], floating and finite
-    regimes=K,
-    latent_dimension=d,
-    initializer=PCAARHMMInitializer(),
-    priors=vague_rslds_fit_priors(K, d, observations.shape[1]),
-    max_outer_iterations=20,
-    max_inner_iterations=500,
-    inner_tolerance=1e-5,
-    key=jax.random.key(0),
-)
-
-if fit.status.value == "diverged":
-    raise RuntimeError(fit.error)
-
-# The fitter certifies the state once after its terminal parameter write.
-final = fit.last_inference.require_converged()
-fit.save_bundle("fitted.cffgz")   # template, points, immutable priors, posteriors
-```
-
-`PCAARHMMInitializer` uses PCA for a reproducible observation-derived latent
-coordinate system, clusters consecutive latent pairs, and fits local
-autoregressions. The explicit key selects cluster centers. Each outer
-coordinate reruns hidden-variable inference and recomputes the initial-regime,
-per-regime dynamics, recurrence, and shared-emission posteriors from the same
-immutable priors. One `Learnables.replace` validates all four candidate
-posteriors before committing them, and one atomic write installs every point
-value. The shared emission is the ordinary tied `gaussian_linear` MNIW
-learnable, so every time slice contributes once. The continuous
-initial-state mean and covariance are fixed initializer outputs, not fitted
-posteriors.
-
-This replacement cadence is different from `RSLDSLearning.update`: `update`
-accumulates evidence from a new independent trial, while `fit_rslds` replaces
-one sequence's coordinates and never counts that sequence again as new data.
-The fit result reports `converged`, `budget_exhausted`, or `diverged`, preserves
-the terminal inner-engine status, and keeps the inner Bethe free-energy trace
-separate from the scale-normalized outer fixed-point residual. That residual
-compares the normalized initial-regime potential and every dynamics,
-recurrence, and emission value installed into the next solve. The historical
-posterior/reporting snapshot and a truth-free transition-function residual
-remain available in `fit.phases` as diagnostics. After a finite
-inner budget exhaustion, the default two retries restart from the same fresh
-state and double the convex update fraction while preserving the fixed point;
-`max_inner_retries=0` retains one fixed-damping attempt. `fit.phases` records
-each damping, status, recurrence status, energy and message-delta tail,
-Gaussian propriety check, and parameter scale. The default outer tolerance is
-dtype-scaled and must hold twice consecutively. A finite outer iteration limit
-may therefore return useful fitted parameters with `budget_exhausted`; it is
-not silently relabeled as convergence.
-
-Functional `mu3` engines are unsupported by this fitter and are rejected
-before inference because the retry policy has no explicit key and fixed-sample
-reuse contract. Fit coordination remains rSLDS-owned until another production
-model proves that its retry, runtime-certificate, and terminal-solve policy has the same
-interface; only the declared-learning transaction is currently shared.
-
-The original canonical NASCAR check supplied the generating parameters and,
-at `T=10,000`, converged in 248 sweeps with `0.001264` latent-state RMSE and
-`99.95%` MAP regime accuracy. The preregistered observed-only comparison then
-fit 8,000 of the same 10,000 generated observations under one disjoint seed:
-
-| Fitted arm | Scalars | Held-out mean log likelihood | Aligned latent RMSE | Aligned regime accuracy | 10,000-step periodicity |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| rSLDS, K=4 | 160 | 30.550824 | 0.001583 | 86.325% | 0.517638, bounded |
-| SLDS, K=4 | 136 | 30.237528 | 0.001559 | 88.8875% | 0, unbounded |
-| SLDS, K=5 | 154 | 31.762280 | 0.002027 | 99.6375% | 0, unbounded |
-
-All arms preserved `budget_exhausted` after the registered two outer
-coordinates, with converged inner and final inference. Exactly one registered
-claim passed: rSLDS held-out prediction exceeded the same-`K` SLDS by
-`0.313296`, above the `0.005` margin. The latent- and regime-recovery margins
-missed, so no recovery advantage is claimed; no claim was registered against
-the K=5 budget-matched arm. The bounded rSLDS rollout is reported as an
-unregistered observation, not promoted to an advantage claim. Exact artifacts
-live in `../experiments/cffg-nascar-validation` at experiment commit `f4e7b0f`
-with results SHA-256 `99d02c92315357e1d778146c7b7ca74cd20aa2390f4ad165ed17515fba29548e`.
-
-Cold setup was a separate host-grounding concern rather than an rSLDS rule or
-JAX-kernel defect. Linear incidence indexes removed the per-variable template
-rescans. In three fresh CPU/x64 workers per path at `T=10,000`, median setup
-fell from `741.361` to `24.060` seconds (`30.81×`), while median converged
-inference changed from `27.342` to `27.020` seconds. Messages, exact support,
-readouts, BFE, and statuses were identical at `T=100`, `1,000`, and `10,000`;
-indexed peak RSS was `1.948` GiB. The reproducible command, every raw phase
-sample, profiles, environment, and hashed arrays live in
-`../experiments/cffg-nascar-validation` at commit `1b1b714`.
-
-## Write named parameters and learn Gaussian factors
-
-Runtime parameter arrays are grouped by factor family and shape. Use factor
-names and serialized parameter roles instead of editing those stacked arrays by
-position:
-
-```python
-from cffg import set_params
-
-params = set_params(
-    engine,
-    engine.init_state().params,
-    {
-        "emission0": {
-            "matrix": H,
-            "offset": h,
-            "cov": R,
-        }
-    },
-)
-```
-
-`set_params` validates every requested value before changing its returned
-mapping. Probability roles keep literal zero as the runtime log-zero sentinel;
-covariances must be finite, symmetric, and positive definite and become the
-runtime precision. A write to one blob/role reaches every factor tied to that
-same serialized blob. Unequal requests through two tied factors are rejected.
-Supported named-write factors are `categorical`, `matrix_cat`,
-`transition_mixture`, `gaussian`, `gaussian_linear`, `gaussian_mixture`,
-`gaussian_mixture_linear`, `recurrence_link`, and `gaussian_prec`.
-
-Declared learning supports NIW for `gaussian`, MNIW for `gaussian_linear`, a
-component MNIW for `gaussian_mixture_linear`, and Pólya–Gamma Gaussian weights
-for `recurrence_link`. An observed Gaussian-linear emission uses the same MNIW
-pairing after compilation to its conditioned runtime rule:
-
-```python
-from cffg import conj
-from cffg.core import LearnableSpec
-from cffg.learn import Learnables
-
-template.learnables["emission"] = LearnableSpec(
-    "emission",
-    "mniw",
-    ("emission_matrix", "emission_offset", "emission_covariance"),
-)
-template.learnables["dynamics"] = LearnableSpec(
-    "dynamics",
-    "component_mniw",
-    ("dynamics_matrix", "dynamics_offset", "dynamics_covariance"),
-)
-template.learnables["recurrence"] = LearnableSpec(
-    "recurrence",
-    "pg_weights",
-    ("recurrence_weights", "recurrence_offsets"),
-)
-engine = Engine(compile_template(template, arrays=arrays))
-learnables = Learnables(
-    engine,
-    priors={
-        "emission": conj.vague_mniw(observation_dim, state_dim),
-        "dynamics": tuple(
-            conj.vague_mniw(state_dim, state_dim) for _ in range(regimes)
-        ),
-        "recurrence": conj.vague_pg_weights(regimes, state_dim),
-    },
-)
-
-result = engine.run(bound_state, 200, tol=1e-7)
-learnables.replace(engine, result)       # same sequence: reset from fixed prior
-next_params = learnables.write(engine, engine.init_state().params)
-```
-
-Pass the status-bearing `RunResult`; learning refuses an unfinished or
-diverged run. `replace` is idempotent for unchanged one-sequence statistics.
-Use `accumulate` instead when the result is a new independent trial whose
-evidence should be added to the current posterior. Both operations pool all
-tied source factors and commit all selected posteriors atomically. Reporting
-uses `learnables.expected(name, role)`; inference rollover writes
-`psi / nu`, the inverse expected precision, rather than the posterior-mean
-covariance. `component_mniw` stores `m`, `lam`, `psi`, and `nu` with a leading
-selector-component axis; exact zero responsibility adds exact zero statistics
-and leaves that component at its prior. `pg_weights` stores `eta` and
-`precision` with source-regime, stick, and augmented `[drive; offset]` axes,
-then rolls posterior means into separate weights and offsets. Both families
-remain host-side empirical-Bayes updates and reject improper or non-finite
-statistics before mutation.
-
-Every `LearnableSpec` now records a namespaced `semantic_identity` for its
-update and sufficient statistics. New Python declarations select the current
-family identity automatically; changing that identity changes the model's
-structure hash. `learnables.persistent_descriptors()` describes each prior and
-posterior array, its dtype and shape, and the sources and parameter targets it
-belongs to. All five registered families support this descriptor.
-
-`state_dict()` includes a scalar JSON learning manifest alongside the keyed
-posterior arrays. Use `hyperparameter_snapshot()` for numeric-only diagnostics.
-Restore validates metadata and values before changing any posterior and
-preserves the stored floating dtype. This API restores posteriors; the initial
-priors remain those supplied when constructing the destination `Learnables`.
-`load_state_dict(..., exact=False)` accepts complete posteriors for selected
-learnables and leaves other posteriors unchanged. `exact=True` requires every
-destination learnable. Missing arrays within a supplied posterior fail in
-either mode before any state changes.
-
-Pre-identity JSON declarations for `dirichlet`, `niw`, `mniw`, and
-`component_mniw` migrate to their documented `/1.0.0` identities. Their old
-bare-name, slash-key, and `v2:` checkpoints remain readable when they contain
-complete multi-array posteriors. Current declarations missing an identity,
-unknown versions, and mismatched ownership fail with the affected learnable's
-name. A standalone unversioned `pg_weights` JSON declaration or unidentified
-recurrence posterior fails with a D8/D9 migration diagnostic: compatible shapes
-cannot establish which statistics produced it. Older checkpoints with an
-explicit D9 recurrence manifest remain readable. Alpha CFFGZ loading supports
-only the current bundle schema; older model-only archives are rejected.
-Missing priors or posterior provenance are never inferred from point estimates.
-
-## Run inference
-
-```python
-from cffg.compiler import compile_template
-from cffg.engine import Engine
-
-engine = Engine(compile_template(template, arrays=arrays))
-state  = engine.init_state()
-state  = engine.bind_data(state, {"obs1": 4, "obs2": None})   # clamp / missing
-result = engine.run(state, 200, tol=1e-12)                      # solve to stationarity
-state  = result.require_converged()                             # raises on every other status
-
-engine.marginals(state)["u1"]   # posteriors by variable name
-engine.bfe(state)               # model-declared BFE, GFE, approximation, or bound
-```
-
-D12 derives a proposed hybrid regime/state approximation that preserves
-source-conditioned moments across declared regions. It is currently an
-experiment, with no public template selection or checkpoint format. Production
-continues to use D9. The proposed construction, ordinary boundary adapters,
-unsupported association cuts, and remaining temporal-mixture error are recorded
-in [D12](docs/DERIVATIONS.md#d12--hybrid-regimestate-separators-cff-ocxl).
-Implementation and persisted-state migration are tracked separately before
-source-recovery qualification.
-
-For hybrid regime epistemics, place a `P_SUBSTITUTION` constraint with
-`substituted_role="out"` on a `gaussian_mixture` or
-`gaussian_mixture_linear` factor whose output faces a fixed `gaussian` goal.
-The compiler derives one D5 composite; Gaussian state edges keep their D3
-messages while the selector solves the regime-information coordinate:
-
-```python
-result = engine.run(engine.init_state(), 200, tol=1e-8)
-state = result.require_converged()
-terms = engine.hybrid_gfe_diagnostics(state)["emission"]
-terms["rho"]                       # stationary regime belief
-terms["mi_regime_surrogate"]       # scored collapse surrogate
-terms["mi_regime_exact_lower"]     # diagnostic sandwich
-terms["mi_regime_exact_upper"]     # includes the H(rho) cap
-terms["bound_direction"]           # reported_gfe_lower_bounds_exact
-```
-
-The direct ledger term is the optimistic D5 `G-hat`, never its stationary
-Lagrangian. Exact selector zeros remain exact; improper state, emission, or
-goal covariances cannot return a converged result.
-
-To let future planning slices send the nonconjugate Part-II `mu3(A)` message
-back toward a learned observation model, opt in when building the rollout and
-prepare one reproducible particle set after installing the current proper
-Dirichlet posterior:
-
-```python
-import jax
-
-template, arrays = build_rollout(
-    "planning_with_parameter_epistemics",
-    steps=3, d=d, A=A, c=c, e=e, Bs=Bs,
-    gfe=True, learned_a=True, mu3=True,
-)
-arrays["Ac"] = alpha_A                       # perception/VMP posterior, all > 0
-engine = Engine(
-    compile_template(template, arrays=arrays),
-    mu3_samples=4096,
-    mu3_min_ess_fraction=0.1,
-)
-state, next_key = engine.prepare_mu3(
-    engine.init_state(), jax.random.PRNGKey(7)
-)
-result = engine.run(state, 200, tol=1e-8)
-result.require_converged()
-engine.mu3_diagnostics(result.state)         # weighted moments, log Z, KL, ESS
-```
-
-Particles remain fixed during that run. Reusing the same key is bitwise
-reproducible; use only `next_key` for a refresh. A changed `alpha_A` requires a
-fresh `prepare_mu3` call. `Engine.score_mu3_epochs` refreshes particles between
-policy-scoring epochs and averages only converged post-burn-in scores; burn-in
-does not turn an unfinished or collapsed estimate into convergence.
-
-`RollingAgent(learn_a=True)` keeps that analytic-moment path as its
-deterministic default. Add `mu3=True, mu3_key=key` to select the serialized
-functional evaluator in the planning template; the one-slice perception
-template stays analytic and supplies the next proper Dirichlet base posterior.
-The agent exposes `last_plan_result`, `planning_diagnostics`,
-`planning_key_cursor`, and `planning_epoch`. It returns no action unless both
-ordinary inference and every functional evaluator converge.
-
-A learned goal uses the conjugate Fig. 5 `mu1(c)` path. Future slices sharing
-`Cc` add their predictive observation mass into one Dirichlet posterior:
-
-```python
-template, arrays = build_rollout(
-    "learned_goal",
-    steps=3, d=d, A=A, c=c, e=e, Bs=Bs,
-    gfe=True, learned_c=True, c_counts=alpha_c,
-)
-engine = Engine(compile_template(template, arrays=arrays))
-trial = engine.run(engine.init_state(), 200, tol=1e-8)
-trial_state = trial.require_converged()
-next_prior = engine.goal_prior_updates(trial_state)  # {"Cc": alpha_c + Σ Abar zbar}
-
-# Rollover is accepted only on a fresh state: sweeps are not new trials.
-next_state = engine.with_goal_priors(engine.init_state(), next_prior)
-```
-
-`E[log c]` drives the learned-goal GFE coordinate. This generic predicted-mass
-rollover is explicit; ordinary observed categorical learning remains the D6a
-parameter-edge path. `RollingAgent(..., learn_goal=True,
-initial_goal_counts=alpha_c)` stages the latest converged planning posterior
-and commits it once at `reset_episode`; checkpoints preserve a pending
-uncommitted trial exactly.
-
-Plans containing GFE composites use the fixed-support trust-region outer
-solver automatically. Caller-tuned `damp` is rejected on that path; use
-`outer_solver="picard"` only to reproduce or diagnose the historical
-fixed-point iteration. `result.status` is one of `converged`,
-`budget_exhausted`, `diverged`, or `infeasible`. Its `outer_residual`,
-`outer_merit`, `outer_gradient_norm`, `trust_radius`, accepted/rejected step
-counts, `outer_map_evaluations`, `trial_evaluations`, `linear_iterations`,
-`solver_compilations`, and `termination_reason` explain a GFE classification;
-the merit never enters `engine.bfe` or a policy score. Fixed chart/support,
-dtype, and hardening phases reuse derivative kernels while observations and
-parameters remain dynamic inputs. Convergence requires a coupled outer root,
-successful local solves, coherent exact support, and a finite stationary FE
-ledger. On ordinary normalized BP trees
-`bfe` equals −log evidence exactly; with no data it is 0 for a normalized
-model — both make good sanity checks. Parameters are *inputs* (`state.params`),
-so you can swap them per run without recompiling.
-
-`Engine.run` returned `(state, deltas)` before cff-j4mu. That tuple API is
-intentionally not iterable now: use `result.state` when a fixed sweep budget is
-deliberate, or `result.require_converged()` before acting on beliefs.
-
-Schedules: the engine picks one automatically (cff-d56d). On an acyclic BP
-model over discrete, Gaussian, or EF edges — chains, trees, state-space
-models — `run` executes one exact inward/outward pass in O(E), certifies
-the fixed point with a fused verification sweep, and returns `converged`
-(even with `tol=None`; there is no sweep budget to exhaust). Loopy pure-BP
-models iterate colored Gauss–Seidel sweeps; models with iterative
-structures (mean-field beads, GFE composites, hard constraints, hybrid
-nodes, recurrence links) run block-phased: each sweep updates those
-structures, then refreshes the BP parts — tree-shaped parts exactly, loopy
-parts by one colored sweep — before convergence is judged. Only δ form
-constraints (and `damp > 0` on otherwise-exact models) still use plain
-flooding; `engine.schedule.kind` and `.reason` say what you got. Force
-flooding with `Engine(arena, schedule="flood")`.
-
-Recurrence links remain time-local factors in both paths. Each recurrence
-categorical pass is `O(T*K^2)` work with `O(T*K^2)` transient pair storage for
-`T` equal-cardinality links, while factor messages and the BFE keep local pair
-ownership. The current mixed scheduler does not fuse all recurrence links
-into a monolithic chain region; fusion may reduce the number of outer passes
-but cannot change the fixed point or counting numbers.
-
-## Run an agent
-
-```python
-import functools
-from cffg.agent import RollingAgent
-from cffg.models.gridworld import CorridorEnv, build_gridworld
-
-env   = CorridorEnv(k=6, seed=1)
-agent = RollingAgent(functools.partial(build_gridworld, k=6), horizon=3)
-for _ in range(10):
-    action, observation = agent.step(env.step)   # plan → act → filter belief
-
-agent.checkpoint("agent.npz"); agent.restore("agent.npz")
-```
-
-Two compiled engines cover any episode length: a planning window from the
-current beliefs and a one-slice filter that re-anchors them. `build_rollout`
-serializes the action readout, DATA ports, prior target, posterior readout, and
-episode learnable in `template.agent`; custom builders must declare the same
-interface with their own model-local names. A one-block model retains the
-`agent.belief` array. Multi-block models use `agent.beliefs[name]`, and their
-joint versus mean-field rollover is explicit in each `BeliefBinding` rather
-than inferred by the runtime.
-
-These are two immutable templates, not the paper's one growing trial graph
-whose future planning bead is replaced by a data bead. An independent two-step
-enumerator establishes that this window transformation preserves both action
-posteriors, the intervening filter posterior, exact-zero support, and the local
-objective ledger for a fixed-A binary discrete model with one joint boundary.
-That is the validated equivalence boundary, not a literal-graph claim or a
-general result for other boundary families.
-
-Pass
-`learn_a=True, initial_counts=...` for continual Dirichlet learning of the
-observation model (see `cffg/experiments/tmaze_learning.py` for the full
-perception–action–learning experiment corresponding to Part II Fig. 9). This
-analytic learned-A approximation does not carry functional `mu3(A)` messages
-between trials. The functional route is explicit:
-
-```python
-import jax
-
-agent = RollingAgent(
-    functools.partial(build_gridworld, k=6),
-    horizon=3,
-    learn_a=True,
-    initial_counts=alpha_A,
-    mu3=True,
-    mu3_key=jax.random.PRNGKey(7),
-    mu3_samples=4096,
-    mu3_min_ess_fraction=0.1,
-)
-action = agent.act()
-agent.planning_diagnostics       # evaluator, weights, log Z, KL, ESS, status
-next_key = agent.planning_key_cursor
-```
-
-The default `mu3_refresh="trial"` draws a fresh fixed particle set after a
-successful observation or episode reset; repeated `act()` calls in the same
-unchanged trial reuse the solved epoch and consume no key. Use
-`mu3_refresh="posterior"` to retain the particle set across a context-only
-rollover while refreshing whenever A changes, or call `refresh_mu3()` to
-declare an independent scoring epoch. The NumPy action-selection generator is
-separate from the JAX key stream. When a prepared epoch exists, versioned
-checkpoints preserve its complete state, result diagnostics, next key,
-evaluator/configuration identity, and base posterior without another split.
-Legacy checkpoints still restore the
-analytic path but are refused for a functional agent because they contain no
-stochastic continuation state.
-
-For behavioral calibration beyond the T-maze golden, the costly-cue experiment
-reports the quantities needed to audit an epistemic decision directly:
-
-```python
-from cffg.experiments.behavioral_epistemics import run_benchmark
-
-gfe = run_benchmark(gfe=True)
-bfe = run_benchmark(gfe=False)
-gfe.candidate_posterior_mi             # MI for left/right/cue/distractor
-gfe.realized_information_gain_by_seed  # posterior KL after the chosen action
-gfe.task_return_by_seed, gfe.regret_by_seed
-gfe.convergence_statuses, gfe.free_energies
-```
-
-The cue is reward-relevant, the distractor has the same uniform observation
-marginal but no context information, and the second action is replanned after
-the first observation. This is exact observation epistemics; dynamics
-curiosity's latent-next-state optimistic bound is a separate contract in
-`docs/LIMITATIONS.md` S1c.
-
-Many agents on one machine:
-
-```python
-from cffg.colony import Colony
-colony = Colony()
-ids = [colony.spawn(t, arrays_i) for arrays_i in per_instance_params]
-colony.run(100)                # grouped by structure
-colony.marginals(ids[0])
-```
-
-Engines are cached by structure hash, and instances couple only through their
-ports. Numeric parameters, including hard-constraint limits and allowed-tuple
-tables, belong to each instance. Ordinary iterative plans batch matching State
-shapes and dtypes and use vmapped rule iterations with host status tracking.
-Different table lengths use separate batches; one cached Engine can have
-several JAX shape/dtype specializations. Mixed-GFE plans
-reuse the compiled matrix-free kernels but currently run one trust controller
-per instance so radii, active supports, and termination reasons remain
-independent.
-
-## Edit, ship, budget
-
-```python
-from cffg.core.edits import (
-    AddFactor, apply_edits, bundle_from_json, bundle_to_json, check_edits,
-)
-new_t   = apply_edits(t, actions)     # all-or-nothing; original untouched
-problems = check_edits(t, actions)    # dry-run: [] means applicable
-# actions round-trip through JSON (bundle_to_json / bundle_from_json)
-
-from cffg.bundle import save_bundle, load_bundle
-save_bundle("model.cffgz", template, arrays)   # zip: model + blobs + manifest
-template, arrays, manifest = load_bundle("model.cffgz")  # hash-verified
-
-# BlobRef paths use .npy or .safetensors; .cffgz stores .npy members.
-# RollingAgent checkpoints use a versioned, structure-bound .npz envelope.
-
-from cffg.estimate import estimate
-print(estimate(engine).summary())
-# state 9.1 KiB (messages 2.8, params 6.4) · 2.76e+04 flops/sweep · 0.203 ms/sweep
-```
-
-Schema-2 `.cffgz` bundles contain the template, point-parameter arrays, and
-complete declared-learning state: immutable priors and current posteriors.
-Pass `learnables=learning` to `save_bundle` for a template that declares
-learnables. Saving checks all inventories, family admissibility, ownership,
-shapes, dtypes and digests before atomically replacing the destination.
-
-This complete example saves an initialized model, loads it without external
-priors, learns from two converged trials, and saves the updated history:
-
-<!-- bundle-resume:start -->
-```python
-import equinox as eqx
-import numpy as np
-
-from cffg import Engine, compile_template, load_bundle, save_bundle
-from cffg.core import (
-    BlobRef, FactorSpec, LearnableSpec, PortRole, PortSpec, Template, VariableSpec,
-)
-from cffg.learn import Learnables
-
-template = Template(
-    name="sensor",
-    variables={"x": VariableSpec("x", cardinality=2)},
-    factors={"prior": FactorSpec(
-        "prior", "categorical", edges={"out": "x"}, param_blobs={"statistic": "p"},
-    )},
-    blobs={"p": BlobRef("p", "p.npy")},
-    ports={"observation": PortSpec("observation", "x", PortRole.DATA)},
-    learnables={"probabilities": LearnableSpec("probabilities", "dirichlet", ("p",))},
-)
-arrays = {"p": np.array([0.5, 0.5])}
-engine = Engine(compile_template(template, arrays=arrays))
-learning = Learnables(engine, priors={"probabilities": np.ones(2)})
-save_bundle("sensor.cffgz", template, arrays, learnables=learning)
-
-bundle = load_bundle("sensor.cffgz")
-learning = bundle.learnables
-engine = Engine(compile_template(bundle.template, arrays=bundle.arrays))
-for observation in (1, 0):                    # two distinct trials
-    state = engine.init_state()
-    params = learning.write(engine, state.params)
-    state = eqx.tree_at(lambda s: s.params, state, params)
-    state = engine.bind_data(state, {"observation": observation})
-    result = engine.run(state, 10)
-    learning.accumulate(engine, result)       # requires converged RunResult
-
-save_bundle("sensor.cffgz", bundle.template, bundle.arrays, learnables=learning)
-```
-<!-- bundle-resume:end -->
-
-Use `replace` instead of `accumulate` when recomputing the same sequence from
-its immutable prior. After loading, `Learnables.write` installs the posterior's
-inference parameters into each fresh state. Bundle point arrays remain in the
-model's serialized parameter form; a runtime parameter mapping is not a blob
-mapping. In particular, Dirichlet inference uses expected log probabilities,
-while Gaussian covariance rollover uses inverse expected precision. Reporting
-means remain available through `learning.expected`.
-
-`RSLDSFitResult` retains `template` and a complete `learnables` snapshot for its
-returned coordinate. `fit.save_bundle(path)` exports those priors and posteriors
-with the fitted point arrays and fixed continuous-state initialization. Loading
-that file uses the same inference, update, and resave workflow above. Tied
-sources, scoped names, and separate target blobs retain their declared owners.
-
-`LoadedBundle` also supports the historical `template, arrays, manifest`
-unpacking. A successful load reports `resumable=True`, including fixed models
-with an explicit empty learning inventory. During alpha, only the current
-bundle schema is supported: older or unknown versions raise `BundleError`.
-No prior or posterior statistics are reconstructed from point estimates, and
-D8 or unidentified recurrence state cannot be resumed as D9. A compatibility
-and migration contract will be established before the format stabilizes.
-
-Bundles capture a committed learning boundary for a later trial, not an exact
-mid-inference or agent-runtime snapshot. Public learner updates and snapshot
-capture share a lock. Callers must synchronize direct edits to templates,
-point arrays, or learner mappings. The supplied point arrays are retained
-exactly, including initialization points that differ from a prior's rollover.
-
-`.npz` is a ZIP container and does not support ordinary per-array memory
-mapping, so it is reserved for agent checkpoints rather than parameter blobs.
-The agent envelope is versioned and records an exact field manifest plus the
-planning and filtering structure and static-parameter hashes. It also records
-the horizon, solver budget, damping, and action-selection mode that determine
-continuation, including the JAX x64 execution setting captured when the agent
-is constructed.
-Restore rejects duplicate archive members and validates belief and learnable
-shapes, learned-goal state, cadence, runtime configuration, and NumPy action RNG
-before one atomic commit. An unknown version, field, structure,
-parameterization, configuration, or shape raises a specific error; legacy
-unversioned analytic checkpoints retain an explicit, completeness-checked
-migration path.
-Legacy formats without fixed-parameter hashes cannot detect a change to supplied
-fixed model data; use the current checkpoint format for that identity check.
-
-## Register a custom factor
-
-EF, ordinary discrete and Gaussian factor types are executable registrations
-(`cffg.kernels`, ARCHITECTURE 2e). Declare the structure, math, and
-robustness answers in one `FactorKernel`; the compiler, VM, ledger, and
-serialization dispatch from the registry:
-
-```python
-from cffg.core import FactorType
-from cffg.kernels import FactorKernel, HostileInputs, register_kernel
-
-register_kernel(FactorKernel(
-    factor_type=FactorType("exponential_obs", edge_roles=("out", "rate"), family="ef"),
-    impl_id="mypkg.exponential_obs", version="1.0.0",   # namespaced; serialized
-    arena="ef", family="gamma", message_roles=("rate",),
-    edge_families={"out": "exponential", "rate": "gamma"},
-    message=my_message, energy=my_energy,               # jnp, trace-safe
-    observed_out="exponential", validate_observation=my_validator,
-    hostile=HostileInputs(...),                         # required, or registration is refused
-))
-```
-
-Templates using the type record `(impl, version)` in their JSON/.cffgz;
-loading without the kernel registered fails loudly and names what to
-install. `tests/test_kernels.py` is the worked example, including the
-independent evidence oracle every kernel is expected to ship with.
-
-For a discrete factor, declare a `DiscreteBinding` instead of the legacy EF
-arguments. A two-role example has the following shape (callbacks supplied
-by the extension):
-
-```python
-from cffg import DiscreteBinding, DiscreteMode, ParameterSpec
-
-binding = DiscreteBinding(
-    roles=("spin", "color"),
-    parameters={"coupling": ParameterSpec(lambda sizes: (), key="strength")},
-    param_keys=("strength",), pack_params=my_pack,
-    potential=my_log_potential,  # (params, cards) -> [members, spin, color]
-    bp=DiscreteMode(my_bp_message, my_bp_energy, my_bp_readout),
-    vmp=DiscreteMode(my_vmp_message, my_vmp_energy, my_vmp_readout),
-)
-register_kernel(FactorKernel(
-    FactorType("spin_color", ("spin", "color"), ("coupling",)),
-    "mypkg.spin_color", "1.0.0", hostile=my_hostile_answers, binding=binding,
-))
-```
-
-BP messages receive `(cavities, params, cards, local_width, reduction)`;
-VMP messages receive `(beliefs, params, cards, local_width)`, where each
-role's belief is a normalized `(q, log_q)` pair from both edge messages.
-Both return `[members, roles, local_width]`, padded with `NEG`. Energies and
-readouts receive `(inputs, params, cards)` using that mode's input meaning.
-The packer receives `(template, members, resolved_arrays)` and returns every
-declared `[members, ...]` parameter. Shape providers receive role-size maps
-and support initializer reconstruction. The potential accessor also powers
-support checks, joint BP beliefs and decoded assignment scoring.
-
-`tests/test_discrete_kernels.py` contains the complete bilinear example,
-independent BP/VMP/energy oracles, float32 and cardinality-128 tests.
-
-A Gaussian extension uses information-form messages and can declare one
-observation-conditioned role:
-
-```python
-from cffg import GaussianBinding, GaussianConditioning
-
-binding = GaussianBinding(
-    roles=("field", "sensor", "offset"),
-    parameters={
-        "center": ParameterSpec(lambda sizes: (sum(sizes.values()),)),
-        "precision_root": ParameterSpec(
-            lambda sizes: (sum(sizes.values()), sum(sizes.values()))),
-    },
-    param_keys=("joint_precision", "joint_information", "log_scale"),
-    pack_params=my_joint_pack, message=my_joint_message, energy=my_joint_energy,
-    conditioning=GaussianConditioning("sensor", my_sensor_validator),
-    readout=my_joint_readout,
-)
-register_kernel(FactorKernel(
-    FactorType("joint_field_sensor", ("field", "sensor", "offset"),
-               ("center", "precision_root"), family="gaussian"),
-    "mypkg.joint_field_sensor", "1.0.0",
-    hostile=my_hostile_answers, binding=binding,
-))
-```
-
-Gaussian callbacks receive `(eta, precision, params, dims, observed_role, y,
-mask)`. Incoming blocks are `[members, roles, local_dimension]` and
-`[members, roles, local_dimension, local_dimension]`; message outputs are
-one exact-sized `(eta, precision)` pair per role. `observed_role` is a static
-index, or `None`. The validator receives `(value, dimension)` and returns
-the observation vector. Keep the observed role's cavity predictive and the
-conditioned factor's normalization constant. Missing data means marginalizing
-that role, not automatically deleting the factor.
-
-`tests/gaussian_kernel_fixture.py` is the complete joint-normal implementation;
-`tests/test_gaussian_kernels.py` checks it against independent Gaussian
-oracles, including float32 and dimension 100. Joint/nonlinear parameter packs
-without direct-write keys reconstruct from updated raw blobs through
-`compile_template`; registration does not automatically extend learning.
-Python binding fields are internal-unstable before 1.0; serialized
-implementation identities are stable.
-
-Registration is the path for an ordinary factor using one existing message
-representation. It does not turn every factor into the same variational object:
-BP cavities, mean-field beliefs, P-substitution composites and structural support
-constraints have different contracts. Multi-arena factors such as recurrence,
-GFE composites and hard constraints therefore have explicit compiler, execution
-and objective owners. "Specialized" names those declared paths; it is not a
-catch-all for an unrecognized type.
-
-For a new factor, start with the [extension matrix](docs/ARCHITECTURE.md#bounded-factor-extension-paths).
-It names the owners and the checks for initialization, learning, parallel instances
-and reconstruction. Staying within an existing binding requires no factor-name
-branch in the public compiler or Engine. A new representation or variational
-method needs an explicit design and mathematical contract, not just registration.
-
-## Consume the engine from an experiment harness
-
-Evaluation harnesses live *outside* this repo (sibling folders under
-`../experiments/`, one uv project per experiment, results never committed
-here). The patterns that matter, learned the measured way (2026-07-09):
-
-```toml
-# pyproject.toml of the harness
-[tool.uv.sources]
-cffg = { path = "../../cffg", editable = true }
-```
-
-- **Enable x64 once, first** (`jax.config.update("jax_enable_x64", True)`)
-  — the ledger identities the tests pin assume it; f32 works but your
-  tolerances won't match the docs.
-- **Compile once, swap parameters through state.** Parameters are *inputs*
-  to the jitted step (the colony contract): for trial loops, build the
-  Engine once for the graph *shape*, then use `set_params` or
-  `Learnables.write` and rebind observations. `Arena.member_of` is the
-  derived role-bearing address map when lower-level inspection is needed. A
-  loop that recompiles per trial is ~50× slower for nothing.
-- **Sliding windows are the streaming pattern**: fixed window shape,
-  compile once, thread the previous posterior in as the next window's
-  prior params. Measured: flat steady-state memory over 10⁵-step streams
-  (drift ≈ 0 after JIT warmup) at hundreds of filtered steps/sec.
-- **Convergence is diameter-bound, not FLOP-bound**, on wide fan-in models:
-  a two-level 784-leaf plate compiles in ~1 s and each sweep is cheap, but
-  a linear equality chain needs ~1 sweep per leaf (cff-9xmq tracks the
-  balanced-tree fix). Budget `run()` sweeps against your graph's diameter,
-  and always pass `tol=` so coherent models exit early.
-- **Read beliefs, not messages**: `marginals`, `gaussian_marginals`,
-  `ef_marginals`, `node_beliefs`, `gaussian_node_stats`, and
-  the specialized `gaussian_mixture_predictives` and
-  `recurrence_weight_stats` are the supported readouts; learning loops mirror
-  `cffg.agent`'s count pattern (infer → accumulate stats → conjugate update →
-  roll expected params back). Improper Gaussian marginals are NaN-marked;
-  node statistics and specialized readouts also expose `proper=False`, which
-  consumers must check before accumulation or use.
-- **Report framework gaps in framework terms.** When a harness needs a
-  numpy workaround, that sentence is a ticket (see cff-9xmq, cff-lquu,
-  cff-5edo, cff-mjku, cff-gul8 — all minted from one evaluation round).
-
-## Draw a model
-
-```python
-from cffg.viz import render_svg, save_svg, save_png
-
-svg = render_svg(template)            # the papers' visual algebra, compressed
-save_svg(template, "model.svg", level=0)   # every bead explicit (Part I Fig 14)
-save_png(template, "model.png")            # needs: uv sync --extra viz
-```
-
-`level=0..4` selects how much of Part I's compression recipe (p.19) is
-applied: 0 shows every bead and internal edge of the variational spec; 4
-(default) is the compact form the papers use for real models — beads pushed
-to node borders, dashed boxes around GFE composites, `⋯` where glue ports
-continue the rollout. Layout is deterministic and *edit-stable*: growing a
-model appends rows/columns without moving what was already drawn. For GUIs,
-`build_scene(template)` returns the typed scene graph (every primitive
-carries the `factor:`/`var:`/`port:` ref it depicts) instead of SVG text.
-
-## Where things are
-
-| | |
+| Model family | Readouts to inspect |
 |---|---|
-| `cffg/core/` | IR, validation, serialization, composition, edit actions (JAX-free) |
-| `cffg/compiler.py` | template → message arena (groups, index tables, GFE composites) |
-| `cffg/rules.py` | BP / VMP / GFE message updates + their free-energy terms |
-| `cffg/engine.py` | jitted flooding step, damping, δ-hardening, marginals, BFE |
-| `cffg/agent.py` `cffg/colony.py` | receding-horizon runtime; many-instance execution |
-| `cffg/models/` `cffg/experiments/` | rollout builder, T-maze, gridworld, learning loop |
-| `cffg/viz/` | paper-notation diagrams: derive → compress → layout → scene → SVG/PNG |
-| `docs/ARCHITECTURE.md` | design + decisions · `docs/LIMITATIONS.md` — what this will never do |
-| `docs/todo-notes/` | remaining threads, one note each, tied to `tk` tickets |
+| Discrete | `marginals`, `node_beliefs`, `dirichlet_marginals`, `goal_marginals`, `goal_prior_updates` |
+| Gaussian | `gaussian_marginals`, `gaussian_node_stats` |
+| Exponential family | `ef_marginals`; check every marginal's `proper` field before using its mean |
+| Hybrid recurrence/mixture | `recurrence_pair_beliefs`, `recurrence_weight_stats`, `gaussian_mixture_predictives`, `hybrid_gfe_diagnostics` |
+| Registered extension | `kernel_readouts` when the binding declares one |
+| Discrete max-product | `decode` plus `objective`; BFE is deliberately undefined |
 
-Working on the code? Read `AGENTS.md` first — uv-only, atomic commits,
-tickets via `tk`, and the canonical-document policy are enforced, one of them
-by a test.
+The common `engine.bfe(state)` accessor reports the graph's declared variational
+ledger; the name does not make every value an exact Bethe evidence identity.
+Interpret it with `engine.objective_contract` and per-factor
+`engine.objective_metadata`:
+
+| Situation | Meaning of the reported objective |
+|---|---|
+| Ordinary registered sum-product tree | Exact BFE and `-log p(observed data)` |
+| Loopy ordinary graph | Bethe free energy at a BP fixed point; marginals and evidence are approximate |
+| P-substituted discrete graph | GFE for the supported LAIF composite; no generic evidence identity |
+| Gaussian mixture | Assumed-density collapse; the reported BFE lower-bounds the mixture-Bethe value at the held moments |
+| `recurrence_link` | Variational objective containing the Jaakkola–Jordan transition bound |
+| Nonlinear/neural Gaussian | Frozen-Gaussian surrogate with conditional stationarity metadata; no proven original-model evidence bound |
+| Discrete max-product | `objective(state)` is decoded assignment energy; `bfe(state)` raises |
+
+Also inspect `proper` flags, support diagnostics, effective sample size, and
+specialized residuals when those fields exist. A finite scalar energy cannot
+override a failed status or improper readout.
+
+## Discrete planning and rolling agents
+
+`build_rollout` and `build_tmaze` expose the general tabular path;
+`build_gridworld` is the compact supported corridor path. Their switches select
+fixed or learned likelihoods and goals, functional mu3(A), and transition
+epistemics. These are different declared objectives, not interchangeable tuning
+flags. `build_factored_rollout` keeps named hidden-state blocks separate until a
+declared coupling or observation needs their product.
+
+`RollingAgent` reconstructs finite planning and filtering windows around a
+fixed-size boundary. The usual loop is `act`, environment transition,
+`observe`, and optional declared learning; `step` combines those operations for
+a callback-style environment. `checkpoint` and `restore` preserve agent
+beliefs, learning state, cadence, RNG, and functional-mu3 state when configured.
+They intentionally do not serialize the environment.
+
+Functional mu3 uses explicit JAX keys and fixed particles within one inference
+attempt. Record ESS and support facts, and use `score_mu3_epochs` only when the
+experiment deliberately averages refreshed particle epochs. Transition
+epistemics price latent next-state information optimistically; consult
+[Known Limitations](docs/LIMITATIONS.md#soft-limitations) before interpreting
+it as realizable information gain.
+
+Two current input hazards need caller-side checks: fixed GFE likelihoods and
+goals must be finite, nonnegative, and normalized along their documented
+probability axes; caller-supplied fixed mu3 particles must be finite,
+nonnegative probability tables. Some low-level paths do not yet reject every
+violation before it can corrupt the reported objective or moment.
+
+`cffg.experiments.behavioral_epistemics.run_benchmark` is the bounded costly-cue
+scientific oracle used to compare epistemic planning with a BFE ablation. It is
+a fixed research workload, not a general environment API. Other modules under
+`cffg.experiments` and `cffg.benchmarks` are derivation, diagnostic, or
+performance artifacts rather than supported newcomer facades.
+
+## Continuous, exponential-family, and hybrid models
+
+`lgssm` constructs a linear-Gaussian state-space model with DATA ports for
+conditioning and missing observations. On its tree, Gaussian marginals match
+Kalman/RTS inference and the ledger has the exact negative-log-evidence
+identity. See [examples/linear_gaussian.py](examples/linear_gaussian.py).
+
+Gamma–Poisson and Beta–Bernoulli graphs use scalar natural-parameter messages.
+Observation factors are conditioned leaves; unobserved Poisson or Bernoulli
+predictives leave the shipped conjugate family and are rejected. See
+[examples/exponential_family.py](examples/exponential_family.py).
+
+Hybrid mixture factors collapse Gaussian mixtures by moments so inference stays
+tractable. `recurrence_link` uses a structured source/destination categorical
+belief and a Pólya–Gamma/Jaakkola–Jordan coordinate. `rslds` assembles this
+production path; `fit_rslds` adds an observed-only empirical-Bayes fitting loop
+with truthful inner and outer statuses. These are named approximations, not
+exact switching-trajectory inference. The deferred D12 research path described
+in `DERIVATIONS.md` is not a production capability. See
+[examples/hybrid_rslds.py](examples/hybrid_rslds.py).
+
+## Nonlinear and neural Gaussian models
+
+A `gaussian_nonlinear` factor references a serialized `FunctionSpec`.
+`register_mean_function` binds a trusted local implementation by name and
+version; choose Taylor linearization or fixed sigma points and declare endpoint
+moment matching. Noise covariance must be positive definite. The runtime checks
+the complete adaptive residual and energy change, while
+`objective_metadata` labels the surrogate's narrower meaning. See
+[examples/nonlinear_gaussian.py](examples/nonlinear_gaussian.py).
+
+`neural_mean` creates a portable dense MLP specification and
+`initialize_neural_parameters` creates its arrays. `FixedPointDifferentiator`
+or `fixed_point_gradient` differentiates the certified adaptive root and
+reported approximate ledger; check `GradientStatus` and both root and adjoint
+residuals. `NeuralTrainer` with `TrainingConfig` provides deterministic
+full-batch Adam continuation. `GaussianAmortizer` learns a Gaussian message
+initializer over declared `PolynomialFeatures`; the normal engine still makes
+the final convergence and properness decision.
+
+These neural APIs do not provide zero-noise equality factors, minibatching,
+weight uncertainty, stochastic mu3 differentiation, or discrete point-decision
+gradients.
+
+## Learn and swap parameters
+
+`LearnableSpec` declares which serialized factors own persistent posterior
+state. Construct `cffg.learn.Learnables` with immutable priors, write its current
+expected parameters into a fresh engine state, run and status-gate inference,
+then choose the cadence deliberately:
+
+- `accumulate(engine, result)` adds statistics from a new independent trial to
+  the current posterior.
+- `replace(engine, result)` recomputes one sequence coordinate from the
+  immutable initial prior; repeated use is an outer variational/EM coordinate,
+  not another independent trial.
+- `expected(name)` returns point parameters for the next solve.
+- `rollover(name)` returns the family-specific state carried across a declared
+  trial boundary.
+
+Dirichlet, NIW, MNIW, component-MNIW, and recurrence Pólya–Gamma families have
+versioned persistent descriptors. Their expected point parameters feed the next
+state; parameter uncertainty generally does not enter all state messages, so
+the continuous/hybrid cadence is empirical Bayes rather than full joint
+variational Bayes. See
+[examples/learning_bundle.py](examples/learning_bundle.py).
+
+For fixed-structure parameter sweeps that are not declared learning,
+`set_params` updates named runtime parameters without recompiling. Shapes,
+factor roles, probability normalization, covariance validity, and tied blobs
+are validated.
+
+## Persist and resume
+
+Choose the artifact by what must continue:
+
+| Artifact | Stores | Does not store |
+|---|---|---|
+| `.cffgz` bundle | Template, source arrays, structure identity, complete declared-learning priors and posteriors | Inference messages, solver progress, agent cadence/RNG, optimizer cursor |
+| `RollingAgent` `.npz` checkpoint | Structure-bound rolling beliefs, learning state, cadence, selection RNG, configured functional-mu3 lifecycle | Environment state or a portable replacement for the model bundle |
+| Neural training continuation | Versioned parameters and deterministic optimizer/training state for its bound initialization and data | General model/agent state or minibatch cursor |
+
+`save_bundle` and `load_bundle` are the source-of-truth model exchange path.
+Recompiling the loaded template and arrays must reconstruct the engine. The
+current alpha loader supports the current schema and refuses older or
+provenance-poor learning archives rather than inventing resumability. A stable
+historical migration contract is future work.
+
+## Hard constraints and MAP
+
+Hard factors can be combined with ordinary discrete probability factors:
+
+- `alldifferent` uses exact combinatorial messages and is capped at
+  `n, K <= 10`.
+- `exactly_k` and `at_most_k` constrain Boolean-style counts.
+- `table` admits explicitly allowed tuples.
+
+In sum-product mode, tree marginals and the hard-factor contribution to BFE are
+exact. Compile with `semiring="max"` for discrete max-product, status-gate the
+run, call `decode(state)`, and score it with `objective(state)`. On a tree this
+is the exact MAP/Viterbi identity. On loops it retains the usual max-product
+caveats; `cffg.csp.decimate` is the explicit feasibility-oriented helper. See
+[examples/hard_constraint.py](examples/hard_constraint.py).
+
+## Batch, extend, render, and estimate
+
+`cffg.colony.Colony` caches one engine per structure hash and vmaps matching
+ordinary state layouts while returning a separate `RunResult` per instance.
+Different parameters do not create different structures. Functional mu3 is
+rejected because Colony does not yet own per-instance PRNG streams, and mixed
+adaptive/GFE controllers still run per instance.
+
+The custom factor API registers one ordinary single-arena factor at a time:
+
+- `DiscreteBinding` covers discrete BP/VMP with a declared potential,
+  messages, energy, assignment scoring, and optional readout.
+- `GaussianBinding` covers a Gaussian conditioning rule with its parameter
+  schema and optional iterative behavior.
+- `EFBinding` covers scalar exponential-family natural-parameter rules.
+- `HostileInputs` records the extension's zero-support, improper/vacuous,
+  float32, and scale contract.
+
+`FactorKernel` and `register_kernel` connect those pieces. Registration does not
+derive mathematical correctness, a learning family, or a specialized
+multi-arena variational object. This surface is explicitly internal-unstable
+before 1.0 even though serialized implementation identity and loud missing-
+implementation failure are supported.
+
+`cffg.viz` derives a deterministic scene and renders SVG directly; PNG uses the
+optional `viz` dependencies. Rendering explains declared structure and
+constraints but does not compile or validate numerical inference.
+
+`cffg.estimate.estimate(engine)` reports persistent arena bytes, a parameter
+total, optional backend cost analysis, and a short calibration extrapolation.
+Use the persistent byte inventory as a planning aid only. The current XLA
+analysis calls an obsolete execution signature, so FLOP and traffic fields may
+be absent; the summary is not peak RSS, compile time, or a reliable cross-model
+performance forecast.
+
+## Experiment checklist
+
+For a result that another agent can compare or reproduce, record:
+
+- repository commit, Python/JAX versions, backend, dtype, and whether x64 was
+  enabled before import;
+- serialized template/bundle identity, model dimensions, schedule, damping,
+  iteration budgets, tolerance, and explicit PRNG keys;
+- `RunStatus`, iteration count, residual and energy traces, plus every relevant
+  `proper`, support, ESS, bound, root, or adjoint diagnostic;
+- `objective_contract` and applicable `objective_metadata`, not just the scalar
+  returned by `bfe`;
+- compilation/first-call time separately from warm execution time;
+- whether learning used `accumulate`, `replace`, direct `set_params`, or a fit
+  helper, and which artifact is required to resume it.
+
+Use small analytic trees to establish exact identities before moving to loopy,
+hybrid, nonlinear, or long-horizon experiments. Increase dimensions under both
+the default JAX dtype and x64 when numerical robustness matters.
+
+## Runnable examples
+
+The examples are standalone programs with their own fixtures. Each rejects an
+unfinished result and asserts the quantity an experiment should inspect.
+
+| File | Demonstrates | Claim boundary |
+|---|---|---|
+| [discrete_agent.py](examples/discrete_agent.py) | Bundle, compile/bind/run/read, rolling agent, checkpoint restore | Exact conditioned tree plus registered fixed-A planning |
+| [discrete_rollout.py](examples/discrete_rollout.py) | Generic finite-horizon discrete GFE planning | Supported one-step P-substituted objective |
+| [linear_gaussian.py](examples/linear_gaussian.py) | LGSSM with a missing observation | Exact tree Gaussian marginals and evidence identity |
+| [exponential_family.py](examples/exponential_family.py) | Gamma–Poisson conjugate inference | Exact registered tree posterior and BFE |
+| [hard_constraint.py](examples/hard_constraint.py) | All-different marginals and max-product MAP | Exact bounded tree CSP identities |
+| [nonlinear_gaussian.py](examples/nonlinear_gaussian.py) | Sigma-point nonlinear Gaussian inference | Declared approximate objective metadata |
+| [learning_bundle.py](examples/learning_bundle.py) | Declared learning, save/load, later-trial continuation | Current-schema immutable prior plus posterior state |
+| [hybrid_rslds.py](examples/hybrid_rslds.py) | Small recurrent switching LDS | Declared mixture/JJ approximation |
+
+Run one from the repository checkout with, for example:
+
+```sh
+uv run python examples/linear_gaussian.py
+```
+
+## Reference map
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — owners, execution paths, and
+  extension change paths.
+- [docs/LIMITATIONS.md](docs/LIMITATIONS.md) — exactness, approximation,
+  numerical, scaling, and known-defect boundaries.
+- [docs/DERIVATIONS.md](docs/DERIVATIONS.md) — project derivations and executable
+  test anchors beyond the papers.
+- [docs/READING.md](docs/READING.md) — short external reading list.
+- [notes/cffg-pt-1.pdf](notes/cffg-pt-1.pdf) and
+  [notes/cffg-pt-2.pdf](notes/cffg-pt-2.pdf) — the two CFFG/LAIF papers.
+- `src/cffg/core/` — serialized graph language and validation.
+- `src/cffg/models/` — supported builders and rSLDS workflow.
+- `src/cffg/readouts/` — family-owned result interpretation.
+- `tests/` — executable contracts and numerical oracles.
+
+Contributing changes to the library? Read [AGENTS.md](AGENTS.md) for the uv,
+ticket, commit, numerical-robustness, and validation protocols.
