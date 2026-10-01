@@ -39,6 +39,10 @@ imports JAX:
 JAX_ENABLE_X64=1 uv run python experiment.py
 ```
 
+Or call `jax.config.update("jax_enable_x64", True)` before constructing arrays,
+compiling a template or initializing a state. Enabling x64 later cannot recover
+precision already lost in float32 inputs or messages.
+
 ## Five-minute workflow
 
 Every workflow has the same spine: build a serializable `Template`, compile its
@@ -345,6 +349,13 @@ performance artifacts rather than supported newcomer facades.
 conditioning and missing observations. On its tree, Gaussian marginals match
 Kalman/RTS inference and the ledger has the exact negative-log-evidence
 identity. See [examples/linear_gaussian.py](examples/linear_gaussian.py).
+
+An exact-tree certificate checks message consistency, not posterior accuracy.
+Choose float64 for tight moment or evidence comparisons, especially with widely
+different variances. The retained PCGym first-order controller certifies in both
+precisions, but float32 still loses accuracy in its information-form messages
+and readouts. Its tests separately check posterior-scaled moments and evidence;
+the bounded precision contract is in [Gaussian numerics](docs/LIMITATIONS.md#soft-limitations).
 
 Gamma–Poisson and Beta–Bernoulli graphs use scalar natural-parameter messages.
 Observation factors are conditioned leaves; unobserved Poisson or Bernoulli

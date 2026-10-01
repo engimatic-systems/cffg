@@ -91,8 +91,8 @@ def test_irrelevant_hardening_preserves_exact_gaussian_result(enabled, length, t
                 engine.run(state, 5, harden_last=invalid)
 
 
-@pytest.mark.parametrize("size", [1, 3])
-@pytest.mark.parametrize("budget,damp", [(0, 0.0), (5, 0.0), (5, 0.5)])
+@pytest.mark.parametrize("size", [pytest.param(1, marks=pytest.mark.slow), 3])
+@pytest.mark.parametrize("budget,damp", [(0, 0.0), (5, 0.0), pytest.param(5, 0.5, marks=pytest.mark.slow)])
 def test_colony_matches_distinct_gaussian_engines(size, budget, damp):
     colony = Colony()
     references = {}
