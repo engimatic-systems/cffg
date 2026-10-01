@@ -723,6 +723,15 @@ propriety predicate or regularize the model. Independent moment, rank and
 derivative anchors are in `tests/test_mixture_collapse.py` and
 `tests/test_mixture_rank.py`.
 
+`mixture_evidence.py` owns relative component scores shared by both Gaussian
+mixture selector updates, node-energy responsibilities and learning statistics.
+Proper inputs use centered predictive integration; improper inputs retain the
+integrable-joint formula, including its component-dependent Jacobians. Absolute
+partitions remain separate for backward mass reconstruction. D3 derives the
+centering and its nondifferentiated common anchor; `tests/test_mixture_evidence.py`
+checks overlap oracles and gradients. This does not change forward/predictive
+weights or the normalized-component envelope of backward collapse.
+
 The public learning boundary reads the same D3 local belief, not separately
 reported endpoint marginals. `Engine.gaussian_node_stats` exposes each soft
 selector responsibility and responsibility-weighted component moments; for a

@@ -86,6 +86,7 @@ def _run(engine, data, learning=None):
     return result
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("cadence,dtype,kind", [
     pytest.param("accumulate", np.float32, "rslds", marks=pytest.mark.slow),
     ("accumulate", np.float32, "gaussian"),
@@ -140,6 +141,7 @@ def test_workflow_fixtures_cover_the_runtime_family_registry():
     assert covered == set(FAMILIES)
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("cadence", ("accumulate", "replace"))
 def test_sparse_component_statistics_remain_exact_after_resume(tmp_path, cadence):
     template, arrays, sources = _mixture_template()

@@ -407,7 +407,7 @@ def test_agent_version_1_functional_checkpoint_migrates_runtime(tmp_path):
 @pytest.mark.parametrize(
     "mismatch",
     (pytest.param("samples", marks=pytest.mark.slow), pytest.param("min_ess", marks=pytest.mark.slow),
-     pytest.param("refresh", marks=pytest.mark.slow), "mode"),
+     pytest.param("refresh", marks=pytest.mark.slow), pytest.param("mode", marks=pytest.mark.slow)),
 )
 def test_functional_checkpoint_configuration_mismatch_is_atomic(
     tmp_path, mismatch
@@ -451,7 +451,7 @@ def test_functional_checkpoint_configuration_mismatch_is_atomic(
         pytest.param("missing_key", marks=pytest.mark.slow),
         pytest.param("unclaimed_key", marks=pytest.mark.slow),
         pytest.param("null_cache", marks=pytest.mark.slow),
-        "nonfinite_state",
+        pytest.param("nonfinite_state", marks=pytest.mark.slow),
         pytest.param("nonfinite_trace", marks=pytest.mark.slow),
         pytest.param("nonfinite_outer", marks=pytest.mark.slow),
         pytest.param("invalid_outer", marks=pytest.mark.slow),
@@ -814,6 +814,7 @@ def test_action_rng_is_separate_from_functional_key_cursor():
     assert json.dumps(first.rng.bit_generator.state, sort_keys=True) != after
 
 
+@pytest.mark.slow
 def test_bad_base_and_legacy_functional_restore_fail_before_mutation(tmp_path):
     for value in (0.0, np.nan, np.inf):
         agent = make_agent()

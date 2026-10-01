@@ -18,7 +18,6 @@ class PlanningReference(NamedTuple):
     means: np.ndarray
     covariances: np.ndarray
     energy: float
-    selector_roundoff: np.ndarray
 
 
 def planning_fixture(horizon=15, dtype=np.float64, noise_scale=1., habit=None):
@@ -96,10 +95,9 @@ def _expected_nll(mean, covariance, target, noise):
 
 def declared_rule_reference(arrays, observations):
     """NumPy moments and local Bethe terms; no production inference/math calls."""
-    dtype = arrays["m0"].dtype
     arrays = {name: np.asarray(value, np.float64) for name, value in arrays.items()}
     mean, covariance = arrays["m0"].copy(), arrays["P0"].copy()
-    means, covariances, regimes, selector_roundoff = [mean], [covariance], [], []
+    means, covariances, regimes = [mean], [covariance], []
     weights, c, r = arrays["habit"], arrays["C"], arrays["R"]
     support = weights > 0
     log_weights = np.full(3, -np.inf)
@@ -131,16 +129,6 @@ def declared_rule_reference(arrays, observations):
         log_rho -= logsumexp(log_rho)
         rho = np.exp(log_rho)
         regimes.append(rho)
-        # Observe the current canonical-score cancellation scale independently.
-        log_mass = _entropy(covariance) - len(mean) / 2
-        log_mass += .5 * mean @ np.linalg.solve(covariance, mean)
-        goal_scale = .5 * (len(target) * np.log(2 * np.pi) + np.linalg.slogdet(r)[1]
-                           + target @ np.linalg.solve(r, target))
-        canonical_scale = np.max(np.abs(log_mass + np.asarray(scores)[support] + goal_scale))
-        # Two log-odds ulps times the binary sigmoid's maximum derivative 1/4.
-        # This is a fixture-specific allowance, not a general accuracy theorem.
-        selector_roundoff.append(.5 * np.spacing(dtype.type(canonical_scale))
-                                 + 8 * np.finfo(dtype).eps)
         energy += rho @ node_terms + rho[support] @ (log_rho[support] - log_weights[support])
         predicted_mean = weights @ np.asarray(component_mean)
         predicted_cov = sum(weight * (cov + np.outer(mu - predicted_mean, mu - predicted_mean))
@@ -155,4 +143,4 @@ def declared_rule_reference(arrays, observations):
             # Degree-three state: two entropy corrections minus emission H.
             energy += _entropy(covariance)
     return PlanningReference(np.asarray(regimes), np.asarray(means), np.asarray(covariances),
-                             float(energy), np.asarray(selector_roundoff))
+                             float(energy))

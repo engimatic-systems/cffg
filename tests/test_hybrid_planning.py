@@ -28,12 +28,8 @@ def assert_reference(engine, result, arrays, observations, *, tolerance=1e-8):
     marginal = engine.marginals(result.state)
     gaussian = engine.gaussian_marginals(result.state)
     for index in range(len(observations)):
-        selector_tolerance = tolerance
-        if arrays["m0"].dtype == np.float32:
-            assert np.count_nonzero(arrays["habit"]) == 2
-            selector_tolerance = max(tolerance, reference.selector_roundoff[index])
         np.testing.assert_allclose(marginal[f"z{index}"], reference.regimes[index],
-                                   rtol=tolerance, atol=selector_tolerance)
+                                   rtol=tolerance, atol=tolerance)
     for index in range(len(observations) + 1):
         mean, covariance = gaussian[f"x{index}"]
         np.testing.assert_allclose(mean, reference.means[index], rtol=tolerance, atol=tolerance)
@@ -125,10 +121,10 @@ def test_neighboring_noise_and_sparse_actions_have_truthful_results(dtype, sched
                 probabilities = engine.marginals(result.state)[f"z{index}"]
                 assert probabilities[2] == 0.
                 if dtype is np.float32:
-                    # Measure canonical-score cancellation separately from convergence.
+                    # Local log odds have a tighter accuracy check than the solver residual.
                     actual = np.log(float(probabilities[0]) / float(probabilities[1]))
                     expected = np.log(reference.regimes[index, 0] / reference.regimes[index, 1])
-                    assert abs(actual - expected) <= 4 * reference.selector_roundoff[index]
+                    assert abs(actual - expected) <= 64 * np.finfo(dtype).eps
         else:
             assert result.iterations == 100
             assert result.failure is not None

@@ -324,9 +324,49 @@ has (same blocks as `gauss.linear_energy`):
     log μ(s) = log Z(η_J(s), Λ_J(s)) − ½ b_sᵀW_s b_s + ½ log det(W_s/2π·I…)
              = log Z(η_J, Λ_J) − ½ b_sᵀW_s b_s + ½ log det W_s − ½ d_y log 2π.
 
-Guard: Λ_J(s) ≻ 0 for all s, else uniform. (Prior variant f_s(y) = N(y; m_s,
-V_s): Λ_J = W_s + Λ_o ≻ 0 always; log μ(s) = log Z(W_s m_s + η_o, W_s + Λ_o)
+Guard: W_s and Λ_J(s) ≻ 0 for all s, else uniform. (Prior variant f_s(y) = N(y; m_s,
+V_s): require Λ_J = W_s + Λ_o ≻ 0; log μ(s) = log Z(W_s m_s + η_o, W_s + Λ_o)
 − ½ m_sᵀW_s m_s + ½ log det W_s − ½ d log 2π.)
+
+**Stable relative evidence.** The formula above subtracts large canonical
+Gaussian constants. For proper input information, integrate the normalized
+predictive N(m_s,C_s), with m_s=A_s Λ_i⁻¹η_i+b_s and
+C_s=W_s⁻¹+A_s Λ_i⁻¹ A_sᵀ, against the output potential instead. The omitted
+input log partition is common to all selectors. The prior-mixture variant
+uses its supplied m_s and C_s=W_s⁻¹ directly.
+
+Choose any common finite anchor a. Write C_s=L_s L_sᵀ,
+r=η_o−Λ_o a, δ_s=m_s−a, and G_s=I+L_sᵀΛ_o L_s. Then
+
+    u_s = G_s⁻¹ (L_s⁻¹δ_s + L_sᵀr),     p_s = L_s u_s,
+    score_s = ½ rᵀp_s + ½ rᵀδ_s − ½ δ_sᵀΛ_o p_s − ½ log det G_s.
+
+This drops only the common output log potential at a. Completing the square
+gives the shifted posterior mode p_s; its stationarity equation
+C_s⁻¹(p_s−δ_s)=r−Λ_o p_s reduces the mode objective to the expression above.
+It avoids subtracting both canonical log partitions and large movement
+quadratics. Λ_o may be singular or symmetric indefinite provided G_s is
+positive definite. In particular, do not discard a linear term η_o in a
+null direction of Λ_o.
+
+`mixture_evidence.py` chooses the output pseudomode clipped to the component
+mean bounds, so a weak output precision cannot put the anchor arbitrarily far
+from the predictive cloud. The anchor is nondifferentiated: its derivative
+changes only a component-common constant and hence cancels from normalized
+weights. Actual computed covariances, G_s, solves and scores must be valid;
+safe-solve placeholders never certify evidence. For improper input information,
+the original integrable-joint formula remains necessary: its component masses
+can contain selector-dependent Jacobians, such as 1/|A_s| in one dimension.
+An unused branch is sanitized before arithmetic to keep derivatives finite.
+
+Selector messages, node-energy responsibilities and learning statistics share
+these relative scores. Absolute Gaussian entropies and expected log factors
+are unchanged; forward weights and backward mass reconstruction are separate.
+`tests/test_mixture_evidence.py` checks independent overlap probabilities,
+displaced means, partial observations, nullspace linear terms, integrable
+negative precision, improper-input Jacobians, derivatives and invalid
+intermediates. `tests/test_hybrid_planning.py` checks retained float32 log odds
+without a canonical-cancellation allowance.
 
 **→ out (collapsed forward).** Component s: the scale-free forward
 predictive (η_f(s), Λ_f(s)) = `linear_forward`(μ_i; A_s, b_s, W_s). Masses

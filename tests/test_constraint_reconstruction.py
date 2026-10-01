@@ -163,7 +163,7 @@ def write_current(path, arrays):
     pytest.param("at_most_k", marks=pytest.mark.slow),
     pytest.param("table", marks=pytest.mark.slow),
 ))
-@pytest.mark.parametrize("envelope", ("current", "agent_v1"))
+@pytest.mark.parametrize("envelope", ("current", pytest.param("agent_v1", marks=pytest.mark.slow)))
 def test_prepared_mu3_cache_rebuilds_pre_constraint_parameter_layout(
     kind, envelope, tmp_path
 ):
@@ -190,6 +190,7 @@ def test_prepared_mu3_cache_rebuilds_pre_constraint_parameter_layout(
     )
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize(
     "corruption", ("declared_missing", "missing_message", "extra_array")
 )
