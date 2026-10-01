@@ -160,6 +160,7 @@ def test_top_level_facade_reexports_only_canonical_owners():
         "EFBinding": cffg.kernel_bindings.EFBinding,
         "Engine": CanonicalEngine,
         "FactorKernel": cffg.kernels.FactorKernel,
+        "FailureDiagnostic": cffg.runtime_types.FailureDiagnostic,
         "FixedPointDifferentiator": cffg.FixedPointDifferentiator,
         "FixedPointGradient": cffg.FixedPointGradient,
         "FunctionSpec": cffg.FunctionSpec,

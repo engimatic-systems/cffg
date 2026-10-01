@@ -18,6 +18,8 @@ class FailureReason(IntEnum):
     IMPROPER_TILT = 7
     UNREPRESENTABLE_SIGMA_POINTS = 8
     NONFINITE_SHARED_GOAL = 9
+    FUNCTIONAL_BUDGET = 10
+    FUNCTIONAL_DIVERGENCE = 11
 
 
 class FailurePhase(IntEnum):
@@ -31,6 +33,7 @@ class FailurePhase(IntEnum):
     OUTER = 7
     RECONSTRUCTION = 8
     LEDGER = 9
+    FUNCTIONAL = 10
 
 
 class FailureFact(NamedTuple):
@@ -44,6 +47,27 @@ class FailureFact(NamedTuple):
     factor: jax.Array
     reason: jax.Array
     phase: jax.Array
+
+
+class FailureAt(NamedTuple):
+    """A retained local cause and its logical update attempt."""
+
+    fact: FailureFact
+    iteration: jax.Array
+
+
+def empty_failure_at() -> FailureAt:
+    return FailureAt(empty_failure(), jnp.asarray(-1, jnp.int32))
+
+
+@jax.jit
+def record_failure(earlier: FailureAt, later: FailureFact, phase, iteration) -> FailureAt:
+    """Retain the first cause on device; finalization alone decodes its name."""
+    new_cause = (earlier.fact.reason == 0) & (later.reason != 0)
+    return FailureAt(
+        first_failure(earlier.fact, in_phase(later, phase)),
+        jnp.where(new_cause, jnp.int32(iteration), earlier.iteration),
+    )
 
 
 def empty_failure() -> FailureFact:

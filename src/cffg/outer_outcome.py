@@ -31,6 +31,7 @@ class OuterOutcome:
     trial_evaluations: int = 0
     linear_iterations: int = 0
     solver_compilations: int = 0
+    initial_rejection: bool = False
 
     def __post_init__(self):
         for name in ("message_deltas", "free_energies"):

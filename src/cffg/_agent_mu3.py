@@ -445,6 +445,7 @@ def _checked_array(value: np.ndarray, expected: jax.Array, label: str) -> jax.Ar
 
 
 def _result_metadata(result: RunResult) -> dict:
+    """Persist numerical evidence, not run-local failure provenance."""
     metadata = {name: getattr(result, name) for name in _RESULT_FIELDS}
     for name in ("message_deltas", "free_energies", "mu3_ess", "mu3_log_normalizers"):
         metadata[name] = list(metadata[name])

@@ -13,6 +13,13 @@ Ticket closure by itself is not delivery evidence: tickets closed as "not
 pursuing" describe research history, not production capability. The README
 capability table is the entry map; this document qualifies its claims.
 
+Failure attribution is diagnostic, not a repair or an accuracy certificate.
+Ordinary and exact runs retain the first observed local failure; global checks
+can report a reason without a known factor. Adaptive outer solves currently
+report generic terminal reasons rather than local trial provenance. Agent
+checkpoints omit these run-local records, so a restored cached unsuccessful
+result can have `failure=None`; its `status` remains authoritative.
+
 ## Hard limitations
 
 **H1. Bethe is an approximation on loopy graphs.** Stationary points of the BFE
