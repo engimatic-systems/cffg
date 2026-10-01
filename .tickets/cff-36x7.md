@@ -21,7 +21,7 @@ The existing adaptive solver can propagate an exactly vacuous input but stops on
 1. Adaptive Engine runs have one explicit bounded startup phase that uses the prerequisite readiness classification. Zero iteration budget performs no extra work.
 2. Eligibility comes from all outgoing message coordinates at each factor, not its incoming cavity. Only neutral-at-entry, not-yet-admitted factors may defer; admission is latched for the run.
 3. Deferred factors do not evaluate their physical function, Jacobian or sigma-point calculation, publish finite moments/energy, or count as convergence. Existing nonneutral sites are never silently replaced with startup zeros.
-4. Ready factors and ordinary neighbors advance while per-factor pending readiness remains available. Invalid noise, parameters, input/output information and failed admitted computations terminate immediately with originating factor diagnostics.
+4. Ready factors and ordinary neighbors advance while per-factor pending readiness remains available. Invalid noise, parameters, resolved invalid input/output information and failed admitted computations terminate immediately with originating factor diagnostics. The prerequisite classifier defines the floating-point resolution band; a partial classification permits only waiting, never a belief or convergence.
 5. Startup work is included in the user iteration budget. Permanently unresolved inputs end truthfully with the pending factor identified. Normal trust-region solving requires both proper chart references and ready adaptive inputs.
 6. Startup never reopens during later support restarts, hard phases or ordinary residual/gradient evaluation. Ordinary local_result and differentiated residual semantics stay strict.
 7. Flood and mixed schedules, host/JIT execution and single/batched local members agree. Adaptive Colony instances retain independent readiness through their existing Engine delegation.
@@ -39,3 +39,9 @@ cff-qw7x establishes the finite-physics planning envelope and updates user-facin
 ## Definitions
 
 An adaptive factor changes its local Gaussian approximation with its input belief. A site is a factor-owned outgoing message. A latch records that a factor has already been admitted. Readiness means the input is normalized enough to evaluate the declared approximation, not that inference has converged. ABI is the shape/meaning of data exchanged between runtime components. Other numerical terms follow cff-fc2y.
+
+## Notes
+
+**2026-09-30T16:03:50Z**
+
+Side research handoff: question — where can once-only startup defer without changing equations or hiding work? Answer — schedule startup should guard one-member Gaussian execution with scalar cond in lax.map/scan, because nonlinear_kernels.results uses vmap and can evaluate inactive branches. Freeze neutral g.scatter eligibility before propagation; keep run-local admitted latches. Control startup before hard phases in OuterTrustRegionStrategy, not solve_outer discovery/recursive restarts, and charge each composed sweep against n_iters. Require all adaptive cavities READY plus chart proper before ordinary solve. Output potentials may legitimately be indefinite; do not reuse PSD input readiness on output. Check finite/symmetric output, packed noise propriety and finite theta before deferral. Sources: execution/synchronous.py, nonlinear_kernels.py, nonlinear.py, outer_strategy.py and outer.py (startup_runtime_review). High confidence. These are method suggestions; validate exact accounting and observation-specific tilt handling in implementation.

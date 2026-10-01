@@ -152,7 +152,7 @@ def test_invalid_input_is_failure_not_initialization(direction, problem):
     assert all(np.isnan(value).all() for value in result)
 
 
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 def test_large_rank_deficient_map_and_vmap_members_are_independent(dtype):
     dimension = 30
     identity = jnp.eye(dimension, dtype=dtype)

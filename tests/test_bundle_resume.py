@@ -268,6 +268,7 @@ def test_learning_bundle_example_saves_loads_updates_and_resaves(tmp_path, monke
 
 
 @pytest.mark.parametrize("schedule", ("auto", "flood"))
+@pytest.mark.slow
 def test_gaussian_resume_accepts_each_inference_execution_surface(tmp_path, schedule):
     template, arrays, _, learning, first, later = _fixture("gaussian", np.float64)
     engine = Engine(compile_template(template, arrays=arrays), schedule=schedule)
