@@ -199,10 +199,11 @@ def assert_vmap(execute, inputs):
     return actual
 
 
-@pytest.mark.parametrize("dtype", (np.float32, np.float64))
 @pytest.mark.parametrize(
-    "kind",
-    (
+    "kind,dtype",
+    [pytest.param(kind, dtype, id=f"{kind}-{np.dtype(dtype).name}",
+                  marks=pytest.mark.slow if kind == "mixture" and dtype is np.float64 else ())
+     for kind in (
         "mixture",
         "mixture_prior",
         "hybrid_gfe",
@@ -218,7 +219,7 @@ def assert_vmap(execute, inputs):
         "transition_fixed",
         "stationary",
         "importance",
-    ),
+    ) for dtype in (np.float32, np.float64)],
 )
 def test_specialized_blocks_and_existing_facts_survive_jitted_vmap(kind, dtype):
     execute, inputs = local_case(kind, dtype)

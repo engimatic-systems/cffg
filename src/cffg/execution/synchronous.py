@@ -169,7 +169,8 @@ def _prec_sweep(arena, g_eta, g_lam, ef_eta, params, failures):
     return gauss_writes, ef_writes, failure
 
 
-def _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params, failures, *, only_iterative=False):
+def _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params, failures, *, only_iterative=False,
+                 execute=_execute_gaussian):
     """One synchronous flooding sweep over the Gaussian groups; returns the
     fully rewritten flat (eta, Lambda) arrays. Dims are static per group, so
     every rule call sees a shape-local block."""
@@ -186,7 +187,7 @@ def _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params, failures, *, only_i
                 _obs_rows(arena, g_obs, g.obs_rows, g.observed_dim),
                 g_mask[jnp.asarray(g.obs_rows)],
             )
-        delta = _execute_gaussian(
+        delta = execute(
             g, inc_e, inc_l, _kernel_params(g, params), y, mk
         )
         if delta.residual is not None:
@@ -245,7 +246,8 @@ def _constraint_writes(arena: Arena, messages: jax.Array, params, op, failures):
     return writes, failure
 
 
-def make_sweep(arena: Arena, skip_scheduled: bool = False) -> Sweep:
+def make_sweep(arena: Arena, skip_scheduled: bool = False, *,
+               _gaussian_executor=_execute_gaussian) -> Sweep:
     """The synchronous sweep. With ``skip_scheduled=True`` (the mixed-mode
     phase step) the plain BP discrete groups, Gaussian groups, and
     EF groups are omitted — the directed island passes own them — while
@@ -402,6 +404,7 @@ def make_sweep(arena: Arena, skip_scheduled: bool = False) -> Sweep:
             new_eta, new_lam, gaussian_residual, gaussian_status, gaussian_failure = _gauss_sweep(
                 arena, g_eta, g_lam, g_obs, g_mask, params, failures,
                 only_iterative=skip_scheduled,
+                execute=_gaussian_executor,
             )
             inner_residual = jnp.maximum(inner_residual, gaussian_residual)
             inner_status = jnp.maximum(inner_status, gaussian_status)

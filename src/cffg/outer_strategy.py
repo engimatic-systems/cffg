@@ -17,6 +17,8 @@ from cffg.outer_evidence import offset_failure, terminal_failure
 from cffg.outer_kernels import KernelPlanProvider
 from cffg.outer_outcome import OuterOutcome
 from cffg.outer_structure import OuterStructure
+from cffg.outer_startup import run_startup
+from cffg.execution.startup import StartupProgram
 from cffg.runtime_types import OuterTerminationReason, State, _replace
 from cffg.schedule_contracts import Propagation, Sweep
 
@@ -42,6 +44,7 @@ class OuterTrustRegionStrategy:
     reconstruct: Propagation | None
     services: OuterServices
     adaptive_gaussian: bool = False
+    startup: StartupProgram | None = None
 
     def run(
         self,
@@ -58,12 +61,20 @@ class OuterTrustRegionStrategy:
             0.0 if tol is None else float(tol),
         )
         if not self.services.finite(state):
+            fact = empty_failure()
+            if self.startup is not None and n_iters > 0:
+                eligible = self.startup.eligibility(state.g_eta, state.g_lam)
+                admitted = tuple(jnp.zeros_like(row) for row in eligible)
+                check = self.startup.inspect(state.g_eta, state.g_lam, state.g_obs, state.g_mask,
+                                             state.params, eligible, admitted, nonfinite_only=True)
+                fact = in_phase(check.failure, FailurePhase.INITIALIZATION)
             return OuterOutcome(
                 state,
                 OuterTerminationReason.NONFINITE_EVALUATION,
                 inner_code=2,
                 inner_residual=float("inf"),
-                initial_rejection=True,
+                initial_rejection=int(fact.reason) == 0,
+                failure=terminal_failure(fact, 0),
             )
         if self.services.zero_support(state):
             return OuterOutcome(
@@ -74,7 +85,17 @@ class OuterTrustRegionStrategy:
             )
 
         priming_fact = empty_failure()
-        if self.prime is not None and n_iters >= 1:
+        startup_iterations = 0
+        startup_deltas = ()
+        if self.startup is not None and n_iters >= 1:
+            initialized = run_startup(self.startup, self.structure, self.eliminated,
+                                      self.services, state, n_iters)
+            state = initialized.state
+            startup_iterations = initialized.iterations
+            startup_deltas = initialized.deltas
+            if initialized.terminal is not None:
+                return initialized.terminal
+        if self.prime is not None and self.startup is None and n_iters >= 1:
             msgs, g_eta, g_lam, ef_eta, *auxiliary = self.prime(
                 state.messages,
                 state.g_eta,
@@ -98,33 +119,36 @@ class OuterTrustRegionStrategy:
                 return OuterOutcome(
                     state,
                     OuterTerminationReason.INNER_FAILURE,
+                    iterations=startup_iterations,
+                    message_deltas=startup_deltas,
                     residual=mu3_residual,
                     inner_code=mu3_code,
                     inner_residual=mu3_residual,
                     functional_failure=True,
-                    failure=terminal_failure(priming_fact, 0),
+                    failure=terminal_failure(priming_fact, startup_iterations),
                 )
 
-        all_deltas: list[float] = []
+        all_deltas: list[float] = list(startup_deltas)
         all_energies: list[float] = []
-        total_iterations = accepted = rejected = 0
+        total_iterations = startup_iterations
+        accepted = rejected = 0
         outer_map_evaluations = trial_evaluations = 0
         linear_iterations = solver_compilations = 0
         mu3_pending = False
         mu3_failure_code = 0
         mu3_failure_residual = 0.0
-        phases: list[tuple[int, list[tuple[int, np.ndarray]]]] = [
-            (n_iters - harden_last, [])
-        ]
+        available = n_iters - startup_iterations
+        hard_budget = min(harden_last, available)
+        phases: list[tuple[int, list[tuple[int, np.ndarray]]]] = [(available - hard_budget, [])]
         hard_rows = [
             (card, pairs[row : row + 1])
             for card, pairs in self.hardening
             for row in range(len(pairs))
         ]
-        if harden_last:
+        if hard_budget:
             if hard_rows:
-                phase_count = min(len(hard_rows), harden_last)
-                quotient, remainder = divmod(harden_last, phase_count)
+                phase_count = min(len(hard_rows), hard_budget)
+                quotient, remainder = divmod(hard_budget, phase_count)
                 row_groups = np.array_split(np.arange(len(hard_rows)), phase_count)
                 phases.extend(
                     (
@@ -134,7 +158,7 @@ class OuterTrustRegionStrategy:
                     for phase, rows in enumerate(row_groups)
                 )
             else:
-                phases.append((harden_last, []))
+                phases.append((hard_budget, []))
         solved = None
         failure = empty_failure_at()
         hard_blocks: list[tuple[np.ndarray, np.ndarray, jax.Array]] = []
@@ -311,7 +335,8 @@ class OuterTrustRegionStrategy:
                 break
 
         if solved is None:
-            return OuterOutcome(state, OuterTerminationReason.ITERATION_BUDGET)
+            return OuterOutcome(state, OuterTerminationReason.ITERATION_BUDGET,
+                                iterations=total_iterations, message_deltas=all_deltas)
         if mu3_failure_code:
             inner_code = mu3_failure_code
             inner_residual = mu3_failure_residual

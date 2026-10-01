@@ -130,13 +130,9 @@ def test_real_improper_cavity_keeps_origin(schedule, dtype):
         index = engine.arena.g_lam_indices(group.gather[:, 1], 1)
         state = replace(state, g_lam=state.g_lam.at[index].set(-1.))
         result = engine.run(state, 5, tol=1e-5)
-        if schedule == "auto":
-            # Exact reconstruction repairs this cavity before the adaptive factor runs.
-            assert result.status is RunStatus.CONVERGED
-            assert result.failure is None
-        else:
-            assert result.status is RunStatus.DIVERGED
-            assert result.failure == FailureDiagnostic("improper_cavity", "sensor", "soft", 1)
+        # Invalid input is attributed before exact neighbors can overwrite it.
+        assert result.status is RunStatus.DIVERGED
+        assert result.failure == FailureDiagnostic("improper_cavity", "sensor", "startup", 1)
 
 
 @pytest.mark.parametrize("recover", [False, True])

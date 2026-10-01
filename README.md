@@ -376,6 +376,11 @@ the complete adaptive residual and energy change, while
 `objective_metadata` labels the surrogate's narrower meaning. See
 [examples/nonlinear_gaussian.py](examples/nonlinear_gaussian.py).
 
+Fresh neutral adaptive sites can wait for partial input information during
+bounded startup; those sweeps count toward `n_iters`. Invalid models and
+established sites remain strict. Unresolved startup reports budget exhaustion
+with the pending factor, not convergence or a fabricated Gaussian belief.
+
 `neural_mean` creates a portable dense MLP specification and
 `initialize_neural_parameters` creates its arrays. `FixedPointDifferentiator`
 or `fixed_point_gradient` differentiates the certified adaptive root and

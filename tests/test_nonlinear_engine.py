@@ -45,6 +45,7 @@ def test_budget_and_unsupported_unglobalized_controls():
 
 @pytest.mark.parametrize("method", ["linearization", "sigma_point"])
 @pytest.mark.parametrize("observed", [False, True])
+@pytest.mark.slow
 def test_affine_limit_matches_full_analytic_energy(method, observed):
     from dataclasses import replace
 

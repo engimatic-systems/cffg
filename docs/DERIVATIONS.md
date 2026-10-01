@@ -3047,7 +3047,8 @@ methods, within representable arithmetic.
 `gaussian_readiness.input_readiness` distinguishes the existing proper-input
 admission from numerical partial-information consistency and invalid/unresolved
 inputs. It returns only an integer classification, never moments or a message.
-The current nonlinear rule and solver do not yet consume this helper.
+The ordinary nonlinear rule remains strict; only the bounded startup program
+consumes this helper to decide whether a neutral site may wait.
 
 For a symmetric positive-semidefinite precision, a flat uninformed direction
 has no quadratic term. Its linear term must also vanish to describe partial
@@ -3103,6 +3104,44 @@ Gaussian approximation or certify convergence. Noise, parameters, output
 potentials and admitted function evaluations remain separate obligations.
 `tests/test_gaussian_readiness.py` pins these limits, structural zeros, rotated
 nullspaces, mixed units, weak-gap refusal and batched float32/float64 behavior.
+
+**Bounded startup, separate from the equations.** A fresh chain can receive
+partial goal information before its proper forward prior. The startup program
+freezes eligibility from exact zeros in both outgoing roles, including checks
+that stored subnormals are not mistaken for zero. A site may defer only if it
+was neutral at run entry, has never been admitted in this run, and its input is
+PARTIAL. It retains its existing outgoing information without selecting a mean,
+forming sigma points, evaluating the physical function, or publishing moments
+or energy. Admission latches when a READY input executes. Loss of readiness
+after admission, or at any established site, is a failure, not a new startup.
+
+Noise and parameters, output finiteness/symmetry and observed values are checked
+before waiting. An unobserved output also needs the principal block `W+Lambda_o`
+to be proper. This is necessary for the Taylor tilt. For sigma regression,
+`Omega=V+positive_semidefinite_correction`, hence `Omega^-1 <= W`; an invalid
+`W+Lambda_o` cannot be rescued by that correction. Output potentials themselves
+may be indefinite; startup does not impose an input-style PSD condition on them.
+All admitted function/tilt failures retain their ordinary diagnostic reason.
+
+Scalar conditional execution within a serial member map prevents deferred
+runtime evaluations; the complete startup step uses sequential outer batching
+as well. Merely placing a conditional inside an ordinary vmap would not provide
+this guarantee. Ordinary neighbors propagate using the unchanged schedule.
+Every startup sweep is charged to `n_iters`. Trust solving starts only when all
+adaptive input cavities are READY and the current chart reference is proper.
+Pending startup exhaustion reports `local_budget` and the pending factor, with
+no finite-energy entry. A global chart obstruction without an unready adaptive
+factor has no invented factor attribution. Zero budget performs no startup.
+Run-local latches do not change checkpoint representation; each new run applies
+the declared neutral-at-entry convention.
+
+`tests/test_adaptive_startup.py` checks actual deferred callback suppression,
+outer batching, both-role site ownership, admission latches, invalid models,
+exact budget exhaustion and float32 affine planning against dense evidence.
+The opt-in affine tests in `tests/test_cstr_planning.py` check fresh and seeded
+starts against the independent Gaussian oracle. Its strict-update mechanism
+tests call strict sweeps without startup; they no longer describe public fresh-run
+failure. Finite reactor physics remains a separate envelope obligation.
 
 ### D13.3 Tilted moments and replacement sites
 

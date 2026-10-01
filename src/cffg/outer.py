@@ -134,9 +134,6 @@ def solve_outer(
         ),
         1,
     )
-    if adaptive_gaussian:
-        # Proper information can travel at most one edge per flooding update.
-        restart_limit += 2 * sum(bool(edge.dim) for edge in arena.edges.values())
     while True:
         chart = build_outer_chart(arena, current, eliminated)
         coordinates = chart_coordinates(chart, current)
@@ -181,6 +178,14 @@ def solve_outer(
                 float("inf"), radius, accepted, rejected,
                 inner_residual, inner_code,
                 failure=discovery_failure,
+            )
+        if adaptive_gaussian and not chart.proper_reference:
+            # Admission happens once, in the budgeted startup program.
+            return OuterSolveResult(
+                current, OuterTerminationReason.INNER_FAILURE, 0,
+                tuple(deltas), tuple(energies), outer_residual, merit,
+                gradient_norm, radius, accepted, rejected,
+                float("inf"), 2, failure=discovery_failure,
             )
         if chart.support_changed(mapped.messages) or not chart.proper_reference:
             restarts += 1

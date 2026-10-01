@@ -17,6 +17,7 @@ from jax.scipy.special import logsumexp
 from cffg.compiled import NEG, Arena
 from cffg.execution.failures import FailureIndex
 from cffg.execution.owners import SCHEDULED_EXECUTORS, ScheduledExecutors
+from cffg.execution.startup import StartupProgram, make_startup_program
 from cffg.execution.scans import _flat_scan_fn as _flat_scan_fn
 from cffg.execution.scans import _scan_stage_fn
 from cffg.execution.support import log_support as _jax_log_support
@@ -44,6 +45,7 @@ class ScheduleProgram:
     reconstruct: Propagation | None = None
     exact_unit: ExactUnit | None = None
     scan_registerized: tuple[bool, ...] = ()
+    startup: StartupProgram | None = None
 
 
 def build_schedule_program(
@@ -82,7 +84,8 @@ def build_schedule_program(
             scan_registerized=raw.scan_registerized,
         )
     if schedule.kind not in ("colored", "mixed"):
-        return ScheduleProgram(schedule, step, step)
+        return ScheduleProgram(schedule, step, step,
+                               startup=make_startup_program(arena, make_sweep))
 
     island = make_propagate(arena, schedule.stages, executors)
     prime = reconstruct = None
@@ -179,6 +182,9 @@ def build_schedule_program(
         prime=prime,
         reconstruct=reconstruct,
         scan_registerized=island.scan_registerized,
+        startup=make_startup_program(arena, make_sweep,
+                                     skip_scheduled=schedule.kind == "mixed",
+                                     propagate=island),
     )
 
 
