@@ -396,7 +396,7 @@ def test_agent_version_1_functional_checkpoint_migrates_runtime(tmp_path):
 
 @pytest.mark.parametrize(
     "mismatch",
-    ("samples", pytest.param("min_ess", marks=pytest.mark.slow),
+    (pytest.param("samples", marks=pytest.mark.slow), pytest.param("min_ess", marks=pytest.mark.slow),
      pytest.param("refresh", marks=pytest.mark.slow), "mode"),
 )
 def test_functional_checkpoint_configuration_mismatch_is_atomic(
@@ -438,14 +438,14 @@ def test_functional_checkpoint_configuration_mismatch_is_atomic(
     "corruption",
     (
         pytest.param("extra_array", marks=pytest.mark.slow),
-        "missing_key",
+        pytest.param("missing_key", marks=pytest.mark.slow),
         pytest.param("unclaimed_key", marks=pytest.mark.slow),
         pytest.param("null_cache", marks=pytest.mark.slow),
         "nonfinite_state",
         pytest.param("nonfinite_trace", marks=pytest.mark.slow),
         pytest.param("nonfinite_outer", marks=pytest.mark.slow),
         pytest.param("invalid_outer", marks=pytest.mark.slow),
-        "invalid_weights",
+        pytest.param("invalid_weights", marks=pytest.mark.slow),
         pytest.param("invalid_counter", marks=pytest.mark.slow),
         pytest.param("invalid_cache", marks=pytest.mark.slow),
         pytest.param("extra_metadata", marks=pytest.mark.slow),
@@ -759,6 +759,7 @@ def test_typed_jax_key_checkpoint_preserves_representation(tmp_path):
     assert_result_exact(restored.last_plan_result, agent.last_plan_result)
 
 
+@pytest.mark.slow
 def test_checkpoint_drops_result_after_particle_budget_change(tmp_path):
     source = make_agent(samples=128)
     source.act()
@@ -781,6 +782,7 @@ def test_checkpoint_drops_result_after_particle_budget_change(tmp_path):
     )
 
 
+@pytest.mark.slow
 def test_action_rng_is_separate_from_functional_key_cursor():
     first = make_agent(select="sample", seed=1)
     second = make_agent(select="sample", seed=99)

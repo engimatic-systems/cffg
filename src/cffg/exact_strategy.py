@@ -62,7 +62,7 @@ class ExactRunStrategy:
         if not self.finite(state):
             return ExactOutcome(state, ExactReason.INITIAL_NONFINITE, 0)
 
-        msgs, g_eta, g_lam, ef_eta, delta_dev, rel_dev, fe_dev, pre_bad, post_bad = (
+        msgs, g_eta, g_lam, ef_eta, delta_dev, rel_dev, fe_dev, pre_bad, post_bad, *_ = (
             self.unit(
                 state.messages,
                 state.g_eta,

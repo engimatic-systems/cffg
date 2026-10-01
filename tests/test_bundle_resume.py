@@ -91,9 +91,9 @@ def _run(engine, data, learning=None):
     ("accumulate", np.float32, "gaussian"),
     pytest.param("accumulate", np.float64, "rslds", marks=pytest.mark.slow),
     ("accumulate", np.float64, "gaussian"),
-    ("replace", np.float32, "rslds"),
+    pytest.param("replace", np.float32, "rslds", marks=pytest.mark.slow),
     ("replace", np.float32, "gaussian"),
-    ("replace", np.float64, "rslds"),
+    pytest.param("replace", np.float64, "rslds", marks=pytest.mark.slow),
     ("replace", np.float64, "gaussian"),
 ])
 def test_all_families_resume_identical_next_update(tmp_path, kind, dtype, cadence):

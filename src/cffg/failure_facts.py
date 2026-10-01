@@ -17,6 +17,7 @@ class FailureReason(IntEnum):
     NONFINITE_FUNCTION = 6
     IMPROPER_TILT = 7
     UNREPRESENTABLE_SIGMA_POINTS = 8
+    NONFINITE_SHARED_GOAL = 9
 
 
 class FailurePhase(IntEnum):

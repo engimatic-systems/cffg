@@ -295,7 +295,7 @@ class Engine:
         if mu3_code:
             outcome = "budget exhausted" if mu3_code == 1 else "diverged"
             raise RuntimeError(f"mu3 importance update {outcome}; use Engine.run for status")
-        msgs, g_eta, g_lam, ef_eta, _, inner_code = self._step(
+        msgs, g_eta, g_lam, ef_eta, _, inner_code, *_ = self._step(
             state.messages, state.g_eta, state.g_lam, state.g_obs, state.g_mask,
             state.ef_eta, state.ef_obs, state.ef_mask, state.params, damp, harden,
         )

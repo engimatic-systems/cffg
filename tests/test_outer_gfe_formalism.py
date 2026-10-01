@@ -50,7 +50,7 @@ def _gauge_shift(engine: Engine, state):
 
 def _undamped_outer_step(engine: Engine, state):
     assert not engine.arena.mu3_groups
-    messages, g_eta, g_lam, ef_eta, inner_residual, inner_code = engine._iter_step(
+    messages, g_eta, g_lam, ef_eta, inner_residual, inner_code, *_ = engine._iter_step(
         state.messages,
         state.g_eta,
         state.g_lam,

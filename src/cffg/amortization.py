@@ -182,7 +182,7 @@ class GaussianAmortizer:
             chart = build_outer_chart(self.engine.arena, self._arrays(candidate), self.engine._outer_eliminated)
             if not chart.proper_reference or not np.isfinite(self.engine.bfe(candidate)):
                 raise ValueError("recognition proposal has improper beliefs or cavities")
-            _, _, _, _, local, status = self.engine._iter_step(
+            _, _, _, _, local, status, *_ = self.engine._iter_step(
                 candidate.messages, candidate.g_eta, candidate.g_lam, candidate.g_obs, candidate.g_mask,
                 candidate.ef_eta, candidate.ef_obs, candidate.ef_mask, candidate.params, 0., False)
             if int(status) or not np.isfinite(float(local)):

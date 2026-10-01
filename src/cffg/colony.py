@@ -147,7 +147,7 @@ class Colony:
             # schedules also prime once (their exact island passes).
             if program.prime is not None and n_iters >= 1 and active.any():
                 def prime_one(st: State, *, program=program):
-                    msgs, g_eta, g_lam, ef_eta = program.prime(
+                    msgs, g_eta, g_lam, ef_eta, *_ = program.prime(
                         st.messages, st.g_eta, st.g_lam, st.ef_eta,
                         st.g_obs, st.g_mask, st.ef_obs, st.ef_mask, st.params,
                     )
@@ -163,7 +163,7 @@ class Colony:
                     batched = jax.tree_util.tree_map(freeze, batched, primed)
 
             def one(st: State, *, program=program):
-                msgs, g_eta, g_lam, ef_eta, inner_residual, inner_status = program.iter_step(
+                msgs, g_eta, g_lam, ef_eta, inner_residual, inner_status, *_ = program.iter_step(
                     st.messages, st.g_eta, st.g_lam, st.g_obs, st.g_mask,
                     st.ef_eta, st.ef_obs, st.ef_mask, st.params, damp, True,
                 )

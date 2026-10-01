@@ -158,7 +158,11 @@ def write_current(path, arrays):
     np.savez(path, **arrays)
 
 
-@pytest.mark.parametrize("kind", ("exactly_k", "at_most_k", "table"))
+@pytest.mark.parametrize("kind", (
+    "exactly_k",
+    pytest.param("at_most_k", marks=pytest.mark.slow),
+    pytest.param("table", marks=pytest.mark.slow),
+))
 @pytest.mark.parametrize("envelope", ("current", "agent_v1"))
 def test_prepared_mu3_cache_rebuilds_pre_constraint_parameter_layout(
     kind, envelope, tmp_path

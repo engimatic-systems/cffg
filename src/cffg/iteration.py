@@ -224,7 +224,7 @@ def run_iterations(
         return progress.finish(state)
 
     if program.prime is not None and n_iters >= 1:
-        msgs, eta, lam, ef_eta = program.prime(
+        msgs, eta, lam, ef_eta, *_ = program.prime(
             state.messages,
             state.g_eta,
             state.g_lam,
@@ -247,7 +247,7 @@ def run_iterations(
             if code:
                 progress.reject_functional(code, residual)
                 return current
-            msgs, eta, lam, ef_eta, inner_residual, inner_code = program.iter_step(
+            msgs, eta, lam, ef_eta, inner_residual, inner_code, *_ = program.iter_step(
                 current.messages,
                 current.g_eta,
                 current.g_lam,

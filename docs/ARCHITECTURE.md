@@ -1172,7 +1172,20 @@ vacuous successful updates are not failures. Non-finite output checks allow
 categorical negative infinity as exact zero support, but not as a Gaussian
 information coordinate. These auxiliary facts do not change convergence or
 derivative calculations. Public factor attribution remains unavailable until
-the schedule/result transport stages of cff-04mb are complete.
+the result transport stages of cff-04mb are complete.
+
+`execution/failures.py` assigns ranks from all executing plans' serialized
+member/prior names, not just parameter-bearing factors. Sweeps, propagation
+and exact units append one `FailureFact` to their numerical outputs. Checks
+inspect actual outgoing blocks in their destination dtype before scatter,
+ignore categorical padding
+and distinguish natural-parameter counts from log support. Separately owned
+prior blocks retain their own factor names; a non-finite pooled shared-goal
+count reports unknown ownership rather than inventing one contributor.
+Flooding reduces simultaneous failures by rank, while ordered stages and
+scan steps retain their first cause. Exact units distinguish propagation
+from certification. Run controllers currently discard these auxiliary facts;
+root/adjoint programs exclude them from differentiated message coordinates.
 
 `execution/synchronous.py:make_sweep` owns the global synchronous transport.
 It gathers every local input from the pre-sweep arrays, collects cross-domain
@@ -1195,7 +1208,9 @@ formulas, outer elimination policy or public termination decisions.
 trusted host handles, never serialized model or runtime-State data.
 
 `execution/transport.py` supplies shared shape-local gathers and scatters.
-Registerized scans still prefetch inputs, carry only cross-step local blocks,
+`execution/scans.py` owns registerized and flat scan execution.
+Registerized scans still prefetch inputs, carry only cross-step local blocks
+plus three scalar integer failure fields,
 and scatter once after the scan; flat scans remain the fallback. EF parameter
 prefetch uses the same selector as flooding. The execution support owner
 evaluates factor support from local inputs; the schedule support check combines
