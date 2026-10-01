@@ -176,9 +176,30 @@ that every gap below will be implemented:
   this missing-information failure from RK4 evaluations or sigma-point moments
   exceeding floating-point range. Its strict-update tests call sweeps without
   startup; fresh affine partial-goal chains now pass the dense Gaussian oracle.
-  This does not establish a general reactor planning envelope. The original
-  failed CSTR invocation was not
-  retained, so these tests are mechanism reproductions, not incident replay.
+  `examples/cstr_planning.py` supplies a separately declared supported candidate:
+  past=0, horizon=2, nominal retained parameters, initial mean zero and
+  P0=diag(.01,.001,1e-4,.1). Its normalized coordinates are concentration,
+  temperature, additive concentration bias and coolant action. Current DATA
+  is [-1/3,.2] (concentration .8 in raw model units, temperature 330 K).
+  Zero concentration/action goals target .85 and 298.5 K, with variance
+  diag(4e-4,1); current-observation variance is diag(1e-4,1e-4).
+  Process covariance is Qp=diag(1e-4,4e-4,4e-6,.25). Both Taylor/sigma-point,
+  f32/f64 and auto/flood have fresh and converged-warm checks at these defaults.
+  The auto temperature-goal grid adds zero temperature targets (325 K), fixes
+  other goal variances, and tests Qp multipliers {.01,1,100} crossed with
+  temperature-goal variances {.01,1} in both methods/dtypes. These are enumerated
+  cases, not an interval-wide guarantee. The 60-iteration budget uses
+  tau=max(1e-6,64*eps) and actual finite FE-change/residual certificates in the
+  solver's frozen chart. Independent affine conditioning and physical ODE
+  comparisons are in `tests/test_cstr_envelope.py`; they do not make the
+  nonlinear posterior exact.
+  Physics evaluation clips initial concentration to [.1,1.6], temperature to
+  [200,450] K and coolant to [275,322] K. Intermediate/final RK4 states are not
+  clipped; the action belief is passed through unchanged. These are not hard
+  [295,302] K actuator bounds. Larger priors/horizons, other observations or
+  constants and closed-loop control performance require separate validation.
+  The original failed CSTR invocation was not retained; wide-prior tests are
+  mechanism reproductions, not incident replay or a proven noise threshold.
   Zero noise, nonlinear GFE, and continuous-to-discrete means remain excluded.
 - *Gaussian/continuous GFE messages* — RESOLVED as a position, 2026-07-12
   (cff-dfpi, DERIVATIONS.md D5): none will be added, and that is a theorem,

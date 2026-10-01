@@ -1,6 +1,6 @@
 ---
 id: cff-qw7x
-status: in_progress
+status: closed
 deps: [cff-36x7, cff-pl0v]
 links: []
 created: 2026-09-25T11:23:56Z
@@ -64,3 +64,39 @@ Integration discovery split into prerequisite cff-pl0v: f32 sigma/flood reports 
 **2026-09-30T19:37:02Z**
 
 Prerequisite cff-pl0v complete: all3 outer success paths now return the certified point. Focused97pass, real f32 reactor frozen-chart certificate passes, mixed reconstruction2pass, final default gate2631pass157deselected wall1182.696s. Resume retained recipe/example from named stash on a branch based on the certified-return PR. Re-run relevant envelope opt-ins after this behavior change; the newly defined default-suite tests need one final gate at the envelope head. Continue actual cavity physics checks and truthful grid assessment; original missing incident remains unavailable.
+
+**2026-09-30T19:44:13Z**
+
+Resume on cff-qw7x-supported-reactor from current published PR#178 ac6d2bc after ff-only bootstrap. Restored source/example work; public builder defines narrow P0 while the original investigation wrapper retains its old defaults. Actual certificate uses captured fixed chart and mixed-slot reconstruction. Fresh-process bundle check confirms absent mean rejected, explicit trusted installation enables load/compile; installation must precede load_bundle, not just a later compile call. New default-focused selection21passed36deselected in18.99s; full relevant opt-ins running. Default suite not yet rerun for this separate implementation head.
+
+**2026-09-30T19:50:21Z**
+
+Relevant completed opt-ins after cff-pl0v: default auto cold/warm bothmethods xbothdtypes —4 passed15deselected in444.86s; initial slow batch has completed both f32 affine-oracle cases and all4 flood cold/warm cases before its grid. Retained affine fresh/exact-seeded, wide RK4, strict missing-information and H150 strict/budgeted startup checks —10 passed41deselected in209.98s. Standalone public recipe subprocess —1 passed16deselected in108.82s. No broad speed claim; cold compile/control is expensive and remains the measured-runtime roadmap. Grid still running; canonical prose is conditional on passing exact enumerated checks.
+
+**2026-09-30T19:53:14Z**
+
+Final bounded review question—do extraction/docs match exact inputs and honest scope? Answer—yes conditional on pending grid: P0/Qp/observations/goals/6 ratios/budget/dtype floor match; no incident/exact-posterior/actuator/closed-loop claim. Source example, original wrapper diff and canonical doc hunks; confidence high. Physics/topology/wide-prior defaults retained. Intentional callback identity is now cffg.example.cstr_rk4; previously saved INTERNAL test fixtures naming cffg.test.cstr_rk4 still need that old trusted registration, not automatic alias/migration. Current bundle schema unchanged. Arrays now own a copy of nominal theta so caller parameter edits cannot contaminate future recipe builds; focused ownership check added.
+
+**2026-09-30T19:58:10Z**
+
+Both float32 grid blocks have passed all6 Qp/temperature-goal pairs in the current opt-in run, with actual frozen-chart residual/FE checks and DOP853 comparisons of solved cavity sigma points. No tau relaxation, noise floor, physical clipping change or caller-side linearization. Float64 grid blocks still running. All remaining default checks after theta ownership change pass21/36deselected; no runtime changes in this envelope PR.
+
+**2026-09-30T20:01:56Z**
+
+The float64 Taylor grid block also passes its six enumerated combinations; only float64 sigma grid remains. Source/API and tests committed as d2f7f79 (default-focused checks passing; numerical equations unchanged). README/ARCHITECTURE/LIMITATIONS describe exact input scope, separate DATA reconstruction, clipping vs actuator bounds and approximate objective. D13 stale pre-startup text corrected to budgeted startup and frozen-chart certified-point handoff. No claim of original failure-threshold reproduction.
+
+**2026-09-30T20:05:36Z**
+
+Complete relevant envelope opt-ins: uv run pytest -q -m slow tests/test_cstr_envelope.py -x (original collection) —10 passed4deselected in1592.53s. Contains2 f32 affine oracle cases,4 flood cold/warm cases and4 six-pair auto grids (all24 grid inputs), including actual returned-point finite beliefs, frozen-chart residual/FE checks and DOP853 comparisons of solved cavity point clouds. Additional4 auto cold/warm cases passed separately after adding schedule coverage. Final code ownership edit preserves identical numerical theta values and focused ownership/local/source tests pass after it. Final default gate proposed head4986508, measured latestwall1182.696s and wait1560s; no repeated unchanged gate planned.
+
+**2026-09-30T20:32:36Z**
+
+First final gate4986508:1 stale README catalogue failure,2636passed172deselected,pytest1176.31s,wall1190.777s (within1200). New README links correctly include cstr_planning.py but test_readme.EXAMPLES inventory omitted it. Fix is expected artifact inventory only; numerical/source behavior unchanged. Update catalogue and focused docs checks, then one corrected gate because the previous full gate did not pass. No marker-only rerun; no budget trimming needed.
+
+**2026-09-30T20:59:47Z**
+
+Corrected final gate d4bcc5c: uv run python tools/dashboard.py --run-suite —2637passed172deselected,4 existing Gym deprecation warnings,pytest1174.64s,wall1188.941s (within1200). Dashboard refreshed green. Catalogue correction focused26passed36deselected15.06s. Complete: public shared recipe, source ownership/portable identity/trusted fresh-process boundary, all24 ratio cases and8 cold/warm schedule-method-dtype cases, affine bothdtypes/methods and retained partial/wide/H150 mechanisms verified. Canonical docs update exact scope and startup truth. No original threshold/exact nonlinear posterior/hard-action/closed-loop claim. Close and publish on base#178; reuse passing gate for ticket/history/PR bookkeeping, no further unchanged suite.
+
+**2026-09-30T21:00:37Z**
+
+Published PR chain link: https://github.com/engimatic-systems/cffg/pull/179, base#178 cff-pl0v-certified-return. Green final gate atd4bcc5c; later commits record tickets/history only. cff-qw7x and integration parent cff-toqa closed; overall cff-xa6z remains open. Next ready issue cff-qu2j exact float32 first-order certification. Retained example stash is now redundant with committed source/tests.

@@ -1,6 +1,6 @@
 ---
 id: cff-toqa
-status: open
+status: closed
 deps: [cff-7kpx, cff-fc2y, cff-36x7, cff-qw7x, cff-pl0v]
 links: []
 created: 2026-09-25T03:46:25Z
@@ -73,3 +73,7 @@ Split before implementation into three bounded tickets using the intelligible-ti
                     --> [blocked] cff-toqa --> cff-wt1c --> cff-xa6z
 
 cff-toqa directly requires all three children. Parallel ready roots include cff-qu2j and cff-ees0. cff-c5qf is a separate scope decision, not authorization to revive the abandoned partial-goal EC solver. tk dep cycle passes.
+
+**2026-09-30T20:59:47Z**
+
+Integration complete through prerequisites cff-7kpx, cff-fc2y, cff-36x7, cff-pl0v and cff-qw7x, allclosed. Outcomes: classified partial startup vs physical RK4/sigma range; neutral-site budgeted admission without invented moments, strict attributed invalid models/sites; actual certified-point handoff; maintained narrow P0,H2 native nonlinear recipe; all24 precision-grid inputs plus8 cold/warm method/dtype/schedule cases pass residual/finite FE/physical point-cloud checks. Independent affine dense oracle covers bothmethods/dtypes; sparse/vacuous/f32/H150/status/JIT/vmap contracts retained. D13 and canonical docs state frozen-surrogate approximation, no original incident/threshold or globally exact inference. Final gate at d4bcc5c2637passed172deselected wall1188.941s, shared by this parent closure; no duplicate suite. Follow-ups remain cff-wt1c matched control/runtime, separate bounds/parameter/agent tickets and cff-c5qf partial-goal hybrid scope decision.
