@@ -1,33 +1,47 @@
-"""Supported pre-1.0 facade for the documented newcomer workflow."""
+"""Supported pre-1.0 facade for common runtime and extension workflows."""
 
 from importlib import import_module
 
 
-_EXPORT_MODULES = {
-    "agent": ("RollingAgent",),
-    "bundle": ("LoadedBundle", "load_bundle", "save_bundle"),
-    "compiler": ("compile_template",),
-    "core.functions": ("FunctionSpec",),
-    "mean_functions": ("MeanImplementation", "register_mean_function"),
-    "neural_schema": ("neural_mean",),
-    "neural": ("initialize_neural_parameters",),
-    "implicit": ("FixedPointDifferentiator", "FixedPointGradient", "GradientStatus", "fixed_point_gradient"),
-    "training": ("NeuralTrainer", "TrainingConfig"),
-    "amortization": ("GaussianAmortizer", "PolynomialFeatures"),
-    "engine": ("Engine", "RunStatus"),
-    "models.gridworld": ("CorridorEnv", "build_gridworld"),
-    "params": ("set_params",),
-    "learning_schema": (
-        "PersistentArray", "PersistentParameter", "PersistentStateDescriptor",
-        "PersistentTarget", "resolve_persistent_state",
-    ),
-    "kernels": ("FactorKernel", "HostileInputs", "register_kernel"),
-    "kernel_bindings": (
-        "DiscreteBinding", "DiscreteMode", "EFBinding", "GaussianBinding",
-        "GaussianConditioning", "ParameterSpec",
-    ),
+_EXPORTS = {
+    "CorridorEnv": "models.gridworld",
+    "DiscreteBinding": "kernel_bindings",
+    "DiscreteMode": "kernel_bindings",
+    "EFBinding": "kernel_bindings",
+    "Engine": "engine",
+    "FactorKernel": "kernels",
+    "FixedPointDifferentiator": "implicit",
+    "FixedPointGradient": "implicit",
+    "FunctionSpec": "core.functions",
+    "GaussianAmortizer": "amortization",
+    "GaussianBinding": "kernel_bindings",
+    "GaussianConditioning": "kernel_bindings",
+    "GradientStatus": "implicit",
+    "HostileInputs": "kernels",
+    "LoadedBundle": "bundle",
+    "MeanImplementation": "mean_functions",
+    "NeuralTrainer": "training",
+    "ParameterSpec": "kernel_bindings",
+    "PersistentArray": "learning_schema",
+    "PersistentParameter": "learning_schema",
+    "PersistentStateDescriptor": "learning_schema",
+    "PersistentTarget": "learning_schema",
+    "PolynomialFeatures": "amortization",
+    "RollingAgent": "agent",
+    "RunStatus": "engine",
+    "TrainingConfig": "training",
+    "build_gridworld": "models.gridworld",
+    "compile_template": "compiler",
+    "fixed_point_gradient": "implicit",
+    "initialize_neural_parameters": "neural",
+    "load_bundle": "bundle",
+    "neural_mean": "neural_schema",
+    "save_bundle": "bundle",
+    "register_kernel": "kernels",
+    "register_mean_function": "mean_functions",
+    "resolve_persistent_state": "learning_schema",
+    "set_params": "params",
 }
-_EXPORTS = {name: module for module, names in _EXPORT_MODULES.items() for name in names}
 
 
 def __getattr__(name):
@@ -43,42 +57,4 @@ def __getattr__(name):
 def __dir__():
     return sorted(set(globals()) | set(__all__))
 
-__all__ = [
-    "CorridorEnv",
-    "DiscreteBinding",
-    "DiscreteMode",
-    "EFBinding",
-    "Engine",
-    "FactorKernel",
-    "FixedPointDifferentiator",
-    "FixedPointGradient",
-    "FunctionSpec",
-    "GaussianAmortizer",
-    "GaussianBinding",
-    "GaussianConditioning",
-    "GradientStatus",
-    "HostileInputs",
-    "LoadedBundle",
-    "MeanImplementation",
-    "NeuralTrainer",
-    "ParameterSpec",
-    "PersistentArray",
-    "PersistentParameter",
-    "PersistentStateDescriptor",
-    "PersistentTarget",
-    "PolynomialFeatures",
-    "RollingAgent",
-    "RunStatus",
-    "TrainingConfig",
-    "build_gridworld",
-    "compile_template",
-    "fixed_point_gradient",
-    "initialize_neural_parameters",
-    "load_bundle",
-    "neural_mean",
-    "save_bundle",
-    "register_kernel",
-    "register_mean_function",
-    "resolve_persistent_state",
-    "set_params",
-]
+__all__ = list(_EXPORTS)
