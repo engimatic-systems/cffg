@@ -257,8 +257,12 @@ alphabetically first factor name. Initialization and priming are iteration
 propagation and certification both belong to iteration 1. A functional
 parameter failure can precede its numbered message-update attempt.
 `phase` distinguishes these stages from the `ledger` check.
-Adaptive outer solves currently report generic `outer_*` terminal reasons;
-rejected trials that recover do not become run failures.
+Adaptive outer solves retain the terminal map's local cause, or a generic
+`outer_*` reason when none is known. A local attempt is numbered after completed
+controller updates, not by map calls (which also include derivative probes).
+Reconstruction has its own `reconstruction` phase. Rejected trials and shadow
+proposals that recover do not become run failures; a collapsed trust region
+names a failed trial only when every trial at that step was invalid.
 
 Converged results have `failure=None`. Diagnostics are run-local and are not
 saved in agent checkpoints: a restored cached unsuccessful result can also

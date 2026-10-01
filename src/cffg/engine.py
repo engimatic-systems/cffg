@@ -478,6 +478,7 @@ class Engine:
         ess, log_normalizers, mu3_statuses = self._mu3_result_diagnostics(outcome.state)
         return run_results.finalize_outer(
             outcome,
+            factor_names=self._failure_names,
             mu3_ess=ess,
             mu3_log_normalizers=log_normalizers,
             mu3_statuses=mu3_statuses,

@@ -1,627 +1,44 @@
-"""Gauge-reduced matrix-free globalization for mixed-GFE outer inference.
+"""Host control for gauge-reduced mixed-GFE outer inference.
 
 The scientific objective remains the engine's Bethe/generalised free-energy
-ledger. This module uses the fixed-point residual only as a numerical merit
-for trust-region step acceptance.
+ledger. The fixed-point residual is a numerical merit for trust-step acceptance.
+Coordinate and derivative-kernel exports retain their existing import paths.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Callable, NamedTuple
+from dataclasses import dataclass, field
+from typing import Callable
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 
-from cffg import efrules
-from cffg.compiled import NEG, Arena
-from cffg.outer_structure import OuterStructure
-from cffg.runtime_types import (
-    OuterTerminationReason as OuterTerminationReason,  # noqa: PLC0414
+from cffg.compiled import Arena
+from cffg.failure_facts import FailureAt, FailureFact, empty_failure_at
+from cffg.outer_chart import (
+    OuterArrays as OuterArrays,
+    OuterChart as OuterChart,
+    _CategoricalBlock as _CategoricalBlock,
+    _PrecisionBlock as _PrecisionBlock,
+    _VectorBlock as _VectorBlock,
+    _linear_map as _linear_map,
+    _unit_scaled as _unit_scaled,
+    build_outer_chart as build_outer_chart,
+    chart_arrays as chart_arrays,
+    chart_coordinates as chart_coordinates,
+    outer_chart_signature as outer_chart_signature,
 )
-
-
-class OuterArrays(NamedTuple):
-    messages: jax.Array
-    g_eta: jax.Array
-    g_lam: jax.Array
-    ef_eta: jax.Array
-
-
-@dataclass(frozen=True)
-class _CategoricalBlock:
-    segment: np.ndarray
-    support: np.ndarray
-    reference: int
-    coordinates: np.ndarray
-
-
-@dataclass(frozen=True)
-class _VectorBlock:
-    field: str
-    indices: np.ndarray
-    forward: np.ndarray
-    inverse: np.ndarray
-    aliases: np.ndarray | None = None
-
-
-@dataclass(frozen=True)
-class _PrecisionBlock:
-    indices: np.ndarray
-    lower: np.ndarray
-    whitening: np.ndarray
-
-
-@dataclass(frozen=True)
-class OuterChart:
-    """One exact-support, gauge-reduced, dimensionless message chart."""
-
-    base: OuterArrays
-    categorical: tuple[_CategoricalBlock, ...]
-    vectors: tuple[_VectorBlock, ...]
-    precisions: tuple[_PrecisionBlock, ...]
-    block_slices: tuple[tuple[int, int], ...]
-    proper_reference: bool
-    ef_shape: tuple[int, ...]
-
-    @property
-    def size(self) -> int:
-        return self.block_slices[-1][1] if self.block_slices else 0
-
-    def pack(self, arrays: OuterArrays) -> jax.Array:
-        pieces: list[jax.Array] = []
-        for block in self.categorical:
-            if block.coordinates.size:
-                pieces.append(
-                    arrays.messages[block.coordinates]
-                    - arrays.messages[block.reference]
-                )
-        for block in self.vectors:
-            values = getattr(arrays, block.field)[block.indices]
-            pieces.append(jnp.asarray(block.forward) @ values)
-        for block in self.precisions:
-            dim = block.indices.shape[0]
-            matrix = arrays.g_lam[block.indices.reshape(-1)].reshape(dim, dim)
-            whitening = jnp.asarray(block.whitening)
-            reduced = jnp.linalg.solve(
-                whitening, jnp.linalg.solve(whitening, matrix).T
-            ).T
-            pieces.append(reduced[block.lower[:, 0], block.lower[:, 1]])
-        if not pieces:
-            return jnp.zeros((0,), dtype=self.base.messages.dtype)
-        return jnp.concatenate([jnp.ravel(piece) for piece in pieces])
-
-    def unpack(
-        self,
-        coordinates: jax.Array,
-        base: OuterArrays | None = None,
-    ) -> OuterArrays:
-        arrays = self.base if base is None else base
-        offset = 0
-        messages = arrays.messages
-        for block in self.categorical:
-            messages = messages.at[block.support].set(0.0)
-            width = block.coordinates.size
-            if width:
-                messages = messages.at[block.coordinates].set(
-                    coordinates[offset : offset + width]
-                )
-                offset += width
-
-        fields = {
-            "messages": messages,
-            "g_eta": arrays.g_eta,
-            "ef_eta": arrays.ef_eta,
-        }
-        for block in self.vectors:
-            width = block.indices.size
-            values = (
-                jnp.asarray(block.inverse)
-                @ coordinates[offset : offset + width]
-            )
-            targets = block.indices if block.aliases is None else block.aliases
-            fields[block.field] = fields[block.field].at[targets].set(
-                values
-            )
-            offset += width
-
-        g_lam = arrays.g_lam
-        for block in self.precisions:
-            width = block.lower.shape[0]
-            reduced = jnp.zeros(block.indices.shape, dtype=g_lam.dtype)
-            values = coordinates[offset : offset + width]
-            rows, cols = block.lower[:, 0], block.lower[:, 1]
-            reduced = reduced.at[rows, cols].set(values)
-            reduced = reduced.at[cols, rows].set(values)
-            whitening = jnp.asarray(block.whitening)
-            matrix = whitening @ reduced @ whitening.T
-            g_lam = g_lam.at[block.indices.reshape(-1)].set(matrix.reshape(-1))
-            offset += width
-
-        return OuterArrays(
-            fields["messages"], fields["g_eta"], g_lam, fields["ef_eta"]
-        )
-
-    def support_changed(self, messages: jax.Array) -> bool:
-        host = np.asarray(messages)
-        base = np.asarray(self.base.messages)
-        return any(
-            not np.array_equal(
-                host[block.segment] != NEG,
-                base[block.segment] != NEG,
-            )
-            for block in self.categorical
-        )
-
-    def residual_scale(self, residual: jax.Array) -> jax.Array:
-        eps_root = np.sqrt(np.finfo(np.asarray(residual).dtype).eps)
-        scale = np.empty(residual.shape, dtype=np.asarray(residual).dtype)
-        for start, stop in self.block_slices:
-            block = np.asarray(residual[start:stop])
-            rms = float(np.sqrt(np.mean(np.square(block)))) if block.size else 0.0
-            scale[start:stop] = max(rms, eps_root)
-        return jnp.asarray(scale)
-
-
-def _linear_map(matrix: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    return matrix, np.linalg.inv(matrix)
-
-
-def _unit_scaled(values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    rms = float(np.sqrt(np.mean(np.square(values)))) if values.size else 0.0
-    unit = max(rms, 1.0)
-    eye = np.eye(values.size, dtype=values.dtype)
-    return eye / unit, eye * unit
-
-
-def build_outer_chart(
-    arena: Arena | OuterStructure,
-    arrays: OuterArrays,
-    eliminated: dict[str, frozenset[int]] | None = None,
-) -> OuterChart:
-    """Build the exact active chart and fixed continuous reference metrics."""
-    eliminated = eliminated or {}
-    discrete_eliminated = eliminated.get("messages", frozenset())
-    gaussian_eliminated = eliminated.get("gaussian", frozenset())
-    ef_eliminated = eliminated.get("ef", frozenset())
-    messages = np.asarray(arrays.messages)
-    dtype = messages.dtype
-    categorical: list[_CategoricalBlock] = []
-    vectors: list[_VectorBlock] = []
-    precisions: list[_PrecisionBlock] = []
-    proper = True
-
-    parameter_aliases: dict[int, np.ndarray] = {}
-    duplicate_slots: set[int] = set()
-    for plan in arena.goal_parameter_plans:
-        for slots in (plan.prior_scatter, plan.count_scatter):
-            if len(slots) > 1:
-                parameter_aliases[int(slots[0])] = arena.message_indices(
-                    slots, plan.cardinality
-                )
-                duplicate_slots.update(int(slot) for slot in slots[1:])
-
-    for edge in sorted(arena.edges.values(), key=lambda item: item.name):
-        if not edge.dim and not edge.ef and not edge.param_shape:
-            for slot in (edge.slot0, edge.slot1):
-                if slot in discrete_eliminated:
-                    continue
-                indices = arena.message_indices(slot, edge.card)
-                support = indices[messages[indices] != NEG]
-                if not support.size:
-                    proper = False
-                    continue
-                block = _CategoricalBlock(
-                    segment=indices,
-                    support=support,
-                    reference=int(support[0]),
-                    coordinates=support[1:],
-                )
-                categorical.append(block)
-        elif edge.param_shape:
-            width = int(np.prod(edge.param_shape))
-            for slot in (edge.slot0, edge.slot1):
-                if slot in discrete_eliminated or slot in duplicate_slots:
-                    continue
-                indices = arena.message_indices(slot, width)
-                forward, inverse = _unit_scaled(messages[indices])
-                vectors.append(
-                    _VectorBlock(
-                        "messages", indices, forward, inverse, parameter_aliases.get(slot)
-                    )
-                )
-
-    g_eta = np.asarray(arrays.g_eta)
-    g_lam = np.asarray(arrays.g_lam)
-    for edge in sorted(arena.edges.values(), key=lambda item: item.name):
-        if not edge.dim:
-            continue
-        dim = edge.dim
-        eta_indices = [
-            arena.g_eta_indices(slot, dim) for slot in (edge.slot0, edge.slot1)
-        ]
-        lam_indices = [
-            arena.g_lam_indices(slot, dim) for slot in (edge.slot0, edge.slot1)
-        ]
-        aggregate = sum(
-            g_lam[index.reshape(-1)].reshape(dim, dim)
-            for index in lam_indices
-        )
-        aggregate = 0.5 * (aggregate + aggregate.T)
-        operator_scale = float(np.linalg.norm(aggregate, ord=2))
-        rank_floor = np.finfo(dtype).eps * dim * operator_scale
-        if np.linalg.eigvalsh(aggregate).min(initial=np.inf) > rank_floor:
-            whitening = np.linalg.cholesky(aggregate)
-        else:
-            whitening = np.eye(dim, dtype=dtype)
-            proper = False
-        eta_forward, eta_inverse = _linear_map(
-            np.linalg.inv(whitening)
-        )
-        lower = np.argwhere(np.tril(np.ones((dim, dim), dtype=bool)))
-        for slot, eta_index, lam_index in zip(
-            (edge.slot0, edge.slot1), eta_indices, lam_indices
-        ):
-            if slot in gaussian_eliminated:
-                continue
-            vectors.append(
-                _VectorBlock(
-                    "g_eta", eta_index, eta_forward, eta_inverse
-                )
-            )
-            precisions.append(
-                _PrecisionBlock(lam_index, lower, whitening)
-            )
-
-    ef_eta = np.asarray(arrays.ef_eta)
-    for edge in sorted(arena.edges.values(), key=lambda item: item.name):
-        if not edge.ef:
-            continue
-        family = efrules.JFAMILIES[edge.ef]
-        aggregate = ef_eta[edge.slot0] + ef_eta[edge.slot1]
-        active = np.arange(aggregate.size, dtype=np.int64)
-        if bool(np.asarray(family.is_proper(jnp.asarray(aggregate)))):
-            fisher = np.asarray(
-                jax.jacfwd(family.mean_stats)(jnp.asarray(aggregate))
-            )
-            fisher = 0.5 * (fisher + fisher.T)
-            scale = max(float(np.linalg.norm(fisher, ord=2)), 1.0)
-            rank_floor = np.finfo(dtype).eps * aggregate.size * scale
-            if np.linalg.eigvalsh(fisher).min(initial=np.inf) > rank_floor:
-                metric = np.linalg.cholesky(fisher).T
-            else:
-                metric = np.eye(aggregate.size, dtype=dtype)
-                proper = False
-        else:
-            metric = np.eye(aggregate.size, dtype=dtype)
-            proper = False
-        forward, inverse = _linear_map(metric)
-        for slot in (edge.slot0, edge.slot1):
-            if slot in ef_eliminated:
-                continue
-            indices = slot * ef_eta.shape[1] + active
-            vectors.append(
-                _VectorBlock("ef_eta", indices, forward, inverse)
-            )
-
-    flat_arrays = OuterArrays(
-        arrays.messages,
-        arrays.g_eta,
-        arrays.g_lam,
-        arrays.ef_eta.reshape(-1),
-    )
-    ordered_widths = [
-        *(block.coordinates.size for block in categorical),
-        *(block.indices.size for block in vectors),
-        *(block.lower.shape[0] for block in precisions),
-    ]
-    ordered_slices: list[tuple[int, int]] = []
-    offset = 0
-    for width in ordered_widths:
-        if width:
-            ordered_slices.append((offset, offset + width))
-            offset += width
-    return OuterChart(
-        flat_arrays,
-        tuple(categorical),
-        tuple(vectors),
-        tuple(precisions),
-        tuple(ordered_slices),
-        proper,
-        tuple(arrays.ef_eta.shape),
-    )
-
-
-def chart_arrays(
-    chart: OuterChart,
-    coordinates: jax.Array,
-    base: OuterArrays | None = None,
-) -> OuterArrays:
-    arrays = chart.unpack(coordinates, base)
-    return arrays._replace(ef_eta=arrays.ef_eta.reshape(chart.ef_shape))
-
-
-def chart_coordinates(chart: OuterChart, arrays: OuterArrays) -> jax.Array:
-    return chart.pack(arrays._replace(ef_eta=arrays.ef_eta.reshape(-1)))
-
-
-def outer_chart_signature(chart: OuterChart) -> tuple:
-    """Exact cache identity for a chart's support, dtype, and metrics."""
-    def array_key(value: np.ndarray) -> tuple:
-        return value.dtype.str, value.shape, value.tobytes()
-
-    return (
-        np.asarray(chart.base.messages).dtype.str,
-        tuple(
-            (
-                array_key(block.segment),
-                array_key(block.support),
-                block.reference,
-                array_key(block.coordinates),
-            )
-            for block in chart.categorical
-        ),
-        tuple(
-            (
-                block.field,
-                array_key(block.indices),
-                array_key(block.forward),
-                array_key(block.inverse),
-                None if block.aliases is None else array_key(block.aliases),
-            )
-            for block in chart.vectors
-        ),
-        tuple(
-            (
-                array_key(block.indices),
-                array_key(block.lower),
-                array_key(block.whitening),
-            )
-            for block in chart.precisions
-        ),
-        chart.ef_shape,
-    )
-
-
-@dataclass(frozen=True)
-class TrustStep:
-    step: jax.Array
-    predicted_reduction: float
-    gradient_norm: float
-    hit_boundary: bool
-    linear_exhausted: bool
-    finite: bool
-
-
-class OuterKernelPlan(NamedTuple):
-    trust: Callable
-    root_diagnostics: Callable
-    context: object
-    compiled: bool
-
-
-def _make_root_diagnostics(
-    residual_fn: Callable[[jax.Array], jax.Array],
-):
-    """Compile the residual merit and its matrix-free gradient at a root."""
-    @jax.jit
-    def diagnostics(coordinates, residual_scale, context=None):
-        def scaled(value):
-            residual = (
-                residual_fn(value)
-                if context is None
-                else residual_fn(value, context)
-            )
-            return residual / residual_scale
-
-        residual, pullback = jax.vjp(scaled, coordinates)
-        gradient = pullback(residual)[0]
-        merit = 0.5 * jnp.vdot(residual, residual).real
-        return merit, jnp.linalg.norm(gradient)
-
-    return diagnostics
-
-
-def _boundary_distance(point, direction, radius):
-    a = jnp.vdot(direction, direction).real
-    b = 2.0 * jnp.vdot(point, direction).real
-    c = jnp.vdot(point, point).real - radius * radius
-    discriminant = jnp.maximum(b * b - 4.0 * a * c, 0.0)
-    return (-b + jnp.sqrt(discriminant)) / (2.0 * a)
-
-
-def _make_trust_kernel(
-    residual_fn: Callable[[jax.Array], jax.Array],
-    dimension: int,
-    max_linear_iters: int | None = None,
-):
-    """Compile one reusable matrix-free Steihaug kernel for a fixed chart."""
-    if max_linear_iters is None:
-        max_linear_iters = max(1, dimension)
-
-    @jax.jit
-    def kernel(
-        coordinates, residual_scale, radius,
-        accelerated_step, has_accelerated_step, context=None,
-    ):
-        def scaled(value):
-            residual = (
-                residual_fn(value)
-                if context is None
-                else residual_fn(value, context)
-            )
-            return residual / residual_scale
-        residual, jvp = jax.linearize(scaled, coordinates)
-        _, pullback = jax.vjp(scaled, coordinates)
-        gradient = pullback(residual)[0]
-        gradient_norm = jnp.linalg.norm(gradient)
-        eps = jnp.finfo(coordinates.dtype).eps
-        target = jnp.sqrt(eps) * jnp.maximum(gradient_norm, 1.0)
-
-        def gauss_product(value):
-            return pullback(jvp(value))[0]
-
-        def body(carry):
-            i, step, linear_residual, direction, done, hit_boundary = carry
-            image = gauss_product(direction)
-            curvature = jnp.vdot(direction, image).real
-            curvature_floor = (
-                eps
-                * jnp.maximum(jnp.linalg.norm(direction), 1.0)
-                * jnp.maximum(jnp.linalg.norm(image), 1.0)
-            )
-            rr = jnp.vdot(linear_residual, linear_residual).real
-            alpha = rr / jnp.where(curvature != 0.0, curvature, 1.0)
-            candidate = step + alpha * direction
-            use_boundary = (
-                ~jnp.isfinite(curvature)
-                | (curvature <= curvature_floor)
-                | (jnp.linalg.norm(candidate) >= radius)
-            )
-            tau = _boundary_distance(step, direction, radius)
-            boundary_step = step + tau * direction
-            next_residual = linear_residual - alpha * image
-            converged = jnp.linalg.norm(next_residual) <= target
-            next_rr = jnp.vdot(next_residual, next_residual).real
-            beta = next_rr / jnp.where(rr != 0.0, rr, 1.0)
-            next_direction = next_residual + beta * direction
-            return (
-                i + 1,
-                jnp.where(use_boundary, boundary_step, candidate),
-                jnp.where(
-                    use_boundary, linear_residual, next_residual
-                ),
-                jnp.where(use_boundary, direction, next_direction),
-                done | use_boundary | converged,
-                hit_boundary | use_boundary,
-            )
-
-        def condition(carry):
-            i, _, _, _, done, _ = carry
-            return (i < max_linear_iters) & ~done
-
-        initial = (
-            jnp.asarray(0),
-            jnp.zeros_like(coordinates),
-            -gradient,
-            -gradient,
-            jnp.asarray(False),
-            jnp.asarray(False),
-        )
-        iterations, step, _, _, done, hit_boundary = jax.lax.while_loop(
-            condition, body, initial
-        )
-
-        def predicted(candidate):
-            image = jvp(candidate)
-            return -(
-                jnp.vdot(gradient, candidate).real
-                + 0.5 * jnp.vdot(image, image).real
-            )
-
-        # Certify the truncated solve against the matrix-free Cauchy point.
-        gg = jnp.vdot(gradient, gradient).real
-        bg = gauss_product(gradient)
-        gbg = jnp.vdot(gradient, bg).real
-        boundary_alpha = radius / jnp.where(
-            gradient_norm != 0.0, gradient_norm, 1.0
-        )
-        alpha = jnp.where(
-            gbg > eps * jnp.maximum(gg, 1.0),
-            jnp.minimum(gg / gbg, boundary_alpha),
-            boundary_alpha,
-        )
-        cauchy = -alpha * gradient
-        use_cauchy = predicted(step) < 0.5 * predicted(cauchy)
-        step = jnp.where(use_cauchy, cauchy, step)
-        hit_boundary = hit_boundary | (
-            use_cauchy & (alpha == boundary_alpha)
-        )
-        fixed_point_step = residual * residual_scale
-        fractions = jnp.asarray(
-            [1.0, 0.5, 0.25, 0.125], dtype=coordinates.dtype
-        )
-        candidates = fractions[:, None] * fixed_point_step[None, :]
-        candidate_norms = jnp.linalg.norm(candidates, axis=1)
-        candidate_scales = jnp.minimum(
-            1.0,
-            radius / jnp.where(candidate_norms != 0.0, candidate_norms, 1.0),
-        )
-        candidates = candidate_scales[:, None] * candidates
-        candidate_predictions = jax.vmap(predicted)(candidates)
-        best = jnp.argmax(candidate_predictions)
-        fixed_point_step = candidates[best]
-        fixed_point_prediction = candidate_predictions[best]
-        use_fixed_point = fixed_point_prediction > predicted(step)
-        step = jnp.where(use_fixed_point, fixed_point_step, step)
-        hit_boundary = hit_boundary | (
-            use_fixed_point & (candidate_scales[best] < 1.0)
-        )
-        accelerated_norm = jnp.linalg.norm(accelerated_step)
-        accelerated_scale = jnp.minimum(
-            1.0,
-            radius / jnp.where(accelerated_norm != 0.0, accelerated_norm, 1.0),
-        )
-        accelerated_step = accelerated_scale * accelerated_step
-        blend_fractions = jnp.asarray(
-            [1.0, 0.5, 0.25, 0.125], dtype=coordinates.dtype
-        )
-        accelerated_candidates = (
-            blend_fractions[:, None] * accelerated_step[None, :]
-            + (1.0 - blend_fractions[:, None]) * step[None, :]
-        )
-        accelerated_norms = jnp.linalg.norm(
-            accelerated_candidates, axis=1
-        )
-        accelerated_scales = jnp.minimum(
-            1.0,
-            radius / jnp.where(
-                accelerated_norms != 0.0, accelerated_norms, 1.0
-            ),
-        )
-        accelerated_candidates = (
-            accelerated_scales[:, None] * accelerated_candidates
-        )
-        accelerated_predictions = jax.vmap(predicted)(
-            accelerated_candidates
-        )
-        accelerated_best = jnp.argmax(accelerated_predictions)
-        use_accelerated = has_accelerated_step & (
-            accelerated_predictions[accelerated_best] > predicted(step)
-        )
-        step = jnp.where(
-            use_accelerated,
-            accelerated_candidates[accelerated_best],
-            step,
-        )
-        hit_boundary = hit_boundary | (
-            use_accelerated
-            & (accelerated_scales[accelerated_best] < 1.0)
-        )
-        prediction = predicted(step)
-        finite = (
-            jnp.all(jnp.isfinite(residual))
-            & jnp.all(jnp.isfinite(gradient))
-            & jnp.all(jnp.isfinite(step))
-            & jnp.isfinite(prediction)
-        )
-        exhausted = (iterations >= max_linear_iters) & ~done
-        return (
-            step,
-            prediction,
-            gradient_norm,
-            hit_boundary,
-            exhausted,
-            finite,
-            accelerated_candidates,
-            accelerated_predictions,
-            candidates,
-            candidate_predictions,
-            iterations,
-        )
-
-    return kernel
+from cffg.outer_evidence import map_evidence, offset_failure, terminal_failure
+from cffg.outer_structure import OuterStructure
+from cffg.outer_trust import (
+    OuterKernelPlan as OuterKernelPlan,
+    TrustStep as TrustStep,
+    _boundary_distance as _boundary_distance,
+    _make_root_diagnostics as _make_root_diagnostics,
+    _make_trust_kernel as _make_trust_kernel,
+)
+from cffg.runtime_types import OuterTerminationReason as OuterTerminationReason
 
 
 @dataclass(frozen=True)
@@ -643,6 +60,7 @@ class OuterSolveResult:
     trial_evaluations: int = 0
     linear_iterations: int = 0
     solver_compilations: int = 0
+    failure: FailureAt = field(default_factory=empty_failure_at)
 
 
 def _finite(arrays: OuterArrays) -> bool:
@@ -667,6 +85,7 @@ def solve_outer(
     arena: Arena | OuterStructure,
     outer_map: Callable[
         [OuterArrays], tuple[OuterArrays, jax.Array, jax.Array]
+        | tuple[OuterArrays, jax.Array, jax.Array, FailureFact]
     ],
     energy: Callable[[OuterArrays], float],
     infeasible: Callable[[OuterArrays], bool],
@@ -677,6 +96,7 @@ def solve_outer(
     kernel_factory: Callable[[OuterChart], OuterKernelPlan] | None = None,
     candidate_limit: int = 128,
     adaptive_gaussian: bool = False,
+    initial_failure: FailureAt | None = None,
     _support_restarts: int = 0,
 ) -> OuterSolveResult:
     """Globalize one fixed-support deterministic outer map."""
@@ -696,6 +116,7 @@ def solve_outer(
     trial_evaluations = 0
     linear_iterations = 0
     solver_compilations = 0
+    discovery_prefix = initial_failure or empty_failure_at()
 
     initial_energy = energy(current)
     if np.isfinite(initial_energy):
@@ -723,22 +144,27 @@ def solve_outer(
         def evaluate(value):
             nonlocal outer_map_evaluations
             outer_map_evaluations += 1
-            mapped, local_residual, local_code = outer_map(
+            mapped, local_residual, local_code, fact = map_evidence(outer_map(
                 chart_arrays(chart, value)
-            )
-            return chart_coordinates(chart, mapped), mapped, local_residual, local_code
+            ))
+            return chart_coordinates(chart, mapped), mapped, local_residual, local_code, fact
 
-        mapped_coordinates, mapped, local_residual, local_code = evaluate(
+        mapped_coordinates, mapped, local_residual, local_code, fact = evaluate(
             coordinates
         )
         inner_residual = float(local_residual)
         inner_code = int(local_code)
+        discovery_failure = (
+            discovery_prefix if int(discovery_prefix.fact.reason) != 0
+            else terminal_failure(fact, 1)
+        )
         if inner_code:
             return OuterSolveResult(
                 current, OuterTerminationReason.INNER_FAILURE, 0,
                 tuple(deltas), tuple(energies), outer_residual, merit,
                 gradient_norm, radius, accepted, rejected,
                 inner_residual, inner_code,
+                failure=discovery_failure,
             )
         if not _finite(current) or not _finite(mapped):
             return OuterSolveResult(
@@ -746,6 +172,7 @@ def solve_outer(
                 tuple(deltas), tuple(energies), float("inf"), float("inf"),
                 float("inf"), radius, accepted, rejected,
                 inner_residual, inner_code,
+                failure=discovery_failure,
             )
         if infeasible(current) or infeasible(mapped):
             return OuterSolveResult(
@@ -753,6 +180,7 @@ def solve_outer(
                 tuple(deltas), tuple(energies), float("inf"), float("inf"),
                 float("inf"), radius, accepted, rejected,
                 inner_residual, inner_code,
+                failure=discovery_failure,
             )
         if chart.support_changed(mapped.messages) or not chart.proper_reference:
             restarts += 1
@@ -763,8 +191,10 @@ def solve_outer(
                     0, tuple(deltas), tuple(energies), float("inf"),
                     float("inf"), float("inf"), radius, accepted, rejected,
                     inner_residual, inner_code,
+                    failure=discovery_failure,
                 )
             current = mapped
+            discovery_prefix = empty_failure_at()
             continue
         break
 
@@ -855,7 +285,7 @@ def solve_outer(
         deltas.append(_array_delta(current, next_arrays))
         current = next_arrays
         candidate_iterations += 1
-        mapped, local_residual, local_code = outer_map(current)
+        mapped, local_residual, local_code, fact = map_evidence(outer_map(current))
         outer_map_evaluations += 1
         inner_residual = float(local_residual)
         inner_code = int(local_code)
@@ -865,6 +295,7 @@ def solve_outer(
                 candidate_iterations, tuple(deltas), tuple(energies),
                 outer_residual, merit, gradient_norm, radius, accepted,
                 rejected, inner_residual, inner_code,
+                failure=terminal_failure(fact, candidate_iterations + 1),
             )
         # ``current`` is a convex blend of the previous two already-valid
         # states on the same exact support face, so only the fresh map output
@@ -875,6 +306,7 @@ def solve_outer(
                 candidate_iterations, tuple(deltas), tuple(energies),
                 float("inf"), float("inf"), float("inf"), radius,
                 accepted, rejected, inner_residual, inner_code,
+                failure=terminal_failure(fact, candidate_iterations + 1),
             )
         if infeasible(mapped):
             return OuterSolveResult(
@@ -882,6 +314,7 @@ def solve_outer(
                 candidate_iterations, tuple(deltas), tuple(energies),
                 float("inf"), float("inf"), float("inf"), radius,
                 accepted, rejected, inner_residual, inner_code,
+                failure=terminal_failure(fact, candidate_iterations + 1),
             )
         if chart.support_changed(mapped.messages):
             restarts += 1
@@ -892,6 +325,7 @@ def solve_outer(
                     candidate_iterations, tuple(deltas), tuple(energies),
                     float("inf"), float("inf"), float("inf"), radius,
                     accepted, rejected, inner_residual, inner_code,
+                    failure=terminal_failure(fact, candidate_iterations + 1),
                 )
             restarted = solve_outer(
                 mapped, arena, outer_map, energy, infeasible,
@@ -921,6 +355,7 @@ def solve_outer(
                 trial_evaluations + restarted.trial_evaluations,
                 linear_iterations + restarted.linear_iterations,
                 solver_compilations + restarted.solver_compilations,
+                offset_failure(restarted.failure, candidate_iterations),
             )
 
     n_iters -= candidate_iterations
@@ -930,13 +365,13 @@ def solve_outer(
     def evaluate(value):
         nonlocal outer_map_evaluations
         outer_map_evaluations += 1
-        mapped, local_residual, local_code = outer_map(
+        mapped, local_residual, local_code, fact = map_evidence(outer_map(
             chart_arrays(chart, value)
-        )
-        return chart_coordinates(chart, mapped), mapped, local_residual, local_code
+        ))
+        return chart_coordinates(chart, mapped), mapped, local_residual, local_code, fact
 
     residual_fn = lambda value: evaluate(value)[0] - value
-    mapped_coordinates, mapped, local_residual, local_code = evaluate(coordinates)
+    mapped_coordinates, mapped, local_residual, local_code, fact = evaluate(coordinates)
     inner_residual = float(local_residual)
     inner_code = int(local_code)
     initial_residual = mapped_coordinates - coordinates
@@ -969,7 +404,7 @@ def solve_outer(
     trust_kernel = plan.trust
 
     for iteration in range(n_iters + 1):
-        mapped_coordinates, mapped, local_residual, local_code = evaluate(
+        mapped_coordinates, mapped, local_residual, local_code, fact = evaluate(
             coordinates
         )
         inner_residual = float(local_residual)
@@ -981,6 +416,7 @@ def solve_outer(
                 tuple(deltas), tuple(energies), outer_residual, merit,
                 gradient_norm, radius, accepted, rejected,
                 inner_residual, inner_code,
+                failure=terminal_failure(fact, candidate_iterations + iteration + 1),
             )
         if not _finite(current) or not _finite(mapped):
             return OuterSolveResult(
@@ -989,6 +425,7 @@ def solve_outer(
                 tuple(deltas), tuple(energies), float("inf"), float("inf"),
                 float("inf"), radius, accepted, rejected,
                 inner_residual, inner_code,
+                failure=terminal_failure(fact, candidate_iterations + iteration + 1),
             )
         if infeasible(current) or infeasible(mapped):
             return OuterSolveResult(
@@ -997,6 +434,7 @@ def solve_outer(
                 tuple(deltas), tuple(energies), float("inf"), float("inf"),
                 float("inf"), radius, accepted, rejected,
                 inner_residual, inner_code,
+                failure=terminal_failure(fact, candidate_iterations + iteration + 1),
             )
         if chart.support_changed(mapped.messages):
             restarts += 1
@@ -1008,6 +446,7 @@ def solve_outer(
                     tuple(deltas), tuple(energies), float("inf"),
                     float("inf"), float("inf"), radius, accepted, rejected,
                     inner_residual, inner_code,
+                    failure=terminal_failure(fact, candidate_iterations + iteration + 1),
                 )
             restarted = solve_outer(
                 mapped,
@@ -1041,6 +480,7 @@ def solve_outer(
                 trial_evaluations + restarted.trial_evaluations,
                 linear_iterations + restarted.linear_iterations,
                 solver_compilations + restarted.solver_compilations,
+                offset_failure(restarted.failure, candidate_iterations + iteration),
             )
         residual = mapped_coordinates - coordinates
         outer_residual = float(
@@ -1095,7 +535,7 @@ def solve_outer(
         scaled_residual = residual / residual_scale
         merit = 0.5 * float(jnp.vdot(scaled_residual, scaled_residual).real)
         host_coordinates = np.asarray(coordinates)
-        shadow_mapped_coordinates, shadow_mapped, shadow_inner, shadow_code = (
+        shadow_mapped_coordinates, shadow_mapped, shadow_inner, shadow_code, _ = (
             evaluate(jnp.asarray(shadow_coordinates))
         )
         shadow_residual = (
@@ -1272,9 +712,8 @@ def solve_outer(
             nonlocal trial_evaluations
             trial_evaluations += 1
             candidate_coordinates = coordinates + candidate_step
-            candidate_mapped_coordinates, candidate_mapped, candidate_inner, candidate_code = (
-                evaluate(candidate_coordinates)
-            )
+            (candidate_mapped_coordinates, candidate_mapped, candidate_inner,
+             candidate_code, candidate_fact) = evaluate(candidate_coordinates)
             candidate_arrays = chart_arrays(chart, candidate_coordinates)
             candidate_residual = (
                 candidate_mapped_coordinates - candidate_coordinates
@@ -1309,7 +748,8 @@ def solve_outer(
                 actual_reduction,
                 ratio_value,
                 float(jnp.linalg.norm(candidate_step)) >= radius,
-        )
+                candidate_fact,
+            )
 
         trials = [candidate(step.step, step.predicted_reduction)]
         for fixed_candidate, fixed_prediction in zip(
@@ -1360,6 +800,7 @@ def solve_outer(
             actual,
             ratio,
             selected_boundary,
+            trial_fact,
         ) = selected
         if ratio < 0.25:
             radius *= 0.25
@@ -1388,6 +829,11 @@ def solve_outer(
                 rejected, inner_residual, inner_code,
                 outer_map_evaluations, trial_evaluations,
                 linear_iterations, solver_compilations,
+                failure=(
+                    terminal_failure(trial_fact, candidate_iterations + iteration + 1)
+                    if not any(trial[6] for trial in trials)
+                    else empty_failure_at()
+                ),
             )
 
     return OuterSolveResult(

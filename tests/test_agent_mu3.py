@@ -330,6 +330,7 @@ def test_trial_loop_matches_direct_engines_and_checkpoint_replays(tmp_path):
     )
 
 
+@pytest.mark.slow
 def test_functional_checkpoint_has_one_exact_outer_and_runtime_manifest(tmp_path):
     source = make_agent()
     source.act()

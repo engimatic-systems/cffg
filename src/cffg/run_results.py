@@ -123,6 +123,7 @@ def finalize_iteration(
 def finalize_outer(
     outcome: OuterOutcome,
     *,
+    factor_names: tuple[str, ...] = (),
     mu3_ess: tuple[float, ...] = (),
     mu3_log_normalizers: tuple[float, ...] = (),
     mu3_statuses: tuple[RunStatus, ...] = (),
@@ -202,6 +203,6 @@ def finalize_outer(
         outer_map_evaluations=outcome.outer_map_evaluations,
         trial_evaluations=outcome.trial_evaluations,
         linear_iterations=outcome.linear_iterations,
-        failure=None if status is RunStatus.CONVERGED else outer_diagnostic(outcome),
+        failure=None if status is RunStatus.CONVERGED else outer_diagnostic(outcome, factor_names),
         solver_compilations=outcome.solver_compilations,
     )

@@ -1,7 +1,7 @@
 ---
 id: cff-d57a
-status: open
-deps: [cff-lhbm]
+status: closed
+deps: [cff-lhbm, cff-8jqy]
 links: []
 created: 2026-09-25T04:22:00Z
 type: feature
@@ -56,3 +56,21 @@ The implementer may choose another sound method. Keep the four existing run stat
 - Root/adjoint: the inference fixed point and the derivative calculation through it.
 - Phase: a distinct initialization, propagation, soft, hard or outer-solver stage.
 - N/A: not applicable.
+
+## Notes
+
+**2026-09-25T06:15:40Z**
+
+Pre-implementation handoff: Runtime numerical/status invariant plus derivative consumers. Affected host/JIT, flood/mixed reconstruction, exact initialization within outer control, Engine/per-instance Colony; outer-controller vmap is unsupported (generic map/kernel batching remains relevant). Current/legacy checkpoint schemas remain unchanged and omission compatibility is already covered by cff-lhbm. outer.py is 1401 lines, so first extract unchanged chart geometry and compiled trust kernels into outer_chart.py and outer_trust.py, retaining existing outer import aliases; then carry auxiliary provenance without altering numerical decisions. Rejected trial/shadow facts must never be latched into a recovered successful result.
+
+**2026-09-25T06:22:46Z**
+
+Research question: which adaptive-map failures are terminal rather than speculative? Answer: retain checked discovery/current-map evidence, offset through recursive and controller restarts, and retain a selected invalid trial only when all trials were invalid at terminal trust collapse; discard rejected shadow/trial facts after recovery and on plain budget exhaustion. Priming expires after discovery advances, even if iteration count stays zero. Source: outer.py and outer_strategy.py control-flow review by failure_provenance sub-agent; confidence high. No numerical policy or derivative coordinates changed. Review found two priming edge cases (immediate functional failure; zero-count discovery advancement), both now covered by mechanism tests.
+
+**2026-09-25T06:52:28Z**
+
+Implemented in c661cce (pure owner extraction) and ec78156 (terminal provenance). Focused validation: 47 passed/5 deselected extraction; 61 passed/3 deselected solver/nonlinear/gradient checks; 38 diagnostic tests passed. Final short suite: 2486 passed, 82 deselected, pytest 1189.27s; measured 1204.745s. Budget follow-up cff-8jqy moves one 7.721s manifest-only case to slow, estimated 1197.024s, with the passing run reused under project rules. New coverage proves discovery/candidate/trust terminal numbering, recursive/controller offsets, invalid-trial recovery, conservative collapse attribution, generic derivative failure, real improper cavities in f32/f64, scheduled reconstruction recovery, reconstruction first cause, and priming/functional order. Numerical/status/FE/gradient policy and checkpoint schemas unchanged. No remaining implementation work in this ticket.
+
+**2026-09-25T06:52:51Z**
+
+Published PR #167: https://github.com/engimatic-systems/cffg/pull/167, based on cff-lhbm-public-failures (#166). Working tree clean after publication.

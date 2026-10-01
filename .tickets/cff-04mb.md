@@ -1,6 +1,6 @@
 ---
 id: cff-04mb
-status: open
+status: closed
 deps: [cff-gsq5, cff-fbps, cff-lhbm, cff-d57a]
 links: []
 created: 2026-09-25T03:46:24Z
@@ -63,3 +63,7 @@ Split before implementation. Legend prerequisite --> dependent:
         --> cff-04mb completion --> cff-7kpx / cff-ectw --> cff-xa6z roadmap
 
 Every stage is also an explicit prerequisite of cff-04mb. The split is serial because each stage consumes the previous interface; other PCGym ready roots remain independent. Derived from tk dep tree --full, tk ready and tk blocked; tk dep cycle reports no cycles. No new persisted State/schema is intended.
+
+**2026-09-25T06:52:28Z**
+
+All four prerequisite stages are implemented and validated: cff-gsq5 local facts, cff-fbps execution transport, cff-lhbm public Engine/Colony results, cff-d57a terminal adaptive provenance. Final gate 2486 passed/82 deselected; cff-8jqy documented the permitted marker-only runtime adjustment. Public failure diagnostics retain local names/reasons/phases/attempts when known; global and derivative failures remain explicitly unowned. Success and recovery do not retain failed speculative trials. Current/legacy checkpoints intentionally omit run-local records. Next ready numerical work: cff-ectw and cff-7kpx.

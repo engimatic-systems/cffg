@@ -70,6 +70,7 @@ EPIC_FILES = {
         "test_failure_facts.py",
         "test_failure_transport.py",
         "test_failure_diagnostics.py",
+        "test_outer_failures.py",
         "test_execution.py",
         "test_execution_specialized.py",
         "test_schedule_program.py",
