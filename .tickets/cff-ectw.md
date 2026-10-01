@@ -1,6 +1,6 @@
 ---
 id: cff-ectw
-status: open
+status: closed
 deps: [cff-04mb, cff-vxza, cff-03dn, cff-u9un]
 links: []
 created: 2026-09-25T03:46:25Z
@@ -72,3 +72,7 @@ Follow-up research: actual dyn_j full-rank input first arrives after j-1 mixed s
 **2026-09-25T07:26:21Z**
 
 Published refinement PR #169: https://github.com/engimatic-systems/cffg/pull/169, based on #168. Numerical investigation is complete; implementation starts with independent cff-vxza while rank/collapse contract review informs cff-03dn.
+
+**2026-09-25T09:56:03Z**
+
+Numerical-stability outcome complete through cff-vxza, cff-03dn and cff-u9un. Original parameters now converge undamped in 16 sweeps; independent NumPy moments and true declared-rule Bethe ledger agree. No automatic damping retry was needed or added. H150 and Engine/Colony boundaries pass; final short suite 2,565 passed. Important handoff: convergence does not restore distant-goal influence under rank-deficient backward mixture fallback (cff-c5qf), and float32 selector evidence still has measured cancellation error (cff-d8jj). Both remain explicit downstream tickets and block matched-benchmark completion, not hidden claims of this numerical repair.

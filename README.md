@@ -87,7 +87,7 @@ example.
 | [Persist and continue](#persist-and-resume) | `save_bundle`; `load_bundle`; agent checkpoints | Template, arrays, declared learning, or rolling-agent runtime | `LoadedBundle`, restored agent | Serialization preserves declared identity; no inference objective | [learning_bundle.py](examples/learning_bundle.py) | **Ready/current schema:** a bundle is not a mid-run snapshot; stable historical migration is open |
 | [Run linear-Gaussian inference](#continuous-exponential-family-and-hybrid-models) | `cffg.models.lgssm` | Gaussian and linear-Gaussian BP with missing observations | `gaussian_marginals`, node statistics, BFE | Exact Kalman/RTS marginals and evidence identity on a tree | [linear_gaussian.py](examples/linear_gaussian.py) | **Ready:** positive-definite covariance contract; scaled readout is still host-loop bound |
 | [Run scalar exponential-family inference](#continuous-exponential-family-and-hybrid-models) | `gamma`, `beta`, `poisson_obs`, `bernoulli_obs`; `ef_marginals` | Conjugate Gamma–Poisson and Beta–Bernoulli BP | Standard parameters, mean, `proper`, BFE | Exact registered tree messages and ledger | [exponential_family.py](examples/exponential_family.py) | **Ready:** conditioned observations only; predictive outputs leave the shipped family |
-| [Run hybrid mixture and recurrence inference](#continuous-exponential-family-and-hybrid-models) | `gaussian_mixture(_linear)`; `recurrence_link`; `gaussian_prec` | Assumed-density mixtures, structured recurrence, Gamma precision | Mixture predictives, pair beliefs, sufficient statistics | Mixture moment collapse and recurrence JJ bound are explicit approximations | [hybrid_rslds.py](examples/hybrid_rslds.py) | **Bounded:** no exact switching trajectory posterior or general evidence bound |
+| [Run hybrid mixture and recurrence inference](#continuous-exponential-family-and-hybrid-models) | `gaussian_mixture(_linear)`; `recurrence_link`; `gaussian_prec` | Assumed-density mixtures, structured recurrence, Gamma precision | Mixture predictives, pair beliefs, sufficient statistics | Mixture moment collapse and recurrence JJ bound are explicit approximations | [hybrid_rslds.py](examples/hybrid_rslds.py) | **Bounded:** no exact switching trajectory posterior; partial goals can lose backward influence |
 | [Build or fit an rSLDS](#continuous-exponential-family-and-hybrid-models) | `rslds`; `fit_rslds`; `PCAARHMMInitializer`; rSLDS learning classes | Recurrent switching LDS inference, learning, observed-only fitting | Fit status, attempts, marginals, FE/residual traces | Empirical-Bayes variational fit with declared hybrid/JJ approximations | [hybrid_rslds.py](examples/hybrid_rslds.py) | **Bounded:** budget exhaustion is preserved; no broad recovery-superiority claim |
 | [Use nonlinear Gaussian factors](#nonlinear-and-neural-gaussian-models) | `FunctionSpec`; `register_mean_function`; `moment_matching` | Taylor or fixed sigma-point positive-noise Gaussian factors | Gaussian marginals, `objective_metadata`, `objective_contract` | Frozen-Gaussian surrogate; adaptive consistency is not an evidence bound | [nonlinear_gaussian.py](examples/nonlinear_gaussian.py) | **Bounded:** zero noise, nonlinear GFE, and continuous-to-discrete means are unsupported |
 | [Use neural means and fixed-point gradients](#nonlinear-and-neural-gaussian-models) | `neural_mean`; `initialize_neural_parameters`; `FixedPointDifferentiator`; `fixed_point_gradient` | Dense MLP mean inside a positive-noise nonlinear Gaussian factor | Gradient status, adjoint/root residuals, parameter gradient | Local derivative of the certified adaptive root and surrogate ledger | [API pattern](#nonlinear-and-neural-gaussian-models) | **Bounded:** local isolated-root assumption; no weight uncertainty or stochastic mu3 |
@@ -251,6 +251,12 @@ Local codes also distinguish `local_budget`, `local_divergence`,
 `unrepresentable_sigma_points`, and `nonfinite_shared_goal`.
 Functional parameter updates use `functional_budget` or `functional_divergence`.
 
+Ordinary sum-mode Gaussian/hybrid initialization can need several sweeps before every belief
+has a finite energy. Those sweeps consume the same budget; exhausting it before
+any finite energy returns `DIVERGED` with `undefined_objective`, never success.
+Ordinary iteration does not silently restart or choose damping. `damp=.5` is
+an explicit experiment setting, not a general convergence guarantee.
+
 The first failing update wins; simultaneous failures choose the
 alphabetically first factor name. Initialization and priming are iteration
 0; message-update attempts start at 1 across soft/hard phases. Exact
@@ -353,6 +359,12 @@ with truthful inner and outer statuses. These are named approximations, not
 exact switching-trajectory inference. The deferred D12 research path described
 in `DERIVATIONS.md` is not a production capability. See
 [examples/hybrid_rslds.py](examples/hybrid_rslds.py).
+
+For hybrid control, test that a distant goal actually changes the first action.
+Rank-deficient backward mixture messages currently become vacuous. A goal on
+position alone in a position/velocity model can therefore produce a converged
+result whose first action ignores later goals. Convergence certifies the
+declared approximate updates, not useful lookahead; see LIMITATIONS S1d.
 
 ## Nonlinear and neural Gaussian models
 

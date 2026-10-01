@@ -20,6 +20,7 @@ from cffg.mean_functions import (
 )
 
 
+@pytest.mark.slow
 def test_json_bundle_and_edit_identity(tmp_path):
     template, arrays = model("sigma_point", observed=True)
     restored = from_json(to_json(template))

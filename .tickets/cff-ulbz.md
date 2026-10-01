@@ -2,7 +2,7 @@
 id: cff-ulbz
 status: closed
 deps: [cff-ocxl, cff-f3jz]
-links: []
+links: [cff-c5qf]
 created: 2026-09-13T18:07:15Z
 type: feature
 priority: 2

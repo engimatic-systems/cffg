@@ -249,8 +249,17 @@ mixture-Bethe value at the same moments (bound direction pinned in
 (4) Observed mixture outputs (regime-dependent emissions with a DATA port)
 are rejected at compile time in v1 — route observations through a plain
 `gaussian_linear` emission node; (5) rank-deficient per-regime backward
-messages have no well-defined collapse and fall back to vacuous — full-rank
-A_s on active selector support is the supported envelope.
+messages have no well-defined normalized collapse and fall back to vacuous.
+Full-rank A_s alone is not sufficient: each supported backward component must
+inform every input direction. In the retained PCGym position/velocity model,
+scalar position goals leave rank-one messages. The first action is exactly
+unchanged between horizons 1 and 15 and when only the distant goal changes,
+despite convergence and a changed terminal posterior/energy. This is a
+planning limitation, not a remaining damping problem. The retained NumPy
+moment/ledger oracle in `tests/hybrid_planning_fixture.py` and
+`tests/test_hybrid_planning.py` make that distinction executable. The deferred
+full-tilt EC work is not an available remedy; changing objectives to add
+artificial full-state preferences would change the experiment.
 Numerical moment collapse checks its computed covariances and output, not just
 the input precisions. If an admitted component calculation overflows or loses
 propriety, it emits nonfinite messages and the run fails with local attribution;
@@ -262,9 +271,18 @@ null direction is not accepted as information. Proper-input covariance-form
 branches check their computed intermediates without imposing a global
 condition-number cutoff. Backward numerical-rank tests use equilibrated
 coordinates and can still classify unresolved near-dependencies as vacuous
-(`tests/test_mixture_rank.py`). These arithmetic guards alone do not promise
-convergence of the retained PCGym planner; initialization and safeguarded
-solver behavior remain tracked in cff-u9un.
+(`tests/test_mixture_rank.py`). The unchanged retained float64 model now reaches
+the declared-rule fixed point in 16 undamped sweeps: the first finite energy
+appears at sweep 15. Its agreement with the independent approximate-rule
+oracle is not an exact-posterior or useful-planning claim. No automatic retry
+or extra covariance floor is introduced.
+
+Float32 convergence also does not imply float64-level posterior accuracy. In a
+retained three-step neighbor, selector scores near 9,849 lose precision when
+common Gaussian constants cancel: posterior error is about 6.04e-5 despite a
+zero fresh update residual. Mean/covariance errors are much smaller. Stable
+selector evidence is tracked in cff-d8jj; the current test records a separate,
+fixture-specific rounding allowance instead of loosening the solver certificate.
 
 **S1e. Gaussian parameter learning is EM-rollover; flooding VMP is not
 strictly monotone.** Continuous conjugate learning (cff-7c5o, DERIVATIONS.md

@@ -404,6 +404,15 @@ moments/energy, weight-trap regression, bound direction),
 `tests/test_switching_kf.py` (enumeration + independent collapsed-smoother
 parity).
 
+Partial-goal planning is a distinct limitation. In the retained two-dimensional
+state chain with scalar position goals, every backward mixture component stays
+rank one and the declared fallback is vacuous. Forward initialization eventually
+makes the ledger finite, but later goals still cannot influence the first
+action. `tests/hybrid_planning_fixture.py` independently computes this fixed
+point's collapsed forward moments and local joint-mixture Bethe terms;
+`tests/test_hybrid_planning.py` checks both numerical convergence and the absence
+of distant-goal influence. No exact smoothing or useful-lookahead claim follows.
+
 ---
 
 ## D4 — Gaussian conjugate learning: sufficient stats, NIW/MNIW/Gamma, gaussian_prec (cff-7c5o)

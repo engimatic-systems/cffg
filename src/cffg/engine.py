@@ -338,6 +338,11 @@ class Engine:
         Callers that require actionable beliefs should use
         ``result.require_converged()``.
 
+        Sum-mode Gaussian/EF initialization can consume several sweeps before the
+        ledger is finite. A positive budget ending without any finite energy
+        reports divergence with ``undefined_objective``. No hidden restart or
+        automatic damping extends the requested work budget.
+
         Mixed-GFE plans use the proof-backed trust-region residual solver by
         default. ``damp`` remains a Picard/flooding parameter and is rejected
         for that path; select ``outer_solver="picard"`` explicitly to retain

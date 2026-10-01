@@ -61,6 +61,7 @@ def test_explicit_key_and_architecture_identity():
 @pytest.mark.parametrize("method", [
     "linearization", pytest.param("sigma_point", marks=pytest.mark.slow),
 ])
+@pytest.mark.slow
 def test_neural_bundle_reconstruction_and_schedule_parity(tmp_path, method):
     template, arrays = neural_model(method)
     path = tmp_path / "network.cffgz"
