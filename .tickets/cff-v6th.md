@@ -1,7 +1,7 @@
 ---
 id: cff-v6th
-status: open
-deps: []
+status: closed
+deps: [cff-rnn1]
 links: []
 created: 2026-09-25T03:46:24Z
 type: bug
@@ -52,3 +52,19 @@ Shared terms: CFFG means constrained Forney-style factor graph; JAX is the numer
 **2026-09-25T03:47:40Z**
 
 Research handoff (question -> answer -> source -> confidence): Why does Colony fail on an exact Gaussian graph without delta constraints? Engine.run treats explicit harden_last as a phase even when arena.delta_pairs is empty; multi-instance Colony bypasses the exact strategy altogether. Validate the argument, then normalize irrelevant hardening and reuse the exact Engine policy for each eligible Colony member. Preserve actual delta full-hardening behavior and damping/zero-budget semantics. Sources: engine.py:358-367, colony.py:121-176; supplied harden_last_gaussian_chain.py reproduces plain=converged, explicit harden=budget_exhausted, singleton Colony=budget_exhausted. Confidence: reproduced defect and source-confirmed cause. Focused regressions: tests/test_schedule.py:421 currently codifies the defect; extend test_engine_contracts and test_colony_failures for singleton/multiple distinct parameter and observation cases plus bad-member isolation. A sequential exact-member correctness path is allowed here; cff-wbhu owns compiled controller throughput.
+
+**2026-09-25T03:51:39Z**
+
+Implementation: Engine validates then discards hardening phases when there are no delta constraints. Engine and Colony share exact eligibility; singleton and multi-member exact groups reuse Engine propagation/certification, while ordinary iterative groups remain vmapped and genuine Colony delta constraints remain fully hardened. This is a correctness repair, not an exact-batch throughput claim. Added self-contained Gaussian goal-chain regression (2 and 20 slices; f32/f64), distinct parameters/observations, zero budget/damping, initial failure isolation and real phase flags. Updated the old no-delta HMM assertion that codified the defect. Architecture/README/LIMITATIONS explain per-instance exact execution. Focused command: uv run pytest -q tests/test_exact_colony.py tests/test_engine_contracts.py tests/test_iteration.py tests/test_colony_failures.py tests/test_colony.py tests/test_schedule.py -> 118 passed, 3 deselected in 52.26s. Original external repro now prints converged for plain/harden/Colony. git diff --check and tk dep cycle pass. Final short-suite gate pending.
+
+**2026-09-25T03:52:05Z**
+
+Independent review found no correctness or failure-isolation defect. It identified one coverage gap: irrelevant partial hardening also reset convergence history on ordinary mixed graphs. Added a regression comparing complete default and harden_last=1 results on the existing no-delta mixed fixture; implementation unchanged.
+
+**2026-09-25T04:20:13Z**
+
+Complete: focused runtime/schedule set passed 118 tests (3 deselected), final exact-colony file passed 16 tests after independent review, and dashboard-backed full short suite at 2226bea passed 2,432 tests (67 deselected, no failures). Actual measured wall time was 1,233.520s. cff-rnn1 subsequently moved two already-passing exhaustive gradient cases to opt-in slow; no numerical code/assertions changed, and the estimated remaining suite is 1,194.450s. Reused the passing result per the explicit selection-change exception. Original supplied reproduction now reports all three paths converged. No scientific objective, certificate threshold, serialization or checkpoint change. Next chain ticket is cff-04mb; cff-qtub cached spawning is now unblocked. Exact-member vectorization remains cff-wbhu performance work.
+
+**2026-09-25T04:21:48Z**
+
+Implementation PR: https://github.com/engimatic-systems/cffg/pull/163, based on roadmap PR #162. Closed with passing numerical validation; marker-only budget correction is separately tracked in cff-rnn1. Repository clean after publishing.

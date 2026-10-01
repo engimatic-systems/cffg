@@ -294,7 +294,10 @@ control posterior at residual 5.5 (vs 4.9e-4 at 400 sweeps). Fixes are
 mechanical, not research: depth-aware/tol-driven sweep budgets in the agent
 loop plus warm-started replanning (cff-5edo). Related measured limits:
 ordinary colony batching is dispatch-bound on CPU, 1.5× at 32 instances until
-the sweep loop is a jitted scan (cff-wbhu). Mixed-GFE colonies currently reuse
+the sweep loop is a jitted scan (cff-wbhu). Exact-eligible colony members use
+standalone propagation and certification per instance; this preserves exact
+schedule semantics but does not yet provide vectorized exact execution.
+Mixed-GFE colonies currently reuse
 compiled trust kernels but run one controller per instance, so they have a
 stronger host-control bottleneck until that same ticket moves the trust/status
 carry into the scan. The GFE-TM curiosity composite

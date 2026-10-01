@@ -305,6 +305,14 @@ class Engine:
             )
         return _replace(state, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta)
 
+    def _can_run_exact(self, n_iters: int, damp: float, harden_last: int) -> bool:
+        return (
+            self._propagate is not None
+            and n_iters >= 1
+            and damp == 0.0
+            and (harden_last == 0 or not len(self.arena.delta_pairs))
+        )
+
     def run(
         self,
         state: State,
@@ -337,7 +345,8 @@ class Engine:
         premature pointmass locks in its own arbitrary argmax. With
         `harden_last=k` (default: k = n_iters // 2 when δ edges exist), the
         first phase runs soft to coherence, then δ edges harden for the final
-        k sweeps so decisions commit sequentially.
+        k sweeps so decisions commit sequentially. Without delta constraints,
+        a valid ``harden_last`` request has no effect.
 
         Two-pass schedules (cff-d56d): when the engine compiled an exact
         directed schedule and the call keeps its contract (``damp=0``, no
@@ -359,12 +368,9 @@ class Engine:
             harden_last = n_iters // 2 if len(self.arena.delta_pairs) else 0
         if not 0 <= harden_last <= n_iters:
             raise ValueError("harden_last must be between 0 and n_iters")
-        if (
-            self._propagate is not None
-            and n_iters >= 1
-            and damp == 0.0
-            and harden_last == 0
-        ):
+        if not len(self.arena.delta_pairs):
+            harden_last = 0
+        if self._can_run_exact(n_iters, damp, harden_last):
             return self._run_exact(state, tol)
         has_gfe = bool(
             self.arena.gfe_groups

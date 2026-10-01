@@ -419,7 +419,7 @@ def test_two_pass_mode_raises_outside_contract():
 # -- run() semantics on the exact path ---------------------------------------
 
 
-def test_damping_and_hardening_requests_use_the_flooding_loop():
+def test_damping_uses_flooding_but_irrelevant_hardening_preserves_exact_schedule():
     engine = hmm_engine("auto", n_steps=4)
     ports = {f"chain/t{t}/sense": OBS[t] for t in range(4)}
     state = engine.bind_data(engine.init_state(), ports)
@@ -427,7 +427,8 @@ def test_damping_and_hardening_requests_use_the_flooding_loop():
     assert result.status is RunStatus.CONVERGED
     assert result.iterations > 1  # flooding loop, not the single execution
     result = engine.run(state, 20, tol=1e-13, harden_last=5)
-    assert result.iterations > 1
+    assert result.status is RunStatus.CONVERGED
+    assert result.iterations == 1
 
 
 def test_poisoned_state_diverges_before_propagation():
