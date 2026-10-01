@@ -272,10 +272,8 @@ def solve_outer(
                 deltas.append(outer_residual)
                 if not energies or energies[-1] != current_energy:
                     energies.append(current_energy)
-                if energies[-1] != mapped_energy:
-                    energies.append(mapped_energy)
                 return OuterSolveResult(
-                    mapped, OuterTerminationReason.ROOT_CONVERGED,
+                    current, OuterTerminationReason.ROOT_CONVERGED,
                     candidate_iterations, tuple(deltas), tuple(energies),
                     outer_residual, merit, gradient_norm, radius, accepted,
                     rejected, inner_residual, inner_code,
@@ -526,7 +524,7 @@ def solve_outer(
             if not energies or energies[-1] != current_energy:
                 energies.append(current_energy)
             return OuterSolveResult(
-                mapped, OuterTerminationReason.ROOT_CONVERGED,
+                current, OuterTerminationReason.ROOT_CONVERGED,
                 candidate_iterations + iteration,
                 tuple(deltas), tuple(energies), outer_residual, merit,
                 gradient_norm,
@@ -590,7 +588,7 @@ def solve_outer(
             deltas.append(shadow_outer_residual)
             energies.append(shadow_energy)
             return OuterSolveResult(
-                shadow_mapped,
+                shadow_arrays,
                 OuterTerminationReason.ROOT_CONVERGED,
                 candidate_iterations + iteration,
                 tuple(deltas),

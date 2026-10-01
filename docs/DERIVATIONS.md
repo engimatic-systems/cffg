@@ -3281,6 +3281,11 @@ max_i |R_i| / (1+|s_i|) <= tau,
 
 with finite values and `tau=max(requested_tol,64 eps(dtype))`. These are full
 adaptive residual and surrogate-change checks, not a small accepted-step test.
+The returned point is the certified `s`, not `T(s)`: without a contraction
+bound, a small residual at `s` does not imply a small residual at its successor.
+The candidate, trust and auxiliary paths obey this same handoff;
+`test_success_returns_the_certified_point_not_its_expansive_successor` checks
+expansive maps in both dtypes with host and JIT callbacks.
 Neither a stationary non-root of the residual merit nor an exhausted trial
 budget is convergence. Conditioning, failure facts, and exact-island
 reconstruction are shared by flooding and mixed schedules. Whole-run control

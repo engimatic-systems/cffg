@@ -88,6 +88,8 @@ class RunResult:
     ``state`` and therefore cross the status-bearing API boundary explicitly.
     ``free_energies`` contains only sweeps on which the ledger is defined
     (improper continuous beliefs during propagation have no FE entry).
+    A converged outer solve returns the certified point, not its unchecked
+    successor; ``outer_residual`` uses that solve's fixed reference chart.
     """
 
     state: State

@@ -30,6 +30,16 @@ def test_curved_sensor_fixed_point_and_energy_contract(method, schedule):
     assert engine.objective_metadata["prior"]["objective"] == "analytic"
     stats = engine.gaussian_node_stats(state)["sensor"]
     assert stats["proper"] and stats["failure_code"] == 0
+    assert outcome.free_energies[-1] == float(engine.bfe(state))
+    if schedule == "auto":
+        assert engine._outer_eliminated["gaussian"]
+        reconstructed = engine._reconstruct(
+            state.messages, state.g_eta, state.g_lam, state.ef_eta,
+            state.g_obs, state.g_mask, state.ef_obs, state.ef_mask, state.params,
+        )
+        assert int(reconstructed[4].reason) == 0
+        np.testing.assert_array_equal(state.g_eta, reconstructed[1])
+        np.testing.assert_array_equal(state.g_lam, reconstructed[2])
 
 
 def test_budget_and_unsupported_unglobalized_controls():

@@ -158,7 +158,8 @@ that every gap below will be implemented:
   frozen Gaussian Bethe energy has conditional stationarity only. The adaptive
   fixed point also enforces coefficient/cavity consistency; no stationarity of
   the total adaptive energy or bound on original nonlinear evidence is claimed.
-  The full residual and finite energy change certify convergence. Difficult
+  The full residual and finite energy change certify the returned point in a
+  fixed reference chart, not its next update or a newly whitened chart. Difficult
   graphs may exhaust their budgets. Singular noise, invalid beliefs, and
   unrepresentable sigma-point spread fail explicitly; no ridge repairs them.
   Negative sites are permitted when combined beliefs remain proper. Full run
