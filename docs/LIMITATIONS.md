@@ -1,9 +1,17 @@
 # Known Limitations of the CFFG/LAIF Engine
 
-Status: assessed 2026-07-05, before implementation. "Hard" = inherent to the
-mathematical framework (constrained Bethe free energy + message passing + LAIF);
-finishing the roadmap does not remove these. "Soft" = removable with additional
-derivation or engineering work; each is a future research/engineering ticket.
+Status: reviewed against the implemented library on 2026-09-22. "Hard" means
+inherent to the mathematical framework (constrained Bethe free energy + message
+passing + LAIF); finishing the roadmap does not remove it. "Soft" means a
+current implementation, modeling, numerical, or scaling boundary that later
+work could remove.
+
+A *named approximation* is usable only with the narrower claim stated here. An
+*unsupported feature* has no executable contract. A *known defect* is accepted
+by some current code path but must not be treated as supported input or output.
+Ticket closure by itself is not delivery evidence: tickets closed as "not
+pursuing" describe research history, not production capability. The README
+capability table is the entry map; this document qualifies its claims.
 
 ## Hard limitations
 
@@ -96,29 +104,43 @@ constraints the modeler adds.
 
 ## Soft limitations
 
+The implemented surface includes discrete BP/VMP/GFE, linear Gaussian and
+exponential-family inference, hard constraints and discrete MAP, assumed-density
+hybrid and recurrent models, positive-noise nonlinear/neural Gaussian factors,
+declared between-trial learning, current-schema persistence, rolling agents,
+ordinary Colony batching, graph rendering, and a partial resource estimator.
+The sections below state the exactness, objective, persistence, input, and scale
+boundaries for those capabilities.
+
 **S1. Message-rule coverage (the big one).** We have: BP/VMP for
 Cat/Dirichlet/equality/δ/transition-mixture, GFE messages for the discrete
 goal-observation composite, and BP for the linear-Gaussian family (gaussian,
 gaussian_linear, Gaussian equality — cff-4e5z: Kalman-smoother parity, exact
-continuous tree identity BFE = −log p(y)). Between converged runs, declared
+continuous tree identity BFE = −log p(y)). Scalar exponential-family BP covers
+Gamma–Poisson and Beta–Bernoulli conditioned-observation graphs. Between
+converged runs, declared
 NIW, MNIW, component-MNIW, and Pólya–Gamma weight learning covers `gaussian`,
 `gaussian_linear`, `gaussian_mixture_linear`, and `recurrence_link`.
-`MOMENT_MATCHING` remains in the template schema as a legacy placeholder, but
-it is underspecified: the factor-only target cannot select the incident edge
-endpoint or sufficient-statistic projection required by the paper. Compilation
-and diagram generation reject it, so neither execution nor visualization can
-silently treat it as ordinary marginalization. Future EP work requires a schema
-migration as well as registered rules and ledger semantics.
-Everything else requires a separately selected derivation or registration
-ticket. Epic
-cff-ahps records the finite integrated baseline; it does not promise that
-every item below will be implemented:
+Endpoint-aware `moment_matching(factor, role, MomentProjection.GAUSSIAN)` is an
+executable declaration for registered Gaussian factors, including the
+positive-noise nonlinear and neural rules. It selects first and second moments
+at one named factor endpoint; it is not a general EP constraint language. The
+older factor-only `MOMENT_MATCHING` payload remains loadable so callers can
+migrate it explicitly with a supplied endpoint and projection, but compilation
+and diagram generation reject it rather than guessing. Supported declarations
+are rendered and compiled; legacy declarations are neither.
+Everything outside these named paths requires a separately selected derivation
+or registration ticket. The following bullets mix delivered boundaries with
+explicit gaps; present-tense executable claims, not ticket closure, distinguish
+them. Epic cff-ahps records the finite integrated baseline and does not promise
+that every gap below will be implemented:
 - *Additional conjugate adapters* — Gamma precision and EF learning remain
   separate paths rather than `LearnableSpec` families. The rSLDS uses the
   generic hybrid pairings; other factor/family combinations need their own
   declared adapter and hostile-input contract.
-- *Hybrid discrete–continuous (switching KF, mixture collapse)* — cff-pksr;
-  the first place exact FE meets a necessary approximation (mixture entropy).
+- *Hybrid discrete–continuous (switching KF, mixture collapse)* — implemented
+  by cff-pksr; the first place exact FE meets a necessary approximation
+  (mixture entropy).
 - *Nonlinear continuous factors* — `gaussian_nonlinear` supports positive-noise
   Gaussian conditionals with registered deterministic means, Taylor or fixed
   sigma-point approximations, and endpoint moment constraints. Its normalized
@@ -143,7 +165,7 @@ every item below will be implemented:
 The registry architecture exists precisely so each of these lands as an isolated
 contribution.
 
-**S1i. Executable registration covers three single-arena bindings.**
+**S1a. Executable registration covers three single-arena bindings.**
 `FactorKernel` (`cffg.kernels`, ARCHITECTURE 2e) binds scalar EF and ordinary
 discrete BP/VMP and Gaussian factors, including external implementations. The discrete
 binding requires a log-potential accessor for support, joint beliefs and
@@ -334,11 +356,13 @@ multimodal joint posterior can remain inaccurate even when the coordinate
 residual converges. D11 evaluates a pair-conditioned Gaussian candidate with
 explicit moment consistency and rejects it as a sufficient repair: separate
 source and drive boundaries lose association inferred by external switching
-factors even when the local JJ bound is exact. D12 now derives hybrid
-regime/state separators that repair that association loss, with production
-integration still pending in the bounded cff-ocxl follow-up tickets. D12 keeps
-one conditional Gaussian per regime at a boundary; histories sharing that
-regime can remain multimodal. Its temporal reflected-mixture example has
+factors even when the local JJ bound is exact. D12 derives hybrid regime/state
+separators that repair that association loss in a NumPy research experiment,
+not in the production engine. Its production chain was later closed as "not
+pursuing"; the closed cff-ffsg, cff-f3jz, and cff-ulbz tickets did not land their
+acceptance criteria on this branch. D12 keeps one conditional Gaussian per
+regime at a boundary; histories sharing that regime can remain multimodal. Its
+temporal reflected-mixture example has
 exact JJ factors and zero EC residual yet opposite exact learning biases that
 the approximation returns as zero. This is not an exact source-learning
 guarantee. Destination-selected affine dynamics, declared hybrid ownership,
@@ -348,10 +372,11 @@ unsupported. The candidate's JJ energy
 upper-bounds the literal-factor EC energy at the same feasible region beliefs,
 but neither has a general bound against true negative log evidence. It does
 not establish source recovery, Gaussian trajectory exactness, or a
-horizon-independent convergence budget. Its signed Gaussian messages also
+horizon-independent convergence budget. Its signed Gaussian messages would also
 require compatible boundary consumers (cff-f3jz and cff-ulbz). The NumPy D12
 experiment solves held auxiliaries and requires proper forward initialization;
-production still needs the joint message/auxiliary solver and execution gate.
+it is derivation evidence, not an importable inference capability or current
+production promise. The executable recurrence path remains D9.
 
 The current v1 requires equal regime cardinalities
 `K >= 2`, a proper Gaussian drive, finite fixed
@@ -523,6 +548,15 @@ multiple refreshed policy-score epochs automatically: callers may explicitly
 refresh, while `Engine.score_mu3_epochs` remains the averaging API. Arbitrary
 stochastic factor families and batched per-agent keys remain future work.
 
+**S2a. Fixed mu3 particle validation has a known hole.** The low-level
+importance rule can treat a NaN inside a caller-supplied fixed particle as
+absent support and report success with a NaN returned moment. Public
+`Engine.run` separately rejects non-finite initial state leaves, so no false
+public convergence path has been demonstrated, but direct rule consumers must
+prevalidate particles as finite, nonnegative probability tables. Ticket
+cff-6n9c owns the direct and jitted rule-level repair. This is a defect, not a
+supported sparse-support convention.
+
 The agent's fixed-memory trial loop likewise uses separate immutable planning
 and filtering templates. It does not mutate the paper's literal graph when an
 observation changes from a planning constraint to data. A two-state, two-action,
@@ -571,16 +605,28 @@ checks matching roots and a positive work-reduction confidence interval;
 there is no universal speedup or same-root theorem for multiple-root models.
 This deterministic API has no particles or importance sampling.
 
-**S6. Structure search as an outer loop.** Free energy is a model-comparison
-score, so propose-and-score topology search (add state, split factor, compare FE
-on held-out rollouts) is buildable on top of the engine. Expensive but not novel
-math.
+**S6. Structure search is not a library capability.** Free energy can be used by
+application code to compare explicitly constructed candidate models, but the
+library exposes no topology-search algorithm, candidate generator, or validated
+search workflow. Earlier roadmap discussion of propose-and-score loops is a
+design possibility, not delivered structure learning.
 
 **S7. Scale engineering.** Sparse A/B matrices, factored transition tensors,
 GPU-resident arenas, incremental recompilation, smarter (residual) schedules —
 ordinary optimization work, unbounded appetite.
 Plate fragments may not themselves declare plates in phase 1; validation rejects
 that unsupported grounding shape until recursive/index-table expansion in cff-6s31.
+Scoping or merging a compact plate is also rejected; call `expand_plates` before
+composition until cff-b2fz lands.
+
+`cffg.estimate.estimate` is only a partial planning aid. Its named persistent
+arena byte counts come from the initialized JAX state, and calibration is an
+approximate extrapolation for the selected run. The XLA cost path still calls an
+obsolete step signature and silently returns no FLOP or byte-traffic figures;
+parameter detail, backend temporary storage, compilation, first execution, and
+scheduled work units are not a trustworthy complete report. Ticket cff-j7mm
+owns that repair. Do not use the current summary as a memory limit, process-RSS
+measurement, or cross-model performance prediction.
 
 **S8. Goal-specification ergonomics.** Goals are prior distributions over future
 observations; translating task intent into calibrated `c` vectors (the softmax
@@ -601,17 +647,24 @@ P2 ticket cff-34gi owns rejecting it and checking the analogous transition-GFE
 path. Positive Dirichlet concentrations have a different contract and need not
 sum to one.
 
+Graph rendering is deterministic documentation of the declared template and
+supported constraint decorations. A successful SVG/PNG/scene render does not
+compile the model, run inference, or certify that numerical inputs and results
+fall inside the envelopes above.
+
 ## The one-paragraph honest summary
 
-The bounded implemented core is a *transparent, compositional,
-continually-learning discrete world-model engine* with principled curiosity,
-source-anchored local ledgers, and models you can read, edit, checkpoint, and
-glue. Exact claims apply only to the registered factor/constraint combinations
-named in `docs/ARCHITECTURE.md`; other rows are named approximations, guarded
-syntax, or unsupported. It will not do
-representation learning, will not scale past modest discrete state spaces without
-hand-factored structure, will not plan contingently beyond its horizon, and
-inherits every classical caveat of loopy variational inference. Its natural
-habitat: problems where the state ontology is designable (devices, protocols,
-games, control loops, cognitive-model experiments), not problems where the
-ontology must be learned from raw sensor streams.
+The implemented library is a transparent, compositional factor-graph and active-
+inference engine spanning tabular discrete models, registered continuous and
+exponential-family factors, bounded hard constraints, declared hybrid/nonlinear
+approximations, between-trial learning, rolling agents, persistence, rendering,
+and ordinary same-structure batching. Exact claims apply only to the registered
+factor/constraint combinations named in `docs/ARCHITECTURE.md`; other delivered
+rows carry the approximation and objective labels above. It does not learn graph
+structure or raw-sensor representations, does not provide contingent policies
+beyond finite-horizon replanning, and inherits the convergence and accuracy
+caveats of loopy variational inference. Treat cff-34gi and cff-6n9c as input-
+validation defects, the estimator and stochastic Colony surfaces as partial,
+alpha bundles as current-schema artifacts, and administratively closed research
+chains as non-capabilities. Its natural habitat remains experiments whose state
+ontology and local factor semantics can be designed and audited explicitly.
