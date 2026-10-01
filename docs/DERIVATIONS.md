@@ -245,7 +245,7 @@ conjugate addition, observation energies).
 2. The third arena is `ef_eta [n_efslots, 2]` with per-group family tags
    (`EfGroupPlan`); vacuous = zeros; same slot discipline as the Gaussian
    arena, independent numbering. The entire update vocabulary: priors and
-   observed likelihoods send constants, equality sends sum-minus-self —
+   observed likelihoods send constants, equality sums the other legs —
    conjugate BP converges in one sweep per graph diameter.
 3. Factor vocabulary v1: `gamma`/`beta` prior leaves (scalar shape/rate,
    a/b blobs; propriety is a compile error, not a runtime surprise);

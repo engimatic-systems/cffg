@@ -43,3 +43,9 @@ Inspect mixg.py forward/backward/_collapse, gauss.py Schur projection and efrule
 Rank is the number of independent informed directions. A Schur complement eliminates Gaussian variables. A covariance is proper only when positive definite. Moment collapse replaces a mixture with a Gaussian having the same first two moments. A branch placeholder is a finite dummy matrix used only to keep an unselected compiled branch safe. JIT is compiled execution; vmap batches instances; dtype is numeric storage precision.
 
 
+
+## Notes
+
+**2026-09-25T07:28:04Z**
+
+Contract review (failure_provenance sub-agent): keep shared strict _pd_ok unchanged; d=100 proper diagonal precision spanning1e-12..1e12 is an existing accepted case. Preserve retained spectral rank at the Schur producer before V diag(eig) V.T reconstruction. Proper-input covariance branches bypass that cutoff. Backward A.T G A needs rank of its generating Gram factor, with coordinate equilibration; singular G can still span every input direction, so requiring full-rank G would be wrong. _collapse must own validity for weights, component means/covariances, collapsed covariance and output; all three callers mixlin_forward, mixlin_backward and mix_forward consume it. Distinguish non-normalizable-yet components from arithmetic collapse failure so a finite placeholder cannot masquerade as information. Independent cases: vacuous scalar input,A=(3,4).T,W=I gives rank-one [[16,-12],[-12,9]]/25; proportional-column backward map; unit-rescaled proper diagonal model; collapse overflow; ordinary quadrature/backward-weight oracles. K=1 parity with plain Gaussian rules applies only when the outgoing component can be normalized, because plain Gaussian messages may legitimately remain singular. Sources gauss.py projection, mixg.py collapse/forward/backward and tests/test_gauss_rules.py mixed-scale propriety. Confidence high code/math review; no patch or experiment executed by reviewer.

@@ -10,7 +10,7 @@ distrax/tfp; two special functions do not justify a framework dependency).
 Message algebra (DERIVATIONS.md D2): messages on an EF edge are natural
 parameters η; products add; vacuous = 0. Prior nodes send a *constant* η_p
 (stacked at compile time — no rule needed), conjugate observation nodes send
-a constant likelihood increment, equality nodes send sum-minus-self. That is
+a constant likelihood increment, equality nodes sum the other legs. That is
 the entire update vocabulary: flooding on EF subgraphs converges in one
 sweep per graph diameter.
 
@@ -35,6 +35,8 @@ from typing import Callable
 import jax
 import jax.numpy as jnp
 from jax.scipy.special import digamma, gammaln
+
+from cffg._cavities import sum_other_legs
 
 
 @dataclass(frozen=True)
@@ -514,7 +516,7 @@ def bernoulli_likelihood_message(y, mask):
 
 def equality_messages(eta):
     """equality → each leg: sum of the other legs. eta [M, R, p] → same shape."""
-    return eta.sum(axis=1, keepdims=True) - eta
+    return sum_other_legs(eta)
 
 
 # --- Node energies F[q_a] --------------------------------------------------------

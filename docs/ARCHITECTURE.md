@@ -632,6 +632,13 @@ use flat `eta` (`sum_slot d`) and flattened `Lambda` (`sum_slot d²`) arrays.
 Compiler prefix-offset tables map logical slots into each array, so one outlier
 domain cannot pad every other edge. Products still add and the vacuous
 Gaussian message is exactly zeros (half-edges and initialization are free).
+Gaussian and scalar exponential-family equality cavities use the shared
+`_cavities.sum_other_legs` exclusive prefix/suffix sums. They never add the
+recipient's input before excluding it: total-minus-self would erase weak
+information next to a strong recipient. Storage grows linearly with the
+number of legs, with no regularization or change to the message equations.
+Direct exclusion, exact vacuous inputs, float32/float64, 300-leg batching and
+analytic Jacobians are checked in `tests/test_equality_cavities.py`.
 Factor groups key on their full cardinality/dimension signature (`equality` is
 polymorphic and routes by family); the VM gathers transient dense blocks only
 to that group's local maximum and scatters exact segments back. Thus rule calls

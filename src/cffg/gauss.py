@@ -78,6 +78,7 @@ import jax
 import jax.numpy as jnp
 
 from cffg import efrules
+from cffg._cavities import sum_other_legs
 
 _LOG2PI = efrules.LOG2PI
 GAUSSIAN = efrules.GAUSSIAN
@@ -230,10 +231,7 @@ def linear_observed_backward(y, mask, a, b, w):
 def equality_messages(eta, lam):
     """equality → each leg: sum of the other legs' (η, Λ).
     eta [M,R,d], lam [M,R,d,d] → same shapes."""
-    tot_e, tot_l = GAUSSIAN.product_axis(
-        (eta, lam), axis=1, keepdims=True
-    )
-    return tot_e - eta, tot_l - lam
+    return sum_other_legs(eta), sum_other_legs(lam)
 
 
 # --- Node energies F[q_a] ----------------------------------------------------
