@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from cffg.models.tmaze import build_tmaze
-from cffg.viz import render_svg, save_svg
+from cffg.viz import build_scene, render_svg, save_svg, to_svg
 
 GOLDEN = Path(__file__).parent / "golden"
 
@@ -61,6 +61,24 @@ def test_save_svg(tmaze, tmp_path):
 
 def test_render_is_deterministic(tmaze):
     assert render_svg(tmaze) == render_svg(tmaze)
+
+
+def test_svg_entrypoints_explain_template_and_scene_inputs(tmaze):
+    scene = build_scene(tmaze)
+    assert to_svg(scene) == render_svg(tmaze)
+    with pytest.raises(TypeError, match="to_svg expects a Scene; use render_svg"):
+        to_svg(tmaze)
+    with pytest.raises(TypeError, match="expects a Template; use to_svg"):
+        render_svg(scene)
+
+
+def test_disconnected_and_empty_templates_render_without_inference():
+    from cffg.core import Template
+    from test_viz_layout import gaussian_components
+
+    for template in (Template("empty"), gaussian_components(2)):
+        ET.fromstring(render_svg(template))
+        assert to_svg(build_scene(template)) == render_svg(template)
 
 
 def test_gridworld_renders(viz_gallery):

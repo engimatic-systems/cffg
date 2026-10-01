@@ -1,6 +1,6 @@
 ---
 id: cff-0kyl
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-09-25T03:46:25Z
@@ -45,3 +45,21 @@ No additional future work is identified within this ticket; the completed outcom
 SVG: scalable vector graphics. Template: serialized model structure. Scene: positioned drawing objects. Connected component: a maximal group of nodes joined by wires.
 
 Shared terms: CFFG means constrained Forney-style factor graph; JAX is the numerical array/compiler library; dtype is a numeric storage type; free energy is the model's inference objective; host/JIT compares Python-side and compiled execution; single/vmap compares one instance with vectorized instances; N/A means not applicable.
+
+## Notes
+
+**2026-09-25T06:53:12Z**
+
+Pre-implementation handoff: layout.py visits only one rail-connected component; every missing factor later fails side assignment. No exact architecture change-path row exists: use Diagram rendering section and viz layout/SVG as authority. Inference, template persistence, readouts and numerical semantics unchanged; host/JIT, flood/scheduled, single/vmap and current/legacy checkpoint pairs all N/A. Plan deterministic component extraction, per-component existing rail layout, and vertical packing of full framed component scenes; preserve single-component goldens. Empty direct layout returns an empty framed scene. Validate multi-size/many components and entry-point type errors, then one full gate.
+
+**2026-09-25T06:54:48Z**
+
+Implemented independent component scenes ordered by natural factor name, packed vertically by complete framed extents; connected component rail/sides/geometry are unchanged. Empty direct layout yields the defined empty frame. Template/Scene SVG entry points now raise actionable TypeErrors and README shows both routes. Focused final check: 52 visualization tests passed, including all connected SVG goldens, 1/2/30 Gaussian components at levels 0/4, mixed-size GFE composite fragments, empty layout, and wrong-input messages. Full gate next.
+
+**2026-09-25T07:23:05Z**
+
+Completed validation: 52 focused visualization tests passed, including unchanged connected SVG goldens. Final short suite: 2496 passed, 83 deselected; pytest 1180.71s, measured 1196.129s (under 1200s). tk dep cycle and git diff --check pass. All acceptance criteria complete; no numerical or persistence surfaces changed. Next: continue cff-xa6z PR chain.
+
+**2026-09-25T07:23:36Z**
+
+Published PR #168: https://github.com/engimatic-systems/cffg/pull/168, based on cff-d57a-outer-provenance (#167).

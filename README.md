@@ -466,6 +466,16 @@ implementation failure are supported.
 `cffg.viz` derives a deterministic scene and renders SVG directly; PNG uses the
 optional `viz` dependencies. Rendering explains declared structure and
 constraints but does not compile or validate numerical inference.
+Disconnected components are laid out independently and stacked without overlap.
+Use `render_svg` for a template, or `to_svg` after constructing a scene:
+
+```python
+from cffg.viz import build_scene, render_svg, to_svg
+
+svg_text = render_svg(template)       # Template -> SVG string
+scene = build_scene(template)        # Template -> positioned Scene
+assert to_svg(scene) == svg_text     # Scene -> SVG string
+```
 
 `cffg.estimate.estimate(engine)` reports persistent arena bytes, a parameter
 total, optional backend cost analysis, and a short calibration extrapolation.

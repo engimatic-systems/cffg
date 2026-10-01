@@ -2148,7 +2148,12 @@ four-stage pipeline, each stage importable on its own:
    left→right (time), selector branches above, obs/goal stacks below,
    terminals on the first free side. Placement is a pure function of names
    and topology, so edits move only the rows/columns they touch — the
-   stability property a template editor needs.
+   stability property a template editor needs within a connected component.
+   Disconnected components use the same independent rail layout, ordered by
+   natural factor name and stacked using their framed scene extents (including
+   terminals and composite boxes). Component growth can move later components
+   down; it does not change their internal layout. Empty diagrams produce an
+   empty margin-sized scene. Connected-model golden output is unchanged.
 4. **`scene` / `svg`** — the layout emits a typed scene graph whose
    primitives carry template refs (`factor:`/`var:`/`port:`/`blob:`/`gfe:`)
    for GUI hit-testing; `svg.to_svg` serialises it dependency-free. PNG goes
