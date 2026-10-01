@@ -1,6 +1,6 @@
 ---
 id: cff-rtuf
-status: open
+status: closed
 deps: [cff-odag]
 links: []
 created: 2026-09-22T19:16:54Z
@@ -54,3 +54,24 @@ These suggestions are optional. Another sound example layout is acceptable.
 - Standalone program: A file that can run without names or data supplied by another document.
 - Status gating: Refusing to use an inference result unless its status satisfies the capability contract.
 
+
+## Notes
+
+**2026-09-22T20:09:09Z**
+
+Delegated extraction report
+
+Question: Which model-specific README walkthroughs should become runnable files?
+Answer: Move the newcomer agent workflow to examples/discrete_agent.py; generic finite-horizon discrete inference to discrete_rollout.py; LGSSM inference to linear_gaussian.py; conjugate exponential-family inference to exponential_family.py; hard constraints plus MAP to hard_constraint.py; nonlinear sigma-point inference to nonlinear_gaussian.py; declared learning and resumable bundles to learning_bundle.py; and hybrid/rSLDS inference to hybrid_rslds.py. The final README should replace those long walkthroughs with short explanations and direct links.
+Source: Existing README workflow sections, the supported public builders and Engine readouts, and the eight executable files added by this ticket.
+Confidence: High. All eight entry points reject unfinished inference; focused tests execute them, and the newcomer agent runs under both float32 and x64.
+
+**2026-09-22T20:36:54Z**
+
+Completed on cff-rtuf-standalone-examples. Added eight status-gated standalone experiment programs for discrete agents, discrete rollouts, linear Gaussian inference, exponential-family inference, hard-constraint marginals and MAP, nonlinear Gaussian inference, declared learning with bundle continuation, and hybrid rSLDS inference. Migrated both README-scraping tests to executable example files.
+
+Validation: uv run pytest -q tests/test_examples.py tests/test_public_api.py tests/test_bundle_resume.py::test_learning_bundle_example_saves_loads_updates_and_resaves (23 passed); git diff --check; uv run python tools/dashboard.py --run-suite (2411 passed, 67 deselected, 4 warnings in 1181.60s). No engine or numerical behavior changed.
+
+**2026-09-22T20:37:18Z**
+
+Pull request: https://github.com/engimatic-systems/cffg/pull/159 (stacked on #158).

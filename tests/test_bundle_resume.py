@@ -2,6 +2,8 @@
 
 import io
 import json
+import runpy
+from pathlib import Path
 
 import equinox as eqx
 import jax
@@ -253,19 +255,14 @@ def test_fitted_rslds_exports_complete_state_and_resumes(tmp_path):
         _same_learning(load_bundle(path).learnables, loaded.learnables)
 
 
-def test_documented_save_load_infer_update_and_resave(tmp_path, monkeypatch):
-    from pathlib import Path
-
-    readme = Path(__file__).parents[1] / "README.md"
-    section = readme.read_text().split("<!-- bundle-resume:start -->")[1].split("<!-- bundle-resume:end -->")[0]
-    source = section.split("```python\n")[1].split("```", 1)[0]
+def test_learning_bundle_example_saves_loads_updates_and_resaves(tmp_path, monkeypatch):
+    example = Path(__file__).parents[1] / "examples" / "learning_bundle.py"
     monkeypatch.chdir(tmp_path)
-    namespace = {}
-    exec(compile(source, str(readme), "exec"), namespace)
-    loaded = load_bundle(tmp_path / "sensor.cffgz")
+    runpy.run_path(str(example), run_name="__main__")
+    loaded = load_bundle(tmp_path / "learning-sensor.cffgz")
     np.testing.assert_array_equal(loaded.learnables.initial_params["probabilities"]["alpha"], [1, 1])
     np.testing.assert_array_equal(loaded.learnables.params["probabilities"]["alpha"], [2, 2])
-    _same_learning(loaded.learnables, namespace["learning"])
+    np.testing.assert_allclose(loaded.learnables.expected("probabilities"), [0.5, 0.5])
 
 
 @pytest.mark.parametrize("schedule", ("auto", "flood"))
