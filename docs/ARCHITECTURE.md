@@ -1163,7 +1163,16 @@ Engine. Transport retains its existing gather, prefetched carry and scatter.
 `ExecutionDelta` is a JAX-compatible immutable record of outgoing blocks and
 optional numerical solver facts; absent facts are not a convergence claim.
 Exact support stays encoded in the outgoing blocks for downstream checks.
-These registered updates have no local iterative solver diagnostics.
+Nonlinear Gaussian updates additionally retain a per-member structured
+`failure_reason` beside their existing residual/status. `failure_facts.py`
+owns the run-local integer reason/phase record and deterministic reduction
+helpers: chronology wins between updates, and stable model-local factor rank
+breaks simultaneous failures. Structured reasons require a failed status;
+vacuous successful updates are not failures. Non-finite output checks allow
+categorical negative infinity as exact zero support, but not as a Gaussian
+information coordinate. These auxiliary facts do not change convergence or
+derivative calculations. Public factor attribution remains unavailable until
+the schedule/result transport stages of cff-04mb are complete.
 
 `execution/synchronous.py:make_sweep` owns the global synchronous transport.
 It gathers every local input from the pre-sweep arrays, collects cross-domain
