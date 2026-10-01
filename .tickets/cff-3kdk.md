@@ -2,7 +2,7 @@
 id: cff-3kdk
 status: open
 deps: []
-links: [cff-d56d]
+links: [cff-d56d, cff-xa6z]
 created: 2026-07-27T05:44:29Z
 type: task
 priority: 2
@@ -45,6 +45,10 @@ tags: [performance]
 
 8. The benchmark evidence records the unvectorized and vectorized medians, hardware, dtype mode, model dimensions, number of repetitions, and speed ratio.
 
+9. Both public readout methods accept an optional edge-name selection. Omitting it preserves the complete readout. A requested subset returns only those edges and does not run numerical work for unselected edges; an empty selection returns an empty dictionary. Unknown names or names from the wrong domain produce an actionable error before computation. Duplicate names have a documented deterministic policy.
+
+10. A selective readout matches the corresponding full-readout entries, including invalid-belief and float32 behavior. A PCGym-shaped horizon-15 control workload records synchronized full-versus-single-edge latency and dispatch counts alongside the original vectorization benchmark.
+
 ## Methodological Suggestions
 
 The implementer may choose a different method that satisfies the outcomes. One likely approach is to extend the `Arena` with deterministically ordered edge groups keyed by categorical cardinality and Gaussian dimension, following `Arena.interior_slot_groups`. Gather both message slots for each edge in a group, form the group's combined natural parameters in one operation, and evaluate categorical or Gaussian moments across the leading group axis. Assemble the `Engine.marginals` and `Engine.gaussian_marginals` dictionaries after the grouped numerical work finishes.
@@ -62,7 +66,7 @@ Focused checks may extend `tests/test_engine_hmm.py` and `tests/test_kalman.py`,
 
 ## Future work
 
-No future work is delegated by this ticket. Ticket cff-d56d has status `closed`, and its schedule and benchmark code is present at repository commit `b09a541`; the link supplies context rather than an unresolved prerequisite.
+cff-wt1c consumes the optimized public readouts in the matched PCGym follow-up comparison under epic cff-xa6z. Ticket cff-d56d has status `closed`, and its schedule and benchmark code is present at repository commit `b09a541`; the link supplies context rather than an unresolved prerequisite.
 
 ## Definitions
 
@@ -87,3 +91,7 @@ No future work is delegated by this ticket. Ticket cff-d56d has status `closed`,
 Retained wiggle candidates after the bounded scan (candidate -> intended meaning): fixed -> constant_parameter; preserve -> byte_or_value_identity, compatibility, or pinned_artifact as selected by the named object; public -> documented_contract for the two Engine methods; same -> equivalent_configuration or shared implementation; implement -> planned_work or primitive_exists; support -> probability_support; complete -> exhaustive timed call or execution_finished setup; remaining -> preserved_state; close -> work_item_completion for cff-d56d status; check -> automated_check, input_guard, or manual_inspection as named; converge -> runtime_status_criterion; evidence -> empirical_support and provenance_artifact; exact -> literal_zero_or_support or absence of an applicable indexed row; oracle -> test_artifact implementing an independent numeric reference; parity -> tolerance_parity or behavioral_parity; pass -> tests_succeed or survive_without_failure for the scale case; test -> test_artifact or automated_execution; infer -> state_or_regime_posterior; learnable -> declared_parameter_artifact; performance -> steady_latency_or_throughput; scale -> asymptotic_behavior, domain_size, or dtype-relative numeric magnitude; speed -> runtime_latency; can -> demonstrated_capability of a named executable check; intended -> declared_scope; may -> optional_requirement; should -> obligation; any -> unrestricted_choice; current -> the named current/legacy review pair; read -> machine_access. Each occurrence is bounded by its sentence, named method, artifact, metric, or repository reference.
 
 Intelligible-ticket review: complete.
+
+**2026-09-25T03:47:40Z**
+
+PCGym follow-up under cff-xa6z: use the Runtime numerical or status invariant change-path row for posterior readout semantics. Current owners are src/cffg/readouts/gaussian.py and categorical readout adapters behind Engine; older compiler.py references above describe the historical benchmark, not a mandate to restore old ownership. Added selective-edge acceptance because control needs only one action edge. No dependency on the new controller is required; cff-wt1c consumes this result. Existing scalar oracle, hostile cases and <=0.1 latency target remain unchanged.
