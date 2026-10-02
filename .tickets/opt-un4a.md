@@ -36,3 +36,7 @@ Default gate means pytest selection not slow. Wall time includes collection and 
 **2026-10-02T05:18:31Z**
 
 Completed: only the card=3 ownership diagnostic is now opt-in slow; its assertions are unchanged. The passing gate at ef71254 already exercised it:2651 passed,192 deselected,1202.469s measured wall (pytest1188.05s). Dashboard testcase duration5.595s gives estimated default1196.874s; this is an estimate, not a rerun. Collection verifies13 default/1 slow in this file and retains exact-zero, f32/f64 and100-step/eight-state cases. git diff --check and tk dep cycle pass. Reuse the passing result per the explicit short-suite budget exception. Include this discovery in the primary opt-ewtf PR; no engine or numerical behavior changed.
+
+**2026-10-02T05:19:59Z**
+
+Included in the same single PR https://github.com/engimatic-systems/cffg/pull/185 as the completed discovery foropt-ewtf. Selection-only edit reuses the larger passing gate; measured1202.469s versus estimated1196.874s is explicitly reported, not relabeled as a fresh run.
