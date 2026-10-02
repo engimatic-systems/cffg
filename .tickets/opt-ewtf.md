@@ -14,17 +14,17 @@ tags: [pcgym, performance]
 
 ## Background in Plain English
 
-Native adaptive nonlinear CSTR planning is now convergent but unusably slow. The retained validation reports about112-125 seconds per compilation-warm plan, with55-58 reported iterations. Each iteration can contain multiple graph maps, reconstructions, energies and derivative/Krylov work. The host-linearized controller's7ms is context only: its numerical model differs.
+Native adaptive nonlinear CSTR planning is now convergent but unusably slow. The retained validation reports about 112–125 seconds per supposedly compilation-warm plan, with 55–58 reported iterations. Each iteration can contain multiple graph maps, reconstructions, energies and derivative/Krylov work. The host-linearized controller's 7 ms is context only: its numerical model differs. Changed observations must be checked for actual recompilation rather than assumed warm.
 
-Cooper requests implemented and validated generic runtime improvements, not profiling alone, targeting100-1600x faster native planning. Keep the original experiment unchanged. Use independent worktrees/environments and land this work in one PR continuing the current chain.
+Cooper requests implemented and validated generic runtime improvements, not profiling alone, targeting 100–1600× faster native planning. Keep the original experiment unchanged. Use independent worktrees/environments and land this work in one PR continuing the current chain.
 
 ## Outcomes / Acceptance Criteria
 
-1. A self-contained performance fixture preserves the actual validation's P4/H15, four-dimensional states,19 adaptive nonlinear transitions,4-substep RK4 physics, true constants, declared Q/R/prior, preview goals, auto schedule and1e-6 tolerance. Any synthetic observations and selected budget are labeled, not invented historical invocation facts.
+1. A self-contained performance fixture preserves the actual validation's P4/H15, four-dimensional states, 19 adaptive nonlinear transitions, four-substep RK4 physics, true constants, declared Q/R/prior, preview goals, auto schedule and 1e-6 tolerance. Any synthetic observations and selected budget are labeled, not invented historical invocation facts.
 
 2. Baseline and optimized runs use separate worktrees and environments with identical dependency versions and workload. Report synchronized cold, compilation-warm repeated-base and changed-observation times, actual compilation/cache behavior, iterations/map evaluations and full objective/certificate results.
 
-3. Implement generic optimizations and validate the100x minimum compilation-warm target, with1600x as the stretch target. Do not claim speedup from a shorter window, hidden warm-start advantage, excluded later recompilation, frozen approximations, missing objective terms or weaker stopping.
+3. Implement generic optimizations and validate the 100× minimum compilation-warm target, with 1600× as the stretch target. Do not claim speedup from a shorter window, hidden warm-start advantage, excluded later recompilation, frozen approximations, missing objective terms or weaker stopping.
 
 4. Returned states pass the original fixed-chart normalized residual, full current/successor free-energy, finite/proper belief, exact-support and inner-status conditions; compare moments/actions/objective against matched baseline results.
 
@@ -66,3 +66,15 @@ Source research: authoritative validation is external FEEDBACK.md62 dated2026-10
 **2026-10-02T04:00:09Z**
 
 Chart implementation and independent tests: grouped pack/unpack retain exact sparse support, singleton gauges, non-diagonal precision transforms, EF aliases, primal/JVP behavior, float32/64, and 100x blocks. First-use JIT exposed a cached-tracer leak; metrics now cache only NumPy values and enter kernels as dynamic leaves. Mixed-dtype promotion matches the original active-block concatenate. Structural reuse binds fresh metrics; independent derivative test passes. Focused geometry/nonlinear/GFE run: 18 passed, 13 deselected. Research review confirms derivative transpose linearity; proposal acceptance will recheck raw mapped finiteness and both compiled and authoritative host energy/root certificates. Preliminary warm CSTR 0.103s vs matched 44.175s, not yet final validated claim.
+
+**2026-10-02T04:01:41Z**
+
+Final comparison acceptance, fixed before matched artifact runs: unchanged 1e-6 root and full current/successor FE certificate, finite/proper non-DATA marginals, no failure; all non-DATA edge means whitened by baseline posterior Cholesky differ <=1e-3, covariance differences whitened on both sides <=1e-3, and normalized total FE difference <=1e-6. These parity bounds acknowledge finite-tolerance roots, not a changed objective. Use identical cold + three repeated-base + three explicitly synthetic changed-observation plans, budget100. Record actual compiled executable cache sizes as well as provider misses. No host controller or warm-start substitution.
+
+**2026-10-02T04:10:55Z**
+
+Matched seven-plan comparison in progress, without concurrent numerical tests. Baseline repeated-observation median so far 36.8s. Changed observation 1 takes124.83s with provider miss1 and JAX trust executables increasing1->2; this reproduces the reported slowdown and proves skipped-first timing did not eliminate observation-dependent compilation. Fully adaptive optimization adds original host certificate on top of compiled raw/canonical successor checks, rejects nonfinite mapped/chart coordinates, preserves traces/budget on fallback, and reports actual proposal radius. New tests cover these failure mechanisms and the recent full CSTR/sigma startup separately. cff-wt1c now depends on opt-ewtf; no cycle.
+
+**2026-10-02T04:18:27Z**
+
+Independent source-only research confirms full model/physics/factor/variable ordering. Initial DATA now uses the retained normalization expression (not rounded [-1/3,.2]). Baseline diagnostic for change2: raw-vs-repacked/reconstructed FE drift3.58e-12 (normalized1.02e-13), fresh root3.10e-7, successor FE delta4.31e-7, original1e-6 checks pass. The unsupported64eps roundtrip assertion is replaced by a recorded drift bounded by original tolerance; neither solver nor preregistered posterior/FE parity tolerances change. Final comparison expanded (not shortened) to nine plans: seven original cases plus two labeled synthetic populated-history/mask/preview cases. Log every JAX JIT compilation inside timed bind/run/sync, alongside specifically labeled outer solver executable variants; compare equal uv.lock hash and hardware as well as versions. No matched denominator uses diagnostic/contended runs.

@@ -23,6 +23,7 @@ class OuterKernelPlan(NamedTuple):
     root_diagnostics: Callable
     context: object
     compiled: bool
+    proposal: Callable | None = None
 
 
 def _make_root_diagnostics(

@@ -1,7 +1,7 @@
 """Trust-region phase and functional-coordinate control, separate from the solver."""
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import jax
 import jax.numpy as jnp
@@ -19,6 +19,7 @@ from cffg.outer_outcome import OuterOutcome
 from cffg.outer_structure import OuterStructure
 from cffg.outer_startup import run_startup
 from cffg.execution.startup import StartupProgram
+from cffg.adaptive_runtime import certify_adaptive_proposal, try_adaptive_proposals
 from cffg.runtime_types import OuterTerminationReason, State, _replace
 from cffg.schedule_contracts import Propagation, Sweep
 
@@ -256,31 +257,60 @@ class OuterTrustRegionStrategy:
                         ef_eta=arrays.ef_eta,
                     )
 
-                solved = solve_outer(
-                    OuterArrays(state.messages, state.g_eta, state.g_lam, state.ef_eta),
-                    self.structure,
-                    outer_map,
-                    lambda arrays, as_state=as_state, reconstruct=reconstruct: (
-                        self.services.free_energy(as_state(reconstruct(arrays)))
-                    ),
-                    lambda arrays, as_state=as_state, reconstruct=reconstruct: (
-                        self.services.zero_support(as_state(reconstruct(arrays)))
-                    ),
-                    n_iters=remaining,
-                    tol=solver_tol,
-                    eliminated=self.eliminated,
-                    kernel_factory=lambda chart, state=state: self.kernel_provider(
-                        chart, state, hard_blocks
-                    ),
-                    candidate_limit=(
-                        0 if self.adaptive_gaussian or self.services.update_functional is not None else 128
-                    ),
-                    adaptive_gaussian=self.adaptive_gaussian,
-                    initial_failure=(
-                        terminal_failure(priming_fact, 0)
-                        if total_iterations == 0 else None
-                    ),
-                )
+                def energy(arrays):
+                    return self.services.free_energy(as_state(reconstruct(arrays)))
+
+                def infeasible(arrays):
+                    return self.services.zero_support(as_state(reconstruct(arrays)))
+
+                proposal = None
+                if self.adaptive_gaussian and self.services.update_functional is None:
+                    proposal = try_adaptive_proposals(
+                        self.structure, self.eliminated, self.kernel_provider,
+                        state, hard_blocks, remaining, solver_tol,
+                    )
+                    if proposal is not None:
+                        proposal = certify_adaptive_proposal(
+                            proposal, outer_map, energy, infeasible, solver_tol,
+                        )
+                if proposal is not None and proposal.result is None:
+                    proposal_arrays, _ = reconstruct_with_fact(proposal.arrays)
+                    state = as_state(proposal_arrays)
+                solved = proposal.result if proposal is not None else None
+                if solved is None:
+                    solved = solve_outer(
+                        OuterArrays(state.messages, state.g_eta, state.g_lam, state.ef_eta),
+                        self.structure,
+                        outer_map,
+                        energy,
+                        infeasible,
+                        n_iters=remaining - (proposal.rounds if proposal is not None else 0),
+                        tol=solver_tol,
+                        eliminated=self.eliminated,
+                        kernel_factory=lambda chart, state=state: self.kernel_provider(
+                            chart, state, hard_blocks
+                        ),
+                        candidate_limit=(
+                            0 if self.adaptive_gaussian or self.services.update_functional is not None else 128
+                        ),
+                        adaptive_gaussian=self.adaptive_gaussian,
+                        initial_failure=(
+                            terminal_failure(priming_fact, 0)
+                            if total_iterations == 0 else None
+                        ),
+                    )
+                    if proposal is not None:
+                        solved = replace(
+                            solved, iterations=solved.iterations + proposal.rounds,
+                            message_deltas=(*proposal.message_deltas, *solved.message_deltas),
+                            free_energies=(*proposal.free_energies, *solved.free_energies),
+                            accepted_steps=solved.accepted_steps + proposal.accepted,
+                            rejected_steps=solved.rejected_steps + proposal.rejected,
+                            outer_map_evaluations=solved.outer_map_evaluations + proposal.maps,
+                            trial_evaluations=solved.trial_evaluations + max(proposal.rounds - 1, 0),
+                            solver_compilations=solved.solver_compilations + proposal.compilations,
+                            failure=offset_failure(solved.failure, proposal.rounds),
+                        )
                 final_arrays, reconstruction_fact = reconstruct_with_fact(solved.arrays)
                 state = as_state(final_arrays)
                 failure = offset_failure(solved.failure, total_iterations)

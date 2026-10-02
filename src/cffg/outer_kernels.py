@@ -12,9 +12,10 @@ from cffg.outer import (
     OuterKernelPlan,
     _make_root_diagnostics,
     _make_trust_kernel,
-    outer_chart_signature,
 )
 from cffg.runtime_types import State
+from cffg.outer_coordinates import structural_signature
+from cffg.adaptive_proposals import make_adaptive_proposals
 from cffg.schedule_contracts import Propagation, Sweep
 
 type HardBlock = tuple[np.ndarray, np.ndarray, jax.Array]
@@ -30,7 +31,7 @@ class OuterKernelProvider:
     """Per-engine cache; schedule handles remain current at kernel tracing time."""
 
     def __init__(self):
-        self.cache: dict[tuple, tuple[Callable, Callable]] = {}
+        self.cache: dict[tuple, tuple[Callable, Callable, Callable | None]] = {}
         self.iter_step: Sweep
         self.reconstruct: Propagation | None = None
 
@@ -42,6 +43,7 @@ class OuterKernelProvider:
         *,
         iter_step: Sweep,
         reconstruct: Propagation | None,
+        belief_kernel: Callable | None = None,
     ) -> OuterKernelPlan:
         """Reuse derivative kernels while keeping every runtime value dynamic."""
         self.iter_step = iter_step
@@ -57,7 +59,7 @@ class OuterKernelProvider:
             )
             for i0, i1, _ in hard_blocks
         )
-        key = outer_chart_signature(chart), hard_indices
+        key = structural_signature(chart), hard_indices, id(iter_step), id(reconstruct), id(belief_kernel)
         compiled = key not in self.cache
         if compiled:
             static_indices = tuple((i0, i1) for i0, i1, _ in hard_blocks)
@@ -66,7 +68,8 @@ class OuterKernelProvider:
             self.cache[key] = (
                 _make_trust_kernel(program.residual, chart.size),
                 _make_root_diagnostics(program.residual),
+                None if belief_kernel is None else make_adaptive_proposals(program, belief_kernel),
             )
-        trust, root_diagnostics = self.cache[key]
+        trust, root_diagnostics, proposal = self.cache[key]
         context = root_context(chart, state, tuple(hot for _, _, hot in hard_blocks))
-        return OuterKernelPlan(trust, root_diagnostics, context, compiled)
+        return OuterKernelPlan(trust, root_diagnostics, context, compiled, proposal)

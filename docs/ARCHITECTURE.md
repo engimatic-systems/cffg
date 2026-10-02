@@ -1120,13 +1120,31 @@ and `outer_trust.py` owns compiled trust steps and root diagnostics.
 Their existing imports from `outer.py` remain available.
 
 `outer_kernels.py:OuterKernelProvider` owns a per-engine lazy derivative cache.
-Its keys retain chart support, dtype and reference metrics plus hard-message
-index dtypes, shapes and bytes. Chart bases, observations, masks, current
-parameters and hard values are passed separately for every solve. The provider
+Its keys retain chart support, dtype, coordinate layout/aliases, hard-message
+index dtypes/shapes/bytes, and numerical callback identity. Reference metrics
+are dynamic `RootContext` leaves, fixed throughout one solve but replaceable
+between solves without rebuilding a structural kernel. Chart bases,
+observations, masks, current parameters and hard values are also passed afresh.
+Coordinate programs group compatible vector/precision transforms and retain
+only host NumPy metrics on charts, so first-use JIT cannot cache a tracer. The provider
 does not capture an Engine; its schedule handles are refreshed through the
 facade's existing instrumentation aliases. Cache creation timing and reported
-compilation counts are unchanged. These trusted process-local callables are
+compilation counts measure provider misses, not every JAX executable variant;
+the runtime benchmark records both. These trusted process-local callables are
 derived runtime artifacts, never serialized model or checkpoint data.
+
+After unchanged budgeted startup, `adaptive_proposals.py` compiles bounded
+Anderson proposals for Gaussian-only adaptive plans without functional updates.
+Every map refreshes nonlinear coefficients in one fixed chart. Least-squares
+rank guards affect proposal directions only, never message precisions. Invalid
+trials backtrack toward a retained admissible point and never enter history.
+Both raw and canonical successor energies must pass the full certificate;
+`adaptive_runtime.py` repeats the original host residual/energy/domain checks
+before acceptance. Otherwise the retained point enters trust inference with
+the remaining budget. Proposal rounds, rejections, traces and map evaluations
+are accounted for; at least eight budget units (or one eighth of the budget)
+are reserved. Startup failures cannot enter this phase. This is an acceleration
+heuristic, not a global convergence or same-basin guarantee.
 
 `ledger.py:ObjectiveLedger` owns the two distinct objective operations.
 `free_energy` retains the host checks in their original order: reject
@@ -1871,9 +1889,11 @@ discarding a joint correlation. Exact joint rollover remains the separate
     and FE certificates pass; otherwise the trust controller takes over. Mu3
     skips this phase so its total budget remains available for outer-root and
     particle-moment block alternation.
-    Derivative kernels are cached by exact chart support, dtype, continuous
-    metric, and hardening phase, while parameters and observations remain
-    dynamic inputs. Other mixed plans retain the ordinary sweep loop and its
+    Derivative kernels are cached by exact chart support, dtype, layout and
+    hardening phase, with solve-fixed continuous metrics, parameters and
+    observations as dynamic inputs. Gaussian-only adaptive plans also use
+    the bounded, certificate-gated compiled proposal phase described above.
+    Other mixed plans retain the ordinary sweep loop and its
     optional damping.
   - flood: retained as an explicit option, and the fallback for δ form
     constraints (whose per-sweep hardening is defined against flooding) and
