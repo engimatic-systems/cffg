@@ -163,7 +163,15 @@ that every gap below will be implemented:
   graphs may exhaust their budgets. Singular noise, invalid beliefs, and
   unrepresentable sigma-point spread fail explicitly; no ridge repairs them.
   Negative sites are permitted when combined beliefs remain proper. Full run
-  control is host-side; local updates and trust kernels support JIT/vmap.
+  control retains host authority; local updates, coordinate conversion, bounded
+  Gaussian-only adaptive proposals and trust kernels support JIT. The proposal
+  phase refreshes coefficients at every map and repeats the original host
+  certificate before acceptance. Failed proposals consume the caller's budget
+  before trust fallback; no global convergence or same-basin guarantee follows.
+  Discrete/EF/functional plans do not use this proposal phase. Metrics are fixed
+  within a solve but dynamic between solves; a changed layout/support/dtype or
+  callback still needs a new kernel. Colony still controls adaptive runs per
+  instance, not as one fully compiled batched control loop.
   Bounded startup can wait for numerically compatible partial inputs at
   neutral-at-entry, not-yet-admitted sites. Its sweeps consume `n_iters`; no
   approximation point, physical evaluation, finite energy or convergence is
@@ -200,6 +208,27 @@ that every gap below will be implemented:
   constants and closed-loop control performance require separate validation.
   The original failed CSTR invocation was not retained; wide-prior tests are
   mechanism reproductions, not incident replay or a proven noise threshold.
+  The later retained native validation is separately reproduced by
+  `tools/cstr_runtime_fixture.py` and `tools/benchmark_adaptive_runtime.py`:
+  P4/H15, four RK4 substeps, true constants, P0=diag(1,1,1e-4,1),
+  Q=Qp=diag(1e-5,1e-5,4e-6,.25), original emissions and tolerance 1e-6.
+  The selected open-grid budget is 100; the source initial observation and
+  labeled synthetic changes are not the missing historical closed-loop inputs.
+  Linearization is the performance acceptance path. Sigma-point startup's
+  `improper_tilt / tr1 / startup` failure remains separate and explicit.
+  Cold compilation and compilation-warm, repeated-base plans must be reported
+  separately, including changed-observation compilation behavior. The host
+  controller's 7 ms uses a different numerical model and is not a parity oracle.
+  Matched Apple M2 Max, Python 3.12.13, JAX/JAXlib 0.10.2 and identical frozen
+  locks: repeated-base medians 36.9305→0.1059 s (348.8×); changed-observation
+  medians 120.6778→0.1075 s (1122.3×). Two synthetic populated-history/preview
+  cases measured 988.7× and 1117.0×, including binding and synchronization.
+  Cold first-run time, including compilation, was 130.7154→26.4802 s (4.9×).
+  All nine cases passed the unchanged certificates; maximum baseline-whitened
+  mean/covariance differences were 2.72e-5/1.14e-6, normalized full-FE difference
+  8.32e-8, and coolant mean difference 4.21e-6 K. No warm timed JIT compilation
+  occurred, even with changed masks/preview. These are plan benchmarks, not a
+  59-step closed-loop replay or a universal speed guarantee; 1600× was not reached.
   Zero noise, nonlinear GFE, and continuous-to-discrete means remain excluded.
 - *Gaussian/continuous GFE messages* — RESOLVED as a position, 2026-07-12
   (cff-dfpi, DERIVATIONS.md D5): none will be added, and that is a theorem,

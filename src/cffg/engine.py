@@ -454,6 +454,7 @@ class Engine:
         return self._outer_kernels.plan(
             chart, state, hard_blocks,
             iter_step=self._iter_step, reconstruct=self._reconstruct,
+            belief_kernel=self._bfe,
         )
 
     def _run_outer_trust_region(
