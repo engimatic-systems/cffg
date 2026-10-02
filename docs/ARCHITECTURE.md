@@ -1115,7 +1115,8 @@ functional-coordinate cadence and accumulated solve diagnostics. It receives
 parameters), hardening rows, eliminated slots, current schedule handles and
 check/ledger/functional callbacks. It returns `OuterOutcome`, not a public
 status. `outer.py` owns host trust-region control; `outer_chart.py` owns chart
-geometry and `outer_trust.py` owns compiled trust steps and root diagnostics.
+geometry, `outer_coordinates.py` owns grouped compiled coordinate conversion,
+and `outer_trust.py` owns compiled trust steps and root diagnostics.
 Their existing imports from `outer.py` remain available.
 
 `outer_kernels.py:OuterKernelProvider` owns a per-engine lazy derivative cache.

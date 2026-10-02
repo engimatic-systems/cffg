@@ -80,6 +80,7 @@ EPIC_FILES = {
         "test_cstr_envelope.py",
         "test_gaussian_readiness.py",
         "test_adaptive_startup.py",
+        "test_outer_coordinates.py",
         "test_execution.py",
         "test_execution_specialized.py",
         "test_schedule_program.py",

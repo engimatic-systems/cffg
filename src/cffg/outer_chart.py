@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import cached_property
 from typing import NamedTuple
 
 import jax
@@ -60,79 +61,22 @@ class OuterChart:
     def size(self) -> int:
         return self.block_slices[-1][1] if self.block_slices else 0
 
-    def pack(self, arrays: OuterArrays) -> jax.Array:
-        pieces: list[jax.Array] = []
-        for block in self.categorical:
-            if block.coordinates.size:
-                pieces.append(
-                    arrays.messages[block.coordinates]
-                    - arrays.messages[block.reference]
-                )
-        for block in self.vectors:
-            values = getattr(arrays, block.field)[block.indices]
-            pieces.append(jnp.asarray(block.forward) @ values)
-        for block in self.precisions:
-            dim = block.indices.shape[0]
-            matrix = arrays.g_lam[block.indices.reshape(-1)].reshape(dim, dim)
-            whitening = jnp.asarray(block.whitening)
-            reduced = jnp.linalg.solve(
-                whitening, jnp.linalg.solve(whitening, matrix).T
-            ).T
-            pieces.append(reduced[block.lower[:, 0], block.lower[:, 1]])
-        if not pieces:
-            return jnp.zeros((0,), dtype=self.base.messages.dtype)
-        return jnp.concatenate([jnp.ravel(piece) for piece in pieces])
+    @cached_property
+    def program(self):
+        from cffg.outer_coordinates import coordinate_program
+        return coordinate_program(self)
 
-    def unpack(
-        self,
-        coordinates: jax.Array,
-        base: OuterArrays | None = None,
-    ) -> OuterArrays:
-        arrays = self.base if base is None else base
-        offset = 0
-        messages = arrays.messages
-        for block in self.categorical:
-            messages = messages.at[block.support].set(0.0)
-            width = block.coordinates.size
-            if width:
-                messages = messages.at[block.coordinates].set(
-                    coordinates[offset : offset + width]
-                )
-                offset += width
+    @cached_property
+    def metrics(self):
+        return self.program.metrics(self)
 
-        fields = {
-            "messages": messages,
-            "g_eta": arrays.g_eta,
-            "ef_eta": arrays.ef_eta,
-        }
-        for block in self.vectors:
-            width = block.indices.size
-            values = (
-                jnp.asarray(block.inverse)
-                @ coordinates[offset : offset + width]
-            )
-            targets = block.indices if block.aliases is None else block.aliases
-            fields[block.field] = fields[block.field].at[targets].set(
-                values
-            )
-            offset += width
+    def pack(self, arrays: OuterArrays, metrics=None) -> jax.Array:
+        return self.program.pack(arrays, self.metrics if metrics is None else metrics)
 
-        g_lam = arrays.g_lam
-        for block in self.precisions:
-            width = block.lower.shape[0]
-            reduced = jnp.zeros(block.indices.shape, dtype=g_lam.dtype)
-            values = coordinates[offset : offset + width]
-            rows, cols = block.lower[:, 0], block.lower[:, 1]
-            reduced = reduced.at[rows, cols].set(values)
-            reduced = reduced.at[cols, rows].set(values)
-            whitening = jnp.asarray(block.whitening)
-            matrix = whitening @ reduced @ whitening.T
-            g_lam = g_lam.at[block.indices.reshape(-1)].set(matrix.reshape(-1))
-            offset += width
+    def unpack(self, coordinates, base=None, metrics=None) -> OuterArrays:
+        return self.program.unpack(coordinates, self.base if base is None else base,
+                                   self.metrics if metrics is None else metrics)
 
-        return OuterArrays(
-            fields["messages"], fields["g_eta"], g_lam, fields["ef_eta"]
-        )
 
     def support_changed(self, messages: jax.Array) -> bool:
         host = np.asarray(messages)
@@ -328,13 +272,14 @@ def chart_arrays(
     chart: OuterChart,
     coordinates: jax.Array,
     base: OuterArrays | None = None,
+    metrics=None,
 ) -> OuterArrays:
-    arrays = chart.unpack(coordinates, base)
+    arrays = chart.unpack(coordinates, base, metrics)
     return arrays._replace(ef_eta=arrays.ef_eta.reshape(chart.ef_shape))
 
 
-def chart_coordinates(chart: OuterChart, arrays: OuterArrays) -> jax.Array:
-    return chart.pack(arrays._replace(ef_eta=arrays.ef_eta.reshape(-1)))
+def chart_coordinates(chart: OuterChart, arrays: OuterArrays, metrics=None) -> jax.Array:
+    return chart.pack(arrays._replace(ef_eta=arrays.ef_eta.reshape(-1)), metrics)
 
 
 def outer_chart_signature(chart: OuterChart) -> tuple:
