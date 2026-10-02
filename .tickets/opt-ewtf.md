@@ -78,3 +78,17 @@ Matched seven-plan comparison in progress, without concurrent numerical tests. B
 **2026-10-02T04:18:27Z**
 
 Independent source-only research confirms full model/physics/factor/variable ordering. Initial DATA now uses the retained normalization expression (not rounded [-1/3,.2]). Baseline diagnostic for change2: raw-vs-repacked/reconstructed FE drift3.58e-12 (normalized1.02e-13), fresh root3.10e-7, successor FE delta4.31e-7, original1e-6 checks pass. The unsupported64eps roundtrip assertion is replaced by a recorded drift bounded by original tolerance; neither solver nor preregistered posterior/FE parity tolerances change. Final comparison expanded (not shortened) to nine plans: seven original cases plus two labeled synthetic populated-history/mask/preview cases. Log every JAX JIT compilation inside timed bind/run/sync, alongside specifically labeled outer solver executable variants; compare equal uv.lock hash and hardware as well as versions. No matched denominator uses diagnostic/contended runs.
+
+**2026-10-02T04:24:46Z**
+
+Implementation committed in four logical steps:400c1fe batched geometry/shared dynamic RootProgram;4226d87 adaptive proposals and original host certificate/fallback;1ebe9a1 exact trust derivative/root-diagnostic reuse;fa3e405 maintained full-window fixture/benchmark/docs. Fresh focused runtime/workload tests10 passed; opt-in CSTR linearization/history/mask/preview and unchanged sigma failure2 passed. Earlier broader focused run60 passed with one incorrect test assertion that small budgets must always exhaust; fixed test now permits genuine trust convergence and checks no proposal execution/iteration overrun. Independent original-source template/array/insertion-order equality and physics/Jacobian parity pass. Source experiment is read-only. Final nine-case isolated timing restarted with source-exact normalization, whole-boundary JAX compile logging and matched lock/hardware; no production changes planned before final gate.
+
+**2026-10-02T04:24:46Z**
+
+Dependency overview (prerequisite --> dependent):
+[x] cff-vxza --> [x] cff-qu2j --> [~] opt-ewtf (active, prerequisites complete)
+                                      |
+                                      +--> [ ] cff-wt1c (blocked by other PCGym prerequisites)
+                                                |
+                                                +--> [ ] cff-xa6z (PCGym epic)
+Parallel ready roots cff-4yr6 (binding), cff-3kdk (readouts), cff-qtub/cff-wbhu (Colony), cff-ees0 (parameter hypotheses), cff-nd1q (action bounds) also lead to cff-wt1c through their recorded implementation dependencies. The runtime PR addresses only opt-ewtf; it does not complete those unrelated blockers. Built from tk dep tree --full, tk ready and tk blocked; tk dep cycle is clear.
