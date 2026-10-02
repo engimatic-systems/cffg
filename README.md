@@ -392,6 +392,20 @@ bounded startup; those sweeps count toward `n_iters`. Invalid models and
 established sites remain strict. Unresolved startup reports budget exhaustion
 with the pending factor, not convergence or a fabricated Gaussian belief.
 
+Gaussian-only adaptive plans use compiled, fully adaptive proposals before
+trust inference. Each proposal refreshes the nonlinear factors; only the full
+root, energy and domain certificate can accept it. Unsuccessful proposals use
+the remaining budget for trust inference. Same-shape observations reuse kernels
+with fresh, solve-fixed chart metrics. This is not a universal convergence or
+speed guarantee; discrete/EF/functional plans retain the trust route.
+
+To reproduce the recent wide-prior P4/H15 CSTR runtime workload, run
+`uv run python tools/benchmark_adaptive_runtime.py --output /tmp/cstr-runtime.json`.
+It checks the full objective and all state marginals, reports cold/repeated-base/
+changed-observation timings and executable counts, and never warm-starts a plan.
+Use independent worktrees with `uv sync --frozen` for comparisons. This workload
+is distinct from the smaller example below; sigma-point startup still fails.
+
 For physical-model planning, run
 `uv run python examples/cstr_planning.py --method sigma_point --dtype float32`.
 The registered RK4 reactor mean is evaluated by CFFG; no caller-side
