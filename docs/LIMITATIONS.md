@@ -219,6 +219,16 @@ that every gap below will be implemented:
   Cold compilation and compilation-warm, repeated-base plans must be reported
   separately, including changed-observation compilation behavior. The host
   controller's 7 ms uses a different numerical model and is not a parity oracle.
+  Matched Apple M2 Max, Python 3.12.13, JAX/JAXlib 0.10.2 and identical frozen
+  locks: repeated-base medians 36.9305→0.1059 s (348.8×); changed-observation
+  medians 120.6778→0.1075 s (1122.3×). Two synthetic populated-history/preview
+  cases measured 988.7× and 1117.0×, including binding and synchronization.
+  Cold first-run time, including compilation, was 130.7154→26.4802 s (4.9×).
+  All nine cases passed the unchanged certificates; maximum baseline-whitened
+  mean/covariance differences were 2.72e-5/1.14e-6, normalized full-FE difference
+  8.32e-8, and coolant mean difference 4.21e-6 K. No warm timed JIT compilation
+  occurred, even with changed masks/preview. These are plan benchmarks, not a
+  59-step closed-loop replay or a universal speed guarantee; 1600× was not reached.
   Zero noise, nonlinear GFE, and continuous-to-discrete means remain excluded.
 - *Gaussian/continuous GFE messages* — RESOLVED as a position, 2026-07-12
   (cff-dfpi, DERIVATIONS.md D5): none will be added, and that is a theorem,

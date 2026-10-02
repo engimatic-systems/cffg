@@ -405,6 +405,10 @@ It checks the full objective and all state marginals, reports cold/repeated-base
 changed-observation timings and executable counts, and never warm-starts a plan.
 Use independent worktrees with `uv sync --frozen` for comparisons. This workload
 is distinct from the smaller example below; sigma-point startup still fails.
+On the matched Apple M2 Max/locked-JAX fixture, repeated-base plans fell from
+36.93 s to 0.106 s (349×), and changed-observation plans from 120.68 s to
+0.108 s (1122×), with unchanged 1e-6 certificates and no warm recompilation.
+Cold first-plan time was 130.72 s versus 26.48 s; see `LIMITATIONS.md` for scope.
 
 For physical-model planning, run
 `uv run python examples/cstr_planning.py --method sigma_point --dtype float32`.
