@@ -1,7 +1,7 @@
 ---
 id: opt-ewtf
 status: in_progress
-deps: [cff-qu2j]
+deps: [cff-qu2j, opt-un4a]
 links: [cff-wt1c]
 created: 2026-10-02T03:40:20Z
 type: task
@@ -100,3 +100,7 @@ All nine matched cases pass original root/full FE/proper posterior audits. Basel
 **2026-10-02T04:49:14Z**
 
 Validated final nine-case comparison (baseline92d6acc, optimized0fe5d80, separate frozen uv envs, Apple M2 Max; artifacts /Users/ravd/agent-share/CFFGAdaptiveRuntime/{baseline.json,optimized.json,report.html}): cold130.7154->26.4802s4.9x; repeated-base median36.9305->.105877s348.8x; changedobs median120.6778->.107526s1122.3x; populatedhistory128.0774->.129539s988.7x; historypreview116.4823->.104283s1117.0x. All nine converged under original1e-6 root/current+successor full-FE/domain checks; independent fresh-chart certificates and all58 non-DATA marginals proper. Max whitened mean2.7161e-5, whitened covariance1.1418e-6, normalized totalFE8.3143e-8, action4.2043e-6K: preregistered parity bounds pass. No warm timed JAX JIT compilation of any kind, including changed masks/history/preview; solver variants remain(0 trust,1diagnostic,1proposal). First source window maps176->45 and Krylov20536->0, iterations58->63 including startup (not per-sweep timing). 100x minimum exceeded;1600stretch not reached. No scientific compromise, original experiment unchanged, host7ms not substituted. Final suite remains the only pending numerical gate.
+
+**2026-10-02T05:18:31Z**
+
+Final gate at ef71254 passed2651 tests,192 deselected,0 failures; pytest1188.05s, measured full wall1202.469s. Discovered opt-un4a moves only a redundant three-state ownership diagnostic5.595s to opt-in slow; default estimate1196.874s and selection-only collection checks pass. All assertions remain, f32/f64/exact-support/uncomfortable-scale coverage stays default, and the already passing numerical gate is reused under the explicit budget rule (no rerun). Final gate history/dashboard updated. Scientific runtime code unchanged since0fe5d80; original source experiment and detached baseline remain unchanged.
