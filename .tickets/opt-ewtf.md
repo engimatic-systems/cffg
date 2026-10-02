@@ -92,3 +92,7 @@ Dependency overview (prerequisite --> dependent):
                                                 |
                                                 +--> [ ] cff-xa6z (PCGym epic)
 Parallel ready roots cff-4yr6 (binding), cff-3kdk (readouts), cff-qtub/cff-wbhu (Colony), cff-ees0 (parameter hypotheses), cff-nd1q (action bounds) also lead to cff-wt1c through their recorded implementation dependencies. The runtime PR addresses only opt-ewtf; it does not complete those unrelated blockers. Built from tk dep tree --full, tk ready and tk blocked; tk dep cycle is clear.
+
+**2026-10-02T04:44:20Z**
+
+All nine matched cases pass original root/full FE/proper posterior audits. Baseline source-exact repeated median36.9305s; changed median120.6778s; full-history128.0774s and changedpreview116.4823s. Initial optimized repeated median.11014s, changed.10873s, history.14793s/.12188s, zero Krylov and no new outer solver variants. Broader JAX logging caught two dynamic_slice compilations for new FE/delta trace lengths (60/40 vs43); fixed readout to transfer fixed128-entry buffers then slice in NumPy. This does not alter inference, tolerances, outputs, or timers; rerun optimized nine cases and require zero warm timed JIT compilation before final gate. No baseline rerun is needed for this optimized-only readout fix.

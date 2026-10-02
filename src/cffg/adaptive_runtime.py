@@ -65,8 +65,8 @@ def try_adaptive_proposals(structure, eliminated, provider, state, hard_blocks, 
     proposal = plan.proposal(coordinates, plan.context, jnp.int32(proposal_budget),
                              jnp.asarray(tolerance, dtype=coordinates.dtype))
     rounds, count = int(proposal.rounds), int(proposal.count)
-    deltas = tuple(float(value) for value in np.asarray(proposal.deltas[:count]))
-    energies = tuple(float(value) for value in np.asarray(proposal.energies[:count]))
+    deltas = tuple(float(value) for value in np.asarray(proposal.deltas)[:count])
+    energies = tuple(float(value) for value in np.asarray(proposal.energies)[:count])
     retained = chart_arrays(chart, proposal.coordinates) if count else arrays
     maps = rounds
     solved = None
