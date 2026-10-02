@@ -1,6 +1,6 @@
 ---
 id: opt-ewtf
-status: in_progress
+status: closed
 deps: [cff-qu2j, opt-un4a]
 links: [cff-wt1c]
 created: 2026-10-02T03:40:20Z
@@ -104,3 +104,7 @@ Validated final nine-case comparison (baseline92d6acc, optimized0fe5d80, separat
 **2026-10-02T05:18:31Z**
 
 Final gate at ef71254 passed2651 tests,192 deselected,0 failures; pytest1188.05s, measured full wall1202.469s. Discovered opt-un4a moves only a redundant three-state ownership diagnostic5.595s to opt-in slow; default estimate1196.874s and selection-only collection checks pass. All assertions remain, f32/f64/exact-support/uncomfortable-scale coverage stays default, and the already passing numerical gate is reused under the explicit budget rule (no rerun). Final gate history/dashboard updated. Scientific runtime code unchanged since0fe5d80; original source experiment and detached baseline remain unchanged.
+
+**2026-10-02T05:19:27Z**
+
+Completed and ready for the single stacked PR: numerical benchmark0fe5d80 passes the unchanged full certificates/parity for nine source-exact P4/H15 plans; final short gateef71254 passes2651 tests. Discoveryopt-un4a is closed in1c6a7bf with marker-only budget correction and selection checks; passing gate reused, estimated remaining default1196.874s. README/ARCHITECTURE/LIMITATIONS document implementation and honest speed/scope. Baseline/root checkout and original experiment unchanged. Remaining:1600x stretch, sigma-point startup failure, other cff-wt1c blockers and actual closed-loop comparison remain separate work; no scientific compromise was needed. Handoff artifacts: /Users/ravd/agent-share/CFFGAdaptiveRuntime/report.html and matching baseline/optimized JSON. Dependency direction prerequisite-->dependent: closed cff-vxza-->closed cff-qu2j and closed opt-un4a-->closed opt-ewtf-->open cff-wt1c-->PCGym epiccff-xa6z; unrelated ready roots remain parallel. No required implementation or numerical validation remains for this ticket.
