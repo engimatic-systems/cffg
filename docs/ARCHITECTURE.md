@@ -1146,6 +1146,12 @@ are accounted for; at least eight budget units (or one eighth of the budget)
 are reserved. Startup failures cannot enter this phase. This is an acceleration
 heuristic, not a global convergence or same-basin guarantee.
 
+Trust derivatives reuse the transpose of the linearized residual map. Collinear
+candidate families share Jacobian products, and certified roots use diagnostic
+gradients without an unnecessary Krylov solve. The objective, stopping criteria
+and Gaussian factor formulas are unchanged. Training uses the same dynamic
+metric `RootProgram`; its certificate retains canonical successor decoding.
+
 `ledger.py:ObjectiveLedger` owns the two distinct objective operations.
 `free_energy` retains the host checks in their original order: reject
 max-product mode, require prepared functional state, reject proven empty

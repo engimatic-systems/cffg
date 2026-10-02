@@ -509,17 +509,13 @@ def solve_outer(
             merit = 0.5 * float(
                 jnp.vdot(scaled_residual, scaled_residual).real
             )
-            root_step = trust_kernel(
+            _, root_gradient = plan.root_diagnostics(
                 coordinates,
                 residual_scale,
-                jnp.asarray(radius, coordinates.dtype),
-                jnp.zeros_like(coordinates),
-                jnp.asarray(False),
                 plan.context,
             )
             outer_map_evaluations += 1
-            linear_iterations += int(root_step[10])
-            gradient_norm = float(root_step[2])
+            gradient_norm = float(root_gradient)
             deltas.append(outer_residual)
             if not energies or energies[-1] != current_energy:
                 energies.append(current_energy)
@@ -575,16 +571,12 @@ def solve_outer(
             shadow_merit = 0.5 * float(
                 jnp.vdot(shadow_scaled, shadow_scaled).real
             )
-            shadow_step = trust_kernel(
+            _, shadow_gradient = plan.root_diagnostics(
                 jnp.asarray(shadow_coordinates),
                 residual_scale,
-                jnp.asarray(radius, coordinates.dtype),
-                jnp.zeros_like(coordinates),
-                jnp.asarray(False),
                 plan.context,
             )
             outer_map_evaluations += 1
-            linear_iterations += int(shadow_step[10])
             deltas.append(shadow_outer_residual)
             energies.append(shadow_energy)
             return OuterSolveResult(
@@ -595,7 +587,7 @@ def solve_outer(
                 tuple(energies),
                 shadow_outer_residual,
                 shadow_merit,
-                float(shadow_step[2]),
+                float(shadow_gradient),
                 radius,
                 accepted + 1,
                 rejected,

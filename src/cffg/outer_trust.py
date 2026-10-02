@@ -78,7 +78,8 @@ def _make_trust_kernel(
             )
             return residual / residual_scale
         residual, jvp = jax.linearize(scaled, coordinates)
-        _, pullback = jax.vjp(scaled, coordinates)
+        # Transpose the same linear map instead of differentiating its primal twice.
+        pullback = jax.linear_transpose(jvp, jnp.zeros_like(coordinates))
         gradient = pullback(residual)[0]
         gradient_norm = jnp.linalg.norm(gradient)
         eps = jnp.finfo(coordinates.dtype).eps
@@ -147,8 +148,8 @@ def _make_trust_kernel(
 
         # Certify the truncated solve against the matrix-free Cauchy point.
         gg = jnp.vdot(gradient, gradient).real
-        bg = gauss_product(gradient)
-        gbg = jnp.vdot(gradient, bg).real
+        image_gradient = jvp(gradient)
+        gbg = jnp.vdot(image_gradient, image_gradient).real
         boundary_alpha = radius / jnp.where(
             gradient_norm != 0.0, gradient_norm, 1.0
         )
@@ -174,7 +175,10 @@ def _make_trust_kernel(
             radius / jnp.where(candidate_norms != 0.0, candidate_norms, 1.0),
         )
         candidates = candidate_scales[:, None] * candidates
-        candidate_predictions = jax.vmap(predicted)(candidates)
+        fixed_image = jvp(fixed_point_step)
+        fixed_weights = fractions * candidate_scales
+        candidate_images = fixed_weights[:, None] * fixed_image
+        candidate_predictions = -(candidates @ gradient + .5 * jnp.sum(candidate_images * candidate_images, axis=1))
         best = jnp.argmax(candidate_predictions)
         fixed_point_step = candidates[best]
         fixed_point_prediction = candidate_predictions[best]
@@ -208,9 +212,16 @@ def _make_trust_kernel(
         accelerated_candidates = (
             accelerated_scales[:, None] * accelerated_candidates
         )
-        accelerated_predictions = jax.vmap(predicted)(
-            accelerated_candidates
-        )
+        def accelerated_predictions_for(_):
+            image_accelerated, image_step = jvp(accelerated_step), jvp(step)
+            images = accelerated_scales[:, None] * (
+                blend_fractions[:, None] * image_accelerated
+                + (1. - blend_fractions[:, None]) * image_step)
+            return -(accelerated_candidates @ gradient + .5 * jnp.sum(images * images, axis=1))
+
+        accelerated_predictions = jax.lax.cond(
+            has_accelerated_step, accelerated_predictions_for,
+            lambda _: jnp.zeros_like(blend_fractions), operand=None)
         accelerated_best = jnp.argmax(accelerated_predictions)
         use_accelerated = has_accelerated_step & (
             accelerated_predictions[accelerated_best] > predicted(step)
