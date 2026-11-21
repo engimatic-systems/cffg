@@ -3307,6 +3307,30 @@ distinct per-instance parameters/observations, and Colony certificates have
 separate anchors in `test_nonlinear_engine.py`.
 
 
+### D13.6 A directed solution on the reactor chain
+
+In the PR 185 reactor fixture each transition chooses its Taylor coefficients
+from its input cavity. Removing that transition disconnects the upstream
+state and its local observation from every downstream goal. A forward filter
+therefore determines the coefficients at every transition in order. For
+filtered mean and covariance $(m,P)$, its outgoing predictive is
+$N(g(m), A P A^T + Q)$, where $A$ is the Jacobian at $m$. A backward
+Gaussian likelihood pass with these coefficients returns all remaining
+transition messages, including the influence of the future goals on the
+current coolant decision. Reapplying D13 at these cavities reproduces the
+same coefficients. The frozen surrogate is a normalized Gaussian chain, so
+its Bethe ledger at this fixed point equals the negative log likelihood of
+the bound observations and goal data under that surrogate.
+
+The independent CPU reference in `tools/benchmark_cstr_chain.py` uses the
+fixture's original RK4 function and Jacobian, checks both directions by
+integrating each two-state Gaussian, and compares the node/edge ledger with
+the sum of the innovation log losses. Its `--stock-rules` check evaluates
+the registered local equations. This reference covers the float64 positive-noise
+Taylor fixture. The mutually changing cubic-sensor cavities in D13.5 violate
+the prefix dependency used by the proof. Automatic schedule selection and
+production execution retain the existing D13.5 path.
+
 ## D14 — Total derivatives of an adaptive neural fixed point
 
 The network is the conditional mean in D13, with positive Gaussian output
