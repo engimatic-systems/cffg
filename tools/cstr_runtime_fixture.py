@@ -70,9 +70,9 @@ def install_mean():
                                              lambda di, do, cfg: {"network_parameters": 4}))
 
 
-def model(method="linearization"):
+def model(method="linearization", *, horizon=HORIZON):
     install_mean()
-    template = Template(name="nlwindow_p4_h15_d4")
+    template = Template(name=f"nlwindow_p4_h{horizon}_d4")
     identity = np.eye(4)
     noise = np.diag([1e-5, 1e-5, 4e-6, .25])
     arrays = dict(theta=PARAMETERS.copy(), Q=noise, Qp=noise.copy(), m0=np.zeros(4),
@@ -90,10 +90,10 @@ def model(method="linearization"):
 
     template.factors["prior"] = FactorSpec("prior", "gaussian", {"out": variable("s0")},
                                            param_blobs={"mean": "m0", "cov": "P0"})
-    for index in range(PAST + HORIZON + 1):
+    for index in range(PAST + horizon + 1):
         kind = "past" if index < PAST else "now" if index == PAST else "goal"
         emission, source = f"s{index}", None
-        if index < PAST + HORIZON:
+        if index < PAST + horizon:
             source, emission = variable(f"s{index}c"), variable(f"s{index}o")
             template.factors[f"eq{index}"] = FactorSpec(
                 f"eq{index}", "equality", {"a": f"s{index}", "b": source, "c": emission})
@@ -116,7 +116,7 @@ def make_engine(method="linearization"):
     return Engine(compile_template(template, arrays=arrays)), template, arrays
 
 
-def observations(change=0, *, history=False, goal=0.):
+def observations(change=0, *, history=False, goal=0., horizon=HORIZON):
     """Source-normalized initial window; changes/history are labeled synthetic."""
     lower, upper = np.array(CONFIGURATION["x_lo"]), np.array(CONFIGURATION["x_hi"])
     current = 2 * (np.array([.8, 330.]) - lower) / (upper - lower) - 1
@@ -124,7 +124,7 @@ def observations(change=0, *, history=False, goal=0.):
     data = {f"e{i}": (np.r_[current + (PAST - i) * np.array([-.01, .01]), -.5]
                        if history else None) for i in range(PAST)}
     data[f"e{PAST}"] = current
-    data.update({f"e{i}": np.array([goal, 0.]) for i in range(PAST + 1, PAST + HORIZON + 1)})
+    data.update({f"e{i}": np.array([goal, 0.]) for i in range(PAST + 1, PAST + horizon + 1)})
     return data
 
 
