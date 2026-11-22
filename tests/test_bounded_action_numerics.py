@@ -311,3 +311,16 @@ def test_public_wide_and_narrow_tail_quadrature(dtype, lo, hi, ref):
     assert out.status == 0
     np.testing.assert_allclose([out.log_mass, out.command, out.covariance[0, 0], out.action_entropy],
                                ref, rtol=128*np.finfo(dtype).eps)
+
+
+@pytest.mark.parametrize("dtype", DTYPES)
+def test_dense_covariance_accepts_roundoff_and_rejects_material_asymmetry(dtype):
+    from cffg.bounded_actions import BoundedGaussianPlan, BoundStatus
+
+    plan = BoundedGaussianPlan((1,), (-1.,), (1.,))
+    m, cov = np.zeros(3, dtype), np.eye(3, dtype=dtype)
+    cov[1, 2] = np.finfo(dtype).eps
+    assert plan.solve_joint(m, cov, 0.).status == BoundStatus.SUCCESS
+    cov[1, 2] = .02
+    bad = plan.solve_joint(m, cov, 0.)
+    assert bad.status == BoundStatus.INVALID_GAUSSIAN and np.isnan(bad.command)

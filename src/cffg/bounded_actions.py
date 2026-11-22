@@ -10,6 +10,8 @@ import numpy as np
 from jax.scipy.special import logsumexp, log_ndtr
 from jax.scipy.linalg import block_diag
 
+from cffg.efrules import _symmetry_ok
+
 
 class BoundStatus(IntEnum):
     SUCCESS = 0
@@ -79,7 +81,7 @@ def _integrate(mean, chol, low, high, rule):
 
 def _block(mean, cov, low, high):
     chol = jnp.linalg.cholesky(cov)
-    valid = (jnp.isfinite(chol).all() & jnp.isfinite(mean).all() & (cov == cov.T).all())
+    valid = (jnp.isfinite(chol).all() & jnp.isfinite(mean).all() & _symmetry_ok(cov))
     coarse, fine = (_integrate(mean, chol, low, high, rule) for rule in (_SCALAR_RULES if mean.size == 1 else _RULES))
     mass, action, variance, entropy = fine
     tol = 128 * jnp.finfo(mean.dtype).eps
@@ -148,14 +150,13 @@ class BoundedGaussianPlan:
         n = self.widths[0]
         if mean.ndim != 1 or mean.size < n or covariance.shape != (mean.size, mean.size):
             raise ValueError("joint Gaussian dimensions disagree")
+        valid = _symmetry_ok(covariance) & jnp.isfinite(covariance).all()
+        covariance = jnp.where(valid, covariance / 2 + covariance.T / 2, jnp.nan)
         marginal = covariance[:n, :n]
         if mean.size == n:
             return self.solve(mean, (marginal,), gaussian_free_energy)
         gain = jnp.linalg.solve(marginal, covariance[:n, n:]).T
         conditional = covariance[n:, n:] - gain @ covariance[:n, n:]
-        # Remove solve roundoff only after checking the supplied joint matrix.
-        valid = (covariance == covariance.T).all() & jnp.isfinite(covariance).all()
-        conditional = jnp.where(valid, conditional / 2 + conditional.T / 2, jnp.nan)
         return self.solve(mean[:n], (marginal,), gaussian_free_energy,
                           state_mean=mean[n:], state_gain=gain,
                           conditional_covariance=conditional)
@@ -209,8 +210,9 @@ class BoundedGaussianPlan:
             gain, c = (jnp.asarray(a, dtype) for a in (state_gain, conditional_covariance))
             if gain.shape != (mx.size, n) or c.shape != (mx.size, mx.size):
                 raise ValueError("conditional Gaussian shape mismatch")
-            valid &= (jnp.isfinite(jnp.linalg.cholesky(c)).all() & (c == c.T).all()
+            valid &= (jnp.isfinite(jnp.linalg.cholesky(c)).all() & _symmetry_ok(c)
                       & jnp.isfinite(gain).all() & jnp.isfinite(mx).all())
+            c = c / 2 + c.T / 2
             cross = gain @ variance
             variance = jnp.block([[variance, cross.T], [cross, c + cross @ gain.T]])
             action = jnp.concatenate((action, mx + gain @ (action - mean)))
