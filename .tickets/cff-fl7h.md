@@ -1,6 +1,6 @@
 ---
 id: cff-fl7h
-status: open
+status: in_progress
 deps: [cff-nd1q]
 links: []
 created: 2026-09-25T03:46:26Z
@@ -53,3 +53,11 @@ Shared terms: CFFG means constrained Forney-style factor graph; JAX is the numer
 **2026-11-22T03:42:58Z**
 
 D15 in docs/DERIVATIONS.md supplies the v1 handoff. Represent the finite hard box once in a closed frozen Gaussian region; proper full-rank cavity, finite positive widths, and certified marginal action blocks of size 1 or 2 (any number of structurally independent blocks and nuisance states). Use the first bounded joint mean as the command. Check state/action cross-covariances and F_G minus the log box mass. Reject larger correlated blocks, unrepresentable arithmetic, unsupported external non-Gaussian messages and singular/invalid cavities with explicit status. A finite flat local cavity is a separate uniform unit-message case without an absolute baseline evidence. Mode is a separate oracle. Implement the D15.6 matched short-horizon ablation and hostile cases before publishing model capabilities; any fully bounded fifteen-step reactor needs a method for dense correlated boxes. Inspect current/legacy template and checkpoint, host/JIT, single/vmap and flood/scheduled execution when a persistent factor is added.
+
+**2026-11-22T19:47:10Z**
+
+Change paths: New factor or rule family / New IR field checked. Closed standalone frozen-region model with explicit independent Gaussian priors and conditional state model. Arena packing, template/checkpoint changes, engine flooding/scheduled, external separators N/A. Host/JIT/vmap use the same pure solve. Empty box, improper/nonfinite Gaussian, unresolvable tails and float32 moments fail closed. Test independent structural blocks at horizon 15, dense >2 rejected; parent owns full suite and directed integration.
+
+**2026-11-22T19:51:00Z**
+
+Implemented closed D15 region in d6b13b4; matched coolant example and README in 48944bc. BoundedGaussianPlan.solve_joint accepts one dense <=2D bounded action block first and arbitrary trailing states. solve accepts structural product action marginals plus shared affine state conditional. Bind either method for JIT/vmap. F_G is required from the caller. No inference schedule or adaptive-site integration. Focused validation on feature/bounded-actions: UV_PROJECT_ENVIRONMENT=/Users/ravd/projects/cffg/.venv PYTHONPATH=$PWD/src uv run --no-sync pytest -q tests/test_bounded_action_{numerics,derivation}.py: 60 passed in 7.79s. Same environment, uv run --no-sync python examples/bounded_coolant.py: clipped/bounded first 298.5/297.38750 K, tracking 1.0/0.682142, penalty 2.630977 nats. git diff --check passed and tk dep cycle found no cycles. Parent owns integration and final short suite. Leave in progress until parent records gate and closes.
