@@ -387,6 +387,24 @@ the complete adaptive residual and energy change, while
 `objective_metadata` labels the surrogate's narrower meaning. See
 [examples/nonlinear_gaussian.py](examples/nonlinear_gaussian.py).
 
+For a CPU Taylor chain with a Gaussian prior and a linear DATA emission at
+each time, the default engine can solve both message directions in one pass
+each. Pass a positive iteration budget and a tolerance. Inspect the method
+that actually certified the result before comparing timings.
+
+```python
+result = engine.run(bound_state, n_iters=100, tol=1e-6)
+state = result.require_converged()
+mean, covariance = engine.gaussian_marginal(state, action_edge)
+method = result.termination_reason.value  # "directed_chain_certified" on this route
+```
+
+The directed solver checks every message and the frozen Bethe objective at
+the answer and its successor. Missing observations and partial goals are
+supported. For a matched coupled-solver reference on the same graph, pass
+`outer_solver="trust_region"`. The single-edge readout also works with that
+reference. It reads the named edge in the model's own units.
+
 Fresh neutral adaptive sites can wait for partial input information during
 bounded startup; those sweeps count toward `n_iters`. Invalid models and
 established sites remain strict. Unresolved startup reports budget exhaustion

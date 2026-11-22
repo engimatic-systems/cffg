@@ -14,6 +14,8 @@ class OuterTerminationReason(str, Enum):
 
     NOT_RUN = "not_run"
     ROOT_CONVERGED = "root_converged"
+    DIRECTED_CHAIN_CERTIFIED = "directed_chain_certified"
+    DIRECTED_CHAIN_UNCERTIFIED = "directed_chain_uncertified"
     STATIONARY_NONROOT = "stationary_nonroot"
     INNER_FAILURE = "inner_failure"
     NONFINITE_EVALUATION = "nonfinite_evaluation"
@@ -115,6 +117,7 @@ class RunResult:
     linear_iterations: int = 0
     solver_compilations: int = 0
     failure: FailureDiagnostic | None = None
+    directed_attempts: int = 0
 
     @property
     def delta_trace(self) -> tuple[float, ...]:

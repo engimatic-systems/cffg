@@ -484,7 +484,7 @@ def replay(engine, binder, base, arrays, record, report):
             report["same_state"] = audit(engine, bound, candidate["messages"])
         except Exception:
             report["same_state_error"] = traceback.format_exc()
-    stock = engine.run(bound, fixture.BUDGET, tol=fixture.TOLERANCE)
+    stock = engine.run(bound, fixture.BUDGET, tol=fixture.TOLERANCE, outer_solver="trust_region")
     report.update(stock_status=stock.status.value, stock_reason=stock.termination_reason.value,
                   stock_failure=str(stock.failure) if stock.failure else None, iterations=stock.iterations,
                   stock_reported_root=stock.outer_residual, stock_reported_residual=stock.residual)

@@ -20,6 +20,30 @@ from cffg.readouts.views import (
 from cffg.runtime_types import State
 
 
+def gaussian_marginal(view: GaussianView, state: State, edge: str):
+    """Host readout for a controller requesting one proper Gaussian edge."""
+    info = view.edges[edge]
+    if not info.dim:
+        raise ValueError(f"edge {edge!r} is not Gaussian")
+    slots = (info.slot0, info.slot1)
+    eta = np.asarray(state.g_eta)[view.g_eta_indices(slots, info.dim)].sum(axis=0)
+    precision = np.asarray(state.g_lam)[view.g_lam_indices(slots, info.dim)].sum(axis=0)
+    if np.isfinite(eta).all() and ef.GAUSSIAN.symmetry_ok(precision):
+        try:
+            symmetric = (precision + precision.T) / 2
+            chol = np.linalg.cholesky(symmetric)
+            sign, logdet = np.linalg.slogdet(symmetric)
+            if sign > 0 and np.isfinite(logdet):
+                # Use the same proper, unregularized Cholesky system as gauss.moments.
+                rhs = np.column_stack((eta, np.eye(info.dim, dtype=eta.dtype)))
+                moments = np.linalg.solve(chol.T, np.linalg.solve(chol, rhs))
+                if np.isfinite(moments).all():
+                    return moments[:, 0], moments[:, 1:]
+        except np.linalg.LinAlgError:
+            pass
+    return np.full_like(eta, np.nan), np.full_like(precision, np.nan)
+
+
 def gaussian_marginals(
     view: GaussianView, state: State
 ) -> dict[str, tuple[np.ndarray, np.ndarray]]:

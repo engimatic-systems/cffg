@@ -90,7 +90,13 @@ def run_certified(engine, state, dtype):
     # The residual metric freezes whitening at solve entry, not at the result.
     with patch.object(outer, "build_outer_chart", side_effect=capture_chart):
         result = engine.run(state, 60, tol=1e-6)
-    assert_certificate(engine, result, dtype, charts[-1])
+    if result.termination_reason.value == "directed_chain_certified":
+        state = result.state
+        arrays = OuterArrays(state.messages, state.g_eta, state.g_lam, state.ef_eta)
+        chart = build_outer_chart(engine.arena, arrays, engine._outer_eliminated)
+    else:
+        chart = charts[-1]
+    assert_certificate(engine, result, dtype, chart)
     return result
 
 

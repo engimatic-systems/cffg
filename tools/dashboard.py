@@ -78,7 +78,7 @@ EPIC_FILES = {
         "test_hybrid_planning.py",
         "test_cstr_planning.py",
         "test_cstr_envelope.py",
-        "test_cstr_runtime.py",
+        "test_cstr_runtime.py", "test_directed_chain_plan.py", "test_directed_chain_run.py",
         "test_gaussian_readiness.py",
         "test_adaptive_startup.py",
         "test_outer_coordinates.py",
