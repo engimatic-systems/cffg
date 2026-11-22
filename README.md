@@ -423,6 +423,28 @@ constraint. Use `--save model.cffgz` to save sources and arrays, then install th
 trusted callback with `install_mean()` before `load_bundle()`; supply DATA
 bindings separately.
 
+For a **frozen Gaussian plan with actuator limits**, declare the hard box and
+supply the joint Gaussian in action-then-state order. The first action is the
+conditional mean under the entire box. For example, a two-command horizon is
+
+```python
+from cffg.bounded_actions import BoundedGaussianPlan, BoundStatus
+
+box = BoundedGaussianPlan((2,), (-1., -1.), (1., 1.))
+result = box.solve_joint(mean, covariance, gaussian_free_energy)
+if result.status == BoundStatus.SUCCESS:
+    command = result.command
+```
+
+Supply the complete free energy of the unbounded frozen region in nats.
+`result.free_energy` includes its box correction once. When the model provides
+structurally independent Gaussian action marginals, use `box.solve` with
+one covariance matrix per declared width and optional affine conditional
+state parameters. Multiple independent blocks can share a downstream state.
+The declaration round-trips through `to_dict` and `from_dict`. Run
+`uv run python examples/bounded_coolant.py` for a matched two-command
+surrogate in 295–302 K coolant units.
+
 `neural_mean` creates a portable dense MLP specification and
 `initialize_neural_parameters` creates its arrays. `FixedPointDifferentiator`
 or `fixed_point_gradient` differentiates the certified adaptive root and
