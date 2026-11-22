@@ -117,6 +117,12 @@ def primary(control, seeds, tie, draws):
         [[row["seed"], number(row["control"]["long"]["arms"]["cffg"]["return_sum"], 8),
           *(number(row["control"]["long"]["paired"][peer]["delta"], 7, signed=True) for peer in PEERS)]
          for row in seeds])
+    short = control["short"]["paired"]
+    short_wins = [f'{NAMES[peer]} on {short[peer]["positive"]} of {short[peer]["n"]} seeds'
+                  for peer in ("numpyro", "gtsam")]
+    short_finding = "Over 59 decisions, CFFG earned a higher return than " + " and ".join(short_wins) + ". "
+    if all(short[peer]["ci95"][0] < 0 < short[peer]["ci95"][1] for peer in ("numpyro", "gtsam")):
+        short_finding += "Both 95% intervals for the mean return difference cross zero. "
     return "".join([
         '<section id="returns"><h2>599-decision return</h2>',
         f'<p class="takeaway">{" ".join(findings)}</p>',
@@ -128,6 +134,8 @@ def primary(control, seeds, tie, draws):
         f'{draws:,} resamples of whole paired seeds and applies to one comparison at a time. '
         'Relative change divides each seed’s difference by the magnitude of its peer return and averages '
         'over seeds with a nonzero peer return.</p>',
+        f'<p>{short_finding}The long schedule adds setpoint changes and varies how long each target '
+        'is held, so the comparison cannot isolate the effect of episode duration.</p>',
         details("Inspect every seed’s 599-decision return difference", seed_table),
         details("Compare the shorter 59-decision episodes", paired_table("short", control["short"])),
         '</section>'])
