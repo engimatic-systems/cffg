@@ -423,7 +423,44 @@ constraint. Use `--save model.cffgz` to save sources and arrays, then install th
 trusted callback with `install_mean()` before `load_bundle()`; supply DATA
 bindings separately.
 
-For a **frozen Gaussian plan with actuator limits**, declare the hard box and
+For a **directed CFFG reactor plan with actuator limits**, declare the constrained
+coordinates on the source template. In a four-history, two-command window the
+coolant is coordinate 3 of each transition input. Bounds use the graph's
+normalized units, where −1 and +1 correspond to 295 and 302 K.
+
+```python
+from cffg.bounded_chain import BoundedChainRegion, BoundedCoordinate
+from cffg.bounded_actions import BoundStatus
+
+region = BoundedChainRegion(template, (
+    BoundedCoordinate("s4c", 3, -1., 1.),
+    BoundedCoordinate("s5c", 3, -1., 1.),
+))
+engine = region.compile(arrays=arrays)
+# Bind the usual window DATA to this engine's state before running it.
+result = engine.run(bound_state, 100, tol=1e-6)
+decision = region.evaluate(engine, result)
+if decision.bounded.status == BoundStatus.SUCCESS:
+    coolant_kelvin = 298.5 + 3.5 * float(decision.bounded.command)
+```
+
+The evaluator derives the trajectory covariance and normalized objective from
+the certified directed result's live parameters, observations and transition
+cavities. It raises on an unsupported declaration, foreign or uncertified
+result, or failed certificate check. The declaration travels as a JSON-compatible
+`region.to_dict()` document containing the source template, variable names,
+coordinates and bounds. Restore it with `BoundedChainRegion.from_dict`;
+`region.scoped(prefix)` renames the whole model and its selected edges together.
+Supply the referenced blob arrays or root at compilation, and install the
+registered mean implementation before loading the declaration.
+
+Run `uv run python tools/cstr_bounded_comparison.py` for the actual P4/H2
+four-substep RK4 reactor comparison. Both readouts share the same directed
+solve and available observations, including the missing history. The example
+reports each command, normalized objective and physical one-step tracking error.
+A connected chain can constrain one or two action coordinates.
+
+For a separately supplied **frozen Gaussian plan with actuator limits**, declare the hard box and
 supply the joint Gaussian in action-then-state order. The first action is the
 conditional mean under the entire box. For example, a two-command horizon is
 

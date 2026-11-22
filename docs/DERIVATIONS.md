@@ -3649,5 +3649,10 @@ and [Genz (1992)](https://doi.org/10.1080/10618600.1992.10477010).
 The public frozen-region implementation is `cffg.bounded_actions`. The
 `test_public_*` and `test_dense_joint_and_independent_blocks_keep_full_state_correlations`
 cases in the two files above exercise its status, moments, energy, declaration
-round trip and staged execution. The matched two-command coolant fixture is
+round trip and staged execution. The graph-backed anchor
+`tests/test_bounded_chain.py::test_reactor_joint_and_live_data_match_independent_precision`
+assembles the complete P4/H2 reactor precision and canonical normalizer
+independently, checks two DATA bindings, then integrates the selected action
+pair. Run `tools/cstr_bounded_comparison.py` for the matched RK4 comparison.
+The quadratic two-command coolant fixture is
 `examples/bounded_coolant.py`.

@@ -216,6 +216,13 @@ that every gap below will be implemented:
   a two-command tracking fixture. Its tracking change does not establish a
   reactor reward or deadline improvement. Numerical quadrature can return a
   failure for sharply correlated, broad or nearly unit-mass pairs.
+  The graph-backed evaluator requires a certified CPU directed-chain result
+  issued by the declaration's compiled engine. Only interior nonterminal state
+  legs can name commands. State coordinates are lifted around the frozen
+  Taylor coefficients of that result. On the retained H2 initial window,
+  conditioning increased the first coolant command by about 0.672 K and the
+  absolute one-step concentration tracking error by about 0.00106 in physical
+  concentration units. This example evaluates one common initial plant state.
   The original failed CSTR invocation was not retained; wide-prior tests are
   mechanism reproductions, not incident replay or a proven noise threshold.
   The later retained native validation is separately reproduced by

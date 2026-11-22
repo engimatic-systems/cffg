@@ -2125,7 +2125,22 @@ against the action covariance. The factorized path in `solve` takes the
 independent action covariances and shared state conditional directly. It never
 selects a partition by thresholding observed correlations.
 
-The same JAX program runs eagerly, under JIT and under vmap. It batches
+The graph-backed `BoundedChainRegion` transports the complete source template
+and an ordered edge/coordinate selection. Compilation checks directed
+recognition for the whole source and resolves equality leg aliases to unique
+nonterminal trajectory coordinates. Its engine records result identity for
+the lifetime of each result. Evaluation reconstructs the full trajectory from
+the returned state's live prior, normalized linear observations and registered
+Taylor evaluations at the directed plan's transition-input cavity slots.
+Appending the joint cross-covariance and conditioning all past states on each
+present observation gives the smoothed Gaussian. Summing innovation costs
+gives its normalized evidence. The directed certificate rechecks that evidence
+and both ledgers on the supplied state before box conditioning. Output order
+lists the selected actions first, followed by remaining time-major coordinates.
+Missing DATA outputs integrate to one. This readout is host-driven and stages
+the final box solve.
+
+The same box kernel runs eagerly, under JIT and under vmap. It batches
 equal-width integrals and checks two quadrature orders for agreement before
 lifting centered moments. A non-success status masks every decision readout.
 The region owns its full objective, including the single log-mass adjustment.
