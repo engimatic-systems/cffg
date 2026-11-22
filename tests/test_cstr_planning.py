@@ -251,3 +251,70 @@ def test_tenfold_horizon_preserves_strict_partial_input_validation():
     result = strict_failure(engine, engine.bind_data(engine.init_state(), data), 4)
     assert_partial_cavity(engine, result)
     assert result.iterations == 1
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_directed_certificate_checks_every_packed_site_and_successor_ledger(dtype):
+    """One identity transition with unit noises and two observed terminal coordinates."""
+    from cffg.directed_chain_certificate import certify
+
+    with jax.enable_x64(dtype is np.float64):
+        template, arrays, _ = planning_fixture(past=0, horizon=1, affine=True, dtype=dtype)
+        identity = np.eye(4, dtype=dtype)
+        arrays.update(theta=np.r_[identity.ravel(), np.zeros(4, dtype=dtype)],
+                      Qp=identity, P0=identity, R_goal=identity[:2, :2], R_now=identity[:2, :2])
+        engine = Engine(compile_template(template, arrays=arrays), schedule="flood")
+        state = engine.bind_data(engine.init_state(), {"e0": None, "e1": np.zeros(2)})
+        # Both observed coordinates have predictive variance 3 (prior + process + sensor).
+        cost = np.log(2 * np.pi * 3)
+        goal = arrays["G_goal"].T @ arrays["G_goal"]
+        precisions = {
+            ("prior", "out"): identity,
+            ("eq0", "a"): goal / 2, ("eq0", "b"): identity, ("eq0", "c"): identity + goal / 2,
+            ("tr1", "in"): goal / 2, ("tr1", "out"): identity / 2,
+            ("em0", "in"): np.zeros_like(identity), ("em0", "out"): np.diag([3 / 5, 1 / 2]),
+            ("em1", "in"): goal, ("em1", "out"): np.eye(2) / 3,
+        }
+        coordinates = {}
+        precision = np.zeros_like(state.g_lam)
+        for group in engine.arena.gauss_groups:
+            for name, slots in zip(group.members, group.scatter, strict=True):
+                for role, dim, slot in zip(group.roles, group.dims, slots, strict=True):
+                    coordinates[name, role] = engine.arena.g_eta_indices(slot, dim)[0]
+                    precision[engine.arena.g_lam_indices(slot, dim)] = precisions[name, role]
+        state = _replace(state, g_lam=jnp.asarray(precision))
+        centers = []
+
+        def linearize(member, center, theta):
+            assert member == "tr1"
+            centers.append(center.copy())
+            matrix = theta[:16].reshape(4, 4)
+            return matrix, matrix @ center + theta[16:]
+
+        tolerance = 64 * np.finfo(dtype).eps
+
+        def check(candidate, evidence=cost):
+            return certify(engine.arena, candidate, linearize, evidence, tolerance)
+
+        checked = check(state)
+        assert checked.passed and checked.residual <= tolerance
+        np.testing.assert_allclose([checked.free_energy, checked.successor_free_energy], cost, atol=tolerance)
+        assert not check(state, cost + 1).passed
+        for key, coordinate in coordinates.items():
+            centers.clear()
+            altered = _replace(state, g_eta=state.g_eta.at[coordinate].set(1))
+            checked = check(altered)
+            assert not checked.passed and checked.residual >= 0.5, key
+            if key == ("eq0", "a"):
+                # Only the prior receives this displaced eta. Its variance is
+                # 2/3 and its new expected quadratic cost increases by (2/3)^2/2.
+                np.testing.assert_allclose(checked.free_energy, cost + 2 / 9, atol=tolerance)
+                np.testing.assert_allclose(checked.successor_free_energy, cost, atol=tolerance)
+            if key == ("eq0", "b"):
+                assert [x[0] for x in centers] == [1, 0]
+
+        # In an unobserved direction the joint's two near-collinear blocks
+        # cancel at working precision despite a finite covariance-form prediction.
+        scale = dtype(4 / np.sqrt(np.finfo(dtype).eps))
+        with pytest.raises(np.linalg.LinAlgError):
+            certify(engine.arena, state, lambda _, x, t: (scale * identity, scale * x), cost, tolerance)
