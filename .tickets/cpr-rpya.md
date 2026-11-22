@@ -1,6 +1,6 @@
 ---
 id: cpr-rpya
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-11-22T02:01:05Z
@@ -39,3 +39,7 @@ A site is a variable together with its incoming Gaussian messages. A belief is t
 **2026-11-22T02:02:35Z**
 
 At 80ae1f2 both checkers accept 296.459723 K and a perturbed 310.459723 K with identical residuals and energies within each mode. Source, commands and JSON are in ~/agent-share/cffg-premerge-review/late/.
+
+**2026-11-22T02:30:34Z**
+
+check_candidate now checks belief count, shapes, means and covariances against each posterior reconstructed from verified messages. Its ledger and returned coolant use those reconstructed values. Both check modes reject the 14 K alteration, covariance perturbation and a missing belief in the focused opt-in test. Independent engine audit passed all nine historical windows and rejected stale history on both paths. Reproduce via uv run pytest -m slow tests/test_cstr_runtime.py -k binds_supplied and the check_all.py driver from the cold-start report. Evidence at ~/agent-share/cffg-reactor-pilot/corrected-nine-windows.json. This change is isolated to the reference tool and regression.

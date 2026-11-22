@@ -87,8 +87,8 @@ def solve(arrays, data):
 
 
 def posterior(site):
-    eta = sum(pair[0] for pair in site.values())
-    precision = sum(pair[1] for pair in site.values())
+    eta = site["pred"][0] + site["obs"][0] + site["future"][0]
+    precision = site["pred"][1] + site["obs"][1] + site["future"][1]
     covariance = symmetric(np.linalg.solve(precision, np.eye(len(eta))))
     np.linalg.cholesky(covariance)
     return np.linalg.solve(precision, eta), covariance
@@ -150,6 +150,22 @@ def gaussian_cost(error, covariance, noise):
 
 def check_candidate(arrays, data, messages, beliefs, evidence_cost, *, stock_rules=False):
     """Check all sites against the bound data and sum the frozen Bethe ledger."""
+    def mismatch(actual, reference):
+        if np.shape(actual) != np.shape(reference):
+            raise ArithmeticError("Candidate shape differs from reference")
+        error = np.max(np.abs(actual - reference) / (1 + np.abs(reference)))
+        if not np.isfinite(error):
+            raise ArithmeticError("Nonfinite message mismatch")
+        return float(error)
+
+    if len(messages) != PAST + HORIZON + 1 or len(beliefs) != len(messages):
+        raise ArithmeticError("Expected one message site and belief for every reactor time step")
+    posteriors = [posterior(site) for site in messages]
+    for index, (belief, (mean, covariance)) in enumerate(zip(beliefs, posteriors, strict=True)):
+        actual_mean, actual_covariance = belief
+        if max(mismatch(actual_mean, mean), mismatch(actual_covariance, covariance)) > TOLERANCE:
+            raise ArithmeticError(f"Belief at time step {index} disagrees with its messages")
+
     left = [(s["pred"][0] + s["obs"][0], s["pred"][1] + s["obs"][1]) for s in messages[:-1]]
     right = [(s["future"][0] + s["obs"][0], s["future"][1] + s["obs"][1]) for s in messages[1:]]
     noise = np.stack([arrays["Q"]] * PAST + [arrays["Qp"]] * HORIZON)
@@ -159,12 +175,6 @@ def check_candidate(arrays, data, messages, beliefs, evidence_cost, *, stock_rul
     checked = jax.device_get(check(left_eta, left_precision, right_eta, right_precision, arrays["theta"], noise))
     if stock_rules and (not checked["proper"].all() or checked["status"].any()):
         raise ArithmeticError("An engine nonlinear rule rejected its proposed cavity")
-    def mismatch(actual, reference):
-        error = np.max(np.abs(actual - reference) / (1 + np.abs(reference)))
-        if not np.isfinite(error):
-            raise ArithmeticError("Nonfinite message mismatch")
-        return float(error)
-
     prior = natural(arrays["m0"], arrays["P0"])
     residual = max(mismatch(value, ref) for value, ref in zip(messages[0]["pred"], prior, strict=True))
     for value in messages[-1]["future"]:
@@ -178,9 +188,9 @@ def check_candidate(arrays, data, messages, beliefs, evidence_cost, *, stock_rul
     # Unary-local entropies cancel their share of the edge corrections.
     # Each internal state still contributes one entropy between its two transitions.
     energy = checked["energy"].sum() + gaussian_cost(
-        beliefs[0][0] - arrays["m0"], beliefs[0][1], arrays["P0"])
-    for index, (mean, covariance) in enumerate(beliefs):
-        if 0 < index < len(beliefs) - 1:
+        posteriors[0][0] - arrays["m0"], posteriors[0][1], arrays["P0"])
+    for index, (mean, covariance) in enumerate(posteriors):
+        if 0 < index < len(posteriors) - 1:
             chol = np.linalg.cholesky(covariance)
             energy += .5 * len(mean) * (1 + np.log(2 * np.pi)) + np.log(np.diag(chol)).sum()
         observation = data[f"e{index}"]
@@ -200,7 +210,8 @@ def check_candidate(arrays, data, messages, beliefs, evidence_cost, *, stock_rul
     error = abs(energy - evidence_cost) / (1 + abs(evidence_cost))
     if not np.isfinite(error) or error > TOLERANCE or residual > TOLERANCE:
         raise ArithmeticError(f"Directed chain check failed: residual={residual}, ledger error={error}")
-    return dict(local_message_residual=float(residual), ledger=float(energy), ledger_error=float(error))
+    return dict(local_message_residual=float(residual), ledger=float(energy), ledger_error=float(error),
+                coolant_kelvin=float(298.5 + 3.5 * posteriors[PAST][0][3]))
 
 
 def main():
@@ -220,7 +231,7 @@ def main():
     checks = check_candidate(arrays, data, messages, beliefs, energy, stock_rules=args.stock_rules)
     print(json.dumps(dict(check="engine_local_rules" if args.stock_rules else "joint_gaussians",
                           solve_seconds=solved - start, checked_seconds=time.perf_counter() - start,
-                          coolant_kelvin=298.5 + 3.5 * beliefs[PAST][0][3], evidence_cost=energy, **checks)))
+                          evidence_cost=energy, **checks)))
 
 
 if __name__ == "__main__":

@@ -64,3 +64,35 @@ def test_recent_sigma_point_startup_failure_is_not_masked_by_proposals():
     assert result.failure.reason == "improper_tilt" and result.failure.factor == "tr1"
     assert result.failure.phase == "startup" and result.failure.iteration == 2
     assert result.solver_compilations == 0
+
+
+@pytest.mark.slow
+def test_reactor_checker_binds_supplied_beliefs_and_action_to_the_messages(monkeypatch):
+    import os
+    import sys
+
+    monkeypatch.setattr(os, "environ", os.environ.copy())
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "tools"))
+    monkeypatch.setitem(sys.modules, "cstr_runtime_fixture", fixture)
+    import benchmark_cstr_chain as chain
+
+    _, arrays = fixture.model()
+    data = fixture.observations()
+    messages, cost = chain.solve(arrays, data)
+    beliefs = [chain.posterior(site) for site in messages]
+    index = fixture.PAST
+    mean, covariance = beliefs[index]
+    for stock in (False, True):
+        def check(candidate):
+            return chain.check_candidate(arrays, data, messages, candidate, cost, stock_rules=stock)
+
+        assert check(beliefs)["coolant_kelvin"] == 298.5 + 3.5 * mean[3]
+        altered = beliefs.copy()
+        altered[index] = (mean + np.array([0., 0., 0., 4.]), covariance)
+        with pytest.raises(ArithmeticError, match="disagrees"):
+            check(altered)
+        altered[index] = (mean, covariance * 1.1)
+        with pytest.raises(ArithmeticError, match="disagrees"):
+            check(altered)
+        with pytest.raises(ArithmeticError, match="every reactor time step"):
+            check(beliefs[:-1])
