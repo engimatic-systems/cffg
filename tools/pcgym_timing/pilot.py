@@ -184,6 +184,11 @@ def worker(args, destination):
         name: sha256((args.output / name).read_bytes()).hexdigest()
         for name in artifacts.get(args.arm, ()) if (args.output / name).exists()
     }
+    if args.arm == "gtsam":
+        metadata["native_binary_sha256"] = {
+            p.name: sha256(p.read_bytes()).hexdigest()
+            for p in (args.output / "gtsam" / "site").glob("_gtsam_cstr*.so")
+        }
     metadata["source_sha256"] = {p.name: sha256(p.read_bytes()).hexdigest() for p in files}
     manifest = destination / "manifest.json"
     save(manifest, metadata)
@@ -203,6 +208,9 @@ def worker(args, destination):
     before = perf_counter()
     adapter = module.Adapter(arrays, fixture.CONFIGURATION)
     setup = perf_counter()-before
+    if hasattr(adapter, "metadata"):
+        metadata["adapter"] = diagnostic(adapter.metadata)
+        save(manifest, metadata)
     try:
         if args.phase == "forecast":
             from forecast import run
