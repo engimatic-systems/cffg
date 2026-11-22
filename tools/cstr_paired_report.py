@@ -825,6 +825,8 @@ def write_report(root, pilot_path, replay):
         command += " --replay " + shlex.quote(str(replay))
     study_cmd = "uv run --frozen python tools/cstr_paired_study.py run --output NEW_ROOT/run"
     replay_cmd = "uv run --frozen python tools/cstr_paired_replay.py NEW_ROOT --output NEW_ROOT/replay"
+    bounds_link = ('<p><a href="bounded-actions.html">Derivation: planning inside actuator limits</a></p>'
+                   if (root / "bounded-actions.html").is_file() else "")
     content = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Paired reactor control study</title><style>
@@ -891,7 +893,7 @@ Each arm manifest records runtime, package versions, hardware, source hashes and
 <p>From the study checkout, reproduce in a fresh directory or regenerate this report from its saved files.</p>
 <pre><code>{esc(study_cmd)}
 {esc(replay_cmd)}
-{esc(command)}</code></pre></section></main></body></html>"""
+{esc(command)}</code></pre>{bounds_link}</section></main></body></html>"""
     with TemporaryDirectory(dir=root) as staging:
         stage = Path(staging)
         return_chart(episodes, stage)

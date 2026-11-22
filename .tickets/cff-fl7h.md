@@ -47,3 +47,9 @@ These are suggestions; another method is acceptable if it satisfies the outcomes
 Feasible action: one satisfying the declared limits. Extreme tail: a region with very small probability before truncation. Ledger: the assembled free-energy accounting.
 
 Shared terms: CFFG means constrained Forney-style factor graph; JAX is the numerical array/compiler library; dtype is a numeric storage type; free energy is the model's inference objective; host/JIT compares Python-side and compiled execution; single/vmap compares one instance with vectorized instances; N/A means not applicable.
+
+## Notes
+
+**2026-11-22T03:42:58Z**
+
+D15 in docs/DERIVATIONS.md supplies the v1 handoff. Represent the finite hard box once in a closed frozen Gaussian region; proper full-rank cavity, finite positive widths, and certified marginal action blocks of size 1 or 2 (any number of structurally independent blocks and nuisance states). Use the first bounded joint mean as the command. Check state/action cross-covariances and F_G minus the log box mass. Reject larger correlated blocks, unrepresentable arithmetic, unsupported external non-Gaussian messages and singular/invalid cavities with explicit status. A finite flat local cavity is a separate uniform unit-message case without an absolute baseline evidence. Mode is a separate oracle. Implement the D15.6 matched short-horizon ablation and hostile cases before publishing model capabilities; any fully bounded fifteen-step reactor needs a method for dense correlated boxes. Inspect current/legacy template and checkpoint, host/JIT, single/vmap and flood/scheduled execution when a persistent factor is added.

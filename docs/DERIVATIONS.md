@@ -3413,3 +3413,238 @@ resamples of whole paired differences with NumPy seed 3202, without dropping
 failed pairs. The measured mean reduction was 20.3125 map evaluations, with interval
 [17.4375, 23.40625]; mean iteration reduction was 1.4375. A positive lower
 endpoint qualifies only this bounded domain.
+
+## D15 — Planning with hard actuator bounds (cff-nd1q)
+
+### D15.1 What changes in the decision
+
+A planner can propose a feasible first action while relying on an impossible
+second action. Clipping the first command at the plant does nothing about the
+second. A hard bound throughout the plan removes every such trajectory before
+the planner chooses its first command. If two decisions are correlated, removing
+impossible futures changes the distribution of the current action.
+
+D15 specifies a **sum-product decision rule**. Condition a frozen Gaussian plan
+on all declared limits, then apply the first coordinate of its joint conditional
+mean. The mean is feasible because a box is convex. It minimizes squared error
+for estimating the bounded action under that belief. It makes no general
+optimal-control claim about nonlinear plant reward. A constrained trajectory
+mode answers a different question. D15.5 gives independent numerical answers
+for both rules on the same model.
+
+### D15.2 The factor, its message and its free energy
+
+Let $u$ collect the commanded coordinates at all constrained times. Let $x$
+collect the rest of a **closed** linear-Gaussian planning block, including the
+states and any unconstrained actions. Fix the observations, goals, parameters
+and any Taylor coefficients. After exact Gaussian elimination the unnormalized
+block is $g(x,u)=Z_G p_G(x,u)$ with a proper, full-rank normalized Gaussian
+$p_G$. Its action marginal has mean $m$ and covariance $S$. For finite bounds
+$l_i<h_i$, add a single hard factor $f_B(u)=\mathbf1\{l\leq u\leq h\}$. The
+factor has value one on the permitted region. There is no division by the
+volume of the box. This models conditioning on feasibility; a separately
+normalized bounded action prior would be a different model.
+
+Write $\alpha=\int_B p_G(u)\,du$. The exact box-to-action message is the
+indicator. The Gaussian block provides the incoming action cavity $p_G(u)$,
+i.e. the action distribution before imposing the bounds. Their product gives
+
+$$
+q_B(x,u)=\frac{p_G(x,u) f_B(u)}{\alpha},\qquad
+Z_B=Z_G\alpha,\qquad F_B=-\log Z_B=F_G-\log\alpha .
+$$
+
+The free-energy accounting can be checked at the individual factors. On a
+cluster tree with the Gaussian block and the box joined by a single joint
+action separator, the Gaussian node contributes
+$-E_{q_B}\log g-H(q_B(x,u))$. The indicator node contributes
+$-H(q_B(u))$, since its expected negative log potential is zero on the
+support. The interior action edge contributes $+H(q_B(u))$, cancelling the
+indicator node's entropy. The resulting value is $F_B$. Replacing a larger
+exact Gaussian subgraph uses its complete original contribution, including
+internal edge corrections. The difference $-\log\alpha$ is a second way to
+evaluate that same replacement. Charging it again would duplicate the penalty.
+
+For the entropy of the bounded $d$-component action, let $a=E_{q_B}u$ and
+$V=\operatorname{Cov}_{q_B}(u)$. Direct integration of $-q_B\log q_B$ gives
+
+$$
+H_B(u)=\tfrac12\left[d\log(2\pi)+\log|S|+
+\mathrm{tr}(S^{-1}V)+(a-m)^T S^{-1}(a-m)\right]+\log\alpha .
+$$
+
+This is the entropy of the truncated belief. The Gaussian having the same
+first two moments puts positive mass outside every proper finite box and has
+infinite expected hard-bound penalty. Its Gaussian entropy cannot be substituted
+in the exact ledger. A quadrature approximation to a finite integral and a
+change of the assumed distribution are distinct approximations.
+
+### D15.3 Computing the block and returning state information
+
+One route to all first and second moments is to tilt the action density by
+$\exp(t^Tu)$. Completing the square gives its normalized cumulant generator
+
+$$
+K_B(t)=t^Tm+\tfrac12 t^T S t+
+\log\alpha(m+St,S)-\log\alpha(m,S).
+$$
+
+Thus $a=m+S\nabla_m\log\alpha$ and
+$V=S+S(\nabla^2_m\log\alpha)S$. Differentiating the integral or
+integrating centered first and second moments gives independent checks. For
+one coordinate of standard deviation $s$, put $A=(l-m)/s$, $D=(h-m)/s$,
+and let $\phi,\Phi$ denote the standard normal density and CDF. In exact
+arithmetic,
+
+$$
+\alpha=\Phi(D)-\Phi(A),\quad r=(\phi(A)-\phi(D))/\alpha,\quad
+a=m+sr,\quad V=s^2\{1+[A\phi(A)-D\phi(D)]/\alpha-r^2\}.
+$$
+
+For a correlated pair, integrate over $u_1$ on its interval. At each
+$u_1$, the second conditional is Gaussian with mean
+$m_2+S_{21}(u_1-m_1)/S_{11}$ and variance $S_{22}-S_{21}^2/S_{11}$.
+Multiply its scalar interval probability by the first-coordinate density.
+Integrate this weight for $\alpha$, and its products with $u_1$,
+$E[u_2\mid u_1,B_2]$, their cross product and the two second moments for
+$a,V$. An independent two-dimensional integration of the original joint
+density checks the result. Positive conditional variances require resolvable
+positive definiteness. Use covariance factorizations and solves in arithmetic.
+
+State information survives elimination. Write $L=\Sigma_{xu}S^{-1}$ and
+$C=\Sigma_{xx}-L\Sigma_{ux}$. Conditioning on $B$ leaves $p_G(x\mid u)$
+intact. Its mean is affine in $u$ and its covariance is the constant $C$, so
+
+$$
+E_B[x]=m_x+L(a-m),\quad
+\operatorname{Cov}_B(x)=C+LVL^T,\quad
+\operatorname{Cov}_B(x,u)=LV,\quad
+H_B(x,u)=H_B(u)+\tfrac12\log|(2\pi e)C|.
+$$
+
+At an open state separator the marginal is proportional to
+$p_G(x)P_G(B\mid x)$. The outgoing sum-product message divides that marginal
+by the incoming separator message on its live support; equivalently, integrate
+the other factors with the recipient's message excluded. This function is
+generally non-Gaussian. The v1 contract therefore returns moments and energy
+from a closed region. Feeding a fitted Gaussian site to a general loopy graph
+would require a separately specified projection, objective and convergence
+criterion. D13.6 establishes a frozen plan on its original input cavities.
+Changing the bounds can change those cavities in an adaptive graph. Any
+relinearizing bounded solver must recheck its own fixed-point equations.
+
+### D15.4 Supported domain and numerical failure
+
+The first implementation can admit any number of nuisance states. For
+numerical integration, the marginal Gaussian **over the bounded coordinates**
+must factor into structurally independent blocks of size one or two. Each
+pair may be correlated. For independent blocks, sum their log masses and
+entropies and concatenate their means and block-diagonal covariances. State
+lifting still uses the full $L$ and $C$. Support needs a model/elimination
+argument for the partition. Diagonal process noise or a sparse *joint
+precision* does not establish independent action marginals. Thresholding small
+observed correlations could silently change the energy and action.
+
+| Input or numerical outcome | Required behavior |
+|---|---|
+| Proper Gaussian, finite positive-width box | Preserve exact zero density outside the box. The mathematical mass is strictly positive. Use log mass for scoring even when ordinary probability underflows. |
+| Reversed or zero-width interval | The event is empty or has zero Lebesgue mass. Return infeasible/zero mass, with no conditional mean or usable action. A known action at a point requires an explicit point constraint or conditioned observation. |
+| Constant unit message on a finite interval | The local normalized density is uniform. Its mean is the midpoint, variance is width squared divided by 12, and entropy is the log width. Its integral is the width in the chosen unit-message gauge. A flat cavity has no normalized Gaussian baseline from which to claim a probability or $F_G-\log\alpha$. |
+| Improper, singular or nonfinite Gaussian block | Classify the invalid or unready input. An indefinite precision, an arbitrary ridge, or an additive scale on an improper message cannot define the baseline evidence. Infinite endpoints and point-mass semantics are outside this finite-box interface. |
+| Deep tails or very narrow intervals | Differences between two rounded CDFs and subtraction of large raw moments can erase mass or variance. Use symmetry, log differences or an interval-scaled integral relative to its peak; integrate centered moments. Check support and positive variance using dtype-aware numerical error estimates. |
+| Unresolvable inputs or exhausted quadrature | If distinct specified endpoints collapse in the target dtype, report lost precision when identifiable from the source. A represented zero-width input still has zero mass. If the requested precision cannot be reached, return a numerical failure or budget exhaustion, never a plausible action certified by a floor or final clip. |
+| Correlated block of size greater than two | Reject as unsupported in v1. Long horizons are eligible when their *marginal* bound blocks meet the independence condition. Independent scalar clipping inside a connected block changes the model. |
+
+### D15.5 A two-decision oracle in which the first command changes
+
+Take a scalar action at each of two times with $x_1=u_0$ and
+$-1\leq u_0,u_1\leq1$. Use the quadratic cost
+
+$$
+J=\tfrac12[u_0^2+(u_1-2)^2+(u_1-x_1-2)^2].
+$$
+
+Before imposing the box, $\exp(-J)$ gives mean $(0,2)$ and precision
+$\left(\begin{smallmatrix}2&-1\\-1&2\end{smallmatrix}\right)$.
+Clipping its mean gives $(0,1)$ and cost 1. The box-constrained mode is
+$(-1/2,1)$ with cost $3/4$. At $u_1=1$ the first-coordinate derivative
+is $2u_0+1$ and the upper-bound derivative has the admissible sign. Positive
+definiteness gives uniqueness. Independent integration of the entire box
+gives $\alpha=0.072008064$, the energy increment $2.63097717$, and
+a **conditional mean of $(-0.31785829,\ 0.65080977)$**. Thus the first
+sum-product command moves from $0$ to $-0.31785829$ despite already being
+inside its own bounds. The MAP command moves to $-0.5$. A quadratic
+optimizer supplies an oracle for the mode; evaluating the integral supplies
+the oracle for the mean.
+
+### D15.6 Relation to the reactor and the next experiment
+
+The ten-seed study measured two controllers which both clip their proposals.
+In fifty archived directed windows we independently rebuilt the complete
+frozen Gaussian precision from the prior, observation and transition factors,
+inverted it and checked all twenty per-time covariance blocks against their
+saved values. In normalized units the absolute correlation between neighboring
+coolant commands ranged from 0.01934 to 0.52279 across the fifteen commands
+used for transitions. Every window has a connected chain of correlations across
+all fifteen time points. They cannot be partitioned into independent singles
+and pairs. A bound on only today's command is a different experiment from
+bounding the full horizon. The executable reconstruction and dense-window check are in
+`tools/cstr_box_oracle.py`.
+
+A separate **offline frozen-window estimate** shows the size of this effect
+on a real input. With $S=LL^T$ and $u=m+Lz$, the allowed interval for
+$z_i$ depends only on $z_{<i}$. Subtract the preceding Cholesky terms and
+divide the two bounds by $L_{ii}$ to obtain endpoints $A_i,D_i$.
+Set $p_i=\Phi(D_i)-\Phi(A_i)$ and transform an independent unit-cube
+coordinate $v_i$ to $z_i=\Phi^{-1}(\Phi(A_i)+v_i p_i)$. The resulting
+integration weight is $w=\prod_i p_i$. Its unit-cube integral gives
+$\alpha$, and the integral of $u_0w$ divided by that of $w$ gives the
+first bounded mean. Conditioning the draws sequentially without retaining
+the weights would generally give a different distribution.
+
+For seed 1, decision 0, all fifteen restricted commands jointly fell inside
+the box with estimated mass about $5.8\times10^{-7}$, an energy increment
+of about 14.36 nats. The unbounded first mean was 296.45972 K. Forward and
+reverse coordinate orderings estimated the bounded first mean as 296.14214 K
+and 296.14453 K. Each ordering used twelve independently scrambled Sobol
+replicates of 131,072 points, after a 16,384-point refinement check and a
+two-action quadrature control. Estimated replicate standard errors for the
+first mean were 0.000012 K and 0.00147 K respectively. These are estimates of
+sampling error, not deterministic error bounds. Different orderings have
+different numerical efficiency. This is one frozen surrogate, conditioned
+after the solve; no such command was sent to the simulated plant in the
+paired experiment. The cloud of samples is unnecessary for storing the
+answer. Per-scramble values, input checksums and both refinements are
+in the study's `h15-oracle.json`.
+
+For the initial matched ablation, freeze the same Gaussian coefficients and
+evidence for both arms on a supported short-horizon fixture. Hold the action
+units, horizon, actuator range, mean readout, observation noise, preview,
+seeds, timing boundaries and fallback fixed. Compare clipping the unbounded
+joint mean with executing the bounded joint mean; log the mass penalty,
+both proposals, the applied command, tracking and timing. Check the mean
+against direct integration and the mode against a constrained quadratic
+optimizer. Any H15 reward claim needs a method for the measured correlated
+15-dimensional box, with independent normalizer, moment and action checks,
+followed by a matched closed-loop run. The paired study measures the effect
+of controller choice under a deadline; it does not measure the effect of
+putting the bounds inside either model.
+
+The truncated-normal moment-generating technique and conditional-integration
+approach have primary references in
+[Tallis (1961)](https://doi.org/10.1111/j.2517-6161.1961.tb00408.x),
+[Manjunath and Wilhelm (2021)](https://doi.org/10.35566/jbds/v1n1/p2)
+and [Genz (1992)](https://doi.org/10.1080/10618600.1992.10477010).
+
+### D15.7 Executable anchors
+
+| Claim | Independent check |
+|---|---|
+| The boxed first mean, trajectory mode and clipped plan differ | `tests/test_bounded_action_derivation.py::test_two_step_lq_joint_mean_map_and_clipping` compares tensor integration, conditional integration and a box-constrained least-squares solver. |
+| One correction to the objective, with exact support and the tilted entropy | `test_joint_mass_entropy_and_free_energy_require_action_correlations` and `test_joint_and_scalar_messages_keep_box_support_on_information_deletion` check the local and clustered identities. |
+| State and action covariances survive elimination | `test_gaussian_lift_matches_full_joint_log_normalizer_derivatives` checks lifted moments against derivatives of a full joint partition function. |
+| Fifteen scalar actions can be admitted or rejected according to their dependence | `test_horizon_15_seven_certified_pairs_and_singleton` checks seven independent correlated pairs and one singleton. `test_connected_dense_three_and_adjacent_horizon_15_exceed_v1_width` checks rejection of connected larger blocks. |
+| Tail, support and precision behavior | `tests/test_bounded_action_numerics.py` exercises mirrored tails, narrow intervals, mass close to one, vacuity, improper inputs and loss of resolution in float32 and float64. `test_independent_action_horizon_keeps_additive_free_energy` checks the log-domain objective at scale. |
+
+These are mathematical reference tests. The production interface and its execution,
+serialization and convergence tests are tracked in cff-fl7h.
