@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from cffg import gauss
-from cffg.nonlinear import NonlinearFailure, approximation, local_result
+from cffg.nonlinear import NonlinearFailure, _sigma_geometry, approximation, local_result
 
 
 @pytest.mark.parametrize("method", ["linearization", "sigma_point"])
@@ -97,6 +97,55 @@ def test_float32_sigma_points_cannot_silently_lose_the_input_variance():
     assert np.isinf(value["energy"])
 
 
+@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("narrow_axis,wide_scale,narrow_scale", [(1, 1, 1), (0, 32, 64)])
+def test_affine_variance_when_only_one_sigma_direction_collapses(dtype, narrow_axis, wide_scale, narrow_scale):
+    # Both signed offsets round back to the mean along the narrow axis.
+    narrow_std = 8 * jnp.finfo(dtype).eps * narrow_scale
+    std = jnp.full((2,), wide_scale, dtype).at[narrow_axis].set(narrow_std)
+    precision = jnp.diag(1 / std**2)
+    mean = jnp.zeros(2, dtype).at[narrow_axis].set(64 * narrow_scale)
+    zero = jnp.zeros(1, dtype)
+    noise = jnp.eye(1, dtype=dtype)
+
+    def project(x, center):
+        return ((x[narrow_axis] - center[narrow_axis]) / narrow_std).reshape(1)
+
+    def update(function, center, method):
+        return local_result(function, precision @ center, precision, zero,
+                            jnp.zeros_like(noise), center, noise, method)
+
+    sigma = update(project, mean, "sigma_point")
+    assert not sigma["proper"] and sigma["status"] == 2
+    assert sigma["failure_code"] == NonlinearFailure.UNREPRESENTABLE_SIGMA_POINTS
+    assert np.isinf(sigma["energy"])
+
+    tolerance = 64 * jnp.finfo(dtype).eps
+    linear = update(project, mean, "linearization")
+    assert linear["proper"]
+    np.testing.assert_allclose(linear["covariance_out"], [[2]], rtol=tolerance)
+
+    def project_both(x, center):
+        return jnp.sum((x - center) / std, keepdims=True)
+
+    resolved = update(project_both, jnp.zeros_like(mean), "sigma_point")
+    assert resolved["proper"]
+    np.testing.assert_allclose(resolved["covariance_out"], [[3]], rtol=tolerance)
+
+
+@pytest.mark.parametrize("dtype,narrow_std", [(jnp.float32, 2**-8), (jnp.float64, 2**-20)])
+def test_rounding_in_one_coordinate_distorts_a_correlated_sigma_direction(dtype, narrow_std):
+    # x[1] - x[0] has small variance even though both marginal variances are large.
+    covariance = jnp.array([[1, 1], [1, 1 + narrow_std**2]], dtype)
+    means = jnp.array([[0, 0], [64, 0]], dtype)
+
+    def represented(mean):
+        return _sigma_geometry(mean, covariance)[2]
+
+    assert [bool(represented(mean)) for mean in means] == [True, False]
+    np.testing.assert_array_equal(jax.jit(jax.vmap(represented))(means), [True, False])
+
+
 def test_sigma_points_retain_nonzero_curvature_covariance():
     matrix, offset, noise = approximation(
         lambda x, p: x + p[0] * x ** 3,
@@ -123,8 +172,9 @@ def test_vacuous_input_is_neutral_and_has_no_finite_belief():
     ({"theta": np.nan}, NonlinearFailure.NONFINITE_FUNCTION),
     ({"lo": -100}, NonlinearFailure.IMPROPER_TILT),
 ])
-def test_invalid_local_inputs_have_explicit_status(kwargs, reason):
-    value = _scalar("linearization", **kwargs)
+@pytest.mark.parametrize("method", ["linearization", "sigma_point"])
+def test_invalid_local_inputs_have_explicit_status(method, kwargs, reason):
+    value = _scalar(method, **kwargs)
     assert value["status"] == 2 and value["failure_code"] == reason
     assert np.isinf(value["energy"]) and not value["proper"]
 

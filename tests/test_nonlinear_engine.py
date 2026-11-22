@@ -124,6 +124,19 @@ def test_improper_runtime_cavity_is_a_machine_readable_failure():
     assert engine.run(state, 5, tol=1e-8).status == RunStatus.DIVERGED
 
 
+@pytest.mark.parametrize("schedule", ["auto", "flood"])
+def test_solver_reports_direction_lost_to_float32_sigma_point_rounding(schedule):
+    with jax.enable_x64(False):
+        template, arrays = model("sigma_point", affine=True, dim=2)
+        arrays.update(m=np.array([0., 64.]), P=np.diag([1., 2.**-40]), V=np.eye(2),
+                      theta=np.array([1., 0., 0., 2.**20, 0., -64 * 2.**20]))
+        engine = Engine(compile_template(template, arrays=arrays), schedule=schedule)
+        result = engine.run(engine.init_state(), 5, tol=1e-4)
+        assert result.status is RunStatus.DIVERGED
+        assert result.failure.reason == "unrepresentable_sigma_points"
+        assert result.failure.factor == "sensor"
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize("method, variance", [
     ("linearization", .15642104055141876), ("sigma_point", .1395200705766338),

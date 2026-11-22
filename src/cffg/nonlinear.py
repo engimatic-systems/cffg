@@ -21,6 +21,7 @@ from enum import IntEnum
 
 import jax
 import jax.numpy as jnp
+from jax.scipy.linalg import solve_triangular
 
 from cffg import gauss
 
@@ -45,12 +46,15 @@ def _inverse(matrix):
 
 def _sigma_geometry(mean, covariance):
     dimension = mean.shape[0]
-    offsets = jnp.sqrt(jnp.asarray(dimension, dtype=mean.dtype)) * jnp.linalg.cholesky(covariance).T
-    centered = jnp.concatenate((jnp.zeros_like(mean)[None], offsets, -offsets))
+    basis = jnp.sqrt(jnp.asarray(dimension, dtype=mean.dtype)) * jnp.linalg.cholesky(covariance)
+    centered = jnp.concatenate((jnp.zeros_like(mean)[None], basis.T, -basis.T))
     points = mean + centered
-    # Rounding must not erase the spread used to represent the input covariance.
-    tolerance = 64 * dimension * jnp.finfo(mean.dtype).eps * jnp.max(jnp.abs(centered))
-    represented = jnp.max(jnp.abs((points - mean) - centered)) <= tolerance
+    # In this basis each intended offset is a signed unit vector. A wide
+    # direction cannot hide rounding error in a narrow or correlated direction.
+    error = (points - mean) - centered
+    relative_error = solve_triangular(basis, error.T, lower=True)
+    tolerance = 64 * dimension * jnp.finfo(mean.dtype).eps
+    represented = jnp.linalg.norm(relative_error) <= tolerance
     return points, centered, represented
 
 

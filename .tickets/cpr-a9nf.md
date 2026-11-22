@@ -1,6 +1,6 @@
 ---
 id: cpr-a9nf
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-11-22T02:01:05Z
@@ -39,3 +39,11 @@ Sigma points are selected input values used to estimate the mean and covariance 
 **2026-11-22T02:02:35Z**
 
 First reproduced at PR 156 head 0080676 and again at 80ae1f2. The variance was 1 in the sigma-point rule and 2 in the linearization control. The guard originates in 20bb3c2. Evidence and commands are in ~/agent-share/cffg-premerge-review/early/.
+
+**2026-11-22T02:30:12Z**
+
+Change-path review before implementation. The New factor or rule family and Runtime numerical or status invariant rows apply. The nonlinear rule owns point construction for single updates, grouped updates, readouts and energy. Check eager and jitted/batched geometry, local failure and affine controls, and public auto and flood failure forwarding. Preserve the existing vacuous/improper classifications. Exercise float32 and float64, swapped axes and rescaled units. Exact discrete zeros, serialization, and current/legacy checkpoints are N/A. Baseline reproduction with uv on this branch gave five identical second coordinates of 64, sigma-point variance 1 with success, and linearization variance 2.
+
+**2026-11-22T02:33:57Z**
+
+The rule now measures point-rounding error in the scaled Cholesky basis of the input covariance. Each off-center point has unit displacement there, so both coordinate and correlated directions are checked against a dtype-relative tolerance. The original float32 reproducer (uv run python ~/agent-share/cffg-premerge-review/early/sigma_collapse.py) now reports represented=False and local status 2. Linearization still succeeds with affine variance 2. Both public schedules identify sensor with unrepresentable_sigma_points. Regressions cover float32 and float64, permuted axes, independent 32x and 64x unit changes, eager and JIT/vmap on correlated inputs, the resolved two-direction variance of 3, and vacuous/improper classifications. uv run pytest -q tests/test_nonlinear_rules.py tests/test_nonlinear_engine.py tests/test_adaptive_startup.py --tb=short passed 74 tests with 12 slow cases deselected in 96.49 seconds. The integrator owns the final suite gate.
