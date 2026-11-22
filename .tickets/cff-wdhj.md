@@ -1,8 +1,8 @@
 ---
 id: cff-wdhj
 status: open
-deps: [cff-3nr4, cff-fj4v, cff-v6th, cff-ectw]
-links: []
+deps: [cff-3nr4, cff-v6th, cff-ectw]
+links: [cff-fj4v]
 created: 2026-09-25T03:46:26Z
 type: feature
 priority: 2
@@ -49,3 +49,9 @@ These are suggestions; another method is acceptable if it satisfies the outcomes
 Facade: a small public interface coordinating existing components. Predicted goal: a planning preference, not a newly observed transition. Override: an action executed instead of the agent's proposed action.
 
 Shared terms: CFFG means constrained Forney-style factor graph; JAX is the numerical array/compiler library; dtype is a numeric storage type; free energy is the model's inference objective; host/JIT compares Python-side and compiled execution; single/vmap compares one instance with vectorized instances; N/A means not applicable.
+
+## Notes
+
+**2026-11-22T01:02:01Z**
+
+The serialized boundary contract (cff-3nr4) remains a prerequisite. The public recipe collection (cff-fj4v) is related work that can run in parallel. The facade still owes its own public example and equivalence to the manual loop.

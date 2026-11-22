@@ -1,0 +1,36 @@
+---
+id: cfp-ru3t
+status: open
+deps: [cfp-hlqd]
+links: []
+created: 2026-11-22T01:00:18Z
+type: task
+priority: 1
+assignee: coopwilliams
+parent: cfp-okq2
+tags: [scheduling, performance]
+---
+# Execute recognized nonlinear chains with checked directional Gaussian messages
+
+## Background in Plain English — WHY
+
+Once the chain is recognized, its transition coefficients can be computed in forward order and its goal information propagated backward. Produce a normal engine state with fresh inputs, failure reporting and the frozen-surrogate objective.
+
+## Outcomes / Acceptance Criteria — WHAT
+
+1. A runnable engine path consumes the recognized ordering, current parameters, mask and goal data, and populates the same directed message slots and public readouts as the existing path.
+2. Compare all returned messages, proper marginals, raw/canonical successor energy, residual, action and local statuses with the directed reference and the coupled solver on matched fixtures.
+3. Cover float32/64, vacuous priors, partially informed goals, invalid noise, nonfinite physics and 10–100× fixture horizon or dimension. Specify where the route fails explicitly or delegates to the coupled solver.
+4. Respect budgets, explicit schedules, and existing status meanings. Document or conservatively exclude unsupported Colony and differentiation paths; no silent numerical or objective change.
+
+## Methodological Suggestions — HOW
+
+Architecture row: Runtime numerical or status invariant. Trace schedule_program, engine, run_results, host/compiled checks, mixed/flood/exact interfaces, ledger and readouts; compare single/vmap and inference/gradient paths where admitted. Runtime state is derived from the template and live arrays. No new checkpoint format is proposed.
+
+## Future work
+
+cfp-okq2 owns automatic dispatch, public documentation and matched cold/warm qualification. The reactor control study proceeds independently.
+
+## Definitions
+
+A directed message carries one neighbor’s contribution to a belief. A frozen surrogate is the Gaussian model evaluated at the expansion points selected by the input cavities.

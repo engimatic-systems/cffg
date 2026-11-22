@@ -2,7 +2,7 @@
 id: cff-fj4v
 status: open
 deps: []
-links: []
+links: [cff-wdhj]
 created: 2026-09-25T03:46:26Z
 type: task
 priority: 2
@@ -40,7 +40,7 @@ These are suggestions; another method is acceptable if it satisfies the outcomes
 
 ## Future work
 
-- cff-wdhj — Implement the continuous and hybrid rolling-agent facade.
+- cff-wdhj is a parallel consumer of the manual-loop examples. The serialized boundary contract in cff-3nr4 gates its implementation.
 
 ## Definitions
 

@@ -1,7 +1,7 @@
 ---
 id: cff-wt1c
 status: open
-deps: [cff-toqa, cff-iplr, cff-fl7h, cff-wdhj, cff-csmz, cff-4yr6, cff-qtub, cff-21vm, cff-qu2j, cff-3kdk, cff-wbhu, cff-c5qf, cff-d8jj, opt-ewtf]
+deps: [cff-toqa, cff-iplr, cff-fl7h, cff-wdhj, cff-csmz, cff-4yr6, cff-qtub, cff-21vm, cff-qu2j, cff-3kdk, cff-wbhu, cff-c5qf, cff-d8jj, opt-ewtf, cfp-lsxw]
 links: [cff-d63w, opt-ewtf]
 created: 2026-09-25T03:46:26Z
 type: task
@@ -17,6 +17,8 @@ tags: [pcgym]
 PCGym results mix library behavior with information access, planner choices, model assumptions and concurrent CPU load. After the improvements land, a bounded comparison must show which capabilities and costs actually changed without treating every reward gap as a library defect.
 
 Evidence comes from the PCGym report at `/Users/ravd/agent-share/PCGymCFFG/` and experiment code at `/Users/ravd/experiments/cffg-testing/pc-gym/00/cffg/`, reviewed against CFFG `fce60bd`. Copy only the minimal reproducible inputs into maintained fixtures; do not add external training artifacts or pickle dependencies.
+
+The fixed-model reactor comparison is owned by cfp-lsxw and can be published when it finishes. Cite its recorded runs here. The other prerequisites govern the remaining comparison arms and final synthesis. Use cfp-okq2 evidence for any later claim about automatic production dispatch. Keep elapsed launch, warm executable reuse and reuse of a previous belief state separate.
 
 ## Outcomes / Acceptance Criteria
 

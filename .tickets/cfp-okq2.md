@@ -1,10 +1,10 @@
 ---
 id: cfp-okq2
 status: open
-deps: [cfp-rh8k]
-links: []
+deps: [cfp-ru3t]
+links: [cfp-rqcd, cfp-9806]
 created: 2026-11-21T21:30:43Z
-type: task
+type: epic
 priority: 2
 assignee: coopwilliams
 ---
@@ -12,6 +12,8 @@ assignee: coopwilliams
 
 ## Background in Plain English — WHY
 The 19-transition reactor on the PR 185 branch chooses each local Taylor model using only evidence from the past and the current observation. A directed reference computes the same message root in two passes. The production engine still builds a coupled nonlinear solver for each fresh model. Other graphs, including an acyclic pair of nonlinear sensors that depend on each other, genuinely need coupled inference.
+
+This is the integration and automatic-dispatch ticket. cfp-hlqd supplies the dependency recognizer and cfp-ru3t supplies the executor and message-parity evidence. Reuse their artifacts for criteria 1–3. This ticket owns enabling eligible automatic dispatch through Engine.run, public documentation and performance qualification. The control experiment has no dependency on this rollout.
 
 ## Outcomes / Acceptance Criteria — WHAT
 1. A conservative schedule recognizes an eligible normalized Gaussian chain from its compiled factor and cavity dependencies, independently of factor names. Unsupported cases retain the current route. Include the two interacting nonlinear sensors as a negative control.

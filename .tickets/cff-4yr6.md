@@ -30,7 +30,7 @@ Evidence comes from the PCGym report at `/Users/ravd/agent-share/PCGymCFFG/` and
 
 5. A synchronized same-process benchmark records cold/warm binding latency, dispatch counts and hardware for 20 and 200 ports before/after; the new path reduces per-port dispatch without regressing small binds materially.
 
-6. Engine and Colony bind through one implementation; API semantics are documented.
+6. Preserve the existing Colony.bind delegation to Engine.bind_data while batching the underlying writes. Document and check the public update semantics on both entry points.
 
 ## Methodological Suggestions
 

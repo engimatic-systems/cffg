@@ -1,7 +1,7 @@
 ---
 id: cff-xa6z
 status: open
-deps: [cff-v6th, cff-04mb, cff-ectw, cff-qu2j, cff-7kpx, cff-toqa, cff-0kyl, cff-4yr6, cff-qtub, cff-3wsw, cff-5k0n, cff-csmz, cff-ees0, cff-wi2o, cff-iplr, cff-nd1q, cff-fl7h, cff-21vm, cff-fj4v, cff-3nr4, cff-wdhj, cff-wt1c, cff-rnn1, cff-98gj, cff-8jqy, cff-5o7r, cff-c5qf, cff-d8jj, cff-aqpz]
+deps: [cff-v6th, cff-04mb, cff-ectw, cff-qu2j, cff-7kpx, cff-toqa, cff-0kyl, cff-3wsw, cff-fj4v, cff-wt1c, cff-rnn1, cff-98gj, cff-8jqy, cff-5o7r, cff-d8jj, cff-aqpz, cfp-okq2]
 links: [cff-wbhu, cff-mjku, cff-3kdk]
 created: 2026-09-25T03:43:40Z
 type: epic
@@ -17,6 +17,8 @@ tags: [pcgym, control]
 The PCGym experiment exposed reproducible execution bugs, expensive host operations, and missing modeling capabilities after successful newcomer onboarding. Cooper requested all follow-ups as dependency-linked tickets and implementation as a PR chain. The goal is reliable nonlinear and uncertainty-aware control, not a blanket promise to beat PPO or to explain every reward gap.
 
 The original evidence is at `/Users/ravd/agent-share/PCGymCFFG/`; experiment source is at `/Users/ravd/experiments/cffg-testing/pc-gym/00/cffg/`. The evaluated/current starting revision is `fce60bd`, the head of PR #161. Independent audit reproduced no-delta hardening/Colony nonconvergence, disconnected rendering, hybrid divergence with damped recovery, and a float32 Gaussian certificate failure. The exact reported nonlinear RK4 failure still needs a valid retained fixture.
+
+The November handoff continues from PR #185 and the checked reference at 265ff14. The fixed-model reactor pilot and production chain recognition can both start now. The remaining open direct dependencies of this epic are the point-training API (cff-3wsw), public recipes (cff-fj4v), matched comparison synthesis (cff-wt1c) and automatic dispatch (cfp-okq2). Their underlying deliverables stay tracked through the dependency tree. See cfp-rqcd for the backlog review and both ready roots.
 
 ## Outcomes / Acceptance Criteria
 

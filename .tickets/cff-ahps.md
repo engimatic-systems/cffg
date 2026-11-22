@@ -12,13 +12,13 @@ assignee: coopwilliams
 
 ## Background in Plain English — WHY
 
-CFFG began with discrete Categorical and Dirichlet factors. Completed tickets have added Gaussian and hybrid models, conjugate exponential-family messages, hard constraints, executable factor registration, and discrete-regime epistemic scoring. This epic finishes the roadmap when the remaining prerequisites add nonlinear and neural factors, scalable plate execution, long-rollout stability, runtime throughput, and continuous-domain diagrams. The result is one serialized modeling system whose compiler, inference runtime, objective ledger, and public tools agree about every factor family they expose.
+CFFG began with discrete Categorical and Dirichlet factors. Completed tickets have added Gaussian and hybrid models, conjugate exponential-family messages, hard constraints, executable factor registration, and discrete-regime epistemic scoring. The reviewed PR stack adds the bounded nonlinear and neural factor paths. The remaining prerequisites cover scalable plates, long-rollout stability, runtime throughput and continuous-domain diagrams. The result is one serialized modeling system whose compiler, inference runtime, objective ledger, and public tools agree about every factor family they expose.
 
-The direct prerequisites already completed are cff-3hgi, cff-44we, cff-d56d,
-cff-dfpi, cff-izjd, cff-l6i5, cff-lquu, and cff-ri8m. The unfinished direct
-prerequisites are cff-cfqg, cff-1o72, cff-5edo, cff-6s31, cff-9xmq,
-cff-bxk4, cff-o7hs, and cff-wbhu. The dependency metadata, rather than the
-order of this prose, determines when this epic is ready to close.
+On the PR #185 branch, cff-cfqg (extension architecture), cff-o7hs
+(nonlinear Gaussian rules) and cff-1o72 (neural means) are closed.
+Five direct prerequisites remain open: cff-wbhu, cff-5edo, cff-9xmq,
+cff-6s31 and cff-bxk4. The two-pass reactor reference in cfp-rh8k uses
+the existing nonlinear rule; cfp-okq2 owns its automatic schedule.
 
 ## Outcomes / Acceptance Criteria — WHAT
 
@@ -50,38 +50,19 @@ These are suggested ways to reach the outcomes. An implementer may choose a diff
 - Keep messages in log space unless a family derivation requires another representation and documents that exception. Normalize messages aggressively, derive numeric guards from `jnp.finfo(dtype)`, and give stochastic rules explicit JAX PRNG keys.
 - Put message and objective derivations in rule docstrings and `docs/DERIVATIONS.md`. Per Cooper's 2026-07-08 delegation decision, keep free-energy ledger semantics, constraint semantics, bead semantics, and the true-BFE invariant under top-level review. Well-specified arena plumbing, builders, focused test scaffolding, reference-number generation, and bounded literature questions may be delegated and then reviewed at top level.
 - Run the contributing ticket's focused rule, compiler, schedule, ledger, serialization, hostile-input, and public-workflow tests during implementation. After the final code change, run the repository's dashboard-backed short suite once as required by `AGENTS.md`; run marked slow tests only when the changed behavior needs them.
-- Recheck the roadmap with `tk dep tree --full cff-ahps`, `tk ready`, `tk blocked`, and `tk dep cycle`. The dependency records remain authoritative. A compact view of the open paths at the 2026-09-08 review is:
+- Recheck the roadmap with `tk dep tree --full cff-ahps`, `tk ready`, `tk blocked`, and `tk dep cycle`. The dependency records remain authoritative. The open paths on the PR #185 branch are:
 
   ```text
   Legend: prerequisite --> dependent
-
-  [ ] cff-wera (ready) --> cff-zq25 --> cff-209l
-    --> cff-ecw0 --> cff-544x --> cff-8t4d --> cff-kfo7
-    --> cff-ejib --> cff-bfr9 --> cff-ddsq --> cff-edoz
-    --> cff-sf29 --> cff-ny7f --> cff-nyad --> cff-5xdy
-    --> cff-ii9t --> cff-jrbw --> cff-gl89 --> cff-3ola
-    --> cff-ws3c --> cff-ofv1 --> cff-cfqg
-
-  cff-cfqg -------------------------------------------> cff-ahps
-  cff-cfqg --> cff-o7hs --> cff-1o72 ----------------> cff-ahps
-  [ ] cff-wbhu (ready) -------------------------------> cff-ahps
-  cff-wbhu --> cff-5edo ------------------------------> cff-ahps
-  cff-wbhu --> cff-9xmq ------------------------------> cff-ahps
-  [ ] cff-9bex (ready) --> cff-bxk4 ------------------> cff-ahps
-  [ ] cff-j7mm (ready) --> cff-6s31 ------------------> cff-ahps
-
-  Parallel/outside persistent-learning chain:
-  [ ] cff-xabn --> cff-enhs --> cff-jilz --> cff-cz6v
+  cff-wbhu (ready) --> cff-5edo --> cff-ahps
+                   +-> cff-9xmq --> cff-ahps
+                   +--------------> cff-ahps
+  cff-9bex (ready) --> cff-bxk4 --> cff-ahps
+  cff-j7mm (ready) --> cff-6s31 --> cff-ahps
   ```
 
 ## Future work
 
-- cff-o7hs owns deterministic nonlinear maps between Gaussian edges, Jacobian
-  linearization, sigma-point moment matching, named approximate ledger terms,
-  and compiler-to-ledger execution of the `MOMENT_MATCHING` constraint.
-  cff-cfqg is its immediate implementation prerequisite; cff-209l supplies the
-  same-arena kernel foundation inside that architecture program.
-- cff-1o72 follows cff-o7hs and owns Gaussian factors with deterministic neural means and positive noise covariance, free-energy-gradient training, solver-gradient evidence, and amortized message initialization.
 - cff-wbhu owns the JIT-compiled sweep loop and its single-engine and batched-runtime throughput and status contracts.
 - cff-5edo follows cff-wbhu and owns depth-aware long-rollout convergence and warm-started replanning without changing action choices.
 - cff-9xmq follows cff-wbhu and owns balanced broadcast expansion, logarithmic message-passing diameter, and marginal agreement with chain expansion at `1e-10`.

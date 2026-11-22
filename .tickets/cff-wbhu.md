@@ -40,6 +40,8 @@ Public results and schedule semantics remain unchanged; the measurable outcome
 is at least an 8× warm throughput gain for the recorded 32-instance workload
 with no single-engine regression.
 
+The exact two-pass Colony path and one-logical-iteration evidence in tests/test_exact_colony.py already cover 5.26–5.27 on their fixture. Reuse these as regression checks. The implementation target here is device-side iterative loop control and measured throughput across 32 instances.
+
 ## Outcomes / Acceptance Criteria
 
 ### 1. Public execution contracts remain stable

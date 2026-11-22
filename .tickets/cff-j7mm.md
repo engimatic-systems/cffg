@@ -9,7 +9,7 @@ priority: 2
 assignee: coopwilliams
 tags: [adversarial-reviewer, performance, estimator]
 ---
-# Resource estimator ignores non-discrete arenas and its XLA analysis no longer calls step correctly
+# Repair scheduled resource analysis and calibration, and name per-parameter storage
 
 ## Background in Plain English
 
@@ -18,6 +18,8 @@ The resource estimator must tell users how much compiled inference state a model
 A 20-step, two-dimensional LGSSM exposed the defect: the old report showed 1,104 bytes although the state leaves occupied 5,088 bytes, and it called discrete `message_bytes` zero although Gaussian messages occupied 3,744 bytes. Memory reports must distinguish exact persistent JAX-array storage from backend-reported temporary buffers. Timing reports must also distinguish compilation, first execution, a flooding sweep, and an active scheduled run; those units are not interchangeable.
 
 cff-6s31 consumes this ticket as the trustworthy compiled-arena baseline for compact plate estimates. This ticket covers already compiled plate arenas. cff-6s31 separately derives resource counts from compact `PlateSpec.dims` before compilation.
+
+At the PR #185 tip, estimate.py and tests/test_estimate.py already cover the eight named arena arrays and aggregate parameter and total bytes. Retain 2.1–2.16 and 2.19–2.24 as regression checks. Remaining memory work is the per-leaf path breakdown (2.17–2.18). The obsolete step signature, schedule-specific executable costs, batch coverage and timing calibration still need work.
 
 ## Outcomes / Acceptance Criteria
 
