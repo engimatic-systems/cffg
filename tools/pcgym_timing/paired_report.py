@@ -201,7 +201,7 @@ def forecast_table(forecast, lead):
                   "90% coverage", "Mean 90% width"], rows)
 
 
-def forecast_section(forecast):
+def forecast_section(forecast, distinct_trajectories):
     performance = []
     for arm, name in NAMES.items():
         record = forecast["arms"][arm]
@@ -225,6 +225,9 @@ def forecast_section(forecast):
                         if diff else f'{noun} RMSE matched persistence')
     takeaway = f'<p>At 60 steps, CFFG’s {" and its ".join(relative)} on matched origins.</p>' if relative else ""
     cffg = forecast["arms"]["cffg"]["leads"][lead]
+    truth_note = ("All seeds share one physical truth trajectory. Sensor noise and particle draws "
+                  "vary across seeds." if distinct_trajectories == 1 else
+                  f"The archive contains {distinct_trajectories} distinct physical truth trajectories.")
     coverage = ""
     if all(cffg[key]["coverage90"] is not None for key in VARIABLES):
         coverage = (f'<p>CFFG’s nominal 90% intervals covered the true concentration '
@@ -236,6 +239,7 @@ def forecast_section(forecast):
         'state from the same observations and past commands. All four forecasts then used the same '
         'reactor propagator, known future coolant commands and 512 matched particle draws. '
         'Persistence holds the latest noisy measurement fixed for every future step.</p>',
+        f'<p>{truth_note}</p>',
         '<h3>60 steps ahead</h3>', takeaway, forecast_table(forecast, lead), coverage,
         '<p class="note">Errors and interval widths use the units shown for each variable. '
         'Coverage measures how often the true state fell inside the predicted 90% interval. '
@@ -329,7 +333,8 @@ def render(root):
         '<a href="#scope">Scope</a><a href="#evidence">Artifacts</a></nav></header>',
         primary(summary["control"], seeds, summary["numerical_tie_abs_return"], summary["bootstrap"]["draws"]),
         control_section(summary["control"]),
-        forecast_section(summary["forecast"]), evidence(root, seeds),
+        forecast_section(summary["forecast"], summary["audit"]["distinct_truth_trajectories"]),
+        evidence(root, seeds),
         '</main></body></html>'])
     destination = root / "index.html"
     with NamedTemporaryFile("w", encoding="utf-8", dir=root, delete=False) as tmp:
