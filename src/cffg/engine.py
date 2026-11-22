@@ -35,6 +35,7 @@ Paired paths:
 from __future__ import annotations
 
 from dataclasses import replace
+from math import isfinite
 
 import equinox as eqx
 import jax
@@ -406,7 +407,7 @@ class Engine:
                     "damp does not apply to trust-region inference; omit it"
                 )
             if (self._directed is not None and outer_solver == "auto" and n_iters > 0
-                    and tol is not None and np.isfinite(tol) and tol >= 0
+                    and tol is not None and isfinite(tol) and tol >= 0
                     and self._directed.admits(state)):
                 proposal = self._directed.run(state, tol)
                 if (proposal.termination_reason is not OuterTerminationReason.DIRECTED_CHAIN_UNCERTIFIED

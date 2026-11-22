@@ -109,8 +109,8 @@ def _equality(incoming):
     for i in range(len(incoming)):
         others = incoming[:i] + incoming[i + 1:]
         outgoing.append(tuple(np.sum(parts, axis=0) for parts in zip(*others, strict=True)))
-    joint_precision = sum(p for _, p in incoming)
-    return outgoing, _negative_entropy(joint_precision)
+    belief_precision = sum(p for _, p in incoming)
+    return outgoing, _negative_entropy(belief_precision)
 
 
 def _prediction(mean, covariance, matrix, offset, noise):
