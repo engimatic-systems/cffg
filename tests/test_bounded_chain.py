@@ -2,7 +2,6 @@
 
 import json
 from dataclasses import replace
-from pathlib import Path
 
 import jax
 import numpy as np
@@ -11,23 +10,10 @@ from numpy.testing import assert_allclose
 
 from cffg.bounded_actions import BoundStatus
 from cffg.bounded_chain import BoundedChainRegion, BoundedCoordinate
-from cffg.mean_functions import MEAN_IMPLEMENTATIONS
+from test_cstr_runtime import fixture as reactor
 
 
-@pytest.fixture
-def reactor(monkeypatch):
-    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "tools"))
-    import cstr_runtime_fixture as fixture
-
-    monkeypatch.delitem(MEAN_IMPLEMENTATIONS, "pcgym.cstr.rk4", raising=False)
-    fixture.install_mean.cache_clear()
-    fixture.install_mean()
-    yield fixture
-    MEAN_IMPLEMENTATIONS.pop("pcgym.cstr.rk4")
-    fixture.install_mean.cache_clear()
-
-
-def model(reactor):
+def model():
     template, arrays = reactor.model(horizon=2)
     actions = tuple(BoundedCoordinate(f"s{t}c", 3, -1., 1.) for t in (4, 5))
     return BoundedChainRegion(template, actions), arrays
@@ -72,10 +58,10 @@ def dense_oracle(reactor, arrays, data):
     return m, cov, energy
 
 
-def test_reactor_joint_and_live_data_match_independent_precision(reactor):
+def test_reactor_joint_and_live_data_match_independent_precision():
     from test_bounded_action_derivation import conditional_integrals
 
-    region, arrays = model(reactor)
+    region, arrays = model()
     region = BoundedChainRegion.from_dict(json.loads(json.dumps(region.to_dict()))).scoped("plant")
     engine = region.compile(arrays={"plant/"+k: v for k, v in arrays.items()})
     binder, base = reactor.Binder(engine), engine.init_state()
@@ -102,11 +88,11 @@ def test_reactor_joint_and_live_data_match_independent_precision(reactor):
         region.evaluate(engine, failed)
 
 
-def test_h15_reactor_rejects_before_compilation_and_state_aliases_fail(reactor):
+def test_h15_reactor_rejects_before_compilation_and_state_aliases_fail():
     template, arrays = reactor.model()
     with pytest.raises(ValueError, match="one or two"):
         BoundedChainRegion(template, tuple(BoundedCoordinate(f"s{t}c", 3, -1., 1.) for t in range(4, 19)))
-    region, arrays = model(reactor)
+    region, arrays = model()
     first = region.actions[0]
     for edge, coordinate, match in (("s4", 3, "aliased"), ("s4c", 3, "duplicate"),
                                     ("s6", 3, "nonterminal"), ("e4", 0, "nonterminal"),
@@ -116,10 +102,10 @@ def test_h15_reactor_rejects_before_compilation_and_state_aliases_fail(reactor):
             invalid.compile(arrays=arrays)
 
 
-def test_region_rejects_open_ports_and_mutated_parameter_bindings(reactor, monkeypatch):
+def test_region_rejects_open_ports_and_mutated_parameter_bindings(monkeypatch):
     from cffg.core import PortRole
 
-    region, arrays = model(reactor)
+    region, arrays = model()
     with monkeypatch.context() as m:
         port = region.template.ports["e6"]
         m.setitem(region.template.ports, "e6", replace(port, role=PortRole.GLUE))
