@@ -476,6 +476,9 @@ Run `uv run python tools/cstr_bounded_comparison.py` for the actual P4/H2
 four-substep RK4 reactor comparison. Both readouts share the same directed
 solve and available observations, including the missing history. The example
 reports each command, normalized objective and physical one-step tracking error.
+Each arm times its first and repeated decision readouts after the common solve.
+The clipped arm reads only the two selected edges. Both clocks stop after the
+proposals, command and objective are available on the host.
 A connected chain can constrain one or two action coordinates.
 
 For a separately supplied **frozen Gaussian plan with actuator limits**, declare the hard box and

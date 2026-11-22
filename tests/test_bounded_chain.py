@@ -125,3 +125,24 @@ def test_region_rejects_open_ports_and_mutated_parameter_bindings(monkeypatch):
         m.setitem(params, path, params[path]+1.)
         with pytest.raises(ValueError, match="certificate"):
             region.evaluate(engine, result)
+
+
+def test_reactor_comparison_reads_selected_edges_and_times_both_arms(monkeypatch):
+    import sys
+    from pathlib import Path
+    from cffg import Engine
+
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "tools"))
+    monkeypatch.setitem(sys.modules, "cstr_runtime_fixture", reactor)
+    import cstr_bounded_comparison as comparison
+
+    def unexpected(*args):
+        pytest.fail("two selected actions should only read their named edges")
+
+    monkeypatch.setattr(Engine, "gaussian_marginals", unexpected)
+    report = comparison.compare()
+    clipped, bounded = (report["arms"][key] for key in ("clipped", "bounded"))
+    assert_allclose(bounded["objective"] - clipped["objective"], -report["log_mass"], atol=1e-8)
+    for arm in (clipped, bounded):
+        assert 295 <= arm["applied_K"] <= 302
+        assert np.isfinite([arm["first_readout_seconds"], arm["warm_readout_seconds"]]).all()
