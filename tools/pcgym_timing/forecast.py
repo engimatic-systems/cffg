@@ -33,7 +33,7 @@ def _commands(steps):
     return .65 * np.sin(2 * np.pi * tick / 73) + .20 * np.cos(2 * np.pi * tick / 19)
 
 
-def prepare(make_env, params, arrays, path):
+def prepare(make_env, params, arrays, path, *, study_seed=None):
     """Run one uninterrupted noisy PCGym CSTR and save its complete, replayable truth manifest."""
     cfg = fixture.CONFIGURATION
     steps = params["N"] - 1
@@ -47,16 +47,18 @@ def prepare(make_env, params, arrays, path):
                     for k, u in (("low", "u_lo"), ("high", "u_hi")))):
         raise ValueError("Expected a 599-step or longer PCGym CSTR with the pilot scales, noise and dt")
     commands = _commands(steps)
+    truth_seed = TRUTH_SEED if study_seed is None else 100000 + study_seed
+    draw_seed = DRAW_SEED if study_seed is None else 200000 + study_seed
     origins = np.linspace(fixture.PAST, steps - max(HORIZONS), 12, dtype=int)
     obs = np.empty((steps + 1, 2))
     truth = np.empty_like(obs)
     # PCGym draws multiplicative observation noise from NumPy's global RandomState.
     caller_rng = np.random.get_state()
     try:
-        np.random.seed(TRUTH_SEED)
+        np.random.seed(truth_seed)
         env = make_env(params)
         try:
-            observation, _ = env.reset(seed=TRUTH_SEED)
+            observation, _ = env.reset(seed=truth_seed)
             obs[0], truth[0] = observation[:2], env.state[:2]
             if env.t != 0 or not (np.isfinite(obs[0]).all() and np.isfinite(truth[0]).all()):
                 raise ValueError("Invalid PCGym initial time, observation or truth")
@@ -73,9 +75,9 @@ def prepare(make_env, params, arrays, path):
         np.random.set_state(caller_rng)
 
     manifest = dict(
-        protocol="pcgym-cstr-open-loop-v1", split="development", plant="PCGym CSTR, CasADi CVODES",
-        truth_seed=TRUTH_SEED, resets=1, steps=int(steps), dt=cfg["dt"],
-        origin_ticks=origins.tolist(), horizons=list(HORIZONS), draw_seed=DRAW_SEED,
+        protocol="pcgym-cstr-open-loop-v1", split="development" if study_seed is None else "held-out",
+        plant="PCGym CSTR, CasADi CVODES", truth_seed=truth_seed, resets=1, steps=int(steps), dt=cfg["dt"],
+        origin_ticks=origins.tolist(), horizons=list(HORIZONS), draw_seed=draw_seed,
         initial_state=np.asarray(params["x0"]).tolist(), setpoints_Ca=list(params["SP"]["Ca"]),
         observation_noise_percentage=params["noise_percentage"],
         process_noise="Qp[:3,:3] in normalized (Ca, T, bias) coordinates",
@@ -214,14 +216,17 @@ def _summary(rows):
     return summary
 
 
-def run(adapter, arrays, dataset, *, particles=512):
+def run(adapter, arrays, dataset, *, particles=512, study_seed=None):
     """Filter twelve fresh masked windows, then forecast matched posterior draws in physical units."""
     start = perf_counter()
     if isinstance(dataset, (str, Path)):
         dataset = json.loads(Path(dataset).read_text())
     if dataset["sha256"] != _digest({k: v for k, v in dataset.items() if k != "sha256"}):
         raise ValueError("Forecast manifest checksum mismatch")
-    if (dataset["protocol"] != "pcgym-cstr-open-loop-v1" or dataset["split"] != "development"
+    expected_split = "development" if study_seed is None else "held-out"
+    if (dataset["protocol"] != "pcgym-cstr-open-loop-v1" or dataset["split"] != expected_split
+            or (study_seed is not None and (dataset["truth_seed"] != 100000 + study_seed
+                                            or dataset["draw_seed"] != 200000 + study_seed))
             or _fixture_digest(arrays) != dataset["fixture_sha256"]):
         raise ValueError("Forecast dataset protocol or numerical fixture mismatch")
     if not jax.config.x64_enabled or particles < 2:

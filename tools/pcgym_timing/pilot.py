@@ -91,12 +91,12 @@ def latency(samples):
         (np.mean(samples), np.median(samples), np.quantile(samples, .95), np.max(samples)))}
 
 
-def episode(adapter, make_env, params, raw, window):
+def episode(adapter, make_env, params, raw, window, seed=SEED):
     import numpy as np
-    stream = np.random.RandomState(SEED)
+    stream = np.random.RandomState(seed)
     with plant_rng(stream):
         env = make_env(params)
-        obs, _ = env.reset(seed=SEED)
+        obs, _ = env.reset(seed=seed)
     last = 0.
     history, rows = [], []
     started = perf_counter()
@@ -147,7 +147,7 @@ def episode(adapter, make_env, params, raw, window):
     if len(rows) != expected or not (done or truncated):
         raise RuntimeError(f"Unexpected termination at {len(rows)}/{expected}")
     env.close()
-    return dict(n=expected, complete=True, seed=SEED, episode_s=perf_counter()-started,
+    return dict(n=expected, complete=True, seed=seed, episode_s=perf_counter()-started,
                 return_sum=sum(r["reward"] for r in rows), rmse_Ca=float(np.sqrt(np.mean(
                     [r["error_Ca"]**2 for r in rows]))), missed=sum(r["late"] for r in rows),
                 holds=sum(r["held"] for r in rows), failures=sum(r["status"] != "ok" for r in rows),
@@ -162,7 +162,7 @@ def configure(args):
                       MKL_NUM_THREADS="1", JULIA_NUM_THREADS="1", NUMEXPR_NUM_THREADS="1")
     sys.path[:0] = [str(ROOT / "src"), str(HERE.parent)]
     if args.arm in ("gtsam", "numpyro"):
-        extra = args.output / ("gtsam/site" if args.arm == "gtsam" else "numpyro-site")
+        extra = args.peer_root / ("gtsam/site" if args.arm == "gtsam" else "numpyro-site")
         sys.path.append(str(extra))
 
 
@@ -173,7 +173,8 @@ def worker(args, destination):
     import cstr_runtime_fixture as fixture
     _, arrays = fixture.model()
     launch = float(os.environ["PCGYM_TIMING_START"])
-    metadata = dict(runtime=runtime, phase=args.phase, arm=args.arm, start_to_imports_s=perf_counter()-launch)
+    metadata = dict(runtime=runtime, phase=args.phase, arm=args.arm, seed=args.seed,
+                    start_to_imports_s=perf_counter()-launch)
     files = [p for p in HERE.iterdir() if p.suffix in (".py", ".jl", ".cpp", ".sh")]
     artifacts = {
         "numpyro": ("numpyro-arm.lock", "numpyro-extra.lock"),
@@ -181,20 +182,21 @@ def worker(args, destination):
         "rxinfer": ("rxinfer/Project.toml", "rxinfer/Manifest.toml"),
     }
     metadata["dependency_sha256"] = {
-        name: sha256((args.output / name).read_bytes()).hexdigest()
-        for name in artifacts.get(args.arm, ()) if (args.output / name).exists()
+        name: sha256((args.peer_root / name).read_bytes()).hexdigest()
+        for name in artifacts.get(args.arm, ()) if (args.peer_root / name).exists()
     }
     if args.arm == "gtsam":
         metadata["native_binary_sha256"] = {
             p.name: sha256(p.read_bytes()).hexdigest()
-            for p in (args.output / "gtsam" / "site").glob("_gtsam_cstr*.so")
+            for p in (args.peer_root / "gtsam" / "site").glob("_gtsam_cstr*.so")
         }
     metadata["source_sha256"] = {p.name: sha256(p.read_bytes()).hexdigest() for p in files}
     manifest = destination / "manifest.json"
     save(manifest, metadata)
     if args.phase == "truth":
         from forecast import prepare
-        prepare(make_env, parameters(base, True), arrays, args.output / "forecast-truth.json")
+        prepare(make_env, parameters(base, True), arrays, args.output / "forecast-truth.json",
+                study_seed=args.seed)
         return dict(complete=True)
     module = importlib.import_module(args.arm + "_adapter")
     for name in ("numpyro", "gtsam"):
@@ -214,7 +216,7 @@ def worker(args, destination):
     try:
         if args.phase == "forecast":
             from forecast import run
-            result = run(adapter, arrays, args.output / "forecast-truth.json")
+            result = run(adapter, arrays, args.output / "forecast-truth.json", study_seed=args.seed)
         else:
             before = perf_counter()
             for hist in (True, False):
@@ -224,7 +226,7 @@ def worker(args, destination):
             warmup = perf_counter()-before
             before = perf_counter()
             result = episode(adapter, make_env, parameters(base, args.phase == "long"),
-                             destination / "ticks.jsonl", pilot.window)
+                             destination / "ticks.jsonl", pilot.window, args.seed or SEED)
             result.update(warmup_s=warmup, previous_stage_to_episode_s=before-launch)
         result.update(adapter_setup_s=setup)
         return result
@@ -238,11 +240,14 @@ def main():
     p.add_argument("phase", choices=("truth", *PHASES))
     p.add_argument("--arm", choices=ARMS, default="cffg")
     p.add_argument("--output", type=Path, required=True)
+    p.add_argument("--peer-root", type=Path, help="Pinned library installations and dependency locks")
+    p.add_argument("--seed", type=int, help="Paired study seed. Omit for the original development pilot.")
     p.add_argument("--experiment", type=Path, default=EXPERIMENT)
     p.add_argument("--run-name", help="New run directory name, e.g. numpyro-oracle-2")
     p.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     args = p.parse_args()
     args.output = args.output.resolve()
+    args.peer_root = (args.peer_root or args.output).resolve()
     destination = args.output / (args.run_name or f"{args.arm}-{args.phase}")
     if args.worker:
         try:
