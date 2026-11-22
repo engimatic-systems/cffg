@@ -263,3 +263,51 @@ def test_independent_action_horizon_keeps_additive_free_energy(dtype, horizon):
     for actual, expected in ((joint_log_mass, expected_log_mass), (entropy, expected_entropy),
                              (prior_energy - entropy, -expected_log_mass)):
         np.testing.assert_allclose(actual, expected, rtol=RELATIVE_ERROR_IN_EPS * np.finfo(dtype).eps, atol=0)
+
+
+@pytest.mark.parametrize("dtype", DTYPES)
+def test_public_tail_and_staged_independent_horizon(dtype):
+    import jax
+    from cffg.bounded_actions import BoundedGaussianPlan, BoundStatus
+
+    plan = BoundedGaussianPlan((1,)*15, (40.,)*15, (41.,)*15)
+    out = jax.jit(plan.solve)(np.zeros(15, dtype), (np.eye(1, dtype=dtype),)*15, 0.)
+    assert out.status == BoundStatus.SUCCESS
+    np.testing.assert_allclose(out.mean, FAR_TAIL.mean, rtol=24*np.finfo(dtype).eps)
+    np.testing.assert_allclose(out.covariance, np.eye(15)*FAR_TAIL.variance,
+                               rtol=128*np.finfo(dtype).eps)
+    np.testing.assert_allclose(out.free_energy, -15*FAR_TAIL.log_probability,
+                               rtol=24*np.finfo(dtype).eps)
+
+
+@pytest.mark.parametrize("lower,upper,variance,status", [
+    (1., 0., 1., 1), (0., 0., 1., 1), (0., 1., 0., 2),
+    (0., 1., -1., 2), (0., 1., np.nan, 2), (1., 1.+2**-26, 1., 3),
+])
+def test_public_invalid_inputs_have_no_command(lower, upper, variance, status):
+    from cffg.bounded_actions import BoundedGaussianPlan
+
+    out = BoundedGaussianPlan((1,), (lower,), (upper,)).solve(
+        np.zeros(1, np.float32), ([[variance]],), 0.)
+    assert out.status == status
+    assert np.isnan(out.command)
+
+
+def test_public_unit_message_uses_interval_volume():
+    from cffg.bounded_actions import unit_interval_belief
+
+    out = unit_interval_belief(-1., 3.)
+    np.testing.assert_allclose(out, [0, 1., 16/12, np.log(4), np.log(4)], rtol=1e-6)
+
+
+@pytest.mark.parametrize("dtype", DTYPES)
+@pytest.mark.parametrize("lo,hi,ref", [(128., 192., WIDE_TAIL),
+                                      (12., 12.+2**-12, NARROW_TAIL)])
+def test_public_wide_and_narrow_tail_quadrature(dtype, lo, hi, ref):
+    from cffg.bounded_actions import BoundedGaussianPlan
+
+    plan = BoundedGaussianPlan((1,), (lo,), (hi,))
+    out = plan.solve(np.zeros(1, dtype), (np.eye(1, dtype=dtype),), 0.)
+    assert out.status == 0
+    np.testing.assert_allclose([out.log_mass, out.command, out.covariance[0, 0], out.action_entropy],
+                               ref, rtol=128*np.finfo(dtype).eps)

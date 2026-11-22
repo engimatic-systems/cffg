@@ -2114,6 +2114,25 @@ particle state, and stochastic statuses exist on `Engine`, but Colony does not
 yet carry them per instance. Per-instance structure changes also fragment
 batching because each distinct hash owns a compiled engine.
 
+### Closed Gaussian actuator planning
+
+`cffg.bounded_actions.BoundedGaussianPlan` represents an unnormalized hard
+indicator on an ordered vector of actions. The versioned declaration stores
+finite endpoints and independent marginal block widths. The numerical inputs
+are the baseline energy and frozen Gaussian supplied at decision time. The
+dense constructor path in `solve_joint` forms the state conditional by solving
+against the action covariance. The factorized path in `solve` takes the
+independent action covariances and shared state conditional directly. It never
+selects a partition by thresholding observed correlations.
+
+The same JAX program runs eagerly, under JIT and under vmap. It batches
+equal-width integrals and checks two quadrature orders for agreement before
+lifting centered moments. A non-success status masks every decision readout.
+The region owns its full objective, including the single log-mass adjustment.
+It executes outside template compilation, engine sweeps and their ledger.
+The local unit-message integral is available separately in
+`unit_interval_belief`. Equations and independent references are in D15.
+
 ## Test suite (three tiers, per the brief)
 
 1. **Undirected / CSP**: small Ising or Potts grids and a mini-Sudoku; check BP

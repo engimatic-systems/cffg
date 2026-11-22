@@ -206,6 +206,16 @@ that every gap below will be implemented:
   clipped; the action belief is passed through unchanged. These are not hard
   [295,302] K actuator bounds. Larger priors/horizons, other observations or
   constants and closed-loop control performance require separate validation.
+  The standalone D15 bounded decision accepts a closed, proper frozen Gaussian
+  and finite static bounds. Its dense entry point admits up to two constrained
+  coordinates. Longer horizons require a model expressed as independent action
+  marginals, each of width at most two. Only nuisance coordinates can be shared
+  through the Gaussian state conditional. A connected H15 reactor box,
+  non-Gaussian separator messages, adaptive relinearization and point clamps
+  require different inference support. The bounded coolant example measures
+  a two-command tracking fixture. Its tracking change does not establish a
+  reactor reward or deadline improvement. Numerical quadrature can return a
+  failure for sharply correlated, broad or nearly unit-mass pairs.
   The original failed CSTR invocation was not retained; wide-prior tests are
   mechanism reproductions, not incident replay or a proven noise threshold.
   The later retained native validation is separately reproduced by

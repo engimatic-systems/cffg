@@ -3646,5 +3646,8 @@ and [Genz (1992)](https://doi.org/10.1080/10618600.1992.10477010).
 | Fifteen scalar actions can be admitted or rejected according to their dependence | `test_horizon_15_seven_certified_pairs_and_singleton` checks seven independent correlated pairs and one singleton. `test_connected_dense_three_and_adjacent_horizon_15_exceed_v1_width` checks rejection of connected larger blocks. |
 | Tail, support and precision behavior | `tests/test_bounded_action_numerics.py` exercises mirrored tails, narrow intervals, mass close to one, vacuity, improper inputs and loss of resolution in float32 and float64. `test_independent_action_horizon_keeps_additive_free_energy` checks the log-domain objective at scale. |
 
-These are mathematical reference tests. The production interface and its execution,
-serialization and convergence tests are tracked in cff-fl7h.
+The public frozen-region implementation is `cffg.bounded_actions`. The
+`test_public_*` and `test_dense_joint_and_independent_blocks_keep_full_state_correlations`
+cases in the two files above exercise its status, moments, energy, declaration
+round trip and staged execution. The matched two-command coolant fixture is
+`examples/bounded_coolant.py`.

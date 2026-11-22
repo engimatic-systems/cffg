@@ -234,3 +234,58 @@ def test_connected_dense_three_and_adjacent_horizon_15_exceed_v1_width():
         # Every nonzero entry in these constructed covariances is a known coupling.
         with pytest.raises(ValueError, match="exceeds width two"):
             v1_blocks(covariance != 0)
+
+
+def test_public_closed_region_matches_conditionally_integrated_pair_and_lift():
+    import jax
+    import jax.numpy as jnp
+    from cffg.bounded_actions import BoundedGaussianPlan, BoundStatus
+
+    plan = BoundedGaussianPlan((2,), (-1., -1.), (1., 1.))
+    assert BoundedGaussianPlan.from_dict(plan.to_dict()) == plan
+    with pytest.raises(ValueError):
+        BoundedGaussianPlan.from_dict(dict(plan.to_dict(), kind="legacy"))
+    with pytest.raises(ValueError):
+        BoundedGaussianPlan((3,), (-1.,)*3, (1.,)*3)
+    integral = conditional_integrals(MEAN, COV, BOX)
+    ref = box_quadrature(MEAN, COV, BOX)
+    gain = np.array([[.5, -.25]])
+    def solve(m):
+        return plan.solve(m, (COV,), 3., state_mean=[1.], state_gain=gain,
+                          conditional_covariance=[[.8]])
+    expected = np.r_[integral[1:] / integral[0], 1 + gain @ (ref.mean - MEAN)]
+    cross = gain @ ref.covariance
+    expected_cov = np.block([[ref.covariance, cross.T], [cross, .8 + cross @ gain.T]])
+    for out in [solve(MEAN), jax.tree.map(lambda x: x[0],
+                jax.jit(jax.vmap(solve))(jnp.asarray([MEAN, MEAN])))]:
+        assert out.status == BoundStatus.SUCCESS
+        assert_allclose(out.mean, expected)
+        assert_allclose(out.covariance, expected_cov)
+        assert_allclose(out.command, expected[0])
+        assert_allclose(out.free_energy, 3 - np.log(integral[0]))
+        assert_allclose(out.action_entropy, ref.entropy)
+    assert_allclose(plan.log_factor([[0., 1.], [0., 1.01]]), [0., -np.inf])
+
+
+def test_dense_joint_and_independent_blocks_keep_full_state_correlations():
+    from cffg.bounded_actions import BoundedGaussianPlan
+
+    pair = BoundedGaussianPlan((2,), (-1., -1.), (1., 1.))
+    gain = np.array([[1., .25], [.5, -.5]])
+    noise = np.array([[.3, .1], [.1, .4]])
+    cross = gain @ COV
+    joint = np.block([[COV, cross.T], [cross, noise + cross @ gain.T]])
+    dense = pair.solve_joint(np.r_[MEAN, [2., 0.]], joint, 4.)
+    structural = pair.solve(MEAN, (COV,), 4., state_mean=[2., 0.],
+                            conditional_covariance=noise, state_gain=gain)
+    assert dense.status == structural.status == 0
+    assert_allclose(dense.covariance, structural.covariance)
+    assert_allclose(dense.mean, structural.mean)
+    mixed = BoundedGaussianPlan((2, 1), (-1.,)*3, (1.,)*3)
+    with pytest.raises(ValueError, match="dense input"):
+        mixed.solve_joint(np.zeros(3), np.eye(3), 0.)
+    out = mixed.solve(np.r_[MEAN, 0.], (COV, [[1.]]), 0., state_mean=[0.],
+                      state_gain=[[1., 0., 1.]], conditional_covariance=[[1.]])
+    assert out.status == 0
+    assert_allclose(out.covariance[:2, 2], 0.)
+    assert out.covariance[3, 0] > 0 and out.covariance[3, 2] > 0
