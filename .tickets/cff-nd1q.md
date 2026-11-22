@@ -61,3 +61,7 @@ Research question: what happens to the ledger and the state separator when an ac
 **2026-11-22T03:46:02Z**
 
 D15 now specifies a closed-region truncated-Gaussian sum-product readout, exact energy accounting and independent scalar/pair implementation envelope. On the two-step LQ example the clipped/MAP/conditional-mean first actions are 0, −0.5 and −0.31785829. All 45 mathematical cases passed; adding dashboard tests gives 58 focused passes. One held-out reactor window was also integrated offline across all 15 correlated commands with two orderings and 12 randomized scrambles per ordering. The first mean moves about −0.32 K despite being initially feasible. Forward/reverse fine estimates 296.14214/296.14453 K. This is an exploratory frozen-window integration, with approximate numerical uncertainty and no plant reward claim. Reproduce via tools/cstr_box_oracle.py STUDY/run --output NEW_FILE and ~/agent-share/cffg-reactor-paired/bounded-actions.html. The qualified short-horizon production work remains cff-fl7h.
+
+**2026-11-22T04:12:00Z**
+
+Final integrated numerical head 1bc7dce passed 2716 default tests with 194 deselected and 4 warnings. Process wall 1179.653 seconds, within the 1200-second budget. The suite included the 45 new mathematical anchors and the existing runtime library. Frozen H15 offline result independently reproduced within 1e-12 for all per-scramble pairs. Next ticket cff-fl7h implements the approved limited block contract.
