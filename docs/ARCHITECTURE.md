@@ -1133,7 +1133,29 @@ compilation counts measure provider misses, not every JAX executable variant;
 the runtime benchmark records both. These trusted process-local callables are
 derived runtime artifacts, never serialized model or checkpoint data.
 
-After unchanged budgeted startup, `adaptive_proposals.py` compiles bounded
+For default `Engine.run`, `directed_chain_plan.py` follows compiled Gaussian
+role addresses from the prior to the terminal linear DATA emission. Each
+intermediate equality must join exactly one prediction, one linear emission
+and one outgoing Taylor transition. Positive noise, a proper prior and finite
+local evaluations are runtime conditions. A registered mean supplies the
+Jacobian and value at each current filtered input. `directed_chain.py` writes
+forward predictions, backward likelihoods, equality cavities and predictive
+DATA slots into the ordinary state. A partially observed state can carry
+singular likelihood information on the backward pass.
+
+`directed_chain_certificate.py` recomputes a synchronous map from the
+candidate's actual slots, checks local joint propriety, and assembles all
+node energies and interior-edge entropies at both the candidate and its raw
+successor. It also checks the independent sequential Gaussian innovation
+cost. `directed_chain_certified` reports this scaled natural-coordinate
+residual. A rejected numerical certificate costs one iteration. With budget
+remaining, the coupled solver starts from the caller's original state.
+`RunResult.directed_attempts` counts the attempt even after fallback.
+`Engine.step`, explicit schedules and the fixed-point derivative use their
+existing JAX programs. Colony applies the public host run separately to
+each adaptive instance. No derived schedule data enters model serialization.
+
+After budgeted startup on the coupled route, `adaptive_proposals.py` compiles bounded
 Anderson proposals for Gaussian-only adaptive plans without functional updates.
 Every map refreshes nonlinear coefficients in one fixed chart. Least-squares
 rank guards affect proposal directions only, never message precisions. Invalid

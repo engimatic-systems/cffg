@@ -36,7 +36,8 @@ def test_recent_cstr_full_certificate_and_changed_observations_reuse_executables
     for change, history, goal in ((0, False, 0.), (1, False, 0.), (2, False, 0.),
                                  (1, True, 1 / 3), (2, True, 2 / 15)):
         data = fixture.observations(change, history=history, goal=goal)
-        result = engine.run(binder.bind(base, data), fixture.BUDGET, tol=fixture.TOLERANCE)
+        result = engine.run(binder.bind(base, data), fixture.BUDGET, tol=fixture.TOLERANCE,
+                            outer_solver="trust_region")
         state = result.require_converged()
         counts = tuple(tuple(kernel._cache_size() for kernel in plan) for plan in engine._outer_kernel_cache.values())
         if executable_counts is not None:

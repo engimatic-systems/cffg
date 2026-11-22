@@ -103,7 +103,7 @@ def measure(output, method):
         recorder.names.clear()
         started = time.perf_counter()
         with jax.log_compiles(True):
-            result = engine.run(binder.bind(base, data), BUDGET, tol=TOLERANCE)
+            result = engine.run(binder.bind(base, data), BUDGET, tol=TOLERANCE, outer_solver="trust_region")
             jax.block_until_ready(result.state)
         elapsed = time.perf_counter() - started
         case = dict(index=index, kind=kind, synthetic_history=history, goal=goal,

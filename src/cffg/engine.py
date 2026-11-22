@@ -45,6 +45,8 @@ from cffg import (
 )
 from cffg.compiled import NEG as NEG  # noqa: PLC0414
 from cffg.compiled import Arena
+from cffg.directed_chain import DirectedChain, after_directed_attempt
+from cffg.directed_chain_plan import recognize_directed_chain
 from cffg.exact_strategy import ExactRunStrategy
 from cffg.execution import (
     parameters as _parameters,
@@ -171,6 +173,9 @@ class Engine:
         self._outer_kernels = OuterKernelProvider()
         self._outer_kernel_cache = self._outer_kernels.cache
         self._checks = StateChecks(arena)
+        self.directed_chain_plan = recognize_directed_chain(arena) if schedule == "auto" else None
+        self._directed = (DirectedChain(arena, self.directed_chain_plan)
+                          if self.directed_chain_plan is not None else None)
 
     # -- state construction ---------------------------------------------
 
@@ -343,6 +348,11 @@ class Engine:
         reports divergence with ``undefined_objective``. No hidden restart or
         automatic damping extends the requested work budget.
 
+        Eligible Gaussian Taylor chains on CPU can use a checked directional
+        solve in auto mode when a tolerance is supplied. A rejected candidate
+        spends one iteration before the coupled solver uses the remaining
+        budget. ``outer_solver="trust_region"`` selects the coupled reference.
+
         Mixed-GFE plans use the proof-backed trust-region residual solver by
         default. ``damp`` remains a Picard/flooding parameter and is rejected
         for that path; select ``outer_solver="picard"`` explicitly to retain
@@ -395,6 +405,15 @@ class Engine:
                 raise ValueError(
                     "damp does not apply to trust-region inference; omit it"
                 )
+            if (self._directed is not None and outer_solver == "auto" and n_iters > 0
+                    and tol is not None and np.isfinite(tol) and tol >= 0
+                    and self._directed.admits(state)):
+                proposal = self._directed.run(state, tol)
+                if (proposal.termination_reason is not OuterTerminationReason.DIRECTED_CHAIN_UNCERTIFIED
+                        or n_iters == 1):
+                    return proposal
+                return after_directed_attempt(self._run_outer_trust_region(
+                    state, n_iters - 1, tol=tol, harden_last=0))
             return self._run_outer_trust_region(
                 state, n_iters, tol=tol, harden_last=harden_last
             )
@@ -568,6 +587,10 @@ class Engine:
         ``init_state`` rather than add a posterior to an old count message.
         """
         return self._state_lifecycle.with_goal_priors(state, priors)
+
+    def gaussian_marginal(self, state: State, edge: str) -> tuple[np.ndarray, np.ndarray]:
+        """Read one named Gaussian mean and covariance on the host."""
+        return _gaussian_readouts.gaussian_marginal(self.arena, state, edge)
 
     def gaussian_marginals(self, state: State) -> dict[str, tuple[np.ndarray, np.ndarray]]:
         """Edge name -> (mean, cov). Requires a proper combined precision —

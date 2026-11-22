@@ -1,6 +1,6 @@
 ---
 id: cfp-okq2
-status: open
+status: in_progress
 deps: [cfp-ru3t]
 links: [cfp-rqcd, cfp-9806]
 created: 2026-11-21T21:30:43Z
@@ -30,3 +30,9 @@ Hybrid mixtures, loopy graphs and uncertain parameter learning require separate 
 
 ## Definitions
 An input cavity is the information arriving from the neighboring factors on the other side of an endpoint. A directed solve computes one ordered pass in each direction. A surrogate is the local Gaussian model used for the nonlinear transition.
+
+## Notes
+
+**2026-11-22T19:47:30Z**
+
+Implementing on the updated PR 189 base. Architecture: Runtime numerical or status invariant. Auto single CPU Engine.run is in scope. Explicit schedules, forced trust-region, transformations, Colony routing and checkpoint reconstruction checked separately. Testing compiler-derived topology, directional slots and candidate/successor objectives against retained PCGym data.

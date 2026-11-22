@@ -1,6 +1,6 @@
 ---
 id: cfp-ru3t
-status: open
+status: in_progress
 deps: [cfp-hlqd]
 links: []
 created: 2026-11-22T01:00:18Z
@@ -34,3 +34,13 @@ cfp-okq2 owns automatic dispatch, public documentation and matched cold/warm qua
 ## Definitions
 
 A directed message carries one neighbor’s contribution to a belief. A frozen surrogate is the Gaussian model evaluated at the expansion points selected by the input cavities.
+
+## Notes
+
+**2026-11-22T19:48:07Z**
+
+Architecture path: runtime numerical or status invariant. CPU automatic single-state inference assembles live Gaussian messages then checks the synchronous local updates and the normalized ledger. Explicit schedules and coupled trust-region retain stock behavior; Colony adaptive requests delegate to individual engines; gradients use existing pure JAX maps.
+
+**2026-11-22T19:56:08Z**
+
+Integrated the two passes, independent synchronous candidate/successor ledger certificate, method-specific diagnostics, fallback budget and per-instance Colony route. Focused checks: 18 passed across recognizer, corrupted-candidate, runtime, named-action readout, independent dense Gaussian, float32/64, invalid factor and live-binding cases. Cross-window and full integration gates tracked on cfp-okq2.
