@@ -29,3 +29,10 @@ cff-wt1c owns broader model, learning and runtime comparisons.
 ## Definitions
 A paired seed supplies matching measurement noise to independent controllers. A forecast origin is a point where observations stop and prediction begins. An interval across resampled seeds measures uncertainty due to this source of variation.
 
+
+## Notes
+
+**2026-11-22T21:33:11Z**
+
+The scored protocol was frozen at 15457bf before measuring the first held-out return. Seeds 1001 through 1030 had no role in selecting the adapters. Each seed has eight episodes and four forecast batches, run serially in fresh processes. Short and long horizons reuse the same seed. Arm order rotates across seeds and phases. Use the one-second warmed deadline, held actions on failure, unchanged clipping and all archived outcomes. Forecast truth and particle seeds are respectively 100000 + control seed and 200000 + control seed. The fixed open-loop commands give the same physical truth across seeds. Forecast uncertainty is across measurement and particle draws.
+Primary comparison is mean paired 599-decision return (CFFG minus each peer), with 20000 paired seed bootstrap draws, 95% pointwise percentile intervals, and numerical ties at absolute return differences up to 1e-8. Short return and forecasts are secondary. Manifest, qualification and per-seed raw data are in ~/agent-share/pcgym-paired-30. Launch command from the worktree is uv run --frozen --no-sync python tools/pcgym_timing/run_paired.py --output ~/agent-share/pcgym-paired-30 --peer-root ~/agent-share/pcgym-four-library-timing. All four fresh qualification workers passed. The measurement session is live.
