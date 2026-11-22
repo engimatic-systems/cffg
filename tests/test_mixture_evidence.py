@@ -214,6 +214,49 @@ def test_node_energy_and_statistics_use_the_same_sparse_responsibilities(linear)
     np.testing.assert_allclose(energy, expected, atol=1e-12)
 
 
+@pytest.mark.parametrize(("dtype", "reading"), [(np.float32, 1e4), (np.float64, 1e9)])
+@pytest.mark.parametrize("linear", [False, True])
+def test_evidence_centering_uses_live_components(dtype, reading, linear):
+    # Only the first (impossible) regime predicts the far observation.
+    k = 32
+    prior = np.arange(1., k + 1)
+    prior[::4] = 0.
+    prior /= prior.sum()
+    log_prior = np.log(np.where(prior > 0., prior, 1.)).astype(dtype)
+    log_prior[::4] = NEG
+    log_prior[::8] = -np.inf
+    # Batch a far and an ordinary reading, with identical likelihoods on support.
+    eo = jnp.array([[reading], [0.]], dtype=dtype)
+    lo = jnp.ones((2, 1, 1), dtype=dtype)
+    means = jnp.zeros((2, k, 1), dtype=dtype).at[0, 0, 0].set(reading)
+    w = jnp.ones((2, k, 1, 1), dtype=dtype)
+    le = jnp.broadcast_to(jnp.asarray(log_prior), (2, k))
+    if linear:
+        cavity, params = (eo, lo, jnp.zeros_like(eo), lo), (jnp.zeros_like(w), means, w)
+        to_selector, statistics, energy = mixg.mixlin_to_selector, mixg.mixlin_stats, mixg.mixlin_energy
+    else:
+        cavity, params = (eo, lo), (means, w)
+        to_selector, statistics, energy = mixg.mix_to_selector, mixg.mix_stats, mixg.mix_energy
+    message = jax.jit(to_selector)(*cavity, *params)
+    args = (*cavity, le, *params)
+    stats = jax.jit(statistics)(*args)
+    node_energy = jax.jit(energy)(*args)
+
+    assert stats.proper.all()
+    live = prior > 0.
+    tol = 8 * np.finfo(dtype).eps
+    np.testing.assert_array_equal(message[:, live] - message[:, 1:2], 0.)
+    np.testing.assert_allclose(stats.responsibility, np.stack([prior, prior]), rtol=tol)
+    np.testing.assert_allclose(stats.responsibility.sum(axis=1), 1., rtol=tol)
+    # On support y|reading is N(reading/2, 1/2). The affine input is an
+    # independent unit Gaussian and contributes its negative entropy.
+    expected = np.array([reading, 0.])**2 / 8 + .5 * np.log(2.) - .25
+    expected += prior[live] @ np.log(prior[live])
+    if linear:
+        expected -= .5 * np.log(2. * np.pi * np.e)
+    np.testing.assert_allclose(node_energy, expected, rtol=tol)
+
+
 @pytest.mark.parametrize("dtype", [np.float32, np.float64])
 def test_representable_inputs_with_overflowing_whitened_system_are_rejected(dtype):
     scale = dtype(1e20 if dtype is np.float32 else 1e200)
@@ -228,16 +271,17 @@ def test_representable_inputs_with_overflowing_whitened_system_are_rejected(dtyp
 
 
 @pytest.mark.parametrize("linear", [False, True])
-def test_empty_selector_support_rejects_statistics_and_energy(linear):
-    eta, precision = jnp.zeros((1, 1)), jnp.ones((1, 1, 1))
-    means, w = jnp.zeros((1, 2, 1)), jnp.ones((1, 2, 1, 1))
-    le = jnp.full((1, 2), NEG)
+def test_empty_or_invalid_selector_rejects_statistics_and_energy(linear):
+    le = jnp.array([[NEG, -jnp.inf], [0., jnp.nan], [jnp.inf, 0.]])
+    members, k = le.shape
+    eta, precision = jnp.zeros((members, 1)), jnp.ones((members, 1, 1))
+    means, w = jnp.zeros((members, k, 1)), jnp.ones((members, k, 1, 1))
     if linear:
         args = (eta, precision, eta, precision, le, w, means, w)
         stats, energy = mixg.mixlin_stats(*args), mixg.mixlin_energy(*args)
     else:
         args = (eta, precision, le, means, w)
         stats, energy = mixg.mix_stats(*args), mixg.mix_energy(*args)
-    assert not stats.proper[0]
+    assert not stats.proper.any()
     assert np.isnan(stats.responsibility).all()
     assert np.isposinf(energy).all()

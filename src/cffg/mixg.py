@@ -134,21 +134,15 @@ def _collapse(log_w: jnp.ndarray, eta: jnp.ndarray, lam: jnp.ndarray,
     return CollapseResult(_nan_unless(valid, eta_out), _nan_unless(valid, lam_out), valid)
 
 
-def _exact_probability(log_message: jax.Array, log_score: jax.Array):
-    """Normalize supported selector states without reviving exact zeros."""
-    support = log_message != jnp.asarray(NEG, log_message.dtype)
-    valid = (
-        jnp.any(support)
-        & jnp.all(jnp.isfinite(log_message))
-        & jnp.all(jnp.where(support, jnp.isfinite(log_score), True))
-    )
-    supported_score = jnp.where(support, log_score, -jnp.inf)
-    normalizer = jnp.where(
-        valid,
-        jax.scipy.special.logsumexp(supported_score),
-        jnp.asarray(0.0, log_score.dtype),
-    )
-    probability = jnp.where(support, jnp.exp(supported_score - normalizer), 0.0)
+def _exact_probability(log_message: jax.Array, log_evidence: jax.Array | None = None):
+    """Normalize selector weights, removing common offsets before adding log odds."""
+    support = _selector_support(log_message)
+    logits = jnp.where(support, log_message, -jnp.inf)
+    if log_evidence is not None:
+        evidence = jnp.where(support, log_evidence, -jnp.inf)
+        logits = (logits - logits.max()) + (evidence - evidence.max())
+    valid = jnp.any(support) & jnp.all(jnp.where(support, jnp.isfinite(logits), True))
+    probability = jax.nn.softmax(jnp.where(valid, logits, 0.0))
     return jnp.where(valid, probability, 0.0), valid
 
 
@@ -190,8 +184,7 @@ def mixlin_stats(eta_o, lam_o, eta_i, lam_i, log_mu_e, a, b, w):
             jnp.eye(lam_j.shape[-1], dtype=lam_j.dtype)[None],
         )
         evidence = linear_evidence(eo, lo, ei, li, A, bb, safe_w)
-        log_score = le + evidence.score
-        responsibility, selector_ok = _exact_probability(le, log_score)
+        responsibility, selector_ok = _exact_probability(le, evidence.score)
         proper = selector_ok & evidence.valid & jnp.all(w_ok) & jnp.all(joint_ok)
 
         covariance = gauss._pd_inverse(safe_lam)
@@ -257,7 +250,7 @@ def mixlin_predictive(eta_i, lam_i, log_mu_e, a, b, w):
         component_covariance += jnp.einsum(
             "kij,jl,kml->kim", A, input_covariance, A
         )
-        weight, selector_ok = _exact_probability(le, le)
+        weight, selector_ok = _exact_probability(le)
         mean, covariance = _collapsed_moments(
             weight, component_mean, component_covariance
         )
@@ -358,7 +351,7 @@ def mixlin_energy(eta_o, lam_o, eta_i, lam_i, log_mu_e, a, b, w):
         ok = gauss._pd_ok(W).all() & gauss._pd_ok(lam_j).all()
         d = lam_j.shape[-1]
         evidence = linear_evidence(eo, lo, ei, li, A, bb, W)
-        rho, selector_ok = _exact_probability(le, le + evidence.score)
+        rho, selector_ok = _exact_probability(le, evidence.score)
         h_s = -(rho * jnp.log(jnp.where(rho > 0., rho, 1.))).sum()
         ok &= evidence.valid & selector_ok
         logdet_j = gauss._pd_logdet(lam_j)
@@ -404,8 +397,7 @@ def mix_stats(eta_o, lam_o, log_mu_e, mean, w):
             jnp.eye(lam_q.shape[-1], dtype=lam_q.dtype)[None],
         )
         evidence = prior_evidence(eo, lo, component_mean, safe_w)
-        log_score = le + evidence.score
-        responsibility, selector_ok = _exact_probability(le, log_score)
+        responsibility, selector_ok = _exact_probability(le, evidence.score)
         covariance = gauss._pd_inverse(safe_lam)
         belief_mean = jnp.einsum("kij,kj->ki", covariance, eta_q)
         second = covariance + jnp.einsum(
@@ -442,7 +434,7 @@ def mix_predictive(log_mu_e, mean, w):
             jnp.eye(W.shape[-1], dtype=W.dtype)[None],
         )
         component_covariance = gauss._pd_inverse(safe_w)
-        weight, selector_ok = _exact_probability(le, le)
+        weight, selector_ok = _exact_probability(le)
         collapsed_mean, covariance = _collapsed_moments(
             weight, component_mean, component_covariance
         )
@@ -501,7 +493,7 @@ def mix_energy(eta_o, lam_o, log_mu_e, mean, w):
         lam_q = W + lo[None]
         d = lam_q.shape[-1]
         evidence = prior_evidence(eo, lo, m, W)
-        rho, selector_ok = _exact_probability(le, le + evidence.score)
+        rho, selector_ok = _exact_probability(le, evidence.score)
         h_s = -(rho * jnp.log(jnp.where(rho > 0., rho, 1.))).sum()
         logdet_q = gauss._pd_logdet(lam_q)
         h_gauss = 0.5 * d * (1.0 + _LOG2PI) - 0.5 * logdet_q
