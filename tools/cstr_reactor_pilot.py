@@ -561,20 +561,23 @@ def negative_controls(engine, binder, base, arrays, record):
     return results
 
 
-def stock_replays(out, arrays, selected, episode_ticks):
+def stock_replays(out, arrays, selected, episode_ticks, *, decisions_dir=None, stock_runtime=None):
     results = {}
     diagnostic_errors = {}
     failures = []
     controls_ok = False
-    engine, _, _ = fixture.make_engine()
-    binder, base = fixture.Binder(engine), engine.init_state()
+    if stock_runtime is None:
+        engine, _, _ = fixture.make_engine()
+        stock_runtime = engine, fixture.Binder(engine), engine.init_state()
+    engine, binder, base = stock_runtime
     for tick in sorted(selected):
+        record = None
         result = dict(tick=tick, historical_parity=False)
         result_path = out / f"stock-{tick:02}.json"
         if tick >= episode_ticks:
             result["missing_decision"] = True
         else:
-            decision = out / f"decision-{tick:02}.json"
+            decision = (decisions_dir or out) / f"decision-{tick:02}.json"
             record = json.loads(decision.read_text())
             result["decision_sha256"] = sha(decision)
             try:
@@ -589,7 +592,7 @@ def stock_replays(out, arrays, selected, episode_ticks):
             failures.append(tick)
         if tick == 5:
             control = dict(tick=tick, passed=False)
-            if result.get("same_state", {}).get("certified") and record["checks"] and not record["error"]:
+            if record and result.get("same_state", {}).get("certified") and record["checks"] and not record["error"]:
                 try:
                     tests = negative_controls(engine, binder, base, arrays, record)
                     controls_ok = all(v["local_rejected"] and v.get("stock_rejected", True) for v in tests.values())
@@ -604,11 +607,11 @@ def stock_replays(out, arrays, selected, episode_ticks):
                 negative_controls_passed=controls_ok)
 
 
-def episode(out, make_env, params, arrays, launch):
+def episode(out, make_env, params, arrays, launch, *, seed=SEED, controller=decide):
     start = perf_counter()
     env = make_env(params)
-    np.random.seed(SEED)  # PCGym draws its multiplicative observation noise from the global stream.
-    obs, _ = env.reset(seed=SEED)
+    np.random.seed(seed)  # PCGym draws its multiplicative observation noise from the global stream.
+    obs, _ = env.reset(seed=seed)
     reset_s = perf_counter() - start
     history, errors, rewards, warm_times = [], [], [], []
     first = {}
@@ -624,7 +627,7 @@ def episode(out, make_env, params, arrays, launch):
 
     decisions = 0
     for tick in range(params["N"] - 1):
-        record, command = decide(params, arrays, history, obs, tick)
+        record, command = controller(params, arrays, history, obs, tick)
         # Hand the selected array directly to PCGym before serializing any evidence.
         called = perf_counter()
         step_error = None
@@ -642,7 +645,7 @@ def episode(out, make_env, params, arrays, launch):
             warm_times.append(record["observation_to_action_s"])
         if checked is not None and timings["launch_to_first_checked_s"] is None:
             timings.update(launch_to_first_checked_s=checked - launch, first_checked_tick=tick)
-        record["seed"] = SEED
+        record["seed"] = seed
         save(out / f"decision-{tick:02}.json", record)
         decisions += 1
         u = float(command[0])
