@@ -161,6 +161,7 @@ def solve_outer(
                 tuple(deltas), tuple(energies), outer_residual, merit,
                 gradient_norm, radius, accepted, rejected,
                 inner_residual, inner_code,
+                outer_map_evaluations=outer_map_evaluations,
                 failure=discovery_failure,
             )
         if not _finite(current) or not _finite(mapped):
@@ -169,6 +170,7 @@ def solve_outer(
                 tuple(deltas), tuple(energies), float("inf"), float("inf"),
                 float("inf"), radius, accepted, rejected,
                 inner_residual, inner_code,
+                outer_map_evaluations=outer_map_evaluations,
                 failure=discovery_failure,
             )
         if infeasible(current) or infeasible(mapped):
@@ -177,6 +179,7 @@ def solve_outer(
                 tuple(deltas), tuple(energies), float("inf"), float("inf"),
                 float("inf"), radius, accepted, rejected,
                 inner_residual, inner_code,
+                outer_map_evaluations=outer_map_evaluations,
                 failure=discovery_failure,
             )
         if adaptive_gaussian and not chart.proper_reference:
@@ -185,7 +188,8 @@ def solve_outer(
                 current, OuterTerminationReason.INNER_FAILURE, 0,
                 tuple(deltas), tuple(energies), outer_residual, merit,
                 gradient_norm, radius, accepted, rejected,
-                float("inf"), 2, failure=discovery_failure,
+                float("inf"), 2, outer_map_evaluations=outer_map_evaluations,
+                failure=discovery_failure,
             )
         if chart.support_changed(mapped.messages) or not chart.proper_reference:
             restarts += 1
@@ -196,6 +200,7 @@ def solve_outer(
                     0, tuple(deltas), tuple(energies), float("inf"),
                     float("inf"), float("inf"), radius, accepted, rejected,
                     inner_residual, inner_code,
+                    outer_map_evaluations=outer_map_evaluations,
                     failure=discovery_failure,
                 )
             current = mapped

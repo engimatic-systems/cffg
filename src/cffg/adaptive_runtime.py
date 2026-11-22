@@ -11,7 +11,7 @@ from cffg.outer_chart import OuterArrays, OuterChart, build_outer_chart, chart_a
 
 @dataclass(frozen=True)
 class ProposalAttempt:
-    arrays: OuterArrays
+    retained: OuterArrays | None
     result: OuterSolveResult | None
     rounds: int
     accepted: int
@@ -27,7 +27,7 @@ def certify_adaptive_proposal(attempt, outer_map, energy, infeasible, tolerance)
     """Repeat the original host certificate before accepting a compiled proposal."""
     if attempt.result is None:
         return attempt
-    arrays = attempt.arrays
+    arrays = attempt.result.arrays
     mapped, inner, code, fact = outer_map(arrays)
     coordinates = chart_coordinates(attempt.chart, arrays)
     residual = chart_coordinates(attempt.chart, mapped) - coordinates
@@ -67,10 +67,10 @@ def try_adaptive_proposals(structure, eliminated, provider, state, hard_blocks, 
     rounds, count = int(proposal.rounds), int(proposal.count)
     deltas = tuple(float(value) for value in np.asarray(proposal.deltas)[:count])
     energies = tuple(float(value) for value in np.asarray(proposal.energies)[:count])
-    retained = chart_arrays(chart, proposal.coordinates) if count else arrays
+    retained = chart_arrays(chart, proposal.coordinates) if count else None
     maps = rounds
     solved = None
-    if bool(proposal.certified):
+    if retained is not None and bool(proposal.certified):
         merit, gradient = plan.root_diagnostics(proposal.coordinates, jnp.ones_like(coordinates), plan.context)
         maps += 1
         if np.isfinite(float(merit)) and np.isfinite(float(gradient)):

@@ -5,12 +5,14 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from cffg import Engine, RunStatus, compile_template
+from cffg import Engine, FailureDiagnostic, RunStatus, compile_template
+from cffg import outer_strategy
 from cffg.adaptive_proposals import _anderson, make_adaptive_proposals
 from cffg.adaptive_runtime import certify_adaptive_proposal
 from cffg.failure_facts import empty_failure
 from cffg.fixed_point import RootContext, RootProgram
 from cffg.outer_chart import OuterArrays, OuterChart, _VectorBlock
+from cffg.runtime_types import OuterTerminationReason, _replace
 from nonlinear_fixture import model
 
 
@@ -33,9 +35,65 @@ def test_nonfinite_mapped_eliminated_field_cannot_be_hidden_by_reconstruction():
     program, context = scalar_program(step, reconstruct)
     proposals = make_adaptive_proposals(program, lambda *args: jnp.asarray(0.))
     result = proposals(jnp.zeros(1), context, 2, 1e-6)
-    assert not result.certified and result.rejected == result.rounds == 2
+    assert not result.certified and result.rejected == result.rounds == 1
     assert result.count == 0
     np.testing.assert_array_equal(result.coordinates, [0.])
+
+
+def test_rejected_trial_can_backtrack_to_a_root_from_the_last_valid_point():
+    def step(messages, eta, lam, obs, mask, ef_eta, ef_obs, ef_mask, params, damp, harden):
+        x = eta[0]
+        target = jnp.where(x == 1.5, x, x + 2.)
+        return messages, eta.at[0].set(target), lam, ef_eta, 0., jnp.where(x >= 2., 2, 0)
+
+    program, context = scalar_program(step)
+    proposals = make_adaptive_proposals(program, lambda *args: jnp.asarray(0.))
+    # The first two valid points are 0 and 1. The trial at 2 fails.
+    limited = proposals(jnp.zeros(1), context, 3, 1e-6)
+    assert not limited.certified and limited.rounds == 3
+    assert limited.count == 2 and limited.rejected == 1
+    np.testing.assert_array_equal(limited.coordinates, [1.])
+
+    recovered = proposals(jnp.zeros(1), context, 4, 1e-6)
+    assert recovered.certified and recovered.rounds == 4
+    assert recovered.count == 3 and recovered.rejected == 1
+    np.testing.assert_array_equal(recovered.coordinates, [1.5])
+
+
+@pytest.mark.parametrize("dtype,stress", [(np.float32, 1e20), (np.float64, 1e200)])
+def test_first_invalid_cubic_proposal_preserves_fallback_attempt_and_budget(
+    monkeypatch, dtype, stress,
+):
+    with jax.enable_x64(dtype is np.float64):
+        template, arrays = model()
+        engine = Engine(compile_template(template, arrays=arrays))
+        state = engine.run(engine.init_state(), 60, tol=1e-9).require_converged()
+        key = engine.arena.member_of["sensor"].parameter("parameters").key
+        parameter = jnp.full_like(state.params[key], stress)
+        assert parameter.dtype == dtype and np.isfinite(parameter).all()
+        state = _replace(state, params={**state.params, key: parameter})
+
+        fallback_budgets = []
+        solve = outer_strategy.solve_outer
+
+        def record_budget(*args, **kwargs):
+            fallback_budgets.append(kwargs["n_iters"])
+            return solve(*args, **kwargs)
+
+        monkeypatch.setattr(outer_strategy, "solve_outer", record_budget)
+        for budget, proposal_rounds in ((8, 0), (9, 1), (40, 1)):
+            result = engine.run(state, budget, tol=1e-9)
+            assert result.status is RunStatus.DIVERGED
+            assert result.termination_reason is OuterTerminationReason.INNER_FAILURE
+            assert result.failure == FailureDiagnostic("improper_tilt", "sensor", "soft", 1)
+            assert result.iterations == 1 and result.rejected_steps == proposal_rounds
+            assert result.outer_map_evaluations == proposal_rounds + 1
+            assert len(result.message_deltas) == 0
+            for actual, expected in zip(
+                jax.tree.leaves(result.state), jax.tree.leaves(state), strict=True,
+            ):
+                np.testing.assert_array_equal(actual, expected)
+        assert fallback_budgets == [8, 8, 39]
 
 
 def test_canonical_successor_energy_is_required_even_when_raw_energy_cancels():

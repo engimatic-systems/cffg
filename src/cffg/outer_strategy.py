@@ -273,11 +273,11 @@ class OuterTrustRegionStrategy:
                         proposal = certify_adaptive_proposal(
                             proposal, outer_map, energy, infeasible, solver_tol,
                         )
-                if proposal is not None and proposal.result is None:
-                    proposal_arrays, _ = reconstruct_with_fact(proposal.arrays)
-                    state = as_state(proposal_arrays)
                 solved = proposal.result if proposal is not None else None
                 if solved is None:
+                    if proposal is not None and proposal.retained is not None:
+                        proposal_arrays, _ = reconstruct_with_fact(proposal.retained)
+                        state = as_state(proposal_arrays)
                     solved = solve_outer(
                         OuterArrays(state.messages, state.g_eta, state.g_lam, state.ef_eta),
                         self.structure,
@@ -300,6 +300,9 @@ class OuterTrustRegionStrategy:
                         ),
                     )
                     if proposal is not None:
+                        # A discovery failure at the original input rechecks the first
+                        # proposal attempt. Its evaluation still spent one budget unit.
+                        replayed_initial = proposal.retained is None and solved.iterations == 0
                         solved = replace(
                             solved, iterations=solved.iterations + proposal.rounds,
                             message_deltas=(*proposal.message_deltas, *solved.message_deltas),
@@ -309,7 +312,9 @@ class OuterTrustRegionStrategy:
                             outer_map_evaluations=solved.outer_map_evaluations + proposal.maps,
                             trial_evaluations=solved.trial_evaluations + max(proposal.rounds - 1, 0),
                             solver_compilations=solved.solver_compilations + proposal.compilations,
-                            failure=offset_failure(solved.failure, proposal.rounds),
+                            failure=offset_failure(
+                                solved.failure, 0 if replayed_initial else proposal.rounds,
+                            ),
                         )
                 final_arrays, reconstruction_fact = reconstruct_with_fact(solved.arrays)
                 state = as_state(final_arrays)

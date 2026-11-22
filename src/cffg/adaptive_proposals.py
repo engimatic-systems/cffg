@@ -82,7 +82,9 @@ def make_adaptive_proposals(program, belief_kernel, history_size=6):
                          jnp.asarray(jnp.inf, initial.dtype))
 
         def condition(carry):
-            return (carry.rounds < budget) & ~carry.certified
+            # Backtracking needs a point whose map has already passed validation.
+            can_propose = (carry.rounds == 0) | (carry.count > 0)
+            return (carry.rounds < budget) & ~carry.certified & can_propose
 
         def body(carry):
             (trial, retained, history, residuals, rounds, count, _, _, _, accepted,

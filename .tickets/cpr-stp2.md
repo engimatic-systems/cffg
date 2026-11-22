@@ -1,6 +1,6 @@
 ---
 id: cpr-stp2
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-11-22T02:01:05Z
@@ -39,3 +39,15 @@ A proposal is a candidate for the next set of iterative solver coordinates. Fall
 **2026-11-22T02:02:35Z**
 
 Pinned CPU/JAX probes at 92d6acc and f9df9d6 agree on improper_tilt / sensor / soft. Under budget 40 the reported failure attempt changes from 1 to 33. Under budget 9 it changes from 1 to 2. Both outcomes are still diverged. Source, commands and JSON are in ~/agent-share/cffg-premerge-review/late/.
+
+**2026-11-22T02:30:14Z**
+
+The applicable architecture row is Runtime numerical or status invariant. The affected surfaces are the compiled Gaussian proposal loop and host trust fallback, including its public failure attempt, retained state, counters and remaining phase budget. Exact/discrete schedules, functional updates, serialization, ledger and readouts are N/A. Test a finite overflow-inducing sensor parameter in float32 and float64, at budgets that skip, limit and admit proposals. Check recovery from a later invalid trial and ordinary certification. Existing startup checks cover vacuous and improper cavities. Exact categorical zeros are N/A.
+
+**2026-11-22T02:33:47Z**
+
+The compiled loop stops after the first invalid map if it has no valid point for backtracking. Trust fallback then evaluates the original state with the remaining budget. A terminal recheck there keeps the originating attempt. Discovery now includes its map call in the physical evaluation count. Once a valid point exists, rejected trials can still backtrack. The scalar regression retains 1 when the third round fails at 2, then certifies 1.5 with one more round.
+
+The original CPU pr185.py probe now reports improper_tilt on sensor in the soft phase at attempt 1 for budgets 9 and 40, with one rejection, one charged iteration and two map evaluations each. Regression tests also verify float32 (1e20), float64 (1e200), equality of every returned state leaf to the prior state, and remaining trust budgets of 8, 8 and 39 for requested budgets 8, 9 and 40.
+
+uv run pytest -q tests/test_adaptive_runtime.py tests/test_adaptive_startup.py tests/test_outer_failures.py passed 71 tests with 2 slow tests deselected. A final focused rerun covering first rejection, later recovery and fallback passed 5 tests. Cooper owns the integrated short-suite gate.
