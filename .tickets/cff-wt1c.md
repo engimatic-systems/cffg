@@ -63,3 +63,7 @@ PCGym comparison inputs are available from the integrated directed and bounded i
 **2026-11-22T21:21:40Z**
 
 Four-library timing pilot cpt-ydse qualified CFFG directed Gaussian inference, native RxInfer streaming linearization, NumPyro joint Laplace, and sparse GTSAM LM on three common affine Gaussian windows apiece. Seed 0 completed all eight fixed-model control runs and 48 forecast origins. Use tools/pcgym_timing/ and ~/agent-share/pcgym-four-library-timing/index.html for the frozen pilot protocol, gate tolerances, native version locks, per-tick traces and projection. Both lengths plus twelve forecasts per arm on 30 seeds project to 51 min serial on the M2 Max under one warm deadline. The one-seed returns and 12 overlapping forecast origins do not establish a population ranking, calibration, or adaptation to parameter drift.
+
+**2026-11-22T22:25:59Z**
+
+Fixed-model four-library comparison cpt-j81k finished on 30 paired seeds. CFFG tied RxInfer on all 30 long runs and achieved +0.6245 mean return against each of NumPyro and GTSAM (95% paired-seed intervals +0.6141 to +0.6349). Short-run differences crossed zero. All 78,960 commands met the warmed one-second deadline and all 1,440 forecasts scored. The report and raw evidence are at ~/agent-share/pcgym-paired-30/. These arms vary sensor noise on a fixed reactor with fixed model parameters. Other model, bounds and learning comparisons under this parent retain their own prerequisites.
