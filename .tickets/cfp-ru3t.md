@@ -1,6 +1,6 @@
 ---
 id: cfp-ru3t
-status: in_progress
+status: closed
 deps: [cfp-hlqd]
 links: []
 created: 2026-11-22T01:00:18Z
@@ -44,3 +44,7 @@ Architecture path: runtime numerical or status invariant. CPU automatic single-s
 **2026-11-22T19:56:08Z**
 
 Integrated the two passes, independent synchronous candidate/successor ledger certificate, method-specific diagnostics, fallback budget and per-instance Colony route. Focused checks: 18 passed across recognizer, corrupted-candidate, runtime, named-action readout, independent dense Gaussian, float32/64, invalid factor and live-binding cases. Cross-window and full integration gates tracked on cfp-okq2.
+
+**2026-11-22T20:53:49Z**
+
+Production gate passed at 8c4993a. Default Engine.run solved all 599 retained/held-out PCGym windows in one directed attempt, plus H194 and fresh/warm stock-map checks for both dtypes on the H2 model. Full numerical gate: 2755 passed, 194 opt-in cases deselected. See cfp-okq2 for timing boundaries and the post-gate suite-budget selection.

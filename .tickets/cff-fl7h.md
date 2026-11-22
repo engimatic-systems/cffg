@@ -1,6 +1,6 @@
 ---
 id: cff-fl7h
-status: in_progress
+status: closed
 deps: [cff-nd1q]
 links: []
 created: 2026-09-25T03:46:26Z
@@ -69,3 +69,7 @@ Graph integration: portable wrapper owns a source template plus bounded edge/coo
 **2026-11-22T19:58:59Z**
 
 Graph path delivered on feature/bounded-actions in ae84866, with directed tip a343a98 merged in 7b3a08d. Dtype-scale covariance symmetry guard 5588a88; reactor horizon fd8f8d1; shared graph oracle fixture 3a05aae; selected-edge first/warm timing and regression 709d642. README graph example and docs/ARCHITECTURE, LIMITATIONS and DERIVATIONS D15 updated. Reproduce from this worktree with UV_PROJECT_ENVIRONMENT=/Users/ravd/projects/cffg/.venv and PYTHONPATH=$PWD/src: uv run --no-sync pytest -q tests/test_bounded*.py tests/test_cstr_runtime.py tests/test_directed_chain_{plan,run}.py -> 83 passed, 3 opt-in slow deselected, 21.85s. Includes original hostile-input guards, dense precision independent oracle, transport/scoping, changed goals, mixed dtype/mutated parameters, foreign and nonterminal certificates, alias/terminal-edge/width checks and real H15 declaration rejection. uv run --no-sync python tools/cstr_bounded_comparison.py -> directed_chain_certified. Clipped vs bounded first command 295.177973 vs 295.849702 K, objective 32.249295 vs 32.824832 nats, one-step concentration tracking error 0.027459 vs 0.028521. Adjacent action covariance 0.0352643. Single local first/warm readout times 0.134/0.106 ms selected-edge clipped, 332.86/5.05 ms bounded, after shared solve 176.92 ms. Full suite and held-out validation are parent-owned; leave ticket in progress for integration gate.
+
+**2026-11-22T20:53:49Z**
+
+Integrated and validated with the production directed engine at 8c4993a. All 2755 short-suite cases passed. The actual P4/H2 graph declares two bounded commands, reconstructs their correlation and the nuisance states, and runs the normalized closed-region readout. The matched run produced 295.850 K bounded vs 295.178 K clipped; absolute next-step concentration error was 0.02852 vs 0.02746. Dense H15 is rejected before compilation. The low-level functional solve supports JIT/vmap; the certified graph wrapper is a host terminal readout. Reproduce with uv run python tools/cstr_bounded_comparison.py.

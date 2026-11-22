@@ -72,7 +72,9 @@ def gaussian_goal_chain(length=2, mean=0.0):
     return template, arrays, observations
 
 
-@pytest.mark.parametrize("enabled,length", [(False, 2), (True, 2), (True, 20)])
+@pytest.mark.parametrize("enabled,length", [
+    (False, 2), pytest.param(True, 2, marks=pytest.mark.slow), (True, 20),
+])
 @pytest.mark.parametrize("tol", [None, 1e-6])
 def test_irrelevant_hardening_preserves_exact_gaussian_result(enabled, length, tol):
     with jax.enable_x64(enabled):

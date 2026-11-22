@@ -55,3 +55,7 @@ Shared terms: CFFG means constrained Forney-style factor graph; JAX is the numer
 **2026-11-22T03:38:43Z**
 
 Fixed-model reactor arm cfp-lsxw is complete. The paired deadline protocol favored the directed reference on all ten seeds (+0.353259 mean return); all fifty directed candidate replays passed stock checks. Startup accounted for much of the observed gap. See ~/agent-share/cffg-reactor-paired/index.html. Other arm prerequisites remain open.
+
+**2026-11-22T20:53:49Z**
+
+PCGym comparison inputs are available from the integrated directed and bounded implementation. For P4/H15 use Engine.run with the default schedule and explicit tolerance, read gaussian_marginal on the current action edge, and log termination_reason plus startup timing boundaries. For an H2 clipping-vs-box comparison use the same graph, data and directed solve with tools/cstr_bounded_comparison.py. Do not use separate scalar boxes as a proxy for the correlated 15-command box. Keep seed/noise/initial conditions/goals/horizon, physical actuator constraints, deadline start and fallback identical across libraries. Existing 599-window replay validates numeric parity; closed-loop return and cross-library performance remain to be measured.

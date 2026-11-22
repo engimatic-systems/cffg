@@ -1,6 +1,6 @@
 ---
 id: cfp-okq2
-status: in_progress
+status: closed
 deps: [cfp-ru3t]
 links: [cfp-rqcd, cfp-9806]
 created: 2026-11-21T21:30:43Z
@@ -36,3 +36,7 @@ An input cavity is the information arriving from the neighboring factors on the 
 **2026-11-22T19:47:30Z**
 
 Implementing on the updated PR 189 base. Architecture: Runtime numerical or status invariant. Auto single CPU Engine.run is in scope. Explicit schedules, forced trust-region, transformations, Colony routing and checkpoint reconstruction checked separately. Testing compiler-derived topology, directional slots and candidate/successor objectives against retained PCGym data.
+
+**2026-11-22T20:53:49Z**
+
+Integrated clean code head 8c4993a: tools/qualify_directed_reactor.py passed 9 retained and 590 held-out decisions from 10 seeds, all using the public directed method. All 59 archived coupled-solver comparisons passed; deliberately stale data was rejected by both independent checks. Warm held-out median 7.230 ms; cold after engine preparation 208.64 ms; process launch to first action 1.402 s with disk cache disabled, preparation 0.819 s. Maximum held-out absolute action difference vs archived coupled solver 2.13e-6 K. Scaling from 6/19/194 transitions: warm median 3.97/6.96/48.41 ms. Among supported fields these are replay/latency results, not closed-loop return comparisons. Logs and raw JSON under ~/agent-share/auto-dispatch-plus-paired-reactor-neon/. The final full gate passed: 2755 passed, 194 opt-in deselected, four warnings. Measured wall time 1203.506s. Moved only the duplicate length-2 float64 hardening parameters (2.49+2.46s) to slow for an estimated default 1198.556s. Retained float64 length 20 and float32 length 2 with both tolerances; verified collection. Reused the passing run per session rule.
