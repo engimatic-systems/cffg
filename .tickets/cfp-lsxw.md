@@ -40,3 +40,7 @@ A paired seed exposes both controllers to the same initial conditions and source
 **2026-11-22T03:24:16Z**
 
 Implementing on experiment/paired-reactor-and-bounds above #187. Architecture row Runtime numerical or status invariant as an external consumer only. Reuse identical pilot simulation, clipping, deadlines, statuses and observation history. Compare the directed reference to the real host controller; replay saved windows through Engine separately. No production Engine, Colony, learning, checkpoint or scheduling semantics change. The held-out protocol and the seed-pair bootstrap are fixed before any comparisons. Keep all failed or late trials and archive raw diagnostic windows.
+
+**2026-11-22T03:29:11Z**
+
+Before held-out measurement: odd seeds run directed first and even seeds run host first. Descriptive near-switch bin uses scored steps 18-22 and 38-42 (decision ticks 17-21 and 37-41), within two steps of the switches. Record both the widest raw proposal gap and widest applied action gap if they occur on different inputs. Replay failures/misses and selected windows from immutable recorded history. Pilot/control facts and raw source hashes are in the manifests.
