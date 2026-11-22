@@ -52,6 +52,10 @@ def configure(factor, sizes):
     except (ValueError, TypeError, AttributeError, IndexError) as error:
         raise MeanShapeError(f"factor {factor.name!r}: mean shape/configuration error: {error}") from error
 
+    def value_with_aux(center, parameters):
+        value = evaluate(center, parameters)
+        return value, value
+
     def results(eta, precision, params, dims, observed_role, observation, mask):
         import jax.numpy as jnp
         from cffg.nonlinear import local_result
@@ -145,6 +149,8 @@ def configure(factor, sizes):
         objective=f"{spec.method}_frozen_gaussian_bethe",
         work=work,
         admission=admission,
+        taylor_linearize=(jax.jit(jax.jacfwd(value_with_aux, has_aux=True))
+                         if spec.method == "linearization" else None),
     )
 
 
