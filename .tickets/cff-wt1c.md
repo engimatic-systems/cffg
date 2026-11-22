@@ -49,3 +49,9 @@ No additional future work is identified within this ticket; the completed outcom
 Ablation: a comparison changing one component. Compute budget: allowed time or computational resources. Microbenchmark: timing one defined operation. Oracle: independent mathematical reference.
 
 Shared terms: CFFG means constrained Forney-style factor graph; JAX is the numerical array/compiler library; dtype is a numeric storage type; free energy is the model's inference objective; host/JIT compares Python-side and compiled execution; single/vmap compares one instance with vectorized instances; N/A means not applicable.
+
+## Notes
+
+**2026-11-22T03:38:43Z**
+
+Fixed-model reactor arm cfp-lsxw is complete. The paired deadline protocol favored the directed reference on all ten seeds (+0.353259 mean return); all fifty directed candidate replays passed stock checks. Startup accounted for much of the observed gap. See ~/agent-share/cffg-reactor-paired/index.html. Other arm prerequisites remain open.
