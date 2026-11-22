@@ -2,7 +2,7 @@
 id: cff-ees0
 status: open
 deps: []
-links: []
+links: [cpc-7tbv]
 created: 2026-09-25T03:46:25Z
 type: feature
 priority: 1
