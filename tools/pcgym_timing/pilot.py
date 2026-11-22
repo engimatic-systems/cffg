@@ -11,6 +11,7 @@ import importlib.metadata
 import json
 import os
 from pathlib import Path
+import math
 import subprocess
 import sys
 from time import perf_counter
@@ -31,6 +32,19 @@ def jsonable(x):
     if hasattr(x, "tolist"):
         return x.tolist()
     raise TypeError(str(type(x)))
+
+
+def diagnostic(value):
+    """Keep nonfinite failure diagnostics legible in strict JSON evidence."""
+    if isinstance(value, dict):
+        return {k: diagnostic(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [diagnostic(v) for v in value]
+    if hasattr(value, "tolist"):
+        return diagnostic(value.tolist())
+    if isinstance(value, float) and not math.isfinite(value):
+        return str(value)
+    return value
 
 
 def save(path, obj):
@@ -120,7 +134,7 @@ def episode(adapter, make_env, params, raw, window):
                 raise ArithmeticError(f"Invalid plant output at tick {tick}")
             row = dict(tick=tick, obs=obs[:2], target=target, next_true_state=truth, reward=reward,
                        error_Ca=float(truth[0]-target), action=action, applied=last, late=late,
-                       held=late or status != "ok", status=status, error=msg, native=native,
+                       held=late or status != "ok", status=status, error=msg, native=diagnostic(native),
                        solve_s=solved-begin_solve, decision_s=ready-start)
             out.write(json.dumps(row, default=jsonable, allow_nan=False) + "\n")
             out.flush()
@@ -160,7 +174,16 @@ def worker(args, destination):
     _, arrays = fixture.model()
     launch = float(os.environ["PCGYM_TIMING_START"])
     metadata = dict(runtime=runtime, phase=args.phase, arm=args.arm, start_to_imports_s=perf_counter()-launch)
-    files = list(HERE.glob("*.py")) + list(HERE.glob("*.jl"))
+    files = [p for p in HERE.iterdir() if p.suffix in (".py", ".jl", ".cpp", ".sh")]
+    artifacts = {
+        "numpyro": ("numpyro-arm.lock", "numpyro-extra.lock"),
+        "gtsam": ("gtsam/requirements.txt", "gtsam/build.lock"),
+        "rxinfer": ("rxinfer/Project.toml", "rxinfer/Manifest.toml"),
+    }
+    metadata["dependency_sha256"] = {
+        name: sha256((args.output / name).read_bytes()).hexdigest()
+        for name in artifacts.get(args.arm, ()) if (args.output / name).exists()
+    }
     metadata["source_sha256"] = {p.name: sha256(p.read_bytes()).hexdigest() for p in files}
     manifest = destination / "manifest.json"
     save(manifest, metadata)
@@ -217,7 +240,7 @@ def main():
         try:
             answer = worker(args, destination)
             save(destination / "result.json", answer)
-            return int(answer.get("complete") is False)
+            return int(answer.get("complete") is False or answer.get("status") == "failed")
         except Exception:
             save(destination / "error.json", dict(error=traceback.format_exc()))
             raise
