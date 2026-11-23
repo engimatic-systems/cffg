@@ -131,7 +131,10 @@ def _log_density(innovation, variance):
 class Learner:
     """Continuous scalar point estimate with local covariance in log coordinates."""
 
-    def __init__(self):
+    def __init__(self, *, motion_sd=MOTION_SD):
+        if not isfinite(motion_sd) or motion_sd < 0:
+            raise ValueError("Motion standard deviation must be finite and nonnegative")
+        self.motion_sd = float(motion_sd)
         self._z = 0.
         self._variance = INITIAL_SD**2
         self.n_updates = 0
@@ -147,7 +150,7 @@ class Learner:
         if noise <= 0:
             raise ArithmeticError("nonpositive conditional temperature variance")
 
-        prior = self._variance + MOTION_SD**2
+        prior = self._variance + self.motion_sd**2
         innovation = observed - expected
         total = noise + derivative**2 * prior
         gain = prior * derivative / total

@@ -181,7 +181,7 @@ def tape(make_env, params, condition, out):
     save(out / f"tape-forecasts-{condition}.json", forecasts)
 
 
-def episode(make_env, params, arrays, fixture, window, seed, condition, arm, out):
+def episode(make_env, params, arrays, fixture, window, seed, condition, arm, out, *, motion_sd=None):
     import numpy as np
     from continual_estimator import Learner, predict, warmup
     from continual_plant import make_plant
@@ -196,7 +196,12 @@ def episode(make_env, params, arrays, fixture, window, seed, condition, arm, out
         planner.install(ua)
         if planner.solve(fixture.observations(history=hist, goal=.19))["status"] != "ok":
             raise ValueError("Controller warmup failed")
-    learner = Learner() if arm == "learned" else None
+    if arm in ("candidate", "original"):
+        learner = Learner(motion_sd=motion_sd)
+    elif arm in ARMS and motion_sd is None:
+        learner = Learner() if arm == "learned" else None
+    else:
+        raise ValueError(f"Unsupported learner configuration: {arm}, {motion_sd}")
     setup_s = perf_counter()-setup_start
     plant = make_plant(make_env, params, coefficients, seed)
     history = []
@@ -249,7 +254,8 @@ def episode(make_env, params, arrays, fixture, window, seed, condition, arm, out
         plant.close()
     save(stem.with_suffix(".json"), dict(seed=seed, condition=condition, arm=arm, steps=STEPS,
          total_return=total, holds=holds, warm_setup_s=setup_s, episode_s=perf_counter()-start,
-         terminal_update=diagnostic(terminal_update), trace_sha256=digest(stem.with_suffix(".jsonl"))))
+         terminal_update=diagnostic(terminal_update), trace_sha256=digest(stem.with_suffix(".jsonl")),
+         motion_sd=learner.motion_sd if learner is not None else None))
 
 
 def run_all(out):
