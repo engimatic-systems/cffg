@@ -161,8 +161,8 @@ def observed(a, b, direction):
     if not all(map(numeric, (a, b))):
         return "Insufficient paired measurements"
     if direction == "width":
-        if a == b:
-            return "Same width. Judge with coverage."
+        if fmt(a) == fmt(b):
+            return "Same width to the displayed precision. Judge with coverage."
         return f'{"CFFG" if a < b else "RxInfer"} narrower. Judge with coverage.'
     if direction == "coverage":
         a, b = abs(a-.9), abs(b-.9)
@@ -227,19 +227,41 @@ def learning_errors(data, seeds):
     return {key: list(cell.values()) for key, cell in errors.items()}
 
 
-def learning_summary(errors):
-    changes = []
-    for lib in LIBS:
-        fixed = fmean(errors[lib, "frozen"])
-        learned = fmean(errors[lib, "adaptive"])
-        delta = learned - fixed
-        if fmt(fixed) == fmt(learned):
-            changes.append(f"gave the same mean error to the displayed precision for {NAMES[lib]}")
-            continue
-        size = f"{abs(delta)/fixed:.1%}" if fixed > 0 else f"{fmt(abs(delta))} concentration units"
-        changes.append(f'{"reduced" if delta < 0 else "increased"} mean error by {size} for {NAMES[lib]}')
-    return ("Compared with keeping the nominal transfer rate fixed, learning it from the two outlets "
-            + " and ".join(changes) + ". These changes are relative to each library’s own fixed-rate error.")
+def learning_summary(errors, groups):
+    def describe(means):
+        observations = {}
+        for lib in LIBS:
+            fixed, learned = means[lib, "frozen"], means[lib, "adaptive"]
+            delta = learned - fixed
+            if fmt(fixed) == fmt(learned):
+                change = "gave the same mean error to the displayed precision"
+            else:
+                size = f"{abs(delta)/fixed:.1%}" if fixed > 0 else f"{fmt(abs(delta))} concentration units"
+                change = f'{"reduced" if delta < 0 else "increased"} mean error by {size}'
+            observations.setdefault(change, []).append(NAMES[lib])
+        return " and ".join(f'{change} for {" and ".join(names)}' for change, names in observations.items())
+
+    def group_means(condition, mode, period, metric):
+        return {(g["library"], g["arm"]): g[period][metric] for g in groups
+                if (g["mode"], g["condition"]) == (mode, condition) and g.get(period)}
+
+    hidden = {key: fmean(values) for key, values in errors.items()}
+    tracking = group_means("changing", "control", "changed", "tracking_rmse")
+    keys = [(lib, arm) for lib in LIBS for arm in ("frozen", "adaptive")]
+    changing = "During changes, learning the transfer rate " + describe(hidden) + " on the hidden concentrations."
+    if all(numeric(tracking.get(key)) for key in keys):
+        changing += " For X5 target tracking, learning " + describe(tracking) + "."
+    paragraphs = [changing + " These gains and costs use each library’s own fixed-rate filter as the reference."]
+    stationary_hidden = group_means("stationary", "tape", "overall", "hidden_rmse")
+    stationary_tracking = group_means("stationary", "control", "overall", "tracking_rmse")
+    if all(numeric(means.get(key)) for means in (stationary_hidden, stationary_tracking) for key in keys):
+        fixed_wins = all(means[lib, "frozen"] < means[lib, "adaptive"]
+                         for means in (stationary_hidden, stationary_tracking) for lib in LIBS)
+        lead = ("On the stationary plant, keeping the correct nominal rate gave lower error on both tasks."
+                if fixed_wins else "On the stationary plant, the nominal rate stayed correct.")
+        paragraphs.append(lead + " Over the full episode, adapting " + describe(stationary_hidden) +
+                          " on the hidden concentrations. For X5 tracking, adapting " + describe(stationary_tracking) + ".")
+    return paragraphs
 
 
 def speed_summary(data, cold):
@@ -340,10 +362,32 @@ def visit_results(data):
             rows.append((label, *(fmt(n) for n in values), observed(*values, "lower")))
     if not rows:
         return ""
-    return disclosure("Hidden error across repeated changes",
-        "<p>Smaller error means a better estimate on the shared recording. A second visit measures how "
-        "well the filter adapts again. The reference and disturbances also affect how difficult each segment is.</p>"
-        + table("Hidden concentration error by changed segment", ["Segment", "CFFG", "RxInfer", "Observed result"], rows))
+    segments = disclosure("Hidden concentration error across changed segments",
+        table("Hidden concentration error by changed segment", ["Segment", "CFFG", "RxInfer", "Observed result"], rows))
+    contrasts = []
+    for entry in data.get("within_library", []):
+        if (entry["condition"], entry["arm"], entry["contrast"]) != ("changing", "adaptive", "second_minus_first_abrupt_visit"):
+            continue
+        ci = entry.get("ci95")
+        if not ci or len(ci) != 2 or not all(map(numeric, ci)):
+            continue
+        lo, hi = ci
+        finding = "Inconclusive" if lo <= 0 <= hi else "Lower error on the second visit" if hi < 0 else "Higher error on the second visit"
+        metric = "Hidden concentrations" if entry["mode"] == "tape" else "X5 target tracking"
+        contrasts.append((NAMES[entry["library"]], metric, fmt(entry["mean_difference"]),
+                          f"{fmt(lo)} to {fmt(hi)}", finding))
+    if not contrasts:
+        return segments
+    finding = ('The paired intervals all include zero. The study found no clear improvement on a repeat visit.'
+               if all(row[-1] == "Inconclusive" for row in contrasts)
+               else 'A difference between visits measures readaptation under the conditions of that visit.')
+    return section("Did performance improve on a repeat visit?",
+        f'<p>{finding} Each 600-step block includes two abrupt visits to the changed rate. '
+        'The comparison subtracts the first visit’s error from the second’s within each seed. '
+        'A negative difference favors the second visit. The filter carries its current estimate continuously '
+        'and has no separate memory of earlier regimes.</p>' +
+        table("Second minus first visit", ["Library", "Error measure", "Mean difference",
+              "Paired 95% interval", "Interpretation"], contrasts) + segments)
 
 
 def recovery(runs):
@@ -617,7 +661,8 @@ def render(root):
         cold = cold_times(root, freeze.get("qualification_sha256", {}))
         seeds = freeze["seeds"]
         errors = learning_errors(data, seeds)
-        opening = f"<p>{txt(learning_summary(errors))}</p><p>{txt(speed_summary(data, cold))}</p>"
+        paragraphs = learning_summary(errors, data["groups"]) + [speed_summary(data, cold)]
+        opening = "".join(f"<p>{txt(line)}</p>" for line in paragraphs)
         margin = freeze.get("practical_margin", (data.get("primary") or {}).get("margin"))
         main_result = primary(data, margin, opening) + learning_figure(root, errors, len(seeds))
         intro = ""
