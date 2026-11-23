@@ -3,6 +3,7 @@
 from importlib import import_module
 
 
+_SUBPACKAGES = {"core", "models"}
 _EXPORTS = {
     "CorridorEnv": "models.gridworld",
     "DiscreteBinding": "kernel_bindings",
@@ -47,6 +48,8 @@ _EXPORTS = {
 
 def __getattr__(name):
     """Keep core imports independent of JAX while retaining the public facade."""
+    if name in _SUBPACKAGES:
+        return import_module(f".{name}", __name__)
     module = _EXPORTS.get(name)
     if module is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
@@ -56,6 +59,6 @@ def __getattr__(name):
 
 
 def __dir__():
-    return sorted(set(globals()) | set(__all__))
+    return sorted(set(globals()) | set(__all__) | _SUBPACKAGES)
 
 __all__ = list(_EXPORTS)

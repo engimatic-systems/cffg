@@ -15,7 +15,11 @@ class NoRuntime(importlib.abc.MetaPathFinder):
             raise AssertionError('core imported runtime: ' + fullname)
 
 sys.meta_path.insert(0, NoRuntime())
+import cffg
+assert "cffg.core" not in sys.modules
+template_type = cffg.core.Template
 from cffg.core import BlobRef, FactorSpec, FunctionSpec, PortRole, PortSpec, Template, VariableSpec, validate
+assert template_type is Template
 from cffg.core.serialize import from_json, structure_hash, to_json
 t = Template('empty')
 validate(t)
@@ -35,6 +39,19 @@ from dataclasses import replace
 t.factors['f'] = replace(t.factors['f'], function=neural_mean((1, 2, 1)))
 assert structure_hash(from_json(to_json(t))) == structure_hash(t)
 assert not {'jax', 'jaxlib', 'equinox'} & sys.modules.keys()
+assert "cffg.models" not in sys.modules
+"""], check=True)
+
+
+def test_models_attribute_after_plain_import():
+    subprocess.run([sys.executable, "-c", """
+import sys
+import cffg
+assert {"core", "models"} <= set(dir(cffg))
+assert not {"cffg.core", "cffg.models"} & sys.modules.keys()
+builder = cffg.models.rslds
+from cffg.models.rslds import rslds
+assert builder is rslds
 """], check=True)
 
 

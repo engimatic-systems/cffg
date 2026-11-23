@@ -1,6 +1,6 @@
 ---
 id: cpr-pch9
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-11-22T02:01:05Z
@@ -38,3 +38,7 @@ A facade is a supported access point for public objects. Lazy loading imports a 
 **2026-11-22T02:02:35Z**
 
 Attribution verified with fresh interpreters. Both attribute reads work on PR 155 and fail on PR 156, where 7ca753a introduces lazy root exports. PR 158 retains this behavior. See ~/agent-share/cffg-premerge-review/early/observed.txt.
+
+**2026-11-23T03:10:32Z**
+
+Reproduced both missing attributes in separate isolated Python processes before editing. The root facade now imports core and models on attribute access and lists both in dir(cffg). The existing wildcard export catalogue is preserved. The core subprocess also blocks JAX and Equinox and checks that models stays unloaded. Validation passed with uv run --frozen --no-sync python -I -m pytest -q tests/test_core_imports.py tests/test_public_api.py::test_top_level_facade_reexports_only_canonical_owners (4 tests). Parent owns the final short suite.
