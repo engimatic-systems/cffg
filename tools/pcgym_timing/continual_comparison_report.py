@@ -22,6 +22,7 @@ REFERENCES = {
     "stationary_penalty": "stationary penalty",
     "informed_control_headroom": "informed control gain",
     "candidate_control_benefit": "selected control gain",
+    "settled_parameter_error": "settled UA error",
     "recovery": "recovery",
     "retention": "original gain retained",
     "reliability": "reliability",
@@ -147,7 +148,8 @@ def adaptation(libraries):
         'by the original learner’s positive gain.</p>',
         details("Engineering reference checks by planner",
                 '<p>The reference asks for ≥1% median tracking gain on the changed plant with gains on ≥8/10 '
-                'seeds for both selected and informed, ≤1% stationary penalty, ≥90% of the original '
+                'seeds for both selected and informed, ≤1% stationary penalty, ≥50% lower settled UA error '
+                'than frozen, ≥90% of the original '
                 'tracking gain, timely recovery at both switches, and zero '
                 'holds, failed solves or missed deadlines.</p>'
                 + table("Engineering checks", ["Planner", "Reference criteria missed"], references)),
