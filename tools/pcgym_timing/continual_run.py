@@ -181,7 +181,8 @@ def tape(make_env, params, condition, out):
     save(out / f"tape-forecasts-{condition}.json", forecasts)
 
 
-def episode(make_env, params, arrays, fixture, window, seed, condition, arm, out, *, motion_sd=None):
+def episode(make_env, params, arrays, fixture, window, seed, condition, arm, out, *,
+            motion_sd=None, planner=None, provenance=None):
     import numpy as np
     from continual_estimator import Learner, predict, warmup
     from continual_plant import make_plant
@@ -190,7 +191,9 @@ def episode(make_env, params, arrays, fixture, window, seed, condition, arm, out
     stem = directory / f"{condition}-{arm}"
     coefficients = schedule(condition)
     setup_start = perf_counter()
-    planner = ReactorPlanner(arrays, fixture.CONFIGURATION)
+    shared_planner = planner is not None
+    if not shared_planner:
+        planner = ReactorPlanner(arrays, fixture.CONFIGURATION)
     warmup()
     for ua, hist in ((51100., True), (NOMINAL, False)):
         planner.install(ua)
@@ -224,7 +227,10 @@ def episode(make_env, params, arrays, fixture, window, seed, condition, arm, out
                 after_update = perf_counter()
                 planner.install(ua)
                 inputs = window(params, history, obs, tick)
-                proposal = planner.solve(inputs["data"])
+                try:
+                    proposal = planner.solve(inputs["data"])
+                except (ArithmeticError, RuntimeError, ValueError) as exc:
+                    proposal = dict(status="error", action=None, error=f"{type(exc).__name__}: {exc}")
                 status, raw = proposal["status"], proposal.get("action")
                 if status == "ok" and not np.isfinite(raw):
                     status, raw = "nonfinite", None
@@ -241,12 +247,15 @@ def episode(make_env, params, arrays, fixture, window, seed, condition, arm, out
                     raise ValueError("Unexpected episode termination")
                 total += reward
                 holds += held
-                write_row(stream, dict(tick=tick, obs=obs, next_obs=next_obs, truth=truth,
+                row = dict(tick=tick, obs=obs, next_obs=next_obs, truth=truth,
                           target=params["SP"]["Ca"][tick+1], true_ua=coefficients[tick],
                           ua=ua, prediction=prediction, applied=applied, raw_action=raw,
                           status=status, held=held, late=late, decision_s=decision_s,
                           update_s=after_update-decision_start, forecast_s=forecast_s,
-                          update=diagnostic(update), reward=reward, residual=proposal.get("residual")))
+                          update=diagnostic(update), reward=reward, residual=proposal.get("residual"))
+                if shared_planner:
+                    row["native"] = diagnostic({k: v for k, v in proposal.items() if k not in ("status", "action")})
+                write_row(stream, row)
                 history.append((obs.copy(), applied))
                 obs, last = next_obs, applied
         terminal_update = learner.update(history[-1][0], last, obs) if learner is not None else None
@@ -255,7 +264,7 @@ def episode(make_env, params, arrays, fixture, window, seed, condition, arm, out
     save(stem.with_suffix(".json"), dict(seed=seed, condition=condition, arm=arm, steps=STEPS,
          total_return=total, holds=holds, warm_setup_s=setup_s, episode_s=perf_counter()-start,
          terminal_update=diagnostic(terminal_update), trace_sha256=digest(stem.with_suffix(".jsonl")),
-         motion_sd=learner.motion_sd if learner is not None else None))
+         motion_sd=learner.motion_sd if learner is not None else None, **(provenance or {})))
 
 
 def run_all(out):
