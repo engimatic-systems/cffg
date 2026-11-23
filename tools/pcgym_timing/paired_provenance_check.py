@@ -42,9 +42,9 @@ class PairedProvenanceTest(unittest.TestCase):
         with patch.multiple(run_paired, HERE=self.harness, ROOT=self.repo), \
                 patch.object(run_paired.subprocess, "check_output", return_value="library-tree\n"):
             frozen = run_paired.signature(self.peers)
-        self.plan = dict(frozen=frozen, seeds=[1001], phases=list(run_paired.PHASES))
+        self.plan = dict(frozen=frozen, seeds=list(run_paired.SEEDS), arms=list(ARMS), phases=list(run_paired.PHASES))
         save(self.archive / "protocol.json", self.plan)
-        save(self.archive / "finished.json", {"completed": 12})
+        save(self.archive / "finished.json", {"completed": 360})
         hashes = frozen["sha256"]
         worker_hashes = {name: hashes[str(self.harness / name)] for name in self.worker_files}
         runtime = dict(modules={}, pcgym_source={}, environment={}, hardware="", devices=[], python_version="3.12",
@@ -53,19 +53,22 @@ class PairedProvenanceTest(unittest.TestCase):
                        experiment=str(self.experiment))
         inputs = [self.repo / name for name in runtime_repo] + [self.experiment / n for n in verifier.EXPERIMENT_INPUTS]
         runtime["file_sha256"] = {str(p): sha256(p.read_bytes()).hexdigest() for p in inputs}
-        for arm in ARMS:
-            for phase in ["oracle", *run_paired.PHASES, *(["truth"] if arm == "cffg" else [])]:
-                oracle = phase == "oracle"
-                directory = self.archive / ("qualification" if oracle else "seed-1001") / f"{arm}-{phase}"
-                directory.mkdir(parents=True)
+        for seed in (None, *run_paired.SEEDS):
+            for arm in ARMS:
+                phases = ["oracle"] if seed is None else list(run_paired.PHASES)
+                if seed is not None and arm == "cffg":
+                    phases.append("truth")
                 deps = {name: hashes[str(self.peers / name)] for name in verifier.PEER_DEPS[arm]}
-                manifest = dict(runtime=runtime, source_sha256=worker_hashes, arm=arm, phase=phase,
-                                seed=None if oracle else 1001, dependency_sha256=deps)
-                if arm == "gtsam":
-                    manifest["native_binary_sha256"] = {Path(binary).name: hashes[str(self.peers / binary)]}
-                save(directory / "manifest.json", manifest)
-                if oracle:
-                    save(directory / "result.json", dict(complete=True, cases=[{"passed": True}]*3))
+                for phase in phases:
+                    directory = self.archive / ("qualification" if seed is None else f"seed-{seed}") / f"{arm}-{phase}"
+                    directory.mkdir(parents=True)
+                    manifest = dict(runtime=runtime, source_sha256=worker_hashes, arm=arm, phase=phase,
+                                    seed=seed, dependency_sha256=deps)
+                    if arm == "gtsam":
+                        manifest["native_binary_sha256"] = {Path(binary).name: hashes[str(self.peers / binary)]}
+                    save(directory / "manifest.json", manifest)
+                    if phase == "oracle":
+                        save(directory / "result.json", dict(complete=True, cases=[{"passed": True}]*3))
 
     def relocate(self):
         roots = {}
@@ -79,7 +82,8 @@ class PairedProvenanceTest(unittest.TestCase):
         for relocated in (False, True):
             roots = self.relocate() if relocated else {}
             report = verifier.audit(self.archive, **roots)
-            self.assertEqual(report["worker_source_checks"], 10 * 17)
+            self.assertEqual(report["worker_manifests"], 394)
+            self.assertEqual(report["worker_source_checks"], 3940)
             self.assertEqual(report["worker_source_files"], 10)
             self.assertEqual(report["frozen_files"], 20)
             self.assertEqual(report["runtime_files"], 12)
@@ -96,7 +100,22 @@ class PairedProvenanceTest(unittest.TestCase):
                         verifier.audit(self.archive, **roots)
                     path.write_text(original)
         with patch.object(verifier, "ROOT", roots.pop("source_root")):
-            self.assertEqual(verifier.audit(self.archive, **roots)["worker_source_checks"], 170)
+            self.assertEqual(verifier.audit(self.archive, **roots)["worker_source_checks"], 3940)
+
+    def test_seed_schedule_is_complete_unique_and_ordered(self):
+        seeds = self.plan["seeds"]
+        for altered in ([seeds[0], *seeds[:-1]], seeds[:-1], [seeds[1], seeds[0], *seeds[2:]]):
+            with self.subTest(first=altered[:2], last=altered[-1]):
+                save(self.archive / "protocol.json", {**self.plan, "seeds": altered})
+                with self.assertRaisesRegex(ValueError, "Seed schedule"):
+                    verifier.audit(self.archive)
+
+    def test_manifest_paths_are_unique(self):
+        duplicate = self.archive / "seed-1030/gtsam-long/manifest.json"
+        duplicate.unlink()
+        duplicate.symlink_to(self.archive / "seed-1001/gtsam-long/manifest.json")
+        with self.assertRaisesRegex(ValueError, "Repeated path"):
+            verifier.audit(self.archive)
 
     def test_incomplete_or_ambiguous_freeze_fails(self):
         path = str(self.harness / "cffg_adapter.py")

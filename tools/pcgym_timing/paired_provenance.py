@@ -8,6 +8,8 @@ from pilot import ARMS, ROOT, save
 
 
 # This inventory belongs to the paired study's frozen run_paired.signature format.
+SEEDS = tuple(range(1001, 1031))
+PHASES = ("short", "long", "forecast")
 HARNESS = Path("tools/pcgym_timing")
 WORKER_SOURCES = (*(f"{arm}_adapter.py" for arm in ARMS), "pilot.py", "forecast.py", "qualification.py",
                   "run_paired.py", "rxinfer_worker.jl", "gtsam_cstr.cpp")
@@ -101,18 +103,23 @@ def frozen_inputs(frozen, reference, *, source_root, peer_root, experiment_root)
 def audit(root, *, source_root=None, peer_root=None, experiment_root=None):
     plan = read(root / "protocol.json")
     finished = read(root / "finished.json")
-    seeds = plan["seeds"]
-    if list(plan["phases"]) != ["short", "long", "forecast"] or finished["completed"] != len(seeds) * len(ARMS) * 3:
+    if plan.get("seeds") != list(SEEDS) or any(type(seed) is not int for seed in plan["seeds"]):
+        raise ValueError("Seed schedule differs from frozen seeds 1001 through 1030 in order")
+    if plan.get("phases") != list(PHASES) or plan.get("arms") != list(ARMS):
+        raise ValueError("Arm or phase schedule differs from the frozen campaign")
+    if finished["completed"] != len(SEEDS) * len(ARMS) * len(PHASES):
         raise ValueError("Incomplete campaign")
     frozen = {Path(p): digest for p, digest in plan["frozen"]["sha256"].items()}
     if len(frozen) != len(plan["frozen"]["sha256"]):
         raise ValueError("Ambiguous frozen file identities")
     qualified = {}
     workers = [(root/"qualification"/f"{arm}-oracle", arm, "oracle", None) for arm in ARMS]
-    for seed in seeds:
+    for seed in SEEDS:
         directory = root / f"seed-{seed}"
         workers.append((directory/"cffg-truth", "cffg", "truth", seed))
-        workers.extend((directory/f"{arm}-{phase}", arm, phase, seed) for phase in plan["phases"] for arm in ARMS)
+        workers.extend((directory/f"{arm}-{phase}", arm, phase, seed) for phase in PHASES for arm in ARMS)
+    if len({(directory / "manifest.json").resolve() for directory, *_ in workers}) != len(workers):
+        raise ValueError("Repeated path in frozen worker manifest inventory")
     reference = read(workers[0][0]/"manifest.json")["runtime"]
     common = ("modules", "library_tree", "pcgym_source", "environment", "file_sha256",
               "hardware", "devices", "python_version", "reference_revision", "nested_checkout")
