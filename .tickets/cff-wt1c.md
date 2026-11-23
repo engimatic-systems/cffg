@@ -67,3 +67,7 @@ Four-library timing pilot cpt-ydse qualified CFFG directed Gaussian inference, n
 **2026-11-22T22:25:59Z**
 
 Fixed-model four-library comparison cpt-j81k finished on 30 paired seeds. CFFG tied RxInfer on all 30 long runs and achieved +0.6245 mean return against each of NumPyro and GTSAM (95% paired-seed intervals +0.6141 to +0.6349). Short-run differences crossed zero. All 78,960 commands met the warmed one-second deadline and all 1,440 forecasts scored. The report and raw evidence are at ~/agent-share/pcgym-paired-30/. These arms vary sensor noise on a fixed reactor with fixed model parameters. Other model, bounds and learning comparisons under this parent retain their own prerequisites.
+
+**2026-11-23T00:54:05Z**
+
+The cpc-4ntg learner passed its fresh validation at the 1% stationary tracking allowance. For a changing-reactor comparison, carry forward the benchmark-side log-UA EKF q=0.003 and the original q=0.012 reference. On ten matched control seeds the stationary penalties were +0.103% and +2.338% and changed-period median RMSE reductions versus frozen were 58.114% and 57.304%. Same change schedule, noise and planner across arms. Full evidence and causal replay are in ~/agent-share/pcgym-one-percent/index.html. This supplies the CFFG baseline for the broader comparison.
