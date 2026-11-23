@@ -1,6 +1,6 @@
 ---
 id: cpr-rjpb
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-11-22T02:01:05Z
@@ -38,3 +38,7 @@ Max-product searches for a most likely joint assignment. A Bethe or generalised 
 **2026-11-22T02:02:35Z**
 
 The label first appears in 58185b4 on PR 156. Independently scoring the two equal priors gives 0.4462871 on its head and the stack tip. Fresh-process output and reproducer are in ~/agent-share/cffg-premerge-review/early/.
+
+**2026-11-23T03:12:06Z**
+
+ObjectiveLedger.contract now labels a max-product score decoded_assignment_energy. The approximate field is false for evaluation of the decoded assignment; max-product stationarity refers to its messages. Existing sum-product and adaptive Gaussian labels and scalar paths are preserved. The two-prior regression checks the decoded score -2 log(0.8), the bfe() guard, and the sum-product score -log(0.2² + 0.8²). The adaptive sensor check verifies the surrogate label and the public energy readout. Isolated validation passed with uv run --frozen --no-sync python -I -m pytest -q tests/test_ledger.py tests/test_nonlinear_engine.py::test_curved_sensor_fixed_point_and_energy_contract (20 passed, 2 slow cases deselected). A separate fresh interpreter reproduced the corrected label and score 0.4462870955 in default precision. Parent owns the documentation and short suite.

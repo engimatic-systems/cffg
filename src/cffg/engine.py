@@ -234,7 +234,7 @@ class Engine:
 
     @property
     def objective_contract(self):
-        """Global energy label, including the presence of adaptive Gaussian terms."""
+        """Describe the semiring's score. Max-product scores its decoded assignment exactly."""
         return self._ledger.contract
 
     def hybrid_gfe_diagnostics(

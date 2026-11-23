@@ -14,6 +14,7 @@ from test_engine_contracts import ordinary_case
 from cffg import engine as engine_module
 from cffg import ledger, ledger_terms
 from cffg.compiler import compile_template
+from cffg.core import BlobRef, FactorSpec, Template, VariableSpec
 from cffg.engine import Engine, _replace
 
 
@@ -41,6 +42,30 @@ def test_raw_factory_keeps_its_existing_engine_alias():
     engine = engine_for("hmm")
     assert callable(engine._ledger.belief_kernel)
     assert not hasattr(engine._ledger, "run")
+
+
+def test_public_objective_contract_matches_the_two_prior_score():
+    template = Template(
+        "two_priors",
+        variables={"x": VariableSpec("x", 2)},
+        factors={name: FactorSpec(name, "categorical", {"out": "x"}, param_blobs={"statistic": "p"})
+                 for name in ("a", "b")},
+        blobs={"p": BlobRef("p", "p.npy")},
+    )
+    p = np.array([0.2, 0.8])
+    engine = Engine(compile_template(template, arrays={"p": p}, semiring="max"))
+    state = engine.run(engine.init_state(), 10).require_converged()
+    assert engine.objective_contract["objective"] == "decoded_assignment_energy"
+    assert engine.objective_contract["approximate"] is False
+    assert engine.decode(state) == {"x": 1}
+    np.testing.assert_allclose(engine.objective(state), -2 * np.log(p[1]))
+    with pytest.raises(RuntimeError, match="Engine.objective"):
+        engine.bfe(state)
+
+    engine = Engine(compile_template(template, arrays={"p": p}, semiring="sum"))
+    state = engine.run(engine.init_state(), 10).require_converged()
+    assert engine.objective_contract["objective"] == "declared_bethe_or_generalised_energy"
+    np.testing.assert_allclose(engine.bfe(state), -np.log(p @ p))
 
 
 @pytest.mark.parametrize("gate", ("max", "unprepared", "empty", "valid"))

@@ -26,6 +26,7 @@ def test_curved_sensor_fixed_point_and_energy_contract(method, schedule):
     assert metadata["objective"] == method + "_frozen_gaussian_bethe"
     assert metadata["approximate"] and metadata["evidence_bound"] is None
     assert metadata["stationarity"] == "frozen coefficients only"
+    assert engine.objective_contract["objective"] == "energy_with_adaptive_gaussian_surrogates"
     assert engine.objective_contract["approximate"]
     assert engine.objective_metadata["prior"]["objective"] == "analytic"
     stats = engine.gaussian_node_stats(state)["sensor"]

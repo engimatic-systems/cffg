@@ -34,6 +34,13 @@ class ObjectiveLedger:
 
     @property
     def contract(self) -> dict[str, str | bool | None]:
+        if self.arena.semiring == "max":
+            return {
+                "objective": "decoded_assignment_energy",
+                "approximate": False,
+                "evidence_bound": None,
+                "stationarity": "max-product message fixed point",
+            }
         adaptive = any(
             g.kernel is not None and g.kernel.binding.iterative
             for g in self.arena.gauss_groups
