@@ -29,3 +29,9 @@ More complex control benchmarks can build on the merged engine. They use a separ
 ## Definitions
 Cold latency is the time from launching a fresh process to its first applied action. Warm latency measures a decision after compilation. An ancestor is a source revision reachable by following the parent links of a later Git commit.
 
+
+## Notes
+
+**2026-11-23T03:21:48Z**
+
+Reviewed all 41 ancestor PRs and the changes through the premerge fixes. The main branch requires a PR and allows a merge commit. No unresolved review threads or pending hosted checks were found. The unrelated PR 140 falls outside this history. Independent review reproduced the numerical fixes and an old optimizer checkpoint export. Review also found that a duplicate seed could conceal omitted archive manifests; the revised auditor enforces the 30 ordered seeds and all 394 distinct worker paths.
