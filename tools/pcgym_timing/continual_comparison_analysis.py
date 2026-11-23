@@ -23,6 +23,9 @@ MOTION = {"frozen": None, "original": .012, "candidate": .003, "informed": None}
 N_EPISODES = len(LIBRARIES) * len(SEEDS) * len(CONDITIONS) * len(MOTION)
 BOOTSTRAP_SEED, DRAWS = 40871, 10000
 FIRST_CHANGE = WINDOWS["during"][0]
+# The live-UA qualification compares native actions on the normalized [-1, 1] axis.
+ACTION_ATOL = 1e-8
+HISTORY_FIELDS = ("applied", "obs_Ca", "obs_T", "log_ua")
 
 
 def metadata(root, hashes):
@@ -59,8 +62,8 @@ def metadata(root, hashes):
                 and hashes[name] == qualified["evidence"][lib], f"Qualification mismatch for {lib}")
         check = evidence["checks"]
         require(len(check["affine"]) == 3 and all(r["passed"] for r in check["affine"])
-                and abs(check["updated"] - check["fresh"]) <= 1e-8
-                and abs(check["nominal"] - check["restored"]) <= 1e-8
+                and abs(check["updated"] - check["fresh"]) <= ACTION_ATOL
+                and abs(check["nominal"] - check["restored"]) <= ACTION_ATOL
                 and abs(check["nominal"] - check["updated"]) >= 1e-4, f"Failed oracle for {lib}")
         if lib == "cffg":
             p = check["plant"]
@@ -166,33 +169,79 @@ def audit_episode(root, lib, seed, condition, arm, plan, ph, targets, hashes):
     return record, trace, times
 
 
-def matched_history(a, b, decisions, observations):
-    """Verify common histories through the first command that a hold actually changes."""
-    unequal = np.flatnonzero(a["applied"][:decisions] != b["applied"][:decisions])
+def history_tolerances(ua_bounds):
+    # Map the same fraction of each axis to its units. Ca and T already use [-1, 1].
+    low, high = ua_bounds
+    log_ua_atol = ACTION_ATOL * .5 * np.log(high / low)
+    return dict(applied=ACTION_ATOL, obs_Ca=ACTION_ATOL, obs_T=ACTION_ATOL, log_ua=log_ua_atol)
+
+
+def matched_history(a, b, decisions, observations, *, tolerances=None, label=""):
+    """Compare pre-action inputs through the first out-of-tolerance action, inclusive."""
+    atol = tolerances if tolerances is not None else dict.fromkeys(HISTORY_FIELDS, 0.)
+    action_diff = abs(a["applied"][:decisions] - b["applied"][:decisions])
+    unequal = np.flatnonzero(action_diff > atol["applied"])
     held = np.flatnonzero(a["held"][:decisions] | b["held"][:decisions])
     split = int(unequal[0]) if unequal.size else None
     if split is not None:
-        require(a["held"][split] or b["held"][split], f"Unexplained action difference at matched tick {split}")
+        require(a["held"][split] or b["held"][split], f"{label}: Unexplained action difference "
+                f"{action_diff[split]:.12g} > {atol['applied']:.12g} at matched tick {split}")
     obs_end = observations if split is None else min(observations, split + 1)
     ua_end = min(decisions, obs_end)
-    require(np.array_equal(a["obs"][:obs_end], b["obs"][:obs_end])
-            and np.array_equal(a["ua"][:ua_end], b["ua"][:ua_end]),
-            "Observation or pre-action UA differs before a permissible divergence")
-    return dict(decisions_checked=decisions if split is None else split, observations_checked=obs_end,
-                first_hold=int(held[0]) if held.size else None, first_divergent_held_action=split)
+    decisions_checked = decisions if split is None else split
+    obs_diff = abs(a["obs"][:obs_end] - b["obs"][:obs_end])
+    left, right = a["ua"][:ua_end], b["ua"][:ua_end]
+    # log1p retains one-ULP UA differences that separate evaluations of log(UA) can erase.
+    diffs = dict(applied=action_diff[:decisions_checked], obs_Ca=obs_diff[:, 0], obs_T=obs_diff[:, 1],
+                 log_ua=abs(np.log1p((left - right) / right)))
+    maxima, first_inexact = {}, {}
+    for field, delta in diffs.items():
+        outside = np.flatnonzero(delta > atol[field])
+        if outside.size:
+            t = int(outside[0])
+            raise ValueError(f"{label}: Observation or pre-action UA differs at {field}, tick {t}: "
+                             f"{delta[t]:.12g} > {atol[field]:.12g}")
+        maxima[field] = float(np.max(delta, initial=0.))
+        inexact = np.flatnonzero(delta != 0)
+        first_inexact[field] = int(inexact[0]) if inexact.size else None
+    return dict(decisions_checked=decisions_checked, observations_checked=obs_end,
+                first_hold=int(held[0]) if held.size else None, first_divergent_held_action=split,
+                divergent_action_abs_diff=float(action_diff[split]) if split is not None else None,
+                exact_checked_prefix=not any(maxima.values()), max_abs_difference=maxima, first_inexact_tick=first_inexact)
 
 
-def histories(traces):
+def histories(traces, tolerances, label):
     stationary, changing = traces["stationary"], traces["switching"]
-    results = {"stationary_informed_frozen": matched_history(stationary["informed"], stationary["frozen"], N, N),
-               "switching_informed_frozen_before_change": matched_history(
-                   changing["informed"], changing["frozen"], FIRST_CHANGE, FIRST_CHANGE + 1)}
+    pairs = {"stationary_informed_frozen": (stationary["informed"], stationary["frozen"], N, N),
+             "switching_informed_frozen_before_change": (
+                 changing["informed"], changing["frozen"], FIRST_CHANGE, FIRST_CHANGE + 1)}
     for arm in MOTION:
         # The oracle knows the change when choosing action 178. Others first observe x179.
         stop = FIRST_CHANGE if arm == "informed" else FIRST_CHANGE + 1
-        results[arm + "_before_observing_change"] = matched_history(stationary[arm], changing[arm],
-                                                                    stop, FIRST_CHANGE + 1)
-    return results
+        pairs[arm + "_before_observing_change"] = (stationary[arm], changing[arm], stop, FIRST_CHANGE + 1)
+    return {name: matched_history(*args, tolerances=tolerances, label=f"{label}/{name}")
+            for name, args in pairs.items()}
+
+
+def history_precision(audits, tolerances, ua_bounds):
+    inexact, per_library = [], {}
+    for lib, seeds in audits.items():
+        checks = []
+        for seed, comparisons in seeds.items():
+            for name, check in comparisons.items():
+                checks.append(check)
+                if not check["exact_checked_prefix"]:
+                    inexact.append(dict(library=lib, seed=int(seed), comparison=name))
+        per_library[lib] = dict(comparisons=len(checks), exact=sum(c["exact_checked_prefix"] for c in checks),
+                                max_abs_difference={f: max(c["max_abs_difference"][f] for c in checks)
+                                                    for f in HISTORY_FIELDS})
+    return dict(numpyro_absolute_tolerances=tolerances, other_libraries_absolute_tolerance=0.,
+                relative_tolerance=0., ua_bounds=ua_bounds, per_library=per_library, inexact=inexact,
+                scale="NumPyro uses the live-UA qualification's 1e-8 normalized action allowance on "
+                      "each [-1,1] axis. This is 3.5e-8 K coolant, 1.5e-9 mol/L Ca and 2.5e-7 K "
+                      "temperature. Log UA uses half the log span of the estimator's physical bounds. "
+                      "Maxima cover only the compared prefix. Divergence beyond tolerance must start "
+                      "on a held action; its difference is saved separately.")
 
 
 def arm_summary(rows):
@@ -283,6 +332,8 @@ def analyze(root):
     plan, workers = metadata(root, hashes)
     ph = hashes["protocol.json"]
     base = dict(N=60, tsim=26., SP={"Ca": np.repeat([.85, .90, .87], 20).tolist()})
+    ua_bounds = plan["starting_method"]["ua_bounds"]
+    numpyro_tolerances = history_tolerances(ua_bounds)
     targets = np.array(parameters(base, True)["SP"]["Ca"][1:])
     libraries, history_audit = {}, {}
     hold_events = []
@@ -324,7 +375,8 @@ def analyze(root):
                     max_sensor = max(max_sensor, a["max_noise_replay_error"])
                     for clock, seconds in times.items():
                         clocks[condition, arm][clock].append(seconds)
-            checks = history_audit[lib][sample] = histories(traces)
+            checks = history_audit[lib][sample] = histories(
+                traces, numpyro_tolerances if lib == "numpyro" else None, f"{lib}/{sample}")
             breaks += sum(v["first_divergent_held_action"] is not None for v in checks.values())
         libraries[lib] = summarize_library(episodes, clocks, workers[lib])
     require(len(hold_events) == sum(s["totals"]["holds"] for s in libraries.values()),
@@ -333,6 +385,7 @@ def analyze(root):
                  max_forecast_replay_error=max_forecast, max_sensor_noise_replay_error=max_sensor,
                  max_paired_noise_difference=max(paired_noise.values()), per_seed_noise_difference=paired_noise,
                  matched_histories=history_audit, history_comparisons_diverged_on_hold=breaks,
+                 history_precision=history_precision(history_audit, numpyro_tolerances, ua_bounds),
                  paired_seed_interpretation="Each seed supplies the same exogenous noise and schedule. "
                  "A held command can separate previously identical trajectories. Its realized outcomes "
                  "and all later outcomes remain in the paired seed comparison.")
