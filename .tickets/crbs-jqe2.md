@@ -1,6 +1,6 @@
 ---
 id: crbs-jqe2
-status: in_progress
+status: closed
 deps: [crbs-4d73, crbs-2xf6]
 links: []
 created: 2026-11-23T04:26:41Z
@@ -41,3 +41,7 @@ If native methods match at the same approximation, preserve that result. The pil
 **2026-11-23T05:06:13Z**
 
 Three development seeds have completed, along with uninterrupted 6000-transition adaptive runs in both libraries. The first development run identified no numerical failures. Independent review then corrected the failure-at-reset policy, interrupted worker receipts and lock inheritance; the original pilot evidence is preserved under attempts/pre-freeze-runner-review, and all development cases have been replayed with the reviewed runner. The next decision uses only the repeated pilot and full qualification attestations. The fresh seeds are still unopened.
+
+**2026-11-23T05:07:17Z**
+
+Final pilot passed all gates, including native affine parity, independent nonlinear reference, identical pre-change adaptive histories, headroom, reliability and 6000-step endurance. The 72 short runs contributed 43200 updates and two 6000-transition runs measured retention of state and memory. The short twin histories and all 43200 sensor records passed independent replay. The signed-off sources and outputs are bound by file digests under ~/agent-share/pcgym-extraction-rxinfer/qual/attestations.json and freeze.json. Frozen design chooses all 20 reserved independent seeds, 6000 transitions each, with a practical primary-error margin of 0.0002 concentration units. Matched Taylor filters are compared on tapes and in separate closed loops, with the frozen and informed controls included.
