@@ -24,8 +24,11 @@ class ChainCertificate(NamedTuple):
     @classmethod
     def measure(cls, current, successor, energy, successor_energy, evidence_cost, tolerance):
         """Measure componentwise message motion and both returned-state ledger checks."""
-        residual = float(np.max([np.max(np.abs(after - before) / (1 + np.abs(before)))
-                                 for before, after in zip(current, successor, strict=True)]))
+        movements = []
+        for before, after in zip(current, successor, strict=True):
+            before, after = np.asarray(before), np.asarray(after)
+            movements.append(np.max(np.abs(after - before) / (1 + np.abs(before))))
+        residual = float(np.max(movements))
         stable = abs(successor_energy - energy) <= tolerance * (1 + abs(energy))
         discrepancy = max(abs(energy - evidence_cost), abs(successor_energy - evidence_cost))
         matches = discrepancy <= tolerance * (1 + abs(evidence_cost))

@@ -328,8 +328,8 @@ class Engine:
         if code:
             raise FloatingPointError("directed candidate failed the engine update")
         return ChainCertificate.measure(
-            (np.asarray(state.g_eta), np.asarray(state.g_lam)),
-            (np.asarray(successor.g_eta), np.asarray(successor.g_lam)),
+            (state.g_eta, state.g_lam),
+            (successor.g_eta, successor.g_lam),
             self.bfe(state), self.bfe(successor), evidence, tolerance,
         )
 

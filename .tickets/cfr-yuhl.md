@@ -34,3 +34,7 @@ The residual here is the maximum of abs(new-old)/(1+abs(old)) over message entri
 **2026-11-23T03:17:39Z**
 
 The certificate now verifies an actual Engine.step update and both production Bethe ledger values against the independent innovation evidence, in both float32 and float64. The bounded region also reuses this check when it revalidates live data. On the reported float32 fixture the public step exceeds tolerance and the one-iteration run returns uncertified. Focused directed/region tests passed (11). The retained 9 plus 590 held-out float64 decisions passed preliminary replay, including all 59 stock references. The compiled check adds cold startup cost; the integration review records final timings on a clean code head.
+
+**2026-11-23T03:21:28Z**
+
+The final integration review identified an architectural boundary test that rejects array conversions inside Engine. Moved those conversions into the numerical certificate owner. The directed suite and the engine boundary check passed together (8 tests).
