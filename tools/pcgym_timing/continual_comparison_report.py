@@ -75,7 +75,7 @@ def primary(data):
             row = pairs[peer][key]
             secondary.append([label, NAMES[peer], number(row["mean"], signed=True), interval(row["ci95"])])
     return "".join([
-        '<section id="primary"><h2>Tracking during the hidden drop</h2>',
+        '<section id="primary"><h2>Primary comparison on all ten paired seeds</h2>',
         f'<p class="takeaway">{takeaway}</p>',
         '<p>All four planners used the selected heat-transfer estimator. For each seed, the analysis measured '
         'the root mean square error (RMSE) between the true concentration and its setpoint during decisions '
@@ -100,6 +100,49 @@ def primary(data):
         f'{" and ".join(max_gaps)}. These measured differences apply to the implementations and windows '
         'tested here. The same external EKF supplied the learned UA in all four implementations.</p>',
         '</section>'])
+
+
+def stationary_hold_diagnostic(libraries):
+    pair = ("numpyro", "gtsam")
+    seeds = sorted(libraries["numpyro"]["per_seed"], key=int)
+    held = {key: {s for s in seeds if libraries[key]["episodes"][s]["stationary"]["frozen"]["audit"]["holds"]}
+            for key in pair}
+    omitted = held["numpyro"] | held["gtsam"]
+    if not omitted:
+        return ""
+    kept = [s for s in seeds if s not in omitted]
+    affected = " and ".join(f'{NAMES[key]} on seeds {", ".join(sorted(held[key], key=int))}' for key in pair if held[key])
+    selected_means = [number(libraries[key]["summary"]["candidate"]["stationary_tracking_rmse"], 7) for key in pair]
+    frozen_means = {key: libraries[key]["summary"]["frozen"]["stationary_tracking_rmse"] for key in pair}
+    explanation = ""
+    if selected_means[0] == selected_means[1]:
+        explanation = f'Both selected mean RMSEs round to {selected_means[0]} mol/L at seven significant digits. '
+        if frozen_means["numpyro"] != frozen_means["gtsam"]:
+            higher = NAMES[max(frozen_means, key=frozen_means.get)]
+            explanation += f'{higher} has the higher frozen mean RMSE, which lowers its selected-to-frozen ratio. '
+    selected_holds = sum(libraries[key]["episodes"][s]["stationary"]["candidate"]["audit"]["holds"]
+                         for key in pair for s in seeds)
+    rows = []
+    for cohort, subset in (("Full", seeds), ("Supplementary", kept)):
+        if not subset:
+            continue
+        for key in pair:
+            records = libraries[key]["per_seed"]
+            selected, frozen = (fmean(records[s][regime]["stationary_tracking_rmse"] for s in subset)
+                                for regime in ("candidate", "frozen"))
+            penalty = f"{100 * (selected / frozen - 1):+.5f}%" if frozen > 0 else "—"
+            rows.append([cohort, len(subset), NAMES[key], number(selected, 8), number(frozen, 8), penalty])
+    return "".join([
+        '<h3>Why the NumPyro and GTSAM stationary penalties can differ</h3>',
+        '<p>The penalty depends on both the selected controller’s mean RMSE and its own frozen comparator’s '
+        f'mean RMSE. {explanation}Frozen stationary holds occurred for {affected}. '
+        f'Together the two selected regimes had {selected_holds} stationary holds.</p>',
+        f'<p>The supplementary comparison excludes those seeds from both planners and recomputes '
+        f'the ratio of means on the same {len(kept)} remaining seeds. The primary comparison and the '
+        '1% engineering check both use all ten seeds.</p>',
+        table("Supplementary matched-subset stationary penalty", ["Cohort", "Paired seeds", "Planner",
+              "Selected mean RMSE (mol/L)", "Frozen mean RMSE (mol/L)", "Penalty vs own frozen"], rows),
+    ])
 
 
 def adaptation(libraries):
@@ -144,6 +187,7 @@ def adaptation(libraries):
         '<p class="note">The stationary allowance applies to the point estimate, using the ratio of mean per-seed errors. Changed gain takes the median '
         'of the ten seed-level percentage reductions during the drop. Retention divides the selected gain '
         'by the original learner’s positive gain.</p>',
+        stationary_hold_diagnostic(libraries),
         details("Engineering reference checks by planner",
                 '<p>The reference asks for ≥1% median tracking gain on the changed plant with gains on ≥8/10 '
                 'seeds for both selected and informed, ≤1% stationary penalty, ≥50% lower settled UA error '
@@ -295,7 +339,38 @@ def source_snapshots(root, frozen):
     return details("Frozen source snapshots", "<ul>" + "".join(items) + "</ul>") if items else ""
 
 
-def evidence(root):
+def history_audit(audit):
+    precision = audit.get("history_precision")
+    if precision is None:
+        return ""
+    lib = precision["per_library"]
+    numpyro = lib["numpyro"]
+    different = numpyro["comparisons"] - numpyro["exact"]
+    seeds = sorted({r["seed"] for r in precision["inexact"] if r["library"] == "numpyro"})
+    seed_text = " (seeds " + ", ".join(map(str, seeds)) + ")" if seeds else ""
+    other_matching = sum(row["exact"] for name, row in lib.items() if name != "numpyro")
+    other_total = sum(row["comparisons"] for name, row in lib.items() if name != "numpyro")
+    limits = precision["numpyro_absolute_tolerances"]
+    maxima = numpyro["max_abs_difference"]
+    rows = [[label, number(maxima[field], 6), number(limits[field], 6)] for field, label in (
+        ("applied", "Applied coolant (normalized)"), ("obs_Ca", "Measured concentration (normalized)"),
+        ("obs_T", "Measured temperature (normalized)"), ("log_ua", "Log UA"))]
+    return "".join([
+        '<h3>Agreement of matched decision histories</h3>',
+        '<p>The audit compared histories within each planner for periods when the inputs should agree. '
+        f'NumPyro passed the numerical bounds. In {different} of {numpyro["comparisons"]} comparisons'
+        f'{seed_text}, at least one recorded value differed at the bit level. Its maximum normalized '
+        f'command difference was {number(maxima["applied"], 6)} against an absolute tolerance of '
+        f'{number(limits["applied"])}. Across CFFG, RxInfer and GTSAM, {other_matching} of {other_total} '
+        f'comparisons matched exactly. An out-of-tolerance held command ended '
+        f'{audit["history_comparisons_diverged_on_hold"]} comparisons early.</p>',
+        details("NumPyro maximum differences and audit bounds",
+                table("NumPyro matched-history precision", ["Field", "Largest absolute difference",
+                      "Absolute tolerance"], rows)),
+    ])
+
+
+def evidence(root, audit):
     paths = [("analysis.json", "Paired estimates, seed-level scores, audits and raw trace digests"),
              ("protocol.json", "Frozen design, numerical source paths, dependency hashes and prior selection hashes"),
              ("qualified.json", "Qualification record and check-file digests"),
@@ -322,6 +397,7 @@ def evidence(root):
         'As trajectories diverged, the shared update rule could produce different estimates. '
         'The intervals describe variation across these noise seeds for one plant and one change schedule. '
         'The earlier one-percent study supplied the tuning choice and engineering reference.</p>',
+        history_audit(audit),
         '<p>Qualification used linear Gaussian problems with known answers and checked the action after a '
         'live UA change against a freshly constructed model at the same value. For timing, library order '
         'rotated by seed and regime order rotated within workers.</p>',
@@ -352,7 +428,8 @@ def render(root):
         '<nav aria-label="Report sections"><a href="#primary">Paired comparison</a>',
         '<a href="#adaptation">Adaptation and recovery</a><a href="#prediction">Predictions</a>',
         '<a href="#timing">Timing and reliability</a><a href="#evidence">Evidence</a></nav></header>',
-        primary(data), adaptation(libraries), predictions(libraries), timing(libraries, data.get("hold_events")), evidence(root),
+        primary(data), adaptation(libraries), predictions(libraries), timing(libraries, data.get("hold_events")),
+        evidence(root, data.get("audit", {})),
         '</main></body></html>'])
     dest = root / "index.html"
     write_atomically(dest, page.encode("utf-8"))
