@@ -40,22 +40,23 @@ def _model(arrays, config, affine):
     prior = dist.MultivariateNormal(mean, covariance_matrix=arrays["P0"])
     noise = np.stack([arrays["Q"]] * PAST + [arrays["Qp"]] * HORIZON)
     process_chol = jnp.asarray(np.linalg.cholesky(noise))
-    theta = jnp.asarray(arrays["theta"])
+    initial_theta = jnp.asarray(arrays["theta"])
     sensors = [(jnp.asarray(arrays[f"G_{kind}"]), jnp.asarray(arrays[f"z_{kind}"]),
                 jnp.asarray(np.linalg.cholesky(arrays[f"R_{kind}"]))) for kind, _ in _GROUPS]
     if affine is None:
-        transition = jax.vmap(lambda state: cstr_rk4(state, theta, config))
+        transition = jax.vmap(lambda state, theta: cstr_rk4(state, theta, config), in_axes=(0, None))
     else:
         matrix, offset = map(jnp.asarray, affine)
-        def transition(states):
+
+        def transition(states, theta):
             return states @ matrix.T + offset
 
-    def model(observations, masks, zero_residual=False):
+    def model(observations, masks, zero_residual=False, *, theta=initial_theta):
         # Lebesgue measure on the trajectory. Its complete normalized density comes
         # from one prior and nineteen conditional transition distributions below.
         states = numpyro.sample("states", dist.ImproperUniform(dist.constraints.real, (), _SHAPE))
         numpyro.sample("prior", prior, obs=states[0])
-        predicted = transition(states[:-1])
+        predicted = transition(states[:-1], theta)
         # At zero residual the ELBO Hessian gives the positive Gauss-Newton
         # metric. Stop-gradient preserves all derivatives of the physical mean.
         predicted = predicted + jax.lax.stop_gradient(jnp.where(
@@ -75,6 +76,7 @@ class Adapter:
     def __init__(self, arrays, config, *, affine=None):
         if not jax.config.x64_enabled or jax.default_backend() != "cpu":
             raise ValueError("NumPyro control requires JAX_ENABLE_X64=1 and JAX_PLATFORMS=cpu")
+        self._theta = np.array(arrays["theta"], dtype=np.float64, copy=True)
         self.model = _model(arrays, config, affine)
         self.guide = AutoLaplaceApproximation(
             self.model, init_loc_fn=init_to_value(values={"states": jnp.zeros(_SHAPE)}))
@@ -83,32 +85,45 @@ class Adapter:
         numpyro.handlers.seed(self.guide, self.key)(*empty)
         objective = Trace_ELBO()
 
-        def loss(loc, observations, masks, zero_residual=False):
+        def loss(loc, observations, masks, zero_residual=False, *, theta=self._theta):
             # get_posterior() on this NumPyro guide captures its prototype data.
             # Evaluate its same ELBO/Hessian with the live window as JIT operands.
             return objective.loss(self.key, {"auto_loc": loc}, self.model, self.guide,
-                                  observations, masks, zero_residual)
+                                  observations, masks, zero_residual, theta=theta)
 
         self.loss = jax.jit(loss)
         self.value_grad = jax.jit(jax.value_and_grad(loss))
         self.curvature = jax.jit(jax.hessian(loss))
 
+    def install(self, ua):
+        """Install physical UA for subsequent windows. The RK4 transition stores log UA."""
+        value = np.asarray(ua)
+        if (value.ndim != 0 or not np.issubdtype(value.dtype, np.number) or np.iscomplexobj(value)
+                or not np.isfinite(value) or value <= 0):
+            raise ValueError("UA must be a positive finite scalar")
+        log_ua = np.log(float(value))
+        if log_ua != self._theta[2]:
+            theta = self._theta.copy()
+            theta[2] = log_ua
+            self._theta = theta
+
     def _fit(self, observations, masks):
+        theta = jnp.asarray(self._theta)
         loc = np.zeros(np.prod(_SHAPE))
         gauss_newton_steps = 0
         backtracks = 0
         for iteration in range(101):
-            value, gradient = self.value_grad(loc, observations, masks)
+            value, gradient = self.value_grad(loc, observations, masks, theta=theta)
             value, gradient = float(value), np.asarray(gradient)
             if not np.isfinite(value) or not np.isfinite(gradient).all():
                 raise ValueError("Nonfinite MAP objective or gradient")
 
-            hessian = self.curvature(loc, observations, masks, False)
+            hessian = self.curvature(loc, observations, masks, False, theta=theta)
             try:
                 factor = cho_factor(np.asarray(hessian), lower=True)
                 positive = True
             except np.linalg.LinAlgError:
-                metric = self.curvature(loc, observations, masks, True)
+                metric = self.curvature(loc, observations, masks, True, theta=theta)
                 factor = cho_factor(np.asarray(metric), lower=True)
                 gauss_newton_steps += 1
                 positive = False
@@ -129,7 +144,7 @@ class Adapter:
             for attempt in range(24):
                 rate = 0.5 ** attempt
                 candidate = loc - rate * step
-                trial = float(self.loss(candidate, observations, masks))
+                trial = float(self.loss(candidate, observations, masks, theta=theta))
                 if np.isfinite(trial) and trial <= value - 1e-4 * rate * squared_decrement + slack:
                     loc = candidate
                     backtracks += attempt
