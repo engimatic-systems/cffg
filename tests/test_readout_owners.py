@@ -3,6 +3,7 @@
 import ast
 import inspect
 
+import jax
 import numpy as np
 import pytest
 from test_compiler_contracts import model
@@ -13,6 +14,7 @@ from cffg.compiler import compile_template
 from cffg.engine import Engine
 from cffg.execution import transport
 from cffg.lifecycle import StateLifecycle
+from cffg.models.kalman import lgssm
 from cffg.readouts import (
     discrete,
     exponential_family,
@@ -24,6 +26,7 @@ from cffg.readouts import (
     types,
     views,
 )
+from cffg.runtime_types import _replace
 
 OWNERS = {
     "marginals": discrete,
@@ -46,6 +49,103 @@ OWNERS = {
 def engine_for(name="hmm"):
     template, arrays = model(name)
     return Engine(compile_template(template, arrays=arrays))
+
+
+@pytest.mark.parametrize("x64", [False, True])
+def test_gaussian_readouts_reject_a_rank_deficient_observation_then_recover(x64):
+    # Three measured combinations of four unknowns leave one direction unobserved.
+    # Both matrices have produced a spurious positive final pivot in host LAPACK.
+    sensing = ([[4, -16, 9, -1], [11, 16, 14, -15], [11, 17, 15, 6]] if x64 else
+               [[-6, 2, -4, 10], [11, 11, 3, -7], [-4, 13, -6, 15]])
+    with jax.enable_x64(x64):
+        dtype = np.float64 if x64 else np.float32
+        h = np.asarray(sensing, dtype=dtype)
+        identity = np.eye(4, dtype=dtype)
+        template, arrays = lgssm(2, identity, identity, h, np.eye(3), np.zeros(4), identity)
+        engine = Engine(compile_template(template, arrays=arrays), schedule="flood")
+        state = engine.step(engine.bind_data(engine.init_state(), {"y0": np.ones(3)}))
+        info = engine.arena.edges["x0o"]
+        slots = (info.slot0, info.slot1)
+        packed = np.asarray(state.g_lam)[engine.arena.g_lam_indices(slots, 4)].sum(axis=0)
+        np.testing.assert_array_equal(packed, h.T @ h)
+        for mean, cov in (engine.gaussian_marginal(state, "x0o"), engine.gaussian_marginals(state)["x0o"]):
+            assert mean.dtype == cov.dtype == dtype
+            assert np.isnan(mean).all() and np.isnan(cov).all()
+
+        # The next sweep delivers the prior, which supplies the missing information.
+        state = engine.step(state)
+        posterior = np.linalg.inv(np.eye(4) + h.T @ h)
+        mean, cov = engine.gaussian_marginal(state, "x0o")
+        bulk = engine.gaussian_marginals(state)
+        assert set(bulk) == {edge.name for edge in engine.arena.edges.values() if edge.dim}
+        np.testing.assert_array_equal(mean, bulk["x0o"][0])
+        np.testing.assert_array_equal(cov, bulk["x0o"][1])
+        tol = 16 * np.finfo(dtype).eps
+        np.testing.assert_allclose(mean, posterior @ h.T @ np.ones(3), rtol=tol, atol=1e-14)
+        np.testing.assert_allclose(cov, posterior, rtol=tol, atol=1e-14)
+
+
+@pytest.mark.parametrize("x64", [False, True])
+def test_gaussian_readouts_at_mixed_coordinate_scales(x64):
+    dim = 40
+    with jax.enable_x64(x64):
+        dtype = np.float64 if x64 else np.float32
+        eye = np.eye(dim)
+        template, arrays = lgssm(1, eye, eye, eye, eye, np.zeros(dim), eye)
+        engine = Engine(compile_template(template, arrays=arrays))
+        initial = engine.init_state()
+        edge = engine.arena.edges["x0"]
+        p_indices = engine.arena.g_lam_indices(edge.slot0, dim)
+        h_indices = engine.arena.g_eta_indices(edge.slot0, dim)
+        scale = np.geomspace(1e-5, 1e5, dim).astype(dtype)
+        normalized = eye + np.ones((dim, dim)) / dim
+        p = (scale[:, None] * normalized * scale).astype(dtype)
+        h = scale.copy()
+        state = _replace(initial, g_lam=initial.g_lam.at[p_indices].set(p),
+                         g_eta=initial.g_eta.at[h_indices].set(h))
+        single = engine.gaussian_marginal(state, "x0")
+        bulk = engine.gaussian_marginals(state)["x0"]
+        for value, other in zip(single, bulk, strict=True):
+            assert value.dtype == dtype
+            np.testing.assert_array_equal(value, other)
+        tol = 2 * dim * np.finfo(dtype).eps
+        np.testing.assert_allclose(single[0] * scale, .5, rtol=tol)
+        np.testing.assert_allclose(single[1] * scale[:, None] * scale, eye - .5 / dim, rtol=tol)
+
+        for bad in (np.zeros_like(p), -p, np.triu(p), np.full_like(p, np.nan)):
+            invalid = _replace(state, g_lam=state.g_lam.at[p_indices].set(bad))
+            for moments in (engine.gaussian_marginal(invalid, "x0"), engine.gaussian_marginals(invalid)["x0"]):
+                assert all(np.isnan(value).all() for value in moments)
+
+
+def test_float32_readout_checks_the_precision_and_returned_covariance_in_their_own_dtype():
+    with jax.enable_x64(False):
+        eye = np.eye(4, dtype=np.float32)
+        template, arrays = lgssm(1, eye, eye, eye, eye, np.zeros(4), eye)
+        engine = Engine(compile_template(template, arrays=arrays))
+        initial = engine.init_state()
+        edge = engine.arena.edges["x0"]
+        indices = engine.arena.g_lam_indices(edge.slot0, 4)
+        eps = np.finfo(np.float32).eps
+
+        # Rounding a rank-three sensor Gram matrix in float32 can give it a
+        # genuinely positive eigenvalue when its stored entries are promoted.
+        sensor = np.array([[-13, 8, 5, -2], [-2, 11, -13, 6], [-9, -13, 1, 15]], np.float32) / 7
+        # Round each dot product once, independent of the host BLAS backend.
+        gram = (sensor.astype(np.float64).T @ sensor.astype(np.float64)).astype(np.float32)
+        assert np.linalg.eigvalsh(gram.astype(np.float64))[0] > 0
+        # Inverting the second precision leaves an unresolved direction in
+        # the returned covariance. The third has margin in both directions.
+        for precision, proper in ((gram, False), (8*eps*eye + (1-8*eps), False),
+                                  (64*eps*eye + (1-64*eps), True)):
+            state = _replace(initial, g_lam=initial.g_lam.at[indices].set(precision))
+            for mean, cov in (engine.gaussian_marginal(state, "x0"), engine.gaussian_marginals(state)["x0"]):
+                if proper:
+                    np.testing.assert_array_equal(mean, 0.)
+                    reference = np.linalg.inv(precision.astype(np.float64)).astype(np.float32)
+                    np.testing.assert_allclose(cov, reference, rtol=2*eps)
+                else:
+                    assert np.isnan(mean).all() and np.isnan(cov).all()
 
 
 @pytest.mark.parametrize("name", OWNERS)
