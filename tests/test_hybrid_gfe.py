@@ -412,7 +412,7 @@ def test_vmap_step_matches_sequential():
     batched = jax.tree_util.tree_map(lambda *values: jnp.stack(values), *states)
 
     def one(state):
-        messages, eta, lam, ef_eta, _, _ = engine._step(
+        messages, eta, lam, ef_eta, _, _, *_ = engine._step(
             state.messages,
             state.g_eta,
             state.g_lam,

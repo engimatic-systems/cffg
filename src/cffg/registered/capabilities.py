@@ -6,18 +6,30 @@ from cffg.core.ir import FACTOR_TYPES, ConstraintKind, PortRole
 from .contracts import RegistrySnapshot
 
 
-def snapshot_registry() -> RegistrySnapshot:
+def snapshot_registry(template=None) -> RegistrySnapshot:
     bindings = dict(kernels.KERNELS)
+    configured = {}
+    if template is not None:
+        for factor in template.factors.values():
+            kernel = bindings.get(factor.type)
+            configure = getattr(getattr(kernel, "binding", None), "configure", None)
+            if configure is not None:
+                sizes = {role: template.variables[var].dim for role, var in factor.edges.items()}
+                configured[factor.name] = kernels.FactorKernel(
+                    kernel.factor_type, kernel.impl_id, kernel.version, hostile=kernel.hostile,
+                    binding=configure(factor, sizes),
+                )
     return RegistrySnapshot(
         bindings,
         frozenset(
             name for name, kernel in bindings.items() if kernel.observed_out is not None
         ),
+        configured,
     )
 
 
 def constraint_problems(factor, registry, *, mean_field, psub, delegated_psub):
-    kernel = registry.bindings.get(factor.type)
+    kernel = registry.for_factor(factor)
     if kernel is not None and not delegated_psub:
         requested = set()
         if mean_field:

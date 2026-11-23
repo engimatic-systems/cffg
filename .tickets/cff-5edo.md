@@ -24,7 +24,7 @@ Open prerequisite `cff-wbhu` owns the compiled sweep loop and truthful per-insta
 ## Outcomes / Acceptance Criteria
 
 1. `RollingAgent` plans to a documented convergence tolerance with a finite cap derived from the compiled plan's maximum scheduled message-path length. A caller may override the cap, but the default is not one horizon-independent sweep count.
-2. `RollingAgent` gates actions on planning status and exposes planning diagnostics.
+2. Preserve the existing action gate and last-plan diagnostics when changing budgets and warm starts. The PR #185 branch already implements 2.1–2.3 in `RollingAgent.act` and `last_plan_result` (src/cffg/agent.py).
    2.1. `RollingAgent.act` returns an action after a `RunStatus.CONVERGED` plan.
    2.2. Budget exhaustion, divergence, and infeasibility remain distinguishable and cannot return an action that appears successful.
    2.3. The agent exposes the last planning `RunResult` for review.

@@ -1,44 +1,64 @@
-"""Supported pre-1.0 facade for the documented newcomer workflow."""
+"""Supported pre-1.0 facade for common runtime and extension workflows."""
 
-from cffg.agent import RollingAgent
-from cffg.bundle import LoadedBundle, load_bundle, save_bundle
-from cffg.compiler import compile_template
-from cffg.engine import Engine, RunStatus
-from cffg.models.gridworld import CorridorEnv, build_gridworld
-from cffg.params import set_params
-from cffg.learning_schema import (
-    PersistentArray, PersistentParameter, PersistentStateDescriptor,
-    PersistentTarget, resolve_persistent_state,
-)
-from cffg.kernels import FactorKernel, HostileInputs, register_kernel
-from cffg.kernel_bindings import (
-    DiscreteBinding, DiscreteMode, EFBinding, GaussianBinding,
-    GaussianConditioning, ParameterSpec,
-)
+from importlib import import_module
 
-__all__ = [
-    "CorridorEnv",
-    "DiscreteBinding",
-    "DiscreteMode",
-    "EFBinding",
-    "Engine",
-    "FactorKernel",
-    "GaussianBinding",
-    "GaussianConditioning",
-    "HostileInputs",
-    "LoadedBundle",
-    "ParameterSpec",
-    "PersistentArray",
-    "PersistentParameter",
-    "PersistentStateDescriptor",
-    "PersistentTarget",
-    "RollingAgent",
-    "RunStatus",
-    "build_gridworld",
-    "compile_template",
-    "load_bundle",
-    "save_bundle",
-    "register_kernel",
-    "resolve_persistent_state",
-    "set_params",
-]
+
+_SUBPACKAGES = {"core", "models"}
+_EXPORTS = {
+    "CorridorEnv": "models.gridworld",
+    "DiscreteBinding": "kernel_bindings",
+    "DiscreteMode": "kernel_bindings",
+    "EFBinding": "kernel_bindings",
+    "Engine": "engine",
+    "FactorKernel": "kernels",
+    "FailureDiagnostic": "runtime_types",
+    "FixedPointDifferentiator": "implicit",
+    "FixedPointGradient": "implicit",
+    "FunctionSpec": "core.functions",
+    "GaussianAmortizer": "amortization",
+    "GaussianBinding": "kernel_bindings",
+    "GaussianConditioning": "kernel_bindings",
+    "GradientStatus": "implicit",
+    "HostileInputs": "kernels",
+    "LoadedBundle": "bundle",
+    "MeanImplementation": "mean_functions",
+    "NeuralTrainer": "training",
+    "ParameterSpec": "kernel_bindings",
+    "PersistentArray": "learning_schema",
+    "PersistentParameter": "learning_schema",
+    "PersistentStateDescriptor": "learning_schema",
+    "PersistentTarget": "learning_schema",
+    "PolynomialFeatures": "amortization",
+    "RollingAgent": "agent",
+    "RunStatus": "engine",
+    "TrainingConfig": "training",
+    "build_gridworld": "models.gridworld",
+    "compile_template": "compiler",
+    "fixed_point_gradient": "implicit",
+    "initialize_neural_parameters": "neural",
+    "load_bundle": "bundle",
+    "neural_mean": "neural_schema",
+    "save_bundle": "bundle",
+    "register_kernel": "kernels",
+    "register_mean_function": "mean_functions",
+    "resolve_persistent_state": "learning_schema",
+    "set_params": "params",
+}
+
+
+def __getattr__(name):
+    """Keep core imports independent of JAX while retaining the public facade."""
+    if name in _SUBPACKAGES:
+        return import_module(f".{name}", __name__)
+    module = _EXPORTS.get(name)
+    if module is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(import_module(f"cffg.{module}"), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__():
+    return sorted(set(globals()) | set(__all__) | _SUBPACKAGES)
+
+__all__ = list(_EXPORTS)

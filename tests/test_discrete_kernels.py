@@ -436,7 +436,7 @@ def test_sparse_large_flat_storage_and_distinct_instance_batch(registered, dtype
         direct = [eng.step(s) for s in (s0, s1)]
 
         def numerical_step(state):
-            messages, eta, lam, ef_eta, _, status = eng._step(
+            messages, eta, lam, ef_eta, _, status, *_ = eng._step(
                 state.messages,
                 state.g_eta,
                 state.g_lam,
@@ -703,7 +703,7 @@ def test_external_chain_scans_and_parameter_changes_reuse_trace(registered):
             if isinstance(stage, ScanStage)
             else _batch_stage_fn(arena, stage, logsumexp)
         )
-        current = eqx.filter_jit(fn)(*current, *args[4:])
+        current = eqx.filter_jit(fn)(*current[:4], *args[4:])
     np.testing.assert_allclose(current[0], exact.messages, atol=1e-12)
 
     closed, _, _ = eqx.filter_make_jaxpr(eng._propagate)(*args)
@@ -723,4 +723,4 @@ def test_external_chain_scans_and_parameter_changes_reuse_trace(registered):
                     visit(value)
 
     visit(closed.jaxpr)
-    assert scans and all(shape == (1, 2) for shape in scans)
+    assert scans and all(shape in {(), (1, 2)} for shape in scans)

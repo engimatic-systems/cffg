@@ -35,6 +35,7 @@ Paired paths:
 from __future__ import annotations
 
 from dataclasses import replace
+from math import isfinite
 
 import equinox as eqx
 import jax
@@ -45,6 +46,8 @@ from cffg import (
 )
 from cffg.compiled import NEG as NEG  # noqa: PLC0414
 from cffg.compiled import Arena
+from cffg.directed_chain import DirectedChain, after_directed_attempt
+from cffg.directed_chain_plan import recognize_directed_chain
 from cffg.exact_strategy import ExactRunStrategy
 from cffg.execution import (
     parameters as _parameters,
@@ -56,6 +59,7 @@ from cffg.execution.transport import _disc_rows as _disc_rows  # noqa: PLC0414
 from cffg.execution.transport import _gauss_rows as _gauss_rows  # noqa: PLC0414
 from cffg.execution.transport import _obs_rows as _obs_rows  # noqa: PLC0414
 from cffg.iteration import IterationPolicy, IterationServices, run_iterations
+from cffg.execution.failures import FailureIndex
 from cffg.ledger import ObjectiveLedger, constraint_satisfied
 from cffg.ledger import make_belief_energy as _make_bfe
 from cffg.lifecycle import StateLifecycle
@@ -126,6 +130,7 @@ class Engine:
         if not 0.0 < mu3_min_ess_fraction <= 1.0:
             raise ValueError("mu3_min_ess_fraction must be in (0, 1]")
         self.arena = arena
+        self._failure_names = FailureIndex(arena).names
         self._state_lifecycle = StateLifecycle(arena)
         for group in arena.groups:
             if group.kernel is not None and arena.semiring not in group.kernel.binding.semirings:
@@ -169,6 +174,9 @@ class Engine:
         self._outer_kernels = OuterKernelProvider()
         self._outer_kernel_cache = self._outer_kernels.cache
         self._checks = StateChecks(arena)
+        self.directed_chain_plan = recognize_directed_chain(arena) if schedule == "auto" else None
+        self._directed = (DirectedChain(arena, self.directed_chain_plan)
+                          if self.directed_chain_plan is not None else None)
 
     # -- state construction ---------------------------------------------
 
@@ -211,6 +219,23 @@ class Engine:
             min_ess_fraction=self.mu3_min_ess_fraction,
         )
         return _replace(state, params=updated.params), delta, code, residual
+
+    @property
+    def has_adaptive_gaussian(self) -> bool:
+        return any(
+            g.kernel is not None and g.kernel.binding.iterative
+            for g in self.arena.gauss_groups
+        )
+
+    @property
+    def objective_metadata(self):
+        """Per-Gaussian-factor energy conventions, including adaptive surrogates."""
+        return self._ledger.metadata
+
+    @property
+    def objective_contract(self):
+        """Describe the semiring's score. Max-product scores its decoded assignment exactly."""
+        return self._ledger.contract
 
     def hybrid_gfe_diagnostics(
         self, state: State
@@ -278,15 +303,43 @@ class Engine:
         if mu3_code:
             outcome = "budget exhausted" if mu3_code == 1 else "diverged"
             raise RuntimeError(f"mu3 importance update {outcome}; use Engine.run for status")
-        msgs, g_eta, g_lam, ef_eta, _, inner_code = self._step(
-            state.messages, state.g_eta, state.g_lam, state.g_obs, state.g_mask,
-            state.ef_eta, state.ef_obs, state.ef_mask, state.params, damp, harden,
-        )
-        if int(inner_code):
+        updated, inner_code = self._step_with_status(state, damp, harden)
+        if inner_code:
             raise RuntimeError(
                 "factor-local inference diverged; use Engine.run for status"
             )
-        return _replace(state, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta)
+        return updated
+
+    def _step_with_status(self, state, damp, harden):
+        msgs, g_eta, g_lam, ef_eta, _, inner_code, *_ = self._step(
+            state.messages, state.g_eta, state.g_lam, state.g_obs, state.g_mask,
+            state.ef_eta, state.ef_obs, state.ef_mask, state.params, damp, harden,
+        )
+        return _replace(state, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta), int(inner_code)
+
+    def _certify_directed(self, state, evidence, tolerance):
+        from cffg.directed_chain_certificate import ChainCertificate, certify
+
+        check = certify(self.arena, state, self._directed.linearize, evidence, tolerance)
+        if not check.passed:
+            return check
+        # The compiled rule can round differently from the independent host reference.
+        successor, code = self._step_with_status(state, 0., True)
+        if code:
+            raise FloatingPointError("directed candidate failed the engine update")
+        return ChainCertificate.measure(
+            (state.g_eta, state.g_lam),
+            (successor.g_eta, successor.g_lam),
+            self.bfe(state), self.bfe(successor), evidence, tolerance,
+        )
+
+    def _can_run_exact(self, n_iters: int, damp: float, harden_last: int) -> bool:
+        return (
+            self._propagate is not None
+            and n_iters >= 1
+            and damp == 0.0
+            and (harden_last == 0 or not len(self.arena.delta_pairs))
+        )
 
     def run(
         self,
@@ -311,6 +364,16 @@ class Engine:
         Callers that require actionable beliefs should use
         ``result.require_converged()``.
 
+        Sum-mode Gaussian/EF initialization can consume several sweeps before the
+        ledger is finite. A positive budget ending without any finite energy
+        reports divergence with ``undefined_objective``. No hidden restart or
+        automatic damping extends the requested work budget.
+
+        Eligible Gaussian Taylor chains on CPU can use a checked directional
+        solve in auto mode when a tolerance is supplied. A rejected candidate
+        spends one iteration before the coupled solver uses the remaining
+        budget. ``outer_solver="trust_region"`` selects the coupled reference.
+
         Mixed-GFE plans use the proof-backed trust-region residual solver by
         default. ``damp`` remains a Picard/flooding parameter and is rejected
         for that path; select ``outer_solver="picard"`` explicitly to retain
@@ -320,7 +383,8 @@ class Engine:
         premature pointmass locks in its own arbitrary argmax. With
         `harden_last=k` (default: k = n_iters // 2 when δ edges exist), the
         first phase runs soft to coherence, then δ edges harden for the final
-        k sweeps so decisions commit sequentially.
+        k sweeps so decisions commit sequentially. Without delta constraints,
+        a valid ``harden_last`` request has no effect.
 
         Two-pass schedules (cff-d56d): when the engine compiled an exact
         directed schedule and the call keeps its contract (``damp=0``, no
@@ -342,27 +406,35 @@ class Engine:
             harden_last = n_iters // 2 if len(self.arena.delta_pairs) else 0
         if not 0 <= harden_last <= n_iters:
             raise ValueError("harden_last must be between 0 and n_iters")
-        if (
-            self._propagate is not None
-            and n_iters >= 1
-            and damp == 0.0
-            and harden_last == 0
-        ):
+        if not len(self.arena.delta_pairs):
+            harden_last = 0
+        if self._can_run_exact(n_iters, damp, harden_last):
             return self._run_exact(state, tol)
         has_gfe = bool(
             self.arena.gfe_groups
             or self.arena.gfe_tm_groups
             or self.arena.hybrid_gfe_groups
         )
-        use_trust_region = has_gfe and outer_solver != "picard"
-        if outer_solver == "trust_region" and not has_gfe:
-            raise ValueError("outer_solver='trust_region' requires a GFE plan")
+        adaptive = self.has_adaptive_gaussian
+        if adaptive and outer_solver == "picard":
+            raise ValueError("adaptive Gaussian inference requires residual globalization")
+        use_trust_region = (has_gfe or adaptive) and outer_solver != "picard"
+        if outer_solver == "trust_region" and not (has_gfe or adaptive):
+            raise ValueError("outer_solver='trust_region' requires a GFE or adaptive Gaussian plan")
         if use_trust_region:
             if damp != 0.0:
                 raise ValueError(
-                    "damp does not apply to mixed-GFE trust-region inference; "
-                    "omit it or select outer_solver='picard' explicitly"
+                    "damp does not apply to trust-region inference; omit it"
                 )
+            if (self._directed is not None and outer_solver == "auto" and n_iters > 0
+                    and tol is not None and isfinite(tol) and tol >= 0
+                    and self._directed.admits(state)):
+                proposal = self._directed.run(state, tol, self._certify_directed)
+                if (proposal.termination_reason is not OuterTerminationReason.DIRECTED_CHAIN_UNCERTIFIED
+                        or n_iters == 1):
+                    return proposal
+                return after_directed_attempt(self._run_outer_trust_region(
+                    state, n_iters - 1, tol=tol, harden_last=0))
             return self._run_outer_trust_region(
                 state, n_iters, tol=tol, harden_last=harden_last
             )
@@ -379,6 +451,7 @@ class Engine:
         ess, log_normalizers, mu3_statuses = self._mu3_result_diagnostics(outcome.state)
         return run_results.finalize_iteration(
             outcome,
+            factor_names=self._failure_names,
             legacy_picard=has_gfe,
             mu3_ess=ess,
             mu3_log_normalizers=log_normalizers,
@@ -421,6 +494,7 @@ class Engine:
         return self._outer_kernels.plan(
             chart, state, hard_blocks,
             iter_step=self._iter_step, reconstruct=self._reconstruct,
+            belief_kernel=self._bfe,
         )
 
     def _run_outer_trust_region(
@@ -439,6 +513,8 @@ class Engine:
             iter_step=self._iter_step,
             prime=self._prime,
             reconstruct=self._reconstruct,
+            adaptive_gaussian=self.has_adaptive_gaussian,
+            startup=self._schedule_program.startup,
             services=OuterServices(
                 self._state_is_finite,
                 self._has_zero_support,
@@ -449,6 +525,7 @@ class Engine:
         ess, log_normalizers, mu3_statuses = self._mu3_result_diagnostics(outcome.state)
         return run_results.finalize_outer(
             outcome,
+            factor_names=self._failure_names,
             mu3_ess=ess,
             mu3_log_normalizers=log_normalizers,
             mu3_statuses=mu3_statuses,
@@ -458,7 +535,7 @@ class Engine:
         outcome = ExactRunStrategy(
             self._exact_unit, self.arena.semiring, self._state_is_finite, self.objective
         ).run(state, tol)
-        return run_results.finalize_exact(outcome)
+        return run_results.finalize_exact(outcome, factor_names=self._failure_names)
     @staticmethod
     def _state_is_finite(state: State) -> bool:
         return state_is_finite(state)
@@ -531,6 +608,10 @@ class Engine:
         ``init_state`` rather than add a posterior to an old count message.
         """
         return self._state_lifecycle.with_goal_priors(state, priors)
+
+    def gaussian_marginal(self, state: State, edge: str) -> tuple[np.ndarray, np.ndarray]:
+        """Read one named Gaussian mean and covariance on the host."""
+        return _gaussian_readouts.gaussian_marginal(self.arena, state, edge)
 
     def gaussian_marginals(self, state: State) -> dict[str, tuple[np.ndarray, np.ndarray]]:
         """Edge name -> (mean, cov). Requires a proper combined precision —

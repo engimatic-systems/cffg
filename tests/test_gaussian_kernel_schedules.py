@@ -79,7 +79,7 @@ def test_observed_custom_chain_scan_transport_and_trace_reuse(registered):
             if isinstance(stage, ScanStage)
             else _batch_stage_fn(arena, stage, logsumexp)
         )
-        current = eqx.filter_jit(fn)(*current, *args[4:])
+        current = eqx.filter_jit(fn)(*current[:4], *args[4:])
     np.testing.assert_allclose(current[1], exact.g_eta, atol=1e-11)
     np.testing.assert_allclose(current[2], exact.g_lam, atol=1e-11)
 
@@ -103,7 +103,7 @@ def test_observed_custom_chain_scan_transport_and_trace_reuse(registered):
 
     visit(closed.jaxpr)
     assert carries
-    assert all(shape in {(1, 1), (1, 3), (1, 1, 1), (1, 3, 3)} for shape in carries)
+    assert all(shape in {(), (1, 1), (1, 3), (1, 1, 1), (1, 3, 3)} for shape in carries)
     assert initial.g_eta.shape not in carries and initial.g_lam.shape not in carries
 
 

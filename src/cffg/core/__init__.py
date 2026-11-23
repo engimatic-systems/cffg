@@ -27,6 +27,14 @@ from cffg.core.ir import (
     register_factor_type,
 )
 from cffg.core.plates import expand_plates, plate_observations
+from cffg.core.functions import FunctionSpec
+from cffg.core.moment_matching import (
+    MomentMatchingEndpoint,
+    MomentProjection,
+    migrate_moment_matching,
+    moment_matching,
+    moment_matching_endpoint,
+)
 from cffg.core.validate import ModelError, validate
 
 __all__ = [
@@ -42,8 +50,11 @@ __all__ = [
     "Expose",
     "FactorSpec",
     "FactorType",
+    "FunctionSpec",
     "LearnableSpec",
     "ModelError",
+    "MomentMatchingEndpoint",
+    "MomentProjection",
     "PlateSpec",
     "PortRole",
     "PortSpec",
@@ -51,6 +62,9 @@ __all__ = [
     "VariableSpec",
     "expand_plates",
     "plate_observations",
+    "migrate_moment_matching",
+    "moment_matching",
+    "moment_matching_endpoint",
     "register_factor_type",
     "validate",
 ]

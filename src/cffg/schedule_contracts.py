@@ -5,10 +5,13 @@ from typing import Protocol
 
 import jax
 
+from cffg.failure_facts import FailureFact
+
 type Parameters = Mapping[str, jax.Array]
 type MessageArrays = tuple[jax.Array, jax.Array, jax.Array, jax.Array]
+type PropagationResult = tuple[jax.Array, jax.Array, jax.Array, jax.Array, FailureFact]
 type SweepResult = tuple[
-    jax.Array, jax.Array, jax.Array, jax.Array, jax.Array, jax.Array
+    jax.Array, jax.Array, jax.Array, jax.Array, jax.Array, jax.Array, FailureFact
 ]
 type ExactResult = tuple[
     jax.Array,
@@ -20,11 +23,12 @@ type ExactResult = tuple[
     jax.Array,
     jax.Array,
     jax.Array,
+    FailureFact,
 ]
 
 
 class Sweep(Protocol):
-    """One update returning message arrays and unchanged inner solver facts."""
+    """Message arrays, unchanged solver facts, and auxiliary failure provenance."""
 
     def __call__(
         self,
@@ -43,7 +47,7 @@ class Sweep(Protocol):
 
 
 class Propagation(Protocol):
-    """Ordered stages, without damping or a public termination decision."""
+    """Ordered messages and first cause, without damping or termination policy."""
 
     def __call__(
         self,
@@ -56,7 +60,7 @@ class Propagation(Protocol):
         ef_obs: jax.Array,
         ef_mask: jax.Array,
         params: Parameters,
-    ) -> MessageArrays: ...
+    ) -> PropagationResult: ...
 
 
 class FreeEnergy(Protocol):

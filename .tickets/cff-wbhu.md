@@ -2,7 +2,7 @@
 id: cff-wbhu
 status: open
 deps: [cff-j4mu, cff-d56d, cff-44we]
-links: [cff-fxmj, cff-5edo, cff-d56d, cff-yl0a, cff-rqqc, cff-weff, cff-lv2w, cff-g7rc, cff-r6bl, cff-sf29, cff-yglj]
+links: [cff-fxmj, cff-5edo, cff-d56d, cff-yl0a, cff-rqqc, cff-weff, cff-lv2w, cff-g7rc, cff-r6bl, cff-sf29, cff-yglj, cff-xa6z]
 created: 2026-07-10T03:34:54Z
 type: feature
 priority: 2
@@ -39,6 +39,8 @@ without changing its root, support, inner-solver, or free-energy certificates.
 Public results and schedule semantics remain unchanged; the measurable outcome
 is at least an 8× warm throughput gain for the recorded 32-instance workload
 with no single-engine regression.
+
+The exact two-pass Colony path and one-logical-iteration evidence in tests/test_exact_colony.py already cover 5.26–5.27 on their fixture. Reuse these as regression checks. The implementation target here is device-side iterative loop control and measured throughput across 32 instances.
 
 ## Outcomes / Acceptance Criteria
 
@@ -853,3 +855,7 @@ Intelligible-ticket review: complete.
 **2026-09-10T00:09:36Z**
 
 cff-yglj isolates the currently reproduced initial-nonfinite Colony result-field mismatch ahead of the shared controller extraction. Its correction and regressions become the reference for this ticket's initial-failure, freezing and per-instance parity criteria; no compiled-loop or throughput work is moved into that bug fix.
+
+**2026-09-25T03:47:40Z**
+
+PCGym follow-up under cff-xa6z: retain a horizon-15 gaussian_mixture_linear control workload as consumer evidence for per-sweep dispatch cost; report warm synchronized inference separately from binding/readouts and concurrent-load wall time. Do not conflate cff-v6th's exact/Colony correctness repair or cff-qtub's cached spawning with this ticket's compiled loop scope. cff-wt1c consumes this result. Existing proof/status/throughput acceptance remains authoritative.

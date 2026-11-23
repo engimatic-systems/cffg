@@ -1,6 +1,7 @@
 """Cross-seam ownership checks; existing factor tests supply numerical oracles."""
 
 import ast
+import inspect
 from functools import cache
 from pathlib import Path
 
@@ -338,6 +339,9 @@ def test_scheduled_and_flat_registered_updates_share_the_same_callables():
     assert SCHEDULED_EXECUTORS.gaussian is registered.execute_gaussian
     assert SCHEDULED_EXECUTORS.exponential_family is registered.execute_ef
     calls = called_names("execution/synchronous.py")
-    for function in ("execute_discrete", "execute_gaussian", "execute_ef"):
+    for function in ("execute_discrete", "execute_ef"):
         assert f"cffg.execution.registered.{function}" in calls
+    assert inspect.signature(synchronous._gauss_sweep).parameters["execute"].default is registered.execute_gaussian
+    assert inspect.signature(synchronous.make_sweep).parameters["_gaussian_executor"].default is registered.execute_gaussian
+    assert "cffg.execution.registered.execute_gaussian" in called_names("execution/startup.py")
     assert synchronous.make_sweep.__module__ == "cffg.execution.synchronous"

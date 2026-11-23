@@ -1,6 +1,6 @@
 ---
 id: cff-zov5
-status: open
+status: closed
 deps: [cff-x0if]
 links: []
 created: 2026-08-31T03:47:26Z
@@ -156,3 +156,7 @@ qualification artifacts after they have run.
 **2026-08-31T03:55:14Z**
 
 Roadmap authoring handoff: PR #102 is stacked on PR #101. The four tickets passed fresh contextual wiggle scans and parse checks; tk dep cycle and git diff --check passed. No short suite ran because this PR changes tickets only. Next work is cff-iur0. Its implementation gate is deliberate: derive and independently test the smallest component contract before touching compiler or engine code. Gotcha: cff-nkbj remains a separate later adapter-comparison chain and is not a prerequisite.
+
+**2026-09-15T13:20:19Z**
+
+Closed as not pursuing at Cooper's direction so other epics can take priority. cff-ocxl contains the short D12 downstream summary and pointers to the preserved implementation/evidence branches. The derivations remain completed, but the outstanding implementation, boundary, composition, persistence and recovery tickets present at PR142 are closed by this decision rather than accepted as delivered. No source-recovery capability was demonstrated, and none of the three registered fits ran. Detailed tickets created after PR142 remain on their existing branches. The separate balanced-tree, destination-softmax and broader factor-library epics are outside this closure.

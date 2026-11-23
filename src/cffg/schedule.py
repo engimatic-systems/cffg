@@ -277,6 +277,8 @@ def _iterative_structures(arena: Arena) -> list[str]:
         reasons.append("recurrence-link VMP groups")
     if arena.prec_groups:
         reasons.append("gaussian_prec VMP groups")
+    if any(g.kernel is not None and g.kernel.binding.iterative for g in arena.gauss_groups):
+        reasons.append("adaptive Gaussian groups")
     return reasons
 
 
@@ -298,6 +300,8 @@ def _island_nodes_and_links(
             for r in range(len(g.roles)):
                 disc_owner[int(g.scatter[mi, r])] = node
     for gi, g in enumerate(arena.gauss_groups):
+        if g.kernel is not None and g.kernel.binding.iterative:
+            continue
         for mi in range(len(g.members)):
             node = ("gauss", gi, mi)
             nodes.append(node)

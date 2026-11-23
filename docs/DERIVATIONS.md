@@ -245,7 +245,7 @@ conjugate addition, observation energies).
 2. The third arena is `ef_eta [n_efslots, 2]` with per-group family tags
    (`EfGroupPlan`); vacuous = zeros; same slot discipline as the Gaussian
    arena, independent numbering. The entire update vocabulary: priors and
-   observed likelihoods send constants, equality sends sum-minus-self —
+   observed likelihoods send constants, equality sums the other legs —
    conjugate BP converges in one sweep per graph diameter.
 3. Factor vocabulary v1: `gamma`/`beta` prior leaves (scalar shape/rate,
    a/b blobs; propriety is a compile error, not a runtime surprise);
@@ -306,9 +306,14 @@ difference between folklore and a correct implementation:
 
 Incoming: μ_o = (η_o, Λ_o) on out, μ_i = (η_i, Λ_i) on in (information form,
 scale-free), μ_e(s) selector log-message. Z(η, Λ) := (2π)^{d/2}
-det(Λ)^{−1/2} exp(½ηᵀΛ⁻¹η) is the unnormalized-Gaussian mass; all propriety
-guards below fall back to the vacuous message mid-flooding and to +inf in
-ledger terms (the engine-wide loudness convention).
+det(Λ)^{−1/2} exp(½ηᵀΛ⁻¹η) is the unnormalized-Gaussian mass. Components
+not yet normalizable fall back to a vacuous message mid-flooding; improper
+ledger beliefs give +inf. After admission, collapse also verifies its computed
+component covariances, means, collapsed covariance and final precision.
+Arithmetic failure there emits nonfinite messages, not a dummy inverse or
+invented regularization. Exact-zero selector components are masked before
+moment products. `tests/test_mixture_collapse.py` pins this distinction with
+independent multidimensional moments, overflow, support and derivative cases.
 
 **→ selector (exact).** Per regime, the joint over (y, x) of node × μ_o × μ_i
 has (same blocks as `gauss.linear_energy`):
@@ -319,9 +324,49 @@ has (same blocks as `gauss.linear_energy`):
     log μ(s) = log Z(η_J(s), Λ_J(s)) − ½ b_sᵀW_s b_s + ½ log det(W_s/2π·I…)
              = log Z(η_J, Λ_J) − ½ b_sᵀW_s b_s + ½ log det W_s − ½ d_y log 2π.
 
-Guard: Λ_J(s) ≻ 0 for all s, else uniform. (Prior variant f_s(y) = N(y; m_s,
-V_s): Λ_J = W_s + Λ_o ≻ 0 always; log μ(s) = log Z(W_s m_s + η_o, W_s + Λ_o)
+Guard: W_s and Λ_J(s) ≻ 0 for all s, else uniform. (Prior variant f_s(y) = N(y; m_s,
+V_s): require Λ_J = W_s + Λ_o ≻ 0; log μ(s) = log Z(W_s m_s + η_o, W_s + Λ_o)
 − ½ m_sᵀW_s m_s + ½ log det W_s − ½ d log 2π.)
+
+**Stable relative evidence.** The formula above subtracts large canonical
+Gaussian constants. For proper input information, integrate the normalized
+predictive N(m_s,C_s), with m_s=A_s Λ_i⁻¹η_i+b_s and
+C_s=W_s⁻¹+A_s Λ_i⁻¹ A_sᵀ, against the output potential instead. The omitted
+input log partition is common to all selectors. The prior-mixture variant
+uses its supplied m_s and C_s=W_s⁻¹ directly.
+
+Choose any common finite anchor a. Write C_s=L_s L_sᵀ,
+r=η_o−Λ_o a, δ_s=m_s−a, and G_s=I+L_sᵀΛ_o L_s. Then
+
+    u_s = G_s⁻¹ (L_s⁻¹δ_s + L_sᵀr),     p_s = L_s u_s,
+    score_s = ½ rᵀp_s + ½ rᵀδ_s − ½ δ_sᵀΛ_o p_s − ½ log det G_s.
+
+This drops only the common output log potential at a. Completing the square
+gives the shifted posterior mode p_s; its stationarity equation
+C_s⁻¹(p_s−δ_s)=r−Λ_o p_s reduces the mode objective to the expression above.
+It avoids subtracting both canonical log partitions and large movement
+quadratics. Λ_o may be singular or symmetric indefinite provided G_s is
+positive definite. In particular, do not discard a linear term η_o in a
+null direction of Λ_o.
+
+`mixture_evidence.py` chooses the output pseudomode clipped to the component
+mean bounds, so a weak output precision cannot put the anchor arbitrarily far
+from the predictive cloud. The anchor is nondifferentiated: its derivative
+changes only a component-common constant and hence cancels from normalized
+weights. Actual computed covariances, G_s, solves and scores must be valid;
+safe-solve placeholders never certify evidence. For improper input information,
+the original integrable-joint formula remains necessary: its component masses
+can contain selector-dependent Jacobians, such as 1/|A_s| in one dimension.
+An unused branch is sanitized before arithmetic to keep derivatives finite.
+
+Selector messages, node-energy responsibilities and learning statistics share
+these relative scores. Absolute Gaussian entropies and expected log factors
+are unchanged; forward weights and backward mass reconstruction are separate.
+`tests/test_mixture_evidence.py` checks independent overlap probabilities,
+displaced means, partial observations, nullspace linear terms, integrable
+negative precision, improper-input Jacobians, derivatives and invalid
+intermediates. `tests/test_hybrid_planning.py` checks retained float32 log odds
+without a canonical-cancellation allowance.
 
 **→ out (collapsed forward).** Component s: the scale-free forward
 predictive (η_f(s), Λ_f(s)) = `linear_forward`(μ_i; A_s, b_s, W_s). Masses
@@ -331,7 +376,12 @@ incoming selector log-message alone. Moment match:
     m̄ = Σ w_s m_s,   C̄ = Σ w_s (C_s + m_s m_sᵀ) − m̄ m̄ᵀ,
     (m_s, C_s) = (Λ_f⁻¹η_f, Λ_f⁻¹);   message = (C̄⁻¹ m̄, C̄⁻¹).
 
-Guard: every Λ_f(s) ≻ 0 (needs Λ_i ≻ 0), else vacuous.
+Guard: every supported component must be normalizable, else vacuous. For
+proper incoming Λ_i, compute the predictive covariance V_s + A_s Λ_i⁻¹ A_sᵀ
+and check each computed covariance and precision. Otherwise the Schur
+projection's retained eigenvalues, not positivity of its rounded reconstructed
+matrix, certify full output rank. An explicitly discarded null direction
+cannot become information merely because matrix multiplication rounds it up.
 
 **→ in (collapsed backward, the weight trap).** Component s: scale-free
 (η_b(s), Λ_b(s)) = `linear_backward`(μ_o; A_s, b_s, W_s), plus the scale the
@@ -342,7 +392,36 @@ engine's convention dropped:
                + ½ log det W_s − ½ d_y log 2π.
 
 Weights w̃_s ∝ exp(μ_e(s)) · c̃_s · Z(η_b(s), Λ_b(s)); moment match as above.
-Guard: every Λ_b(s) ≻ 0 (needs Λ_o ≻ 0 and rank(A_s) = d_x), else vacuous.
+Guard: every supported component must inform all d_x input directions,
+else vacuous. For proper W, G = W(W + Λ_o)⁻¹Λ_o has exactly the same
+nullspace as Λ_o. Consequently rank(A_sᵀ G A_s) equals rank(U₊ᵀ A_s),
+where U₊ spans the retained informed subspace of Λ_o. Use this incoming
+subspace, not eigenvectors contaminated by the Schur subtraction. For this
+rank-only calculation, first equilibrate Λ_o = D C D by its positive diagonal
+entries and transform A_s to D A_s. This congruence preserves the rank question
+without letting unrelated coordinate units erase an informed direction.
+When Λ_o
+is proper, the question reduces to rank(A_s); no eigenvalue cutoff is applied
+to its weak but proper information. Singular Λ_o is allowed when its informed
+subspace still spans every input direction.
+
+Before equilibration, the U₊ᵀ A_s projection is screened against dtype-relative
+roundoff in these equilibrated coordinates: 16 d_y eps(dtype) times the
+componentwise product |U₊ᵀ| |D A_s|,
+plus an eigenspace-uncertainty allowance proportional to
+scale(C)/λ_j times each transformed input column's norm for retained eigenvalue λ_j.
+This prevents both cancellation and uncertain spectral directions from being
+amplified into information. Unresolved near-null directions remain vacuous.
+Rank analysis then equilibrates columns and rows and compares singular values
+with 16 max(d_y,d_x) eps(dtype) times the largest; it is auxiliary and
+nondifferentiated. This numerical-rank decision does not add a precision floor
+or tighten the shared Gaussian propriety predicate. Invalid computed
+covariances or precisions produce nonfinite failure evidence, not the vacuous
+initialization fallback. `tests/test_mixture_rank.py` pins rotated nullspaces,
+proportional columns, retained subspaces, coordinate scales, overflow and
+proper-branch derivatives in both supported floating precisions.
+Components outside exact selector support do not take part in
+moment or score arithmetic, nor in these component-admission guards.
 
 **Node energy (exact for the held beliefs).** ρ_s = softmax over s of
 [μ_e(s) + log μ(s)-integrand above]; q(y,x|s) is Gaussian with (η_J, Λ_J):
@@ -355,7 +434,8 @@ tr(W_s J_s Σ_J J_sᵀ)), r_s = J_s m_J − b_s, J_s = [I, −A_s] — the
 the Gaussian edges keep their standard interior +H corrections; the Gaussian
 ones use collapsed beliefs, which is the ledger's one bounded term (D3.1.3).
 
-Checks: K = 1 reduces every rule to the plain `gaussian_linear` rules and
+Checks: for normalizable, numerically valid components, K = 1 reduces every
+rule to the plain `gaussian_linear` rules and
 the energy to `linear_energy`. Vacuous μ_e ⇒ w_s uniform in the forward
 collapse. A_s ≡ A, b_s ≡ b, V_s ≡ V across s ⇒ collapse is exact (mixture
 of identical Gaussians) and F_a reduces to linear_energy + H-cancellation
@@ -363,6 +443,15 @@ on the selector edge. Executable anchors: `tests/test_mixg.py` (quadrature
 moments/energy, weight-trap regression, bound direction),
 `tests/test_switching_kf.py` (enumeration + independent collapsed-smoother
 parity).
+
+Partial-goal planning is a distinct limitation. In the retained two-dimensional
+state chain with scalar position goals, every backward mixture component stays
+rank one and the declared fallback is vacuous. Forward initialization eventually
+makes the ledger finite, but later goals still cannot influence the first
+action. `tests/hybrid_planning_fixture.py` independently computes this fixed
+point's collapsed forward moments and local joint-mixture Bethe terms;
+`tests/test_hybrid_planning.py` checks both numerical convergence and the absence
+of distant-goal influence. No exact smoothing or useful-lookahead claim follows.
 
 ---
 
@@ -2132,3 +2221,1438 @@ authority is anchored in `tests/test_structured_recurrence_rule.py`:
   compiled flooding and mixed schedules. It checks compiler acyclicity,
   factor-local pairs, Gaussian writes, the pair/separator BFE ledger,
   fixed-drive `-log Z`, loop claim boundaries, and `O(T K^2)` batch storage.
+
+## D11 — Pair-conditioned Gaussian recurrence regions (cff-iur0)
+
+### D11.1 Plain English and the decision
+
+**Decision: no new production coordinate is authorized.** The local
+pair-conditioned Gaussian EC candidate below has sound stationary equations,
+but fails a source-association counterexample at its ordinary boundaries.
+cff-ocxl is rewritten as a hybrid-separator derivation gate before any
+implementation. D10 remains the name of the retired historical whole-model
+candidate; the equations below do not revive that dispatch path.
+
+D9 remembers which regimes occurred together, but forgets which continuous
+states went with those regime transitions. For example, two equally likely
+source regimes can favor positive and negative positions respectively. Their
+overall mean position is zero. Multiplying each source's responsibility by
+that zero loses both learning signals. Learning which regime labels explain
+observations does not recover the missing positions automatically.
+
+The candidate region remembers a mean and covariance for each source/destination
+pair. It sends their combined mean and covariance to ordinary Gaussian
+neighbors. Those neighbors retain one Gaussian belief, while the recurrence
+region retains its labeled mixture. The two beliefs agree on moments, not
+on their probability densities. This distinction is an explicit constraint
+choice, not an exact Gaussian representation of the mixture. It can remember
+association induced by its own recurrence factor, but cannot receive
+association that another factor inferred between source and position. That
+remaining information loss is the reason for the negative decision.
+
+Part I §5.4, Eq. (31), permits replacing marginal consistency by
+sufficient-statistic consistency and obtains expectation propagation (EP).
+We apply that construction to this recurrence region. The term
+*expectation consistent* (EC) below names this moment constraint.
+Sources: [Part I](https://biaslab.github.io/pdf/arxiv/2306.08014.pdf),
+[Opper and Winther, 2005](https://www.jmlr.org/papers/volume6/opper05a/opper05a.pdf).
+The recurrence-specific equations and minimality comparison below are our
+derivation, not claims that those sources analyzed this recurrence rule.
+
+Two consequences remain useful for the next derivation. A Gaussian **message** can have
+negative precision; the beliefs and integrals used by the rule must remain
+proper. Also, the complete EC objective has no general bound direction against
+the true negative log evidence. The JJ bound retains its precise direction
+against the same EC objective with literal logistic factors (D11.9).
+
+### D11.2 What D9 removes; the factor-local candidate
+
+Use D9's transition indexing, with `T` regimes, `T-1` drives, `K` regimes
+per slice, dimension `d`, and fixed installed `theta_il=[R_il;r_il]`.
+Let `h=[x;1]`, `b_jl=1(j>=l)`, and `k_jl=1(j=l)-b_jl/2`, for
+`l=0,...,K-2`. The learning coordinates require
+
+    A_til = sum_j k_jl E[1(z_t=i,z_{t+1}=j) h_t],
+    B_til = omega_til sum_j b_jl E[1(z_t=i,z_{t+1}=j) h_t h_t^T]. (D11.1)
+
+D9 replaces the expectations by `rho_tij E_qG[h_t]` and
+`rho_tij E_qG[h_t h_t^T]`. It sets both the indicator/feature covariance
+and the indicator/second-moment covariance to zero. Preserving `rho` alone
+does not restore either covariance. D11 changes the auxiliary as well as
+the learning statistic; using its moments with D9's unconditional auxiliary
+would not solve the declared coordinate.
+
+Consider one region per recurrence factor:
+
+    b_t(i,j,x) = rho_tij N(x; m_tij, S_tij),                 (D11.2)
+    rho >= 0, sum_ij rho = 1, S_ij positive definite on active pairs.
+
+Retain `rho`, `m`, `S`, `h_ij=[m_ij;1]`, and
+`M_ij=[[S_ij+m_ij m_ij^T,m_ij],[m_ij^T,1]]`. The last two are derived,
+not independent coordinates. All required cross-moments are `rho h` and
+`rho M`. Retain categorical edge beliefs `gamma_L=sum_j rho`,
+`gamma_R=sum_i rho`, and Gaussian edge belief `q_x=N(mu,V)`, constrained by
+
+    mu = sum_ij rho_ij m_ij,
+    V + mu mu^T = sum_ij rho_ij (S_ij+m_ij m_ij^T).          (D11.3)
+
+No continuous cross-time covariance is stored in this region. An external
+Gaussian dynamics factor retains its own joint Gaussian covariance under
+its own node and edge ownership. There is no global `q(Z,X)` asserted by
+(D11.2--3).
+
+The auxiliary coordinates are one `xi_il=c_il^2>=0` per source/stick,
+shared across at-risk destinations. This is a deliberate tying constraint
+on the JJ bound. No random coefficient posterior or extra independent PG
+entropy is included: coefficients are installed point values and the PG
+coordinate is eliminated into the bound, as in D9.
+
+| Candidate | Decision |
+| --- | --- |
+| D9 pair times one unconditional Gaussian | Cannot represent either covariance in D11.1. |
+| One Gaussian per source, with `q(x\|i,j)=q(x\|i)` | Cannot distinguish success/failure positions even when the source is clamped. |
+| Pair-conditioned Gaussian triplet | Smallest recurrence-factor scope with unrestricted local conditional moments, but rejected as a sufficient source-learning repair by D11.15. |
+| Per-destination auxiliaries `c_ijl` | Can tighten JJ, but add an `O(K^3)` coordinate inventory without retaining another required cross-moment. Deferred. |
+| Hybrid separator `(z_t,x_t)` between grouped/overlapping regions | Necessary to communicate source-conditioned moments across the counterexample boundary, unless the coupled factors share one owner. Full construction deferred to cff-ocxl. |
+| Whole-trajectory mixture / dense continuous trajectory | Not justified: a hybrid separator is a smaller candidate to evaluate first; path enumeration/dense covariance violates the required scaling. |
+
+This is minimality among those stated region/conditional-Gaussian candidates,
+not a proof of optimal recovery or a comparison against every possible
+approximation or an accepted composable trajectory approximation. Keeping only moment numbers without a density does not define
+the required region entropy.
+
+### D11.3 One objective, counting numbers, and the bound
+
+For `psi_il(x)=R_il^T x+r_il`, put
+
+    w_il = tanh(c_il/2)/(2 c_il), with w(0)=1/4,
+    L_il(x) = log(2 cosh(c_il/2)) + w_il (psi_il(x)^2-c_il^2)/2,
+    log f_t^JJ(i,j,x) = sum_l [k_jl psi_il(x) - b_jl L_il(x)]
+                     = a_ij + h_ij^nat x - x^T P_ij x/2.   (D11.4)
+
+Here `h^nat` is a row/vector natural coefficient, distinct from augmented
+feature `h`. Explicitly,
+
+    P_ij = sum_l b_jl w_il R_il R_il^T,
+    h_ij^nat = sum_l (k_jl-b_jl w_il r_il) R_il,
+    a_ij = sum_l { k_jl r_il - b_jl [log(2 cosh(c_il/2))
+                                  + w_il (r_il^2-c_il^2)/2] }. (D11.5)
+
+Every `c>=0` gives a pointwise lower bound on the literal log factor.
+All constants in (D11.5) belong in the node energy. With
+`G(S)=d(1+log(2 pi))/2+logdet(S)/2`, the recurrence node owns
+
+    H(b_t) = H(rho_t) + sum_ij rho_tij G(S_tij),
+    F_t = -H(b_t) - sum_ij rho_tij [a_ij + h_ij^nat m_ij
+                         - tr(P_ij(S_ij+m_ij m_ij^T))/2].   (D11.6)
+
+For a factor graph after equality expansion, or its equivalent variable-node
+representation with variable degree `d_v`, the **single** objective is
+
+    F_EC^JJ = sum_f { -H(b_f) - E_bf[log f_f^JJ] }
+                           + sum_v (d_v-1) H(q_v).         (D11.7)
+
+Only recurrence factors use the JJ replacement. Other declared node
+objectives retain their own factors/constraints. Region entropy counting
+numbers are `+1`; variable-separator entropy counting numbers are `1-d_v`.
+Their free-energy signs are respectively minus and plus. A Forney internal
+edge has `d_v=2`; a dangling edge has `d_v=1`. Normal categorical equality
+expansion telescopes to these counts. Gaussian equality expansion must carry
+the same moment constraints, rather than assert mixture-density equality.
+For a categorical recurrence chain the interior correction is `+H(gamma_t)`;
+each recurrence drive also gets the Gaussian corrections dictated by its
+actual incidence. There is no second trajectory entropy owner.
+
+Minimize (D11.7) subject to normalization, categorical marginal consistency,
+and the Gaussian first/second-moment constraints (D11.3) at each incidence.
+Other included regions must have their own compatible stationary rules.
+The entropy of the Gaussian edge is exact for `q_v`; it is not substituted
+for the mixture entropy in (D11.6).
+
+For local solving with categorical cavities `lambda_L,lambda_R` and Gaussian
+cavity `log m_c(x)=eta_c^T x-x^T J_c x/2`, use
+
+    F_local = F_t - E_b[lambda_L(i)+lambda_R(j)+log m_c(x)]. (D11.8)
+
+This is the complete cavity-inclusive local objective. It is **not** an
+additional graph ledger term: remove cavity expectations to recover (D11.6).
+Canonical Gaussian cavities omit an arbitrary log scale. A known normalized
+prior's scale must be counted once when reporting its evidence; the oracle
+uses explicitly stated, unnormalized canonical potentials on both sides.
+
+At any identical feasible region/edge beliefs and held auxiliaries,
+
+    F_EC^JJ - F_EC^literal
+       = sum_t E_bt[log f_t - log f_t^JJ] >= 0.             (D11.9)
+
+The inequality also holds between infima over the same feasible set. Neither
+EC value has a general bound against true `-log Z`: moment consistency does
+not establish a globally consistent joint density. In the isolated local
+problem, however, `F_local = KL(b || normalized tilted f_JJ)-log Z_JJ`.
+Its fixed-c minimum is exactly `-log Z_JJ >= -log Z_literal`. The independent-
+drive categorical chain below also has a genuine tree joint and this stronger
+evidence statement. Do not extend that special case to coupled Gaussian
+dynamics or arbitrary loops. No GFE/P-substitution is derived here.
+
+### D11.4 Every coordinate and boundary equation
+
+For held cavities and auxiliaries, define
+
+    J_ij = J_c + P_ij, eta_ij = eta_c + h_ij^nat,
+    S_ij = J_ij^-1, m_ij = S_ij eta_ij,
+    log I_ij = a_ij + d log(2 pi)/2 - logdet(J_ij)/2
+                                         + eta_ij^T m_ij/2,
+    log rho_ij = lambda_L(i)+lambda_R(j)+log I_ij-log Z,
+    log Z = logsumexp_ij[lambda_L(i)+lambda_R(j)+log I_ij]. (D11.10)
+
+Each active `J_ij` must be positive definite. These are the unique
+fixed-cavity, fixed-c stationary Gaussian and simplex coordinates. The
+auxiliary stationarity condition is
+
+    e_il = sum_j b_jl rho_ij,
+    xi_il = sum_j b_jl rho_ij theta_il^T M_ij theta_il / e_il,
+    c_il = sqrt(xi_il),                                    (D11.11)
+
+on positive exposure. Zero exposure gives exact zero learning increments;
+choose `xi=0` to fix the otherwise unidentifiable auxiliary. Use
+`xi - conditional E[psi^2]` as the residual. Differentiating in `c` alone
+creates a spurious zero at `c=0`: the derivative in `xi` is
+`(e_il/2) (dw/dxi) (conditional E[psi^2]-xi)`, with
+`dw/dxi|0=-1/48`. At the nonnegative boundary `xi=0` stationarity requires
+zero squared-logit moment. This handles the KKT condition as well as positive
+auxiliaries.
+
+All outgoing messages are
+
+    log m_to_L(i) = logsumexp_j[lambda_R(j)+log I_ij] + C_L,
+    log m_to_R(j) = logsumexp_i[lambda_L(i)+log I_ij] + C_R,
+    J_to_x = V^-1-J_c, eta_to_x = V^-1 mu-eta_c,            (D11.12)
+
+using (D11.3). Constants `C_L,C_R` normalize on the active categorical face.
+These categorical formulas use the held optimized auxiliary; its dependence
+on cavities is not differentiated again (stationarity eliminates that term).
+Gaussian natural messages omit their log scale. Incoming cavities are sums
+of other incident outgoing natural/log messages, exactly as for ordinary
+factor boundaries. An attached likelihood changes these sums without changing
+the chosen region. A quotient precision can be negative and must not be
+clamped: with unit Gaussian cavity, equal source weights, observed success,
+and logits `4x-4,-4x-4`, the converged pair means are approximately
+`+/-1.25954`, their variances `0.25954`, and total variance `1.84599`.
+The required outgoing precision is approximately `-0.45828`.
+
+For completeness, the graph stationary equations can be expressed without a
+hidden internal coordinate. Let each directed message have natural coordinate
+`theta_fv`, let `chi_fv=sum_{g!=f} theta_gv`, and let
+`q_v` have coordinate `sum_f theta_fv`. Form (D11.10) from `chi` at recurrence
+nodes and the declared tilted beliefs at other compatible nodes. Neighbors
+with additional internal constraints must also supply their internal
+stationarity equations; this inventory assumes unrestricted tilted beliefs
+for those neighbors. The residual
+has, at **each** factor/variable incidence,
+
+    R_fv = E_bf[phi_v] - E_qv[phi_v],
+    R_il = xi_il - sum_j b_jl rho_ij theta_il^T M_ij theta_il/e_il, (D11.13)
+
+where categorical `phi` drops one active indicator and Gaussian `phi` contains
+`x` and the independent entries of `xx^T`. On zero exposure replace the
+second residual by `xi_il`. Normalize/drop one categorical log coordinate
+per message to remove its additive gauge. Setting off-support entries to log
+zero is a fixed feasible-face restriction, not an additive gauge; all
+stationarity claims are conditional on that face. Gaussian symmetric natural
+coordinates have no gauge after discarding the log scale. Absent pairs have
+no mean/covariance coordinates. There is no regime-label gauge with fixed
+installed source-specific coefficients. Inactive auxiliaries are the only
+additional unidentifiable coordinates and the zero convention fixes them.
+
+To see completeness, introduce incidence multipliers for the constraints in
+(D11.7). Variation in `b_f` gives `b_f proportional to f_f^JJ exp(sum chi_fv phi_v)`;
+variation in `q_v` gives the exponential-family edge with natural coordinate
+`sum_f chi_fv/(d_v-1)` when `d_v>1`. With the message parameterization above
+this is exactly `sum_f theta_fv`. At degree one the cavity is vacuous and
+the sole site's moment equation sets `q_v`. Variation in `xi` gives
+(D11.11). Thus (D11.13), positivity, and the support/normalization constraints
+are the full gauge-reduced stationarity system. Equation (D11.12) is its
+ordinary message fixed-point form.
+
+Alternating (D11.10) and (D11.11) performs exact minimizations of (D11.8);
+it needs no Newton globalization claim. Require both its finite FE change
+and auxiliary residual to meet tolerance; return `budget_exhausted` when
+the declared budget ends. At graph level this local descent is not a
+convergence proof. A future implementation would need a damped/backtracked solve of the scaled
+residual (D11.13), checking integrability and finite FE at proposed iterates.
+The residual norm is a solver merit function, never free energy. Graph
+convergence requires a small residual and stable finite (D11.7), not merely
+small parameter changes. A non-finite objective or residual is divergence.
+
+The existing D3 switching-Gaussian rule is **not** automatically a compatible
+neighbor. Its outgoing mixture is collapsed before the receiving Gaussian
+cavity is included; its node energy uses the full tilted labeled mixture.
+These operations generally leave a nonzero moment-consistency residual.
+For example, a prior mixture `0.5 N(-2,1)+0.5 N(2,1)` facing `N(0,1)` gives
+edge variance `5/6` under collapse-first messaging. The full tilted region
+has equal components `N(-1,1/2),N(1,1/2)` and variance `3/2`.
+
+The needed companion keeps D3.2's **same factor scope** and full tilted
+blocks, `b(s,y,x)=rho_s N([y;x];m_s,S_s)`. Its selector output is still the
+integrated Gaussian log mass without the selector cavity. For each Gaussian
+role `v` extract that role's block and set
+
+    mu_v = sum_s rho_s m_sv,
+    V_v = sum_s rho_s [S_svv+(m_sv-mu_v)(m_sv-mu_v)^T],
+    J_to_v = V_v^-1-J_cavity_v,
+    eta_to_v = V_v^-1 mu_v-eta_cavity_v.                    (D11.14)
+
+All role cavities participate in `rho_s,m_s,S_s`. There is no JJ auxiliary
+at this companion. D3.2 already gives its factor precision, linear term,
+constant, selector integral, and exact labeled node entropy/energy. Together
+with (D11.14) and ordinary edge corrections these are its complete stationary
+coordinates under (D11.7). The example's outgoing precision is `-1/3`.
+Cost is `O(K(d_in+d_out)^3)` per node and storage
+`O(K(d_in+d_out)^2)`. cff-ulbz tracks this distinct mixture boundary issue,
+conditional on the region design from cff-ocxl. It does not change existing
+D3 behavior and does not solve the source-association obstruction below.
+
+**Decisive boundary falsifier.** Consider the source-dependent prior
+`p(i)=1/2, p(x|i)=N(a_i,1)`, with `a=(2,-2)`, and an observed destination
+success under `R=r=0`. Recurrence success is exactly `1/2`; JJ at `c=0` is
+exact. Exhaustive pair enumeration and independent quadrature give
+
+    rho_i0 = 1/2, E[x]=0, E[x^2]=5,
+    E[1(i=0,j=0)x]=1, E[1(i=1,j=0)x]=-1,
+    Delta eta_weight = (1/2,-1/2).                         (D11.15)
+
+Swap the two prior means. Both ordinary singleton boundaries stay identical:
+uniform source and Gaussian moments `(0,5)`. The required source-conditioned
+first moments and weight updates change sign. D11.10 receives identical
+inputs for both models and returns all conditional means zero. Its local
+residual is zero and its JJ bound is exact; neither fact detects this lost
+information. This is not a numerical-tolerance or approximation-bound issue.
+
+Consequently **no factor-local function of those separate singleton cavities
+can return both models' correct source-conditioned moments**. Allowing the
+recurrence region to hold such moments internally is insufficient. A
+companion EC mixture rule fixes its own moment projection, but the two
+regions still share only separate regime and continuous moments; they do not
+constrain `E[1_i x]` to agree. Gaussian source-dependent variances produce the
+analogous second-moment obstruction.
+
+The next candidate must retain a joint hybrid separator over `(z_t,x_t)`,
+including `gamma_i`, `E[1_i x]`, and `E[1_i xx^T]`, or place the factors that
+infer and consume those statistics inside one owner with equivalent internal
+constraints. Ordinary Gaussian/categorical external ports can remain only
+where they do not cut that required association. The full entropy, messages,
+gauge-reduced residual, and complexity of that larger construction are **not
+established here**. This is the explicit negative branch of cff-iur0's
+acceptance criterion 11, rather than authorization based on local exactness.
+
+### D11.5 Cost, hostile inputs, and reductions
+
+For one region, prefix accumulation of (D11.5) costs `O(K^2 d^2)`, its
+`K^2` dense factorizations/solves cost `O(K^2 d^3)`, and reverse cumulative
+pair moments compute (D11.11) and learning statistics in `O(K^2 d^2)`.
+There is no `K x K x (K-1)` stick tensor. Across `T-1` regions,
+persistent region/message/auxiliary storage is `O(T K^2 d^2)`; streamed
+transient storage is `O(K^2 d^2)` (batching all times uses another
+`O(T K^2 d^2)`). Parameters take `O(K^2 d)` when shared across time.
+Objective and residual evaluation are linear in `T` with these polynomial
+local costs. A declared budget of `I` local updates and `J` graph residual
+evaluations costs `O(J I T K^2 d^3)`, plus the stated costs of external
+regions. The experiment is NumPy; it makes no production JIT claim.
+
+These are bounded-work costs, not a claim that convergence takes constant
+`I,J` as horizon grows. Flooding a chain may itself require a horizon-dependent
+number of sweeps. Production must publish its budgets/status and avoid a
+dense numerical Jacobian: directional derivatives or local blocks preserve
+linear storage; a dense global Newton solve would violate this contract.
+No complete regime paths or dense continuous trajectory covariance are
+materialized by this local candidate. Only the tiny oracle may do so.
+
+| Hostile input | Required behavior |
+| --- | --- |
+| Literal log-zero regime support | Work on the active face, retain exact zero masses/statistics, and never take `-inf-(-inf)`. Outgoing categorical coordinates outside the face are fixed to log zero. |
+| A previously impossible regime becomes possible | Invalidate affected messages and reinitialize support/auxiliaries; inactive auxiliary values do not define a unique counterfactual message. No silent support revival from cached values. |
+| Empty supported component | Error; never normalize an all-zero region. |
+| Vacuous or improper Gaussian cavity | Accept only if every active **bounded tilt** is positive definite and the projected edge belief is proper. A vacuous cavity with an unconstrained direction fails. This local integrability claim is for JJ, not proof that the literal logistic integral is finite. |
+| Signed Gaussian output | Preserve it. Validate aggregate beliefs and the next tilted integrals; a consumer requiring positive site precision is incompatible and must reject the composition. |
+| Float32 / unresolved precision | Reject eigenvalues at or below `32 d eps * max(abs(eigenvalues))`; no ridge or absolute floor. This is a relative resolution check, not a repair. |
+| Small `c`, roundoff in a squared moment | Use `w=1/4-c^2/48` below `sqrt(eps)`; clip only negative roundoff bounded by `32 eps` times the sum of absolute quadratic terms. Larger negatives fail. |
+| Non-finite coordinates/objective/residual | Error or explicit `diverged`, never convergence or a vacuous-message substitute. |
+| Long horizon / larger state | The executable case uses `T=100,K=8` (50 times the smallest horizon), plus a separate `d=10` local case in both dtypes. |
+
+With a fixed drive, condition on that value rather than inserting a singular
+Gaussian density into the entropy formula. Setting `c_il=abs(psi_il(x))`
+makes JJ exact, and categorical messages/statistics reduce to D9. With
+`R_il=0`, the pair conditionals equal the Gaussian cavity, the Gaussian output
+is zero, and the local rule equals D9 even with uncertain continuous states.
+That is not global source-learning exactness when another factor couples
+source and drive, as (D11.15) shows. **Identical
+source rows with nonzero `R` are not a D9 reduction**: destination/drive
+dependence can remain. Source relabeling/invariance must still hold there.
+
+### D11.6 Independent executable anchors and implementation handoff
+
+`tests/regime_trajectory_reference.py` imports no CFFG code. It enumerates all
+discrete paths for `K=2,d=1,2<=T<=6`, integrates fixed-JJ paths by independent
+dense Gaussian completion, and separately uses adaptive scalar quadrature for
+literal logistic and JJ node integrals, moments, and trial-belief objectives.
+The reference uses float64 arithmetic even when checking a float32 candidate.
+Comparison budgets are declared before evaluating the candidate:
+`256 n eps(dtype)` absolute and relative tolerance for `n` accumulated terms;
+central-difference gradient tolerance is `2048 eps(float64)^(2/3)`, with
+step `eps(float64)^(1/3)`. Quadrature requests absolute and relative error
+`2e-11`; the Gaussian-JJ analytic enumeration supplies an independent check
+below that requested quadrature budget. These tolerances are comparison
+budgets, not numeric floors in the rule.
+
+`cffg.experiments.regime_pair` is an unregistered executable derivation.
+`tests/test_regime_pair_derivation.py` anchors:
+
+- `test_all_boundary_messages_moments_and_local_energy_match_quadrature`:
+  all three messages, both weighted moments, full (D11.8), and `-log Z_JJ`.
+- `test_literal_logistic_reference_exposes_lost_d9_and_source_only_moments`:
+  nonzero indicator/drive covariance and destination-conditioned means,
+  measured JJ approximation error, and the local bound directions.
+- `test_drive_independent_reduction_is_d9_exact` and
+  `test_fixed_drive_and_multistick_learning_contract`: the genuine D9
+  reductions and augmented learning statistics, including multiple sticks.
+- `test_complete_chain_region_objective_and_moments_match_path_enumeration`:
+  `T=5`, independent Gaussian drives, full node/chain-separator counting,
+  pair moments, and exact bounded-path normalization.
+- `test_complete_objective_gradient_and_stationary_auxiliary_match_quadrature`:
+  gauge-reduced probability, Gaussian mean/variance, and auxiliary coordinates,
+  both at stationarity and at a nonstationary perturbation.
+- The remaining named tests pin the source-homogeneity counterexample,
+  signed output, literal support, invalid/vacuous cavities, separate budget
+  status, float32, and the `T=100,K=8,d=10` inventory above.
+- `test_existing_mixture_collapse_requires_a_distinct_ec_binding` pins the
+  D3/EC second-moment mismatch and D11.14's signed Gaussian quotient by
+  independent adaptive quadrature.
+- `test_separate_boundaries_erase_external_source_association` pins D11.15
+  in both dtypes: the exact source moments are opposite while all available
+  singleton cavities are equal. This is a passing test of a rejected candidate,
+  not a production recovery success.
+- `test_separate_boundaries_also_erase_source_conditioned_second_moments`
+  repeats the obstruction with swapped variances and the precision statistic.
+
+**Implementation is not authorized by this result.** cff-ocxl now derives
+the smallest hybrid separator/grouping that passes D11.15 and provides a
+complete objective and ordinary exterior boundary contract. It must decide
+the grouping from serialized local semantics, never a whole-rSLDS classifier.
+Its positive outcome must create a separate bounded implementation ticket;
+its negative outcome must leave the mathematical blocker explicit. cff-ulbz
+tracks the independently discovered D3/EC projection issue and remains
+conditional on that decision. cff-x0if cannot qualify source recovery before
+both mathematical boundaries and their implementation dependencies are met.
+
+The local candidate meets the requested local equation, objective, oracle,
+hostile-input, and bounded-cost checks. It does **not** meet the requested
+composable source-association construction; no claim is made that the larger
+candidate satisfies criteria 4–8. The negative decision and rewritten
+downstream gate are the deliverable. Production selection, engine paths,
+public factors, readouts, and checkpoints remain D9 in this ticket.
+
+## D12 — Hybrid regime/state separators (cff-ocxl)
+
+### D12.1 Decision and plain-English companion
+
+**Positive mathematical decision: `hybrid-regime-ec-v1`.** This names the
+approximation below, not a shipped executable or checkpoint version. Production
+integration requires the separate implementation tickets recorded in cff-ocxl.
+D9 remains the public runtime. No source-recovery result is claimed.
+
+A boundary now carries a probability, mean, and covariance **for each regime**.
+The switched priors in D11.15 consequently send different boundaries: the two
+sources keep their positive and negative positions instead of sharing a zero
+mean. Recurrence learning uses those positions with the inferred source and
+next-regime pair. The variance twins also retain their different second moments.
+
+This fixes the identified missing association. It still merges different
+histories that end in the same regime into one conditional Gaussian. Those
+histories can matter to a later observation or learning update. D12.7 gives a
+counterexample with exact JJ factors and zero stationarity residual where the
+remaining learning error changes sign. The accepted contract is an explicit
+expectation-consistent (EC) approximation, not exact temporal inference.
+
+The sufficient-statistic EC construction has the same source basis as D11:
+[Part I §5.4](https://biaslab.github.io/pdf/arxiv/2306.08014.pdf) and
+[Opper and Winther (2005)](https://www.jmlr.org/papers/volume6/opper05a/opper05a.pdf).
+The scopes, elimination identity, adapters, and counterexamples here are our
+derivations. Existing D3 collapse-first outputs do not implement these equations.
+
+### D12.2 Smallest scopes, coordinates, and local integration
+
+Let `Y_t=(z_t,x_t)`, `z_t` have K states, and `x_t` have dimension d.
+Initially restrict the dynamics to the destination-selected affine channel
+`D_t(j,x,y)=N(y;A_tj x+b_tj,Q_tj)` with positive definite noise.
+The smallest scopes among the D11 candidates that preserve the required
+association form an alternating cluster chain:
+
+    Y_t=(i,x) -- R_t(i,j,x) -- H_t=(j,x)
+                                 -- D_t(j,x,y) -- Y_{t+1}=(j,y).
+
+The duplicated x or j at a region's ports is one internal variable. Region
+entropy uses the reduced coordinates, not the entropy of continuous copies
+with a Dirac equality density. This cluster chain has running intersection.
+A construction that attaches separate recurrence and dynamics regions only
+to both endpoint Y separators instead introduces a four-cycle and is a
+different objective. Singleton categorical/Gaussian ports fail D11.15.
+
+`R` retains `rho_ij N(x;m_ij,S_ij)`, `D` retains `pi_j N([x;y];m_j,S_j)`,
+and both H and Y retain `pi_i N(x;mu_i,V_i)`. At every hybrid incidence match
+`1_i`, `1_i x`, and the independent symmetric entries of `1_i xx^T`.
+Conditional covariance, not just raw second moment, must be positive definite.
+All beliefs normalize on their declared active support. There is no independent
+unconditional Gaussian trajectory belief. Source/destination pair probabilities,
+weighted first/second source moments, and conditional cross-time covariance
+are retained; all other readouts are derived from these beliefs.
+
+For evaluation, analytically eliminate D and H to obtain a grouped region
+
+    b_t(i,j,u)=rho_tij N(u;m_tij,S_tij), u=[x;y].             (D12.1)
+
+With D11.5 coefficients `(a,h,P)` and `W_j=Q_j^-1`, its log potential is
+`kappa_ij+g_ij^T u-u^T B_ij u/2`, where
+
+    B_ij = [[P_ij+A_j^T W_j A_j, -A_j^T W_j],
+            [-W_j A_j,           W_j       ]],
+    g_ij = [h_ij-A_j^T W_j b_j; W_j b_j],
+    kappa_ij = a_ij-(b_j^T W_j b_j+logdet Q_j+d log(2 pi))/2. (D12.2)
+
+Every Gaussian normalizing constant contributes to label masses and energy.
+Given hybrid cavities `(a_Li,eta_Li,J_Li)` and `(a_Rj,eta_Rj,J_Rj)`, add their
+block-diagonal precisions and concatenated linear terms to B and g. Call the
+result J and eta. Each active block has `S=J^-1`, `m=S eta`, and log mass
+
+    kappa_ij+a_Li+a_Rj+d log(2 pi)-logdet J_ij/2+eta_ij^T m_ij/2.
+
+Normalize over active pairs using logsumexp. This is exact Gaussian integration
+for fixed cavities and fixed JJ auxiliaries. It enumerates pairs, never paths.
+
+Why elimination adds no approximation here: for a held right hybrid cavity,
+
+    C_j=(W_j+J_Rj)^-1, L_j=C_j W_j A_j,
+    d_j=C_j(W_j b_j+eta_Rj),
+    b(y|x,i,j)=N(y;L_j x+d_j,C_j).
+
+This conditional is independent of i. Projecting the x mixture conditional on j
+preserves all joint moments through that affine conditional and hence preserves
+the quadratic dynamics energy. On the resulting feasible lifted beliefs,
+
+    H(b_D)-H(q_H)=sum_j pi_j G(C_j)=H(b_group)-H(b_R),
+    F_R+F_D+H(q_H)=F_group.                                 (D12.3)
+
+The stationary recurrence belief, auxiliary, learning moments, endpoint
+messages, and objective agree. The grouped experiment therefore evaluates the
+smaller alternating scopes by elimination. This argument requires the stated
+destination-selected affine channel; a source- or pair-selected channel needs
+its own scope declaration/derivation and cannot reuse this identity silently.
+Larger trajectory mixtures or dense covariance are unnecessary for the declared
+moments. This is minimality within the compared conditional-Gaussian scopes,
+not a theorem that this family is optimal among every possible approximation.
+
+### D12.3 One constrained objective and its bound direction
+
+For hybrid unary canonical potentials `s_t(i,x)` counted once, and `d_t`
+incident transition regions, the grouped objective is
+
+    F_EC^JJ = sum_t[-H(b_t)-E_bt log(f_t^JJ D_t)]
+             +sum_t(d_t-1)H(q_t)-sum_t E_qt log s_t.        (D12.4)
+
+`H(b)=H(rho)+sum rho G(S)` and `H(q)=H(pi)+sum pi G(V)` use the
+**labeled** entropy; `G` is D11's Gaussian entropy. Region counting numbers are
++1; separator counting numbers are `1-d_t`. An interior chain separator adds
+`+H(q_t)`, and an endpoint adds none. No separate z or x edge correction is
+added for those same incidences. Unary-site entropy cancels its own additional
+separator incidence, leaving the expectation shown. D12.3 establishes the
+identical alternating-region ledger. Adapters below are extra named regions
+with their own ports and counts, not unrecorded entropy corrections.
+
+At identical feasible beliefs and auxiliaries,
+
+    F_EC^JJ-F_EC^literal=sum_t E_bt[log f_t-log f_t^JJ]>=0.   (D12.5)
+
+This also compares infima over the same feasible set. Neither EC objective
+has a general bound against true negative log evidence. One isolated grouped
+region has the stronger local identity `F=-log Z_JJ` at its tilted optimum,
+and `-log Z_JJ>=-log Z_literal`. Local JJ exactness does not extend that statement
+to a temporal graph with projected separators.
+
+### D12.4 Stationarity, gauges, and learning
+
+Write a hybrid message as `a_i+eta_i^T x-x^T J_i x/2`. The natural coordinates
+of its normalized projected belief are
+
+    J_i=V_i^-1, eta_i=J_i mu_i,
+    a_i=log pi_i-logdet(V_i)/2-d log(2 pi)/2-mu_i^T J_i mu_i/2. (D12.6)
+
+Only a **common** additive shift of a is gauge. Dropping different Gaussian
+normalizers per regime changes the probabilities. Fix one active a coordinate
+per directed message to zero. Symmetric precision uses its independent entries;
+there is no extra Gaussian gauge. Fixed installed parameters give no regime-label
+gauge. Absent labels have no Gaussian coordinates, and no residual divides by
+their zero mass.
+
+For region f and separator v, let `theta_fv` be the outgoing natural message,
+`chi_fv=s_v+sum_{g!=f}theta_gv`, and `nat(q_v)=s_v+sum_g theta_gv`.
+The complete fixed-auxiliary stationarity equations are
+
+    R_fv=E_bf phi_v-E_qv phi_v=0,
+    theta_fv=nat(Proj_v b_f)-chi_fv,                        (D12.7)
+
+where `phi=(1_i,1_i x,1_i vech(xx^T))`, dropping one active indicator for
+normalization. Projection includes the covariance **between** pair means at
+each fixed endpoint label. Scale conditional moment residuals as well as label
+masses; a tiny active label must not hide an unconverged conditional covariance.
+The complete natural quotient has the same zero set on proper, fixed support;
+the experiment measures that quotient residual with relative coordinate scaling.
+Individual message/cavity precisions may be signed. They are never clamped.
+
+There is one tied auxiliary `xi_til=c_til²>=0` for each source/stick. Using the
+source x-block of D12.1 and augmented feature `h=[x;1]`, add
+
+    e_til=sum_j b_jl rho_tij,
+    R_xi=xi_til-sum_j b_jl rho_tij theta_il^T M_tij theta_il/e_til. (D12.8)
+
+Here `b_jl=1(j>=l)` and `M_tij=E[hh^T|i,j]`. Zero exposure fixes xi to zero
+and gives zero learning increments. At xi=0 the derivative/KKT condition is
+D11.11: `dF/dxi=(e/2)(dw/dxi)(E[psi²]-xi)`, with `dw/dxi=-1/48`.
+A zero derivative with respect to c alone does not certify stationarity.
+Learning uses D11.1 with these same pair-conditioned M and first moments.
+It never multiplies rho by an unconditional state moment. Reusing D9's
+unconditional auxiliary with the new moments changes the meaning again.
+
+Varying normalized regional beliefs in the constrained Lagrangian gives the
+tilted densities in D12.2; varying separators gives the message sums above;
+varying xi gives D12.8. These, positivity, support, and normalization are the
+full stationarity system. No independent component belief may become a second
+production state authority.
+
+For fixed auxiliaries, the dual diagnostic on a chain is
+
+    Phi=-sum_t log Z_bt+sum_interior log Z_qt.              (D12.9)
+
+Its derivative in an internal directed natural coordinate is the separator
+canonical-statistic moment minus the opposite incident region's moment. For
+the stored precision J, a diagonal derivative is -1/2 times the xx moment
+difference; an independently varied symmetric off-diagonal has factor -1.
+At stationarity Phi equals
+D12.4. Away from consistency the separately evaluated primal expression is not
+a feasible variational objective. A residual or a dual slope is never relabeled
+free energy. The executable solve is a bounded fixed-JJ experiment: it uses
+backtracking on the quotient residual, checks properness, and certifies both
+finite residual and stable finite energy. It does not claim a completed joint
+xi/message optimizer. D12.8 supplies that optimizer's required residual.
+
+### D12.5 Ordinary exterior and the D3 companion
+
+Fixed categorical or Gaussian evidence broadcasts into the hybrid unary site.
+An ordinary live neighbor instead connects through an explicit identity adapter
+from `Y=(i,x)` to an ordinary **copy** `u=x` or `v=i`. The adapter uses reduced
+belief `a(i,x)` on the equality support, owns zero factor energy and `-H(a)`,
+and matches hybrid moments at Y and ordinary moments at the copy. It never
+computes differential entropy of a delta distribution.
+
+For a Gaussian port the tilt is `a(i,x) proportional to m_Y(i,x)m_u(x)`.
+Its hybrid output is the Gaussian cavity broadcast across regimes. Its ordinary
+output is `nat(Proj_G a)-nat(m_u)`, projecting the full tilt before dividing.
+The categorical adapter similarly sends `log sum_x a(i,x)-log m_v(i)` and
+broadcasts its categorical cavity into the hybrid output. Both are closed
+stationary equations under D12.4's generic region/port counting.
+
+With n hybrid neighbors and m ordinary neighbors, the adapter adds one
+incidence at each port: its `-H(a)` cancels the extra `+H(q_Y)` at consistency,
+leaving `(n-1)H(q_Y)+m H(q_u)` before the ordinary neighbors' own terms.
+This explicit accounting prevents double-counting nested z, x, and Y entropy.
+A mixture `N(+/-2,1)` with a unit Gaussian cavity has tilted variance 3/2;
+its required Gaussian quotient precision is -1/3, not D3's collapsed result.
+
+Ordinary linear-Gaussian and categorical factors can use these ordinary ports
+with their stationary rules. An exterior mixture requires the full tilted
+D11.14 EC binding tracked by cff-ulbz. Grouped internal switching dynamics
+eliminates that internal D3 port, but does not remove the need for the companion
+at exterior mixture ports. A factor that supplies association between the same
+regime and state must enter through a hybrid port or be explicitly grouped;
+splitting both its legs into singleton adapters repeats D11.15. Such a cut is
+outside the accepted construction and must fail with the named boundary.
+General nonconjugate neighbors need their own stationary tilted belief rule.
+GFE/P-substitution, nonlinear channels, and unstated constraint combinations
+are not covered by this derivation.
+
+### D12.6 Numerical and complexity contract
+
+For T slices, a grouped evaluation costs `O(T K² d³)` and stores
+`O(T K² d²)` region blocks plus `O(T K d²)` separators/messages and
+`O(T K²)` auxiliaries. Recurrence prefixes avoid a K³ stick tensor. The
+alternating representation uses `K²` d-dimensional and K 2d-dimensional
+blocks per transition; D12.3 permits either evaluator. One isolated evaluation
+needs `O(K² d²)` transient memory; evaluating/storing a whole residual uses
+`O(T K² d²)`. No T-by-T continuous covariance or exponential path mixture is
+part of the candidate. Adapter cost is polynomial and adds linearly in its
+explicit number of incidences.
+
+For I global iterations, B line-search trials, L local auxiliary iterations,
+and M matrix-free linear iterations, explicitly budget
+`O(I B L (1+M) T K² d³)` work. This is a budget expression, not a
+horizon-independent convergence theorem. A forward/adjoint directional
+linearization visits local blocks with the same asymptotic work; an adjoint
+tape stores local blocks linearly in T. A restarted Krylov solver with restart
+r adds `O(r T K d²)` vector storage and at most `O(M r T K d²)` orthogonalization
+work per solve. Dense global Jacobians, dense trajectory covariance, and
+unbounded differentiation through optimization iterations are excluded.
+Finite-difference checks in the tiny oracle do not authorize a dense runtime
+Jacobian. The fixed-JJ experiment has L=1, M=0; its forward initialization
+requires proper successive tilted blocks and is not a general feasible-start
+algorithm. Production must implement the declared budget/status contract.
+
+| Input | Required behavior before numerical work |
+| --- | --- |
+| Literal log-zero labels | Restrict the fixed active face, omit inactive Gaussian coordinates, keep weighted moments exactly zero. |
+| Empty support | Error naming the supported region; no uniform fallback. |
+| Support changes | Rebuild the active coordinate inventory; never reuse an old quotient or inactive xi. |
+| Tiny positive labels | Keep log mass; the NumPy experiment fails on probability underflow rather than turning a positive label into a structural zero. |
+| Inactive auxiliaries | xi=0 and zero learning increments; no zero-exposure division. |
+| Signed/vacuous cavity | Allowed when required aggregate and active tilted beliefs are proper; otherwise error, never a ridge. |
+| Float32 | Relative spectral resolution `32 d eps * spectral_scale`; squared-logit roundoff guards use D11's finfo rule. No absolute floor. |
+| Shape, dtype, asymmetry, NaN/Inf | Reject before claiming a belief. Active non-finite objective or residual is divergence/error. Improper trial steps can be backtracked. |
+| Iteration or line-search budget | Return exhaustion separately from convergence. The experiment raises for invalid/non-finite active states; it never returns them as successful results. |
+
+### D12.7 Independent anchors and remaining temporal error
+
+`tests/hybrid_separator_reference.py` imports neither the candidate nor any
+production recurrence implementation. It enumerates K=2 scalar paths for
+2<=T<=6, integrates fixed-JJ Gaussian paths independently, and also integrates
+literal logistic paths by Gauss-Hermite quadrature for T<=3. Dense covariance
+and enumeration are confined to this reference. Quadrature refinement checks
+its stated tolerance before comparison. Floating-point equality budgets are
+`512 * terms * finfo(dtype).eps`; approximation limits are separate constants
+fixed before candidate evaluation in each test.
+
+`src/cffg/experiments/hybrid_separator.py` and
+`tests/test_hybrid_separator_derivation.py` anchor:
+
+- `test_one_group_all_moments_messages_objective_and_learning_match_reference`:
+  every hybrid natural message block, weighted moments, learning increments,
+  node/endpoint energy, and dual equality, in float32 and float64.
+- `test_d11_twins_cross_hybrid_boundary_with_opposite_learning`: both signs
+  of the prior-mean twin and both source-variance assignments, including exact
+  zero destination support and vacuous receiving cavities.
+- `test_temporal_decoupled_reduction_matches_exact_chain`: a temporal Gaussian
+  chain with nonzero cross-time covariance, regime-independent dynamics/state
+  evidence and initial independence, and drive-independent recurrence.
+- `test_temporal_coupled_case_reports_projection_gap_separately_from_stationarity`:
+  T=3 coupled fixed-JJ reference; maximum pair/first/second errors approximately
+  `8.08e-6`, `2.78e-5`, `3.79e-4`; objective error `1.21e-5`, with a quotient
+  residual below `8e-11` in float64. These are approximation errors.
+- `test_dual_gradient_is_incidence_moment_residual` and
+  `test_auxiliary_xi_gradient_and_false_zero_at_c_zero`: independent finite
+  differences of the complete dual and held-belief energy, respectively.
+- `test_alternating_scopes_and_grouped_elimination_have_identical_energy`:
+  D12.3 conditional covariance, entropy cancellation, and channel energy.
+- `test_ordinary_gaussian_adapter_uses_full_tilt_and_signed_quotient`: D11.14
+  projection order, signed output, and extra hybrid entropy cancellation.
+- `test_local_jj_gap_is_separate_from_hybrid_projection_gap`: literal versus
+  fixed-JJ local moments and the isolated evidence inequality.
+- Hostile-coordinate, support rebuild, vacuous/signed cavity, exhaustion,
+  T=100, K=20, and d=10 tests pin the numerical and storage inventory.
+
+D9 reductions remain local: a fixed drive is conditioned out before Gaussian
+entropy evaluation and gives the exact categorical recurrence table; a
+source-independent Gaussian cavity with drive-independent logits recovers
+D9's recurrence messages. The existing D11/D9 executable reductions remain
+unchanged. `R=0` alone does **not** make source-dependent temporal dynamics
+or externally associated learning equal to D9. Identical nonzero source slopes
+do not imply exact Gaussian closure either.
+
+For a stronger approximation falsifier, let adjacent reduced temporal factors be
+
+    f_L(h,i,x)=p_h N(x;a_h,1)/2,
+    f_R(i,j,x)=N(x;b_j,1/2)/2,
+    a=(2,-1), p_0=e/(e+2 exp(1/4)), b=(1,-1)/sqrt(2).
+
+All recurrence logits are zero, so JJ is exact. At the stationary hybrid
+separator `q(i,x)=N(x;0,1)/2`, right-to-left precision is 1 and left-to-right
+precision is 0. The left tilt has conditional weights `(1/3,2/3)`, means
+`(1,-1/2)`, variance 1/2. The right tilt has equal weights, means
+`+/-1/sqrt(2)`, variance 1/2. Both match all retained hybrid moments.
+Reflecting a preserves those messages and zero residuals. Exact integration
+of the four products nevertheless gives:
+
+| Quantity | Original exact | Reflected exact | EC, both |
+| --- | ---: | ---: | ---: |
+| E[x] | -0.010630665 | +0.010630665 | 0 |
+| P(j=0) | 0.480735496 | 0.519264504 | 0.5 |
+| E[x²] | 1.029089989 | 1.029089989 | 1 |
+| Per-source learning slope A | 0.183824595 | 0.183824595 | 0.176776695 |
+| Per-source learning bias A | -0.009632252 | +0.009632252 | 0 |
+
+`B_i=(1/8)[[E x²,E x],[E x,1]]` also loses its signed off-diagonal. This has
+an affine temporal realization: a previous hidden label generates x with
+means a; a Gaussian transition of variance 1/4 and a destination-conditioned
+Gaussian observation of variance 1/4 produce f_R after integration. The
+reflected-mixture reference and stationary-cavity tests reproduce the gap.
+It is not a collapse-first error, a JJ error, or a failure to solve EC.
+Retaining arbitrary conditional history mixtures would violate the chosen
+bounded inventory. The positive decision accepts this disclosed approximation;
+cff-x0if must judge source recovery empirically after implementation, and can
+reject it without reinterpreting D12's mathematical guarantees.
+
+## D13 — Adaptive nonlinear Gaussian conditionals
+
+### D13.1 Plain-English contract and portable model
+
+A nonlinear sensor predicts an output from an input, then adds Gaussian noise:
+`Y | X, theta ~ N(g_theta(X), V)`, with positive-definite `V`. The deterministic
+function is the conditional mean. It does not remove the observation noise.
+`FunctionSpec` names that function and a local approximation method; parameter
+arrays and `V` are separate serialized blobs.
+
+Both methods replace the curved sensor locally with a straight Gaussian model.
+Taylor uses the slope at the current input estimate. Sigma points evaluate a
+small, spread-out set of inputs to account for some of the curvature. When
+neighboring factors change the input estimate, the approximation changes too.
+Inference must settle both the messages and those changing approximations.
+The reported energy belongs to the resulting Gaussian approximation. It has
+no established upper or lower bound on the original nonlinear evidence.
+
+### D13.2 Local approximation
+
+Let the proper input cavity be `N(m,P)`. Write the approximate normalized
+conditional as `f_c(y|x)=N(y; Ax+b, Omega)`, where `c=(A,b,Omega)`.
+Taylor sets
+
+```text
+A = Dg_theta(m),    b = g_theta(m) - A m,    Omega = V.       (D13.1)
+```
+
+For input dimension `d`, the scaled unscented rule fixes `alpha=1, beta=2,
+kappa=0`. Its points are `m` and `m +/- sqrt(d) chol(P)[:,i]`. The mean weights
+are `w0=0`, `wi=1/(2d)`; the covariance weight at the center is two. With
+`gbar=sum wi g(xi)`, cross covariance `C=sum wi (xi-m)(g(xi)-gbar)^T`, and
+residuals `ri=g(xi)-gbar-A(xi-m)`, use
+
+```text
+A = C^T P^-1,   b = gbar - A m,
+Omega = V + sum wi ri ri^T + 2 r0 r0^T.                     (D13.2)
+```
+
+This outer-product expression equals the regression residual covariance of
+the declared sigma rule. Its weights are nonnegative; it avoids subtracting
+two nearly equal covariance matrices. There is no ridge or clipping. A point
+set whose perturbations cannot survive floating-point addition to `m` fails
+with `UNREPRESENTABLE_SIGMA_POINTS`; it cannot silently report lost variance.
+Affine functions recover the ordinary linear Gaussian factor under both
+methods, within representable arithmetic.
+
+**Input-readiness metadata, not a solver relaxation.**
+`gaussian_readiness.input_readiness` distinguishes the existing proper-input
+admission from numerical partial-information consistency and invalid/unresolved
+inputs. It returns only an integer classification, never moments or a message.
+The ordinary nonlinear rule remains strict; only the bounded startup program
+consumes this helper to decide whether a neutral site may wait.
+
+For a symmetric positive-semidefinite precision, a flat uninformed direction
+has no quadratic term. Its linear term must also vanish to describe partial
+Gaussian information. In exact arithmetic this is
+`eta in Range(Lambda)`. Such a potential still has infinite integral over its
+uninformed directions. A pseudoinverse covariance would instead declare zero
+variance there, the opposite of missing information.
+
+READY is exactly finite `eta` plus the existing strict propriety predicate.
+The fallback checks finite symmetric information, nonnegative diagonals, and
+exactly zero rows/columns and `eta` entries wherever a diagonal is zero.
+Set `D_ii=sqrt(Lambda_ii)` on positive diagonals, using a dummy divisor one on
+zero rows. The congruence `C=D^-1 Lambda D^-1` and transformed vector
+`D^-1 eta` preserve the range question under coordinate-unit changes. Successive
+division avoids overflowing `D_ii D_jj`. Mantissa/exponent scaling normalizes
+the transformed vector `z` without overflowing the ratios or subtracting
+large logarithms. If only coordinate directions are missing and the informed
+principal block passes strict propriety, their range condition is structural;
+no spectral cutoff is applied to weak proper directions in that block.
+Fallback candidates containing subnormal information or precision entries are
+INVALID: some JAX backends flush these values to zero during comparisons and
+scaling. Integer bit checks distinguish them from exact signed zeros. This
+conservative refusal does not change the existing READY predicate.
+
+For other fallback candidates, symmetrize C and compute `C=V diag(lambda) V^T`
+numerically. With dimension d, `eps=finfo(dtype).eps`, `s=||C||_infinity`, use
+
+```text
+E = ||C V - V diag(lambda)||_F
+    + s (||V^T V - I||_F + 8 d eps).
+```
+
+This working error envelope includes decomposition residual, orthogonality
+error and congruence/symmetrization rounding. Directions with `lambda>E` are
+retained; require `lambda_min>=-E` and a nonempty proper retained subspace.
+Let `gap` separate the smallest retained and largest discarded eigenvalues.
+Require `gap>2E` and `u=E/(gap-2E)<=sqrt(eps)`; otherwise refuse the fallback,
+rather than widening its compatibility band to a substantial fraction of the
+information vector. For each discarded coordinate j require
+
+```text
+|v_j^T z| <= 16 d eps (|V|^T |z|)_j + (u + 4 eps) ||z||_2.
+```
+
+The terms cover null-dot rounding, eigenbasis uncertainty and transformed-vector
+division error. All classifications are nondifferentiated metadata. INVALID
+includes unresolved numerical cases; it does not prove the complete model has
+no posterior. PARTIAL is **numerical consistency at this resolution**, not an
+exact-rank theorem: `C=[[1,1+2eps],[1+2eps,1]]` has tiny negative curvature,
+and `C=ones(2,2), eta=[1+eps,1-eps]` has a tiny incompatible linear term, yet
+both can lie inside the rounding band. This metadata cannot authorize a finite
+Gaussian approximation or certify convergence. Noise, parameters, output
+potentials and admitted function evaluations remain separate obligations.
+`tests/test_gaussian_readiness.py` pins these limits, structural zeros, rotated
+nullspaces, mixed units, weak-gap refusal and batched float32/float64 behavior.
+
+**Bounded startup, separate from the equations.** A fresh chain can receive
+partial goal information before its proper forward prior. The startup program
+freezes eligibility from exact zeros in both outgoing roles, including checks
+that stored subnormals are not mistaken for zero. A site may defer only if it
+was neutral at run entry, has never been admitted in this run, and its input is
+PARTIAL. It retains its existing outgoing information without selecting a mean,
+forming sigma points, evaluating the physical function, or publishing moments
+or energy. Admission latches when a READY input executes. Loss of readiness
+after admission, or at any established site, is a failure, not a new startup.
+
+Noise and parameters, output finiteness/symmetry and observed values are checked
+before waiting. An unobserved output also needs the principal block `W+Lambda_o`
+to be proper. This is necessary for the Taylor tilt. For sigma regression,
+`Omega=V+positive_semidefinite_correction`, hence `Omega^-1 <= W`; an invalid
+`W+Lambda_o` cannot be rescued by that correction. Output potentials themselves
+may be indefinite; startup does not impose an input-style PSD condition on them.
+All admitted function/tilt failures retain their ordinary diagnostic reason.
+
+Scalar conditional execution within a serial member map prevents deferred
+runtime evaluations; the complete startup step uses sequential outer batching
+as well. Merely placing a conditional inside an ordinary vmap would not provide
+this guarantee. Ordinary neighbors propagate using the unchanged schedule.
+Every startup sweep is charged to `n_iters`. Trust solving starts only when all
+adaptive input cavities are READY and the current chart reference is proper.
+Pending startup exhaustion reports `local_budget` and the pending factor, with
+no finite-energy entry. A global chart obstruction without an unready adaptive
+factor has no invented factor attribution. Zero budget performs no startup.
+Run-local latches do not change checkpoint representation; each new run applies
+the declared neutral-at-entry convention.
+
+`tests/test_adaptive_startup.py` checks actual deferred callback suppression,
+outer batching, both-role site ownership, admission latches, invalid models,
+exact budget exhaustion and float32 affine planning against dense evidence.
+The opt-in affine tests in `tests/test_cstr_planning.py` check fresh and seeded
+starts against the independent Gaussian oracle. Its strict-update mechanism
+tests call strict sweeps without startup; they no longer describe public fresh-run
+failure. Finite reactor physics remains a separate envelope obligation.
+
+### D13.3 Tilted moments and replacement sites
+
+Let incoming cavity natural parameters be `(eta_x,Lambda_x)` and
+`(eta_y,Lambda_y)`, and `W=Omega^-1`. For unobserved output, the normalized
+Gaussian tilted belief has information vector and precision
+
+```text
+h = [eta_x - A^T W b; eta_y + W b],
+Q = [[Lambda_x + A^T W A, -A^T W],
+     [-W A,                Lambda_y + W]].                  (D13.3)
+```
+
+Its mean is `Q^-1 h`, covariance `Q^-1`. Each replacement site is the marginal
+natural parameter minus its cavity parameter. This is the EP cavity convention;
+adding the old site again would double count evidence. Finite individual sites
+may have negative precision. The tilted belief and combined edge beliefs must
+remain proper.
+
+The implementation evaluates the same subtraction by Schur elimination,
+preventing a very strong input cavity from numerically erasing a weak site:
+
+```text
+S = W + Lambda_y,
+Lambda_site,x = A^T sym(W S^-1 Lambda_y) A,
+eta_site,x = A^T W S^-1 (eta_y - Lambda_y b).               (D13.4)
+```
+
+The forward site is the predictive Gaussian with mean `A m+b` and covariance
+`Omega+A P A^T`. For observed `y`, the input site is exactly
+`(A^T W(y-b), A^T W A)`; its tilted covariance is
+`(Lambda_x+A^T W A)^-1`. The DATA predictive excludes its own observation.
+The zero output covariance in an observed node readout represents conditioning,
+not a singular latent Gaussian belief. Missing observations use (D13.3).
+
+A vacuous input returns neutral dependent messages without choosing a mean.
+Its final energy is infinite. Invalid noise, required cavity, function value,
+Jacobian, tilted covariance, or unrepresentable output returns explicit failure
+facts and shape-preserving NaNs. All computed moments and messages are checked,
+not merely the matrix before solving. No invalid final belief certifies success.
+
+### D13.4 Energy and conditional stationarity
+
+For fixed coefficients `c`, the node contributes
+
+```text
+F_f(q_f;c) = E_qf[log q_f - log N(y; A x+b, Omega)].         (D13.5)
+```
+
+Every Gaussian normalization constant is included. For observed output the
+entropy is over the latent input only. For an unobserved joint of dimension
+`n=di+do`, mean `mu`, covariance `Cq`, and residual map `B=[-A,I]`, this is
+
+```text
+F_f = 1/2 [-log det Cq - n(1+log(2 pi))
+            + do log(2 pi) + log det Omega
+            + (B mu-b)^T W(B mu-b) + tr(W B Cq B^T)].       (D13.6)
+```
+
+The full frozen Gaussian Bethe energy sums node terms and adds `H(q_e)` on
+each interior Forney edge, correcting the duplicated negative edge entropy.
+At a selected moment endpoint the constraints equate the first and second
+moments of node and edge beliefs. Variation of this constrained functional
+with fixed `c` gives a Gaussian node density proportional to its conditional
+and incoming sites; variations of the moment multipliers give the endpoint
+moment equations. Thus (D13.3) plus marginal cavity subtraction implements
+conditional frozen-factor stationarity. Unselected density constraints are
+also constraints on this declared Gaussian surrogate; they do not preserve
+the original curved node density exactly.
+
+Adaptive inference additionally requires `c_f=C_f(cavity_f)` by (D13.1) or
+(D13.2). These coefficient equations are separate from frozen-factor energy
+stationarity. In particular the total derivative of `F(q;C(q))` contains the
+coefficient derivative, and need not vanish at the adaptive fixed point.
+Implicit gradients must differentiate all of this dependence; an envelope or
+stop-gradient shortcut is not justified.
+
+Executable local anchors: `test_nonlinear_rules.py` compares both methods and
+both dtypes with analytic linear Gaussian messages/energy, checks the nonzero
+sigma residual covariance, permits negative sites, tests strong-cavity
+cancellation and unrepresentable sigma points, and compares the frozen cubic
+posterior with refined dense-grid quadrature. That selected fixture has
+Hellinger limits 0.16 for Taylor and 0.10 for sigma points; this is not a claim
+that sigma points are more accurate for every nonlinear model.
+
+The reconstructed reactor investigation (`tests/test_cstr_planning.py`) makes
+the proper-input requirement explicit. A finite positive-semidefinite precision
+with a null direction describes an unnormalized partial-information potential,
+not a degenerate Gaussian with covariance equal to its pseudoinverse. Taylor
+and sigma-point propagation therefore cannot use that pseudoinverse as an input
+belief. A proper global posterior does not imply every cavity is initially
+proper: partial goal information can arrive before a forward prior. The affine
+limit agrees with independent dense Gaussian conditioning from both a fresh
+neutral state admitted by D13.2 startup and a proper exact initialization.
+Strict local updates without startup still reject the partial cavity. Broad
+proper input beliefs pose a separate problem: the retained
+fixed-step RK4 function can return nonfinite values or values too large to form
+second moments. No change to message normalization fixes that physical-function
+evaluation. The fixture labels all reconstructed choices; the original failed
+caller and its process/goal precision settings are unavailable.
+
+### D13.5 Adaptive residual globalization and certification
+
+Let `s` be the gauge-reduced Gaussian message coordinates of D7. Information
+vectors and independent symmetric precision entries are whitened by a fixed
+proper reference belief. A complete update `T(s;theta)` rebuilds every local
+coefficient from the current cavity, reconstructs attached exact islands, and
+returns all replacement sites. The adaptive equations and merit are
+
+```text
+R(s;theta) = T(s;theta) - s = 0,
+Phi(s) = 1/2 ||R(s;theta)||^2.                              (D13.7)
+```
+
+The Gaussian chart is already dimensionless, so these equations retain unit
+weights. In particular an initially zero residual does not receive inverse
+machine-epsilon weight. D7's trust-region method computes Jacobian-vector and
+transpose-Jacobian-vector products of this full map, using truncated conjugate
+gradients and a Cauchy fallback. It forms no dense whole-graph Jacobian. Trial
+steps are accepted only with finite proper candidate beliefs and sufficient
+actual/predicted residual-merit reduction. A failed auxiliary proposal cannot
+enter acceleration history. Plain fixed damping is not a substitute for this
+globalization, and the surrogate itself is not assumed to decrease.
+
+Initialization uses the budgeted startup program of D13.2 to propagate actual
+messages to obtain a proper reference. A waiting partial input supplies no
+invented approximation point or finite energy. Every composed startup sweep
+consumes `n_iters`; the remaining budget covers outer solves. There is no
+uncounted adaptive priming or later admission retry. Discrete support changes
+retain their graph-size-bounded chart restarts. Map-evaluation counts include
+discovery and trial work. If startup cannot obtain a proper reference within
+budget, it returns a non-converged machine-readable termination reason.
+
+Certification requires both
+
+```text
+max_i |R_i| / (1+|s_i|) <= tau,
+|F(T(s))-F(s)| <= tau (1+|F(s)|),                            (D13.8)
+```
+
+with finite values and `tau=max(requested_tol,64 eps(dtype))`. These are full
+adaptive residual and surrogate-change checks, not a small accepted-step test.
+The returned point is the certified `s`, not `T(s)`: without a contraction
+bound, a small residual at `s` does not imply a small residual at its successor.
+The candidate, trust and auxiliary paths obey this same handoff;
+`test_success_returns_the_certified_point_not_its_expansive_successor` checks
+expansive maps in both dtypes with host and JIT callbacks.
+Neither a stationary non-root of the residual merit nor an exhausted trial
+budget is convergence. Conditioning, failure facts, and exact-island
+reconstruction are shared by flooding and mixed schedules. Whole-run control
+is host-side; local maps and the trust kernel remain JIT/vmap compatible.
+
+`test_mutually_changing_cavities_match_independent_site_root` uses a prior
+`N(0,1)`, two cubic sensors `g(x)=x+0.3x^3` with variance 0.2, and conflicting
+Gaussian evidence centered at +/-0.3 with variance 0.2. Each input cavity
+contains the other sensor's site. Independent four-site root equations give
+latent variance 0.156421040551 for Taylor and 0.139520070577 for sigma points;
+the engine checks both schedule routes against these values.
+`test_rejected_trials_cannot_poison_acceleration_or_claim_small_step_convergence`
+uses evidence +/-1.5 and variances 0.05 to exercise rejected proposals and
+honest budget exhaustion. Affine full-ledger parity, float32 coordinate units,
+distinct per-instance parameters/observations, and Colony certificates have
+separate anchors in `test_nonlinear_engine.py`.
+
+
+### D13.6 A directed solution on the reactor chain
+
+In the PR 185 reactor fixture each transition chooses its Taylor coefficients
+from its input cavity. Removing that transition disconnects the upstream
+state and its local observation from every downstream goal. A forward filter
+therefore determines the coefficients at every transition in order. For
+filtered mean and covariance $(m,P)$, its outgoing predictive is
+$N(g(m), A P A^T + Q)$, where $A$ is the Jacobian at $m$. A backward
+Gaussian likelihood pass with these coefficients returns all remaining
+transition messages, including the influence of the future goals on the
+current coolant decision. Reapplying D13 at these cavities reproduces the
+same coefficients. The frozen surrogate is a normalized Gaussian chain, so
+its Bethe ledger at this fixed point equals the negative log likelihood of
+the bound observations and goal data under that surrogate.
+
+The independent CPU reference in `tools/benchmark_cstr_chain.py` uses the
+fixture's original RK4 function and Jacobian, checks both directions by
+integrating each two-state Gaussian, and compares the node/edge ledger with
+the sum of the innovation log losses. Its `--stock-rules` check evaluates
+the registered local equations. This reference covers the float64 positive-noise
+Taylor fixture. The mutually changing cubic-sensor cavities in D13.5 violate
+the prefix dependency used by the proof. Automatic schedule selection and
+production execution retain the existing D13.5 path.
+
+## D14 — Total derivatives of an adaptive neural fixed point
+
+The network is the conditional mean in D13, with positive Gaussian output
+noise. Training minimizes the reported, recomputed approximate energy at a
+certified inference root. In plain English, changing a weight changes the
+predicted output, the messages, and the Gaussian approximation used by the
+messages. All three effects belong in the derivative.
+
+Let `u` be the gauge-reduced message coordinates, `theta` the unique serialized
+weight blobs, and `R(u,theta) = T(u,theta)-u` the complete update residual.
+At a locally isolated differentiable root with nonsingular `R_u`,
+
+```text
+R_u du/dtheta + R_theta = 0,
+R_u^T lambda = E_u,
+dE/dtheta = E_theta - R_theta^T lambda.                      (D14.1)
+```
+
+`E` is the complete ledger, including adaptive coefficients and interior edge
+entropy corrections. No frozen-factor envelope argument applies to its total
+derivative. Fixed Gaussian whitening matrices only change coordinates; they
+do not freeze the approximation coefficients. `fixed_point.RootProgram`
+provides the same reconstruction, update and energy composition to inference
+and differentiation. `trainable.NeuralParameters` injects each unique weight
+blob into every packed reader; reverse differentiation sums tied contributions.
+
+`implicit.py` uses JAX derivative-vector products and restarted GMRES without
+materializing a graph Jacobian. It recomputes the original transposed-system
+residual, rejecting non-finite or exhausted solves and excessive adjoint
+amplification relative to dtype resolution. A fresh residual and energy-change
+certificate rejects stale weights and observations. Numerical certificates do
+not establish global uniqueness, or prove nonsingularity in unprobed directions;
+the local isolated-root assumption remains part of the derivative contract.
+Stochastic mu3 updates and discrete point-mass decisions are outside this API.
+
+Executable authority: `test_fixed_point_gradients.py` compares both methods
+against independently re-solved central energy differences on two coupled,
+tied four-parameter tanh sensors. Halving a difference step preserves agreement.
+It also checks original-adjoint budget exhaustion, stale states, tied reader
+sums and a float32 difference with dtype-scaled error tolerances.
+
+
+### D14.2 Reproducible training and recognition qualification
+
+The regression authority in `test_neural_training.py` uses 17 input centers
+from -1.6 to 1.6, positive input standard deviation 0.04, generating mean
+`tanh(2x)`, and output standard deviation 0.08. Threefry keys 3101 and 3102
+generate independent latent and observation noise. A seven-parameter 1-2-1
+tanh mean starts from key 71. The frozen rule is 32 full-batch Adam steps with
+learning rate 0.03, betas 0.9/0.999 and denominator epsilon `sqrt(dtype eps)`.
+The objective and gradient are divided by 17. Every update uses D14.1.
+
+For this fixed-input-cavity fixture, an independent scalar evidence formula is
+`mean[log(2*pi*S)/2 + (y-g(c))^2/(2*S)]`, where
+`S = 0.08^2 + 0.04^2*g'(c)^2`. The affine baseline minimizes that same
+objective by comparing all real stationary slopes, rather than ignoring input
+uncertainty. On 16 held-out midpoint centers, the production engine reduced
+mean-function RMSE from 0.1721923 to 0.04896684; the affine baseline was
+0.2341921. Mean energy changed from 0.6313725 to -1.1958261. These are
+fixture-specific results, not a guarantee about arbitrary networks or data.
+
+The sparse complete-graph authority is `test_neural_gfe.py`: a neural mean
+feeds an admitted hybrid GFE input with two active regimes and one exactly
+excluded regime. Independent re-solved energy differences agree with its total
+derivative. Local forward/reverse checks also cover float32 with 32 regimes
+and a transition-mixture output row with exactly zero predictive mass.
+Inactive logarithm operands are finite before masking; no mass is added.
+The optional pairwise entropy-bound diagnostic is outside this trained energy
+path; its separate sparse derivative follow-up is cff-1et5.
+
+The paired recognition authority is `test_amortization.py`. It learns an
+affine output layer over powers 0 through 7 of a scaled observation average,
+using 17 certified roots of two noisy tanh sensors sharing one Gaussian
+latent variable. A single reference chart is fixed at the central case.
+The held-out 32 observation pairs come from Threefry key 3201, and every pair
+must converge with matching Gaussian means, covariances and ledger values.
+The primary work measure is complete outer map evaluations; solver iterations
+are also recorded. The predeclared 95% interval uses 10,000 bootstrap
+resamples of whole paired differences with NumPy seed 3202, without dropping
+failed pairs. The measured mean reduction was 20.3125 map evaluations, with interval
+[17.4375, 23.40625]; mean iteration reduction was 1.4375. A positive lower
+endpoint qualifies only this bounded domain.
+
+## D15 — Planning with hard actuator bounds (cff-nd1q)
+
+### D15.1 What changes in the decision
+
+A planner can propose a feasible first action while relying on an impossible
+second action. Clipping the first command at the plant does nothing about the
+second. A hard bound throughout the plan removes every such trajectory before
+the planner chooses its first command. If two decisions are correlated, removing
+impossible futures changes the distribution of the current action.
+
+D15 specifies a **sum-product decision rule**. Condition a frozen Gaussian plan
+on all declared limits, then apply the first coordinate of its joint conditional
+mean. The mean is feasible because a box is convex. It minimizes squared error
+for estimating the bounded action under that belief. It makes no general
+optimal-control claim about nonlinear plant reward. A constrained trajectory
+mode answers a different question. D15.5 gives independent numerical answers
+for both rules on the same model.
+
+### D15.2 The factor, its message and its free energy
+
+Let $u$ collect the commanded coordinates at all constrained times. Let $x$
+collect the rest of a **closed** linear-Gaussian planning block, including the
+states and any unconstrained actions. Fix the observations, goals, parameters
+and any Taylor coefficients. After exact Gaussian elimination the unnormalized
+block is $g(x,u)=Z_G p_G(x,u)$ with a proper, full-rank normalized Gaussian
+$p_G$. Its action marginal has mean $m$ and covariance $S$. For finite bounds
+$l_i<h_i$, add a single hard factor $f_B(u)=\mathbf1\{l\leq u\leq h\}$. The
+factor has value one on the permitted region. There is no division by the
+volume of the box. This models conditioning on feasibility; a separately
+normalized bounded action prior would be a different model.
+
+Write $\alpha=\int_B p_G(u)\,du$. The exact box-to-action message is the
+indicator. The Gaussian block provides the incoming action cavity $p_G(u)$,
+i.e. the action distribution before imposing the bounds. Their product gives
+
+$$
+q_B(x,u)=\frac{p_G(x,u) f_B(u)}{\alpha},\qquad
+Z_B=Z_G\alpha,\qquad F_B=-\log Z_B=F_G-\log\alpha .
+$$
+
+The free-energy accounting can be checked at the individual factors. On a
+cluster tree with the Gaussian block and the box joined by a single joint
+action separator, the Gaussian node contributes
+$-E_{q_B}\log g-H(q_B(x,u))$. The indicator node contributes
+$-H(q_B(u))$, since its expected negative log potential is zero on the
+support. The interior action edge contributes $+H(q_B(u))$, cancelling the
+indicator node's entropy. The resulting value is $F_B$. Replacing a larger
+exact Gaussian subgraph uses its complete original contribution, including
+internal edge corrections. The difference $-\log\alpha$ is a second way to
+evaluate that same replacement. Charging it again would duplicate the penalty.
+
+For the entropy of the bounded $d$-component action, let $a=E_{q_B}u$ and
+$V=\operatorname{Cov}_{q_B}(u)$. Direct integration of $-q_B\log q_B$ gives
+
+$$
+H_B(u)=\tfrac12\left[d\log(2\pi)+\log|S|+
+\mathrm{tr}(S^{-1}V)+(a-m)^T S^{-1}(a-m)\right]+\log\alpha .
+$$
+
+This is the entropy of the truncated belief. The Gaussian having the same
+first two moments puts positive mass outside every proper finite box and has
+infinite expected hard-bound penalty. Its Gaussian entropy cannot be substituted
+in the exact ledger. A quadrature approximation to a finite integral and a
+change of the assumed distribution are distinct approximations.
+
+### D15.3 Computing the block and returning state information
+
+One route to all first and second moments is to tilt the action density by
+$\exp(t^Tu)$. Completing the square gives its normalized cumulant generator
+
+$$
+K_B(t)=t^Tm+\tfrac12 t^T S t+
+\log\alpha(m+St,S)-\log\alpha(m,S).
+$$
+
+Thus $a=m+S\nabla_m\log\alpha$ and
+$V=S+S(\nabla^2_m\log\alpha)S$. Differentiating the integral or
+integrating centered first and second moments gives independent checks. For
+one coordinate of standard deviation $s$, put $A=(l-m)/s$, $D=(h-m)/s$,
+and let $\phi,\Phi$ denote the standard normal density and CDF. In exact
+arithmetic,
+
+$$
+\alpha=\Phi(D)-\Phi(A),\quad r=(\phi(A)-\phi(D))/\alpha,\quad
+a=m+sr,\quad V=s^2\{1+[A\phi(A)-D\phi(D)]/\alpha-r^2\}.
+$$
+
+For a correlated pair, integrate over $u_1$ on its interval. At each
+$u_1$, the second conditional is Gaussian with mean
+$m_2+S_{21}(u_1-m_1)/S_{11}$ and variance $S_{22}-S_{21}^2/S_{11}$.
+Multiply its scalar interval probability by the first-coordinate density.
+Integrate this weight for $\alpha$, and its products with $u_1$,
+$E[u_2\mid u_1,B_2]$, their cross product and the two second moments for
+$a,V$. An independent two-dimensional integration of the original joint
+density checks the result. Positive conditional variances require resolvable
+positive definiteness. Use covariance factorizations and solves in arithmetic.
+
+State information survives elimination. Write $L=\Sigma_{xu}S^{-1}$ and
+$C=\Sigma_{xx}-L\Sigma_{ux}$. Conditioning on $B$ leaves $p_G(x\mid u)$
+intact. Its mean is affine in $u$ and its covariance is the constant $C$, so
+
+$$
+E_B[x]=m_x+L(a-m),\quad
+\operatorname{Cov}_B(x)=C+LVL^T,\quad
+\operatorname{Cov}_B(x,u)=LV,\quad
+H_B(x,u)=H_B(u)+\tfrac12\log|(2\pi e)C|.
+$$
+
+At an open state separator the marginal is proportional to
+$p_G(x)P_G(B\mid x)$. The outgoing sum-product message divides that marginal
+by the incoming separator message on its live support; equivalently, integrate
+the other factors with the recipient's message excluded. This function is
+generally non-Gaussian. The v1 contract therefore returns moments and energy
+from a closed region. Feeding a fitted Gaussian site to a general loopy graph
+would require a separately specified projection, objective and convergence
+criterion. D13.6 establishes a frozen plan on its original input cavities.
+Changing the bounds can change those cavities in an adaptive graph. Any
+relinearizing bounded solver must recheck its own fixed-point equations.
+
+### D15.4 Supported domain and numerical failure
+
+The first implementation can admit any number of nuisance states. For
+numerical integration, the marginal Gaussian **over the bounded coordinates**
+must factor into structurally independent blocks of size one or two. Each
+pair may be correlated. For independent blocks, sum their log masses and
+entropies and concatenate their means and block-diagonal covariances. State
+lifting still uses the full $L$ and $C$. Support needs a model/elimination
+argument for the partition. Diagonal process noise or a sparse *joint
+precision* does not establish independent action marginals. Thresholding small
+observed correlations could silently change the energy and action.
+
+| Input or numerical outcome | Required behavior |
+|---|---|
+| Proper Gaussian, finite positive-width box | Preserve exact zero density outside the box. The mathematical mass is strictly positive. Use log mass for scoring even when ordinary probability underflows. |
+| Reversed or zero-width interval | The event is empty or has zero Lebesgue mass. Return infeasible/zero mass, with no conditional mean or usable action. A known action at a point requires an explicit point constraint or conditioned observation. |
+| Constant unit message on a finite interval | The local normalized density is uniform. Its mean is the midpoint, variance is width squared divided by 12, and entropy is the log width. Its integral is the width in the chosen unit-message gauge. A flat cavity has no normalized Gaussian baseline from which to claim a probability or $F_G-\log\alpha$. |
+| Improper, singular or nonfinite Gaussian block | Classify the invalid or unready input. An indefinite precision, an arbitrary ridge, or an additive scale on an improper message cannot define the baseline evidence. Infinite endpoints and point-mass semantics are outside this finite-box interface. |
+| Deep tails or very narrow intervals | Differences between two rounded CDFs and subtraction of large raw moments can erase mass or variance. Use symmetry, log differences or an interval-scaled integral relative to its peak; integrate centered moments. Check support and positive variance using dtype-aware numerical error estimates. |
+| Unresolvable inputs or exhausted quadrature | If distinct specified endpoints collapse in the target dtype, report lost precision when identifiable from the source. A represented zero-width input still has zero mass. If the requested precision cannot be reached, return a numerical failure or budget exhaustion, never a plausible action certified by a floor or final clip. |
+| Correlated block of size greater than two | Reject as unsupported in v1. Long horizons are eligible when their *marginal* bound blocks meet the independence condition. Independent scalar clipping inside a connected block changes the model. |
+
+### D15.5 A two-decision oracle in which the first command changes
+
+Take a scalar action at each of two times with $x_1=u_0$ and
+$-1\leq u_0,u_1\leq1$. Use the quadratic cost
+
+$$
+J=\tfrac12[u_0^2+(u_1-2)^2+(u_1-x_1-2)^2].
+$$
+
+Before imposing the box, $\exp(-J)$ gives mean $(0,2)$ and precision
+$\left(\begin{smallmatrix}2&-1\\-1&2\end{smallmatrix}\right)$.
+Clipping its mean gives $(0,1)$ and cost 1. The box-constrained mode is
+$(-1/2,1)$ with cost $3/4$. At $u_1=1$ the first-coordinate derivative
+is $2u_0+1$ and the upper-bound derivative has the admissible sign. Positive
+definiteness gives uniqueness. Independent integration of the entire box
+gives $\alpha=0.072008064$, the energy increment $2.63097717$, and
+a **conditional mean of $(-0.31785829,\ 0.65080977)$**. Thus the first
+sum-product command moves from $0$ to $-0.31785829$ despite already being
+inside its own bounds. The MAP command moves to $-0.5$. A quadratic
+optimizer supplies an oracle for the mode; evaluating the integral supplies
+the oracle for the mean.
+
+### D15.6 Relation to the reactor and the next experiment
+
+The ten-seed study measured two controllers which both clip their proposals.
+In fifty archived directed windows we independently rebuilt the complete
+frozen Gaussian precision from the prior, observation and transition factors,
+inverted it and checked all twenty per-time covariance blocks against their
+saved values. In normalized units the absolute correlation between neighboring
+coolant commands ranged from 0.01934 to 0.52279 across the fifteen commands
+used for transitions. Every window has a connected chain of correlations across
+all fifteen time points. They cannot be partitioned into independent singles
+and pairs. A bound on only today's command is a different experiment from
+bounding the full horizon. The executable reconstruction and dense-window check are in
+`tools/cstr_box_oracle.py`.
+
+A separate **offline frozen-window estimate** shows the size of this effect
+on a real input. With $S=LL^T$ and $u=m+Lz$, the allowed interval for
+$z_i$ depends only on $z_{<i}$. Subtract the preceding Cholesky terms and
+divide the two bounds by $L_{ii}$ to obtain endpoints $A_i,D_i$.
+Set $p_i=\Phi(D_i)-\Phi(A_i)$ and transform an independent unit-cube
+coordinate $v_i$ to $z_i=\Phi^{-1}(\Phi(A_i)+v_i p_i)$. The resulting
+integration weight is $w=\prod_i p_i$. Its unit-cube integral gives
+$\alpha$, and the integral of $u_0w$ divided by that of $w$ gives the
+first bounded mean. Conditioning the draws sequentially without retaining
+the weights would generally give a different distribution.
+
+For seed 1, decision 0, all fifteen restricted commands jointly fell inside
+the box with estimated mass about $5.8\times10^{-7}$, an energy increment
+of about 14.36 nats. The unbounded first mean was 296.45972 K. Forward and
+reverse coordinate orderings estimated the bounded first mean as 296.14214 K
+and 296.14453 K. Each ordering used twelve independently scrambled Sobol
+replicates of 131,072 points, after a 16,384-point refinement check and a
+two-action quadrature control. Estimated replicate standard errors for the
+first mean were 0.000012 K and 0.00147 K respectively. These are estimates of
+sampling error, not deterministic error bounds. Different orderings have
+different numerical efficiency. This is one frozen surrogate, conditioned
+after the solve; no such command was sent to the simulated plant in the
+paired experiment. The cloud of samples is unnecessary for storing the
+answer. Per-scramble values, input checksums and both refinements are
+in the study's `h15-oracle.json`.
+
+For the initial matched ablation, freeze the same Gaussian coefficients and
+evidence for both arms on a supported short-horizon fixture. Hold the action
+units, horizon, actuator range, mean readout, observation noise, preview,
+seeds, timing boundaries and fallback fixed. Compare clipping the unbounded
+joint mean with executing the bounded joint mean; log the mass penalty,
+both proposals, the applied command, tracking and timing. Check the mean
+against direct integration and the mode against a constrained quadratic
+optimizer. Any H15 reward claim needs a method for the measured correlated
+15-dimensional box, with independent normalizer, moment and action checks,
+followed by a matched closed-loop run. The paired study measures the effect
+of controller choice under a deadline; it does not measure the effect of
+putting the bounds inside either model.
+
+The truncated-normal moment-generating technique and conditional-integration
+approach have primary references in
+[Tallis (1961)](https://doi.org/10.1111/j.2517-6161.1961.tb00408.x),
+[Manjunath and Wilhelm (2021)](https://doi.org/10.35566/jbds/v1n1/p2)
+and [Genz (1992)](https://doi.org/10.1080/10618600.1992.10477010).
+
+### D15.7 Executable anchors
+
+| Claim | Independent check |
+|---|---|
+| The boxed first mean, trajectory mode and clipped plan differ | `tests/test_bounded_action_derivation.py::test_two_step_lq_joint_mean_map_and_clipping` compares tensor integration, conditional integration and a box-constrained least-squares solver. |
+| One correction to the objective, with exact support and the tilted entropy | `test_joint_mass_entropy_and_free_energy_require_action_correlations` and `test_joint_and_scalar_messages_keep_box_support_on_information_deletion` check the local and clustered identities. |
+| State and action covariances survive elimination | `test_gaussian_lift_matches_full_joint_log_normalizer_derivatives` checks lifted moments against derivatives of a full joint partition function. |
+| Fifteen scalar actions can be admitted or rejected according to their dependence | `test_horizon_15_seven_certified_pairs_and_singleton` checks seven independent correlated pairs and one singleton. `test_connected_dense_three_and_adjacent_horizon_15_exceed_v1_width` checks rejection of connected larger blocks. |
+| Tail, support and precision behavior | `tests/test_bounded_action_numerics.py` exercises mirrored tails, narrow intervals, mass close to one, vacuity, improper inputs and loss of resolution in float32 and float64. `test_independent_action_horizon_keeps_additive_free_energy` checks the log-domain objective at scale. |
+
+The public frozen-region implementation is `cffg.bounded_actions`. The
+`test_public_*` and `test_dense_joint_and_independent_blocks_keep_full_state_correlations`
+cases in the two files above exercise its status, moments, energy, declaration
+round trip and staged execution. The graph-backed anchor
+`tests/test_bounded_chain.py::test_reactor_joint_and_live_data_match_independent_precision`
+assembles the complete P4/H2 reactor precision and canonical normalizer
+independently, checks two DATA bindings, then integrates the selected action
+pair. Run `tools/cstr_bounded_comparison.py` for the matched RK4 comparison.
+The quadratic two-command coolant fixture is
+`examples/bounded_coolant.py`.

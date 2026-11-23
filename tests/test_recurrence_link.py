@@ -478,6 +478,7 @@ def test_rslds_rejects_invalid_model_and_prior_inputs():
         vague_rslds_learning(2, 1, recurrence_strength=0.0)
 
 
+@pytest.mark.slow
 def test_declared_rslds_learning_is_independent_of_every_factor_name():
     parameters = _rslds_parameters(np.float64)
     template, arrays = rslds(3, **parameters)
@@ -959,7 +960,7 @@ def test_vmap_step_matches_sequential():
     batched = jax.tree_util.tree_map(lambda *values: jnp.stack(values), *states)
 
     def one(state):
-        messages, eta, precision, ef_eta, _, _ = engine._step(
+        messages, eta, precision, ef_eta, _, _, *_ = engine._step(
             state.messages,
             state.g_eta,
             state.g_lam,

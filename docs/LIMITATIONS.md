@@ -1,9 +1,28 @@
 # Known Limitations of the CFFG/LAIF Engine
 
-Status: assessed 2026-07-05, before implementation. "Hard" = inherent to the
-mathematical framework (constrained Bethe free energy + message passing + LAIF);
-finishing the roadmap does not remove these. "Soft" = removable with additional
-derivation or engineering work; each is a future research/engineering ticket.
+Status: reviewed against the implemented library on 2026-09-22. "Hard" means
+inherent to the mathematical framework (constrained Bethe free energy + message
+passing + LAIF); finishing the roadmap does not remove it. "Soft" means a
+current implementation, modeling, numerical, or scaling boundary that later
+work could remove.
+
+A *named approximation* is usable only with the narrower claim stated here. An
+*unsupported feature* has no executable contract. A *known defect* is accepted
+by some current code path but must not be treated as supported input or output.
+Ticket closure by itself is not delivery evidence: tickets closed as "not
+pursuing" describe research history, not production capability. The README
+capability table is the entry map; this document qualifies its claims.
+
+Failure attribution is diagnostic, not a repair or an accuracy certificate.
+Ordinary and exact runs retain the first observed local failure; global checks
+can report a reason without a known factor. Adaptive outer solves report
+terminal local evidence when available; derivative-kernel failures and budget
+exhaustion can still have unknown ownership. Rejected trial/shadow failures
+are discarded after recovery. A trust-region collapse attributes its selected
+trial only when every trial at that step was invalid, not whenever a rejected
+trial happened to fail. This is attribution, not a full evaluation history. Agent
+checkpoints omit these run-local records, so a restored cached unsuccessful
+result can have `failure=None`; its `status` remains authoritative.
 
 ## Hard limitations
 
@@ -35,8 +54,8 @@ but that is model *comparison* wrapped around the engine, not learning within it
 **H4. Tabular representation → combinatorial state walls.** Discrete variables are
 one-hot; joint states are Kronecker products. The T-maze is 4 positions × 2 reward
 contexts = 8 states; every new orthogonal feature multiplies. A matrices are
-|X|×|Z|, controlled transitions |Z|²×|U|. There is no representation learning and
-no amortization: raw pixels, audio, or text cannot be consumed without a
+|X|×|Z|, controlled transitions |Z|²×|U|. The tabular path has no representation learning or amortization: raw pixels,
+audio, or text cannot be consumed without a
 hand-built (or externally learned) discretization/featurization front-end. This is
 tabular RL's scaling wall, inherited intact. Neural hybrid nodes (S5) can push it
 back but change the free-energy semantics at the boundary.
@@ -96,31 +115,153 @@ constraints the modeler adds.
 
 ## Soft limitations
 
+The implemented surface includes discrete BP/VMP/GFE, linear Gaussian and
+exponential-family inference, hard constraints and discrete MAP, assumed-density
+hybrid and recurrent models, positive-noise nonlinear/neural Gaussian factors,
+declared between-trial learning, current-schema persistence, rolling agents,
+ordinary Colony batching, graph rendering, and a partial resource estimator.
+The sections below state the exactness, objective, persistence, input, and scale
+boundaries for those capabilities.
+
 **S1. Message-rule coverage (the big one).** We have: BP/VMP for
 Cat/Dirichlet/equality/δ/transition-mixture, GFE messages for the discrete
 goal-observation composite, and BP for the linear-Gaussian family (gaussian,
 gaussian_linear, Gaussian equality — cff-4e5z: Kalman-smoother parity, exact
-continuous tree identity BFE = −log p(y)). Between converged runs, declared
+continuous tree identity BFE = −log p(y)). Scalar exponential-family BP covers
+Gamma–Poisson and Beta–Bernoulli conditioned-observation graphs. Between
+converged runs, declared
 NIW, MNIW, component-MNIW, and Pólya–Gamma weight learning covers `gaussian`,
 `gaussian_linear`, `gaussian_mixture_linear`, and `recurrence_link`.
-`MOMENT_MATCHING` remains in the template schema as a legacy placeholder, but
-it is underspecified: the factor-only target cannot select the incident edge
-endpoint or sufficient-statistic projection required by the paper. Compilation
-and diagram generation reject it, so neither execution nor visualization can
-silently treat it as ordinary marginalization. Future EP work requires a schema
-migration as well as registered rules and ledger semantics.
-Everything else requires a separately selected derivation or registration
-ticket. Epic
-cff-ahps records the finite integrated baseline; it does not promise that
-every item below will be implemented:
+Endpoint-aware `moment_matching(factor, role, MomentProjection.GAUSSIAN)` is an
+executable declaration for registered Gaussian factors, including the
+positive-noise nonlinear and neural rules. It selects first and second moments
+at one named factor endpoint; it is not a general EP constraint language. The
+older factor-only `MOMENT_MATCHING` payload remains loadable so callers can
+migrate it explicitly with a supplied endpoint and projection, but compilation
+and diagram generation reject it rather than guessing. Supported declarations
+are rendered and compiled; legacy declarations are neither.
+Everything outside these named paths requires a separately selected derivation
+or registration ticket. The following bullets mix delivered boundaries with
+explicit gaps; present-tense executable claims, not ticket closure, distinguish
+them. Epic cff-ahps records the finite integrated baseline and does not promise
+that every gap below will be implemented:
 - *Additional conjugate adapters* — Gamma precision and EF learning remain
   separate paths rather than `LearnableSpec` families. The rSLDS uses the
   generic hybrid pairings; other factor/family combinations need their own
   declared adapter and hostile-input contract.
-- *Hybrid discrete–continuous (switching KF, mixture collapse)* — cff-pksr;
-  the first place exact FE meets a necessary approximation (mixture entropy).
-- *Nonlinear continuous factors* — cff-o7hs: EP/moment-matching or sigma-point
-  messages with controlled FE accounting.
+- *Hybrid discrete–continuous (switching KF, mixture collapse)* — implemented
+  by cff-pksr; the first place exact FE meets a necessary approximation
+  (mixture entropy).
+- *Nonlinear continuous factors* — `gaussian_nonlinear` supports positive-noise
+  Gaussian conditionals with registered deterministic means, Taylor or fixed
+  sigma-point approximations, and endpoint moment constraints. Its normalized
+  frozen Gaussian Bethe energy has conditional stationarity only. The adaptive
+  fixed point also enforces coefficient/cavity consistency; no stationarity of
+  the total adaptive energy or bound on original nonlinear evidence is claimed.
+  The full residual and finite energy change certify the returned point in a
+  fixed reference chart, not its next update or a newly whitened chart. Difficult
+  graphs may exhaust their budgets. Singular noise, invalid beliefs, and
+  unrepresentable sigma-point spread fail explicitly; no ridge repairs them.
+  Negative sites are permitted when combined beliefs remain proper. Full run
+  control retains host authority; local updates, coordinate conversion, bounded
+  Gaussian-only adaptive proposals and trust kernels support JIT. The proposal
+  phase refreshes coefficients at every map and repeats the original host
+  certificate before acceptance. Failed proposals consume the caller's budget
+  before trust fallback; no global convergence or same-basin guarantee follows.
+  Discrete/EF/functional plans do not use this proposal phase. Metrics are fixed
+  within a solve but dynamic between solves; a changed layout/support/dtype or
+  callback still needs a new kernel. Colony still controls adaptive runs per
+  instance, not as one fully compiled batched control loop.
+  Bounded startup can wait for numerically compatible partial inputs at
+  neutral-at-entry, not-yet-admitted sites. Its sweeps consume `n_iters`; no
+  approximation point, physical evaluation, finite energy or convergence is
+  claimed while waiting. It cannot defer established sites or a loss of
+  readiness after admission. Unresolved inputs exhaust truthfully with a
+  pending factor diagnostic. Readiness has the stated D13 numerical-resolution
+  band and conservatively refuses subnormal fallback entries; it is not an
+  exact PSD/rank proof. Run-local admission does not change checkpoints.
+  The reconstructed CSTR fixture in `tests/test_cstr_planning.py` distinguishes
+  this missing-information failure from RK4 evaluations or sigma-point moments
+  exceeding floating-point range. Its strict-update tests call sweeps without
+  startup; fresh affine partial-goal chains now pass the dense Gaussian oracle.
+  `examples/cstr_planning.py` supplies a separately declared supported candidate:
+  past=0, horizon=2, nominal retained parameters, initial mean zero and
+  P0=diag(.01,.001,1e-4,.1). Its normalized coordinates are concentration,
+  temperature, additive concentration bias and coolant action. Current DATA
+  is [-1/3,.2] (concentration .8 in raw model units, temperature 330 K).
+  Zero concentration/action goals target .85 and 298.5 K, with variance
+  diag(4e-4,1); current-observation variance is diag(1e-4,1e-4).
+  Process covariance is Qp=diag(1e-4,4e-4,4e-6,.25). Both Taylor/sigma-point,
+  f32/f64 and auto/flood have fresh and converged-warm checks at these defaults.
+  The auto temperature-goal grid adds zero temperature targets (325 K), fixes
+  other goal variances, and tests Qp multipliers {.01,1,100} crossed with
+  temperature-goal variances {.01,1} in both methods/dtypes. These are enumerated
+  cases, not an interval-wide guarantee. The 60-iteration budget uses
+  tau=max(1e-6,64*eps) and actual finite FE-change/residual certificates in the
+  solver's frozen chart. Independent affine conditioning and physical ODE
+  comparisons are in `tests/test_cstr_envelope.py`; they do not make the
+  nonlinear posterior exact.
+  Physics evaluation clips initial concentration to [.1,1.6], temperature to
+  [200,450] K and coolant to [275,322] K. Intermediate/final RK4 states are not
+  clipped; the action belief is passed through unchanged. These are not hard
+  [295,302] K actuator bounds. Larger priors/horizons, other observations or
+  constants and closed-loop control performance require separate validation.
+  The standalone D15 bounded decision accepts a closed, proper frozen Gaussian
+  and finite static bounds. The input covariance must resolve as positive
+  definite in the solve dtype after scaling each coordinate to unit variance.
+  Unresolved input returns `INVALID_GAUSSIAN`. If lifting the conditioned
+  covariance loses rank, the solve returns `NUMERICAL_FAILURE`. Both outcomes
+  mask the command and scores. The dense entry point admits up to two constrained
+  coordinates. Longer horizons require a model expressed as independent action
+  marginals, each of width at most two. Only nuisance coordinates can be shared
+  through the Gaussian state conditional. A connected H15 reactor box,
+  non-Gaussian separator messages, adaptive relinearization and point clamps
+  require different inference support. The bounded coolant example measures
+  a two-command tracking fixture. Its tracking change does not establish a
+  reactor reward or deadline improvement. Numerical quadrature can return a
+  failure for sharply correlated, broad or nearly unit-mass pairs.
+  The graph-backed evaluator requires a certified CPU directed-chain result
+  issued by the declaration's compiled engine. Only interior nonterminal state
+  legs can name commands. State coordinates are lifted around the frozen
+  Taylor coefficients of that result. On the retained H2 initial window,
+  conditioning increased the first coolant command by about 0.672 K and the
+  absolute one-step concentration tracking error by about 0.00106 in physical
+  concentration units. This example evaluates one common initial plant state.
+  The original failed CSTR invocation was not retained; wide-prior tests are
+  mechanism reproductions, not incident replay or a proven noise threshold.
+  Automatic directed execution covers a single chain of constant-dimensional
+  Taylor states on one CPU device, with a fixed Gaussian prior, one transition
+  group and one linear DATA likelihood per state. Rows can have distinct
+  parameters and noise. The model can omit observations at runtime and use
+  partial goals. Declared learnables, interacting nonlinear factors,
+  sigma-point methods and other topologies use the existing coupled route.
+  Explicit schedules, fixed budgets without a tolerance and forced trust
+  solves also use the existing execution paths. Directed inference builds its
+  proposal on the host and verifies it against the compiled engine update and
+  objective. The implicit differentiator independently checks its own JAX
+  residual before admitting a returned state.
+  The later retained native validation is separately reproduced by
+  `tools/cstr_runtime_fixture.py` and `tools/benchmark_adaptive_runtime.py`:
+  P4/H15, four RK4 substeps, true constants, P0=diag(1,1,1e-4,1),
+  Q=Qp=diag(1e-5,1e-5,4e-6,.25), original emissions and tolerance 1e-6.
+  The selected open-grid budget is 100; the source initial observation and
+  labeled synthetic changes are not the missing historical closed-loop inputs.
+  Linearization is the performance acceptance path. Sigma-point startup's
+  `improper_tilt / tr1 / startup` failure remains separate and explicit.
+  Cold compilation and compilation-warm, repeated-base plans must be reported
+  separately, including changed-observation compilation behavior. The host
+  controller's 7 ms uses a different numerical model and is not a parity oracle.
+  Matched Apple M2 Max, Python 3.12.13, JAX/JAXlib 0.10.2 and identical frozen
+  locks: repeated-base medians 36.9305→0.1059 s (348.8×); changed-observation
+  medians 120.6778→0.1075 s (1122.3×). Two synthetic populated-history/preview
+  cases measured 988.7× and 1117.0×, including binding and synchronization.
+  Cold first-run time, including compilation, was 130.7154→26.4802 s (4.9×).
+  All nine cases passed the unchanged certificates; maximum baseline-whitened
+  mean/covariance differences were 2.72e-5/1.14e-6, normalized full-FE difference
+  8.32e-8, and coolant mean difference 4.21e-6 K. No warm timed JIT compilation
+  occurred, even with changed masks/preview. These are plan benchmarks, not a
+  59-step closed-loop replay or a universal speed guarantee; 1600× was not reached.
+  Zero noise, nonlinear GFE, and continuous-to-discrete means remain excluded.
 - *Gaussian/continuous GFE messages* — RESOLVED as a position, 2026-07-12
   (cff-dfpi, DERIVATIONS.md D5): none will be added, and that is a theorem,
   not a gap. Additive-control linear-Gaussian models provably have
@@ -133,7 +274,7 @@ every item below will be implemented:
 The registry architecture exists precisely so each of these lands as an isolated
 contribution.
 
-**S1i. Executable registration covers three single-arena bindings.**
+**S1a. Executable registration covers three single-arena bindings.**
 `FactorKernel` (`cffg.kernels`, ARCHITECTURE 2e) binds scalar EF and ordinary
 discrete BP/VMP and Gaussian factors, including external implementations. The discrete
 binding requires a log-potential accessor for support, joint beliefs and
@@ -165,6 +306,37 @@ would diverge the differential-entropy ledger). Nonsymmetric, non-PD, or
 non-finite beliefs make node/edge energy terms `+inf`; marginal readouts return
 NaNs, and sufficient-statistic readouts also carry `proper=False` — deliberate
 loudness, not a plausible negative covariance.
+
+Exact-tree certification checks a fresh message recomputation at each entry's
+own scale. It is not an accuracy guarantee for posterior moments or evidence.
+Gaussian equality cavities exclude the recipient before summing; the older
+total-minus-recipient arithmetic caused the retained PCGym first-order chain
+to fail certification in float32. Restoring only that old rule reproduces the
+reported residual of `0.0006103515625`; the current rule certifies without
+changing certificate tolerances.
+
+The three-dimensional, past-4/horizon-15 retained fixture and its constant-goal
+horizon-150 scale variant are checked against independent dense conditioning
+in both precisions (`tests/test_first_order_precision.py`). The float32 fixture
+contract permits a mean error below 1% of posterior standard deviation, a
+covariance error below 1% in any posterior-scaled direction, and an evidence
+error below 0.001 nat per observed scalar. These are bounded fixture checks,
+not guarantees for arbitrary Gaussian graphs. Source covariance inversion
+before runtime precision casting is included in the reference, so input
+rounding is distinguished from inference error.
+
+Float32 information-form and readout arithmetic still lose avoidable accuracy
+on this controller (cff-d63w): the retained candidates have mean errors of
+order `1e-4`, while float64 agrees to about `1e-12` on the original horizon.
+Use `JAX_ENABLE_X64=1 uv run python experiment.py`, or configure
+`jax.config.update("jax_enable_x64", True)` **before constructing arrays,
+compiling or initializing** when tighter accuracy is required. Increasing the
+iteration budget or enabling x64 after a float32 solve does not restore lost
+precision. There is no blanket float32 ban or relaxed global certificate.
+The fully unobserved variant also loses the zero-energy identity in float32
+(about `-0.205` instead of zero); its moment checks pass, but its energy check
+is a strict expected failure tracked by cff-d63w. The conditioned fixture's
+evidence bound must not be extended to that variant.
 
 **S1c. Dynamics curiosity is an optimistic bound.** The GFE-TM composite
 (cff-fk2u, `epistemic_b=True`; derivation in docs/DERIVATIONS.md D1) gives
@@ -206,8 +378,44 @@ mixture-Bethe value at the same moments (bound direction pinned in
 (4) Observed mixture outputs (regime-dependent emissions with a DATA port)
 are rejected at compile time in v1 — route observations through a plain
 `gaussian_linear` emission node; (5) rank-deficient per-regime backward
-messages have no well-defined collapse and fall back to vacuous — full-rank
-A_s per regime is the supported envelope.
+messages have no well-defined normalized collapse and fall back to vacuous.
+Full-rank A_s alone is not sufficient: each supported backward component must
+inform every input direction. In the retained PCGym position/velocity model,
+scalar position goals leave rank-one messages. The first action is exactly
+unchanged between horizons 1 and 15 and when only the distant goal changes,
+despite convergence and a changed terminal posterior/energy. This is a
+planning limitation, not a remaining damping problem. The retained NumPy
+moment/ledger oracle in `tests/hybrid_planning_fixture.py` and
+`tests/test_hybrid_planning.py` make that distinction executable. The deferred
+full-tilt EC work is not an available remedy; changing objectives to add
+artificial full-state preferences would change the experiment.
+Numerical moment collapse checks its computed covariances and output, not just
+the input precisions. If an admitted component calculation overflows or loses
+propriety, it emits nonfinite messages and the run fails with local attribution;
+an internal collapse safe-inverse placeholder is not a valid approximation. This differs
+from the vacuous fallback for components not yet normalizable during
+initialization. Component producers retain Schur rank evidence before matrix
+reconstruction and test backward rank before forming a Gram matrix; a rounded
+null direction is not accepted as information. Proper-input covariance-form
+branches check their computed intermediates without imposing a global
+condition-number cutoff. Backward numerical-rank tests use equilibrated
+coordinates and can still classify unresolved near-dependencies as vacuous
+(`tests/test_mixture_rank.py`). The unchanged retained float64 model now reaches
+the declared-rule fixed point in 16 undamped sweeps: the first finite energy
+appears at sweep 15. Its agreement with the independent approximate-rule
+oracle is not an exact-posterior or useful-planning claim. No automatic retry
+or extra covariance floor is introduced.
+
+Float32 convergence does not imply float64-level posterior accuracy. Selector
+updates, node-energy weights and learning responsibilities now share centered
+relative evidence for proper Gaussian inputs; the retained three-step test no
+longer allows error from subtracting large common Gaussian constants. Improper
+inputs whose combined joint is integrable retain the canonical joint formula
+and its potential cancellation. No general condition-number or posterior-error
+certificate is supplied. Extremely scaled but finite inputs can still overflow
+the whitened evidence system; this is reported as invalid evidence, not repaired
+by a floor or accepted as a finite posterior. These numerical changes do not
+repair the partial-goal planning limitation above.
 
 **S1e. Gaussian parameter learning is EM-rollover; flooding VMP is not
 strictly monotone.** Continuous conjugate learning (cff-7c5o, DERIVATIONS.md
@@ -262,7 +470,10 @@ control posterior at residual 5.5 (vs 4.9e-4 at 400 sweeps). Fixes are
 mechanical, not research: depth-aware/tol-driven sweep budgets in the agent
 loop plus warm-started replanning (cff-5edo). Related measured limits:
 ordinary colony batching is dispatch-bound on CPU, 1.5× at 32 instances until
-the sweep loop is a jitted scan (cff-wbhu). Mixed-GFE colonies currently reuse
+the sweep loop is a jitted scan (cff-wbhu). Exact-eligible colony members use
+standalone propagation and certification per instance; this preserves exact
+schedule semantics but does not yet provide vectorized exact execution.
+Mixed-GFE colonies currently reuse
 compiled trust kernels but run one controller per instance, so they have a
 stronger host-control bottleneck until that same ticket moves the trust/status
 carry into the scan. The GFE-TM curiosity composite
@@ -321,7 +532,32 @@ same time-local rules are Bethe pseudomarginals and do not define one exact
 path posterior. The remaining factorization separates the categorical path
 from the Gaussian drive and PG auxiliaries, so a strongly coupled or
 multimodal joint posterior can remain inaccurate even when the coordinate
-residual converges. v1 requires equal regime cardinalities
+residual converges. D11 evaluates a pair-conditioned Gaussian candidate with
+explicit moment consistency and rejects it as a sufficient repair: separate
+source and drive boundaries lose association inferred by external switching
+factors even when the local JJ bound is exact. D12 derives hybrid regime/state
+separators that repair that association loss in a NumPy research experiment,
+not in the production engine. Its production chain was later closed as "not
+pursuing"; the closed cff-ffsg, cff-f3jz, and cff-ulbz tickets did not land their
+acceptance criteria on this branch. D12 keeps one conditional Gaussian per
+regime at a boundary; histories sharing that regime can remain multimodal. Its
+temporal reflected-mixture example has
+exact JJ factors and zero EC residual yet opposite exact learning biases that
+the approximation returns as zero. This is not an exact source-learning
+guarantee. Destination-selected affine dynamics, declared hybrid ownership,
+and stationary ordinary adapters define its accepted scope; cutting an
+externally inferred regime/state association into two singleton ports is
+unsupported. The candidate's JJ energy
+upper-bounds the literal-factor EC energy at the same feasible region beliefs,
+but neither has a general bound against true negative log evidence. It does
+not establish source recovery, Gaussian trajectory exactness, or a
+horizon-independent convergence budget. Its signed Gaussian messages would also
+require compatible boundary consumers (cff-f3jz and cff-ulbz). The NumPy D12
+experiment solves held auxiliaries and requires proper forward initialization;
+it is derivation evidence, not an importable inference capability or current
+production promise. The executable recurrence path remains D9.
+
+The current v1 requires equal regime cardinalities
 `K >= 2`, a proper Gaussian drive, finite fixed
 `weights[K,K-1,d]`/`offsets[K,K-1]`, and sum-product semantics. Between-trial
 PG learning accumulates the same structured pair-derived at-risk and
@@ -491,6 +727,15 @@ multiple refreshed policy-score epochs automatically: callers may explicitly
 refresh, while `Engine.score_mu3_epochs` remains the averaging API. Arbitrary
 stochastic factor families and batched per-agent keys remain future work.
 
+**S2a. Fixed mu3 particle validation has a known hole.** The low-level
+importance rule can treat a NaN inside a caller-supplied fixed particle as
+absent support and report success with a NaN returned moment. Public
+`Engine.run` separately rejects non-finite initial state leaves, so no false
+public convergence path has been demonstrated, but direct rule consumers must
+prevalidate particles as finite, nonnegative probability tables. Ticket
+cff-6n9c owns the direct and jitted rule-level repair. This is a defect, not a
+supported sparse-support convention.
+
 The agent's fixed-memory trial loop likewise uses separate immutable planning
 and filtering templates. It does not mutate the paper's literal graph when an
 observation changes from a planning constraint to data. A two-state, two-action,
@@ -513,22 +758,54 @@ structured (non-mean-field) constraints over control sequences, or explicit
 branching on future observations, trade compute for policy expressiveness.
 Receding-horizon replanning already recovers most practical value cheaply.
 
-**S5. Neural hybrid nodes.** Deterministic NN factors with learned amortized
-messages (extended-VMP style) are the known escape hatch from H4's tabular wall —
-JAX makes the plumbing natural. Research-grade: the FE contribution of such nodes
-is approximate, so they must be quarantined behind explicit "surrogate" bead
-types to keep the exact-FE guarantee for the rest of the graph.
+**S5. Neural Gaussian means and recognition.** Dense neural means now enter
+positive-noise Gaussian conditionals through Taylor linearization or fixed
+sigma points (DERIVATIONS D13). Their labeled frozen Gaussian Bethe terms
+claim conditional stationarity only. Rebuilding coefficients as cavities
+change adds a fixed-point consistency condition; the resulting adaptive root
+need not make the total reported energy stationary, and that energy has no
+established nonlinear evidence bound. Exact zero noise remains cff-u06e;
+arbitrary nonlinear P-substitution and Gaussian-only GFE are unsupported.
 
-**S6. Structure search as an outer loop.** Free energy is a model-comparison
-score, so propose-and-score topology search (add state, split factor, compare FE
-on held-out rollouts) is buildable on top of the engine. Expensive but not novel
-math.
+Neural training differentiates the complete adaptive root and approximate
+ledger under a local isolated differentiable-root assumption (D14). Root and
+original-adjoint residual checks detect failed or exhausted numerical solves;
+they do not prove nonsingularity in every direction, global uniqueness or a
+minimum. Stochastic mu3 and discrete point-mass decisions are rejected.
+Adam continuation is deterministic and full-batch; it binds the original
+training initialization and data. It does not provide weight uncertainty,
+minibatch scheduling or conjugate posterior learning.
+
+The learned initializer is an affine recognition output layer over declared
+polynomial features of scalar Gaussian observations. It predicts Gaussian
+messages only, requires proper proposed beliefs without clipping, and leaves
+final certification to the normal solver. The bounded paired benchmark
+checks matching roots and a positive work-reduction confidence interval;
+there is no universal speedup or same-root theorem for multiple-root models.
+This deterministic API has no particles or importance sampling.
+
+**S6. Structure search is not a library capability.** Free energy can be used by
+application code to compare explicitly constructed candidate models, but the
+library exposes no topology-search algorithm, candidate generator, or validated
+search workflow. Earlier roadmap discussion of propose-and-score loops is a
+design possibility, not delivered structure learning.
 
 **S7. Scale engineering.** Sparse A/B matrices, factored transition tensors,
 GPU-resident arenas, incremental recompilation, smarter (residual) schedules —
 ordinary optimization work, unbounded appetite.
 Plate fragments may not themselves declare plates in phase 1; validation rejects
 that unsupported grounding shape until recursive/index-table expansion in cff-6s31.
+Scoping or merging a compact plate is also rejected; call `expand_plates` before
+composition until cff-b2fz lands.
+
+`cffg.estimate.estimate` is only a partial planning aid. Its named persistent
+arena byte counts come from the initialized JAX state, and calibration is an
+approximate extrapolation for the selected run. The XLA cost path still calls an
+obsolete step signature and silently returns no FLOP or byte-traffic figures;
+parameter detail, backend temporary storage, compilation, first execution, and
+scheduled work units are not a trustworthy complete report. Ticket cff-j7mm
+owns that repair. Do not use the current summary as a memory limit, process-RSS
+measurement, or cross-model performance prediction.
 
 **S8. Goal-specification ergonomics.** Goals are prior distributions over future
 observations; translating task intent into calibrated `c` vectors (the softmax
@@ -549,17 +826,24 @@ P2 ticket cff-34gi owns rejecting it and checking the analogous transition-GFE
 path. Positive Dirichlet concentrations have a different contract and need not
 sum to one.
 
+Graph rendering is deterministic documentation of the declared template and
+supported constraint decorations. A successful SVG/PNG/scene render does not
+compile the model, run inference, or certify that numerical inputs and results
+fall inside the envelopes above.
+
 ## The one-paragraph honest summary
 
-The bounded implemented core is a *transparent, compositional,
-continually-learning discrete world-model engine* with principled curiosity,
-source-anchored local ledgers, and models you can read, edit, checkpoint, and
-glue. Exact claims apply only to the registered factor/constraint combinations
-named in `docs/ARCHITECTURE.md`; other rows are named approximations, guarded
-syntax, or unsupported. It will not do
-representation learning, will not scale past modest discrete state spaces without
-hand-factored structure, will not plan contingently beyond its horizon, and
-inherits every classical caveat of loopy variational inference. Its natural
-habitat: problems where the state ontology is designable (devices, protocols,
-games, control loops, cognitive-model experiments), not problems where the
-ontology must be learned from raw sensor streams.
+The implemented library is a transparent, compositional factor-graph and active-
+inference engine spanning tabular discrete models, registered continuous and
+exponential-family factors, bounded hard constraints, declared hybrid/nonlinear
+approximations, between-trial learning, rolling agents, persistence, rendering,
+and ordinary same-structure batching. Exact claims apply only to the registered
+factor/constraint combinations named in `docs/ARCHITECTURE.md`; other delivered
+rows carry the approximation and objective labels above. It does not learn graph
+structure or raw-sensor representations, does not provide contingent policies
+beyond finite-horizon replanning, and inherits the convergence and accuracy
+caveats of loopy variational inference. Treat cff-34gi and cff-6n9c as input-
+validation defects, the estimator and stochastic Colony surfaces as partial,
+alpha bundles as current-schema artifacts, and administratively closed research
+chains as non-capabilities. Its natural habitat remains experiments whose state
+ontology and local factor semantics can be designed and audited explicitly.

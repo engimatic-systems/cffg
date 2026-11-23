@@ -5,7 +5,7 @@ from __future__ import annotations
 import jax.numpy as jnp
 import numpy as np
 
-from cffg import ef, gauss, mixg
+from cffg import mixg
 from cffg.execution.transport import _gauss_rows, _obs_rows
 from cffg.kernel_runtime import gaussian_readout as _gauss_readout
 from cffg.kernel_runtime import parameters as _kernel_params
@@ -20,32 +20,66 @@ from cffg.readouts.views import (
 from cffg.runtime_types import State
 
 
+def _resolved_correlation(matrix):
+    """Check positive definiteness at the stored precision, independently of coordinate units."""
+    scale = np.sqrt(matrix.diagonal().astype(np.float64))
+    correlation = (matrix / scale[:, None]) / scale[None, :]
+    if not np.isfinite(correlation).all():
+        raise FloatingPointError
+    dim = len(scale)
+    eps = np.finfo(matrix.dtype).eps
+    asymmetry = np.max(np.abs(correlation - correlation.T))
+    if asymmetry > 16 * dim * eps * np.max(np.abs(correlation)):
+        raise np.linalg.LinAlgError
+    correlation = (correlation + correlation.T) / 2
+    # A Cholesky pivot subtracts up to dim products from a unit diagonal.
+    # Reserve that source-dtype roundoff for admission; solve the unshifted system.
+    guarded = correlation.copy()
+    np.fill_diagonal(guarded, 1 - dim * eps)
+    np.linalg.cholesky(guarded)
+    return correlation, scale
+
+
+def _edge_moments(view, edge, eta, precision):
+    dim = edge.dim
+    slots = (edge.slot0, edge.slot1)
+    try:
+        with np.errstate(over="raise", invalid="raise", divide="raise"):
+            h = eta[view.g_eta_indices(slots, dim)].sum(axis=0)
+            p = precision[view.g_lam_indices(slots, dim)].sum(axis=0)
+            if not np.isfinite(h).all():
+                raise FloatingPointError
+            correlation, scale = _resolved_correlation(p)
+            chol = np.linalg.cholesky(correlation)
+            rhs = np.column_stack((h / scale, np.eye(dim)))
+            solved = np.linalg.solve(chol.T, np.linalg.solve(chol, rhs)) / scale[:, None]
+            mean = solved[:, 0].astype(eta.dtype)
+            covariance = (solved[:, 1:] / scale).astype(precision.dtype)
+            _resolved_correlation(covariance)
+            if np.isfinite(mean).all():
+                return mean, covariance
+    except (np.linalg.LinAlgError, FloatingPointError):
+        pass
+    return np.full(dim, np.nan, dtype=eta.dtype), np.full((dim, dim), np.nan, dtype=precision.dtype)
+
+
+def gaussian_marginal(view: GaussianView, state: State, edge: str):
+    """Host readout for a controller requesting one proper Gaussian edge."""
+    info = view.edges[edge]
+    if not info.dim:
+        raise ValueError(f"edge {edge!r} is not Gaussian")
+    return _edge_moments(view, info, np.asarray(state.g_eta), np.asarray(state.g_lam))
+
+
 def gaussian_marginals(
     view: GaussianView, state: State
 ) -> dict[str, tuple[np.ndarray, np.ndarray]]:
-    """Edge name -> (mean, cov). Requires a proper combined precision —
-    run to coherence (and bind data) first. Improper beliefs return NaN
-    mean/cov arrays, an explicit readout that cannot resemble a valid
-    negative or huge covariance."""
-    out: dict[str, tuple[np.ndarray, np.ndarray]] = {}
-    eta, lam = np.asarray(state.g_eta), np.asarray(state.g_lam)
-    for e in view.edges.values():
-        if not e.dim:
-            continue
-        d = e.dim
-        eta_q, lam_q = ef.GAUSSIAN.product(
-            (
-                eta[view.g_eta_indices(e.slot0, d)],
-                lam[view.g_lam_indices(e.slot0, d)],
-            ),
-            (
-                eta[view.g_eta_indices(e.slot1, d)],
-                lam[view.g_lam_indices(e.slot1, d)],
-            ),
-        )
-        mean, cov = gauss.moments(eta_q, lam_q)
-        out[e.name] = (np.asarray(mean), np.asarray(cov))
-    return out
+    """Return moments by Gaussian edge name. Improper or unresolved beliefs have NaN moments."""
+    eta, precision = np.asarray(state.g_eta), np.asarray(state.g_lam)
+    return {
+        edge.name: _edge_moments(view, edge, eta, precision)
+        for edge in view.edges.values() if edge.dim
+    }
 
 
 def gaussian_node_stats(

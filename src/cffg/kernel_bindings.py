@@ -132,6 +132,17 @@ class GaussianBinding(ImmutableRecord):
     A missing observation means marginalization of its role, not necessarily
     deletion of the remaining factor. The callback owns that mathematical
     distinction and the node's normalization constant.
+
+    ``moment_projections`` advertises endpoint projections implemented by
+    these callbacks. Declaring a projection does not add an update rule.
+    ``configure(factor, sizes)`` specializes a portable function declaration.
+    ``iterative`` excludes adaptive factors from exact directed schedules and
+    requires residual globalization. Messages may wrap outgoing pairs in an
+    ExecutionDelta to carry local numerical status. ``objective`` names the
+    node energy convention exposed by the ledger.
+    Optional ``admission`` returns input readiness and validation reasons
+    without evaluating a mean function or constructing moments. Only the
+    separate startup program may use it to defer a neutral, unadmitted site.
     """
 
     roles: tuple[str, ...]
@@ -143,8 +154,19 @@ class GaussianBinding(ImmutableRecord):
     conditioning: GaussianConditioning | None = None
     statistics: Callable | None = None
     readout: Callable | None = None
+    moment_projections: frozenset[str] = frozenset()
+    configure: Callable | None = None
+    iterative: bool = False
+    objective: str = "analytic"
+    work: Mapping[str, int] = field(default_factory=dict)
+    admission: Callable | None = None
+    # Configured Taylor means expose (Jacobian, value) at a live input and parameter row.
+    taylor_linearize: Callable | None = None
     arena: str = field(default="gaussian", init=False)
-    constraint_modes: frozenset[str] = field(default=frozenset(), init=False)
+
+    @property
+    def constraint_modes(self) -> frozenset[str]:
+        return frozenset({"moment_matching"}) if self.moment_projections else frozenset()
 
     @property
     def message_roles(self) -> tuple[str, ...]:

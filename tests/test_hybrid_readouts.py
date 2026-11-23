@@ -3,6 +3,7 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 from numpy.polynomial.hermite import hermgauss
 
 from cffg import conj, gauss, mixg
@@ -327,6 +328,7 @@ def test_linear_mixture_stats_match_independent_d3_joint():
     np.testing.assert_allclose(actual["Syy"].sum(axis=0), syy.sum(axis=0))
 
 
+@pytest.mark.slow
 def test_single_regime_stats_reduce_to_gaussian_linear():
     mixture_template, mixture_arrays = _linear_template(
         mixture=True, regimes=1, dimension=2
@@ -509,6 +511,56 @@ def test_prior_mixture_stats_and_predictive_name_weighting_explicitly():
     np.testing.assert_allclose(
         stats["weighted_second"], expected_weighted_second
     )
+
+
+@pytest.mark.parametrize(("linear", "schedule", "prior"), [
+    (False, "auto", [0.5, 0.5]),
+    (True, "flood", [0.2, 0., 0.8]),
+])
+def test_far_observation_preserves_selector_odds_and_certified_energy(linear, schedule, prior):
+    reading = 10000.
+    if linear:
+        template, arrays = _linear_template(regimes=len(prior))
+        arrays["x_mean"].fill(0.)
+        arrays["x_covariance"].fill(1.)
+        arrays["matrix"].fill(1.)
+        arrays["offset"].fill(0.)
+        factor, predictive_variance = "transition", 2.
+    else:
+        template, arrays = _prior_mixture_template(regimes=len(prior), dimension=1)
+        template.ports.clear()
+        template.factors["y_prior"] = FactorSpec(
+            "y_prior", "gaussian", {"out": "y"},
+            param_blobs={"mean": "y_mean", "cov": "y_covariance"},
+        )
+        template.blobs.update(_blobs("y_mean", "y_covariance"))
+        arrays["mean"].fill(0.)
+        factor, predictive_variance = "mixture", 1.
+    arrays["covariance"].fill(1.)
+    arrays.update(probability=np.asarray(prior), y_mean=np.array([reading]),
+                  y_covariance=np.eye(1))
+
+    with jax.enable_x64(False):
+        engine = Engine(compile_template(template, arrays=arrays), schedule=schedule)
+        result = engine.run(engine.init_state(), 40, tol=1e-6)
+        state = result.require_converged()
+        stats = engine.gaussian_node_stats(state)[factor]
+        selector = engine.marginals(state)["selector"]
+        bfe = engine.bfe(state)
+
+    assert state.g_eta.dtype == np.float32
+    assert stats["proper"]
+    tol = 8 * np.finfo(np.float32).eps
+    np.testing.assert_allclose(selector, prior, rtol=tol)
+    np.testing.assert_allclose(stats["responsibility"], prior, rtol=tol)
+    np.testing.assert_allclose(stats["responsibility"].sum(), 1., rtol=tol)
+    # The observation is a Gaussian convolution, identical in every regime.
+    variance = predictive_variance + 1.
+    expected_bfe = .5 * (reading**2 / variance + np.log(2 * np.pi * variance))
+    np.testing.assert_allclose([bfe, result.free_energies[-1]], expected_bfe, rtol=tol)
+    posterior_mean = reading * predictive_variance / variance
+    weighted_mean = stats["Syx"][:, 0, -1] if linear else stats["weighted_mean"][:, 0]
+    np.testing.assert_allclose(weighted_mean, np.asarray(prior) * posterior_mean, rtol=tol)
 
 
 def test_exact_support_improper_inputs_float32_and_uncomfortable_scale():

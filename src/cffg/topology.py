@@ -32,6 +32,7 @@ class FactorDeclaration(ImmutableRecord):
     edges: Mapping[str, str]
     param_edges: Mapping[str, str]
     param_blobs: Mapping[str, str]
+    function: object = None
 
     def all_edges(self) -> dict[str, str]:
         return {**self.edges, **self.param_edges}
@@ -93,6 +94,7 @@ def build_topology(template: Template) -> TopologyLayout:
     factors = {
         name: FactorDeclaration(
             factor.name, factor.type, factor.edges, factor.param_edges, factor.param_blobs,
+            factor.function,
         )
         for name, factor in template.factors.items()
     }

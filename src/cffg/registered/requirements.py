@@ -13,7 +13,7 @@ def source_requirements(topology, registry):
     """Include absorbed members, preserving original factor/role traversal."""
     sources = []
     for factor in topology.factors.values():
-        kernel = registry.bindings.get(factor.type)
+        kernel = registry.for_factor(factor)
         parameters = kernel.binding.parameters if kernel is not None else {}
         sizes = FrozenMap(
             {

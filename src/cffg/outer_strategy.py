@@ -1,7 +1,7 @@
 """Trust-region phase and functional-coordinate control, separate from the solver."""
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import jax
 import jax.numpy as jnp
@@ -9,10 +9,17 @@ import numpy as np
 
 from cffg._immutable import FrozenArray
 from cffg.compiled import NEG
+from cffg.failure_facts import (
+    FailurePhase, empty_failure, empty_failure_at, first_failure, in_phase,
+)
 from cffg.outer import OuterArrays, solve_outer
+from cffg.outer_evidence import offset_failure, terminal_failure
 from cffg.outer_kernels import KernelPlanProvider
 from cffg.outer_outcome import OuterOutcome
 from cffg.outer_structure import OuterStructure
+from cffg.outer_startup import run_startup
+from cffg.execution.startup import StartupProgram
+from cffg.adaptive_runtime import certify_adaptive_proposal, try_adaptive_proposals
 from cffg.runtime_types import OuterTerminationReason, State, _replace
 from cffg.schedule_contracts import Propagation, Sweep
 
@@ -37,6 +44,8 @@ class OuterTrustRegionStrategy:
     prime: Propagation | None
     reconstruct: Propagation | None
     services: OuterServices
+    adaptive_gaussian: bool = False
+    startup: StartupProgram | None = None
 
     def run(
         self,
@@ -53,21 +62,42 @@ class OuterTrustRegionStrategy:
             0.0 if tol is None else float(tol),
         )
         if not self.services.finite(state):
+            fact = empty_failure()
+            if self.startup is not None and n_iters > 0:
+                eligible = self.startup.eligibility(state.g_eta, state.g_lam)
+                admitted = tuple(jnp.zeros_like(row) for row in eligible)
+                check = self.startup.inspect(state.g_eta, state.g_lam, state.g_obs, state.g_mask,
+                                             state.params, eligible, admitted, nonfinite_only=True)
+                fact = in_phase(check.failure, FailurePhase.INITIALIZATION)
             return OuterOutcome(
                 state,
                 OuterTerminationReason.NONFINITE_EVALUATION,
                 inner_code=2,
                 inner_residual=float("inf"),
+                initial_rejection=int(fact.reason) == 0,
+                failure=terminal_failure(fact, 0),
             )
         if self.services.zero_support(state):
             return OuterOutcome(
                 state,
                 OuterTerminationReason.INFEASIBLE,
                 free_energies=(float("inf"),),
+                initial_rejection=True,
             )
 
-        if self.prime is not None and n_iters >= 1:
-            msgs, g_eta, g_lam, ef_eta = self.prime(
+        priming_fact = empty_failure()
+        startup_iterations = 0
+        startup_deltas = ()
+        if self.startup is not None and n_iters >= 1:
+            initialized = run_startup(self.startup, self.structure, self.eliminated,
+                                      self.services, state, n_iters)
+            state = initialized.state
+            startup_iterations = initialized.iterations
+            startup_deltas = initialized.deltas
+            if initialized.terminal is not None:
+                return initialized.terminal
+        if self.prime is not None and self.startup is None and n_iters >= 1:
+            msgs, g_eta, g_lam, ef_eta, *auxiliary = self.prime(
                 state.messages,
                 state.g_eta,
                 state.g_lam,
@@ -81,6 +111,8 @@ class OuterTrustRegionStrategy:
             state = _replace(
                 state, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta
             )
+            if auxiliary:
+                priming_fact = in_phase(auxiliary[0], FailurePhase.PRIMING)
 
         if self.services.update_functional is not None:
             state, _, mu3_code, mu3_residual = self.services.update_functional(state)
@@ -88,32 +120,36 @@ class OuterTrustRegionStrategy:
                 return OuterOutcome(
                     state,
                     OuterTerminationReason.INNER_FAILURE,
+                    iterations=startup_iterations,
+                    message_deltas=startup_deltas,
                     residual=mu3_residual,
                     inner_code=mu3_code,
                     inner_residual=mu3_residual,
                     functional_failure=True,
+                    failure=terminal_failure(priming_fact, startup_iterations),
                 )
 
-        all_deltas: list[float] = []
+        all_deltas: list[float] = list(startup_deltas)
         all_energies: list[float] = []
-        total_iterations = accepted = rejected = 0
+        total_iterations = startup_iterations
+        accepted = rejected = 0
         outer_map_evaluations = trial_evaluations = 0
         linear_iterations = solver_compilations = 0
         mu3_pending = False
         mu3_failure_code = 0
         mu3_failure_residual = 0.0
-        phases: list[tuple[int, list[tuple[int, np.ndarray]]]] = [
-            (n_iters - harden_last, [])
-        ]
+        available = n_iters - startup_iterations
+        hard_budget = min(harden_last, available)
+        phases: list[tuple[int, list[tuple[int, np.ndarray]]]] = [(available - hard_budget, [])]
         hard_rows = [
             (card, pairs[row : row + 1])
             for card, pairs in self.hardening
             for row in range(len(pairs))
         ]
-        if harden_last:
+        if hard_budget:
             if hard_rows:
-                phase_count = min(len(hard_rows), harden_last)
-                quotient, remainder = divmod(harden_last, phase_count)
+                phase_count = min(len(hard_rows), hard_budget)
+                quotient, remainder = divmod(hard_budget, phase_count)
                 row_groups = np.array_split(np.arange(len(hard_rows)), phase_count)
                 phases.extend(
                     (
@@ -123,8 +159,9 @@ class OuterTrustRegionStrategy:
                     for phase, rows in enumerate(row_groups)
                 )
             else:
-                phases.append((harden_last, []))
+                phases.append((hard_budget, []))
         solved = None
+        failure = empty_failure_at()
         hard_blocks: list[tuple[np.ndarray, np.ndarray, jax.Array]] = []
         for budget, new_hard_rows in phases:
             if budget == 0:
@@ -148,13 +185,14 @@ class OuterTrustRegionStrategy:
             remaining = budget
             while remaining > 0:
                 params = state.params
+                phase = FailurePhase.HARD if hard_blocks else FailurePhase.SOFT
 
-                def reconstruct(
+                def reconstruct_with_fact(
                     arrays: OuterArrays, *, state=state, params=params
-                ) -> OuterArrays:
+                ):
                     if self.reconstruct is None:
-                        return arrays
-                    messages, g_eta, g_lam, ef_eta = self.reconstruct(
+                        return arrays, empty_failure()
+                    messages, g_eta, g_lam, ef_eta, *auxiliary = self.reconstruct(
                         arrays.messages,
                         arrays.g_eta,
                         arrays.g_lam,
@@ -165,17 +203,25 @@ class OuterTrustRegionStrategy:
                         state.ef_mask,
                         params,
                     )
-                    return OuterArrays(messages, g_eta, g_lam, ef_eta)
+                    fact = auxiliary[0] if auxiliary else empty_failure()
+                    return (
+                        OuterArrays(messages, g_eta, g_lam, ef_eta),
+                        in_phase(fact, FailurePhase.RECONSTRUCTION),
+                    )
+
+                def reconstruct(arrays, *, reconstruct_with_fact=reconstruct_with_fact):
+                    return reconstruct_with_fact(arrays)[0]
 
                 def outer_map(
                     arrays: OuterArrays,
                     *,
-                    reconstruct=reconstruct,
+                    reconstruct_with_fact=reconstruct_with_fact,
                     state=state,
                     params=params,
+                    phase=phase,
                 ):
-                    arrays = reconstruct(arrays)
-                    messages, g_eta, g_lam, ef_eta, inner_r, inner_code = (
+                    arrays, reconstruction_fact = reconstruct_with_fact(arrays)
+                    messages, g_eta, g_lam, ef_eta, inner_r, inner_code, *auxiliary = (
                         self.iter_step(
                             arrays.messages,
                             arrays.g_eta,
@@ -196,6 +242,10 @@ class OuterTrustRegionStrategy:
                         OuterArrays(messages, g_eta, g_lam, ef_eta),
                         inner_r,
                         inner_code,
+                        first_failure(
+                            reconstruction_fact,
+                            in_phase(auxiliary[0] if auxiliary else empty_failure(), phase),
+                        ),
                     )
 
                 def as_state(arrays: OuterArrays, *, state=state) -> State:
@@ -207,27 +257,72 @@ class OuterTrustRegionStrategy:
                         ef_eta=arrays.ef_eta,
                     )
 
-                solved = solve_outer(
-                    OuterArrays(state.messages, state.g_eta, state.g_lam, state.ef_eta),
-                    self.structure,
-                    outer_map,
-                    lambda arrays, as_state=as_state, reconstruct=reconstruct: (
-                        self.services.free_energy(as_state(reconstruct(arrays)))
-                    ),
-                    lambda arrays, as_state=as_state, reconstruct=reconstruct: (
-                        self.services.zero_support(as_state(reconstruct(arrays)))
-                    ),
-                    n_iters=remaining,
-                    tol=solver_tol,
-                    eliminated=self.eliminated,
-                    kernel_factory=lambda chart, state=state: self.kernel_provider(
-                        chart, state, hard_blocks
-                    ),
-                    candidate_limit=(
-                        0 if self.services.update_functional is not None else 128
-                    ),
-                )
-                state = as_state(reconstruct(solved.arrays))
+                def energy(arrays):
+                    return self.services.free_energy(as_state(reconstruct(arrays)))
+
+                def infeasible(arrays):
+                    return self.services.zero_support(as_state(reconstruct(arrays)))
+
+                proposal = None
+                if self.adaptive_gaussian and self.services.update_functional is None:
+                    proposal = try_adaptive_proposals(
+                        self.structure, self.eliminated, self.kernel_provider,
+                        state, hard_blocks, remaining, solver_tol,
+                    )
+                    if proposal is not None:
+                        proposal = certify_adaptive_proposal(
+                            proposal, outer_map, energy, infeasible, solver_tol,
+                        )
+                solved = proposal.result if proposal is not None else None
+                if solved is None:
+                    if proposal is not None and proposal.retained is not None:
+                        proposal_arrays, _ = reconstruct_with_fact(proposal.retained)
+                        state = as_state(proposal_arrays)
+                    solved = solve_outer(
+                        OuterArrays(state.messages, state.g_eta, state.g_lam, state.ef_eta),
+                        self.structure,
+                        outer_map,
+                        energy,
+                        infeasible,
+                        n_iters=remaining - (proposal.rounds if proposal is not None else 0),
+                        tol=solver_tol,
+                        eliminated=self.eliminated,
+                        kernel_factory=lambda chart, state=state: self.kernel_provider(
+                            chart, state, hard_blocks
+                        ),
+                        candidate_limit=(
+                            0 if self.adaptive_gaussian or self.services.update_functional is not None else 128
+                        ),
+                        adaptive_gaussian=self.adaptive_gaussian,
+                        initial_failure=(
+                            terminal_failure(priming_fact, 0)
+                            if total_iterations == 0 else None
+                        ),
+                    )
+                    if proposal is not None:
+                        # A discovery failure at the original input rechecks the first
+                        # proposal attempt. Its evaluation still spent one budget unit.
+                        replayed_initial = proposal.retained is None and solved.iterations == 0
+                        solved = replace(
+                            solved, iterations=solved.iterations + proposal.rounds,
+                            message_deltas=(*proposal.message_deltas, *solved.message_deltas),
+                            free_energies=(*proposal.free_energies, *solved.free_energies),
+                            accepted_steps=solved.accepted_steps + proposal.accepted,
+                            rejected_steps=solved.rejected_steps + proposal.rejected,
+                            outer_map_evaluations=solved.outer_map_evaluations + proposal.maps,
+                            trial_evaluations=solved.trial_evaluations + max(proposal.rounds - 1, 0),
+                            solver_compilations=solved.solver_compilations + proposal.compilations,
+                            failure=offset_failure(
+                                solved.failure, 0 if replayed_initial else proposal.rounds,
+                            ),
+                        )
+                final_arrays, reconstruction_fact = reconstruct_with_fact(solved.arrays)
+                state = as_state(final_arrays)
+                failure = offset_failure(solved.failure, total_iterations)
+                if int(failure.fact.reason) == 0:
+                    failure = terminal_failure(
+                        reconstruction_fact, total_iterations + solved.iterations + 1,
+                    )
                 consumed = max(solved.iterations, 1)
                 remaining -= consumed
                 total_iterations += consumed
@@ -275,7 +370,8 @@ class OuterTrustRegionStrategy:
                 break
 
         if solved is None:
-            return OuterOutcome(state, OuterTerminationReason.ITERATION_BUDGET)
+            return OuterOutcome(state, OuterTerminationReason.ITERATION_BUDGET,
+                                iterations=total_iterations, message_deltas=all_deltas)
         if mu3_failure_code:
             inner_code = mu3_failure_code
             inner_residual = mu3_failure_residual
@@ -309,4 +405,5 @@ class OuterTrustRegionStrategy:
             trial_evaluations=trial_evaluations,
             linear_iterations=linear_iterations,
             solver_compilations=solver_compilations,
+            failure=failure,
         )

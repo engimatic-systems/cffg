@@ -9,6 +9,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 from cffg.compiler import CompileError, compile_template
 from cffg.core.serialize import from_json, to_json
@@ -86,6 +87,7 @@ def test_improper_edge_readout_is_explicit_nan():
     assert np.isnan(mean).all() and np.isnan(cov).all()
 
 
+@pytest.mark.slow
 def test_serialization_round_trip_compiles_and_agrees():
     t, arrays = lgssm(T, F, Q, H, R, M0, P0)
     back = from_json(to_json(t))
@@ -110,7 +112,7 @@ def test_vmap_batch_equals_sequential():
     batched = jax.tree_util.tree_map(lambda *xs: jnp.stack(xs), *states)
 
     def one(st):
-        msgs, g_eta, g_lam, ef_eta, _, _ = engine._step(
+        msgs, g_eta, g_lam, ef_eta, _, _, *_ = engine._step(
             st.messages, st.g_eta, st.g_lam, st.g_obs, st.g_mask,
             st.ef_eta, st.ef_obs, st.ef_mask, st.params,
         )

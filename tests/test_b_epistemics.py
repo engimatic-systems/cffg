@@ -543,6 +543,7 @@ def build_curiosity_engine(epistemic: bool):
     return Engine(compile_template(t, arrays=arrays))
 
 
+@pytest.mark.slow
 def test_engine_prefers_unknown_dynamics():
     engine = build_curiosity_engine(epistemic=True)
     state = engine.run(engine.init_state(), 40, tol=1e-11).require_converged()

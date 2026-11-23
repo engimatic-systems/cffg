@@ -10,11 +10,14 @@ import numpy as np
 import pytest
 
 from cffg.models.rollout import build_rollout
+from cffg.core import BlobRef, FactorSpec, PortRole, PortSpec, Template, VariableSpec, validate
+from cffg.core.compose import merge, scoped
 from cffg.viz import derive
 from cffg.viz.compress import present
 from cffg.viz.diagram import TerminalKind
 from cffg.viz.layout import LayoutStyle, layout
-from cffg.viz.scene import Bead, CompositeBox, EllipsisMark, Terminal
+from cffg.viz.layout import _item_points
+from cffg.viz.scene import Bead, Box, CompositeBox, EllipsisMark, Terminal
 
 
 def rollout_template(steps=2, **kw):
@@ -128,3 +131,63 @@ class TestStability:
         full = scene_of(hmm_slice, 0).boxes()["factor:eq"]
         compact = scene_of(hmm_slice, 4).boxes()["factor:eq"]
         assert full.w == style.box and compact.w == style.compact_box
+
+
+def gaussian_components(count):
+    template = Template("independent_gaussians")
+    template.blobs = {name: BlobRef(name, name + ".npy") for name in ("mean", "cov")}
+    for index in range(count):
+        name = f"x{index}"
+        template.variables[name] = VariableSpec(name, dim=1)
+        template.factors[f"prior{index}"] = FactorSpec(
+            f"prior{index}", "gaussian", edges={"out": name},
+            param_blobs={"mean": "mean", "cov": "cov"},
+        )
+        template.ports[name] = PortSpec(name, name, PortRole.DATA)
+    validate(template)
+    return template
+
+
+@pytest.mark.parametrize("count", [1, 2, 30])
+@pytest.mark.parametrize("level", [0, 4])
+def test_disconnected_gaussians_place_every_factor_once(count, level):
+    template = gaussian_components(count)
+    scene = scene_of(template, level)
+    boxes = list(scene.boxes().values())
+    assert len(boxes) == count
+    assert sum(isinstance(item, Box) for item in scene.items) == count
+    assert {box.name for box in boxes} == set(template.factors)
+    assert [box.name for box in boxes] == [f"prior{i}" for i in range(count)]
+    assert all(a.y + a.h / 2 < b.y - b.h / 2 for a, b in zip(boxes, boxes[1:]))
+    assert scene == scene_of(template, level)
+
+
+@pytest.mark.parametrize("level", [0, 4])
+def test_mixed_size_components_pack_full_extents_with_composites(level):
+    parts = [scoped(rollout_template(steps), f"part{index}")
+             for index, steps in enumerate((1, 3, 2))]
+    template = Template("disconnected_rollouts")
+    for part in reversed(parts):
+        part.agent = None
+        template = merge(template, part, template.name)
+    scene = scene_of(template, level)
+    assert set(scene.boxes()) == {"factor:" + name for name in template.factors}
+    last_bottom = 0.
+    for index, part in enumerate(parts):
+        items = [item for item in scene.items if f":part{index}/" in item.ref]
+        points = [point for item in items for point in _item_points(item)]
+        assert min(y for _, y in points) > last_bottom
+        last_bottom = max(y for _, y in points)
+        assert last_bottom < scene.height
+        assert all(0 < x < scene.width for x, _ in points)
+        local = scene_of(part, level).boxes()
+        offsets = {(box.x - local[ref].x, box.y - local[ref].y)
+                   for ref, box in scene.boxes().items() if ref in local}
+        assert len(offsets) == 1
+        assert len(items) == len(scene_of(part, level).items)
+
+
+def test_empty_direct_layout_has_a_defined_frame():
+    scene = scene_of(Template("empty"))
+    assert scene.items == []
+    assert scene.width == scene.height == 2 * LayoutStyle().margin

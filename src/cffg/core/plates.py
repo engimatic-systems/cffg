@@ -108,6 +108,7 @@ def _scope_copy(
             edges={r: s(v) for r, v in f.edges.items()},
             param_edges={r: s(v) for r, v in f.param_edges.items()},
             param_blobs={r: sb(b) for r, b in f.param_blobs.items()},
+            function=f.function,
         )
         for f in frag.factors.values()
     }
@@ -273,6 +274,7 @@ def _rename_variable(out: Template, old: str, new: str, proto: VariableSpec) -> 
             edges={r: new if v == old else v for r, v in f.edges.items()},
             param_edges={r: new if v == old else v for r, v in f.param_edges.items()},
             param_blobs=dict(f.param_blobs),
+            function=f.function,
         )
     out.constraints = [
         dataclasses.replace(c, target=new) if c.target == old else c for c in out.constraints

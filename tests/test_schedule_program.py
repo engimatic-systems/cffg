@@ -111,7 +111,7 @@ def test_program_composes_only_required_stages_and_preserves_facade(kind, dtype)
     args = state_args(state)
     actual = program.iter_step(*args, 0.25, False)
     reference = engine._iter_step(*args, 0.25, False)
-    for left, right in zip(actual, reference, strict=True):
+    for left, right in zip(jax.tree.leaves(actual), jax.tree.leaves(reference), strict=True):
         assert left.shape == right.shape and left.dtype == right.dtype
         np.testing.assert_array_equal(left, right)
 
@@ -135,7 +135,8 @@ def test_exact_unit_uses_injected_ledger_only_when_defined(dtype, semiring):
         free_energy=ledger,
     )
     result = program.exact_unit(*state_args(state_in_dtype(engine, dtype)))
-    assert len(result) == 9
+    assert len(result) == 10
+    assert int(result[9].reason) == 0
     assert result[6].shape == () and result[6].dtype == np.dtype(dtype)
     assert result[7].dtype == result[8].dtype == np.dtype(bool)
     if semiring == "sum":
@@ -158,6 +159,7 @@ def test_mixed_schedule_transports_inner_failure_facts_without_classifying(dtype
                 *result[:4],
                 jnp.asarray(0.125, dtype=messages.dtype),
                 jnp.asarray(2),
+                result[6],
             )
 
         return sweep
@@ -170,9 +172,9 @@ def test_mixed_schedule_transports_inner_failure_facts_without_classifying(dtype
         free_energy=_make_bfe(arena),
     )
     result = program.iter_step(*state_args(state_in_dtype(engine, dtype)), 0.0, False)
-    assert result[-2].dtype == np.dtype(dtype)
-    assert float(result[-2]) == 0.125
-    assert result[-1].shape == () and int(result[-1]) == 2
+    assert result[4].dtype == np.dtype(dtype)
+    assert float(result[4]) == 0.125
+    assert result[5].shape == () and int(result[5]) == 2
 
 
 def test_schedule_source_does_not_own_family_selection_or_public_status():
@@ -244,8 +246,8 @@ def test_ef_registerized_prefetch_uses_owner_and_reuses_dynamic_observations(dty
         flat = args[:4]
         for stage in program.schedule.stages:
             build = _flat_scan_fn if isinstance(stage, ScanStage) else _batch_stage_fn
-            flat = eqx.filter_jit(build(arena, stage, logsumexp))(*flat, *args[4:])
-        for left, right in zip(actual, flat, strict=True):
+            flat = eqx.filter_jit(build(arena, stage, logsumexp))(*flat[:4], *args[4:])
+        for left, right in zip(jax.tree.leaves(actual), jax.tree.leaves(flat), strict=True):
             np.testing.assert_allclose(left, right, atol=64 * np.finfo(dtype).eps)
 
         result = engine.ef_marginals(_replace(state, ef_eta=actual[3]))

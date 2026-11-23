@@ -14,8 +14,11 @@ convention drops (the "weight trap").
 
 Conventions match cffg.gauss: batched over group members ([M, ...] leading
 axis) via vmap, per-member parameter stacks carry the regime axis K
-([M, K, ...]); dims and K are static per group. Propriety guards fall back
-to the *vacuous* message mid-flooding (never NaN); ledger terms go +inf on
+([M, K, ...]); dims and K are static per group. Non-normalizable components
+fall back to a *vacuous* message mid-flooding. Numerical collapse failures
+after component admission return NaN messages for runtime failure attribution;
+safe-inverse placeholders inside collapse never become accepted information.
+Ledger terms go +inf on
 improper beliefs, while public belief/predictive reads return shape-preserving
 NaNs with ``proper=False``. Guards are scale-relative per the robustness
 contract: proper systems are solved without regularization, while singular
@@ -32,6 +35,10 @@ import jax.numpy as jnp
 
 from cffg import gauss
 from cffg.compiled import NEG
+from cffg.gaussian_components import backward_component, forward_component
+from cffg.mixture_evidence import joint_blocks as _joint_blocks
+from cffg.mixture_evidence import log_z as _log_z
+from cffg.mixture_evidence import linear_evidence, prior_evidence
 
 _LOG2PI = 1.8378770664093453
 
@@ -66,64 +73,76 @@ class MixturePredictive(NamedTuple):
     proper: jax.Array
 
 
-def _log_z(eta: jnp.ndarray, lam: jnp.ndarray) -> jnp.ndarray:
-    """log ∫ exp(−½yᵀΛy + ηᵀy) dy = ½ηᵀΛ⁻¹η + d/2·log2π − ½·logdet Λ.
-    Caller guarantees Λ ≻ 0 (guarded upstream); branch-safe helpers keep an
-    untaken invalid path finite without perturbing an accepted matrix."""
-    d = lam.shape[-1]
-    sol = gauss._pd_solve(lam, eta[..., None])[..., 0]
-    logdet = gauss._pd_logdet(lam)
-    return 0.5 * (eta * sol).sum(-1) + 0.5 * d * _LOG2PI - 0.5 * logdet
+class CollapseResult(NamedTuple):
+    """Checked moment projection; invalid outputs are nonfinite, never a ridge."""
+
+    eta: jax.Array
+    precision: jax.Array
+    valid: jax.Array
 
 
-def _joint_blocks(eta_o, lam_o, eta_i, lam_i, a, b, w):
-    """Per-regime joint (η_J, Λ_J) over (y, x) of node × μ_o × μ_i — the
-    same blocks as gauss.linear_energy, vectorized over the K axis."""
-    wa = jnp.einsum("kij,kjl->kil", w, a)  # [K, do, di]
-    top = jnp.concatenate([w + lam_o[None], -wa], axis=-1)
-    bot = jnp.concatenate([-wa.swapaxes(-1, -2), jnp.einsum("kji,kjl->kil", a, wa) + lam_i[None]], axis=-1)
-    lam_j = jnp.concatenate([top, bot], axis=-2)  # [K, do+di, do+di]
-    wb = jnp.einsum("kij,kj->ki", w, b)
-    eta_j = jnp.concatenate(
-        [wb + eta_o[None], -jnp.einsum("kji,kj->ki", a, wb) + eta_i[None]], axis=-1
+def _selector_support(log_weights):
+    return ((log_weights != jnp.asarray(NEG, log_weights.dtype))
+            & ~jnp.isneginf(log_weights))
+
+
+def _active_components(log_weights, *parameters):
+    """Keep zero-weight components out of unstable arithmetic and its derivatives.
+
+    Inactive components borrow the first active component only for computation;
+    their probability remains exactly zero. No substituted value is published.
+    """
+    support = _selector_support(log_weights)
+    first = jnp.argmax(support)
+    return support, tuple(
+        jnp.where(support.reshape((-1,) + (1,) * (value.ndim - 1)), value, value[first])
+        for value in parameters
     )
-    return eta_j, lam_j
 
 
-def _node_const(b, w):
-    """Per-regime constant of log f_s: −½ b_sᵀW_s b_s + ½ logdet W_s − ½ d_y log2π."""
-    logdet_w = gauss._pd_logdet(w)
-    return -0.5 * jnp.einsum("ki,kij,kj->k", b, w, b) + 0.5 * logdet_w - 0.5 * b.shape[-1] * _LOG2PI
+def _collapse(log_w: jnp.ndarray, eta: jnp.ndarray, lam: jnp.ndarray,
+              *, support=None) -> CollapseResult:
+    """Moment-match supported proper components and validate every inverse result.
 
-
-def _collapse(log_w: jnp.ndarray, eta: jnp.ndarray, lam: jnp.ndarray):
-    """Moment-match Σ_s softmax(log_w)_s · N(η_s, Λ_s) → one (η, Λ).
-    All components must be proper (guarded by callers)."""
-    w_s = jax.nn.softmax(log_w)  # [K]
-    cov = gauss._pd_inverse(lam)  # [K, d, d]
-    m = jnp.einsum("kij,kj->ki", cov, eta)
+    Strict component propriety cannot certify a later covariance calculation.
+    Inactive components are sanitized before arithmetic; exact zero support
+    must not multiply an overflowing moment by zero after the fact.
+    """
+    support = _selector_support(log_w) if support is None else support
+    weights_valid = jnp.any(support) & jnp.all(jnp.where(support, jnp.isfinite(log_w), True))
+    logits = jnp.where(support, log_w, -jnp.inf)
+    w_s = jnp.where(support, jax.nn.softmax(jnp.where(weights_valid, logits, 0.0)), 0.0)
+    safe_eta = jnp.where(support[:, None], eta, 0.0)
+    safe_lam = jnp.where(support[:, None, None], lam, jnp.eye(lam.shape[-1], dtype=lam.dtype))
+    cov = gauss._pd_inverse(safe_lam)
+    m = jnp.einsum("kij,kj->ki", cov, safe_eta)
     m_bar = jnp.einsum("k,ki->i", w_s, m)
-    spread = m - m_bar[None]
+    spread = jnp.where(support[:, None], m - m_bar[None], 0.0)
     c_bar = jnp.einsum("k,kij->ij", w_s, cov) + jnp.einsum("k,ki,kj->ij", w_s, spread, spread)
     lam_out = gauss._pd_inverse(c_bar)
-    return lam_out @ m_bar, lam_out
-
-
-def _exact_probability(log_message: jax.Array, log_score: jax.Array):
-    """Normalize supported selector states without reviving exact zeros."""
-    support = log_message != jnp.asarray(NEG, log_message.dtype)
+    eta_out = lam_out @ m_bar
     valid = (
-        jnp.any(support)
-        & jnp.all(jnp.isfinite(log_message))
-        & jnp.all(jnp.where(support, jnp.isfinite(log_score), True))
+        weights_valid
+        & jnp.all(jnp.isfinite(w_s))
+        & jnp.all(gauss._pd_ok(safe_lam))
+        & jnp.all(jnp.isfinite(m))
+        & jnp.all(gauss._pd_ok(cov))
+        & gauss._pd_ok(c_bar)
+        & gauss._pd_ok(lam_out)
+        & jnp.all(jnp.isfinite(eta_out))
     )
-    supported_score = jnp.where(support, log_score, -jnp.inf)
-    normalizer = jnp.where(
-        valid,
-        jax.scipy.special.logsumexp(supported_score),
-        jnp.asarray(0.0, log_score.dtype),
-    )
-    probability = jnp.where(support, jnp.exp(supported_score - normalizer), 0.0)
+    return CollapseResult(_nan_unless(valid, eta_out), _nan_unless(valid, lam_out), valid)
+
+
+def _exact_probability(log_message: jax.Array, log_evidence: jax.Array | None = None):
+    """Normalize selector weights, removing common offsets before adding log odds."""
+    support = _selector_support(log_message)
+    logits = jnp.where(support, log_message, -jnp.inf)
+    if log_evidence is not None:
+        evidence = jnp.where(support, log_evidence, -jnp.inf)
+        logits = (logits - logits.max()) + (evidence - evidence.max())
+    valid = jnp.any(support) & jnp.all(jnp.where(support, jnp.isfinite(logits), True))
+    probability = jax.nn.softmax(jnp.where(valid, logits, 0.0))
     return jnp.where(valid, probability, 0.0), valid
 
 
@@ -164,9 +183,9 @@ def mixlin_stats(eta_o, lam_o, eta_i, lam_i, log_mu_e, a, b, w):
             lam_j,
             jnp.eye(lam_j.shape[-1], dtype=lam_j.dtype)[None],
         )
-        log_score = le + _log_z(eta_j, safe_lam) + _node_const(bb, safe_w)
-        responsibility, selector_ok = _exact_probability(le, log_score)
-        proper = selector_ok & jnp.all(w_ok) & jnp.all(joint_ok)
+        evidence = linear_evidence(eo, lo, ei, li, A, bb, safe_w)
+        responsibility, selector_ok = _exact_probability(le, evidence.score)
+        proper = selector_ok & evidence.valid & jnp.all(w_ok) & jnp.all(joint_ok)
 
         covariance = gauss._pd_inverse(safe_lam)
         mean = jnp.einsum("kij,kj->ki", covariance, eta_j)
@@ -231,7 +250,7 @@ def mixlin_predictive(eta_i, lam_i, log_mu_e, a, b, w):
         component_covariance += jnp.einsum(
             "kij,jl,kml->kim", A, input_covariance, A
         )
-        weight, selector_ok = _exact_probability(le, le)
+        weight, selector_ok = _exact_probability(le)
         mean, covariance = _collapsed_moments(
             weight, component_mean, component_covariance
         )
@@ -264,8 +283,9 @@ def mixlin_to_selector(eta_o, lam_o, eta_i, lam_i, a, b, w):
     def one(eo, lo, ei, li, A, bb, W):
         eta_j, lam_j = _joint_blocks(eo, lo, ei, li, A, bb, W)
         ok = gauss._pd_ok(W).all() & gauss._pd_ok(lam_j).all()
-        logmu = _log_z(eta_j, lam_j) + _node_const(bb, W)
-        return jnp.where(ok, logmu - logmu.max(), jnp.zeros_like(logmu))
+        evidence = linear_evidence(eo, lo, ei, li, A, bb, W)
+        logmu = _nan_unless(evidence.valid, evidence.score - evidence.score.max())
+        return jnp.where(ok, logmu, jnp.zeros_like(logmu))
 
     return jax.vmap(one)(eta_o, lam_o, eta_i, lam_i, a, b, w)
 
@@ -275,29 +295,12 @@ def mixlin_forward(eta_i, lam_i, log_mu_e, a, b, w):
     incoming selector message alone (component masses are s-independent)."""
 
     def one(ei, li, le, A, bb, W):
-        def fwd(Ak, bk, Wk):
-            s = Ak.T @ Wk @ Ak + li
-            s_inv = gauss._psd_pinv(s)
-            lam = gauss._project_psd(Wk - Wk @ Ak @ s_inv @ Ak.T @ Wk, Wk)
-            eta = lam @ bk + Wk @ Ak @ (s_inv @ ei)
-            proper_i = gauss._pd_ok(li)
-            cov_i = gauss._pd_inverse(li)
-            mean_i = gauss._pd_solve(li, ei)
-            pred_cov = gauss._pd_inverse(Wk) + Ak @ cov_i @ Ak.T
-            lam_proper = gauss._pd_inverse(pred_cov)
-            eta_proper = lam_proper @ (bk + Ak @ mean_i)
-            lam = jnp.where(proper_i, lam_proper, lam)
-            eta = jnp.where(proper_i, eta_proper, eta)
-            return eta, lam
-
-        eta_f, lam_f = jax.vmap(fwd)(A, bb, W)  # [K, do], [K, do, do]
-        ok = (
-            gauss._pd_ok(W).all()
-            & gauss._psd_ok(li)
-            & gauss._pd_ok(lam_f).all()
+        support, (A, bb, W) = _active_components(le, A, bb, W)
+        components = jax.vmap(forward_component, in_axes=(None, None, 0, 0, 0))(
+            ei, li, A, bb, W,
         )
-        eta, lam = _collapse(le, eta_f, lam_f)
-        return jnp.where(ok, eta, 0.0), jnp.where(ok, lam, 0.0)
+        collapsed = _collapse(le, components.eta, components.precision, support=support)
+        return _component_message(components, collapsed)
 
     return jax.vmap(one)(eta_i, lam_i, log_mu_e, a, b, w)
 
@@ -308,36 +311,33 @@ def mixlin_backward(eta_o, lam_o, log_mu_e, a, b, w):
     message convention drops must be rebuilt here (the weight trap)."""
 
     def one(eo, lo, le, A, bb, W):
+        support, (A, bb, W) = _active_components(le, A, bb, W)
         def bwd(Ak, bk, Wk):
-            k = gauss._pd_solve(Wk + lo, Wk)
-            g = gauss._project_psd(Wk - Wk @ k, Wk)
-            lam = Ak.T @ g @ Ak
-            eta = Ak.T @ (k.T @ eo - g @ bk)
-            proper_o = gauss._pd_ok(lo)
-            cov_o = gauss._pd_inverse(lo)
-            mean_o = gauss._pd_solve(lo, eo)
-            g_proper = gauss._pd_inverse(gauss._pd_inverse(Wk) + cov_o)
-            lam_proper = Ak.T @ g_proper @ Ak
-            eta_proper = Ak.T @ (g_proper @ (mean_o - bk))
-            lam = jnp.where(proper_o, lam_proper, lam)
-            eta = jnp.where(proper_o, eta_proper, eta)
+            component = backward_component(eo, lo, Ak, bk, Wk)
             # log c̃: mass of ∫ N(y; b_k, V_k) μ_o(y) dy (D3)
             log_c = _log_z(Wk @ bk + eo, Wk + lo) - 0.5 * bk @ Wk @ bk
             logdet_w = gauss._pd_logdet(Wk)
             log_c = log_c + 0.5 * logdet_w - 0.5 * bk.shape[-1] * _LOG2PI
-            return eta, lam, log_c
+            return component, log_c
 
-        eta_b, lam_b, log_c = jax.vmap(bwd)(A, bb, W)
-        ok = (
-            gauss._pd_ok(W).all()
-            & gauss._psd_ok(lo)
-            & gauss._pd_ok(lam_b).all()
+        components, log_c = jax.vmap(bwd)(A, bb, W)
+        ok = jnp.all(components.valid & components.normalizable)
+        log_w = le + log_c + jnp.where(
+            ok, _log_z(components.eta, components.precision), 0.0,
         )
-        log_w = le + log_c + jnp.where(ok, _log_z(eta_b, lam_b), 0.0)
-        eta, lam = _collapse(log_w - log_w.max(), eta_b, lam_b)
-        return jnp.where(ok, eta, 0.0), jnp.where(ok, lam, 0.0)
+        collapsed = _collapse(log_w, components.eta, components.precision, support=support)
+        return _component_message(components, collapsed)
 
     return jax.vmap(one)(eta_o, lam_o, log_mu_e, a, b, w)
+
+
+def _component_message(components, collapsed):
+    normalizable = jnp.all(components.normalizable)
+    valid = jnp.all(components.valid)
+    return (
+        _nan_unless(valid, jnp.where(normalizable, collapsed.eta, 0.0)),
+        _nan_unless(valid, jnp.where(normalizable, collapsed.precision, 0.0)),
+    )
 
 
 def mixlin_energy(eta_o, lam_o, eta_i, lam_i, log_mu_e, a, b, w):
@@ -350,10 +350,10 @@ def mixlin_energy(eta_o, lam_o, eta_i, lam_i, log_mu_e, a, b, w):
         eta_j, lam_j = _joint_blocks(eo, lo, ei, li, A, bb, W)
         ok = gauss._pd_ok(W).all() & gauss._pd_ok(lam_j).all()
         d = lam_j.shape[-1]
-        log_rho = le + _log_z(eta_j, lam_j) + _node_const(bb, W)
-        rho = jax.nn.softmax(log_rho)
-        log_rho_n = jax.nn.log_softmax(log_rho)
-        h_s = -(rho * log_rho_n).sum()
+        evidence = linear_evidence(eo, lo, ei, li, A, bb, W)
+        rho, selector_ok = _exact_probability(le, evidence.score)
+        h_s = -(rho * jnp.log(jnp.where(rho > 0., rho, 1.))).sum()
+        ok &= evidence.valid & selector_ok
         logdet_j = gauss._pd_logdet(lam_j)
         h_gauss = 0.5 * d * (1.0 + _LOG2PI) - 0.5 * logdet_j  # [K]
 
@@ -396,17 +396,8 @@ def mix_stats(eta_o, lam_o, log_mu_e, mean, w):
             lam_q,
             jnp.eye(lam_q.shape[-1], dtype=lam_q.dtype)[None],
         )
-        log_score = (
-            le
-            + _log_z(eta_q, safe_lam)
-            - 0.5
-            * jnp.einsum(
-                "ki,kij,kj->k", component_mean, safe_w, component_mean
-            )
-            + 0.5 * gauss._pd_logdet(safe_w)
-            - 0.5 * component_mean.shape[-1] * _LOG2PI
-        )
-        responsibility, selector_ok = _exact_probability(le, log_score)
+        evidence = prior_evidence(eo, lo, component_mean, safe_w)
+        responsibility, selector_ok = _exact_probability(le, evidence.score)
         covariance = gauss._pd_inverse(safe_lam)
         belief_mean = jnp.einsum("kij,kj->ki", covariance, eta_q)
         second = covariance + jnp.einsum(
@@ -416,6 +407,7 @@ def mix_stats(eta_o, lam_o, log_mu_e, mean, w):
         weighted_second = responsibility[:, None, None] * second
         proper = (
             selector_ok
+            & evidence.valid
             & jnp.all(w_ok)
             & jnp.all(belief_ok)
             & jnp.all(jnp.isfinite(weighted_mean))
@@ -442,7 +434,7 @@ def mix_predictive(log_mu_e, mean, w):
             jnp.eye(W.shape[-1], dtype=W.dtype)[None],
         )
         component_covariance = gauss._pd_inverse(safe_w)
-        weight, selector_ok = _exact_probability(le, le)
+        weight, selector_ok = _exact_probability(le)
         collapsed_mean, covariance = _collapsed_moments(
             weight, component_mean, component_covariance
         )
@@ -468,18 +460,13 @@ def mix_predictive(log_mu_e, mean, w):
 
 
 def mix_to_selector(eta_o, lam_o, mean, w):
-    """→ selector, exact and always proper: W_s + Λ_o ≻ 0."""
+    """→ selector, exact when every W_s and W_s + Λ_o is proper."""
 
     def one(eo, lo, m, W):
-        wm = jnp.einsum("kij,kj->ki", W, m)
-        logmu = (
-            _log_z(wm + eo[None], W + lo[None])
-            - 0.5 * jnp.einsum("ki,kij,kj->k", m, W, m)
-            + 0.5 * gauss._pd_logdet(W)
-            - 0.5 * m.shape[-1] * _LOG2PI
-        )
+        evidence = prior_evidence(eo, lo, m, W)
+        logmu = _nan_unless(evidence.valid, evidence.score - evidence.score.max())
         ok = gauss._pd_ok(W).all() & gauss._pd_ok(W + lo[None]).all()
-        return jnp.where(ok, logmu - logmu.max(), jnp.zeros_like(logmu))
+        return jnp.where(ok, logmu, jnp.zeros_like(logmu))
 
     return jax.vmap(one)(eta_o, lam_o, mean, w)
 
@@ -489,9 +476,10 @@ def mix_forward(log_mu_e, mean, w):
     weights (masses are all 1 — no trap in this direction)."""
 
     def one(le, m, W):
-        eta, lam = _collapse(le, jnp.einsum("kij,kj->ki", W, m), W)
+        support, (m, W) = _active_components(le, m, W)
+        collapsed = _collapse(le, jnp.einsum("kij,kj->ki", W, m), W, support=support)
         ok = gauss._pd_ok(W).all()
-        return jnp.where(ok, eta, 0.0), jnp.where(ok, lam, 0.0)
+        return jnp.where(ok, collapsed.eta, 0.0), jnp.where(ok, collapsed.precision, 0.0)
 
     return jax.vmap(one)(log_mu_e, mean, w)
 
@@ -504,14 +492,9 @@ def mix_energy(eta_o, lam_o, log_mu_e, mean, w):
         eta_q = jnp.einsum("kij,kj->ki", W, m) + eo[None]
         lam_q = W + lo[None]
         d = lam_q.shape[-1]
-        log_rho = (
-            le + _log_z(eta_q, lam_q)
-            - 0.5 * jnp.einsum("ki,kij,kj->k", m, W, m)
-            + 0.5 * gauss._pd_logdet(W)
-            - 0.5 * d * _LOG2PI
-        )
-        rho = jax.nn.softmax(log_rho)
-        h_s = -(rho * jax.nn.log_softmax(log_rho)).sum()
+        evidence = prior_evidence(eo, lo, m, W)
+        rho, selector_ok = _exact_probability(le, evidence.score)
+        h_s = -(rho * jnp.log(jnp.where(rho > 0., rho, 1.))).sum()
         logdet_q = gauss._pd_logdet(lam_q)
         h_gauss = 0.5 * d * (1.0 + _LOG2PI) - 0.5 * logdet_q
         sig_q = gauss._pd_inverse(lam_q)
@@ -524,6 +507,7 @@ def mix_energy(eta_o, lam_o, log_mu_e, mean, w):
             - 0.5 * (jnp.einsum("ki,kij,kj->k", r, W, r) + jnp.einsum("kij,kji->k", W, sig_q))
         )
         ok = gauss._pd_ok(W).all() & gauss._pd_ok(lam_q).all()
+        ok &= evidence.valid & selector_ok
         f = -h_s - (rho * h_gauss).sum() - (rho * e_logf).sum()
         return jnp.where(ok, f, jnp.inf)
 

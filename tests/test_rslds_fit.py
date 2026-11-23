@@ -157,6 +157,7 @@ def test_pca_arhmm_initializer_is_seeded_finite_and_dtype_scaled():
     )
 
 
+@pytest.mark.slow
 def test_fit_replaces_one_sequence_coordinates_and_reuses_one_engine(monkeypatch):
     observations = _observations(8)
     engine_ids = []
@@ -617,6 +618,7 @@ def test_float32_fitter_survives_tenfold_horizon():
     assert all(np.all(np.isfinite(value)) for value in result.parameters.values())
 
 
+@pytest.mark.slow
 def test_structured_nascar_coordinates_avoid_the_legacy_finite_cycle():
     observations = _nascar_observations()
     key = jax.random.split(

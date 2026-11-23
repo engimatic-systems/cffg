@@ -1,4 +1,4 @@
-"""Canonical environments and their CFFG templates (brief item 5)."""
+"""Supported model builders, environments, fitting, and learning helpers."""
 
 from cffg.models.factored import (
     CouplingSpec,
@@ -7,6 +7,9 @@ from cffg.models.factored import (
     build_factored_corridor,
     build_factored_rollout,
 )
+from cffg.models.gridworld import CorridorEnv, build_gridworld
+from cffg.models.kalman import lgssm
+from cffg.models.rollout import build_rollout
 from cffg.models.rslds import RSLDSLearning, rslds, vague_rslds_learning
 from cffg.models.rslds_fit import (
     RSLDSFitPriors,
@@ -21,8 +24,10 @@ from cffg.models.rslds_init import (
     RSLDSInitialization,
     RSLDSInitializer,
 )
+from cffg.models.tmaze import build_tmaze
 
 __all__ = [
+    "CorridorEnv",
     "CouplingSpec",
     "ObservationSpec",
     "PCAARHMMInitializer",
@@ -36,7 +41,11 @@ __all__ = [
     "StateBlockSpec",
     "build_factored_corridor",
     "build_factored_rollout",
+    "build_gridworld",
+    "build_rollout",
+    "build_tmaze",
     "fit_rslds",
+    "lgssm",
     "rslds",
     "vague_rslds_fit_priors",
     "vague_rslds_learning",

@@ -34,7 +34,7 @@ def _conditioning(topology, claims, registry):
         member, role = candidate.endpoint
         kind = topology.factors[member].type
         if variable.dim:
-            kernel = registry.bindings.get(kind)
+            kernel = registry.for_factor(topology.factors[member])
             conditioning = (
                 kernel.binding.conditioning
                 if kernel is not None and kernel.arena == "gaussian"
@@ -103,7 +103,7 @@ def _group_keys(t, claims, gauss_data_ports, registry):
             ft.family == "any" and t.variables[f.edges[roles[0]]].dim > 0
         ):
             dims = tuple(t.variables[f.edges[r]].dim for r in roles)
-            kern = registry.bindings.get(f.type)
+            kern = registry.for_factor(f)
             if kern is None or kern.arena != "gaussian":
                 problem = (
                     problem or f"factor type {f.type!r} has no Gaussian kernel binding"
@@ -119,7 +119,8 @@ def _group_keys(t, claims, gauss_data_ports, registry):
                 if observed
                 else f.type
             )
-            gauss_buckets.setdefault((gtype, dims, f.type, observed), []).append(fname)
+            configuration = f.function.grouping_key if f.function is not None else ""
+            gauss_buckets.setdefault((gtype, dims, f.type, observed, configuration), []).append(fname)
         elif ft.family == "ef" or (
             ft.family == "any" and bool(t.variables[f.edges[roles[0]]].ef)
         ):
@@ -264,10 +265,14 @@ def lower_registered(
         if members[0] in claims.equalities:
             gaussian.append(EqualityReference(key, tuple(members)))
             continue
-        kind, dims, base, observed = key
-        kernel = registry.bindings[base]
+        kind, dims, base, observed, configuration = key
+        kernel = registry.for_factor(template.factors[members[0]])
         roles = FACTOR_TYPES[base].edge_roles
         name = f"gauss:{kind}:{'x'.join(map(str, dims))}"
+        if configuration:
+            import hashlib
+
+            name += ":" + hashlib.sha256(configuration.encode()).hexdigest()
         gather, scatter = _addresses(topology, members, roles)
         observation = None
         if observed:

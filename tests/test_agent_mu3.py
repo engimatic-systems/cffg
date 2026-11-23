@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import functools
 import json
-from dataclasses import fields
+from dataclasses import fields, replace
 
 import jax
 import jax.numpy as jnp
@@ -113,10 +113,18 @@ def assert_result_exact(actual: RunResult, expected: RunResult) -> None:
     for field in fields(RunResult):
         # Kernel-cache compilation count depends on whether the otherwise
         # identical direct or agent run reaches the shared Engine first.
-        if field.name not in {"state", "solver_compilations"}:
+        if field.name == "failure":
+            assert actual.failure == expected.failure
+        elif field.name not in {"state", "solver_compilations"}:
             np.testing.assert_equal(
                 getattr(actual, field.name), getattr(expected, field.name)
             )
+
+
+def assert_restored_result(actual: RunResult, expected: RunResult) -> None:
+    """Check every persisted field; run-local provenance is intentionally absent."""
+    assert actual.failure is None
+    assert_result_exact(actual, replace(expected, failure=None))
 
 
 def checkpoint_arrays(path) -> dict[str, np.ndarray]:
@@ -240,6 +248,7 @@ def test_public_rollout_wrappers_preserve_serialized_evaluator(builder, kwargs):
     assert len(plan.rows) == 2
 
 
+@pytest.mark.slow
 def test_trial_loop_matches_direct_engines_and_checkpoint_replays(tmp_path):
     key0 = jax.random.PRNGKey(7)
     agent = make_agent(key=key0)
@@ -321,6 +330,7 @@ def test_trial_loop_matches_direct_engines_and_checkpoint_replays(tmp_path):
     )
 
 
+@pytest.mark.slow
 def test_functional_checkpoint_has_one_exact_outer_and_runtime_manifest(tmp_path):
     source = make_agent()
     source.act()
@@ -350,6 +360,7 @@ def test_functional_checkpoint_has_one_exact_outer_and_runtime_manifest(tmp_path
     }
 
 
+@pytest.mark.slow
 def test_agent_version_1_functional_checkpoint_migrates_runtime(tmp_path):
     source = make_agent()
     action = source.act()
@@ -395,7 +406,8 @@ def test_agent_version_1_functional_checkpoint_migrates_runtime(tmp_path):
 
 @pytest.mark.parametrize(
     "mismatch",
-    ("samples", "min_ess", "refresh", "mode"),
+    (pytest.param("samples", marks=pytest.mark.slow), pytest.param("min_ess", marks=pytest.mark.slow),
+     pytest.param("refresh", marks=pytest.mark.slow), pytest.param("mode", marks=pytest.mark.slow)),
 )
 def test_functional_checkpoint_configuration_mismatch_is_atomic(
     tmp_path, mismatch
@@ -435,19 +447,19 @@ def test_functional_checkpoint_configuration_mismatch_is_atomic(
 @pytest.mark.parametrize(
     "corruption",
     (
-        "extra_array",
-        "missing_key",
-        "unclaimed_key",
-        "null_cache",
-        "nonfinite_state",
-        "nonfinite_trace",
-        "nonfinite_outer",
-        "invalid_outer",
-        "invalid_weights",
-        "invalid_counter",
-        "invalid_cache",
-        "extra_metadata",
-        "missing_state",
+        pytest.param("extra_array", marks=pytest.mark.slow),
+        pytest.param("missing_key", marks=pytest.mark.slow),
+        pytest.param("unclaimed_key", marks=pytest.mark.slow),
+        pytest.param("null_cache", marks=pytest.mark.slow),
+        pytest.param("nonfinite_state", marks=pytest.mark.slow),
+        pytest.param("nonfinite_trace", marks=pytest.mark.slow),
+        pytest.param("nonfinite_outer", marks=pytest.mark.slow),
+        pytest.param("invalid_outer", marks=pytest.mark.slow),
+        pytest.param("invalid_weights", marks=pytest.mark.slow),
+        pytest.param("invalid_counter", marks=pytest.mark.slow),
+        pytest.param("invalid_cache", marks=pytest.mark.slow),
+        pytest.param("extra_metadata", marks=pytest.mark.slow),
+        pytest.param("missing_state", marks=pytest.mark.slow),
     ),
 )
 def test_functional_checkpoint_runtime_schema_corruption_is_atomic(
@@ -625,13 +637,13 @@ def test_weight_collapse_checkpoint_replays_and_advances_exactly(tmp_path):
 
     restored = make_weight_collapse_agent(key=jax.random.PRNGKey(999))
     restored.restore(path)
-    assert_result_exact(restored.last_plan_result, source_result)
+    assert_restored_result(restored.last_plan_result, source_result)
     np.testing.assert_array_equal(restored.planning_key_cursor, source_key)
     assert restored.planning_epoch == source_epoch
 
     with pytest.raises(InferenceError) as replayed:
         restored.act()
-    assert_result_exact(replayed.value.result, source_result)
+    assert_restored_result(replayed.value.result, source_result)
     np.testing.assert_array_equal(restored.planning_key_cursor, source_key)
     assert restored.planning_epoch == source_epoch
 
@@ -700,6 +712,7 @@ def test_weight_collapse_checkpoint_rejects_invalid_failure_state(
     assert_used_agent_unchanged(target, snapshot)
 
 
+@pytest.mark.slow
 def test_posterior_refresh_policy_reuses_particles_for_context_only_changes():
     agent = make_agent(refresh="posterior")
     agent.act()
@@ -720,6 +733,7 @@ def test_posterior_refresh_policy_reuses_particles_for_context_only_changes():
     )
 
 
+@pytest.mark.slow
 def test_cached_epoch_is_invalidated_by_runtime_configuration_changes():
     agent = make_agent()
     agent.act()
@@ -741,6 +755,7 @@ def test_cached_epoch_is_invalidated_by_runtime_configuration_changes():
     np.testing.assert_array_equal(agent.planning_key_cursor, first_key)
 
 
+@pytest.mark.slow
 def test_typed_jax_key_checkpoint_preserves_representation(tmp_path):
     agent = make_agent(key=jax.random.key(12))
     agent.act()
@@ -757,6 +772,7 @@ def test_typed_jax_key_checkpoint_preserves_representation(tmp_path):
     assert_result_exact(restored.last_plan_result, agent.last_plan_result)
 
 
+@pytest.mark.slow
 def test_checkpoint_drops_result_after_particle_budget_change(tmp_path):
     source = make_agent(samples=128)
     source.act()
@@ -779,6 +795,7 @@ def test_checkpoint_drops_result_after_particle_budget_change(tmp_path):
     )
 
 
+@pytest.mark.slow
 def test_action_rng_is_separate_from_functional_key_cursor():
     first = make_agent(select="sample", seed=1)
     second = make_agent(select="sample", seed=99)
@@ -797,6 +814,7 @@ def test_action_rng_is_separate_from_functional_key_cursor():
     assert json.dumps(first.rng.bit_generator.state, sort_keys=True) != after
 
 
+@pytest.mark.slow
 def test_bad_base_and_legacy_functional_restore_fail_before_mutation(tmp_path):
     for value in (0.0, np.nan, np.inf):
         agent = make_agent()

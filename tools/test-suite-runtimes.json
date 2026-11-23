@@ -1,48 +1,48 @@
 {
   "latest": {
-    "case_seconds": 1218.326,
-    "commit": "48dbc8b",
-    "completed_at": "2026-09-13T16:24:00.347132+00:00",
+    "case_seconds": 1212.62,
+    "commit": "2967b07",
+    "completed_at": "2026-11-23T03:43:46.865551+00:00",
     "failed": 0,
     "pytest_exit_code": 0,
     "result": "passed",
     "selection": "not slow",
-    "test_count": 2270,
-    "wall_seconds": 1234.451
+    "test_count": 2766,
+    "wall_seconds": 1236.962
   },
   "previous-3": [
     {
-      "case_seconds": 1147.796,
-      "commit": "b01edae",
-      "completed_at": "2026-09-13T03:35:23.410268+00:00",
-      "failed": 0,
-      "pytest_exit_code": 0,
-      "result": "passed",
+      "case_seconds": 1170.986,
+      "commit": "a751f22",
+      "completed_at": "2026-11-22T20:20:25.800763+00:00",
+      "failed": 2,
+      "pytest_exit_code": 1,
+      "result": "failed",
       "selection": "not slow",
-      "test_count": 2210,
-      "wall_seconds": 1163.362
+      "test_count": 2755,
+      "wall_seconds": 1198.49
     },
     {
-      "case_seconds": 1161.205,
-      "commit": "1234380",
-      "completed_at": "2026-09-13T15:44:21.382574+00:00",
+      "case_seconds": 1187.301,
+      "commit": "8c4993a",
+      "completed_at": "2026-11-22T20:47:56.859110+00:00",
       "failed": 0,
       "pytest_exit_code": 0,
       "result": "passed",
       "selection": "not slow",
-      "test_count": 2245,
-      "wall_seconds": 1177.041
+      "test_count": 2755,
+      "wall_seconds": 1203.506
     },
     {
-      "case_seconds": 1218.326,
-      "commit": "48dbc8b",
-      "completed_at": "2026-09-13T16:24:00.347132+00:00",
+      "case_seconds": 1212.62,
+      "commit": "2967b07",
+      "completed_at": "2026-11-23T03:43:46.865551+00:00",
       "failed": 0,
       "pytest_exit_code": 0,
       "result": "passed",
       "selection": "not slow",
-      "test_count": 2270,
-      "wall_seconds": 1234.451
+      "test_count": 2766,
+      "wall_seconds": 1236.962
     }
   ],
   "schema_version": 2,

@@ -23,6 +23,7 @@ from cffg.core.ir import Template
 from cffg.core.serialize import structure_hash
 from cffg.engine import Engine, RunResult, State, _replace
 from cffg.iteration import IterationProgress, step_facts
+from cffg.failure_facts import FailurePhase, empty_failure
 from cffg.runtime_types import RunStatus as RunStatus  # noqa: PLC0414
 
 
@@ -91,8 +92,9 @@ class Colony:
     ) -> dict[int, RunResult]:
         """Run each structure batch and return one truthful result per instance.
 
-        Rule evaluation remains vmapped.  Termination is tracked per instance
-        on the host until cff-wbhu moves this status carry into ``lax.scan``.
+        Ordinary iterative rule evaluation remains vmapped. Exact schedules
+        reuse Engine's per-instance propagation and certification. Termination
+        is tracked on the host until the controller loop is compiled.
         """
         by_key: dict[tuple, list[int]] = {}
         for iid, inst in self.instances.items():
@@ -101,7 +103,7 @@ class Colony:
         for (key, _signature), iids in by_key.items():
             engine = self.engines[key]
             states = [self.instances[i].state for i in iids]
-            if engine.arena.gfe_groups or engine.arena.gfe_tm_groups:
+            if engine.arena.gfe_groups or engine.arena.gfe_tm_groups or engine.has_adaptive_gaussian:
                 if damp != 0.0:
                     raise ValueError(
                         "damp does not apply to mixed-GFE trust-region "
@@ -117,12 +119,13 @@ class Colony:
                     self.instances[iid].state = result.state
                     self.last_results[iid] = result
                 continue
-            if len(states) == 1:
-                result = engine.run(
-                    states[0], n_iters, tol=tol, damp=damp, harden_last=n_iters
-                )
-                self.instances[iids[0]].state = result.state
-                self.last_results[iids[0]] = result
+            if len(states) == 1 or engine._can_run_exact(n_iters, damp, n_iters):
+                for iid, state in zip(iids, states, strict=True):
+                    result = engine.run(
+                        state, n_iters, tol=tol, damp=damp, harden_last=n_iters
+                    )
+                    self.instances[iid].state = result.state
+                    self.last_results[iid] = result
                 continue
             n = len(states)
             policy = engine._iteration_policy(states[0], tol)
@@ -145,23 +148,34 @@ class Colony:
             # schedules also prime once (their exact island passes).
             if program.prime is not None and n_iters >= 1 and active.any():
                 def prime_one(st: State, *, program=program):
-                    msgs, g_eta, g_lam, ef_eta = program.prime(
+                    msgs, g_eta, g_lam, ef_eta, *auxiliary = program.prime(
                         st.messages, st.g_eta, st.g_lam, st.ef_eta,
                         st.g_obs, st.g_mask, st.ef_obs, st.ef_mask, st.params,
                     )
                     return _replace(
                         st, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta
-                    )
+                    ), auxiliary[0] if auxiliary else empty_failure()
 
-                primed = eqx.filter_vmap(prime_one)(batched)
+                primed, failures = eqx.filter_vmap(prime_one)(batched)
                 # Rejected inputs stay frozen across initial propagation too.
                 if active.all():
                     batched = primed
                 else:
                     batched = jax.tree_util.tree_map(freeze, batched, primed)
+                for b in np.flatnonzero(active):
+                    progress[b].record_failure(
+                        jax.tree.map(lambda value: value[b], failures),
+                        phase=FailurePhase.PRIMING, iteration=0,
+                    )
+
+            for b in np.flatnonzero(active):
+                progress[b].begin_phase(
+                    FailurePhase.HARD if n_iters > 0 and len(engine.arena.delta_pairs)
+                    else FailurePhase.SOFT
+                )
 
             def one(st: State, *, program=program):
-                msgs, g_eta, g_lam, ef_eta, inner_residual, inner_status = program.iter_step(
+                msgs, g_eta, g_lam, ef_eta, inner_residual, inner_status, *auxiliary = program.iter_step(
                     st.messages, st.g_eta, st.g_lam, st.g_obs, st.g_mask,
                     st.ef_eta, st.ef_obs, st.ef_mask, st.params, damp, True,
                 )
@@ -169,6 +183,7 @@ class Colony:
                     _replace(st, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta),
                     inner_residual,
                     inner_status,
+                    auxiliary[0] if auxiliary else empty_failure(),
                 )
 
             step_v = eqx.filter_vmap(one)
@@ -176,7 +191,7 @@ class Colony:
             for _ in range(n_iters):
                 if not active.any():
                     break
-                candidate, inner_r, inner_code = step_v(batched)
+                candidate, inner_r, inner_code, failures = step_v(batched)
 
                 previous = batched
                 batched = jax.tree_util.tree_map(freeze, batched, candidate)
@@ -185,12 +200,15 @@ class Colony:
                     old = jax.tree_util.tree_map(lambda x: x[b], previous)
                     state = jax.tree_util.tree_map(lambda x: x[b], batched)
                     facts = step_facts(old, state, inner_r_np[b], inner_code_np[b])
+                    progress[b].record_failure(jax.tree.map(lambda value: value[b], failures))
                     progress[b].consume(state, facts, services)
                     active[b] = not progress[b].stopped
 
             for b, iid in enumerate(iids):
                 state = jax.tree_util.tree_map(lambda x: x[b], batched)
-                result = run_results.finalize_iteration(progress[b].finish(state))
+                result = run_results.finalize_iteration(
+                    progress[b].finish(state), factor_names=engine._failure_names
+                )
                 self.instances[iid].state = result.state
                 self.last_results[iid] = result
         return {iid: self.last_results[iid] for iid in self.instances}

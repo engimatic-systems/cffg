@@ -32,17 +32,7 @@ from cffg.params import set_params as canonical_set_params
 
 
 REPO = Path(__file__).resolve().parents[1]
-QUICKSTART_START = "<!-- public-quickstart:start -->"
-QUICKSTART_END = "<!-- public-quickstart:end -->"
-
-
-def _quickstart_source() -> str:
-    readme = (REPO / "README.md").read_text()
-    assert readme.count(QUICKSTART_START) == readme.count(QUICKSTART_END) == 1
-    marked = readme.split(QUICKSTART_START, 1)[1].split(QUICKSTART_END, 1)[0]
-    assert marked.count("```python") == 1
-    assert marked.count("```") == 2
-    return marked.split("```python", 1)[1].split("```", 1)[0].strip()
+NEWCOMER_EXAMPLE = REPO / "examples" / "discrete_agent.py"
 
 
 def _make_agent(
@@ -170,22 +160,36 @@ def test_top_level_facade_reexports_only_canonical_owners():
         "EFBinding": cffg.kernel_bindings.EFBinding,
         "Engine": CanonicalEngine,
         "FactorKernel": cffg.kernels.FactorKernel,
+        "FailureDiagnostic": cffg.runtime_types.FailureDiagnostic,
+        "FixedPointDifferentiator": cffg.FixedPointDifferentiator,
+        "FixedPointGradient": cffg.FixedPointGradient,
+        "FunctionSpec": cffg.FunctionSpec,
+        "GaussianAmortizer": cffg.GaussianAmortizer,
         "GaussianBinding": cffg.kernel_bindings.GaussianBinding,
         "GaussianConditioning": cffg.kernel_bindings.GaussianConditioning,
+        "GradientStatus": cffg.GradientStatus,
         "HostileInputs": cffg.kernels.HostileInputs,
         "LoadedBundle": cffg.bundle.LoadedBundle,
+        "MeanImplementation": cffg.MeanImplementation,
+        "NeuralTrainer": cffg.NeuralTrainer,
         "ParameterSpec": cffg.kernel_bindings.ParameterSpec,
         "PersistentArray": cffg.learning_schema.PersistentArray,
         "PersistentParameter": cffg.learning_schema.PersistentParameter,
         "PersistentStateDescriptor": cffg.learning_schema.PersistentStateDescriptor,
         "PersistentTarget": cffg.learning_schema.PersistentTarget,
+        "PolynomialFeatures": cffg.PolynomialFeatures,
         "RollingAgent": CanonicalRollingAgent,
         "RunStatus": CanonicalRunStatus,
+        "TrainingConfig": cffg.TrainingConfig,
         "build_gridworld": canonical_build_gridworld,
         "compile_template": canonical_compile_template,
+        "fixed_point_gradient": cffg.fixed_point_gradient,
+        "initialize_neural_parameters": cffg.initialize_neural_parameters,
         "load_bundle": canonical_load_bundle,
+        "neural_mean": cffg.neural_mean,
         "save_bundle": canonical_save_bundle,
         "register_kernel": cffg.kernels.register_kernel,
+        "register_mean_function": cffg.register_mean_function,
         "resolve_persistent_state": cffg.learning_schema.resolve_persistent_state,
         "set_params": canonical_set_params,
     }
@@ -197,14 +201,14 @@ def test_top_level_facade_reexports_only_canonical_owners():
 
 @pytest.mark.parametrize(
     ("jax_enable_x64", "expected_dtype"),
-    (("0", "np.float32"), ("1", "np.float64")),
+    (("0", "float32"), pytest.param("1", "float64", marks=pytest.mark.slow)),
 )
-def test_readme_quickstart_uses_only_the_facade_and_runs_in_configured_precision(
+def test_newcomer_example_uses_only_the_facade_and_runs_in_configured_precision(
     tmp_path,
     jax_enable_x64,
     expected_dtype,
 ):
-    source = _quickstart_source()
+    source = NEWCOMER_EXAMPLE.read_text()
     syntax = ast.parse(source)
     cffg_imports = [
         node
@@ -224,11 +228,7 @@ def test_readme_quickstart_uses_only_the_facade_and_runs_in_configured_precision
     environment = dict(os.environ)
     environment["JAX_ENABLE_X64"] = jax_enable_x64
     completed = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            source + f"\nassert state.messages.dtype == np.dtype({expected_dtype})",
-        ],
+        [sys.executable, str(NEWCOMER_EXAMPLE)],
         cwd=tmp_path,
         env=environment,
         text=True,
@@ -237,6 +237,7 @@ def test_readme_quickstart_uses_only_the_facade_and_runs_in_configured_precision
         check=False,
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert f"message dtype: {expected_dtype}" in completed.stdout
     assert (tmp_path / "corridor.cffgz").is_file()
     assert (tmp_path / "agent.npz").is_file()
 
@@ -445,6 +446,7 @@ def test_checkpoint_rejects_version_structure_shape_and_fields_atomically(tmp_pa
     _assert_agent_snapshot(target, expected)
 
 
+@pytest.mark.slow
 def test_checkpoint_rejects_goal_corruption_atomically(tmp_path):
     source = _make_agent(learn_goal=True)
     action = source.act()

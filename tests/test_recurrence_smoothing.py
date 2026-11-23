@@ -22,7 +22,7 @@ from cffg.experiments.recurrence_smoothing import (
 )
 
 
-@pytest.mark.parametrize("card", (2, 3))
+@pytest.mark.parametrize("card", (2, pytest.param(3, marks=pytest.mark.slow)))
 def test_enumerator_and_engine_comparison_issues_variational_ownership(card):
     result = diagnose_case(card)
     tolerance = result["tolerance"]

@@ -120,7 +120,10 @@ def compile_template(
     t = expand_plates(t)
     validate(t)
     topology = build_topology(t)
-    registry = snapshot_registry()
+    try:
+        registry = snapshot_registry(t)
+    except (ValueError, TypeError, KeyError) as error:
+        raise CompileError(str(error)) from error
     claims = discover_specialized(t, topology, semiring, registry)
     validate_admission(t.name, claims)
     registered = lower_registered(t, topology, claims, semiring, registry)

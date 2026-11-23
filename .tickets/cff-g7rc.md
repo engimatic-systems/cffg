@@ -20,6 +20,8 @@ PR #49 also compared `600a775` with pre-soundness commit `931758d` on the same A
 
 This ticket reduces fixed construction, certification, derivative-compilation, and synchronization costs for tiny one-shot mixed-GFE solves. It retains the raw-root, exact-support, inner-solver, feasibility, and stationary-BFE certificate, while keeping repeated planning and the horizon-8 globalized solve as no-regression controls. It does not own iterative sweep dispatch, HMM scan fusion, or resource-estimator repair.
 
+Reuse the existing benign-candidate path and plan cache. tests/test_outer_gfe_formalism.py already checks zero trials and Krylov iterations, changed-prior reuse, and invalidation by support and dtype. Keep them as regression evidence. Measuring actual JIT compilation by kernel and meeting the T-maze and D1 latency targets remain open. The reactor used a different graph and objective.
+
 ## Outcomes / Acceptance Criteria
 
 1. The optimized path preserves the mixed-GFE convergence contract.

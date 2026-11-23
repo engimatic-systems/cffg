@@ -2,7 +2,7 @@
 id: cff-mjku
 status: open
 deps: [cff-9xmq]
-links: [cff-b47g]
+links: [cff-b47g, cff-xa6z]
 created: 2026-07-10T03:31:28Z
 type: feature
 priority: 3
@@ -503,3 +503,7 @@ Retained candidate meanings:
   learnable state, or codec already present in the repository is meant.
 
 Intelligible-ticket review: complete.
+
+**2026-09-25T03:47:40Z**
+
+PCGym evidence under cff-xa6z: the experiment repeatedly hand-built equality nodes to tap interior continuous states. This is additional evidence for the existing public fan-out/observation-branch contract, not a new duplicate ticket. Keep its cff-9xmq prerequisite and degree-two/serialization requirements; PCGym recipes can show explicit equality construction until it lands.

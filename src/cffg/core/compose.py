@@ -65,6 +65,7 @@ def scoped(template: Template, prefix: str) -> Template:
                 edges={r: s(v) for r, v in f.edges.items()},
                 param_edges={r: s(v) for r, v in f.param_edges.items()},
                 param_blobs={r: s(b) for r, b in f.param_blobs.items()},
+                function=f.function,
             )
             for f in template.factors.values()
         },
@@ -170,6 +171,7 @@ def bond(t: Template, port_a: str, port_b: str) -> Template:
             edges={r: va.name if v == vb.name else v for r, v in f.edges.items()},
             param_edges={r: va.name if v == vb.name else v for r, v in f.param_edges.items()},
             param_blobs=dict(f.param_blobs),
+            function=f.function,
         )
     t.constraints = [
         dataclasses.replace(c, target=va.name) if c.target == vb.name else c

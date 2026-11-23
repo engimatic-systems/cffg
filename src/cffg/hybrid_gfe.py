@@ -61,10 +61,13 @@ def _entropy_precision(precision: jax.Array) -> jax.Array:
 
 
 def _discrete_entropy(probabilities: jax.Array) -> jax.Array:
+    active = probabilities > 0
+    # Keep reverse derivatives finite on the fixed support without adding mass.
+    log_probability = jnp.log(jnp.where(active, probabilities, 1.0))
     return -jnp.sum(
         jnp.where(
-            probabilities > 0,
-            probabilities * jnp.log(probabilities),
+            active,
+            probabilities * log_probability,
             0.0,
         )
     )

@@ -13,7 +13,7 @@ Three sources, in order of trustworthiness:
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import jax
 
@@ -28,6 +28,7 @@ class Estimate:
     bytes_accessed_per_sweep: float | None
     seconds_per_sweep: float | None
     calibration_status: RunStatus | None
+    declared_work: dict[str, dict[str, int]] = field(default_factory=dict)
 
     @property
     def message_bytes(self) -> int:
@@ -104,4 +105,9 @@ def estimate(engine: Engine, *, calibrate: bool = True, sample_iters: int = 10) 
         bytes_accessed_per_sweep=bytes_accessed,
         seconds_per_sweep=seconds,
         calibration_status=calibration_status,
+        declared_work={
+            group.name: {"members": len(group.members), **group.kernel.binding.work}
+            for group in engine.arena.gauss_groups
+            if group.kernel is not None and group.kernel.binding.work
+        },
     )

@@ -14,6 +14,8 @@ class OuterTerminationReason(str, Enum):
 
     NOT_RUN = "not_run"
     ROOT_CONVERGED = "root_converged"
+    DIRECTED_CHAIN_CERTIFIED = "directed_chain_certified"
+    DIRECTED_CHAIN_UNCERTIFIED = "directed_chain_uncertified"
     STATIONARY_NONROOT = "stationary_nonroot"
     INNER_FAILURE = "inner_failure"
     NONFINITE_EVALUATION = "nonfinite_evaluation"
@@ -64,6 +66,23 @@ class InferenceError(RuntimeError):
 
 
 @dataclass(frozen=True)
+class FailureDiagnostic:
+    """Run-local explanation, not a replacement for the authoritative status.
+
+    ``reason`` and ``phase`` are stable lowercase codes. ``factor`` is the
+    serialized model-local name, or None when ownership is unknown.
+    Initialization and priming use iteration zero; update attempts start at
+    one. A functional failure can precede that attempt's message update.
+    Diagnostics are not persisted in agent checkpoints.
+    """
+
+    reason: str
+    factor: str | None
+    phase: str
+    iteration: int
+
+
+@dataclass(frozen=True)
 class RunResult:
     """Status-bearing result of an inference run.
 
@@ -71,6 +90,8 @@ class RunResult:
     ``state`` and therefore cross the status-bearing API boundary explicitly.
     ``free_energies`` contains only sweeps on which the ledger is defined
     (improper continuous beliefs during propagation have no FE entry).
+    A converged outer solve returns the certified point, not its unchecked
+    successor; ``outer_residual`` uses that solve's fixed reference chart.
     """
 
     state: State
@@ -95,6 +116,8 @@ class RunResult:
     trial_evaluations: int = 0
     linear_iterations: int = 0
     solver_compilations: int = 0
+    failure: FailureDiagnostic | None = None
+    directed_attempts: int = 0
 
     @property
     def delta_trace(self) -> tuple[float, ...]:

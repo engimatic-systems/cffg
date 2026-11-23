@@ -119,7 +119,9 @@ CASES = [
 ]
 
 
-@pytest.mark.parametrize("label,mk,ys,gaps", CASES, ids=[c[0] for c in CASES])
+@pytest.mark.parametrize("label,mk,ys,gaps",
+                         [pytest.param(*c, marks=pytest.mark.slow if c[0] == "2d" else ()) for c in CASES],
+                         ids=[c[0] for c in CASES])
 def test_engine_matches_collapsed_reference(label, mk, ys, gaps):
     """Tight parity: the engine and the independent numpy implementation of
     the same D3 rules must land on the same fixed point."""

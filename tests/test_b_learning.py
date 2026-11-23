@@ -7,6 +7,7 @@ integrating those pairs must then recover a known stochastic B from data.
 """
 
 import numpy as np
+import pytest
 
 from cffg.agent import RollingAgent
 from cffg.compiler import compile_template
@@ -111,6 +112,7 @@ def corridor_builder(**kw):
     )
 
 
+@pytest.mark.slow
 def test_b_recovery_from_random_walk():
     true_bs = corridor_bs()
     acc = 0.9

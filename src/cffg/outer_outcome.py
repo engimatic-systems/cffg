@@ -1,10 +1,11 @@
 """Outer-control evidence without a public inference status decision."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
 from cffg._immutable import FrozenArray
+from cffg.failure_facts import FailureAt, empty_failure_at
 from cffg.outer import OuterSolveResult
 from cffg.runtime_types import OuterTerminationReason, State
 
@@ -31,6 +32,8 @@ class OuterOutcome:
     trial_evaluations: int = 0
     linear_iterations: int = 0
     solver_compilations: int = 0
+    initial_rejection: bool = False
+    failure: FailureAt = field(default_factory=empty_failure_at)
 
     def __post_init__(self):
         for name in ("message_deltas", "free_energies"):

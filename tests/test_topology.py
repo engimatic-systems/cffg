@@ -181,11 +181,11 @@ def test_conditioning_diagnostics_still_wait_until_after_array_resolution(monkey
 
 def test_constraint_detail_is_a_snapshot_even_for_list_input():
     template = admission_model()
-    detail = [["projection", "unspecified"]]
-    template.constraints[0] = replace(template.constraints[0], detail=detail)
+    detail = [["blocks", "x"]]
+    template.constraints[0] = ConstraintSpec(ConstraintKind.MEAN_FIELD, "f", detail)
     layout = topology(template)
     detail[0][1] = "changed"
-    assert layout.constraints[0].detail == (("projection", "unspecified"),)
+    assert layout.constraints[0].detail == (("blocks", "x"),)
 
 
 def test_parameter_diagnostic_keeps_its_original_endpoint_list_format():
