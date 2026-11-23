@@ -78,11 +78,22 @@ def metadata(root, hashes):
                     and b == load(f"workers/{lib}-{b['seed']}.json"), f"Worker block mismatch for {lib}/{b['seed']}")
             require(b["runtime"]["library_tree"] == plan["frozen"]["library_tree"],
                     f"Worker used a different CFFG source tree at {lib}/{b['seed']}")
-            require(all(np.isfinite(b[k]) and b[k] >= 0 for k in ("adapter_setup_s", "first_warmup_s", "process_wall_s")),
+            if "block_timing" in plan:
+                n = len(CONDITIONS)*len(MOTION)
+                require(type(b.get("episodes_run")) is int and 0 <= b["episodes_run"] <= n
+                        and (b["process_wall_s"] is None or b["episodes_run"] == n),
+                        f"Partial process recorded as full block at {lib}/{b['seed']}")
+            clocks = [b["adapter_setup_s"], b["first_warmup_s"]]
+            if b["process_wall_s"] is not None or "block_timing" not in plan:
+                clocks.append(b["process_wall_s"])
+            require(all(isinstance(v, (int, float)) and np.isfinite(v) and v >= 0 for v in clocks),
                     f"Invalid worker timing for {lib}/{b['seed']}")
         workers[lib] = blocks
-    measured = sum(b["process_wall_s"] for blocks in workers.values() for b in blocks)
-    require(np.isclose(measured, completed["worker_s"], rtol=1e-13, atol=1e-10), "Process time total mismatch")
+    walls = [b["process_wall_s"] for blocks in workers.values() for b in blocks]
+    if None in walls:
+        require(completed["worker_s"] is None, "Incomplete process clocks cannot form a campaign total")
+    else:
+        require(np.isclose(sum(walls), completed["worker_s"], rtol=1e-13, atol=1e-10), "Process time total mismatch")
     return plan, workers
 
 
@@ -283,6 +294,19 @@ def engineering_references(rows, summary, totals):
     return gates
 
 
+def worker_costs(episodes, blocks):
+    full = [b for b in blocks if b["process_wall_s"] is not None]
+    for b in full:
+        sides = episodes[str(b["seed"])]
+        stages = b["adapter_setup_s"] + b["first_warmup_s"] + sum(
+            r["warm_setup_s"] + r["episode_s"] for arms in sides.values() for r in arms.values())
+        require(b["process_wall_s"] >= stages,
+                f"Process time below measured stages of eight episodes at {b['library']}/{b['seed']}")
+    empty = dict(n=0, mean=None, median=None, p95=None, p99=None, max=None)
+    return {key: latency([b[key] for b in full]) if full else empty.copy()
+            for key in ("adapter_setup_s", "first_warmup_s", "process_wall_s")}
+
+
 def summarize_library(episodes, clocks, blocks):
     rows = paired_rows(episodes)
     summary = arm_summary(rows)
@@ -294,7 +318,7 @@ def summarize_library(episodes, clocks, blocks):
         regimes[condition] = {arm: {
             clock: latency(np.concatenate([arr for c in sources for arr in clocks[c, arm][clock]]))
             for clock in ("decision_s", "update_s", "forecast_s")} for arm in MOTION}
-    worker_cost = {k: latency([b[k] for b in blocks]) for k in ("adapter_setup_s", "first_warmup_s", "process_wall_s")}
+    worker_cost = worker_costs(episodes, blocks)
     return dict(episodes=episodes, per_seed=rows, summary=summary, gates=engineering_references(rows, summary, totals),
                 within_library_intervals=bootstrap(rows), pooled_latency_s=regimes, worker_cost_s=worker_cost,
                 totals=totals, status_counts=dict(sum((Counter(r["audit"]["status_counts"]) for r in records), Counter())))
@@ -405,8 +429,13 @@ def analyze(root):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True, help="Completed comparison archive")
-    root = parser.parse_args().output.expanduser().resolve()
+    parser.add_argument("--check", action="store_true", help="Audit all raw evidence without writing analysis.json")
+    args = parser.parse_args()
+    root = args.output.expanduser().resolve()
     result = analyze(root)
+    if args.check:
+        print(f"Verified {result['audit']['decisions']} decisions in {root}")
+        return
     save(root / "analysis.json", result)
     print(f"Wrote {root / 'analysis.json'} from {result['audit']['decisions']} audited decisions")
 

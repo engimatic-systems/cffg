@@ -1,18 +1,20 @@
 """Compare four native planners receiving the same online estimate on a changing reactor."""
 import argparse
 from datetime import datetime, timezone
+import fcntl
 import importlib
 import importlib.metadata
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
+from tempfile import mkdtemp
 from time import perf_counter
 from types import SimpleNamespace
 
 from continual_run import (CHANGED, CONDITIONS, NOMINAL, STEPS, ReactorPlanner, digest, episode,
                            read, schedule, signatures)
-from one_percent_run import exclusive
 from pilot import ARMS as LIBRARIES, DEADLINE, EXPERIMENT, HERE, ROOT, configure, parameters, save
 from run_paired import signature
 
@@ -58,6 +60,8 @@ def freeze(out, peers, prior):
                        "seed and condition. One measured worker at a time. All episodes start fresh. "
                        "Warm decision includes estimator update, live parameter installation, window, "
                        "native solve, readout and action clipping. Hold last applied action on timeout or failure.",
+                block_timing="Report process wall time only for a single measured launch completing all eight episodes. "
+                             "Exclude a block with prior attempts or an unavailable process clock from timing totals.",
                 prior_sha256={p: digest(prior/p) for p in ("freeze.json", "validation.json")},
                 frozen=sources(peers))
     path = out/"protocol.json"
@@ -140,9 +144,52 @@ def valid_episode(stem, lib, seed, condition, arm, protocol_hash):
     return True
 
 
+def guard_open_campaign(out):
+    if (out/"completed.json").exists():
+        raise ValueError("Completed study is sealed; use continual_comparison_analysis.py --check to audit it")
+
+
+def recover_inventory(out, lib, seed, ph, *, finished):
+    """Validate published episodes before moving any recognizable interrupted files."""
+    folder = out/lib/f"seed-{seed}"
+    stems = {f"{c}-{a}" for c in CONDITIONS for a in SETTINGS}
+    extras = []
+    if folder.exists():
+        for path in sorted(folder.iterdir()):
+            if path.suffix not in (".jsonl", ".json", ".tmp"):
+                continue
+            if path.is_symlink() or not path.is_file():
+                raise ValueError(f"Unexpected episode file: {path}")
+            if path.stem in stems:
+                if path.suffix == ".tmp":
+                    extras.append(path)
+            else:
+                legacy = re.fullmatch(r"(.+)\.interrupted-[0-9]+(?:\.[0-9]+)?\.jsonl", path.name)
+                if not legacy or legacy[1] not in stems:
+                    raise ValueError(f"Unexpected episode file: {path}")
+                extras.append(path)
+    for condition in CONDITIONS:
+        for arm in SETTINGS:
+            stem = folder/f"{condition}-{arm}"
+            if not valid_episode(stem, lib, seed, condition, arm, ph):
+                if finished:
+                    raise ValueError(f"Completed worker missing episode: {stem}")
+                if stem.with_suffix(".jsonl").exists():
+                    extras.append(stem.with_suffix(".jsonl"))
+    if extras:
+        archive = out/"attempts"/f"{lib}-{seed}"
+        archive.mkdir(parents=True, exist_ok=True)
+        dest = Path(mkdtemp(prefix="interrupted-", dir=archive))
+        for path in extras:
+            path.rename(dest/path.name)
+
+
 def block(out, lib, seed, data, protocol_hash):
     from continual_estimator import warmup
     make_env, params, arrays, fixture, window, runtime = data
+    attempts = out/"attempts"/f"{lib}-{seed}"
+    staging = Path(mkdtemp(prefix="attempt-", dir=attempts))
+    published = 0
     started = perf_counter()
     native_module = importlib.import_module(lib + "_adapter")
     planner = factory(lib)(arrays, fixture.CONFIGURATION)
@@ -164,98 +211,148 @@ def block(out, lib, seed, data, protocol_hash):
                 stem = folder/f"seed-{seed}"/f"{condition}-{arm}"
                 if valid_episode(stem, lib, seed, condition, arm, protocol_hash):
                     continue
-                trace = stem.with_suffix(".jsonl")
-                if trace.exists():
-                    trace.rename(trace.with_suffix(f".interrupted-{datetime.now().timestamp()}.jsonl"))
-                episode(make_env, params, arrays, fixture, window, seed, condition, arm, folder,
+                episode(make_env, params, arrays, fixture, window, seed, condition, arm, staging,
                         motion_sd=SETTINGS[arm], planner=planner,
                         provenance=dict(library=lib, protocol_sha256=protocol_hash))
+                staged = staging/f"seed-{seed}"/stem.name
+                if not valid_episode(staged, lib, seed, condition, arm, protocol_hash):
+                    raise ValueError(f"Worker did not finish episode: {staged}")
+                # The sidecar commits the trace. Recovery preserves an orphan if this pair is interrupted.
+                stem.parent.mkdir(exist_ok=True)
+                staged.with_suffix(".jsonl").rename(stem.with_suffix(".jsonl"))
+                staged.with_suffix(".json").rename(stem.with_suffix(".json"))
+                published += 1
         metadata = dict(getattr(planner, "metadata", {}))
         metadata["module"] = native_module.__file__
         if lib in ("numpyro","gtsam"):
             metadata["version"] = importlib.metadata.version(lib)
         return dict(library=lib, seed=seed, runtime=runtime, adapter_metadata=metadata,
-                    adapter_setup_s=setup_s, first_warmup_s=first_warmup_s, protocol_sha256=protocol_hash)
+                    adapter_setup_s=setup_s, first_warmup_s=first_warmup_s, episodes_run=published,
+                    protocol_sha256=protocol_hash)
     finally:
         close(planner)
 
 
 def worker(out, lib, seed, peers):
+    guard_open_campaign(out)
+    if seed is None:
+        if any((out/f).exists() for f in ("qualified.json", "opened.json", f"qualification/{lib}.json")):
+            raise ValueError("Qualification evidence already exists or is sealed")
+    elif (out/"workers"/f"{lib}-{seed}.json").exists():
+        raise ValueError("Worker record already exists")
     plan = read(out/"protocol.json")
     if plan["frozen"] != sources(peers):
         raise ValueError("Worker sources differ from frozen protocol")
     ph = digest(out/"protocol.json")
+    if seed is not None:
+        qualified = read(out/"qualified.json")
+        opened = read(out/"opened.json")
+        if (seed not in SEEDS or qualified["protocol_sha256"] != ph or opened["protocol_sha256"] != ph
+                or opened["qualified_sha256"] != digest(out/"qualified.json")
+                or qualified["evidence"][lib] != digest(out/"qualification"/f"{lib}.json")):
+            raise ValueError("Missing qualification or unexpected seed")
+        # A directly invoked worker can also fail before producing any episode.
+        (out/"attempts"/f"{lib}-{seed}").mkdir(parents=True, exist_ok=True)
+        recover_inventory(out, lib, seed, ph, finished=False)
     data = context(lib, peers)
     if data[-1]["library_tree"] != plan["frozen"]["library_tree"]:
         raise ValueError("CFFG runtime differs from frozen checkout")
     if seed is None:
         save(out/"qualification"/f"{lib}.json", dict(library=lib, protocol_sha256=ph, checks=qualification(lib, data)))
     else:
-        if not (seed in SEEDS and read(out/"qualified.json")["protocol_sha256"] == ph):
-            raise ValueError("Missing qualification or unexpected seed")
         record = block(out, lib, seed, data, ph)
         save(out/"workers"/f"{lib}-{seed}.json", record)
 
 
-def run_child(out, lib, peers, seed=None):
+def run_child(out, lib, peers, lock_fd, seed=None):
     name = f"{lib}-{seed}" if seed is not None else f"qualify-{lib}"
     cmd = [sys.executable, str(Path(__file__).resolve()), "worker", "--output", str(out),
-           "--library", lib, "--peer-root", str(peers)]
+           "--library", lib, "--peer-root", str(peers), "--lock-fd", str(lock_fd)]
     if seed is not None:
         cmd.extend(["--seed", str(seed)])
     start = perf_counter()
     with (out/"logs"/f"{name}.log").open("a") as log:
-        subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT, check=True)
+        subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT, check=True, pass_fds=(lock_fd,))
     return perf_counter()-start
 
 
-def campaign(out, peers, prior):
+def measure_block(out, lib, seed, peers, ph, lock_fd):
+    rec = out/"workers"/f"{lib}-{seed}.json"
+    attempts = out/"attempts"/f"{lib}-{seed}"
+    folder = out/lib/f"seed-{seed}"
+    previous = (attempts.exists() or (out/"logs"/f"{lib}-{seed}.log").exists()
+                or (folder.exists() and any(folder.iterdir())))
+    elapsed = None
+    if not rec.exists():
+        # Persist launch intent before any worker code, including imports and setup.
+        attempts.mkdir(parents=True, exist_ok=True)
+        elapsed = run_child(out, lib, peers, lock_fd, seed)
+    record = read(rec)
+    if (record["library"], record["seed"], record["protocol_sha256"]) != (lib, seed, ph):
+        raise ValueError(f"Worker identity mismatch: {rec}")
+    recover_inventory(out, lib, seed, ph, finished=True)
+    interrupted = any(attempts.glob("interrupted-*"))
+    if "process_wall_s" not in record or (interrupted and record["process_wall_s"] is not None):
+        # A worker may have committed all eight episodes before its parent recorded the clock.
+        full = (elapsed is not None and not previous and not interrupted
+                and record["episodes_run"] == len(CONDITIONS)*len(SETTINGS))
+        record["process_wall_s"] = elapsed if full else None
+        save(rec, record)
+    return record
+
+
+def campaign(out, peers, prior, lock_fd):
+    guard_open_campaign(out)
+    measured = ((out/"attempts").exists() or any((out/"workers").glob("*.json"))
+                or any(folder for lib in LIBRARIES for folder in (out/lib).glob("seed-*"))
+                or any(log for lib in LIBRARIES for log in (out/"logs").glob(f"{lib}-*.log")))
+    if measured and not all((out/f).exists() for f in ("qualified.json", "opened.json")):
+        raise ValueError("Missing qualification or opening seal for measured study")
+    if not (out/"protocol.json").exists() and (any((out/"qualification").glob("*.json"))
+            or (out/"qualified.json").exists() or (out/"opened.json").exists()):
+        raise ValueError("Missing sealed protocol")
+    freeze(out, peers, prior)
     for folder in ("qualification", "workers", "logs", *LIBRARIES):
         (out/folder).mkdir(exist_ok=True)
-    freeze(out, peers, prior)
     ph = digest(out/"protocol.json")
     for lib in LIBRARIES:
         path = out/"qualification"/f"{lib}.json"
         if not path.exists():
+            if (out/"qualified.json").exists() or (out/"opened.json").exists():
+                raise ValueError("Missing sealed qualification evidence")
             print("Qualifying", lib, flush=True)
-            run_child(out, lib, peers)
+            run_child(out, lib, peers, lock_fd)
         if read(path)["protocol_sha256"] != ph:
             raise ValueError("Saved qualification is for a different protocol")
     qualified = dict(protocol_sha256=ph, evidence={lib:digest(out/"qualification"/f"{lib}.json") for lib in LIBRARIES})
     if (out/"qualified.json").exists() and read(out/"qualified.json") != qualified:
         raise ValueError("Qualification evidence changed")
-    save(out/"qualified.json", qualified)
+    if not (out/"qualified.json").exists():
+        if (out/"opened.json").exists():
+            raise ValueError("Missing qualification seal for opened study")
+        save(out/"qualified.json", qualified)
     opened = out/"opened.json"
     if not opened.exists():
         save(opened, dict(opened=now(), protocol_sha256=ph, qualified_sha256=digest(out/"qualified.json")))
     if read(opened)["qualified_sha256"] != digest(out/"qualified.json") or read(opened)["protocol_sha256"] != ph:
         raise ValueError("Opened study differs from current qualification")
+    block_size = len(CONDITIONS)*len(SETTINGS)
+    total = block_size*len(LIBRARIES)*len(SEEDS)
     blocks = {lib:[] for lib in LIBRARIES}
     for i, seed in enumerate(SEEDS):
         offset = i % len(LIBRARIES)
         for lib in LIBRARIES[offset:]+LIBRARIES[:offset]:
-            rec = out/"workers"/f"{lib}-{seed}.json"
-            if not rec.exists() or "process_wall_s" not in read(rec):
-                elapsed = run_child(out, lib, peers, seed)
-                record = read(rec)
-                record["process_wall_s"] = elapsed
-                save(rec, record)
-            record = read(rec)
-            if (record["library"], record["seed"], record["protocol_sha256"]) != (lib, seed, ph):
-                raise ValueError(f"Worker identity mismatch: {rec}")
-            for c in CONDITIONS:
-                for a in SETTINGS:
-                    if not valid_episode(out/lib/f"seed-{seed}"/f"{c}-{a}", lib, seed, c, a, ph):
-                        raise ValueError("Completed worker missing episode")
+            record = measure_block(out, lib, seed, peers, ph, lock_fd)
             blocks[lib].append(record)
-            count = 8*sum(map(len, blocks.values()))
-            save(out/"progress.json", dict(episodes=count, total=320, latest_library=lib, latest_seed=seed))
-            print(seed, lib, count, "/ 320 episodes", flush=True)
+            count = block_size*sum(map(len, blocks.values()))
+            save(out/"progress.json", dict(episodes=count, total=total, latest_library=lib, latest_seed=seed))
+            print(seed, lib, count, "/", total, "episodes", flush=True)
     for lib, records in blocks.items():
         save(out/"workers"/f"{lib}.json", dict(library=lib, blocks=records))
+    walls = [r["process_wall_s"] for records in blocks.values() for r in records]
     save(out/"completed.json", dict(protocol_sha256=ph, qualified_sha256=digest(out/"qualified.json"),
-         episodes=320, decisions=STEPS*320, finished=now(), opened=read(opened)["opened"],
-         worker_s=sum(r["process_wall_s"] for records in blocks.values() for r in records)))
+         episodes=total, decisions=STEPS*total, finished=now(), opened=read(opened)["opened"],
+         worker_s=sum(walls) if None not in walls else None))
 
 
 if __name__ == "__main__":
@@ -266,12 +363,20 @@ if __name__ == "__main__":
     p.add_argument("--prior", type=Path, default=PRIOR)
     p.add_argument("--library", choices=LIBRARIES)
     p.add_argument("--seed", type=int)
+    p.add_argument("--lock-fd", type=int, help=argparse.SUPPRESS)
     args = p.parse_args()
     root, peer_root = args.output.resolve(), args.peer_root.resolve()
     os.environ.update(PCGYM_RXINFER_PROJECT=str(peer_root/"rxinfer"),
                       XLA_FLAGS="--xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1")
-    if args.phase == "worker":
-        worker(root, args.library, args.seed, peer_root)
-    else:
-        with exclusive(root):
-            campaign(root, peer_root, args.prior.resolve())
+    root.mkdir(parents=True, exist_ok=True)
+    # A surviving child keeps its parent's lock until it finishes publishing.
+    guard_open_campaign(root)
+    lock_path = root/"study.lock"
+    with (lock_path.open("a") if args.lock_fd is None else os.fdopen(args.lock_fd, "a")) as lock:
+        if not os.path.samestat(os.fstat(lock.fileno()), lock_path.stat()):
+            raise ValueError("Worker lock does not match study")
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if args.phase == "worker":
+            worker(root, args.library, args.seed, peer_root)
+        else:
+            campaign(root, peer_root, args.prior.resolve(), lock.fileno())

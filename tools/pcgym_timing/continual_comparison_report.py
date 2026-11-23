@@ -261,7 +261,7 @@ def hold_details(events):
     return details(f"Held commands and native reasons ({len(events)})", body)
 
 
-def timing(libraries, events):
+def timing(libraries, events, tracks_attempts):
     costs, latencies, reliability = [], [], []
     for key, library in libraries.items():
         name = NAMES[key]
@@ -269,7 +269,7 @@ def timing(libraries, events):
         clocks = library["pooled_latency_s"]["both"]["candidate"]
         dec = clocks["decision_s"]
         setups = [c[a]["warm_setup_s"] for r in library["episodes"].values() for c in r.values() for a in REGIMES]
-        costs.append([name, number(worker["adapter_setup_s"]["median"], 4),
+        costs.append([name, f'{worker["process_wall_s"]["n"]}/{len(library["episodes"])}', number(worker["adapter_setup_s"]["median"], 4),
                       number(worker["first_warmup_s"]["median"], 4),
                       number(median(setups), 4), number(worker["process_wall_s"]["median"], 4)])
         counts = library["totals"]
@@ -277,6 +277,10 @@ def timing(libraries, events):
                          number(1000*clocks["update_s"]["median"], 4)])
         total = sum(library["pooled_latency_s"]["both"][arm]["decision_s"]["n"] for arm in REGIMES)
         reliability.append([name, total, total - counts["holds"], counts["failures"], counts["misses"], counts["holds"]])
+    scope = ("A retry or missing clock excludes that block from the process and startup medians. "
+             "The campaign total is unavailable if any block lacks a full clock." if tracks_attempts else
+             "This archive predates attempt tracking. Its process times cover the recorded worker launches. "
+             "The duration of any unrecorded attempt is unknown.")
     return "".join([
         '<section id="timing"><h2>Decision time and reliability</h2>',
         '<p>The warmed clock includes the online estimator update where applicable, installation of UA, '
@@ -289,11 +293,11 @@ def timing(libraries, events):
         table("All-regime reliability across both conditions", ["Planner", "All decisions", "Applied on time",
               "Failed solves", "Deadline misses", "Commands held"], reliability),
         hold_details(events),
-        details("Setup and process time", '<p>Each library used a fresh single-threaded process per seed. '
-                'Its eight episodes shared compiled code and began with an independent plant and estimator. '
-                'Adapter setup, first warmup and process wall time are medians over ten processes. '
-                'Repeated setup is the median over the four regimes and both conditions.</p>'
-                + table("Measured setup stages", ["Planner", "Adapter setup (s)", "First warmup (s)",
+        details("Setup and process time", '<p>Each library started a fresh single-threaded worker per seed. '
+                'Each episode began with an independent plant and estimator. Adapter setup, first warmup and '
+                f'process time are medians across workers with an available eight-episode clock. {scope} '
+                'Repeated setup and control results include every completed episode.</p>'
+                + table("Measured setup stages", ["Planner", "Full clocks / seeds", "Adapter setup (s)", "First warmup (s)",
                         "Repeated episode setup (s)", "Eight-episode process (s)"], costs)),
         '</section>'])
 
@@ -428,7 +432,8 @@ def render(root):
         '<nav aria-label="Report sections"><a href="#primary">Paired comparison</a>',
         '<a href="#adaptation">Adaptation and recovery</a><a href="#prediction">Predictions</a>',
         '<a href="#timing">Timing and reliability</a><a href="#evidence">Evidence</a></nav></header>',
-        primary(data), adaptation(libraries), predictions(libraries), timing(libraries, data.get("hold_events")),
+        primary(data), adaptation(libraries), predictions(libraries), timing(libraries, data.get("hold_events"),
+              tracks_attempts="block_timing" in read(root / "protocol.json")),
         evidence(root, data.get("audit", {})),
         '</main></body></html>'])
     dest = root / "index.html"
