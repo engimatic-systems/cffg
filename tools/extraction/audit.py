@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-import shutil
 
 from study import DEFAULT_ROOT, configure, read, save, sha
 
@@ -15,7 +14,7 @@ def audit(root,stage):
     import plant
     from episode import H,HIDDEN,PRIOR,R
     from dynamics import linearize
-    from study import DEADLINE, DEVELOPMENT, LIBRARIES, MOTION_SD
+    from study import DEADLINE, MOTION_SD
     from cffg_native_check import dense_update
 
     seal=read(root/("completed.json" if stage=="heldout" else "development-completed.json"))

@@ -85,6 +85,11 @@ if __name__=="__main__":
     p.add_argument("--output",type=Path,default=DEFAULT_ROOT)
     args=p.parse_args()
     configure()
+    from campaign import identity, runtime
+    before=identity(runtime())
     record=run(args.library)
+    if identity(runtime()) != before:
+        raise RuntimeError("Measurement source changed during qualification")
+    record["runtime_sha256"]=before
     save(args.output/"qual"/(args.library+".json"),record)
     print(record,flush=True)
