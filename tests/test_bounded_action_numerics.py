@@ -324,3 +324,64 @@ def test_dense_covariance_accepts_roundoff_and_rejects_material_asymmetry(dtype)
     cov[1, 2] = .02
     bad = plan.solve_joint(m, cov, 0.)
     assert bad.status == BoundStatus.INVALID_GAUSSIAN and np.isnan(bad.command)
+
+
+@pytest.mark.parametrize("dtype", DTYPES)
+def test_dense_conditional_variance_across_singularity(dtype):
+    import jax
+    from cffg.bounded_actions import BoundedGaussianPlan, BoundStatus
+
+    plan = BoundedGaussianPlan((1,), (-1.,), (1.,))
+    mean = np.zeros(2, dtype)
+    eps = np.finfo(dtype).eps
+    # [3, b] generates the exact rank-one cases. Perturb only the nuisance
+    # variance, then test the same geometry with different units and signs.
+    b = 5 if dtype == np.float32 else 1
+    covariances, expected, slopes, conditional = [], [], [], []
+    for scale in (b, -b * 128., b / 128.):
+        for gap in (0., -256 * eps, 256 * eps):
+            covariances.append([[9., 3. * scale], [3. * scale, scale**2 * (1 + gap)]])
+            expected.append(BoundStatus.SUCCESS if gap > 0 else BoundStatus.INVALID_GAUSSIAN)
+            slopes.append(scale / 3)
+            conditional.append(scale**2 * gap)
+    covariances = np.array(covariances, dtype=dtype)
+
+    def solve(cov):
+        return plan.solve_joint(mean, cov, 0.)
+
+    batched = jax.jit(jax.vmap(solve))(covariances)
+    staged = jax.jit(solve)
+    for i, cov in enumerate(covariances):
+        for out in (solve(cov), staged(cov), jax.tree.map(lambda x: x[i], batched)):
+            assert out.status == expected[i]
+            if expected[i] == BoundStatus.INVALID_GAUSSIAN:
+                for value in out[1:]:
+                    assert np.isnan(value).all()
+            else:
+                # Var(x - slope*u) is unchanged by conditioning on the action.
+                direction = np.array([-slopes[i], 1.])
+                lifted = direction @ np.asarray(out.covariance, dtype=np.float64) @ direction
+                np.testing.assert_allclose(lifted, conditional[i], atol=2 * eps * cov[1, 1])
+
+
+@pytest.mark.parametrize("dtype", DTYPES)
+def test_dense_correlated_nuisance_and_unrepresentable_lift(dtype):
+    import jax
+    from cffg.bounded_actions import BoundedGaussianPlan, BoundStatus
+
+    plan = BoundedGaussianPlan((1,), (-1.,), (1.,))
+    eps = np.finfo(dtype).eps
+    # The smallest eigenvalue is 1024 eps, including when there are 47
+    # correlated nuisance coordinates in the block.
+    cov = np.full((48, 48), 1 - 1024 * eps, dtype=dtype)
+    np.fill_diagonal(cov, 1.)
+    dense = jax.jit(plan.solve_joint)(np.zeros(48, dtype), cov, 0.)
+    assert dense.status == BoundStatus.SUCCESS
+
+    # Here the conditional variance is positive on input but is lost when
+    # adding the shared action variance to form the returned covariance.
+    lifted = jax.jit(plan.solve)(
+        np.zeros(1, dtype), (np.eye(1, dtype=dtype),), 0., state_mean=np.zeros(1, dtype),
+        state_gain=np.ones((1, 1), dtype), conditional_covariance=np.array([[eps**2]], dtype))
+    assert lifted.status == BoundStatus.NUMERICAL_FAILURE
+    assert np.isnan(lifted.command)

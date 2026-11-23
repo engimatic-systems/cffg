@@ -39,6 +39,29 @@ _RULES = (_rule(24), _rule(48))
 _SCALAR_RULES = (_rule(64), _rule(96))
 
 
+def _checked_correlation(cov):
+    """Check positive definiteness in units of each coordinate's deviation."""
+    scale = jnp.sqrt(jnp.diag(cov))
+    if cov.shape == (1, 1):
+        valid = jnp.isfinite(cov[0, 0]) & (cov[0, 0] > 0)
+        return valid, jnp.ones_like(cov), scale
+    correlation = (cov / scale[:, None]) / scale[None, :]
+    # Each row of a correlation Cholesky factor has unit norm. Its pivot
+    # subtracts a sum of up to dim products from 1. Reserve roundoff for
+    # that subtraction so a singular direction cannot pass on a tiny pivot.
+    dim = cov.shape[0]
+    margin = dim * jnp.finfo(cov.dtype).eps
+    guarded = correlation - margin * jnp.eye(dim, dtype=cov.dtype)
+    valid = _symmetry_ok(correlation) & jnp.isfinite(jnp.linalg.cholesky(guarded)).all()
+    return valid, correlation, scale
+
+
+def _covariance_root(cov):
+    valid, correlation, scale = _checked_correlation(cov)
+    root = scale[:, None] * jnp.linalg.cholesky(correlation)
+    return jnp.where(valid, root, jnp.nan)
+
+
 def _integrate(mean, chol, low, high, rule):
     """Tensor quadrature relative to the marginal mode, with centered moments."""
     nodes, weights = (jnp.asarray(a, dtype=mean.dtype) for a in rule)
@@ -80,8 +103,8 @@ def _integrate(mean, chol, low, high, rule):
 
 
 def _block(mean, cov, low, high):
-    chol = jnp.linalg.cholesky(cov)
-    valid = (jnp.isfinite(chol).all() & jnp.isfinite(mean).all() & _symmetry_ok(cov))
+    chol = _covariance_root(cov)
+    valid = jnp.isfinite(chol).all() & jnp.isfinite(mean).all()
     coarse, fine = (_integrate(mean, chol, low, high, rule) for rule in (_SCALAR_RULES if mean.size == 1 else _RULES))
     mass, action, variance, entropy = fine
     tol = 128 * jnp.finfo(mean.dtype).eps
@@ -150,13 +173,14 @@ class BoundedGaussianPlan:
         n = self.widths[0]
         if mean.ndim != 1 or mean.size < n or covariance.shape != (mean.size, mean.size):
             raise ValueError("joint Gaussian dimensions disagree")
-        valid = _symmetry_ok(covariance) & jnp.isfinite(covariance).all()
-        covariance = jnp.where(valid, covariance / 2 + covariance.T / 2, jnp.nan)
         marginal = covariance[:n, :n]
         if mean.size == n:
             return self.solve(mean, (marginal,), gaussian_free_energy)
-        gain = jnp.linalg.solve(marginal, covariance[:n, n:]).T
-        conditional = covariance[n:, n:] - gain @ covariance[:n, n:]
+        # In the joint Cholesky factor, L_xu = gain @ L_uu and L_xx is
+        # the conditional covariance root. Use the unshifted input here.
+        root = _covariance_root(covariance)
+        gain = jax.scipy.linalg.solve_triangular(root[:n, :n].T, root[n:, :n].T).T
+        conditional = root[n:, n:] @ root[n:, n:].T
         return self.solve(mean[:n], (marginal,), gaussian_free_energy,
                           state_mean=mean[n:], state_gain=gain,
                           conditional_covariance=conditional)
@@ -210,14 +234,15 @@ class BoundedGaussianPlan:
             gain, c = (jnp.asarray(a, dtype) for a in (state_gain, conditional_covariance))
             if gain.shape != (mx.size, n) or c.shape != (mx.size, mx.size):
                 raise ValueError("conditional Gaussian shape mismatch")
-            valid &= (jnp.isfinite(jnp.linalg.cholesky(c)).all() & _symmetry_ok(c)
-                      & jnp.isfinite(gain).all() & jnp.isfinite(mx).all())
+            proper, _, _ = _checked_correlation(c)
+            valid &= proper & jnp.isfinite(gain).all() & jnp.isfinite(mx).all()
             c = c / 2 + c.T / 2
             cross = gain @ variance
             variance = jnp.block([[variance, cross.T], [cross, c + cross @ gain.T]])
             action = jnp.concatenate((action, mx + gain @ (action - mean)))
-        resolved &= (jnp.isfinite(action).all() & jnp.isfinite(objective)
-                     & jnp.isfinite(jnp.linalg.cholesky(variance)).all() & jnp.isfinite(entropy))
+        proper, _, _ = _checked_correlation(variance)
+        resolved &= (proper & jnp.isfinite(action).all() & jnp.isfinite(objective)
+                     & jnp.isfinite(entropy))
         infeasible = any(h <= l for l, h in zip(self.lower, self.upper))
         status = jnp.select([infeasible, ~valid, ~resolved],
                             [BoundStatus.INFEASIBLE, BoundStatus.INVALID_GAUSSIAN,
