@@ -192,7 +192,32 @@ def predictions(libraries):
             + '</section>')
 
 
-def timing(libraries):
+def hold_details(events):
+    if events is None:
+        return details("Held command details", "<p>This analysis contains aggregate counts only. "
+                       "The linked episode logs record the individual decisions.</p>")
+    triggers = {"failure_only": "Solve failed", "deadline_only": "Deadline exceeded",
+                "failure_and_deadline": "Solve failed and deadline exceeded"}
+    groups = {"Selected (0.003)": [e for e in events if e["arm"] == "candidate"],
+              "Comparators (frozen, original and informed)": [e for e in events if e["arm"] != "candidate"]}
+    counts, rows = [], []
+    for label, group in groups.items():
+        counts.append([label, len(group), sum(e["status"] != "ok" for e in group), sum(e["late"] for e in group)])
+        for e in group:
+            native = e["native"]
+            reasons = [str(native[k]) for k in ("error", "reason", "stop_reason", "termination") if native.get(k)]
+            rows.append([NAMES[e["library"]], REGIMES[e["arm"]], e["condition"], e["seed"], e["tick"],
+                         triggers[e["kind"]], e["status"], " / ".join(dict.fromkeys(reasons)) or "—",
+                         number(1000 * e["decision_s"], 6)])
+    body = table("Selected and comparator hold counts", ["Regime", "Held commands", "Failed solves",
+                 "Deadline misses"], counts)
+    if rows:
+        body += table("Individual held commands", ["Planner", "UA source", "Plant condition", "Seed", "Decision tick",
+                      "Hold trigger", "Native status", "Native reason", "Decision time (ms)"], rows)
+    return details(f"Held commands and native reasons ({len(events)})", body)
+
+
+def timing(libraries, events):
     costs, latencies, reliability = [], [], []
     for key, library in libraries.items():
         name = NAMES[key]
@@ -219,6 +244,7 @@ def timing(libraries):
         'command. A late failure contributes to both diagnostic counts and one hold.</p>',
         table("All-regime reliability across both conditions", ["Planner", "All decisions", "Applied on time",
               "Failed solves", "Deadline misses", "Commands held"], reliability),
+        hold_details(events),
         details("Setup and process time", '<p>Each library used a fresh single-threaded process per seed. '
                 'Its eight episodes shared compiled code and began with an independent plant and estimator. '
                 'Adapter setup, first warmup and process wall time are medians over ten processes. '
@@ -326,7 +352,7 @@ def render(root):
         '<nav aria-label="Report sections"><a href="#primary">Paired comparison</a>',
         '<a href="#adaptation">Adaptation and recovery</a><a href="#prediction">Predictions</a>',
         '<a href="#timing">Timing and reliability</a><a href="#evidence">Evidence</a></nav></header>',
-        primary(data), adaptation(libraries), predictions(libraries), timing(libraries), evidence(root),
+        primary(data), adaptation(libraries), predictions(libraries), timing(libraries, data.get("hold_events")), evidence(root),
         '</main></body></html>'])
     dest = root / "index.html"
     write_atomically(dest, page.encode("utf-8"))
