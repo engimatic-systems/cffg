@@ -106,10 +106,15 @@ def load_trace(path, seed, expected_steps, condition, mode):
     for name in flags + ["held"]:
         require(name in a and a[name].shape == (n,) and a[name].dtype.kind == "b", f"{path}: invalid {name}")
     require(not (mode == "tape" and a["held"].any()), f"{path}: tape cannot hold a commanded action")
-    require(np.array_equal(a["failed"], a["filter_failed"] | a["planner_failed"]), f"{path}: inconsistent failure flags")
+    reset = a.get("reset_failed", np.asarray(False))
+    require(reset.shape == () and reset.dtype.kind == "b", f"{path}: reset_failed must be a scalar boolean")
+    a["reset_failed"] = reset.item()
+    failed = a["filter_failed"] | a["planner_failed"]
+    failed[0] |= a["reset_failed"]
+    require(np.array_equal(a["failed"], failed), f"{path}: inconsistent failure flags")
     if mode == "control":
         require(np.array_equal(a["late"], a["latency"] > DEADLINE), f"{path}: deadline flag mismatch")
-        held = a["late"] | a["planner_failed"] | np.r_[False, a["filter_failed"][:-1]]
+        held = a["late"] | a["planner_failed"] | np.r_[a["reset_failed"], a["filter_failed"][:-1]]
         require(np.array_equal(held, a["held"]), f"{path}: held flag mismatch")
         previous = np.vstack([NOMINAL_FLOW, a["u"][:-1]])
         require(np.array_equal(a["u"][held], previous[held]), f"{path}: held command was not the previous applied flow")
@@ -236,6 +241,7 @@ def score_run(path, seed, condition, mode, arm, library, steps, refs):
     phases = [dict(start=i, stop=j, phase=event, changed=bool(changed[i:j].any()), metrics=metrics(a, s, slice(i, j)))
               for i, j, event in segments(a["event"])]
     flags = {name: np.flatnonzero(a[name]).tolist() for name in ("failed", "late", "held", "filter_failed", "planner_failed")}
+    flags["reset_failed"] = [0] if a["reset_failed"] else []
     timing = dict(first_s=float(a["latency"][0]))
     for name in ("t_filter", "t_plan"):
         if name in a:
@@ -249,7 +255,7 @@ def score_run(path, seed, condition, mode, arm, library, steps, refs):
                overall=metrics(a, s, slice(None)), changed=metrics(a, s, changed),
                first600=metrics(a, s, slice(600)), after600=metrics(a, s, slice(600, None)),
                phases=phases, by_event={event: metrics(a, s, a["event"] == event) for event in np.unique(a["event"])},
-               recovery=recovery(a, s), events=flags, timing=timing, meta=a["meta"],
+               recovery=recovery(a, s), reset_failed=a["reset_failed"], events=flags, timing=timing, meta=a["meta"],
                diagnostics=json.loads(a["diagnostics"].item()) if "diagnostics" in a else [])
     return row, a["latency"], changed
 
@@ -278,7 +284,8 @@ def groups(rows, timings):
     result = []
     for key, members in by_arm.items():
         condition, mode, arm, library = key
-        group = dict(condition=condition, mode=mode, arm=arm, library=library, n_seeds=len(members))
+        group = dict(condition=condition, mode=mode, arm=arm, library=library, n_seeds=len(members),
+                     reset_failures=sum(r["reset_failed"] for r in members))
         for scope in ("overall", "changed", "first600", "after600"):
             group[scope] = summarize_metrics([r[scope] for r in members])
             if group[scope] is None:

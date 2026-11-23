@@ -61,6 +61,33 @@ def archive(root, seeds, split="development", n=24):
 
 
 class ScorerTest(unittest.TestCase):
+    def test_reset_only_failure_is_scored_once(self):
+        with TemporaryDirectory() as folder:
+            path = Path(folder)/"run.npz"
+            for mode in ("tape", "control"):
+                spec = (17101, "changing", mode, "adaptive", "cffg")
+                data = trace(17101, 24, *spec[1:])
+                data["reset_failed"] = np.asarray(True)
+                data["failed"][0] = True
+                data["held"][0] = mode == "control"
+                np.savez(path, **data)
+                row, _, _ = a.score_run(path, *spec, 24, {})
+                self.assertTrue(row["reset_failed"])
+                self.assertEqual(row["events"]["failed"], [0])
+                self.assertEqual(row["events"]["reset_failed"], [0])
+                self.assertEqual(row["events"]["filter_failed"], [])
+                self.assertEqual(row["overall"]["holds"], int(mode == "control"))
+                self.assertEqual(row["overall"]["n"], 24)
+                data["failed"][0] = False
+                np.savez(path, **data)
+                with self.assertRaisesRegex(ValueError, "inconsistent failure"):
+                    a.score_run(path, *spec, 24, {})
+            data["failed"][0] = True
+            data["held"][:] = False
+            np.savez(path, **data)
+            with self.assertRaisesRegex(ValueError, "held flag mismatch"):
+                a.score_run(path, *spec, 24, {})
+
     def test_joint_and_outlet_densities(self):
         r = trace(17101, 24, "changing", "tape", "adaptive", "cffg")
         s = a.score_arrays(r)
