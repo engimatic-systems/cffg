@@ -19,6 +19,7 @@ h3{font-size:1.08rem;margin:1.3rem 0 .35rem}p{max-width:79ch;margin:.5rem 0 1rem
 section{padding:1.65rem 0;border-top:1px solid #cbd6d4}header{padding-bottom:1rem}
 .status{font-weight:700;color:#205d60;margin:0}.finding{font-size:1.18rem;font-weight:600}
 a{color:#165e73;text-underline-offset:.16em}a:focus-visible,summary:focus-visible{outline:3px solid #bd7826}
+figure{margin:1rem 0}figure img{display:block;width:100%;max-width:52rem;height:auto}figcaption{max-width:79ch;margin-top:.65rem}
 .scroll{overflow-x:auto;margin:.9rem 0}table{border-collapse:collapse;width:100%;font-size:.92rem;font-variant-numeric:tabular-nums}
 th,td{padding:.5rem .65rem;border-bottom:1px solid #dde3df;text-align:left;vertical-align:top}thead th{background:#e8efec}
 details{margin:.8rem 0}summary{cursor:pointer;font-weight:650}li{margin:.25rem 0}ul{padding-left:1.35rem}
@@ -89,7 +90,7 @@ def gate_rows(pilot):
     return rows
 
 
-def primary(data, margin):
+def primary(data, margin, opening=""):
     score = data.get("primary") or {}
     if score.get("comparison") not in (None, "cffg_minus_rxinfer"):
         raise ValueError("Unexpected primary comparison direction")
@@ -122,7 +123,7 @@ def primary(data, margin):
     relative = f" ({fmt(100*abs(effect)/avg_rxinfer)}% of RxInfer’s error)" if avg_rxinfer > 0 else ""
     rows = [(r["seed"], fmt(r["cffg"]), fmt(r["rxinfer"]), fmt(r["delta"])) for r in pairs]
     return section("Hidden concentration error",
-        f'<p class="finding">{verdict}</p><p>Across {len(pairs)} paired seeds, average error was '
+        f'<p class="finding">{verdict}</p>{opening}<p>Across {len(pairs)} paired seeds, average error was '
         f'{fmt(avg_cffg)} for CFFG and {fmt(avg_rxinfer)} '
         f'for RxInfer. Smaller is better. CFFG minus RxInfer was {fmt(effect)} concentration units{relative} '
         f'(95% interval {fmt(lo)} to {fmt(hi)}). {threshold}</p>'
@@ -207,6 +208,122 @@ def highlights(groups, runs, protocol, *, complete):
         "The hidden-state comparison uses identical inputs. The target-tracking and timing comparisons "
         "use each controller’s own actions.</p>" +
         table(title, ["Question", "CFFG", "RxInfer", "Observed result", "Reference"], rows))
+
+
+def learning_errors(data, seeds):
+    """Keep every frozen seed in every library/arm mean and observed range."""
+    arms = ("frozen", "adaptive", "informed")
+    errors = {(lib, arm): {} for lib in LIBS for arm in arms}
+    for row in data["runs"]:
+        if (row["mode"], row["condition"]) != ("tape", "changing"):
+            continue
+        cell = errors[row["library"], row["arm"]]
+        error = (row.get("changed") or {}).get("hidden_rmse")
+        if not numeric(error) or error < 0 or row["seed"] in cell:
+            raise ValueError("Invalid or duplicate changed-period hidden error")
+        cell[row["seed"]] = error
+    if not seeds or len(set(seeds)) != len(seeds) or any(set(cell) != set(seeds) for cell in errors.values()):
+        raise ValueError("Hidden-error figure requires all frozen seeds for both libraries and all three filters")
+    return {key: list(cell.values()) for key, cell in errors.items()}
+
+
+def learning_summary(errors):
+    changes = []
+    for lib in LIBS:
+        fixed = fmean(errors[lib, "frozen"])
+        learned = fmean(errors[lib, "adaptive"])
+        delta = learned - fixed
+        if fmt(fixed) == fmt(learned):
+            changes.append(f"gave the same mean error to the displayed precision for {NAMES[lib]}")
+            continue
+        size = f"{abs(delta)/fixed:.1%}" if fixed > 0 else f"{fmt(abs(delta))} concentration units"
+        changes.append(f'{"reduced" if delta < 0 else "increased"} mean error by {size} for {NAMES[lib]}')
+    return ("Compared with keeping the nominal transfer rate fixed, learning it from the two outlets "
+            + " and ".join(changes) + ". These changes are relative to each library’s own fixed-rate error.")
+
+
+def speed_summary(data, cold):
+    warm = {g["library"]: g["overall"]["latency_p50_s"] for g in data.get("groups", [])
+            if (g["arm"], g["mode"], g["condition"]) == ("adaptive", "control", "changing")}
+    medians_ms = [1000*warm[lib] if numeric(warm.get(lib)) else None for lib in LIBS]
+    lines = []
+    for values, boundary, unit in [(cold, "time to the first real action from a fresh process", "s"),
+                                   (medians_ms, "median time per warmed adaptive decision on the changing plant", "ms")]:
+        if not all(map(numeric, values)):
+            lines.append(f"The {boundary} comparison is unavailable.")
+            continue
+        times = f"CFFG {fmt(values[0])} {unit}, RxInfer {fmt(values[1])} {unit}"
+        if fmt(values[0]) == fmt(values[1]):
+            lines.append(f"The {boundary} was the same to the displayed precision ({times}).")
+        else:
+            winner = NAMES[LIBS[0 if values[0] < values[1] else 1]]
+            lines.append(f"{winner} had the shorter {boundary} ({times}).")
+    return " ".join(lines)
+
+
+def learning_figure(root, errors, n_seeds):
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.figure import Figure
+    from matplotlib.ticker import MaxNLocator
+
+    arms = ("frozen", "adaptive", "informed")
+    labels = ("Assume the nominal rate", "Learn the rate from outlets", "Supply the true rate")
+    fig = Figure(figsize=(8.0, 4.2), dpi=210, facecolor="white")
+    FigureCanvasAgg(fig)
+    fig.subplots_adjust(left=.31, right=.965, top=.75, bottom=.24)
+    ax = fig.subplots()
+    fig.text(.035, .92, "Hidden concentration error as the transfer rate changes",
+             fontsize=15, fontweight="bold", color="#183438")
+    fig.text(.035, .844, f"Same outlet recordings for both filters  ·  {n_seeds} paired seeds",
+             fontsize=10, color="#425658")
+    max_error = max(max(values) for values in errors.values())
+    for lib, offset, color, marker in (("cffg", -.13, "#006c73", "o"), ("rxinfer", .13, "#8d4e11", "D")):
+        for j, arm in enumerate(arms):
+            values = errors[lib, arm]
+            y = j+offset
+            ax.plot([min(values), max(values)], [y, y], color=color, linewidth=2, solid_capstyle="round")
+            ax.plot(fmean(values), y, marker=marker, markersize=7, color=color, linestyle="none",
+                    label=NAMES[lib] if j == 0 else None)
+    ax.set(yticks=range(len(labels)), yticklabels=labels, ylim=(2.5,-.5), xlim=(0, max_error*1.09 or 1.),
+           xlabel="Hidden-state RMSE in concentration units   ·   zero is best")
+    ax.xaxis.set_major_locator(MaxNLocator(nbins=5))
+    ax.tick_params(axis="y", length=0, pad=9)
+    ax.tick_params(axis="x", length=3, color="#a2b2b2")
+    ax.spines[["top","right","left"]].set_visible(False)
+    ax.spines["bottom"].set_color("#a2b2b2")
+    ax.set_axisbelow(True)
+    ax.grid(axis="x", color="#dce3e2", linewidth=.7)
+    handles, names = ax.get_legend_handles_labels()
+    fig.legend(handles, names, loc="lower left", bbox_to_anchor=(.022,.025), ncol=2, frameon=False)
+    fig.text(.36,.072,"Marker = seed mean     Line = smallest to largest seed error", fontsize=9, color="#425658")
+    name = "hidden-concentration-error.png"
+    stream = NamedTemporaryFile(dir=root, prefix=".figure-", suffix=".png", delete=False)
+    tmp = Path(stream.name)
+    try:
+        with stream:
+            fig.savefig(stream, format="png", facecolor="white")
+        tmp.replace(root/name)
+    finally:
+        tmp.unlink(missing_ok=True)
+    alt = "Hidden error during changed periods. " + " ".join(
+        f'{label}: CFFG {fmt(fmean(errors["cffg", arm]))}, RxInfer {fmt(fmean(errors["rxinfer", arm]))}.'
+        for arm, label in zip(arms, labels))
+    best = {}
+    for lib in LIBS:
+        means = [fmean(errors[lib, arm]) for arm in arms]
+        best[lib] = " and ".join(arm for arm, val in zip(arms, means) if fmt(val) == fmt(min(means)))
+    if best["cffg"] == best["rxinfer"]:
+        finding = f'The {best["cffg"]} filter gave the lowest mean error for both libraries.'
+        if " and " in best["cffg"]:
+            finding = f'The {best["cffg"]} filters tied for lowest mean error to the displayed precision for both libraries.'
+    else:
+        finding = f'The lowest observed mean error came from {best["cffg"]} for CFFG and {best["rxinfer"]} for RxInfer.'
+    oracle = ", ".join(f'{NAMES[lib]} {fmt(fmean(errors[lib, "informed"]))}' for lib in LIBS)
+    return section("How much did learning the transfer rate help?",
+        f'<figure><a href="{name}"><img src="{name}" width="1680" height="882" alt="{txt(alt)}"></a>'
+        f'<figcaption>{txt(finding)} The informed filter received the true rate and still had to infer the eight '
+        f'hidden concentrations ({txt(oracle)}). Each marker averages one error '
+        f'per seed across changed periods. The lines show variation among seeds.</figcaption></figure>')
 
 
 def visit_results(data):
@@ -355,13 +472,24 @@ def coverage(data):
         "A predictive density that could not be calculated needs a separate count.</p>")
 
 
-def compute(root, data):
-    rows = []
+def cold_times(root, sealed_hashes=None):
     cold = []
     for lib in LIBS:
         path = root/"qual"/f"{lib}.json"
+        if sealed_hashes is not None:
+            expected = sealed_hashes.get(path.name)
+            if not expected:
+                cold.append(None)
+                continue
+            if not path.is_file() or sha256(path.read_bytes()).hexdigest() != expected:
+                raise ValueError(f"Qualification clock differs from the freeze: {path.name}")
         record = read(path) if path.is_file() else {}
         cold.append(record.get("cold_real_action_s") if record.get("passed") else None)
+    return cold
+
+
+def compute(cold, data):
+    rows = []
     if any(map(numeric, cold)):
         rows.append(("Qualification · first real action (s)", fmt(cold[0]), fmt(cold[1]), observed(*cold, "lower"),
                      "Fresh process through first action including physics, graph setup and compilation"))
@@ -486,9 +614,15 @@ def render(root):
         if data["inventory"]["sha256"] != marker["runs"]:
             raise ValueError("Scored trace hashes differ from the completion record")
         label = "Fresh-seed benchmark"
-        main_result = primary(data, (data.get("primary") or {}).get("margin", protocol.get("practical_margin_concentration")))
+        cold = cold_times(root, freeze.get("qualification_sha256", {}))
+        seeds = freeze["seeds"]
+        errors = learning_errors(data, seeds)
+        opening = f"<p>{txt(learning_summary(errors))}</p><p>{txt(speed_summary(data, cold))}</p>"
+        margin = freeze.get("practical_margin", (data.get("primary") or {}).get("margin"))
+        main_result = primary(data, margin, opening) + learning_figure(root, errors, len(seeds))
         intro = ""
     else:
+        cold = cold_times(root)
         data = development
         main_result = ""
         if status == "no_go":
@@ -515,7 +649,7 @@ def render(root):
             '<p>Can CFFG or RxInfer estimate eight hidden concentrations more accurately from two noisy '
             'outlet readings as the transfer rate changes?</p>' + intro + '</header>' + main_result +
             highlights(data.get("groups") or [], data.get("runs") or [], protocol, complete=complete) + readiness(pilot, protocol, development if complete else data) +
-            coverage(data) + visit_results(data) + recovery(data.get("runs") or []) + compute(root, data) + group_results(data.get("groups") or [], data.get("runs") or []) +
+            coverage(data) + visit_results(data) + recovery(data.get("runs") or []) + compute(cold, data) + group_results(data.get("groups") or [], data.get("runs") or []) +
             design(protocol) + evidence(root, complete, status == "no_go", pilot.get("source_revision")))
     page = ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width, initial-scale=1">'
