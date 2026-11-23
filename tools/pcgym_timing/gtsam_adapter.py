@@ -4,6 +4,8 @@ Run setup_gtsam.sh with the harness Python and append the resulting site directo
 to PYTHONPATH. The native transition uses forward-mode derivatives through RK4.
 """
 
+from copy import deepcopy
+
 import gtsam
 import numpy as np
 
@@ -18,29 +20,30 @@ def whitener(covariance):
 
 class Adapter:
     def __init__(self, arrays, config, *, affine=None):
-        self.graph = gtsam.NonlinearFactorGraph()
         self.initial = gtsam.Values()
         self.origin = gtsam.Values()
         for i in range(SITES):
             self.initial.insert(i, arrays["m0"])
             self.origin.insert(i, np.zeros(4))
 
-        self.graph.add(gtsam.PriorFactorVector(
+        self._prior = gtsam.NonlinearFactorGraph()
+        self._prior.add(gtsam.PriorFactorVector(
             0, arrays["m0"], gtsam.noiseModel.Gaussian.Covariance(arrays["P0"])))
+        self._theta = None
         if affine is None:
-            from _gtsam_cstr import Reactor
-            reactor = Reactor(arrays["theta"], config)
-        for i in range(SITES - 1):
-            cov = arrays["Q" if i < PAST else "Qp"]
-            if affine is None:
-                factor = reactor.factor(i, gtsam.noiseModel.Gaussian.Covariance(cov))
-            else:
-                matrix, offset = affine
-                w = whitener(cov)
+            self._theta = np.array(arrays["theta"], dtype=np.float64, copy=True)
+            self._config = deepcopy(config)
+            past, future = (gtsam.noiseModel.Gaussian.Covariance(arrays[k]) for k in ("Q", "Qp"))
+            self._transition_noise = (past,) * PAST + (future,) * HORIZON
+            self.graph = self._reactor_graph(self._theta)
+        else:
+            matrix, offset = affine
+            self.graph = gtsam.NonlinearFactorGraph(self._prior)
+            for i in range(SITES - 1):
+                w = whitener(arrays["Q" if i < PAST else "Qp"])
                 linear = gtsam.JacobianFactor(i, -w @ matrix, i + 1, w, w @ offset,
                                               gtsam.noiseModel.Unit.Create(4))
-                factor = gtsam.LinearContainerFactor(linear, self.origin)
-            self.graph.add(factor)
+                self.graph.add(gtsam.LinearContainerFactor(linear, self.origin))
 
         self.emissions = []
         for i in range(SITES):
@@ -56,6 +59,29 @@ class Adapter:
         self.params.setAbsoluteErrorTol(1e-10)
         self.method = ("affine Gaussian MAP and covariance" if affine is not None else
                        "local nonlinear MAP with Gauss-Newton covariance")
+
+    def _reactor_graph(self, theta):
+        from _gtsam_cstr import Reactor
+
+        reactor = Reactor(theta, self._config)
+        graph = gtsam.NonlinearFactorGraph(self._prior)
+        for i, noise in enumerate(self._transition_noise):
+            graph.add(reactor.factor(i, noise))
+        return graph
+
+    def install(self, ua):
+        """Set physical heat transfer for subsequent solves. The affine map is fixed."""
+        value = np.asarray(ua)
+        if value.shape or value.dtype.kind not in "fiu" or not np.isfinite(value) or value <= 0:
+            raise ValueError("UA must be a positive finite real scalar")
+        log_ua = np.log(float(value))
+        if self._theta is None or self._theta[2] == log_ua:
+            return
+        theta = self._theta.copy()
+        theta[2] = log_ua
+        # Each native factor captures its Reactor by value.
+        self.graph = self._reactor_graph(theta)
+        self._theta = theta
 
     def solve(self, data, *, details=False):
         graph = gtsam.NonlinearFactorGraph(self.graph)

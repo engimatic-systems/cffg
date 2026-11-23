@@ -55,6 +55,50 @@ def check_transition():
     return dict(states=len(states), theta_vectors=2, **groups)
 
 
+def check_install(arrays):
+    # A nondefault reaction rate detects resets of parameters other than UA.
+    theta = arrays["theta"].copy()
+    theta[0] += .01
+    model = {**arrays, "theta": theta.copy()}
+    data = fixture.observations()
+    adapter = Adapter(model, fixture.CONFIGURATION)
+    ua = np.exp(theta[2])
+    changed_ua = 1.03 * ua
+
+    def posterior(planner):
+        result = planner.solve(data, details=True)
+        assert result["status"] == "ok", result
+        return np.r_[result["action"], result["mean"], result["cov"].ravel(), result["next_action_cov"]]
+
+    baseline = posterior(adapter)
+    adapter.install(changed_ua)
+    changed = posterior(adapter)
+    rebuilt_theta = theta.copy()
+    rebuilt_theta[2] = np.log(changed_ua)
+    rebuilt = posterior(Adapter({**model, "theta": rebuilt_theta}, fixture.CONFIGURATION))
+    np.testing.assert_allclose(changed, rebuilt, rtol=1e-12, atol=1e-12)
+    assert abs(changed[0] - baseline[0]) > 1e-4
+    for invalid in (0., -1., np.inf, np.nan, [ua]):
+        with np.testing.assert_raises(ValueError):
+            adapter.install(invalid)
+    np.testing.assert_array_equal(posterior(adapter), changed)
+    adapter.install(ua)
+    restored = posterior(adapter)
+    np.testing.assert_allclose(restored, baseline, rtol=1e-12, atol=1e-12)
+    np.testing.assert_array_equal(model["theta"], theta)
+
+    def installed_affine(arrays, config, *, affine):
+        planner = Adapter(arrays, config, affine=affine)
+        planner.install(changed_ua)
+        return planner
+
+    affine = qualify(installed_affine, arrays)
+    assert all(case["passed"] for case in affine), affine
+    return dict(ua=float(ua), changed_ua=float(changed_ua), baseline_action=baseline[0],
+                changed_action=changed[0], rebuilt_error=float(np.max(abs(changed - rebuilt))),
+                restored_error=float(np.max(abs(restored - baseline))), affine=affine)
+
+
 if __name__ == "__main__":
     jax.config.update("jax_enable_x64", True)
     arrays = fixture.model()[1]
@@ -75,4 +119,5 @@ if __name__ == "__main__":
         real[name] = {k: v for k, v in answer.items() if k not in ("mean", "cov")}
         real[name]["details_s"] = elapsed
     assert real["fresh"]["action"] == real["fresh_again"]["action"]
-    print(json.dumps(dict(affine=affine, real=real, physics=check_transition()), indent=2))
+    print(json.dumps(dict(affine=affine, real=real, physics=check_transition(),
+                          install=check_install(arrays)), indent=2))
