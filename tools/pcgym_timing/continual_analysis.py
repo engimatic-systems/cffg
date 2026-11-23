@@ -164,7 +164,7 @@ def audit_updates(updates, estimates, observed, predictions, method, settings):
     return result
 
 
-def control(path, seed, condition, arm, settings):
+def control(path, seed, condition, arm, settings, *, learner_arm="learned"):
     rows, common, audit = read_series(path, seed, condition)
     ua = series([r["ua"] for r in rows], (N,), "ua")
     check_ua(arm, ua, common["true_ua"])
@@ -172,11 +172,11 @@ def control(path, seed, condition, arm, settings):
     require(sidecar["trace_sha256"] == sha256(path.read_bytes()).hexdigest()
             and (sidecar["seed"], sidecar["arm"], sidecar["condition"], sidecar["steps"]) ==
             (seed, arm, condition, N), f"Episode provenance mismatch in {path}")
-    if arm == "learned":
+    if arm == learner_arm:
         require(rows[0]["update"] is None, "Spurious first-tick update")
         updates = [r["update"] for r in rows[1:]] + [sidecar["terminal_update"]]
         audit["learning"] = audit_updates(updates, ua, [r["next_obs"][1] for r in rows],
-                                          [r["prediction"][1] for r in rows], arm, settings)
+                                          [r["prediction"][1] for r in rows], "learned", settings)
     else:
         require(all(r["update"] is None for r in rows) and sidecar["terminal_update"] is None,
                 f"Unexpected parameter update in {path}")
