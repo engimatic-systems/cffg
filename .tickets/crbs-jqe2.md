@@ -1,6 +1,6 @@
 ---
 id: crbs-jqe2
-status: open
+status: in_progress
 deps: [crbs-4d73, crbs-2xf6]
 links: []
 created: 2026-11-23T04:26:41Z
@@ -37,3 +37,7 @@ A development seed can inform design decisions. A held-out seed is first used af
 **2026-11-23T04:27:10Z**
 
 If native methods match at the same approximation, preserve that result. The pilot may qualify a second method per library using the same resource budget. Predeclare the primary competitive configuration for each library before fresh seeds. For long-run repeatability, separate a second abrupt visit to the same B plateau from a gradual excursion. Compare first and second abrupt visits with matched amplitude, dwell and setpoint phase; report the ramp separately.
+
+**2026-11-23T05:06:13Z**
+
+Three development seeds have completed, along with uninterrupted 6000-transition adaptive runs in both libraries. The first development run identified no numerical failures. Independent review then corrected the failure-at-reset policy, interrupted worker receipts and lock inheritance; the original pilot evidence is preserved under attempts/pre-freeze-runner-review, and all development cases have been replayed with the reviewed runner. The next decision uses only the repeated pilot and full qualification attestations. The fresh seeds are still unopened.
