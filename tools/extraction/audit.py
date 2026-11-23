@@ -49,7 +49,7 @@ def audit(root,stage):
                 assert np.array_equal(u,tape["flows"])
             else:
                 last=np.vstack((plant.NOMINAL_FLOW,u[:-1]))
-                assert np.array_equal(held,late|src["planner_failed"]|np.r_[False,failed[:-1]])
+                assert np.array_equal(held,late|src["planner_failed"]|np.r_[bool(src["reset_failed"]),failed[:-1]])
                 assert np.array_equal(late,src["latency"]>DEADLINE)
                 assert np.array_equal(u,np.where(held[:,None],last,np.clip(src["raw_u"],plant.FLOW_LOW,plant.FLOW_HIGH)))
             Q=np.diag([.001**2]*10+[MOTION_SD**2 if arm=="adaptive" else 1e-6])
@@ -67,7 +67,7 @@ def audit(root,stage):
                     prior=PRIOR.copy()
                     if arm!="adaptive": prior[-1,-1]=1e-6
                     mu,cov,_=dense_update(np.r_[plant.nominal_profile(),np.log(5.)],prior,np.eye(11),
-                                         np.zeros(11),np.zeros((11,11)),H,R,tape["y0"])
+                                         np.zeros(11),np.zeros((11,11)),H,R,None if src["reset_failed"] else tape["y0"])
                 point=mu.copy()
                 if arm!="adaptive": point[-1]=np.log(5. if arm=="frozen" else tape["kla"][t])
                 A,B,b=linearize(point,u[t]); off=b+B@u[t]

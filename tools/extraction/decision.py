@@ -28,6 +28,14 @@ def decide(root):
     nonlinear=read(qual/"nonlinear.json")
     native={lib:read(qual/f"{lib}.json") for lib in LIBRARIES}
     if not (with_scope and nonlinear and all(native.values())): raise ValueError("Missing qualification evidence")
+    signature=identity(runtime())
+    if any(r["runtime_sha256"]!=signature for r in native.values()):
+        raise ValueError("Native qualification used a different measurement runtime")
+    att=read(qual/"attestations.json")
+    if not att or att["runtime_sha256"]!=signature or any(sha(qual/k)!=v for k,v in att["results"].items()):
+        raise ValueError("Qualification records differ from the measurement runtime or attestation")
+    if any(sha(REPO/k)!=v for k,v in att["checks"].items()):
+        raise ValueError("Qualification programs changed after execution")
     checks={}
     def gate(key,ok,detail):
         checks[key]=dict(passed=bool(ok),detail=detail)
@@ -39,7 +47,7 @@ def decide(root):
     workloads={}
     all_causal=True
     for lib in LIBRARIES:
-        gains=[]; adaptive=[]; worst=0.; total_s=0
+        gains=[]; adaptive=[]; worst_hold=worst_update=0.; total_s=0
         for seed in DEVELOPMENT:
             dir_=root/"development"/f"seed-{seed}"
             costs={}
@@ -55,7 +63,8 @@ def decide(root):
                         total_s+=read(path.with_suffix(".json"))["episode_s"]
                         if arm=="adaptive" and mode=="control":
                             with np.load(path) as f:
-                                worst=max(worst,float(np.mean(f["held"]|f["failed"])))
+                                worst_hold=max(worst_hold,float(np.mean(f["held"])))
+                                worst_update=max(worst_update,float((f["filter_failed"].sum()+int(f["reset_failed"]))/(len(f["m"])+1)))
             gains.append(100*(1-costs["informed"]/costs["frozen"]))
             # The two regimes have identical past data and all forecasts until their first change.
             with (np.load(dir_/"stationary"/f"tape-adaptive-{lib}.npz") as st,
@@ -64,14 +73,15 @@ def decide(root):
                 all_causal &= all(np.array_equal(st[k][:t],ch[k][:t]) for k in ("obs","u","m","P"))
         long=root/"endurance"/f"seed-{ENDURANCE}"/"changing"/f"control-adaptive-{lib}.npz"
         with np.load(long) as f:
-            worst=max(worst,float(np.mean(f["held"]|f["failed"])))
+            worst_hold=max(worst_hold,float(np.mean(f["held"])))
+            worst_update=max(worst_update,float((f["filter_failed"].sum()+int(f["reset_failed"]))/(len(f["m"])+1)))
             finite=bool(np.isfinite(f["m"]).all() and len(f["m"])==6000)
         gate("information_"+lib,np.mean(gains)>=5 and np.count_nonzero(np.array(gains)>=5)>=2,
              f"Informed hidden-state RMSE reduction vs frozen by seed (%) {np.round(gains,3).tolist()}.")
-        gate("reliability_"+lib,worst<=.01 and finite,
-             f"Worst adaptive control hold/failure fraction {worst:.6g} across short and 6000-tick development episodes.")
+        gate("reliability_"+lib,max(worst_hold,worst_update)<=.01 and finite,
+             f"Worst adaptive held-command fraction {worst_hold:.6g} and observation-update failure fraction {worst_update:.6g} across development episodes.")
         agreement.append(np.array(adaptive))
-        results[lib]=dict(headroom_percent=gains,adaptive_rmse=adaptive,worst_unreliable_fraction=worst)
+        results[lib]=dict(headroom_percent=gains,adaptive_rmse=adaptive,worst_hold_fraction=worst_hold,worst_update_failure_fraction=worst_update)
         workloads[lib]=total_s/len(DEVELOPMENT)*10*len(HELDOUT)
     gate("causal_history",all_causal,"Identical fixed-tape adaptive posteriors before the first hidden plant change.")
     gate("endurance",all(read(root/"workers"/"endurance"/f"{ENDURANCE}-{lib}.json") for lib in LIBRARIES),

@@ -90,7 +90,12 @@ def simulate(backend, simulator, tape, arm, mode):
         P[-1,-1]=1e-6
     started=perf_counter()
     # Sum of these two independent Gaussians is the declared reset prior exactly.
-    m,P=proper(*backend.update(m,P*.5,np.eye(11),np.zeros(11),P*.5,H,R,tape["y0"]))
+    reset_failed=False
+    try:
+        m,P=proper(*backend.update(m,P*.5,np.eye(11),np.zeros(11),P*.5,H,R,tape["y0"]))
+    except (ValueError, ArithmeticError, RuntimeError, OSError, np.linalg.LinAlgError) as exc:
+        reset_failed=True
+        diagnostics.append([0,"reset update",str(exc)])
     previous_update=perf_counter()-started
     last=NOMINAL_U.copy()
     targets=np.pad(tape["target"], (0,HORIZON-1),mode="edge")
@@ -104,13 +109,13 @@ def simulate(backend, simulator, tape, arm, mode):
             try:
                 raw=plan(backend,m,P,last,targets[t:t+HORIZON],known,Q)
                 proposed=np.clip(raw,plant.FLOW_LOW,plant.FLOW_HIGH)
-            except (ValueError, ArithmeticError, RuntimeError, np.linalg.LinAlgError) as exc:
+            except (ValueError, ArithmeticError, RuntimeError, OSError, np.linalg.LinAlgError) as exc:
                 raw=last.copy(); proposed=last; planner_failed[t]=True
                 if len(diagnostics)<16: diagnostics.append([t,"plan",str(exc)])
             t_plan[t]=perf_counter()-tick
             latency[t]=previous_update+t_plan[t]
             late[t]=latency[t]>DEADLINE
-            held[t]=late[t] or planner_failed[t] or (t>0 and failed[t-1])
+            held[t]=late[t] or planner_failed[t] or (failed[t-1] if t else reset_failed)
             chosen=last if held[t] else proposed
         else:
             chosen=raw=tape["flows"][t]
@@ -129,7 +134,7 @@ def simulate(backend, simulator, tape, arm, mode):
             pred[t]=H@prior_m
             pred_cov[t]=H@prior_P@H.T+R
             m,P=proper(*backend.update(m,P,A,offset,Q,H,R,obs[t]))
-        except (ValueError, ArithmeticError, RuntimeError, np.linalg.LinAlgError) as exc:
+        except (ValueError, ArithmeticError, RuntimeError, OSError, np.linalg.LinAlgError) as exc:
             # Python assigns the fallback pair only after both prediction checks succeed.
             m,P=prior_m,prior_P; failed[t]=True
             if len(diagnostics)<16: diagnostics.append([t,"update",str(exc)])
@@ -137,8 +142,10 @@ def simulate(backend, simulator, tape, arm, mode):
         if mode=="tape": latency[t]=previous_update
         means[t]=m; covs[t]=P
     times.append((n,ps_memory()))
+    aggregate_failed=failed|planner_failed
+    aggregate_failed[0] |= reset_failed
     return dict(x=x,u=u,raw_u=raw_u,m=means,P=covs,obs=obs,pred=pred,pred_cov=pred_cov,
                 kla=tape["kla"],phase=tape["phase"],event=tape["event"],target=tape["target"],
-                y0=tape["y0"],failed=failed|planner_failed,filter_failed=failed,planner_failed=planner_failed,
+                y0=tape["y0"],reset_failed=np.asarray(reset_failed),failed=aggregate_failed,filter_failed=failed,planner_failed=planner_failed,
                 held=held,late=late,latency=latency,t_filter=t_filter,t_plan=t_plan,
                 rss_samples=np.asarray(times),diagnostics=np.asarray(json.dumps(diagnostics)))

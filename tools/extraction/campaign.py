@@ -129,6 +129,11 @@ def run(root,stage):
         for lib in LIBRARIES[i%2:]+LIBRARIES[:i%2]:
             if all(valid(root/stage/f"seed-{seed}"/c/f"{m}-{a}-{lib}.npz",signature,stage,seed,c,m,a,lib)
                    for c,m,a in keys(stage)):
+                receipt=root/"workers"/stage/f"{seed}-{lib}.json"
+                if not receipt.exists():
+                    save(receipt,dict(library=lib,seed=seed,stage=stage,runtime_sha256=signature,
+                                      recovered_from_sealed_episodes=True,setup_s=None,warmup_s=None,
+                                      process_to_first_synthetic_plan_s=None))
                 continue
             print("Starting",stage,seed,lib,flush=True)
             start=perf_counter()
