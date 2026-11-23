@@ -120,6 +120,23 @@ def check_native(lib, rows):
         require(ok, f"Invalid {lib} success diagnostics at tick {r['tick']}")
 
 
+def held_commands(rows, lib, seed, condition, arm, trace_path):
+    events = []
+    for r in rows:
+        if not r["held"]:
+            continue
+        if r["status"] == "ok":
+            kind = "deadline_only"
+        else:
+            kind = "failure_and_deadline" if r["late"] else "failure_only"
+        event = {k: r[k] for k in ("tick", "status", "late", "native", "decision_s", "update_s",
+                                    "forecast_s", "applied")}
+        events.append(dict(event, library=lib, arm=arm, condition=condition, seed=seed, kind=kind,
+                           trace=trace_path, plant_time_min=r["tick"] * (26 / 60),
+                           applied_coolant_K=295 + (r["applied"] + 1) * (302 - 295) / 2))
+    return events
+
+
 def audit_episode(root, lib, seed, condition, arm, plan, ph, targets, hashes):
     stem = f"{lib}/seed-{seed}/{condition}-{arm}"
     path = root / (stem + ".jsonl")
@@ -143,6 +160,7 @@ def audit_episode(root, lib, seed, condition, arm, plan, ph, targets, hashes):
         rows, side["terminal_update"], trace, arm, plan["starting_method"]["initial_ua"])
     audit["status_counts"] = dict(statuses)
     record["motion_sd"] = q
+    trace["hold_events"] = held_commands(rows, lib, seed, condition, arm, stem + ".jsonl")
     hashes[stem + ".jsonl"] = audit["trace_sha256"]
     hashes[stem + ".json"] = digest(path.with_suffix(".json"))
     return record, trace, times
@@ -267,6 +285,7 @@ def analyze(root):
     base = dict(N=60, tsim=26., SP={"Ca": np.repeat([.85, .90, .87], 20).tolist()})
     targets = np.array(parameters(base, True)["SP"]["Ca"][1:])
     libraries, history_audit = {}, {}
+    hold_events = []
     noise_reference = {}
     paired_noise = {str(s): 0. for s in SEEDS}
     max_forecast = max_reward = max_sensor = 0.
@@ -291,6 +310,7 @@ def analyze(root):
                 traces[condition] = {}
                 for arm in MOTION:
                     record, trace, times = audit_episode(root, lib, seed, condition, arm, plan, ph, targets, hashes)
+                    hold_events.extend(trace["hold_events"])
                     traces[condition][arm] = trace
                     entries[arm] = record
                     noise = trace["noise"]
@@ -307,6 +327,8 @@ def analyze(root):
             checks = history_audit[lib][sample] = histories(traces)
             breaks += sum(v["first_divergent_held_action"] is not None for v in checks.values())
         libraries[lib] = summarize_library(episodes, clocks, workers[lib])
+    require(len(hold_events) == sum(s["totals"]["holds"] for s in libraries.values()),
+            "Held command records disagree with audited episode totals")
     audit = dict(episodes=N_EPISODES, decisions=N_EPISODES*N, max_reward_replay_error=max_reward,
                  max_forecast_replay_error=max_forecast, max_sensor_noise_replay_error=max_sensor,
                  max_paired_noise_difference=max(paired_noise.values()), per_seed_noise_difference=paired_noise,
@@ -314,7 +336,7 @@ def analyze(root):
                  paired_seed_interpretation="Each seed supplies the same exogenous noise and schedule. "
                  "A held command can separate previously identical trajectories. Its realized outcomes "
                  "and all later outcomes remain in the paired seed comparison.")
-    return dict(schema_version=1, protocol_sha256=ph, seeds=list(SEEDS), libraries=libraries,
+    return dict(schema_version=1, protocol_sha256=ph, seeds=list(SEEDS), libraries=libraries, hold_events=hold_events,
                 between_libraries=between_libraries(libraries, SEEDS), audit=audit, raw_sha256=hashes,
                 bootstrap=dict(draws=DRAWS, seed=BOOTSTRAP_SEED, level=.95, unit="whole paired seed",
                                method="Pointwise descriptive percentile interval for the mean paired difference"),
