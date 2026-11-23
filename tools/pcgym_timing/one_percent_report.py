@@ -242,9 +242,11 @@ def validation_sections(val, image_name):
         '<p class="note">The 2% and 3% sensitivity checks change only the allowable stationary tracking '
         'penalty. Every other requirement and the frozen estimator stay fixed.</p></section>',
         '<section id="validation"><h2>All four controllers on fresh seeds</h2>',
-        '<p>Each controller used the same planner and received noisy concentration and temperature. '
-        'Frozen kept UA at 50,000. Informed received the actual UA and shows the benefit available '
-        'from knowing the change. Original and selected inferred UA from realized transitions.</p>',
+        '<p>All four controllers used the same CFFG planner and received noisy concentration and temperature. '
+        'The frozen controller kept the reactor’s heat-transfer coefficient (UA) at 50,000. The informed '
+        'controller received its true value before acting. In the other two controllers, an extended Kalman '
+        'filter in the benchmark updated UA after each observed transition and passed the estimate to CFFG '
+        'for its next decision.</p>',
         table("Held-out tracking, parameter estimation and temperature prediction",
               ["Controller", "Stationary penalty", "Changed tracking gain", "Changed wins vs frozen",
                "Settled mean |UA error|", "Tape temperature RMSE (K)"], arm_rows),
