@@ -1,6 +1,6 @@
 ---
 id: crbs-duxy
-status: in_progress
+status: closed
 deps: [crbs-jqe2]
 links: []
 created: 2026-11-23T04:25:21Z
@@ -43,3 +43,9 @@ Prerequisite --> dependent. The two development roots can proceed in parallel.
 [ ] crbs-2xf6  Native filter and planner qualification (ready) --+
 
 At the proposed scale the full closed-loop matrix spans 1,440,000 decisions (20 seeds x 6,000 transitions x 2 conditions x 3 arms x 2 libraries). Common-tape filtering adds another 1,440,000 filter updates over 40 distinct tapes if all arms use the full design. Forecast/reference audits can be restricted to prespecified windows. The pilot sets sample size and forecasts wall time from measured rates. No held-out runs are part of scoping.
+
+**2026-11-23T06:01:55Z**
+
+Completed all 480 fresh-seed runs, with 6,000 uninterrupted transitions per run and 20 independently paired seeds. Each library estimated eight hidden concentrations from two outlet sensors. On the common recordings during changes, both adaptive filters averaged 0.0020072 hidden-state error. The mean paired difference was 2.99e-17, well inside the prespecified practical margin of 0.0002. Compared with fixing the rate at its nominal value, learning reduced hidden-state error by 81.4% and closed-loop outlet-tracking error by 24.3% during changes. On the stationary plant, fixing the correct rate won both comparisons. Adapting increased hidden-state error by 23.9% and tracking error by 1.1%. Both filters regained the changed rate in a median eight decisions on both abrupt visits. The measured routes use the same local Gaussian approximation. CFFG used its directed Gaussian operations, and RxInfer used its cached Julia graphs. CFFG reached the first real action faster in one cold launch per library (2.33 vs 11.28 s). RxInfer was faster once warm (1.01 vs 1.15 ms median). All 1,440,000 closed-loop commands met the deadline with zero fallback commands.
+
+The HTML report, frozen protocol, 480 raw archives and checksums are in ~/agent-share/pcgym-extraction-rxinfer. The independent audit replayed 2,880,000 sensor records, checked 2,640 sampled state transitions and dense filter outputs, and reproduced the primary effect to rounding. To reproduce scoring, run uv run --frozen --no-sync python tools/extraction/analysis.py --output ~/agent-share/pcgym-extraction-rxinfer --stage heldout, then use audit.py with the same arguments and report.py with the output directory as its positional argument. Isolated benchmark code and tickets are the only changed paths. Focused runner_check.py, analysis_check.py, report_check.py, native filter and planner references, nonlinear reference convergence, and full-archive verification cover this comparison. The default core-library suite was outside this change. Discrete operating-mode memory remains a separate research question.
