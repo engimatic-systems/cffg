@@ -32,7 +32,12 @@ def decide(root):
     if any(r["runtime_sha256"]!=signature for r in native.values()):
         raise ValueError("Native qualification used a different measurement runtime")
     att=read(qual/"attestations.json")
-    if not att or att["runtime_sha256"]!=signature or any(sha(qual/k)!=v for k,v in att["results"].items()):
+    required_results={"cffg.json","rxinfer.json","plant-qualification.json","nonlinear.json"}
+    required_checks={f"tools/extraction/{name}.py" for name in
+                     ("qual_bundle","qualify","plant_check","dynamics_check","cffg_native_check")}
+    if not att or set(att["results"])!=required_results or set(att["checks"])!=required_checks:
+        raise ValueError("Missing qualification records or programs in attestation")
+    if att["runtime_sha256"]!=signature or any(sha(qual/k)!=v for k,v in att["results"].items()):
         raise ValueError("Qualification records differ from the measurement runtime or attestation")
     if any(sha(REPO/k)!=v for k,v in att["checks"].items()):
         raise ValueError("Qualification programs changed after execution")
