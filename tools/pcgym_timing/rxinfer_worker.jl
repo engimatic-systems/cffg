@@ -129,8 +129,14 @@ function posterior(graph, input)
     return mean_cov(last(graph.engine.history[:joint]))
 end
 
-function solve(fixture, data, details)
+function solve(fixture, data, details; ua=nothing)
     length(data) == 20 || error("expected 20 observation rows")
+    if !isnothing(ua)
+        fixture.transition isa Reactor || error("an affine transition has no heat-transfer coefficient")
+        isfinite(ua) && ua > 0 || error("UA must be positive and finite")
+        # All cached slice graphs reference this reactor's parameter vector.
+        fixture.transition.theta[3] = log(ua)
+    end
     m, P = fixture.m0, fixture.P0
     smallest_pivot = Inf
     approximation = "RxInfer Linearization (forward joint Gaussian message per slice)"
@@ -175,7 +181,7 @@ function serve()
                 (; status="ready", rxinfer_version=string(pkgversion(RxInfer)), julia_version=string(VERSION),
                    julia_threads=Threads.nthreads(), blas_threads=BLAS.get_num_threads())
             elseif request["op"] == "solve"
-                solve(fixture, request["data"], request["details"])
+                solve(fixture, request["data"], request["details"]; ua=get(request, "ua", nothing))
             else
                 error("unrecognized request")
             end

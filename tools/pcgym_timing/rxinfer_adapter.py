@@ -19,6 +19,8 @@ import numpy as np
 
 class Adapter:
     def __init__(self, arrays, config, *, affine=None):
+        self._ua = None
+        self._affine = affine is not None
         project = Path(os.environ.get(
             "PCGYM_RXINFER_PROJECT", "~/agent-share/pcgym-four-library-timing/rxinfer"
         )).expanduser()
@@ -54,11 +56,22 @@ class Adapter:
             raise RuntimeError(f"RxInfer worker exited with code {self.proc.wait()}")
         return json.loads(line)
 
+    def install(self, ua):
+        """Use physical UA for subsequent nonlinear solves. The affine map is fixed."""
+        value = np.asarray(ua)
+        if value.shape or value.dtype.kind not in "fiu" or not np.isfinite(value) or value <= 0:
+            raise ValueError("UA must be a positive finite real scalar")
+        if not self._affine:
+            self._ua = float(value)
+
     def solve(self, data, *, details=False):
         try:
             values = (data[f"e{i}"] for i in range(20))
             rows = [None if value is None else np.asarray(value).tolist() for value in values]
-            return self._request(dict(op="solve", data=rows, details=details))
+            request = dict(op="solve", data=rows, details=details)
+            if self._ua is not None:
+                request["ua"] = self._ua
+            return self._request(request)
         except (KeyError, TypeError, ValueError, OSError, RuntimeError) as exc:
             return dict(status="error", action=None, error=str(exc))
 
