@@ -66,7 +66,7 @@ def decide(root):
         with np.load(long) as f:
             worst=max(worst,float(np.mean(f["held"]|f["failed"])))
             finite=bool(np.isfinite(f["m"]).all() and len(f["m"])==6000)
-        gate("information_"+lib,np.mean(gains)>=5 and np.count_nonzero(np.array(gains)>0)>=2,
+        gate("information_"+lib,np.mean(gains)>=5 and np.count_nonzero(np.array(gains)>=5)>=2,
              f"Informed hidden-state RMSE reduction vs frozen by seed (%) {np.round(gains,3).tolist()}.")
         gate("reliability_"+lib,worst<=.01 and finite,
              f"Worst adaptive control hold/failure fraction {worst:.6g} across short and 6000-tick development episodes.")
