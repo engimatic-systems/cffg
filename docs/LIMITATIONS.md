@@ -207,7 +207,11 @@ that every gap below will be implemented:
   [295,302] K actuator bounds. Larger priors/horizons, other observations or
   constants and closed-loop control performance require separate validation.
   The standalone D15 bounded decision accepts a closed, proper frozen Gaussian
-  and finite static bounds. Its dense entry point admits up to two constrained
+  and finite static bounds. The input covariance must resolve as positive
+  definite in the solve dtype after scaling each coordinate to unit variance.
+  Unresolved input returns `INVALID_GAUSSIAN`. If lifting the conditioned
+  covariance loses rank, the solve returns `NUMERICAL_FAILURE`. Both outcomes
+  mask the command and scores. The dense entry point admits up to two constrained
   coordinates. Longer horizons require a model expressed as independent action
   marginals, each of width at most two. Only nuisance coordinates can be shared
   through the Gaussian state conditional. A connected H15 reactor box,
