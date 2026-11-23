@@ -4,11 +4,9 @@ import argparse
 from hashlib import sha256
 from html import escape
 import json
-from os.path import relpath
 from pathlib import Path
 from statistics import fmean, median
 from tempfile import NamedTemporaryFile
-from urllib.parse import quote
 
 if __package__:
     from .paired_report import NAMES, PEERS, STYLE, details, interval, number, table
@@ -230,19 +228,48 @@ def timing(libraries):
         '</section>'])
 
 
-def evidence(root):
-    frozen = read(root / "protocol.json")["frozen"]
+def write_atomically(target, content):
+    with NamedTemporaryFile(dir=target.parent, delete=False) as stream:
+        tmp = Path(stream.name)
+        try:
+            stream.write(content)
+            stream.close()
+            tmp.replace(target)
+        finally:
+            tmp.unlink(missing_ok=True)
+
+
+def source_snapshots(root, frozen):
     here = Path(__file__).resolve().parent
-    repo = here.parents[1]
-    sources = {Path(path): digest for path, digest in frozen["sha256"].items()}
-    sources.update({repo / path: digest for path, digest in frozen["experiment_sha256"].items()})
-    source_links = []
-    for source in ("continual_comparison.py", "continual_estimator.py", "cffg_adapter.py", "rxinfer_worker.jl",
-                   "numpyro_adapter.py", "gtsam_adapter.py", "gtsam_cstr.cpp"):
-        path = here / source
-        if path in sources and path.is_file() and sha256(path.read_bytes()).hexdigest() == sources[path]:
-            href = quote(relpath(path, root))
-            source_links.append(f'<li><a href="{href}">{source}</a></li>')
+    entries = [(Path(path), digest) for manifest in ("sha256", "experiment_sha256")
+               for path, digest in frozen[manifest].items()]
+    items = []
+    for name in ("continual_comparison.py", "continual_estimator.py", "cffg_adapter.py", "rxinfer_adapter.py",
+                 "rxinfer_worker.jl", "numpyro_adapter.py", "gtsam_adapter.py", "gtsam_cstr.cpp"):
+        digests = {digest for path, digest in entries if path.parts[-3:] == ("tools", "pcgym_timing", name)}
+        if not digests:
+            continue
+        if len(digests) != 1:
+            items.append(f"<li>{name} — conflicting hashes in the frozen protocol.</li>")
+            continue
+        expected, = digests
+        dest = root / "sources" / name
+        if not dest.is_file() or sha256(dest.read_bytes()).hexdigest() != expected:
+            src = here / name
+            if not src.is_file():
+                items.append(f"<li>{name} — frozen source unavailable.</li>")
+                continue
+            content = src.read_bytes()
+            if sha256(content).hexdigest() != expected:
+                items.append(f"<li>{name} — source SHA-256 differs from the frozen protocol.</li>")
+                continue
+            dest.parent.mkdir(exist_ok=True)
+            write_atomically(dest, content)
+        items.append(f'<li><a href="sources/{name}">{name}</a></li>')
+    return details("Frozen source snapshots", "<ul>" + "".join(items) + "</ul>") if items else ""
+
+
+def evidence(root):
     paths = [("analysis.json", "Paired estimates, seed-level scores, audits and raw trace digests"),
              ("protocol.json", "Frozen design, numerical source paths, dependency hashes and prior selection hashes"),
              ("qualified.json", "Qualification record and check-file digests"),
@@ -273,8 +300,7 @@ def evidence(root):
         'live UA change against a freshly constructed model at the same value. For timing, library order '
         'rotated by seed and regime order rotated within workers.</p>',
         '</section><section id="evidence"><h2>Evidence</h2><ul>', "".join(links), '</ul>',
-        details("Local source files matching the frozen hashes", "<ul>" + "".join(source_links) + "</ul>")
-        if source_links else "",
+        source_snapshots(root, read(root / "protocol.json")["frozen"]),
         '</section>'])
 
 
@@ -303,14 +329,7 @@ def render(root):
         primary(data), adaptation(libraries), predictions(libraries), timing(libraries), evidence(root),
         '</main></body></html>'])
     dest = root / "index.html"
-    with NamedTemporaryFile("w", encoding="utf-8", dir=root, delete=False) as stream:
-        path = Path(stream.name)
-        try:
-            stream.write(page)
-            stream.close()
-            path.replace(dest)
-        finally:
-            path.unlink(missing_ok=True)
+    write_atomically(dest, page.encode("utf-8"))
     return dest
 
 
