@@ -1,6 +1,6 @@
 ---
 id: crbs-4d73
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-11-23T04:25:49Z
@@ -41,3 +41,15 @@ Feasibility calculation on the installed PCGym 0.1.8 multistage_extraction right
 **2026-11-23T04:26:57Z**
 
 Plant review: existing sibling ~/experiments/cffg-testing/pc-gym/00/cffg/common/envs.py:34 exposes the ten concentrations; extraction_column/experiment_physics.py:22 and common/plants.py:113 carry older nonlinear model choices. Installed pcgym/model_classes.py:350 defines multistage_extraction, two physical flows and two feed disturbances. A changing Kla requires a wrapper. Raw info may expose hidden state. Confidence high for the source layout and the local linearization, unqualified for long-rollout identifiability.
+
+**2026-11-23T04:52:07Z**
+
+Architecture change path checked: runtime numerical/status invariant. The fixture uses only a local benchmark plant and offline qualification. Engine, model serialization, scheduler, FE and runtime API surfaces are N/A. Target the native RHS with an independent fixed-parameter integrator, full discrete Jacobians, sparse data and causal replay checks.
+
+**2026-11-23T04:57:07Z**
+
+Implemented tools/extraction/plant.py and plant_check.py. Plant uses PCGym 0.1.8 git d26cbc0690024efef488dc6a304d37654934e525 directly, through CVODES. Physical Kla is supplied with the applied flows on each transition. Scorer-owned distinct seeded streams supply async L/G probes, initial state, outlet and process noise, plant changes and public references. Each 600 transitions contains two matched abrupt visits and a ramp. The 6,000-step trace repeats the design with new jitter and the short trace is an exact prefix. Expose only the two noisy outlets in X5,Y1 order, including at reset; the scorer keeps the full tape.
+
+**2026-11-23T04:57:07Z**
+
+Development validation: uv run --frozen --no-sync python tools/extraction/plant_check.py --output ~/agent-share/pcgym-extraction-rxinfer/qual/plant-qualification.json passed all controls. Seeds 17101–17103 each have 600 transitions, 17104 has 6,000 per stationary/changing plant; no evaluation data. Independent fixed-coefficient SciPy DOP853 replay of all changing transitions matches native state, terminal, observation and post-command tracking cost within 2e-9. Six preview ticks (0.3 hours) reach the .295–.375 target range from nominal with either coefficient; slowest local 95% settling is 27.2 ticks, below the 62–68 tick abrupt dwell. Shared-tape reference EKF with known Kla improves hidden RMSE vs nominal by 87.7–88.1% on changed periods and improves pre-reading whitened physical outlet RMSE 78.0–81.9%. Adaptive reference hidden RMSE improves 81.8–85.4%. Conditional sensor gain is much smaller with the parameter known. On changed phases, X1 and X2 error decreased only 0.3% and 2.2% relative to a known-Kla observer without sensor updates. Six of eleven local scaled observability singular values exceed one. Physical concentration ranges remained inside [0,1] without clamps. Fixture checks took 6.99 s, excluding imports; the controller Jacobian and library gates are tracked separately by crbs-2xf6/crbs-jqe2. Isolated external experiment; modifies no library or test-selection code. py_compile, tk dep cycle and git diff --check passed.
