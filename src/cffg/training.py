@@ -9,10 +9,13 @@ import numpy as np
 
 from cffg.bundle import save_bundle
 from cffg.compiler import compile_template
+from cffg.core.plates import expand_plates
 from cffg.core.serialize import from_dict, structure_hash, to_dict
+from cffg.core.validate import validate
 from cffg.engine import Engine
 from cffg.implicit import FixedPointDifferentiator, FixedPointGradient, GradientStatus
 from cffg.neural_artifacts import array_digest, read_artifact, write_artifact
+from cffg.resolution.sources import resolve_arrays
 from cffg.runtime_types import RunResult, RunStatus, _replace
 from cffg.trainable import NeuralParameters
 
@@ -84,8 +87,15 @@ class NeuralTrainer:
     def __init__(self, template, arrays, observations, *, config=None, factors=None):
         self.config = config or TrainingConfig()
         self.template = from_dict(to_dict(template))
-        self.arrays = {name: np.asarray(value).copy() for name, value in arrays.items()}
-        self.engine = Engine(compile_template(self.template, arrays=self.arrays))
+        supplied = {name: np.asarray(value).copy() for name, value in arrays.items()}
+        self.arrays = supplied
+        expanded = expand_plates(self.template)
+        if expanded.blobs.keys() - supplied.keys():
+            validate(expanded)
+            resolved = resolve_arrays(expanded, supplied, root=None)
+            # Keep the caller's source dtypes alongside the materialized initializers.
+            self.arrays = {**resolved, **supplied}
+        self.engine = Engine(compile_template(expanded, arrays=self.arrays))
         if (self.engine.arena.semiring != "sum" or self.engine.arena.mu3_groups
                 or len(self.engine.arena.delta_pairs)):
             raise ValueError("neural training requires a deterministic smooth sum-product graph")
@@ -105,7 +115,8 @@ class NeuralTrainer:
             "structure": structure_hash(self.template), "configuration": asdict(self.config),
             "dtype": self.dtype.str,
             "parameters": [asdict(blob) for blob in self.parameters.blobs],
-            "initial_arrays": array_digest(self.arrays),
+            # Version 1 checkpoint identities use the original caller-supplied arrays.
+            "initial_arrays": array_digest(supplied),
             "reference": array_digest({
                 name: getattr(self.reference.state, name)
                 for name in ("messages", "g_eta", "g_lam", "ef_eta", "g_obs", "g_mask", "ef_obs", "ef_mask")

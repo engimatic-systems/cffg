@@ -7,7 +7,7 @@ import jax
 import numpy as np
 import pytest
 
-from cffg import load_bundle
+from cffg import inits, load_bundle
 from cffg.training import NeuralTrainer, TrainingConfig
 from neural_training_fixture import affine_baseline, mean_values, regression_model
 from test_fixed_point_gradients import coupled_neural_model
@@ -51,6 +51,35 @@ def test_optimizer_continuation_and_bundle_are_replayable_and_strict(tmp_path, x
             with pytest.raises(ValueError, match=message):
                 trainer.load_checkpoint(checkpoint)
             np.testing.assert_array_equal(state.weights, restored.weights)
+
+
+def test_bundle_exports_initializers_overrides_and_trained_weights(tmp_path, monkeypatch):
+    template, arrays, observations, *_ = regression_model(1)
+    template.blobs["m0"] = replace(template.blobs["m0"], init=inits.spec("zeros"))
+    del arrays["m0"]
+    covariance = inits.spec("random_spd", seed=824, scale=.002)
+    template.blobs["P"] = replace(template.blobs["P"], init=covariance)
+    del arrays["P"]
+    template.blobs["V"] = replace(template.blobs["V"], init=inits.spec("eye", scale=1.))
+    arrays["V"] = arrays["V"].astype(np.float32)
+    expected = {**arrays, "m0": np.zeros(1), "P": inits.from_spec(covariance, (1, 1))}
+
+    trainer = NeuralTrainer(template, arrays, observations)
+
+    def reject_reinitialization(*args):
+        pytest.fail("A self-contained bundle must use the values resolved at trainer construction")
+
+    monkeypatch.setattr(inits, "from_spec", reject_reinitialization)
+    initial = trainer.initial_state()
+    trained = trainer.step(initial).require_applied()
+    assert not np.array_equal(initial.weights, trained.weights)
+    for state in (initial, trained):
+        path = tmp_path / f"step-{state.step}.cffgz"
+        trainer.save_bundle(path, state)
+        loaded = load_bundle(path)
+        assert loaded.arrays.keys() == expected.keys()
+        for name, value in {**expected, "theta": state.weights}.items():
+            np.testing.assert_array_equal(loaded.arrays[name], value, strict=True)
 
 
 def test_optimizer_refuses_an_actual_exhausted_adjoint_without_updating():

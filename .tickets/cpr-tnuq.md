@@ -1,6 +1,6 @@
 ---
 id: cpr-tnuq
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-11-22T02:01:05Z
@@ -39,3 +39,9 @@ A blob is a named parameter array in the template. An initializer supplies its v
 **2026-11-22T02:02:35Z**
 
 Initializer-only m0 reproduced at PR 157 head 02344ba and at 80ae1f2 with the public trainer. Export path begins in 82765a7. See ~/agent-share/cffg-premerge-review/early/initialized_trainer_bundle.py and observed.txt.
+
+**2026-11-23T03:13:45Z**
+
+The original one-observation reproducer converged and failed export for missing m0 before the fix. NeuralTrainer now resolves missing arrays on the expanded template at construction, keeps explicit override dtypes, and passes the same values to compilation and bundle export. Export overlays the weights from the requested optimizer step. The version-1 checkpoint identity continues to hash the original supplied arrays. The model bundle format is unchanged.
+
+Focused validation on review/premerge-195: the original reproducer creates a bundle. The new regression saved and loaded initial and Adam-updated weights with an initializer-only mean, a seeded random_spd prior covariance, and an explicit float32 override while initializer evaluation was disabled after construction. It passed. Existing float32 and float64 strict checkpoint/bundle continuation and exhausted-adjoint tests passed (3); existing self-contained, missing-array, and extracted-plate bundle tests passed (3). A compact two-copy neural plate preserved a private per-copy initializer and float32 override through export/reload. A version-1 checkpoint created with pre-fix training.py on the partial-input fixture loaded with the same identity. No outstanding ticket work. Parent owns integrated suite and merge.
