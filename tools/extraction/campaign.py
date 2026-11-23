@@ -120,7 +120,7 @@ def worker(root,stage,seed,lib):
         if hasattr(backend,"close"): backend.close()
 
 
-def run(root,stage):
+def run(root,stage,lock_fd):
     seeds=expected_seeds(root,stage)
     manifest=runtime()
     signature=identity(manifest)
@@ -138,7 +138,7 @@ def run(root,stage):
             print("Starting",stage,seed,lib,flush=True)
             start=perf_counter()
             subprocess.run([sys.executable,__file__,"worker","--output",str(root),"--stage",stage,
-                            "--seed",str(seed),"--library",lib],check=True,
+                            "--seed",str(seed),"--library",lib,"--lock-fd",str(lock_fd)],check=True,pass_fds=(lock_fd,),
                            env={**os.environ,"EXTRACTION_LAUNCH":str(time.time())})
             print("Block elapsed",round(perf_counter()-start,2),flush=True)
     paths=inventory(root,stage,seeds) if stage!="endurance" else [
@@ -161,17 +161,21 @@ def main():
     p.add_argument("--stage",choices=("development","endurance","heldout"))
     p.add_argument("--seed",type=int)
     p.add_argument("--library",choices=LIBRARIES)
+    p.add_argument("--lock-fd",type=int,help=argparse.SUPPRESS)
     args=p.parse_args(); root=args.output.resolve()
     configure()
     root.mkdir(parents=True,exist_ok=True)
-    if args.action=="worker":
-        if not read(root/"protocol.json"): raise ValueError("Missing protocol")
-        worker(root,args.stage,args.seed,args.library)
-    else:
-        with (root/"campaign.lock").open("a") as lock:
-            fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+    lock_path=root/"campaign.lock"
+    with (lock_path.open("a") if args.lock_fd is None else os.fdopen(args.lock_fd,"a")) as lock:
+        if not os.path.samestat(os.fstat(lock.fileno()),lock_path.stat()):
+            raise ValueError("Inherited lock belongs to a different study")
+        fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        if args.action=="worker":
+            if not read(root/"protocol.json"): raise ValueError("Missing protocol")
+            worker(root,args.stage,args.seed,args.library)
+        else:
             setup(root)
-            if args.action=="run": run(root,args.stage)
+            if args.action=="run": run(root,args.stage,lock.fileno())
 
 
 if __name__=="__main__":
