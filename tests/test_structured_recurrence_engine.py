@@ -129,8 +129,10 @@ def test_wrapper_keeps_asymmetric_source_destination_axes():
     ) > 1e-2
 
 
-@pytest.mark.parametrize("card", (2, 3))
-@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+@pytest.mark.parametrize("dtype,card", [
+    pytest.param(np.float32, 2, marks=pytest.mark.slow), (np.float32, 3),
+    (np.float64, 2), pytest.param(np.float64, 3, marks=pytest.mark.slow),
+])
 def test_engine_pair_regions_and_bfe_match_fixed_drive_chain(card, dtype):
     engine, result, oracle, weights, offsets, tolerance = _chain(card, dtype)
     assert result.status is RunStatus.CONVERGED

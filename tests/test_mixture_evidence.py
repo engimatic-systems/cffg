@@ -29,8 +29,10 @@ def assert_scores(actual, expected, dtype, *, scale=64):
                                atol=scale * np.finfo(dtype).eps)
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
-@pytest.mark.parametrize("linear", [False, True])
+@pytest.mark.parametrize("linear,dtype", [
+    (False, np.float32), pytest.param(False, np.float64, marks=pytest.mark.slow),
+    pytest.param(True, np.float32, marks=pytest.mark.slow), (True, np.float64),
+])
 def test_displaced_components_do_not_lose_selector_evidence(dtype, linear):
     convert = lambda value: jnp.asarray(value, dtype=dtype)
     mean = convert([[10000.], [10000.125], [9999.75]])
