@@ -71,3 +71,7 @@ Fixed-model four-library comparison cpt-j81k finished on 30 paired seeds. CFFG t
 **2026-11-23T00:54:05Z**
 
 The cpc-4ntg learner passed its fresh validation at the 1% stationary tracking allowance. For a changing-reactor comparison, carry forward the benchmark-side log-UA EKF q=0.003 and the original q=0.012 reference. On ten matched control seeds the stationary penalties were +0.103% and +2.338% and changed-period median RMSE reductions versus frozen were 58.114% and 57.304%. Same change schedule, noise and planner across arms. Full evidence and causal replay are in ~/agent-share/pcgym-one-percent/index.html. This supplies the CFFG baseline for the broader comparison.
+
+**2026-11-23T01:34:03Z**
+
+cpcc-2dc3 completed the matched changing-reactor comparison. CFFG and RxInfer produced matching changed-period concentration RMSE on ten fresh seeds using the shared q=0.003 estimator. Both had 1.16% lower mean error than NumPyro or GTSAM. RxInfer warmed decisions were about 15× faster than CFFG. All four learned conditions stayed within the 1% stationary allowance and held zero actions. ~/agent-share/pcgym-continual-comparison/index.html has the full results, including eight GTSAM holds in fixed/informed comparisons and startup cost. This is evidence about four planners consuming the same online estimates, with separate native learning algorithms outside this experiment.
