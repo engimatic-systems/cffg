@@ -124,9 +124,8 @@ class BoundedChainRegion:
             mean, cov, energy = _frozen_joint(chain, result.state)
         # Recheck the terminal state's ledger and cavities with the reconstructed
         # evidence. State.params is a mapping and may have been edited after run.
-        from cffg.directed_chain_certificate import certify
         tol = max(1e-6, 64 * np.finfo(mean.dtype).eps)
-        check = certify(engine.arena, result.state, chain.linearize, energy, tol)
+        check = engine._certify_directed(result.state, energy, tol)
         if not check.passed or abs(check.free_energy-result.free_energies[0]) > tol*(1+abs(energy)):
             raise ValueError("terminal certificate disagrees with live bindings or frozen evidence")
         dim = chain.plan.dim

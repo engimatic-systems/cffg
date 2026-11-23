@@ -232,8 +232,9 @@ that every gap below will be implemented:
   partial goals. Declared learnables, interacting nonlinear factors,
   sigma-point methods and other topologies use the existing coupled route.
   Explicit schedules, fixed budgets without a tolerance and forced trust
-  solves also use the existing execution paths. Directed execution is host
-  inference. The implicit differentiator independently checks its own JAX
+  solves also use the existing execution paths. Directed inference builds its
+  proposal on the host and verifies it against the compiled engine update and
+  objective. The implicit differentiator independently checks its own JAX
   residual before admitting a returned state.
   The later retained native validation is separately reproduced by
   `tools/cstr_runtime_fixture.py` and `tools/benchmark_adaptive_runtime.py`:

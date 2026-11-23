@@ -303,15 +303,35 @@ class Engine:
         if mu3_code:
             outcome = "budget exhausted" if mu3_code == 1 else "diverged"
             raise RuntimeError(f"mu3 importance update {outcome}; use Engine.run for status")
+        updated, inner_code = self._step_with_status(state, damp, harden)
+        if inner_code:
+            raise RuntimeError(
+                "factor-local inference diverged; use Engine.run for status"
+            )
+        return updated
+
+    def _step_with_status(self, state, damp, harden):
         msgs, g_eta, g_lam, ef_eta, _, inner_code, *_ = self._step(
             state.messages, state.g_eta, state.g_lam, state.g_obs, state.g_mask,
             state.ef_eta, state.ef_obs, state.ef_mask, state.params, damp, harden,
         )
-        if int(inner_code):
-            raise RuntimeError(
-                "factor-local inference diverged; use Engine.run for status"
-            )
-        return _replace(state, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta)
+        return _replace(state, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta), int(inner_code)
+
+    def _certify_directed(self, state, evidence, tolerance):
+        from cffg.directed_chain_certificate import ChainCertificate, certify
+
+        check = certify(self.arena, state, self._directed.linearize, evidence, tolerance)
+        if not check.passed:
+            return check
+        # The compiled rule can round differently from the independent host reference.
+        successor, code = self._step_with_status(state, 0., True)
+        if code:
+            raise FloatingPointError("directed candidate failed the engine update")
+        return ChainCertificate.measure(
+            (np.asarray(state.g_eta), np.asarray(state.g_lam)),
+            (np.asarray(successor.g_eta), np.asarray(successor.g_lam)),
+            self.bfe(state), self.bfe(successor), evidence, tolerance,
+        )
 
     def _can_run_exact(self, n_iters: int, damp: float, harden_last: int) -> bool:
         return (
@@ -409,7 +429,7 @@ class Engine:
             if (self._directed is not None and outer_solver == "auto" and n_iters > 0
                     and tol is not None and isfinite(tol) and tol >= 0
                     and self._directed.admits(state)):
-                proposal = self._directed.run(state, tol)
+                proposal = self._directed.run(state, tol, self._certify_directed)
                 if (proposal.termination_reason is not OuterTerminationReason.DIRECTED_CHAIN_UNCERTIFIED
                         or n_iters == 1):
                     return proposal

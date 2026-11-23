@@ -24,6 +24,16 @@ def test_partial_goal_posterior_and_energy_match_dense_gaussian(dtype):
         assert result.linear_iterations == result.solver_compilations == 0
         assert result.inner_status is RunStatus.CONVERGED
         state = result.require_converged()
+        successor = engine.step(state)
+        residuals = []
+        for field in ("g_eta", "g_lam"):
+            current = np.asarray(getattr(state, field))
+            mapped = np.asarray(getattr(successor, field))
+            residuals.append(np.max(np.abs(mapped - current) / (1 + np.abs(current))))
+        assert result.outer_residual == max(residuals)
+        energy = engine.bfe(state)
+        assert result.free_energies[-1] == energy
+        assert abs(engine.bfe(successor) - energy) <= max(1e-6, 64 * np.finfo(dtype).eps) * (1 + abs(energy))
         mu, cov, cost = affine_reference({k: v.astype(np.float64) for k, v in arrays.items()}, data)
         atol = 512 * np.finfo(dtype).eps if dtype is np.float32 else 1e-10
         np.testing.assert_allclose(result.free_energies[-1], cost, rtol=atol, atol=atol)
@@ -32,6 +42,26 @@ def test_partial_goal_posterior_and_energy_match_dense_gaussian(dtype):
             mean, covariance = engine.gaussian_marginal(state, f"s{index}")
             np.testing.assert_allclose(mean, mu[block], rtol=atol, atol=atol)
             np.testing.assert_allclose(covariance, cov[block, block], rtol=atol, atol=atol)
+
+
+def test_float32_directed_proposal_rejects_disagreement_with_engine_step():
+    with jax.enable_x64(False):
+        template, arrays, data = planning_fixture(past=0, horizon=2, affine=True, dtype=np.float32,
+                                                  process_scale=.02)
+        engine = Engine(compile_template(template, arrays=arrays))
+        initial = engine.bind_data(engine.init_state(), data)
+        proposal, _ = engine._directed.candidate(initial)
+        mapped = engine.step(proposal)
+        before, after = np.asarray(proposal.g_eta), np.asarray(mapped.g_eta)
+        error = np.max(np.abs(after - before) / (1 + abs(before)))
+        result = engine.run(initial, 1, tol=1e-6)
+        # Backend rounding can differ. Certification must follow this backend's actual step.
+        if error > 64 * np.finfo(np.float32).eps:
+            assert result.termination_reason is OuterTerminationReason.DIRECTED_CHAIN_UNCERTIFIED
+            assert result.state is initial and not result.free_energies
+            assert result.residual >= error
+        elif result.status is RunStatus.CONVERGED:
+            assert result.outer_residual >= error
 
 
 def test_masks_parameters_and_metrics_are_live_on_reused_engine():

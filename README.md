@@ -399,8 +399,10 @@ mean, covariance = engine.gaussian_marginal(state, action_edge)
 method = result.termination_reason.value  # "directed_chain_certified" on this route
 ```
 
-The directed solver checks every message and the frozen Bethe objective at
-the answer and its successor. Missing observations and partial goals are
+The directed solver checks every message against an ordinary engine step
+and evaluates the frozen Bethe objective before and after that step. The first
+solve compiles the step and objective. Later solves with the same shapes
+reuse those compiled functions. Missing observations and partial goals are
 supported. For a matched coupled-solver reference on the same graph, pass
 `outer_solver="trust_region"`. The single-edge readout also works with that
 reference. It reads the named edge in the model's own units.

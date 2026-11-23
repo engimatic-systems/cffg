@@ -21,6 +21,17 @@ class ChainCertificate(NamedTuple):
     successor_free_energy: float
     passed: bool
 
+    @classmethod
+    def measure(cls, current, successor, energy, successor_energy, evidence_cost, tolerance):
+        """Measure componentwise message motion and both returned-state ledger checks."""
+        residual = float(np.max([np.max(np.abs(after - before) / (1 + np.abs(before)))
+                                 for before, after in zip(current, successor, strict=True)]))
+        stable = abs(successor_energy - energy) <= tolerance * (1 + abs(energy))
+        discrepancy = max(abs(energy - evidence_cost), abs(successor_energy - evidence_cost))
+        matches = discrepancy <= tolerance * (1 + abs(evidence_cost))
+        finite = all(map(math.isfinite, (residual, energy, successor_energy, evidence_cost)))
+        return cls(residual, energy, successor_energy, bool(finite and residual <= tolerance and stable and matches))
+
 
 _LOG2PI = math.log(2 * math.pi)
 
@@ -257,9 +268,5 @@ def certify(arena, state, linearize, evidence_cost, tolerance) -> ChainCertifica
         args = obs, mask, params, linearize
         mapped_eta, mapped_precision, energy = _sweep(arena, eta, precision, *args)
         _, _, successor_energy = _sweep(arena, mapped_eta, mapped_precision, *args)
-        residual = max(float(np.max(np.abs(mapped - current) / (1 + np.abs(current))))
-                       for mapped, current in ((mapped_eta, eta), (mapped_precision, precision)))
-    stable = abs(successor_energy - energy) <= tolerance * (1 + abs(energy))
-    discrepancy = max(abs(energy - evidence_cost), abs(successor_energy - evidence_cost))
-    matches = discrepancy <= tolerance * (1 + abs(evidence_cost))
-    return ChainCertificate(residual, energy, successor_energy, bool(residual <= tolerance and stable and matches))
+        return ChainCertificate.measure((eta, precision), (mapped_eta, mapped_precision),
+                                        energy, successor_energy, evidence_cost, tolerance)

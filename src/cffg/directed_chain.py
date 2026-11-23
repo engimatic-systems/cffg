@@ -191,15 +191,13 @@ class DirectedChain:
         return _replace(state, g_eta=jax.device_put(eta, device),
                         g_lam=jax.device_put(precision, device)), cost
 
-    def run(self, state, tol):
+    def run(self, state, tol, certify_state):
         """One proposal and an independent ledger/map check at its own cavities."""
-        from cffg.directed_chain_certificate import certify
-
         tolerance = max(float(tol), 64 * np.finfo(state.g_eta.dtype).eps)
         try:
             with np.errstate(over="raise", divide="raise", invalid="raise"):
                 candidate, evidence = self.candidate(state)
-                check = certify(self.arena, candidate, self.linearize, evidence, tolerance)
+                check = certify_state(candidate, evidence, tolerance)
         except InvalidFactor as error:
             return RunResult(
                 state, RunStatus.DIVERGED, 1, (), (), float("inf"),
