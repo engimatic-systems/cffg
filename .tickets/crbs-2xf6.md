@@ -1,6 +1,6 @@
 ---
 id: crbs-2xf6
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-11-23T04:26:14Z
@@ -37,3 +37,7 @@ A filter uses only observations available at the current tick. Planning uses pos
 **2026-11-23T04:26:57Z**
 
 Compatibility review against merged 51ae6a7: src/cffg/directed_chain_plan.py admits a fixed-dimensional continuous Taylor chain with projected data. Current tools/pcgym_timing/cffg_adapter.py resets from its base, and rxinfer_worker.jl:132 starts each planning solve at m0/P0. The Julia slice already carries dense covariances internally. Both adapters need a new plant model, goals and two-action readout, plus a separate causal filter. Confidence high for the current APIs. Full native nonlinear posterior quality and performance on this plant require the pilot.
+
+**2026-11-23T05:01:17Z**
+
+Qualified both benchmark-native implementations against dense correlated 11-dimensional filters and independent two-flow control references. CFFG uses the same Affine and Natural message rules as its production directed solver; a separate public Engine template agrees. RxInfer uses persistent Julia graph updates through a binary pipe. Both share the nonlinear tangent computation and the observer/planner split. Missing readings, changing goals, two-flow output, restart and likelihood calculations passed. Each arm differed from the dense command oracle by less than 3e-12 flow units. A short four-transition nonlinear importance-sampling reference with 262144 particles passed the declared budget and repeat checks. Both arms were within 0.056 posterior standard deviations in mean and 0.100 in scaled covariance. Qualified PCGym mean and Jacobians across 180 operating points. Raw checks in ~/agent-share/pcgym-extraction-rxinfer/qual/.
