@@ -210,7 +210,7 @@ def run_child(out, lib, peers, seed=None):
 
 
 def campaign(out, peers, prior):
-    for folder in ("qualification", "workers", "logs"):
+    for folder in ("qualification", "workers", "logs", *LIBRARIES):
         (out/folder).mkdir(exist_ok=True)
     freeze(out, peers, prior)
     ph = digest(out/"protocol.json")
