@@ -59,6 +59,7 @@ EPIC_FILES = {
         "test_factored_rollout.py",
         "test_rollout_planning.py",
         "test_axiom_planning.py",
+        "test_axiom_tracking.py",
         "test_outer_gfe_formalism.py",
     ],
     "M4 · Epistemic behavior": [
