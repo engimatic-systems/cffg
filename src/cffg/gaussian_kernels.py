@@ -205,10 +205,10 @@ def centered_linear_statistics(eta, precision, params, dims, observed_role, obse
         eo, lo = eta[:, 0, :dy], precision[:, 0, :dy, :dy]
         top = jnp.concatenate((w + lo, -w @ a), axis=-1)
         bottom = jnp.concatenate((-atw, atw @ a + li), axis=-1)
-        joint_precision = jnp.concatenate((top, bottom), axis=-2)
+        block_precision = jnp.concatenate((top, bottom), axis=-2)
         wb = jnp.einsum("mij,mj->mi", w, b)
         joint_eta = jnp.concatenate((wb + eo, ei - jnp.einsum("mji,mj->mi", a, wb)), axis=-1)
-        mean, covariance = gauss.moments(joint_eta, joint_precision)
+        mean, covariance = gauss.moments(joint_eta, block_precision)
         blocks = {"cov_yy": covariance[:, :dy, :dy], "cov_yx": covariance[:, :dy, dy:],
                   "cov_xx": covariance[:, dy:, dy:]}
     else:
