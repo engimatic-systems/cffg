@@ -14,6 +14,7 @@ from cffg.gaussian_learning import (
     _finite_stat,
     _proper,
     _require_keys,
+    _regression_record,
 )
 
 
@@ -37,7 +38,7 @@ class ComponentMNIWFamily:
     """One MNIW posterior per Gaussian-mixture selector component."""
 
     name = "component_mniw"
-    readout = "gaussian_node_stats"
+    readout = "centered_gaussian_stats"
     _PARAMS = {"m", "lam", "psi", "nu"}
     semantic_identity = LEARNING_IDENTITIES["component_mniw"]
     parameter_forms = ("expected",)
@@ -94,6 +95,8 @@ class ComponentMNIWFamily:
             raise ValueError(
                 f"{ftype} responsibility must be a nonnegative component vector"
             )
+        if "cov_xx" in readout:
+            return _regression_record(readout, responsibility)
         return {
             "Syy": _finite_stat(readout, "Syy", ftype),
             "Syx": _finite_stat(readout, "Syx", ftype),
@@ -102,6 +105,8 @@ class ComponentMNIWFamily:
         }
 
     def pool(self, records) -> dict[str, np.ndarray]:
+        if "covariance" in records[0]:
+            return {key: np.stack([row[key] for row in records]) for key in records[0]}
         return {
             key: np.sum(np.stack([record[key] for record in records]), axis=0)
             for key in ("Syy", "Syx", "Sxx", "n")
@@ -109,6 +114,16 @@ class ComponentMNIWFamily:
 
     def fold(self, params, stats) -> dict[str, np.ndarray]:
         priors = self._posteriors("posterior", params)
+        if "covariance" in stats:
+            weights, means, covs = (stats[key] for key in ("weight", "mean", "covariance"))
+            if weights.ndim != 2 or weights.shape[1] != len(priors) or (
+                means.shape[:2] != weights.shape or covs.shape[:2] != weights.shape
+            ):
+                raise ValueError("incompatible component MNIW statistic shapes")
+            return _stack_mniw([
+                prior.update_centered(means[:, k], covs[:, k], weights[:, k])
+                for k, prior in enumerate(priors)
+            ])
         syy = np.asarray(stats["Syy"])
         syx = np.asarray(stats["Syx"])
         sxx = np.asarray(stats["Sxx"])

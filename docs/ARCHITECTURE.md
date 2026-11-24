@@ -1688,10 +1688,10 @@ them. Four rules define the contract:
    family names which engine readout it draws from (`cffg.learn.READOUTS`),
    because a conjugate posterior is not always one array read off one
    readout. An MNIW over a `gaussian_linear` carries four hyperparameters,
-   accumulates three statistics from `Engine.gaussian_node_stats`, and rolls
-   over into three blobs at different shapes. Component MNIW uses the same
-   statistic names with leading selector axes and occurrence counts equal to
-   soft responsibilities. PG weights instead draw additive `linear` and
+   reads conditional means and covariances from `Engine.gaussian_node_stats`,
+   and rolls over into three blobs at different shapes. Component MNIW
+   receives the same conditional statistics with leading selector axes.
+   Each component contributes its soft responsibility exactly once. PG weights instead draw additive `linear` and
    `quadratic` records from `Engine.recurrence_weight_stats`. A `LearnTarget`
    names both the blob it writes and the parameter role that blob fills, which
    routes every multi-parameter write. `Dirichlet` is the degenerate case of

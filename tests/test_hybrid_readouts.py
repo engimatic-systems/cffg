@@ -235,7 +235,7 @@ def _incoming_gaussian(arena, state, group, role, dimension):
     return eta, precision
 
 
-def _numpy_linear_stats(engine, state):
+def _numpy_linear_stats(engine, state, *, centered=False):
     group = engine.arena.mix_groups[0]
     dimension = group.dims[0]
     eta_y, precision_y = _incoming_gaussian(
@@ -285,6 +285,8 @@ def _numpy_linear_stats(engine, state):
         scores.append(log_selector[regime] + log_z + node_constant)
     responsibility = np.exp(np.asarray(scores) - np.max(scores))
     responsibility /= responsibility.sum()
+    if centered:
+        return responsibility, np.stack(means), np.stack(covariances)
     syy = []
     syx = []
     sxx = []
@@ -316,6 +318,14 @@ def test_linear_mixture_stats_match_independent_d3_joint():
     engine, state = _converge(template, arrays)
     actual = engine.gaussian_node_stats(state)["transition"]
     responsibility, syy, syx, sxx = _numpy_linear_stats(engine, state)
+    conditional = engine.gaussian_node_stats(state, centered=True)["transition"]
+    _, mean, cov = _numpy_linear_stats(engine, state, centered=True)
+    np.testing.assert_allclose(conditional["mean"], mean, atol=1e-11)
+    np.testing.assert_allclose(conditional["cov_yy"], cov[:, :2, :2], atol=1e-11)
+    np.testing.assert_allclose(conditional["cov_yx"], cov[:, :2, 2:], atol=1e-11)
+    np.testing.assert_allclose(conditional["cov_xx"], cov[:, 2:, 2:], atol=1e-11)
+    np.testing.assert_allclose(conditional["responsibility"], responsibility, atol=1e-11)
+
 
     assert bool(actual["proper"])
     np.testing.assert_allclose(

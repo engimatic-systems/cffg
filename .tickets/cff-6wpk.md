@@ -52,3 +52,7 @@ Reproduced the two scalar float32 cases on fd8bfd1: correct marginal variances 0
 **2026-11-24T05:25:15Z**
 
 Registered latent and DATA regression now use joint-centered moments and QR. Exact scales at 4096 and at 2^27: 3.25/4.0. Dense, fractional, rank-one and point conditional data agree with an independent regression oracle. 85 focused conjugate, Gaussian-learning and readout-ownership cases passed (one opt-in excluded). New P2 cad-1bat reproduces an unrepresentable column precision with two translated predictors; the learner explicitly refuses that update.
+
+**2026-11-24T05:27:25Z**
+
+Switching-linear centered readout is tested against the independent full Gaussian joint, including its cross-covariance and responsibility. Translated sparse f32 flood and f64 auto public learning cases passed, as did the existing K=32,d=16 write path. Fused centered callbacks are candidates for coordinated timing; raw Engine and direct raw-update APIs retain their original algorithms.

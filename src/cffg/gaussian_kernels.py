@@ -226,6 +226,8 @@ def centered_linear_statistics(eta, precision, params, dims, observed_role, obse
 
 
 def install(register, kernel, hostile):
+    from jax import jit
+
     prior = {
         "mean": ParameterSpec(lambda s: (s["out"],), "m"),
         "cov": ParameterSpec(
@@ -265,8 +267,10 @@ def install(register, kernel, hostile):
                     energy,
                     conditioning,
                     stats,
-                    centered_statistics=(centered_prior_statistics if name == "gaussian"
-                                         else centered_linear_statistics),
+                    centered_statistics=jit(
+                        centered_prior_statistics if name == "gaussian" else centered_linear_statistics,
+                        static_argnums=(3, 4),
+                    ),
                     moment_projections=frozenset({"gaussian_first_second"}),
                 ),
             )

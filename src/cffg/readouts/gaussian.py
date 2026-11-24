@@ -119,7 +119,8 @@ def gaussian_node_stats(
         w = state.params[g.name + ":W"]
         if g.type == "gaussian_mixture_linear":
             do, di = g.dims
-            stats = mixg.mixlin_stats(
+            read_stats = mixg.mixlin_centered_stats if centered else mixg.mixlin_stats
+            stats = read_stats(
                 inc_e[:, 0, :do],
                 inc_l[:, 0, :do, :do],
                 inc_e[:, 1, :di],
@@ -130,6 +131,9 @@ def gaussian_node_stats(
                 w,
             )
             for i, name in enumerate(g.members):
+                if centered:
+                    out[name] = {key: np.asarray(value[i]) for key, value in stats._asdict().items()}
+                    continue
                 out[name] = {
                     "responsibility": np.asarray(stats.responsibility[i]),
                     "Syy": np.asarray(stats.syy[i]),

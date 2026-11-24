@@ -419,7 +419,7 @@ by a floor or accepted as a finite posterior. These numerical changes do not
 repair the partial-goal planning limitation above.
 
 Default raw Gaussian statistics can round different conditional variances
-to the same second moment. Declared NIW and ordinary MNIW consume centered
+to the same second moment. Declared NIW, ordinary MNIW and component MNIW consume centered
 statistics. MNIW still stores a dense float64 coefficient precision. For two
 unit-variance predictors both centered at 2²⁷, their small difference can
 vanish in that stored matrix. The centered update raises a precision error
