@@ -1,6 +1,6 @@
 ---
 id: cao-lty5
-status: in_progress
+status: closed
 deps: [cao-m63a]
 links: []
 created: 2026-11-24T05:32:40Z
@@ -40,3 +40,7 @@ A neighbor is another eligible slot close enough to influence motion. A categori
 **2026-11-24T05:32:53Z**
 
 Independent fixtures use the motion child handoff and existing MixedBatch. No live learner or campaign is required.
+
+**2026-11-24T05:36:06Z**
+
+Four focused tests passed with uv run --frozen --no-sync pytest -q tests/test_axiom_interaction.py (2.49s). interaction_batch exports point-valued MixedBatch records with either the six observed categories or contextual reward and switch set to -1. Fixtures cover projected ellipse contact, tracked over static rectangular neighbors, same-identity handling, frozen absent distance, float32/64 and eager/JIT. Full short gate and dashboard are parent-owned.
