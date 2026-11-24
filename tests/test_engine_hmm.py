@@ -6,6 +6,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 from cffg.compiler import compile_template
 from cffg.core.compose import compose, unroll
@@ -108,6 +109,7 @@ def test_partial_observations():
     np.testing.assert_allclose(engine.bfe(state), -loglik, atol=1e-9)
 
 
+@pytest.mark.slow
 def test_vmap_batch_equals_sequential():
     engine = build_engine()
     sequences = [[1, 0, 1, 1], [0, 0, None, 1], [1, 1, 1, None]]

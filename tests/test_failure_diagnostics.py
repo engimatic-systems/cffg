@@ -70,7 +70,7 @@ def test_success_discards_recovered_auxiliary_facts_and_budget_has_generic_reaso
     assert result.failure is None
 
 
-@pytest.mark.parametrize("schedule", ["auto", "flood"])
+@pytest.mark.parametrize("schedule", ["auto", pytest.param("flood", marks=pytest.mark.slow)])
 def test_actual_hybrid_overflow_identifies_its_model_local_factor(schedule):
     template, arrays = mixlin_template()
     engine = Engine(compile_template(template, arrays=arrays), schedule=schedule)
@@ -107,7 +107,7 @@ def test_priming_origin_survives_later_lower_rank_failure():
     assert result.failure == FailureDiagnostic("local_budget", engine._failure_names[rank], "priming", 0)
 
 
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 def test_larger_colony_keeps_failed_members_separate_from_healthy_results(dtype):
     template, arrays, observations = ordinary_case(0)
     colony = Colony()

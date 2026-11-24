@@ -73,7 +73,7 @@ def test_empty_full_and_donor_generation_after_replay(tmp_path):
     assert_same(*proposals)
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_real_update_merge_subtracts_donor_prior_once(dtype):
     p = prior(dtype)
     # The donor's prior and its learned evidence must be separated.
@@ -193,7 +193,7 @@ def test_snapshot_rejects_missing_carry_reused_ids_and_contaminated_dormant_slot
         ComponentBank.from_state_dict(state)
 
 
-@pytest.mark.parametrize("capacity", [32, 500, 5000])
+@pytest.mark.parametrize("capacity", [32, pytest.param(500, marks=pytest.mark.slow), 5000])
 def test_lifecycle_preserves_fixed_pytree_shapes_at_capacity(capacity):
     active = np.zeros(capacity, bool)
     active[[0, -1]] = True

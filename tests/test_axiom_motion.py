@@ -42,7 +42,7 @@ def test_slot_observation_visibility_velocity_clip_and_teleport_boundary():
     np.testing.assert_allclose(again, [0, 0, .2, 0, 0, 0], atol=1e-14)
 
 
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 def test_ordered_acceleration_birth_reuse_and_action_handoff(dtype):
     bank = initial_motion(dtype=dtype)
     # Two tracked objects undergo the same acceleration at distinct positions.

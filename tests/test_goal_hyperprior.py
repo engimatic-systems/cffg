@@ -196,6 +196,7 @@ def test_sweeps_replace_mu1_and_explicit_rollover_adds_one_new_trial():
     )
 
 
+@pytest.mark.slow
 def test_rollover_changes_next_policy_in_predicted_direction():
     d = np.array([0.5, 0.5])
     matrix = np.eye(2)

@@ -462,6 +462,7 @@ def test_linear_predictive_matches_components_and_forward_message():
     )
 
 
+@pytest.mark.slow
 def test_scalar_predictive_matches_dense_gauss_hermite_quadrature():
     template, arrays = _linear_template(regimes=3, dimension=1)
     engine, state = _converge(template, arrays)
@@ -523,7 +524,7 @@ def test_prior_mixture_stats_and_predictive_name_weighting_explicitly():
     )
 
 
-@pytest.mark.parametrize(("x64", "schedule"), [(False, "auto"), (True, "flood")])
+@pytest.mark.parametrize(("x64", "schedule"), [(False, "auto"), pytest.param(True, "flood", marks=pytest.mark.slow)])
 def test_centered_mixture_readout_preserves_uncertainty_at_displaced_origin(x64, schedule):
     template, arrays = _prior_mixture_template(regimes=3, dimension=1)
     template.ports.clear()
@@ -559,7 +560,7 @@ def test_centered_mixture_readout_preserves_uncertainty_at_displaced_origin(x64,
 
 
 @pytest.mark.parametrize(("linear", "schedule", "prior"), [
-    (False, "auto", [0.5, 0.5]),
+    pytest.param(False, "auto", [0.5, 0.5], marks=pytest.mark.slow),
     (True, "flood", [0.2, 0., 0.8]),
 ])
 def test_far_observation_preserves_selector_odds_and_certified_energy(linear, schedule, prior):

@@ -683,7 +683,7 @@ def test_hybrid_legacy_checkpoint_requires_complete_posterior(
     learnables.load_state_dict(legacy_checkpoint)
 
 
-@pytest.mark.parametrize("x64,schedule", [(False, "flood"), (True, "auto")])
+@pytest.mark.parametrize("x64,schedule", [(False, "flood"), pytest.param(True, "auto", marks=pytest.mark.slow)])
 def test_component_mniw_retains_translated_conditional_spread(x64, schedule):
     with jax.enable_x64(x64):
         t, arrays, sources = _mixture_template(regimes=3, dimension=1)

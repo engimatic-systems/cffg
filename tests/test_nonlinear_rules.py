@@ -97,7 +97,7 @@ def test_float32_sigma_points_cannot_silently_lose_the_input_variance():
     assert np.isinf(value["energy"])
 
 
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 @pytest.mark.parametrize("narrow_axis,wide_scale,narrow_scale", [(1, 1, 1), (0, 32, 64)])
 def test_affine_variance_when_only_one_sigma_direction_collapses(dtype, narrow_axis, wide_scale, narrow_scale):
     # Both signed offsets round back to the mean along the narrow axis.

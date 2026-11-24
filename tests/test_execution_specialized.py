@@ -206,7 +206,10 @@ def assert_vmap(execute, inputs):
             kind, dtype, id=f"{kind}-{np.dtype(dtype).name}",
             marks=pytest.mark.slow if (
                 (dtype is np.float64 and kind != "dirichlet")
-                or kind in {"mixture_prior", "hybrid_prior", "gfe_learned", "gfe_goal", "transition_fixed"}
+                or kind in {
+                    "mixture", "mixture_prior", "hybrid_prior", "gfe_learned",
+                    "gfe_goal", "transition", "transition_fixed",
+                }
             ) else (),
         )
         for kind in (

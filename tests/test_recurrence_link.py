@@ -818,6 +818,7 @@ def test_engine_tracks_dense_quadrature_and_upper_bounds_evidence():
     assert bounded_vfe - exact_evidence < 0.06
 
 
+@pytest.mark.slow
 def test_flood_and_mixed_schedules_reach_the_same_bound_root():
     template, arrays = _template(
         weights=np.array([[[0.4]], [[-0.3]]]),

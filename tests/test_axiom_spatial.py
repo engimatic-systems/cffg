@@ -57,7 +57,7 @@ def reference(model, pixels, prior, initial, alpha, active, sweeps):
     return position, C, w, ell.max(axis=1)
 
 
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 def test_posterior_positions_and_assignments_match_quadratic_log_joint(dtype):
     model, frame, _ = example(dtype)
     k = 3

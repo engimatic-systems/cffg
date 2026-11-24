@@ -9,7 +9,7 @@ from cffg import gauss
 from cffg.gaussian_readiness import InputReadiness, _information_direction, input_readiness
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_proper_admission_is_exactly_the_existing_contract(dtype):
     matrices = (
         np.eye(3), np.diag([1e-25, 1., 1e25]),
@@ -23,7 +23,7 @@ def test_proper_admission_is_exactly_the_existing_contract(dtype):
         assert input_readiness(eta.at[0].set(jnp.nan), precision) == InputReadiness.INVALID
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_exact_vacuity_and_structural_missing_coordinates(dtype):
     precision = jnp.diag(jnp.array([1e-25, 0., 1e25, 0.], dtype=dtype))
     eta = jnp.array([1., 0., -1., 0.], dtype=dtype)
@@ -37,7 +37,7 @@ def test_exact_vacuity_and_structural_missing_coordinates(dtype):
     assert input_readiness(eta, negative) == InputReadiness.INVALID
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 @pytest.mark.parametrize("units", [(1., 1.), (1e-12, 1e12), (1e12, 1e-12)])
 def test_rotated_rank_one_information_survives_coordinate_units(dtype, units):
     units = np.asarray([*units, 1.], dtype=dtype)
@@ -114,7 +114,7 @@ def test_subnormal_fallback_information_is_not_erased_as_exact_zero(dtype):
     assert classify(jnp.asarray([0., -0.], dtype=dtype), precision * 0) == InputReadiness.PARTIAL
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_larger_batched_members_remain_independent_and_jit_equivalent(dtype):
     precision = np.tile(np.eye(40, dtype=dtype), (32, 1, 1))
     eta = np.ones((32, 40), dtype=dtype)
