@@ -44,3 +44,7 @@ Implement independent read-only sampled planning against an enumerable world. Ar
 **2026-11-24T05:30:00Z**
 
 Release-budget planner probe completed with supplied two-object, three-interaction snapshot: 32×512×3=49,152 imagined steps and zero real steps. CPU float32 compile 0.732 s, one synchronized warmed decision 21.56 ms. Exact synthetic rollout distribution/score and selection checks plus optional no-bonus comparison passed. Live features and model binding belong to car-mps6. Do not extrapolate these numbers to a 32-object, 5,000-interaction bank or game reward. Shared suite pending.
+
+**2026-11-24T06:02:02Z**
+
+Planner qualification covers one compact live rMM/tMM snapshot, relative and absolute scores against a full-bank query, read-only updates, bitwise-matched keys, no-bonus and reversed discounted/undiscounted rankings. A 32-step ×512 strings ×3 draws synthetic two-slot/three-rule case ran once warm in 21.56 ms. A 5,000-slot bank with eight occupied rules and six tracked objects passed a separately qualified H8×16×3 development search; its 384 imagined transitions took 7.16–7.86 ms after setup. Neither measurement is a 10,000-step Gameworld score.

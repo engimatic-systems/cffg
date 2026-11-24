@@ -1,6 +1,6 @@
 ---
 id: cff-961d
-status: in_progress
+status: closed
 deps: [cff-zpk8]
 links: []
 created: 2026-11-24T05:26:05Z
@@ -40,3 +40,7 @@ A spatial slot is a Gaussian belief about an object position. A responsibility a
 **2026-11-24T05:30:00Z**
 
 Two-sweep 32-slot / 33,600 pixel smoke passed on Explode base frame 0; fully coupled update versus independent information solve using the returned final assignments differed by max 1.15e-5 normalized coordinate and 1.20e-7 covariance. Three targeted spatial tests (two precisions, independent quadratic fitting, permutation, zero support) plus four underlying frame regression tests. Full suite pending.
+
+**2026-11-24T06:02:02Z**
+
+The retained AXIOM full-frame equation includes a rank-one 1e-8 contribution to position precision, including the negative off-diagonal covariance its two-axis fixture predicts. Independent posterior and full-frame checks pass. The separate growth/initialization work uses the same equations and passed on real frames.

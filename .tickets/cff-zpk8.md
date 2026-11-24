@@ -1,6 +1,6 @@
 ---
 id: cff-zpk8
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-11-24T05:20:14Z
