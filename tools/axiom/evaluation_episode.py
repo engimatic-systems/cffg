@@ -11,7 +11,7 @@ import traceback
 import numpy as np
 
 from evaluation_actor import Actor
-from evaluation_campaign import (STAGES, canonical, digest, exclusive, publish, read,
+from evaluation_campaign import (STAGES, audit_run, canonical, digest, exclusive, publish, read,
                                  run_name, verify_before, verify_source)
 from evaluation_checkpoint import save, restore
 from evaluation_game import simulator
@@ -220,9 +220,10 @@ def main():
     case, = [case for case in study["stages"][args.stage]
              if case["game"] == args.game and case["model_seed"] == args.model_seed]
     dest = root / args.stage / run_name(case)
-    with exclusive(dest / "worker.lock"):
+    with exclusive(dest / "worker.lock", wait=True):
         if (dest / "result.json").exists():
-            raise FileExistsError("a sealed result already exists for this seed")
+            audit_run(root, study, args.stage, case)
+            return
         episode(root, study, args.stage, case)
 
 

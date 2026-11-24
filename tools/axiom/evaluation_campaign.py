@@ -53,10 +53,10 @@ def publish(path, value):
 
 
 @contextmanager
-def exclusive(path):
+def exclusive(path, *, wait=False):
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a+") as handle:
-        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(handle, fcntl.LOCK_EX if wait else fcntl.LOCK_EX | fcntl.LOCK_NB)
         yield handle
 
 
@@ -111,7 +111,7 @@ def seal(root, reference):
                  horizon=32, candidates=512, draws=3, reduction_cadence=500,
                  created=datetime.now(timezone.utc).isoformat(),
                  revision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO,text=True).strip(),
-                 runtime=runtime(),
+                 runtime=runtime(), module_fixtures=qualification_inputs(),
                  source_files=sources, source_sha256=hashlib.sha256(canonical(sources)).hexdigest(),
                  protocol_sha256=digest(HERE / "reference_protocol.json"), reference_sha256=digest(ref_path),
                  stages={s: list(seed_pairs(protocol, s)) for s in STAGES})
@@ -151,7 +151,35 @@ def stage_receipt(root, study, stage):
                 runs={run_name(c): audit_run(root, study, stage, c) for c in study["stages"][stage]})
 
 
+def qualification_inputs():
+    files = sorted((REPO / "tests").glob("test_axiom_*.py"))
+    return {str(path.relative_to(REPO)):digest(path) for path in files}
+
+
+def qualify(root, study):
+    """Exercise the frozen module fixtures, including the opt-in capacity cases."""
+    inputs = qualification_inputs()
+    if inputs != study["module_fixtures"]:
+        raise ValueError("module fixtures differ from the freeze")
+    path = root / "module_qualification.json"
+    expected = dict(source_sha256=study["source_sha256"], fixtures=inputs, status="passed")
+    if path.exists():
+        if read(path) != expected:
+            raise ValueError("module qualification differs from its frozen inputs")
+        return
+    cmd = [sys.executable, "-m", "pytest", "-q", "-m", "slow or not slow", *inputs]
+    with (root / "module_qualification.log").open("ab") as log:
+        subprocess.run(cmd, cwd=REPO, env=dict(os.environ, PYTHONPATH=str(REPO / "src")),
+                       stdout=log, stderr=subprocess.STDOUT, check=True)
+    publish(path, expected)
+
+
 def verify_before(root, study, stage):
+    if stage != "development":
+        qualification = read(root / "module_qualification.json")
+        if qualification != dict(source_sha256=study["source_sha256"], fixtures=study["module_fixtures"],
+                                 status="passed"):
+            raise ValueError("missing qualified module fixtures")
     for prior in STAGES[:STAGES.index(stage)]:
         if read(root / MARKERS[prior]) != stage_receipt(root, study, prior):
             raise ValueError(f"missing or invalid {prior} qualification")
@@ -191,6 +219,8 @@ def run(root, workers):
     study = read(root / "study.json")
     verify_source(study)
     for stage in STAGES:
+        if stage == "pre_evaluation":
+            qualify(root, study)
         verify_before(root, study, stage)
         marker = root / MARKERS[stage]
         if marker.exists():
