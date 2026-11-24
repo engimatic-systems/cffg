@@ -13,10 +13,11 @@ from cffg import mixed_scoring
 
 
 class MixedCarry(NamedTuple):
-    """Low words of the posterior mean, Gaussian masses and categorical counts."""
+    """Low words of the continuous parameters, mixture masses and categorical counts."""
 
     mu: jax.Array
     kappa: jax.Array
+    psi: jax.Array
     nu: jax.Array
     alpha: jax.Array
     categories: tuple[jax.Array, ...]
@@ -39,8 +40,8 @@ def _zeros(value):
     return jnp.zeros_like(value)
 
 
-def _zero_carry(mu, kappa, nu, alpha, categories):
-    return MixedCarry(_zeros(mu), _zeros(kappa), _zeros(nu), _zeros(alpha),
+def _zero_carry(mu, kappa, psi, nu, alpha, categories):
+    return MixedCarry(_zeros(mu), _zeros(kappa), _zeros(psi), _zeros(nu), _zeros(alpha),
                       tuple(_zeros(head) for head in categories))
 
 
@@ -57,7 +58,7 @@ class MixedBank(_BankFields):
 
     def __new__(cls, mu, kappa, psi, nu, alpha, categories, active, carry=None):
         if carry is None:
-            carry = _zero_carry(mu, kappa, nu, alpha, categories)
+            carry = _zero_carry(mu, kappa, psi, nu, alpha, categories)
         return super().__new__(cls, mu, kappa, psi, nu, alpha, categories, active, carry)
 
     def _replace(self, /, **fields):
@@ -139,4 +140,4 @@ class MixedBank(_BankFields):
 
 
 _PRIMARY = {"mu", "kappa", "psi", "nu", "alpha", "active"}
-_CARRIED = ("mu", "kappa", "nu", "alpha")
+_CARRIED = ("mu", "kappa", "psi", "nu", "alpha")
