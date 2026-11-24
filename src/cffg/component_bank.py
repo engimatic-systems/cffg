@@ -55,15 +55,15 @@ def _supported(bank):
     return bank._replace(active=jnp.asarray(bank.active).at[0].set(True))
 
 
-def _exact_snapshot(bank):
-    record = _supported(bank).state_dict(exact=True)
+def _snapshot(bank, *, exact):
+    record = _supported(bank).state_dict(exact=exact)
     record["active"] = np.array(bank.active, copy=True)
     return record
 
 
-def _restore_bank(record):
-    if np.asarray(record.get("version")).shape != () or record.get("version") != 3:
-        raise ValueError("slot lifecycle requires an exact mixed-bank snapshot")
+def _restore_bank(record, mixed_version):
+    if np.asarray(record.get("version")).shape != () or record.get("version") != mixed_version:
+        raise ValueError(f"component lifecycle requires mixed-bank version {mixed_version}")
     active = np.asarray(record.get("active"))
     if active.ndim != 1 or active.dtype != np.bool_ or not len(active):
         raise ValueError("invalid component mask")
@@ -75,6 +75,28 @@ def _restore_bank(record):
     return bank._replace(active=jnp.array(active, copy=True))
 
 
+def _count_fields(bank):
+    for name in ("kappa", "nu", "alpha"):
+        yield name, getattr(bank, name), getattr(bank.carry, name)
+    for i, (values, lows) in enumerate(zip(bank.categories, bank.carry.categories, strict=True)):
+        yield f"category_{i}", values, lows
+
+
+def _check_counts(prior, posterior, *, compact_posterior=None):
+    """Validate count ordering and align equivalent midpoint encodings in a compact copy."""
+    for base_field, field in zip(_count_fields(prior), _count_fields(posterior), strict=True):
+        name, base, base_low = base_field
+        _, value, low = field
+        base, base_low, value, low = map(np.asarray, (base, base_low, value, low))
+        # Opposite low words can encode the identical midpoint at adjacent high words.
+        shared = (low != 0) & (low == -base_low) & ((base - value) == low + low)
+        if np.any(((value < base) & ~shared) | ((value == base) & (low < base_low))):
+            raise ValueError("posterior count is below its reset prior")
+        if compact_posterior is not None:
+            # Equal counts must still have zero excess after both low words are dropped.
+            np.copyto(compact_posterior[name], base, where=shared)
+
+
 def _validate_layout(prior, posterior):
     lhs, left_tree = jax.tree.flatten(prior)
     rhs, right_tree = jax.tree.flatten(posterior)
@@ -82,19 +104,7 @@ def _validate_layout(prior, posterior):
         a.shape != b.shape or a.dtype != b.dtype for a, b in zip(lhs, rhs)
     ):
         raise ValueError("posterior layout differs from the reset prior")
-    # Adjacent primary words may encode the same midpoint with opposite
-    # low words. Otherwise these expansions order lexicographically.
-    for field in ("kappa", "nu", "alpha", "categories"):
-        for base, base_low, value, low in zip(
-            jax.tree.leaves(getattr(prior, field)), jax.tree.leaves(getattr(prior.carry, field)),
-            jax.tree.leaves(getattr(posterior, field)), jax.tree.leaves(getattr(posterior.carry, field)),
-            strict=True,
-        ):
-            base, base_low, value, low = map(np.asarray, (base, base_low, value, low))
-            midpoint = (base - value) / 2
-            shared_midpoint = (low > 0) & (low == midpoint) & (base_low == -midpoint)
-            if np.any(((value < base) & ~shared_midpoint) | ((value == base) & (low < base_low))):
-                raise ValueError("posterior count is below its reset prior")
+    _check_counts(prior, posterior)
     dormant = ~np.asarray(posterior.active)
     if dormant.any():
         for field in (*MixedCarry._fields, "carry"):
@@ -202,7 +212,7 @@ class ComponentBank:
 
     Construct with the reset prior and initial active mask. Call update to learn
     from observations on this layout. Both this constructor and the
-    exact snapshot codec accept an empty active set. All operations are host
+    snapshot codec accept an empty active set. All operations are host
     transactions on one bank, outside JIT and vmap.
     """
 
@@ -315,31 +325,41 @@ class ComponentBank:
                               self.generations, self.next_id)
         return SlotResult(new, SlotStatus.OK, receiver)
 
-    def state_dict(self) -> dict[str, np.ndarray]:
-        """Return an independent exact snapshot, including every high and low word."""
+    def state_dict(self, *, exact=False) -> dict[str, np.ndarray]:
+        """Save the reset prior, posterior and identities in independent host arrays.
+
+        The compact default omits both sets of low words. A count at the same
+        midpoint as its reset prior uses the prior's primary word. Set exact=True
+        to retain every low word for bitwise continuation on the same runtime.
+        """
         state = {
-            "version": np.array(1, np.int32),
+            "version": np.array(1 if exact else 2, np.int32),
             "logical_ids": np.array(self.logical_ids, np.int64),
             "generations": np.array(self.generations, np.int64),
             "next_id": np.array(self.next_id, np.int64),
         }
         for prefix, bank in (("prior", self.reset_prior), ("posterior", self.posterior)):
-            state.update({f"{prefix}/{k}": v for k, v in _exact_snapshot(bank).items()})
+            record = _snapshot(bank, exact=exact)
+            if prefix == "posterior" and not exact:
+                _check_counts(self.reset_prior, self.posterior, compact_posterior=record)
+            state.update({f"{prefix}/{k}": v for k, v in record.items()})
         return state
 
     @classmethod
     def from_state_dict(cls, state: Mapping[str, np.ndarray]) -> ComponentBank:
-        """Validate the entire exact snapshot before returning a live bank."""
+        """Restore a v1 exact or v2 compact lifecycle snapshot and validate both banks."""
         metadata = {k for k in state if not k.startswith(("prior/", "posterior/"))}
         if metadata != {"version", "next_id", "generations", "logical_ids"}:
             raise ValueError("unexpected or missing component lifecycle metadata")
         version = np.asarray(state["version"])
-        if version.shape != () or version.dtype != np.int32 or version != 1:
+        if version.shape != () or version.dtype != np.int32 or version.item() not in (1, 2):
             raise ValueError("unknown component lifecycle version")
 
+        mixed_version = 3 if version == 1 else 2
+
         def decode(prefix):
-            return _restore_bank({k.removeprefix(prefix): v for k, v in state.items()
-                                  if k.startswith(prefix)})
+            record = {k.removeprefix(prefix): state[k] for k in state if k.startswith(prefix)}
+            return _restore_bank(record, mixed_version)
         prior, posterior = decode("prior/"), decode("posterior/")
         _validate_layout(prior, posterior)
         shape = posterior.active.shape

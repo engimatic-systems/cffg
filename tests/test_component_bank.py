@@ -42,7 +42,7 @@ def test_empty_full_and_donor_generation_after_replay(tmp_path):
     empty = ComponentBank(p)
     p.mu[0, 0] = -123  # caller-owned storage cannot change the reset prior
     assert empty.reset_prior.mu[0, 0] == 4096
-    empty = ComponentBank.from_state_dict(empty.state_dict())
+    empty = ComponentBank.from_state_dict(empty.state_dict(exact=True))
     assert empty.reference(0) is None
     first = empty.birth()
     second = first.bank.birth()
@@ -50,7 +50,7 @@ def test_empty_full_and_donor_generation_after_replay(tmp_path):
     b = second.bank
     assert b.birth().status == SlotStatus.FULL and b.birth().bank is b
     assert b.propose_merge(first.component, first.component).status == SlotStatus.SAME_COMPONENT
-    before = b.state_dict()
+    before = b.state_dict(exact=True)
     path = tmp_path / "slots.npz"
     np.savez(path, **before)
     with np.load(path, allow_pickle=False) as state:
@@ -68,8 +68,8 @@ def test_empty_full_and_donor_generation_after_replay(tmp_path):
         assert new_ref.generation == 2 and new_ref.logical_id == 3
         stale = next_birth.bank.propose_merge(first.component, second.component)
         assert stale.status == SlotStatus.STALE_REFERENCE and stale.bank is next_birth.bank
-        proposals.append(next_birth.bank.state_dict())
-    assert_same(before, b.state_dict())
+        proposals.append(next_birth.bank.state_dict(exact=True))
+    assert_same(before, b.state_dict(exact=True))
     assert_same(*proposals)
 
 
@@ -139,7 +139,7 @@ def test_exact_fraction_oracle_for_every_high_and_low_word(dtype):
     s = learned.bank
     # Both slots contain evidence below the spacing of their primary coordinates.
     assert np.any(np.asarray(s.posterior.carry.mu[:2]) != 0)
-    restored = ComponentBank.from_state_dict(s.state_dict())
+    restored = ComponentBank.from_state_dict(s.state_dict(exact=True))
     result = restored.propose_merge(restored.reference(0), restored.reference(1))
     assert result.status == SlotStatus.OK
     post = result.bank.posterior
@@ -168,7 +168,8 @@ def test_exact_fraction_oracle_for_every_high_and_low_word(dtype):
         for actual, want, low in zip(np.ravel(value), np.ravel(target), np.ravel(lo), strict=True):
             assert abs(actual - want) <= Fraction(float(abs(np.spacing(low))))
     uninterrupted = s.propose_merge(s.reference(0), s.reference(1))
-    assert_same(uninterrupted.bank.birth().bank.state_dict(), result.bank.birth().bank.state_dict())
+    assert_same(uninterrupted.bank.birth().bank.state_dict(exact=True),
+                result.bank.birth().bank.state_dict(exact=True))
 
 
 def test_snapshot_rejects_missing_carry_reused_ids_and_contaminated_dormant_slot():
@@ -177,16 +178,16 @@ def test_snapshot_rejects_missing_carry_reused_ids_and_contaminated_dormant_slot
                        ("logical_ids", np.array([1, 1, 0], np.int64)),
                        ("generations", np.array([0, 2, 0], np.int64))):
         with pytest.raises(ValueError):
-            ComponentBank.from_state_dict({**b.state_dict(), key: value})
-    state = b.state_dict()
+            ComponentBank.from_state_dict({**b.state_dict(exact=True), key: value})
+    state = b.state_dict(exact=True)
     state["posterior/carry_alpha"][0] = -np.spacing(np.float32(5)) / 4
     with pytest.raises(ValueError, match="below its reset prior"):
         ComponentBank.from_state_dict(state)
-    state = b.state_dict()
+    state = b.state_dict(exact=True)
     del state["prior/carry_psi"]
     with pytest.raises(ValueError):
         ComponentBank.from_state_dict(state)
-    state = b.state_dict()
+    state = b.state_dict(exact=True)
     state["posterior/category_0"][2, 0] += 1
     with pytest.raises(ValueError, match="dormant"):
         ComponentBank.from_state_dict(state)
@@ -212,7 +213,7 @@ def test_invalid_prior_and_unrepresentable_merge_are_atomic():
     p.psi[0] = [[1, 2], [2, 1]]
     with pytest.raises(ValueError, match="prior"):
         ComponentBank(p)
-    record = ComponentBank(prior()).state_dict()
+    record = ComponentBank(prior()).state_dict(exact=True)
     # Each valid posterior contains many observed category-only records.
     mass = np.float32(np.finfo(np.float32).max * .75)
     record["posterior/alpha"][:2] = mass
@@ -220,7 +221,7 @@ def test_invalid_prior_and_unrepresentable_merge_are_atomic():
     b = ComponentBank.from_state_dict(record)
     result = b.propose_merge(b.reference(0), b.reference(1))
     assert result.status == SlotStatus.INVALID_POSTERIOR and result.bank is b
-    assert_same(b.state_dict(), record)
+    assert_same(b.state_dict(exact=True), record)
 
 
 def test_bank_refuses_staged_host_transaction():
@@ -245,3 +246,117 @@ def test_policy_can_install_valid_heads_only_on_the_source_layout():
                     proposed._replace(alpha=proposed.alpha.at[0].set(-1))):
         result = b.replace_posterior(invalid, previous=previous)
         assert result.status == SlotStatus.INVALID_POSTERIOR and result.bank is b
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_compact_default_and_exact_learned_files(tmp_path, dtype):
+    p = prior(dtype)
+    # This sub-ULP scale correction belongs to the reset prior as well as its dormant rows.
+    p.carry.psi[:, 0, 0] = np.spacing(p.psi[:, 0, 0]) / 4
+    base = ComponentBank(p)
+    x = MixedBatch(np.array([[4097, -7]], dtype), np.zeros((1, 2, 2), dtype),
+                   np.array([True]), (np.array([1]), np.array([2])))
+    result = base.update(x, np.array([[.25, .75, 0]], dtype))
+    assert result.status == SlotStatus.OK
+    source = result.bank
+    full = source.state_dict(exact=True)
+    assert np.any(full["posterior/carry_mu"] != 0)
+    compact = source.state_dict()
+    assert compact["version"] == 2 and full["version"] == 1
+    for prefix in ("prior/", "posterior/"):
+        assert compact[prefix + "version"] == 2 and full[prefix + "version"] == 3
+    carry_keys = {key for key in full if "/carry_" in key}
+    assert carry_keys and set(compact) == set(full) - carry_keys
+    for key in compact:
+        if not key.endswith("version"):
+            np.testing.assert_array_equal(compact[key], full[key], err_msg=key)
+
+    for exact_mode, record in ((False, compact), (True, full)):
+        path = tmp_path / f"{exact_mode}.npz"
+        np.savez(path, **record)
+        with np.load(path, allow_pickle=False) as archive:
+            loaded = ComponentBank.from_state_dict(archive)
+        assert_same(loaded.state_dict(exact=exact_mode), record)
+        assert loaded.logical_ids == source.logical_ids and loaded.next_id == source.next_id
+        assert loaded.generations == source.generations
+        if exact_mode:
+            again = loaded.update(x, np.array([[.25, .75, 0]], dtype))
+            uninterrupted = source.update(x, np.array([[.25, .75, 0]], dtype))
+            assert again.status == uninterrupted.status == SlotStatus.OK
+            assert_same(again.bank.state_dict(exact=True), uninterrupted.bank.state_dict(exact=True))
+        else:
+            for mixed in (loaded.reset_prior, loaded.posterior):
+                assert all(np.count_nonzero(low) == 0 for low in jax.tree.leaves(mixed.carry))
+            assert loaded.birth().component == source.birth().component
+    assert (tmp_path / "False.npz").stat().st_size < (tmp_path / "True.npz").stat().st_size
+    compact["posterior/mu"][0, 0] = 0
+    assert_same(source.state_dict(exact=True), full)
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_legacy_opposite_midpoints_keep_zero_excess_in_compact_counts(dtype):
+    p = prior(dtype)
+    # Recreate the earlier format directly, independently of ComponentBank.state_dict.
+    legacy = {"version": np.int32(1), "next_id": np.int64(3),
+              "generations": np.array([1, 1, 0], np.int64),
+              "logical_ids": np.array([1, 2, 0], np.int64)}
+    for prefix in ("prior/", "posterior/"):
+        legacy.update({prefix + k: v for k, v in p.state_dict(exact=True).items()})
+    lower = dtype(8)
+    upper = np.nextafter(lower, dtype(9))
+    half = (upper - lower) / dtype(2)
+    fields = ("kappa", "nu", "alpha", "category_0", "category_1")
+    for name in fields:
+        for prefix, highs, lows in (("prior/", (upper, lower), (-half, half)),
+                                    ("posterior/", (lower, upper), (half, -half))):
+            for i in (0, 1):
+                legacy[prefix + name][i] = highs[i]
+                legacy[prefix + "carry_" + name][i] = lows[i]
+    bank = ComponentBank.from_state_dict(legacy)
+    assert_same(bank.state_dict(exact=True), legacy)
+    record = bank.state_dict()
+    for name in fields:
+        np.testing.assert_array_equal(record["prior/" + name], record["posterior/" + name])
+        np.testing.assert_array_equal(record["prior/" + name], legacy["prior/" + name])
+    restored = ComponentBank.from_state_dict(record)
+    assert restored.propose_merge(restored.reference(0), restored.reference(1)).status == SlotStatus.OK
+    assert_same(bank.state_dict(exact=True), legacy)
+
+
+@pytest.mark.parametrize("exact_mode", [False, True])
+def test_reject_inconsistent_formats_counts_dormant_rows_and_identity(exact_mode):
+    bank = ComponentBank(prior())
+    def saved():
+        return bank.state_dict(exact=exact_mode)
+    for prefix in ("prior/", "posterior/"):
+        record = saved()
+        other = bank.state_dict(exact=not exact_mode)
+        for key in list(record):
+            if key.startswith(prefix):
+                del record[key]
+        record.update({k: v for k, v in other.items() if k.startswith(prefix)})
+        with pytest.raises(ValueError, match="mixed-bank version"):
+            ComponentBank.from_state_dict(record)
+    if not exact_mode:
+        with pytest.raises(ValueError, match="unexpected or missing"):
+            ComponentBank.from_state_dict({**saved(), "posterior/carry_alpha": np.zeros(3, np.float32)})
+    for key in ("prior/category_cardinalities", "posterior/active", "generations"):
+        record = saved()
+        del record[key]
+        with pytest.raises(ValueError):
+            ComponentBank.from_state_dict(record)
+    for key, value in (("logical_ids", np.array([1, 1, 0], np.int64)),
+                       ("prior/unexpected", np.zeros(3)), ("version", np.uint32(2))):
+        with pytest.raises(ValueError):
+            ComponentBank.from_state_dict({**saved(), key: value})
+    record = saved()
+    record["posterior/kappa"][0] -= 1
+    with pytest.raises(ValueError, match="below its reset prior"):
+        ComponentBank.from_state_dict(record)
+    record = saved()
+    record["posterior/mu"][2, 0] += 1
+    with pytest.raises(ValueError, match="dormant"):
+        ComponentBank.from_state_dict(record)
+    empty = ComponentBank(prior(active=(False, False)))
+    restored = ComponentBank.from_state_dict(empty.state_dict(exact=exact_mode))
+    assert restored.birth().component == empty.birth().component

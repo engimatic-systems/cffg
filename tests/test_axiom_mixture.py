@@ -95,7 +95,7 @@ def test_empty_identity_bank_ordered_birth_full_update_and_checkpoint():
         host = result.bank
     assert host.logical_ids == (1,2) and host.generations == (1,1)
     same(out.bank, device.from_host(host))
-    restored = ComponentBank.from_state_dict(host.state_dict())
+    restored = ComponentBank.from_state_dict(host.state_dict(exact=True))
     same(device.from_host(restored), out.bank)
     broken = tape._replace(mean=tape.mean.at[-1,0].set(jnp.nan))
     invalid = learn_frame(device.from_host(base), broken, mask, threshold=100.)

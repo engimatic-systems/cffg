@@ -1741,7 +1741,11 @@ them. Four rules define the contract:
    These arrays describe a finite bank whose semantic fields and category
    order are supplied by the model. Compact mixed snapshots save the rounded
    parameters; exact snapshots also save the corrections carried into the
-   next update.
+   next update. The component lifecycle v2 envelope holds compact v2 mixed
+   records for its reset prior and posterior. The optional exact lifecycle v1
+   envelope retains the original pair of v3 mixed records. Both codecs validate
+   identity metadata and require dormant parameters to match the reset prior.
+   Device-to-host conversion uses the exact codec.
 
    Frame-local appearance regression is owned by `frame_regression.py`.
    `score_pixels` evaluates the expected log likelihood for each pixel
