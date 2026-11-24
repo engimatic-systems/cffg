@@ -41,3 +41,7 @@ A compact snapshot stores rounded parameter values. An exact snapshot also saves
 **2026-11-24T05:44:20Z**
 
 Implementation from a72cabc compiles the existing elementwise parameter and residual checks during snapshot save/restore after checking input types and layouts at source precision. Keep the eager correlation/Cholesky calculation: fusing it changed five of 1,800 acceptance decisions near the numerical rank boundary on CPU. Independent public save and load results now match the original across all 1,800 matrices in float32 and float64, plus 20 malformed layouts and value cases. Rewriting and continuing each of 16 real learned snapshots matches every array and compressed file byte with fixed Python hash seed. Tests cover the source dtype, dormant residual and near-rank cases. Frozen standalone matched I/O protocol and sources are in ~/agent-share/axiom-online-precision/checkpoint-io. Formal timing and final integrated suite remain with the coordinated parent run.
+
+**2026-11-24T05:57:10Z**
+
+Combined b7f1fd8 real-file experiment finished (12 paired blocks per shape). Compact bytes are identical for the same visible arrays. Compact writes -16.1% to +1.0% versus fd8bfd1. At the largest 32×5000 cell compact restore took 4.374 versus 3.972 ms, +10.65% [5.68%,12.47%]; all other upper bounds below 10%. Optional exact archives grew 66.8–88.3% in actual compressed bytes. This remaining measured default cost is included in the pending performance decision. Raw evidence ~/agent-share/axiom-online-precision/checkpoint-io/combined-confirmation-2.

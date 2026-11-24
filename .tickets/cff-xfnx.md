@@ -49,3 +49,7 @@ Cooper chose compact snapshots by default, exact continuation opt-in. Round only
 **2026-11-24T05:25:00Z**
 
 A second accumulated array also needs a remainder. With float32 Gaussian scale Psi=2^24, sixteen observations contributing 0.25 each must add 4. Uncompensated scalar updates add zero. Exact mode therefore includes the full scale matrix as well as the mean and counts; compact stays in v2. Development tests cover all three mechanisms and exercise optional exact restore at every tick. An overstrict precision guard in the draft rejected some normal soft assignments including Gameworld patch tick 37 and 28/40 seeded scan steps at N=1, K=5000. Repairing and independently replaying before timing.
+
+**2026-11-24T05:57:10Z**
+
+Independent checks on 089f377 preserved all three precision corrections, 480 recurrent updates and archival compatibility. The real-frame RGB patch corpus saw zero changed MAP labels across 23,040 assignments, and exact file reload preserved output bits. A compact restart on every translated scalar observation still loses 21.53%; once per 128 loses 0.029%. First default compute candidate and improved candidate both exceed Cooper’s threshold. Experimental result and the open default decision live in caoc-0dvd and http://localhost:8080/axiom-online-precision/index.html.
