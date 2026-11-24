@@ -1761,6 +1761,12 @@ them. Four rules define the contract:
    The tracker reads the appearance transform at the position mean and the
    inverse expected observation precision for each output channel.
 
+   In the AXIOM experiment, `axiom_evidence.release_view` derives the
+   scale used by the release to score Gaussian evidence. Its explicit
+   normalized diagonal and off-diagonal cutoffs can change a birth decision.
+   Updates and resets use the original sufficient statistics. Unmasked
+   reduction queries may separately expose seeded virgin components.
+
    `rollout_planning.sample_action_sequences` executes an immutable parameter
    snapshot on action sequences. Each policy, sample and time index gets a
    stable random key. The AXIOM experiment owns its independent object
