@@ -1712,6 +1712,11 @@ them. Four rules define the contract:
    graph supplies the statistics and writes
    `E[log θ] = ψ(α) − ψ(α₀)`.
 
+   Declared Gaussian NIW updates request the mean and covariance directly with
+   `Engine.gaussian_node_stats(state, centered=True)`. The prior binding computes
+   these moments before any raw second moment is formed. The default readout
+   still supplies raw statistics to callers that request that representation.
+
    The `component_niw` family reads centered per-component moments from
    `gaussian_mixture`. It shares the existing declared-learning transaction,
    rollover and bundle machinery. The batched mixed-data API in

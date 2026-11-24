@@ -384,7 +384,8 @@ def test_selected_updates_are_atomic_on_hostile_mniw_statistics(
     before = learnables.state_dict()
     readout = engine.gaussian_node_stats(result.state)
     corrupt(readout["transition"])
-    monkeypatch.setattr(engine, "gaussian_node_stats", lambda state: readout)
+    centered = engine.gaussian_node_stats(result.state, centered=True)
+    monkeypatch.setattr(engine, "gaussian_node_stats", lambda state, **kw: centered if kw else readout)
 
     with pytest.raises((ValueError, KeyError), match=match):
         learnables.replace(engine, result)
@@ -548,3 +549,23 @@ def test_unsupported_gaussian_family_pairs_fail_at_compile_time():
     )
     with pytest.raises(CompileError, match="learnable 'bad'.*mniw/gaussian_linear"):
         compile_template(mixture, arrays=mixture_arrays)
+
+
+@pytest.mark.parametrize("x64,origin", [(False, 4096.), (True, 2.**27)])
+def test_declared_gaussian_spread_at_translated_origin(x64, origin):
+    with jax.enable_x64(x64):
+        for variance in (.25, 1.):
+            template, arrays = _learning_template(1)
+            arrays.update(m0=np.array([origin]), P0=np.array([[variance]]),
+                          A=np.zeros((1, 1)), b=np.array([origin]), Q=np.array([[variance]]),
+                          H=np.zeros((1, 1)))
+            engine = Engine(compile_template(template, arrays=arrays))
+            result = engine.run(engine.bind_data(engine.init_state(), {"observation": [0.]}),
+                                20, tol=1e-6)
+            learner = Learnables(engine, priors={
+                "a_state": conj.NIW(np.array([origin]), 2., np.array([[3.]]), 4.),
+                "z_dynamics": conj.MNIW(np.array([[0., origin]]), np.eye(2), np.array([[3.]]), 4.),
+            })
+            learner.accumulate(engine, result, only=("a_state",))
+            assert engine.gaussian_marginal(result.state, "x0")[1].item() == variance
+            np.testing.assert_allclose(learner.params["a_state"]["psi"], [[3. + variance]])

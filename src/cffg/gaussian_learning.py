@@ -54,7 +54,7 @@ class NIWFamily:
     """Normal-inverse-Wishart learning for a Gaussian prior factor."""
 
     name = "niw"
-    readout = "gaussian_node_stats"
+    readout = "centered_gaussian_stats"
     _PARAMS = {"mu", "kappa", "psi", "nu"}
     semantic_identity = LEARNING_IDENTITIES["niw"]
     parameter_forms = ("expected",)
@@ -91,32 +91,20 @@ class NIWFamily:
         _proper(readout, ftype)
         return {
             "mean": _finite_stat(readout, "mean", ftype),
-            "second": _finite_stat(readout, "second", ftype),
+            "covariance": _finite_stat(readout, "covariance", ftype),
         }
 
     def pool(self, records) -> dict[str, np.ndarray]:
         return {
             "mean": np.stack([record["mean"] for record in records]),
-            "second": np.stack([record["second"] for record in records]),
+            "covariance": np.stack([record["covariance"] for record in records]),
         }
 
     def fold(self, params, stats) -> dict[str, np.ndarray]:
         prior = self._posterior("posterior", params)
         means = np.asarray(stats["mean"])
-        seconds = np.asarray(stats["second"])
-        if means.ndim != 2 or means.shape[1:] != prior.mu.shape:
-            raise ValueError(
-                f"NIW mean statistics must have shape [n,{prior.mu.shape[0]}], "
-                f"got {means.shape}"
-            )
-        if seconds.shape != (means.shape[0], *prior.psi.shape):
-            raise ValueError(
-                f"NIW second statistics shape {seconds.shape} != "
-                f"{(means.shape[0], *prior.psi.shape)}"
-            )
-        if not np.all(np.isfinite(means)) or not np.all(np.isfinite(seconds)):
-            raise ValueError("NIW statistics must be finite")
-        return self.as_params(prior.update(means, seconds))
+        posterior = prior.update_centered(means, stats["covariance"], np.ones(len(means)))
+        return self.as_params(posterior)
 
     def rollover(self, params, ftype) -> dict[str, np.ndarray]:
         mean, cov = self._posterior("posterior", params).rollover()

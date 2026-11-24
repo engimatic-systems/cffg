@@ -640,13 +640,14 @@ class Engine:
         )
 
     def gaussian_node_stats(
-        self, state: State, *, centered_mixtures: bool = False
+        self, state: State, *, centered_mixtures: bool = False, centered: bool = False
     ) -> dict[str, dict[str, np.ndarray]]:
         """Factor name -> expected sufficient statistics of the node belief
         (cff-7c5o, D4): the continuous analog of node_beliefs, feeding the
         NIW/MNIW conjugate updates in cffg.conj.
 
-        gaussian:            {"mean" E[x], "second" E[xxᵀ]}
+        gaussian:            {"mean" E[x], "second" E[xxᵀ]}, or mean and
+                             covariance with `centered=True`.
         gaussian_linear:     {"Syy" E[yyᵀ], "Syx" E[yx̃ᵀ], "Sxx" E[x̃x̃ᵀ]}
                              with x̃ = [x; 1] (offset column absorbed)
         gaussian_linear_obs: same keys with y fixed at the bound observation,
@@ -665,7 +666,7 @@ class Engine:
         equality nodes are skipped."""
         return _gaussian_readouts.gaussian_node_stats(
             self.arena, state, pair_beliefs=self.recurrence_pair_beliefs,
-            centered_mixtures=centered_mixtures,
+            centered_mixtures=centered_mixtures, centered=centered,
         )
 
     def recurrence_weight_stats(

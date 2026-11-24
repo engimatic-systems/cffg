@@ -1,6 +1,6 @@
 ---
 id: cff-6wpk
-status: open
+status: in_progress
 deps: []
 links: [cff-7t4j]
 created: 2026-11-24T02:37:08Z
@@ -40,3 +40,11 @@ A posterior scale is the matrix that carries evidence about noise in the Gaussia
 **2026-11-24T02:39:18Z**
 
 Verified through the public converged Engine and Learnables.accumulate with JAX 0.10.2 on CPU, source 8d46be4 and centered-pooling candidate b763744. Each prior and linear factor reported proper. Both scalar ground-truth marginals correctly distinguish 0.25 and 1. The two raw node records are identical and both posterior scales are 3.0. Independent callback and scalar update corroborate the mechanism. The observed-output and switching-linear callbacks use raw latent moments, with observed coordinates fixed where applicable. The adjacent AXIOM prior-mixture path has its own centered mode. Full scripts and results live under ~/agent-share/axiom-centered-checkpoint/other_families*. This follow-up is related work, not a blanket dependency on unrelated graph families.
+
+**2026-11-24T05:17:01Z**
+
+Implementation handoff on fd8bfd1, fix/centered-declared-learning. Architecture rows: Learnable or checkpoint feature and New factor or rule family (readout only). Check registered prior, latent and DATA linear callbacks, specialized switching-linear callback, shared host reduction and checkpoint continuation. Flood/scheduled inference feed the same readout. Messages, FE, graph encoding, parameter addresses and disk posterior layout N/A. Cover rank-deficient point observations, exact-zero mass, missing/improper rows, both float precisions and large translated coordinates. Wall-time measurements and the short gate await a coordinated slot.
+
+**2026-11-24T05:20:14Z**
+
+Reproduced the two scalar float32 cases on fd8bfd1: correct marginal variances 0.25 and 1, both declared scales 3.0. Ordinary NIW now returns 3.25 and 4.0, also at float64 origin 2^27. Existing raw readout remains available. 68 focused Gaussian learner, readout ownership and registered kernel tests passed (2 opt-in cases excluded).

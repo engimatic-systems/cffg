@@ -110,6 +110,20 @@ def prior_statistics(eta, precision, params, dims, observed_role, observation, m
     return _stack_stats(rows)
 
 
+def centered_prior_statistics(eta, precision, params, dims, observed_role, observation, mask):
+    import jax.numpy as jnp
+    from cffg import gauss
+
+    (d,) = dims
+    w = params["W"]
+    total = w + precision[:, 0, :d, :d]
+    h = jnp.einsum("mij,mj->mi", w, params["m"]) + eta[:, 0, :d]
+    mean, cov = gauss.moments(h, total)
+    proper = gauss.is_proper_precision(w) & jnp.all(jnp.isfinite(mean), axis=-1)
+    return {"mean": jnp.where(proper[:, None], mean, jnp.nan),
+            "covariance": jnp.where(proper[:, None, None], cov, jnp.nan), "proper": proper}
+
+
 def linear_statistics(eta, precision, params, dims, observed_role, observation, mask):
     from cffg import gauss
 
@@ -218,6 +232,7 @@ def install(register, kernel, hostile):
                     energy,
                     conditioning,
                     stats,
+                    centered_statistics=centered_prior_statistics if name == "gaussian" else None,
                     moment_projections=frozenset({"gaussian_first_second"}),
                 ),
             )

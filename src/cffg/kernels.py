@@ -256,6 +256,7 @@ def register_kernel(k: FactorKernel) -> FactorKernel:
             problems.append("Gaussian work declarations require named nonnegative integer counts")
         for callback_name, callback in (
             ("statistics", b.statistics),
+            ("centered_statistics", b.centered_statistics),
             ("readout", b.readout),
         ):
             if callback is not None and not callable(callback):

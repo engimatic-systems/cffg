@@ -84,7 +84,7 @@ def gaussian_marginals(
 
 def gaussian_node_stats(
     view: GaussianStatisticsView, state: State, *, pair_beliefs: PairBeliefs,
-    centered_mixtures: bool = False,
+    centered_mixtures: bool = False, centered: bool = False,
 ) -> dict[str, dict[str, np.ndarray]]:
     """Factor name -> expected sufficient statistics of the node belief
     (cff-7c5o, D4): the continuous analog of node_beliefs, feeding the
@@ -122,7 +122,7 @@ def gaussian_node_stats(
             _kernel_params(g, state.params),
             y,
             mk,
-            statistics=True,
+            statistics=True, centered=centered,
         )
         for i, name in enumerate(g.members):
             out[name] = {key: np.asarray(value)[i] for key, value in values.items()}
@@ -159,7 +159,7 @@ def gaussian_node_stats(
                 }
         else:
             (do,) = g.dims
-            read_stats = mixg.mix_centered_stats if centered_mixtures else mixg.mix_stats
+            read_stats = mixg.mix_centered_stats if centered_mixtures or centered else mixg.mix_stats
             stats = read_stats(
                 inc_e[:, 0, :do],
                 inc_l[:, 0, :do, :do],
