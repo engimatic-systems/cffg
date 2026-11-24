@@ -3,7 +3,7 @@
 import jax
 import jax.numpy as jnp
 from jax.scipy.linalg import solve_triangular
-from jax.scipy.special import digamma, polygamma
+from jax.scipy.special import digamma
 
 from cffg import _compensated
 from cffg.efrules import LOG2PI, _symmetry_ok
@@ -182,7 +182,12 @@ def _digamma_adjustment(x, relative):
     # needs only a first-order correction at this perturbation size.
     small = x < 16
     safe = jnp.where(small, x, 1)
-    near = relative / (safe * (1 + relative)) + (relative * safe) * polygamma(1, safe + 1)
+    # After two recurrences the alternating trigamma expansion has error
+    # below 1/(30*(x+2)**9). This derivative multiplies a sub-ULP low word.
+    inv2 = 1 / (safe + 2)
+    regular = 1 / (safe + 1)**2 + inv2 * (
+        1 + inv2/2 + inv2**2/6 - inv2**4/30 + inv2**6/42)
+    near = relative / (safe * (1 + relative)) + (relative * safe) * regular
     inv = 1 / jnp.where(small, 16, x)
     far = relative * (1 + inv/2 + inv**2/6 - inv**4/30 + inv**6/42)
     return jnp.where(small, near, far)
@@ -200,11 +205,9 @@ def _dirichlet_adjustment(alpha, low, active, base):
     return jnp.where(jnp.abs(base) < jnp.finfo(alpha.dtype).eps, 0, correction)
 
 
-def _covariance_trace(root, covariance, active):
+def _covariance_trace(root, inverse_root, covariance, active):
     """Return tr(Psi^-1 C) without cancellation for nearly orthogonal directions."""
-    k, d, _ = root.shape
-    eye = jnp.broadcast_to(jnp.eye(d, dtype=root.dtype), (k, d, d))
-    inverse_root = solve_triangular(root, eye, lower=True)
+    d = root.shape[-1]
     dot = jax.lax.Precision.HIGHEST
     precision = jnp.einsum("kli,klj->kij", inverse_root, inverse_root, precision=dot)
     trace = jnp.einsum("kij,nji->nk", precision, covariance, precision=dot)
@@ -228,6 +231,33 @@ def _covariance_trace(root, covariance, active):
     return jax.lax.cond(jnp.any(unstable & active), whitened_trace, lambda: trace)
 
 
+def _scale_response(perturbation, score_scale, active):
+    """Return the inverse-scale change and log determinant in whitened coordinates.
+
+    For symmetric D with spectral radius at most r < 1, replacing
+    (I+D)^-1 D by D has spectral-norm error at most r²/(1-r).
+    Replacing logdet(I+D) by tr(D) has error at most d*r²/(2*(1-r)).
+    score_scale includes d/2 and bounds the absolute quadratic multiplier.
+    """
+    d = perturbation.shape[-1]
+    radius = jnp.max(jnp.sum(jnp.abs(perturbation), axis=-1), axis=-1)
+    # Multiply by score_scale first: r² can underflow for a distant reading.
+    small = ((radius < 0.5) & ((score_scale * radius) * radius
+                               <= jnp.finfo(perturbation.dtype).eps * (1 - radius) / 4))
+
+    def exact():
+        identity = jnp.eye(d, dtype=perturbation.dtype)
+        change = jnp.linalg.solve(identity + perturbation, perturbation)
+        log_volume = jnp.sum(jnp.log1p(jnp.linalg.eigvalsh(perturbation)), axis=-1)
+        return change, log_volume
+
+    return jax.lax.cond(
+        jnp.all(~active | small),
+        lambda: (perturbation, jnp.trace(perturbation, axis1=-2, axis2=-1)),
+        exact,
+    )
+
+
 def _gaussian_log(bank, batch):
     """Return the NIW expected log likelihood and its low-word correction."""
     d = bank.mu.shape[1]
@@ -244,7 +274,9 @@ def _gaussian_log(bank, batch):
     difference = mean.T[None, :, :] - bank.mu[:, :, None]
     whitened = solve_triangular(root, difference, lower=True)
     squared = jnp.sum(jnp.square(whitened), axis=1).T
-    trace = _covariance_trace(root, cov, bank.active)
+    eye = jnp.broadcast_to(jnp.eye(d, dtype=root.dtype), root.shape)
+    inverse = solve_triangular(root, eye, lower=True)
+    trace = _covariance_trace(root, inverse, cov, bank.active)
     loglik = 0.5 * (elogdet - d * LOG2PI - d / bank.kappa - bank.nu * (squared + trace))
     observed = batch.gaussian_observed[:, None]
     base = jnp.where(observed, loglik, 0)
@@ -257,8 +289,6 @@ def _gaussian_log(bank, batch):
         # In whitened coordinates the effective scale is I+D. Solve for
         # (I+D)^-1 D directly, retaining precision corrections below one ULP
         # of I that can still change odds for distant observations.
-        eye = jnp.broadcast_to(jnp.eye(d, dtype=root.dtype), root.shape)
-        inverse = solve_triangular(root, eye, lower=True)
         dot = jax.lax.Precision.HIGHEST
         def product(a, b):
             return jnp.matmul(a, b, precision=dot)
@@ -266,14 +296,15 @@ def _gaussian_log(bank, batch):
             return a.swapaxes(-1, -2)
         perturbation = product(product(inverse, carry.psi), transpose(inverse))
         perturbation = 0.5 * perturbation + 0.5 * transpose(perturbation)
-        change = jnp.linalg.solve(eye + perturbation, perturbation)
         centered = whitened - low_mean
+        location_bound = jnp.max(jnp.sum(centered**2, axis=1), axis=-1)
+        spread_bound = (d * jnp.max(jnp.abs(cov))) * jnp.sum(inverse**2, axis=(-2, -1))
+        weight = jnp.abs(bank.nu) + jnp.abs(carry.nu)
+        change, log_volume = _scale_response(
+            perturbation, d / 2 + weight * (location_bound + spread_bound), bank.active)
         location = jnp.sum(centered * product(change, centered), axis=1).T
         precision_change = product(product(transpose(inverse), change), inverse)
         spread = jnp.einsum("kij,nji->nk", precision_change, cov, precision=dot)
-        # Canonical scale lows are small in source units; strict correlation
-        # validation of the high word keeps I+D positive definite.
-        log_volume = jnp.sum(jnp.log1p(jnp.linalg.eigvalsh(perturbation)), axis=-1)
         return location + spread, log_volume
 
     scale_delta, volume = jax.lax.cond(

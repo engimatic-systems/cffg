@@ -165,3 +165,35 @@ def test_scores_retain_gaussian_and_categorical_low_word_odds(dtype):
         _, weights, valid = jax.jit(score)(bank, missing)
         assert valid
         np.testing.assert_allclose(weights[0, 0], expit(2*fraction/(a*(1-fraction**2))), rtol=8*eps)
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_canonical_low_word_matches_directed_spacing_at_binade_edges(dtype):
+    from cffg import _compensated
+
+    with jax.enable_x64(dtype == np.float64), np.errstate(over="ignore", under="ignore"):
+        info = np.finfo(dtype)
+        powers = np.ldexp(np.ones(info.maxexp - info.minexp + info.nmant, dtype),
+                          np.arange(info.minexp - info.nmant, info.maxexp))
+        magnitudes = np.r_[powers, np.nextafter(powers, dtype(0)),
+                           np.nextafter(powers, dtype(np.inf)), dtype(0), info.max]
+        high = np.r_[magnitudes, -magnitudes]
+        accepted = jax.jit(jax.vmap(_compensated.canonical))
+
+        @jax.jit
+        def directed_spacing(high, low):
+            neighbor = jnp.nextafter(high, jnp.copysign(jnp.inf, low))
+            inward = jnp.nextafter(high, jnp.zeros_like(high))
+            gap = jnp.where(jnp.isfinite(neighbor), neighbor - high, high - inward)
+            return jnp.isfinite(high + low) & (jnp.abs(low) <= jnp.abs(gap) / 2)
+        for direction in (dtype(np.inf), dtype(-np.inf)):
+            neighbor = np.nextafter(high, direction)
+            gap = np.where(np.isfinite(neighbor), neighbor - high,
+                           high - np.nextafter(high, dtype(0)))
+            for low in (gap / 2, np.nextafter(gap / 2, direction), gap):
+                got = accepted(high, low)
+                np.testing.assert_array_equal(got, directed_spacing(high, low))
+                # NumPy retains subnormals even on devices that flush them.
+                normal = abs(gap) / 2 > info.tiny
+                expected = np.isfinite(high + low) & (abs(low) <= abs(gap) / 2)
+                np.testing.assert_array_equal(np.asarray(got)[normal], expected[normal])
