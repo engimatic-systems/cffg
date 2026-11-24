@@ -83,3 +83,7 @@ Implementation dependencies left on this branch: none for the fixed affine slice
 **2026-11-24T06:03:20Z**
 
 Focused validation at the proposed implementation bytes: all seven cases in tests/test_gaussian_agent.py passed, including the opt-in fresh-interpreter restart. The physical witness produced command 0.8, post-override mean (0.3,0.15) and off-diagonal covariance 0.12 in float32 and float64. A second interpreter loaded both .cffgz models and the pending .npz and reproduced the next mean, full covariance, command and free energy exactly. Hostile cases cover an unresolved float32 prior, a DATA-edge cavity masquerading as a posterior, a stale control matrix, damaged snapshot, injected budget exhaustion, invalid feedback, and duplicate feedback. The float32 FE error against the analytic normalizer was 1.50e-6; the test uses 16 machine epsilons relative. Also passed 65 existing short cases in agent_spec, serialize, ir, compose, bundle, and the public API authority/checkpoint envelope (1 deselected). No independent full gate or timing measurement. Diff hygiene and ticket dependency cycle checks clean.
+
+**2026-11-24T06:09:02Z**
+
+The cumulative branch renamed the covariance-rank helper. Integration first exposed five facade imports that failed. The agent now uses the shared ef.resolved_correlation entry point. The original unresolved float32 covariance regression and the combined public-agent and reducer tests passed on the integrated source.

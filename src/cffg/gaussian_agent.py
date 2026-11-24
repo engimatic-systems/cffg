@@ -12,10 +12,10 @@ import numpy as np
 from cffg.bundle import load_bundle
 from cffg.compiler import compile_template
 from cffg.core import GaussianFilterSpec, GaussianPlanSpec
+from cffg.ef import resolved_correlation
 from cffg.engine import Engine
 from cffg.neural_artifacts import array_digest, write_artifact
 from cffg.params import set_params
-from cffg.readouts.gaussian import _resolved_correlation
 from cffg.runtime_types import _replace, RunStatus
 
 
@@ -48,7 +48,7 @@ def _moments(mean, cov, dim, dtype, *, exact=False):
     cov = _array(cov, (dim, dim), dtype, "Gaussian covariance", exact=exact)
     try:
         with np.errstate(invalid="raise", divide="raise", over="raise"):
-            _resolved_correlation(cov)
+            resolved_correlation(cov)
     except (np.linalg.LinAlgError, FloatingPointError) as error:
         raise ValueError("Gaussian covariance is unresolved at the execution precision") from error
     return mean, cov
