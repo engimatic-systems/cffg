@@ -578,7 +578,8 @@ write `G = O inv(P) + Mᵀ diag(a/b) M` where O is the number of output
 channels. Let `u` denote the spatial indices and `c` the bias. Start from
 the same frame prior precision and linear parameter on each sweep. A
 weighted pixel contributes `w G_uu` to precision and
-`w (M_uᵀ diag(a/b) y − G_uc)` to the linear parameter. An unused slot
+`w (M_uᵀ diag(a/b) y − G_uc)` to the linear parameter. The AXIOM spatial model adds the rank-one precision
+`1e-8 × ones` once per position update, with zero linear parameter. An unused slot
 retains its previous position in the spatial coordinate loop. An
 independent evaluation of the quadratic log joint checks both coordinates
 in `tests/test_axiom_spatial.py`.

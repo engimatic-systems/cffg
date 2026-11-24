@@ -44,7 +44,7 @@ def reference(model, pixels, prior, initial, alpha, active, sweeps):
 
             def F(off):
                 lik = w[:, i] @ evaluate(i, mu + off, np.zeros_like(C[i]))
-                return lik - 0.5 * off @ np.linalg.solve(cov0[i], off)
+                return lik - 0.5 * off @ np.linalg.solve(cov0[i], off) - 0.5e-8 * sum(mu + off) ** 2
 
             zero = np.zeros(d - 1)
             eye = np.eye(d - 1)
@@ -113,3 +113,33 @@ def test_empty_support_and_undefined_pixel_fail_explicitly():
         assert not out.valid
         np.testing.assert_array_equal(out.assignment, 0)
         np.testing.assert_array_equal(out.positions.mean, pos.mean)
+
+
+def test_released_scalar_precision_couples_two_position_axes():
+    from cffg.frame_regression import Regression
+
+    eye = jnp.tile(jnp.eye(2), (2, 1, 1))
+    model = Regression(
+        jnp.pad(eye, ((0, 0), (0, 0), (0, 1))),
+        jnp.tile(1e16 * jnp.eye(3), (2, 1, 1)),
+        jnp.ones((2, 2)),
+        jnp.ones((2, 2)),
+    )
+    pixels = jnp.array([[0.0, 0.0], [2.0, 0.0]])
+    prior = Positions(pixels, eye)
+    output = infer_slots(
+        model,
+        pixels,
+        prior,
+        Positions(jnp.ones((2, 2)), eye),
+        jnp.ones(2),
+        jnp.ones(2, bool),
+        sweeps=1,
+    )
+    assert output.valid
+    np.testing.assert_array_equal(output.assignment, 0.5)
+    P = 2 * np.eye(2) + 1e-8 * np.ones((2, 2))
+    np.testing.assert_allclose(output.positions.cov[0], np.linalg.inv(P), atol=3e-16)
+    np.testing.assert_allclose(
+        output.positions.mean, np.linalg.solve(P, [[1, 3], [0, 0]]).T, rtol=0, atol=5e-16
+    )

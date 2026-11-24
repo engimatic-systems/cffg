@@ -110,7 +110,7 @@ def run(archive):
         h = assignment[:, i]
         tau = a[i] / b[i]
         g = o * np.linalg.inv(V[i]) + (m[i].T * tau) @ m[i]
-        C = np.linalg.inv(np.eye(2) + h.sum() * g[:-1, :-1])
+        C = np.linalg.inv(np.eye(2) + h.sum() * g[:-1, :-1] + 1e-8)
         location = C @ ((m[i][:, :-1].T * tau) @ (h @ Y) - h.sum() * g[:-1, -1])
         max_position_error = max(
             max_position_error, float(np.max(abs(location - spatial.positions.mean[i])))

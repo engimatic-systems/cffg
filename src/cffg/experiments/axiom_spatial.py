@@ -55,16 +55,20 @@ def _position_terms(model, pixels, prior):
     return inv_prior, curvature, residual, slope_tau, cov_derivative
 
 
-def _infer_positions(terms, weights, prior, previous):
+def _infer_positions(terms, weights, prior, previous, *, keep_empty=True):
     inv_prior, curvature, residual, slope_tau, cov_derivative = terms
     mass = weights.sum(axis=0)
     center_error = _dot("nk,nko->ko", weights, residual)
     gradient = _dot("ko,koi->ki", center_error, slope_tau) - mass[:, None] * cov_derivative
-    precision = inv_prior + mass[:, None, None] * curvature
+    # AXIOM adds a scalar to every precision entry in its position message.
+    coupling = jnp.asarray(1e-8, prior.mean.dtype)
+    precision = inv_prior + mass[:, None, None] * curvature + coupling
+    gradient -= coupling * prior.mean.sum(axis=1, keepdims=True)
     cov = _inverse(precision)
     mean = prior.mean + _dot("kij,kj->ki", cov, gradient)
-    mean = jnp.where((mass > 0)[:, None], mean, previous.mean)
-    cov = jnp.where((mass > 0)[:, None, None], cov, previous.cov)
+    if keep_empty:
+        mean = jnp.where((mass > 0)[:, None], mean, previous.mean)
+        cov = jnp.where((mass > 0)[:, None, None], cov, previous.cov)
     return Positions(mean, cov), (
         jnp.all(jnp.isfinite(mean))
         & _matrix_valid(precision, strict=True)
@@ -73,7 +77,15 @@ def _infer_positions(terms, weights, prior, previous):
 
 
 def infer_slots(
-    model: Regression, pixels, prior: Positions, initial: Positions, counts, active, *, sweeps=2
+    model: Regression,
+    pixels,
+    prior: Positions,
+    initial: Positions,
+    counts,
+    active,
+    *,
+    sweeps=2,
+    keep_empty=True,
 ) -> SpatialReadout:
     """Run a fixed number of assignment-then-position steps for one frame.
 
@@ -109,7 +121,7 @@ def infer_slots(
         ell, scored = score_pixels(model, appearance_frame(pixels, pos, active))
         best = jnp.max(ell, axis=1)
         w = jax.nn.softmax((ell - best[:, None]) + log_prior, axis=-1)
-        pos, proper = _infer_positions(terms, w, prior, pos)
+        pos, proper = _infer_positions(terms, w, prior, pos, keep_empty=keep_empty)
         return pos, w, best, ok & scored & proper & jnp.all(jnp.isfinite(w))
 
     positions, weights, best, valid = jax.lax.fori_loop(
