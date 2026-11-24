@@ -66,6 +66,13 @@ Builder = Callable[..., tuple]  # build_rollout-style: (past, steps) -> (Templat
 
 
 class RollingAgent:
+    @staticmethod
+    def from_gaussian_bundles(plan_path, filter_path, *, n_sweeps=100, tol=1e-7):
+        """Open a fixed affine controller with a serialized joint Gaussian boundary."""
+        from cffg.gaussian_agent import GaussianRollingAgent
+
+        return GaussianRollingAgent(plan_path, filter_path, n_sweeps=n_sweeps, tol=tol)
+
     def __init__(
         self,
         builder: Builder,
@@ -459,6 +466,8 @@ def _require_agent_spec(template: Template, window: str) -> AgentSpec:
         raise ValueError(
             f"{window} template {template.name!r} does not declare an AgentSpec"
         )
+    if not isinstance(template.agent, AgentSpec):
+        raise ValueError("use RollingAgent.from_gaussian_bundles for Gaussian agent declarations")
     return template.agent
 
 

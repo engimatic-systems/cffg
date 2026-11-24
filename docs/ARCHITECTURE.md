@@ -1849,8 +1849,13 @@ continuous, hybrid, or hierarchical boundaries.
 ##### Continuous and hybrid rolling boundaries (design for `cff-wdhj`)
 
 The first extension carries **one joint Gaussian** between a planning template
-and a one-transition perception template. This is a design for the public
-facade. The shipped contract above covers categorical boundaries.
+and a one-transition perception template. The implemented slice is
+`RollingAgent.from_gaussian_bundles` for fixed affine Gaussian windows, a
+deterministic mean command and raise-on-failure planning. Its declarations
+are `GaussianPlanSpec` and `GaussianFilterSpec`. Their JSON names the window
+and orders the state coordinates, command components and first-action indices.
+The known-selector hybrid, marked hold policy and online learning below are
+the remaining design for `cff-wdhj`.
 
 **Model declaration.** Opt in with `agent.version = 2`. Both templates name
 the same logical state coordinates in the same order and units. Each binds
