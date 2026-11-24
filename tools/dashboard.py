@@ -65,7 +65,9 @@ EPIC_FILES = {
         "test_axiom_interaction.py",
         "test_axiom_mixture.py",
         "test_axiom_reduction.py",
+        "test_axiom_reduction_bounds.py",
         "test_axiom_observation.py",
+        "test_axiom_evaluation_checkpoint.py",
         "test_outer_gfe_formalism.py",
     ],
     "M4 · Epistemic behavior": [
