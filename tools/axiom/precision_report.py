@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import tempfile
 from html import escape
 from pathlib import Path
 
@@ -234,12 +235,107 @@ changed some assignment probabilities while preserving every winning label. Only
 consecutive frames to one of 32 possible spatial slots. Float32 and float64 selected the same slot
 for every pixel in these recordings. Positions from the preceding frame supplied the next
 predictions. This measures frame-local fitting and short-term slot reuse on recorded actions.
-Game policy and reward remain unmeasured.</p>
+Policy choice and return are outside this recorded-action comparison.</p>
 {table("Per-pixel float32 versus float64 replay", ["Game", "Frames", "Slots added (float32)", "Pixels compared", "Different labels"], slot_rows)}
 <p class="sources">{link('frames.json', 'Fixed-action patch runs')} ·
 {link('compute-development/089f377/frames.json', 'Optimized patch replay')} ·
 {link('frame-regression.json', 'Single-frame appearance check')} · {link('spatial-frame.json', 'Spatial fit check')} ·
 {link('slot-replay.json', 'Per-frame slot assignments and growth')}</p></section>"""
+
+
+SCENE_FILES = {
+    "final-scene-f32.json": "8de52cc16d0e7d3c7c15c380763678ba066e9c376de84411f8f6774c884bc0f5",
+    "final-scene-f64.json": "47652dde6d23217f1bae4c291b74b6f53abf286cd670dca59076881dea97d402",
+    "bounce-common-init/replay.json": "2014f2535970ab7d1bfcb6964777b286a3b0eb5a01c3959141076ce4c3c966f2",
+}
+ACTED = "acted-smoke.json"
+
+
+def scene_replays(root):
+    pairs = {}
+    rows = []
+    for bits in (32, 64):
+        name = f"final-scene-f{bits}.json"
+        records = read(root / name, SCENE_FILES[name])
+        pairs[bits] = {record["game"]: record for record in records}
+    for game in ("Explode", "Bounce", "Aviate"):
+        for bits in (32, 64):
+            record = pairs[bits][game]
+            updates = [entry for entry in record["trace"] if entry["update"]]
+            last = updates[-1]
+            if ([x["tick"] for x in updates] != list(range(48)) or
+                    record["exact_reloaded_at_tick"] != 24 or record["final_all_arrays_equal"] is not True):
+                raise ValueError(f"Incomplete {game} float{bits} replay or restart")
+            rows.append([game, f"float{bits}", len(updates), record["reset_observations"],
+                         sum(len(x["tracked"]) for x in updates), last["active_identities"],
+                         last["active_motion"], last["active_interactions"]])
+    common_path = "bounce-common-init/replay.json"
+    common = read(root / common_path, SCENE_FILES[common_path])
+    final = common["final_components"]
+    mismatch_count = common["mismatching_track_ticks"]
+    comparisons = common["n"] * pairs[32]["Bounce"]["config"]["slots"]
+    cli = ("https://github.com/VersesTech/axiom/blob/"
+           "b99f62599e73294639f1944827bf427909f6c698/defaults.py#L255")
+    return f"""<section id="scenes"><h2>Tracking and learning from whole scenes</h2>
+<p>The observation model followed the same 48 recorded actions per game and precision. It saw
+each new image, applied action and reward, tracked visible slots, and updated its identity, motion
+and interaction components. Each run reloaded the scene after action 24 and finished with all 101
+state arrays byte-identical to its uninterrupted counterpart. Aviate also processed one reset
+observation per precision.</p>
+{table("Fixed-action development replay · cumulative tracking and final component counts",
+       ["Game", "Precision", "Actions", "Resets", "Tracked slot-steps", "Identities", "Motion", "Interactions"], rows)}
+<p>A tracked slot-step counts one tracked slot on one actual transition. The final three columns
+count occupied components. The same seed (17) initialized each native run, and random draws can
+differ by precision. On Bounce the native tracking masks first differed at tick
+{common["original_native_first_track_difference"]}. Slot 4 appeared only in the float32 mask there. Their final interaction counts were {pairs[32]["Bounce"]["trace"][-1]["active_interactions"]}
+and {pairs[64]["Bounce"]["trace"][-1]["active_interactions"]}, respectively.</p>
+<p><strong>The tracking difference disappeared with a common start.</strong> The control initialized
+Bounce once in float32 and widened each floating-point array exactly for the float64 run. Tracking
+masks differed on {mismatch_count} of {common["n"]} transitions across {comparisons:,} individual
+slot decisions. The final interaction counts were {final["32"]} and {final["64"]}. These recordings
+have no ground-truth object labels for assessing tracking quality. The authors’ command-line runner
+defaults to float32 and allows float64. The training seeds and precision of the published results
+remain unspecified by this evidence.</p>
+<p class="sources">{link("final-scene-f32.json", "Native float32 scenes")} ·
+{link("final-scene-f64.json", "Native float64 scenes")} · {link(common_path, "Common-start Bounce trace")} ·
+{link(cli, "Authors’ command-line setting")}</p>
+{acted_smoke(root)}</section>"""
+
+
+def acted_smoke(root):
+    path = root / ACTED
+    pending = "<h3>Acted development smoke</h3><p>Pending a complete, validated 24-action Explode run.</p>"
+    if not path.exists():
+        return pending
+    data = path.read_bytes()
+    report = json.loads(data)
+    if report.get("phase") != "complete" or report.get("passed") is not True:
+        return pending
+    # The producer verified all trace entries, the disk restart and Git source hashes.
+    audited_sha = "c37fed8473489526a858365c21df5f6b9cad95b04586fdfbe03ad4dd2afaa1ea"
+    if hashlib.sha256(data).hexdigest() != audited_sha or report["source_reverified"] is not True:
+        raise ValueError("Acted smoke differs from the independently validated result")
+    summary = report["summary"]
+    histogram = summary["applied_histogram"]
+    active = summary["final_active"]
+    warm = summary["warm_decision_s"]
+    cold = summary["first_by_shape_decision_s"]
+    return f'''<h3 data-acted-status="complete">One acted development run</h3><p>In a separate float32 Explode run, the
+planner considered 16 candidate action sequences over eight steps with three sampled rollouts per
+sequence. The simulator applied all 24 selected commands. Actions 0, 1 and 2 occurred
+{histogram[0]}, {histogram[1]} and {histogram[2]} times. Each new observation used the applied
+command and returned reward. All observed rewards were zero. The novelty term distinguished
+candidate scores on {summary["decisions_with_score_spread"]} of 24 decisions. The observed model’s
+bytes remained identical across each planning call. Reloading the 104 scene, proposal and key arrays
+at decision 12 reproduced action 2, the full decision output and the next random key.</p>
+<p>The run finished with {active["identity"]} identity, {active["motion"]} motion and
+{active["interaction"]} interaction components. The 24 actions preceded the
+first scheduled model reduction. Across {warm["n"]} decisions that reused compiled shapes, the
+median decision took {1000*warm["median"]:.2f} ms including model preparation. First use of
+{cold["n"]} shapes took {cold["minimum"]:.2f}–{cold["maximum"]:.2f} s. Updating the scene after the first action took {summary["first_observe_s"]:.2f} s and the median for the remaining 23 was
+{1000*summary["warm_observe_s"]["median"]:.2f} ms. These timings describe one development
+trajectory. A policy-quality comparison would require separate evaluation.</p>
+<p class="sources">{link(ACTED, "Acted smoke trace and checkpoint receipt")}</p>'''
 
 
 def declared(root):
@@ -316,7 +412,7 @@ def render(root):
         raise ValueError("The decision summary needs review against the timing threshold")
     nav = " ".join(link("#" + dest, label) for dest, label in (
         ("accuracy", "Accuracy and restarts"), ("compute", "Update time"), ("files", "File costs"),
-        ("frames", "Recorded frames"), ("declared", "Declared learners")))
+        ("frames", "Recorded frames"), ("scenes", "Scene tracking and actions"), ("declared", "Declared learners")))
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Online learning precision and its cost</title><style>{CSS}</style></head><body><main>
@@ -330,19 +426,41 @@ implementation in the CPU benchmark. All twelve 95% intervals lie above the pred
 cost threshold. Required compact storage grew by zero bytes for identical values. Optional exact
 files were 67–88% larger than compact files and enabled bitwise continuation.</p>
 <nav aria-label="Report sections">{nav}</nav></header>
-{accuracy(root)}{compute(initial, confirmed, raw)}{checkpoint(initial, io)}{recordings(root)}{declared(root)}
+{accuracy(root)}{compute(initial, confirmed, raw)}{checkpoint(initial, io)}{recordings(root)}{scene_replays(root)}{declared(root)}
 <footer>Apple M2 Max CPU · JAX 0.10.2 · Timed learner inputs in float32 · Rounded baseline
 <code>fd8bfd1</code> · Initial compensation <code>a72cabc</code> · Optimized compute <code>089f377</code> ·
 Combined checkpoint validation <code>b7f1fd8</code></footer></main></body></html>
 """
 
 
+def publish(root):
+    # Detect a replaced producer result, renderer or destination during a render.
+    paths = [Path(__file__), root / ACTED, *(root / name for name in SCENE_FILES), root / "index.html"]
+
+    def fingerprint():
+        return [hashlib.sha256(p.read_bytes()).digest() if p.exists() else None for p in paths]
+
+    destination = root / "index.html"
+    before = fingerprint()
+    html = render(root)
+    complete = 'data-acted-status="complete"'
+    if complete not in html and destination.exists() and complete in destination.read_text(encoding="utf-8"):
+        raise ValueError("Preserving the completed report while acted evidence is incomplete")
+    with tempfile.TemporaryDirectory(dir=root) as directory:
+        draft = Path(directory) / "index.html"
+        draft.write_text(html, encoding="utf-8")
+        if destination.exists():
+            draft.chmod(destination.stat().st_mode & 0o777)
+        if fingerprint() != before:
+            raise RuntimeError("Scene evidence, renderer or report changed during rendering")
+        draft.replace(destination)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root", nargs="?", type=Path, default=ROOT)
     root = parser.parse_args().root.expanduser()
-    html = render(root)
-    (root / "index.html").write_text(html, encoding="utf-8")
+    publish(root)
 
 
 if __name__ == "__main__":
