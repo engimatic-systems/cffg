@@ -13,6 +13,10 @@
     "meaning": "One coordinate of two independent unit-variance latent slots. Inject fixed prior means and unit observation variance with identity transform. Compare one E sweep from a supplied previous qx; this is an analytic fixture.",
     "prior_means": [0,2], "previous_means": [1,1], "previous_variances": [1,1], "tokens": [0,2], "mix_alpha": [1,1],
     "expected_qz": [[0.5,0.5],[0.5,0.5]], "expected_qx_means": [0.5,1.5], "expected_qx_variances": [0.5,0.5],
+    "second_axis": "All token and prior second coordinates are zero. Both backward and prior precisions are diagonal before the release adjustment.",
+    "release_precision_scalar_added_to_every_entry": 1e-8,
+    "expected_release_covariance": [[0.4999999975000000,-2.499999975e-9],[-2.499999975e-9,0.4999999975000000]],
+    "expected_release_means": [[0.4999999975000000,-2.499999975e-9],[1.4999999925000001,-7.499999925e-9]],
     "expected_hard_used": [true,false], "expected_positive_mass": [true,true]
   },
   "birth": {
@@ -64,6 +68,7 @@
   "relation": {
     "source": ["defaults.py#L446-L483", "axiom/models/rmm.py#L337-L425"],
     "own": [0.1,0.2,0,0.02,-0.03], "neighbor_displacement_feature": [0.03,0.04], "velocity_scale": 10,
+    "stationary_circles": {"center_separation":2.4,"unscaled_radius":1,"scale":[0.8,1.25],"overlap":[false,true],"grid_width":30,"neighbor_index":2},
     "expected": {"default_features": [0.1,0.2,0,0.2,-0.3,0.03,0.04], "fixed_features": [0.1,0.2,0,0.2,-0.3], "fixed_default_switch_neighbor": null, "fixed_nondefault_switch_neighbor": 2}
   },
   "reduction": {

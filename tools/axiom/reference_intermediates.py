@@ -8,10 +8,8 @@ import json
 import math
 from pathlib import Path
 
-import numpy as np
-
 import gameworld_replay as gw
-
+import numpy as np
 
 HERE = Path(__file__).resolve().parent
 DEV_MANIFEST = "abca225803b4b79801c7fcf2a5823cc639237f12b707f779dea3f3815f3ed376"
@@ -62,6 +60,14 @@ def scalar_checks(cases):
         spatial["expected_qx_means"],
     )
     check("slot_variance", variance, spatial["expected_qx_variances"])
+    precision = np.eye(2) * (1 + mass[0]) + spatial["release_precision_scalar_added_to_every_entry"]
+    eta = np.column_stack((spatial["prior_means"] + (pixels * qz).sum(axis=0), np.zeros(len(mass))))
+    check(
+        "release_slot_covariance",
+        np.linalg.solve(precision, np.eye(2)),
+        spatial["expected_release_covariance"],
+    )
+    check("release_slot_means", np.linalg.solve(precision, eta.T).T, spatial["expected_release_means"])
     check(
         "occupied_by_winner",
         np.bincount(qz.argmax(axis=1), minlength=len(mass)) > 0,
@@ -176,8 +182,17 @@ def scalar_checks(cases):
     )
     check("fixed_features", own, r["expected"]["fixed_features"])
 
+    circles = r["stationary_circles"]
+    overlaps = []
+    for scale in circles["scale"]:
+        radius = scale * circles["unscaled_radius"]
+        grid = np.linspace(-radius, radius, circles["grid_width"])
+        x, y = np.meshgrid(grid, grid)
+        other_x = x + circles["center_separation"]
+        overlaps.append(bool(np.any((x * x + y * y <= radius**2) & (other_x**2 + y * y <= radius**2))))
+    check("tuned_radius_overlap", overlaps, circles["overlap"])
     for switch, name in ((0, "fixed_default_switch_neighbor"), (1, "fixed_nondefault_switch_neighbor")):
-        neighbor = 2 if switch else None
+        neighbor = circles["neighbor_index"] if switch and overlaps[-1] else None
         if neighbor != r["expected"][name]:
             raise ValueError(name)
         checks.append(name)
