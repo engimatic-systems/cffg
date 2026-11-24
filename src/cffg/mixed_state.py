@@ -77,20 +77,12 @@ class MixedBank(_BankFields):
         intact. Loading a compact record starts from the saved values with zero
         carry. Exact snapshots (v3) also persist the residuals at this boundary.
         """
-        if not bool(mixed_scoring.validate_bank(self, for_checkpoint=True)):
-            raise ValueError("invalid mixed-learning snapshot parameters")
-        fields = {key: np.array(getattr(self, key), copy=True) for key in _PRIMARY}
-        for i, head in enumerate(self.categories):
-            fields[f"category_{i}"] = np.array(head, copy=True)
-        fields["category_cardinalities"] = np.asarray([h.shape[1] for h in self.categories],
-                                                     dtype=np.int64)
-        fields["version"] = np.int32(3 if exact else 2)
-        if exact:
-            for key in _CARRIED:
-                fields[f"carry_{key}"] = np.array(getattr(self.carry, key), copy=True)
-            for i, low in enumerate(self.carry.categories):
-                fields[f"carry_category_{i}"] = np.array(low, copy=True)
-        return fields
+        return _snapshot(self, exact)
+
+    def as_rounded(self) -> RoundedBank:
+        """Use the visible primary values and discard residuals from subsequent learning."""
+        return RoundedBank(self.mu, self.kappa, self.psi, self.nu, self.alpha,
+                           self.categories, self.active)
 
     @classmethod
     def from_state_dict(cls, state: Mapping[str, np.ndarray]) -> MixedBank:
@@ -137,6 +129,49 @@ class MixedBank(_BankFields):
         if not bool(mixed_scoring.validate_bank(bank, for_checkpoint=True)):
             raise ValueError("invalid mixed-learning snapshot parameters")
         return bank
+
+
+
+class RoundedBank(NamedTuple):
+    """One-word posterior for the opt-in rounded score and update arithmetic."""
+
+    mu: jax.Array
+    kappa: jax.Array
+    psi: jax.Array
+    nu: jax.Array
+    alpha: jax.Array
+    categories: tuple[jax.Array, ...]
+    active: jax.Array
+
+    def as_compensated(self) -> MixedBank:
+        """Begin compensated learning from the current values with zero residuals."""
+        return MixedBank(*self)
+
+    def state_dict(self, *, exact=False) -> dict[str, np.ndarray]:
+        """Save all seven primary fields in v2. This is exact for a rounded learner."""
+        return _snapshot(self, False)
+
+    @classmethod
+    def from_state_dict(cls, state: Mapping[str, np.ndarray]) -> RoundedBank:
+        """Validate v1/v2/v3, then select rounded arithmetic from the saved primary fields."""
+        return MixedBank.from_state_dict(state).as_rounded()
+
+
+def _snapshot(bank, exact):
+    if not bool(mixed_scoring.validate_bank(bank, for_checkpoint=True)):
+        raise ValueError("invalid mixed-learning snapshot parameters")
+    fields = {key: np.array(getattr(bank, key), copy=True) for key in _PRIMARY}
+    for i, head in enumerate(bank.categories):
+        fields[f"category_{i}"] = np.array(head, copy=True)
+    fields["category_cardinalities"] = np.asarray([h.shape[1] for h in bank.categories],
+                                                 dtype=np.int64)
+    fields["version"] = np.int32(3 if exact else 2)
+    if exact:
+        for key in _CARRIED:
+            fields[f"carry_{key}"] = np.array(getattr(bank.carry, key), copy=True)
+        for i, low in enumerate(bank.carry.categories):
+            fields[f"carry_category_{i}"] = np.array(low, copy=True)
+    return fields
 
 
 _PRIMARY = {"mu", "kappa", "psi", "nu", "alpha", "active"}

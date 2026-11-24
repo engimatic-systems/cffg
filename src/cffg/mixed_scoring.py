@@ -351,9 +351,13 @@ def score(bank, batch, *, include_mixing=False):
 
     def evaluate():
         base, correction = _gaussian_log(bank, batch)
-        scores = base + correction
-        logits = relative(relative(base) + relative(correction))
         carry = getattr(bank, "carry", None)
+        if carry is None:
+            scores = base
+            logits = relative(base)
+        else:
+            scores = base + correction
+            logits = relative(relative(base) + relative(correction))
         for i, (index, head) in enumerate(zip(batch.categories, bank.categories, strict=True)):
             index = category_indices(index)
             table = _dirichlet_log(head, True)
