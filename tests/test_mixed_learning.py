@@ -100,7 +100,55 @@ def test_update_rejects_invalid_batch_without_partial_commit():
 
 def test_restore_rejects_invalid_snapshot():
     bank, _, _ = fixture(jnp.float32)
-    for extra in ({"version": np.int32(2)}, {"category_9": np.ones(1)},
+    for extra in ({"version": np.int32(3)}, {"category_9": np.ones(1)},
                   {"psi": np.zeros_like(bank.psi)}):
         with pytest.raises(ValueError):
             mixed.MixedBank.from_state_dict({**bank.state_dict(), **extra})
+
+
+@pytest.mark.parametrize(("width", "indices", "valid"), [
+    (256, np.array([-1, 127], dtype=np.int8), True),
+    (257, np.array([0, 255], dtype=np.uint8), True),
+    (256, np.array([-2, 0], dtype=np.int8), False),
+    (255, np.array([0, 255], dtype=np.uint8), False),
+])
+def test_narrow_category_indices_score_and_update_only_observed_bins(width, indices, valid):
+    bank, batch, weights = fixture(jnp.float32)
+    head = jnp.broadcast_to(jnp.arange(1, width + 1, dtype=bank.mu.dtype), (len(bank.mu), width))
+    bank = bank._replace(categories=(head,))
+    batch = batch._replace(gaussian_observed=jnp.array([False, False]),
+                           categories=(jnp.asarray(indices),))
+    score = jax.jit(mixed.score)
+    scores, _, accepted = score(bank, batch)
+    assert bool(accepted) == valid
+    reference, _, _ = score(bank, batch._replace(categories=(jnp.asarray(indices, jnp.int32),)))
+    np.testing.assert_array_equal(scores, reference)
+    updated, accepted = jax.jit(mixed.update)(bank, batch, weights)
+    assert bool(accepted) == valid
+    counts = np.zeros_like(head)
+    if valid:
+        for row, index in enumerate(indices):
+            if int(index) >= 0:
+                counts[:, index] += weights[row]
+    same_bank(updated, bank._replace(categories=(head + counts,),
+                                     alpha=bank.alpha + counts.sum(axis=1)))
+
+
+def test_snapshot_checks_ordered_head_inventory_and_reads_legacy():
+    bank, _, _ = fixture(jnp.float32)
+    state = bank.state_dict()
+    assert state["version"] == 2
+    np.testing.assert_array_equal(state["category_cardinalities"], [2, 3])
+    legacy = {k: v for k, v in state.items() if k != "category_cardinalities"}
+    legacy["version"] = np.int32(1)
+    same_bank(mixed.MixedBank.from_state_dict(legacy), bank)
+    for missing in ("category_0", "category_1", "category_cardinalities"):
+        with pytest.raises(ValueError, match="missing"):
+            mixed.MixedBank.from_state_dict({k: v for k, v in state.items() if k != missing})
+    for widths in ([3, 2], [2], [2, 0], [[2, 3]], [2., 3.]):
+        with pytest.raises(ValueError):
+            mixed.MixedBank.from_state_dict({**state, "category_cardinalities": np.array(widths)})
+    with pytest.raises(ValueError, match="shape"):
+        mixed.MixedBank.from_state_dict({**state, "category_1": state["category_1"][:, :-1]})
+    empty = bank._replace(categories=())
+    same_bank(mixed.MixedBank.from_state_dict(empty.state_dict()), empty)

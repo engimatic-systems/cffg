@@ -58,6 +58,11 @@ def _check_batch_shapes(bank, batch):
         _array("category indices", index, (n,), index.dtype)
 
 
+def category_indices(index):
+    """Use an integer wide enough for JAX to address the entire category axis."""
+    return index.astype(jnp.int32) if index.dtype.itemsize < 4 else index
+
+
 def _correlation(matrices):
     diag = jnp.diagonal(matrices, axis1=-2, axis2=-1)
     sd = jnp.sqrt(jnp.where(diag > 0, diag, 1))
@@ -220,6 +225,7 @@ def score(bank, batch, *, include_mixing=False):
         scores = _gaussian_log(bank, batch)
         logits = relative(scores)
         for index, head in zip(batch.categories, bank.categories, strict=True):
+            index = category_indices(index)
             table = _dirichlet_log(head, True)
             term = jnp.where(index[:, None] >= 0, table.T[jnp.maximum(index, 0)], 0)
             scores += term

@@ -36,21 +36,39 @@ class MixedBank(NamedTuple):
                   for key in ("mu", "kappa", "psi", "nu", "alpha", "active")}
         fields.update({f"category_{i}": np.array(head, copy=True)
                        for i, head in enumerate(self.categories)})
-        fields["version"] = np.array(1, dtype=np.int32)
+        fields["category_cardinalities"] = np.array(
+            [head.shape[1] for head in self.categories], dtype=np.int64
+        )
+        fields["version"] = np.array(2, dtype=np.int32)
         return fields
 
     @classmethod
     def from_state_dict(cls, state: Mapping[str, np.ndarray]) -> MixedBank:
-        """Restore a snapshot in its saved precision; reject broken layouts."""
+        """Restore saved precision and the ordered categorical layout.
+
+        Legacy v1 records have only consecutively numbered head arrays, so
+        their format cannot establish whether a trailing head was lost.
+        """
         version = np.asarray(state.get("version"))
-        if version.shape != () or version.dtype != np.int32 or version.item() != 1:
+        if version.shape != () or version.dtype != np.int32 or version.item() not in (1, 2):
             raise ValueError("unknown mixed-learning snapshot version")
-        required = {"mu", "kappa", "psi", "nu", "alpha", "active", "version"}
-        heads = tuple(f"category_{i}" for i in range(len(set(state) - required)))
-        if set(state) != required | set(heads):
+        required = {"mu", "kappa", "psi", "nu", "alpha", "active"}
+        metadata = {"version"}
+        cardinalities = None
+        if version.item() == 2:
+            metadata.add("category_cardinalities")
+            cardinalities = np.asarray(state.get("category_cardinalities"))
+            if (cardinalities.dtype != np.int64 or cardinalities.ndim != 1
+                    or np.any(cardinalities < 1)):
+                raise ValueError("invalid or missing snapshot category cardinalities")
+            count = len(cardinalities)
+        else:
+            count = len(set(state) - required - metadata)
+        heads = tuple(f"category_{i}" for i in range(count))
+        if set(state) != required | metadata | set(heads):
             raise ValueError("unexpected or missing mixed-learning snapshot field")
         fields = {}
-        for key in set(state) - {"version"}:
+        for key in required | set(heads):
             value = np.asarray(state[key])
             dtype = jax.dtypes.canonicalize_dtype(value.dtype)
             if value.dtype != dtype:
@@ -58,6 +76,10 @@ class MixedBank(NamedTuple):
             fields[key] = jnp.array(value, copy=True)
         bank = cls(fields["mu"], fields["kappa"], fields["psi"], fields["nu"],
                    fields["alpha"], tuple(fields[key] for key in heads), fields["active"])
+        if cardinalities is not None and any(
+            head.shape[1:] != (width,) for head, width in zip(bank.categories, cardinalities, strict=True)
+        ):
+            raise ValueError("snapshot categorical head shape disagrees with its cardinality")
         if not bool(mixed_scoring.validate_bank(bank)):
             raise ValueError("invalid mixed-learning snapshot parameters")
         return bank
@@ -135,8 +157,11 @@ def update(bank: MixedBank, batch: MixedBatch, weights: jax.Array) -> tuple[Mixe
         present = observed
         heads = []
         for index, alpha in zip(batch.categories, bank.categories, strict=True):
-            present = present | (index >= 0)
+            index = mixed_scoring.category_indices(index)
+            observed_category = index >= 0
+            present = present | observed_category
             hot = jax.nn.one_hot(index, alpha.shape[1], dtype=weights.dtype)
+            hot = jnp.where(observed_category[:, None], hot, 0)
             counts = jnp.matmul(weights.T, hot, precision=precision)
             heads.append(jnp.where(counts > 0, alpha + counts, alpha))
         seen_mass = jnp.where(present[:, None], weights, 0).sum(axis=0)
