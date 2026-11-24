@@ -419,10 +419,10 @@ by a floor or accepted as a finite posterior. These numerical changes do not
 repair the partial-goal planning limitation above.
 
 Default raw Gaussian statistics can round different conditional variances
-to the same second moment. Declared NIW, ordinary MNIW and component MNIW consume centered
-statistics. MNIW still stores a dense float64 coefficient precision. For two
-unit-variance predictors both centered at 2²⁷, their small difference can
-vanish in that stored matrix. The centered update raises a precision error
+to the same second moment. Declared NIW, ordinary MNIW and component MNIW
+consume centered statistics. MNIW stores a dense coefficient precision.
+Even in float64, two unit-variance predictors both centered at 2²⁷ can
+lose the small variance of their difference in that matrix. The centered update raises a precision error
 before committing it. Center input coordinates at a fixed origin when the
 stored precision would otherwise be unresolved. `cad-1bat` tracks a
 representation that retains this information across checkpoints.

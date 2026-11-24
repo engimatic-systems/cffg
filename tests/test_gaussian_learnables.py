@@ -570,3 +570,50 @@ def test_declared_gaussian_spread_at_translated_origin(x64, origin):
             assert engine.gaussian_marginal(result.state, "x0")[1].item() == variance
             for name in ("a_state", "z_dynamics"):
                 np.testing.assert_allclose(learner.params[name]["psi"], [[3. + variance]])
+
+
+def test_observed_centered_regression_retains_input_spread_and_skips_missing():
+    with jax.enable_x64(False):
+        t, arrays = _tied_emissions(2, 1)
+        x = 4096.
+        arrays.update(input_mean=np.array([x]), input_cov=np.array([[.25]]),
+                      R=np.array([[.25]]))
+        engine = Engine(compile_template(t, arrays=arrays))
+        state = engine.bind_data(engine.init_state(), {"observation0": [x]})
+        result = engine.run(state, 40, tol=1e-6)
+        prior = conj.MNIW(np.array([[1., 0.]]), np.eye(2), np.array([[3.]]), 4.)
+        learner = Learnables(engine, {"emission": prior})
+        learner.accumulate(engine, result)
+        # One observed row has input variance v and zero mean prediction error.
+        # Integrating the two coefficient increments subtracts 2*v²/det(Lambda).
+        v = .125
+        expected = 3. + v - 2 * v**2 / (x*x + 2. + 2.*v)
+        np.testing.assert_allclose(learner.params["emission"]["psi"], [[expected]],
+                                   rtol=0, atol=np.spacing(np.float32(v)))
+        assert learner.params["emission"]["nu"] == 5.
+        row = engine.gaussian_node_stats(result.state)["emission0"]
+        raw = prior.update(row["Syy"], row["Syx"], row["Sxx"], 1.)
+        np.testing.assert_allclose(raw.psi, [[3.]], atol=1e-8)
+
+
+def test_centered_linear_callback_matches_eager_singletons_across_batch():
+    import jax.numpy as jnp
+    from cffg.gaussian_kernels import centered_linear_statistics
+
+    dims = (1, 2)
+    eta = jnp.array([[[.2, 0.], [-1., .5]], [[-.3, 0.], [1., -.25]]])
+    precision = jnp.broadcast_to(jnp.eye(2), (2, 2, 2, 2))
+    params = {"A": jnp.array([[[.7, -.3]], [[-.5, .2]]]),
+              "b": jnp.array([[.25], [-.5]]), "W": jnp.array([[[1.]], [[2.]]])}
+    compiled = jax.jit(centered_linear_statistics, static_argnums=(3, 4))
+    for role in (None, 0):
+        y, mask = (None, None) if role is None else (jnp.array([[2.], [0.]]), jnp.array([1., 0.]))
+        result = compiled(eta, precision, params, dims, role, y, mask)
+        for i in range(2):
+            subset = lambda a: a[i:i+1]
+            single = centered_linear_statistics(
+                subset(eta), subset(precision), jax.tree.map(subset, params), dims, role,
+                None if y is None else subset(y), None if mask is None else subset(mask),
+            )
+            for key in result:
+                np.testing.assert_allclose(result[key][i], single[key][0], rtol=1e-12, atol=1e-12)
