@@ -3,8 +3,9 @@
 import jax
 import jax.numpy as jnp
 from jax.scipy.linalg import solve_triangular
-from jax.scipy.special import digamma
+from jax.scipy.special import digamma, polygamma
 
+from cffg import _compensated
 from cffg.efrules import LOG2PI, _symmetry_ok
 
 
@@ -37,6 +38,15 @@ def _check_bank_shapes(bank):
         if head.ndim != 2 or head.shape[-1] < 1:
             raise ValueError("each categorical prior must have shape [K,C] with C >= 1")
         _array("categorical prior", head, (k, head.shape[1]), bank.mu.dtype)
+    carry = getattr(bank, "carry", None)
+    if carry is not None:
+        for name in ("mu", "kappa", "psi", "nu", "alpha"):
+            high = getattr(bank, name)
+            _array(f"carry.{name}", getattr(carry, name), high.shape, high.dtype)
+        if not isinstance(carry.categories, tuple) or len(carry.categories) != len(bank.categories):
+            raise ValueError("carry must contain one low array for each categorical field")
+        for high, low in zip(bank.categories, carry.categories, strict=True):
+            _array("categorical carry", low, high.shape, high.dtype)
 
 
 def _check_batch_shapes(bank, batch):
@@ -96,6 +106,12 @@ def validate_bank(bank):
              & _matrix_valid(bank.psi, strict=True))
     for values in (bank.kappa, bank.alpha, *bank.categories):
         valid &= jnp.all(jnp.isfinite(values) & (values > 0))
+    carry = getattr(bank, "carry", None)
+    if carry is not None:
+        for name in ("mu", "kappa", "psi", "nu", "alpha"):
+            valid &= _compensated.canonical(getattr(bank, name), getattr(carry, name))
+        for high, low in zip(bank.categories, carry.categories, strict=True):
+            valid &= _compensated.canonical(high, low)
     return valid & jnp.all(jnp.isfinite(bank.nu) & (bank.nu > bank.mu.shape[1] - 1))
 
 
@@ -159,6 +175,31 @@ def _dirichlet_log(alpha, active):
     return jax.lax.fori_loop(0, 8, subtract_term, result)
 
 
+def _digamma_adjustment(x, relative):
+    """Change from x to x*(1+relative), with a sub-ULP relative perturbation."""
+    # At small x the pole can amplify a low word into observable log odds.
+    # Its reciprocal difference is exact algebraically; the regular part
+    # needs only a first-order correction at this perturbation size.
+    small = x < 16
+    safe = jnp.where(small, x, 1)
+    near = relative / (safe * (1 + relative)) + (relative * safe) * polygamma(1, safe + 1)
+    inv = 1 / jnp.where(small, 16, x)
+    far = relative * (1 + inv/2 + inv**2/6 - inv**4/30 + inv**6/42)
+    return jnp.where(small, near, far)
+
+
+def _dirichlet_adjustment(alpha, low, active, base):
+    support = jnp.where(active, alpha, 0)
+    peak = jnp.max(support, axis=-1, keepdims=True)
+    relative = jnp.sum(jnp.where(active, low, 0) / peak, axis=-1, keepdims=True)
+    relative /= jnp.sum(support / peak, axis=-1, keepdims=True)
+    correction = (_digamma_adjustment(alpha, low / alpha)
+                  - _digamma_adjustment(jnp.sum(support, axis=-1, keepdims=True), relative))
+    # For a near-unit event even the entire log likelihood is below epsilon.
+    # The high-word complement already resolves it to relative source precision.
+    return jnp.where(jnp.abs(base) < jnp.finfo(alpha.dtype).eps, 0, correction)
+
+
 def _covariance_trace(root, covariance, active):
     """Return tr(Psi^-1 C) without cancellation for nearly orthogonal directions."""
     k, d, _ = root.shape
@@ -188,12 +229,14 @@ def _covariance_trace(root, covariance, active):
 
 
 def _gaussian_log(bank, batch):
-    """E log N(x | location, precision) under independent observation and NIW."""
+    """Return the NIW expected log likelihood and its low-word correction."""
     d = bank.mu.shape[1]
     corr, scale = _correlation(bank.psi)
     root = scale[:, :, None] * jnp.linalg.cholesky(corr)
     logdet = 2 * jnp.sum(jnp.log(jnp.diagonal(root, axis1=-2, axis2=-1)), axis=-1)
-    orders = (bank.nu[:, None] - jnp.arange(d, dtype=bank.nu.dtype)) / 2
+    carry = getattr(bank, "carry", None)
+    degrees = bank.nu[:, None] - jnp.arange(d, dtype=bank.nu.dtype)
+    orders = (degrees if carry is None else degrees + carry.nu[:, None]) / 2
     elogdet = jnp.sum(digamma(orders), axis=-1) + d * jnp.log(2.) - logdet
 
     mean = jnp.where(batch.gaussian_observed[:, None], batch.mean, 0)
@@ -203,11 +246,54 @@ def _gaussian_log(bank, batch):
     squared = jnp.sum(jnp.square(whitened), axis=1).T
     trace = _covariance_trace(root, cov, bank.active)
     loglik = 0.5 * (elogdet - d * LOG2PI - d / bank.kappa - bank.nu * (squared + trace))
-    return jnp.where(batch.gaussian_observed[:, None], loglik, 0)
+    observed = batch.gaussian_observed[:, None]
+    base = jnp.where(observed, loglik, 0)
+    if carry is None:
+        return base, jnp.zeros_like(base)
+    low_mean = solve_triangular(root, carry.mu[..., None], lower=True)
+    delta = jnp.sum(low_mean * (low_mean - 2 * whitened), axis=1).T
+
+    def scale_adjustment():
+        # In whitened coordinates the effective scale is I+D. Solve for
+        # (I+D)^-1 D directly, retaining precision corrections below one ULP
+        # of I that can still change odds for distant observations.
+        eye = jnp.broadcast_to(jnp.eye(d, dtype=root.dtype), root.shape)
+        inverse = solve_triangular(root, eye, lower=True)
+        dot = jax.lax.Precision.HIGHEST
+        def product(a, b):
+            return jnp.matmul(a, b, precision=dot)
+        def transpose(a):
+            return a.swapaxes(-1, -2)
+        perturbation = product(product(inverse, carry.psi), transpose(inverse))
+        perturbation = 0.5 * perturbation + 0.5 * transpose(perturbation)
+        change = jnp.linalg.solve(eye + perturbation, perturbation)
+        centered = whitened - low_mean
+        location = jnp.sum(centered * product(change, centered), axis=1).T
+        precision_change = product(product(transpose(inverse), change), inverse)
+        spread = jnp.einsum("kij,nji->nk", precision_change, cov, precision=dot)
+        # Canonical scale lows are small in source units; strict correlation
+        # validation of the high word keeps I+D positive definite.
+        log_volume = jnp.sum(jnp.log1p(jnp.linalg.eigvalsh(perturbation)), axis=-1)
+        return location + spread, log_volume
+
+    scale_delta, volume = jax.lax.cond(
+        jnp.any(carry.psi != 0), scale_adjustment,
+        lambda: (jnp.zeros_like(base), jnp.zeros_like(bank.nu)),
+    )
+    delta -= scale_delta
+    correction = 0.5 * ((d / bank.kappa) * (carry.kappa / bank.kappa)
+                        - volume - bank.nu * delta - carry.nu * (squared + trace + delta))
+    return base, jnp.where(observed, correction, 0)
 
 
 def score(bank, batch, *, include_mixing=False):
-    """Return absolute likelihood scores [N,K], assignments [N,K], and scalar validity."""
+    """Return source-dtype absolute scores [N,K], assignments [N,K], and scalar validity.
+
+    Low-word corrections enter the relative logits separately from large
+    common likelihoods. The NIW uses the resolved primary scale and its
+    whitened perturbation. Dirichlet corrections use the digamma recurrence
+    at its pole and its derivative for the smooth sub-ULP displacement.
+    """
     valid = validate_inputs(bank, batch)
     mixing = jnp.asarray(include_mixing)
     _array("include_mixing", mixing, (), jnp.bool_)
@@ -222,9 +308,11 @@ def score(bank, batch, *, include_mixing=False):
         return supported - jnp.max(supported, axis=-1, keepdims=True)
 
     def evaluate():
-        scores = _gaussian_log(bank, batch)
-        logits = relative(scores)
-        for index, head in zip(batch.categories, bank.categories, strict=True):
+        base, correction = _gaussian_log(bank, batch)
+        scores = base + correction
+        logits = relative(relative(base) + relative(correction))
+        carry = getattr(bank, "carry", None)
+        for i, (index, head) in enumerate(zip(batch.categories, bank.categories, strict=True)):
             index = category_indices(index)
             table = _dirichlet_log(head, True)
             term = jnp.where(index[:, None] >= 0, table.T[jnp.maximum(index, 0)], 0)
@@ -232,10 +320,20 @@ def score(bank, batch, *, include_mixing=False):
             # The absolute sum may round away a categorical log odds when
             # every component agrees on a very unlikely continuous field.
             logits = relative(logits + relative(term))
+            if carry is not None:
+                adjust = _dirichlet_adjustment(head, carry.categories[i], True, table)
+                term = jnp.where(index[:, None] >= 0, adjust.T[jnp.maximum(index, 0)], 0)
+                scores += term
+                logits = relative(logits + relative(term))
         scores = jnp.where(bank.active, scores, -jnp.inf)
         mixing_log = jax.lax.cond(mixing, lambda: _dirichlet_log(bank.alpha, bank.active),
                                   lambda: jnp.zeros_like(bank.alpha))
-        weights = jax.nn.softmax(logits + relative(mixing_log), axis=-1)
+        logits = logits + relative(mixing_log)
+        if carry is not None:
+            adjust = jax.lax.cond(mixing, lambda: _dirichlet_adjustment(
+                bank.alpha, carry.alpha, bank.active, mixing_log), lambda: jnp.zeros_like(bank.alpha))
+            logits += relative(adjust)
+        weights = jax.nn.softmax(logits, axis=-1)
         finite = (jnp.all(~bank.active | jnp.isfinite(scores))
                   & jnp.all(~bank.active | jnp.isfinite(mixing_log))
                   & jnp.all(jnp.isfinite(weights)))
