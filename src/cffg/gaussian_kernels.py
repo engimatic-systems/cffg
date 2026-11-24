@@ -6,6 +6,8 @@ operations preserve the original per-member NumPy/JAX evaluation order.
 
 from __future__ import annotations
 
+from functools import cache, wraps
+
 import numpy as np
 
 from cffg.core.ir import FACTOR_TYPES
@@ -225,9 +227,22 @@ def centered_linear_statistics(eta, precision, params, dims, observed_role, obse
     return rows
 
 
-def install(register, kernel, hostile):
-    from jax import jit
+def _compiled_statistics(statistics):
+    """Keep registration runtime-free and reuse the JIT callback across reads."""
+    @cache
+    def compiled():
+        from jax import jit
 
+        return jit(statistics, static_argnums=(3, 4))
+
+    @wraps(statistics)
+    def read(*args, **kwargs):
+        return compiled()(*args, **kwargs)
+
+    return read
+
+
+def install(register, kernel, hostile):
     prior = {
         "mean": ParameterSpec(lambda s: (s["out"],), "m"),
         "cov": ParameterSpec(
@@ -267,9 +282,8 @@ def install(register, kernel, hostile):
                     energy,
                     conditioning,
                     stats,
-                    centered_statistics=jit(
-                        centered_prior_statistics if name == "gaussian" else centered_linear_statistics,
-                        static_argnums=(3, 4),
+                    centered_statistics=_compiled_statistics(
+                        centered_prior_statistics if name == "gaussian" else centered_linear_statistics
                     ),
                     moment_projections=frozenset({"gaussian_first_second"}),
                 ),

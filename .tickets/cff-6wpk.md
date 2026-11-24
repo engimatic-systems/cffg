@@ -2,7 +2,7 @@
 id: cff-6wpk
 status: closed
 deps: []
-links: [cff-7t4j, cad-1bat]
+links: [cff-7t4j, cad-1bat, cao-zfxu]
 created: 2026-11-24T02:37:08Z
 type: bug
 priority: 1
