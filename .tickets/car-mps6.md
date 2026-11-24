@@ -1,7 +1,7 @@
 ---
 id: car-mps6
 status: open
-deps: [car-k6oi, car-8rgl, cff-pksr]
+deps: [car-k6oi, car-8rgl, cff-pksr, cao-0pbk]
 links: [cff-du6m]
 created: 2026-11-23T21:48:38Z
 type: feature
