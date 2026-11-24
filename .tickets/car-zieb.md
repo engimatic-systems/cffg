@@ -87,3 +87,17 @@ Next accuracy checkpoint is cff-xfnx --> car-9ccf --> downstream component lifec
 **2026-11-24T06:04:21Z**
 
 Road position after the precision gate. A supported typed agent restart now has explicit ownership in cao-lxmq. Existing categorical/one-Gaussian restart cannot restore AXIOM tracks, component banks, policy proposal or accumulated reduction samples. The fixed-action and small acting smoke can proceed with experiment-owned state. The full public-facade reproduction remains downstream. Legend: prerequisites --> dependents. Mixed learning + fixed-bank operations --> scene learning and rMM reduction; scene + sampled planner --> short acting smoke; scene + planner + reduction + rolling boundary --> cao-lxmq --> 10k integration, then preregistered million-step car-zieb study. Default compensated learning needs a human speed decision (caoc-0dvd).
+
+**2026-11-24T06:44:11Z**
+
+The public experiment now takes pixels through tracking and learning to actions. On 24 closed-loop Explode steps at a reduced search budget, all 24 actions were applied, the agent received zero reward, and an exact disk restart before action 12 reproduced that action, the plan and the next random key. The reducer also has independent positive/negative merge and 500-step cadence checks. A whole-agent continuation that includes its retained synthetic records still belongs to cao-lxmq. The short game establishes the interfaces and leaves the paper's returns unmeasured.
+
+In the fixed-action Bounce development run, separate native initializations ended at 129 versus 112 interaction rules in float32 and float64. An exact shared start produced 129 each and matched all 1,536 tracking decisions. The authors' released command line defaults to float32 and also supports float64. The dtype of historical paper runs is unconfirmed.
+
+Selected dependencies, prerequisite --> dependent. car-8rgl supplies the frozen protocol. The compute tradeoff is the P1 decision for Cooper.
+
+    caoc-0dvd + cff-xfnx --> car-9ccf --> car-k6oi
+    car-k6oi + car-8rgl --> car-kwjj + car-mps6 --> car-zieb
+    car-ne0a + cao-fs5s + cff-wdhj --> cao-lxmq --> car-zieb
+
+The reviewed measurements, scripts and raw records are linked from ~/agent-share/axiom-online-precision/index.html. The 10,000-step evaluation is pending.
