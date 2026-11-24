@@ -6,6 +6,7 @@ import io
 import json
 from functools import partial
 from pathlib import Path
+import subprocess
 from time import perf_counter
 
 import jax
@@ -38,6 +39,19 @@ def state_hashes(state):
 
 
 def run(tapes, game, steps, dtype, seed, cfg=None):
+    package = Path(cffg.__file__).resolve().parent
+    revision = subprocess.check_output(
+        ["git", "-C", str(package), "rev-parse", "HEAD"], text=True
+    ).strip()
+
+    def fingerprint():
+        return {
+            str(p.relative_to(package)): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in sorted(package.rglob("*.py"))
+        }
+
+    source = fingerprint()
+    replay_digest = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     manifest = json.loads((tapes / "manifest.json").read_text())
     row = next(r for r in manifest["runs"] if r["game"] == game and r["condition"] == "base")
     archive = tapes / row["file"]
@@ -126,14 +140,15 @@ def run(tapes, game, steps, dtype, seed, cfg=None):
     exact = continuation is not None and state_hashes(continuation) == state_hashes(state)
     if not exact:
         raise ArithmeticError("restart failed to reproduce final state")
+    if (
+        source != fingerprint()
+        or hashlib.sha256(Path(__file__).read_bytes()).hexdigest() != replay_digest
+    ):
+        raise RuntimeError("source changed during the replay, record from an immutable checkout")
     return dict(
-        source_sha256={
-            str(p.relative_to(Path(cffg.__file__).parent)): hashlib.sha256(
-                p.read_bytes()
-            ).hexdigest()
-            for p in sorted(Path(cffg.__file__).parent.rglob("*.py"))
-        },
-        replay_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        source_sha256=source,
+        revision=revision,
+        replay_sha256=replay_digest,
         backend=str(jax.devices()[0]),
         jax=jax.__version__,
         game=game,
