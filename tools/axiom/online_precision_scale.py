@@ -42,6 +42,17 @@ def score_oracle(b, x):
     return full, np.exp(full - logsumexp(full, axis=1, keepdims=True))
 
 
+@jax.jit
+def recurrent_valid(bank, tape):
+    def step(state, xx):
+        _, weights, score_ok = score(state, xx)
+        updated, update_ok = update(state, xx, weights)
+        return updated, score_ok & update_ok
+
+    _, flags = jax.lax.scan(step, bank, tape)
+    return flags
+
+
 def run(dtype, root, legacy=None):
     compiled = jax.jit(score)
     fold = jax.jit(update)
@@ -62,12 +73,15 @@ def run(dtype, root, legacy=None):
         if np.any(abs(w[:, active] - ref_w[:, active]) > budget * ref_w[:, active]):
             raise AssertionError("normalized weights exceed log-score roundoff budget")
         post, ok = fold(bank, x, w)
-        assert ok
+        assert ok, f"single batched update rejected at N={n}, K={k}"
         expected = oracle(bank, x, w)
         single = bank
         for i in range(n):
             single, ok = fold(single, jax.tree.map(lambda a: a[i : i + 1], x), w[i : i + 1])
-            assert ok
+            assert ok, f"fixed-assignment update {i} rejected at N={n}, K={k}"
+        flags = np.asarray(recurrent_valid(bank, batches))
+        rejected = np.flatnonzero(~flags).tolist()
+        assert not rejected, f"recurrent updates rejected at N={n}, K={k}, ticks {rejected}"
         a = visible(post)
         for field, r in expected.items():
             np.testing.assert_allclose(a[field], r, rtol=64 * eps, atol=64 * eps)
@@ -77,6 +91,7 @@ def run(dtype, root, legacy=None):
             dict(
                 n=n,
                 k=k,
+                recurrent_valid_ticks=int(flags.sum()),
                 max_abs_score=float(abs(s[:, active] - ref_s[:, active]).max()),
                 max_abs_weight=float(abs(w - ref_w).max()),
                 batch_error=metrics(post, expected),
