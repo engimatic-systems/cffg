@@ -43,7 +43,8 @@ def _draw_rows(weights, key):
 
 
 def predict_objects(model, objects, tracked, log_likelihood, key, *,
-                    match_threshold=-10., reward_threshold=.45):
+                    match_threshold=-10., reward_threshold=.45,
+                    responsibilities=None, total_alpha=None):
     """Draw one scene's successor and score it. Inputs remain read-only.
 
     Objects have shape [slots, features]. The first D features evolve and
@@ -64,7 +65,9 @@ def predict_objects(model, objects, tracked, log_likelihood, key, *,
     comp_key, motion_key, noise_key = jax.random.split(key, 3)
     logits = jnp.where(occupied, log_likelihood, -jnp.inf)
     fit = jnp.max(logits, axis=1)
-    q = jax.nn.softmax(logits, axis=1)
+    q = jax.nn.softmax(logits, axis=1) if responsibilities is None else responsibilities
+    if q.shape != logits.shape:
+        raise ValueError("expected one responsibility per object and component")
     component = _draw_rows(q, comp_key)
     motion_weights = jnp.where(motion_p > 1e-4, motion_p, 0)[component]
     motion = _draw_rows(motion_weights, motion_key)
@@ -80,7 +83,10 @@ def predict_objects(model, objects, tracked, log_likelihood, key, *,
     rewards = jnp.where(tracked, rewards, 0.)
     reward = rewards[jnp.argmax(jnp.abs(rewards))]
 
-    inverse_total = 1 / jnp.sum(alpha)
+    # A compact snapshot can contain only occupied rows. Dormant counts still
+    # contribute to the reference novelty baseline.
+    total = alpha.sum() if total_alpha is None else total_alpha
+    inverse_total = 1 / total
     # Divide after weighting so a dormant component contributes exactly zero
     # even when its count is too small for its reciprocal to be representable.
     bonuses = jnp.sum(q / alpha, axis=1) - inverse_total
@@ -97,7 +103,11 @@ def predict_objects(model, objects, tracked, log_likelihood, key, *,
               & jnp.all(jnp.isfinite(reward_p) & (reward_p >= 0) & (reward_p <= 1))
               & jnp.all(jnp.abs(motion_p.sum(axis=1) - 1) <= motion_tol)
               & jnp.all(jnp.abs(reward_p.sum(axis=1) - 1) <= reward_tol))
-    valid_slot = (jnp.isfinite(fit) & (motion_weights.sum(axis=1) > 0)
+    q_tol = (8 + components.bit_length()) * jnp.finfo(q.dtype).eps
+    proper &= jnp.isfinite(total) & (total > 0)
+    valid_q = (jnp.isfinite(q) & (q >= 0) & (occupied | (q == 0))).all(axis=1)
+    valid_slot = (valid_q & (jnp.abs(q.sum(axis=1) - 1) <= q_tol)
+                  & jnp.isfinite(fit) & (motion_weights.sum(axis=1) > 0)
                   & jnp.isfinite(positions).all(axis=1))
     valid = proper & jnp.all(~tracked | valid_slot)
     return ObjectPrediction(next_state, jnp.where(tracked, component, -1),
