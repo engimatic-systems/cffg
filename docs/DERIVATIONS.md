@@ -556,6 +556,23 @@ record can change later assignments. The small independent score and
 posterior oracles are in `tests/test_mixed_scoring.py` and
 `tests/test_mixed_learning.py`.
 
+**Frame-local appearance regression.** Pixels partly assigned to the same
+slot share an uncertain input position. Each pixel channel has a separate
+noise precision. For a channel with coefficients distributed as
+`N(m, inv(P)/tau)` and `tau ~ Gamma(a,b)` (shape and rate), take input
+mean `x`, covariance `C`, and `S = C + x xᵀ`. Its expected log likelihood
+is half of `digamma(a) - log(2πb) - (a/b)((y-mx)² + m C mᵀ) - tr(inv(P) S)`.
+Let `h` be the sum of this slot's pixel weights. The new precision is
+`P' = P + h S`, and the weighted normal equations give the posterior
+coefficient mean `m'`. Add `h/2` to the shape. The rate increment is half
+the sum of the weighted squared residuals at `m'`, the input-noise term
+`h m' C m'ᵀ`, and the prior penalty `(m'-m) P (m'-m)ᵀ`. Every term is a
+squared distance. Computing them this way preserves small within-frame
+spread around large predictions. A bias uses a constant input with zero
+variance. `tests/test_frame_regression.py` checks these equations against
+augmented least squares and exact second-order integration.
+
+
 **MNIW update** (gaussian_linear node, x̃ = [x; 1], prior (M0 [dy,di+1],
 Λ0 [di+1,di+1] column precision, Ψ0, ν0), per-trial stats Syy = E[yyᵀ],
 Syx̃ = E[yx̃ᵀ], Sx̃x̃ = E[x̃x̃ᵀ], summed over the trial's node occurrences,

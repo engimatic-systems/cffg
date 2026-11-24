@@ -1721,7 +1721,15 @@ them. Four rules define the contract:
    input bank on numerical failure. Versioned host snapshots preserve the
    component axis, categorical head order, precision and occupancy mask.
    These arrays describe a finite bank whose semantic fields and category
-   order are supplied by the model.
+   order are supplied by the model. Compact mixed snapshots save the rounded
+   parameters; exact snapshots also save the corrections carried into the
+   next update.
+
+   Frame-local appearance regression is owned by `frame_regression.py`.
+   `score_pixels` evaluates the expected log likelihood for each pixel
+   under each occupied slot. `fit_frame` takes one immutable regression prior,
+   one Gaussian design belief per slot and fractional pixel assignments.
+   The caller owns slot growth, coordinate iteration and reuse of the prior.
 
    Reading is not evidence, so a learnable may restrict which instances
    supply statistics: `LearnableSpec.sources` is `None` for every reader, a

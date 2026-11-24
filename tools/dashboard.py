@@ -149,6 +149,7 @@ EPIC_FILES = {
         "test_component_niw_learning.py",
         "test_mixed_scoring.py",
         "test_mixed_learning.py",
+        "test_frame_regression.py",
     ],
     "M16 · Plates": ["test_plates.py"],
     "M17 · Constraints": ["test_csp.py"],
