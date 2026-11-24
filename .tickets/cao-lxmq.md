@@ -1,6 +1,6 @@
 ---
 id: cao-lxmq
-status: open
+status: in_progress
 deps: [cao-36dd, car-ne0a, cao-fs5s, cff-wdhj]
 links: []
 created: 2026-11-24T06:03:43Z
@@ -33,3 +33,9 @@ Prerequisite --> dependent
                 --> typed AXIOM continuation --> car-zieb
 
 A continuation includes both what the agent learned and where it was in the real-observation / imagined-action cycle. A compact restart can round parameter evidence once at load. The actual observations, episode metadata and applied commands remain exact.
+
+## Notes
+
+**2026-11-24T14:53:18Z**
+
+Evaluation checkpoint slice on experiment/axiom-10000. The controller factory owns its model layout. The actor owns the scene, pending decision if supported, planner and reduction state. The runner supplies exact source/stage/game/seeds/goal/tick/trace metadata and replays the native environment externally. Use the Learnable or checkpoint feature change path. Check disk restart in a fresh actor, clock/metadata and complete array inventory, precision and keys, accumulated reduction histories, and rejection before mutating the destination. Numerical inference and its host/compiled/schedule paths are shared and unchanged. This assignment covers exact evaluation restart only. Compact/published facade qualification remains separately tracked.
