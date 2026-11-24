@@ -75,3 +75,7 @@ Research record. Which existing tickets actually block the port? The hybrid conj
 **2026-11-24T01:37:58Z**
 
 Work paused on the first accuracy checkpoint. car-9ccf now depends on cff-7t4j. The current float32 mixture readout can encode distinct true within-component spreads with identical public statistics. Reference work established separate additive and released-history update fixtures. No Gameworld outcomes have been measured.
+
+**2026-11-24T03:34:42Z**
+
+The centered mixture uncertainty repair passed. Implementation paused at Cooper’s performance checkpoint during the next learning milestone. Corpus, public readout, posterior and host-fold measurements are linked in the served ~/agent-share/axiom-centered-checkpoint report. Both API options are available for further testing. The one-game pilot remains downstream.

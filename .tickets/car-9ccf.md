@@ -44,3 +44,7 @@ Paused at the requested accuracy checkpoint before adding the learner. New prere
 **2026-11-24T01:38:16Z**
 
 Additional large-count score fixture for criterion 4: with Dirichlet concentrations (2^22,1), the exact expected log probability of the first category is -2^-22 by the digamma recurrence. Independent probe of efrules.py returned zero in float32. Absolute error is 2.38e-7. Preserve as a separately quantified stress case; it was not the reason for the stop.
+
+**2026-11-24T03:34:42Z**
+
+The numerical prerequisite cff-7t4j is closed on the fix branch. A public readout plus centered NIW update distinguished the two previously identical variances. Paused before adding mixed-evidence learner registration because validated host pooling was 2.32x the raw time on 32 six-dimensional observations, with a 56-microsecond absolute difference. Recommend measuring a batched, validated learner update in the real data path before choosing a default. No Gameworld episodes run. Independently, cff-6wpk covers conventional Gaussian/regression learner paths and is not a hard dependency here.
