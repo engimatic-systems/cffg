@@ -433,7 +433,9 @@ at mean 10000 and κ=4096, 1024 identical unit-weight records at 10001
 (conditional variance 0.125) leave the streaming float32 mean at 10000.
 The correct mean is 10000.2. Starting at Ψ=3, the stored scale becomes
 1154.78 rather than 950.2. A single batch or a float64 stream recovers the
-analytic scale on this fixture. Centering the input coordinates at the
+analytic scale on this fixture. Wider storage moves the precision limit. An
+update below half the spacing at the stored mean can also round away in
+float64. Centering the input coordinates at the
 original mean also recovers it to float32 precision. The declared
 `component_niw` family accumulates on the host in float64. The standalone
 mixed learner's `valid` flag checks inputs and posterior propriety. Long-run
@@ -600,7 +602,7 @@ A compatibility and migration promise is deferred until the format stabilizes.
 Flooding and mixed scheduling solve the same coordinates,
 but neither guarantees monotone progress on every loopy hybrid graph.
 
-All five declared-learning families supply versioned persistent-state
+All declared-learning families supply versioned persistent-state
 descriptors. The generic checkpoint inventory describes immutable priors and
 current posteriors, but flat `Learnables` checkpoints restore only posteriors;
 they retain the caller's destination priors. Schema-2 CFFGZ bundles store both

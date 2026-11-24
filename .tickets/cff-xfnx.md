@@ -35,3 +35,9 @@ car-9ccf can qualify its native streaming API after this accuracy boundary is re
 
 An ULP is the gap between adjacent representable numbers at a given magnitude. A persistent accumulator stores evidence across real observations. A posterior scale carries information about the variance the learner is estimating.
 
+
+## Notes
+
+**2026-11-24T03:55:16Z**
+
+Independent review supplied a two-record regression in either dtype: let m=4096 and h=spacing(m), with kappa=1 and psi=h*h. Two point observations at m+h give 5*h*h/3 in a batch but 13*h*h/6 one at a time, also after restart. Storing a wider mean moves the limit. Compare keeping the fractional offset across checkpoints as well as a wider accumulator; quantify the supported range.
