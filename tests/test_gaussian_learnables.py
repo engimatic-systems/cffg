@@ -368,9 +368,9 @@ def test_scheduled_and_flooded_gaussian_updates_match():
     ("corrupt", "match"),
     [
         (lambda row: row.update(proper=np.asarray(False)), "improper"),
-        (lambda row: row.update(Syy=np.full_like(row["Syy"], np.nan)), "finite"),
-        (lambda row: row.update(Syx=np.zeros((1, 1))), "statistic shapes"),
-        (lambda row: row.update(Syy=np.eye(2) * -100.0), "positive definite"),
+        (lambda row: row.update(cov_yy=np.full_like(row["cov_yy"], np.nan)), "finite"),
+        (lambda row: row.update(cov_yx=np.zeros((1, 1))), "statistic shapes"),
+        (lambda row: row.update(cov_yy=np.eye(2) * -100.0), "positive semidefinite"),
     ],
 )
 def test_selected_updates_are_atomic_on_hostile_mniw_statistics(
@@ -383,8 +383,8 @@ def test_selected_updates_are_atomic_on_hostile_mniw_statistics(
     )
     before = learnables.state_dict()
     readout = engine.gaussian_node_stats(result.state)
-    corrupt(readout["transition"])
     centered = engine.gaussian_node_stats(result.state, centered=True)
+    corrupt(centered["transition"])
     monkeypatch.setattr(engine, "gaussian_node_stats", lambda state, **kw: centered if kw else readout)
 
     with pytest.raises((ValueError, KeyError), match=match):
@@ -566,6 +566,7 @@ def test_declared_gaussian_spread_at_translated_origin(x64, origin):
                 "a_state": conj.NIW(np.array([origin]), 2., np.array([[3.]]), 4.),
                 "z_dynamics": conj.MNIW(np.array([[0., origin]]), np.eye(2), np.array([[3.]]), 4.),
             })
-            learner.accumulate(engine, result, only=("a_state",))
+            learner.accumulate(engine, result)
             assert engine.gaussian_marginal(result.state, "x0")[1].item() == variance
-            np.testing.assert_allclose(learner.params["a_state"]["psi"], [[3. + variance]])
+            for name in ("a_state", "z_dynamics"):
+                np.testing.assert_allclose(learner.params[name]["psi"], [[3. + variance]])

@@ -2,7 +2,7 @@
 id: cff-6wpk
 status: in_progress
 deps: []
-links: [cff-7t4j]
+links: [cff-7t4j, cad-1bat]
 created: 2026-11-24T02:37:08Z
 type: bug
 priority: 1
@@ -48,3 +48,7 @@ Implementation handoff on fd8bfd1, fix/centered-declared-learning. Architecture 
 **2026-11-24T05:20:14Z**
 
 Reproduced the two scalar float32 cases on fd8bfd1: correct marginal variances 0.25 and 1, both declared scales 3.0. Ordinary NIW now returns 3.25 and 4.0, also at float64 origin 2^27. Existing raw readout remains available. 68 focused Gaussian learner, readout ownership and registered kernel tests passed (2 opt-in cases excluded).
+
+**2026-11-24T05:25:15Z**
+
+Registered latent and DATA regression now use joint-centered moments and QR. Exact scales at 4096 and at 2^27: 3.25/4.0. Dense, fractional, rank-one and point conditional data agree with an independent regression oracle. 85 focused conjugate, Gaussian-learning and readout-ownership cases passed (one opt-in excluded). New P2 cad-1bat reproduces an unrepresentable column precision with two translated predictors; the learner explicitly refuses that update.

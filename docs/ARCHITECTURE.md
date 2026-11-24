@@ -1716,6 +1716,10 @@ them. Four rules define the contract:
    `Engine.gaussian_node_stats(state, centered=True)`. The prior binding computes
    these moments before any raw second moment is formed. The default readout
    still supplies raw statistics to callers that request that representation.
+   Declared MNIW uses the joint (output, input) mean and the three distinct
+   covariance blocks. Conditioned outputs supply only the input covariance.
+   The host solves for a coefficient increment relative to the stored prior
+   using QR and accumulates squared residuals as derived in D4.2.
 
    The `component_niw` family reads centered per-component moments from
    `gaussian_mixture`. It shares the existing declared-learning transaction,

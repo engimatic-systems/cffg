@@ -418,13 +418,14 @@ the whitened evidence system; this is reported as invalid evidence, not repaired
 by a floor or accepted as a finite posterior. These numerical changes do not
 repair the partial-goal planning limitation above.
 
-Ordinary `gaussian` and `gaussian_linear` declared learners still consume
-raw second moments. In float32, a component centered at 4096 can have a
-variance of 0.25 or 1 and return the same raw second moment in both cases.
-The inferred marginal can retain the variance while the resulting learned
-noise scale loses it. The component-MNIW readout uses raw moments as well.
-The centered readout for `gaussian_mixture` preserves each conditional
-covariance. See the Gaussian learning follow-up `cff-6wpk`.
+Default raw Gaussian statistics can round different conditional variances
+to the same second moment. Declared NIW and ordinary MNIW consume centered
+statistics. MNIW still stores a dense float64 coefficient precision. For two
+unit-variance predictors both centered at 2²⁷, their small difference can
+vanish in that stored matrix. The centered update raises a precision error
+before committing it. Center input coordinates at a fixed origin when the
+stored precision would otherwise be unresolved. `cad-1bat` tracks a
+representation that retains this information across checkpoints.
 
 The batched mixed learner stores its posterior in the caller's working
 precision. A well-formed update can round a small mean or count increment

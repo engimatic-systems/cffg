@@ -5,7 +5,7 @@ from __future__ import annotations
 import jax.numpy as jnp
 import numpy as np
 
-from cffg import mixg
+from cffg import ef, mixg
 from cffg.execution.transport import _gauss_rows, _obs_rows
 from cffg.kernel_runtime import gaussian_readout as _gauss_readout
 from cffg.kernel_runtime import parameters as _kernel_params
@@ -20,26 +20,6 @@ from cffg.readouts.views import (
 from cffg.runtime_types import State
 
 
-def _resolved_correlation(matrix):
-    """Check positive definiteness at the stored precision, independently of coordinate units."""
-    scale = np.sqrt(matrix.diagonal().astype(np.float64))
-    correlation = (matrix / scale[:, None]) / scale[None, :]
-    if not np.isfinite(correlation).all():
-        raise FloatingPointError
-    dim = len(scale)
-    eps = np.finfo(matrix.dtype).eps
-    asymmetry = np.max(np.abs(correlation - correlation.T))
-    if asymmetry > 16 * dim * eps * np.max(np.abs(correlation)):
-        raise np.linalg.LinAlgError
-    correlation = (correlation + correlation.T) / 2
-    # A Cholesky pivot subtracts up to dim products from a unit diagonal.
-    # Reserve that source-dtype roundoff for admission; solve the unshifted system.
-    guarded = correlation.copy()
-    np.fill_diagonal(guarded, 1 - dim * eps)
-    np.linalg.cholesky(guarded)
-    return correlation, scale
-
-
 def _edge_moments(view, edge, eta, precision):
     dim = edge.dim
     slots = (edge.slot0, edge.slot1)
@@ -49,13 +29,13 @@ def _edge_moments(view, edge, eta, precision):
             p = precision[view.g_lam_indices(slots, dim)].sum(axis=0)
             if not np.isfinite(h).all():
                 raise FloatingPointError
-            correlation, scale = _resolved_correlation(p)
+            correlation, scale = ef.resolved_correlation(p)
             chol = np.linalg.cholesky(correlation)
             rhs = np.column_stack((h / scale, np.eye(dim)))
             solved = np.linalg.solve(chol.T, np.linalg.solve(chol, rhs)) / scale[:, None]
             mean = solved[:, 0].astype(eta.dtype)
             covariance = (solved[:, 1:] / scale).astype(precision.dtype)
-            _resolved_correlation(covariance)
+            ef.resolved_correlation(covariance)
             if np.isfinite(mean).all():
                 return mean, covariance
     except (np.linalg.LinAlgError, FloatingPointError):

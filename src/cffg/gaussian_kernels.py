@@ -192,6 +192,39 @@ def linear_statistics(eta, precision, params, dims, observed_role, observation, 
     return _stack_stats(rows)
 
 
+def centered_linear_statistics(eta, precision, params, dims, observed_role, observation, mask):
+    import jax.numpy as jnp
+    from cffg import gauss
+
+    dy, dx = dims
+    a, b, w = params["A"], params["b"], params["W"]
+    ei, li = eta[:, 1, :dx], precision[:, 1, :dx, :dx]
+    atw = a.swapaxes(-1, -2) @ w
+    proper = gauss.is_proper_precision(w)
+    if observed_role is None:
+        eo, lo = eta[:, 0, :dy], precision[:, 0, :dy, :dy]
+        top = jnp.concatenate((w + lo, -w @ a), axis=-1)
+        bottom = jnp.concatenate((-atw, atw @ a + li), axis=-1)
+        joint_precision = jnp.concatenate((top, bottom), axis=-2)
+        wb = jnp.einsum("mij,mj->mi", w, b)
+        joint_eta = jnp.concatenate((wb + eo, ei - jnp.einsum("mji,mj->mi", a, wb)), axis=-1)
+        mean, covariance = gauss.moments(joint_eta, joint_precision)
+        blocks = {"cov_yy": covariance[:, :dy, :dy], "cov_yx": covariance[:, :dy, dy:],
+                  "cov_xx": covariance[:, dy:, dy:]}
+    else:
+        total = li + mask[:, None, None] * (atw @ a)
+        h = ei + mask[:, None] * jnp.einsum("mij,mj->mi", atw, observation - b)
+        mx, cov = gauss.moments(h, total)
+        mean = jnp.concatenate((observation, mx), axis=-1)
+        blocks = {"cov_xx": cov}
+    proper &= jnp.all(jnp.isfinite(mean), axis=-1)
+    rows = {key: jnp.where(proper[:, None, None], value, jnp.nan) for key, value in blocks.items()}
+    rows.update(mean=jnp.where(proper[:, None], mean, jnp.nan), proper=proper)
+    if observed_role is not None:
+        rows["mask"] = mask
+    return rows
+
+
 def install(register, kernel, hostile):
     prior = {
         "mean": ParameterSpec(lambda s: (s["out"],), "m"),
@@ -232,7 +265,8 @@ def install(register, kernel, hostile):
                     energy,
                     conditioning,
                     stats,
-                    centered_statistics=centered_prior_statistics if name == "gaussian" else None,
+                    centered_statistics=(centered_prior_statistics if name == "gaussian"
+                                         else centered_linear_statistics),
                     moment_projections=frozenset({"gaussian_first_second"}),
                 ),
             )
