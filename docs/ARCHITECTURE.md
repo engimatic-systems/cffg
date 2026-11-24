@@ -1767,6 +1767,14 @@ them. Four rules define the contract:
    Updates and resets use the original sufficient statistics. Unmasked
    reduction queries may separately expose seeded virgin components.
 
+   `experiments/axiom_observation.py` consumes an RGB frame, the action
+   actually applied and its reward. Identity updates receive previous
+   appearance from eligible foreground slots. The interaction learner sees
+   that previous scene with its freshly inferred identities and the motion
+   switch observed in the transition. A reset frame can update perception
+   while retaining learned dynamics and the real action count. An invalid
+   observation keeps the previous scene and clears the learning receipts.
+
    `rollout_planning.sample_action_sequences` executes an immutable parameter
    snapshot on action sequences. Each policy, sample and time index gets a
    stable random key. The AXIOM experiment owns its independent object
