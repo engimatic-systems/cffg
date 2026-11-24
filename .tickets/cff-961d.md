@@ -34,3 +34,9 @@ car-kwjj adds initialization, threshold-driven proposals, identity, and carrying
 
 A spatial slot is a Gaussian belief about an object position. A responsibility assigns a fraction of a pixel to a slot. Hard occupancy counts the pixels that prefer a slot over every other slot.
 
+
+## Notes
+
+**2026-11-24T05:30:00Z**
+
+Two-sweep 32-slot / 33,600 pixel smoke passed on Explode base frame 0; fully coupled update versus independent information solve using the returned final assignments differed by max 1.15e-5 normalized coordinate and 1.20e-7 covariance. Three targeted spatial tests (two precisions, independent quadratic fitting, permutation, zero support) plus four underlying frame regression tests. Full suite pending.

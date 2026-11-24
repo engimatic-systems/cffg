@@ -40,3 +40,7 @@ A proposal is the distribution used to suggest action strings. An elite is a hig
 **2026-11-24T05:16:09Z**
 
 Implement independent read-only sampled planning against an enumerable world. Architecture paths: Agent, planning, or hierarchy feature and Runtime numerical or status invariant. Check shared callback, scalar/batched trajectories, explicit RNG and cold/warm planning, checkpointed planner state, masks, invalid settings and reward aggregation in both precisions. CFFG message sweeps, GFE and template/bundle migration do not own this sampled objective. Object-model integration depends on the native pipeline.
+
+**2026-11-24T05:30:00Z**
+
+Release-budget planner probe completed with supplied two-object, three-interaction snapshot: 32×512×3=49,152 imagined steps and zero real steps. CPU float32 compile 0.732 s, one synchronized warmed decision 21.56 ms. Exact synthetic rollout distribution/score and selection checks plus optional no-bonus comparison passed. Live features and model binding belong to car-mps6. Do not extrapolate these numbers to a 32-object, 5,000-interaction bank or game reward. Shared suite pending.

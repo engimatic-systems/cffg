@@ -11,6 +11,7 @@ import jax.numpy as jnp
 import numpy as np
 from scipy.special import digamma
 
+from cffg.experiments.axiom_spatial import Positions, infer_slots
 from cffg.frame_regression import Frame, Regression, fit_frame, score_pixels
 
 
@@ -91,6 +92,32 @@ def run(archive):
             delta[key] = max(delta[key], float(np.max(abs(np.asarray(v) - ref) / (1 + abs(ref)))))
     if max(delta.values()) > 3e-4:
         raise AssertionError(delta)
+    # Compare the second position coordinate to an independent information-form solve
+    # using its reported assignments and the original (fixed) Gaussian frame prior.
+    initial = Positions(frame.design[:, :-1], frame.covariance[:, :-1, :-1])
+    frame_prior = Positions(
+        jnp.zeros_like(initial.mean), jnp.tile(jnp.eye(2, dtype=initial.mean.dtype), (k, 1, 1))
+    )
+    spatial = jax.jit(infer_slots)(
+        prior, frame.pixels, frame_prior, initial, jnp.ones(k, initial.mean.dtype), frame.active
+    )
+    if not spatial.valid:
+        raise ArithmeticError("invalid full-resolution spatial coordinate")
+    assignment = np.asarray(spatial.assignment, float)
+    max_position_error = 0.0
+    max_cov_error = 0.0
+    for i in range(k):
+        h = assignment[:, i]
+        tau = a[i] / b[i]
+        g = o * np.linalg.inv(V[i]) + (m[i].T * tau) @ m[i]
+        C = np.linalg.inv(np.eye(2) + h.sum() * g[:-1, :-1])
+        location = C @ ((m[i][:, :-1].T * tau) @ (h @ Y) - h.sum() * g[:-1, -1])
+        max_position_error = max(
+            max_position_error, float(np.max(abs(location - spatial.positions.mean[i])))
+        )
+        max_cov_error = max(max_cov_error, float(np.max(abs(C - spatial.positions.cov[i]))))
+    if max_position_error > 3e-4 or max_cov_error > 3e-4 or int(spatial.occupancy.sum()) != len(Y):
+        raise AssertionError((max_position_error, max_cov_error))
     return dict(
         pixels=len(Y),
         slots=k,
@@ -101,6 +128,9 @@ def run(archive):
         synchronized_first_s=cold,
         synchronized_warm_s=times,
         max_scaled_error=delta,
+        spatial_sweeps=2,
+        max_position_error=max_position_error,
+        max_position_covariance_error=max_cov_error,
         scope="Frame-local score, assignments and appearance fit under supplied slot beliefs, CPU float32.",
     )
 
