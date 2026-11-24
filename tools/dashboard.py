@@ -106,6 +106,7 @@ EPIC_FILES = {
         "test_agent.py",
         "test_agent_mu3.py",
         "test_agent_spec.py",
+        "test_gaussian_agent.py",
         "test_constraint_flip.py",
         "test_colony.py",
         "test_public_api.py",

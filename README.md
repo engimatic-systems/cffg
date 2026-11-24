@@ -373,6 +373,31 @@ conditioning and missing observations. On its tree, Gaussian marginals match
 Kalman/RTS inference and the ledger has the exact negative-log-evidence
 identity. See [examples/linear_gaussian.py](examples/linear_gaussian.py).
 
+For fixed affine control, save a planning template with a
+`cffg.core.GaussianPlanSpec` and a one-transition filter with a
+`cffg.core.GaussianFilterSpec` using `save_bundle`. The two declarations
+name the same ordered state and command coordinates. The filter applies
+`b + B @ applied` and carries the full filtered covariance to the next plan.
+With those two bundles, the same public interface handles a control step and restart.
+
+```python
+from cffg import RollingAgent
+
+agent = RollingAgent.from_gaussian_bundles("plan.cffgz", "filter.cffgz")
+decision = agent.propose({"target": [2.0]})
+applied = [-0.5]  # the command the actuator actually executed
+agent.observe(applied, [0.5], tick=decision.tick)
+agent.checkpoint("controller.npz")
+
+resumed = RollingAgent.from_gaussian_bundles("plan.cffgz", "filter.cffgz")
+resumed.restore("controller.npz")
+```
+
+The sensor argument can be `None` for a missing reading. A failed solve
+raises before advancing the tick. A checkpoint taken after `propose` also
+retains the outstanding decision. The numerical fixture includes both bundle
+declarations. [Gaussian agent fixture](tests/test_gaussian_agent.py)
+
 An exact-tree certificate checks message consistency, not posterior accuracy.
 Choose float64 for tight moment or evidence comparisons, especially with widely
 different variances. The retained PCGym first-order controller certifies in both

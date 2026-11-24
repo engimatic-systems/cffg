@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from cffg.core.constraint_details import p_substitution_conflicts
+from cffg.core import gaussian_agent
 from cffg.core.ir import (
     AgentSpec,
     BeliefBinding,
@@ -153,7 +154,9 @@ def to_dict(t: Template) -> dict[str, Any]:
     # Additive (cff-nhxf): the serialized model/runtime interface. These are
     # structural names and variational-family declarations, so changing any
     # binding changes the structure hash.
-    if t.agent is not None:
+    if isinstance(t.agent, (gaussian_agent.GaussianPlanSpec, gaussian_agent.GaussianFilterSpec)):
+        d["agent"] = gaussian_agent.to_document(t.agent)
+    elif t.agent is not None:
         belief_names = [belief.name for belief in t.agent.beliefs]
         if len(set(belief_names)) != len(belief_names):
             raise ValueError(
@@ -196,6 +199,30 @@ def to_dict(t: Template) -> dict[str, Any]:
     if required:
         d["kernels"] = required
     return d
+
+
+def _load_agent(record):
+    if record is None:
+        return None
+    if "version" in record:
+        return gaussian_agent.from_document(record)
+    return AgentSpec(
+        action=record["action"],
+        beliefs=tuple(
+            BeliefBinding(
+                name=name,
+                blocks=tuple(spec["blocks"]),
+                prior=spec["prior"],
+                posterior=spec["posterior"],
+                factorization=BoundaryFactorization(spec["factorization"]),
+                constraints=tuple(spec.get("constraints", ())),
+                episode_learnable=spec.get("episode_learnable"),
+            )
+            for name, spec in sorted(record["beliefs"].items())
+        ),
+        action_port=record.get("action_port"),
+        observation_port=record.get("observation_port"),
+    )
 
 
 def from_dict(d: dict[str, Any]) -> Template:
@@ -265,27 +292,7 @@ def from_dict(d: dict[str, Any]) -> Template:
             )
             for name, spec in d.get("learnables", {}).items()
         },
-        agent=(
-            AgentSpec(
-                action=d["agent"]["action"],
-                beliefs=tuple(
-                    BeliefBinding(
-                        name=name,
-                        blocks=tuple(spec["blocks"]),
-                        prior=spec["prior"],
-                        posterior=spec["posterior"],
-                        factorization=BoundaryFactorization(spec["factorization"]),
-                        constraints=tuple(spec.get("constraints", ())),
-                        episode_learnable=spec.get("episode_learnable"),
-                    )
-                    for name, spec in sorted(d["agent"]["beliefs"].items())
-                ),
-                action_port=d["agent"].get("action_port"),
-                observation_port=d["agent"].get("observation_port"),
-            )
-            if "agent" in d
-            else None
-        ),
+        agent=_load_agent(d.get("agent")),
         schema_version=d["schema_version"],
     )
 
