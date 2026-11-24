@@ -46,7 +46,7 @@ def component_model(prior_dtype=np.float64):
     return template, arrays, {OWNER: priors}
 
 
-@pytest.mark.parametrize("x64", [False, True])
+@pytest.mark.parametrize("x64", [False, pytest.param(True, marks=pytest.mark.slow)])
 def test_component_niw_centered_tied_update_and_scoped_writes(x64):
     template, arrays, priors = component_model()
     with jax.enable_x64(x64):

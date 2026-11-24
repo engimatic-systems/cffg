@@ -16,7 +16,9 @@ from cffg.rules import gfe_tm_update
 from test_hybrid_gfe import _linear_template
 
 
-@pytest.mark.parametrize("dtype, regimes", [(jnp.float64, 2), (jnp.float32, 32)])
+@pytest.mark.parametrize("dtype, regimes", [
+    pytest.param(jnp.float64, 2, marks=pytest.mark.slow), (jnp.float32, 32),
+])
 def test_sparse_hybrid_energy_reverse_derivative_matches_forward_mode(dtype, regimes):
     selector = np.ones(regimes) / (regimes - 1)
     selector[-1] = 0.
