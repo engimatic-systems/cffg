@@ -452,31 +452,51 @@ def qualify(dtype):
         np.testing.assert_allclose(s[:, :2], -1 / mass, atol=0.0, rtol=32 * eps)
         return dict(score=float(s[0, 0]), exact=-1 / mass)
 
-    def large_mass_update():
-        # Quarter-counts remain exactly representable at 8192 in both dtypes.
-        # At 2^22 their representability depends on the returned source dtype.
-        results = []
+    def count_precision(mass):
         one = jax.tree.map(lambda value: value[:1], x)
-        for mass in (8192, 2**22):
-            prior = b._replace(
-                kappa=np.full(3, mass, dtype), nu=np.full(3, mass, dtype), alpha=np.full(3, mass, dtype)
+        prior = b._replace(
+            kappa=np.full(3, mass, dtype), nu=np.full(3, mass, dtype), alpha=np.full(3, mass, dtype)
+        )
+        count = 4
+        batch = jax.tree.map(lambda value: np.repeat(value, count, axis=0), one)
+        weights = np.repeat(fixed[:1], count, axis=0)
+
+        def observation(post, valid, intended):
+            deltas = {
+                name: (np.asarray(getattr(post, name), dtype=float) - mass).tolist()
+                for name in ("alpha", "kappa", "nu")
+            }
+            exact = bool(valid and all(np.array_equal(v, intended) for v in deltas.values()))
+            return dict(
+                public_valid=bool(valid),
+                increments=deltas,
+                exact_target=intended.tolist(),
+                preserves_fractional_counts=exact,
             )
-            post, valid = host_arrays(compiled_update(prior, one, fixed[:1]))
-            if mass == 8192 or dtype == np.float64:
-                assert valid
-                for name in ("alpha", "kappa", "nu"):
-                    delta = np.asarray(getattr(post, name), dtype=float) - mass
-                    np.testing.assert_array_equal(delta, fixed[0])
-                close(post, host_update(prior, one, fixed[:1]), dtype)
-            results.append(
-                dict(
-                    mass=mass,
-                    valid=bool(valid),
-                    intended=fixed[0].tolist(),
-                    represented_alpha_increment=(post.alpha.astype(float) - mass).tolist(),
-                )
-            )
-        return dict(cases=results)
+
+        first, ok = host_arrays(compiled_update(prior, one, fixed[:1]))
+        result = dict(first=observation(first, ok, fixed[0]))
+        batched, ok = host_arrays(compiled_update(prior, batch, weights))
+        result["one_batch"] = observation(batched, ok, weights.sum(axis=0))
+        single = prior
+        all_valid = True
+        for _ in range(count):
+            single, ok = host_arrays(compiled_update(single, one, fixed[:1]))
+            all_valid &= bool(ok)
+        result["repeated_singles"] = observation(single, all_valid, weights.sum(axis=0))
+        exact = all(row["preserves_fractional_counts"] for row in result.values())
+        return dict(
+            mass=mass,
+            source_spacing=float(np.spacing(dtype(mass))),
+            observations=count,
+            preserves_fractional_counts=exact,
+            results=result,
+        )
+
+    def resolved_counts():
+        result = count_precision(8192)
+        assert result["preserves_fractional_counts"], result
+        return result
 
     def translation():
         shift = np.array([10000.0, -10000.0], dtype)
@@ -528,13 +548,19 @@ def qualify(dtype):
         ("release_vs_additive", additive),
         ("masked_fields", missing),
         ("large_dirichlet", large),
-        ("large_mass_update", large_mass_update),
+        ("resolved_quarter_count_updates", resolved_counts),
         ("translated", translation),
         ("atomic_rejection", hostile),
     ):
         run(name, fn)
+    boundary = count_precision(2**22)
+    fixed_cases = all(item["passed"] for item in report.values())
     return dict(
-        passed=all(item["passed"] for item in report.values()), checks=report, provenance=provenance()
+        all_accuracy_cases_passed=fixed_cases and boundary["preserves_fractional_counts"],
+        fixed_case_gates_passed=fixed_cases,
+        count_resolution_at_2_to_22=boundary,
+        checks=report,
+        provenance=provenance(),
     )
 
 
@@ -700,7 +726,7 @@ def main():
             args.output.with_suffix(".partial.json").unlink()
     else:
         print(payload)
-    if result.get("passed") is False:
+    if result.get("fixed_case_gates_passed", result.get("passed")) is False:
         raise SystemExit(1)
 
 
