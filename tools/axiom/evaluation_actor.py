@@ -15,6 +15,11 @@ from cffg.experiments.axiom_observation import SceneSettings, initialize_scene, 
 from cffg.experiments.axiom_planning import SearchSettings, initial_proposal, plan
 from cffg.experiments.axiom_rollout import WorldStatus, freeze_world, rollout_step
 
+if __package__:
+    from .evaluation_planning import cached_plan
+else:
+    from evaluation_planning import cached_plan
+
 
 @jax.jit
 def _labels(bank, scene):
@@ -101,8 +106,9 @@ class Actor:
         tracks = self.scene.tracks
         n_tracked = _count(tracks.tracked)
         n_active = _count(self.scene.interaction.posterior.active)
+        cache_stats = {}
+        chunk = 512
         if not n_tracked:
-            chunk = 512
             prepared = perf_counter()
             result = jax.block_until_ready(_empty_plan(self.proposal, subkey))
         else:
@@ -117,10 +123,14 @@ class Actor:
                                             self.scene.absent_distance, config=self.config))
             if not bool(model.valid):
                 raise ArithmeticError(f"invalid frozen scene: {WorldStatus(int(model.status)).name}")
-            chunk = _chunk(model.component_rows.size, model.focused_slots.size)
             prepared = perf_counter()
-            result = jax.block_until_ready(_plan(model, tracks.scene, self.proposal, subkey,
-                                                config=self.config, batch_size=chunk))
+            if self.config.fixed_radius or self.config.static_contacts:
+                chunk = _chunk(model.component_rows.size, model.focused_slots.size)
+                result = _plan(model, tracks.scene, self.proposal, subkey, config=self.config, batch_size=chunk)
+            else:
+                result, cache_stats = cached_plan(model, tracks.scene, self.proposal, subkey,
+                                                  config=self.config, settings=SearchSettings())
+            result = jax.block_until_ready(result)
         finished = perf_counter()
         if not bool(result.valid):
             raise ArithmeticError(f"invalid full-budget decision at tick {self.tick}")
@@ -132,7 +142,8 @@ class Actor:
                                   total_score_range=float(np.ptp(np.asarray(result.total_return))),
                                   predicted_reward_range=float(np.ptp(np.asarray(result.reward))),
                                   novelty_range=float(np.ptp(np.asarray(result.novelty))),
-                                  snapshot_s=prepared-start, plan_s=finished-prepared, decision_s=finished-start)
+                                  snapshot_s=prepared-start, plan_s=finished-prepared, decision_s=finished-start,
+                                  **cache_stats)
         if self.audit_plan:
             if __package__:
                 from .acted_smoke import tree_digest
