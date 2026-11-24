@@ -1,6 +1,6 @@
 ---
 id: cff-xfnx
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-11-24T03:52:06Z
@@ -57,3 +57,7 @@ Independent checks on 089f377 preserved all three precision corrections, 480 rec
 **2026-11-24T07:18:58Z**
 
 The final integrated short suite passed 2798 tests in 1163.637 seconds wall time at f74543f. The corrected compensated update and opt-in exact continuation are implemented and qualified for both working precisions. The remaining blocker for the default is Cooper's decision in caoc-0dvd (optimized recurring float32 time increases 21.7–54.2%). The disk cost of the compact format for the same visible arrays is unchanged. The full review artifact is ~/agent-share/axiom-online-precision/index.html.
+
+**2026-11-24T14:50:52Z**
+
+Default approved by Cooper. The integrated short gate and both precision qualifications passed in PR #203; the speed opt-out is being added independently. The corrected default is selected for the AXIOM campaign.
