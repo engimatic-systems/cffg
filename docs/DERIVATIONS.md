@@ -519,6 +519,20 @@ edge (its message is a proper constant).
 here; with point observations it vanishes into the scatter term.)
 Rollover: mean μn, precision E[W] = νn Ψn⁻¹.
 
+For fractional responsibilities `w_t`, let `n = Σ w_t`, `m` be the
+weighted mean of the conditional means `m_t`, and `C_t` their conditional
+covariances. Grouping the preceding sums about `m` gives
+
+    κn = κ0 + n,  νn = ν0 + n,  μn = μ0 + (n/κn)(m − μ0),
+    Ψn = Ψ0 + Σ w_t [C_t + (m_t − m)(m_t − m)ᵀ]
+            + κ0 (n/κn)(m − μ0)(m − μ0)ᵀ.
+
+Each term adds the spread inside one observation or the separation of two
+means. Translating all means leaves these terms unchanged. At zero mass the
+posterior equals the prior. `NIW.update_centered` consumes this representation.
+`tests/test_conj.py` exercises the update and `tests/test_hybrid_readouts.py`
+checks the source of the component covariances.
+
 **MNIW update** (gaussian_linear node, x̃ = [x; 1], prior (M0 [dy,di+1],
 Λ0 [di+1,di+1] column precision, Ψ0, ν0), per-trial stats Syy = E[yyᵀ],
 Syx̃ = E[yx̃ᵀ], Sx̃x̃ = E[x̃x̃ᵀ], summed over the trial's node occurrences,
