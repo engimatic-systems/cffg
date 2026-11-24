@@ -130,8 +130,9 @@ gaussian_linear, Gaussian equality — cff-4e5z: Kalman-smoother parity, exact
 continuous tree identity BFE = −log p(y)). Scalar exponential-family BP covers
 Gamma–Poisson and Beta–Bernoulli conditioned-observation graphs. Between
 converged runs, declared
-NIW, MNIW, component-MNIW, and Pólya–Gamma weight learning covers `gaussian`,
-`gaussian_linear`, `gaussian_mixture_linear`, and `recurrence_link`.
+NIW, MNIW, component-NIW, component-MNIW, and Pólya–Gamma weight learning covers
+`gaussian`, `gaussian_linear`, `gaussian_mixture`, `gaussian_mixture_linear`,
+and `recurrence_link`.
 Endpoint-aware `moment_matching(factor, role, MomentProjection.GAUSSIAN)` is an
 executable declaration for registered Gaussian factors, including the
 positive-noise nonlinear and neural rules. It selects first and second moments
@@ -425,6 +426,20 @@ noise scale loses it. The component-MNIW readout uses raw moments as well.
 The centered readout for `gaussian_mixture` preserves each conditional
 covariance. See the Gaussian learning follow-up `cff-6wpk`.
 
+The batched mixed learner stores its posterior in the caller's working
+precision. A well-formed update can round a small mean or count increment
+away when written to float32 state. This matters in long streams. Starting
+at mean 10000 and κ=4096, 1024 identical unit-weight records at 10001
+(conditional variance 0.125) leave the streaming float32 mean at 10000.
+The correct mean is 10000.2. Starting at Ψ=3, the stored scale becomes
+1154.78 rather than 950.2. A single batch or a float64 stream recovers the
+analytic scale on this fixture. Centering the input coordinates at the
+original mean also recovers it to float32 precision. The declared
+`component_niw` family accumulates on the host in float64. The standalone
+mixed learner's `valid` flag checks inputs and posterior propriety. Long-run
+accumulation accuracy needs a separate check; reproduce this case with
+`tools/axiom/mixed_streaming_probe.py`.
+
 **S1e. Gaussian parameter learning is EM-rollover; flooding VMP is not
 strictly monotone.** Continuous conjugate learning (cff-7c5o, DERIVATIONS.md
 D4) has two honest edges. (1) NIW/MNIW updates run *between* trials from
@@ -438,7 +453,7 @@ tractable — `gaussian_prec`'s Gamma-precision edge. `accumulate` adds an
 independent trial to the current posterior; `replace` recomputes one sequence
 coordinate from the immutable initial prior. Neither operation turns point-
 parameter inference into full joint VB. Generic registration also supports
-component-MNIW/`gaussian_mixture_linear` and
+component-NIW/`gaussian_mixture`, component-MNIW/`gaussian_mixture_linear` and
 PG-weights/`recurrence_link`. Exact-zero mixture responsibilities retain the
 component prior; exact-zero structured recurrence exposure likewise retains
 the source/stick prior. The recurrence posterior keeps source-regime, stick,

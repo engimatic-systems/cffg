@@ -87,7 +87,7 @@ example.
 | [Use GFE and parameter epistemics](#discrete-planning-and-rolling-agents) | `ConstraintKind.P_SUBSTITUTION`; `prepare_mu3`; `score_mu3_epochs`; builder flags | Observation epistemics, learned goals, finite-sample mu3(A), transition novelty | Policy posterior, ESS/support facts, specialized diagnostics | GFE; transition novelty is an optimistic bound | [discrete_rollout.py](examples/discrete_rollout.py) | **Bounded:** explicit PRNG keys; open validation defects are listed in `LIMITATIONS.md` |
 | [Run a receding-horizon agent](#discrete-planning-and-rolling-agents) | `RollingAgent` | Plan, act, observe, learn, roll a fixed-memory boundary | Action, beliefs, learning state, checkpoint | Replans a finite-horizon factorized policy each tick | [discrete_agent.py](examples/discrete_agent.py) | **Ready:** environment state is external; deep plans need status/trace checks |
 | [Run the costly-cue behavioral oracle](#discrete-planning-and-rolling-agents) | `cffg.experiments.behavioral_epistemics.run_benchmark` | Fixed active-inference versus BFE-ablation task | `BehavioralReport` | Bounded scientific regression, not a general inference objective | [API pattern](#discrete-planning-and-rolling-agents) | **Research-only:** fixed task and no supported package facade or reuse guarantee |
-| [Learn declared parameters](#learn-and-swap-parameters) | `cffg.learn.Learnables`; `cffg.conj`; `LearnableSpec` | Dirichlet, NIW, MNIW, component-MNIW, Pólya–Gamma | `expected`, `rollover`, persistent posterior state | Between-trial conjugate or empirical-Bayes updates | [learning_bundle.py](examples/learning_bundle.py) | **Ready:** `accumulate` and `replace` have different trial semantics; not full joint VB |
+| [Learn declared parameters](#learn-and-swap-parameters) | `cffg.learn.Learnables`; `cffg.conj`; `LearnableSpec` | Dirichlet, NIW, MNIW, component-NIW, component-MNIW, Pólya–Gamma | `expected`, `rollover`, persistent posterior state | Between-trial conjugate or empirical-Bayes updates | [learning_bundle.py](examples/learning_bundle.py) | **Ready:** `accumulate` and `replace` have different trial semantics; not full joint VB |
 | [Persist and continue](#persist-and-resume) | `save_bundle`; `load_bundle`; agent checkpoints | Template, arrays, declared learning, or rolling-agent runtime | `LoadedBundle`, restored agent | Serialization preserves declared identity; no inference objective | [learning_bundle.py](examples/learning_bundle.py) | **Ready/current schema:** a bundle is not a mid-run snapshot; stable historical migration is open |
 | [Run linear-Gaussian inference](#continuous-exponential-family-and-hybrid-models) | `cffg.models.lgssm` | Gaussian and linear-Gaussian BP with missing observations | `gaussian_marginals`, node statistics, BFE | Exact Kalman/RTS marginals and evidence identity on a tree | [linear_gaussian.py](examples/linear_gaussian.py) | **Ready:** positive-definite covariance contract; scaled readout is still host-loop bound |
 | [Run scalar exponential-family inference](#continuous-exponential-family-and-hybrid-models) | `gamma`, `beta`, `poisson_obs`, `bernoulli_obs`; `ef_marginals` | Conjugate Gamma–Poisson and Beta–Bernoulli BP | Standard parameters, mean, `proper`, BFE | Exact registered tree messages and ledger | [exponential_family.py](examples/exponential_family.py) | **Ready:** conditioned observations only; predictive outputs leave the shipped family |
@@ -541,12 +541,43 @@ then choose the cadence deliberately:
 - `rollover(name)` returns the family-specific state carried across a declared
   trial boundary.
 
-Dirichlet, NIW, MNIW, component-MNIW, and recurrence Pólya–Gamma families have
+Dirichlet, NIW, MNIW, component-NIW, component-MNIW, and recurrence Pólya–Gamma families have
 versioned persistent descriptors. Their expected point parameters feed the next
 state; parameter uncertainty generally does not enter all state messages, so
 the continuous/hybrid cadence is empirical Bayes rather than full joint
 variational Bayes. See
 [examples/learning_bundle.py](examples/learning_bundle.py).
+
+A declared `component_niw` learns the means and full covariances of a
+`gaussian_mixture` from its centered conditional moments. When a record
+also contains categorical evidence, use `cffg.mixed_learning` to update all
+observed fields with one set of responsibilities. For example, an object with
+an uncertain position and an observed type can teach several components in
+proportion to how well each explains the record.
+
+```python
+import jax
+from cffg.mixed_learning import score, update
+
+@jax.jit
+def learn_batch(bank, observations):
+    log_likelihood, weights, scored = score(bank, observations, include_mixing=True)
+    posterior, updated = update(bank, observations, weights)
+    return posterior, log_likelihood, scored & updated
+```
+
+`MixedBank` stores component priors and their active mask. `MixedBatch` holds
+a mean and covariance for each continuous observation, a boolean presence
+mask and one integer array per categorical field. Use zero covariance for a
+known point and category index `-1` for a missing field. Scores are absolute
+expected log likelihoods in nats. Set `include_mixing=False` to assign
+components by observed features alone. Inspect the returned validity flag
+before using the result. `MixedBank.state_dict()` and
+`MixedBank.from_state_dict()` round-trip the full posterior at its saved
+precision. For long streams with large coordinate offsets, use float64 for the
+persistent bank or work in local feature coordinates. The float32 update can
+round away each small change to an absolute mean while still returning valid.
+See the streaming checkpoint in `docs/LIMITATIONS.md`.
 
 For fixed-structure parameter sweeps that are not declared learning,
 `set_params` updates named runtime parameters without recompiling. Shapes,
