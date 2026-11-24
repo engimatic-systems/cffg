@@ -1,7 +1,7 @@
 ---
 id: car-9ccf
 status: in_progress
-deps: [cff-lquu, cff-6tek, cff-qg1d, cff-7t4j]
+deps: [cff-lquu, cff-6tek, cff-qg1d, cff-7t4j, cff-xfnx]
 links: []
 created: 2026-11-23T21:48:38Z
 type: feature
@@ -48,3 +48,11 @@ Additional large-count score fixture for criterion 4: with Dirichlet concentrati
 **2026-11-24T03:34:42Z**
 
 The numerical prerequisite cff-7t4j is closed on the fix branch. A public readout plus centered NIW update distinguished the two previously identical variances. Paused before adding mixed-evidence learner registration because validated host pooling was 2.32x the raw time on 32 six-dimensional observations, with a 56-microsecond absolute difference. Recommend measuring a batched, validated learner update in the real data path before choosing a default. No Gameworld episodes run. Independently, cff-6wpk covers conventional Gaussian/regression learner paths and is not a hard dependency here.
+
+**2026-11-24T03:45:30Z**
+
+Cooper accepted the measured centered-update cost. Implementing the mixed Gaussian and categorical update on #200. Change paths: Learnable or checkpoint feature, New factor or rule family (existing factor, new learning family), Runtime numerical or status invariant. Check eager/compiled, single/vmap, fixed responsibilities vs split batches, current/legacy persistence, existing Engine readouts and schedules. The caller-driven mixed update consumes observations outside flooding/scheduled inference. The standalone additive learner and release-specific history policy have separate oracle values.
+
+**2026-11-24T03:53:38Z**
+
+The mixed Gaussian/categorical candidate and the declared component NIW family are implemented. The standalone float32 online bank fails repeated observations at translated coordinates. In the 1024-reading fixture, the analytic scale is 950.2 and the stored scale is 1154.7755, 21.53% too high, despite successful status at every tick. Float64 streaming, zero-origin float32 and one-batch float32 controls pass. At 2^22, four streamed quarter-count assignments add (0,4) instead of (1,3). cff-xfnx blocks qualification. The prior centered moment readout remains accurate. Timing was deferred at the requested accuracy stop.

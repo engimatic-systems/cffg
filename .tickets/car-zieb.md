@@ -79,3 +79,7 @@ Work paused on the first accuracy checkpoint. car-9ccf now depends on cff-7t4j. 
 **2026-11-24T03:34:42Z**
 
 The centered mixture uncertainty repair passed. Implementation paused at Cooper’s performance checkpoint during the next learning milestone. Corpus, public readout, posterior and host-fold measurements are linked in the served ~/agent-share/axiom-centered-checkpoint report. Both API options are available for further testing. The one-game pilot remains downstream.
+
+**2026-11-24T03:53:38Z**
+
+Next accuracy checkpoint is cff-xfnx --> car-9ccf --> downstream component lifecycle/model work (arrow from prerequisite to dependent). At the new checkpoint, storing a small float32 change at each tick lost real learning; one batch and float64 recovered the analytic answer. A separate Gameworld tape capture/replay milestone is available in PR #201. End-to-end learning and game reward remain unmeasured.
