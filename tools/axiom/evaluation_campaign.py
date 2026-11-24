@@ -4,6 +4,7 @@ import argparse
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from time import time_ns
 import fcntl
 import hashlib
 import json
@@ -158,18 +159,32 @@ def verify_before(root, study, stage):
 
 def launch(root, study, stage, case):
     path = root / stage / run_name(case)
-    if (path / "result.json").exists():
-        audit_run(root, study, stage, case)
-        return
     path.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, PYTHONPATH=str(REPO / "src"), JAX_PLATFORMS="cpu", JAX_ENABLE_X64="0",
                JAX_COMPILATION_CACHE_DIR=str(root / "jit-cache"))
     cmd = [sys.executable, "-u", str(HERE / "evaluation_episode.py"), str(root), stage,
            case["game"], str(case["model_seed"])]
-    with (path / "worker.log").open("ab") as log:
-        # A per-seed lock in the worker outlives a killed campaign driver.
-        subprocess.run(cmd, cwd=REPO, env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
-    audit_run(root, study, stage, case)
+    result = path / "result.json"
+    for attempt in range(3):
+        if result.is_file():
+            saved = read(result)
+            if saved.get("status") != "failed" or saved.get("infrastructure") is not True:
+                audit_run(root, study, stage, case)
+                return
+            # Keep the failed receipt; its trace prefix and native rewards stay on disk.
+            with exclusive(path / "worker.lock"):
+                os.replace(result, path / f"infrastructure-{time_ns()}.json")
+        with (path / "worker.log").open("ab") as log:
+            # A per-seed lock in the worker outlives a killed campaign driver.
+            proc = subprocess.run(cmd, cwd=REPO, env=env, stdout=log, stderr=subprocess.STDOUT)
+        if proc.returncode == 0:
+            audit_run(root, study, stage, case)
+            return
+        if result.is_file() and read(result).get("infrastructure") is not True:
+            raise RuntimeError(f"sealed model or consistency failure at {path}")
+        if proc.returncode >= 0 and not result.is_file():
+            raise RuntimeError(f"worker exited {proc.returncode} before writing {result}")
+    raise RuntimeError(f"repeated infrastructure failure at {path}")
 
 
 def run(root, workers):

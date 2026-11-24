@@ -188,13 +188,21 @@ def episode(root, study, stage, case):
                       resumed_from=available[-1] if available else 0, resume_matched_steps=matched, final_state_sha256=end_digest,
                       process_s=perf_counter()-start, final_checkpoint_sha256=digest(checkpoints / f"{budget}.npz"))
     except Exception as exc:
-        result = dict(status="failed", failure_type=type(exc).__name__, reason=str(exc),
+        transport = isinstance(exc, (OSError, EOFError)) or (
+            isinstance(exc, RuntimeError) and str(exc).startswith(("Gameworld worker stopped", "Gameworld worker exited")))
+        result = dict(status="failed", infrastructure=transport, failure_type=type(exc).__name__, reason=str(exc),
                       applied_before_failure=dict(pending), traceback=traceback.format_exc())
         raise
     finally:
         if "result" in locals():
             result.update(**identity, steps=len(rows), return_sum=sum(r["reward"] for r,_ in rows),
                           steps_sha256=digest(trace_file) if trace_file.exists() else hashlib.sha256().hexdigest())
+            # A failed update can follow a real rewarded action. Keep that raw transition
+            # separate from the verified prefix when computing descriptive partial totals.
+            extra = result.get("applied_before_failure", {}).get("game", {})
+            beyond_prefix = extra.get("tick") == len(rows)
+            result["native_steps"] = len(rows) + int(beyond_prefix)
+            result["native_return_sum"] = result["return_sum"] + (extra["reward"] if beyond_prefix else 0)
             publish(dest / "result.json", result)
 
 

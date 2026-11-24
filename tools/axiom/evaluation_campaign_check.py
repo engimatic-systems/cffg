@@ -132,6 +132,8 @@ class CampaignTest(unittest.TestCase):
             self.assertEqual(actual["tick"],0)
             self.assertEqual(actual["applied"],0)
             self.assertEqual(actual["reward"],0.)
+            self.assertEqual(failed["native_steps"],1)
+            self.assertEqual(failed["native_return_sum"],actual["reward"])
             self.assertEqual(failed["steps_sha256"],hashlib.sha256().hexdigest())
 
 
