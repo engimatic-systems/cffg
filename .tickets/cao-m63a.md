@@ -1,6 +1,6 @@
 ---
 id: cao-m63a
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-11-24T05:25:59Z
@@ -35,3 +35,9 @@ car-mps6 owns the recurrent interaction features, reward learning and reductions
 
 An affine expert predicts a state by multiplying the previous state by a matrix and adding an offset. A switch is the integer index selected for the observed transition.
 
+
+## Notes
+
+**2026-11-24T05:31:22Z**
+
+Implemented initial_motion, observed_state, motion_step and acquire_motion in cffg.experiments.axiom_motion. The JAX frame scan processes eligible slots in order, returns absolute Gaussian likelihoods and post-insertion switches, and retains the previous bank on invalid frames. At distance exactly the observation teleport cutoff, a velocity expert can be born while an older expert wins the rescoring tie. A clipped all-zero teleport stays vacant. Seven focused tests passed with uv run --frozen --no-sync pytest -q tests/test_axiom_motion.py (4.60s), including float32/64, 500 rows, eager/JIT, true boundary ties, a repeat after restoration, nonfinite inputs and full capacity. Independent analytical histories only. The parent owns the full gate, dashboard entry and shared docs. The default six-coordinate unit-frame velocity model is covered. Interaction feature and bank learning remain with car-mps6.
