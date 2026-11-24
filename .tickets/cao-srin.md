@@ -34,3 +34,9 @@ car-zieb tracks the ancillary ablations and visual perturbation comparisons. car
 ## Definitions
 
 One real action advances the game once. Each decision compares 512 candidate action sequences, each 32 imagined steps long with three draws. The score for a seed is its sum of 10,000 real rewards. A seed fixes the starting random streams for one run.
+
+## Notes
+
+**2026-11-24T15:09:43Z**
+
+Full-budget Explode development pilot launched from immutable e741943d820c25fdedfee1059efacc6c5fb52221. Source digest b2dd424ff72de822ac4147bede47f3e733fc04e40d9a577cadc34741902a3673, model seed 88101, game seed 180400, real budget 10000. ROOT is ~/agent-share/axiom-10000. Live report at http://localhost:8080/axiom-10000/index.html. Zero-score or poor early returns do not stop this registered run. The supervisor writes the native action log, exact checkpoint every 500 and a stage receipt on completion. Scored seeds remain behind the published qualification gate.
