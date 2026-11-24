@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 
 import numpy as np
 
-from cffg import conj
+from cffg import conj, ef
 from cffg.core.learning_identity import LEARNING_IDENTITIES
 from cffg.learning_schema import PersistentParameter
 from cffg.gaussian_learning import (
@@ -14,6 +14,7 @@ from cffg.gaussian_learning import (
     _finite_stat,
     _proper,
     _require_keys,
+    _regression_record,
 )
 
 
@@ -33,11 +34,40 @@ def _stack_mniw(posteriors: Sequence[conj.MNIW]) -> dict[str, np.ndarray]:
     }
 
 
+def _retain_component_dtype(before, after, *, matrix):
+    """Keep an existing float32 coordinate only when its update survives rounding."""
+    if before.dtype != np.float32:
+        return after
+    with np.errstate(over="ignore"):
+        compact = after.astype(np.float32)
+    if not np.isfinite(compact).all():
+        return after
+    error = compact.astype(np.float64) - after
+    increment = after - before
+    # Retain at least half the working precision in each evidence increment.
+    budget = np.sqrt(np.finfo(np.float32).eps, dtype=np.float64)
+    if np.any(np.abs(error) > budget * np.abs(increment)):
+        return after
+    if matrix:
+        # Positive definiteness of both inequalities bounds the rounding
+        # error in every direction of an increment, including small modes.
+        try:
+            with np.errstate(over="raise", invalid="raise", divide="raise"):
+                for stored, gain, loss in zip(compact, increment, error, strict=True):
+                    ef.resolved_correlation(stored)
+                    if np.any(loss):
+                        ef.resolved_correlation(budget * gain + loss)
+                        ef.resolved_correlation(budget * gain - loss)
+        except (FloatingPointError, np.linalg.LinAlgError):
+            return after
+    return compact
+
+
 class ComponentMNIWFamily:
     """One MNIW posterior per Gaussian-mixture selector component."""
 
     name = "component_mniw"
-    readout = "gaussian_node_stats"
+    readout = "centered_gaussian_stats"
     _PARAMS = {"m", "lam", "psi", "nu"}
     semantic_identity = LEARNING_IDENTITIES["component_mniw"]
     parameter_forms = ("expected",)
@@ -94,6 +124,8 @@ class ComponentMNIWFamily:
             raise ValueError(
                 f"{ftype} responsibility must be a nonnegative component vector"
             )
+        if "cov_xx" in readout:
+            return _regression_record(readout, responsibility)
         return {
             "Syy": _finite_stat(readout, "Syy", ftype),
             "Syx": _finite_stat(readout, "Syx", ftype),
@@ -102,6 +134,8 @@ class ComponentMNIWFamily:
         }
 
     def pool(self, records) -> dict[str, np.ndarray]:
+        if "covariance" in records[0]:
+            return {key: np.stack([row[key] for row in records]) for key in records[0]}
         return {
             key: np.sum(np.stack([record[key] for record in records]), axis=0)
             for key in ("Syy", "Syx", "Sxx", "n")
@@ -109,6 +143,19 @@ class ComponentMNIWFamily:
 
     def fold(self, params, stats) -> dict[str, np.ndarray]:
         priors = self._posteriors("posterior", params)
+        if "covariance" in stats:
+            weights, means, covs = (stats[key] for key in ("weight", "mean", "covariance"))
+            if weights.ndim != 2 or weights.shape[1] != len(priors) or (
+                means.shape[:2] != weights.shape or covs.shape[:2] != weights.shape
+            ):
+                raise ValueError("incompatible component MNIW statistic shapes")
+            result = _stack_mniw([
+                prior.update_centered(means[:, k], covs[:, k], weights[:, k])
+                for k, prior in enumerate(priors)
+            ])
+            for key in ("m", "lam", "psi"):
+                result[key] = _retain_component_dtype(params[key], result[key], matrix=key != "m")
+            return result
         syy = np.asarray(stats["Syy"])
         syx = np.asarray(stats["Syx"])
         sxx = np.asarray(stats["Sxx"])

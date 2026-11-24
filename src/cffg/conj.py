@@ -50,7 +50,7 @@ def _symmetrize_cancellation(
     return 0.5 * (matrix + matrix.T)
 
 
-def _conditional_covariances(covariances: np.ndarray) -> np.ndarray:
+def _conditional_covariances(covariances: np.ndarray, *, root: bool = False) -> np.ndarray:
     """Check within-component covariance on the scale of each coordinate."""
     source_dtype = np.result_type(covariances.dtype, np.float32)
     cov = np.asarray(covariances, dtype=np.float64)
@@ -60,7 +60,7 @@ def _conditional_covariances(covariances: np.ndarray) -> np.ndarray:
     if np.any(variances < 0):
         raise ValueError("covariances must be positive semidefinite")
     if cov.shape[-1] == 1 or not np.any(cov):
-        return cov
+        return np.sqrt(cov) if root else cov
     sd = np.sqrt(variances)
     scale = sd[:, :, None] * sd[:, None, :]
     if np.any((scale == 0) & (cov != 0)):
@@ -79,13 +79,18 @@ def _conditional_covariances(covariances: np.ndarray) -> np.ndarray:
     corr -= .5 * skew
     symmetric = cov + .5 * (cov.swapaxes(-1, -2) - cov)
     try:
-        np.linalg.cholesky(corr)
-        return symmetric
+        lower = np.linalg.cholesky(corr)
+        return sd[:, :, None] * lower if root else symmetric
     except np.linalg.LinAlgError:
         pass  # Singular covariance is valid conditional evidence.
-    eigenvalues = np.linalg.eigvalsh(corr)
+    if root:
+        eigenvalues, vectors = np.linalg.eigh(corr)
+    else:
+        eigenvalues = np.linalg.eigvalsh(corr)
     if np.any(eigenvalues[:, 0] < -tolerance):
         raise ValueError("covariances must be positive semidefinite")
+    if root:
+        return sd[:, :, None] * vectors * np.sqrt(np.maximum(eigenvalues, 0.))[:, None, :]
     # A rounded singular input can have tiny negative eigenvalues. Remove
     # only those directions so accumulating more mass cannot amplify them.
     rounded = eigenvalues[:, 0] < 0
@@ -233,6 +238,70 @@ class MNIW:
             psi=_spd("psi_n", psin),
             nu=self.nu + n,
         )
+
+    def update_centered(self, means, covariances, weights) -> "MNIW":
+        """Fold weighted conditional moments without subtracting raw second moments.
+
+        The augmented design D contains the prior column-precision root, then
+        the mean and covariance-root rows of each observation scaled by sqrt(w).
+        Regress the residual E relative to the prior coefficients on D. If the
+        fitted increment is T, the posterior precision is D.T @ D and its noise
+        scale is Psi + (E - D @ T).T @ (E - D @ T).
+        """
+        means, covariances, weights = map(np.asarray, (means, covariances, weights))
+        dy, augmented = self.m.shape
+        dimension = dy + augmented - 1
+        if (means.ndim != 2 or means.shape[-1] != dimension
+                or covariances.shape != (len(means), dimension, dimension)
+                or weights.shape != (len(means),)):
+            raise ValueError("incompatible centered regression statistic shapes")
+        if any(a.dtype.kind not in "buif" for a in (means, covariances, weights)):
+            raise ValueError("centered regression statistics must be real")
+        if not np.isfinite(weights).all() or np.any(weights < 0):
+            raise ValueError("regression weights must be finite and nonnegative")
+        active = weights > 0
+        if not active.any():
+            return self
+        if not active.all():
+            means, covariances, weights = means[active], covariances[active], weights[active]
+        means = np.asarray(means, dtype=np.float64)
+        weights = np.asarray(weights, dtype=np.float64)
+        if not np.isfinite(means).all():
+            raise ValueError("positive-weight joint means must be finite")
+        root = _conditional_covariances(covariances, root=True)
+
+        matrix, offset = np.asarray(self.m, dtype=np.float64)[:, :-1], self.m[:, -1]
+        y, x = means[:, :dy], means[:, dy:]
+        mass = np.sqrt(weights)[:, None]
+        design = [np.linalg.cholesky(np.asarray(self.lam, dtype=np.float64)).T,
+                  mass * np.column_stack((x, np.ones(len(x))))]
+        residual = [np.zeros((augmented, dy)), mass * ((y - offset) - x @ matrix.T)]
+        if root.any():
+            # Every column of the joint root contributes a paired x/y deviation.
+            deviations = (mass[:, None, :] * root).swapaxes(1, 2).reshape(-1, dimension)
+            xdev = deviations[:, dy:]
+            design.append(np.column_stack((xdev, np.zeros(len(xdev)))))
+            residual.append(deviations[:, :dy] - xdev @ matrix.T)
+        design, residual = np.vstack(design), np.vstack(residual)
+        if not np.isfinite(design).all() or not np.isfinite(residual).all():
+            raise ValueError("regression design and residual must be finite")
+        q, r = np.linalg.qr(design, mode="reduced")
+        increment = np.linalg.solve(r, q.T @ residual)
+        error = residual - design @ increment
+        m, lam = self.m + increment.T, design.T @ design
+        psi, nu = self.psi + error.T @ error, float(self.nu) + weights.sum()
+        if not all(np.isfinite(a).all() for a in (m, lam, psi, nu)):
+            raise ValueError("regression posterior must be finite")
+        # A well-posed QR fit can lose a direction when its dense precision
+        # is rounded for the next update. Check the actual stored arrays.
+        for name, matrix in (("column precision", lam), ("noise scale", psi)):
+            if len(matrix) > 1:
+                try:
+                    with np.errstate(over="raise", invalid="raise", divide="raise"):
+                        ef.resolved_correlation(matrix)
+                except (FloatingPointError, np.linalg.LinAlgError):
+                    raise ValueError(f"MNIW {name} unresolved at stored precision") from None
+        return replace(self, m=m, lam=lam, psi=psi, nu=nu)
 
     def rollover(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """(A, b, cov) for the next trial's gaussian_linear params;

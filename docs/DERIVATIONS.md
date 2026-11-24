@@ -597,6 +597,24 @@ Rollover: [Ā b̄] = Mn, E[W] = νn Ψn⁻¹. Ψn ≻ 0 is guaranteed in exact
 arithmetic (Schur complement of a PSD block matrix); the implementation
 asserts it rather than ridging — a violation means broken stats, not noise.
 
+The declared regression learner evaluates the same update from a conditional
+mean and covariance for the joint vector (y, x). Factor each covariance as
+`F Fᵀ` and multiply its columns and its mean row by the square root of the
+occurrence weight. The design matrix D stacks the input deviations with a
+zero intercept column and the mean inputs with a unit intercept. The paired
+output rows minus the predictions of M0 form E. Include a row block
+`chol(Λ0)ᵀ` in D with zero paired residual. Thin QR solves the least-squares
+problem `D T ≈ E`. Its normal equations give the same Mn above. Completing
+the square gives
+
+    Mn = M0 + Tᵀ,  Λn = Dᵀ D,  Ψn = Ψ0 + (E − D T)ᵀ (E − D T).
+
+In ordinary terms, the scale adds the squared spread left after predicting
+the output. Paired deviations retain input-output correlation, including when
+the joint covariance is singular. A fixed observed output has zero deviation.
+`test_centered_mniw_correlated_rows_match_independent_raw_oracle` checks
+this expression against direct integration on a translated example.
+
 **Gamma precision update** (gaussian_prec nodes sharing a τ edge):
 αn = α0 + n/2, βn = β0 + Σ s_t / 2 — but note this one usually needs no
 trial loop at all: it is the exact in-loop conjugate posterior the τ edge

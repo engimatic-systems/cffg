@@ -85,6 +85,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 READOUTS = {
     "node_beliefs": lambda engine, state: engine.node_beliefs(state),
     "gaussian_node_stats": lambda engine, state: engine.gaussian_node_stats(state),
+    "centered_gaussian_stats": lambda engine, state: engine.gaussian_node_stats(state, centered=True),
     "centered_mixture_stats": lambda engine, state: engine.gaussian_node_stats(
         state, centered_mixtures=True
     ),

@@ -80,6 +80,26 @@ digamma = _vectorized(_digamma_scalar)
 gammaln = _vectorized(math.lgamma)
 
 
+def resolved_correlation(matrix):
+    """Check positive definiteness at the stored precision, independently of coordinate units."""
+    scale = np.sqrt(matrix.diagonal().astype(np.float64))
+    correlation = (matrix / scale[:, None]) / scale[None, :]
+    if not np.isfinite(correlation).all():
+        raise FloatingPointError
+    dim = len(scale)
+    eps = np.finfo(matrix.dtype).eps
+    asymmetry = np.max(np.abs(correlation - correlation.T))
+    if asymmetry > 16 * dim * eps * np.max(np.abs(correlation)):
+        raise np.linalg.LinAlgError
+    correlation = (correlation + correlation.T) / 2
+    # A Cholesky pivot subtracts up to dim products from a unit diagonal.
+    # Reserve that source-dtype roundoff for admission; solve the unshifted system.
+    guarded = correlation.copy()
+    np.fill_diagonal(guarded, 1 - dim * eps)
+    np.linalg.cholesky(guarded)
+    return correlation, scale
+
+
 @dataclass(frozen=True)
 class NaturalParameterFamily:
     """Shared message algebra for every natural-parameter representation."""

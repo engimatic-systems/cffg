@@ -479,8 +479,8 @@ def test_improper_statistics_diverge_before_parameter_write(
     else:
         original_readout = Engine.gaussian_node_stats
 
-        def improper_readout(self, state):
-            rows = original_readout(self, state)
+        def improper_readout(self, state, **kwargs):
+            rows = original_readout(self, state, **kwargs)
             name = next(name for name in rows if name.startswith(kind))
             rows[name] = {**rows[name], "proper": np.asarray(False)}
             return rows

@@ -1688,10 +1688,10 @@ them. Four rules define the contract:
    family names which engine readout it draws from (`cffg.learn.READOUTS`),
    because a conjugate posterior is not always one array read off one
    readout. An MNIW over a `gaussian_linear` carries four hyperparameters,
-   accumulates three statistics from `Engine.gaussian_node_stats`, and rolls
-   over into three blobs at different shapes. Component MNIW uses the same
-   statistic names with leading selector axes and occurrence counts equal to
-   soft responsibilities. PG weights instead draw additive `linear` and
+   reads conditional means and covariances from `Engine.gaussian_node_stats`,
+   and rolls over into three blobs at different shapes. Component MNIW
+   receives the same conditional statistics with leading selector axes.
+   Each component contributes its soft responsibility exactly once. PG weights instead draw additive `linear` and
    `quadratic` records from `Engine.recurrence_weight_stats`. A `LearnTarget`
    names both the blob it writes and the parameter role that blob fills, which
    routes every multi-parameter write. `Dirichlet` is the degenerate case of
@@ -1711,6 +1711,24 @@ them. Four rules define the contract:
    writes the raw counts α that its novelty term differentiates; the perception
    graph supplies the statistics and writes
    `E[log θ] = ψ(α) − ψ(α₀)`.
+
+   Declared Gaussian NIW updates request the mean and covariance directly with
+   `Engine.gaussian_node_stats(state, centered=True)`. The prior binding computes
+   these moments before any raw second moment is formed. The default readout
+   still supplies raw statistics to callers that request that representation.
+   Declared MNIW uses the joint (output, input) mean and the three distinct
+   covariance blocks. Conditioned outputs supply only the input covariance.
+   The host solves for a coefficient increment relative to the stored prior
+   using QR and accumulates squared residuals as derived in D4.2.
+
+   For component MNIW, a float32 coefficient, column-precision or noise-scale
+   array keeps its dtype when rounding changes each evidence increment by at
+   most √ε relative to that increment (ε is float32 machine epsilon).
+   Matrix increments must satisfy the bound in every direction, and the
+   stored matrix must remain resolvably positive definite. If the check
+   fails, the affected array keeps the float64 result. Counts stay in the
+   host update precision. Saving and loading preserve each stored dtype
+   and value exactly.
 
    The `component_niw` family reads centered per-component moments from
    `gaussian_mixture`. It shares the existing declared-learning transaction,

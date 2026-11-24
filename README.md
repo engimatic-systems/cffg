@@ -296,6 +296,12 @@ and covariance are conditional on that component. Apply its responsibility
 once when updating the learner. This preserves small variances even when the
 feature coordinates have a large offset.
 
+Declared NIW and MNIW learners request centered moments automatically.
+For your own regression update, `engine.gaussian_node_stats(state, centered=True)`
+returns the joint (output, input) mean and the distinct covariance blocks
+`cov_yy`, `cov_yx` and `cov_xx`. A fixed observed output needs only `cov_xx`.
+A switching linear factor also returns each component's responsibility.
+
 The common `engine.bfe(state)` accessor reports the graph's declared variational
 ledger; the name does not make every value an exact Bethe evidence identity.
 Interpret it with `engine.objective_contract` and per-factor
