@@ -137,8 +137,12 @@ def summarize(blocks):
         return [draws[249], draws[9749]]
 
     means = {arm: [statistics.mean(row[arm]) / 1e6 for row in blocks] for arm in ARMS}
-    latency = {arm: dict(median_ms=statistics.median(values), range_ms=[min(values), max(values)])
-               for arm, values in means.items()}
+    latency = {}
+    for arm, values in means.items():
+        calls_ms = [ns / 1e6 for row in blocks for ns in row[arm]]
+        latency[arm] = dict(pooled_call_median_ms=statistics.median(calls_ms),
+                            block_mean_median_ms=statistics.median(values),
+                            block_mean_range_ms=[min(values), max(values)])
     ratios = {}
     for a, b in (("centered", "old_default"), ("centered", "current_default"), ("current_default", "old_default")):
         paired = [x/y for x, y in zip(means[a], means[b], strict=True)]
