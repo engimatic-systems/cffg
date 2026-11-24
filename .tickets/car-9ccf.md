@@ -1,7 +1,7 @@
 ---
 id: car-9ccf
-status: open
-deps: [cff-lquu, cff-6tek, cff-qg1d]
+status: in_progress
+deps: [cff-lquu, cff-6tek, cff-qg1d, cff-7t4j]
 links: []
 created: 2026-11-23T21:48:38Z
 type: feature
@@ -34,3 +34,13 @@ Per-output regression noise for pixels belongs to car-kwjj. Generic joint draws 
 ## Definitions
 
 A responsibility is the fraction of an observation assigned to an alternative. Sufficient statistics are the counts and sums needed for a parameter update. A Normal–inverse-Wishart distribution represents uncertainty in a Gaussian mean and covariance. A Dirichlet distribution represents uncertainty in categorical probabilities.
+
+## Notes
+
+**2026-11-24T01:37:58Z**
+
+Paused at the requested accuracy checkpoint before adding the learner. New prerequisite cff-7t4j documents a public readout information-loss case and the centered-update acceptance check. The scalar absolute-score and fractional-update oracle is recorded on car-8rgl. Resume at the readout boundary after Cooper decides. No game or wall-time comparison was run.
+
+**2026-11-24T01:38:16Z**
+
+Additional large-count score fixture for criterion 4: with Dirichlet concentrations (2^22,1), the exact expected log probability of the first category is -2^-22 by the digamma recurrence. Independent probe of efrules.py returned zero in float32. Absolute error is 2.38e-7. Preserve as a separately quantified stress case; it was not the reason for the stop.
