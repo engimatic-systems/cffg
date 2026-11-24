@@ -26,13 +26,28 @@ def patches(frames):
 
 
 def prior(dtype):
-    colors = [[.05, .05, .05], [.75, .15, .15], [.15, .75, .15],
-              [.15, .15, .75], [.85, .85, .85], [.5, .5, .5]]
+    colors = [
+        [0.05, 0.05, 0.05],
+        [0.75, 0.15, 0.15],
+        [0.15, 0.75, 0.15],
+        [0.15, 0.15, 0.75],
+        [0.85, 0.85, 0.85],
+        [0.5, 0.5, 0.5],
+    ]
     k = len(colors)
+
     def f(values):
         return jnp.asarray(values, dtype=dtype)
-    return MixedBank(f(colors), f([1] * k), f(np.tile(np.eye(3) * .3, (k, 1, 1))),
-                     f([5] * k), f([1] * k), (f(np.ones((k, 4))),), jnp.ones(k, bool))
+
+    return MixedBank(
+        f(colors),
+        f([1] * k),
+        f(np.tile(np.eye(3) * 0.3, (k, 1, 1))),
+        f([5] * k),
+        f([1] * k),
+        (f(np.ones((k, 4))),),
+        jnp.ones(k, bool),
+    )
 
 
 @jax.jit
@@ -69,14 +84,21 @@ def run(bank, patch_tape, boundaries=(), exact=False):
 def metrics(run_a, reference):
     bank, weights = run_a
     other, baseline = reference
-    final_high_delta = max(float(np.max(abs(x.astype(float) - y.astype(float))))
-                           for x, y in zip(jax.tree.leaves(bank)[:5], jax.tree.leaves(other)[:5]))
-    exact = all(np.array_equal(x,y) for x,y in zip(jax.tree.leaves(bank),jax.tree.leaves(other),strict=True))
-    return {"max_assignment_difference": float(np.max(abs(weights.astype(float) - baseline))),
-            "changed_patch_labels": int(np.count_nonzero(weights.argmax(2) != baseline.argmax(2))),
-            "max_primary_gaussian_or_mixture_parameter_difference": final_high_delta,
-            "all_posterior_arrays_identical": exact,
-            "all_assignment_arrays_identical": np.array_equal(weights,baseline)}
+    final_high_delta = max(
+        float(np.max(abs(x.astype(float) - y.astype(float))))
+        for x, y in zip(jax.tree.leaves(bank)[:5], jax.tree.leaves(other)[:5])
+    )
+    exact = all(
+        np.array_equal(x, y)
+        for x, y in zip(jax.tree.leaves(bank), jax.tree.leaves(other), strict=True)
+    )
+    return {
+        "max_assignment_difference": float(np.max(abs(weights.astype(float) - baseline))),
+        "changed_patch_labels": int(np.count_nonzero(weights.argmax(2) != baseline.argmax(2))),
+        "max_primary_gaussian_or_mixture_parameter_difference": final_high_delta,
+        "all_posterior_arrays_identical": exact,
+        "all_assignment_arrays_identical": np.array_equal(weights, baseline),
+    }
 
 
 def main():
@@ -86,8 +108,21 @@ def main():
     args = p.parse_args()
     manifest = (args.tapes / "manifest.json").read_bytes()
     runs = json.loads(manifest)["runs"]
-    games = {"Aviate","Bounce","Cross","Drive","Explode","Fruits","Gold","Hunt","Impact","Jump"}
-    if {(r["game"], r["condition"]) for r in runs} != {(g,c) for g in games for c in ("base","color","shape")} or len(runs)!=30:
+    games = {
+        "Aviate",
+        "Bounce",
+        "Cross",
+        "Drive",
+        "Explode",
+        "Fruits",
+        "Gold",
+        "Hunt",
+        "Impact",
+        "Jump",
+    }
+    if {(r["game"], r["condition"]) for r in runs} != {
+        (g, c) for g in games for c in ("base", "color", "shape")
+    } or len(runs) != 30:
         raise ValueError("incomplete or duplicated development tapes")
     results = []
     for record in runs:
@@ -97,28 +132,44 @@ def main():
         with np.load(io.BytesIO(data), allow_pickle=False) as archive:
             samples = patches(archive["pixels"][archive["pre_frame"]])
             episode = archive["episode"]
-        if samples.shape != (48,16,3):
+        if samples.shape != (48, 16, 3):
             raise ValueError("unexpected development dimensions")
         tape = jnp.asarray(samples, dtype=jnp.float32)
         boundaries = set(np.flatnonzero(episode[1:] != episode[:-1]) + 1)
-        regular = set(range(16,len(episode),16))
+        regular = set(range(16, len(episode), 16))
         b = prior(jnp.float32)
-        reference = run(b,tape)
-        alternatives = {"compact_episode":run(b,tape,boundaries),
-                        "compact_every_16":run(b,tape,regular),
-                        "exact_every_16":run(b,tape,regular,True)}
-        rows = {key: metrics(value, reference) for key,value in alternatives.items()}
-        if not (rows["exact_every_16"]["all_assignment_arrays_identical"] and
-                rows["exact_every_16"]["all_posterior_arrays_identical"]):
+        reference = run(b, tape)
+        alternatives = {
+            "compact_episode": run(b, tape, boundaries),
+            "compact_every_16": run(b, tape, regular),
+            "exact_every_16": run(b, tape, regular, True),
+        }
+        rows = {key: metrics(value, reference) for key, value in alternatives.items()}
+        if not (
+            rows["exact_every_16"]["all_assignment_arrays_identical"]
+            and rows["exact_every_16"]["all_posterior_arrays_identical"]
+        ):
             raise ArithmeticError("exact restart changed the trajectory")
-        results.append({"file": record["file"],"episode_reloads":len(boundaries),
-                        "assignments":len(tape)*16, "comparisons":rows})
-    out = {"schema":1,"manifest_sha256":digest(manifest),"worker_sha256":digest(Path(__file__).read_bytes()),
-           "head":subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip(),
-           "jax":jax.__version__,"device":str(jax.devices()[0]),"runs":results,
-           "scope":"Six-component RGB patch learner on prior-to-action frames, recorded actions. No AXIOM object identity, planning or policy reward."}
-    args.output.write_text(json.dumps(out,indent=2,allow_nan=False)+"\n")
+        results.append(
+            {
+                "file": record["file"],
+                "episode_reloads": len(boundaries),
+                "assignments": len(tape) * 16,
+                "comparisons": rows,
+            }
+        )
+    out = {
+        "schema": 1,
+        "manifest_sha256": digest(manifest),
+        "worker_sha256": digest(Path(__file__).read_bytes()),
+        "head": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+        "jax": jax.__version__,
+        "device": str(jax.devices()[0]),
+        "runs": results,
+        "scope": "Six-component RGB patch learner on prior-to-action frames, recorded actions. No AXIOM object identity, planning or policy reward.",
+    }
+    args.output.write_text(json.dumps(out, indent=2, allow_nan=False) + "\n")
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     main()
