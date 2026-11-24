@@ -28,17 +28,19 @@ def add(high, low, increment, *, count=False):
     if count:
         # Tiny responsibility tails can round at the low word in a healthy
         # accumulator. Reject lost mass if even one whole trial is unresolved.
-        spacing = jnp.nextafter(new_low, jnp.full_like(new_low, jnp.inf)) - new_low
-        ok = jnp.all((lost == 0) | (spacing <= 1))
+        # At +2**p the next float is two units away. At -2**p the
+        # positive neighbor is still one unit away (p includes the hidden bit).
+        unit_limit = float(2**(jnp.finfo(new_low.dtype).nmant + 1))
+        resolves_unit = (new_low >= -unit_limit) & (new_low < unit_limit)
+        ok = jnp.all((lost == 0) | resolves_unit)
     return (jnp.where(increment != 0, new_high, high),
             jnp.where(increment != 0, new_low, low), ok)
 
 
 def canonical(high, low):
     """The high word is a nearest float; either endpoint represents a midpoint."""
-    direction = jnp.copysign(jnp.full_like(high, jnp.inf), low)
-    neighbor = jnp.nextafter(high, direction)
-    gap = jnp.abs(neighbor - high)
-    # At the largest finite value the outward ULP equals the inward one.
-    gap = jnp.where(jnp.isinf(neighbor), jnp.abs(high - jnp.nextafter(high, jnp.zeros_like(high))), gap)
-    return jnp.all(jnp.isfinite(high + low) & (jnp.abs(low) <= gap * 0.5))
+    rounded = jax.lax.optimization_barrier(high + low)
+    # Round-to-nearest either returns high or chooses the other endpoint
+    # of an exact midpoint. In that case their difference is exactly 2*low.
+    displacement = jax.lax.optimization_barrier(rounded - high)
+    return jnp.all(jnp.isfinite(rounded) & ((rounded == high) | (0.5 * displacement == low)))

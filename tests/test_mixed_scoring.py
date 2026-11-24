@@ -230,3 +230,24 @@ def test_static_layout_errors_fail_at_trace_time():
             jax.eval_shape(score, b, x)
     with pytest.raises(TypeError):
         jax.eval_shape(score, bank, batch, include_mixing=1)
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_scale_response_accounts_for_distant_observations(dtype):
+    from cffg.mixed_scoring import _scale_response
+
+    with jax.enable_x64(dtype == np.float64):
+        # Same scale perturbation, two different observation energies. The
+        # distant observation magnifies the inverse's second-order term.
+        r = dtype(np.sqrt(np.finfo(dtype).eps) / 16)
+        delta = np.array([[[0, r], [r, 0]]], dtype)
+        active = np.array([True])
+        evaluate = jax.jit(_scale_response)
+        local, volume = evaluate(delta, np.array([2], dtype), active)
+        np.testing.assert_array_equal(local, delta)
+        np.testing.assert_array_equal(volume, 0)
+        remote, volume = evaluate(delta, np.array([1/r**2], dtype), active)
+        exact = np.array([[[-r*r, r], [r, -r*r]]]) / (1 - r*r)
+        np.testing.assert_allclose(remote, exact, rtol=8*np.finfo(dtype).eps, atol=0)
+        # log1p of opposite eigenvalues can cancel to source precision.
+        np.testing.assert_allclose(volume, np.log1p(-r*r), atol=4*np.finfo(dtype).eps*r)
