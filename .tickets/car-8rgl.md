@@ -1,6 +1,6 @@
 ---
 id: car-8rgl
-status: in_progress
+status: closed
 deps: []
 links: [cff-du6m, car-ozw0]
 created: 2026-11-23T21:48:38Z
@@ -95,3 +95,7 @@ refpython tools/axiom/reference_protocol_check.py
 ```
 
 Validation used the isolated-tooling exception. Only the reference protocol, its scorer and independent fixtures changed. Five focused test groups passed for inventory, uncertainty, failure denominators, paired effects/recovery and corrupted evidence. The raw Gameworld checker and original tapes were reused. Source formatting, diff and ticket cycle checks passed. The architecture change-path review covers fixture serialization and replay. Engine rules, synchronous/scheduled execution, host/compiled numerical behavior, package dependencies and repository suite selection are N/A.
+
+**2026-11-24T06:37:08Z**
+
+Verified the published reference-v1 protocol digest ef5141f7 on the integrated branch. The reference archive qualifies 48 scalar cases and all 60 published score/SD pairs. Scoring now has a frozen inventory. Direct reference-agent output provenance remains tracked separately in car-ozw0.
