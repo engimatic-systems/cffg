@@ -48,3 +48,7 @@ At implementation head 152866c the default suite passed all 2808 selected tests,
 **2026-11-24T17:19:15Z**
 
 Cooper chose to report the 10,000-action Explode run first. This session finishes development/Explode-88101 and reports its complete native reward and costs. Both later study stages remain unlaunched. Their original protocol, seeds, and scoring rules stay in the ticket for a future decision.
+
+**2026-11-24T22:35:42Z**
+
+Requested Explode milestone complete. Immutable e741943 on model seed 88101/game seed 180400 scored +157 (199 catches, 42 misses, 9759 neutral actions); first half +64, second half +93. Historical untuned Table 1 mean 180, SD 30 across 10 seeds; one point difference of -23 is descriptive. Worker ran 26726.495 s (7 h 25 min), all 20 scheduled reductions, no restart. A separate fresh simulator reproduced all 10001 initial/action receipts, including every reward and frame hash. Final trace SHA256 c639ca630fc55cd11f8c4fe4d212b9756fd34f0cb31adef21cf5a864b5572eb3. Native replay and finished report: ~/agent-share/axiom-10000/{explode-native-replay.json,explode.html}; live index serves the report, campaign.html preserves the cumulative dashboard. Cooper requested this single run first. No pre-evaluation or primary workers launched. If resumed, use the same sealed snapshot and receipts. The broader ticket stays in progress for that separate decision.
