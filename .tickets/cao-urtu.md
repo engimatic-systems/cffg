@@ -1,6 +1,6 @@
 ---
 id: cao-urtu
-status: in_progress
+status: closed
 deps: [cao-36dd, cao-1qsi]
 links: []
 created: 2026-11-24T05:59:40Z
@@ -40,3 +40,7 @@ A real action is a Gymnasium step. An imagined transition advances only the froz
 **2026-11-24T05:59:47Z**
 
 Freeze 24 real actions in the unperturbed game under the two fresh seeds. Collect synchronized first-call, first-call-by-shape and reused-shape latencies. Learner timing includes perception, tracking and the observed mixture updates; model hashing and serialization are outside these clocks.
+
+**2026-11-24T06:04:12Z**
+
+Completed the 24-action closed-loop development smoke from clean detached source 8605c13c4536d643e5bbbb2824d7e8550b02e1fe. The qualified Python 3.11 Gameworld child attested MIT source, versions and overlay lock; the shared model process attested all 28 loaded CFFG/tool/lock files against Git. Output ~/agent-share/axiom-online-precision/acted-smoke.json SHA256 c37fed8473489526a858365c21df5f6b9cad95b04586fdfbe03ad4dd2afaa1ea. Independent archive check matched each pre-frame to its preceding post/reset hash, all 24 planned/applied/observed actions and rewards, clocks and model hash pairs, plus the next-action checkpoint replay and the source bytes. Nine stay, eight left, seven right. No simulator terminal/reset or nonzero reward; reset branch is wired but unexercised on this trajectory. All spatial statuses valid. 21 decisions had differing novelty scores; predicted reward had zero spread. Final active identities/motions/interactions 3/13/52, identity/interaction writes 67/64. At tick 12 restored 104 leaves (50,877,880 bytes) and reproduced action 2, all plan arrays and next key. Warm decision median 10.41 ms (n17), first per bucket 1.46–2.27 s (n7); first observe 4.877 s then warm median 104.35 ms (n23). Source py_compile/help, scoped git diff --check and tk dep cycle passed. This isolated tool imports existing public model calls and has no runtime, CI or benchmark dependency changes. Reproduce from an immutable checkout with JAX_PLATFORMS=cpu JAX_ENABLE_X64=0 uv run --frozen --no-sync python tools/axiom/acted_smoke.py --output <fresh-path>. Parent and report owner were sent the validated evidence digest. Longer acting, reduction and any held-out campaign remain separate.
