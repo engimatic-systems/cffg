@@ -1731,6 +1731,19 @@ them. Four rules define the contract:
    one Gaussian design belief per slot and fractional pixel assignments.
    The caller owns slot growth, coordinate iteration and reuse of the prior.
 
+   The spatial experiment in `experiments/axiom_spatial.py` alternates a
+   per-pixel assignment with the Gaussian position update from all pixels
+   assigned to a slot. The motion prediction can initialize the iterate;
+   its separately supplied Gaussian prior appears once per coordinate fit.
+   Absolute likelihood and assignment probability have distinct outputs.
+
+   `rollout_planning.sample_action_sequences` executes an immutable parameter
+   snapshot on action sequences. Each policy, sample and time index gets a
+   stable random key. The AXIOM experiment owns its independent object
+   prediction kernel, proposal refit and scoring function. Its reward and
+   count-based novelty are reported separately. This path advances imagined
+   states and leaves the learned posterior available for real observations.
+
    Reading is not evidence, so a learnable may restrict which instances
    supply statistics: `LearnableSpec.sources` is `None` for every reader, a
    tuple for exactly those, and an empty tuple for none. Habits are the case

@@ -572,6 +572,17 @@ spread around large predictions. A bias uses a constant input with zero
 variance. `tests/test_frame_regression.py` checks these equations against
 augmented least squares and exact second-order integration.
 
+The reverse update infers the spatial input from the assigned pixels.
+With an augmented design consisting of position and a final constant,
+write `G = O inv(P) + Mᵀ diag(a/b) M` where O is the number of output
+channels. Let `u` denote the spatial indices and `c` the bias. Start from
+the same frame prior precision and linear parameter on each sweep. A
+weighted pixel contributes `w G_uu` to precision and
+`w (M_uᵀ diag(a/b) y − G_uc)` to the linear parameter. An unused slot
+retains its previous position in the spatial coordinate loop. An
+independent evaluation of the quadratic log joint checks both coordinates
+in `tests/test_axiom_spatial.py`.
+
 
 **MNIW update** (gaussian_linear node, x̃ = [x; 1], prior (M0 [dy,di+1],
 Λ0 [di+1,di+1] column precision, Ψ0, ν0), per-trial stats Syy = E[yyᵀ],

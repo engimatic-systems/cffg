@@ -57,6 +57,8 @@ EPIC_FILES = {
         "test_goal_hyperprior.py",
         "test_shared_goals.py",
         "test_factored_rollout.py",
+        "test_rollout_planning.py",
+        "test_axiom_planning.py",
         "test_outer_gfe_formalism.py",
     ],
     "M4 · Epistemic behavior": [
@@ -150,6 +152,7 @@ EPIC_FILES = {
         "test_mixed_scoring.py",
         "test_mixed_learning.py",
         "test_frame_regression.py",
+        "test_axiom_spatial.py",
     ],
     "M16 · Plates": ["test_plates.py"],
     "M17 · Constraints": ["test_csp.py"],

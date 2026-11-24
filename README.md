@@ -350,6 +350,16 @@ a fixed research workload, not a general environment API. Other modules under
 `cffg.experiments` and `cffg.benchmarks` are derivation, diagnostic, or
 performance artifacts rather than supported newcomer facades.
 
+For explicit stochastic action sequences, `cffg.rollout_planning.sample_action_sequences`
+takes a pure transition function, a read-only parameter snapshot, the current
+belief, a policy batch and a random key. The AXIOM experiment builds candidate
+action sequences with `cffg.experiments.axiom_planning.plan`. Its refit ranks
+sequences by discounted reward and novelty; execution uses the first action
+of the best undiscounted sequence. `SearchSettings(novelty_weight=0.)` runs
+the same search without the count bonus. The reference-budget test uses a
+supplied two-object world model. End-to-end game control requires learned
+perception, motion and interaction models.
+
 ## Continuous, exponential-family, and hybrid models
 
 `lgssm` constructs a linear-Gaussian state-space model with DATA ports for
