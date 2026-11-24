@@ -341,6 +341,7 @@ def test_improper_initial_gaussian_priors_are_refused():
         )
 
 
+@pytest.mark.slow
 def test_scheduled_and_flooded_gaussian_updates_match():
     template, arrays = _learning_template(2)
     priors = {

@@ -601,6 +601,7 @@ def test_inner_retry_schedule_retries_finite_exhaustion():
     ]
 
 
+@pytest.mark.slow
 def test_float32_fitter_survives_tenfold_horizon():
     result = _fit(
         _observations(80),

@@ -51,7 +51,7 @@ def compare_to_host(before):
     return compiled
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_compiled_merge_real_fractional_update(dtype):
     p = prior(dtype)
     p.mu[1] += [3, -1]

@@ -58,7 +58,7 @@ def test_forced_write_uses_only_new_row_and_restarts_from_immutable_prior():
     same(repeated, post)
 
 
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 def test_initialize_observe_growth_budget_and_no_write(dtype):
     m, xy = fixture(dtype)
     trained, r = jax.jit(initialize_frame)(m, xy)

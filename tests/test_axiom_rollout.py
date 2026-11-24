@@ -51,7 +51,7 @@ def inputs(slots, config, dtype, tracked):
             jnp.asarray([1.201, 1.208], dtype))
 
 
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 def test_sparse_snapshot_matches_full_component_and_slot_axes(dtype):
     config = InteractionConfig(actions=3, identities=3, motions=5)
     model = mixture(10, [1, 4, 8], config, dtype)
@@ -84,7 +84,7 @@ def test_sparse_snapshot_matches_full_component_and_slot_axes(dtype):
     assert float(snap.total_alpha) == pytest.approx(float(model.alpha.sum()))
 
 
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 def test_dormant_projected_scale_changes_live_rollout_probabilities(dtype):
     cfg = InteractionConfig(actions=2, identities=2, motions=4)
     scene, ids, tracked, absent = inputs(2, cfg, dtype, [1])

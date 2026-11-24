@@ -73,7 +73,7 @@ def test_scale_projection_from_raw_natural_parameters_and_zero_boundary():
     assert out.psi[1, 0, 1] == 0.001
 
 
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 def test_full_bank_normalized_repair_for_scores_and_unshifted_sampling(dtype):
     eps = np.finfo(dtype).eps
     bad = [[0.01, 0.0009, 0.0072], [0.0009, 0.01, 0.0072], [0.0072, 0.0072, 0.01]]

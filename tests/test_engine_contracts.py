@@ -106,7 +106,7 @@ def assert_result_equal(actual, expected):
             )
 
 
-@pytest.mark.parametrize("budget", [1, 20])
+@pytest.mark.parametrize("budget", [1, pytest.param(20, marks=pytest.mark.slow)])
 def test_iterative_colony_results_match_distinct_standalone_instances(
     budget, monkeypatch
 ):

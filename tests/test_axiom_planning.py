@@ -90,7 +90,7 @@ def choice_step(snapshot, state, action, key):
     return state, (snapshot[action] * state, (action == 0).astype(snapshot.dtype))
 
 
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 def test_replan_action_support_and_no_bonus(dtype):
     previous = initial_proposal(2, horizon=1, dtype=dtype)
     options = SearchSettings(candidates=12)

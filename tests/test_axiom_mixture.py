@@ -34,7 +34,7 @@ def same(left, right):
         np.testing.assert_array_equal(a, b)
 
 
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 def test_discounted_excess_for_gaussian_and_categorical_heads(dtype):
     p = bank([True, True], heads=(2,3), dtype=dtype)
     history = points([1,1,1,1], dtype, ([0]*4, [2]*4))

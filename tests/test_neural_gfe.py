@@ -71,6 +71,7 @@ def neural_hybrid_model():
     return template, arrays
 
 
+@pytest.mark.slow
 def test_complete_neural_hybrid_gradient_preserves_exact_support():
     template, arrays = neural_hybrid_model()
     engine = Engine(compile_template(template, arrays=arrays))

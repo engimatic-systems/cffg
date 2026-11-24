@@ -71,7 +71,7 @@ def test_declaration_identity_scoping_and_dedicated_parameters():
                 validate(t)
 
 
-@pytest.mark.parametrize("x64", [True, False])
+@pytest.mark.parametrize("x64", [pytest.param(True, marks=pytest.mark.slow), False])
 def test_applied_affine_input_and_pending_or_committed_restart(tmp_path, x64):
     with jax.enable_x64(x64):
         paths = bundles(tmp_path)

@@ -10,7 +10,7 @@ from cffg.nonlinear import NonlinearFailure, _sigma_geometry, approximation, loc
 
 
 @pytest.mark.parametrize("method", ["linearization", "sigma_point"])
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 @pytest.mark.parametrize("observed", [False, True])
 def test_affine_messages_and_node_energy_match_analytic_gaussian(method, dtype, observed):
     a = jnp.asarray([[1.2, -0.3], [0.4, 0.8]], dtype)
@@ -185,7 +185,7 @@ def test_finite_negative_site_precision_is_not_clamped():
     assert value["precision_in"][0, 0] + 2 > 0
 
 
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 def test_dimension32_jit_and_member_batching(dtype):
     dimension = 32
     identity = jnp.eye(dimension, dtype=dtype)

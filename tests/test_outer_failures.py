@@ -201,7 +201,7 @@ def test_nonfinite_derivative_kernel_does_not_invent_local_ownership(scalar_char
 
 
 @pytest.mark.parametrize("schedule", ["auto", "flood"])
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 def test_real_improper_cavity_keeps_origin(schedule, dtype):
     with jax.enable_x64(dtype == jnp.float64):
         template, arrays = model()
