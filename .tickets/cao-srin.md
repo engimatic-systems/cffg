@@ -40,3 +40,7 @@ One real action advances the game once. Each decision compares 512 candidate act
 **2026-11-24T15:09:43Z**
 
 Full-budget Explode development pilot launched from immutable e741943d820c25fdedfee1059efacc6c5fb52221. Source digest b2dd424ff72de822ac4147bede47f3e733fc04e40d9a577cadc34741902a3673, model seed 88101, game seed 180400, real budget 10000. ROOT is ~/agent-share/axiom-10000. Live report at http://localhost:8080/axiom-10000/index.html. Zero-score or poor early returns do not stop this registered run. The supervisor writes the native action log, exact checkpoint every 500 and a stage receipt on completion. Scored seeds remain behind the published qualification gate.
+
+**2026-11-24T16:21:54Z**
+
+At implementation head 152866c the default suite passed all 2808 selected tests, with 380 slow tests deselected. Dashboard wall time 1333.136 seconds, pytest 1317.22 seconds. The ongoing isolated development run shared the CPU for this validation. The measured selection adjustment is being tracked separately and can reuse this passing result. The scored agent is the separately sealed e741943 snapshot.
