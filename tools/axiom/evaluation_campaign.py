@@ -215,10 +215,10 @@ def launch(root, study, stage, case):
     raise RuntimeError(f"repeated infrastructure failure at {path}")
 
 
-def run(root, workers):
+def run(root, workers, through="evaluation"):
     study = read(root / "study.json")
     verify_source(study)
-    for stage in STAGES:
+    for stage in STAGES[:STAGES.index(through)+1]:
         if stage == "pre_evaluation":
             qualify(root, study)
         verify_before(root, study, stage)
@@ -238,6 +238,8 @@ def main():
     parser.add_argument("operation", choices=("seal", "run"))
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--reference", type=Path, default=Path.home()/"agent-share/axiom-gameworld-reference")
+    parser.add_argument("--through", choices=STAGES, default="evaluation",
+                        help="Stop cleanly after publishing the selected stage receipt.")
     parser.add_argument("--workers", type=int, default=1)
     args = parser.parse_args()
     if args.workers < 1:
@@ -247,7 +249,7 @@ def main():
         if args.operation == "seal":
             seal(root, args.reference.resolve())
         else:
-            run(root, args.workers)
+            run(root, args.workers, args.through)
 
 
 if __name__ == "__main__":
