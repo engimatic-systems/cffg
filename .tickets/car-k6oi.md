@@ -1,6 +1,6 @@
 ---
 id: car-k6oi
-status: open
+status: closed
 deps: [car-9ccf, cff-jilz]
 links: [cff-ees0]
 created: 2026-11-23T21:48:38Z
@@ -34,3 +34,9 @@ Searching arbitrary graph topologies and ranking rewritten models by held-out Be
 ## Definitions
 
 Capacity is the maximum number of components that fit without resizing. Natural parameters encode a distribution so independent evidence can be added. A donor is the component whose evidence is moved and whose slot is then released.
+
+## Notes
+
+**2026-11-24T15:02:47Z**
+
+Both prerequisites and the host/device lifecycle implementations have qualified. cao-0cla covers immutable host proposals and stable IDs. cao-24tn covers fixed compiled layouts up to 5,000 rows, with exact host retry for the documented numerical-range refusal in cao-ar2d. Compact and exact component-bank files preserve identities and generation counters across restart. Tests cover accepted/rejected merges, donor reset and reuse. The AXIOM campaign reducer uses the exact host merge.
