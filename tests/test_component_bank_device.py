@@ -85,7 +85,7 @@ def test_compiled_transfer_of_sub_ulp_mass_and_gaussian_moments(dtype):
     assert exact(result.kappa[0], result.carry.kappa[0]) == int(large) + 1
     # Restore the device output's exact codec and repeat the next transaction.
     old = device.from_host(compare_to_host(b))
-    restored = device.from_host(ComponentBank.from_state_dict(device.to_host(old).state_dict()))
+    restored = device.from_host(ComponentBank.from_state_dict(device.to_host(old).state_dict(exact=True)))
     array_equal(_birth(old), _birth(restored))
 
 
@@ -114,7 +114,7 @@ def test_empty_full_and_id_reuse_across_uint32_rollover():
     resumed = device.to_host(bank)
     for _ in range(2):
         host = host.propose_merge(host.reference(0), host.reference(1)).bank.birth().bank
-    assert_same(resumed.state_dict(), host.state_dict())
+    assert_same(resumed.state_dict(exact=True), host.state_dict(exact=True))
     assert resumed.reference(1).logical_id == 2**32
     vacant = host.propose_merge(host.reference(0), host.reference(1)).bank.state_dict()
     limit = np.iinfo(np.int64).max
@@ -204,7 +204,7 @@ def test_unresolved_prior_subtraction_uses_explicit_range_status(dtype):
     p = MixedBank(np.array([[0], [1]], dtype), np.array([1, 2], dtype),
                   np.ones((2, 1, 1), dtype), np.array([4, 4], dtype),
                   np.ones(2, dtype), (), np.ones(2, bool))
-    record = ComponentBank(p).state_dict()
+    record = ComponentBank(p).state_dict(exact=True)
     for name, location, value in (("mu", (1, 0), Fraction(2, 3)),
                                   ("psi", (1, 0, 0), Fraction(5, 3))):
         high = dtype(float(value))
@@ -222,4 +222,4 @@ def test_unresolved_prior_subtraction_uses_explicit_range_status(dtype):
     retry = original.propose_merge(original.reference(0), original.reference(1))
     assert retry.status == SlotStatus.OK
     expected = host.propose_merge(host.reference(0), host.reference(1)).bank
-    assert_same(retry.bank.state_dict(), expected.state_dict())
+    assert_same(retry.bank.state_dict(exact=True), expected.state_dict(exact=True))

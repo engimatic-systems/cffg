@@ -40,7 +40,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from cffg._compensated import _two_sum
-from cffg.component_bank import ComponentBank, _exact_snapshot
+from cffg.component_bank import ComponentBank, _snapshot
 from cffg.mixed_scoring import validate_bank
 from cffg.mixed_state import MixedBank, MixedCarry
 
@@ -101,7 +101,7 @@ def to_host(bank: DeviceBank) -> ComponentBank:
     state = {"version": np.int32(1), "logical_ids": integer(bank.logical_ids),
              "generations": integer(bank.generations), "next_id": integer(bank.next_id)}
     for name, mixed in (("prior", bank.prior), ("posterior", bank.posterior)):
-        state.update({f"{name}/{k}": v for k, v in _exact_snapshot(mixed).items()})
+        state.update({f"{name}/{k}": v for k, v in _snapshot(mixed, exact=True).items()})
     return ComponentBank.from_state_dict(state)
 
 

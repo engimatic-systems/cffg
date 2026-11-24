@@ -598,6 +598,12 @@ Resume on the same backend and numerical configuration for exact replay.
 Both snapshot modes occupy a fixed amount of uncompressed storage for a
 given bank shape and precision, regardless of episode count.
 
+`ComponentBank.state_dict()` applies the same compact default to both the reset
+prior and the learned posterior. Both modes save logical IDs, generations and
+occupancy. Pass `exact=True` when later updates or merges must reproduce the
+uninterrupted result. `ComponentBank.from_state_dict(snapshot)` also reads
+exact lifecycle snapshots created before the compact option was introduced.
+
 For fixed-structure parameter sweeps that are not declared learning,
 `set_params` updates named runtime parameters without recompiling. Shapes,
 factor roles, probability normalization, covariance validity, and tied blobs
