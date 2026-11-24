@@ -1846,6 +1846,101 @@ joint-boundary case. It does not turn the two immutable templates into a
 literal mutable graph or establish the transformation for mean-field,
 continuous, hybrid, or hierarchical boundaries.
 
+##### Continuous and hybrid rolling boundaries (design for `cff-wdhj`)
+
+The first extension carries **one joint Gaussian** between a planning template
+and a one-transition perception template. This is a design for the public
+facade. The shipped contract above covers categorical boundaries.
+
+**Model declaration.** Opt in with `agent.version = 2`. Both templates name
+the same logical state coordinates in the same order and units. Each binds
+them to a single vector-valued `gaussian` prior with named mean and covariance
+roles. Perception also names the posterior edge. A committed belief is its
+finite mean `(d,)` and full, proper covariance `(d,d)` at the execution
+precision. Read the joint with `Engine.gaussian_marginal` and inject both
+moments with validated member writes. A state and an inferred disturbance in
+the same vector retain their cross-covariance. Reject an improper readout,
+overlapping parameter owners or a proposed joint assembled from separate
+edges. A missing observation masks the likelihood and carries the proper
+prediction. A singular prior or a partly missing vector needs a different
+declaration.
+
+| Window | Continuous action | Categorical action selecting Gaussian dynamics |
+|---|---|---|
+| Plan | Read the posterior mean at declared, ordered indices of one Gaussian edge. The indices can select the current control from an augmented state. Return the raw vector in the declared action coordinates. | Read the normalized first-selector marginal. Use the existing MAP tie rule or seeded categorical sampling. Preserve zero support. |
+| Perceive | Declare a controlled affine transition with offset `b + B @ applied`. Name the transition, its fixed base offset and control-matrix blob. Check dimensions and write the effective offset for that transition from the base on every tick. | Bind the executed index to the selector DATA port in the one-step filter. The selected transition acts on the carried Gaussian. The plan's action preferences belong only to the plan. |
+
+The hybrid case models a **known executed switch**. Competing actions in the
+plan use the declared Gaussian-mixture moment approximation. A persistent
+*hidden* regime would also need its probabilities and conditional state
+moments, or a declared approximation across the boundary. For example, two
+equiprobable regimes with opposite state means can have the same marginal
+Gaussian after interchanging their labels and yield different next
+predictions. The first extension rejects such a boundary. Gaussian sampling,
+an integrated box-constrained action solve and arbitrary nonlinear command
+transforms are outside its scope. A caller can bound or replace the proposal
+and pass the physical command back in the model's units.
+
+**One transition.** The v2 public operations are a planning call with a
+preview and a separate observation call with the decision tick and applied
+command. Start tick `t` with a filtered boundary, including any initial
+observation the caller used to construct it. Plan from a copy, with
+the declared goal DATA ports bound only to the preview available at `t`.
+On success, return a proposal tagged with the tick, inference status and
+objective. The caller selects a failure policy. A failed solve or invalid
+readout raises with the diagnostic or returns a marked hold of the last
+*applied* command. Holding requires an initial command for the first tick.
+Planning can advance a selection key and stage a pending decision. Repeating
+the call with the same tick and preview returns that decision. A different preview
+for an outstanding decision is an error.
+
+Commit `(t, applied, observation_at_t_plus_1)` once. Bind the actual command
+and new sensor value, check convergence and the complete boundary, and stage
+the declared per-transition learning from that filter result. Planning goals
+and model-generated observations supply no learning statistics. A fully
+missing sensor tick advances the prediction and skips the learning update.
+Advance belief, learning, last applied command and tick together. Reject
+duplicate or out-of-order feedback. A filter or learning failure leaves the transition pending for
+retry with the same evidence. An episode starts from its declared initial
+belief, clears pending work and the previous command, and retains the declared
+learning history. The legacy categorical episode and learned-goal cadence
+continue to use their existing rules.
+
+**Reconstruction and restart.** Store each template and its numeric blobs in
+its own `.cffgz`. Each bundle uses that window's learning descriptors, which
+can name different sources. Bind the controller checkpoint to both structure
+hashes, fixed numeric inputs (including `B`, base and reset priors), immutable
+learning priors and execution settings. Use a version-2 controller envelope
+with a checked inventory of typed arrays. It stores the joint moments,
+current learning state, global and episode ticks, last applied command and
+owned RNG state. Between proposal and feedback it also stores the pending
+tick, preview identity, proposed command, status and objective/diagnostic.
+Resuming this phase returns the recorded decision without drawing again or
+repeating an external action. The caller owns the plant, observation stream
+and the record of whether a physical command actually ran. Restore validates
+the complete record before replacing live state. Compiled arenas and messages
+are reconstructed. Unversioned categorical declarations retain their current
+encoding and structure hashes, and use the existing checkpoint decoder.
+Reading an old checkpoint as a continuous boundary is an error.
+
+**Qualification boundary.** Compare the facade to manually driven Engines
+on the same rolled windows, including each window's free energy, and to a
+Kalman calculation on the linear case. Use a two-state correlated Gaussian,
+a sensor observing only the first coordinate, and an overridden command.
+In the hybrid case use two different affine branches, an exact-zero planning
+weight and feedback selecting a different branch. Restart in a fresh process
+from both windows and the controller checkpoint before and after feedback.
+Check the next action, filter, objective, learning update and key progression.
+The detailed acceptance cases are in `cff-wdhj`.
+
+An AXIOM agent also needs object identities, visibility and motion history,
+generation-tagged component banks, model-reduction samples, and a planning
+proposal and previous best action sequence. These affect future decisions
+even when the Gaussian moments agree. Their owners need typed, exact
+snapshots at the same committed tick, including their own random streams.
+An AXIOM episode can compose these records in its own checkpoint. A generic
+custom-state extension to `RollingAgent` would need a separate API decision.
+
 #### 3d. Factored rollout lowering (`cffg.models.factored`, cff-b47g)
 
 `build_factored_rollout` is a topology-generic front end over the existing IR,
