@@ -35,3 +35,9 @@ car-9ccf consumes this timing decision for mixed learning. The Gameworld reprodu
 
 A low word stores the fraction lost when a number rounds in its working precision. A responsibility is an observation’s fractional assignment to a component. JIT compiles a function, and a scan applies it repeatedly inside one compiled call.
 
+
+## Notes
+
+**2026-11-24T05:50:46Z**
+
+Qualified candidate 089f377 preserved all frozen accuracy tests and recovered 30–47% of elapsed time against the first compensated implementation. All twelve original/optimized comparisons remain above the human decision boundary. The paired compute scan costs +21.7% to +54.2%, public returned-array calls +22.5% to +50.2%. Exact numbers and 95% intervals in ~/agent-share/axiom-online-precision/compute-confirmation/summary.json. A request to Cooper to choose the default is pending. Continue independent AXIOM design and fixed-action validation on the evaluation branch.
