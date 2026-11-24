@@ -1,7 +1,7 @@
 ---
 id: car-zieb
 status: open
-deps: [car-kwjj, car-mps6, car-ne0a, cff-wdhj, cao-36dd]
+deps: [car-kwjj, car-mps6, car-ne0a, cff-wdhj, cao-36dd, cao-lxmq]
 links: [cff-xa6z, cff-cynx]
 created: 2026-11-23T21:48:38Z
 type: epic
@@ -83,3 +83,7 @@ The centered mixture uncertainty repair passed. Implementation paused at Cooperâ
 **2026-11-24T03:53:38Z**
 
 Next accuracy checkpoint is cff-xfnx --> car-9ccf --> downstream component lifecycle/model work (arrow from prerequisite to dependent). At the new checkpoint, storing a small float32 change at each tick lost real learning; one batch and float64 recovered the analytic answer. A separate Gameworld tape capture/replay milestone is available in PR #201. End-to-end learning and game reward remain unmeasured.
+
+**2026-11-24T06:04:21Z**
+
+Road position after the precision gate. A supported typed agent restart now has explicit ownership in cao-lxmq. Existing categorical/one-Gaussian restart cannot restore AXIOM tracks, component banks, policy proposal or accumulated reduction samples. The fixed-action and small acting smoke can proceed with experiment-owned state. The full public-facade reproduction remains downstream. Legend: prerequisites --> dependents. Mixed learning + fixed-bank operations --> scene learning and rMM reduction; scene + sampled planner --> short acting smoke; scene + planner + reduction + rolling boundary --> cao-lxmq --> 10k integration, then preregistered million-step car-zieb study. Default compensated learning needs a human speed decision (caoc-0dvd).
