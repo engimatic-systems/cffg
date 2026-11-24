@@ -1774,6 +1774,14 @@ them. Four rules define the contract:
    count-based novelty are reported separately. This path advances imagined
    states and leaves the learned posterior available for real observations.
 
+   The AXIOM experiment uses `experiments/axiom_tracking.py` to carry observed
+   slot descriptors and their covariances between frames. Pixel winners determine
+   visibility. Summed soft assignments determine foreground. The identity write
+   mask selects previously visible slots using the current foreground mask.
+   Motion and interaction writes use the current tracking mask. An observation
+   with learning disabled advances the carry and closes both write masks. The
+   scene integrator owns the learned banks and checkpoint envelope.
+
    Reading is not evidence, so a learnable may restrict which instances
    supply statistics: `LearnableSpec.sources` is `None` for every reader, a
    tuple for exactly those, and an empty tuple for none. Habits are the case
