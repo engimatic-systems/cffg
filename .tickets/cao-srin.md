@@ -44,3 +44,7 @@ Full-budget Explode development pilot launched from immutable e741943d820c25fded
 **2026-11-24T16:21:54Z**
 
 At implementation head 152866c the default suite passed all 2808 selected tests, with 380 slow tests deselected. Dashboard wall time 1333.136 seconds, pytest 1317.22 seconds. The ongoing isolated development run shared the CPU for this validation. The measured selection adjustment is being tracked separately and can reuse this passing result. The scored agent is the separately sealed e741943 snapshot.
+
+**2026-11-24T17:19:15Z**
+
+Cooper chose to report the 10,000-action Explode run first. This session finishes development/Explode-88101 and reports its complete native reward and costs. Both later study stages remain unlaunched. Their original protocol, seeds, and scoring rules stay in the ticket for a future decision.
