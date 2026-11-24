@@ -1,6 +1,6 @@
 ---
 id: cff-xfnx
-status: open
+status: in_progress
 deps: []
 links: []
 created: 2026-11-24T03:52:06Z
@@ -41,3 +41,7 @@ An ULP is the gap between adjacent representable numbers at a given magnitude. A
 **2026-11-24T03:55:16Z**
 
 Independent review supplied a two-record regression in either dtype: let m=4096 and h=spacing(m), with kappa=1 and psi=h*h. Two point observations at m+h give 5*h*h/3 in a batch but 13*h*h/6 one at a time, also after restart. Storing a wider mean moves the limit. Compare keeping the fractional offset across checkpoints as well as a wider accumulator; quantify the supported range.
+
+**2026-11-24T05:16:09Z**
+
+Cooper chose compact snapshots by default, exact continuation opt-in. Round only at reload by saving the primary fields from a live compensated bank; ordinary saves leave learning untouched. Preserve exact count and mean carry when requested, reload old layouts with zero carry, reject damaged exact layouts. Architecture paths: Learnable or checkpoint feature and Runtime numerical or status invariant. Check public score/update and paused/restarted streams in eager/JIT/scan/vmap and both precisions; solver sweeps, graph templates and CFFGZ declared-family layout are outside this standalone operation. Benchmark recurring score/update speed and compact file cost against fd8bfd1. A required double-digit performance or file tradeoff needs a human decision; optional exact bytes already authorized.

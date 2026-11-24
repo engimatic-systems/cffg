@@ -1,6 +1,6 @@
 ---
 id: car-ne0a
-status: open
+status: in_progress
 deps: [cff-lquu]
 links: [cff-21vm, cff-pyy9]
 created: 2026-11-23T21:48:38Z
@@ -34,3 +34,9 @@ The separate cff-pyy9 roadmap branches a future decision on a hypothetical obser
 ## Definitions
 
 A proposal is the distribution used to suggest action strings. An elite is a high-scoring candidate used to improve the proposal. Discounting gives less weight to later rewards. A random key makes one stream of draws reproducible.
+
+## Notes
+
+**2026-11-24T05:16:09Z**
+
+Implement independent read-only sampled planning against an enumerable world. Architecture paths: Agent, planning, or hierarchy feature and Runtime numerical or status invariant. Check shared callback, scalar/batched trajectories, explicit RNG and cold/warm planning, checkpointed planner state, masks, invalid settings and reward aggregation in both precisions. CFFG message sweeps, GFE and template/bundle migration do not own this sampled objective. Object-model integration depends on the native pipeline.
