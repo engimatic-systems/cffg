@@ -153,6 +153,7 @@ EPIC_FILES = {
         "test_mixed_learning.py",
         "test_frame_regression.py",
         "test_axiom_spatial.py",
+        "test_axiom_slots.py",
     ],
     "M16 · Plates": ["test_plates.py"],
     "M17 · Constraints": ["test_csp.py"],

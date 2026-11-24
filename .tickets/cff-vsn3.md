@@ -1,6 +1,6 @@
 ---
 id: cff-vsn3
-status: in_progress
+status: closed
 deps: [cff-961d]
 links: []
 created: 2026-11-24T05:32:53Z
@@ -34,3 +34,9 @@ car-kwjj carries slot motion, identity, visibility and reuse across observations
 
 A hard winner is the slot with the largest assignment probability for a pixel. A vacant slot has no hard winners, even when its total soft probability is positive. A growth attempt forces one pixel to a vacant row before updating the appearance model.
 
+
+## Notes
+
+**2026-11-24T05:42:31Z**
+
+The release configuration passes max_grow_steps=20 from SMMConfig through its hierarchical wrapper. Seeded initialization, forced first fit, ordinary no-write frames, threshold, capacity, growth and invalid handling passed full precision tests. The spatial-only replay compared 403,200 hard pixel assignments across twelve real 210x160 frames (Explode and Bounce) from identical initial values. Both precisions made identical assignments throughout. Explode admitted two births on its second frame; Bounce made seven attempts and retained seven hard-winning slots including background. Evidence at ~/agent-share/axiom-online-precision/slot-replay.json. Real agent actions and object identity accuracy remain downstream.

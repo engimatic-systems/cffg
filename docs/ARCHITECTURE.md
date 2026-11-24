@@ -1736,6 +1736,12 @@ them. Four rules define the contract:
    assigned to a slot. The motion prediction can initialize the iterate;
    its separately supplied Gaussian prior appears once per coordinate fit.
    Absolute likelihood and assignment probability have distinct outputs.
+   `experiments/axiom_slots.py` owns the raw-frame encoding, seeded
+   appearance and position initialization, and worst-pixel growth. On each
+   attempted birth it records the forced pixel and previously unoccupied
+   slot. Accepted frames return their assignments and inferred positions.
+   The tracker reads the appearance transform at the position mean and the
+   inverse expected observation precision for each output channel.
 
    `rollout_planning.sample_action_sequences` executes an immutable parameter
    snapshot on action sequences. Each policy, sample and time index gets a
