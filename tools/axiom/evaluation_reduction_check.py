@@ -1,6 +1,7 @@
 """Exercise the acted reduction boundary against the direct host API on synthetic data."""
 
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,10 +13,16 @@ import numpy as np
 
 import evaluation_reduction as boundary
 from cffg.component_bank_device import from_host, to_host
+from cffg.experiments import _axiom_reduction_scores as scoring
 from cffg.experiments.axiom_banks import BankSettings, initial_banks, seeded_dormant
 from cffg.experiments.axiom_mixture import learn_frame
 from cffg.experiments.axiom_reduction import ReductionState, reduce_interactions
 from cffg.mixed_learning import MixedBatch
+
+
+def exhaustive_bounds(tables, tape, ids):
+    """Force the reference competition to evaluate every fixed component."""
+    return np.zeros(len(ids), bool), -np.inf
 
 
 def equal_fields(left, right):
@@ -72,7 +79,8 @@ class ScheduledTests(unittest.TestCase):
                 records = type(history.records)(*(np.resize(a, (38_000, a.shape[1])) for a in history.records))
                 history = ReductionState(history.key, 9500, records)
                 reference = ReductionState(reference.key, 9500, records)
-            direct = reduce_interactions(reference_bank, reference, step=step, dormant_initial=virgin)
+            with mock.patch.object(scoring, "_fixed_bounds", exhaustive_bounds):
+                direct = reduce_interactions(reference_bank, reference, step=step, dormant_initial=virgin)
             bank, history, receipt = boundary.after_action(bank,history,step=step,dormant_initial=virgin)
             self.assertEqual(direct.status, "ok")
             self.assertEqual(receipt["step"], step)
@@ -112,5 +120,51 @@ class ScheduledTests(unittest.TestCase):
             boundary.after_action(bank,history,step=True,dormant_initial=virgin)
 
 
+def full_size_work():
+    """Count actual context evaluations on a sparse full-width development fixture."""
+    model = initial_banks(3)[1]
+    virgin = seeded_dormant(model.prior, jax.random.key(170))
+    model = learn(model, [0., .05, 1.25, 1.5, 2., 4.])
+    pending = boundary.start(model, jax.random.key(123))
+    original = scoring.Tables.context
+
+    def run(bank, history, step, *, exhaustive=False):
+        count = 0
+        def counted(self, tape, slots):
+            nonlocal count
+            count += len(tape.features)*len(slots)
+            return original(self, tape, slots)
+        bounds = exhaustive_bounds if exhaustive else scoring._fixed_bounds
+        with mock.patch.object(scoring, "_fixed_bounds", bounds), mock.patch.object(scoring.Tables, "context", counted):
+            result = boundary.after_action(bank, history, step=step, dormant_initial=virgin)
+        return result, count
+
+    (first, history, early), work = run(model, pending, 500)
+    (check, saved, receipt), exhaustive = run(model, pending, 500, exhaustive=True)
+    equal_fields(to_host(first).state_dict(exact=True), to_host(check).state_dict(exact=True))
+    equal_fields(boundary.archive(history), boundary.archive(saved))
+    if early != receipt:
+        raise AssertionError("large sparse reduction decisions changed")
+    changed = learn(first, [3., 3.25, 4.5])
+    # Keep the first real batch as the replay population to control the large
+    # input size. The final call draws 2,000 new points from the changed bank.
+    retained = type(history.records)(*(np.tile(a, (19,1)) for a in history.records))
+    previous = ReductionState(history.key, 9500, retained)
+    (_, final, late), final_work = run(changed, previous, 10000)
+    print(json.dumps({
+        "slots": len(model.posterior.active), "early": early["records_total"],
+        "early_active": early["active_before"], "early_pairs": early["pairs"],
+        "early_accepted": early["accepted"], "early_exhaustive_contexts": exhaustive,
+        "early_certified_contexts": work, "late": late["records_total"],
+        "late_active": late["active_before"], "late_pairs": late["pairs"],
+        "late_accepted": late["accepted"], "late_certified_contexts": final_work,
+        "late_initial_dense_contexts": late["records_total"]*len(model.posterior.active),
+        "late_tape_bytes": sum(a.nbytes for a in final.records),
+    }, indent=2))
+
+
 if __name__ == "__main__":
-    unittest.main()
+    if sys.argv[1:] == ["--scale"]:
+        full_size_work()
+    else:
+        unittest.main()

@@ -10,9 +10,12 @@ mixing Dirichlet KL, in nats. A contextual winner with zero excess mixing
 mass contributes zero. Host comparisons use float64 expected log scores.
 
 With N generated records and K slots, the initial competition evaluates
-N*K contexts in blocks. A trial that changes the bank-wide likelihood
-repair requires another N*K evaluations before acceptance can be decided.
-Otherwise only the two proposals compete with the cached untouched leader.
+up to N*K contexts in blocks. A trial that changes the bank-wide likelihood
+repair rebuilds the competition. Fixed dormant slots with diagonal precision
+have an exact score upper bound. Their likelihoods are evaluated for a record
+only if they could win the initial decision or a later trial.
+When the global repair is unchanged, the two revised rows compete against
+the best untouched row.
 An accepted local merge refreshes up to two 64-row blocks. Pair selection
 separately compares at most 4,000 sampled sources against all K targets.
 """
@@ -190,8 +193,8 @@ def _pass(bank, records, pairs, tables, minima, dormant_initial):
     mass, base, excess = mixing(bank.posterior, bank.reset_prior)
     active = np.asarray(bank.posterior.active)
     mutable = pairs[active[pairs].all(axis=1)].ravel()
-    cache = Competition(tables, records, mutable)
-    scores = tables.output(records.categories, cache.best.ids[:, 0], excess > 0)
+    cache = Competition(tables, records, mutable, active=active)
+    scores = tables.output(records.categories, cache.winners(), excess > 0)
     current = _score(scores, mass, base, excess)
     initial = current
     count = int(active.sum())
@@ -222,8 +225,8 @@ def _pass(bank, records, pairs, tables, minima, dormant_initial):
                 if full_rescore:
                     model = _initial(candidate.bank, dormant_initial)
                     full = Tables.build(model, minimum=candidate_minimum)
-                    trial = Competition(full, records, mutable)
-                    output = full.output(records.categories, trial.best.ids[:, 0], next_excess > 0)
+                    trial = Competition(full, records, mutable, active=np.asarray(candidate.bank.posterior.active))
+                    output = full.output(records.categories, trial.winners(), next_excess > 0)
                 else:
                     new = Tables.build(raw, minimum=candidate_minimum)
                     output = _local_outputs(cache, pair, new, next_excess > 0)

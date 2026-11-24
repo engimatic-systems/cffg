@@ -1,6 +1,6 @@
 ---
 id: cao-1ggb
-status: in_progress
+status: closed
 deps: [cao-fs5s]
 links: []
 created: 2026-11-24T14:51:40Z
@@ -41,3 +41,7 @@ A reduction pass combines rules using retained synthetic data. A dormant row is 
 **2026-11-24T14:55:12Z**
 
 The actor boundary is available in tools/axiom/evaluation_reduction.py. The synthetic actor check compared every exact bank/checkpoint field, both scores, every greedy trial and all future generated records against direct host calls after real release learner updates. Tested clock 499/500, 1000 and the 10000 terminal boundary with 40000 records, plus empty support, skipped reductions and incomplete archives. Command: uv run --frozen --no-sync python tools/axiom/evaluation_reduction_check.py (2 passed). The integrated actor and checkpoint owners are using this interface. Next qualify an exact likelihood bound on fixed dormant components to avoid scoring guaranteed losers at full capacity.
+
+**2026-11-24T14:59:12Z**
+
+All 22 focused core cases passed, including both opt-in 5000-slot tests and two new tests for exact bounds, ties, numerical range and a dormant row becoming the winner after a trial. Fixed diagonal precision makes every term in the centered quadratic nonnegative; the row constant plus the four maximum categorical scores is an upper bound in the same arithmetic. Score only when the current winner fails to exceed that bound strictly. Cache evaluated fixed winners for the rest of the pass and rebuild the bounds whenever the global likelihood repair changes. General precision or extreme operands use the exhaustive path. The deterministic K=5000 development work-count check used the actual seeded dormant bank, all six head widths and six live rows learned using learn_frame. At 500 actions it performed 60000 instead of 10048000 context comparisons, 5 pairs and 3 merges. The entire bank, state, score and decisions matched dense computation. At 10000, after further learned updates, 40000 retained rows required 560000 evaluations, 5 pairs and 1 merge. The terminal tape used 38000 tiled earlier generated records plus 2000 fresh records and occupied 2080000 bytes. Pair proposal still compares its sampled live sources against all slots. This is a work count; busy or saturated bank wall times are unmeasured. Reproduce with uv run --frozen --no-sync python tools/axiom/evaluation_reduction_check.py --scale.
