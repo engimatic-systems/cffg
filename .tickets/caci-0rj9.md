@@ -35,3 +35,9 @@ The separate recurrent score-and-update optimization for cff-xfnx addresses comp
 
 A compact snapshot stores rounded parameter values. An exact snapshot also saves the smaller corrections used at the next update. One ULP is the gap between neighboring representable numbers. NPZ is a ZIP container for NumPy arrays.
 
+
+## Notes
+
+**2026-11-24T05:44:20Z**
+
+Implementation from a72cabc compiles the existing elementwise parameter and residual checks during snapshot save/restore after checking input types and layouts at source precision. Keep the eager correlation/Cholesky calculation: fusing it changed five of 1,800 acceptance decisions near the numerical rank boundary on CPU. Independent public save and load results now match the original across all 1,800 matrices in float32 and float64, plus 20 malformed layouts and value cases. Rewriting and continuing each of 16 real learned snapshots matches every array and compressed file byte with fixed Python hash seed. Tests cover the source dtype, dormant residual and near-rank cases. Frozen standalone matched I/O protocol and sources are in ~/agent-share/axiom-online-precision/checkpoint-io. Formal timing and final integrated suite remain with the coordinated parent run.

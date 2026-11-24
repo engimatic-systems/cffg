@@ -178,3 +178,50 @@ def test_compact_and_exact_snapshots_have_distinct_continuation_contracts(tmp_pa
     for key in ["carry_mu", "carry_psi", "carry_category_1"]:
         with pytest.raises(ValueError, match="missing"):
             mixed.MixedBank.from_state_dict({k: v for k, v in exact.items() if k != key})
+
+
+def test_checkpoint_checks_host_dtypes_before_jax_conversion():
+    with jax.enable_x64(False):
+        bank, _, _ = fixture(jnp.float32)
+        wide = np.asarray(bank.alpha, dtype=np.float64)
+        with pytest.raises(TypeError, match="alpha must have dtype"):
+            bank._replace(alpha=wide).state_dict()
+        with pytest.raises(ValueError, match="saved dtype"):
+            mixed.MixedBank.from_state_dict({**bank.state_dict(), "alpha": wide})
+
+
+def test_checkpoint_checks_carry_on_dormant_components():
+    bank, _, _ = fixture(jnp.float32)
+    low = bank.carry.alpha.at[2].set(jnp.nan)
+    invalid = bank._replace(carry=bank.carry._replace(alpha=low))
+    for exact in (False, True):
+        with pytest.raises(ValueError, match="invalid mixed-learning snapshot"):
+            invalid.state_dict(exact=exact)
+    snapshot = bank.state_dict(exact=True)
+    with pytest.raises(ValueError, match="invalid mixed-learning snapshot"):
+        mixed.MixedBank.from_state_dict({**snapshot, "carry_alpha": np.asarray(low)})
+
+
+def test_checkpoint_preserves_eager_scale_validation_at_rank_boundary():
+    from cffg.mixed_scoring import validate_bank
+
+    with jax.enable_x64(True):
+        bank, _, _ = fixture(jnp.float64)
+        source = bank.state_dict()
+        # Scaling this nearly rank-one matrix to correlation units and fusing
+        # the subsequent Cholesky check can change the sign of its last pivot.
+        matrix = np.array([[120.05345625225891, -9.974864878360373],
+                           [-9.974864878360373, .8287802154773474]])
+        for direction in (-np.inf, matrix[1, 1], np.inf):
+            value = matrix.copy()
+            value[1, 1] = np.nextafter(value[1, 1], direction)
+            candidate = bank._replace(psi=bank.psi.at[2].set(value))
+            snapshot = {**source, "psi": np.asarray(candidate.psi)}
+            if validate_bank(candidate):
+                np.testing.assert_array_equal(candidate.state_dict()["psi"], snapshot["psi"])
+                same_bank(mixed.MixedBank.from_state_dict(snapshot), candidate)
+            else:
+                with pytest.raises(ValueError, match="invalid mixed-learning snapshot"):
+                    candidate.state_dict()
+                with pytest.raises(ValueError, match="invalid mixed-learning snapshot"):
+                    mixed.MixedBank.from_state_dict(snapshot)

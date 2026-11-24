@@ -99,11 +99,8 @@ def _matrix_valid(matrices, *, strict):
     return valid & jnp.all(_symmetry_ok(corr)) & jnp.all(jnp.isfinite(jnp.linalg.cholesky(guarded)))
 
 
-def validate_bank(bank):
-    """Check every component, including dormant slots. Return a scalar JAX bool."""
-    _check_bank_shapes(bank)
-    valid = (jnp.any(bank.active) & jnp.all(jnp.isfinite(bank.mu))
-             & _matrix_valid(bank.psi, strict=True))
+def _parameters_valid(bank, scale_valid):
+    valid = jnp.any(bank.active) & jnp.all(jnp.isfinite(bank.mu)) & scale_valid
     for values in (bank.kappa, bank.alpha, *bank.categories):
         valid &= jnp.all(jnp.isfinite(values) & (values > 0))
     carry = getattr(bank, "carry", None)
@@ -113,6 +110,20 @@ def validate_bank(bank):
         for high, low in zip(bank.categories, carry.categories, strict=True):
             valid &= _compensated.canonical(high, low)
     return valid & jnp.all(jnp.isfinite(bank.nu) & (bank.nu > bank.mu.shape[1] - 1))
+
+
+_compiled_parameters_valid = jax.jit(_parameters_valid)
+
+
+def validate_bank(bank, *, for_checkpoint=False):
+    """Check every component, including dormant slots. Return a scalar JAX bool."""
+    # Check source dtypes before JAX can narrow a host array on dispatch.
+    _check_bank_shapes(bank)
+    # Keep the checkpoint's matrix operations in their original precision
+    # and sequence: fusion can change a Cholesky pivot at the rank boundary.
+    scale_valid = _matrix_valid(bank.psi, strict=True)
+    parameters_valid = _compiled_parameters_valid if for_checkpoint else _parameters_valid
+    return parameters_valid(bank, scale_valid)
 
 
 def validate_inputs(bank, batch):

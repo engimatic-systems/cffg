@@ -77,7 +77,7 @@ class MixedBank(_BankFields):
         intact. Loading a compact record starts from the saved values with zero
         carry. Exact snapshots (v3) also persist the residuals at this boundary.
         """
-        if not bool(mixed_scoring.validate_bank(self)):
+        if not bool(mixed_scoring.validate_bank(self, for_checkpoint=True)):
             raise ValueError("invalid mixed-learning snapshot parameters")
         fields = {key: np.array(getattr(self, key), copy=True) for key in _PRIMARY}
         for i, head in enumerate(self.categories):
@@ -134,7 +134,7 @@ class MixedBank(_BankFields):
                                tuple(arrays[f"carry_{h}"] for h in heads))
         bank = cls(arrays["mu"], arrays["kappa"], arrays["psi"], arrays["nu"],
                    arrays["alpha"], cats, arrays["active"], carry)
-        if not bool(mixed_scoring.validate_bank(bank)):
+        if not bool(mixed_scoring.validate_bank(bank, for_checkpoint=True)):
             raise ValueError("invalid mixed-learning snapshot parameters")
         return bank
 
