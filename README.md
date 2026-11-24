@@ -152,12 +152,13 @@ expose the specialized workflows named in the capability map.
 </details>
 
 <details>
-<summary><code>cffg.core</code> — serialized graph language (29)</summary>
+<summary><code>cffg.core</code> — serialized graph language (31)</summary>
 
 <!-- facade-core:start -->
 `FACTOR_TYPES`, `AgentSpec`, `BeliefBinding`, `BlobRef`, `BoundaryFactorization`,
 `Broadcast`, `Chain`, `ConstraintKind`, `ConstraintSpec`, `Expose`, `FactorSpec`,
-`FactorType`, `FunctionSpec`, `LearnableSpec`, `ModelError`,
+`FactorType`, `FunctionSpec`, `GaussianFilterSpec`, `GaussianPlanSpec`,
+`LearnableSpec`, `ModelError`,
 `MomentMatchingEndpoint`, `MomentProjection`, `PlateSpec`, `PortRole`, `PortSpec`,
 `Template`, `VariableSpec`, `expand_plates`, `plate_observations`,
 `migrate_moment_matching`, `moment_matching`, `moment_matching_endpoint`,
