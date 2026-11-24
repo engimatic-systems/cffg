@@ -420,7 +420,8 @@ def render(root):
 <p class="lede">Keeping small rounding remainders fixed an error that built up across repeated
 float32 updates. When 1,024 observations accumulated near 10,000, the compensated stream recovered
 the expected scale of 950.2. The original stream reached 1,154.8.</p>
-<p class="decision"><strong>Public default decision pending.</strong> Even after optimization,
+<p class="decision"><strong>Compensated updates are the approved default for float32 and float64.</strong>
+The rounded update is the approved speed option. The 10,000-step campaign uses the corrected default. Even after optimization,
 each recurrent score and update took {min(costs):.1f}–{max(costs):.1f}% more time than the rounded
 implementation in the CPU benchmark. All twelve 95% intervals lie above the predeclared 10%
 cost threshold. Required compact storage grew by zero bytes for identical values. Optional exact
