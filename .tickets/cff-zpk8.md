@@ -34,3 +34,9 @@ car-kwjj supplies the actual slot detection, identity and frame-to-frame inferen
 
 A slot is a candidate object. A Gamma distribution represents precision, the inverse noise variance. A fractional assignment is the share of a pixel attributed to a slot.
 
+
+## Notes
+
+**2026-11-24T05:25:00Z**
+
+Frame regression and a full-resolution probe landed on the shared branch. Direct CPU x32/x64 oracles passed four targeted tests. On 33,600 RGB+position tokens across 32 slots, max scaled discrepancies versus a full float64 raw-moment oracle were 2.43e-7 in scores, 2.47e-5 in means and 3.12e-5 in rates. Five synchronized compiled development calls took 4.79–5.52 ms. These are local frame-fit measurements with supplied slot beliefs, including score, softmax and fit, not full frame-to-action times. Full gate with parent pending.

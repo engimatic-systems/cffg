@@ -45,3 +45,7 @@ Independent review supplied a two-record regression in either dtype: let m=4096 
 **2026-11-24T05:16:09Z**
 
 Cooper chose compact snapshots by default, exact continuation opt-in. Round only at reload by saving the primary fields from a live compensated bank; ordinary saves leave learning untouched. Preserve exact count and mean carry when requested, reload old layouts with zero carry, reject damaged exact layouts. Architecture paths: Learnable or checkpoint feature and Runtime numerical or status invariant. Check public score/update and paused/restarted streams in eager/JIT/scan/vmap and both precisions; solver sweeps, graph templates and CFFGZ declared-family layout are outside this standalone operation. Benchmark recurring score/update speed and compact file cost against fd8bfd1. A required double-digit performance or file tradeoff needs a human decision; optional exact bytes already authorized.
+
+**2026-11-24T05:25:00Z**
+
+A second accumulated array also needs a remainder. With float32 Gaussian scale Psi=2^24, sixteen observations contributing 0.25 each must add 4. Uncompensated scalar updates add zero. Exact mode therefore includes the full scale matrix as well as the mean and counts; compact stays in v2. Development tests cover all three mechanisms and exercise optional exact restore at every tick. An overstrict precision guard in the draft rejected some normal soft assignments including Gameworld patch tick 37 and 28/40 seeded scan steps at N=1, K=5000. Repairing and independently replaying before timing.
