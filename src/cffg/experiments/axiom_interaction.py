@@ -156,3 +156,21 @@ def interaction_batch(scene, identities, tracked, action, absent_distance, *, co
               jnp.full(n, action), jnp.full(n, reward_class), switches)
     return InteractionBatch(MixedBatch(features, jnp.zeros((n, d, d), scene.dtype),
                                        jnp.ones(n, bool), fields), neighbor, valid)
+
+
+def score_context(bank, evidence):
+    """Score a prediction query from a mixed posterior. Reject revealed outcomes."""
+    from cffg.experiments.axiom_evidence import release_view
+    from cffg.mixed_learning import score
+
+    scores, q, proper = score(release_view(bank), evidence.records)
+    reward, motion = evidence.records.categories[-2:]
+    valid = evidence.valid & proper & (reward == -1).all() & (motion == -1).all()
+    return jnp.where(valid, scores, -jnp.inf), jnp.where(valid, q, 0), valid
+
+
+def learn_interactions(bank, evidence, tracked, *, threshold=-10.):
+    """Apply observed scene records to a DeviceBank in tracked-slot order."""
+    from cffg.experiments.axiom_mixture import learn_frame
+
+    return learn_frame(bank, evidence.records, tracked, threshold=threshold, valid_input=evidence.valid)

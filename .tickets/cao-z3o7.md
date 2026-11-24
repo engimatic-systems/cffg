@@ -1,7 +1,7 @@
 ---
 id: cao-z3o7
-status: open
-deps: [cao-0cla, car-9ccf, cao-lty5]
+status: closed
+deps: [cao-0cla, car-9ccf, cao-lty5, cao-24tn, cao-0pbk]
 links: []
 created: 2026-11-24T05:32:40Z
 type: feature
@@ -41,3 +41,7 @@ Excess statistics are learned posterior natural parameters minus their reset-pri
 **2026-11-24T05:32:53Z**
 
 The feature child supplies scene integration, the mixed learner supplies absolute scoring, and the lifecycle child supplies immutable host identity transactions. Device acquisition preserves the same layout.
+
+**2026-11-24T05:49:04Z**
+
+Implemented immutable host learn_observation and compiled ordered learn_frame. Full-bank novelty selects row zero and preserves its identity. Confirmed both dtypes give two 1.6 counts from 2.1 under equal responsibilities; ordinary additive learning gives 2.6. Strict quarter and 32 cutoffs, winner history, all heads, empty support, restart, rollback and the independent 32-slot statistics oracle passed. Real rMM updates consume observed reward and switch; contextual queries withhold them. All 10 focused tests passed after applying release_view during scoring (25.50s): uv run --frozen --no-sync pytest -q tests/test_axiom_mixture.py tests/test_axiom_interaction.py. Dependencies 848355c and d1b1953 are in the shared branch. Parent owns the final suite, documentation and dashboard.
