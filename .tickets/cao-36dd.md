@@ -24,3 +24,9 @@ Connect the released Gaussian and categorical priors, previously learned identit
 ## Method and scope
 
 Use the Learnable or checkpoint feature and Runtime numerical or status invariant architecture paths. Compare host to the compiled record update, float32 to float64 on controlled cases, and one-slot to batched behavior. A prior is the parameter record restored on an empty slot. A dormant slot has a reserved row but has yet to receive any real evidence.
+
+## Notes
+
+**2026-11-24T06:00:54Z**
+
+At immutable 09702a4 both source precisions completed 48 real actions apiece in Explode, Bounce and Aviate. Across 288 real transitions there were two extra reset observations; resets preserved every dynamics/identity/interaction array and did not advance the action clock. Exact midway NPZ replay matched every final array on all six runs. Final live interaction counts were 105/105 in Explode, 129/112 in Bounce, 72/72 in Aviate (float32/float64). The independent native seeds share a numerical seed but produce different initial arrays across dtypes; source attribution for the tracking difference is under review. See ~/agent-share/axiom-online-precision/final-scene-{f32,f64}.json. This is a fixed-action development trace, not a policy reward study.

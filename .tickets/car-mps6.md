@@ -1,6 +1,6 @@
 ---
 id: car-mps6
-status: open
+status: in_progress
 deps: [car-k6oi, car-8rgl, cff-pksr, cao-0pbk]
 links: [cff-du6m]
 created: 2026-11-23T21:48:38Z
@@ -34,3 +34,9 @@ Jointly refitting every affine matrix and using a general model-search objective
 ## Definitions
 
 An affine rule maps the previous state to a matrix times that state plus an offset. A switch chooses a motion rule. A pseudo-observation is drawn from the current model. KL divergence measures a difference between probability distributions.
+
+## Notes
+
+**2026-11-24T06:00:54Z**
+
+Live frames now train all motion and interaction components, with delayed identity writes and actual applied action and reward. The learned sparse rollout bridge is separately qualified. The released scale calculation includes a global diagonal repair after sparsifying Gaussian evidence. Training, rollout and reduction must share its result across all components; sampling uses the distinct unshifted projection. The scheduled model reduction and its assembled integration remain their own gate.
