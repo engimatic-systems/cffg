@@ -1,7 +1,7 @@
 ---
 id: car-kwjj
 status: open
-deps: [car-k6oi, car-8rgl, cff-cpxj, cff-zpk8]
+deps: [car-k6oi, car-8rgl, cff-cpxj, cff-zpk8, cff-961d]
 links: []
 created: 2026-11-23T21:48:38Z
 type: feature
