@@ -54,10 +54,13 @@ def _prepare(posterior, rows):
     # Padding uses a real component's parameters and never gets probability.
     live = rows >= 0
     indices = jnp.where(live, rows, jnp.maximum(rows[0], 0))
-    subset = jax.tree.map(lambda x: x[indices], posterior)
+    # The released precision repair uses the worst normalized eigenvalue over
+    # all components. A dormant row can alter every occupied row's likelihood.
+    full_view = release_view(posterior)
+    subset = jax.tree.map(lambda x: x[indices], full_view)
     # A finite dummy makes all-untracked, empty-bank rollouts well-defined.
     support = live.at[0].set(live[0] | ~live.any())
-    subset = release_view(subset._replace(active=support))
+    subset = subset._replace(active=support)
     proper = mixed_scoring.validate_bank(subset)
     means = []
     terms = []
@@ -78,6 +81,8 @@ def _prepare(posterior, rows):
 def freeze_world(posterior, motion, identities, tracked, absent_distance, *, config, noise_sd=None):
     """Prepare one live model for sampled rollouts. Pass the raw rMM MixedBank.
 
+    If virgin components carry seeded initial parameters, supply the full
+    initialized_view(posterior, generations, dormant_initial) from axiom_evidence.
     The six categorical heads are own/other identity, visible, action, reward
     and motion switch. All motion matrices, including unused zero maps, retain
     their released switch indices. For an empty rMM a tracked prediction fails;

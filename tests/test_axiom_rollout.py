@@ -84,6 +84,44 @@ def test_sparse_snapshot_matches_full_component_and_slot_axes(dtype):
     assert float(snap.total_alpha) == pytest.approx(float(model.alpha.sum()))
 
 
+@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+def test_dormant_projected_scale_changes_live_rollout_probabilities(dtype):
+    cfg = InteractionConfig(actions=2, identities=2, motions=4)
+    scene, ids, tracked, absent = inputs(2, cfg, dtype, [1])
+    motion = initial_motion(capacity=4, dtype=dtype)
+    source = mixture(3, [0, 1], cfg, dtype, prior=True)
+    evidence = interaction_batch(scene, ids, tracked, 0, absent, config=cfg)
+    point = evidence.records.mean[1]
+    scales = jnp.broadcast_to(jnp.eye(7, dtype=dtype) * .001, source.psi.shape)
+    separation = .014
+    means = source.mu.at[0].set(point).at[1].set(point.at[0].add(separation))
+    healthy = source._replace(mu=means, psi=scales)
+
+    # This raw dormant block is positive definite. Thresholding drops the
+    # first cross term. The resulting lowest eigenvalue is .01 - sqrt(2)*.0072.
+    block = jnp.array([[.01, .0009, .0072], [.0009, .01, .0072],
+                       [.0072, .0072, .01]], dtype=dtype)
+    assert np.linalg.eigvalsh(block).min() > 0
+    affected = healthy._replace(psi=scales.at[2, :3, :3].set(block))
+    min_eig = .01 - np.sqrt(2) * .0072
+    shift = 2 * (np.finfo(dtype).eps - min_eig)
+    probabilities = []
+    for raw, scale in ((healthy, .001), (affected, .001 + shift)):
+        _, full_q, ok = score_context(raw, evidence)
+        assert ok
+        snapshot = freeze_world(raw, motion, ids, tracked, absent, config=cfg)
+        assert snapshot.valid
+        _, frozen_q = _context_scores(snapshot, jax.tree.map(lambda a: a[1:2], evidence.records))
+        # Both live rows have identical scales, degrees, kappa and head counts.
+        # Their odds differ only by the displaced mean's Mahalanobis penalty.
+        odds = np.exp(.5 * float(raw.nu[0]) * separation**2 / scale)
+        expected = odds / (1 + odds)
+        np.testing.assert_allclose(full_q[1], [expected, 1 - expected, 0], atol=4e-6)
+        np.testing.assert_allclose(frozen_q[0], full_q[1, :2], atol=2e-6)
+        probabilities.append(float(frozen_q[0, 0]))
+    assert probabilities[0] - probabilities[1] > .045
+
+
 def test_causal_acquired_motion_and_reward_change_imagined_action():
     cfg = InteractionConfig(actions=2, identities=3, motions=5, static_contacts=True)
     scene, ids, tracked, absent = inputs(3, cfg, jnp.float32, [2])
@@ -171,12 +209,25 @@ def test_sparse_reference_capacity_subset():
         repeat = jax.block_until_ready(compiled(*args))
         times.append(perf_counter() - start)
         np.testing.assert_array_equal(first.total_return, repeat.total_return)
+    # A single dormant row can force an eigensolve over the complete source
+    # bank. Measure that preparation separately from the diagonal fast path.
+    block = jnp.array([[.01, .0009, .0072], [.0009, .01, .0072],
+                       [.0072, .0072, .01]], jnp.float32)
+    bad_source = jax.block_until_ready(model._replace(psi=model.psi.at[0, :3, :3].set(block)))
+    def repaired_snapshot():
+        return freeze_world(bad_source, motion, ids, tracked, absent, config=cfg)
+    forced = jax.block_until_ready(repaired_snapshot())
+    assert forced.valid and forced.gaussian.psi[0, 0, 0] > snap.gaussian.psi[0, 0, 0]
+    start = perf_counter()
+    forced = jax.block_until_ready(repaired_snapshot())
+    repair_prepare = perf_counter() - start
+    assert jax.block_until_ready(compiled(forced, *args[1:])).valid
     mem = compiled.memory_analysis()
     rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     print(dict(device=str(jax.devices()[0]), dtype="float32", physical_components=5000,
                occupied=8, switches=500, slots=32, tracked=6,
                horizon=8, policies=16, replicates=3, imagined_transitions=384,
-               prepare_first_s=first_prepare, prepare_warm_s=warm_prepare,
+               prepare_first_s=first_prepare, prepare_warm_s=warm_prepare, prepare_with_global_repair_s=repair_prepare,
                compile_s=compile_time, warm_s=times, xla_temp_bytes=mem.temp_size_in_bytes,
                executable_argument_bytes=mem.argument_size_in_bytes,
                peak_process_rss_bytes=rss if sys.platform == "darwin" else rss * 1024))
