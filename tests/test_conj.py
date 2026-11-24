@@ -43,6 +43,112 @@ def test_niw_soft_stats_equal_hard_stats_in_expectation():
     assert post.psi[0, 0] == pytest.approx(hard.psi[0, 0] + 2 * var)
 
 
+def test_niw_matching_translated_point_preserves_prior_scale():
+    prior = conj.NIW(np.array([10001], np.float32), 2, np.array([[3]], np.float32), 4)
+    point = np.array([10001.], np.float64)
+    post = prior.update(point, np.outer(point, point))
+    np.testing.assert_array_equal(post.psi, [[3.]])
+    np.testing.assert_array_equal(post.mu, point)
+    assert (post.kappa, post.nu) == (3., 5.)
+
+    # Raw second moments are checked through the pooled posterior scale.
+    np.testing.assert_array_equal(prior.update(point, point**2 - 1).psi, [[2.]])
+    with pytest.raises(ValueError, match="psi_n not positive definite"):
+        prior.update(point, point**2 - 4)
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("translation", [0, 10001])
+def test_niw_centered_fractional_scatter_and_split_batches(dtype, translation):
+    location = np.array([translation, -translation], dtype=dtype)
+    prior = conj.NIW(location, dtype(2), np.array([[3, 1], [1, 2]], dtype=dtype), dtype(4))
+    offsets = np.array([[-3, 2], [1, -2], [5, 1]], dtype=dtype)
+    means = location + offsets
+    covs = np.array([[[.125, 0], [0, .5]], [[1, -1], [-1, 1]], [[0, 0], [0, 0]]], dtype=dtype)
+    weights = np.array([.25, .5, .125], dtype=dtype)
+
+    # Independent scatter identity over all pairs, including the prior mean.
+    support = [([0., 0.], 2.), *zip(offsets.astype(float), weights.astype(float))]
+    mass = sum(w for _, w in support)
+    expected_scale = prior.psi.astype(float) + sum(w * c for w, c in zip(weights, covs))
+    for i, (a, wa) in enumerate(support):
+        for b, wb in support[i + 1:]:
+            delta = a - b
+            expected_scale += (wa * wb / mass) * np.outer(delta, delta)
+    expected_offset = np.array([.375, -.375]) / mass
+
+    pooled = prior.update_centered(means, covs, weights)
+    split = prior.update_centered(means[:2], covs[:2], weights[:2])
+    split = split.update_centered(means[2:], covs[2:], weights[2:])
+    for post in (pooled, split):
+        assert (post.kappa, post.nu) == (mass, 4.875)
+        np.testing.assert_allclose(post.mu, location + expected_offset, rtol=0, atol=2e-12)
+        np.testing.assert_allclose(post.psi, expected_scale, rtol=0, atol=2e-12)
+
+
+def test_niw_centered_scatter_survives_sub_ulp_posterior_displacement():
+    anchor = float(2**53)
+    prior = conj.NIW(np.array([anchor]), 1., np.eye(1), 3.)
+    post = prior.update_centered([[anchor + 2]], [[[.125]]], [.25])
+    # The true posterior mean rounds to the prior. Its between-mean scale
+    # contribution is (1 * .25 / 1.25) * 2**2, independently of that rounding.
+    np.testing.assert_array_equal(post.mu, [anchor])
+    np.testing.assert_allclose(post.psi, [[1 + .25 * .125 + .8]], rtol=1e-15)
+
+    # Use the same origin across calls when the absolute posterior mean cannot
+    # represent the intermediate displacement. The stored local mean can.
+    local_prior = conj.NIW(np.zeros(1), prior.kappa, prior.psi, prior.nu)
+    local = local_prior.update_centered([[2]], [[[.125]]], [.25])
+    split = local.update_centered([[2]], [[[.125]]], [.25])
+    pooled = prior.update_centered([[anchor + 2]] * 2, [[[.125]]] * 2, [.25, .25])
+    np.testing.assert_array_equal(anchor + split.mu, pooled.mu)
+    np.testing.assert_allclose(split.psi, pooled.psi, rtol=1e-15)
+
+
+def test_niw_centered_accepts_rounded_rank_one_float32_covariance():
+    direction = np.array([.3, .7], dtype=np.float32)
+    covariance = np.outer(direction, direction)
+    assert np.linalg.eigvalsh(covariance.astype(float))[0] < 0
+    prior = conj.NIW(np.zeros(2), 1., np.eye(2), 4.)
+    post = prior.update_centered([[0, 0]], [covariance], [1.])
+    np.testing.assert_allclose(post.psi, prior.psi + covariance, rtol=1e-7)
+    assert np.linalg.eigvalsh(post.psi - prior.psi)[0] >= -np.finfo(float).eps
+
+
+def test_niw_centered_zero_weights_skip_undefined_evidence():
+    prior = conj.vague_niw(1)
+    means = np.array([[np.nan], [np.inf], [2.]])
+    covs = np.array([[[np.nan]], [[-4.]], [[.25]]])
+    assert prior.update_centered(means, covs, np.zeros(3)) is prior
+    assert prior.update_centered(means[:0], covs[:0], []) is prior
+    sparse = prior.update_centered(means, covs, [0, 0, .5])
+    single = prior.update_centered(means[-1:], covs[-1:], [.5])
+    np.testing.assert_array_equal(sparse.mu, single.mu)
+    np.testing.assert_array_equal(sparse.psi, single.psi)
+    assert (sparse.kappa, sparse.nu) == (single.kappa, single.nu)
+
+
+@pytest.mark.parametrize(("means", "covs", "weights", "message"), [
+    ([1, 2], [np.eye(2)], [1], "shape"),
+    ([[1, 2]], np.eye(2), [1], "shape"),
+    ([[1, 2]], [np.eye(2)], [[1]], "shape"),
+    ([[1, 2]], [np.eye(2)], [np.nan], "finite"),
+    ([[1, 2]], [np.eye(2)], [-1], "nonnegative"),
+    ([[1, 2]], [np.eye(2)], [float("inf")], "finite"),
+    ([[1, np.nan]], [np.eye(2)], [1], "finite"),
+    ([[1, 2]], [[[1, np.nan], [0, 1]]], [1], "finite"),
+    ([[1, 2]], [[[1, 1], [0, 1]]], [1], "symmetric"),
+    ([[1, 2]], [[[1, 2], [2, 1]]], [1], "semidefinite"),
+    ([[1, 2]], [[[-1., 0], [0, 1e24]]], [1], "semidefinite"),
+    ([[1, 2]], [[[0., 1], [1, 1e24]]], [1], "zero covariance"),
+    ([[1, 2]], [[[1, 0], [10, 1e24]]], [1], "symmetric"),
+    ([[1j, 2]], [np.eye(2)], [1], "real"),
+])
+def test_niw_centered_rejects_invalid_statistics(means, covs, weights, message):
+    with pytest.raises(ValueError, match=message):
+        conj.vague_niw(2).update_centered(means, covs, weights)
+
+
 def test_mniw_recovers_regression():
     rng = _rng()
     a_true, b_true, v_true = np.array([[0.9, -0.3], [0.1, 0.7]]), np.array([0.5, -1.0]), 0.04
