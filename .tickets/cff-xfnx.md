@@ -53,3 +53,7 @@ A second accumulated array also needs a remainder. With float32 Gaussian scale P
 **2026-11-24T05:57:10Z**
 
 Independent checks on 089f377 preserved all three precision corrections, 480 recurrent updates and archival compatibility. The real-frame RGB patch corpus saw zero changed MAP labels across 23,040 assignments, and exact file reload preserved output bits. A compact restart on every translated scalar observation still loses 21.53%; once per 128 loses 0.029%. First default compute candidate and improved candidate both exceed Cooper’s threshold. Experimental result and the open default decision live in caoc-0dvd and http://localhost:8080/axiom-online-precision/index.html.
+
+**2026-11-24T07:18:58Z**
+
+The final integrated short suite passed 2798 tests in 1163.637 seconds wall time at f74543f. The corrected compensated update and opt-in exact continuation are implemented and qualified for both working precisions. The remaining blocker for the default is Cooper's decision in caoc-0dvd (optimized recurring float32 time increases 21.7–54.2%). The disk cost of the compact format for the same visible arrays is unchanged. The full review artifact is ~/agent-share/axiom-online-precision/index.html.

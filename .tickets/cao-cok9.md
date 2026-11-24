@@ -54,3 +54,7 @@ Retained short-suite coverage for the complete scenarios now selected with slow:
 - The neural large-parameter memory/work scenario retains both source precisions of the network Jacobian oracle and the generic cost estimator. The complete neural hybrid gradient retains public float32 fixed-point gradient checks, sparse K32 forward/reverse gradient agreement, and the zero-predictive-row derivative regression.
 
 Verified both collections with `uv run --frozen --no-sync pytest --collect-only -q` and `uv run --frozen --no-sync pytest --collect-only -q -m slow`. Compared their disjoint union to the original full collection and checked the four failed IDs from /tmp/cffg-axiom-overnight-final-suite.log. The compiler-value import, core import, registration ownership and README export regressions all remain short. The coordinator owns the next short-suite run after fixing those regressions.
+
+**2026-11-24T07:18:58Z**
+
+Actual final run at f74543f: 2798 passed, 379 opt-in cases deselected, 4 warnings; pytest 1150.03 seconds, total dashboard wall time 1163.637 seconds. The final suite finished 36.36 seconds under the project ceiling.

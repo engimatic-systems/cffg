@@ -1,6 +1,6 @@
 ---
 id: car-ne0a
-status: in_progress
+status: closed
 deps: [cff-lquu]
 links: [cff-21vm, cff-pyy9]
 created: 2026-11-23T21:48:38Z
@@ -48,3 +48,7 @@ Release-budget planner probe completed with supplied two-object, three-interacti
 **2026-11-24T06:02:02Z**
 
 Planner qualification covers one compact live rMM/tMM snapshot, relative and absolute scores against a full-bank query, read-only updates, bitwise-matched keys, no-bonus and reversed discounted/undiscounted rankings. A 32-step ×512 strings ×3 draws synthetic two-slot/three-rule case ran once warm in 21.56 ms. A 5,000-slot bank with eight occupied rules and six tracked objects passed a separately qualified H8×16×3 development search; its 384 imagined transitions took 7.16–7.86 ms after setup. Neither measurement is a 10,000-step Gameworld score.
+
+**2026-11-24T07:18:58Z**
+
+The public sampler, search, learned snapshot bridge and acted development checks passed. Exact restart reproduced the plan and next random key before real action 12. All 24 Explode rewards were zero. The aggregate short suite passed 2798 tests at f74543f. Full-game performance and the supported whole-agent continuation stay with car-zieb and cao-lxmq.

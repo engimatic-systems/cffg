@@ -61,3 +61,7 @@ Implemented cffg.component_bank_device with from_host/to_host, reference, birth 
 Final validation: uv run --frozen --no-sync pytest -q -m 'slow or not slow' tests/test_component_bank_device.py passed all 17 tests in 34.01 s. Includes eager/JIT/vmap/scan, independent exact selected-row comparison, literal zero support via donor reset, invalid-covariance rollback, stale and full status, uint32 rollover and int64 exhaustion, exact replay, and all 32/500/5000 capacities x both float dtypes. A separate JAX_ENABLE_X64=0 probe produced next ID 4294967296 across a live merge and rebirth. All 24 ordinary seeded fractional-update proposals compared against the exact host accepted: max absolute effective mean error zero; max scale error 5.69e-14 f32 and 9.87e-32 f64. No device timing campaign.
 
 The device can decline very small products and cancellation at ordinary scales; cao-ar2d tracks the concrete two-thirds/five-thirds example. Its exact host retry passed in both precisions. Implementation and focused qualification are complete. Leave this ticket in progress until car-9ccf and the parent worktree's aggregate short suite are ready. The release-specific rMM reduction will use the exact host proposal directly.
+
+**2026-11-24T07:18:58Z**
+
+The aggregate short suite passed at f74543f, including the device lifecycle cases in its default selection. The separate 17 focused and scale cases cover 32, 500 and 5000 slots. The remaining prerequisite for this ticket is adoption of car-9ccf. cao-ar2d tracks device cancellation refusals and the qualified host retry.

@@ -1,6 +1,6 @@
 ---
 id: caci-0rj9
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-11-24T05:38:52Z
@@ -45,3 +45,7 @@ Implementation from a72cabc compiles the existing elementwise parameter and resi
 **2026-11-24T05:57:10Z**
 
 Combined b7f1fd8 real-file experiment finished (12 paired blocks per shape). Compact bytes are identical for the same visible arrays. Compact writes -16.1% to +1.0% versus fd8bfd1. At the largest 32×5000 cell compact restore took 4.374 versus 3.972 ms, +10.65% [5.68%,12.47%]; all other upper bounds below 10%. Optional exact archives grew 66.8–88.3% in actual compressed bytes. This remaining measured default cost is included in the pending performance decision. Raw evidence ~/agent-share/axiom-online-precision/checkpoint-io/combined-confirmation-2.
+
+**2026-11-24T07:18:57Z**
+
+Integrated validation passed at f74543f. The final short suite passed 2798 tests in 1163.637 seconds wall time. Compact members and byte counts matched for equal visible data at all six shapes. Compared with the previous corrected writer, the optimized compact reader was 27.2–50.1% faster. Compared with the older rounded release, the largest 32-record read took 4.374 versus 3.972 ms (+10.65%, paired 95% interval +5.68% to +12.47%). This remaining endpoint cost is part of the caoc-0dvd decision. The paired records are in the linked HTML report and checkpoint-io/combined-confirmation-2.
