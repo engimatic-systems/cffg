@@ -127,9 +127,14 @@ def interaction_batch(scene, identities, tracked, action, absent_distance, *, co
         if (switches.shape != tracked.shape or reward.shape
                 or not jnp.issubdtype(switches.dtype, jnp.integer)):
             raise ValueError("expected an integer switch per slot and a scalar reward")
+        if not (jnp.issubdtype(reward.dtype, jnp.integer) or jnp.issubdtype(reward.dtype, jnp.floating)):
+            raise TypeError("expected a real reward")
         valid &= ((switches >= 0) & (switches < config.motions)).all()
-        valid &= (reward == -1) | (reward == 0) | (reward == 1)
-        reward_class = (reward + 1).astype(jnp.int32)
+        valid &= jnp.isfinite(reward) & (reward == jnp.floor(reward))
+        # Release one_hot(reward + 1, 3) is all zeros for multi-point Hunt rewards.
+        # Check the range before narrowing so a large integer cannot wrap into a bin.
+        in_bins = (reward >= -1.) & (reward <= 1.)
+        reward_class = jnp.where(in_bins, reward + 1., -1.).astype(jnp.int32)
         if config.fixed_radius:
             neighbor = jnp.where(switches == 0, -1, neighbor)
     else:
@@ -173,4 +178,7 @@ def learn_interactions(bank, evidence, tracked, *, threshold=-10.):
     """Apply observed scene records to a DeviceBank in tracked-slot order."""
     from cffg.experiments.axiom_mixture import learn_frame
 
-    return learn_frame(bank, evidence.records, tracked, threshold=threshold, valid_input=evidence.valid)
+    fields = evidence.records.categories
+    observed = evidence.valid & (fields[-1] >= 0).all()
+    return learn_frame(bank, evidence.records, tracked, threshold=threshold,
+                       valid_input=observed, zero_count_head=len(fields) - 2)

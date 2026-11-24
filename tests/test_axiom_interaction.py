@@ -69,3 +69,20 @@ def test_recorded_absent_distance_and_invalid_categories():
     assert not interaction_batch(*args, config=cfg, reward=.5, switches=jnp.array([1])).valid
     with pytest.raises(ValueError, match="both"):
         interaction_batch(*args, config=cfg, reward=1)
+
+
+@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+def test_reward_bins_and_large_native_integers(dtype):
+    cfg = InteractionConfig(actions=2)
+    x = scene(dtype)[1:2]
+    def encode(reward):
+        evidence = interaction_batch(x, jnp.array([1]), jnp.array([True]), 0, jnp.ones(2, dtype),
+                                     config=cfg, reward=reward, switches=jnp.array([1]))
+        return evidence.records.categories[-2][0], evidence.valid
+
+    bins, valid = jax.jit(jax.vmap(encode))(jnp.array([-512, -2, -1, 0, 1, 2, 512], dtype))
+    assert valid.all()
+    np.testing.assert_array_equal(bins, [-1, -1, 0, 1, 2, -1, -1])
+    # Narrowing this observed reward to int32 first would turn it into zero.
+    label, ok = encode(jnp.int64(2**32))
+    assert ok and label == -1

@@ -9,6 +9,7 @@ calculation. It accepts the ordinary CFFG mixed learner's bank and batch types.
 """
 
 from enum import IntEnum
+from functools import partial
 from typing import NamedTuple
 
 import jax
@@ -118,7 +119,7 @@ def _conditional_write(prior, old, point, weights):
     return posterior, jnp.zeros_like(old.active).at[rows].set(write), valid
 
 
-def _assimilate(bank, point, threshold):
+def _assimilate(bank, point, threshold, zero_count_head):
     old = bank.posterior
     active = old.active
     # The scoring primitive requires nonempty support; bootstrap only validates
@@ -140,10 +141,12 @@ def _assimilate(bank, point, threshold):
     keep_birth = need_birth & written[target]
     owner = jax.tree.map(lambda new, prev: jnp.where(keep_birth, new, prev), staged, bank)
     owner = owner._replace(posterior=posterior._replace(active=owner.posterior.active))
-    # Training consumes observed point records. Context-only queries use score().
+    # A designated all-zero categorical observation adds zero ELL and counts.
+    # Its previous counts still receive the same discount as other heads.
     complete = point.gaussian_observed[0] & jnp.all(point.covariance == 0)
-    for field in point.categories:
-        complete &= field[0] >= 0
+    for i, field in enumerate(point.categories):
+        if i != zero_count_head:
+            complete &= field[0] >= 0
     valid &= allocated & proper & complete & jnp.isfinite(threshold)
     kind = jnp.where(match, AssignmentStatus.MATCHED,
                      jnp.where(full, AssignmentStatus.FULL_TO_ZERO, AssignmentStatus.NOVEL))
@@ -151,17 +154,21 @@ def _assimilate(bank, point, threshold):
                    jnp.where(valid, kind, AssignmentStatus.INVALID).astype(jnp.int32))
 
 
-@jax.jit
-def learn_frame(bank, records, eligibility, *, threshold, valid_input=True):
+@partial(jax.jit, static_argnames=("zero_count_head",))
+def learn_frame(bank, records, eligibility, *, threshold, valid_input=True, zero_count_head=None):
     """Apply complete observations in slot order and atomically publish the frame.
 
     bank is a DeviceBank from component_bank_device.from_host. eligibility is
-    boolean [N]. Empty categories select iMM learning. On failure the previous
+    boolean [N]. Empty categories select iMM learning. A zero-based
+    zero_count_head permits label -1 to encode an observed all-zero vector
+    only in that field. On failure the previous
     bank is returned and every write/birth receipt is cleared.
     """
     eligibility = jnp.asarray(eligibility)
     if eligibility.shape != (records.mean.shape[0],) or eligibility.dtype != jnp.bool_:
         raise ValueError("eligibility must be a boolean per observation")
+    if zero_count_head is not None and not 0 <= zero_count_head < len(records.categories):
+        raise ValueError("zero_count_head must index a categorical field")
     k = bank.posterior.active.size
 
     def visit(current, item):
@@ -170,7 +177,7 @@ def learn_frame(bank, records, eligibility, *, threshold, valid_input=True):
         def skip(_):
             return current, (jnp.zeros(k, bank.posterior.mu.dtype), jnp.zeros(k, bool),
                              jnp.int32(-1), jnp.int32(AssignmentStatus.SKIPPED))
-        return jax.lax.cond(enabled, lambda _: _assimilate(current, point, threshold), skip, None)
+        return jax.lax.cond(enabled, lambda _: _assimilate(current, point, threshold, zero_count_head), skip, None)
 
     candidate, (weights, written, born, status) = jax.lax.scan(
         visit, bank, (records, eligibility & valid_input))
@@ -182,7 +189,7 @@ def learn_frame(bank, records, eligibility, *, threshold, valid_input=True):
     return LearningResult(final, weights, written & valid, jnp.where(valid, born, -1), status, valid)
 
 
-def learn_observation(bank, batch, *, threshold):
+def learn_observation(bank, batch, *, threshold, zero_count_head=None):
     """Host transaction for a single observed point from either learned mixture.
 
     Return scalar status/born and one vector each for assignment/write mask.
@@ -190,7 +197,8 @@ def learn_observation(bank, batch, *, threshold):
     """
     if batch.mean.shape[0] != 1:
         raise ValueError("learn_observation takes one point")
-    device = learn_frame(lifecycle.from_host(bank), batch, jnp.ones(1, bool), threshold=threshold)
+    device = learn_frame(lifecycle.from_host(bank), batch, jnp.ones(1, bool), threshold=threshold,
+                         zero_count_head=zero_count_head)
     valid = bool(device.valid)
     target = bank
     if valid and int(device.born[0]) >= 0:
