@@ -1,6 +1,6 @@
 ---
 id: car-9ccf
-status: in_progress
+status: closed
 deps: [cff-lquu, cff-6tek, cff-qg1d, cff-7t4j, cff-xfnx, caoc-0dvd]
 links: []
 created: 2026-11-23T21:48:38Z
@@ -60,3 +60,7 @@ The mixed Gaussian/categorical candidate and the declared component NIW family a
 **2026-11-24T04:26:30Z**
 
 Final numerical source 454c7cb. After reproducing a narrow mask error and truncated snapshot restore, both affected test files passed (23 cases). After a Dirichlet precision discrepancy, the original six scale checks passed unchanged at both precisions; the independent streaming and count probes still reproduce cff-xfnx. The short dashboard suite passed 2,782 tests with 237 opt-in deselected and 4 warnings. Measured wall time 1,222.55 s. Moved only the recurrence-report generation (8.56 s including tiny input guard), reactor comparison report (3.70 s), and extra x64 variants of component-NIW writes (3.98 s), small hybrid reverse derivative (5.67 s) and discrete storage batching (3.49 s) to the opt-in suite. The nonfinite guard remains short and passed separately. Estimated short wall time ~1,197.3 s after selection, actual new time unmeasured. Full result reused under project policy; both precision stress records remain in the experiment archive. Remains in progress behind cff-xfnx.
+
+**2026-11-24T14:57:37Z**
+
+Cooper accepted the remaining precision/speed decision. The default passes both precision suites, the large-count, translated-stream, and 480-step checks; optional RoundedBank now reproduces the old score/update stream byte for byte. Declared component-NIW learning, masked categorical evidence and exact/compact restart are in PRs #202 and #203. The AXIOM evaluation uses the corrected default.
