@@ -289,6 +289,13 @@ Readouts are family-specific on purpose:
 | Registered extension | `kernel_readouts` when the binding declares one |
 | Discrete max-product | `decode` plus `objective`; BFE is deliberately undefined |
 
+For a `gaussian_mixture` learner, call
+`engine.gaussian_node_stats(state, centered_mixtures=True)`. Each component
+has a `responsibility`, `component_mean` and `component_covariance`. The mean
+and covariance are conditional on that component. Apply its responsibility
+once when updating the learner. This preserves small variances even when the
+feature coordinates have a large offset.
+
 The common `engine.bfe(state)` accessor reports the graph's declared variational
 ledger; the name does not make every value an exact Bethe evidence identity.
 Interpret it with `engine.objective_contract` and per-factor

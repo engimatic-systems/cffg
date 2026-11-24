@@ -639,7 +639,9 @@ class Engine:
             self.arena, state,
         )
 
-    def gaussian_node_stats(self, state: State) -> dict[str, dict[str, np.ndarray]]:
+    def gaussian_node_stats(
+        self, state: State, *, centered_mixtures: bool = False
+    ) -> dict[str, dict[str, np.ndarray]]:
         """Factor name -> expected sufficient statistics of the node belief
         (cff-7c5o, D4): the continuous analog of node_beliefs, feeding the
         NIW/MNIW conjugate updates in cffg.conj.
@@ -652,7 +654,9 @@ class Engine:
         gaussian_mixture_linear: soft ``responsibility`` plus responsibility-
                              weighted ``Syy``, ``Syx``, and ``Sxx``.
         gaussian_mixture: soft ``responsibility``, ``weighted_mean``, and
-                             ``weighted_second``.
+                             ``weighted_second``. With ``centered_mixtures=True``
+                             return unweighted ``component_mean`` and
+                             ``component_covariance`` alongside responsibility.
         recurrence_link: normalized source/destination pair, its marginals and
                              literal support, plus shared D9 masses and direct
                              continuous drive moments.
@@ -661,6 +665,7 @@ class Engine:
         equality nodes are skipped."""
         return _gaussian_readouts.gaussian_node_stats(
             self.arena, state, pair_beliefs=self.recurrence_pair_beliefs,
+            centered_mixtures=centered_mixtures,
         )
 
     def recurrence_weight_stats(

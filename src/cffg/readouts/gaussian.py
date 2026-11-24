@@ -83,7 +83,8 @@ def gaussian_marginals(
 
 
 def gaussian_node_stats(
-    view: GaussianStatisticsView, state: State, *, pair_beliefs: PairBeliefs
+    view: GaussianStatisticsView, state: State, *, pair_beliefs: PairBeliefs,
+    centered_mixtures: bool = False,
 ) -> dict[str, dict[str, np.ndarray]]:
     """Factor name -> expected sufficient statistics of the node belief
     (cff-7c5o, D4): the continuous analog of node_beliefs, feeding the
@@ -97,7 +98,8 @@ def gaussian_node_stats(
     gaussian_mixture_linear: soft ``responsibility`` plus responsibility-
                          weighted ``Syy``, ``Syx``, and ``Sxx``.
     gaussian_mixture: soft ``responsibility``, ``weighted_mean``, and
-                         ``weighted_second``.
+                         ``weighted_second``, or the conditional mean and
+                         covariance with ``centered_mixtures=True``.
     recurrence_link: normalized source/destination pair, its marginals and
                          literal support, plus shared D9 masses and direct
                          continuous drive moments.
@@ -157,7 +159,8 @@ def gaussian_node_stats(
                 }
         else:
             (do,) = g.dims
-            stats = mixg.mix_stats(
+            read_stats = mixg.mix_centered_stats if centered_mixtures else mixg.mix_stats
+            stats = read_stats(
                 inc_e[:, 0, :do],
                 inc_l[:, 0, :do, :do],
                 mu_e,
@@ -165,12 +168,7 @@ def gaussian_node_stats(
                 w,
             )
             for i, name in enumerate(g.members):
-                out[name] = {
-                    "responsibility": np.asarray(stats.responsibility[i]),
-                    "weighted_mean": np.asarray(stats.weighted_mean[i]),
-                    "weighted_second": np.asarray(stats.weighted_second[i]),
-                    "proper": np.asarray(stats.proper[i]),
-                }
+                out[name] = {key: np.asarray(value[i]) for key, value in stats._asdict().items()}
 
     for name, pair in pair_beliefs(state).items():
         out[name] = {

@@ -744,7 +744,13 @@ reported endpoint marginals. `Engine.gaussian_node_stats` exposes each soft
 selector responsibility and responsibility-weighted component moments; for a
 linear mixture these are augmented `(Syy, Syx, Sxx)` statistics ready for one
 MNIW update. Exact selector zeros therefore produce exact zero weighted
-statistics. The separate `Engine.gaussian_mixture_predictives` boundary reads
+statistics. For a prior mixture, `centered_mixtures=True` selects the
+responsibility, unweighted posterior mean and within-component covariance.
+It has the same output shapes and byte count as the raw representation.
+This choice is local to the readout. Both use the same cavities and selector
+evidence. A zero-weight component with valid Gaussian parameters retains its
+conditional moments and contributes zero evidence to learning.
+The separate `Engine.gaussian_mixture_predictives` boundary reads
 the factor-to-`out` cavity: selector plus Gaussian input for a linear mixture,
 but never the message facing `out`. It reports component moments and their
 moment-matched collapse. Both boundaries are derived reads of `State`, store
