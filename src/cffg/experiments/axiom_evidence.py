@@ -3,24 +3,19 @@
 import jax
 import jax.numpy as jnp
 
+from cffg import _compensated
 from cffg.mixed_state import MixedBank
 
 
-def release_view(bank: MixedBank) -> MixedBank:
-    """Compute the released model's scoring scale from the unmodified posterior.
-
-    In normalized natural-parameter coordinates the model sets diagonal
-    entries below 0.001 to 0.001 and removes smaller off-diagonals. This
-    threshold belongs to the model, including on float64. The original
-    posterior carries the sufficient statistics for the next observation.
-    """
+def _project_scale(bank):
     psi = bank.psi
     mean = bank.mu + bank.carry.mu
     kappa = bank.kappa + bank.carry.kappa
     diag = jnp.diagonal(psi + bank.carry.psi, axis1=-2, axis2=-1)
     magnitude = jnp.maximum(1, 0.5 * (diag + kappa[:, None] * mean**2))
     scale = jnp.sqrt(magnitude)
-    cutoff = (scale[:, :, None] * scale[:, None, :]) * jnp.asarray(1e-3, psi.dtype)
+    norm = scale[:, :, None] * scale[:, None, :]
+    cutoff = norm * jnp.asarray(1e-3, psi.dtype)
     eye = jnp.eye(psi.shape[-1], dtype=bool)[None]
     # Compare while keeping the low word at the boundary. If a field survives
     # the projection its exact outgoing high/low pair remains available.
@@ -32,7 +27,73 @@ def release_view(bank: MixedBank) -> MixedBank:
     low = jnp.where(replace_diag | drop_cross, 0, low)
     # Propagate range failure from the normalization to the public score check.
     high = jnp.where(jnp.isfinite(cutoff), high, jnp.nan)
-    return bank._replace(psi=high, carry=bank.carry._replace(psi=low))
+    return bank._replace(psi=high, carry=bank.carry._replace(psi=low)), norm
+
+
+def sampling_view(bank: MixedBank) -> MixedBank:
+    """Return the projected scale used in the release's expected covariance.
+
+    The released sampler divides this scale by nu-d-1 before applying
+    a separate definiteness repair to each component's covariance matrix.
+    """
+    projected, _ = _project_scale(bank)
+    return projected
+
+
+def _minima(projected, norm):
+    normalized = (projected.psi + projected.carry.psi) / norm
+    d = normalized.shape[-1]
+    diag = jnp.diagonal(normalized, axis1=-2, axis2=-1)
+    off_sum = jnp.sum(jnp.where(jnp.eye(d, dtype=bool), 0, jnp.abs(normalized)), axis=-1)
+    eps = jnp.finfo(normalized.dtype).eps
+    # Strict diagonal dominance certifies positivity cheaply for initial
+    # banks. Allow for roundoff in the row sums and in the eigensolver.
+    margin = 8 * d * eps * jnp.max(jnp.abs(diag) + off_sum, axis=-1, keepdims=True)
+    positive = jnp.all(diag - off_sum > margin)
+
+    def eigenvalues():
+        return jnp.minimum(jnp.linalg.eigvalsh(normalized)[:, 0], 0)
+
+    return jax.lax.cond(positive, lambda: jnp.zeros_like(diag[:, 0]), eigenvalues)
+
+
+def release_minima(bank: MixedBank) -> jax.Array:
+    """Return each row's smallest normalized projected eigenvalue, capped at zero."""
+    return _minima(*_project_scale(bank))
+
+
+def release_view(bank: MixedBank, *, minimum=None) -> MixedBank:
+    """Return the likelihood scale using the full bank's normalized eigenvalue repair.
+
+    AXIOM thresholds the normalized scale at 0.001 and repairs the precision
+    and log determinant using one minimum across all rows, including dormant
+    ones. When scoring selected rows, supply min(release_minima(full_bank))
+    from the same model revision. Keep the raw posterior for learning.
+    """
+    projected, norm = _project_scale(bank)
+    d = bank.mu.shape[-1]
+    if minimum is None:
+        minimum = jnp.min(_minima(projected, norm))
+    else:
+        minimum = jnp.asarray(minimum)
+        if minimum.shape != () or minimum.dtype != bank.mu.dtype:
+            raise ValueError("minimum must be a scalar of the bank's floating dtype")
+
+    def repair():
+        # The shared shift is in normalized coordinates. Convert it back to
+        # each component's physical units, preserving stored off-diagonal lows.
+        shift = 2 * (jnp.finfo(bank.psi.dtype).eps - minimum)
+        delta = shift * jnp.diagonal(norm, axis1=-2, axis2=-1)
+        idx = jnp.arange(d)
+        high, low, _ = _compensated.add(
+            projected.psi[:, idx, idx], projected.carry.psi[:, idx, idx], delta
+        )
+        return projected._replace(
+            psi=projected.psi.at[:, idx, idx].set(high),
+            carry=projected.carry._replace(psi=projected.carry.psi.at[:, idx, idx].set(low)),
+        )
+
+    return jax.lax.cond(jnp.isfinite(minimum) & (minimum >= 0), lambda: projected, repair)
 
 
 def initialized_view(posterior, generations, dormant_initial):

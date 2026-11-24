@@ -24,3 +24,11 @@ The released agent changes its Gaussian scale before computing a score. With sev
 ## Method and scope
 
 The architecture path is a runtime numerical invariant. Check eager/compiled, both dtypes and batched components. Message schedules and Bethe ledgers are inapplicable to this experiment-specific readout. The public release b99f625, axiom/vi/conjugate/mvn.py lines 184–194, 247–264 and 588–618, rescales the Gaussian scale by the magnitude of its second natural parameter, bounds its normalized diagonal from below and zeros sufficiently small normalized off-diagonal entries. A view is a derived set of arrays used to evaluate scores, separate from the bank saved for the next update.
+
+## Notes
+
+**2026-11-24T05:57:28Z**
+
+Release b99f625 inverts and scores the normalized clipped scale after a single bank-wide eigenvalue repair, including dormant components (axiom/vi/utils/math.py, inv_and_logdet). If the minimum eigenvalue is negative, it adds twice the difference between dtype epsilon and that minimum to every normalized diagonal. Sampling reads the unshifted inv_u to form expected_sigma first, then applies make_pd separately to each covariance (hybrid_mixture_model.py, sample). Both views retain the raw learning posterior.
+
+release_view(full_bank) now implements scoring repair. release_minima(full_bank) returns the per-row nonpositive minima; a consumer can pass their global minimum to release_view(subset, minimum=minimum) for the same model revision. sampling_view(raw_bank) exposes the projection before the repair. An inactive component changed the score of a second active component on the regression. Before the fix, raw minimum eigenvalue +0.00025772 became -0.00018234 on projection, and the score failed. The release returned finite scores after adding 0.00036468 to both normalized diagonals in float64. Checked eager/JIT float32 and float64, physical unit scaling, unchanged raw state, independent absolute scores and cached subset equivalence. Command uv run --frozen --no-sync python -m pytest -q tests/test_axiom_evidence.py passed 6 tests in 12.80 s. Rollout and reduction owners have the integration contracts; their consumer replays are tracked in their tickets.
