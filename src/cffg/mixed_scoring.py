@@ -112,8 +112,8 @@ def validate_inputs(bank, batch):
 def _dirichlet_log(alpha, active):
     """Compute psi(a) - psi(S), retaining a small complement S-a.
 
-    Shift both arguments by eight using the digamma recurrence. Thereafter
-    the asymptotic series is accurate to about 3e-13 in absolute log score.
+    Shift both arguments by eight using the digamma recurrence. The first
+    omitted asymptotic term is then below machine epsilon in each dtype.
     Factoring each difference by the complement preserves near-unit events.
     """
     if alpha.shape[-1] == 1:
@@ -140,8 +140,10 @@ def _dirichlet_log(alpha, active):
                           jnp.log(shifted / scale) - jnp.log(denominator))
     inverse = 1 / shifted
     result = log_ratio - 0.5 * inverse * share
-    for power, coefficient in ((2, -1/12), (4, 1/120), (6, -1/252),
-                               (8, 1/240), (10, -1/132)):
+    terms = ((2, -1/12), (4, 1/120), (6, -1/252), (8, 1/240), (10, -1/132))
+    if alpha.dtype == jnp.float64:
+        terms += ((12, 691/32760), (14, -1/12), (16, 3617/8160))
+    for power, coefficient in terms:
         result -= coefficient * inverse**power * jnp.expm1(power * log_ratio)
 
     def subtract_term(i, value):

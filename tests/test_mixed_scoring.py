@@ -89,6 +89,28 @@ def test_large_counts_keep_small_absolute_expected_log(dtype):
     assert values[2, 0] == 0
 
 
+def test_two_categorical_heads_match_harmonic_score_and_small_weights_float64():
+    # Record 4 of the stress fixture has missing Gaussian evidence. Integer
+    # counts give exact digamma differences via the harmonic recurrence.
+    group = np.arange(32) % 8
+    heads = tuple((1 + (group[:, None] + np.arange(c)) % 5).astype(np.float64) for c in (3, 5))
+    bank = Bank(np.zeros((32, 1)), np.ones(32), np.ones((32, 1, 1)), np.ones(32),
+                np.ones(32), heads, group != 7)
+    batch = Batch(np.array([[np.nan]]), np.array([[[np.nan]]]), np.array([False]),
+                  (np.array([1]), np.array([4])))
+    scores, weights, valid = jax.jit(score)(bank, batch)
+    assert valid
+    expected = np.zeros(32)
+    for counts, label in zip(heads, (1, 4), strict=True):
+        for k, row in enumerate(counts.astype(int)):
+            expected[k] -= sum(1 / i for i in range(row[label], row.sum()))
+    expected[~bank.active] = -np.inf
+    tolerance = 64 * np.finfo(np.float64).eps
+    np.testing.assert_allclose(scores[0, 1], -40265/9009, atol=tolerance, rtol=tolerance)
+    np.testing.assert_allclose(scores[0], expected, atol=tolerance, rtol=tolerance)
+    np.testing.assert_allclose(weights[0], softmax(expected), atol=0, rtol=tolerance)
+
+
 def test_categorical_odds_survive_identical_distant_gaussians_float32():
     bank, batch = fixture(jnp.float32)
     head = jnp.array([[20, 1], [10, 1], [1, 1]], dtype=jnp.float32)
