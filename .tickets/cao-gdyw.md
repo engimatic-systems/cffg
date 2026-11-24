@@ -1,6 +1,6 @@
 ---
 id: cao-gdyw
-status: in_progress
+status: closed
 deps: [cao-urtu, cao-fs5s]
 links: []
 created: 2026-11-24T14:51:38Z
@@ -40,3 +40,11 @@ A pending action is one chosen by the actor whose observed transition has not ye
 **2026-11-24T14:51:44Z**
 
 The campaign actor uses the seed-key scheme already qualified by the acted smoke. Gauss owns the reduction scheduler and archive; the actor will call those hooks. The parent owns remote or long measured runs.
+
+**2026-11-24T15:10:06Z**
+
+Actor and checkpoint contract landed in 27be7fb, followed by the populated full-budget search in e741943. The actor owns one explicit plan key, next proposal, pending command and full model/learner/reducer checkpoint. A real applied action advances the clock once; a reset preserves it. Optional audit_plan hashes the deterministic search result and next key. Empty tracking uses the unchanged zero-score proposal/refit. The untuned populated model shares likelihoods only for byte-identical features and categorical fields within one decision. The 64 MiB cap covers numeric lookup storage; distinct per-policy draws, all 32 steps and all 512×3 trajectories remain. Other temporary arrays, executable memory and Python keys consume additional memory.
+
+From this worktree run JAX_PLATFORMS=cpu JAX_ENABLE_X64=0 uv run --frozen --no-sync python tools/axiom/evaluation_planning_check.py --output /tmp/trace-qualification.json and repeat with --acted --output /tmp/live-qualification.json. Both passed on the integrated production sources. Two to 28 live real rows and a 128-live repeated-prototype stress case gave zero differences in 540672 selected components and motion classes, identical candidates, winner, action and proposal support, and zero max absolute score or proposal drift. Warm 2/12/28/128-row canonical to cached seconds were .431/.039, .615/.138, .743/.146 and 1.469/.219. A separate 12-action development run gave one 3.73e-9 mean novelty difference without a change in ranking. These checks cover sparse, untuned models on CPU. All-live costs and campaign throughput are unmeasured.
+
+Eight real Explode actions (game seed 270037, model seed 87037) succeeded at full budget. Tick-five real disk restart reproduced the full plan SHA b78b9019b48d9a76aad51dcc08d52f8061ab7074a2d85f54251de61f24bfb48f. Empty cold .312s, empty warm about .001s, first populated 2.155s, 13-row warm .122s. First observation 3.52s, later populated updates about .10s. Source hashes and raw traces in ~/agent-share/axiom-online-precision/full-budget-planner-qualification.json (SHA-256 6a1b22dc27484473786300af120c6fa8127df6e623c20f97be2c69c5332cb332). Parent owns the cumulative short suite and sealed campaign; no evaluation seeds used here.
