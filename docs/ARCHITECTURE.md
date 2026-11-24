@@ -1769,7 +1769,19 @@ them. Four rules define the contract:
    scale used by the release to score Gaussian evidence. Its explicit
    normalized diagonal and off-diagonal cutoffs can change a birth decision.
    Updates and resets use the original sufficient statistics. Unmasked
-   reduction queries may separately expose seeded virgin components.
+   reduction queries may separately expose seeded virgin components. Scoring
+   uses a shared covariance repair across the full bank. Synthetic observation
+   draws use the unshifted projection and repair their sampled covariance.
+
+   Every 500 real actions, the experiment can call
+   `experiments.axiom_reduction.reduce_interactions` to draw synthetic
+   records and append them to its retained sample. It evaluates proposed
+   merges sequentially on that same sample. Context selects a component
+   across the whole bank. Exposure determines whether its predicted reward
+   and motion switch contribute to the score. A change in the shared
+   covariance repair triggers rescoring of the untouched components too.
+   Restarting reduction requires its retained sample, random key and action
+   count alongside the learned bank.
 
    `experiments/axiom_observation.py` consumes an RGB frame, the action
    actually applied and its reward. Identity updates receive previous

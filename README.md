@@ -363,8 +363,17 @@ action sequences with `cffg.experiments.axiom_planning.plan`. Its refit ranks
 sequences by discounted reward and novelty; execution uses the first action
 of the best undiscounted sequence. `SearchSettings(novelty_weight=0.)` runs
 the same search without the count bonus. The reference-budget test uses a
-supplied two-object world model. End-to-end game control requires learned
-perception, motion and interaction models.
+supplied two-object world model.
+
+The experimental Gameworld loop starts with `initialize_scene` and feeds
+`observe_scene` each new RGB frame, the action actually applied and its
+reward. The agent tracks objects and learns their identities, motions and
+interactions. Its planner queries a read-only snapshot of those learned
+rules. The [fixed-action replay](tools/axiom/scene_replay.py) checks learning
+and restart on shared pixels. The [closed-loop smoke test](tools/axiom/acted_smoke.py)
+lets the model select the actions. Its 24-step Explode run used a reduced
+search budget and received zero reward. Full-game learning curves remain
+open.
 
 ## Continuous, exponential-family, and hybrid models
 

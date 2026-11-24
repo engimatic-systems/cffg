@@ -64,6 +64,7 @@ EPIC_FILES = {
         "test_axiom_motion.py",
         "test_axiom_interaction.py",
         "test_axiom_mixture.py",
+        "test_axiom_reduction.py",
         "test_axiom_observation.py",
         "test_outer_gfe_formalism.py",
     ],
