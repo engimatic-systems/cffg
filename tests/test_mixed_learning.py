@@ -50,7 +50,7 @@ def test_independent_fractional_posterior_and_resume(tmp_path, dtype):
     first, valid = update(bank, jax.tree.map(lambda x: x[:1], batch), weights[:1])
     assert valid
     path = tmp_path / "posterior.npz"
-    np.savez(path, **first.state_dict())
+    np.savez(path, **first.state_dict(exact=True))
     with np.load(path, allow_pickle=False) as state:
         resumed = mixed.MixedBank.from_state_dict(state)
     same_bank(resumed, first)
@@ -152,3 +152,29 @@ def test_snapshot_checks_ordered_head_inventory_and_reads_legacy():
         mixed.MixedBank.from_state_dict({**state, "category_1": state["category_1"][:, :-1]})
     empty = bank._replace(categories=())
     same_bank(mixed.MixedBank.from_state_dict(empty.state_dict()), empty)
+
+
+def test_compact_and_exact_snapshots_have_distinct_continuation_contracts(tmp_path):
+    bank, _, _ = fixture(jnp.float32)
+    # Represent a quarter vote on a large count. The visible high word is unchanged.
+    bank = bank._replace(alpha=bank.alpha.at[0].set(2**22))
+    live = bank._replace(carry=bank.carry._replace(alpha=bank.carry.alpha.at[0].set(.25)))
+    plain = live.state_dict()
+    exact = live.state_dict(exact=True)
+    assert plain["version"] == 2 and exact["version"] == 3
+    assert set(plain) == set(bank.state_dict())
+    assert sum(v.nbytes for v in plain.values()) == sum(v.nbytes for v in bank.state_dict().values())
+    assert not any(key.startswith("carry_") for key in plain)
+    np.testing.assert_array_equal(plain["alpha"], bank.alpha)
+    same_bank(mixed.MixedBank.from_state_dict(plain), bank)
+    path = tmp_path / "exact.npz"
+    np.savez(path, **exact)
+    with np.load(path, allow_pickle=False) as values:
+        same_bank(mixed.MixedBank.from_state_dict(values), live)
+    # A compact save must leave the data that will drive the next update intact.
+    assert float(live.carry.alpha[0]) == .25
+    exact["carry_alpha"][0] = 0
+    assert float(live.carry.alpha[0]) == .25
+    for key in ["carry_mu", "carry_psi", "carry_category_1"]:
+        with pytest.raises(ValueError, match="missing"):
+            mixed.MixedBank.from_state_dict({k: v for k, v in exact.items() if k != key})

@@ -572,12 +572,15 @@ mask and one integer array per categorical field. Use zero covariance for a
 known point and category index `-1` for a missing field. Scores are absolute
 expected log likelihoods in nats. Set `include_mixing=False` to assign
 components by observed features alone. Inspect the returned validity flag
-before using the result. `MixedBank.state_dict()` and
-`MixedBank.from_state_dict()` round-trip the full posterior at its saved
-precision. For long streams with large coordinate offsets, use float64 for the
-persistent bank or work in local feature coordinates. The float32 update can
-round away each small change to an absolute mean while still returning valid.
-See the streaming checkpoint in `docs/LIMITATIONS.md`.
+before using the result. `bank.state_dict()` saves a compact snapshot of
+the rounded parameters using the existing v2 layout. Saving leaves the live
+learner intact. Reloading with `MixedBank.from_state_dict(snapshot)` starts
+from the saved values with zero rounding remainders. For experiments that
+need to continue exactly across a restart, use `bank.state_dict(exact=True)`.
+The v3 snapshot includes the corrections needed for subsequent updates.
+Resume on the same backend and numerical configuration for exact replay.
+Both snapshot modes occupy a fixed amount of uncompressed storage for a
+given bank shape and precision, regardless of episode count.
 
 For fixed-structure parameter sweeps that are not declared learning,
 `set_params` updates named runtime parameters without recompiling. Shapes,
