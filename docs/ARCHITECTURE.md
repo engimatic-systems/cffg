@@ -1721,6 +1721,15 @@ them. Four rules define the contract:
    The host solves for a coefficient increment relative to the stored prior
    using QR and accumulates squared residuals as derived in D4.2.
 
+   For component MNIW, a float32 coefficient, column-precision or noise-scale
+   array keeps its dtype when rounding changes each evidence increment by at
+   most √ε relative to that increment (ε is float32 machine epsilon).
+   Matrix increments must satisfy the bound in every direction, and the
+   stored matrix must remain resolvably positive definite. If the check
+   fails, the affected array keeps the float64 result. Counts stay in the
+   host update precision. Saving and loading preserve each stored dtype
+   and value exactly.
+
    The `component_niw` family reads centered per-component moments from
    `gaussian_mixture`. It shares the existing declared-learning transaction,
    rollover and bundle machinery. The batched mixed-data API in

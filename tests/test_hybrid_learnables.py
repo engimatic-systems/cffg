@@ -700,3 +700,32 @@ def test_component_mniw_retains_translated_conditional_spread(x64, schedule):
         np.testing.assert_allclose(learning.params["neutral_dynamics"]["psi"][:, 0, 0],
                                    scale, atol=1e-6, rtol=1e-6)
         assert learning.params["neutral_dynamics"]["nu"][-1] == prior.nu
+
+
+def test_component_mniw_compact_updates_preserve_resolved_directions_and_resume(tmp_path):
+    from cffg import load_bundle, save_bundle
+
+    t, arrays, _, engine, result = _run_mixture()
+    name = "neutral_dynamics"
+    priors = (conj.vague_mniw(2, 2),) * 3
+    params = Learnables(engine, {name: priors}).params[name]
+    compact = Learnables(engine, {name: {k: v.astype(np.float32) for k, v in params.items()}})
+    compact.accumulate(engine, result)
+    assert all(compact.params[name][k].dtype == np.float32 for k in ("m", "lam", "psi"))
+    assert compact.params[name]["nu"].dtype == np.float64
+    path = tmp_path / "compact.cffgz"
+    save_bundle(path, t, arrays, learnables=compact)
+    resumed = load_bundle(path).learnables
+    assert resumed.persistent_descriptors() == compact.persistent_descriptors()
+    for learner in (resumed, compact):
+        learner.accumulate(engine, result)
+    assert resumed.persistent_descriptors() == compact.persistent_descriptors()
+
+    from cffg.hybrid_learning import _retain_component_dtype
+    identity = np.eye(2, dtype=np.float32)[None]
+    # Rounding erases the tiny contrast in an otherwise positive, near-rank-one gain.
+    gain = np.array([[[1., 1.-1e-9], [1.-1e-9, 1.]]])
+    precise = identity + gain
+    assert _retain_component_dtype(identity, precise, matrix=True).dtype == np.float64
+    mean = np.array([[2.**18]], dtype=np.float32)
+    assert _retain_component_dtype(mean, mean.astype(float) + .001, matrix=False).dtype == np.float64
