@@ -417,6 +417,14 @@ the whitened evidence system; this is reported as invalid evidence, not repaired
 by a floor or accepted as a finite posterior. These numerical changes do not
 repair the partial-goal planning limitation above.
 
+Ordinary `gaussian` and `gaussian_linear` declared learners still consume
+raw second moments. In float32, a component centered at 4096 can have a
+variance of 0.25 or 1 and return the same raw second moment in both cases.
+The inferred marginal can retain the variance while the resulting learned
+noise scale loses it. The component-MNIW readout uses raw moments as well.
+The centered readout for `gaussian_mixture` preserves each conditional
+covariance. See the Gaussian learning follow-up `cff-6wpk`.
+
 **S1e. Gaussian parameter learning is EM-rollover; flooding VMP is not
 strictly monotone.** Continuous conjugate learning (cff-7c5o, DERIVATIONS.md
 D4) has two honest edges. (1) NIW/MNIW updates run *between* trials from
