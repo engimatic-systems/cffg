@@ -1,6 +1,6 @@
 ---
 id: ccrp-fuob
-status: in_progress
+status: closed
 deps: []
 links: [cns-t0b9]
 created: 2026-11-25T19:36:00Z
@@ -38,3 +38,7 @@ A junction is a tile where paths meet. A route is the series of moves from a nam
 **2026-11-25T19:36:07Z**
 
 Use the completed study for the actual junctions, moves and goals. Update the HTML template and served guide and refresh its archive verification.
+
+**2026-11-25T19:38:20Z**
+
+Published the walk-through at the existing pilot URL using the archived study data. The shared junction page recorded four north moves to Brass and four to Slate. At move two of Amber-to-Blue that map chooses north, the two-junction map chooses east, and the latter reaches Blue in ten moves. Desktop and mobile offline Chromium checks passed. Independent archive replay passed, and served guide, study and refreshed audit bytes were checked. Validation used the isolated report path because this changes explanatory copy and its display checks. The experiment and its measurements use the original study.json.
