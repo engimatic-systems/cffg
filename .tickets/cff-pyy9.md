@@ -1,6 +1,6 @@
 ---
 id: cff-pyy9
-status: open
+status: closed
 deps: [cff-1d6t, cff-gjjk, cff-d56d, cff-mjku]
 links: [cff-cz6v]
 created: 2026-07-05T22:12:32Z
@@ -583,3 +583,11 @@ The registered 16-seed study at 73e6d0c contains 6,144 completed cue-and-commit 
 **2026-11-25T06:31:43Z**
 
 The two-clock filter and depth-two contingent planner have separate implementation children chr-kzwu and chr-d760. The registered 16-seed cue study at 73e6d0c reached 6,144/6,144 converged ticks. Mean posterior mass on the true regime at the period boundary was 0.88554 (criterion 0.75). Recorded native actions scored 5,311/6,144, versus 4,423/6,144 for the independent-trial control and 5,207/6,144 for the flat filter that retained history. An independent exact-odds audit found 10 mathematical ties. Seven native choices differed from the ideal lowest-index rule only because of floating-point rounding. Using that ideal tie rule gives 5,308/6,144 and still passes the frozen 0.06 improvement threshold. See ~/agent-share/cffg-hierarchy-validation/drift.json and drift-ties.json and the replay commands under tools/hierarchy. No Craftax training or episodes were used. Parent closure also requires the prerequisite tickets and the integrated short suite.
+
+**2026-11-25T07:58:58Z**
+
+M7 delivered the two-level categorical joint filter, exact period energy, separate real clocks, posterior carry, and runtime checkpointing at 4d0dbd9/6b61cec. The optional child planner has a separate goal ledger and episode clock. A stochastic stream is inapplicable to this deterministic filter. The dedicated tests/test_hierarchy.py and tests/test_hierarchy_checkpoint.py cover the five execution surfaces named in 10.9–10.13, including a repeated same-clock joint HMM, both precisions, exact path enumeration, failure rollback, resume and standalone goal-rollover parity. The registered drift result was 5311/6144 versus 4423 independent and 5207 with flat memory. At seven mathematical ties native floating-point MAP differs from exact lowest-index handling. Exact replay scores 5308/6144 and still clears the registered thresholds. Raw drift.json and drift-ties.json under ~/agent-share/cffg-hierarchy-validation can be recomputed with tools/hierarchy/.
+
+**2026-11-25T07:58:58Z**
+
+Bounded contingent planning at fe2fad3 supports one or two future readings, a reachable committed action lookup and native expected-loss certification. Physically matched expected payoff was +2.2 versus 0 on the paid cue and +0.75 versus 0 on the two-reading task. At 57 histories, depth two measured 24.4 s first solve, 14.57 ms warm, and 1.64 GB peak RSS; 37,907 bytes is the compressed model. Templates with larger history or table counts are refused before expansion. The fixed-duration filter and finite policy builder have separate APIs. D16/D17, S3/S4, and the README cover boundaries, equations and executable examples. The final integrated gate passed all 2751 default tests on f5b8ede. Craftax remains parked in chr-zcfm.
