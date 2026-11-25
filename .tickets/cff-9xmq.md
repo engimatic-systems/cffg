@@ -151,12 +151,15 @@ growth.
   balanced implementation.
 - [ ] 5.7 The frozen fixture's historical chain result falls within 60 through
   80 performed flooding sweeps.
-- [ ] 5.8 The balanced version of the frozen fixture reports `CONVERGED` in at
-  most 12 performed flooding sweeps.
-- [ ] 5.9 The balanced fixture does not satisfy criterion 5.8 by exhausting its
-  budget.
-- [ ] 5.10 The balanced fixture does not satisfy criterion 5.8 with a non-finite
-  free energy.
+- [ ] 5.8 For 49 branches, the longest path between branches in the generated
+  Broadcast crosses at most 12 equality factors (criterion 2.9). Measure this
+  on the generated topology.
+- [ ] 5.9 Each timed full-classifier result reaches certified convergence
+  within the registered budget and has finite free energy. Record performed
+  sweeps. The 16-pixel chain inside each patch contributes to that count.
+- [ ] 5.10 Every full-classifier class posterior matches the independent exact
+  contraction within the registered numerical tolerance. Section 7 evaluates
+  the separate end-to-end speed gates for single images and batches.
 - [ ] 5.11 A mixed-schedule fixture re-equilibrates a balanced Broadcast forest
   island through the current exact forest pass.
 - [ ] 5.12 The mixed-schedule fixture matches flooding marginals at a
@@ -278,7 +281,8 @@ growth.
 - [ ] 8.22 `tests/test_plates.py` covers topology, discrete semantics, Gaussian
   semantics, edge cases, exact-zero support, float32, and the 784-branch case.
 - [ ] 8.23 `tests/test_schedule.py` covers two-pass, flooding, mixed scheduling,
-  max-product, and the frozen 49-branch sweep bound.
+  and max-product. The plate topology tests cover the 49-branch diameter,
+  and the frozen application benchmark checks converged classifier posteriors.
 - [ ] 8.24 `tests/test_serialize.py` covers the frozen Broadcast JSON and
   structure-hash contract.
 - [ ] 8.25 `tests/test_bundle.py` covers balanced reconstruction from a compact
@@ -290,7 +294,7 @@ growth.
 - [ ] 8.28 `README.md` replaces the linear-diameter Broadcast warning with the
   delivered logarithmic bound and benchmark result.
 - [ ] 8.29 `docs/LIMITATIONS.md` removes the linear Broadcast bottleneck only
-  after the sweep and throughput criteria pass.
+  after the structural, numerical and throughput criteria pass.
 - [ ] 8.30 The final code change is followed by one passing default short-suite
   run through the repository dashboard workflow.
 
@@ -562,3 +566,7 @@ Implemented cffg.core.equality_tree.plan_equality_tree and used it in compact pl
 **2026-11-25T06:20:29Z**
 
 The frozen 49-patch full consumer includes a chain of sixteen pixel factors inside each patch. One ordinary synchronous flood moves information across one neighboring factor. With the outer Broadcast balanced, only 260 of 784 pixels can affect the class marginal after twelve sweeps. On the first 512 original archived images the independently contracted posterior gave 386 correct at twelve sweeps versus 421 at convergence (92 decisions differ). Using Engine on native 51ae6a7, balanced model images 9 and 16 returned BUDGET_EXHAUSTED at twelve sweeps and chose 7 and 4. Both converged in 44 sweeps to class 9, in agreement with native two_pass and independent contraction. The historical chain required 80 sweeps on the two checked chain witnesses. The observational dataset, model and tolerances are unchanged. ~/agent-share/cffg-hierarchy-validation/{flood_witness.py,flood_witness.json,native_flood.py,native_flood.json,balanced.json,chain.json} retain replay evidence. AC5.8 cannot hold as written for this workload under synchronous flooding. Requested Cooper's decision between separate structural/full-model gates and a separate multi-factor exact schedule. Until decided, retain the published criterion and convergence statuses; throughput qualification continues separately.
+
+**2026-11-25T06:25:13Z**
+
+Cooper chose option 1 after reviewing the 92 changed classifications. AC5.8 now applies the 12-factor bound to the generated outer fan-out. The frozen classifier must still converge, match the exact class probabilities, and reach at least 20 images per second for single images and for batches of 128. Preserve identical fixtures, source hashes, tolerances and timing boundaries. Record exact two-pass performance as a separate comparator. The original criterion and the evidence that prompted this decision are retained in Git and the preceding note.
