@@ -127,7 +127,7 @@ and review context proportional to the change.
 | Derived component coordinate | Serialized explicit region/constraint semantics and approximation identity; D12 equations in `docs/DERIVATIONS.md` (production protocol deferred) | New IR field validation/JSON/hash/scoping/edits/composition; topology and specialized/registered ownership; compiler grouping, slots, parameter packing, resolution, assembly, `Arena` and `member_of`; component/boundary indexes and schedule stages; synchronous and scheduled local/batch/scan execution; lifecycle and host/JIT support/status checks; ledger region/separator/adapter ownership; readouts and `Learnables.replace`; learnable/executable/checkpoint/CFFGZ semantic identity and legacy rejection/migration; estimator and public exports | `tests/test_hybrid_separator_derivation.py` mathematical oracle; affected IR/serialize/plates/edits/topology/resolution/assembly, kernel/ledger/runtime/schedule, learnable/readout/checkpoint/bundle tests from the rows below; public composition fixtures and host/JIT, synchronous/scheduled, single/vmap, current/legacy parity | D12 derivation and anchors; ownership here; construction/migration in README; approximation and unsupported compositions in LIMITATIONS |
 | New IR field | `src/cffg/core/ir.py` (`Template` or its spec dataclass) | `src/cffg/core/validate.py`; `src/cffg/core/serialize.py` (`to_dict`, `from_dict`, `structure_hash`); `src/cffg/core/plates.py` scoping; `src/cffg/core/compose.py` and `src/cffg/core/edits.py` when editable; `src/cffg/topology.py` declaration snapshots/layout, `src/cffg/specialized/` semantic claims/drafts, `src/cffg/registered/` same-arena drafts, `src/cffg/resolution/` arrays/addresses, `src/cffg/assembly.py` arena assembly, and `src/cffg/compiled.py` values when executable; bundle and agent state when persisted | `tests/test_ir.py`, `tests/test_serialize.py`, `tests/test_plates.py`, `tests/test_topology.py`, `tests/test_registered.py`, `tests/test_resolution.py`, `tests/test_assembly.py`; add `tests/test_edit_codec.py`, `tests/test_edits.py`, `tests/test_agent_spec.py`, or `tests/test_bundle.py` only for the affected boundary | Contract in this document; public construction and migration in `README.md`; unsupported cases in `LIMITATIONS.md` |
 | New factor or rule family | `src/cffg/kernels.py:FactorKernel`, `kernel_bindings.py`, its `src/cffg/core/ir.py:FactorType`, and the family rule module; formal equations are authoritative in code docstrings and `DERIVATIONS.md` | `topology.py` declared role/slot facts; `specialized/` named family discovery/completion; `registered/` binding capabilities and same-arena structural lowering; common declarations in `array_requirements.py`; `registered/packing.py` and `specialized/packing.py` family adapters; `resolution/` parameter/observation resolution; `assembly.py`, `Arena`, and `member_of`; typed local updates in `execution/` and `ExecutionDelta`; registered mathematics/readouts/energy in `kernel_runtime.py`; objective assembly in `ledger.py` and specialized local terms in `ledger_terms.py`; `execution/synchronous.py:make_sweep`; `execution/transport.py` and `schedule_program.py` batch/registerized/flat scans; `lifecycle.py` observation binding and `mu3_lifecycle.py` functional state; `ledger.make_belief_energy`; support checks, assignment scoring, `readouts/` posterior/statistic adapters, schedule classification, serialization manifest, estimator, and public exports as applicable | `tests/test_kernels.py`, `tests/test_execution.py`, `tests/test_registered.py`, `tests/test_resolution.py`, `tests/test_assembly.py`, `tests/test_discrete_kernels.py`, `tests/test_gaussian_kernels.py`, `tests/test_gaussian_kernel_schedules.py`; `tests/test_ledger.py`, `tests/test_readout_owners.py`; family rule and engine-oracle tests; `tests/test_schedule.py`, `tests/test_schedule_program.py`; sparse-support, float32, and uncomfortable-scale cases | Derivation in `DERIVATIONS.md`; integration contract here; approximations in `LIMITATIONS.md`; public modeling API in `README.md` |
-| Runtime numerical or status invariant | `AGENTS.md` numerical contract and `src/cffg/runtime_types.py` (state/result/status values) and `src/cffg/iteration.py` (ordinary policy), `exact_strategy.py` and `outer_strategy.py` (distinct run control), and `run_results.py` (public results), plus `ledger.py` and `ledger_terms.py` (objectives) and `readouts/` (posteriors/statistics) | Flooding, colored/mixed, and exact schedules; host `runtime_checks.StateChecks` and `schedule_program.make_support_check`; `execution.synchronous.make_sweep`, `ScheduleProgram`, `make_exact_unit`, `make_propagate`, and `ledger.make_belief_energy`; `StateLifecycle`/`Mu3Lifecycle` initialization, preparation and status forwarding; inner-solver status; `RollingAgent`, `Colony`, estimator, benchmark, and dashboard consumers | `tests/test_runtime_status.py`, `tests/test_schedule.py`, `tests/test_schedule_program.py`, `tests/test_engine_contracts.py`, `tests/test_lifecycle.py`, `tests/test_iteration.py`, `tests/test_ledger.py`, `tests/test_readout_owners.py`, `tests/test_run_strategies.py`, `tests/test_colony.py`, `tests/test_colony_failures.py`, `tests/test_constraint_data.py`, `tests/test_constraint_reconstruction.py`, plus the changed rule family's hostile-input tests | Runtime contract here and in `README.md`; any accepted failure mode or approximation in `LIMITATIONS.md` |
+| Runtime numerical or status invariant | `AGENTS.md` numerical contract and `src/cffg/runtime_types.py` (state/result/status values) and `src/cffg/compiled_iteration.py` (deterministic iteration) and `iteration.py` (functional updates and host reference), `exact_strategy.py` and `outer_strategy.py` (distinct run control), and `run_results.py` (public results), plus `ledger.py` and `ledger_terms.py` (objectives) and `readouts/` (posteriors/statistics) | Flooding, colored/mixed, and exact schedules; host `runtime_checks.StateChecks` and `schedule_program.make_support_check`; `execution.synchronous.make_sweep`, `ScheduleProgram`, `make_exact_unit`, `make_propagate`, and `ledger.make_belief_energy`; `StateLifecycle`/`Mu3Lifecycle` initialization, preparation and status forwarding; inner-solver status; `RollingAgent`, `Colony`, estimator, benchmark, and dashboard consumers | `tests/test_runtime_status.py`, `tests/test_schedule.py`, `tests/test_schedule_program.py`, `tests/test_engine_contracts.py`, `tests/test_lifecycle.py`, `tests/test_iteration.py`, `tests/test_compiled_iteration.py`, `tests/test_iteration_checks.py`, `tests/test_iteration_tolerance.py`, `tests/test_ledger.py`, `tests/test_readout_owners.py`, `tests/test_run_strategies.py`, `tests/test_colony.py`, `tests/test_colony_failures.py`, `tests/test_constraint_data.py`, `tests/test_constraint_reconstruction.py`, plus the changed rule family's hostile-input tests | Runtime contract here and in `README.md`; any accepted failure mode or approximation in `LIMITATIONS.md` |
 | Learnable or checkpoint feature | `src/cffg/core/ir.py` (`LearnableSpec`, `AgentSpec`, `BeliefBinding`) and `src/cffg/learn.py` (`Family`, `Learnables`); neural point training in `training.py` and recognition in `amortization.py` | Validation, JSON/hash, plate scoping, specialized parameter/objective ownership, `resolution/addresses.py:resolve_learnables` and declared member/parameter requirements, `Arena.learn_plans`, `member_of`, `StateLifecycle` initial arrays and binding, `Mu3Lifecycle` functional parameter state, `readouts/` adapters and `StateLifecycle.with_goal_priors`, agent cadence, checkpoint encode/decode and legacy migration, and bundles | `tests/test_learnables.py`, `tests/test_readout_owners.py`, `tests/test_lifecycle.py`, `tests/test_constraint_reconstruction.py`, `tests/test_resolution.py`, `tests/test_assembly.py`, `tests/test_agent_spec.py`, `tests/test_agent.py`, and `tests/test_bundle.py`; add the contributing factor family's statistic test | Conjugate contract here; statistics beyond the papers in `DERIVATIONS.md`; public cadence/checkpoint API in `README.md`; remaining family gaps in `LIMITATIONS.md` |
 
 Duplicated execution surfaces are deliberate review pairs: host/JIT,
@@ -1083,21 +1083,23 @@ finite/support predicate is distinct from a false predicate. Outcome traces
 are immutable host arrays that retain Python-float precision even when JAX
 x64 is disabled; the public boundary converts them to Python tuples.
 
-`iteration.py` owns ordinary soft/hard iteration and the shared incremental
-`IterationProgress` assessment. It consumes prepared State, `ScheduleProgram`,
-explicit policy/controls and narrow check/objective/functional-update callbacks;
-it does not inspect factor types or import Engine. Engine supplies current
-step/prime handles and callbacks at run entry. Colony retains its vmapped
-transport and per-instance active masks, but uses the same assessment owner.
-Initial rejection precedes priming, stopped batch members remain frozen, and
-FE comparison history resets between soft and hard phases.
+`compiled_iteration.py` runs deterministic flooding, colored and mixed
+schedules on device. Engine supplies the scheduled sweep, optional forest
+prime and belief-energy kernel. Each soft or hard phase uses a `lax.while_loop`.
+Its carry records the current messages, performed count, last defined energy,
+residual, local failure and bounded delta/energy traces. The initial finite
+and exact-support checks precede priming. Hardening begins with a fresh energy
+comparison. At max-product stationarity, the public decoded-assignment objective
+certifies each stationary phase on the host. This preserves NumPy's tie handling
+when a rounded probability decides feasibility. `iteration.py` handles functional
+updates and supplies the host reference used in parity tests.
 
 `run_results.py` is the public status/result authority for all three run
 strategies. Its `finalize_iteration`, `finalize_exact` and `finalize_outer`
 functions validate their distinct terminal evidence and construct `RunResult`.
 Ordinary initial rejection retains `NOT_RUN`, including in explicit
 legacy-Picard GFE calls; valid zero-budget and later Picard results retain
-their `LEGACY_PICARD` tag. The host convergence loop is not newly jitted.
+their `LEGACY_PICARD` tag.
 `test_iteration.py` protects the owner boundary, immutable/precision-preserving
 traces, transformable facts and shared finalization; existing family and
 failure tests remain the numerical authorities.
@@ -2113,7 +2115,7 @@ the region entropy correction and its path-enumeration oracle.
 messages, parameters, and conditioned observations; structure remains in the
 cached engine. Ordinary iterative instances are grouped by structure plus State
 pytree layout, array shapes and dtypes before stacking. Each compatible batch
-evaluates one scheduled iteration under `filter_vmap`; different structures or
+vectorizes the compiled controller with `jax.vmap`. Distinct structures or
 numeric layouts run as separate groups. Different allowed-tuple table lengths
 therefore cannot enter one stack, while same-shaped tables with different
 contents retain vectorized execution. One cached Engine can have several JAX
@@ -2149,12 +2151,13 @@ of mixed float precisions and table lengths. `test_constraint_reconstruction.py`
 checks bundles, current and supported legacy agent reconstruction, and strict
 fixed-data mismatch rejection.
 
-Ordinary runs share `IterationProgress` assessment and `finalize_iteration`
-result construction with Engine; Colony owns batching and active-member
-freezing, not a second termination policy. The convergence loop and
-per-instance status bookkeeping are currently Python
-host control flow around the vmapped iteration. The measured 32-instance CPU
-speedup is about 1.5× over sequential execution because dispatch dominates.
+Ordinary Colony runs use the same compiled iteration and public result
+finalization as Engine. Each member's reason and performed count freeze its
+state and trace independently inside the vectorized loop. At exit the host
+truncates the trace buffers to each member’s recorded counts. Trace storage scales
+with batch width times sweep budget. `tools/benchmark_ordinary_iteration.py`
+compares the two public entry points on 32 distinct Hallway priors and 60
+ordinary sweeps, including synchronized wall time and device submissions.
 Stochastic `mu3` evaluators are rejected by `Colony`: explicit PRNG preparation,
 particle state, and stochastic statuses exist on `Engine`, but Colony does not
 yet carry them per instance. Per-instance structure changes also fragment
@@ -2404,9 +2407,9 @@ source of truth for readiness, scope, and status.
 
 ### Near-term architectural targets
 
-- **Colony runtime (cff-wbhu, cff-rqqc).** Put the general convergence loop and
-  per-instance status carry inside one compiled scan, and give stochastic
-  evaluators explicit per-instance PRNG streams and particle state.
+- **Colony runtime (cff-wbhu, cff-rqqc).** Measure throughput across grouped
+  controllers and extend stochastic evaluators with per-instance PRNG streams
+  and particle state.
 - **Resource analysis (cff-j7mm).** Restore correct XLA lowering and calibrated
   FLOP/byte reporting on top of the existing exact arena-byte estimate.
 - **Visualization clients (cff-jude).** Use the edit API as the model-editor

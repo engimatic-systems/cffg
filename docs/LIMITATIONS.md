@@ -469,8 +469,14 @@ travel ~one slice per sweep, and a fixed 120-sweep budget leaves the H=25
 control posterior at residual 5.5 (vs 4.9e-4 at 400 sweeps). Fixes are
 mechanical, not research: depth-aware/tol-driven sweep budgets in the agent
 loop plus warm-started replanning (cff-5edo). Related measured limits:
-ordinary colony batching is dispatch-bound on CPU, 1.5× at 32 instances until
-the sweep loop is a jitted scan (cff-wbhu). Exact-eligible colony members use
+on an M2 Max CPU (x64, JAX 0.10.2), the ordinary public-API benchmark
+uses 32 distinct Hallway priors and 60 damped sweeps. From `51ae6a7` to
+`8ae5bdb`, warm Colony time fell from 9.550 to 2.568 s and 32 sequential
+Engine runs from 6.430 to 2.466 s. Colony reached 0.96× the throughput of
+the compiled sequential runs, below the 8× target. The compiled group made
+15 device submissions at both one and 60 sweeps. These medians use one warmup
+and three repetitions per arm (`tools/benchmark_ordinary_iteration.py`).
+The historical 1.54× CPU ratio used a handwritten batched sweep on a GFE graph. Exact-eligible colony members use
 standalone propagation and certification per instance; this preserves exact
 schedule semantics but does not yet provide vectorized exact execution.
 Mixed-GFE colonies currently reuse

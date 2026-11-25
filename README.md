@@ -649,7 +649,9 @@ caveats; `cffg.csp.decimate` is the explicit feasibility-oriented helper. See
 ## Batch, extend, render, and estimate
 
 `cffg.colony.Colony` caches one engine per structure hash and vmaps matching
-ordinary iterative state layouts while returning a separate `RunResult` per instance.
+ordinary iterative state layouts. Each member has its own stopping condition
+inside a compiled sweep loop and returns its own state, status and traces in a
+`RunResult`. A member that stops early keeps its final state while peers continue.
 Exact schedules use the same per-instance propagation and certification as
 `Engine.run`; they do not fall back to flooding just because they are in a colony.
 Different parameters do not create different structures. Functional mu3 is
