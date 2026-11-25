@@ -64,7 +64,7 @@ def maze_run(config, seed):
     metrics = {field:float(np.mean([t[field] == t['true_arm'] for t in trials]))
                for field in ['hierarchy_arm','flat_arm','memory_flat_arm']}
     metrics['last_parent_mass'] = float(np.mean([t['parent'][t['true_arm']] for t in trials if t['tick']==k-1]))
-    return dict(seed=seed, artifact_hash=model.artifact_hash, passed=max_error <= 1024*np.finfo(float).eps,
+    return dict(seed=seed, artifact_hash=model.artifact_hash, passed=bool(max_error <= 1024*np.finfo(float).eps),
                 max_abs_posterior_error=max_error, metrics=metrics, trials=trials)
 
 
