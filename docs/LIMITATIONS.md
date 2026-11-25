@@ -749,10 +749,14 @@ two-window implementation claim until they receive their own oracle.
 
 **S3. Deep temporal / hierarchical models.** The exact two-level categorical
 filter supports a fixed number of fast ticks per slow transition, including
-partially observed trajectories. Its separator stores one probability per
-(regime, fast state) pair. The dense transition costs scale as
-`O(R X²)` per fast tick and `O(R² X)` per slow rollover, for `R` regimes and
-`X` fast states. Continuous levels, event-triggered durations, discovery of
+partially observed trajectories. With `R` regimes, `X` fast states and `O`
+possible observations, a dense fast tick takes `O(R X² + O X)` work. The
+second term accounts for the emission entropy used for missing readings.
+The slow rollover takes `O(R² X)` work. The joint regime/state messages and
+conditional path moments occupy `O(R X)` entries. Accumulating the fast and
+slow transition statistics requires another `R X² + R²` entries. These sizes
+are independent of the number of elapsed ticks. Continuous levels,
+event-triggered durations, discovery of
 spatial regions, and sparse motion between uncertain neighboring cells are
 outside this schedule. See DERIVATIONS D16.
 
