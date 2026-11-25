@@ -1131,6 +1131,18 @@ Coordinate programs group compatible vector/precision transforms and retain
 only host NumPy metrics on charts, so first-use JIT cannot cache a tracer. The provider
 does not capture an Engine; its schedule handles are refreshed through the
 facade's existing instrumentation aliases. Cache creation timing and reported
+The optional `compiled_trust_region` controller yields at fixed-chart phase
+boundaries. `outer_batch.py` groups requests for the same kernel and returns
+each reply to its originating solve. `outer_candidate.py` advances bounded
+damped candidates. `outer_fixed.py` carries each member's accepted point,
+radius, six-point acceleration history and work counters through a device
+loop using the same matrix-free trust steps. Feasibility is invariant while
+all reconstructed discrete supports and parameters stay fixed. A change
+hands control back to the existing host policy, along with the last accepted
+state and history. Support discovery, hardening and terminal certification
+stay with that policy. The host rechecks the undamped map and ledger before
+reporting a root. Group width and trace-buffer shape specialize JAX compilation.
+
 compilation counts measure provider misses, not every JAX executable variant;
 the runtime benchmark records both. These trusted process-local callables are
 derived runtime artifacts, never serialized model or checkpoint data.

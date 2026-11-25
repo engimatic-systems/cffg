@@ -88,16 +88,21 @@ class Colony:
         inst.state = self.engines[inst.key].bind_data(inst.state, observations)
 
     def run(
-        self, n_iters: int, *, damp: float = 0.0, tol: float | None = None
+        self, n_iters: int, *, damp: float = 0.0, tol: float | None = None,
+        outer_solver: str = "auto",
     ) -> dict[int, RunResult]:
         """Run each structure batch and return one truthful result per instance.
 
         Ordinary iterative rule evaluation remains vmapped. Exact schedules
         reuse Engine's per-instance propagation and certification. Termination
-        is tracked independently for each member on device.
+        is tracked independently for each member. Mixed GFE uses the host trust
+        controller by default. Select ``outer_solver="compiled_trust_region"``
+        to batch deterministic fixed-support phases across compatible members.
         """
         if n_iters < 0:
             raise ValueError("n_iters must be non-negative")
+        if outer_solver not in ("auto", "trust_region", "compiled_trust_region"):
+            raise ValueError("Colony outer_solver must be 'auto', 'trust_region', or 'compiled_trust_region'")
         by_key: dict[tuple, list[int]] = {}
         for iid, inst in self.instances.items():
             by_key.setdefault((inst.key, _batch_signature(inst.state)), []).append(iid)
@@ -105,19 +110,27 @@ class Colony:
         for (key, _signature), iids in by_key.items():
             engine = self.engines[key]
             states = [self.instances[i].state for i in iids]
-            if engine.arena.gfe_groups or engine.arena.gfe_tm_groups or engine.has_adaptive_gaussian:
+            if (engine.arena.gfe_groups or engine.arena.gfe_tm_groups
+                    or engine.arena.hybrid_gfe_groups or engine.has_adaptive_gaussian):
                 if damp != 0.0:
                     raise ValueError(
                         "damp does not apply to mixed-GFE trust-region "
                         "inference"
                     )
-                for iid, state in zip(iids, states):
-                    result = engine.run(
-                        state,
-                        n_iters,
-                        tol=tol,
-                        harden_last=n_iters,
+                batch_trust = (
+                    outer_solver == "compiled_trust_region"
+                    and not (engine.has_adaptive_gaussian or engine.arena.mu3_groups)
+                    and not engine._can_run_exact(n_iters, damp, n_iters)
+                )
+                if batch_trust:
+                    results = engine._run_outer_batch(
+                        states, n_iters, tol=tol,
+                        harden_last=n_iters if len(engine.arena.delta_pairs) else 0,
                     )
+                else:
+                    results = [engine.run(state, n_iters, tol=tol, harden_last=n_iters,
+                                          outer_solver=outer_solver) for state in states]
+                for iid, result in zip(iids, results, strict=True):
                     self.instances[iid].state = result.state
                     self.last_results[iid] = result
                 continue

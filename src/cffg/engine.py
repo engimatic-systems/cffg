@@ -385,7 +385,9 @@ class Engine:
         Mixed-GFE plans use the proof-backed trust-region residual solver by
         default. ``damp`` remains a Picard/flooding parameter and is rejected
         for that path; select ``outer_solver="picard"`` explicitly to retain
-        the legacy fixed-damping iteration as a diagnostic.
+        the legacy fixed-damping iteration as a diagnostic. For deterministic
+        GFE, ``outer_solver="compiled_trust_region"`` runs fixed-support phases
+        on device. It trades extra first-call compilation and memory for reuse.
 
         δ form-constraints must not fire while beliefs are still garbage — a
         premature pointmass locks in its own arbitrary argmax. With
@@ -405,9 +407,9 @@ class Engine:
         sweep budget applies)."""
         if n_iters < 0:
             raise ValueError("n_iters must be non-negative")
-        if outer_solver not in ("auto", "trust_region", "picard"):
+        if outer_solver not in ("auto", "trust_region", "compiled_trust_region", "picard"):
             raise ValueError(
-                "outer_solver must be 'auto', 'trust_region', or 'picard'"
+                "outer_solver must be 'auto', 'trust_region', 'compiled_trust_region', or 'picard'"
             )
         self._require_mu3_ready(state)
         if harden_last is None:
@@ -424,6 +426,8 @@ class Engine:
             or self.arena.hybrid_gfe_groups
         )
         adaptive = self.has_adaptive_gaussian
+        if outer_solver == "compiled_trust_region" and (not has_gfe or adaptive or self.arena.mu3_groups):
+            raise ValueError("compiled_trust_region requires deterministic GFE without adaptive Gaussian updates")
         if adaptive and outer_solver == "picard":
             raise ValueError("adaptive Gaussian inference requires residual globalization")
         use_trust_region = (has_gfe or adaptive) and outer_solver != "picard"
@@ -443,6 +447,8 @@ class Engine:
                     return proposal
                 return after_directed_attempt(self._run_outer_trust_region(
                     state, n_iters - 1, tol=tol, harden_last=0))
+            if outer_solver == "compiled_trust_region":
+                return self._run_outer_batch([state], n_iters, tol=tol, harden_last=harden_last)[0]
             return self._run_outer_trust_region(
                 state, n_iters, tol=tol, harden_last=harden_last
             )
@@ -509,11 +515,18 @@ class Engine:
         tol: float | None,
         harden_last: int,
     ) -> RunResult:
-        outcome = OuterTrustRegionStrategy(
+        return self._run_outer_batch(
+            [state], n_iters, tol=tol, harden_last=harden_last, compiled=False,
+        )[0]
+
+    def _run_outer_batch(self, states, n_iters, *, tol, harden_last, compiled=True):
+        from cffg.outer_batch import run_phases
+        strategy = OuterTrustRegionStrategy(
             structure=OuterStructure.from_arena(self.arena),
             hardening=tuple(self.arena.delta_slot_groups),
             eliminated=self._outer_eliminated,
             kernel_provider=self._outer_kernel_plan,
+            stage_kernel=self._outer_kernels.stage if compiled else None, ledger=self._bfe,
             iter_step=self._iter_step,
             prime=self._prime,
             reconstruct=self._reconstruct,
@@ -525,7 +538,12 @@ class Engine:
                 self.bfe,
                 self._update_mu3 if self.arena.mu3_groups else None,
             ),
-        ).run(state, n_iters, tol=tol, harden_last=harden_last)
+        )
+        outcomes = run_phases([strategy.phases(state, n_iters, tol=tol, harden_last=harden_last)
+                               for state in states])
+        return [self._outer_result(outcome) for outcome in outcomes]
+
+    def _outer_result(self, outcome):
         ess, log_normalizers, mu3_statuses = self._mu3_result_diagnostics(outcome.state)
         return run_results.finalize_outer(
             outcome,

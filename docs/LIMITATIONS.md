@@ -479,10 +479,15 @@ and three repetitions per arm (`tools/benchmark_ordinary_iteration.py`).
 The historical 1.54× CPU ratio used a handwritten batched sweep on a GFE graph. Exact-eligible colony members use
 standalone propagation and certification per instance; this preserves exact
 schedule semantics but does not yet provide vectorized exact execution.
-Mixed-GFE colonies currently reuse
-compiled trust kernels but run one controller per instance, so they have a
-stronger host-control bottleneck until that same ticket moves the trust/status
-carry into the scan. The GFE-TM curiosity composite
+The default mixed-GFE controller runs per instance. The optional
+`outer_solver="compiled_trust_region"` batches deterministic GFE members
+with matching chart layouts and support. The host handles hardening and root
+certification. A support change or invalid auxiliary proposal can return the
+remaining iterations to the host. Adaptive Gaussian and functional solves retain
+their existing controllers. On a CPU/float64 32-member T-maze batch with a
+10-step trust budget, the first host/compiled calls took 10.9/17.4 s and
+the repeated calls took 2.58/0.50 s. Process peak RSS was 865/1,369 MiB.
+Those measurements cover one first and one repeat call per mode. The GFE-TM curiosity composite
 costs ~4× a plain act() in every slice and its novelty channel outcompetes
 the goal channel while counts are near-uniform. After the cff-hp3y cavity and
 ledger repair, the like-for-like 25-episode Hallway rerun scored 0.16 success
