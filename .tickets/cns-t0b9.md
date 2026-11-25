@@ -2,7 +2,7 @@
 id: cns-t0b9
 status: closed
 deps: [cff-du6m]
-links: []
+links: [ccrp-fuob]
 created: 2026-11-25T18:24:33Z
 type: task
 priority: 2
