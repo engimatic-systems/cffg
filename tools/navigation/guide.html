@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Learning a way back · Navigation study</title>
+<style>
+:root{color-scheme:light;--paper:#f5f3eb;--ink:#192e29;--muted:#51635a;--line:#c5cdc1;--panel:#fcfbf6;--map:#152d29;--trail:#f2bc68;--seen:#99cabb;--active:#ef9f54;--teal:#146352;--sans:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--serif:Georgia,"Times New Roman",serif;--mono:ui-monospace,SFMono-Regular,Consolas,monospace}
+*{box-sizing:border-box}
+html{scroll-padding-top:1rem}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 var(--sans);-webkit-text-size-adjust:100%}
+a{color:var(--teal);text-underline-offset:.18em}a:hover{text-decoration-thickness:2px}
+button,select,input{font:inherit;color:inherit}button,select,summary,input[type=range]{cursor:pointer}
+button,select{min-height:40px;border:1px solid #aebcb0;border-radius:5px;background:var(--panel);padding:.4rem .75rem}
+button:hover,select:hover{border-color:var(--teal)}button:disabled{cursor:default;opacity:.5}
+:focus-visible{outline:3px solid #08798d;outline-offset:3px}button[aria-pressed=true],.play{background:var(--teal);border-color:var(--teal);color:white}
+[hidden]{display:none!important}
+.skip{position:fixed;left:1rem;top:-100px;z-index:2;background:white;padding:.6rem}.skip:focus{top:1rem}
+.wrap{max-width:1220px;margin:0 auto;padding:0 clamp(16px,4.8vw,66px)}
+.mast{border-bottom:1px solid var(--line);padding:18px 0}
+.mast .wrap{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:.65rem;font-weight:700;letter-spacing:-.02em}
+.brand i{display:grid;grid-template-columns:repeat(2,6px);gap:3px;transform:rotate(-8deg)}
+.brand i b{height:6px;background:var(--teal)}.brand i b:nth-child(2){background:#be7b3a}
+nav{display:flex;gap:clamp(12px,2vw,24px);font-size:.86rem}nav a{color:var(--muted);font-weight:620;text-decoration:none}nav a:hover{text-decoration:underline}
+.intro{padding:clamp(30px,5vw,64px) 0 clamp(24px,3.8vw,48px)}
+h1,h2,h3,p,figure,ol,dl{margin:0}h1,h2{font-family:var(--serif);font-weight:400;letter-spacing:-.045em;line-height:1.07}
+h1{font-size:clamp(3rem,6.6vw,5.35rem);max-width:1000px}h2{font-size:clamp(2rem,4vw,3.05rem)}
+h3{font-size:1.08rem;line-height:1.3;letter-spacing:-.02em}
+.lead{font-size:clamp(1.02rem,1.65vw,1.23rem);max-width:72ch;color:var(--muted);margin-top:15px}
+.finding{border-left:3px solid #6d9986;padding-left:13px;margin-top:16px;max-width:83ch;font-size:.94rem}
+.section-head{display:flex;align-items:baseline;justify-content:space-between;gap:.7rem 2rem;flex-wrap:wrap;margin-bottom:16px}
+.section-note,figcaption,.sub,.note{color:var(--muted);font-size:.88rem}
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,145px),1fr));gap:8px 14px;margin:12px 0 16px}
+.controls label,.view-choice{min-width:0;color:var(--muted);font:650 .78rem/1.4 var(--sans)}
+.controls select{display:block;width:100%;margin-top:3px;font-size:.91rem;font-weight:560}
+.workbench{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(235px,.85fr);gap:14px}
+.board,.inspector,.scores,.methods,.connect{min-width:0;border:1px solid var(--line);border-radius:9px;background:var(--panel)}
+.board{overflow:hidden}.map-box{position:relative;background:var(--map);color:#f5f5ea;padding:15px}
+.map-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.map-top h3{font-weight:600}.view-choice select,.map-top button{color:var(--ink);font-size:.83rem;min-height:36px}.map-top button[aria-pressed=true]{color:white}
+.map-options{display:flex;align-items:center;gap:5px}.map-scroll{max-height:62vh;overflow:auto}.map-scroll.enlarged .map-svg{width:var(--map-width);height:var(--map-height);max-width:none}
+svg{display:block;width:100%;height:auto}.map-svg{height:clamp(200px,29vw,340px);margin:8px auto 6px;overflow:visible}
+.legend{display:flex;align-items:center;flex-wrap:wrap;gap:6px 16px;color:#dce5df;font-size:.76rem;line-height:1.3}
+.legend span{display:inline-flex;align-items:center;gap:5px}.legend i{width:14px;height:4px;border-radius:3px;background:var(--trail)}.legend .agent{width:9px;height:9px;border:2px solid white;background:var(--active);border-radius:50%}.legend .goal{width:10px;height:10px;border:2px solid var(--seen);transform:rotate(45deg);background:none}.legend .known{background:#adc2b2}
+.transport{padding:12px 15px 10px}.seek{display:flex;align-items:center;gap:12px}
+.seek output{font:600 .84rem var(--mono);white-space:nowrap;min-width:75px;text-align:right}.seek input{flex:1;min-width:0;accent-color:var(--teal);height:28px}
+.buttons{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:5px}.buttons button{font-weight:620;font-size:.88rem}.buttons .play{min-width:76px}
+.board figcaption{padding:0 15px 14px}.inspector{padding:16px 18px}.inspector h3{margin-bottom:12px}
+.readings{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);font-size:.9rem;line-height:1.4}
+.readings dt,.readings dd{padding:7px 0;border-top:1px solid #d8ded4}.readings dt{color:var(--muted)}.readings dd{margin:0;overflow-wrap:anywhere;font-weight:570}
+.connect{margin-top:14px;padding:15px 18px}.connect summary,.methods summary{font-weight:650}.scroll{overflow:auto;max-width:100%}
+table{width:100%;border-collapse:collapse;font-size:.88rem;text-align:left}caption{text-align:left;font-size:.83rem;color:var(--muted);padding:8px 0}thead{color:var(--muted);font-size:.78rem}td,th{padding:9px 11px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}tbody th{font-weight:580}tbody tr:last-child>*{border-bottom:none}
+td:first-child,th:first-child{padding-left:0}td:last-child,th:last-child{padding-right:0}
+.content-section{margin:clamp(36px,6vw,72px) 0}.scores,.methods{padding:clamp(14px,2.2vw,24px)}
+.scores h3:not(:first-child){margin-top:25px}.scores .note,.connect .note,.inspector .note{margin-top:10px}.scores p,.methods p{max-width:80ch}
+.methods{display:grid;gap:16px}.stages{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px;list-style:none;padding:0}
+.stages li{border-top:2px solid #82ac9b;padding-top:10px}.stages li p{color:var(--muted);font-size:.92rem;margin-top:5px}
+.method-text{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px}.method-text h3{margin-bottom:5px}.method-text p{font-size:.94rem}
+.sources{border-top:1px solid var(--line);padding-top:12px}.sources p{margin:8px 0}.sources a{overflow-wrap:anywhere}
+.error{color:#832818}.sr{position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden;white-space:nowrap}
+@media(max-width:700px){.workbench{grid-template-columns:1fr}.intro{padding-top:32px}.stages,.method-text{grid-template-columns:1fr}.map-svg{height:245px}.controls{grid-template-columns:repeat(2,minmax(0,1fr))}.brand{font-size:.95rem}.mast nav{font-size:.8rem}.wrap{padding:0 14px}.section-head{gap:.3rem}td,th{padding:7px}}
+@media(max-width:400px){.mast .wrap{gap:.45rem}.map-top{gap:4px}.transport,.inspector,.connect{padding:12px}.buttons button{padding:.4rem .62rem}}
+@media(print){nav,.controls,.transport,.view-choice,.skip{display:none}.wrap{max-width:none;padding:0}.board,.inspector,.scores,.connect,.methods{break-inside:avoid}}
+</style>
+</head>
+<body>
+<a class="skip" href="#replay">Skip to replay</a>
+<header class="mast"><div class="wrap"><span class="brand"><i aria-hidden="true"><b></b><b></b><b></b><b></b></i>CFFG navigation study</span><nav aria-label="Sections"><a href="#replay">Replay</a><a href="#scores">Scores</a><a href="#method">Method</a></nav></div></header>
+<main class="wrap">
+<section class="intro"><h1>Learning a way back</h1><p class="lead">Two junctions can look the same and lead somewhere different. Does giving each junction its own learned place improve the next prediction and the route home?</p><p class="finding"><span id="finding"></span> <a href="?case=aliased&amp;phase=navigation&amp;policy=split&amp;route=amber-to-blue&amp;step=2#replay">Compare the first junction →</a></p></section>
+<p id="error" class="error" role="alert" hidden></p>
+<section id="replay" aria-labelledby="replay-title">
+<div class="section-head"><h2 id="replay-title">Route replay</h2><p id="case-summary" class="section-note"></p></div>
+<div class="controls">
+<label>Fixture<select id="fixture"></select></label>
+<label>Orientation<select id="orientation"></select></label>
+<label>Phase<select id="phase"></select></label>
+<label>Policy<select id="policy"></select></label>
+<label>Route<select id="route"></select></label>
+</div>
+<div class="workbench">
+<figure class="board"><div class="map-box"><div class="map-top"><h3 id="map-title">Route map</h3>
+<div class="map-options"><label class="view-choice"><span class="sr">Map view</span><select id="view"><option value="observed">Observed map</option><option value="actual">Actual layout</option></select></label><button type="button" id="zoom" aria-pressed="false">Enlarge</button></div></div>
+<div class="map-scroll" id="map-scroll" tabindex="0" role="region" aria-label="Route map, scroll when enlarged"><svg id="map" class="map-svg" role="img" aria-labelledby="map-desc"><title id="map-desc">Selected route map</title></svg></div>
+<div class="legend"><span><i class="agent"></i>Current position</span><span><i></i>Replay trail</span><span><i class="goal"></i>Goal</span><span><i class="known"></i>Known connection</span></div>
+</div><div class="transport"><div class="seek"><label class="sr" for="scrub">Replay step</label><input id="scrub" type="range" min="0" max="0" value="0"><output id="step" for="scrub"></output></div>
+<div class="buttons"><button id="prev" type="button">← Previous</button><button id="play" class="play" type="button">Play</button><button id="next" type="button">Next →</button></div></div>
+<figcaption id="map-caption"></figcaption></figure>
+<aside class="inspector" aria-labelledby="step-title"><h3 id="step-title">At this step</h3><dl id="readings" class="readings"></dl><p id="outcome" class="note"></p></aside></div>
+<details id="connect" class="connect" open><summary>Learned connectivity</summary>
+<label class="view-choice">From place <select id="origin"></select></label><p id="connection-summary" class="note"></p><div id="edge-table" class="scroll"></div></details>
+</section>
+<section id="scores" class="content-section" aria-labelledby="scores-title"><div class="section-head"><h2 id="scores-title">Held-out evidence</h2></div>
+<div class="scores"><h3>Predicting the next observation</h3><p id="score-text" class="note"></p><div id="score-table" class="scroll"></div>
+<h3>Reaching the goal</h3><p id="route-text" class="note"></p><div id="route-table" class="scroll"></div></div></section>
+<section id="scale" class="content-section" aria-labelledby="scale-title" hidden><div class="section-head"><h2 id="scale-title">Cost at larger map sizes</h2></div><div class="scores"><p class="note" id="scale-note"></p><div id="scale-table" class="scroll"></div><a id="scale-download" download="scale.json">Download scale measurements (JSON)</a></div></section>
+<section id="method" class="content-section" aria-labelledby="method-title"><div class="section-head"><h2 id="method-title">How the study works</h2></div>
+<div class="methods"><ol class="stages"><li><h3>Fit</h3><p>Two surveys begin at home. Each tests compass moves and records where they lead, including blocked moves. A split is proposed only for the prespecified junction symbol observed at distinct positions.</p></li><li><h3>Select</h3><p>Compare the fitted candidates on two selection traversals, then freeze the choice. The control gives both junctions identically labeled exits in each direction.</p></li><li><h3>Evaluate</h3><p>Score both candidates on four final traversals. Then replay six landmark routes with a 24-action limit. The rotated cases test the same layouts in another orientation.</p></li></ol>
+<div class="method-text"><section><h3>What the navigator sees</h3><p id="inputs"></p></section><section><h3>Reading the scores</h3><p id="metrics"></p></section></div>
+<details class="sources"><summary>Research behind the question</summary>
+<p>A renormalising generative model (RGM) groups recurring blocks of observations and sequences across fixed spatial and temporal scales. Its “path” is a latent transition pattern. Here a route is a sequence of executed compass moves, and the learned structure is a spatial place split. Learning multi-step events is a separate research question. <a href="https://arxiv.org/pdf/2407.20292#page=26">RGM, Algorithm 1</a> · <a href="https://arxiv.org/pdf/2407.20292#page=50">Pong example</a></p>
+<p>AIMAPP proposes places from local observations and updates directed connections through experienced movement. It motivates the distinction between discovering a place and learning how to return to it. <a href="https://arxiv.org/html/2510.09574v2#S3.SS5">AIMAPP, §3.5</a> · <a href="https://arxiv.org/html/2510.09574v2#S4.SS4">Goal-reaching benchmark, Table 5</a></p>
+</details></div></section>
+</main>
+<script id="study" type="application/json">__NAVIGATION_STUDY_JSON__</script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const ui = Object.fromEntries(['fixture','orientation','phase','policy','route','view','scrub','play','prev','next'].map(k=>[k,$(k)]));
+const policies = {appearance:'Appearance only',split:'Split junctions',tile:'Observed tile map'};
+const phases = {navigation:'Navigation',fit:'Fit traversal',selection:'Selection traversal',final:'Final traversal'};
+const labels = {'aliased':'Aliased junctions','same-exits':'Same exits · control'};
+const compass = {N:'North',E:'East',S:'South',W:'West'};
+const posKey = pos => pos.join(',');
+const loc = pos => '(' + pos.join(', ') + ')';
+const same = (a,b) => a[0] === b[0] && a[1] === b[1];
+const fixed = n => Number.isFinite(n) ? n.toFixed(3) : '—';
+function element(tag,text) {
+  const el = document.createElement(tag);
+  if (text !== undefined) el.textContent = text;
+  return el;
+}
+function svg(tag, attrs, parent, text) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg',tag);
+  for (const [k,v] of Object.entries(attrs)) el.setAttribute(k,v);
+  if (text !== undefined) el.textContent = text;
+  parent.append(el);
+  return el;
+}
+function options(select, pairs, value) {
+  select.replaceChildren(...pairs.map(([key,text])=>new Option(text,key)));
+  if (pairs.some(([key])=>key === value)) select.value = value;
+}
+function table(host, caption, columns, rows) {
+  const tbl = element('table');
+  tbl.createCaption().textContent = caption;
+  const tr = tbl.createTHead().insertRow();
+  for (const title of columns) { const th = element('th',title); th.scope='col'; tr.append(th); }
+  const body = tbl.createTBody();
+  for (const values of rows) {
+    const row = body.insertRow(), th = element('th',values[0]); th.scope='row'; row.append(th);
+    for (const v of values.slice(1)) row.insertCell().textContent = v;
+  }
+  $(host).replaceChildren(tbl);
+}
+let study, selectedCase, finding, tapes, tape, t=0, timer=null;
+function modelKey() {return ui.policy.value === 'selected' ? finding.selection.selected : ui.policy.value;}
+function caseName(c) {return (labels[c.condition] || c.condition)+' · '+c.rotation+'°';}
+function stop() {
+  clearInterval(timer); timer=null; ui.play.textContent='Play'; ui.play.setAttribute('aria-label','Play route replay');
+}
+function go(step) { t = Math.max(0, Math.min(tape.steps.length,step)); frame(); }
+function begin() {
+  if (timer !== null) { stop(); return; }
+  if (!tape.steps.length) return;
+  if (t >= tape.steps.length) go(0);
+  ui.play.textContent='Pause'; ui.play.setAttribute('aria-label','Pause route replay');
+  timer = setInterval(()=>{go(t+1); if(t === tape.steps.length) stop();},650);
+}
+function setCase() {
+  const variants=study.cases.filter(c=>c.condition===ui.fixture.value);
+  options(ui.orientation,variants.map(c=>[String(c.rotation),c.rotation===0?'Original · 0°':'Rotated · '+c.rotation+'°']),ui.orientation.value);
+  selectedCase = variants.find(c=>String(c.rotation)===ui.orientation.value);
+  finding = study.findings.find(f=>f.id===selectedCase.id);
+  if (!finding) throw Error('Missing finding for '+selectedCase.id);
+  $('case-summary').textContent = selectedCase.condition === 'same-exits' ? 'Negative control · matching exits' :
+    'Place proposal · '+selectedCase.proposal.positions.length+' junctions';
+  options(ui.phase,Object.entries(phases),ui.phase.value || 'navigation');
+  setPhase();
+}
+function setPhase() {
+  const nav = ui.phase.value === 'navigation';
+  const names = [['selected','Selected · '+policies[finding.selection.selected]],...Object.entries(policies)];
+  options(ui.policy,names.filter(([k])=>nav || k!=='tile'),ui.policy.value || 'selected');
+  setPolicy();
+}
+function setPolicy(keepStep=false) {
+  const nav = ui.phase.value === 'navigation';
+  const previousId=ui.route.value, previousStep=t;
+  tapes = nav ? selectedCase.routes[modelKey()] : selectedCase.traversals[ui.phase.value];
+  options(ui.route,tapes.map(x=>[x.id,x.id]),ui.route.value);
+  setTape();
+  if(keepStep && tape.id===previousId) go(previousStep);
+}
+function setTape() {
+  stop();
+  $('origin').replaceChildren();
+  tape = tapes.find(x=>x.id===ui.route.value);
+  if (!tape) throw Error('A route recording is missing.');
+  ui.scrub.max = tape.steps.length;
+  ui.scrub.disabled = ui.play.disabled = !tape.steps.length;
+  go(0);
+}
+function history() {
+  const result = {tiles:new Map(), links:new Map(), moves:[]};
+  // Only completed fit steps provide learned connectivity. Other phases also show
+  // their recorded trail, without adding navigation or evaluation moves to the fit.
+  for (const fit of selectedCase.traversals.fit) {
+    const here = ui.phase.value === 'fit' && fit === tape;
+    result.tiles.set(posKey(fit.start.position),fit.start);
+    for (const s of (here ? fit.steps.slice(0,t) : fit.steps)) {
+      result.moves.push(s);
+      result.tiles.set(posKey(s.next_position),{position:s.next_position,symbol:s.next_symbol});
+      if (!same(s.position,s.next_position)) {
+        const key = [posKey(s.position),posKey(s.next_position)].sort().join('/');
+        result.links.set(key,[s.position,s.next_position]);
+      }
+    }
+    if (here) break;
+  }
+  return result;
+}
+function drawMap(h, pos, symbol) {
+  const actual = ui.view.value === 'actual', board=$('map');
+  board.replaceChildren();
+  const tiles = new Map(actual ? selectedCase.layout.tiles.map(v=>[posKey(v.position),v]) : h.tiles);
+  const visited = [tape.start.position,...tape.steps.slice(0,t).map(s=>s.next_position)];
+  if (!actual) {
+    tiles.set(posKey(tape.start.position),tape.start);
+    for (const s of tape.steps.slice(0,t)) tiles.set(posKey(s.next_position),{position:s.next_position,symbol:s.next_symbol});
+  }
+  const [r0,c0,r1,c1] = selectedCase.layout.bounds, stride=68, pad=36;
+  const width = 2*pad+(c1-c0)*stride, height = 2*pad+(r1-r0)*stride;
+  board.style.setProperty('--map-width',width+'px');
+  board.style.setProperty('--map-height',height+'px');
+  const xy = p => [pad+(p[1]-c0)*stride,pad+(p[0]-r0)*stride];
+  board.setAttribute('viewBox','0 0 '+width+' '+height);
+  svg('title',{id:'map-desc'},board,(actual?'Actual layout':'Observed map')+'. '+symbol+' at '+loc(pos)+', step '+t+' of '+tape.steps.length+'.');
+  const paths = svg('g',{'stroke-linecap':'round'},board);
+  function line(p,q,color,sw) {
+    const [x1,y1] = xy(p), [x2,y2]=xy(q);
+    svg('line',{x1,y1,x2,y2,stroke:color,'stroke-width':sw},paths);
+  }
+  if (actual) for (const v of tiles.values()) {
+    const [r,c]=v.position;
+    for (const q of [[r+1,c],[r,c+1]]) if (tiles.has(posKey(q))) line(v.position,q,'#536c64',5);
+  }
+  for (const [p,q] of h.links.values()) line(p,q,'#adc2b2',5);
+  for (const [i,p] of visited.entries()) if(i) line(visited[i-1],p,'#f2bc68',5);
+  const nodes=svg('g',{},board);
+  for (const v of tiles.values()) {
+    const [x,y]=xy(v.position), current=same(pos,v.position), goal=tape.goal===v.symbol;
+    const cell=svg('g',{},nodes);
+    svg('title',{},cell,v.symbol+' '+loc(v.position)+(goal?' · goal':'')+(current?' · current position':''));
+    const seen=h.tiles.has(posKey(v.position));
+    svg('rect',{x:x-24,y:y-19,width:48,height:38,rx:6,fill:seen?'#304e44':'#253e37',stroke:seen?'#7c9f8f':'#577266','stroke-width':1.5},cell);
+    const font = Math.min(13, 71/Math.max(1,v.symbol.length));
+    svg('text',{x,y:y+4,'text-anchor':'middle','font-family':'system-ui,sans-serif','font-weight':600,'font-size':font,fill:'#f0f4e8'},cell,v.symbol);
+    if(goal) svg('path',{d:'M '+(x-21)+' '+(y-23)+' l 5 5 -5 5 -5 -5 Z',fill:'#152d29',stroke:'#99cabb','stroke-width':2.4},cell);
+    if(current) svg('circle',{id:'agent-position',cx:x+19,cy:y-17,r:7,fill:'#ef9f54',stroke:'white','stroke-width':2},cell);
+  }
+  $('map-title').textContent = tape.goal ? tape.start.symbol+' → '+tape.goal : 'Traversal map';
+  $('map-caption').textContent = actual?'The full layout is available to the scorer. Pale lines mark traversed fit connections; darker lines show other legal adjacencies.':
+    ui.phase.value === 'fit' ? 'Tiles and connections appear as the fit traversal reaches them. The trail ends at the current observation.':
+    'This view combines the map observed during fitting with the selected replay trail. Held-out steps leave the fitted connections unchanged.';
+}
+function placeOf(symbol,pos,arm) {
+  if (arm==='tile') return symbol+' '+loc(pos);
+  const split = arm==='split' && symbol===selectedCase.proposal.symbol &&
+    selectedCase.proposal.positions.some(p=>same(p,pos));
+  return split ? symbol+' '+loc(pos) : symbol;
+}
+function showConnectivity(h,pos,symbol) {
+  const arm = modelKey(), select=$('origin');
+  const current=placeOf(symbol,pos,arm);
+  const origins=[...new Set([...h.tiles.values()].map(v=>placeOf(v.symbol,v.position,arm)))].sort();
+  options(select,[['','Replay position · '+current],...origins.map(v=>[v,v])],select.value);
+  const place=select.value || current;
+  $('connection-summary').textContent = (arm==='tile'?'The tile map groups movements by position.':arm==='split'?
+    'The split model distinguishes the proposed junctions using their integrated positions.':'The appearance model pools visits with the same symbol into one place.')+
+    ' The table shows directed fit connections from '+place+'.';
+  if (ui.phase.value!=='fit' && arm!=='tile') {
+    const candidate=selectedCase.candidates[arm];
+    const names=new Map(candidate.places.map(p=>[p.id,p.position ? p.symbol+' '+loc(p.position) : p.symbol]));
+    const edges=candidate.transitions.filter(s=>names.get(s.source)===place);
+    const count=new Map();
+    for (const edge of edges) count.set(edge.action,(count.get(edge.action)||0)+edge.count);
+    table('edge-table','Frozen learned connections and empirical movement probabilities.',
+      ['Command','Destination place','Fit count','Probability given command'],
+      edges.map(e=>[compass[e.action],names.get(e.target),e.count,(100*e.count/count.get(e.action)).toFixed(1)+'%']));
+    return;
+  }
+  const exits = new Map();
+  for (const s of h.moves) {
+    if (placeOf(s.symbol,s.position,arm)!==place) continue;
+    const dest=placeOf(s.next_symbol,s.next_position,arm), blocked=same(s.position,s.next_position);
+    const key=JSON.stringify([s.action,dest,blocked]);
+    const row=exits.get(key) || [compass[s.action],dest,blocked?'Blocked':'Moved',0];
+    row[3]++; exits.set(key,row);
+  }
+  const rows = [...exits.values()];
+  if (rows.length) table('edge-table','Observed fit transitions from '+place,['Command','Destination','Movement','Count'],rows);
+  else $('edge-table').replaceChildren(element('p','No outgoing fit transitions recorded here yet.'));
+}
+function frame() {
+  const step = t ? tape.steps[t-1] : null, pos=step?step.next_position:tape.start.position;
+  const symbol=step?step.next_symbol:tape.start.symbol;
+  const h=history(), arm=modelKey();
+  drawMap(h,pos,symbol); showConnectivity(h,pos,symbol);
+  $('step').value=t+' / '+tape.steps.length;
+  ui.scrub.value=t; ui.scrub.setAttribute('aria-valuetext','Step '+t+' of '+tape.steps.length);
+  ui.prev.disabled=t===0; ui.next.disabled=t===tape.steps.length;
+  const items = [['Observation',symbol],['Position (row, col)',loc(pos)],['Place in model',placeOf(symbol,pos,arm)]];
+  if(ui.phase.value==='navigation' && t<tape.steps.length) items.push(['Next recorded command',compass[tape.steps[t].action]]);
+  if(step) items.push(['Last command',compass[step.action]],['From',step.symbol+' '+loc(step.position)],['Displacement',loc(step.displacement)]);
+  else items.push(['Initial heading',compass[tape.heading]]);
+  if(tape.goal) items.push(['Goal observation',tape.goal],['Action budget',tape.budget]);
+  // Energies use the concatenated tape order within a partition.
+  if(step && (ui.phase.value==='selection' || ui.phase.value==='final')) {
+    const k=tapes.slice(0,tapes.indexOf(tape)).reduce((n,x)=>n+x.steps.length,0)+t-1;
+    const energy=finding.scores[arm][ui.phase.value].energies[k];
+    items.push(['Next-symbol BFE',fixed(energy)+' nats']);
+  }
+  $('readings').replaceChildren(...items.flatMap(([k,v])=>[element('dt',k),element('dd',v)]));
+  $('outcome').textContent=ui.phase.value==='navigation' && t===tape.steps.length ?
+    (tape.success?'Goal reached':'Goal unreached')+' · '+t+' actions'+(tape.reason?' · '+tape.reason:'')+'.' :
+    step && same(step.position,step.next_position) ? 'This command left the agent in place.' :
+    !step ? 'The start observation appears before the first move.' : '';
+}
+function renderScores() {
+  const stats=[], nav=[];
+  for (const c of study.cases) {
+    const f=study.findings.find(x=>x.id===c.id);
+    for(const arm of ['appearance','split']) {
+      const m=f.scores[arm], chosen=f.selection.selected===arm;
+      stats.push([caseName(c),policies[arm],chosen?'Selected':'—',fixed(m.selection.total_bfe),
+        m.final.n_events,fixed(m.final.total_bfe),fixed(m.final.mean_bfe)]);
+    }
+    for(const arm of ['appearance','split','tile']) {
+      const r=f.routes[arm];
+      nav.push([caseName(c),policies[arm],r.completed+' / '+r.attempted,r.actions]);
+    }
+  }
+  table('score-table','Ordinary tree Bethe free energy (BFE), in nats. Lower scores mean better predictions.',
+    ['Fixture','Candidate','Choice','Selection total','Final moves','Final total','Nats / move'],stats);
+  table('route-table','Frozen policies on goal-directed route replays. Actions include unsuccessful attempts.',
+    ['Fixture','Policy','Goals reached','Total actions'],nav);
+  $('score-text').textContent='The selection traversal determines which candidate to use. Both candidates are scored on the final traversal with their fitted counts frozen.';
+  $('route-text').textContent='The place policies plan from fitted next-place frequencies, minimizing expected moves plus a penalty for missing the goal. The tile policy uses breadth-first search over traversed links. All three choose among tied moves using their current heading.';
+  const main=study.findings.find(x=>x.id==='aliased'), control=study.findings.find(x=>x.id==='same-exits');
+  if (main && control) {
+    const result=(f,arm)=>f.routes[arm].completed+'/'+f.routes[arm].attempted;
+    const controlWinner=control.selection.selected;
+    $('finding').textContent='On the original aliased layout, the split model reached '+result(main,'split')+
+      ' goals and appearance alone reached '+result(main,'appearance')+'. With matching exits, selection favored the '+
+      controlWinner+' model. Appearance reached '+result(control,'appearance')+' goals, the split reached '+
+      result(control,'split')+' and the observed tile map reached '+result(control,'tile')+
+      '. A model can predict the next symbol well and still lose track of the way home.';
+  }
+}
+function init() {
+  study=JSON.parse($('study').textContent);
+  if(!study.cases?.length || !study.findings?.length) throw Error('No study cases or scores.');
+  const conditions=[...new Set(study.cases.map(c=>c.condition))];
+  options(ui.fixture,conditions.map(k=>[k,labels[k]||k]),'aliased');
+  $('inputs').textContent='The agent receives a local symbol and exact row/column displacement after each compass move. It integrates motion relative to its starting landmark. A blocked move has zero displacement. The full layout appears in the guide for inspection.';
+  $('metrics').textContent='For each observed next symbol, the ordinary categorical CFFG tree computes the negative log of its fitted predictive probability. Counts have one added to each possible outcome. The independent calculation checks every native energy. A split is selected only when its total selection BFE is lower beyond the numerical tolerance.';
+  renderScores(); setCase();
+  const query=new URLSearchParams(location.search);
+  const linked=study.cases.find(c=>c.id===query.get('case'));
+  if(linked) {ui.fixture.value=linked.condition; setCase(); ui.orientation.value=String(linked.rotation); setCase();}
+  for(const [key,refresh] of [['phase',setPhase],['policy',setPolicy],['route',setTape]]) {
+    const pick=query.get(key);
+    if(pick && [...ui[key].options].some(o=>o.value===pick)) {ui[key].value=pick;refresh();}
+  }
+  const step=query.get('step');
+  if(step && /^\d+$/.test(step)) go(Number(step));
+  if (study.scale?.status==='complete' && study.scale.rows?.length) {
+    const rows=study.scale.rows;
+    $('scale').hidden=false;
+    $('scale-note').textContent='Separate synthetic loops on '+(study.scale.hardware?.cpu || 'CPU')+
+      '. Each fresh worker scored 24 events once cold and five times warm. Cold time covers table preparation, native scoring and numerical checks, excluding imports and fitting. The count table occupies as many bytes as the probability table. Peak RSS covers the whole worker lifetime.';
+    table('scale-table','Float64 scoring measurements. These runs measure resource use on larger inputs.',
+      ['Tiles','Assignment','Directed links','Dense entries','Probability table (KiB)','Cold (s)','Warm median (ms)','Peak RSS (MiB)'],
+      rows.map(r=>[r.tiles,policies[r.assignment],r.observed_directed_transitions,r.dense_entries,(r.cpt_bytes/1024).toFixed(1),fixed(r.cold_s),(1000*r.warm_s.median).toFixed(2),r.peak_rss_mib.toFixed(1)]));
+    $('scale-download').href=URL.createObjectURL(new Blob([JSON.stringify(study.scale,null,2)],{type:'application/json'}));
+  }
+}
+ui.fixture.onchange=ui.orientation.onchange=setCase; ui.phase.onchange=setPhase; ui.policy.onchange=()=>setPolicy(true); ui.route.onchange=setTape;
+ui.view.onchange=()=>frame(); ui.prev.onclick=()=>{stop();go(t-1);}; ui.next.onclick=()=>{stop();go(t+1);};
+ui.play.onclick=begin; ui.scrub.oninput=()=>{stop();go(Number(ui.scrub.value));};
+$('origin').onchange=()=>frame();
+$('zoom').onclick=()=>{
+  const large=$('map-scroll').classList.toggle('enlarged');
+  $('zoom').setAttribute('aria-pressed',String(large));
+  if (large) {
+    const region=$('map-scroll'), dot=$('agent-position').getBoundingClientRect(), box=region.getBoundingClientRect();
+    region.scrollLeft+=dot.left-box.left-box.width/2;
+    region.scrollTop+=dot.top-box.top-box.height/2;
+  }
+};
+document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});
+try{init();}catch(e){stop();$('error').textContent='The replay data could not be displayed. '+e.message;$('error').hidden=false;}
+</script>
+</body></html>
