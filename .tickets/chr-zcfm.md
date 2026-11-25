@@ -49,3 +49,12 @@ cff-3kdk (selective readouts, ready) -------------------------------------------
 **2026-11-25T06:27:42Z**
 
 Library timing on the frozen 860-factor spatial surrogate (1,116 variables, same 25 warm calls) is a starting point for resumption. Input binding fell from 22.036 ms to 0.219 ms and requested posterior readout from 14.113 ms to 0.080 ms. End-to-end median decision time fell from 39.853 ms to 3.995 ms. Both sets of 52 recorded marginal arrays and 52 energies matched exactly. The inference phase itself took 2.263 and 2.276 ms. Sources ff845a4 and 9da2f7a, raw comparison ~/agent-share/hierarchical-runtime/spatial-proxy/comparison.json. The surrogate is one fixed graph and contains no game episodes. Real map size, transition support and end-to-end controller behavior still need the measurements in outcomes 4 and 5 when Craftax resumes.
+
+**2026-11-25T07:59:10Z**
+
+Resume point. All three direct prerequisites are closed and this ticket appears in tk ready. No new Craftax episodes or training were run. The next experiment still requires Cooper to resume it. The 8× Hallway throughput goal chr-d4dl is independent and remains open. The local transition contract and dense parity check in outcomes 4–5 are the first modeling task on resumption.
+
+Prerequisite --> dependent
+[x] cff-wbhu --> [x] cff-9xmq --> [x] cff-mjku --> [x] cff-pyy9 --+
+[x] cff-4yr6 -------------------------------------------------------+--> [ ] chr-zcfm (ready, parked)
+[x] cff-3kdk -------------------------------------------------------+
