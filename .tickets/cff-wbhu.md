@@ -1,6 +1,6 @@
 ---
 id: cff-wbhu
-status: in_progress
+status: closed
 deps: [cff-j4mu, cff-d56d, cff-44we]
 links: [cff-fxmj, cff-5edo, cff-d56d, cff-yl0a, cff-rqqc, cff-weff, cff-lv2w, cff-g7rc, cff-r6bl, cff-sf29, cff-yglj, cff-xa6z, chr-d4dl]
 created: 2026-07-10T03:34:54Z
@@ -517,7 +517,7 @@ The exact two-pass Colony path and one-logical-iteration evidence in tests/test_
   The unmet speed target remains visible in chr-d4dl.
 - [ ] 10.43 `docs/LIMITATIONS.md` removes the mixed-GFE per-instance host-loop
   limitation only after mixed controller batching lands.
-- [ ] 10.44 The final code change is followed by one passing default short-suite
+- [x] 10.44 The final code change is followed by one passing default short-suite
   run through the repository dashboard workflow.
 
 ## Methodological Suggestions
@@ -887,3 +887,7 @@ Cooper’s 2026-11-24 acceptance decision supersedes the previous 1.2–1.8× re
 **2026-11-25T06:46:07Z**
 
 Mixed-GFE qualification at 4528ab7 (chr-y2wk). Cooper selected explicit outer_solver="compiled_trust_region" for deterministic fixed-support models. Engine/Colony auto keeps the host trust path. Each eligible lane runs the existing trust step and receives an independent final undamped-map, support and ledger certificate; the host handles restarts, hardening, final certification and exceptional recovery. In §6.16 the cache counter records derivative-plan misses. In §6.23–24 a candidate can reject an invalid trial before terminal classification. §6.30 uses chart layout and supplies metric values at runtime. §6.42 specializes executables by phase, width and trace capacity. §6.43 describes the regular phase. Adaptive Gaussian and functional paths retain their source controllers. For §8.28, five lanes exercise unequal stops; all 32 benchmark members took eight iterations. The experiment directly supports §9.32–35 on CPU. Default/opt-in wall times for 32 distinct T-maze priors were 10.875/17.424 s cold and 2.582/0.501 s warm, with peak RSS 865/1369 MiB. All 32 reached root_converged, map counts were 41/42, maximum absolute ledger difference 5.33e-15. The 41 focused passes excluded a separately tracked pre-existing adaptive fixture (chr-odhx). Full receipts, source hashes and per-member outcomes are recorded in chr-y2wk. The ordinary P2 chr-d4dl excludes this mixed benchmark.
+
+**2026-11-25T07:58:37Z**
+
+Integrated acceptance at f5b8ede. The default dashboard suite passed all 2,751 selected tests, with 335 opt-in slow cases deselected. Wall time was 1,143.367 seconds, within the 1,200-second budget. The ordinary compiled controller remains the default. The separate P2 chr-d4dl owns the outstanding 8× CPU throughput target under Cooper’s revised acceptance decision. The optional mixed trust controller and its certificate boundaries are recorded above. This closes the compiled-controller ticket.
