@@ -12,6 +12,7 @@ import numpy as np
 from cffg.compiler import compile_template
 from cffg.core import BlobRef, FactorSpec, PortRole, PortSpec, Template, VariableSpec
 from cffg.core.serialize import structure_hash
+from cffg.core.validate import validate
 
 
 @dataclass(frozen=True)
@@ -79,6 +80,10 @@ def canonical_model(parent_prior, parent_transition, child_prior, child_transiti
 
 
 def _factors(level, template, array_values, kinds):
+    try:
+        validate(template)
+    except ValueError as exc:
+        raise ValueError(f"{level} hierarchy template: {exc}") from exc
     if (template.constraints or template.learnables or template.plates or template.agent
             or sorted(f.type for f in template.factors.values()) != sorted(kinds)):
         raise ValueError(f"{level}: unsupported factors, constraints, learning, plates or agent declaration")

@@ -131,7 +131,7 @@ def test_support_budgets_vacuity_and_reference_execution():
     assert abs(vacuous.free_energy) < 1e-12
 
 
-def test_long_float32_period_finite_at_exact_zero_support():
+def test_long_float32_period_remains_finite_beyond_linear_space_underflow():
     p,t,d,b,a = tables(np.float32)
     a = np.array([[1.,1.], [1e-12,2e-12]],np.float32)
     h = Hierarchy.from_tables(p,t,d,b,a,thickness=64)
@@ -139,6 +139,10 @@ def test_long_float32_period_finite_at_exact_zero_support():
         r = h.step(1).require_converged()
         # A linear-space forward likelihood underflows inside this period.
         assert np.isfinite(r.log_cavity).all() and np.isfinite(r.free_energy)
+        if tick == 55:
+            resumed = Hierarchy.from_tables(p,t,d,b,a,thickness=64)
+            resumed.restore(h.checkpoint())
+            h = resumed
     assert h.parent_periods == 1 and min(-r.log_cavity) > 1000
 
 
@@ -160,3 +164,47 @@ def test_declaration_rejects_unsupported_semantics_and_invalid_inputs():
     with pytest.raises(ValueError,match="unversioned"):
         HierarchySpec.from_json("{}")
     assert Hierarchy(*args).structure_hash != Hierarchy.from_tables(*tables(),thickness=1).structure_hash
+
+
+def test_child_failure_gates_parent_and_nonfinite_joint_never_commits(monkeypatch):
+    import cffg.hierarchy as module
+
+    h = Hierarchy.from_tables(*tables(), thickness=1)
+    original_child, original_parent = module.child_message, module.parent_message
+
+    def invalid_child(*args):
+        return (*original_child(*args)[:-1], False)
+
+    def forbidden(*args):
+        pytest.fail("parent consumed a divergent child result")
+
+    monkeypatch.setattr(module, "child_message", invalid_child)
+    monkeypatch.setattr(module, "parent_message", forbidden)
+    r = h.step(0)
+    assert (r.status, r.child_status, r.parent_status) == (RunStatus.DIVERGED, RunStatus.DIVERGED, None)
+
+    def invalid_parent(*args):
+        z, log_joint, terms, stat = original_parent(*args)
+        return z, log_joint, terms.at[0].set(np.nan), stat
+
+    monkeypatch.setattr(module, "child_message", original_child)
+    monkeypatch.setattr(module, "parent_message", invalid_parent)
+    r = h.step(0)
+    assert (r.status, r.child_status, r.parent_status) == (RunStatus.DIVERGED, RunStatus.CONVERGED, RunStatus.DIVERGED)
+    assert h.child_ticks == h.parent_periods == 0
+
+
+def test_vmap_child_eliminates_independent_observations():
+    import jax.numpy as jnp
+    from cffg.hierarchy_kernel import child_message, initial_cost
+
+    p, _, d, b, a = tables()
+    frontier = jnp.log(jnp.broadcast_to(d, (len(p), len(d))))
+    args = (frontier, jnp.zeros(len(p)), initial_cost(frontier), jnp.log(b), jnp.log(a))
+    observations = jnp.array([-1, 0, 1])
+    batched = jax.vmap(child_message, in_axes=(None, None, None, None, None, 0))(*args, observations)
+    for i, observation in enumerate(observations):
+        with jax.disable_jit():
+            uncompiled = child_message(*args, observation)
+        for actual, expected in zip(batched, uncompiled, strict=True):
+            np.testing.assert_allclose(actual[i], expected, atol=32*np.finfo(float).eps)

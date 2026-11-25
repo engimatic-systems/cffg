@@ -17,7 +17,6 @@ from threading import RLock
 
 import jax.numpy as jnp
 import numpy as np
-from scipy.special import logsumexp
 
 from cffg.hierarchy_kernel import child_message, initial_cost, parent_message, rollover
 from cffg.hierarchy_model import HierarchySpec, canonical_model, compile_hierarchy
@@ -96,7 +95,7 @@ class Hierarchy:
     permits the one certified exact pass on its level. No samples are drawn.
     """
 
-    def __init__(self, spec: HierarchySpec, parent, parent_arrays, child, child_arrays):
+    def __init__(self, spec: HierarchySpec, parent, parent_arrays, child, child_arrays, *, goal_window=None):
         self._lock = RLock()
         self.spec = spec
         self.parent_template, self.child_template = copy.deepcopy((parent, child))
@@ -115,12 +114,18 @@ class Hierarchy:
             data = np.asarray(value)
             h.update(data.dtype.str.encode())
             h.update(data.tobytes())
+        self._goals = None
+        if goal_window is not None:
+            from cffg.hierarchy_goals import GoalWindow
+            self._goals = GoalWindow(*goal_window)
+            h.update(self._goals.identity.encode())
         self.artifact_hash = h.hexdigest()
 
     @classmethod
-    def from_tables(cls, parent_prior, parent_transition, child_prior, child_transition, emission, *, thickness):
+    def from_tables(cls, parent_prior, parent_transition, child_prior, child_transition, emission, *, thickness, goal_window=None):
         """Tables are indexed [next,old], [regime,next,old], and [observed,next]."""
-        return cls(*canonical_model(parent_prior, parent_transition, child_prior, child_transition, emission, thickness))
+        model = canonical_model(parent_prior, parent_transition, child_prior, child_transition, emission, thickness)
+        return cls(*model, goal_window=goal_window)
 
     @property
     def child_ticks(self):
@@ -141,6 +146,11 @@ class Hierarchy:
         return np.array(self._state.parent_statistics)
 
     @property
+    def period_prior(self):
+        """Downward regime message, held fixed until the next slow rollover."""
+        return np.exp(np.asarray(self._state.prior))
+
+    @property
     def current_joint(self):
         """Boundary before the next fast transition; includes the scheduled slow rollover."""
         state = self._state
@@ -148,7 +158,7 @@ class Hierarchy:
         cavity = np.asarray(state.cavity)
         weights = prior + (cavity - np.max(cavity[np.isfinite(prior)]))
         mass = weights[:, None] + np.asarray(state.frontier)
-        return np.exp(mass - logsumexp(mass))
+        return np.exp(mass - np.logaddexp.reduce(mass, axis=None))
 
     def preview(self, observation, *, child_budget=1, parent_budget=1, coupled_budget=1):
         with self._lock:
@@ -198,7 +208,7 @@ class Hierarchy:
         # and the two normalized boundary marginals against their message product.
         prior = np.asarray(state.prior)
         weights = prior + (cavity - np.max(cavity[np.isfinite(prior)]))
-        regime = np.exp(weights - logsumexp(weights))
+        regime = np.exp(weights - np.logaddexp.reduce(weights))
         prob_residual = max(abs(joint.sum() - 1), np.max(np.abs(joint.sum(axis=1) - regime)))
         energy_residual = abs(ledger.total + z)
         eps = np.finfo(terms.dtype).eps
@@ -206,7 +216,7 @@ class Hierarchy:
         energy_scale = max(1., np.abs(terms).sum(), abs(z))
         residual = float(max(energy_residual, prob_residual))
         if not math.isfinite(energy_residual) or not math.isfinite(prob_residual):
-            return HierarchyResult(diverged, ok, ok, ledger=ledger, residual=residual)
+            return HierarchyResult(diverged, ok, ok, ledger=ledger, residual=math.nan)
         if energy_residual > 128 * eps * energy_scale or prob_residual > 128 * eps:
             return HierarchyResult(diverged, ok, ok, ledger=ledger, residual=residual)
         ticks = state.ticks + 1
@@ -221,3 +231,44 @@ class Hierarchy:
                                  parent_statistics=state.parent_statistics + pstat)
             self._state = staged
         return HierarchyResult(ok, ok, ok, joint.sum(axis=1), joint.sum(axis=0), joint, cavity, ledger, residual, complete)
+
+    @property
+    def goal_priors(self):
+        """Committed child planning-window Dirichlet counts, keyed by blob name."""
+        with self._lock:
+            return {} if self._goals is None else {k: v.copy() for k, v in self._goals.priors.items()}
+
+    def plan_goals(self, n_iters, *, data=None, tol=None):
+        """Stage the latest converged native child planning window, on its separate GFE ledger."""
+        if self._goals is None:
+            raise ValueError("no child learned-goal planning window declared")
+        with self._lock:
+            return self._goals.plan(n_iters, data, tol)
+
+    def finish_episode(self):
+        """Roll one staged goal posterior. The environment and regime clocks continue."""
+        with self._lock:
+            return self._goals is not None and self._goals.finish()
+
+    def checkpoint(self):
+        """Return independent arrays suitable for np.savez and pickle-free restoration."""
+        from cffg.hierarchy_io import checkpoint
+        with self._lock:
+            return checkpoint(self)
+
+    def restore(self, values):
+        """Validate all fields before installing the saved boundary."""
+        from cffg.hierarchy_io import restore
+        with self._lock:
+            restore(self, values)
+
+    def save_bundle(self, path):
+        """Atomically package the hierarchy declaration, native level bundles and checkpoint."""
+        from cffg.hierarchy_io import save
+        with self._lock:
+            save(self, path)
+
+    @classmethod
+    def load_bundle(cls, path):
+        from cffg.hierarchy_io import load
+        return load(cls, path)

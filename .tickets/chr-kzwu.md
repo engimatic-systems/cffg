@@ -1,6 +1,6 @@
 ---
 id: chr-kzwu
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-11-25T06:05:31Z
@@ -38,3 +38,9 @@ The parent epic cff-pyy9 owns the behavioral comparison, shallow contingent poli
 
 A regime is the slow categorical state that selects the fast transition table. A cavity is evidence returned to a variable after excluding its incoming prior. A separator is the joint distribution carried across an elimination boundary. Bethe free energy is the sum of local expected negative log factors and entropy corrections. On this tree it equals the negative log evidence. A checkpoint stores the model state between calls.
 
+
+## Notes
+
+**2026-11-25T06:18:51Z**
+
+Implemented exact, deterministic categorical inference from two compiled templates. The parent and child GLUE ports are the two endpoints of one edge. A separate native child planning window may stage goal counts. Its episode rollover and GFE are separate from the ordinary categorical evidence ledger. Checkpoint version 1 binds the declaration, active precision and packed model. It stores the pending log cavity, conditional state and ledger moments, slow and fast statistics/clocks, and pending/committed Dirichlet counts. A nested bundle rebuilds the templates and optional planner. Stochastic factors and general cross-level GFE are outside the v1 model. Eleven focused tests passed in 7.41s using uv run --frozen --no-sync pytest -q tests/test_hierarchy.py tests/test_hierarchy_checkpoint.py. Direct path enumeration checks each term, real Engine flood/two_pass check the one-clock limit, and eager/JIT/vmap check child messages. Exact zeros, divergent and exhausted levels, 64 rare float32 readings, stale/incompatible state, scoped names, and standalone goal parity covered. tk dep cycle passed. Parent owns the short suite and acceptance of the separately registered behavioral trial. External study outcome belongs in cff-pyy9.
