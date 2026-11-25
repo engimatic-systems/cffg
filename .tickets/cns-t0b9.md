@@ -1,6 +1,6 @@
 ---
 id: cns-t0b9
-status: open
+status: in_progress
 deps: [cff-du6m]
 links: []
 created: 2026-11-25T18:24:33Z
