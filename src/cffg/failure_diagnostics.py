@@ -1,6 +1,6 @@
 """Decode retained execution evidence once at the public result boundary."""
 
-import jax.numpy as jnp
+import jax
 import numpy as np
 
 from cffg.exact_strategy import ExactReason
@@ -11,7 +11,7 @@ from cffg.runtime_types import FailureDiagnostic, OuterTerminationReason
 
 def local_diagnostic(retained, names):
     factor, reason, phase, iteration = np.asarray(
-        jnp.stack((*retained.fact, retained.iteration))
+        jax.device_get((*retained.fact, retained.iteration))
     ).tolist()
     if reason == FailureReason.NONE:
         return None

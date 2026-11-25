@@ -1,6 +1,6 @@
 ---
 id: cff-wbhu
-status: open
+status: in_progress
 deps: [cff-j4mu, cff-d56d, cff-44we]
 links: [cff-fxmj, cff-5edo, cff-d56d, cff-yl0a, cff-rqqc, cff-weff, cff-lv2w, cff-g7rc, cff-r6bl, cff-sf29, cff-yglj, cff-xa6z]
 created: 2026-07-10T03:34:54Z
@@ -859,3 +859,11 @@ cff-yglj isolates the currently reproduced initial-nonfinite Colony result-field
 **2026-09-25T03:47:40Z**
 
 PCGym follow-up under cff-xa6z: retain a horizon-15 gaussian_mixture_linear control workload as consumer evidence for per-sweep dispatch cost; report warm synchronized inference separately from binding/readouts and concurrent-load wall time. Do not conflate cff-v6th's exact/Colony correctness repair or cff-qtub's cached spawning with this ticket's compiled loop scope. cff-wt1c consumes this result. Existing proof/status/throughput acceptance remains authoritative.
+
+**2026-11-25T06:07:07Z**
+
+Ordinary execution work starts on the shared hierarchical runtime branch. Architecture change path: Runtime numerical or status invariant. Checked pairs: Engine.run and Colony.run, sequential and grouped schedules, solver and ledger status, host and device exact support. Exact propagation and stochastic functional updates retain their existing owners. Mixed fixed-support trust execution, documentation, dashboard and final suite have separate owners. Check float32/64, exact zero support, vacuous inputs, nonfinite state/ledger, asynchronous member stopping, and 320-member scaling. Benchmark the same 32 deterministic states and 60 ordinary sweeps in both public paths and retain the original host controller as the reference.
+
+**2026-11-25T06:20:15Z**
+
+Ordinary controller implementation: one XLA while loop per soft or hard phase, one vmapped controller per compatible Colony group. Retains defined energy/delta traces, first local failure, per-member counters, and immutable observations and parameters. Public max-product decoding uses rounded NumPy probabilities. A real near-tie yields a different JAX argmax in both precisions. Certify the existing public assignment objective at stationarity, including the soft/hard boundary. Stochastic functional updates retain the host controller. Support checks and tolerance comparisons have independent focused receipts in 973aa42 and 542b658. The benchmark at 0fd9588 reconstructs the ordinary 32-by-60 controls. The historical 1.54x GFE/raw-vmap experiment used 120 sweeps; it is a different denominator and does not establish the proposed ordinary gate. Mixed compiled trust control, a final multi-owner suite and formal throughput qualification are tracked separately in this ticket.

@@ -58,7 +58,10 @@ from cffg.execution.transport import _disc_both as _disc_both  # noqa: PLC0414
 from cffg.execution.transport import _disc_rows as _disc_rows  # noqa: PLC0414
 from cffg.execution.transport import _gauss_rows as _gauss_rows  # noqa: PLC0414
 from cffg.execution.transport import _obs_rows as _obs_rows  # noqa: PLC0414
-from cffg.iteration import IterationPolicy, IterationServices, run_iterations
+from cffg.compiled_iteration import controller_for
+from cffg.iteration import (
+    IterationPolicy, IterationServices, allows_initial_undefined_energy, run_iterations,
+)
 from cffg.execution.failures import FailureIndex
 from cffg.ledger import ObjectiveLedger, constraint_satisfied
 from cffg.ledger import make_belief_energy as _make_bfe
@@ -444,15 +447,16 @@ class Engine:
                 state, n_iters, tol=tol, harden_last=harden_last
             )
 
-        outcome = run_iterations(
-            state,
-            self._iteration_program(),
-            services=self._iteration_services(),
-            policy=self._iteration_policy(state, tol),
-            n_iters=n_iters,
-            damp=damp,
-            harden_last=harden_last,
-        )
+        if self._mu3_lifecycle is not None or "_update_mu3" in vars(self):
+            outcome = run_iterations(
+                state, self._iteration_program(), services=self._iteration_services(),
+                policy=self._iteration_policy(state, tol), n_iters=n_iters,
+                damp=damp, harden_last=harden_last,
+            )
+        else:
+            outcome = controller_for(self).run_single(
+                state, n_iters=n_iters, damp=damp, harden_last=harden_last, tol=tol,
+            )
         ess, log_normalizers, mu3_statuses = self._mu3_result_diagnostics(outcome.state)
         return run_results.finalize_iteration(
             outcome,
@@ -476,12 +480,7 @@ class Engine:
         return IterationPolicy.from_dtype(
             state.messages.dtype,
             semiring=self.arena.semiring,
-            allow_initial_undefined_energy=bool(
-                self.arena.gauss_groups
-                or self.arena.ef_groups
-                or self.arena.prec_groups
-                or self.arena.recurrence_groups
-            ),
+            allow_initial_undefined_energy=allows_initial_undefined_energy(self.arena),
             tol=tol,
         )
 
