@@ -79,6 +79,7 @@ from cffg.readouts import hybrid as _hybrid_readouts
 from cffg.readouts import parameters as _parameters_readouts
 from cffg.readouts import recurrence as _recurrence_readouts
 from cffg.readouts import registered as _registered_readouts
+from cffg.readouts.selection import EdgeSelection
 from cffg.readouts.types import DirichletMarginal as DirichletMarginal  # noqa: PLC0414
 from cffg.readouts.types import EfMarginal as EfMarginal  # noqa: PLC0414
 from cffg.runtime_checks import StateChecks, state_is_finite
@@ -549,10 +550,9 @@ class Engine:
 
     # -- readouts ---------------------------------------------------------
 
-    def marginals(self, state: State) -> dict[str, np.ndarray]:
-        return _discrete_readouts.marginals(
-            self.arena, state,
-        )
+    def marginals(self, state: State, edges: EdgeSelection = None) -> dict[str, np.ndarray]:
+        """Categorical probabilities for all edges or the named subset, in first-occurrence order."""
+        return _discrete_readouts.marginals(self.arena, state, edges=edges)
 
     def node_beliefs(self, state: State) -> dict[str, np.ndarray]:
         """Factor name -> the node belief q_a, the object conjugate updates
@@ -617,14 +617,14 @@ class Engine:
         """Read one named Gaussian mean and covariance on the host."""
         return _gaussian_readouts.gaussian_marginal(self.arena, state, edge)
 
-    def gaussian_marginals(self, state: State) -> dict[str, tuple[np.ndarray, np.ndarray]]:
-        """Edge name -> (mean, cov). Requires a proper combined precision —
-        run to coherence (and bind data) first. Improper beliefs return NaN
-        mean/cov arrays, an explicit readout that cannot resemble a valid
-        negative or huge covariance."""
-        return _gaussian_readouts.gaussian_marginals(
-            self.arena, state,
-        )
+    def gaussian_marginals(
+        self, state: State, edges: EdgeSelection = None,
+    ) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+        """Gaussian moments for all edges or the named subset, in first-occurrence order.
+
+        Improper or unresolved beliefs return shape-preserving NaN means and covariances.
+        """
+        return _gaussian_readouts.gaussian_marginals(self.arena, state, edges=edges)
 
     def recurrence_pair_beliefs(
         self, state: State

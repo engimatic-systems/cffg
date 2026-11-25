@@ -24,6 +24,7 @@ from cffg.core.serialize import structure_hash
 from cffg.engine import Engine, RunResult, State, _replace
 from cffg.iteration import IterationProgress, step_facts
 from cffg.failure_facts import FailurePhase, empty_failure
+from cffg.readouts.selection import EdgeSelection
 from cffg.runtime_types import RunStatus as RunStatus  # noqa: PLC0414
 
 
@@ -214,9 +215,15 @@ class Colony:
                 self.last_results[iid] = result
         return {iid: self.last_results[iid] for iid in self.instances}
 
-    def marginals(self, iid: int) -> dict[str, np.ndarray]:
+    def marginals(self, iid: int, edges: EdgeSelection = None) -> dict[str, np.ndarray]:
         inst = self.instances[iid]
-        return self.engines[inst.key].marginals(inst.state)
+        return self.engines[inst.key].marginals(inst.state, edges=edges)
+
+    def gaussian_marginals(
+        self, iid: int, edges: EdgeSelection = None,
+    ) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+        inst = self.instances[iid]
+        return self.engines[inst.key].gaussian_marginals(inst.state, edges=edges)
 
     def __len__(self) -> int:
         return len(self.instances)

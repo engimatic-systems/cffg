@@ -5,9 +5,11 @@ from __future__ import annotations
 import numpy as np
 
 from cffg import ef
+from cffg.compiled import NEG
 from cffg.execution.transport import _disc_both, _disc_rows
 from cffg.kernel_runtime import discrete_potential as _disc_potential
 from cffg.kernel_runtime import parameters as _kernel_params
+from cffg.readouts.selection import EdgeSelection, grouped_edges, selected_edges
 from cffg.readouts.types import (
     Marginals,
 )
@@ -18,18 +20,25 @@ from cffg.readouts.views import (
 from cffg.runtime_types import State
 
 
-def marginals(view: DiscreteView, state: State) -> dict[str, np.ndarray]:
-    out: dict[str, np.ndarray] = {}
+def _card(edge):
+    return 0 if edge.dim or edge.ef or edge.param_shape else edge.card
+
+
+def marginals(view: DiscreteView, state: State, edges: EdgeSelection = None) -> dict[str, np.ndarray]:
+    selected = selected_edges(view, edges, "categorical", _card)
+    if not selected:
+        return {}
     msgs = np.asarray(state.messages)
-    for e in view.edges.values():
-        if e.dim or e.ef or e.param_shape:
-            continue  # gaussian_marginals / ef_marginals
-        lq = ef.CATEGORICAL.product(
-            msgs[view.message_indices(e.slot0, e.card)],
-            msgs[view.message_indices(e.slot1, e.card)],
-        )
-        out[e.name] = ef.CATEGORICAL.mean(lq)
-    return out
+    out = {}
+    for card, group in grouped_edges(selected, _card):
+        slots = [(edge.slot0, edge.slot1) for edge in group]
+        both = msgs[view.message_indices(slots, card)]
+        # Restore literal log-zeros before multiplication can erase the sentinel.
+        both = np.where(both == np.asarray(NEG, dtype=both.dtype), -np.inf, both)
+        with np.errstate(invalid="ignore"):
+            probabilities = ef.CATEGORICAL.mean(ef.CATEGORICAL.product(both[:, 0], both[:, 1]))
+        out.update((edge.name, row) for edge, row in zip(group, probabilities, strict=True))
+    return {edge.name: out[edge.name] for edge in selected}
 
 
 def node_beliefs(view: NodeView, state: State) -> dict[str, np.ndarray]:
