@@ -230,3 +230,11 @@ Existing tracker dependencies, prerequisite --> dependent
     [closed] cff-izjd hybrid GFE ----+
 
 The navigation example supplies a possible consumer. The remaining review of growth, merge, and reduced-prior evidence stays on cff-du6m. The implementation split belongs after that review.
+
+**2026-11-25T18:27:26Z**
+
+What does a renormalising generative model contribute to learning places? In From pixels to planning, a chosen partition and temporal stride define which observations are grouped. Fast structure learning assigns distinct recurring patterns to states, records which states follow under latent transition modes called paths, and passes initial states and paths to the next level. A path in this model describes how states change. It need not correspond to a compass command or a route on a map. Confidence is high for the construction. [Friston et al., Figure 3 and Algorithm 1](https://arxiv.org/pdf/2407.20292#page=26)
+
+How does this differ from an online map learner? The Pong demonstration selects successful event sequences from random play for training. That selection matters when interpreting what the learned higher-level sequences predict. The study gives a way to propose abstractions over ordered experience. It does not validate a rule for recognizing a physical junction on revisiting it. Confidence is high for the reported protocol. [Pong experiment, Figures 25–27](https://arxiv.org/pdf/2407.20292#page=50)
+
+How could we test a transfer? Fit a dictionary of two-step events on the exploration prefix. Freeze it, then compare next-observation prediction with a one-scale model on the same ordered continuation. Include identical views reached after a successful and a blocked movement. Prefer cumulative conditional log loss and report dictionary size. This is a proposed temporal extension. The current navigation pilot tests distinct spatial places and loop returns.
