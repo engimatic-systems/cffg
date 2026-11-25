@@ -13,10 +13,13 @@ import copy
 import dataclasses
 from dataclasses import dataclass
 
+from cffg.core.compose import ComposeError
+from cffg.core.equality_tree import plan_equality_tree
 from cffg.core.ir import (
     BlobRef,
     ConstraintSpec,
     FactorSpec,
+    PortRole,
     PortSpec,
     Template,
     VariableSpec,
@@ -161,6 +164,95 @@ class SetPlateDims:
         t.plates[self.name] = dataclasses.replace(t.plates[self.name], dims=tuple(self.dims))
 
 
+def _attach_branches(t: Template, target: str, names: tuple[str, ...], role: PortRole, prefix: str) -> None:
+    operation = "observe_interior" if role is PortRole.DATA else "fan_out"
+    where = f"{operation}({target!r})"
+    if not isinstance(target, str) or target not in t.variables:
+        raise EditError(f"{where}: expected a known variable name")
+    original = t.variables[target]
+    if role is PortRole.DATA and original.ef:
+        raise EditError(f"{where}: unsupported DATA domain {original.ef!r}")
+    endpoints = []
+    for factor in t.factors.values():
+        if target in factor.param_edges.values():
+            raise EditError(f"{where}: cannot branch a parameter edge")
+        endpoints.extend((factor.name, key) for key, variable in factor.edges.items() if variable == target)
+    ports = t.ports_of(target)
+    if len(endpoints) + len(ports) != 2 or len(ports) > 1:
+        raise EditError(f"{where}: expected two endpoints including any boundary port")
+    if role is PortRole.DATA and ports:
+        raise EditError(f"{where}: expected an interior variable, already exposed by {ports[0].name!r}")
+
+    peer = f"{prefix}/peer"
+    for name in (peer, *names):
+        if name in t.variables:
+            raise EditError(f"{where}: variable {name!r} already exists")
+    for name in names:
+        if name in t.ports:
+            raise EditError(f"{where}: port {name!r} already exists")
+    tree = plan_equality_tree(target, (peer, *names), prefix)
+    try:
+        tree.install(t.variables, t.factors, original)
+    except ComposeError as exc:
+        raise EditError(f"{where}: {exc}") from exc
+
+    if ports:
+        port = ports[0]
+        t.ports[port.name] = dataclasses.replace(port, variable=peer)
+    else:
+        # Retain one endpoint on the original, including any constraint on it.
+        factor_name, key = max(endpoints)
+        factor = t.factors[factor_name]
+        t.factors[factor_name] = dataclasses.replace(factor, edges={**factor.edges, key: peer})
+    for name in (peer, *names):
+        t.variables[name] = dataclasses.replace(original, name=name)
+    for name in names:
+        t.ports[name] = PortSpec(name, name, role)
+
+
+@dataclass(frozen=True)
+class FanOut:
+    target: str
+    branch_count: int
+
+    @property
+    def ports(self) -> tuple[str, ...]:
+        if type(self.branch_count) is not int or self.branch_count < 1:
+            raise EditError(f"fan_out({self.target!r}): branch_count must be a positive integer")
+        return tuple(f"{self.target}/_fanout/branch{i}" for i in range(self.branch_count))
+
+    def apply(self, t: Template) -> None:
+        _attach_branches(t, self.target, self.ports, PortRole.GLUE, f"{self.target}/_fanout")
+
+
+@dataclass(frozen=True)
+class ObserveInterior:
+    target: str
+
+    @property
+    def port(self) -> str:
+        return f"{self.target}/_observe/data"
+
+    def apply(self, t: Template) -> None:
+        _attach_branches(t, self.target, (self.port,), PortRole.DATA, f"{self.target}/_observe")
+
+
+def fan_out(t: Template, target: str, branch_count: int) -> tuple[Template, tuple[str, ...]]:
+    """Branch an existing structural edge and return the copy and its ordered GLUE ports.
+
+    The two existing endpoints (including a boundary port when present) keep
+    their roles. Each additional port carries the same variable domain.
+    """
+    action = FanOut(target, branch_count)
+    return apply_edits(t, [action]), action.ports
+
+
+def observe_interior(t: Template, target: str) -> tuple[Template, str]:
+    """Return a copy with one equality tap and a DATA port on the degree-two latent."""
+    action = ObserveInterior(target)
+    return apply_edits(t, [action]), action.port
+
+
 EditAction = (
     AddVariable
     | AddFactor
@@ -174,6 +266,8 @@ EditAction = (
     | AddBlob
     | RebindBlobPath
     | SetPlateDims
+    | FanOut
+    | ObserveInterior
 )
 
 
@@ -219,6 +313,8 @@ _ACTIONS: dict[str, type] = {
     "add_blob": AddBlob,
     "rebind_blob_path": RebindBlobPath,
     "set_plate_dims": SetPlateDims,
+    "fan_out": FanOut,
+    "observe_interior": ObserveInterior,
 }
 _ACTION_NAMES = {cls: name for name, cls in _ACTIONS.items()}
 
@@ -252,6 +348,8 @@ def _spec_to_dict(spec) -> dict:
 
 def action_to_dict(action: EditAction) -> dict:
     name = _ACTION_NAMES[type(action)]
+    if isinstance(action, (FanOut, ObserveInterior)):
+        return {"action": name, **dataclasses.asdict(action)}
     if hasattr(action, "spec"):
         return {"action": name, "spec": _spec_to_dict(action.spec)}
     if hasattr(action, "ref"):
@@ -269,6 +367,15 @@ def action_from_dict(d: dict) -> EditAction:
     cls = _ACTIONS.get(d.get("action", ""))
     if cls is None:
         raise EditError(f"unknown edit action {d.get('action')!r}")
+    if cls in (FanOut, ObserveInterior):
+        expected = {"action", "target", "branch_count"} if cls is FanOut else {"action", "target"}
+        if set(d) != expected or not isinstance(d["target"], str):
+            raise EditError(f"{d['action']!r} requires fields {sorted(expected)} and a string target")
+        if cls is FanOut:
+            if type(d["branch_count"]) is not int or d["branch_count"] < 1:
+                raise EditError(f"fan_out({d['target']!r}): branch_count must be a positive integer")
+            return FanOut(d["target"], d["branch_count"])
+        return ObserveInterior(d["target"])
     if cls is AddVariable:
         return cls(VS(d["spec"]["name"], d["spec"].get("cardinality", 0), d["spec"].get("dim", 0)))
     if cls in (AddFactor, ReplaceFactor):

@@ -26,6 +26,7 @@ from cffg.core.ir import (
     VariableSpec,
     register_factor_type,
 )
+from cffg.core.edits import FanOut, ObserveInterior, fan_out, observe_interior
 from cffg.core.plates import expand_plates, plate_observations
 from cffg.core.functions import FunctionSpec
 from cffg.core.moment_matching import (
@@ -50,6 +51,8 @@ __all__ = [
     "Expose",
     "FactorSpec",
     "FactorType",
+    "FanOut",
+    "ObserveInterior",
     "FunctionSpec",
     "LearnableSpec",
     "ModelError",
@@ -61,6 +64,8 @@ __all__ = [
     "Template",
     "VariableSpec",
     "expand_plates",
+    "fan_out",
+    "observe_interior",
     "plate_observations",
     "migrate_moment_matching",
     "moment_matching",

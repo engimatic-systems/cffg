@@ -88,3 +88,19 @@ def test_replace_missing_factor_refused(hmm_slice):
 def test_unknown_action_name_refused():
     with pytest.raises(EditError, match="unknown edit action"):
         action_from_dict({"action": "transmogrify", "name": "z"})
+
+
+def test_branch_edit_codec_is_strict():
+    from cffg.core import FanOut, ObserveInterior
+
+    actions = [FanOut("unit/scoped", 2), ObserveInterior("other/value")]
+    assert bundle_from_json(bundle_to_json(actions)) == actions
+    for bad in (
+        {"action": "fan_out", "target": "z"},
+        {"action": "observe_interior"},
+        {"action": "fan_out", "target": "z", "branch_count": 1, "extra": 0},
+        {"action": "observe_interior", "target": "z", "branch_count": 1},
+        {"action": "fan_out", "target": "z", "branch_count": True},
+    ):
+        with pytest.raises(EditError):
+            action_from_dict(bad)
