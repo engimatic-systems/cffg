@@ -64,7 +64,7 @@ def timings(build_model, protocol, counts, pixels, balanced, width, sample_count
         names.append(f'grid/pix/{row}/{col}/p{i}')
         indices.append((4*int(row)+i//4, 4*int(col)+i%4))
     rr, cc = np.asarray(indices).T
-    records = pixels[:, rr, cc]
+    records = pixels[:, rr, cc].astype(np.intp)
     references = softmax(expected_log[np.arange(len(indices)), records].sum(axis=1), axis=1)
     setup_s = perf_counter() - start
 
