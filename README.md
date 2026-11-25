@@ -222,11 +222,19 @@ For reusable structure:
   before scoping or merging. For a hub shared by 49 copies, the outer
   `Broadcast` has at most six equality factors from hub to copy and at most
   twelve between copies. Factors inside each copy add to the distance that
-  evidence must travel under synchronous flooding.
+  evidence must travel under synchronous flooding. On an Apple M2 Max CPU,
+  the full 784-pixel classifier converged in 43–44 sweeps and processed
+  36.2 images/s singly or 47.7 images/s in batches of 128. For an acyclic
+  ordinary BP model, the exact two-pass schedule is also available. It
+  processed 263.9 and 273.1 images/s on this classifier.
 - `cffg.core.fan_out(template, edge, branch_count)` returns a validated
   template and ordered GLUE ports for attaching new factors. Its endpoints
   keep their roles. `observe_interior(template, edge)` returns a template and
-  a DATA port for conditioning a supported latent.
+  a DATA port for conditioning a supported latent. For a Gaussian latent
+  shared by ordinary priors and affine Gaussian factors, bind a vector to
+  this port to observe the latent exactly. Its posterior mean equals the
+  vector and its covariance is zero. Bind `None` to clear the observation.
+  An ordinary emission DATA edge continues to report its cavity prediction.
 - `cffg.core.edits` applies validated all-or-nothing graph edits rather than
   leaving a half-mutated template after a failure.
 - `validate(template)` reports structural problems before compilation, while

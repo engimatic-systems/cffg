@@ -2252,7 +2252,14 @@ nothing committed here) — the durable engine-level findings:
   balanced tree used by Broadcast expansion and structural branch edits.
   For `N` leaves the hub-to-leaf bound is `ceil(log2(N))` equality factors.
   Synchronous whole-model convergence also depends on paths inside the
-  patches. Runtime speed is measured on the complete classifier.
+  patches. On the frozen 49-patch classifier this cut the longest outer path
+  from 48 to 11 equality factors and the full-model sweep count from 80–81 to
+  43–44. On the Apple M2 Max CPU, single/batched throughput rose from
+  20.4/28.2 to 36.2/47.7 images/s. The maximum difference from independently
+  contracted posterior probabilities was below 5e-13. Both 784-leaf topology
+  variants held 401,648 bytes of numerical state. The inputs, timing boundaries
+  and separate size fixture are specified in
+  `tools/hierarchy/broadcast_protocol.json`.
 - Hybrid nodes originally lacked soft sufficient statistics and predictive
   readouts; cff-lquu resolved that consumer boundary.
 - Long rollouts re-solve cold every step and degrade past ~20 slices
