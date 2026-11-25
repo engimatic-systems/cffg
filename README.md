@@ -226,6 +226,41 @@ For reusable structure:
   compilation additionally checks executable factor/constraint ownership and
   numeric arrays.
 
+## Filter a slow regime and a fast state
+
+Use `cffg.hierarchy.Hierarchy` when a hidden regime selects the fast dynamics
+for a known number of observations. For example, the regime below determines
+whether the fast state tends to stay put or switch. The sensor sometimes
+misreads the fast state.
+
+```python
+from cffg.hierarchy import Hierarchy
+
+model = Hierarchy.from_tables(
+    parent_prior=[0.5, 0.5],
+    parent_transition=[[0.9, 0.1], [0.1, 0.9]],
+    child_prior=[0.7, 0.3],
+    child_transition=[
+        [[0.95, 0.05], [0.05, 0.95]],  # persistent regime
+        [[0.10, 0.90], [0.90, 0.10]],  # switching regime
+    ],
+    emission=[[0.85, 0.15], [0.15, 0.85]],
+    thickness=3,
+)
+for reading in [0, None, 1]:
+    result = model.step(reading).require_converged()
+    print(result.parent, result.child, result.free_energy)
+```
+
+Columns of each transition table index the previous state. Each call advances
+one fast transition. A missing reading (`None`) still advances time. On the
+third call, `result.joint` holds the posterior just before the slow transition.
+`model.current_joint` holds the prediction for the next period and retains
+regime–state correlations. `preview(reading)` computes a candidate update
+without advancing either clock. Free energy is in nats and covers all the
+observations since the start of the current period. Use the last value from
+each completed period when summing evidence across periods.
+
 ## Compile, run, and read results
 
 Compile once for a fixed template shape. Observations and same-shaped parameter

@@ -3656,3 +3656,54 @@ independently, checks two DATA bindings, then integrates the selected action
 pair. Run `tools/cstr_bounded_comparison.py` for the matched RK4 comparison.
 The quadratic two-command coolant fixture is
 `examples/bounded_coolant.py`.
+
+## D16 — Filtering two categorical timescales
+
+Suppose the same hidden regime governs several successive observations. The
+child can tell the parent how well each regime explains those observations.
+It must send the likelihood under each regime, excluding the regime prior:
+the parent already has that prior. At the period boundary, retaining the
+joint distribution allows the new regime to inherit information about the
+fast state. Resetting the fast state to its unconditional marginal would
+erase that information.
+
+Let the start-of-period joint be $p(r)d_r(x_0)$, let $B_r(j,i)$ be the
+probability of moving from fast state $i$ to $j$, and let $A(y,j)$ be its
+sensor likelihood. Start with $f_{r,0}=d_r$ and $L_{r,0}=1$. Given a
+reading $y_t$, form
+
+$$
+v_r(j)=A(y_t,j)\sum_i B_r(j,i) f_{r,t-1}(i),\quad
+s_r=\sum_j v_r(j),\quad
+f_{r,t}=v_r/s_r,\quad L_{r,t}=L_{r,t-1}s_r.
+$$
+
+A missing reading integrates the sensor to one. A regime with zero likelihood
+gets zero posterior mass. The implementation tracks $\log L_{r,t}$ and
+row-normalizes the fast messages. With $Z_t=\sum_r p(r)L_{r,t}$, the posterior
+is $q(r,j)=p(r)L_{r,t}f_{r,t}(j)/Z_t$. At rollover the joint becomes
+$\sum_r T(r',r)q(r,j)$ before the next fast transition.
+
+**Free energy.** Let $W$ denote the fast trajectory together with any
+unobserved emissions. The normalized joint path posterior gives the ordinary
+variational energy $F=E_q[\log q(r,W)-\log p(r,W,y)]$. On this tree of
+regions the seven ledger contributions are
+
+1. $D_{KL}(q(r)\Vert p(r))$.
+2. $E_q[-\log d_r(x_0)]$.
+3. The expected negative log fast transitions.
+4. The expected negative log emissions.
+5. $-H_q(W\mid r,x_t)$.
+6. $-H_q(r,x_t)$.
+7. $+H_q(r)$, the correction for the regime shared by the two regions.
+
+Together these give $F=-\log Z_t$. For an unobserved emission its expected
+energy cancels its conditional entropy. Computing these expectations by
+conditioning the old path on the new endpoint requires no stored list of
+past paths. The runtime checks the ledger against an independent
+log-partition reduction before committing new clocks and statistics.
+
+`tests/test_hierarchy.py::test_joint_every_term_entropies_and_correlation_across_periods`
+enumerates complete paths and missing emissions across successive periods in
+float32 and float64. The same file checks zero support, budgets, and a long
+float32 period with very small likelihood.

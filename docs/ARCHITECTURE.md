@@ -2086,6 +2086,23 @@ discarding a joint correlation. Exact joint rollover remains the separate
 - Sensor/actuator adapters are plain Python callbacks mapping env observations to
   one-hot data bindings and control marginals to env actions.
 
+### Two-clock categorical filtering
+
+`cffg.hierarchy.Hierarchy` executes a categorical slow transition and a
+regime-selected fast transition with an observed categorical emission. Both
+levels have a serialized template and parameter arrays. The declared binding
+selects the regime axis of the fast transition. Compiling the templates gives
+the registered numerical parameters to a dedicated exact elimination schedule.
+
+For each fast tick the schedule predicts the fast state separately in each
+regime and multiplies by the observation likelihood. It returns the normalized
+joint regime/state posterior and the child log likelihood for each regime. At
+the declared period boundary the slow transition acts on that joint, preserving
+the correlation needed for the next period. The runtime commits inference
+statistics and clocks after a successful joint certificate. A supplied budget
+of zero returns the corresponding unfinished stage. See DERIVATIONS D16 for
+the region entropy correction and its path-enumeration oracle.
+
 ### 5b. Colony execution (many small graphs, one machine)
 
 `Colony` owns an instance table of `(structure_hash, State)` pairs and caches one
@@ -2386,14 +2403,9 @@ source of truth for readiness, scope, and status.
 
 ### Hierarchical and sophisticated inference
 
-- **Hierarchical models: cleanly additive, plan as M7.** Templates-with-ports
-  already compose vertically: a higher level places priors on a lower level's
-  parameters or goal statistics (Part II §7.2's goal hyperprior is the depth-2
-  base case, and the buyer/seller simulation is two coupled models at different
-  timescales). What M7 adds is message rules for inter-level couplings
-  (Dirichlet hyperpriors exist; Cat-parameters-from-a-parent and temporal
-  thickness à la de Vries & Friston 2017 need deriving) and nested-schedule
-  support in the VM. No IR or compiler changes anticipated.
+- A fixed two-level categorical hierarchy is implemented in §5. Extending the
+  binding to continuous states, additional levels or learned transition
+  parameters requires corresponding message and ledger rules.
 - **Sophisticated inference: shallow yes, deep no.** Contingent planning
   ("branch on what I might observe") can be expressed as a *bigger template* —
   observation-branch mixture nodes unrolled into a policy tree — so the engine
