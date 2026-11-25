@@ -1,6 +1,5 @@
 """Initial and later failures share one truthful public result contract."""
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -10,6 +9,7 @@ from test_engine_contracts import (
     assert_result_equal,
     assert_state_equal,
     ordinary_case,
+    record_compiled_batches,
 )
 
 from cffg.colony import Colony
@@ -57,22 +57,9 @@ def test_initial_failure_preserves_state_and_healthy_peer(
     expected = [
         engine.run(state, budget, tol=1e-12, harden_last=budget) for state in states
     ]
-    batch_sizes = []
-    original_vmap = eqx.filter_vmap
-
-    def observe_vmap(function, *args, **kwargs):
-        mapped = original_vmap(function, *args, **kwargs)
-        if function.__name__ != "one":
-            return mapped
-
-        def execute(state):
-            batch_sizes.append(state.messages.shape[0])
-            return mapped(state)
-
-        return execute
-
-    monkeypatch.setattr(eqx, "filter_vmap", observe_vmap)
+    batches = record_compiled_batches(monkeypatch)
     actual = colony.run(budget, tol=1e-12)
+    launched = [(len(group), sweeps) for group, sweeps in batches]
 
     rejected = actual[ids[0]]
     assert rejected.status is expected_status
@@ -82,10 +69,11 @@ def test_initial_failure_preserves_state_and_healthy_peer(
         assert_result_equal(actual[iid], reference)
         assert colony.instances[iid].state is actual[iid].state
     if budget:
-        assert batch_sizes and set(batch_sizes) == {2}
+        assert launched == [(2, budget)]
         assert actual[ids[1]].status is RunStatus.CONVERGED
     else:
-        assert not batch_sizes
+        assert launched in ([], [(2, 0)])
+        assert actual[ids[1]].iterations == 0
         assert actual[ids[1]].status is RunStatus.BUDGET_EXHAUSTED
 
 
@@ -104,12 +92,22 @@ def test_all_rejected_instances_skip_priming_and_updates(monkeypatch):
     for iid, state in zip(ids, states, strict=True):
         colony.instances[iid].state = state
 
-    def forbidden(*args, **kwargs):
-        raise AssertionError("Rejected inputs must not enter numerical execution")
+    calls = []
 
-    monkeypatch.setattr(engine, "_prime", forbidden)
-    monkeypatch.setattr(engine, "_iter_step", forbidden)
+    def observe(name, original):
+        def execute(*args, **kwargs):
+            jax.debug.callback(lambda _: calls.append(name), args[0][0])
+            return original(*args, **kwargs)
+
+        return execute
+
+    monkeypatch.setattr(engine, "_prime", observe("prime", engine._prime))
+    monkeypatch.setattr(engine, "_iter_step", observe("step", engine._iter_step))
+    batches = record_compiled_batches(monkeypatch)
     actual = colony.run(8)
+    jax.effects_barrier()
+    assert [(len(group), sweeps) for group, sweeps in batches] == [(2, 8)]
+    assert calls == []
     for iid, reference in zip(ids, expected, strict=True):
         assert_result_equal(actual[iid], reference)
 
@@ -194,29 +192,16 @@ def check_later_failure(
         )
 
     def energy(state):
-        count = float(getattr(state, counter_field)[0] - state.params["test:origin"])
-        if failure == "energy" and state.params["test:failure"] and count >= 2.5:
-            return float("nan")
-        return count
+        count = getattr(state, counter_field)[0] - state.params["test:origin"]
+        fails = state.params["test:failure"] & (count >= 2.5)
+        return jnp.where(fails, jnp.nan, count) if failure == "energy" else count
 
     monkeypatch.setattr(engine, "_iter_step", step)
     monkeypatch.setattr(engine, "bfe", energy)
     expected = [engine.run(state, 5, harden_last=5) for state in states]
-    batch_sizes = []
-    original_vmap = eqx.filter_vmap
-
-    def observe_vmap(function, *args, **kwargs):
-        mapped = original_vmap(function, *args, **kwargs)
-
-        def execute(state):
-            batch_sizes.append(state.messages.shape[0])
-            return mapped(state)
-
-        return execute
-
-    monkeypatch.setattr(eqx, "filter_vmap", observe_vmap)
+    batches = record_compiled_batches(monkeypatch)
     actual = colony.run(5)
-    assert batch_sizes and set(batch_sizes) == {size}
+    assert [(len(group), sweeps) for group, sweeps in batches] == [(size, 5)]
     assert actual[ids[0]].iterations == 3
     assert len(actual[ids[0]].free_energies) == (3 if failure == "support" else 2)
     if failure == "inner_budget":
@@ -302,7 +287,9 @@ def test_terminal_objective_and_undefined_ledger_failures_report_infinite_residu
 
     monkeypatch.setattr(engine, "_iter_step", step)
     if failure == "objective":
-        monkeypatch.setattr(engine, "objective", lambda state: float("nan"))
+        monkeypatch.setattr(
+            engine, "objective", lambda state: jnp.asarray(jnp.nan, state.messages.dtype)
+        )
     expected = [
         engine.run(colony.instances[iid].state, 3, tol=1e-5, harden_last=3)
         for iid in ids

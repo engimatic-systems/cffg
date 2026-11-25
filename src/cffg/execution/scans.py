@@ -4,6 +4,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from cffg.execution.transport import gaussian_tap_parameters as _tap_parameters
 from cffg.compiled import NEG, Arena
 from cffg.execution.failures import FailureIndex
 from cffg.failure_facts import empty_failure, first_failure
@@ -175,7 +176,8 @@ def _registerized_scan_fn(
                     x["ov"] = ef_obs[jnp.asarray(orows)]
                     x["om"] = ef_mask[jnp.asarray(orows)]
             else:
-                for k, v in executors.parameters(g, params, None).items():
+                par = executors.parameters(g, params, None)
+                for k, v in _tap_parameters(g, par, g_obs, g_mask).items():
                     x[f"p{k}"] = v[elem.rows]
                 if g.obs_rows is not None:
                     orows = g.obs_rows[elem.rows]
@@ -454,7 +456,8 @@ def _flat_scan_fn(arena: Arena, stage, op, executors=SCHEDULED_EXECUTORS):
                         for r, d in enumerate(g.dims)
                     ]
                     inc_e, inc_l = jnp.stack(eb, axis=-2), jnp.stack(lb, axis=-3)
-                    par = executors.parameters(g, params, x["rows"])
+                    par = _tap_parameters(g, executors.parameters(g, params, x["rows"]),
+                                          g_obs, g_mask, x["rows"])
                     y = mk = None
                     if g.obs_rows is not None:
                         y, mk = g_obs[x["ov"]], g_mask[x["mr"]]

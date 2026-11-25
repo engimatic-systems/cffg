@@ -1,6 +1,6 @@
 ---
 id: cff-9xmq
-status: open
+status: closed
 deps: [cff-wbhu]
 links: [cff-6s31]
 created: 2026-07-10T03:30:52Z
@@ -151,12 +151,15 @@ growth.
   balanced implementation.
 - [ ] 5.7 The frozen fixture's historical chain result falls within 60 through
   80 performed flooding sweeps.
-- [ ] 5.8 The balanced version of the frozen fixture reports `CONVERGED` in at
-  most 12 performed flooding sweeps.
-- [ ] 5.9 The balanced fixture does not satisfy criterion 5.8 by exhausting its
-  budget.
-- [ ] 5.10 The balanced fixture does not satisfy criterion 5.8 with a non-finite
-  free energy.
+- [ ] 5.8 For 49 branches, the longest path between branches in the generated
+  Broadcast crosses at most 12 equality factors (criterion 2.9). Measure this
+  on the generated topology.
+- [ ] 5.9 Each timed full-classifier result reaches certified convergence
+  within the registered budget and has finite free energy. Record performed
+  sweeps. The 16-pixel chain inside each patch contributes to that count.
+- [ ] 5.10 Every full-classifier class posterior matches the independent exact
+  contraction within the registered numerical tolerance. Section 7 evaluates
+  the separate end-to-end speed gates for single images and batches.
 - [ ] 5.11 A mixed-schedule fixture re-equilibrates a balanced Broadcast forest
   island through the current exact forest pass.
 - [ ] 5.12 The mixed-schedule fixture matches flooding marginals at a
@@ -278,7 +281,8 @@ growth.
 - [ ] 8.22 `tests/test_plates.py` covers topology, discrete semantics, Gaussian
   semantics, edge cases, exact-zero support, float32, and the 784-branch case.
 - [ ] 8.23 `tests/test_schedule.py` covers two-pass, flooding, mixed scheduling,
-  max-product, and the frozen 49-branch sweep bound.
+  and max-product. The plate topology tests cover the 49-branch diameter,
+  and the frozen application benchmark checks converged classifier posteriors.
 - [ ] 8.24 `tests/test_serialize.py` covers the frozen Broadcast JSON and
   structure-hash contract.
 - [ ] 8.25 `tests/test_bundle.py` covers balanced reconstruction from a compact
@@ -290,7 +294,7 @@ growth.
 - [ ] 8.28 `README.md` replaces the linear-diameter Broadcast warning with the
   delivered logarithmic bound and benchmark result.
 - [ ] 8.29 `docs/LIMITATIONS.md` removes the linear Broadcast bottleneck only
-  after the sweep and throughput criteria pass.
+  after the structural, numerical and throughput criteria pass.
 - [ ] 8.30 The final code change is followed by one passing default short-suite
   run through the repository dashboard workflow.
 
@@ -550,3 +554,27 @@ enumerated set of intended meanings in this ticket.
   ticket's shared-plan delivery.
 
 Intelligible-ticket review: complete.
+
+**2026-11-25T06:05:14Z**
+
+Change path: New IR field checklist, derived structure only. Keep compact PlateSpec/Broadcast serialization, lookup, scoping, structure hash and bundle formats. Change plate materialization and deterministic equality wiring. Compiler/Arena and scheduled fingerprints derive from the new flat tree. Same categorical/Gaussian equality rules, host/JIT, flooding/scheduled and single/batch execution. No checkpoint, parameter or learnable state. Qualify topology count/diameter (1..784), exact support, analytic product and information addition, f32 tolerance 64*eps times output scale, f64 absolute 1e-10; preserve any failed benchmark target in the record. The compiled-loop prerequisite, historical baseline and final gate have independent owners.
+
+**2026-11-25T06:14:11Z**
+
+Implemented cffg.core.equality_tree.plan_equality_tree and used it in compact plate expansion. Frozen input/schedule benchmark protocol is 2340d07; benchmark code e6fcb33. Focused qualification (isolated base 51ae6a7 plus exactly the proposed topology, excluding concurrent loop changes): uv run --frozen --no-sync python -m pytest -q -m "slow or not slow" tests/test_plates.py: 34 passed, including all structural counts/diameters through 784, 32-dimensional Gaussian and 32-category 784-leaf compiles, row-major deterministic wiring, sum/max stationary flooding and exact schedules, mixed forest parity, failure statuses, unbound Gaussian, both dtypes, pre-change compact SHA, bundle and schedule. Topology alone does not remove internal 16-pixel fan-out or runtime propagation outside the 49-patch tree. Parent owns final integrated suite and measured sweep/throughput qualification, so ticket stays in progress.
+
+**2026-11-25T06:20:29Z**
+
+The frozen 49-patch full consumer includes a chain of sixteen pixel factors inside each patch. One ordinary synchronous flood moves information across one neighboring factor. With the outer Broadcast balanced, only 260 of 784 pixels can affect the class marginal after twelve sweeps. On the first 512 original archived images the independently contracted posterior gave 386 correct at twelve sweeps versus 421 at convergence (92 decisions differ). Using Engine on native 51ae6a7, balanced model images 9 and 16 returned BUDGET_EXHAUSTED at twelve sweeps and chose 7 and 4. Both converged in 44 sweeps to class 9, in agreement with native two_pass and independent contraction. The historical chain required 80 sweeps on the two checked chain witnesses. The observational dataset, model and tolerances are unchanged. ~/agent-share/cffg-hierarchy-validation/{flood_witness.py,flood_witness.json,native_flood.py,native_flood.json,balanced.json,chain.json} retain replay evidence. AC5.8 cannot hold as written for this workload under synchronous flooding. Requested Cooper's decision between separate structural/full-model gates and a separate multi-factor exact schedule. Until decided, retain the published criterion and convergence statuses; throughput qualification continues separately.
+
+**2026-11-25T06:25:13Z**
+
+Cooper chose option 1 after reviewing the 92 changed classifications. AC5.8 now applies the 12-factor bound to the generated outer fan-out. The frozen classifier must still converge, match the exact class probabilities, and reach at least 20 images per second for single images and for batches of 128. Preserve identical fixtures, source hashes, tolerances and timing boundaries. Record exact two-pass performance as a separate comparator. The original criterion and the evidence that prompted this decision are retained in Git and the preceding note.
+
+**2026-11-25T06:29:54Z**
+
+Sealed 49-patch public throughput ran on CPU float64, Apple M2 Max / JAX 0.10.2, CFFG 8ae5bdb and active-vision 00a8a43e. Independent breadth-first traversal of the two archived templates measured chain max hub-to-leaf / leaf-to-leaf 48/48, balanced 6/11 (49 leaves, 48 equalities each): ~/agent-share/cffg-hierarchy-validation/diameter.json. Actual full classifier converged in 80–81 chain vs 43–44 balanced synchronous sweeps. Warm chain→balanced images/s: Engine single (40 images) 20.39→36.20, Colony batch 128 (512 images) 28.23→47.73. Full wall includes building a 784-port dict per image, Engine.bind_data on reusable base states, Engine.run or Colony.run, converged status and synchronized class marginal readout; model setup, offline oracle, training and disk I/O are outside. Mean group-sweep inference cost .593→.601 ms single and 53.63→56.61 ms batch. Same-scope supplementary exact two-pass: 250.06→263.95 images/s single and 260.74→273.08 batch (Colony runs exact trees per member); first single wall 7.861→6.227 s vs flood .340→.293 s. Every posterior matched independent softmax to max absolute 4.85e-13. Both 784-leaf compiles had 1569 factors, 2353 variables, 401648 bytes of initialized numerical state. Firsts, setup, every raw block, counts, qualified source/input hashes, frozen protocol and receipt: ~/agent-share/cffg-hierarchical-runtime/broadcast/8ae5bdb/{flood.json,two-pass.json,receipt.json}. Timed in the predeclared chain-then-balanced order; one host and a fixed corpus. Depth, both warm speed thresholds and posterior checks passed. Parent owns the integrated final gate; prerequisite cff-wbhu still in progress.
+
+**2026-11-25T07:58:40Z**
+
+Release qualification at f5b8ede: 2,751 default cases passed, 335 opt-in cases deselected, 1,143.367 s dashboard wall. The isolated 49-leaf fan-out spans 11 equality factors between the farthest pair and 6 from the hub. The complete balanced classifier used 43–44 synchronous sweeps with every recorded posterior within 4.85e-13 of the dense reference at 36.20 sequential and 47.73 batched images/s. These measured criteria implement Cooper’s option 1. See committed benchmark protocol, benchmark_broadcast.py, tests/test_plates.py, and the sealed receipt in the preceding note.

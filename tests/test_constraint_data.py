@@ -1,11 +1,14 @@
 """One cached structure must not substitute another graph's constraint data."""
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from test_engine_contracts import assert_result_equal, assert_state_equal
+from test_engine_contracts import (
+    assert_result_equal,
+    assert_state_equal,
+    record_compiled_batches,
+)
 
 from cffg.colony import Colony
 from cffg.compiler import CompileError, compile_template
@@ -44,25 +47,6 @@ def cast_state(state, dtype):
     )
 
 
-def observe_batches(monkeypatch):
-    batches = []
-    original = eqx.filter_vmap
-
-    def observe(function, *args, **kwargs):
-        mapped = original(function, *args, **kwargs)
-        if function.__name__ != "one":
-            return mapped
-
-        def execute(state):
-            batches.append(state)
-            return mapped(state)
-
-        return execute
-
-    monkeypatch.setattr(eqx, "filter_vmap", observe)
-    return batches
-
-
 @pytest.mark.parametrize("kind", ("exactly_k", "at_most_k", "table"))
 @pytest.mark.parametrize("reverse", (False, True))
 @pytest.mark.parametrize("observed", (False, True))
@@ -87,12 +71,12 @@ def test_distinct_constraint_instances_match_solo_in_both_orders(
     key = colony.instances[ids[0]].key
     assert key == structure_hash(template) == colony.instances[ids[1]].key
     colony.engines[key] = Engine(colony.engines[key].arena, schedule=schedule)
-    batches = observe_batches(monkeypatch)
+    batches = record_compiled_batches(monkeypatch)
     actual = colony.run(8, tol=1e-7)
     for iid, expected in zip(ids, references, strict=True):
         assert_result_equal(actual[iid], expected)
         assert colony.instances[iid].state is actual[iid].state
-    assert batches and {state.messages.shape[0] for state in batches} == {2}
+    assert [(len(group), sweeps) for group, sweeps in batches] == [(2, 8)]
     statuses = [actual[iid].status for iid in ids]
     if observed:
         assert set(statuses) == {RunStatus.INFEASIBLE, RunStatus.CONVERGED}
@@ -115,14 +99,19 @@ def test_table_lengths_and_dtypes_partition_batches_without_new_engines(monkeypa
             colony.instances[iid].state = cast_state(colony.instances[iid].state, dtype)
             references[iid] = engine.run(state, 8, tol=1e-7, harden_last=8)
     assert len(colony.engines) == 1
-    batches = observe_batches(monkeypatch)
+    batches = record_compiled_batches(monkeypatch)
     actual = colony.run(8, tol=1e-7)
     for iid, expected in references.items():
         assert_result_equal(actual[iid], expected)
-    assert batches and {state.messages.shape[0] for state in batches} == {2}
+    assert [(len(group), sweeps) for group, sweeps in batches] == [(2, 8)] * 4
     key = next(iter(colony.engines.values())).arena.constraint_groups[0].parameter_key
-    assert {(state.messages.dtype, state.params[key].shape) for state in batches} == {
-        (np.dtype(dtype), (2, rows, 2))
+    layouts = [
+        {(state.messages.dtype, state.params[key].shape) for state in group}
+        for group, _ in batches
+    ]
+    assert all(len(layout) == 1 for layout in layouts)
+    assert set.union(*layouts) == {
+        (np.dtype(dtype), (rows, 2))
         for dtype in (np.float32, np.float64)
         for rows in (2, 20)
     }

@@ -134,7 +134,11 @@ def test_engine_matches_collapsed_reference(label, mk, ys, gaps):
     np.testing.assert_allclose(covs, ref.state_cov, atol=1e-6)
 
 
-@pytest.mark.parametrize("label,mk,ys,gaps", CASES, ids=[c[0] for c in CASES])
+@pytest.mark.parametrize(
+    "label,mk,ys,gaps",
+    [pytest.param(*case, marks=pytest.mark.slow if case[0] == "1d" else ()) for case in CASES],
+    ids=[case[0] for case in CASES],
+)
 def test_engine_vs_exact_enumeration_within_measured_gap(label, mk, ys, gaps):
     """Honest bound vs exact inference: the assumed-density gap, measured by
     the reference tier, asserted with ~2x headroom (LIMITATIONS S1d)."""
@@ -157,6 +161,7 @@ def test_missing_observation(viz_gallery):
     np.testing.assert_allclose(means, ref.state_mean, atol=1e-6)
 
 
+@pytest.mark.slow
 def test_bfe_finite_and_near_evidence():
     """The reported BFE is a *bounded* ledger (LIMITATIONS S1d), not the
     tree identity: assert it is finite, loud-free, and lands within a

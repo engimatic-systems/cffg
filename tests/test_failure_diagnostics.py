@@ -148,7 +148,7 @@ def test_larger_colony_keeps_failed_members_separate_from_healthy_results(dtype)
 
 def test_scalar_ledger_failure_has_no_fabricated_factor():
     engine = Engine(program_arena("two_pass"), schedule="flood")
-    engine.bfe = lambda state: float("nan")
+    engine.bfe = lambda state: jnp.asarray(jnp.nan, dtype=state.messages.dtype)
     result = engine.run(engine.init_state(), 3, tol=1e-8)
     assert result.failure == FailureDiagnostic("nonfinite_objective", None, "ledger", 1)
 
@@ -173,10 +173,12 @@ def test_hard_phase_keeps_one_based_numbering_across_soft_updates():
     original = engine._iter_step
 
     def marked(*args):
-        result = original(*args)
-        if args[-1]:
-            return (*result[:5], jnp.asarray(2), fact())
-        return result
+        *updates, status, failure = original(*args)
+        hard = args[-1]
+        marked_failure = jax.tree.map(
+            lambda on, off: jnp.where(hard, on, off), fact(), failure
+        )
+        return (*updates, jnp.where(hard, 2, status), marked_failure)
 
     engine._iter_step = marked
     result = engine.run(engine.init_state(), 4, harden_last=2)
@@ -215,7 +217,7 @@ def test_functional_budget_cause_survives_undefined_ledger_status_reclassificati
     state = engine.bind_data(engine.init_state(), observations)
     codes = iter([0, 1])
     engine._update_mu3 = lambda state: (state, 0., next(codes), 0.5)
-    engine.bfe = lambda state: float("nan")
+    engine.bfe = lambda state: jnp.asarray(jnp.nan, dtype=state.messages.dtype)
     result = engine.run(state, 3)
     # Preserve the existing undefined-ledger decision, but not at the cost of its cause.
     assert result.status is RunStatus.DIVERGED

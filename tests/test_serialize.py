@@ -114,3 +114,14 @@ def test_ef_domain_round_trips(hmm_slice):
     # The domain tag is structure: retagging the family must change the hash.
     hmm_slice.variables["lam"] = VariableSpec("lam", ef="beta")
     assert structure_hash(hmm_slice) != structure_hash(back)
+
+
+def test_branch_transforms_round_trip(hmm_slice):
+    from cffg.core import fan_out, observe_interior
+
+    observed, sensor = observe_interior(hmm_slice, "z_mid")
+    branched, ports = fan_out(observed, "z_obs", 2)
+    restored = from_json(to_json(branched))
+    assert structure_hash(restored) == structure_hash(branched) != structure_hash(observed)
+    assert structure_hash(observed) != structure_hash(hmm_slice)
+    assert {sensor, *ports} <= restored.ports.keys()

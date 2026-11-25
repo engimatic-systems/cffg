@@ -199,7 +199,7 @@ def test_schedule_source_does_not_own_family_selection_or_public_status():
     assert "RunStatus" not in names
 
 
-@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+@pytest.mark.parametrize("dtype", (np.float32, pytest.param(np.float64, marks=pytest.mark.slow)))
 def test_ef_registerized_prefetch_uses_owner_and_reuses_dynamic_observations(dtype):
     template, arrays = gamma_poisson(32)
     arena = compile_template(template, arrays=arrays)

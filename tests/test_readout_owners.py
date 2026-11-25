@@ -166,6 +166,8 @@ def test_public_method_delegates_to_its_focused_owner(monkeypatch, name):
     expected = (state,) if name == "decode" else (engine.arena, state)
     assert len(args) == len(expected)
     assert all(left is right for left, right in zip(args, expected))
+    if name in ("marginals", "gaussian_marginals"):
+        assert callbacks.pop("edges") is None
     for callback in callbacks.values():
         assert callback.__self__ is engine
 

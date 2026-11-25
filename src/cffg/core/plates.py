@@ -9,7 +9,7 @@ wired together by the plate's bonds. The wiring vocabulary:
                   boundary copies keep their unbonded chain ports exposed.
 - ``Broadcast`` — tie every copy's port to one shared hub edge; because FFG
                   edges have max degree 2, this synthesizes an equality tree
-                  (a chain of ternary equality factors).
+                  (a balanced tree of ternary equality factors).
 - ``Expose``    — leftover ports stay exposed as ``plate/<i>/port`` (the
                   default in phase 1; the rule is the explicit marker).
 
@@ -25,6 +25,7 @@ import dataclasses
 import numpy as np
 
 from cffg.core.compose import SCOPE_SEP, ComposeError, bond
+from cffg.core.equality_tree import plan_equality_tree
 from cffg.core.ir import (
     BlobRef,
     Broadcast,
@@ -226,42 +227,21 @@ def _apply_broadcast(out: Template, plate: str, spec: PlateSpec, rule: Broadcast
     """Tie every copy's `rule.port` to one shared hub edge via an equality
     tree. N copies + hub = N+1 edges, connected by N-1 ternary equality
     factors (N==1: hub IS the single branch; N==2: one equality)."""
-    idxs = _indices(spec.dims)
-    # Branch variable + port name for each copy, in row-major order.
-    branch_vars: list[str] = []
-    for idx in idxs:
-        port_name = _prefix(plate, idx) + SCOPE_SEP + rule.port
-        port = out.ports[port_name]
-        branch_vars.append(port.variable)
-        del out.ports[port_name]  # branch becomes interior (degree 2)
-
-    proto = out.variables[branch_vars[0]]
-    hub = f"{plate}{SCOPE_SEP}{rule.hub}"
-    hub_port = f"{plate}{SCOPE_SEP}{rule.hub}"
-
-    n = len(branch_vars)
-    if n == 1:
-        # No equality needed: the single branch IS the hub edge. Rename it.
-        _rename_variable(out, branch_vars[0], hub, proto)
+    hub = f"{plate}/{rule.hub}"
+    ports = [f"{_prefix(plate, i)}/{rule.port}" for i in _indices(spec.dims)]
+    branches = [out.ports[name].variable for name in ports]
+    if hub in out.variables or hub in out.ports:
+        raise ComposeError(f"plate {plate!r}: generated Broadcast hub {hub!r} already exists")
+    tree = plan_equality_tree(hub, branches, f"{plate}/_bcast/{rule.hub}")
+    prototype = out.variables[branches[0]]
+    tree.install(out.variables, out.factors, prototype)
+    for name in ports:
+        del out.ports[name]
+    if len(branches) == 1:
+        _rename_variable(out, branches[0], hub, prototype)
     else:
-        out.variables[hub] = dataclasses.replace(proto, name=hub)
-        base = f"{plate}{SCOPE_SEP}_bcast{SCOPE_SEP}{rule.hub}"
-        prev = hub  # the "a" edge feeding the next equality
-        for k in range(n - 1):
-            b_edge = branch_vars[k]
-            last = k == n - 2
-            if last:
-                c_edge = branch_vars[k + 1]
-            else:
-                c_edge = f"{base}{SCOPE_SEP}link{k}"
-                out.variables[c_edge] = dataclasses.replace(proto, name=c_edge)
-            eq = f"{base}{SCOPE_SEP}eq{k}"
-            out.factors[eq] = FactorSpec(
-                eq, "equality", edges={"a": prev, "b": b_edge, "c": c_edge}
-            )
-            prev = c_edge
-
-    out.ports[hub_port] = PortSpec(hub_port, hub, PortRole.GLUE)
+        out.variables[hub] = dataclasses.replace(prototype, name=hub)
+    out.ports[hub] = PortSpec(hub, hub, PortRole.GLUE)
 
 
 def _rename_variable(out: Template, old: str, new: str, proto: VariableSpec) -> None:

@@ -279,8 +279,14 @@ contribution.
 discrete BP/VMP and Gaussian factors, including external implementations. The discrete
 binding requires a log-potential accessor for support, joint beliefs and
 assignment scoring; it is not a sparse/combinatorial factor interface.
-Gaussian conditioning currently declares one DATA role per factor; Gaussian
-mean-field and nonlinear rules are not delivered by this interface. Structural
+A registered Gaussian kernel declares one exterior DATA role. An interior
+Gaussian equality can additionally observe a whole vector shared by ordinary
+built-in Gaussian priors and affine conditionals. The compiler requires at
+most one such observation per equality-connected variable. Distinct latent
+variables can be observed at both ends of an affine factor. Partial-coordinate
+or noisy measurements use an affine emission with positive-definite noise.
+Nonlinear, hybrid and external endpoints have no interior-tap rule.
+Gaussian mean-field and nonlinear rules are not delivered by this interface. Structural
 equality, hard constraints, Dirichlet parameter-edge composites, GFE
 composites and multi-arena factors remain separate plans. Registration alone
 does not add a new conjugate-learning rule or inference method.
@@ -469,14 +475,25 @@ travel ~one slice per sweep, and a fixed 120-sweep budget leaves the H=25
 control posterior at residual 5.5 (vs 4.9e-4 at 400 sweeps). Fixes are
 mechanical, not research: depth-aware/tol-driven sweep budgets in the agent
 loop plus warm-started replanning (cff-5edo). Related measured limits:
-ordinary colony batching is dispatch-bound on CPU, 1.5× at 32 instances until
-the sweep loop is a jitted scan (cff-wbhu). Exact-eligible colony members use
+on an M2 Max CPU (x64, JAX 0.10.2), the ordinary public-API benchmark
+uses 32 distinct Hallway priors and 60 damped sweeps. From `51ae6a7` to
+`8ae5bdb`, warm Colony time fell from 9.550 to 2.568 s and 32 sequential
+Engine runs from 6.430 to 2.466 s. Colony reached 0.96× the throughput of
+the compiled sequential runs, below the 8× target. The compiled group made
+15 device submissions at both one and 60 sweeps. These medians use one warmup
+and three repetitions per arm (`tools/benchmark_ordinary_iteration.py`).
+The historical 1.54× CPU ratio used a handwritten batched sweep on a GFE graph. Exact-eligible colony members use
 standalone propagation and certification per instance; this preserves exact
 schedule semantics but does not yet provide vectorized exact execution.
-Mixed-GFE colonies currently reuse
-compiled trust kernels but run one controller per instance, so they have a
-stronger host-control bottleneck until that same ticket moves the trust/status
-carry into the scan. The GFE-TM curiosity composite
+The default mixed-GFE controller runs per instance. The optional
+`outer_solver="compiled_trust_region"` batches deterministic GFE members
+with matching chart layouts and support. The host handles hardening and root
+certification. A support change or invalid auxiliary proposal can return the
+remaining iterations to the host. Adaptive Gaussian and functional solves retain
+their existing controllers. On a CPU/float64 32-member T-maze batch with a
+10-step trust budget, the first host/compiled calls took 10.9/17.4 s and
+the repeated calls took 2.58/0.50 s. Process peak RSS was 865/1,369 MiB.
+Those measurements cover one first and one repeat call per mode. The GFE-TM curiosity composite
 costs ~4× a plain act() in every slice and its novelty channel outcompetes
 the goal channel while counts are near-uniform. After the cff-hp3y cavity and
 ledger repair, the like-for-like 25-episode Hallway rerun scored 0.16 success
@@ -586,9 +603,11 @@ committed learning boundary. Fit exports retain that coordinate's original
 priors and current posteriors; they do not resume an outer fitting loop at its
 interrupted iteration. They do not store inference messages, solver
 progress, executing agent or hierarchy state, PRNG streams, or optimizer state.
-Exact mid-run continuation and supported agent replay require their checkpoint
-APIs; a portable learning bundle is not a runtime snapshot. The four unchanged
-nonrecurrence families
+Use the corresponding runtime checkpoint API for mid-run continuation.
+For the two-level categorical filter, `Hierarchy.save_bundle` writes a
+hierarchy archive containing both models, the clocks, the joint boundary
+and any pending child goal counts. Load it with `Hierarchy.load_bundle`.
+The four unchanged nonrecurrence families
 have deterministic legacy posterior migration; unidentified recurrence
 posteriors have none.
 Scoping or merging a template with compact plates requires `expand_plates`
@@ -702,10 +721,10 @@ is ~1.5-2x faster and remains a useful strict kernel ceiling, but it is a
 different output contract rather than machine variance. Honest residuals:
 the exact certificate is elementwise,
 `max(|new-old| / (1+|old|)) <= 64 eps`, so neither graph depth nor an
-unrelated large-magnitude block can widen it; `gaussian_marginals` readout
-is a Python-per-edge loop and dominates end-to-end LGSSM time at scale
-(cff-3kdk); slice-fused composite kernels (cff-yl0a) remain the lever if
-the envelope must tighten below ~10x.
+unrelated large-magnitude block can widen it. Gaussian readouts now group
+same-dimension edges and allow a named subset. Quoted inference timings
+above retain their original output contracts. Slice-fused composite kernels
+(cff-yl0a) remain a possible improvement to the inference step.
 
 **S2. Importance-sampling noise in parameter messages.** The message to A is a
 non-conjugate log-message evaluated by importance sampling; variance grows with
@@ -747,16 +766,39 @@ generalize the equivalence to mean-field, continuous, hybrid, hierarchical,
 learned-parameter, or arbitrary loopy boundaries; those retain only the named
 two-window implementation claim until they receive their own oracle.
 
-**S3. Deep temporal / hierarchical models.** The papers say extensions are
-"straightforward — write the CFFG," which is true of the *notation*; the message
-rules for inter-level couplings (Cat parameters generated by a higher level,
-temporal thickness à la de Vries & Friston 2017) still need deriving and testing.
-Engineering plus modest derivation.
+**S3. Deep temporal / hierarchical models.** The exact two-level categorical
+filter supports a fixed number of fast ticks per slow transition, including
+partially observed trajectories. With `R` regimes, `X` fast states and `O`
+possible observations, a dense fast tick takes `O(R X² + O X)` work. The
+second term accounts for the emission entropy used for missing readings.
+The slow rollover takes `O(R² X)` work. The joint regime/state messages and
+conditional path moments occupy `O(R X)` entries. Accumulating the fast and
+slow transition statistics requires another `R X² + R²` entries. These sizes
+are independent of the number of elapsed ticks. Continuous levels,
+event-triggered durations, discovery of
+spatial regions, and sparse motion between uncertain neighboring cells are
+outside this schedule. See DERIVATIONS D16.
 
-**S4. Contingent planning.** H5's policy factorization can be partially lifted:
-structured (non-mean-field) constraints over control sequences, or explicit
-branching on future observations, trade compute for policy expressiveness.
-Receding-horizon replanning already recovers most practical value cheaply.
+**S4. Contingent planning.** A separate finite categorical policy template
+can precommit through one or two future observations. Its objective is
+physically expected negative log preference, with an ordinary tree Bethe
+ledger (DERIVATIONS D17). The original H5 action-marginal LAIF objective
+retains its factorization. Inputs must provide proper causal observation
+kernels and finite preferences in [0, 1]. A zero preference at a reached
+history excludes that policy. An observation history of zero physical mass
+has zero cost and no executable action.
+
+With a constant branching factor `B` and `A` actions per stage, depth two
+has `1+B+B²` histories. The largest prefix has `A³` states, and each
+last-stage copy-and-append transition is stored as a dense `A³ × A²` CPT.
+Construction defaults to at most 256 histories and 1,000,000 scalar CPT
+entries counted over factor instances. That entry limit permits at most
+4 MB of float32 or 8 MB of float64 CPT payload before sharing. Template
+text, compiler working memory, file headers and runtime buffers add to it.
+Greater depth requires a different scale contract. The solver uses arena
+precision for joint MAP and has no guarantee of resolving sub-ulp policy
+differences. A positive source mass below working precision or a positive
+weighted cost that rounds to zero during construction raises an error.
 
 **S5. Neural Gaussian means and recognition.** Dense neural means now enter
 positive-noise Gaussian conditionals through Taylor linearization or fixed

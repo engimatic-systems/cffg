@@ -6,8 +6,10 @@ order across extracted groups rather than regrouping their sums.
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 
 from cffg import csp, efrules, gauss, hybrid_gfe, kernels, mixg, recurrence
+from cffg.execution.transport import gaussian_tap_parameters as _tap_parameters
 from cffg.compiled import Arena
 from cffg.execution import parameters as _parameters
 from cffg.execution.support import log_support as _jax_log_support
@@ -40,12 +42,21 @@ def gaussian_energy(arena, g_eta, g_lam, g_obs, g_mask, params):
             mk = g_mask[jnp.asarray(g.obs_rows)]
         total = (
             total
-            + _gauss_energy(g, inc_e, inc_l, _kernel_params(g, params), y, mk).sum()
+            + _gauss_energy(g, inc_e, inc_l, _tap_parameters(g, _kernel_params(g, params), g_obs, g_mask), y, mk).sum()
         )
     for d, pairs in arena.gauss_interior:
         l0 = g_lam[arena.g_lam_indices(pairs[:, 0], d)]
         l1 = g_lam[arena.g_lam_indices(pairs[:, 1], d)]
-        total = total + gauss.edge_entropy(l0, l1).sum()
+        if arena.gaussian_taps:
+            slots = {arena.edges[name].slot0: row for name, row in arena.gaussian_taps.items()}
+            rows = np.array([slots.get(int(pair[0]), -1) for pair in pairs])
+            fixed = (rows >= 0) & (g_mask[np.maximum(rows, 0)] != 0)
+            # Supply a proper unused operand to the entropy primitive on eliminated coordinates.
+            l0 = jnp.where(fixed[:, None, None], jnp.eye(d, dtype=l0.dtype), l0)
+            l1 = jnp.where(fixed[:, None, None], 0., l1)
+            total = total + jnp.where(fixed, 0., gauss.edge_entropy(l0, l1)).sum()
+        else:
+            total = total + gauss.edge_entropy(l0, l1).sum()
     return total
 
 

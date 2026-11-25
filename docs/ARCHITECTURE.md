@@ -127,7 +127,7 @@ and review context proportional to the change.
 | Derived component coordinate | Serialized explicit region/constraint semantics and approximation identity; D12 equations in `docs/DERIVATIONS.md` (production protocol deferred) | New IR field validation/JSON/hash/scoping/edits/composition; topology and specialized/registered ownership; compiler grouping, slots, parameter packing, resolution, assembly, `Arena` and `member_of`; component/boundary indexes and schedule stages; synchronous and scheduled local/batch/scan execution; lifecycle and host/JIT support/status checks; ledger region/separator/adapter ownership; readouts and `Learnables.replace`; learnable/executable/checkpoint/CFFGZ semantic identity and legacy rejection/migration; estimator and public exports | `tests/test_hybrid_separator_derivation.py` mathematical oracle; affected IR/serialize/plates/edits/topology/resolution/assembly, kernel/ledger/runtime/schedule, learnable/readout/checkpoint/bundle tests from the rows below; public composition fixtures and host/JIT, synchronous/scheduled, single/vmap, current/legacy parity | D12 derivation and anchors; ownership here; construction/migration in README; approximation and unsupported compositions in LIMITATIONS |
 | New IR field | `src/cffg/core/ir.py` (`Template` or its spec dataclass) | `src/cffg/core/validate.py`; `src/cffg/core/serialize.py` (`to_dict`, `from_dict`, `structure_hash`); `src/cffg/core/plates.py` scoping; `src/cffg/core/compose.py` and `src/cffg/core/edits.py` when editable; `src/cffg/topology.py` declaration snapshots/layout, `src/cffg/specialized/` semantic claims/drafts, `src/cffg/registered/` same-arena drafts, `src/cffg/resolution/` arrays/addresses, `src/cffg/assembly.py` arena assembly, and `src/cffg/compiled.py` values when executable; bundle and agent state when persisted | `tests/test_ir.py`, `tests/test_serialize.py`, `tests/test_plates.py`, `tests/test_topology.py`, `tests/test_registered.py`, `tests/test_resolution.py`, `tests/test_assembly.py`; add `tests/test_edit_codec.py`, `tests/test_edits.py`, `tests/test_agent_spec.py`, or `tests/test_bundle.py` only for the affected boundary | Contract in this document; public construction and migration in `README.md`; unsupported cases in `LIMITATIONS.md` |
 | New factor or rule family | `src/cffg/kernels.py:FactorKernel`, `kernel_bindings.py`, its `src/cffg/core/ir.py:FactorType`, and the family rule module; formal equations are authoritative in code docstrings and `DERIVATIONS.md` | `topology.py` declared role/slot facts; `specialized/` named family discovery/completion; `registered/` binding capabilities and same-arena structural lowering; common declarations in `array_requirements.py`; `registered/packing.py` and `specialized/packing.py` family adapters; `resolution/` parameter/observation resolution; `assembly.py`, `Arena`, and `member_of`; typed local updates in `execution/` and `ExecutionDelta`; registered mathematics/readouts/energy in `kernel_runtime.py`; objective assembly in `ledger.py` and specialized local terms in `ledger_terms.py`; `execution/synchronous.py:make_sweep`; `execution/transport.py` and `schedule_program.py` batch/registerized/flat scans; `lifecycle.py` observation binding and `mu3_lifecycle.py` functional state; `ledger.make_belief_energy`; support checks, assignment scoring, `readouts/` posterior/statistic adapters, schedule classification, serialization manifest, estimator, and public exports as applicable | `tests/test_kernels.py`, `tests/test_execution.py`, `tests/test_registered.py`, `tests/test_resolution.py`, `tests/test_assembly.py`, `tests/test_discrete_kernels.py`, `tests/test_gaussian_kernels.py`, `tests/test_gaussian_kernel_schedules.py`; `tests/test_ledger.py`, `tests/test_readout_owners.py`; family rule and engine-oracle tests; `tests/test_schedule.py`, `tests/test_schedule_program.py`; sparse-support, float32, and uncomfortable-scale cases | Derivation in `DERIVATIONS.md`; integration contract here; approximations in `LIMITATIONS.md`; public modeling API in `README.md` |
-| Runtime numerical or status invariant | `AGENTS.md` numerical contract and `src/cffg/runtime_types.py` (state/result/status values) and `src/cffg/iteration.py` (ordinary policy), `exact_strategy.py` and `outer_strategy.py` (distinct run control), and `run_results.py` (public results), plus `ledger.py` and `ledger_terms.py` (objectives) and `readouts/` (posteriors/statistics) | Flooding, colored/mixed, and exact schedules; host `runtime_checks.StateChecks` and `schedule_program.make_support_check`; `execution.synchronous.make_sweep`, `ScheduleProgram`, `make_exact_unit`, `make_propagate`, and `ledger.make_belief_energy`; `StateLifecycle`/`Mu3Lifecycle` initialization, preparation and status forwarding; inner-solver status; `RollingAgent`, `Colony`, estimator, benchmark, and dashboard consumers | `tests/test_runtime_status.py`, `tests/test_schedule.py`, `tests/test_schedule_program.py`, `tests/test_engine_contracts.py`, `tests/test_lifecycle.py`, `tests/test_iteration.py`, `tests/test_ledger.py`, `tests/test_readout_owners.py`, `tests/test_run_strategies.py`, `tests/test_colony.py`, `tests/test_colony_failures.py`, `tests/test_constraint_data.py`, `tests/test_constraint_reconstruction.py`, plus the changed rule family's hostile-input tests | Runtime contract here and in `README.md`; any accepted failure mode or approximation in `LIMITATIONS.md` |
+| Runtime numerical or status invariant | `AGENTS.md` numerical contract and `src/cffg/runtime_types.py` (state/result/status values) and `src/cffg/compiled_iteration.py` (deterministic iteration) and `iteration.py` (functional updates and host reference), `exact_strategy.py` and `outer_strategy.py` (distinct run control), and `run_results.py` (public results), plus `ledger.py` and `ledger_terms.py` (objectives) and `readouts/` (posteriors/statistics) | Flooding, colored/mixed, and exact schedules; host `runtime_checks.StateChecks` and `schedule_program.make_support_check`; `execution.synchronous.make_sweep`, `ScheduleProgram`, `make_exact_unit`, `make_propagate`, and `ledger.make_belief_energy`; `StateLifecycle`/`Mu3Lifecycle` initialization, preparation and status forwarding; inner-solver status; `RollingAgent`, `Colony`, estimator, benchmark, and dashboard consumers | `tests/test_runtime_status.py`, `tests/test_schedule.py`, `tests/test_schedule_program.py`, `tests/test_engine_contracts.py`, `tests/test_lifecycle.py`, `tests/test_iteration.py`, `tests/test_compiled_iteration.py`, `tests/test_iteration_checks.py`, `tests/test_iteration_tolerance.py`, `tests/test_ledger.py`, `tests/test_readout_owners.py`, `tests/test_run_strategies.py`, `tests/test_colony.py`, `tests/test_colony_failures.py`, `tests/test_constraint_data.py`, `tests/test_constraint_reconstruction.py`, plus the changed rule family's hostile-input tests | Runtime contract here and in `README.md`; any accepted failure mode or approximation in `LIMITATIONS.md` |
 | Learnable or checkpoint feature | `src/cffg/core/ir.py` (`LearnableSpec`, `AgentSpec`, `BeliefBinding`) and `src/cffg/learn.py` (`Family`, `Learnables`); neural point training in `training.py` and recognition in `amortization.py` | Validation, JSON/hash, plate scoping, specialized parameter/objective ownership, `resolution/addresses.py:resolve_learnables` and declared member/parameter requirements, `Arena.learn_plans`, `member_of`, `StateLifecycle` initial arrays and binding, `Mu3Lifecycle` functional parameter state, `readouts/` adapters and `StateLifecycle.with_goal_priors`, agent cadence, checkpoint encode/decode and legacy migration, and bundles | `tests/test_learnables.py`, `tests/test_readout_owners.py`, `tests/test_lifecycle.py`, `tests/test_constraint_reconstruction.py`, `tests/test_resolution.py`, `tests/test_assembly.py`, `tests/test_agent_spec.py`, `tests/test_agent.py`, and `tests/test_bundle.py`; add the contributing factor family's statistic test | Conjugate contract here; statistics beyond the papers in `DERIVATIONS.md`; public cadence/checkpoint API in `README.md`; remaining family gaps in `LIMITATIONS.md` |
 
 Duplicated execution surfaces are deliberate review pairs: host/JIT,
@@ -663,6 +663,16 @@ worth remembering:
   tree identity exact: BFE = −log p(bound observations), the Kalman tier's
   pinned test. Missing data contributes −H[mu_in], mirroring the discrete
   missing-data cancellation.
+- **Interior Gaussian observations.** A DATA port on a Gaussian equality
+  identifies one observed vector across the connected equality factors.
+  Each adjacent built-in prior or affine conditional substitutes that value.
+  Given `x=c`, the affine factor on `y` becomes `N(y; A c + b, V)`.
+  Given both endpoints, its ledger contribution is the negative log density
+  of `y` under that Gaussian. Priors retain the density of an observed point.
+  Fixed coordinates drop out of local and edge entropy. The compiler shares
+  one observation row among all incident roles. Clearing its mask restores
+  ordinary messages. Flooding and the scheduled executors use the same local
+  substitution, and the host marginal returns the point on every captured leg.
 - **One damp knob.** Linear damping on (eta, Lambda) *is* log-space damping
   for Gaussians, so the engine's damp parameter acts uniformly across
   families.
@@ -1083,21 +1093,23 @@ finite/support predicate is distinct from a false predicate. Outcome traces
 are immutable host arrays that retain Python-float precision even when JAX
 x64 is disabled; the public boundary converts them to Python tuples.
 
-`iteration.py` owns ordinary soft/hard iteration and the shared incremental
-`IterationProgress` assessment. It consumes prepared State, `ScheduleProgram`,
-explicit policy/controls and narrow check/objective/functional-update callbacks;
-it does not inspect factor types or import Engine. Engine supplies current
-step/prime handles and callbacks at run entry. Colony retains its vmapped
-transport and per-instance active masks, but uses the same assessment owner.
-Initial rejection precedes priming, stopped batch members remain frozen, and
-FE comparison history resets between soft and hard phases.
+`compiled_iteration.py` runs deterministic flooding, colored and mixed
+schedules on device. Engine supplies the scheduled sweep, optional forest
+prime and belief-energy kernel. Each soft or hard phase uses a `lax.while_loop`.
+Its carry records the current messages, performed count, last defined energy,
+residual, local failure and bounded delta/energy traces. The initial finite
+and exact-support checks precede priming. Hardening begins with a fresh energy
+comparison. At max-product stationarity, the public decoded-assignment objective
+certifies each stationary phase on the host. This preserves NumPy's tie handling
+when a rounded probability decides feasibility. `iteration.py` handles functional
+updates and supplies the host reference used in parity tests.
 
 `run_results.py` is the public status/result authority for all three run
 strategies. Its `finalize_iteration`, `finalize_exact` and `finalize_outer`
 functions validate their distinct terminal evidence and construct `RunResult`.
 Ordinary initial rejection retains `NOT_RUN`, including in explicit
 legacy-Picard GFE calls; valid zero-budget and later Picard results retain
-their `LEGACY_PICARD` tag. The host convergence loop is not newly jitted.
+their `LEGACY_PICARD` tag.
 `test_iteration.py` protects the owner boundary, immutable/precision-preserving
 traces, transformable facts and shared finalization; existing family and
 failure tests remain the numerical authorities.
@@ -1118,6 +1130,18 @@ status. `outer.py` owns host trust-region control; `outer_chart.py` owns chart
 geometry, `outer_coordinates.py` owns grouped compiled coordinate conversion,
 and `outer_trust.py` owns compiled trust steps and root diagnostics.
 Their existing imports from `outer.py` remain available.
+
+The optional `compiled_trust_region` controller yields at fixed-chart phase
+boundaries. `outer_batch.py` groups requests for the same kernel and returns
+each reply to its originating solve. `outer_candidate.py` advances bounded
+damped candidates. `outer_fixed.py` carries each member's accepted point,
+radius, six-point acceleration history and work counters through a device
+loop using the same matrix-free trust steps. Feasibility is invariant while
+all reconstructed discrete supports and parameters stay fixed. A change
+hands control back to the existing host policy, along with the last accepted
+state and history. Support discovery, hardening and terminal certification
+stay with that policy. The host rechecks the undamped map and ledger before
+reporting a root. Group width and trace-buffer shape specialize JAX compilation.
 
 `outer_kernels.py:OuterKernelProvider` owns a per-engine lazy derivative cache.
 Its keys retain chart support, dtype, coordinate layout/aliases, hard-message
@@ -1227,9 +1251,12 @@ where one readout depends on another. Goal readouts still use
 `dirichlet_marginals`; Gaussian/recurrence learning statistics still use
 `recurrence_pair_beliefs`; decoding still uses `marginals`. This preserves call
 order and instrumentation without capturing an Engine inside a readout owner.
-Existing ordinary/legacy EF callback lookup timing, field order, dtype, support
-and improper-belief outputs are unchanged. No readout vectorization or caching
-is introduced; `cff-3kdk` remains that separate performance work.
+Categorical and Gaussian readout owners accept an ordered subset of names.
+They validate the selection before reading numerical state and group work
+by cardinality or dimension. Engine and Colony expose the same selection.
+The full readout remains the default. Runtime DATA binding precomputes
+observation slices per compiled structure, checks the partial input mapping
+on the host and batches its updates to the immutable numerical state.
 
 `with_goal_priors` is a state replacement, not a readout. Its implementation now
 lives in `StateLifecycle`, retaining the fresh-trial count guard, prior-shape
@@ -1864,7 +1891,7 @@ Lowering uses no `FactorType` or compiler special case:
    `transition_mixture` implementing `out = left * K_right + right`;
 2. products of more components form a left-deep chain of those nodes; and
 3. every logical net with more than two endpoints becomes the minimum
-   left-deep chain of ternary equality factors, keeping every materialized
+   balanced tree of ternary equality factors, keeping every materialized
    FFG edge at degree two.
 
 One blob per block is shared by every time member, so blob identity provides
@@ -2086,6 +2113,23 @@ discarding a joint correlation. Exact joint rollover remains the separate
 - Sensor/actuator adapters are plain Python callbacks mapping env observations to
   one-hot data bindings and control marginals to env actions.
 
+### Two-clock categorical filtering
+
+`cffg.hierarchy.Hierarchy` executes a categorical slow transition and a
+regime-selected fast transition with an observed categorical emission. Both
+levels have a serialized template and parameter arrays. The declared binding
+selects the regime axis of the fast transition. Compiling the templates gives
+the registered numerical parameters to a dedicated exact elimination schedule.
+
+For each fast tick the schedule predicts the fast state separately in each
+regime and multiplies by the observation likelihood. It returns the normalized
+joint regime/state posterior and the child log likelihood for each regime. At
+the declared period boundary the slow transition acts on that joint, preserving
+the correlation needed for the next period. The runtime commits inference
+statistics and clocks after a successful joint certificate. A supplied budget
+of zero returns the corresponding unfinished stage. See DERIVATIONS D16 for
+the region entropy correction and its path-enumeration oracle.
+
 ### 5b. Colony execution (many small graphs, one machine)
 
 `Colony` owns an instance table of `(structure_hash, State)` pairs and caches one
@@ -2093,7 +2137,7 @@ discarding a joint correlation. Exact joint rollover remains the separate
 messages, parameters, and conditioned observations; structure remains in the
 cached engine. Ordinary iterative instances are grouped by structure plus State
 pytree layout, array shapes and dtypes before stacking. Each compatible batch
-evaluates one scheduled iteration under `filter_vmap`; different structures or
+vectorizes the compiled controller with `jax.vmap`. Distinct structures or
 numeric layouts run as separate groups. Different allowed-tuple table lengths
 therefore cannot enter one stack, while same-shaped tables with different
 contents retain vectorized execution. One cached Engine can have several JAX
@@ -2129,12 +2173,13 @@ of mixed float precisions and table lengths. `test_constraint_reconstruction.py`
 checks bundles, current and supported legacy agent reconstruction, and strict
 fixed-data mismatch rejection.
 
-Ordinary runs share `IterationProgress` assessment and `finalize_iteration`
-result construction with Engine; Colony owns batching and active-member
-freezing, not a second termination policy. The convergence loop and
-per-instance status bookkeeping are currently Python
-host control flow around the vmapped iteration. The measured 32-instance CPU
-speedup is about 1.5× over sequential execution because dispatch dominates.
+Ordinary Colony runs use the same compiled iteration and public result
+finalization as Engine. Each member's reason and performed count freeze its
+state and trace independently inside the vectorized loop. At exit the host
+truncates the trace buffers to each member’s recorded counts. Trace storage scales
+with batch width times sweep budget. `tools/benchmark_ordinary_iteration.py`
+compares the two public entry points on 32 distinct Hallway priors and 60
+ordinary sweeps, including synchronized wall time and device submissions.
 Stochastic `mu3` evaluators are rejected by `Colony`: explicit PRNG preparation,
 particle state, and stochastic statuses exist on `Engine`, but Colony does not
 yet carry them per instance. Per-instance structure changes also fragment
@@ -2227,15 +2272,24 @@ nothing committed here) — the durable engine-level findings:
   cff-5edo).
 
 **Bottlenecks found (each a ticket, in priority order).**
-- Sweeps, not FLOPs: wide fan-ins expand to *linear* equality chains, so
-  BP diameter — hence sweeps-to-convergence — is O(N) in plate size; this,
-  not compile time (1.2 s for 784 leaves) and not per-sweep cost, capped
-  perception throughput (cff-9xmq: balanced trees).
+- The historical 49-patch classifier used a linear equality chain to connect
+  the patches. `cffg.core.equality_tree.plan_equality_tree` now generates the
+  balanced tree used by Broadcast expansion and structural branch edits.
+  For `N` leaves the hub-to-leaf bound is `ceil(log2(N))` equality factors.
+  Synchronous whole-model convergence also depends on paths inside the
+  patches. On the frozen 49-patch classifier this cut the longest outer path
+  from 48 to 11 equality factors and the full-model sweep count from 80–81 to
+  43–44. On the Apple M2 Max CPU, single/batched throughput rose from
+  20.4/28.2 to 36.2/47.7 images/s. The maximum difference from independently
+  contracted posterior probabilities was below 5e-13. Both 784-leaf topology
+  variants held 401,648 bytes of numerical state. The inputs, timing boundaries
+  and separate size fixture are specified in
+  `tools/hierarchy/broadcast_protocol.json`.
 - Hybrid nodes originally lacked soft sufficient statistics and predictive
   readouts; cff-lquu resolved that consumer boundary.
 - Long rollouts re-solve cold every step and degrade past ~20 slices
-  (cff-5edo); fan-out and observe-an-interior-latent need one-call helpers
-  (cff-mjku). Role-bearing non-discrete writes are now the `set_params`
+  (cff-5edo). The structural edit API now provides `fan_out` and
+  `observe_interior`. Role-bearing non-discrete writes use the `set_params`
   contract in §3b.
 
 **Method note.** The evaluation discipline that made this productive:
@@ -2375,9 +2429,9 @@ source of truth for readiness, scope, and status.
 
 ### Near-term architectural targets
 
-- **Colony runtime (cff-wbhu, cff-rqqc).** Put the general convergence loop and
-  per-instance status carry inside one compiled scan, and give stochastic
-  evaluators explicit per-instance PRNG streams and particle state.
+- **Colony runtime (cff-wbhu, cff-rqqc).** Measure throughput across grouped
+  controllers and extend stochastic evaluators with per-instance PRNG streams
+  and particle state.
 - **Resource analysis (cff-j7mm).** Restore correct XLA lowering and calibrated
   FLOP/byte reporting on top of the existing exact arena-byte estimate.
 - **Visualization clients (cff-jude).** Use the edit API as the model-editor
@@ -2386,22 +2440,23 @@ source of truth for readiness, scope, and status.
 
 ### Hierarchical and sophisticated inference
 
-- **Hierarchical models: cleanly additive, plan as M7.** Templates-with-ports
-  already compose vertically: a higher level places priors on a lower level's
-  parameters or goal statistics (Part II §7.2's goal hyperprior is the depth-2
-  base case, and the buyer/seller simulation is two coupled models at different
-  timescales). What M7 adds is message rules for inter-level couplings
-  (Dirichlet hyperpriors exist; Cat-parameters-from-a-parent and temporal
-  thickness à la de Vries & Friston 2017 need deriving) and nested-schedule
-  support in the VM. No IR or compiler changes anticipated.
-- **Sophisticated inference: shallow yes, deep no.** Contingent planning
-  ("branch on what I might observe") can be expressed as a *bigger template* —
-  observation-branch mixture nodes unrolled into a policy tree — so the engine
-  runs it without architectural change; the cost is combinatorial in branch
-  depth (practical to depth ~2–3). Deep SI is tree search, which is precisely
-  what LAIF exists to avoid; it will not fall out of message passing
-  (LIMITATIONS H5/S4). Default posture: receding-horizon replanning first,
-  shallow branch templates where contingency demonstrably pays.
+- A fixed two-level categorical hierarchy is implemented in §5. Extending the
+  binding to continuous states, additional levels or learned transition
+  parameters requires corresponding message and ledger rules.
+- `cffg.models.contingent.build_contingent` expands one or two categorical
+  observation layers into action-prefix variables. Copy-and-append transitions
+  share the pre-observation actions. Balanced equality trees connect each
+  prefix to its children, a DATA tap and its preference and response factors.
+  `build_contingent_rollout` obtains the same inputs by causal forward filtering
+  of a categorical controlled state model. The stored template and CPT blobs
+  suffice to compile both native traversals.
+- `cffg.contingent.ContingentPlanner` checks source layout, uniform action
+  priors and physical history masses. For MAP it integrates the passive
+  response leaves and runs an exact max-product tree. For scores and
+  conditional branch distributions it clamps earlier decisions on the
+  sum-product tree. Execution after commitment is a history lookup. D17
+  derives the two ledgers and the fixed-policy expected loss. S4 gives
+  the bounded domain and resource limits.
 
 ### Long-term positions from the brief
 

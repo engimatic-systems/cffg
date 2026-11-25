@@ -42,6 +42,8 @@ def _conditioning(topology, claims, registry):
             )
             if conditioning is not None and role == conditioning.role:
                 gaussian[candidate.variable] = candidate.port
+            elif kind == "equality":
+                continue  # resolve_taps checks the entire equality class and its endpoints.
             elif candidate.port in claims.conditioning_problems:
                 problems.append(claims.conditioning_problems[candidate.port])
             else:

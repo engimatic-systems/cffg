@@ -217,6 +217,7 @@ def _rslds_parameters(dtype=np.float32):
     }
 
 
+@pytest.mark.slow
 def test_rslds_tier_matches_tiny_exact_oracle_and_rolls_all_parameters():
     """One compact integration tier: float32 inference, exact quadrature gap,
     finite ledger, and exact between-trial parameter installation."""
@@ -817,6 +818,7 @@ def test_engine_tracks_dense_quadrature_and_upper_bounds_evidence():
     assert bounded_vfe - exact_evidence < 0.06
 
 
+@pytest.mark.slow
 def test_flood_and_mixed_schedules_reach_the_same_bound_root():
     template, arrays = _template(
         weights=np.array([[[0.4]], [[-0.3]]]),
@@ -950,6 +952,7 @@ def test_float32_k32_d16_converges_without_cubic_plan_storage():
     )
 
 
+@pytest.mark.slow
 def test_vmap_step_matches_sequential():
     template, arrays = _template(
         weights=np.array([[[0.4]], [[-0.2]]]),

@@ -97,3 +97,16 @@ def test_unrolled_chain_is_a_valid_operand_again(hmm_slice):
     week = compose(a, b, {"t1/tail": "t0/head"}, name="glued_chains")
     assert len(week.factors) == 12
     validate(week)
+
+
+def test_fanout_of_boundary_keeps_original_port_composable():
+    from cffg.core import fan_out
+
+    tree, ports = fan_out(make_state_prior(), "z0", 16)
+    validate(tree)
+    assert tree.ports["attach"].role is PortRole.GLUE
+    assert tuple(p for p in tree.ports if p != "attach") == ports
+    combined = compose(tree, make_state_prior(), {ports[-1]: "attach"}, name="coupled")
+    validate(combined)
+    assert "a/attach" in combined.ports
+    assert "a/" + ports[-1] not in combined.ports

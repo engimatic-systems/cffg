@@ -43,7 +43,7 @@ def _run_chain(card, dtype):
     return engine, result, exact, weights, offsets, tolerance
 
 
-@pytest.mark.parametrize("card", (2, 3))
+@pytest.mark.parametrize("card", (pytest.param(2, marks=pytest.mark.slow), 3))
 def test_public_pair_and_learning_match_independent_chain_oracle(card):
     engine, result, exact, weights, offsets, tolerance = _run_chain(
         card, np.float64

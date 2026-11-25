@@ -58,7 +58,10 @@ from cffg.execution.transport import _disc_both as _disc_both  # noqa: PLC0414
 from cffg.execution.transport import _disc_rows as _disc_rows  # noqa: PLC0414
 from cffg.execution.transport import _gauss_rows as _gauss_rows  # noqa: PLC0414
 from cffg.execution.transport import _obs_rows as _obs_rows  # noqa: PLC0414
-from cffg.iteration import IterationPolicy, IterationServices, run_iterations
+from cffg.compiled_iteration import controller_for
+from cffg.iteration import (
+    IterationPolicy, IterationServices, allows_initial_undefined_energy, run_iterations,
+)
 from cffg.execution.failures import FailureIndex
 from cffg.ledger import ObjectiveLedger, constraint_satisfied
 from cffg.ledger import make_belief_energy as _make_bfe
@@ -79,6 +82,7 @@ from cffg.readouts import hybrid as _hybrid_readouts
 from cffg.readouts import parameters as _parameters_readouts
 from cffg.readouts import recurrence as _recurrence_readouts
 from cffg.readouts import registered as _registered_readouts
+from cffg.readouts.selection import EdgeSelection
 from cffg.readouts.types import DirichletMarginal as DirichletMarginal  # noqa: PLC0414
 from cffg.readouts.types import EfMarginal as EfMarginal  # noqa: PLC0414
 from cffg.runtime_checks import StateChecks, state_is_finite
@@ -291,9 +295,13 @@ class Engine:
         )
 
     def bind_data(self, state: State, observations: dict) -> State:
-        """Bind DATA ports: discrete ports take an int (None = missing =
-        uniform); Gaussian ports take a length-dim vector, EF ports a scalar
-        count/flip (None = missing = the likelihood node drops out)."""
+        """Return a new state with a partial DATA update. Omitted ports keep their values.
+
+        Categorical integers clamp a label. None restores a uniform message.
+        Gaussian vectors and exponential-family scalars bind numeric observations.
+        None clears their masks while retaining the cached values. Invalid input
+        leaves the supplied state intact.
+        """
         return self._state_lifecycle.bind_data(state, observations)
 
     # -- execution --------------------------------------------------------
@@ -377,7 +385,9 @@ class Engine:
         Mixed-GFE plans use the proof-backed trust-region residual solver by
         default. ``damp`` remains a Picard/flooding parameter and is rejected
         for that path; select ``outer_solver="picard"`` explicitly to retain
-        the legacy fixed-damping iteration as a diagnostic.
+        the legacy fixed-damping iteration as a diagnostic. For deterministic
+        GFE, ``outer_solver="compiled_trust_region"`` runs fixed-support phases
+        on device. It trades extra first-call compilation and memory for reuse.
 
         δ form-constraints must not fire while beliefs are still garbage — a
         premature pointmass locks in its own arbitrary argmax. With
@@ -397,9 +407,9 @@ class Engine:
         sweep budget applies)."""
         if n_iters < 0:
             raise ValueError("n_iters must be non-negative")
-        if outer_solver not in ("auto", "trust_region", "picard"):
+        if outer_solver not in ("auto", "trust_region", "compiled_trust_region", "picard"):
             raise ValueError(
-                "outer_solver must be 'auto', 'trust_region', or 'picard'"
+                "outer_solver must be 'auto', 'trust_region', 'compiled_trust_region', or 'picard'"
             )
         self._require_mu3_ready(state)
         if harden_last is None:
@@ -416,6 +426,8 @@ class Engine:
             or self.arena.hybrid_gfe_groups
         )
         adaptive = self.has_adaptive_gaussian
+        if outer_solver == "compiled_trust_region" and (not has_gfe or adaptive or self.arena.mu3_groups):
+            raise ValueError("compiled_trust_region requires deterministic GFE without adaptive Gaussian updates")
         if adaptive and outer_solver == "picard":
             raise ValueError("adaptive Gaussian inference requires residual globalization")
         use_trust_region = (has_gfe or adaptive) and outer_solver != "picard"
@@ -435,19 +447,22 @@ class Engine:
                     return proposal
                 return after_directed_attempt(self._run_outer_trust_region(
                     state, n_iters - 1, tol=tol, harden_last=0))
+            if outer_solver == "compiled_trust_region":
+                return self._run_outer_batch([state], n_iters, tol=tol, harden_last=harden_last)[0]
             return self._run_outer_trust_region(
                 state, n_iters, tol=tol, harden_last=harden_last
             )
 
-        outcome = run_iterations(
-            state,
-            self._iteration_program(),
-            services=self._iteration_services(),
-            policy=self._iteration_policy(state, tol),
-            n_iters=n_iters,
-            damp=damp,
-            harden_last=harden_last,
-        )
+        if self._mu3_lifecycle is not None or "_update_mu3" in vars(self):
+            outcome = run_iterations(
+                state, self._iteration_program(), services=self._iteration_services(),
+                policy=self._iteration_policy(state, tol), n_iters=n_iters,
+                damp=damp, harden_last=harden_last,
+            )
+        else:
+            outcome = controller_for(self).run_single(
+                state, n_iters=n_iters, damp=damp, harden_last=harden_last, tol=tol,
+            )
         ess, log_normalizers, mu3_statuses = self._mu3_result_diagnostics(outcome.state)
         return run_results.finalize_iteration(
             outcome,
@@ -471,12 +486,7 @@ class Engine:
         return IterationPolicy.from_dtype(
             state.messages.dtype,
             semiring=self.arena.semiring,
-            allow_initial_undefined_energy=bool(
-                self.arena.gauss_groups
-                or self.arena.ef_groups
-                or self.arena.prec_groups
-                or self.arena.recurrence_groups
-            ),
+            allow_initial_undefined_energy=allows_initial_undefined_energy(self.arena),
             tol=tol,
         )
 
@@ -505,11 +515,18 @@ class Engine:
         tol: float | None,
         harden_last: int,
     ) -> RunResult:
-        outcome = OuterTrustRegionStrategy(
+        return self._run_outer_batch(
+            [state], n_iters, tol=tol, harden_last=harden_last, compiled=False,
+        )[0]
+
+    def _run_outer_batch(self, states, n_iters, *, tol, harden_last, compiled=True):
+        from cffg.outer_batch import run_phases
+        strategy = OuterTrustRegionStrategy(
             structure=OuterStructure.from_arena(self.arena),
             hardening=tuple(self.arena.delta_slot_groups),
             eliminated=self._outer_eliminated,
             kernel_provider=self._outer_kernel_plan,
+            stage_kernel=self._outer_kernels.stage if compiled else None, ledger=self._bfe,
             iter_step=self._iter_step,
             prime=self._prime,
             reconstruct=self._reconstruct,
@@ -521,7 +538,12 @@ class Engine:
                 self.bfe,
                 self._update_mu3 if self.arena.mu3_groups else None,
             ),
-        ).run(state, n_iters, tol=tol, harden_last=harden_last)
+        )
+        outcomes = run_phases([strategy.phases(state, n_iters, tol=tol, harden_last=harden_last)
+                               for state in states])
+        return [self._outer_result(outcome) for outcome in outcomes]
+
+    def _outer_result(self, outcome):
         ess, log_normalizers, mu3_statuses = self._mu3_result_diagnostics(outcome.state)
         return run_results.finalize_outer(
             outcome,
@@ -545,10 +567,9 @@ class Engine:
 
     # -- readouts ---------------------------------------------------------
 
-    def marginals(self, state: State) -> dict[str, np.ndarray]:
-        return _discrete_readouts.marginals(
-            self.arena, state,
-        )
+    def marginals(self, state: State, edges: EdgeSelection = None) -> dict[str, np.ndarray]:
+        """Categorical probabilities for all edges or the named subset, in first-occurrence order."""
+        return _discrete_readouts.marginals(self.arena, state, edges=edges)
 
     def node_beliefs(self, state: State) -> dict[str, np.ndarray]:
         """Factor name -> the node belief q_a, the object conjugate updates
@@ -613,14 +634,14 @@ class Engine:
         """Read one named Gaussian mean and covariance on the host."""
         return _gaussian_readouts.gaussian_marginal(self.arena, state, edge)
 
-    def gaussian_marginals(self, state: State) -> dict[str, tuple[np.ndarray, np.ndarray]]:
-        """Edge name -> (mean, cov). Requires a proper combined precision —
-        run to coherence (and bind data) first. Improper beliefs return NaN
-        mean/cov arrays, an explicit readout that cannot resemble a valid
-        negative or huge covariance."""
-        return _gaussian_readouts.gaussian_marginals(
-            self.arena, state,
-        )
+    def gaussian_marginals(
+        self, state: State, edges: EdgeSelection = None,
+    ) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+        """Gaussian moments for all edges or the named subset, in first-occurrence order.
+
+        Improper or unresolved beliefs return shape-preserving NaN means and covariances.
+        """
+        return _gaussian_readouts.gaussian_marginals(self.arena, state, edges=edges)
 
     def recurrence_pair_beliefs(
         self, state: State

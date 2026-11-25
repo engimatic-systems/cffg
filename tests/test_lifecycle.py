@@ -229,3 +229,158 @@ def test_epoch_scoring_uses_supplied_run_authority_and_explicit_key(
         assert result.status is failure
         assert result.epoch_scores == (2.0,)
         assert np.isnan(result.policy_score)
+
+
+def tile_observations(count=99):
+    from cffg.core import BlobRef, FactorSpec, PortRole, PortSpec, Template, VariableSpec
+
+    t = Template(name="binary_tile_observations")
+    arrays = {"probabilities": np.array([.4, .6])}
+    t.blobs["probabilities"] = BlobRef("probabilities", "tiles.npy")
+    for k in range(count):
+        port = f"tile{k}"
+        t.variables[port] = VariableSpec(port, 2)
+        t.ports[port] = PortSpec(port, port, PortRole.DATA)
+        t.factors[port] = FactorSpec(
+            port, "categorical", {"out": port}, param_blobs={"statistic": "probabilities"}
+        )
+    return t, arrays
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_99_binary_tiles_batch_and_partial_updates_match_independent_rows(enabled):
+    with jax.enable_x64(enabled):
+        template, arrays = tile_observations()
+        engine = Engine(compile_template(template, arrays=arrays))
+        state = engine.init_state()
+        ports = list(reversed(template.ports))
+        slots = [engine.arena.data_slots[p] for p in ports]
+        indices = engine.arena.message_indices(np.array(slots), 2)
+        observations = dict(zip(ports, ([0, np.int32(1), None] * 33), strict=True))
+        observed = engine.bind_data(state, observations)
+        expected = np.asarray(state.messages).copy()
+        for i, v in enumerate(observations.values()):
+            row = np.full(2, -np.log(2) if v is None else NEG)
+            if v is not None:
+                row[v] = 0.
+            expected[indices[i]] = row
+        np.testing.assert_array_equal(observed.messages, expected)
+
+        # A pair of booleans previously used NumPy's scalar boolean indexing
+        # (all entries or none). The public integer labels 0 and 1 remain one-hot.
+        changed = engine.bind_data(observed, {ports[0]: True, ports[1]: np.bool_(False),
+                                             ports[2]: 1, ports[3]: None})
+        expected[indices[:2]] = [[0., 0.], [NEG, NEG]]
+        expected[indices[2]] = [NEG, 0.]
+        expected[indices[3]] = -np.log(2)
+        np.testing.assert_array_equal(changed.messages, expected)
+        assert observed.messages.dtype == changed.messages.dtype == state.messages.dtype
+
+
+def mixed_observation_model():
+    from test_ef_engine import gamma_poisson
+
+    from cffg.core.compose import merge, scoped
+    from cffg.models.kalman import lgssm
+
+    template, arrays = tile_observations(4)
+    for prefix, (other, other_arrays) in (
+        ("counts", gamma_poisson(2)),
+        ("scalar", lgssm(2, np.eye(2), np.eye(2), np.ones((1, 2)),
+                         np.eye(1), np.zeros(2), np.eye(2))),
+        ("vector", lgssm(2, np.eye(3), np.eye(3), np.eye(3), np.eye(3),
+                         np.zeros(3), np.eye(3))),
+    ):
+        template = merge(template, scoped(other, prefix), name="mixed_data")
+        arrays.update({f"{prefix}/{name}": value for name, value in other_arrays.items()})
+    return template, arrays
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_mixed_grouped_bind_matches_scalar_binds_and_preserves_masked_caches(enabled):
+    with jax.enable_x64(enabled):
+        template, arrays = mixed_observation_model()
+        engine = Engine(compile_template(template, arrays=arrays))
+        base = engine.init_state()
+        full = {"tile1": 1, "counts/count1": 7, "vector/y0": [[3., 4., 6.]],
+                "scalar/y1": -2.5, "tile3": None, "counts/count0": 2,
+                "scalar/y0": [9.], "vector/y1": [-1., -2., -3.]}
+        # Preserve the contribution of omitted ports and the cached values of
+        # masked ports. Each row deliberately uses a different value or domain.
+        partial = {"tile1": None, "counts/count0": None, "scalar/y0": None,
+                   "vector/y0": [-5., 8., .5], "tile2": 0, "counts/count1": 10}
+
+        scalar = base
+        grouped = base
+        for batch in (full, partial, {}):
+            for name, v in batch.items():
+                scalar = engine.bind_data(scalar, {name: v})
+            grouped = engine.bind_data(grouped, batch)
+            assert_tree_equal(grouped, scalar)
+        for port, expected, mask in (("scalar/y1", [-2.5], 1.), ("scalar/y0", [9.], 0.),
+                                     ("vector/y1", [-1., -2., -3.], 1.),
+                                     ("vector/y0", [-5., 8., .5], 1.)):
+            row, dim = engine.arena.gauss_data[port]
+            idx = engine.arena.g_obs_indices(row, dim)
+            np.testing.assert_array_equal(np.asarray(grouped.g_obs)[idx], expected)
+            assert np.asarray(grouped.g_mask)[row] == mask
+        for port, expected, mask in (("counts/count0", 2., 0.), ("counts/count1", 10., 1.)):
+            row, _ = engine.arena.ef_data[port]
+            assert np.asarray(grouped.ef_obs)[row] == expected
+            assert np.asarray(grouped.ef_mask)[row] == mask
+        # The public host binder also composes with a traced state and static observations.
+        compiled_bind = jax.jit(lambda s: engine.bind_data(s, partial))
+        assert_tree_equal(grouped, compiled_bind(engine.bind_data(base, full)))
+
+
+def test_colony_mixed_partial_bind_validates_entire_batch_before_device_writes(monkeypatch):
+    from cffg import lifecycle
+    from cffg.colony import Colony
+
+    template, arrays = mixed_observation_model()
+    colony = Colony()
+    first = colony.spawn(template, arrays)
+    other = colony.spawn(template, arrays)
+    other_before = colony.instances[other].state
+    colony.bind(first, {"vector/y0": [1., 2., 3.], "counts/count0": 5, "tile0": 1})
+    colony.bind(first, {"counts/count0": None, "tile0": None})
+    state = colony.instances[first].state
+    arena = colony.engines[colony.instances[first].key].arena
+    row, _ = arena.ef_data["counts/count0"]
+    assert np.asarray(state.ef_mask)[row] == 0 and np.asarray(state.ef_obs)[row] == 5
+    gaussian, dim = arena.gauss_data["vector/y0"]
+    np.testing.assert_array_equal(np.asarray(state.g_obs)[arena.g_obs_indices(gaussian, dim)],
+                                  [1., 2., 3.])
+    assert colony.instances[other].state is other_before
+    assert not np.asarray(other_before.g_mask).any()
+
+    def premature_write(*_):
+        pytest.fail("invalid partial update reached the device")
+
+    monkeypatch.setattr(lifecycle, "_scatter_observations", premature_write)
+    for name, value, exception, text in (
+        ("bad-port", 0, KeyError, "no DATA port"),
+        ("tile0", 2, ValueError, "out of range"),
+        ("counts/count1", -.5, ValueError, "port 'counts/count1'"),
+        ("scalar/y1", [1., 2.], ValueError, "observation has dim 2"),
+    ):
+        with pytest.raises(exception, match=text):
+            colony.bind(first, {"tile1": 1, "vector/y0": None, name: value})
+        assert colony.instances[first].state is state
+
+
+def test_partial_bind_reuses_compilation_when_small_batch_size_and_missingness_change():
+    from cffg.models.kalman import lgssm
+
+    eye = np.eye(2)
+    t, arrays = lgssm(20, eye, eye, eye, eye, np.zeros(2), eye)
+    engine = Engine(compile_template(t, arrays=arrays))
+    bound = engine.bind_data(engine.init_state(), {"y0": [2., -3.]})
+    with jax.no_tracing():
+        rebound = engine.bind_data(bound, {"y7": [0., 0.], "y0": None, "y18": [1., 4.]})
+    for port, expected, mask in (("y0", [2., -3.], 0), ("y18", [1., 4.], 1),
+                                 ("y7", [0., 0.], 1)):
+        row, dim = engine.arena.gauss_data[port]
+        idx = engine.arena.g_obs_indices(row, dim)
+        np.testing.assert_array_equal(np.asarray(rebound.g_obs)[idx], expected)
+        assert np.asarray(rebound.g_mask)[row] == mask

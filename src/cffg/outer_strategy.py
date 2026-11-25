@@ -1,6 +1,6 @@
 """Trust-region phase and functional-coordinate control, separate from the solver."""
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Generator, Mapping
 from dataclasses import dataclass, replace
 
 import jax
@@ -12,7 +12,8 @@ from cffg.compiled import NEG
 from cffg.failure_facts import (
     FailurePhase, empty_failure, empty_failure_at, first_failure, in_phase,
 )
-from cffg.outer import OuterArrays, solve_outer
+from cffg.outer import OuterArrays, OuterSolveResult, solve_outer
+from cffg.outer_batch import ChartCall, run_phases
 from cffg.outer_evidence import offset_failure, terminal_failure
 from cffg.outer_kernels import KernelPlanProvider
 from cffg.outer_outcome import OuterOutcome
@@ -46,15 +47,20 @@ class OuterTrustRegionStrategy:
     services: OuterServices
     adaptive_gaussian: bool = False
     startup: StartupProgram | None = None
+    stage_kernel: Callable | None = None
+    ledger: Callable | None = None
 
-    def run(
+    def run(self, state, n_iters, *, tol, harden_last):
+        return run_phases([self.phases(state, n_iters, tol=tol, harden_last=harden_last)])[0]
+
+    def phases(
         self,
         state: State,
         n_iters: int,
         *,
         tol: float | None,
         harden_last: int,
-    ) -> OuterOutcome:
+    ) -> Generator[ChartCall, object, OuterOutcome]:
         """Solve each fixed hard-constraint phase with the D7 outer method."""
         dtype = np.asarray(state.messages).dtype
         solver_tol = max(
@@ -278,7 +284,15 @@ class OuterTrustRegionStrategy:
                     if proposal is not None and proposal.retained is not None:
                         proposal_arrays, _ = reconstruct_with_fact(proposal.retained)
                         state = as_state(proposal_arrays)
-                    solved = solve_outer(
+                    stage_kernel = None
+                    if self.stage_kernel is not None:
+                        def stage_kernel(chart, capacity, trust=None):
+                            return self.stage_kernel(
+                                chart, state, hard_blocks, capacity=capacity,
+                                iter_step=self.iter_step, reconstruct=self.reconstruct,
+                                trust=trust, ledger=self.ledger,
+                            )
+                    result = solve_outer(
                         OuterArrays(state.messages, state.g_eta, state.g_lam, state.ef_eta),
                         self.structure,
                         outer_map,
@@ -286,6 +300,7 @@ class OuterTrustRegionStrategy:
                         infeasible,
                         n_iters=remaining - (proposal.rounds if proposal is not None else 0),
                         tol=solver_tol,
+                        stage_kernel=stage_kernel,
                         eliminated=self.eliminated,
                         kernel_factory=lambda chart, state=state: self.kernel_provider(
                             chart, state, hard_blocks
@@ -299,6 +314,7 @@ class OuterTrustRegionStrategy:
                             if total_iterations == 0 else None
                         ),
                     )
+                    solved = result if isinstance(result, OuterSolveResult) else (yield from result)
                     if proposal is not None:
                         # A discovery failure at the original input rechecks the first
                         # proposal attempt. Its evaluation still spent one budget unit.

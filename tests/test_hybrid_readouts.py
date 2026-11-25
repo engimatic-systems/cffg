@@ -689,6 +689,7 @@ def test_prior_predictive_is_proper_without_a_gaussian_cavity():
     np.testing.assert_allclose(predictive["weight"], [0.5, 0.5])
 
 
+@pytest.mark.slow
 def test_recurrence_readout_matches_edge_beliefs_and_preserves_support():
     template, arrays = _recurrence_template()
     engine, state = _converge(template, arrays)
@@ -776,6 +777,7 @@ def test_recurrence_readout_matches_edge_beliefs_and_preserves_support():
     assert np.isnan(vacuous["drive_covariance"]).all()
 
 
+@pytest.mark.slow
 def test_soft_regime_stats_beat_hard_assignments_for_overlapping_dynamics():
     """A low-separation E/M step retains information hard labels discard."""
     rng = np.random.default_rng(0)

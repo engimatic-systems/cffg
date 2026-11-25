@@ -170,7 +170,9 @@ def test_real_delta_phases_and_colony_full_hardening_remain_distinct(monkeypatch
     original = engine._iter_step
 
     def observe(*args):
-        flags.append(args[-1])
+        jax.debug.callback(
+            lambda flag: flags.append(bool(flag)), args[-1], ordered=True
+        )
         return original(*args)
 
     monkeypatch.setattr(engine, "_iter_step", observe)
@@ -178,6 +180,7 @@ def test_real_delta_phases_and_colony_full_hardening_remain_distinct(monkeypatch
         flags.clear()
         result = engine.run(state, 6, harden_last=harden_last)
         assert result.status is RunStatus.BUDGET_EXHAUSTED
+        jax.effects_barrier()
         assert flags == [False] * (6 - harden_last) + [True] * harden_last
         expected = [0.0, 0.0, 1.0] if harden_last else arrays["p"]
         np.testing.assert_allclose(engine.marginals(result.state)["x"], expected)

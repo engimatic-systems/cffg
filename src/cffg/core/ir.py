@@ -465,7 +465,7 @@ class Broadcast:
     """Every copy's `port` faces one shared parent-level edge named `hub`.
 
     FFG edges have max degree 2, so expansion SYNTHESIZES an equality tree (a
-    chain of ternary equality factors) tying all copies' branch edges to the
+    balanced tree of ternary equality factors) tying all copies' branch edges to the
     hub. The hub edge is exposed as a GLUE port on the parent for the rest of
     the model to terminate (a prior, a goal, further gluing)."""
 

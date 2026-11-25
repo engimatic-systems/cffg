@@ -9,7 +9,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from test_compiler_contracts import model
-from test_engine_contracts import ordinary_case
+from test_engine_contracts import ordinary_case, record_compiled_batches
 
 from cffg import iteration, iteration_types, run_results
 from cffg.colony import Colony
@@ -177,7 +177,9 @@ def test_engine_and_actual_colony_batch_use_the_same_result_owner(monkeypatch):
 
     monkeypatch.setattr(run_results, "finalize_iteration", record)
     engine.run(colony.instances[ids[0]].state, 3, harden_last=3)
+    batches = record_compiled_batches(monkeypatch)
     colony.run(3)
+    assert [(len(group), sweeps) for group, sweeps in batches] == [(2, 3)]
     assert len(seen) == 3
 
 

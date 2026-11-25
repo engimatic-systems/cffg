@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from operator import attrgetter
+
 import jax.numpy as jnp
 import numpy as np
 
 from cffg import mixg
+from cffg.execution.transport import gaussian_tap_parameters as _tap_parameters
 from cffg.execution.transport import _gauss_rows, _obs_rows
 from cffg.kernel_runtime import gaussian_readout as _gauss_readout
 from cffg.kernel_runtime import parameters as _kernel_params
+from cffg.readouts.selection import EdgeSelection, grouped_edges, selected_edges
 from cffg.readouts.types import (
     PairBeliefs,
 )
@@ -20,47 +24,73 @@ from cffg.readouts.views import (
 from cffg.runtime_types import State
 
 
-def _resolved_correlation(matrix):
-    """Check positive definiteness at the stored precision, independently of coordinate units."""
-    scale = np.sqrt(matrix.diagonal().astype(np.float64))
-    correlation = (matrix / scale[:, None]) / scale[None, :]
-    if not np.isfinite(correlation).all():
-        raise FloatingPointError
-    dim = len(scale)
-    eps = np.finfo(matrix.dtype).eps
-    asymmetry = np.max(np.abs(correlation - correlation.T))
-    if asymmetry > 16 * dim * eps * np.max(np.abs(correlation)):
-        raise np.linalg.LinAlgError
-    correlation = (correlation + correlation.T) / 2
-    # A Cholesky pivot subtracts up to dim products from a unit diagonal.
-    # Reserve that source-dtype roundoff for admission; solve the unshifted system.
-    guarded = correlation.copy()
-    np.fill_diagonal(guarded, 1 - dim * eps)
-    np.linalg.cholesky(guarded)
-    return correlation, scale
-
-
-def _edge_moments(view, edge, eta, precision):
-    dim = edge.dim
-    slots = (edge.slot0, edge.slot1)
+def _cholesky(matrices):
+    """Isolate failed LAPACK factorizations without losing the other rows."""
     try:
-        with np.errstate(over="raise", invalid="raise", divide="raise"):
-            h = eta[view.g_eta_indices(slots, dim)].sum(axis=0)
-            p = precision[view.g_lam_indices(slots, dim)].sum(axis=0)
-            if not np.isfinite(h).all():
-                raise FloatingPointError
-            correlation, scale = _resolved_correlation(p)
-            chol = np.linalg.cholesky(correlation)
-            rhs = np.column_stack((h / scale, np.eye(dim)))
-            solved = np.linalg.solve(chol.T, np.linalg.solve(chol, rhs)) / scale[:, None]
-            mean = solved[:, 0].astype(eta.dtype)
-            covariance = (solved[:, 1:] / scale).astype(precision.dtype)
-            _resolved_correlation(covariance)
-            if np.isfinite(mean).all():
-                return mean, covariance
-    except (np.linalg.LinAlgError, FloatingPointError):
-        pass
-    return np.full(dim, np.nan, dtype=eta.dtype), np.full((dim, dim), np.nan, dtype=precision.dtype)
+        return np.linalg.cholesky(matrices)
+    except np.linalg.LinAlgError:
+        if matrices.ndim == 2 or len(matrices) == 1:
+            return np.full_like(matrices, np.nan)
+        middle = len(matrices) // 2
+        return np.concatenate((_cholesky(matrices[:middle]), _cholesky(matrices[middle:])))
+
+
+def _resolved_correlation(matrix):
+    """Test each matrix at its stored precision independently of coordinate units."""
+    dim = matrix.shape[-1]
+    scale = np.sqrt(np.diagonal(matrix, axis1=-2, axis2=-1).astype(np.float64))
+    correlation = (matrix / scale[..., :, None]) / scale[..., None, :]
+    transpose = correlation.swapaxes(-2, -1)
+    eps = np.finfo(matrix.dtype).eps
+    valid = np.isfinite(correlation).all(axis=(-2, -1))
+    valid &= (np.max(np.abs(correlation - transpose), axis=(-2, -1))
+              <= 16 * dim * eps * np.max(np.abs(correlation), axis=(-2, -1)))
+    correlation = (correlation + transpose) / 2
+    guarded = correlation.copy()
+    if not valid.all():
+        guarded[~valid] = 0
+    # Reserve source-dtype roundoff in each Cholesky pivot for admission only.
+    diagonal = np.arange(dim)
+    guarded[..., diagonal, diagonal] = 1 - dim * eps
+    valid &= np.isfinite(_cholesky(guarded)[..., -1, -1])
+    return correlation, scale, valid
+
+
+def _moments(h, precision):
+    correlation, scale, admitted = _resolved_correlation(precision)
+    admitted &= np.isfinite(h).all(axis=-1)
+    dim = h.shape[-1]
+    if not admitted.any():
+        return np.full_like(h, np.nan), np.full_like(precision, np.nan)
+    if not admitted.all():
+        # Keep one batched solve; rejected rows have no influence on their neighbors.
+        correlation[~admitted] = np.eye(dim)
+        scale[~admitted] = 1
+    chol = _cholesky(correlation)
+    rhs = np.empty((*h.shape, dim + 1), dtype=chol.dtype)
+    rhs[..., 0] = h / scale
+    rhs[..., 1:] = np.eye(dim)
+    solved = np.linalg.solve(chol.swapaxes(-2, -1), np.linalg.solve(chol, rhs)) / scale[..., None]
+    mean = solved[..., 0].astype(h.dtype)
+    covariance = (solved[..., 1:] / scale[..., None, :]).astype(precision.dtype)
+    _, _, valid = _resolved_correlation(covariance)
+    valid &= admitted & np.isfinite(mean).all(axis=-1)
+    if not valid.all():
+        mean[~valid] = np.nan
+        covariance[~valid] = np.nan
+    return mean, covariance
+
+
+def _group_moments(view, slots, dim, eta, precision):
+    with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+        h = eta[view.g_eta_indices(slots, dim)].sum(axis=-2)
+        p = precision[view.g_lam_indices(slots, dim)].sum(axis=-3)
+        return _moments(h, p)
+
+
+def _point_moments(view, state, edge, row):
+    value = np.asarray(state.g_obs)[view.g_obs_indices(row, edge.dim)]
+    return value, np.zeros((edge.dim, edge.dim), dtype=state.g_lam.dtype)
 
 
 def gaussian_marginal(view: GaussianView, state: State, edge: str):
@@ -68,18 +98,42 @@ def gaussian_marginal(view: GaussianView, state: State, edge: str):
     info = view.edges[edge]
     if not info.dim:
         raise ValueError(f"edge {edge!r} is not Gaussian")
-    return _edge_moments(view, info, np.asarray(state.g_eta), np.asarray(state.g_lam))
+    if view.gaussian_taps:
+        row = view.gaussian_taps.get(edge)
+        if row is not None and np.asarray(state.g_mask)[row]:
+            return _point_moments(view, state, info, row)
+    return _group_moments(view, (info.slot0, info.slot1), info.dim,
+                          np.asarray(state.g_eta), np.asarray(state.g_lam))
 
 
 def gaussian_marginals(
-    view: GaussianView, state: State
+    view: GaussianView, state: State, edges: EdgeSelection = None,
 ) -> dict[str, tuple[np.ndarray, np.ndarray]]:
     """Return moments by Gaussian edge name. Improper or unresolved beliefs have NaN moments."""
+    dimension = attrgetter("dim")
+    selected = selected_edges(view, edges, "Gaussian", dimension)
+    if not selected:
+        return {}
+    if len(selected) == 1:
+        name = selected[0].name
+        return {name: gaussian_marginal(view, state, name)}
     eta, precision = np.asarray(state.g_eta), np.asarray(state.g_lam)
-    return {
-        edge.name: _edge_moments(view, edge, eta, precision)
-        for edge in view.edges.values() if edge.dim
-    }
+    out = {}
+    if view.gaussian_taps:
+        mask = np.asarray(state.g_mask)
+        fixed = [e for e in selected if e.name in view.gaussian_taps and mask[view.gaussian_taps[e.name]]]
+        for dim, group in grouped_edges(fixed, dimension):
+            rows = [view.gaussian_taps[e.name] for e in group]
+            values = np.asarray(state.g_obs)[view.g_obs_indices(rows, dim)]
+            zeros = np.zeros((len(group), dim, dim), dtype=precision.dtype)
+            out.update((e.name, (v, c)) for e, v, c in zip(group, values, zeros, strict=True))
+    remaining = [edge for edge in selected if edge.name not in out] if out else selected
+    for dim, group in grouped_edges(remaining, dimension):
+        slots = [(edge.slot0, edge.slot1) for edge in group]
+        means, covariances = _group_moments(view, slots, dim, eta, precision)
+        out.update((edge.name, (mean, cov))
+                   for edge, mean, cov in zip(group, means, covariances, strict=True))
+    return {edge.name: out[edge.name] for edge in selected}
 
 
 def gaussian_node_stats(
@@ -117,7 +171,7 @@ def gaussian_node_stats(
             g,
             inc_e,
             inc_l,
-            _kernel_params(g, state.params),
+            _tap_parameters(g, _kernel_params(g, state.params), state.g_obs, state.g_mask),
             y,
             mk,
             statistics=True,

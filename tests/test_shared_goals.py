@@ -102,7 +102,7 @@ def test_equal_prior_values_do_not_tie_different_blob_names():
     assert not np.array_equal(*engine.goal_prior_updates(state).values())
 
 
-@pytest.mark.parametrize("schedule", ["flood", "auto"])
+@pytest.mark.parametrize("schedule", [pytest.param("flood", marks=pytest.mark.slow), "auto"])
 @pytest.mark.parametrize("solver", ["picard", "trust_region"])
 def test_mixed_goal_convergence_and_rollover(schedule, solver):
     template, arrays = mixed_goals()
@@ -181,6 +181,7 @@ def test_global_plan_reconstruction_and_fingerprint(tmp_path):
     )
 
 
+@pytest.mark.slow
 def test_group_order_damping_and_vmapped_instances():
     template, arrays = mixed_goals(states=(2, 3, 2))
     arena = compile_template(template, arrays=arrays)

@@ -16,6 +16,11 @@ type StateObjective = Callable[[State], float]
 type FunctionalUpdate = Callable[[State], tuple[State, float, int, float]]
 
 
+def allows_initial_undefined_energy(arena):
+    """Continuous messages can need several sweeps to form a proper belief."""
+    return bool(arena.gauss_groups or arena.ef_groups or arena.prec_groups or arena.recurrence_groups)
+
+
 @dataclass(frozen=True)
 class IterationPolicy:
     semiring: str

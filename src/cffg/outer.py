@@ -29,6 +29,7 @@ from cffg.outer_chart import (
     chart_coordinates as chart_coordinates,
     outer_chart_signature as outer_chart_signature,
 )
+from cffg.outer_batch import ChartCall, run_phases
 from cffg.outer_evidence import map_evidence, offset_failure, terminal_failure
 from cffg.outer_structure import OuterStructure
 from cffg.outer_trust import (
@@ -80,7 +81,13 @@ def _array_delta(left: OuterArrays, right: OuterArrays) -> float:
     )
 
 
-def solve_outer(
+def solve_outer(*args, stage_kernel=None, **kwargs):
+    """Return phase requests when batching, otherwise run the host controller."""
+    phases = outer_phases(*args, stage_kernel=stage_kernel, **kwargs)
+    return phases if stage_kernel is not None else run_phases([phases])[0]
+
+
+def outer_phases(
     initial: OuterArrays,
     arena: Arena | OuterStructure,
     outer_map: Callable[
@@ -98,7 +105,8 @@ def solve_outer(
     adaptive_gaussian: bool = False,
     initial_failure: FailureAt | None = None,
     _support_restarts: int = 0,
-) -> OuterSolveResult:
+    stage_kernel=None,
+):
     """Globalize one fixed-support deterministic outer map."""
     current = initial
     dtype = np.asarray(initial.messages).dtype
@@ -117,6 +125,13 @@ def solve_outer(
     linear_iterations = 0
     solver_compilations = 0
     discovery_prefix = initial_failure or empty_failure_at()
+
+    def stopped(*args, **kwargs):
+        # A compiled prefix retains its work when the host classifies the boundary.
+        if stage_kernel is not None:
+            kwargs.update(outer_map_evaluations=outer_map_evaluations, trial_evaluations=trial_evaluations,
+                          linear_iterations=linear_iterations, solver_compilations=solver_compilations)
+        return OuterSolveResult(*args, **kwargs)
 
     initial_energy = energy(current)
     if np.isfinite(initial_energy):
@@ -231,7 +246,38 @@ def solve_outer(
     # common benign case. It advances the arena arrays directly, avoiding
     # chart dispatch on every sweep, but never certifies itself.
     candidate_iterations = 0
-    for _ in range(min(candidate_limit, n_iters // 2)):
+    candidate_budget = min(candidate_limit, n_iters // 2)
+    device_candidate = None
+    if stage_kernel is not None and candidate_budget:
+        device_candidate, candidate_context = stage_kernel(chart, candidate_limit)
+    while candidate_iterations < candidate_budget:
+        if device_candidate is not None:
+            result = yield ChartCall(device_candidate, (
+                current, mapped, jnp.asarray(local_residual),
+                candidate_context, jnp.int32(candidate_budget - candidate_iterations),
+                jnp.asarray(effective_tol, mapped.messages.dtype),
+            ))
+            count = int(result.count)
+            outer_map_evaluations += int(result.maps)
+            proposed, successor = jax.tree.map(jnp.asarray, (result.current, result.mapped))
+            inner = result.inner
+            if count and bool(result.advance) and candidate_iterations + count < candidate_budget:
+                # Recheck the terminal candidate with the standalone undamped map.
+                # Batch fusion can round a boundary differently from a single sweep.
+                successor, inner, code, _ = map_evidence(outer_map(proposed))
+                outer_map_evaluations += 1
+                if (int(code) or not np.isfinite(float(inner)) or not _finite(successor)
+                        or infeasible(successor) or chart.support_changed(successor.messages)):
+                    # Reproduce the first failing transition and its cause on the host.
+                    device_candidate = None
+                    continue
+            candidate_iterations += count
+            current, mapped = proposed, successor
+            inner_residual = float(inner)
+            deltas.extend(np.asarray(result.deltas)[:count].tolist())
+            if candidate_iterations == candidate_budget:
+                break
+
         raw_residual = _array_delta(current, mapped)
         if raw_residual <= effective_tol:
             coordinates = chart_coordinates(chart, current)
@@ -298,7 +344,7 @@ def solve_outer(
         inner_residual = float(local_residual)
         inner_code = int(local_code)
         if inner_code:
-            return OuterSolveResult(
+            return stopped(
                 current, OuterTerminationReason.INNER_FAILURE,
                 candidate_iterations, tuple(deltas), tuple(energies),
                 outer_residual, merit, gradient_norm, radius, accepted,
@@ -309,7 +355,7 @@ def solve_outer(
         # states on the same exact support face, so only the fresh map output
         # needs another finite/feasibility check here.
         if not _finite(mapped):
-            return OuterSolveResult(
+            return stopped(
                 current, OuterTerminationReason.NONFINITE_EVALUATION,
                 candidate_iterations, tuple(deltas), tuple(energies),
                 float("inf"), float("inf"), float("inf"), radius,
@@ -317,7 +363,7 @@ def solve_outer(
                 failure=terminal_failure(fact, candidate_iterations + 1),
             )
         if infeasible(mapped):
-            return OuterSolveResult(
+            return stopped(
                 current, OuterTerminationReason.INFEASIBLE,
                 candidate_iterations, tuple(deltas), tuple(energies),
                 float("inf"), float("inf"), float("inf"), radius,
@@ -327,7 +373,7 @@ def solve_outer(
         if chart.support_changed(mapped.messages):
             restarts += 1
             if restarts > restart_limit:
-                return OuterSolveResult(
+                return stopped(
                     current,
                     OuterTerminationReason.SUPPORT_RESTART_EXHAUSTED,
                     candidate_iterations, tuple(deltas), tuple(energies),
@@ -335,7 +381,7 @@ def solve_outer(
                     accepted, rejected, inner_residual, inner_code,
                     failure=terminal_failure(fact, candidate_iterations + 1),
                 )
-            restarted = solve_outer(
+            restarted = yield from outer_phases(
                 mapped, arena, outer_map, energy, infeasible,
                 n_iters=max(n_iters - candidate_iterations, 0),
                 tol=tol,
@@ -344,6 +390,7 @@ def solve_outer(
                 candidate_limit=candidate_limit,
                 adaptive_gaussian=adaptive_gaussian,
                 _support_restarts=restarts,
+                stage_kernel=stage_kernel,
             )
             return OuterSolveResult(
                 restarted.arrays,
@@ -411,14 +458,44 @@ def solve_outer(
     solver_compilations += int(plan.compiled)
     trust_kernel = plan.trust
 
-    for iteration in range(n_iters + 1):
+    completed = 0
+    if stage_kernel is not None and chart.size and n_iters:
+        # Trace storage is bounded by iterations, never by the size of the arena.
+        capacity = 1 << (n_iters - 1).bit_length()
+        device_trust, context = stage_kernel(chart, capacity, plan.trust)
+        fixed = yield ChartCall(device_trust, (
+            current, coordinates, residual_scale,
+            jnp.asarray(radius, coordinates.dtype), jnp.asarray(radius_ceiling, coordinates.dtype),
+            jnp.asarray(inner_residual, coordinates.dtype), context, jnp.int32(n_iters),
+            jnp.asarray(effective_tol, coordinates.dtype),
+        ))
+        accepted = int(fixed.accepted)
+        rejected = int(fixed.rejected)
+        completed = accepted + rejected
+        outer_map_evaluations += int(fixed.maps)
+        trial_evaluations += int(fixed.trials)
+        linear_iterations += int(fixed.linear)
+        if completed:
+            coordinates = jnp.asarray(fixed.value)
+            current = jax.tree.map(jnp.asarray, fixed.arrays)
+            deltas.extend(np.asarray(fixed.deltas)[:accepted].tolist())
+            energies.extend(np.asarray(fixed.energies)[:accepted].tolist())
+            radius, merit = float(fixed.radius), float(fixed.merit)
+            outer_residual, gradient_norm = float(fixed.norm), float(fixed.gradient)
+            inner_residual = float(fixed.inner)
+            shadow_coordinates = np.asarray(fixed.shadow).copy()
+            length = int(fixed.history)
+            shadow_history_coordinates = list(np.asarray(fixed.points)[-length:])
+            shadow_history_residuals = list(np.asarray(fixed.residuals)[-length:])
+
+    for iteration in range(completed, n_iters + 1):
         mapped_coordinates, mapped, local_residual, local_code, fact = evaluate(
             coordinates
         )
         inner_residual = float(local_residual)
         inner_code = int(local_code)
         if inner_code:
-            return OuterSolveResult(
+            return stopped(
                 current, OuterTerminationReason.INNER_FAILURE,
                 candidate_iterations + iteration,
                 tuple(deltas), tuple(energies), outer_residual, merit,
@@ -427,7 +504,7 @@ def solve_outer(
                 failure=terminal_failure(fact, candidate_iterations + iteration + 1),
             )
         if not _finite(current) or not _finite(mapped):
-            return OuterSolveResult(
+            return stopped(
                 current, OuterTerminationReason.NONFINITE_EVALUATION,
                 candidate_iterations + iteration,
                 tuple(deltas), tuple(energies), float("inf"), float("inf"),
@@ -436,7 +513,7 @@ def solve_outer(
                 failure=terminal_failure(fact, candidate_iterations + iteration + 1),
             )
         if infeasible(current) or infeasible(mapped):
-            return OuterSolveResult(
+            return stopped(
                 current, OuterTerminationReason.INFEASIBLE,
                 candidate_iterations + iteration,
                 tuple(deltas), tuple(energies), float("inf"), float("inf"),
@@ -447,7 +524,7 @@ def solve_outer(
         if chart.support_changed(mapped.messages):
             restarts += 1
             if restarts > restart_limit:
-                return OuterSolveResult(
+                return stopped(
                     current,
                     OuterTerminationReason.SUPPORT_RESTART_EXHAUSTED,
                     candidate_iterations + iteration,
@@ -456,7 +533,7 @@ def solve_outer(
                     inner_residual, inner_code,
                     failure=terminal_failure(fact, candidate_iterations + iteration + 1),
                 )
-            restarted = solve_outer(
+            restarted = yield from outer_phases(
                 mapped,
                 arena,
                 outer_map,
@@ -469,6 +546,7 @@ def solve_outer(
                 candidate_limit=candidate_limit,
                 adaptive_gaussian=adaptive_gaussian,
                 _support_restarts=restarts,
+                stage_kernel=stage_kernel,
             )
             return OuterSolveResult(
                 restarted.arrays,
@@ -679,7 +757,7 @@ def solve_outer(
             * max(float(jnp.linalg.norm(scaled_residual)), 1.0)
         )
         if not step.finite:
-            return OuterSolveResult(
+            return stopped(
                 current, OuterTerminationReason.NONFINITE_EVALUATION,
                 candidate_iterations + iteration,
                 tuple(deltas), tuple(energies), outer_residual,
@@ -687,7 +765,7 @@ def solve_outer(
                 inner_residual, inner_code,
             )
         if gradient_norm <= gradient_floor:
-            return OuterSolveResult(
+            return stopped(
                 current, OuterTerminationReason.STATIONARY_NONROOT,
                 candidate_iterations + iteration,
                 tuple(deltas), tuple(energies), outer_residual, merit,
@@ -701,7 +779,7 @@ def solve_outer(
                 if step.linear_exhausted
                 else OuterTerminationReason.STAGNATION
             )
-            return OuterSolveResult(
+            return stopped(
                 current, reason, candidate_iterations + iteration,
                 tuple(deltas), tuple(energies),
                 outer_residual, merit, gradient_norm, radius, accepted,

@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -22,8 +21,8 @@ from cffg.compiler import compile_template
 from cffg.core.ir import Template
 from cffg.core.serialize import structure_hash
 from cffg.engine import Engine, RunResult, State, _replace
-from cffg.iteration import IterationProgress, step_facts
-from cffg.failure_facts import FailurePhase, empty_failure
+from cffg.compiled_iteration import controller_for
+from cffg.readouts.selection import EdgeSelection
 from cffg.runtime_types import RunStatus as RunStatus  # noqa: PLC0414
 
 
@@ -51,7 +50,7 @@ class Colony:
         template: Template,
         arrays: dict[str, np.ndarray],
         *,
-        observations: dict[str, int | None] | None = None,
+        observations: dict[str, object] | None = None,
     ) -> int:
         """Add an instance; compiles only if this structure is new."""
         key = structure_hash(template)
@@ -83,19 +82,27 @@ class Colony:
         del self.instances[iid]
         self.last_results.pop(iid, None)
 
-    def bind(self, iid: int, observations: dict[str, int | None]) -> None:
+    def bind(self, iid: int, observations: dict[str, object]) -> None:
+        """Apply Engine.bind_data's partial update to this instance only."""
         inst = self.instances[iid]
         inst.state = self.engines[inst.key].bind_data(inst.state, observations)
 
     def run(
-        self, n_iters: int, *, damp: float = 0.0, tol: float | None = None
+        self, n_iters: int, *, damp: float = 0.0, tol: float | None = None,
+        outer_solver: str = "auto",
     ) -> dict[int, RunResult]:
         """Run each structure batch and return one truthful result per instance.
 
         Ordinary iterative rule evaluation remains vmapped. Exact schedules
         reuse Engine's per-instance propagation and certification. Termination
-        is tracked on the host until the controller loop is compiled.
+        is tracked independently for each member. Mixed GFE uses the host trust
+        controller by default. Select ``outer_solver="compiled_trust_region"``
+        to batch deterministic fixed-support phases across compatible members.
         """
+        if n_iters < 0:
+            raise ValueError("n_iters must be non-negative")
+        if outer_solver not in ("auto", "trust_region", "compiled_trust_region"):
+            raise ValueError("Colony outer_solver must be 'auto', 'trust_region', or 'compiled_trust_region'")
         by_key: dict[tuple, list[int]] = {}
         for iid, inst in self.instances.items():
             by_key.setdefault((inst.key, _batch_signature(inst.state)), []).append(iid)
@@ -103,19 +110,27 @@ class Colony:
         for (key, _signature), iids in by_key.items():
             engine = self.engines[key]
             states = [self.instances[i].state for i in iids]
-            if engine.arena.gfe_groups or engine.arena.gfe_tm_groups or engine.has_adaptive_gaussian:
+            if (engine.arena.gfe_groups or engine.arena.gfe_tm_groups
+                    or engine.arena.hybrid_gfe_groups or engine.has_adaptive_gaussian):
                 if damp != 0.0:
                     raise ValueError(
                         "damp does not apply to mixed-GFE trust-region "
                         "inference"
                     )
-                for iid, state in zip(iids, states):
-                    result = engine.run(
-                        state,
-                        n_iters,
-                        tol=tol,
-                        harden_last=n_iters,
+                batch_trust = (
+                    outer_solver == "compiled_trust_region"
+                    and not (engine.has_adaptive_gaussian or engine.arena.mu3_groups)
+                    and not engine._can_run_exact(n_iters, damp, n_iters)
+                )
+                if batch_trust:
+                    results = engine._run_outer_batch(
+                        states, n_iters, tol=tol,
+                        harden_last=n_iters if len(engine.arena.delta_pairs) else 0,
                     )
+                else:
+                    results = [engine.run(state, n_iters, tol=tol, harden_last=n_iters,
+                                          outer_solver=outer_solver) for state in states]
+                for iid, result in zip(iids, results, strict=True):
                     self.instances[iid].state = result.state
                     self.last_results[iid] = result
                 continue
@@ -127,95 +142,25 @@ class Colony:
                     self.instances[iid].state = result.state
                     self.last_results[iid] = result
                 continue
-            n = len(states)
-            policy = engine._iteration_policy(states[0], tol)
-            services = engine._iteration_services()
-            program = engine._iteration_program()
-            progress = [IterationProgress(policy) for _ in states]
-            for current, state in zip(progress, states, strict=True):
-                current.initial(state, services)
-            active = np.asarray([not current.stopped for current in progress])
-
-            def freeze(old, new, *, active=active, n=n):
-                mask = jnp.asarray(active).reshape((n,) + (1,) * (old.ndim - 1))
-                return jnp.where(mask, new, old)
-
-            batched = jax.tree_util.tree_map(lambda *xs: jnp.stack(xs), *states)
-
-            # The batch runs the engine's *scheduled* iteration (cff-d56d) —
-            # the same function the sequential path loops — so vmapped and
-            # sequential results stay bitwise-comparable. Colored/mixed
-            # schedules also prime once (their exact island passes).
-            if program.prime is not None and n_iters >= 1 and active.any():
-                def prime_one(st: State, *, program=program):
-                    msgs, g_eta, g_lam, ef_eta, *auxiliary = program.prime(
-                        st.messages, st.g_eta, st.g_lam, st.ef_eta,
-                        st.g_obs, st.g_mask, st.ef_obs, st.ef_mask, st.params,
-                    )
-                    return _replace(
-                        st, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta
-                    ), auxiliary[0] if auxiliary else empty_failure()
-
-                primed, failures = eqx.filter_vmap(prime_one)(batched)
-                # Rejected inputs stay frozen across initial propagation too.
-                if active.all():
-                    batched = primed
-                else:
-                    batched = jax.tree_util.tree_map(freeze, batched, primed)
-                for b in np.flatnonzero(active):
-                    progress[b].record_failure(
-                        jax.tree.map(lambda value: value[b], failures),
-                        phase=FailurePhase.PRIMING, iteration=0,
-                    )
-
-            for b in np.flatnonzero(active):
-                progress[b].begin_phase(
-                    FailurePhase.HARD if n_iters > 0 and len(engine.arena.delta_pairs)
-                    else FailurePhase.SOFT
-                )
-
-            def one(st: State, *, program=program):
-                msgs, g_eta, g_lam, ef_eta, inner_residual, inner_status, *auxiliary = program.iter_step(
-                    st.messages, st.g_eta, st.g_lam, st.g_obs, st.g_mask,
-                    st.ef_eta, st.ef_obs, st.ef_mask, st.params, damp, True,
-                )
-                return (
-                    _replace(st, messages=msgs, g_eta=g_eta, g_lam=g_lam, ef_eta=ef_eta),
-                    inner_residual,
-                    inner_status,
-                    auxiliary[0] if auxiliary else empty_failure(),
-                )
-
-            step_v = eqx.filter_vmap(one)
-
-            for _ in range(n_iters):
-                if not active.any():
-                    break
-                candidate, inner_r, inner_code, failures = step_v(batched)
-
-                previous = batched
-                batched = jax.tree_util.tree_map(freeze, batched, candidate)
-                inner_r_np, inner_code_np = np.asarray(inner_r), np.asarray(inner_code)
-                for b in np.flatnonzero(active):
-                    old = jax.tree_util.tree_map(lambda x: x[b], previous)
-                    state = jax.tree_util.tree_map(lambda x: x[b], batched)
-                    facts = step_facts(old, state, inner_r_np[b], inner_code_np[b])
-                    progress[b].record_failure(jax.tree.map(lambda value: value[b], failures))
-                    progress[b].consume(state, facts, services)
-                    active[b] = not progress[b].stopped
-
-            for b, iid in enumerate(iids):
-                state = jax.tree_util.tree_map(lambda x: x[b], batched)
-                result = run_results.finalize_iteration(
-                    progress[b].finish(state), factor_names=engine._failure_names
-                )
+            outcomes = controller_for(engine).run_batch(
+                states, n_iters=n_iters, damp=damp, tol=tol,
+                harden_last=n_iters if len(engine.arena.delta_pairs) else 0,
+            )
+            for iid, outcome in zip(iids, outcomes, strict=True):
+                result = run_results.finalize_iteration(outcome, factor_names=engine._failure_names)
                 self.instances[iid].state = result.state
                 self.last_results[iid] = result
         return {iid: self.last_results[iid] for iid in self.instances}
 
-    def marginals(self, iid: int) -> dict[str, np.ndarray]:
+    def marginals(self, iid: int, edges: EdgeSelection = None) -> dict[str, np.ndarray]:
         inst = self.instances[iid]
-        return self.engines[inst.key].marginals(inst.state)
+        return self.engines[inst.key].marginals(inst.state, edges=edges)
+
+    def gaussian_marginals(
+        self, iid: int, edges: EdgeSelection = None,
+    ) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+        inst = self.instances[iid]
+        return self.engines[inst.key].gaussian_marginals(inst.state, edges=edges)
 
     def __len__(self) -> int:
         return len(self.instances)

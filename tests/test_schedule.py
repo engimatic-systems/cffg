@@ -170,6 +170,7 @@ def test_long_range_information_flow_single_final_observation():
     np.testing.assert_allclose(result.free_energies[-1], -loglik, atol=1e-9)
 
 
+@pytest.mark.slow
 def test_two_pass_lgssm_matches_rts_smoother():
     n = 32
     f = np.array([[1.0, 0.3], [0.0, 0.9]])

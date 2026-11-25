@@ -1,0 +1,17 @@
+{
+  "workload": "Repeated cue-and-commit T-maze with a hidden left/right reward context",
+  "pragmatic_reward": {"correct_arm": 1, "wrong_arm": 0},
+  "environment": "Every trial starts at the same junction, supplies one left/right cue, and ends with one committed arm choice. A fresh trial begins on the next tick. Arm payoffs are recorded by the evaluator and withheld from both filters. There is no action-dependent observation channel, so the paired agents can share the exact observation tape.",
+  "seeds": [17011,17012,17013,17014,17015,17016,17017,17018,17019,17020,17021,17022,17023,17024,17025,17026],
+  "generator": "numpy.random.Generator(PCG64(seed)). Draw first context with integers(2); before each subsequent period flip context iff random()<0.20; for each child tick report the true side iff random()<0.72. The same cues go to both controllers.",
+  "periods": 48,
+  "child_ticks_per_period": 8,
+  "first_parent_prior": [0.5,0.5],
+  "parent_flip_probability": 0.2,
+  "cue_accuracy": 0.72,
+  "emission": "Identity from child cue state to observed side. Each parent regime selects a two-state child transition with equal columns and the prescribed cue accuracy.",
+  "policy": "Choose the arm with higher posterior expected reward, breaking ties to the lowest index. Score every real trial. The flat agent has the same one-trial mixture, preferences and observation but marginalizes the regime independently at each new trial. Separately report a flat HMM with per-tick switch probability 0.20/8, which retains history and has no explicit period boundaries.",
+  "primary_parent_metric": "Mean posterior mass assigned to the true regime at the final child tick of each parent period; threshold >=0.75.",
+  "primary_task_metric": "Across all matched trials the hierarchical success rate exceeds the independent-trial flat baseline by at least 0.06 in absolute success probability. Report each seed and the history-using flat control. No threshold is imposed against the history-using control.",
+  "verification": "Record action, status, posterior, cue and true side by seed and tick, full configuration, source revision, and a digest of the serialized hierarchy; retain all invalid statuses and do not rank an incomplete cohort. Check parent beliefs versus an independent float64 forward recurrence. The tiny exact ledger and hostile-input tests are separate from this controlled behavioral outcome."
+}

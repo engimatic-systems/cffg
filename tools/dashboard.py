@@ -88,6 +88,11 @@ EPIC_FILES = {
         "test_schedule_program.py",
         "test_lifecycle.py",
         "test_iteration.py",
+        "test_compiled_iteration.py",
+        "test_iteration_checks.py",
+        "test_iteration_tolerance.py",
+        "test_mixed_controller.py",
+        "test_selective_marginals.py",
         "test_run_strategies.py",
         "test_ledger.py",
         "test_readout_owners.py",
@@ -113,6 +118,11 @@ EPIC_FILES = {
         "test_ticket_dashboard.py",
         "test_ticket_rewrite_scheduler.py",
     ],
+    "M7 · Hierarchies": [
+        "test_hierarchy.py",
+        "test_hierarchy_checkpoint.py",
+        "test_contingent_policy.py",
+    ],
     "M8 · Plotting": [
         "test_viz_diagram.py",
         "test_viz_compress.py",
@@ -121,6 +131,8 @@ EPIC_FILES = {
     ],
     "M9 · Gaussian": [
         "test_gauss_rules.py", "test_kalman.py", "test_gaussian_kernels.py",
+        "test_gaussian_tap_execution.py",
+        "test_gaussian_tap_oracle.py",
         "test_first_order_precision.py",
         "test_bounded_action_derivation.py", "test_bounded_action_numerics.py", "test_bounded_chain.py",
         "test_nonlinear_rules.py", "test_nonlinear_schema.py", "test_nonlinear_engine.py",

@@ -97,7 +97,7 @@ example.
 | [Use neural means and fixed-point gradients](#nonlinear-and-neural-gaussian-models) | `neural_mean`; `initialize_neural_parameters`; `FixedPointDifferentiator`; `fixed_point_gradient` | Dense MLP mean inside a positive-noise nonlinear Gaussian factor | Gradient status, adjoint/root residuals, parameter gradient | Local derivative of the certified adaptive root and surrogate ledger | [API pattern](#nonlinear-and-neural-gaussian-models) | **Bounded:** local isolated-root assumption; no weight uncertainty or stochastic mu3 |
 | [Train or amortize neural inference](#nonlinear-and-neural-gaussian-models) | `NeuralTrainer`; `TrainingConfig`; `GaussianAmortizer`; `PolynomialFeatures` | Deterministic full-batch Adam and Gaussian recognition initialization | Training/continuation state and proposed Gaussian messages | Optimizes the same approximate adaptive objective | [API pattern](#nonlinear-and-neural-gaussian-models) | **Bounded:** no minibatching, discrete point decisions, or universal speedup claim |
 | [Use hard constraints or MAP](#hard-constraints-and-map) | Constraint factors; `compile_template(..., semiring="max")`; `cffg.csp` | Sum-product CSP marginals or discrete max-product | Marginals/BFE, or `decode` and `objective` | Exact tree partition/MAP identities; loopy max-product is bounded | [hard_constraint.py](examples/hard_constraint.py) | **Ready:** max mode is discrete-only; `alldifferent` is capped at `n, K <= 10` |
-| [Batch matching structures](#batch-extend-render-and-estimate) | `cffg.colony.Colony` | Vmapped iterative states; per-instance exact schedules | One `RunResult` per instance | Each instance keeps its normal engine objective/status | [API pattern](#batch-extend-render-and-estimate) | **Ready/partial:** functional mu3 rejected; exact and mixed controllers remain per-instance |
+| [Batch matching structures](#batch-extend-render-and-estimate) | `cffg.colony.Colony` | Vmapped iterative states; per-instance exact schedules | One `RunResult` per instance | Each instance keeps its normal engine objective/status | [API pattern](#batch-extend-render-and-estimate) | **Ready/partial:** functional mu3 rejected; exact schedules are per-instance; deterministic mixed GFE offers compiled batching |
 | [Register an ordinary custom factor](#batch-extend-render-and-estimate) | `FactorKernel`; binding classes; `register_kernel` | Single-arena discrete BP/VMP, Gaussian, or scalar EF | Generic marginals, energy, optional `kernel_readouts` | Extension author supplies mathematically valid messages and ledger | [API pattern](#batch-extend-render-and-estimate) | **Pre-1.0 unstable:** specialized/multi-arena variational objects need dedicated engine paths |
 | [Render a model](#batch-extend-render-and-estimate) | `cffg.viz` | Deterministic scene, SVG, or PNG from a template | `Scene`, SVG text, image file | Visualization only; no compile or inference certificate | [API pattern](#batch-extend-render-and-estimate) | **Ready:** PNG needs the `viz` extra; legacy moment syntax is rejected |
 | [Estimate resources](#batch-extend-render-and-estimate) | `cffg.estimate.estimate` | Static state bytes, optional cost analysis and calibration | `Estimate`, summary, predicted seconds | Measurement/planning aid, not a probabilistic objective | [API pattern](#batch-extend-render-and-estimate) | **Partial:** persistent arena bytes are useful; current XLA FLOP/traffic analysis is defective |
@@ -152,14 +152,14 @@ expose the specialized workflows named in the capability map.
 </details>
 
 <details>
-<summary><code>cffg.core</code> — serialized graph language (29)</summary>
+<summary><code>cffg.core</code> — serialized graph language (33)</summary>
 
 <!-- facade-core:start -->
 `FACTOR_TYPES`, `AgentSpec`, `BeliefBinding`, `BlobRef`, `BoundaryFactorization`,
 `Broadcast`, `Chain`, `ConstraintKind`, `ConstraintSpec`, `Expose`, `FactorSpec`,
-`FactorType`, `FunctionSpec`, `LearnableSpec`, `ModelError`,
+`FactorType`, `FanOut`, `ObserveInterior`, `FunctionSpec`, `LearnableSpec`, `ModelError`,
 `MomentMatchingEndpoint`, `MomentProjection`, `PlateSpec`, `PortRole`, `PortSpec`,
-`Template`, `VariableSpec`, `expand_plates`, `plate_observations`,
+`Template`, `VariableSpec`, `expand_plates`, `fan_out`, `observe_interior`, `plate_observations`,
 `migrate_moment_matching`, `moment_matching`, `moment_matching_endpoint`,
 `register_factor_type`, `validate`
 <!-- facade-core:end -->
@@ -219,12 +219,73 @@ For reusable structure:
 - `cffg.core.compose` scopes, merges, and chains templates.
 - `PlateSpec`, `expand_plates`, and `plate_observations` declare repeated
   fragments. Plate fragments cannot nest, and compact plates must be expanded
-  before scoping or merging.
+  before scoping or merging. For a hub shared by 49 copies, the outer
+  `Broadcast` has at most six equality factors from hub to copy and at most
+  twelve between copies. Factors inside each copy add to the distance that
+  evidence must travel under synchronous flooding. On an Apple M2 Max CPU,
+  the full 784-pixel classifier converged in 43–44 sweeps and processed
+  36.2 images/s singly or 47.7 images/s in batches of 128. For an acyclic
+  ordinary BP model, the exact two-pass schedule is also available. It
+  processed 263.9 and 273.1 images/s on this classifier.
+- `cffg.core.fan_out(template, edge, branch_count)` returns a validated
+  template and ordered GLUE ports for attaching new factors. Its endpoints
+  keep their roles. `observe_interior(template, edge)` returns a template and
+  a DATA port for conditioning a supported latent. For a Gaussian latent
+  shared by ordinary priors and affine Gaussian factors, bind a vector to
+  this port to observe the latent exactly. Its posterior mean equals the
+  vector and its covariance is zero. Bind `None` to clear the observation.
+  An ordinary emission DATA edge continues to report its cavity prediction.
 - `cffg.core.edits` applies validated all-or-nothing graph edits rather than
   leaving a half-mutated template after a failure.
 - `validate(template)` reports structural problems before compilation, while
   compilation additionally checks executable factor/constraint ownership and
   numeric arrays.
+
+## Filter a slow regime and a fast state
+
+Use `cffg.hierarchy.Hierarchy` when a hidden regime selects the fast dynamics
+for a known number of observations. For example, the regime below determines
+whether the fast state tends to stay put or switch. The sensor sometimes
+misreads the fast state.
+
+```python
+from cffg.hierarchy import Hierarchy
+
+model = Hierarchy.from_tables(
+    parent_prior=[0.5, 0.5],
+    parent_transition=[[0.9, 0.1], [0.1, 0.9]],
+    child_prior=[0.7, 0.3],
+    child_transition=[
+        [[0.95, 0.05], [0.05, 0.95]],  # persistent regime
+        [[0.10, 0.90], [0.90, 0.10]],  # switching regime
+    ],
+    emission=[[0.85, 0.15], [0.15, 0.85]],
+    thickness=3,
+)
+for reading in [0, None, 1]:
+    result = model.step(reading).require_converged()
+    print(result.parent, result.child, result.free_energy)
+```
+
+Columns of each transition table index the previous state. Each call advances
+one fast transition. A missing reading (`None`) still advances time. On the
+third call, `result.joint` holds the posterior just before the slow transition.
+`model.current_joint` holds the prediction for the next period and retains
+regime–state correlations. `preview(reading)` computes a candidate update
+without advancing either clock. Free energy is in nats and covers all the
+observations since the start of the current period. Use the last value from
+each completed period when summing evidence across periods.
+
+To resume between fast ticks, use `model.save_bundle(path)` and
+`Hierarchy.load_bundle(path)`. The hierarchy archive contains both model
+templates, their parameter arrays, and the checkpoint for both clocks. With a
+learned-goal child planning window, `plan_goals(...)` stages its inferred
+Dirichlet counts. Call `finish_episode()` at the real episode boundary to
+apply them once. Staged counts survive a save and reload.
+
+To reproduce the registered cue-and-commit comparison, run
+`JAX_ENABLE_X64=1 uv run --frozen python tools/hierarchy/drift.py --output drift.json`.
+The JSON includes the cue, true regime, posterior and action for each trial.
 
 ## Compile, run, and read results
 
@@ -232,6 +293,16 @@ Compile once for a fixed template shape. Observations and same-shaped parameter
 values are runtime inputs; a changed horizon, cardinality, dimension, dtype, or
 schedule selects another JAX executable. `set_params` performs validated named
 writes into `state.params` and preserves serialized parameter tying.
+
+For a tick with many new readings, pass a dictionary to one
+`engine.bind_data(state, observations)` call. Omitted ports retain their
+bindings. An explicit `None` removes that port's evidence. The engine checks the
+supplied readings before writing their values and masks together.
+After a solve, request the variables your controller actually consumes with
+`engine.marginals(state, edges=["action"])` or
+`engine.gaussian_marginals(state, edges=["position"])`, using edge names from
+your template. Omitting `edges` returns all variables of that family. The
+same selection works on a Colony instance.
 
 Never consume `result.state` as if the iteration budget implied success. Use
 `result.require_converged()` or branch explicitly on `result.status`:
@@ -342,6 +413,47 @@ scientific oracle used to compare epistemic planning with a BFE ablation. It is
 a fixed research workload, not a general environment API. Other modules under
 `cffg.experiments` and `cffg.benchmarks` are derivation, diagnostic, or
 performance artifacts rather than supported newcomer facades.
+
+### Commit to an action after each possible reading
+
+For one or two future categorical readings, solve a policy once and execute its
+branches by lookup. This example has a 90%-accurate cue costing one utility
+unit and a correct/incorrect guess worth +4/−4.
+
+```python
+from cffg.contingent import ContingentPlanner
+from cffg.experiments import behavioral_epistemics as cue
+from cffg.models.contingent import build_contingent_rollout
+
+task = cue.CueTask(cue_quality=.9, cue_cost=1., reward_utility=4.)
+template, arrays = build_contingent_rollout(
+    "paid cue", depth=1, d=cue.initial_state(), Bs=cue.transition_stack(),
+    A=cue.observation_matrix(task), c=cue.goal_statistic(task),
+)
+policy = ContingentPlanner(template, arrays).solve()
+policy.action()                  # 2: buy the cue
+policy.action([cue.CUE_LEFT])    # 0: choose left
+policy.action([cue.CUE_RIGHT])   # 1: choose right
+```
+
+The commitment earns 2.2 expected utility. Passing `open_loop=True` ties
+both responses to the same action and gives an optimum of zero. Each reachable
+history has its physical probability and conditional action distribution in
+`policy.branches`. `policy.free_energy` scores the whole policy distribution
+and `policy.committed_free_energy` scores the selected commitment. Both are
+native tree Bethe energies in nats. `policy.expected_loss` sums its observed
+negative log preferences. For direct history tables use `build_contingent`;
+both builders produce a template and arrays suitable for `save_bundle`.
+
+This planner is opt-in. Existing agents retain their priors and default
+horizons. In the example above, increasing to depth two generated 57 histories
+and 73,392 CPT entries across factor instances. Shared tables occupied 95,424
+uncompressed source bytes and the saved bundle occupied 37,907 bytes. On an
+Apple M2 Max CPU in float32, the first depth-two solve took **24.4 s** including
+JAX compilation and process peak memory was **1.64 GB**. Native preparation
+took another 0.29 s. Once warm, solving again took a median of 14.57 ms.
+Executing an already chosen branch is a lookup. See D17 in
+[the derivations](docs/DERIVATIONS.md#d17-committing-to-a-categorical-action-after-each-reading).
 
 ## Continuous, exponential-family, and hybrid models
 
@@ -552,7 +664,8 @@ Choose the artifact by what must continue:
 
 | Artifact | Stores | Does not store |
 |---|---|---|
-| `.cffgz` bundle | Template, source arrays, structure identity, complete declared-learning priors and posteriors | Inference messages, solver progress, agent cadence/RNG, optimizer cursor |
+| Single-template `.cffgz` bundle | Template, source arrays, structure identity, complete declared-learning priors and posteriors | Inference messages, solver progress, agent cadence/RNG, optimizer cursor |
+| `Hierarchy.save_bundle` archive | Both templates and arrays, joint boundary, level clocks and statistics, optional child goal window and pending counts | Environment state |
 | `RollingAgent` `.npz` checkpoint | Structure-bound rolling beliefs, learning state, cadence, selection RNG, configured functional-mu3 lifecycle | Environment state or a portable replacement for the model bundle |
 | Neural training continuation | Versioned parameters and deterministic optimizer/training state for its bound initialization and data | General model/agent state or minibatch cursor |
 
@@ -581,12 +694,75 @@ caveats; `cffg.csp.decimate` is the explicit feasibility-oriented helper. See
 ## Batch, extend, render, and estimate
 
 `cffg.colony.Colony` caches one engine per structure hash and vmaps matching
-ordinary iterative state layouts while returning a separate `RunResult` per instance.
+ordinary iterative state layouts. Each member has its own stopping condition
+inside a compiled sweep loop and returns its own state, status and traces in a
+`RunResult`. A member that stops early keeps its final state while peers continue.
 Exact schedules use the same per-instance propagation and certification as
 `Engine.run`; they do not fall back to flooding just because they are in a colony.
 Different parameters do not create different structures. Functional mu3 is
-rejected because Colony does not yet own per-instance PRNG streams, and mixed
-adaptive/GFE controllers still run per instance.
+rejected because Colony does not yet own per-instance PRNG streams.
+
+Mixed GFE uses the host trust controller by default. For repeated solves or a
+batch of deterministic GFE members, select the compiled controller explicitly:
+
+```python
+result = engine.run(state, 80, tol=1e-8, outer_solver="compiled_trust_region")
+by_id = colony.run(80, tol=1e-8, outer_solver="compiled_trust_region")
+```
+
+Members sharing a support face can run together while retaining separate
+radii, stopping decisions and root certificates. First use can take longer
+and use more memory. Adaptive Gaussian and stochastic functional updates
+use their existing solvers.
+
+### Independent CPU solves with host threads
+
+For a batch of ordinary iterative solves, you can share one warmed `Engine`
+across Python threads. Prepare an immutable `State` per member on the calling
+thread. Workers share model parameters and return separate `RunResult` objects.
+Keep any changes to Colony membership or stored states on the calling thread.
+
+```python
+from concurrent.futures import ThreadPoolExecutor
+
+import jax
+from cffg import Engine, build_gridworld, compile_template
+
+template, arrays = build_gridworld(past=1, steps=1, k=4, gfe=False)
+engine = Engine(compile_template(template, arrays=arrays))
+base = engine.init_state()
+states = [engine.bind_data(base, {"act1": 1, "obs1": cell}) for cell in range(4)]
+
+def solve(state):
+    result = engine.run(state, 120, damp=0.5, tol=1e-5)
+    jax.block_until_ready(result.state)
+    return result
+
+solve(states[0])  # Warm the executable before starting workers.
+with ThreadPoolExecutor(max_workers=4) as pool:
+    results = list(pool.map(solve, states))  # Same order as the inputs.
+posteriors = [engine.marginals(result.require_converged())["zm1"] for result in results]
+```
+
+On an Apple M2 Max CPU with JAX 0.10.2 in float64, 32 independent Hallway
+priors shared one engine for 60 damped sweeps. That benchmark used `tol=None`,
+so all 32 results reported `budget_exhausted` as expected. The medians below
+cover three warm batches per worker count.
+
+| Host workers | Wall time for all 32 | Solves/s | Member p95, excluding queue | Process peak RSS before output validation |
+|---|---:|---:|---:|---:|
+| Serial | 2.490 s | 12.9 | 79 ms | 439 MiB |
+| 4 | 0.877 s | 36.5 | 112 ms | 513 MiB |
+| 8 | 0.748 s | 42.8 | 194 ms | 512 MiB |
+
+Eight workers finished the batch 3.33× faster than serial. Going from four
+to eight gained 17% throughput while increasing time in service at p95 by
+74%. Every member's state, status and traces matched serial execution exactly
+on this workload. Time your own batch with the CPU capacity available to it.
+Host threading is opt-in. The separate 8× throughput target for `Colony.run`
+is tracked in [chr-d4dl](.tickets/chr-d4dl.md).
+
+### Custom factors, rendering, and resource estimates
 
 The custom factor API registers one ordinary single-arena factor at a time:
 

@@ -80,6 +80,7 @@ def test_predictive_readout_on_observed_edge():
     np.testing.assert_allclose(cov_y, H @ covs_loo[0] @ H.T + R, atol=1e-8)
 
 
+@pytest.mark.slow
 def test_improper_edge_readout_is_explicit_nan():
     engine, state = run_engine(YS)
     bad = _replace(state, g_lam=-jnp.ones_like(state.g_lam))
@@ -100,6 +101,7 @@ def test_serialization_round_trip_compiles_and_agrees():
     )
 
 
+@pytest.mark.slow
 def test_vmap_batch_equals_sequential():
     # Colony contract: Gaussian instances sharing a structure batch too.
     t, arrays = lgssm(T, F, Q, H, R, M0, P0)

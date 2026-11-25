@@ -112,7 +112,7 @@ def registered_case(kind, dtype):
     return partial(execute_ef, plan), examples
 
 
-@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+@pytest.mark.parametrize("dtype", (np.float32, pytest.param(np.float64, marks=pytest.mark.slow)))
 @pytest.mark.parametrize(
     "kind", ("bp", "vmp", "gaussian", "ef_prior", "ef_obs", "ef_equality")
 )

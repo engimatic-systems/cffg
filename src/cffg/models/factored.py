@@ -9,7 +9,7 @@ the fastest-moving index.
 
 No product factor is registered.  The builder lowers each Cartesian product
 to deterministic ``transition_mixture`` nodes and lowers every fan-out to a
-chain of ternary equality nodes.  Learned transition blobs therefore retain
+balanced tree of ternary equality nodes.  Learned transition blobs therefore retain
 their factored shapes even though product-valued message edges may exist.
 """
 
@@ -21,6 +21,7 @@ from typing import Iterable
 
 import numpy as np
 
+from cffg.core.equality_tree import plan_equality_tree
 from cffg.core.ir import (
     AgentSpec,
     BeliefBinding,
@@ -93,9 +94,7 @@ class _Graph:
     """A tiny private netlist lowered to degree-two FFG edges.
 
     A logical net may have any number of factor/port endpoints.  Materializing
-    it inserts the minimum left-deep chain of ternary equality nodes.  This is
-    deliberately builder-local; the reusable public fan-out primitive remains
-    tracked by cff-mjku.
+    it connects endpoints with the shared balanced equality-tree planner.
     """
 
     def __init__(self, name: str):
@@ -169,7 +168,7 @@ class _Graph:
 
         variables: dict[str, VariableSpec] = {}
         endpoint_var: dict[tuple[str, str, str], str] = {}
-        equalities: list[FactorSpec] = []
+        equalities: dict[str, FactorSpec] = {}
 
         for net, net_endpoints in endpoints.items():
             card = self._cards[net]
@@ -190,29 +189,8 @@ class _Graph:
                 variables[leaf] = VariableSpec(leaf, card)
                 endpoint_var[endpoint] = leaf
 
-            carry: str | None = None
-            for index in range(count - 2):
-                last = index == count - 3
-                if index == 0:
-                    a, b = leaves[0], leaves[1]
-                    next_leaf = 2
-                else:
-                    assert carry is not None
-                    a, b = carry, leaves[index + 1]
-                    next_leaf = index + 2
-                if last:
-                    c = leaves[next_leaf]
-                else:
-                    c = f"{net}/carry/{index}"
-                    variables[c] = VariableSpec(c, card)
-                equalities.append(
-                    FactorSpec(
-                        f"branch/{net}/{index}",
-                        "equality",
-                        edges={"a": a, "b": b, "c": c},
-                    )
-                )
-                carry = c
+            tree = plan_equality_tree(leaves[0], leaves[1:], f"branch/{net}")
+            tree.install(variables, equalities, variables[leaves[0]])
 
         factors: dict[str, FactorSpec] = {}
         for draft in self._factors:
@@ -225,7 +203,9 @@ class _Graph:
                 },
                 param_blobs=draft.param_blobs,
             )
-        factors.update({factor.name: factor for factor in equalities})
+        if factors.keys() & equalities.keys():
+            raise ValueError("factored rollout: equality collides with an existing factor")
+        factors.update(equalities)
         ports = {
             port.name: PortSpec(
                 port.name,

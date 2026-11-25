@@ -25,6 +25,7 @@ class ResolvedCompileData(ImmutableRecord):
     ef_groups: tuple[EfGroupPlan, ...]
     constraint_groups: tuple[ConstraintPlan, ...]
     gauss_data: Mapping[str, tuple[int, int]]
+    gaussian_taps: Mapping[str, int]
     n_obs_rows: int
     ef_data: Mapping[str, tuple[int, str]]
     n_ef_obs: int

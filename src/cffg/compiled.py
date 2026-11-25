@@ -115,6 +115,13 @@ class ConstraintPlan(ImmutableRecord):
 
 
 @dataclass(frozen=True)
+class GaussianTapRole(ImmutableRecord):
+    role: int
+    rows: FrozenArray  # observation mask row per member, -1 if untapped
+    indices: FrozenArray  # [members, role dimension] into g_obs
+
+
+@dataclass(frozen=True)
 class GaussGroupPlan(ImmutableRecord):
     """All Gaussian-family factors of one (type, dim-signature), run together.
 
@@ -135,6 +142,7 @@ class GaussGroupPlan(ImmutableRecord):
     kernel: kernels.FactorKernel | None = None
     parameter_paths: tuple[tuple[str, str], ...] = ()
     observed_role: int | None = None
+    taps: tuple[GaussianTapRole, ...] = ()
 
     @property
     def observed_dim(self) -> int:
@@ -507,6 +515,7 @@ class Arena(ImmutableRecord):
     # direct named-write entry points.
     learn_plans: tuple[LearnPlan, ...] = field(default_factory=tuple)
     # Declared learnables resolved to stat sources and write targets (cff-x0sv).
+    gaussian_taps: Mapping[str, int] = field(default_factory=dict)  # equality leg -> observation row
 
     @property
     def interior_slot_pairs(self) -> np.ndarray:

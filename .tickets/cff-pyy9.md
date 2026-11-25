@@ -1,6 +1,6 @@
 ---
 id: cff-pyy9
-status: open
+status: closed
 deps: [cff-1d6t, cff-gjjk, cff-d56d, cff-mjku]
 links: [cff-cz6v]
 created: 2026-07-05T22:12:32Z
@@ -573,3 +573,21 @@ Retained candidate meanings:
   sentence.
 
 Intelligible-ticket review: complete.
+
+**2026-11-25T06:31:40Z**
+
+Hierarchy acceptance evidence for sections 1–6, 9 and 10: src/cffg/hierarchy.py and hierarchy_kernel.py implement the sum-product schedule for two fixed categorical templates. tests/test_hierarchy.py covers a direct path and missing-emission oracle in float32 and float64, each ledger term, joint correlations through slow rollover, public Engine flood/two_pass at thickness one, eager/JIT/vmapped child kernels, schedules and statuses including blocked parent updates, and 64 tiny-likelihood ticks. tests/test_hierarchy_checkpoint.py covers composed/scoped port names, round-trip structural identity and external arrays, validated atomic mid-period restore, incompatible or legacy refusal, a separate actual GFE child planning window, repeated planning with unchanged Dirichlet counts, and pending-goal bundle restoration. plan_goals() stages the latest converged count vector. finish_episode() commits it once, matching standalone Engine.with_goal_priors()/goal_prior_updates() on consecutive trials. A second finish without a pending posterior adds zero counts. These dedicated test files own the nested schedule, RunStatus, composition, transition_mixture, and goal-cadence regressions named in 10.9–10.13. Generic Engine/Colony run policies and single-template bundle encodings have their own suites; the hierarchy uses a dedicated region kernel and wrapper bundle. Stochastic hierarchy PRNG cases are inapplicable to the deterministic v1 family. Neither templates nor factors add new IR fields. Parent owns shared documentation and the combined short suite.
+
+The registered 16-seed study at 73e6d0c contains 6,144 completed cue-and-commit trials (48 eight-tick periods per seed). Mean final mass on the true regime was 0.885543 against the 0.75 acceptance threshold. Recorded native MAP choices earned 5,311/6,144 (86.4421%), the independent flat control 4,423/6,144 (71.9889%), and the history-using flat control 5,207/6,144 (84.7493%). The preregistered advantage threshold over the independent flat agent was 6 percentage points. tools/hierarchy/drift_ties.py separately regenerates every cue/context and applies the lowest-index tie rule using exact integer odds. Ten hierarchical decisions were exact ties. Native floating-point argmax chose the right arm in seven of those. Exact tie handling earned 5,308/6,144 (86.3932%), a 14.4043-point advantage over independent flat; both controls had unchanged decisions. All seven occurred in period zero: seed/tick 17011/1, 17012/1, 17013/1, 17016/1, 17016/3, 17019/1 and 17019/3. The raw run and thresholds are preserved. ~/agent-share/cffg-hierarchy-validation/drift-ties.json has SHA-256 96aef704921acc7f51d741052994a71287b99de511d9697bcfce6354104bd24d.
+
+**2026-11-25T06:31:43Z**
+
+The two-clock filter and depth-two contingent planner have separate implementation children chr-kzwu and chr-d760. The registered 16-seed cue study at 73e6d0c reached 6,144/6,144 converged ticks. Mean posterior mass on the true regime at the period boundary was 0.88554 (criterion 0.75). Recorded native actions scored 5,311/6,144, versus 4,423/6,144 for the independent-trial control and 5,207/6,144 for the flat filter that retained history. An independent exact-odds audit found 10 mathematical ties. Seven native choices differed from the ideal lowest-index rule only because of floating-point rounding. Using that ideal tie rule gives 5,308/6,144 and still passes the frozen 0.06 improvement threshold. See ~/agent-share/cffg-hierarchy-validation/drift.json and drift-ties.json and the replay commands under tools/hierarchy. No Craftax training or episodes were used. Parent closure also requires the prerequisite tickets and the integrated short suite.
+
+**2026-11-25T07:58:58Z**
+
+M7 delivered the two-level categorical joint filter, exact period energy, separate real clocks, posterior carry, and runtime checkpointing at 4d0dbd9/6b61cec. The optional child planner has a separate goal ledger and episode clock. A stochastic stream is inapplicable to this deterministic filter. The dedicated tests/test_hierarchy.py and tests/test_hierarchy_checkpoint.py cover the five execution surfaces named in 10.9–10.13, including a repeated same-clock joint HMM, both precisions, exact path enumeration, failure rollback, resume and standalone goal-rollover parity. The registered drift result was 5311/6144 versus 4423 independent and 5207 with flat memory. At seven mathematical ties native floating-point MAP differs from exact lowest-index handling. Exact replay scores 5308/6144 and still clears the registered thresholds. Raw drift.json and drift-ties.json under ~/agent-share/cffg-hierarchy-validation can be recomputed with tools/hierarchy/.
+
+**2026-11-25T07:58:58Z**
+
+Bounded contingent planning at fe2fad3 supports one or two future readings, a reachable committed action lookup and native expected-loss certification. Physically matched expected payoff was +2.2 versus 0 on the paid cue and +0.75 versus 0 on the two-reading task. At 57 histories, depth two measured 24.4 s first solve, 14.57 ms warm, and 1.64 GB peak RSS; 37,907 bytes is the compressed model. Templates with larger history or table counts are refused before expansion. The fixed-duration filter and finite policy builder have separate APIs. D16/D17, S3/S4, and the README cover boundaries, equations and executable examples. The final integrated gate passed all 2751 default tests on f5b8ede. Craftax remains parked in chr-zcfm.

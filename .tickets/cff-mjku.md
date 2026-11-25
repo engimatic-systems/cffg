@@ -1,6 +1,6 @@
 ---
 id: cff-mjku
-status: open
+status: closed
 deps: [cff-9xmq]
 links: [cff-b47g, cff-xa6z]
 created: 2026-07-10T03:31:28Z
@@ -507,3 +507,15 @@ Intelligible-ticket review: complete.
 **2026-09-25T03:47:40Z**
 
 PCGym evidence under cff-xa6z: the experiment repeatedly hand-built equality nodes to tap interior continuous states. This is additional evidence for the existing public fan-out/observation-branch contract, not a new duplicate ticket. Keep its cff-9xmq prerequisite and degree-two/serialization requirements; PCGym recipes can show explicit equality construction until it lands.
+
+**2026-11-25T06:06:17Z**
+
+Change path: New IR field applies to public edit actions and their strict JSON codec. Reuse transactional apply_edits, shared equality wiring, validation, template/bundle serialization and structure hashes. Includes migration of factored rollout. No new stochastic parameters, checkpoint formats or actor state. Existing equality JIT/host, single/batch and scheduled/flooding unchanged for ordinary fan-out and discrete observations. Exact continuous DATA on an equality requires additional runtime conditioning semantics; parent investigating this separately. Focused checks will cover f32/f64 agreement at 64*eps scaled for same-graph parity (f64 absolute target 1e-10), support failure, vacuous observations, stale names, and 64 branches K=32 within 64 undamped sweeps at tolerance 1e-10. Final prerequisite/performance/full gate coordinated by parent.
+
+**2026-11-25T06:17:09Z**
+
+Public cffg.core.fan_out and observe_interior now lower through frozen FanOut and ObserveInterior actions plus the shared balanced equality planner. Branches preserve existing endpoint roles and the original constrained variable; malformed edits leave the source unchanged. Factored-rollout migration preserves flat-joint/BFE parity. In isolation against the pre-loop runtime: 72 focused default cases passed across test_edits, edit_codec, compose, serialize, bundle and factored_rollout. The opt-in factored builder/serialized bindings test also passed. Independent two-prior reference, hand-written equality tap, exact-zero categorical conditioning, f32/f64 Gaussian product, and 64-branch cardinality-32 convergence are covered. Categorical helpers are ready for M7. The Gaussian DATA topology is present; point conditioning execution is pending the separately owned runtime path. Formal closure also requires the upstream benchmark and final integrated short suite.
+
+**2026-11-25T07:58:40Z**
+
+Final qualification completes the interim handoff above. Structural edit/codec and factored builder acc5956, affine Gaussian message fix 20e2f5a, exact Gaussian DATA support ffaf1b9, and dense oracle 17dd71a. In the supported ordinary affine/prior model a bound coordinate returns the point and zero covariance, clearing it restores cavity evidence, and save/reload preserves the model. Independent dense conditioning, innovation/RTS and both halves of a split 32-step chain agree. Parameter edges and unregistered conditioning semantics are outside this contract. The integrated short suite at f5b8ede passed all 2,751 cases in 1,143.367 s. The balanced-broadcast benchmark passed its revised criterion.

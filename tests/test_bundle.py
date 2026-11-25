@@ -462,3 +462,21 @@ def test_load_rejects_hand_built_nested_plate_bundle(tmp_path):
         ),
     ):
         load_bundle(path)
+
+
+def test_branch_transforms_survive_bundle(tmp_path):
+    from cffg.core import fan_out, observe_interior
+    from test_edits import _product_latent
+
+    original, target, arrays = _product_latent()
+    graph, branches = fan_out(original, target, 2)
+    graph, data = observe_interior(graph, target)
+    path = tmp_path / "observed.cffgz"
+    save_bundle(path, graph, arrays)
+    restored, params, manifest = load_bundle(path)
+    assert manifest["structure_hash"] == structure_hash(graph) == structure_hash(restored)
+    engine = Engine(compile_template(restored, arrays=params))
+    state = engine.run(engine.bind_data(engine.init_state(), {data: 2}), 1, tol=1e-10).require_converged()
+    beliefs = engine.marginals(state)
+    for edge in (target, *branches):
+        np.testing.assert_array_equal(beliefs[edge], [0, 0, 1])

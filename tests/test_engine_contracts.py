@@ -7,7 +7,6 @@ oracles remain the mathematical authorities.
 from dataclasses import fields, replace
 from enum import Enum
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -106,6 +105,22 @@ def assert_result_equal(actual, expected):
             )
 
 
+def record_compiled_batches(monkeypatch):
+    from cffg.compiled_iteration import CompiledIteration
+
+    batches = []
+    original = CompiledIteration.run_batch
+
+    def record(self, states, *, n_iters, damp, harden_last, tol):
+        batches.append((tuple(states), n_iters))
+        return original(
+            self, states, n_iters=n_iters, damp=damp, harden_last=harden_last, tol=tol
+        )
+
+    monkeypatch.setattr(CompiledIteration, "run_batch", record)
+    return batches
+
+
 @pytest.mark.parametrize("budget", [1, 20])
 def test_iterative_colony_results_match_distinct_standalone_instances(
     budget, monkeypatch
@@ -124,23 +139,11 @@ def test_iterative_colony_results_match_distinct_standalone_instances(
         assert not engine.arena.mu3_groups
         assert any(group.mode == "vmp" for group in engine.arena.groups)
 
-    vectorized_batches = []
-    original = eqx.filter_vmap
-
-    def observe(function, *args, **kwargs):
-        mapped = original(function, *args, **kwargs)
-        if function.__name__ != "one":
-            return mapped
-
-        def call(state):
-            vectorized_batches.append(state.messages.shape[0])
-            return mapped(state)
-
-        return call
-
-    monkeypatch.setattr(eqx, "filter_vmap", observe)
+    batches = record_compiled_batches(monkeypatch)
     results = colony.run(budget, tol=1e-12)
-    assert vectorized_batches and set(vectorized_batches) == {2}
+    assert [(len(group), sweeps) for group, sweeps in batches if len(group) > 1] == [
+        (2, budget)
+    ]
     assert all(colony.engines[key] is engine for key, engine in engines.items())
     for index, iid in enumerate(ids):
         template, arrays, observations = ordinary_case(index)
@@ -149,6 +152,12 @@ def test_iterative_colony_results_match_distinct_standalone_instances(
         solo = engine.run(state, budget, tol=1e-12, harden_last=budget)
         actual = results[iid]
         assert_result_equal(actual, solo)
+        with monkeypatch.context() as host:
+            # The same functional hook still returns a no-op. Installing it
+            # on the instance selects the preserved host controller.
+            host.setattr(engine, "_update_mu3", engine._update_mu3)
+            reference = engine.run(state, budget, tol=1e-12, harden_last=budget)
+        assert_result_equal(actual, reference)
         assert colony.instances[iid].state is actual.state
         assert colony.last_results[iid] is actual
         size = len(CASES[index][0])
