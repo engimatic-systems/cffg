@@ -132,6 +132,7 @@ EPIC_FILES = {
     "M9 · Gaussian": [
         "test_gauss_rules.py", "test_kalman.py", "test_gaussian_kernels.py",
         "test_gaussian_tap_execution.py",
+        "test_gaussian_tap_oracle.py",
         "test_first_order_precision.py",
         "test_bounded_action_derivation.py", "test_bounded_action_numerics.py", "test_bounded_chain.py",
         "test_nonlinear_rules.py", "test_nonlinear_schema.py", "test_nonlinear_engine.py",
