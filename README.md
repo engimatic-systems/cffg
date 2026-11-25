@@ -219,7 +219,14 @@ For reusable structure:
 - `cffg.core.compose` scopes, merges, and chains templates.
 - `PlateSpec`, `expand_plates`, and `plate_observations` declare repeated
   fragments. Plate fragments cannot nest, and compact plates must be expanded
-  before scoping or merging.
+  before scoping or merging. For a hub shared by 49 copies, the outer
+  `Broadcast` has at most six equality factors from hub to copy and at most
+  twelve between copies. Factors inside each copy add to the distance that
+  evidence must travel under synchronous flooding.
+- `cffg.core.fan_out(template, edge, branch_count)` returns a validated
+  template and ordered GLUE ports for attaching new factors. Its endpoints
+  keep their roles. `observe_interior(template, edge)` returns a template and
+  a DATA port for conditioning a supported latent.
 - `cffg.core.edits` applies validated all-or-nothing graph edits rather than
   leaving a half-mutated template after a failure.
 - `validate(template)` reports structural problems before compilation, while
@@ -267,6 +274,16 @@ Compile once for a fixed template shape. Observations and same-shaped parameter
 values are runtime inputs; a changed horizon, cardinality, dimension, dtype, or
 schedule selects another JAX executable. `set_params` performs validated named
 writes into `state.params` and preserves serialized parameter tying.
+
+For a tick with many new readings, pass a dictionary to one
+`engine.bind_data(state, observations)` call. Omitted ports retain their
+bindings. An explicit `None` removes that port's evidence. The engine checks the
+supplied readings before writing their values and masks together.
+After a solve, request the variables your controller actually consumes with
+`engine.marginals(state, edges=["action"])` or
+`engine.gaussian_marginals(state, edges=["position"])`, using edge names from
+your template. Omitting `edges` returns all variables of that family. The
+same selection works on a Colony instance.
 
 Never consume `result.state` as if the iteration budget implied success. Use
 `result.require_converged()` or branch explicitly on `result.status`:

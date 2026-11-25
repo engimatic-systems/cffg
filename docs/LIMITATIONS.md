@@ -702,10 +702,10 @@ is ~1.5-2x faster and remains a useful strict kernel ceiling, but it is a
 different output contract rather than machine variance. Honest residuals:
 the exact certificate is elementwise,
 `max(|new-old| / (1+|old|)) <= 64 eps`, so neither graph depth nor an
-unrelated large-magnitude block can widen it; `gaussian_marginals` readout
-is a Python-per-edge loop and dominates end-to-end LGSSM time at scale
-(cff-3kdk); slice-fused composite kernels (cff-yl0a) remain the lever if
-the envelope must tighten below ~10x.
+unrelated large-magnitude block can widen it. Gaussian readouts now group
+same-dimension edges and allow a named subset. Quoted inference timings
+above retain their original output contracts. Slice-fused composite kernels
+(cff-yl0a) remain a possible improvement to the inference step.
 
 **S2. Importance-sampling noise in parameter messages.** The message to A is a
 non-conjugate log-message evaluated by importance sampling; variance grows with

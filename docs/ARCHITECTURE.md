@@ -1227,9 +1227,12 @@ where one readout depends on another. Goal readouts still use
 `dirichlet_marginals`; Gaussian/recurrence learning statistics still use
 `recurrence_pair_beliefs`; decoding still uses `marginals`. This preserves call
 order and instrumentation without capturing an Engine inside a readout owner.
-Existing ordinary/legacy EF callback lookup timing, field order, dtype, support
-and improper-belief outputs are unchanged. No readout vectorization or caching
-is introduced; `cff-3kdk` remains that separate performance work.
+Categorical and Gaussian readout owners accept an ordered subset of names.
+They validate the selection before reading numerical state and group work
+by cardinality or dimension. Engine and Colony expose the same selection.
+The full readout remains the default. Runtime DATA binding precomputes
+observation slices per compiled structure, checks the partial input mapping
+on the host and batches its updates to the immutable numerical state.
 
 `with_goal_priors` is a state replacement, not a readout. Its implementation now
 lives in `StateLifecycle`, retaining the fresh-trial count guard, prior-shape
@@ -1864,7 +1867,7 @@ Lowering uses no `FactorType` or compiler special case:
    `transition_mixture` implementing `out = left * K_right + right`;
 2. products of more components form a left-deep chain of those nodes; and
 3. every logical net with more than two endpoints becomes the minimum
-   left-deep chain of ternary equality factors, keeping every materialized
+   balanced tree of ternary equality factors, keeping every materialized
    FFG edge at degree two.
 
 One blob per block is shared by every time member, so blob identity provides
@@ -2244,15 +2247,17 @@ nothing committed here) — the durable engine-level findings:
   cff-5edo).
 
 **Bottlenecks found (each a ticket, in priority order).**
-- Sweeps, not FLOPs: wide fan-ins expand to *linear* equality chains, so
-  BP diameter — hence sweeps-to-convergence — is O(N) in plate size; this,
-  not compile time (1.2 s for 784 leaves) and not per-sweep cost, capped
-  perception throughput (cff-9xmq: balanced trees).
+- The historical 49-patch classifier used a linear equality chain to connect
+  the patches. `cffg.core.equality_tree.plan_equality_tree` now generates the
+  balanced tree used by Broadcast expansion and structural branch edits.
+  For `N` leaves the hub-to-leaf bound is `ceil(log2(N))` equality factors.
+  Synchronous whole-model convergence also depends on paths inside the
+  patches. Runtime speed is measured on the complete classifier.
 - Hybrid nodes originally lacked soft sufficient statistics and predictive
   readouts; cff-lquu resolved that consumer boundary.
 - Long rollouts re-solve cold every step and degrade past ~20 slices
-  (cff-5edo); fan-out and observe-an-interior-latent need one-call helpers
-  (cff-mjku). Role-bearing non-discrete writes are now the `set_params`
+  (cff-5edo). The structural edit API now provides `fan_out` and
+  `observe_interior`. Role-bearing non-discrete writes use the `set_params`
   contract in §3b.
 
 **Method note.** The evaluation discipline that made this productive:
