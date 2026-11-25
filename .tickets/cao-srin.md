@@ -1,6 +1,6 @@
 ---
 id: cao-srin
-status: in_progress
+status: open
 deps: [car-ne0a, car-8rgl]
 links: []
 created: 2026-11-24T14:50:52Z
@@ -56,3 +56,7 @@ Requested Explode milestone complete. Immutable e741943 on model seed 88101/game
 **2026-11-24T22:50:32Z**
 
 Interpretation requested after the pilot. The 23-point gap is 0.77 of the 30-point standard deviation reported for ten AXIOM seeds in arXiv v1 Table 1. Under an illustrative common normal seed-return model, treating 30 as the sample SD, the one-new-run Student t calculation gives a lower-tail area of about 0.24 (9 degrees of freedom). This makes ordinary seed variation plausible and provides no causal attribution. Our exact trailing 1000-action totals at 5000/6000/7000 were 13/14/17 versus approximately 20/23/22 read from the untuned mean in Fig. 3 (https://arxiv.org/html/2505.24784v1/rewards.png). At 10000 they were 23 versus approximately 22. Chart readings are approximate to about one point per 1000 actions. Raw matched historical seed traces and bomb opportunity counts were unavailable in the paper/release. More independent Explode runs would test whether the difference in mean return persists. No further seeds were run for this analysis.
+
+**2026-11-25T00:36:12Z**
+
+Paused at Cooper’s request after the verified Explode report. This campaign has no active worker. Resume context and the exact source and receipt hashes are in the earlier notes.
