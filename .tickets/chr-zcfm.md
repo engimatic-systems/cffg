@@ -1,6 +1,6 @@
 ---
 id: chr-zcfm
-status: open
+status: closed
 deps: [cff-pyy9, cff-4yr6, cff-3kdk]
 links: []
 created: 2026-11-25T06:04:34Z
@@ -66,3 +66,7 @@ Cooper chose a navigation proxy for the survival comparison. Outcomes 4–5 now 
 **2026-11-25T14:07:35Z**
 
 Positioning is ready for the next controller. Experiment branch experiment/craftax-live commit ea90752 (ticket ccl-n8rp) provides tools/craftax_live/position.py and an independent native scorer. Every archived action and reset matched: 45,353 absolute overworld steps plus 116 resets, and 3,799 first-dungeon steps in entry-relative coordinates. All 24 descents were included. A later unobservable move can make the floor position unknown while visible offsets remain exact. Receipt ~/agent-share/craftax-experiment2-verification/position-TkxfoH/positions.json. This replay reused Experiment 2 actions; it does not measure policy improvement.
+
+**2026-11-25T15:17:12Z**
+
+Resolved by Experiment 3 on local branch experiment/craftax-survival at 34189b1. The source-frozen runtime dd4128b used the public M7 hierarchy in Craftax against a matched flat joint filter. Both policies used the same observation-only navigation and action graph. Eight paired lanes of 2,048 real actions per arm yielded 5 vs 6 first dungeon entries and 0 vs 1 lanes surviving another 200 actions. Independent replay checked every action, recorded position, native frame and lane outcome. The report, raw evidence and all episode replays are accessible at http://localhost:8080/craftax-live/dungeon-survival/results.html. Project validation passed 2,751 default tests, with 335 deselected and 1,178.203 s wall time. The experiment branch carries the full qualification and implementation.
