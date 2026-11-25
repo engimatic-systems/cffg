@@ -663,6 +663,16 @@ worth remembering:
   tree identity exact: BFE = −log p(bound observations), the Kalman tier's
   pinned test. Missing data contributes −H[mu_in], mirroring the discrete
   missing-data cancellation.
+- **Interior Gaussian observations.** A DATA port on a Gaussian equality
+  identifies one observed vector across the connected equality factors.
+  Each adjacent built-in prior or affine conditional substitutes that value.
+  Given `x=c`, the affine factor on `y` becomes `N(y; A c + b, V)`.
+  Given both endpoints, its ledger contribution is the negative log density
+  of `y` under that Gaussian. Priors retain the density of an observed point.
+  Fixed coordinates drop out of local and edge entropy. The compiler shares
+  one observation row among all incident roles. Clearing its mask restores
+  ordinary messages. Flooding and the scheduled executors use the same local
+  substitution, and the host marginal returns the point on every captured leg.
 - **One damp knob.** Linear damping on (eta, Lambda) *is* log-space damping
   for Gaussians, so the engine's damp parameter acts uniformly across
   families.

@@ -165,6 +165,8 @@ def _arena_signature(arena: Arena) -> str:
                 gather = g.gather_both
             h.update(np.ascontiguousarray(gather).tobytes())
             h.update(np.ascontiguousarray(g.scatter).tobytes())
+    if arena.gaussian_taps:
+        h.update(repr(sorted(arena.gaussian_taps.items())).encode())
     for g in arena.gfe_groups:
         h.update(
             f"gfe|{g.name}|{len(g.members)}|{g.learned}|{g.mu3}|"

@@ -63,6 +63,7 @@ def assemble_arena(
         g_lam_starts=data.g_lam_starts,
         gauss_groups=data.gauss_groups,
         gauss_data=data.gauss_data,
+        gaussian_taps=data.gaussian_taps,
         n_obs_rows=data.n_obs_rows,
         g_obs_starts=data.g_obs_starts,
         mix_groups=tuple(draft.plan for draft in drafts.mixtures),

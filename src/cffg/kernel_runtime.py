@@ -141,6 +141,9 @@ def gaussian_update(group, eta, precision, params, observation=None, mask=None):
             mask,
         )
     delta = outputs if isinstance(outputs, ExecutionDelta) else ExecutionDelta(outputs)
+    if group.taps:
+        from cffg.gaussian_taps import messages
+        delta = ExecutionDelta(messages(group, delta.outgoing, params))
     outputs = delta.outgoing
     if len(outputs) != len(group.roles):
         raise ValueError(
@@ -175,6 +178,9 @@ def gaussian_energy(group, eta, precision, params, observation=None, mask=None):
             observation,
             mask,
         )
+    if group.taps:
+        from cffg.gaussian_taps import energy
+        out = energy(group, out, eta, precision, params, observation, mask)
     if out.shape != (eta.shape[0],):
         raise ValueError(
             f"group {group.name!r}: node energy must have one value per member"
@@ -190,6 +196,9 @@ def gaussian_readout(
     values = callback(
         eta, precision, params, group.dims, group.observed_role, observation, mask
     )
+    if group.taps and statistics:
+        from cffg.gaussian_taps import statistics as point_statistics
+        values = point_statistics(group, values, eta, precision, params, observation, mask)
     for key, value in values.items():
         if not value.shape or value.shape[0] != eta.shape[0]:
             raise ValueError(

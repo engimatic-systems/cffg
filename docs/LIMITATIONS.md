@@ -279,8 +279,14 @@ contribution.
 discrete BP/VMP and Gaussian factors, including external implementations. The discrete
 binding requires a log-potential accessor for support, joint beliefs and
 assignment scoring; it is not a sparse/combinatorial factor interface.
-Gaussian conditioning currently declares one DATA role per factor; Gaussian
-mean-field and nonlinear rules are not delivered by this interface. Structural
+A registered Gaussian kernel declares one exterior DATA role. An interior
+Gaussian equality can additionally observe a whole vector shared by ordinary
+built-in Gaussian priors and affine conditionals. The compiler requires at
+most one such observation per equality-connected variable. Distinct latent
+variables can be observed at both ends of an affine factor. Partial-coordinate
+or noisy measurements use an affine emission with positive-definite noise.
+Nonlinear, hybrid and external endpoints have no interior-tap rule.
+Gaussian mean-field and nonlinear rules are not delivered by this interface. Structural
 equality, hard constraints, Dirichlet parameter-edge composites, GFE
 composites and multi-arena factors remain separate plans. Registration alone
 does not add a new conjugate-learning rule or inference method.

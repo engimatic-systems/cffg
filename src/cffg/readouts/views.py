@@ -43,8 +43,9 @@ class GoalView(Protocol):
     def goal_parameter_plans(self) -> tuple[GoalParameterPlan, ...]: ...
 
 
-class GaussianView(GaussianLayout, EdgesView, Protocol):
-    pass
+class GaussianView(GaussianLayout, ObservationLayout, EdgesView, Protocol):
+    @property
+    def gaussian_taps(self) -> Mapping[str, int]: ...
 
 
 class MixtureView(MessageLayout, GaussianLayout, Protocol):

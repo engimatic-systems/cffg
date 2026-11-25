@@ -8,6 +8,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from cffg import mixg
+from cffg.execution.transport import gaussian_tap_parameters as _tap_parameters
 from cffg.execution.transport import _gauss_rows, _obs_rows
 from cffg.kernel_runtime import gaussian_readout as _gauss_readout
 from cffg.kernel_runtime import parameters as _kernel_params
@@ -87,11 +88,20 @@ def _group_moments(view, slots, dim, eta, precision):
         return _moments(h, p)
 
 
+def _point_moments(view, state, edge, row):
+    value = np.asarray(state.g_obs)[view.g_obs_indices(row, edge.dim)]
+    return value, np.zeros((edge.dim, edge.dim), dtype=state.g_lam.dtype)
+
+
 def gaussian_marginal(view: GaussianView, state: State, edge: str):
     """Host readout for a controller requesting one proper Gaussian edge."""
     info = view.edges[edge]
     if not info.dim:
         raise ValueError(f"edge {edge!r} is not Gaussian")
+    if view.gaussian_taps:
+        row = view.gaussian_taps.get(edge)
+        if row is not None and np.asarray(state.g_mask)[row]:
+            return _point_moments(view, state, info, row)
     return _group_moments(view, (info.slot0, info.slot1), info.dim,
                           np.asarray(state.g_eta), np.asarray(state.g_lam))
 
@@ -109,7 +119,16 @@ def gaussian_marginals(
         return {name: gaussian_marginal(view, state, name)}
     eta, precision = np.asarray(state.g_eta), np.asarray(state.g_lam)
     out = {}
-    for dim, group in grouped_edges(selected, dimension):
+    if view.gaussian_taps:
+        mask = np.asarray(state.g_mask)
+        fixed = [e for e in selected if e.name in view.gaussian_taps and mask[view.gaussian_taps[e.name]]]
+        for dim, group in grouped_edges(fixed, dimension):
+            rows = [view.gaussian_taps[e.name] for e in group]
+            values = np.asarray(state.g_obs)[view.g_obs_indices(rows, dim)]
+            zeros = np.zeros((len(group), dim, dim), dtype=precision.dtype)
+            out.update((e.name, (v, c)) for e, v, c in zip(group, values, zeros, strict=True))
+    remaining = [edge for edge in selected if edge.name not in out] if out else selected
+    for dim, group in grouped_edges(remaining, dimension):
         slots = [(edge.slot0, edge.slot1) for edge in group]
         means, covariances = _group_moments(view, slots, dim, eta, precision)
         out.update((edge.name, (mean, cov))
@@ -152,7 +171,7 @@ def gaussian_node_stats(
             g,
             inc_e,
             inc_l,
-            _kernel_params(g, state.params),
+            _tap_parameters(g, _kernel_params(g, state.params), state.g_obs, state.g_mask),
             y,
             mk,
             statistics=True,

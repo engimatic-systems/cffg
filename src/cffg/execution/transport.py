@@ -91,6 +91,20 @@ def _set_disc_block(
     return messages.at[arena.message_indices(slots, card)].set(rows[..., :card])
 
 
+def gaussian_tap_parameters(group, params, observations, masks, rows=None):
+    """Gather observed values and active masks for the roles with compiled equality taps."""
+    if not group.taps:
+        return params
+    local = dict(params)
+    for tap in group.taps:
+        indices, address = jnp.asarray(tap.indices), jnp.asarray(tap.rows)
+        if rows is not None:
+            indices, address = indices[rows], address[rows]
+        local[f"point{tap.role}"] = observations[indices]
+        local[f"bound{tap.role}"] = (address >= 0) & (masks[jnp.maximum(address, 0)] != 0)
+    return local
+
+
 def _gauss_rows(
     arena: GaussianLayout,
     eta: jax.Array,

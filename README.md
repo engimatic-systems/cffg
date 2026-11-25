@@ -230,7 +230,11 @@ For reusable structure:
 - `cffg.core.fan_out(template, edge, branch_count)` returns a validated
   template and ordered GLUE ports for attaching new factors. Its endpoints
   keep their roles. `observe_interior(template, edge)` returns a template and
-  a DATA port for conditioning a supported latent.
+  a DATA port for conditioning a supported latent. For a Gaussian latent
+  shared by ordinary priors and affine Gaussian factors, bind a vector to
+  this port to observe the latent exactly. Its posterior mean equals the
+  vector and its covariance is zero. Bind `None` to clear the observation.
+  An ordinary emission DATA edge continues to report its cavity prediction.
 - `cffg.core.edits` applies validated all-or-nothing graph edits rather than
   leaving a half-mutated template after a failure.
 - `validate(template)` reports structural problems before compilation, while

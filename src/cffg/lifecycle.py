@@ -87,6 +87,9 @@ class StateLifecycle:
             if group.obs_rows is not None
             for row in group.obs_rows
         }
+        if a.gaussian_taps:
+            from cffg.gaussian_taps import validate_point
+            validators.update(dict.fromkeys(a.gaussian_taps.values(), validate_point))
         object.__setattr__(
             self,
             "gaussian_validators",
@@ -147,6 +150,9 @@ class StateLifecycle:
                     try:
                         value = np.asarray(self.gaussian_validators[port](value, dim),
                                            dtype=np.float64)
+                        if self.arena.gaussian_taps and row in self.arena.gaussian_taps.values():
+                            if not np.all(np.abs(value) <= np.finfo(state.g_obs.dtype).max):
+                                raise ValueError("tap value must be finite in the state dtype")
                         if value.shape != (dim,):
                             raise ValueError(
                                 f"observation validator returned shape {value.shape}, expected {(dim,)}"

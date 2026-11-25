@@ -9,6 +9,7 @@ import jax
 import jax.numpy as jnp
 from jax.scipy.special import logsumexp
 
+from cffg.execution.transport import gaussian_tap_parameters as _tap_parameters
 from cffg.compiled import NEG, Arena
 from cffg.execution import (
     composites as _composites,
@@ -188,7 +189,7 @@ def _gauss_sweep(arena, g_eta, g_lam, g_obs, g_mask, params, failures, *, only_i
                 g_mask[jnp.asarray(g.obs_rows)],
             )
         delta = execute(
-            g, inc_e, inc_l, _kernel_params(g, params), y, mk
+            g, inc_e, inc_l, _tap_parameters(g, _kernel_params(g, params), g_obs, g_mask), y, mk
         )
         if delta.residual is not None:
             residual = jnp.maximum(residual, jnp.max(delta.residual))

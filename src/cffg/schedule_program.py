@@ -14,6 +14,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax.scipy.special import logsumexp
 
+from cffg.execution.transport import gaussian_tap_parameters as _tap_parameters
 from cffg.compiled import NEG, Arena
 from cffg.execution.failures import FailureIndex
 from cffg.execution.owners import SCHEDULED_EXECUTORS, ScheduledExecutors
@@ -242,7 +243,7 @@ def _batch_stage_fn(arena: Arena, stage, op, executors=SCHEDULED_EXECUTORS):
         if g.obs_rows is not None:
             y, mk = _obs_rows(arena, g_obs, obs_rows, g.observed_dim), g_mask[obs_rows]
         delta = executors.gaussian(
-            g, inc_e, inc_l, executors.parameters(g, params, rows), y, mk
+            g, inc_e, inc_l, _tap_parameters(g, executors.parameters(g, params, rows), g_obs, g_mask, rows), y, mk
         )
         failure = failures.delta(g, delta, "gauss", rows=rows, gaussian_dtypes=(g_eta.dtype, g_lam.dtype))
         for r, (oe, ol) in enumerate(delta.outgoing):

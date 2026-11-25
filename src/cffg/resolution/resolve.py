@@ -6,6 +6,7 @@ import numpy as np
 
 from cffg.compiled import EfGroupPlan
 from cffg.compiler_errors import CompileError
+from cffg.resolution.gaussian_taps import resolve_taps
 from cffg.core.ir import Template
 from cffg.registered.contracts import EqualityReference, RegisteredPlanDrafts
 from cffg.registered.packing import pack_discrete, pack_ef, pack_gaussian
@@ -172,6 +173,7 @@ def resolve_compile_data(
         )
     if specialized.delta_problem:
         raise CompileError(specialized.delta_problem)
+    gauss_groups, tap_edges = resolve_taps(topology, gauss_groups, observations)
     obs_lengths = observations.gaussian_lengths()
     if specialized.goal_parameter_problem:
         raise ValueError(specialized.goal_parameter_problem)
@@ -190,6 +192,7 @@ def resolve_compile_data(
         ef_groups=ef_groups,
         constraint_groups=constraint_groups,
         gauss_data=observations.gauss_data,
+        gaussian_taps=tap_edges,
         n_obs_rows=observations.n_obs_rows,
         ef_data=observations.ef_data,
         n_ef_obs=observations.n_ef_obs,
