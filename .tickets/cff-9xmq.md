@@ -1,6 +1,6 @@
 ---
 id: cff-9xmq
-status: in_progress
+status: closed
 deps: [cff-wbhu]
 links: [cff-6s31]
 created: 2026-07-10T03:30:52Z
@@ -574,3 +574,7 @@ Cooper chose option 1 after reviewing the 92 changed classifications. AC5.8 now 
 **2026-11-25T06:29:54Z**
 
 Sealed 49-patch public throughput ran on CPU float64, Apple M2 Max / JAX 0.10.2, CFFG 8ae5bdb and active-vision 00a8a43e. Independent breadth-first traversal of the two archived templates measured chain max hub-to-leaf / leaf-to-leaf 48/48, balanced 6/11 (49 leaves, 48 equalities each): ~/agent-share/cffg-hierarchy-validation/diameter.json. Actual full classifier converged in 80–81 chain vs 43–44 balanced synchronous sweeps. Warm chain→balanced images/s: Engine single (40 images) 20.39→36.20, Colony batch 128 (512 images) 28.23→47.73. Full wall includes building a 784-port dict per image, Engine.bind_data on reusable base states, Engine.run or Colony.run, converged status and synchronized class marginal readout; model setup, offline oracle, training and disk I/O are outside. Mean group-sweep inference cost .593→.601 ms single and 53.63→56.61 ms batch. Same-scope supplementary exact two-pass: 250.06→263.95 images/s single and 260.74→273.08 batch (Colony runs exact trees per member); first single wall 7.861→6.227 s vs flood .340→.293 s. Every posterior matched independent softmax to max absolute 4.85e-13. Both 784-leaf compiles had 1569 factors, 2353 variables, 401648 bytes of initialized numerical state. Firsts, setup, every raw block, counts, qualified source/input hashes, frozen protocol and receipt: ~/agent-share/cffg-hierarchical-runtime/broadcast/8ae5bdb/{flood.json,two-pass.json,receipt.json}. Timed in the predeclared chain-then-balanced order; one host and a fixed corpus. Depth, both warm speed thresholds and posterior checks passed. Parent owns the integrated final gate; prerequisite cff-wbhu still in progress.
+
+**2026-11-25T07:58:40Z**
+
+Release qualification at f5b8ede: 2,751 default cases passed, 335 opt-in cases deselected, 1,143.367 s dashboard wall. The isolated 49-leaf fan-out spans 11 equality factors between the farthest pair and 6 from the hub. The complete balanced classifier used 43–44 synchronous sweeps with every recorded posterior within 4.85e-13 of the dense reference at 36.20 sequential and 47.73 batched images/s. These measured criteria implement Cooper’s option 1. See committed benchmark protocol, benchmark_broadcast.py, tests/test_plates.py, and the sealed receipt in the preceding note.
