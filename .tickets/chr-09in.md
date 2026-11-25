@@ -1,6 +1,6 @@
 ---
 id: chr-09in
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-11-25T07:23:58Z
@@ -27,3 +27,7 @@ Export the existing record from the compiler facade and check its identity, immu
 **2026-11-25T07:24:23Z**
 
 At 8ec7ae2 the default suite passed 2,843 cases and failed only test_compatibility_exports_have_one_owner. Reproduced in isolation. The compiler now re-exports GaussianTapRole, and the ownership test checks that all 21 frozen dataclasses are also in the public export list. The focused compiled-value, compiler-contract and import suites passed all 88 tests in 3.57 s. Integrated rerun follows the test-budget review.
+
+**2026-11-25T07:58:26Z**
+
+Integrated gate f5b8ede passed all 2,751 default tests in 1,143.367 wall seconds. All 21 compiled records have a single immutable owner and have a public compiler alias.
