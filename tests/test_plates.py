@@ -478,17 +478,22 @@ def test_balanced_broadcast_wiring(n):
     degrees = Counter(v for f in flat.factors.values() for v in f.edges.values())
     assert max(degrees.values()) <= 2
 
-    def descend(edge, depth):
+    def subtree(edge):
         if edge not in nodes:
-            return [(edge, depth)]
-        left, right = (descend(child, depth + 1) for child in nodes[edge])
+            return [edge], 0, 0
+        left_edge, right_edge = nodes[edge]
+        left, left_height, left_diameter = subtree(left_edge)
+        right, right_height, right_diameter = subtree(right_edge)
         assert abs(len(left) - len(right)) <= 1
-        return left + right
+        height = 1 + max(left_height, right_height)
+        through_root = left_height + 1 + right_height
+        return left + right, height, max(left_diameter, right_diameter, through_root)
 
-    leaves = descend("p/hub", 0)
+    leaves, height, diameter = subtree("p/hub")
     expected = ["p/hub"] if n == 1 else [f"p/{i}/s" for i in range(n)]
-    assert [name for name, _ in leaves] == expected
-    assert max(depth for _, depth in leaves) <= ceil(log2(n))
+    assert leaves == expected
+    assert height <= ceil(log2(n))
+    assert diameter <= 2 * ceil(log2(n))
 
 
 def test_balanced_broadcast_rejects_name_collision():
