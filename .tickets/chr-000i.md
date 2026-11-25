@@ -1,6 +1,6 @@
 ---
 id: chr-000i
-status: in_progress
+status: closed
 deps: []
 links: [chr-kzwu]
 created: 2026-11-25T06:27:52Z
@@ -39,3 +39,7 @@ An odds pair contains unnormalized integer weights for the left and right regime
 **2026-11-25T06:27:57Z**
 
 Architecture index: Runtime numerical or status invariant is exercised at the public existing hierarchy boundary by a stronger independent same-clock oracle. No engine, kernel, schedule, checkpoint or IR changes. The post-hoc command is isolated analysis of a saved trace; it runs no measured policies. Parent owns the final combined default suite.
+
+**2026-11-25T06:34:00Z**
+
+Checked 6,144 immutable native decisions from 16 registered seeds and regenerated the cue tape. Exact integer replay finds ten ties and seven changed actions, all within period zero. Native reward count was 5,311 and the exact lowest-index count was 5,308. Independent flat and history-using flat counts remained 4,423 and 5,207. The check rejected a tampered recorded action. The parent ticket holds the seven coordinates and both rates. tests/test_hierarchy.py::test_repeated_one_clock_matches_flattened_joint_hmm independently reduces the hierarchy to one dense ordinary Markov process on the joint state for eight consecutive observations; parent and child clocks, joint beliefs, conditional evidence and rollover prediction agree in float32 and float64. Both final hierarchy files passed, 13 tests in 13.31 seconds, via uv run --frozen --no-sync pytest -q tests/test_hierarchy.py tests/test_hierarchy_checkpoint.py. This focused correctness run overlapped other correctness workers. The parent owns the combined short gate.

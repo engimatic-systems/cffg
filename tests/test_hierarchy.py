@@ -208,3 +208,34 @@ def test_vmap_child_eliminates_independent_observations():
             uncompiled = child_message(*args, observation)
         for actual, expected in zip(batched, uncompiled, strict=True):
             np.testing.assert_allclose(actual[i], expected, atol=32*np.finfo(float).eps)
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_repeated_one_clock_matches_flattened_joint_hmm(dtype):
+    # Flatten (regime, fast state) into one ordinary HMM state. A single dense
+    # matrix then implements both clocks together, including inherited correlation.
+    p, t, d, b, a = tables(dtype)
+    runtime = Hierarchy.from_tables(p, t, d, b, a, thickness=1)
+    r, x = len(p), len(d)
+    pair = np.outer(p.astype(float), d).ravel()
+    dense = np.empty((r*x, r*x))
+    for old_r, new_r, old_x, new_x in product(range(r), range(r), range(x), range(x)):
+        dense[new_r*x + new_x, old_r*x + old_x] = float(t[new_r,old_r]) * b[new_r,new_x,old_x]
+    observations = (0,None,1,0,1,None,1,1)
+    for i, y in enumerate(observations):
+        if i:
+            pair = dense @ pair
+        else:
+            # The first fast transition uses the initial slow state directly.
+            pair = np.concatenate([b[j].astype(float) @ pair[j*x:(j+1)*x] for j in range(r)])
+        if y is not None:
+            pair = pair * np.tile(a[y],r)
+        z = pair.sum()
+        pair /= z
+        out = runtime.step(y).require_converged()
+        tol = 96*np.finfo(dtype).eps
+        np.testing.assert_allclose(out.joint.ravel(),pair,atol=tol,rtol=0)
+        np.testing.assert_allclose(out.free_energy,-np.log(z),atol=tol,rtol=0)
+        predicted = np.einsum("nr,rx->nx",t,pair.reshape(r,x))
+        np.testing.assert_allclose(runtime.current_joint,predicted,atol=tol,rtol=0)
+        assert out.period_complete and runtime.parent_periods == runtime.child_ticks == i+1
