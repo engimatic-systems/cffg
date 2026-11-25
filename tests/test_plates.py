@@ -459,3 +459,237 @@ def test_chain_plate_reproduces_unrolled_hmm(hmm_slice):
     np.testing.assert_allclose(marg["pr/z0"], smoothed[0], atol=1e-6)
     for t in range(T):
         np.testing.assert_allclose(marg[f"ch/c/{t}/z_mid"], smoothed[t + 1], atol=1e-6)
+
+
+@pytest.mark.parametrize("n", [1, 2, 3, 4, 49, 784])
+def test_balanced_broadcast_wiring(n):
+    from collections import Counter
+    from math import ceil, log2
+
+    plate = Template("balanced", plates={"p": PlateSpec(selector_fragment(), (n,), (Broadcast("s", "hub"),))})
+    flat = expand_plates(plate)
+    validate(flat)
+    assert to_dict(flat) == to_dict(expand_plates(from_json(to_json(plate))))
+    nodes = {
+        f.edges["a"]: (f.edges["b"], f.edges["c"]) for f in flat.factors.values() if f.type == "equality"
+    }
+    assert len(nodes) == n - 1
+    assert len([v for v in flat.variables if "/_bcast/" in v]) == max(n - 2, 0)
+    degrees = Counter(v for f in flat.factors.values() for v in f.edges.values())
+    assert max(degrees.values()) <= 2
+
+    def descend(edge, depth):
+        if edge not in nodes:
+            return [(edge, depth)]
+        left, right = (descend(child, depth + 1) for child in nodes[edge])
+        assert abs(len(left) - len(right)) <= 1
+        return left + right
+
+    leaves = descend("p/hub", 0)
+    expected = ["p/hub"] if n == 1 else [f"p/{i}/s" for i in range(n)]
+    assert [name for name, _ in leaves] == expected
+    assert max(depth for _, depth in leaves) <= ceil(log2(n))
+
+
+def test_balanced_broadcast_rejects_name_collision():
+    from cffg.core.compose import ComposeError
+
+    plate = Template(
+        "collision", plates={"p": PlateSpec(selector_fragment(), (3,), (Broadcast("s", "hub"),))}
+    )
+    path = "p/_bcast/hub/eq1"
+    plate.variables["outside"] = VariableSpec("outside", K)
+    plate.blobs["old"] = BlobRef("old", "old.npy", inits.spec("uniform"))
+    plate.factors[path] = FactorSpec(
+        path, "categorical", {"out": "outside"}, param_blobs={"statistic": "old"}
+    )
+    plate.ports["existing"] = PortSpec("existing", "outside", PortRole.GLUE)
+    before = to_json(plate)
+    with pytest.raises(ComposeError, match=path):
+        expand_plates(plate)
+    assert to_json(plate) == before
+
+
+def _linear_reference(plate, n, branch):
+    flat = expand_plates(plate)
+    for i in range(n - 1):
+        name = f"p/_bcast/hub/eq{i}"
+        inlet = "p/hub" if i == 0 else f"p/_bcast/hub/link{i - 1}"
+        continuation = f"p/{i + 1}/{branch}" if i == n - 2 else f"p/_bcast/hub/link{i}"
+        flat.factors[name] = FactorSpec(
+            name, "equality", {"a": inlet, "b": f"p/{i}/{branch}", "c": continuation}
+        )
+    validate(flat)
+    return flat
+
+
+@pytest.mark.parametrize("semiring", ["sum", "max"])
+def test_balanced_broadcast_matches_chain_and_flooding(semiring):
+    n = 5
+    plate = Template(
+        "sparse",
+        plates={"p": PlateSpec(selector_fragment(), (n,), (Broadcast("s", "hub"),), per_copy_blobs=("w",))},
+    )
+    weights = np.array(
+        [[0.7, 0.3, 0], [1 / 3, 1 / 3, 1 / 3], [0.4, 0.4, 0.2], [0.1, 0.8, 0.1], [0.4, 0.5, 0.1]]
+    )
+    arrays = {f"p/{i}/w": w for i, w in enumerate(weights)}
+    expected = weights.prod(axis=0)
+    expected /= expected.sum()
+    values = []
+    for template, schedule in [
+        (plate, "auto"),
+        (plate, "flood"),
+        (_linear_reference(plate, n, "s"), "flood"),
+    ]:
+        eng = Engine(compile_template(template, arrays=arrays, semiring=semiring), schedule=schedule)
+        if schedule == "auto":
+            assert eng.schedule.kind == "two_pass"
+        state = eng.run(eng.init_state(), 32, tol=1e-10).require_converged()
+        if semiring == "sum":
+            for name in ["p/hub", *(f"p/{i}/s" for i in range(n))]:
+                belief = eng.marginals(state)[name]
+                np.testing.assert_allclose(belief, expected, atol=1e-10, rtol=0)
+                assert belief[2] == 0
+            values.append(float(eng.bfe(state)))
+        else:
+            assert set(eng.decode(state).values()) == {int(expected.argmax())}
+            values.append(float(eng.objective(state)))
+    np.testing.assert_allclose(values, values[0], atol=1e-10, rtol=0)
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_balanced_gaussian_broadcast_matches_information_sum(dtype):
+    import jax
+
+    n, dim = 5, 32
+    plate = Template(
+        "continuous", plates={"p": PlateSpec(sensor_fragment(dim), (n,), (Broadcast("st", "hub"),))}
+    )
+    # The last sensor is unbound and contributes zero information.
+    readings = np.arange((n - 1) * dim, dtype=dtype).reshape(n - 1, dim) / dim
+    observations = {f"p/{i}/y": y for i, y in enumerate(readings)}
+    atol = 64 * np.finfo(dtype).eps if dtype is np.float32 else 1e-10
+    with jax.enable_x64(dtype == np.float64):
+        energies = []
+        for template in (plate, _linear_reference(plate, n, "state")):
+            eng = Engine(compile_template(template), schedule="flood")
+            state = eng.run(eng.bind_data(eng.init_state(), observations), 32, tol=atol).require_converged()
+            beliefs = eng.gaussian_marginals(state)
+            for name in ["p/hub", *(f"p/{i}/state" for i in range(n))]:
+                mean, cov = beliefs[name]
+                np.testing.assert_allclose(mean, readings.mean(axis=0), atol=atol, rtol=atol)
+                np.testing.assert_allclose(cov, 2 * np.eye(dim) / (n - 1), atol=atol, rtol=atol)
+            energies.append(float(eng.bfe(state)))
+        np.testing.assert_allclose(energies, energies[0], atol=atol, rtol=atol)
+
+
+def test_frozen_broadcast_json_and_bundle(tmp_path):
+    import json
+
+    from cffg.bundle import save_bundle, load_bundle
+    from cffg.schedule import ScanStage, build_schedule
+    from collections import Counter
+
+    # The pre-balancing schema-1 compact template and its canonical structure hash.
+    old = {
+        "schema_version": "1",
+        "name": "bank",
+        "variables": {},
+        "factors": {},
+        "constraints": [],
+        "ports": {},
+        "blobs": {},
+        "plates": {
+            "b": {
+                "fragment": {
+                    "schema_version": "1",
+                    "name": "leaf",
+                    "variables": {"v": {"cardinality": 2}},
+                    "factors": {
+                        "p": {
+                            "type": "categorical",
+                            "edges": {"out": "v"},
+                            "param_edges": {},
+                            "param_blobs": {"statistic": "p"},
+                        }
+                    },
+                    "constraints": [],
+                    "ports": {"v": {"variable": "v", "role": "glue"}},
+                    "blobs": {"p": {"path": "p.npy"}},
+                },
+                "dims": [3],
+                "bonds": [{"kind": "broadcast", "port": "v", "hub": "c"}],
+                "per_copy_blobs": [],
+            }
+        },
+    }
+    t = from_json(json.dumps(old))
+    assert to_dict(t) == old
+    assert structure_hash(t) == "57689e3ef8a045c77b74269b21f84542f587122adf34ebf97cc548e2744067c0"
+    arrays = {"p": np.array([0.1, 0.9])}
+    save_bundle(tmp_path / "b.cffgz", t, arrays)
+    loaded, restored, _ = load_bundle(tmp_path / "b.cffgz")
+    arena = compile_template(t, arrays=arrays)
+    schedules = [build_schedule(arena), build_schedule(compile_template(loaded, arrays=restored))]
+    firings = Counter()
+    for stage in schedules[0].stages:
+        for batch in stage.elems if isinstance(stage, ScanStage) else (stage,):
+            members = arena.groups[batch.group].members
+            firings.update(members[i] for i in np.ravel(batch.rows))
+    assert {name: n for name, n in firings.items() if "/_bcast/" in name} == {
+        "b/_bcast/c/eq0": 2,
+        "b/_bcast/c/eq1": 2,
+    }
+    assert schedules[0].kind == schedules[1].kind == "two_pass"
+    assert schedules[0].fingerprint == schedules[1].fingerprint
+
+
+def test_balanced_forest_mixed_schedule():
+    from cffg.core import ConstraintSpec, ConstraintKind
+    from cffg.core.compose import merge
+
+    t = Template("bank", plates={"p": PlateSpec(selector_fragment(), (7,), (Broadcast("s", "hub"),))})
+    bead = pixel_fragment()
+    bead.constraints.append(ConstraintSpec(ConstraintKind.MEAN_FIELD, "obs"))
+    model = merge(expand_plates(t), bead, name="forest")
+    values = []
+    for schedule in ("auto", "flood"):
+        engine = Engine(compile_template(model), schedule=schedule)
+        if schedule == "auto":
+            assert engine.schedule.kind == "mixed"
+        result = engine.run(engine.bind_data(engine.init_state(), {"x": 1}), 80, tol=1e-10)
+        state = result.require_converged()
+        values.append((engine.marginals(state), float(engine.bfe(state))))
+    for name in model.variables:
+        np.testing.assert_allclose(values[0][0][name], values[1][0][name], atol=1e-10, rtol=0)
+    np.testing.assert_allclose(values[0][1], values[1][1], atol=1e-10, rtol=0)
+
+
+def test_balanced_broadcast_reports_support_failure():
+    from cffg.engine import RunStatus, _replace
+
+    t = Template(
+        "bank",
+        plates={"p": PlateSpec(selector_fragment(), (4,), (Broadcast("s", "hub"),), per_copy_blobs=("w",))},
+    )
+    arrays = {f"p/{i}/w": np.array([1.0, 0.0, 0.0]) if i % 2 else np.array([0.0, 1.0, 0.0]) for i in range(4)}
+    eng = Engine(compile_template(t, arrays=arrays), schedule="flood")
+    state = eng.init_state()
+    assert eng.run(state, 32, tol=1e-10).status is RunStatus.INFEASIBLE
+    invalid = _replace(state, messages=state.messages.at[0].set(np.nan))
+    assert eng.run(invalid, 32, tol=1e-10).status is RunStatus.DIVERGED
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("domain", ["categorical", "gaussian"])
+def test_broadcast_compiles_784_leaves_at_domain_size_32(domain):
+    fragment = selector_fragment() if domain == "categorical" else sensor_fragment(32)
+    port = "s" if domain == "categorical" else "st"
+    if domain == "categorical":
+        fragment.variables["s"] = VariableSpec("s", 32)
+    t = Template("large", plates={"p": PlateSpec(fragment, (28, 28), (Broadcast(port, "hub"),))})
+    arena = compile_template(t)
+    groups = (*arena.groups, *arena.gauss_groups)
+    assert sum(name.startswith("p/_bcast/hub/eq") for group in groups for name in group.members) == 783
+    assert len([name for name in arena.edges if name.startswith("p/_bcast/hub/link")]) == 782

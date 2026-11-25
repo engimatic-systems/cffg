@@ -1,6 +1,6 @@
 ---
 id: cff-9xmq
-status: open
+status: in_progress
 deps: [cff-wbhu]
 links: [cff-6s31]
 created: 2026-07-10T03:30:52Z
@@ -550,3 +550,11 @@ enumerated set of intended meanings in this ticket.
   ticket's shared-plan delivery.
 
 Intelligible-ticket review: complete.
+
+**2026-11-25T06:05:14Z**
+
+Change path: New IR field checklist, derived structure only. Keep compact PlateSpec/Broadcast serialization, lookup, scoping, structure hash and bundle formats. Change plate materialization and deterministic equality wiring. Compiler/Arena and scheduled fingerprints derive from the new flat tree. Same categorical/Gaussian equality rules, host/JIT, flooding/scheduled and single/batch execution. No checkpoint, parameter or learnable state. Qualify topology count/diameter (1..784), exact support, analytic product and information addition, f32 tolerance 64*eps times output scale, f64 absolute 1e-10; preserve any failed benchmark target in the record. The compiled-loop prerequisite, historical baseline and final gate have independent owners.
+
+**2026-11-25T06:14:11Z**
+
+Implemented cffg.core.equality_tree.plan_equality_tree and used it in compact plate expansion. Frozen input/schedule benchmark protocol is 2340d07; benchmark code e6fcb33. Focused qualification (isolated base 51ae6a7 plus exactly the proposed topology, excluding concurrent loop changes): uv run --frozen --no-sync python -m pytest -q -m "slow or not slow" tests/test_plates.py: 34 passed, including all structural counts/diameters through 784, 32-dimensional Gaussian and 32-category 784-leaf compiles, row-major deterministic wiring, sum/max stationary flooding and exact schedules, mixed forest parity, failure statuses, unbound Gaussian, both dtypes, pre-change compact SHA, bundle and schedule. Topology alone does not remove internal 16-pixel fan-out or runtime propagation outside the 49-patch tree. Parent owns final integrated suite and measured sweep/throughput qualification, so ticket stays in progress.
