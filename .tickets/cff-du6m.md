@@ -213,3 +213,20 @@ Retained current-scan map, candidate -> selected meaning:
 - `later` -> downstream implementation or sequential posterior use after this research step.
 
 Intelligible-ticket review: complete.
+
+**2026-11-25T18:07:43Z**
+
+Navigation example for the structure-learning review
+
+What does AIMAPP learn? De Tinguy et al. propose unvisited places from unobstructed headings beyond an existing place radius. Equation 7 compares the pose likelihood before and after expansion. Experienced transitions update directed connection strengths. Position estimates, obstacle sensing and low-level movement come from separate components. Section 3.5 gives a worked example of suppressing incoming transitions to a blocked place. Confidence is high for these mechanisms. [AIMAPP v2, §§3.1–3.6](https://arxiv.org/html/2510.09574v2#S3.SS5)
+
+What did the benchmark establish? The goal-reaching comparison starts at a known position on a previously explored graph. The median executed distance was 1.24 times the full-map A* distance over 40 trials. The scope of that result is route finding. The authors discuss symmetric views, drift and finite planning horizons separately. Confidence is high for the protocol and reported statistic. [Table 5](https://arxiv.org/html/2510.09574v2#S4.SS4) and [§5.1](https://arxiv.org/html/2510.09574v2#S5.SS1)
+
+Which part would transfer? A proposed first test keeps exact local motion, presents two similar junctions with different exits, and includes a return route. Compare a fixed map model and a model allowed to propose distinct places or reconnect a revisit. Give candidates identical ordered fit data and score their predictions on the same reserved continuation. Compare route success and steps against a tile-map planner with the same observations. Keep predicted connections distinguishable from traversed connections. This is a proposed test. The paper's local expansion score and the epic's held-out model score have different meanings. Scale measurements should cover graph growth, parameter transfer, recompilation time and peak memory before choosing sparse storage.
+
+Existing tracker dependencies, prerequisite --> dependent
+    [ready] cff-du6m review ---------+
+                                     +--> [blocked] cff-cynx outer model comparison
+    [closed] cff-izjd hybrid GFE ----+
+
+The navigation example supplies a possible consumer. The remaining review of growth, merge, and reduced-prior evidence stays on cff-du6m. The implementation split belongs after that review.
