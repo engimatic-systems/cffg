@@ -2421,14 +2421,20 @@ source of truth for readiness, scope, and status.
 - A fixed two-level categorical hierarchy is implemented in §5. Extending the
   binding to continuous states, additional levels or learned transition
   parameters requires corresponding message and ledger rules.
-- **Sophisticated inference: shallow yes, deep no.** Contingent planning
-  ("branch on what I might observe") can be expressed as a *bigger template* —
-  observation-branch mixture nodes unrolled into a policy tree — so the engine
-  runs it without architectural change; the cost is combinatorial in branch
-  depth (practical to depth ~2–3). Deep SI is tree search, which is precisely
-  what LAIF exists to avoid; it will not fall out of message passing
-  (LIMITATIONS H5/S4). Default posture: receding-horizon replanning first,
-  shallow branch templates where contingency demonstrably pays.
+- `cffg.models.contingent.build_contingent` expands one or two categorical
+  observation layers into action-prefix variables. Copy-and-append transitions
+  share the pre-observation actions. Balanced equality trees connect each
+  prefix to its children, a DATA tap and its preference and response factors.
+  `build_contingent_rollout` obtains the same inputs by causal forward filtering
+  of a categorical controlled state model. The stored template and CPT blobs
+  suffice to compile both native traversals.
+- `cffg.contingent.ContingentPlanner` checks source layout, uniform action
+  priors and physical history masses. For MAP it integrates the passive
+  response leaves and runs an exact max-product tree. For scores and
+  conditional branch distributions it clamps earlier decisions on the
+  sum-product tree. Execution after commitment is a history lookup. D17
+  derives the two ledgers and the fixed-policy expected loss. S4 gives
+  the bounded domain and resource limits.
 
 ### Long-term positions from the brief
 

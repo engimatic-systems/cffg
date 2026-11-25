@@ -766,10 +766,26 @@ event-triggered durations, discovery of
 spatial regions, and sparse motion between uncertain neighboring cells are
 outside this schedule. See DERIVATIONS D16.
 
-**S4. Contingent planning.** H5's policy factorization can be partially lifted:
-structured (non-mean-field) constraints over control sequences, or explicit
-branching on future observations, trade compute for policy expressiveness.
-Receding-horizon replanning already recovers most practical value cheaply.
+**S4. Contingent planning.** A separate finite categorical policy template
+can precommit through one or two future observations. Its objective is
+physically expected negative log preference, with an ordinary tree Bethe
+ledger (DERIVATIONS D17). The original H5 action-marginal LAIF objective
+retains its factorization. Inputs must provide proper causal observation
+kernels and finite preferences in [0, 1]. A zero preference at a reached
+history excludes that policy. An observation history of zero physical mass
+has zero cost and no executable action.
+
+With a constant branching factor `B` and `A` actions per stage, depth two
+has `1+B+B²` histories. The largest prefix has `A³` states, and each
+last-stage copy-and-append transition is stored as a dense `A³ × A²` CPT.
+Construction defaults to at most 256 histories and 1,000,000 scalar CPT
+entries counted over factor instances. That entry limit permits at most
+4 MB of float32 or 8 MB of float64 CPT payload before sharing. Template
+text, compiler working memory, file headers and runtime buffers add to it.
+Greater depth requires a different scale contract. The solver uses arena
+precision for joint MAP and has no guarantee of resolving sub-ulp policy
+differences. A positive source mass below working precision or a positive
+weighted cost that rounds to zero during construction raises an error.
 
 **S5. Neural Gaussian means and recognition.** Dense neural means now enter
 positive-noise Gaussian conditionals through Taylor linearization or fixed

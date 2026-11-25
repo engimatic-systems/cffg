@@ -3707,3 +3707,105 @@ log-partition reduction before committing new clocks and statistics.
 enumerates complete paths and missing emissions across successive periods in
 float32 and float64. The same file checks zero support, budgets, and a long
 float32 period with very small likelihood.
+
+## D17 — Committing to a categorical action after each reading
+
+Buying a cue is valuable if the two possible readings lead to different
+subsequent choices. A policy assigns one action to each available reading
+history. At the root the reading has yet to occur, so every branch must
+share the same first decision. The builder accepts one or two future
+observation layers. It can also tie all choices at a stage to measure
+the value of a fixed action sequence on the same physical model.
+
+### Physical history and preference cost
+
+Write $h=(o_0,\ldots,o_{t-1})$ and $x_h=(a_0,\ldots,a_t)$ for the actions
+prescribed along that history by a deterministic policy $\pi$. Let
+$K_h(o\mid x_h)$ be the sensor law under the prescribed actions. Starting
+from $r_{\varnothing}=1$, the physical probability of visiting a child is
+$r_{ho}=r_hK_h(o\mid x_h)$. Computing this law uses earlier readings and
+interventions. A preference for future observations does not enter it. For
+the controlled hidden-state interface, propagate the state belief through
+the chosen transition, predict the observation, then condition on each
+possible reading to obtain its child belief.
+
+Each history has a preference likelihood $c_h(x_h)\in[0,1]$. With a
+preference distribution $c(y)$ over sensor outcomes the rollout uses
+$\log c_h(x_h)=\sum_y K_h(y\mid x_h)\log c(y)$. The model observes the
+preferred value of a binary factor with likelihood $w_h=c_h(x_h)^{r_h}$.
+Set $w_h=1$ on a physically impossible prefix, including $0^0$. A
+reachable zero preference gives a literal likelihood of zero. Thus
+
+$$L(\pi)=-\sum_h\log w_h=\sum_{h:r_h>0}r_h[-\log c_h(x_h)].$$
+
+This prices the expected physical outcome of an action taken before a
+reading. It gives no advantage to a policy merely for predicting that a
+favorable reading will occur.
+
+### Native tree and the two scores
+
+At each observation history a prefix variable stores the actions along
+its path. A child copies the parent's entire prefix and appends a fresh
+uniform action. All child wires share the same parent through equalities.
+This assigns the uniform prior $1/N$ to each complete policy, with
+$N=\prod_g A_g$ over distinct action choices $g$. For a fixed sequence,
+there is one $g$ per stage. Eliminating every choice in a physically
+unreachable subtree contributes one because its preferences are neutral
+and its action conditionals normalize. The tree therefore represents the
+whole-policy Gibbs law $q(\pi)\propto e^{-L(\pi)}$ without an axis of length
+$N$. Ordinary sum-product Bethe free energy on this tree is exact:
+
+$$F=-\log\left(N^{-1}\sum_\pi e^{-L(\pi)}\right),\qquad
+  F_{\pi}=L(\pi)+\log N.$$
+
+The second score clamps all policy choices, including arbitrary ties in
+unreachable subtrees. The implementation also sums the selected observed
+factor terms directly in host double precision and checks $F_{\pi}$ against
+the native ledger. This recovers small losses that would be lost by
+subtracting two nearly equal floating-point scores.
+
+The passive response leaf emits the local action with probability $r_h$ and
+an extra absent symbol with probability $1-r_h$. Summing it out gives one
+for every prefix. Do this before native max-product, since maximizing over
+the report would also optimize a chance outcome. Decode a joint maximizing
+policy top-down, restricting each prefix to the already selected ancestor
+actions and choosing the first maximizer in model order on ties. With those
+ancestor choices clamped on the sum-product tree, the posterior mass on the
+non-absent report is $r_h$; normalizing its action entries gives the
+conditional Gibbs action distribution. Other branches at that depth are
+independent given their ancestor choices. A stored branch can then execute
+without inferring again.
+
+`tests/test_contingent_policy.py::test_native_policy_matches_full_enumeration`
+compares these distributions and both native energies with complete policy
+enumeration in float32 and float64. The same file's paid-cue test compares a
+fixed-sequence optimum of zero with a commitment earning
+$.9(4)+.1(-4)-1=2.2$. Its two-reading parity task requires a distinct
+action at each level to realize the analytic gain of $0.75$. These are
+expected-utility comparisons for the specified preference tables.
+
+### Measured size and execution cost
+
+The same four-action, seven-reading paid-cue model gives the following costs
+on an Apple M2 Max CPU in float32 with JAX 0.10.2. Each depth used a fresh
+process. Preparation compiles the template to native execution structures.
+The first solve includes JAX compilation. Warm times are medians of three
+synchronized complete solves returning the same policy.
+
+| Quantity | One reading | Two readings |
+|---|---:|---:|
+| Observable histories before selecting actions | 8 | 57 |
+| Generated factors / CPT entries over instances | 47 / 1,264 | 341 / 73,392 |
+| Unique source array bytes / saved CFFGZ bytes | 3,520 / 6,953 | 95,424 / 37,907 |
+| Build / native preparation | 0.008 / 0.157 s | 0.347 / 0.290 s |
+| First solve / warm solve | 3.645 s / 3.00 ms | 24.416 s / 14.57 ms |
+| Peak live numerical State bytes at Engine boundaries | 40,368 | 1,395,120 |
+| Peak process RSS, including compilation | 629,358,592 B | 1,637,433,344 B |
+
+`tools/hierarchy/benchmark_contingent.py` counts distinct live State buffers
+at entry and return from public run/bind operations in a separate solve.
+Compiler temporaries and native executable storage contribute to process
+RSS outside that count. At depth two the largest prefix has 64 categories;
+explicitly listing every complete commitment would take $4^{57}$ entries.
+The source guard counts dense CPTs, including all uses of shared transitions,
+before allocating them. Process memory can be much larger than this guard.

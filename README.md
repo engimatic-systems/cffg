@@ -410,6 +410,47 @@ a fixed research workload, not a general environment API. Other modules under
 `cffg.experiments` and `cffg.benchmarks` are derivation, diagnostic, or
 performance artifacts rather than supported newcomer facades.
 
+### Commit to an action after each possible reading
+
+For one or two future categorical readings, solve a policy once and execute its
+branches by lookup. This example has a 90%-accurate cue costing one utility
+unit and a correct/incorrect guess worth +4/−4.
+
+```python
+from cffg.contingent import ContingentPlanner
+from cffg.experiments import behavioral_epistemics as cue
+from cffg.models.contingent import build_contingent_rollout
+
+task = cue.CueTask(cue_quality=.9, cue_cost=1., reward_utility=4.)
+template, arrays = build_contingent_rollout(
+    "paid cue", depth=1, d=cue.initial_state(), Bs=cue.transition_stack(),
+    A=cue.observation_matrix(task), c=cue.goal_statistic(task),
+)
+policy = ContingentPlanner(template, arrays).solve()
+policy.action()                  # 2: buy the cue
+policy.action([cue.CUE_LEFT])    # 0: choose left
+policy.action([cue.CUE_RIGHT])   # 1: choose right
+```
+
+The commitment earns 2.2 expected utility. Passing `open_loop=True` ties
+both responses to the same action and gives an optimum of zero. Each reachable
+history has its physical probability and conditional action distribution in
+`policy.branches`. `policy.free_energy` scores the whole policy distribution
+and `policy.committed_free_energy` scores the selected commitment. Both are
+native tree Bethe energies in nats. `policy.expected_loss` sums its observed
+negative log preferences. For direct history tables use `build_contingent`;
+both builders produce a template and arrays suitable for `save_bundle`.
+
+This planner is opt-in. Existing agents retain their priors and default
+horizons. In the example above, increasing to depth two generated 57 histories
+and 73,392 CPT entries across factor instances. Shared tables occupied 95,424
+uncompressed source bytes and the saved bundle occupied 37,907 bytes. On an
+Apple M2 Max CPU in float32, the first depth-two solve took **24.4 s** including
+JAX compilation and process peak memory was **1.64 GB**. Native preparation
+took another 0.29 s. Once warm, solving again took a median of 14.57 ms.
+Executing an already chosen branch is a lookup. See D17 in
+[the derivations](docs/DERIVATIONS.md#d17--committing-to-a-categorical-action-after-each-reading).
+
 ## Continuous, exponential-family, and hybrid models
 
 `lgssm` constructs a linear-Gaussian state-space model with DATA ports for
