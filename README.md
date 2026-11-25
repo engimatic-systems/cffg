@@ -268,6 +268,17 @@ without advancing either clock. Free energy is in nats and covers all the
 observations since the start of the current period. Use the last value from
 each completed period when summing evidence across periods.
 
+To resume between fast ticks, use `model.save_bundle(path)` and
+`Hierarchy.load_bundle(path)`. The hierarchy archive contains both model
+templates, their parameter arrays, and the checkpoint for both clocks. With a
+learned-goal child planning window, `plan_goals(...)` stages its inferred
+Dirichlet counts. Call `finish_episode()` at the real episode boundary to
+apply them once. Staged counts survive a save and reload.
+
+To reproduce the registered cue-and-commit comparison, run
+`JAX_ENABLE_X64=1 uv run --frozen python tools/hierarchy/drift.py --output drift.json`.
+The JSON includes the cue, true regime, posterior and action for each trial.
+
 ## Compile, run, and read results
 
 Compile once for a fixed template shape. Observations and same-shaped parameter
@@ -604,7 +615,8 @@ Choose the artifact by what must continue:
 
 | Artifact | Stores | Does not store |
 |---|---|---|
-| `.cffgz` bundle | Template, source arrays, structure identity, complete declared-learning priors and posteriors | Inference messages, solver progress, agent cadence/RNG, optimizer cursor |
+| Single-template `.cffgz` bundle | Template, source arrays, structure identity, complete declared-learning priors and posteriors | Inference messages, solver progress, agent cadence/RNG, optimizer cursor |
+| `Hierarchy.save_bundle` archive | Both templates and arrays, joint boundary, level clocks and statistics, optional child goal window and pending counts | Environment state |
 | `RollingAgent` `.npz` checkpoint | Structure-bound rolling beliefs, learning state, cadence, selection RNG, configured functional-mu3 lifecycle | Environment state or a portable replacement for the model bundle |
 | Neural training continuation | Versioned parameters and deterministic optimizer/training state for its bound initialization and data | General model/agent state or minibatch cursor |
 
