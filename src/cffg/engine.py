@@ -291,9 +291,13 @@ class Engine:
         )
 
     def bind_data(self, state: State, observations: dict) -> State:
-        """Bind DATA ports: discrete ports take an int (None = missing =
-        uniform); Gaussian ports take a length-dim vector, EF ports a scalar
-        count/flip (None = missing = the likelihood node drops out)."""
+        """Return a new state with a partial DATA update. Omitted ports keep their values.
+
+        Categorical integers clamp a label. None restores a uniform message.
+        Gaussian vectors and exponential-family scalars bind numeric observations.
+        None clears their masks while retaining the cached values. Invalid input
+        leaves the supplied state intact.
+        """
         return self._state_lifecycle.bind_data(state, observations)
 
     # -- execution --------------------------------------------------------

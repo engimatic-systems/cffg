@@ -1,6 +1,6 @@
 ---
 id: cff-4yr6
-status: open
+status: in_progress
 deps: []
 links: []
 created: 2026-09-25T03:46:25Z
@@ -47,3 +47,13 @@ These are suggestions; another method is acceptable if it satisfies the outcomes
 DATA port: a named observed variable boundary. Scatter: an indexed array update. Mask: a flag indicating whether an observation is present. Dispatch: submitting an array operation to the execution backend.
 
 Shared terms: CFFG means constrained Forney-style factor graph; JAX is the numerical array/compiler library; dtype is a numeric storage type; free energy is the model's inference objective; host/JIT compares Python-side and compiled execution; single/vmap compares one instance with vectorized instances; N/A means not applicable.
+
+## Notes
+
+**2026-11-25T06:05:43Z**
+
+Implementation gate on feature/hierarchical-runtime. Architecture change path: runtime numerical or status invariant, StateLifecycle and public Engine/Colony binding. The host validates and packs mixed partial updates before compiled scatter. Flooding and schedules share one lifecycle. Single-instance and Colony isolation are checked. Serialization and legacy migration are unchanged. Focused checks cover 99 binary tiles (zeros, ones, missing), mixed cardinalities and vector dimensions, both precision modes, retained masked values, domain errors, and atomic rejection. Synchronized 1/20/200-port old/new measurements follow the change. Parent owns aggregate suite and dashboard.
+
+**2026-11-25T06:13:57Z**
+
+The host precomputes ragged segment addresses and validates submitted ports in their original order. The compiled program applies one scatter per touched state buffer. Dropped padding addresses preserve masked cached values and reuse executables as the input count varies. The lifecycle, Colony, EF, external kernel, Gaussian kernel and tree tests passed: 84 passed, 5 slow cases deselected on 51ae6a7 plus the final binding implementation. New regression cases cover 99 binary integer/None observations, prior NumPy boolean scalar indexing, float32/64, mixed ragged dimensions/EF, partial changes under JIT, no premature device call on error, and Colony instance isolation. Bind integer 0 or 1 for one-hot binary evidence. An explicit Python or NumPy boolean retains the legacy boolean mask indexing behavior. Parent runs the aggregate gate.

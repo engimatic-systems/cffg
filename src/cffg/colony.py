@@ -51,7 +51,7 @@ class Colony:
         template: Template,
         arrays: dict[str, np.ndarray],
         *,
-        observations: dict[str, int | None] | None = None,
+        observations: dict[str, object] | None = None,
     ) -> int:
         """Add an instance; compiles only if this structure is new."""
         key = structure_hash(template)
@@ -83,7 +83,8 @@ class Colony:
         del self.instances[iid]
         self.last_results.pop(iid, None)
 
-    def bind(self, iid: int, observations: dict[str, int | None]) -> None:
+    def bind(self, iid: int, observations: dict[str, object]) -> None:
+        """Apply Engine.bind_data's partial update to this instance only."""
         inst = self.instances[iid]
         inst.state = self.engines[inst.key].bind_data(inst.state, observations)
 
