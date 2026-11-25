@@ -17,9 +17,11 @@ from jax.scipy.special import logsumexp
 from cffg.compiled import NEG, Arena
 from cffg.execution.failures import FailureIndex
 from cffg.execution.owners import SCHEDULED_EXECUTORS, ScheduledExecutors
+from cffg.execution.parameters import constraint_parameters
 from cffg.execution.startup import StartupProgram, make_startup_program
 from cffg.execution.scans import _flat_scan_fn as _flat_scan_fn
 from cffg.execution.scans import _scan_stage_fn
+from cffg.execution.support import constraint_zero_support
 from cffg.execution.support import log_support as _jax_log_support
 from cffg.execution.transport import (
     _disc_rows,
@@ -255,13 +257,11 @@ def _batch_stage_fn(arena: Arena, stage, op, executors=SCHEDULED_EXECUTORS):
 def make_support_check(
     arena: Arena, executors: ScheduledExecutors = SCHEDULED_EXECUTORS
 ):
-    """Jitted mirror of ``Engine._has_zero_support`` for constraint-free
-    models (every two-pass model): True iff an edge or factor belief has
-    empty exact support. Semantics are identical to the NumPy check: NEG is
-    the one reserved zero sentinel and every other finite log value has
-    support, irrespective of magnitude."""
-    if arena.constraint_groups:  # combinatorial feasibility is host-side
-        raise ValueError("jitted support check requires a constraint-free model")
+    """Build a device predicate for empty exact edge or factor support.
+
+    NEG is the reserved log-zero value. No magnitude threshold is applied.
+    Constraint parameters are current instance inputs, like factor potentials.
+    """
     by_card: dict[int, list[list[int]]] = {}
     for e in arena.edges.values():
         if not e.dim and not e.ef and not e.param_shape:
@@ -288,6 +288,12 @@ def make_support_check(
             bad |= executors.discrete_zero_support(
                 group, tuple(supports), executors.parameters(group, params, None)
             )
+        for plan in arena.constraint_groups:
+            supports = tuple(
+                _jax_log_support(messages[arena.message_indices(plan.gather[r], card)])
+                for r, card in enumerate(plan.cards)
+            )
+            bad |= constraint_zero_support(plan, supports, constraint_parameters(plan, params))
         return bad
 
     return check
