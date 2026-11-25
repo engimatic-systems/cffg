@@ -233,3 +233,105 @@ def test_mixed_scale_d100_readout_survives(dtype):
     z2 = np.zeros((1, d, d), dtype=dtype)
     _, lam_f = gauss.linear_forward(z1, z2, np.eye(d, dtype=dtype)[None], z1, lam)
     np.testing.assert_array_equal(np.asarray(lam_f), 0.0)
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_backward_rounded_rank_one_likelihood_preserves_observed_direction(dtype):
+    # The rounded rank-one Gram matrix can pass a raw Cholesky test in either dtype.
+    h = np.array([1., -.2], dtype=dtype)
+    a = np.array([[.85, -.15], [.1, .85]], dtype=dtype)
+    b = np.array([.25, -.6], dtype=dtype)
+    y = dtype(1.3)
+    w = np.eye(2, dtype=dtype) * 5
+    eta, lam = gauss.linear_backward(*[x[None] for x in (h*y, np.outer(h, h), a, b, w)])
+    h, a, b = (x.astype(np.float64) for x in (h, a, b))
+    sensor = h @ a
+    variance = 1 + h @ np.linalg.solve(w.astype(np.float64), h)
+    tol = 64 * np.finfo(dtype).eps
+    np.testing.assert_allclose(eta[0], sensor * (y - h @ b) / variance, rtol=tol, atol=tol)
+    np.testing.assert_allclose(lam[0], np.outer(sensor, sensor) / variance, rtol=tol, atol=tol)
+    assert eta.dtype == lam.dtype == dtype
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_partial_information_from_weak_to_nearly_noiseless(dtype):
+    h = np.ones(2, dtype=dtype)
+    w = np.array([[4., -.5], [-.5, 1.]], dtype=dtype)
+    a = np.array([[.875, .125], [-.25, .75]], dtype=dtype)
+    b = np.array([.25, -.375], dtype=dtype)
+    eps = np.finfo(dtype).eps
+    scales = np.array([eps / 100, 1., 100 / eps], dtype=dtype)
+    as_batch = lambda array: np.broadcast_to(array, (len(scales), *array.shape))
+    for rule in (gauss.linear_forward, gauss.linear_backward):
+        eta, precision = rule(scales[:, None] * h, scales[:, None, None] * np.outer(h, h),
+                              as_batch(a), as_batch(b), as_batch(w))
+        for i, magnitude in enumerate(scales):
+            if rule is gauss.linear_forward:
+                measured = np.linalg.solve(a.astype(float).T, h)
+                direction, target = measured, 1. + measured @ b
+            else:
+                measured = h.astype(float)
+                direction, target = measured @ a, 1. - measured @ b
+            variance = 1. / float(magnitude) + measured @ np.linalg.solve(w.astype(float), measured)
+            np.testing.assert_allclose(precision[i], np.outer(direction, direction) / variance,
+                                       rtol=64 * eps, atol=0.)
+            np.testing.assert_allclose(eta[i], direction * target / variance, rtol=64 * eps, atol=0.)
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_rectangular_prediction_with_partial_information(dtype):
+    # One free input coordinate and one noisy measurement of the other.
+    h = np.array([1., -1.], dtype=dtype)
+    a = np.array([[1., .25], [-.25, .5], [.125, .25]], dtype=dtype)
+    b = np.array([.25, -.5, .75], dtype=dtype)
+    w = np.diag(np.array([.0625, 1., 16.], dtype=dtype))
+    l = np.outer(h, h)
+    e, pred = gauss.linear_forward(*[v[None] for v in (h, l, a, b, w)])
+    a, h, w = (v.astype(float) for v in (a, h, w))
+    gain = np.linalg.solve(a.T @ w @ a, a.T @ w)
+    null_precision = w - w @ a @ gain
+    v = h @ gain
+    var = 1. + h @ np.linalg.solve(a.T @ w @ a, h)
+    p = null_precision + np.outer(v, v) / var
+    tol = 64 * np.finfo(dtype).eps
+    np.testing.assert_allclose(pred[0], p, atol=tol, rtol=tol)
+    np.testing.assert_allclose(e[0], p @ b + v / var, atol=tol, rtol=tol)
+
+
+@pytest.mark.parametrize("rule", [gauss.linear_forward, gauss.linear_backward])
+def test_isotropic_likelihood_directional_derivative(rule):
+    import jax
+
+    args = tuple(v[None] for v in (np.array([.5, -.25]), np.eye(2), np.array([[.8, -.1], [.2, .7]]),
+                                    np.array([.1, .375]), 2. * np.eye(2)))
+    delta = tuple(v[None] for v in (np.array([.1, .2]), np.array([[.13, .1], [.1, -.2]]),
+                                     np.eye(2) * .125, np.array([-.075, .125]), np.eye(2) * .4))
+    # Independent lanes with repeated eigenvalues exercise the compiled batch
+    # derivative as well as the public eager, one-member rule.
+    batched = tuple(np.stack((v, v)) for v in args)
+    directions = tuple(np.stack((d, -d)) for d in delta)
+    _, batched_derivative = jax.jit(
+        lambda xs, ds: jax.jvp(jax.vmap(rule), xs, ds)
+    )(batched, directions)
+    _, derivative = jax.jvp(rule, args, delta)
+    for local, lanes in zip(derivative, batched_derivative, strict=True):
+        np.testing.assert_allclose(lanes, np.stack((local, -local)), rtol=1.e-10, atol=1.e-12)
+    step = 1.e-5
+    plus = rule(*(x + step * dx for x, dx in zip(args, delta, strict=True)))
+    minus = rule(*(x - step * dx for x, dx in zip(args, delta, strict=True)))
+    for tangent, p, m in zip(derivative, plus, minus, strict=True):
+        np.testing.assert_allclose(tangent, (p - m) / (2 * step), rtol=1.e-7, atol=1.e-9)
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_affine_gradient_keeps_independent_coordinate_units(dtype):
+    import jax
+
+    identity = np.eye(2, dtype=dtype)[None]
+    zero = np.zeros((1, 2), dtype=dtype)
+    precision = np.diag(np.array([1e-10, 1e10], dtype=dtype))[None]
+    for rule in (gauss.linear_forward, gauss.linear_backward):
+        def output(e):
+            return rule(e, precision, identity, zero, precision)[0]
+        _, tangent = jax.jvp(output, (zero,), (np.ones_like(zero),))
+        np.testing.assert_allclose(tangent, .5, rtol=8 * np.finfo(dtype).eps)

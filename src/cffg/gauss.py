@@ -9,8 +9,8 @@ of messages add their (η, Λ), and the *vacuous* message (a half-edge, an
 unbonded glue port, an uninitialized slot) is exactly (0, 0) — no infinities,
 no special cases. Λ may be singular (an improper, partially-informative
 message); that is a feature, and no rule requires an inverse of an arbitrary
-incoming Λ. Proper inputs use a stable covariance-form solve; singular inputs
-use the Schur complement's relative-rank pseudoinverse limit.
+incoming Λ. Affine rules factor the incoming likelihood in unit-scaled coordinates.
+The outgoing precision is a Gram matrix, including for partial observations.
 
 Derivations (recorded per AGENTS.md: durable math lives next to the code).
 Both node rules come from one Gaussian integral. For f(y, x) =
@@ -25,10 +25,10 @@ FORWARD (marginalize x against mu_in = (η_i, Λ_i)):
     Checks: Λ_i = 0, A square invertible ⇒ Λ_out = 0 (vacuous propagates
     exactly, by Woodbury); Λ_i ≻ 0 ⇒ Λ_out = (V + A Λ_i⁻¹ Aᵀ)⁻¹, the
     covariance-form Kalman prediction. S can be singular while beliefs are
-    still forming (vacuous Λ_i, rank-deficient A), so its Moore-Penrose
-    inverse is taken with a dtype-relative numerical-rank threshold. This is
-    the zero-ridge limit and therefore preserves vacuous propagation at every
-    precision scale instead of injecting an absolute information floor.
+    still forming (vacuous Λ_i, rank-deficient A), so the implementation
+    eliminates the input in a balanced joint least-squares system using
+    the left null space of its design. For invertible square A a change of
+    variables z=Ax reduces prediction to the same convolution as below.
 
 BACKWARD (marginalize y against mu_out = (η_o, Λ_o)):
     mu(x) = ∫ f(y,x) mu_out(y) dy.  Quadratic in y with curvature W + Λ_o
@@ -36,6 +36,8 @@ BACKWARD (marginalize y against mu_out = (η_o, Λ_o)):
         G     = W − W (W + Λ_o)⁻¹ W          (= (V + Λ_o⁻¹)⁻¹ when Λ_o ≻ 0)
         Λ_in  = Aᵀ G A
         η_in  = Aᵀ ( W (W + Λ_o)⁻¹ η_o − G b )
+    A likelihood with square root B has G = Bᵀ(I+BVBᵀ)⁻¹B. A stacked
+    QR gives the square root of I+BVBᵀ without forming that sum.
     Checks: Λ_o = 0 ⇒ G = 0 ⇒ vacuous propagates exactly. Λ_o → ∞·I at an
     observation y* ⇒ G → W, η_in → AᵀW(y*−b): the observed rule below is
     this exact limit, taken symbolically.
@@ -145,6 +147,40 @@ def _project_psd(mat: jnp.ndarray, reference: jnp.ndarray) -> jnp.ndarray:
     return _project_psd_with_rank(mat, reference).matrix
 
 
+def _likelihood_axes(eta, precision):
+    """In x = diag(1/scale) U v the incoming precision is diagonal."""
+    scale = jnp.sqrt(jnp.where(jnp.diag(precision) > 0, jnp.diag(precision), 1.))
+    corr = (precision / scale[:, None]) / scale[None, :]
+    values, axes = jnp.linalg.eigh(corr)
+    roots = jnp.sqrt(jnp.maximum(values, 0.))
+    scaled_eta = eta / scale
+    natural = axes.T @ scaled_eta
+    # A resolvable null-space linear tilt survives. Rounding the dot product
+    # for a strong observation in its supported direction can mimic a tilt.
+    error = len(eta) * jnp.finfo(eta.dtype).eps * (abs(axes.T) @ abs(scaled_eta))
+    natural = jnp.where((roots == 0) & (abs(natural) <= error), 0., natural)
+    return roots, axes, scale, natural
+
+
+def _observed_affine(channel, target, flat, a, b, w):
+    """Integrate those channels against N(y; Ax+b, W⁻¹), returning a Gram precision."""
+    chol = jnp.linalg.cholesky(w)
+    noise = jax.lax.linalg.triangular_solve(chol, channel.T, left_side=True, lower=True)
+    # QR obtains a square root of I + B V Bᵀ without adding the identity
+    # to a large squared singular value. No inverse of Λo is taken.
+    r = jnp.linalg.qr(jnp.concatenate((noise, jnp.eye(len(w), dtype=w.dtype))), mode="r")
+    shift = jax.lax.linalg.triangular_solve(chol, flat[:, None], left_side=True, lower=True)
+    rhs = target - channel @ b - (noise.T @ shift)[:, 0]
+    design = channel @ a
+    whitened = jax.lax.linalg.triangular_solve(
+        r, jnp.column_stack((design, rhs)), left_side=True, transpose_a=True,
+    )
+    design, rhs = whitened[:, :-1], whitened[:, -1]
+    lam = design.T @ design
+    eta = design.T @ rhs + a.T @ flat
+    return eta, lam
+
+
 def _neg_entropy(lam_q: jnp.ndarray) -> jnp.ndarray:
     """−H[q], or +inf when Λ is nonsymmetric/non-PD/non-finite."""
     return GAUSSIAN.negative_entropy_from_precision(lam_q)
@@ -158,82 +194,111 @@ def prior_message(eta_p, w):
     return eta_p, w
 
 
+def _valid_affine(e, l, a, b, w):
+    return _pd_ok(w) & _psd_ok(l) & jnp.isfinite(a).all() & jnp.isfinite(b).all() & jnp.isfinite(e).all()
+
+
+def _channel_data(e, l):
+    roots, axes, scale, natural = _likelihood_axes(e, l)
+    channel = (roots[:, None] * axes.T) * scale[None, :]
+    flat = scale * (axes @ jnp.where(roots == 0, natural, 0.))
+    target = jnp.where(roots > 0, natural / jnp.where(roots > 0, roots, 1.), 0.)
+    return channel, target, flat
+
+
+def _inverse_map_forward(e, l, a, b, w):
+    channel, target, flat = _channel_data(e, l)
+    transformed = jnp.linalg.solve(a.T, jnp.column_stack((channel.T, flat)))
+    result = _observed_affine(transformed[:, :-1].T, target, transformed[:, -1],
+                             jnp.eye(len(e), dtype=e.dtype), -b, w)
+    return tuple(jnp.where(_valid_affine(e, l, a, b, w), out, 0.) for out in result)
+
+
+@jax.custom_jvp
 def linear_forward(eta_i, lam_i, a, b, w):
     """gaussian_linear → out. [M,·] batched; see module docstring."""
 
     def one(ei, li, A, bb, W):
-        s = A.T @ W @ A + li
-        s_inv = _psd_pinv(s)
-        c_eta = s_inv @ ei
-        c_awt = s_inv @ (A.T @ W)
-        lam = _project_psd(W - W @ A @ c_awt, W)
-        eta = lam @ bb + W @ A @ c_eta
-        # When the incoming belief is proper, covariance form avoids the
-        # subtractive Schur cancellation that would lose a weak (but valid)
-        # precision against much stronger process noise in float32.
-        proper_i = _pd_ok(li)
-        cov_i = _pd_inverse(li)
-        mean_i = _pd_solve(li, ei)
-        pred_cov = _pd_inverse(W) + A @ cov_i @ A.T
-        lam_proper = _pd_inverse(pred_cov)
-        eta_proper = lam_proper @ (bb + A @ mean_i)
-        lam = jnp.where(proper_i, lam_proper, lam)
-        eta = jnp.where(proper_i, eta_proper, eta)
+        roots, axes, scale, natural = _likelihood_axes(ei, li)
+        noise = jnp.linalg.cholesky(W).T
+        model = noise @ ((A / scale) @ axes)
+        # In the joint least-squares system the input design has orthogonal
+        # likelihood rows. Balance its columns before eliminating the input.
+        joint = jnp.vstack((model, jnp.diag(roots)))
+        norms = jnp.max(abs(joint), axis=0)
+        norms = jnp.where(norms > 0, norms, 1.)
+        left, singular, right = jnp.linalg.svd(joint / norms, full_matrices=True)
+        retained = singular > max(joint.shape) * jnp.finfo(ei.dtype).eps * singular[0]
+        null = jnp.concatenate((~retained, jnp.ones(len(bb), dtype=bool)))
+        # The rows left orthogonal to the input give an output square root.
+        residual = (left[:len(bb)].T @ noise) * null[:, None]
+        lam = residual.T @ residual
+        reciprocal = jnp.where(retained, 1 / jnp.where(retained, singular, 1.), 0.)
+        inverse = (right.T * reciprocal**2) @ right
+        gain = (model / norms) @ inverse
+        eta = lam @ bb + noise.T @ (gain @ (natural / norms))
         if A.shape[0] == A.shape[1]:
-            # For an algebraically invertible square map, a vacuous input has
-            # an exactly vacuous output.  Taking this identity symbolically
-            # avoids losing it when coordinate scaling makes A.T@W@A exceed
-            # the working dtype's numerical condition range.
-            sign_a, logdet_a = jnp.linalg.slogdet(A)
-            exact_vacuous = (
-                (li == 0).all()
-                & (ei == 0).all()
-                & (sign_a != 0)
-                & jnp.isfinite(logdet_a)
-            )
-            eta = jnp.where(exact_vacuous, jnp.zeros_like(eta), eta)
-            lam = jnp.where(exact_vacuous, jnp.zeros_like(lam), lam)
-        ok = (
-            _pd_ok(W)
-            & _psd_ok(li)
-            & jnp.isfinite(A).all()
-            & jnp.isfinite(bb).all()
-            & jnp.isfinite(ei).all()
-        )
+            sign, logdet = jnp.linalg.slogdet(A)
+            vacuous = (li == 0).all() & (ei == 0).all() & (sign != 0) & jnp.isfinite(logdet)
+            eta = jnp.where(vacuous, 0., eta)
+            lam = jnp.where(vacuous, 0., lam)
+        ok = _valid_affine(ei, li, A, bb, W)
         return jnp.where(ok, eta, 0.0), jnp.where(ok, lam, 0.0)
 
-    return jax.vmap(one)(eta_i, lam_i, a, b, w)
+    args = (eta_i, lam_i, a, b, w)
+    if a.shape[-1] == a.shape[-2]:
+        sign, logdet = jnp.linalg.slogdet(a)
+        invertible = jnp.all((sign != 0) & jnp.isfinite(logdet))
+        return jax.lax.cond(invertible, lambda xs: jax.vmap(_inverse_map_forward)(*xs),
+                            lambda xs: jax.vmap(one)(*xs), args)
+    return jax.vmap(one)(*args)
 
 
+@jax.custom_jvp
 def linear_backward(eta_o, lam_o, a, b, w):
     """gaussian_linear → in; invalid incoming precisions yield vacuous."""
 
     def one(eo, lo, A, bb, W):
-        k = _pd_solve(W + lo, W)  # (W+Λo)⁻¹ W
-        g = _project_psd(W - W @ k, W)  # symmetric PSD
-        lam = A.T @ g @ A
-        eta = A.T @ (k.T @ eo - g @ bb)
-        proper_o = _pd_ok(lo)
-        cov_o = _pd_inverse(lo)
-        mean_o = _pd_solve(lo, eo)
-        g_proper = _pd_inverse(_pd_inverse(W) + cov_o)
-        lam_proper = A.T @ g_proper @ A
-        eta_proper = A.T @ (g_proper @ (mean_o - bb))
-        lam = jnp.where(proper_o, lam_proper, lam)
-        eta = jnp.where(proper_o, eta_proper, eta)
+        # Factor Λo = BᵀB in unit-scaled coordinates. A singular likelihood
+        # contributes ordinary scalar observations on its supported directions.
+        channel, target, flat = _channel_data(eo, lo)
+        eta, lam = _observed_affine(channel, target, flat, A, bb, W)
         exact_vacuous = (lo == 0).all() & (eo == 0).all()
         lam = jnp.where(exact_vacuous, jnp.zeros_like(lam), lam)
         eta = jnp.where(exact_vacuous, jnp.zeros_like(eta), eta)
-        ok = (
-            _pd_ok(W)
-            & _psd_ok(lo)
-            & jnp.isfinite(A).all()
-            & jnp.isfinite(bb).all()
-            & jnp.isfinite(eo).all()
-        )
+        ok = _valid_affine(eo, lo, A, bb, W)
         return jnp.where(ok, eta, 0.0), jnp.where(ok, lam, 0.0)
 
     return jax.vmap(one)(eta_o, lam_o, a, b, w)
+
+
+# The eigenvector, QR and SVD bases are nonunique (e.g. an isotropic
+# likelihood). Differentiate the basis-independent Gaussian integral.
+@linear_forward.defjvp
+def _forward_jvp(primals, tangents):
+    def canonical(e, l, a, b, w):
+        cross = w @ a
+        system = cross.T @ a + l
+        # Apply the fixed-rank derivative in local units so independent
+        # coordinates survive even when their raw precisions span many decades.
+        scale = jnp.sqrt(jnp.where(jnp.diag(system) > 0, jnp.diag(system), 1.))
+        normalized = (system / scale[:, None]) / scale[None, :]
+        inverse = (_psd_pinv(normalized) / scale[:, None]) / scale[None, :]
+        gain = cross @ inverse
+        precision = w - gain @ cross.T
+        return gain @ e + precision @ b, precision
+
+    return linear_forward(*primals), jax.jvp(jax.vmap(canonical), primals, tangents)[1]
+
+
+@linear_backward.defjvp
+def _backward_jvp(primals, tangents):
+    def canonical(e, l, a, b, w):
+        gain = _pd_solve(w + l, w).T
+        precision = gain @ l
+        return a.T @ (gain @ e - precision @ b), a.T @ precision @ a
+
+    return linear_backward(*primals), jax.jvp(jax.vmap(canonical), primals, tangents)[1]
 
 
 def linear_observed_backward(y, mask, a, b, w):
