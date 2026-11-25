@@ -51,7 +51,7 @@ def marked_executors():
     return replace(SCHEDULED_EXECUTORS, discrete=discrete)
 
 
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 @pytest.mark.parametrize("mode", ["batch", "registerized", "flat"])
 def test_ordered_updates_keep_first_cause_despite_finite_messages(dtype, mode):
     arena = independent_priors()
@@ -85,7 +85,7 @@ def test_ordered_updates_keep_first_cause_despite_finite_messages(dtype, mode):
     assert_fact(reference[4], -1, FailureReason.NONE)
 
 
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 def test_real_nonlinear_cavity_reason_is_independent_in_batched_sweeps(dtype):
     template, arrays = model()
     engine = Engine(compile_template(template, arrays=arrays), schedule="flood")

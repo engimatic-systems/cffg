@@ -306,6 +306,7 @@ def test_engine_matches_d5_oracle_and_reports_bounds():
     np.testing.assert_array_equal(in_lam, 0.0)
 
 
+@pytest.mark.slow
 def test_probe_wins_only_with_regime_epistemics():
     totals = {}
     risks = {}
@@ -321,6 +322,7 @@ def test_probe_wins_only_with_regime_epistemics():
     assert risks["probe"] > risks["idle"]
 
 
+@pytest.mark.slow
 def test_mixed_and_flooding_surfaces_reach_the_same_root():
     _, template, arrays = _probe_template("probe")
     mixed_engine, mixed = _run(template, arrays, schedule="auto")
@@ -405,6 +407,7 @@ def test_improper_runtime_state_is_loud():
     assert not np.isfinite(engine.bfe(result.state))
 
 
+@pytest.mark.slow
 def test_vmap_step_matches_sequential():
     _, template, arrays = _probe_template()
     engine = Engine(compile_template(template, arrays=arrays))

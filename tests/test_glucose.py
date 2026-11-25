@@ -35,6 +35,7 @@ def test_reactive_controller_clears_fda_bound():
         assert p.time_low <= 0.10, f"{p.name} hypo time too high: {p.time_low:.1%}"
 
 
+@pytest.mark.slow
 def test_benchmark_is_nontrivial():
     """Basal-only floor: if this ever passes 70%, the scenario got too easy
     and the benchmark stopped meaning anything."""

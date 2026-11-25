@@ -62,7 +62,7 @@ def test_displaced_components_do_not_lose_selector_evidence(dtype, linear):
     assert stats.responsibility[0, 2] == 0.
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_partial_observation_at_large_dimension_matches_overlap(dtype):
     rng = np.random.default_rng(418)
     components, dimension = 32, 20
@@ -82,7 +82,7 @@ def test_partial_observation_at_large_dimension_matches_overlap(dtype):
     assert batched.valid.all()
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 @pytest.mark.parametrize("precision", [0., 1e-12, -.25])
 def test_weak_vacuous_and_integrable_negative_potentials(dtype, precision):
     eta = jnp.array([1.], dtype=dtype)
@@ -109,7 +109,7 @@ def test_singular_potential_keeps_linear_term_in_nullspace(dtype):
     assert_scores(result, expected, dtype)
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_improper_input_retains_integrable_joint_jacobian(dtype):
     convert = lambda value: jnp.asarray(value, dtype=dtype)
     args = tuple(map(convert, ([0.], [[1.]], [0.], [[0.]], [[[1.]], [[2.]]], [[0.], [0.]], [[[1.]], [[1.]]])))
@@ -194,7 +194,7 @@ def test_cavity_and_covariance_derivatives_match_direct_integral(output_precisio
     np.testing.assert_allclose(jax.jit(jax.jacrev(weights))(parameters), expected, atol=1e-12)
 
 
-@pytest.mark.parametrize("linear", [False, True])
+@pytest.mark.parametrize("linear", [pytest.param(False, marks=pytest.mark.slow), True])
 def test_node_energy_and_statistics_use_the_same_sparse_responsibilities(linear):
     means = jnp.array([[.3], [1.2], [-.4]])
     w = jnp.array([[[2.]], [[1.]], [[3.]]])

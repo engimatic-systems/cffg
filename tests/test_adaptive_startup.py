@@ -69,8 +69,8 @@ def input_blocks(engine, group, state, precisions, etas=None):
     return _replace(state, g_eta=e, g_lam=p)
 
 
-@pytest.mark.parametrize("method", ["linearization", "sigma_point"])
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("method", [pytest.param("linearization", marks=pytest.mark.slow), "sigma_point"])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_only_ready_members_evaluate_even_under_an_outer_vmap(monkeypatch, method, dtype):
     with jax.enable_x64(dtype is np.float64):
         engine, group, calls = counter_model(monkeypatch, method=method, members=2)
@@ -247,7 +247,7 @@ def test_invalid_models_fail_before_partial_input_can_wait(monkeypatch, problem,
     assert not calls
 
 
-@pytest.mark.parametrize("budget", [0, 1, 5])
+@pytest.mark.parametrize("budget", [0, pytest.param(1, marks=pytest.mark.slow), 5])
 def test_permanently_partial_input_exhausts_exactly_the_requested_budget(monkeypatch, budget):
     engine, _, calls = counter_model(monkeypatch)
     # Replace the input prior with a rank-one observation: no proper forward cavity can arrive.

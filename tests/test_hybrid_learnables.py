@@ -450,6 +450,7 @@ def test_restricted_runtime_and_public_rollover_use_declared_contract():
     )
 
 
+@pytest.mark.slow
 def test_pg_scheduled_and_flooded_statistics_produce_same_posterior():
     posteriors = []
     for schedule in ("auto", "flood"):
@@ -557,7 +558,7 @@ def test_hybrid_learning_rejects_incompatible_family_pair(builder, family, match
         compile_template(template, arrays=arrays)
 
 
-@pytest.mark.parametrize("builder", (_mixture_template, _recurrence_template))
+@pytest.mark.parametrize("builder", (pytest.param(_mixture_template, marks=pytest.mark.slow), _recurrence_template))
 def test_hybrid_learning_declaration_does_not_change_inference_or_ledger(builder):
     template, arrays, _sources = builder()
     undeclared = dataclasses.replace(template, learnables={})
@@ -575,6 +576,7 @@ def test_hybrid_learning_declaration_does_not_change_inference_or_ledger(builder
     assert left_engine.bfe(left.state) == right_engine.bfe(right.state)
 
 
+@pytest.mark.slow
 def test_component_mniw_plate_copies_pool_into_one_tied_posterior():
     fragment, arrays, _sources = _mixture_template()
     fragment.learnables["neutral_dynamics"] = dataclasses.replace(

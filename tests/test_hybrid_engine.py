@@ -367,6 +367,7 @@ def _linear_chain(mix: bool):
     return compile_template(t, arrays=arrays)
 
 
+@pytest.mark.slow
 def test_k1_reduces_to_gaussian_linear():
     eng_m, st_m = _converge(_linear_chain(mix=True))
     eng_l, st_l = _converge(_linear_chain(mix=False))

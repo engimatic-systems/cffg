@@ -11,7 +11,7 @@ from cffg.colony import Colony
 from cffg.compiled import NEG
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 @pytest.mark.parametrize("components,dimension", [(2, 3), (32, 30)])
 def test_checked_collapse_matches_independent_multidimensional_moments(dtype, components, dimension):
     rng = np.random.default_rng(11)

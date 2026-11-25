@@ -213,6 +213,7 @@ def _identity_selected(
     return out
 
 
+@pytest.mark.slow
 def test_three_block_public_api_compiles_runs_and_round_trips():
     template, arrays = build_factored_rollout(
         "three-block",

@@ -7,6 +7,7 @@ z*, and the engine's total BFE must equal J(z*) (prior node + z-edge entropy
 + composite term collapse to exactly J — derivation in ticket cff-007q).
 """
 
+import pytest
 import numpy as np
 from scipy.special import logsumexp
 
@@ -195,6 +196,7 @@ def test_raw_mu2_and_local_energy_match_independent_formula():
     )
 
 
+@pytest.mark.slow
 def test_ambiguity_aversion_and_bfe_ablation():
     """Uniform goal, uniform prior: the epistemic term alone must pull the
     agent toward the unambiguous state — and removing the single P-bead
@@ -216,6 +218,7 @@ def test_bfe_equals_local_objective_minimum():
     np.testing.assert_allclose(engine.bfe(state), j_min, atol=1e-6)
 
 
+@pytest.mark.slow
 def test_goal_seeking_with_informative_observations():
     """Biased goal + near-identity A: extrinsic value tilts the state."""
     a = np.array([[0.99, 0.01], [0.01, 0.99]])
@@ -244,6 +247,7 @@ def test_posterior_predictive_on_x():
     np.testing.assert_allclose(engine.marginals(state)["x"], A_EPI @ zbar, atol=1e-8)
 
 
+@pytest.mark.slow
 def test_learned_composite_recovers_fixed_at_high_counts():
     """Dirichlet mode with enormous counts must converge to the fixed-A
     composite: Ā → A and the closed-form E[A log A] pseudo-entropy → h(A)."""
