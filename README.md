@@ -711,6 +711,55 @@ radii, stopping decisions and root certificates. First use can take longer
 and use more memory. Adaptive Gaussian and stochastic functional updates
 use their existing solvers.
 
+### Independent CPU solves with host threads
+
+For a batch of ordinary iterative solves, you can share one warmed `Engine`
+across Python threads. Prepare an immutable `State` per member on the calling
+thread. Workers share model parameters and return separate `RunResult` objects.
+Keep any changes to Colony membership or stored states on the calling thread.
+
+```python
+from concurrent.futures import ThreadPoolExecutor
+
+import jax
+from cffg import Engine, build_gridworld, compile_template
+
+template, arrays = build_gridworld(past=1, steps=1, k=4, gfe=False)
+engine = Engine(compile_template(template, arrays=arrays))
+base = engine.init_state()
+states = [engine.bind_data(base, {"act1": 1, "obs1": cell}) for cell in range(4)]
+
+def solve(state):
+    result = engine.run(state, 120, damp=0.5, tol=1e-5)
+    jax.block_until_ready(result.state)
+    return result
+
+solve(states[0])  # Warm the executable before starting workers.
+with ThreadPoolExecutor(max_workers=4) as pool:
+    results = list(pool.map(solve, states))  # Same order as the inputs.
+posteriors = [engine.marginals(result.require_converged())["zm1"] for result in results]
+```
+
+On an Apple M2 Max CPU with JAX 0.10.2 in float64, 32 independent Hallway
+priors shared one engine for 60 damped sweeps. That benchmark used `tol=None`,
+so all 32 results reported `budget_exhausted` as expected. The medians below
+cover three warm batches per worker count.
+
+| Host workers | Wall time for all 32 | Solves/s | Member p95, excluding queue | Process peak RSS before output validation |
+|---|---:|---:|---:|---:|
+| Serial | 2.490 s | 12.9 | 79 ms | 439 MiB |
+| 4 | 0.877 s | 36.5 | 112 ms | 513 MiB |
+| 8 | 0.748 s | 42.8 | 194 ms | 512 MiB |
+
+Eight workers finished the batch 3.33× faster than serial. Going from four
+to eight gained 17% throughput while increasing time in service at p95 by
+74%. Every member's state, status and traces matched serial execution exactly
+on this workload. Time your own batch with the CPU capacity available to it.
+Host threading is opt-in. The separate 8× throughput target for `Colony.run`
+is tracked in [chr-d4dl](.tickets/chr-d4dl.md).
+
+### Custom factors, rendering, and resource estimates
+
 The custom factor API registers one ordinary single-arena factor at a time:
 
 - `DiscreteBinding` covers discrete BP/VMP with a declared potential,
