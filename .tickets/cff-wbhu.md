@@ -435,12 +435,12 @@ The exact two-pass Colony path and one-logical-iteration evidence in tests/test_
 - [x] 9.30 The benchmark reports logical iterations separately from wall time.
 - [x] 9.31 The benchmark verifies ordinary device submissions do not grow with
   the sweep budget.
-- [ ] 9.32 A 32-member deterministic mixed-GFE benchmark reports sequential and
+- [x] 9.32 A 32-member deterministic mixed-GFE benchmark reports sequential and
   batched warm wall times.
-- [ ] 9.33 The mixed-GFE benchmark reports per-member termination reasons.
-- [ ] 9.34 The mixed-GFE benchmark reports per-member outer-map evaluation
+- [x] 9.33 The mixed-GFE benchmark reports per-member termination reasons.
+- [x] 9.34 The mixed-GFE benchmark reports per-member outer-map evaluation
   counts.
-- [ ] 9.35 The handoff makes no GPU throughput claim without a measured GPU
+- [x] 9.35 The handoff makes no GPU throughput claim without a measured GPU
   result.
 
 ### 10. Change-path review, tests, and documentation cover every affected surface
@@ -883,3 +883,7 @@ Formal ordinary result at 8ae5bdb: CPU float64 on the 64 GB Apple M2 Max, JAX/ja
 **2026-11-25T06:43:58Z**
 
 Cooper’s 2026-11-24 acceptance decision supersedes the previous 1.2–1.8× reproduction and 8× closure criteria (9.2, 9.22, 10.42). The recovered historical denominator used different algorithms and work; require the actual frozen public ordinary baseline and keep it visible. Ship the truthful controller and measured absolute improvements. The 8× target was missed at 0.961× and remains an explicit P2 outcome in chr-d4dl. The existing numerical, status, fixed-point, support, FE and integrated-suite criteria continue to apply. The 32×60 ordinary run and 320×600 failure-isolation test do not substitute for the mixed-path qualifications. Close this ticket only when the parent confirms a passing integrated suite.
+
+**2026-11-25T06:46:07Z**
+
+Mixed-GFE qualification at 4528ab7 (chr-y2wk). Cooper selected explicit outer_solver="compiled_trust_region" for deterministic fixed-support models. Engine/Colony auto keeps the host trust path. Each eligible lane runs the existing trust step and receives an independent final undamped-map, support and ledger certificate; the host handles restarts, hardening, final certification and exceptional recovery. In §6.16 the cache counter records derivative-plan misses. In §6.23–24 a candidate can reject an invalid trial before terminal classification. §6.30 uses chart layout and supplies metric values at runtime. §6.42 specializes executables by phase, width and trace capacity. §6.43 describes the regular phase. Adaptive Gaussian and functional paths retain their source controllers. For §8.28, five lanes exercise unequal stops; all 32 benchmark members took eight iterations. The experiment directly supports §9.32–35 on CPU. Default/opt-in wall times for 32 distinct T-maze priors were 10.875/17.424 s cold and 2.582/0.501 s warm, with peak RSS 865/1369 MiB. All 32 reached root_converged, map counts were 41/42, maximum absolute ledger difference 5.33e-15. The 41 focused passes excluded a separately tracked pre-existing adaptive fixture (chr-odhx). Full receipts, source hashes and per-member outcomes are recorded in chr-y2wk. The ordinary P2 chr-d4dl excludes this mixed benchmark.
