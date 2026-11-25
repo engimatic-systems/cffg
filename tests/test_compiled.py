@@ -25,7 +25,8 @@ def test_compatibility_exports_have_one_owner():
         name: value for name, value in vars(compiled).items()
         if isinstance(value, type) and is_dataclass(value)
     }
-    assert len(records) == 20
+    assert len(records) == 21
+    assert records.keys() <= set(compiler.__all__)
     for name, value in records.items():
         assert getattr(compiler, name) is value
         assert value.__module__ == "cffg.compiled"
