@@ -88,6 +88,11 @@ EPIC_FILES = {
         "test_schedule_program.py",
         "test_lifecycle.py",
         "test_iteration.py",
+        "test_compiled_iteration.py",
+        "test_iteration_checks.py",
+        "test_iteration_tolerance.py",
+        "test_mixed_controller.py",
+        "test_selective_marginals.py",
         "test_run_strategies.py",
         "test_ledger.py",
         "test_readout_owners.py",
@@ -112,6 +117,11 @@ EPIC_FILES = {
         "test_edit_codec.py",
         "test_ticket_dashboard.py",
         "test_ticket_rewrite_scheduler.py",
+    ],
+    "M7 · Hierarchies": [
+        "test_hierarchy.py",
+        "test_hierarchy_checkpoint.py",
+        "test_contingent_policy.py",
     ],
     "M8 · Plotting": [
         "test_viz_diagram.py",
