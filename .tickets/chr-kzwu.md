@@ -2,7 +2,7 @@
 id: chr-kzwu
 status: closed
 deps: []
-links: []
+links: [chr-000i]
 created: 2026-11-25T06:05:31Z
 type: feature
 priority: 1
