@@ -2,24 +2,23 @@
 id: cff-wbhu
 status: in_progress
 deps: [cff-j4mu, cff-d56d, cff-44we]
-links: [cff-fxmj, cff-5edo, cff-d56d, cff-yl0a, cff-rqqc, cff-weff, cff-lv2w, cff-g7rc, cff-r6bl, cff-sf29, cff-yglj, cff-xa6z]
+links: [cff-fxmj, cff-5edo, cff-d56d, cff-yl0a, cff-rqqc, cff-weff, cff-lv2w, cff-g7rc, cff-r6bl, cff-sf29, cff-yglj, cff-xa6z, chr-d4dl]
 created: 2026-07-10T03:34:54Z
 type: feature
 priority: 2
 assignee: coopwilliams
 parent: cff-ahps
 ---
-# Colony throughput: jitted sweep loop (lax.scan) — dispatch-bound batching measured at 1.5x
+# Compile deterministic Engine and Colony sweep control
 
 ## Background in Plain English
 
-`Engine.run` performs iterative inference by calling a compiled message update
-from a Python loop. `Colony.run` stacks compatible instances and vectorizes one
-message update, but Python still launches that update and copies status data to
-the host after each sweep. A recorded CPU experiment therefore found only a
-1.5× throughput gain for 32 Colony instances even though the vectorized update
-itself worked correctly. The launch and synchronization cost, rather than the
-message arithmetic, dominated the batch.
+Before this change, ordinary Engine and Colony inference launched a scheduled
+sweep from Python, read its results and made a stopping decision on the host.
+The contemporary public-API baseline on the 32-prior Hallway benchmark measured
+6.430 s sequentially and 9.550 s grouped. The earlier 1.54× ratio came from
+a 120-sweep GFE experiment using a handwritten batched update. Both protocols
+and their distinct controls are recorded in the benchmark.
 
 Three completed prerequisites make the loop safe to compile. cff-j4mu defined
 truthful converged, budget-exhausted, diverged, and infeasible results. cff-d56d
@@ -36,9 +35,11 @@ batch should carry each member's state, trace, status, and stopping decision in
 that loop without allowing one failed or early-converged member to affect its
 peers. The fixed-support mixed-GFE controller should use the same approach
 without changing its root, support, inner-solver, or free-energy certificates.
-Public results and schedule semantics remain unchanged; the measurable outcome
-is at least an 8× warm throughput gain for the recorded 32-instance workload
-with no single-engine regression.
+Acceptance requires public numerical and status parity, device submissions
+independent of the ordinary sweep budget, measured warm improvement over the
+host controllers and no single-engine regression. Cooper assigned the remaining
+8× within-revision throughput target to the independent P2 chr-d4dl on
+2026-11-24.
 
 The exact two-pass Colony path and one-logical-iteration evidence in tests/test_exact_colony.py already cover 5.26–5.27 on their fixture. Reuse these as regression checks. The implementation target here is device-side iterative loop control and measured throughput across 32 instances.
 
@@ -370,17 +371,17 @@ The exact two-pass Colony path and one-logical-iteration evidence in tests/test_
 - [ ] 8.18 Every numeric guard added by this work derives from the active dtype.
 - [ ] 8.19 Every numeric guard added by this work names the invariant it
   protects.
-- [ ] 8.20 An uncomfortable ordinary fixture contains 320 same-structure Colony
+- [x] 8.20 An uncomfortable ordinary fixture contains 320 same-structure Colony
   instances.
-- [ ] 8.21 The uncomfortable ordinary fixture accepts a 600-sweep fixed budget.
-- [ ] 8.22 The uncomfortable ordinary fixture completes without a Python loop
+- [x] 8.21 The uncomfortable ordinary fixture accepts a 600-sweep fixed budget.
+- [x] 8.22 The uncomfortable ordinary fixture completes without a Python loop
   over its 600 sweeps.
-- [ ] 8.23 The uncomfortable ordinary fixture returns one status for each of its
+- [x] 8.23 The uncomfortable ordinary fixture returns one status for each of its
   320 instances.
-- [ ] 8.24 The uncomfortable ordinary fixture preserves instance-local states.
-- [ ] 8.25 A heterogeneous arena fixture includes categorical cardinality 32.
-- [ ] 8.26 The heterogeneous arena fixture includes Gaussian dimension 32.
-- [ ] 8.27 The heterogeneous arena fixture retains the exact segmented-state
+- [x] 8.24 The uncomfortable ordinary fixture preserves instance-local states.
+- [x] 8.25 A heterogeneous arena fixture includes categorical cardinality 32.
+- [x] 8.26 The heterogeneous arena fixture includes Gaussian dimension 32.
+- [x] 8.27 The heterogeneous arena fixture retains the exact segmented-state
   byte count supplied by cff-44we.
 - [ ] 8.28 A 32-member mixed-GFE batch permits different convergence counts
   without recompiling one kernel per member.
@@ -390,45 +391,49 @@ The exact two-pass Colony path and one-logical-iteration evidence in tests/test_
 
 ### 9. Performance evidence measures dispatch removal directly
 
-- [ ] 9.1 A committed benchmark command reproduces the ordinary 32-instance
+- [x] 9.1 A committed benchmark command reproduces the ordinary 32-instance
   Colony workload.
-- [ ] 9.2 Before implementation, that command records a warm Colony speedup
-  between 1.2× and 1.8× over sequential execution.
-- [ ] 9.3 The benchmark uses one deterministic non-GFE structure for all 32
+- [x] 9.2 Record the actual before-change public Engine/Colony ratio using the
+  frozen ordinary workload on the comparable CPU. Pristine 51ae6a7 measured
+  0.673×. The historical 1.54× GFE/raw-vmap figure has its own protocol.
+- [x] 9.3 The benchmark uses one deterministic non-GFE structure for all 32
   instances.
-- [ ] 9.4 The 32 instances carry distinct declared parameters or observations.
-- [ ] 9.5 The benchmark requests 60 fixed-budget ordinary iterative sweeps.
-- [ ] 9.6 The benchmark times 32 direct `Engine.run` calls as the sequential
+- [x] 9.4 The 32 instances carry distinct declared parameters or observations.
+- [x] 9.5 The benchmark requests 60 fixed-budget ordinary iterative sweeps.
+- [x] 9.6 The benchmark times 32 direct `Engine.run` calls as the sequential
   denominator.
-- [ ] 9.7 The benchmark times one `Colony.run` call as the batched numerator.
-- [ ] 9.8 The benchmark excludes template compilation from warm inference
+- [x] 9.7 The benchmark times one `Colony.run` call as the batched numerator.
+- [x] 9.8 The benchmark excludes template compilation from warm inference
   timing.
-- [ ] 9.9 The benchmark excludes Colony spawning from warm inference timing.
-- [ ] 9.10 The benchmark excludes data binding from warm inference timing.
-- [ ] 9.11 The benchmark excludes marginal readout from warm inference timing.
-- [ ] 9.12 Every timed device result is blocked until ready.
-- [ ] 9.13 The benchmark records the hardware identifier.
-- [ ] 9.14 The benchmark records the JAX and jaxlib versions.
-- [ ] 9.15 The benchmark records the Python version.
-- [ ] 9.16 The benchmark records the active dtype.
-- [ ] 9.17 The benchmark records the warmup count.
-- [ ] 9.18 The benchmark records the timed repetition count.
-- [ ] 9.19 The benchmark reports sequential wall time per 32-instance group.
-- [ ] 9.20 The benchmark reports Colony wall time per 32-instance group.
-- [ ] 9.21 The benchmark reports the Colony-to-sequential throughput ratio.
-- [ ] 9.22 On the recorded Apple M2 Max, 64 GB, CPU-only configuration, the warm
-  Colony throughput ratio is at least 8×.
-- [ ] 9.23 If that baseline hardware is unavailable, the handoff reports the
-  blocker instead of claiming the 8× outcome from different hardware.
-- [ ] 9.24 A paired warm benchmark shows compiled single-engine execution is no
+- [x] 9.9 The benchmark excludes Colony spawning from warm inference timing.
+- [x] 9.10 The benchmark excludes data binding from warm inference timing.
+- [x] 9.11 The benchmark excludes marginal readout from warm inference timing.
+- [x] 9.12 Every timed device result is blocked until ready.
+- [x] 9.13 The benchmark records the hardware identifier.
+- [x] 9.14 The benchmark records the JAX and jaxlib versions.
+- [x] 9.15 The benchmark records the Python version.
+- [x] 9.16 The benchmark records the active dtype.
+- [x] 9.17 The benchmark records the warmup count.
+- [x] 9.18 The benchmark records the timed repetition count.
+- [x] 9.19 The benchmark reports sequential wall time per 32-instance group.
+- [x] 9.20 The benchmark reports Colony wall time per 32-instance group.
+- [x] 9.21 The benchmark reports the Colony-to-sequential throughput ratio.
+- [x] 9.22 On the recorded 64 GB M2 Max CPU, show that compiled grouped and
+  single inference improve over their paired host-controller baselines with
+  qualified outputs. Publish the within-head grouped/sequential throughput
+  ratio. Measured 3.720× group improvement, 2.473× single improvement and
+  0.961× within-head throughput. The 8× goal remains open in chr-d4dl.
+- [x] 9.23 Identify the baseline hardware and backend or report its
+  unavailability. Both formal arms used the same M2 Max CPU in x64 mode.
+- [x] 9.24 A paired warm benchmark shows compiled single-engine execution is no
   slower than the frozen host-loop reference.
-- [ ] 9.25 The single-engine comparison uses equal initial states.
-- [ ] 9.26 The single-engine comparison uses equal run controls.
-- [ ] 9.27 The benchmark reports controller compilation time separately.
-- [ ] 9.28 The benchmark reports first-call device time separately.
-- [ ] 9.29 The benchmark reports steady-state device time separately.
-- [ ] 9.30 The benchmark reports logical iterations separately from wall time.
-- [ ] 9.31 The benchmark verifies ordinary device submissions do not grow with
+- [x] 9.25 The single-engine comparison uses equal initial states.
+- [x] 9.26 The single-engine comparison uses equal run controls.
+- [x] 9.27 The benchmark reports controller compilation time separately.
+- [x] 9.28 The benchmark reports first-call device time separately.
+- [x] 9.29 The benchmark reports steady-state device time separately.
+- [x] 9.30 The benchmark reports logical iterations separately from wall time.
+- [x] 9.31 The benchmark verifies ordinary device submissions do not grow with
   the sweep budget.
 - [ ] 9.32 A 32-member deterministic mixed-GFE benchmark reports sequential and
   batched warm wall times.
@@ -507,8 +512,9 @@ The exact two-pass Colony path and one-logical-iteration evidence in tests/test_
 - [ ] 10.40 `docs/DERIVATIONS.md` replaces its future cff-wbhu controller note
   with the delivered fixed-support carry boundary.
 - [ ] 10.41 `README.md` describes compiled per-instance Colony stopping.
-- [ ] 10.42 `docs/LIMITATIONS.md` removes the ordinary 1.5× bottleneck only after
-  the 8× gate passes.
+- [x] 10.42 `docs/LIMITATIONS.md` states the measured public-API throughput
+  and actual submission counts and distinguishes the historical protocol.
+  The unmet speed target remains visible in chr-d4dl.
 - [ ] 10.43 `docs/LIMITATIONS.md` removes the mixed-GFE per-instance host-loop
   limitation only after mixed controller batching lands.
 - [ ] 10.44 The final code change is followed by one passing default short-suite
@@ -570,12 +576,12 @@ turn the legacy Picard path into an automatic fallback.
 
 ### Benchmark asynchronous JAX honestly
 
-Commit the benchmark before replacing the loop and verify that it reproduces
-the recorded dispatch-bound range. Warm each compiled path, block the final
+Freeze the ordinary benchmark and measure the pristine implementation under
+the same public-API controls. Warm each compiled path, block the final
 device value before stopping each timer, and time inference separately from
 compile, spawn, bind, and readout. Compare one 32-member Colony group with 32
 sequential calls over equal states and controls. Report raw timings alongside
-the ratio so an 8× claim cannot hide a single-engine regression.
+the ratio to expose any single-engine regression.
 
 ### Evidence anchors and dependency state
 
@@ -596,7 +602,8 @@ the ratio so an 8× claim cannot hide a single-engine regression.
 - `tests/test_outer_gfe_formalism.py` pins single/`vmap` trust-kernel agreement
   and the complete mixed-GFE root certificate.
 - `notes/adversarial-review-2026-07-10/02-performance.txt` records the
-  32-instance 1.5× CPU result and identifies Python dispatch as one bottleneck.
+  historical 32-instance GFE/raw-vmap result. The formal ordinary public-API
+  baseline and compiled comparisons are in ordinary-comparison.json.
 - `docs/ARCHITECTURE.md` assigns both the general convergence carry and the
   mixed-GFE active-set/status carry to cff-wbhu.
 - `docs/LIMITATIONS.md` records both ordinary and mixed-GFE Colony host-control
@@ -607,7 +614,8 @@ the ratio so an 8× claim cannot hide a single-engine regression.
 - cff-weff and cff-lv2w supply the proof-backed and optimized mixed-GFE
   numerical controller.
 - cff-wbhu owns compiled deterministic Engine and Colony loop control,
-  per-instance stopping, and the 8× ordinary throughput gate.
+  per-instance stopping and the public performance evidence. chr-d4dl
+  owns further performance engineering and the 8× ordinary throughput gate.
 - cff-rqqc owns stochastic `mu3` PRNG and particle-state batching.
 - cff-yl0a owns discrete HMM `ScanStage` body fusion.
 - cff-g7rc owns remaining fixed certification and cold-compile costs for tiny
@@ -837,7 +845,7 @@ enumerated set of intended meanings in this ticket.
 - `all`: every member of the locally named configuration or diagnostic set is
   meant.
 - `any`: every input or nonconverged status inside the named boundary is meant.
-- `at_least`: the stated 8× throughput value is an inclusive lower bound.
+- `at_least`: the 8× target in chr-d4dl is an inclusive lower bound.
 - `every`: the statement applies separately to each member of the named result,
   instance, field, status, solver, or guard collection.
 - `only`: a hard semantic exclusion, temporal gate, or ticket-scope boundary is
@@ -867,3 +875,11 @@ Ordinary execution work starts on the shared hierarchical runtime branch. Archit
 **2026-11-25T06:20:15Z**
 
 Ordinary controller implementation: one XLA while loop per soft or hard phase, one vmapped controller per compatible Colony group. Retains defined energy/delta traces, first local failure, per-member counters, and immutable observations and parameters. Public max-product decoding uses rounded NumPy probabilities. A real near-tie yields a different JAX argmax in both precisions. Certify the existing public assignment objective at stationarity, including the soft/hard boundary. Stochastic functional updates retain the host controller. Support checks and tolerance comparisons have independent focused receipts in 973aa42 and 542b658. The benchmark at 0fd9588 reconstructs the ordinary 32-by-60 controls. The historical 1.54x GFE/raw-vmap experiment used 120 sweeps; it is a different denominator and does not establish the proposed ordinary gate. Mixed compiled trust control, a final multi-owner suite and formal throughput qualification are tracked separately in this ticket.
+
+**2026-11-25T06:38:59Z**
+
+Formal ordinary result at 8ae5bdb: CPU float64 on the 64 GB Apple M2 Max, JAX/jaxlib 0.10.2, one warmup and three synchronized repetitions. For 32 distinct priors and 60 damped Hallway sweeps, pristine 51ae6a7 vs compiled medians were 0.190535 vs 0.077056 s for one Engine, 6.43005 vs 2.466355 s for 32 sequential Engine runs, 9.550400 vs 2.567648 s for one Colony. Both absolute times improved. Within the new head the Colony/sequential ratio is 0.96055, so the 8x throughput gate remains OPEN. Profiler: at budgets 1 and 60, exactly 1 and 1 PJRT submissions for Engine, 15 and 15 for Colony; public state and status match, worst scaled peer message difference 5.83e-16. Incomplete cold/sequential spans are explicitly marked. Source and hardware receipts, traces, digests and paired comparisons: ~/agent-share/cffg-hierarchical-runtime/ordinary-comparison.json. Child artifacts: support 973aa42, tolerance 542b658, controller 8ae5bdb, benchmark b2bbcb3, docs 969c124, scale 7295f59. Focused results: 162 existing compatibility cases passed, 10 initial compiled parity checks passed; after extending scale, 320 public members keep independent 600-sweep histories and the K32/d32 segmented state uses exactly 10,752 bytes. The retained host iteration executes stochastic functional updates and provides independent semantic comparisons. Parent owns the integrated short suite.
+
+**2026-11-25T06:43:58Z**
+
+Cooper’s 2026-11-24 acceptance decision supersedes the previous 1.2–1.8× reproduction and 8× closure criteria (9.2, 9.22, 10.42). The recovered historical denominator used different algorithms and work; require the actual frozen public ordinary baseline and keep it visible. Ship the truthful controller and measured absolute improvements. The 8× target was missed at 0.961× and remains an explicit P2 outcome in chr-d4dl. The existing numerical, status, fixed-point, support, FE and integrated-suite criteria continue to apply. The 32×60 ordinary run and 320×600 failure-isolation test do not substitute for the mixed-path qualifications. Close this ticket only when the parent confirms a passing integrated suite.
