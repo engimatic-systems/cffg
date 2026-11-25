@@ -3708,7 +3708,7 @@ enumerates complete paths and missing emissions across successive periods in
 float32 and float64. The same file checks zero support, budgets, and a long
 float32 period with very small likelihood.
 
-## D17 — Committing to a categorical action after each reading
+## D17. Committing to a categorical action after each reading
 
 Buying a cue is valuable if the two possible readings lead to different
 subsequent choices. A policy assigns one action to each available reading

@@ -152,14 +152,14 @@ expose the specialized workflows named in the capability map.
 </details>
 
 <details>
-<summary><code>cffg.core</code> — serialized graph language (29)</summary>
+<summary><code>cffg.core</code> — serialized graph language (33)</summary>
 
 <!-- facade-core:start -->
 `FACTOR_TYPES`, `AgentSpec`, `BeliefBinding`, `BlobRef`, `BoundaryFactorization`,
 `Broadcast`, `Chain`, `ConstraintKind`, `ConstraintSpec`, `Expose`, `FactorSpec`,
-`FactorType`, `FunctionSpec`, `LearnableSpec`, `ModelError`,
+`FactorType`, `FanOut`, `ObserveInterior`, `FunctionSpec`, `LearnableSpec`, `ModelError`,
 `MomentMatchingEndpoint`, `MomentProjection`, `PlateSpec`, `PortRole`, `PortSpec`,
-`Template`, `VariableSpec`, `expand_plates`, `plate_observations`,
+`Template`, `VariableSpec`, `expand_plates`, `fan_out`, `observe_interior`, `plate_observations`,
 `migrate_moment_matching`, `moment_matching`, `moment_matching_endpoint`,
 `register_factor_type`, `validate`
 <!-- facade-core:end -->
@@ -449,7 +449,7 @@ Apple M2 Max CPU in float32, the first depth-two solve took **24.4 s** including
 JAX compilation and process peak memory was **1.64 GB**. Native preparation
 took another 0.29 s. Once warm, solving again took a median of 14.57 ms.
 Executing an already chosen branch is a lookup. See D17 in
-[the derivations](docs/DERIVATIONS.md#d17--committing-to-a-categorical-action-after-each-reading).
+[the derivations](docs/DERIVATIONS.md#d17-committing-to-a-categorical-action-after-each-reading).
 
 ## Continuous, exponential-family, and hybrid models
 
