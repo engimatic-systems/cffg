@@ -1,8 +1,8 @@
 ---
 id: cff-3kdk
-status: open
+status: closed
 deps: []
-links: [cff-d56d, cff-xa6z]
+links: [cff-d56d, cff-xa6z, chr-ozmk]
 created: 2026-07-27T05:44:29Z
 type: task
 priority: 2
@@ -95,3 +95,15 @@ Intelligible-ticket review: complete.
 **2026-09-25T03:47:40Z**
 
 PCGym follow-up under cff-xa6z: use the Runtime numerical or status invariant change-path row for posterior readout semantics. Current owners are src/cffg/readouts/gaussian.py and categorical readout adapters behind Engine; older compiler.py references above describe the historical benchmark, not a mandate to restore old ownership. Added selective-edge acceptance because control needs only one action edge. No dependency on the new controller is required; cff-wt1c consumes this result. Existing scalar oracle, hostile cases and <=0.1 latency target remain unchanged.
+
+**2026-11-25T06:13:55Z**
+
+Runtime numerical or status invariant row. Engine reads one synchronized State. The same host readout serves flood, scheduled and Colony callers. Each requested cardinality or dimension gets one slot gather and batched posterior calculation. Check exact categorical zero support (including the finite NEG sentinel), Gaussian input and post-cast covariance guards, output dtype, selected-only work and 256-step size. No stored fields change. Parent owns the integrated short suite, dashboard and shared docs.
+
+**2026-11-25T06:32:31Z**
+
+Source 9da2f7a. Apple M2 Max CPU, JAX x64, NumPy host, single BLAS thread; 5 warmups and 40 timer samples per arm, interleaved in seed-314159 permutations, identical converged states. Whole public call returns host arrays/dictionary before timer stop. Legacy scalar call restored from 51ae6a7. T256 d2/m1 (1,022 edges) medians 56.169 -> 1.718 ms (32.69x; new/old 0.0306). The current scheduling fixture d4/m2 gave 57.607 -> 2.587 ms (22.27x). All corresponding outputs bit-identical. P4/H15 full median 4.401 -> 0.439 ms, chosen s4 subset 0.072 ms (160 B vs 10,432 B full payload). Existing single-edge API 0.061 -> 0.070 ms. JAX native trace: zero executable launches for every readout, one for the calibrated JIT control. Host transfers synchronize the input; on accelerators the API still materializes flat input buffers on the host. No persisted state or template changes for readouts. Raw samples, quartiles, trace and reproduction script: ~/agent-share/cffg-hierarchical-runtime/readouts/timing.json and measure.py. Original d2 vs corrected d4 protocol details are in linked cff-d56d.
+
+**2026-11-25T06:56:41Z**
+
+Closed after the original 256-step RTS oracle passed unchanged with the separate affine-rule fix 20e2f5a. The selected-edge suite passed together with all Gaussian rule and 32-state tests (37 checks). Native readouts remain at 9da2f7a; the Gaussian tap extension ffaf1b9 returns zero covariance on observed equality copies. Parent owns the integrated short gate.
