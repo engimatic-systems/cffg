@@ -40,7 +40,7 @@ def chain_reference(model, grid):
         })
 
 
-def timings(build_model, protocol, counts, pixels, balanced, width, sample_count):
+def timings(build_model, protocol, counts, pixels, balanced, width, sample_count, out):
     start = perf_counter()
     model = build_model()
     if not balanced:
@@ -68,6 +68,8 @@ def timings(build_model, protocol, counts, pixels, balanced, width, sample_count
     references = softmax(expected_log[np.arange(len(indices)), records].sum(axis=1), axis=1)
     setup_s = perf_counter() - start
 
+    out.update(width=width, setup_s=setup_s, warm=[])
+
     def measure(ids):
         start = perf_counter()
         for i, image in enumerate(ids):
@@ -83,22 +85,33 @@ def timings(build_model, protocol, counts, pixels, balanced, width, sample_count
         iterations = []
         for i in range(width):
             result = results[i]
-            verified = result.require_converged()
+            try:
+                verified = result.require_converged()
+            except RuntimeError:
+                out['failed_measurement'] = dict(
+                    first_image=int(ids[0]), last_image=int(ids[-1]),
+                    wall_s=perf_counter()-start, inference_s=infer_done-infer_start,
+                    statuses=[r.status.value for r in results.values()],
+                    sweeps=[int(r.iterations) for r in results.values()],
+                )
+                raise
             marginals.append(eng.marginals(verified, edges=['head/zc'])['head/zc'])
             iterations.append(int(result.iterations))
         end = perf_counter()
         error = float(np.max(np.abs(marginals - references[ids])))
-        if error > 1e-8:
+        record = dict(wall_s=end-start, inference_s=infer_done-infer_start, sweeps=iterations,
+                      abs_posterior_error=error if np.isfinite(error) else None)
+        if not np.isfinite(error) or error > 1e-8:
+            out['failed_measurement'] = dict(record, first_image=int(ids[0]), last_image=int(ids[-1]))
             raise ArithmeticError(f'Broadcast posterior error {error} on images {ids[0]}–{ids[-1]}')
-        return dict(wall_s=end-start, inference_s=infer_done-infer_start,
-                    sweeps=iterations, abs_posterior_error=error)
+        return record
 
-    cold = measure(np.arange(width))
-    measurements = [measure(np.arange(i, i+width)) for i in range(0,sample_count,width)]
-    return dict(width=width, setup_s=setup_s, first=cold, warm=measurements,
-                warm_images_s=sample_count/sum(x['wall_s'] for x in measurements),
-                warm_s_per_group_sweep=sum(x['inference_s'] for x in measurements)/
-                sum(max(x['sweeps']) for x in measurements))
+    out['first'] = measure(np.arange(width))
+    for i in range(0, sample_count, width):
+        out['warm'].append(measure(np.arange(i, i+width)))
+    out['warm_images_s'] = sample_count/sum(x['wall_s'] for x in out['warm'])
+    out['warm_s_per_group_sweep'] = (sum(x['inference_s'] for x in out['warm']) /
+                                     sum(max(x['sweeps']) for x in out['warm']))
 
 
 def sizes(build_model, balanced):
@@ -132,20 +145,54 @@ def main():
     report = dict(hardware=platform.uname()._asdict(), jax=jax.__version__,
                   jaxlib=jaxlib.__version__, backend=jax.default_backend(),
                   protocol=protocol, arms={})
+    if args.output.exists():
+        raise FileExistsError(f'Choose a fresh output path: {args.output}')
+
+    def publish():
+        temp = args.output.with_suffix(args.output.suffix + '.partial')
+        temp.write_text(json.dumps(report, indent=2, allow_nan=False)+'\n')
+        temp.replace(args.output)
+
+    report['status'] = 'running'
+    publish()
     for topology in ('chain','balanced'):
         balanced = topology == 'balanced'
-        b = protocol['batch']['width']
-        report['arms'][topology] = dict(
-            single=timings(build_model,protocol,counts,pixels,balanced,1,protocol['single']['images']),
-            batch=timings(build_model,protocol,counts,pixels,balanced,b,b*protocol['batch']['timed_batches']),
-            scale=sizes(build_model,balanced))
-        args.output.write_text(json.dumps(report,indent=2,allow_nan=False)+'\n')
-    old,new = report['arms'].values()
-    assert new['scale'] == old['scale']
+        arm = report['arms'][topology] = {}
+        for mode in ('single', 'batch', 'scale'):
+            phase = arm[mode] = {}
+            try:
+                if mode == 'scale':
+                    phase.update(sizes(build_model, balanced))
+                elif mode == 'single':
+                    timings(build_model,protocol,counts,pixels,balanced,1,protocol['single']['images'],phase)
+                else:
+                    width = protocol['batch']['width']
+                    timings(build_model,protocol,counts,pixels,balanced,width,
+                            width*protocol['batch']['timed_batches'],phase)
+                phase['status'] = 'complete'
+            except Exception as exc:
+                phase.update(status='failed', error=f'{type(exc).__name__}: {exc}')
+                print(f'{topology} {mode}: {phase["error"]}', file=sys.stderr, flush=True)
+            finally:
+                publish()
+
+    old, new = report['arms'].values()
+    gates = {'all_phases_complete': all(phase['status'] == 'complete'
+                                        for arm in (old, new) for phase in arm.values())}
+    if old['scale']['status'] == new['scale']['status'] == 'complete':
+        gates['same_784_sizes'] = old['scale'] == new['scale']
     for mode in ('single','batch'):
-        assert new[mode]['warm_images_s'] >= protocol['min_balanced_images_per_second_single_and_batch']
-        assert np.mean([s for rec in new[mode]['warm'] for s in rec['sweeps']]) < np.mean(
-            [s for rec in old[mode]['warm'] for s in rec['sweeps']])
+        if new[mode]['status'] == 'complete':
+            gates[f'{mode}_throughput'] = (
+                new[mode]['warm_images_s'] >= protocol['min_balanced_images_per_second_single_and_batch'])
+        if old[mode]['status'] == new[mode]['status'] == 'complete':
+            def mean_sweeps(arm):
+                return np.mean([s for rec in arm[mode]['warm'] for s in rec['sweeps']])
+            gates[f'{mode}_fewer_sweeps'] = bool(mean_sweeps(new) < mean_sweeps(old))
+    report.update(gates=gates, status='passed' if all(gates.values()) else 'failed')
+    publish()
+    if report['status'] != 'passed':
+        raise SystemExit(1)
 
 
 if __name__ == '__main__':
