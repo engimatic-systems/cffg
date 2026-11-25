@@ -17,6 +17,8 @@ def check_view(page, root, study, mobile):
               + "?case=aliased&phase=navigation&policy=split&route=amber-to-blue&step=2#replay")
     ui = page.locator
     expect(ui("#error")).to_be_hidden()
+    expect(page.get_by_role("heading", name="What should the traveler remember?")).to_be_attached()
+    expect(ui(".intro ol li")).to_have_count(3)
     expect(ui("#route")).to_have_value("amber-to-blue")
     expect(ui("#policy")).to_have_value("split")
     expect(ui("#scrub")).to_have_value("2")
@@ -61,7 +63,7 @@ def check_view(page, root, study, mobile):
         ui("#scrub").focus()
         page.keyboard.press("End")
         expect(ui("#step")).to_have_text(f"{len(tape['steps'])} / {len(tape['steps'])}")
-        expect(ui("#outcome")).to_contain_text("Goal reached" if tape["success"] else "Goal unreached")
+        expect(ui("#outcome")).to_contain_text("Goal reached" if tape["success"] else "Move limit reached")
         expect(ui("#readings dd").first).to_have_text(tape["steps"][-1]["next_symbol"])
 
     ui("#phase").select_option("fit")
