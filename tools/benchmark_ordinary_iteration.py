@@ -136,7 +136,7 @@ def trace_metrics(directory, *, require_complete):
 
     def during(frame, name):
         return [span for span in spans if span["name"] == name
-                and frame["ts"] <= span["ts"] <= frame["ts"] + frame["dur"]]
+                and frame["ts"] <= span["ts"] < frame["ts"] + frame["dur"]]
 
     complete = len(bodies) == len(ends) == 1 and len(during(ends[0], CPU_DISPATCH)) == 1
     executions = during(bodies[0], CPU_DISPATCH) if complete else []
@@ -306,7 +306,7 @@ def worker(arm, output, warmup, repetitions, trace_budget):
             reset()
             run(budget)  # warm each static budget before counting
         reset()
-        elapsed, profiled, counts = profile(jax, lambda: run(budget), probe)
+        elapsed, profiled, counts = profile(jax, lambda: run(budget), probe, require_complete=False)
         results_record(profiled, budget)
         submissions[str(budget)] = {**counts, "profiled_wall_s": elapsed}
 
@@ -367,6 +367,12 @@ def compare(before, after):
             "single_no_slower_than_frozen_host": output["single_warm_speedup"] >= 1.}
 
 
+def submission_parity(traces):
+    if not all(trace["complete"] for trace in traces.values()):
+        return None
+    return len({trace["cpu_executable_submissions"] for trace in traces.values()}) == 1
+
+
 def run_study(args):
     import numpy as np
     repo = args.checkout.resolve()
@@ -419,9 +425,8 @@ def run_study(args):
         "submission_trace_budgets": [1, args.trace_budget],
         "cold_timing_boundary": "first public 60-sweep call with host profiler and compile logging enabled",
         "warm_timing_boundary": "synchronized public inference from initial states with no instrumentation",
-        "submissions_independent_of_budget": {arm: (a["submissions_by_sweep_budget"]["1"]["cpu_executable_submissions"]
-            == a["submissions_by_sweep_budget"][str(args.trace_budget)]["cpu_executable_submissions"])
-            for arm, a in arms.items()},
+        "submissions_independent_of_budget": {arm: submission_parity(a["submissions_by_sweep_budget"])
+                                               for arm, a in arms.items()},
     }
     if args.baseline is not None:
         report["paired_revision_comparison"] = compare(json.loads(args.baseline.read_text()), report)
