@@ -145,3 +145,52 @@ def test_shape_segmented_arenas_are_exact_at_hostile_scale_and_survive_float32()
         assert bool(jnp.isfinite(leaf).all())
         if jnp.issubdtype(leaf.dtype, jnp.floating):
             assert leaf.dtype == jnp.float32
+
+
+def test_estimator_analyzes_the_real_cpu_sweep_and_cost_contract():
+    from cffg.resource_analysis import cost_values
+    engine = make_engine()
+    result = estimate(engine, calibrate=False)
+    sweep = result.executables["flooding_step"]
+    if sweep["backend"] == "cpu":
+        assert sweep["cost"]["flops"] > 0
+        assert sweep["cost"]["bytes accessed"] > 0
+        memory = sweep["memory_bytes"]["device"]
+        assert memory["planned_peak"] == memory["argument"] + memory["output"] - memory["alias"] + memory["temp"]
+    good = {"flops": 2., "bytes accessed": 16.}
+    for data in (good, [good], (good,)):
+        assert cost_values(data) == good
+    for bad in ({}, {"flops": np.nan, "bytes accessed": 0.}, [{"flops": 0}]):
+        with pytest.raises(ValueError):
+            cost_values(bad)
+
+
+def test_state_storage_validates_batch_before_allocation():
+    from cffg.resource_analysis import state_storage
+    state = make_engine().init_state()
+    single = state_storage(state)
+    report = state_storage(state, 128)
+    assert report["state_bytes"] == 128 * single["state_bytes"]
+    assert sum(report["parameter_leaves"].values()) == 128 * single["parameter_bytes"]
+    assert report["batch_size"] == 128
+    with pytest.raises(ValueError, match="at least one"):
+        state_storage(jax.tree.map(lambda x: jnp.broadcast_to(x, (0, *x.shape)), state))
+    for bad in (0, -5):
+        with pytest.raises(ValueError):
+            state_storage(state, bad)
+    with pytest.raises(OverflowError, match="Batch size.*overflows"):
+        state_storage(state, 2**63)
+
+
+def test_gaussian_scheduled_resources_include_the_exact_unit():
+    from cffg.models.kalman import lgssm
+    template, arrays = lgssm(2, np.eye(1), np.eye(1), np.eye(1), np.eye(1), np.zeros(1), np.eye(1))
+    engine = Engine(compile_template(template, arrays=arrays))
+    result = estimate(engine, sample_iters=2)
+    assert result.executables["two_pass_exact"]["cost"]["bytes accessed"] > 0
+    assert result.executables["two_pass_exact"]["first_execution_seconds"] >= 0
+    assert result.calibration["execution"] == "single"
+    assert result.prediction_unit == "two_pass"
+    assert result.calibration["executed_units"] == 1
+    assert len(result.calibration["warm_seconds"]) >= 5
+    assert result.predict_seconds(99) is None
