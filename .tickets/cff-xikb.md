@@ -1,6 +1,6 @@
 ---
 id: cff-xikb
-status: open
+status: closed
 deps: [cff-cz82, cff-7noc, cff-w551, cff-5mf2, cff-fw2v]
 links: [cff-0266]
 created: 2026-11-26T19:44:48Z
@@ -54,3 +54,7 @@ cff-j7mm estimator repair (existing, ready) --> cff-5mf2   |
                                                           +--> cff-xikb
 
 Verified with tk dep tree --full cff-xikb, tk ready, tk blocked and tk dep cycle. First reviewable workflow: create an rSLDS from the remote browser, reopen it and have an independent agent retrieve the same revision. The proposal is at docs/todo-notes/cffg-studio.md. Retire the note when the epic lands.
+
+**2026-11-26T21:13:28Z**
+
+The private workstation is deployed and agent-share launches it. The model library contains a blank starter, linear Gaussian tracker and rSLDS. README.md documents the owner experience, agent transactions and host installation. ARCHITECTURE.md records the workstation and resource contracts. The proposal todo note has been retired. Production generation, deterministic simulation and profile/replay succeeded. The dashboard-backed default run at 943f8be passed 2762 tests, 335 opt-in deselected. Measured wall 1231.168s. Two Git integration scenarios measured 19.916s and 14.606s; moving those passing scenarios to the opt-in slow suite gives estimated default wall 1196.646s. Both remain available with uv run --extra studio pytest -m slow tests/test_studio.py. Selection-only changes reuse this passing result. No outstanding deployment step.

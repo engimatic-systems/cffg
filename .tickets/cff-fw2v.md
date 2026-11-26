@@ -1,6 +1,6 @@
 ---
 id: cff-fw2v
-status: open
+status: closed
 deps: [cff-djod]
 links: []
 created: 2026-11-26T19:44:49Z
@@ -34,3 +34,9 @@ No further simulator work is required by this proposal.
 ## Definitions
 
 An observation contract defines the data a model accepts. Ground truth means the simulator's hidden state, retained separately for evaluation.
+
+## Notes
+
+**2026-11-26T21:13:28Z**
+
+Shipped structured model-conditioned simulator generation, editable source and a pinned no-network, read-only Docker/Colima NumPy runner. The live provider authored switching sensor dynamics against DATA ports y0,y1,y2. Two isolated runs at seed 7 produced equal observations plus hidden position and regime, and subsequent profile and replay had identical posterior beliefs. Production job e784def0b24042488f2c67895872ff83 preserves source and contract. Tape 8c9c534f246149e19f93989c90eeec81 can be reused from Runs. The model remains unchanged when generation, binding or execution fails.

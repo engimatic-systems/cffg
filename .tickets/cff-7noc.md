@@ -1,6 +1,6 @@
 ---
 id: cff-7noc
-status: open
+status: closed
 deps: [cff-x6c0]
 links: []
 created: 2026-11-26T19:44:48Z
@@ -33,3 +33,9 @@ The keyboard editor consumes the same review protocol and the simulator can link
 ## Definitions
 
 An anchor identifies an element and the revision under discussion. A cursor is the last event a client received.
+
+## Notes
+
+**2026-11-26T21:13:28Z**
+
+Shipped scoped credentials, OpenAPI and the cffg-studio CLI. Reviews and proposals carry author, stable anchor, base, replies and resolution. Review of a changed model requires a fresh digest and compile validation. Independent API users created a critique, replied, proposed, previewed and accepted the fix while preserving learner values. History and SSE replayed missed revisions on reconnect. CLI workflow and token issuance/revocation are in README.md. Verification includes tests/test_studio.py and the two-client HTTP acceptance run.

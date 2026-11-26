@@ -1,6 +1,6 @@
 ---
 id: cff-7piw
-status: open
+status: closed
 deps: [cff-0266]
 links: []
 created: 2026-11-26T19:44:48Z
@@ -34,3 +34,9 @@ Expose the accepted commands through Studio menus, the keyboard palette and the 
 ## Definitions
 
 An initializer supplies parameter values. A prior records starting learning information and a posterior records updated information. An rSLDS is a recurrent switching linear dynamical system.
+
+## Notes
+
+**2026-11-26T21:13:28Z**
+
+Shipped typed transactions for rename, dimension propagation, shared parameter initialization, explicit coordinate maps and learning-state reset/replacement. Native rSLDS import recovers the canonical tied roles. Browser/API previews show names, shapes, consumers and learner changes. Validated K=2→3 and an observation dimension of 1→2, rectangular covariance, EF action JSON and annotated compact plates with distinct per-copy values. Unsupported learner mappings require an explicit state/bundle. See tests/test_studio.py and tests/test_edit_codec.py.

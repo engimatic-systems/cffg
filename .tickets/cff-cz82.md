@@ -1,6 +1,6 @@
 ---
 id: cff-cz82
-status: open
+status: closed
 deps: [cff-x6c0, cff-7piw]
 links: [cff-9bex]
 created: 2026-11-26T19:44:48Z
@@ -34,3 +34,9 @@ Agent review and live runs use the same panels, revision identities and command 
 ## Definitions
 
 Forney notation draws variables as wires. A plate represents repeated structure. An inspector edits the selected item's properties.
+
+## Notes
+
+**2026-11-26T21:13:28Z**
+
+Shipped keyboard commands, editable keymap, outline, scoped plate navigation, grid offsets, command search and accessible diagram semantics. Chrome browser smoke covered creation, F2 rename, note, save/export/reopen, invalid edit rejection, run, stepping, profiling and responsive 1440×900 and 390px layouts. The full private HTTPS launcher also opened the real rSLDS and its measurements. Research: how do dense scientific graphs behave under pan and zoom? On the M2 Max, Chromium 153, 891×530 viewport, 5,000 factors + 5,000 wires (1,012–1,128 in view), the high-resolution local p95 was 16.67ms for both gestures. Default timer read 16.7 and 16.8ms. Keyboard p95: palette 33.2ms, outline 34.2ms, selection 28.3ms. Dense low-zoom views keep selected labels. Evidence: graph.js, browser-perf-high-resolution.json and browser-perf-final-chrome.json in /tmp/cffg-studio-qa. High confidence on this client; transport latency varies.

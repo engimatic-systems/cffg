@@ -1,6 +1,6 @@
 ---
 id: cff-x6c0
-status: open
+status: closed
 deps: [cff-0266]
 links: [cff-1xig, cff-gnpn]
 created: 2026-11-26T19:44:48Z
@@ -34,3 +34,9 @@ The Studio editor, collaboration, search and experiment tickets consume this API
 ## Definitions
 
 An API is the programmatic interface. A bundle is a portable .cffgz archive. A base revision identifies the exact model an edit started from.
+
+## Notes
+
+**2026-11-26T21:13:28Z**
+
+Landed the private bare Git library with compiler-checked atomic publication, conditional revisions, retry receipts and portable native/Studio exports. HTTP clients independently exercised preview, invalid shape, stale revision, retry and export/import of all four rSLDS learner priors and posteriors. Source: tests/test_studio.py, src/cffg/studio/library.py, and the real two-client acceptance run. Concurrent writers observed one 200 and one 409. Large-array Git LFS checkout, hydration and export were exercised separately. The central repository is on the Studio host at ~/projects/cffg-models. New writes go through /v1/models. High confidence.
