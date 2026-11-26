@@ -60,14 +60,14 @@ def render_svg(
 
 
 def build_scene(
-    template: Template, *, level: int = FULL_COMPRESSION, style: LayoutStyle = LayoutStyle()
+    template: Template, *, level: int = FULL_COMPRESSION, style: LayoutStyle = LayoutStyle(), offsets=None
 ) -> Scene:
     """Lay out a Template; use to_svg to serialize the resulting Scene."""
     if not isinstance(template, Template):
         raise TypeError("build_scene expects a Template; use to_svg(scene) for a Scene")
     diagram = derive(template)
     if diagram.nodes:
-        scene = layout(diagram, present(diagram, level), style)
+        scene = layout(diagram, present(diagram, level), style, offsets=offsets)
     else:  # a pure plate host has no top-level factors to lay out
         m = style.margin
         scene = Scene(name=template.name, width=2 * m, height=2 * m, items=[])

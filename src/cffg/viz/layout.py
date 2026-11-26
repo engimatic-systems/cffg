@@ -77,12 +77,12 @@ def natural_key(value: str) -> tuple[object, ...]:
 
 
 def layout(
-    diagram: Diagram, presentation: Presentation, style: LayoutStyle = LayoutStyle()
+    diagram: Diagram, presentation: Presentation, style: LayoutStyle = LayoutStyle(), *, offsets=None
 ) -> Scene:
     components = _component_diagrams(diagram)
     if not components:
         return _framed(diagram.name, [], style)
-    scenes = [_layout_connected(component, presentation, style) for component in components]
+    scenes = [_layout_connected(component, presentation, style, offsets) for component in components]
     if len(scenes) == 1:
         return scenes[0]
     items = []
@@ -93,8 +93,13 @@ def layout(
     return Scene(diagram.name, max(scene.width for scene in scenes), height, items)
 
 
-def _layout_connected(diagram, presentation, style) -> Scene:
+def _layout_connected(diagram, presentation, style, offsets=None) -> Scene:
     grid, rail = _place_factors(diagram)
+    if offsets:
+        grid = {name: (x + offsets.get(name, (0, 0))[0], y + offsets.get(name, (0, 0))[1])
+                for name, (x, y) in grid.items()}
+        if len(set(grid.values())) != len(grid):
+            raise ValueError("Another factor occupies that grid cell")
     sides = _assign_sides(diagram, grid, rail)
     return _emit(diagram, presentation, style, grid, sides)
 
