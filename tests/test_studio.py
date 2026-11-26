@@ -227,6 +227,9 @@ def test_discovery_reconciles_root_change_and_same_mtime_rewrite(tmp_path, monke
         save(first / f"{i}.cffg", "A match")
     sample = second / "example.cffg"
     save(sample, "Z match")
+    bundled = starter("kalman", "Spring tracker")
+    embedded = first / "unrelated-filename.cffgstudio"
+    embedded.write_bytes(bundled.project(bundled.certify()))
     service = Discovery(state, [first, second])
 
     def idle():
@@ -235,6 +238,7 @@ def test_discovery_reconciles_root_change_and_same_mtime_rewrite(tmp_path, monke
         assert service.error is None
 
     idle()
+    assert service.find("Spring")[0]["name"] == "Spring tracker"
     old = sample.stat()
     save(sample, "X match")
     os.utime(sample, ns=(old.st_atime_ns, old.st_mtime_ns))

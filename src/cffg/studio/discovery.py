@@ -10,7 +10,7 @@ from time import time
 from zipfile import ZipFile
 
 from cffg.core.plates import expand_plates
-from cffg.core.serialize import from_dict
+from cffg.core.serialize import SCHEMA_VERSION, from_dict
 from cffg.resolution.sources import _load_blob, resolve_arrays
 from .jobs import write
 from .models import Document, MAX_ARCHIVE_BYTES
@@ -22,6 +22,17 @@ def file_digest(path):
 
     with path.open("rb") as f:
         return hashlib.file_digest(f, "sha256").hexdigest()
+
+
+def bundle_header(file):
+    with ZipFile(file) as archive:
+        model = archive.getinfo("model.json")
+        manifest = archive.getinfo("manifest.json")
+        if max(model.file_size, manifest.file_size) > 8 * 1024 * 1024:
+            raise ValueError("Model header exceeds index size limit")
+        return json.loads(archive.read(model)), json.loads(archive.read(manifest)).get(
+            "schema_version"
+        )
 
 
 class Discovery:
@@ -126,7 +137,7 @@ class Discovery:
                                 st = p.stat()
                                 if st.st_size > MAX_ARCHIVE_BYTES:
                                     continue
-                                stamp = f"{st.st_mtime_ns}:{st.st_ctime_ns}"
+                                stamp = f"2:{st.st_mtime_ns}:{st.st_ctime_ns}"
                                 old = db.execute(
                                     "SELECT stamp,size FROM files WHERE path=?",
                                     (str(p),),
@@ -144,36 +155,29 @@ class Discovery:
                                     continue
                                 fmt = "Template JSON"
                                 diagnostic = ""
-                                if p.suffix.lower() == ".cffgstudio":
-                                    fmt = "Studio project"
-                                    with ZipFile(p) as project:
-                                        if "model.cffgz" not in project.namelist():
-                                            continue
-                                    obj = {
-                                        "name": p.stem,
-                                        "schema_version": 1,
-                                        "variables": {},
-                                        "factors": {},
-                                    }
-                                elif p.suffix.lower() == ".cffgz":
-                                    with ZipFile(p) as z:
-                                        row = z.getinfo("model.json")
-                                        if row.file_size > 8 * 1024 * 1024:
-                                            continue
-                                        obj = json.loads(z.read(row))
-                                        manifest = z.getinfo("manifest.json")
-                                        if manifest.file_size > 8 * 1024 * 1024:
-                                            continue
-                                        version = json.loads(z.read(manifest)).get(
-                                            "schema_version"
-                                        )
+                                if p.suffix.lower() in (".cffgstudio", ".cffgz"):
+                                    if p.suffix.lower() == ".cffgstudio":
+                                        fmt = "Studio project"
+                                        with ZipFile(p) as project:
+                                            nested = project.getinfo("model.cffgz")
+                                            if nested.file_size > MAX_ARCHIVE_BYTES:
+                                                continue
+                                            with project.open(nested) as file:
+                                                obj, version = bundle_header(file)
+                                    else:
+                                        obj, version = bundle_header(p)
                                         fmt = f"Bundle v{version}"
-                                        if version != BUNDLE_SCHEMA_VERSION:
-                                            diagnostic = f"Requires bundle schema {BUNDLE_SCHEMA_VERSION}; found {version}"
+                                    if version != BUNDLE_SCHEMA_VERSION:
+                                        diagnostic = f"Requires bundle schema {BUNDLE_SCHEMA_VERSION}; found {version}"
                                 else:
                                     if st.st_size > 8 * 1024 * 1024:
                                         continue
                                     obj = json.loads(p.read_bytes())
+                                    if (
+                                        isinstance(obj, dict)
+                                        and obj.get("schema_version") != SCHEMA_VERSION
+                                    ):
+                                        diagnostic = f"Requires template schema {SCHEMA_VERSION}; found {obj.get('schema_version')}"
                                 if (
                                     not isinstance(obj, dict)
                                     or not {
