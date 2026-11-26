@@ -64,6 +64,7 @@ def test_map_latent_coordinates_and_keep_rectangular_noise_proper():
     Document.load(d.certify())
 
 
+@pytest.mark.slow
 def test_studio_head_is_atomic_and_request_retry_returns_original_revision(tmp_path):
     library = Library(tmp_path / "models")
     saved = library.create(starter("blank", "Blank"), "Alice")
@@ -122,6 +123,7 @@ def test_project_exchange_preserves_review_anchor_after_rename():
         assert "studio.json" not in z.namelist()
 
 
+@pytest.mark.slow
 def test_studio_api_rejects_stale_agent_and_replays_model_history(tmp_path):
     pytest.importorskip("fastapi")
     pytest.importorskip("httpx")
