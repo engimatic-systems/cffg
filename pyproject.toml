@@ -14,6 +14,9 @@ dependencies = [
     "safetensors>=0.8.0",
 ]
 
+[project.scripts]
+cffg-studio = "cffg.studio.cli:main"
+
 [project.optional-dependencies]
 viz = [
     "cairosvg>=2.9.0",

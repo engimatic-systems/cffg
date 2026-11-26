@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>CFFG Studio</title>
+  <link rel="stylesheet" href="/static/studio.css">
+  <script type="module" src="/static/studio.js"></script>
+</head>
+<body>
+  <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-brand" viewBox="0 0 32 32"><path fill="currentColor" d="M3 3h15v5H8v10H3zm11 26v-5h10V14h5v15z"/><path fill="currentColor" d="M13 13h7v7h-7z"/></symbol>
+    <symbol id="i-command" viewBox="0 0 24 24"><path d="M8 8H5.5A2.5 2.5 0 1 1 8 5.5V18.5A2.5 2.5 0 1 1 5.5 16H18.5A2.5 2.5 0 1 1 16 18.5V5.5A2.5 2.5 0 1 1 18.5 8Z"/></symbol>
+    <symbol id="i-keys" viewBox="0 0 24 24"><rect x="2.5" y="5.5" width="19" height="13" rx="2"/><path d="M6 9h1m3 0h1m3 0h1m3 0h.1M6 12h1m3 0h1m3 0h1m3 0h.1M8 15h8"/></symbol>
+    <symbol id="i-new" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-open" viewBox="0 0 24 24"><path d="M3 18V6a1 1 0 0 1 1-1h5l2 3h8v3M3 19l3-8h16l-3 8z"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M4 4h13l3 3v13H4zM8 4v6h8V4M8 20v-7h8v7"/></symbol>
+    <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 15V3m-4 4 4-4 4 4M5 13v7h14v-7"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="m9 5-5 5 5 5M5 10h8a6 6 0 0 1 6 6v2"/></symbol>
+    <symbol id="i-redo" viewBox="0 0 24 24"><path d="m15 5 5 5-5 5m4-5h-8a6 6 0 0 0-6 6v2"/></symbol>
+    <symbol id="i-run" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M6 3.8a.8.8 0 0 1 1.2-.7l13 8.2a.8.8 0 0 1 0 1.4l-13 8.2A.8.8 0 0 1 6 20.2z"/></symbol>
+    <symbol id="i-library" viewBox="0 0 24 24"><path d="M4 5v14m4-14v14m4-14v14m3-13 4 13"/></symbol>
+    <symbol id="i-outline" viewBox="0 0 24 24"><path d="M5 4v14h6M5 9h6"/><rect x="12" y="6" width="7" height="5" rx=".6"/><rect x="12" y="16" width="7" height="5" rx=".6"/></symbol>
+    <symbol id="i-graph" viewBox="0 0 24 24"><path d="M2 7h5m6 0h4v10h5M4 17h5"/><rect x="7" y="4" width="6" height="6"/><circle cx="12" cy="17" r="3"/><path d="M15 17h2"/></symbol>
+    <symbol id="i-inspector" viewBox="0 0 24 24"><path d="M4 7h5m5 0h6M4 17h9m5 0h2"/><circle cx="11.5" cy="7" r="2.5"/><circle cx="15.5" cy="17" r="2.5"/></symbol>
+    <symbol id="i-annotate" viewBox="0 0 24 24"><path d="M4 4h16v12H9l-5 4zM8 8h8m-8 4h5"/></symbol>
+    <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5m6 0h5v5m0 6v5h-5m-6 0H4v-5"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 10a9 9 0 1 1 1.5 7M3.3 4.4 3 10l5.5-.6M12 7v5l3 2"/></symbol>
+    <symbol id="i-critiques" viewBox="0 0 24 24"><path d="M3 4h14v10H8l-5 4zm7 13h6l5 3V9"/></symbol>
+    <symbol id="i-profile" viewBox="0 0 24 24"><path d="M3 18h18M5 15v-4m5 4V5m5 10V8m5 7v-3"/></symbol>
+    <symbol id="i-simulator" viewBox="0 0 24 24"><path d="M2 15h4l3-10 5 15 3-10 2 5h3"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="m14.5 14.5 5 5"/></symbol>
+    <symbol id="i-activity" viewBox="0 0 24 24"><path d="m4 7 5 5-5 5m8 0h8"/></symbol>
+  </svg>
+
+  <header class="app-bar">
+    <div class="brand">
+      <svg class="brand-mark" aria-hidden="true"><use href="#i-brand"/></svg>
+      <h1>CFFG <span>Studio</span></h1>
+    </div>
+    <button class="command-trigger" data-cmd="palette" type="button" aria-haspopup="dialog">
+      <svg class="icon" aria-hidden="true"><use href="#i-command"/></svg>
+      <span>Command palette</span>
+    </button>
+    <div class="document-actions" role="group" aria-label="Document actions">
+      <div class="tool-group editing-tools">
+        <button class="icon-button" data-cmd="undo" title="Undo" aria-label="Undo"><svg class="icon" aria-hidden="true"><use href="#i-undo"/></svg></button>
+        <button class="icon-button" data-cmd="redo" title="Redo" aria-label="Redo"><svg class="icon" aria-hidden="true"><use href="#i-redo"/></svg></button>
+      </div>
+      <button class="tool-button" data-cmd="save" title="Save model"><svg class="icon" aria-hidden="true"><use href="#i-save"/></svg><span>Save</span></button>
+      <button class="tool-button" data-cmd="export" title="Export model"><svg class="icon" aria-hidden="true"><use href="#i-export"/></svg><span>Export</span></button>
+      <button class="run-button" data-cmd="run"><svg class="icon" aria-hidden="true"><use href="#i-run"/></svg><span>Run</span></button>
+    </div>
+  </header>
+
+  <main class="workspace" aria-label="Model workspace">
+    <aside class="navigation-dock" aria-label="Workspace navigation">
+      <section class="library-pane" aria-labelledby="library-heading">
+        <div class="pane-bar">
+          <h2 id="library-heading"><svg class="icon" aria-hidden="true"><use href="#i-library"/></svg>Model library</h2>
+          <div class="tool-group">
+            <button class="icon-button" data-cmd="open" title="Open model" aria-label="Open model"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg></button>
+            <button class="icon-button" data-cmd="new" title="New model" aria-label="New model"><svg class="icon" aria-hidden="true"><use href="#i-new"/></svg></button>
+          </div>
+        </div>
+        <div id="models" class="dock-list" tabindex="-1" aria-label="Models">
+          <p class="empty">Saved models appear here.</p>
+        </div>
+      </section>
+      <section class="outline-pane" aria-labelledby="outline-heading">
+        <div class="pane-bar"><h2 id="outline-heading"><svg class="icon" aria-hidden="true"><use href="#i-outline"/></svg>Graph outline</h2></div>
+        <div id="outline" class="dock-list" tabindex="-1" aria-label="Graph outline">
+          <p class="empty">Open a model to browse its elements.</p>
+        </div>
+      </section>
+    </aside>
+
+    <section class="graph-pane" aria-label="Graph editor">
+      <div class="document-bar">
+        <div class="document-name">
+          <svg class="icon" aria-hidden="true"><use href="#i-graph"/></svg>
+          <h2 id="title">Graph editor</h2>
+        </div>
+        <button class="tool-button" data-cmd="annotate" title="Annotate selection"><svg class="icon" aria-hidden="true"><use href="#i-annotate"/></svg><span>Annotate</span></button>
+      </div>
+      <div id="viewport" tabindex="0" aria-label="Graph canvas">
+        <div id="graph">
+          <div class="canvas-empty">
+            <svg class="empty-graph-icon icon" aria-hidden="true"><use href="#i-graph"/></svg>
+            <h3>Open a graph</h3>
+            <p>Choose a model from the library or create one.</p>
+            <div class="tool-group">
+              <button class="neutral-button" data-cmd="open">Open model</button>
+              <button class="neutral-button" data-cmd="new">New model</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="canvas-footer">
+        <div class="legends">
+          <ul class="legend" aria-label="Graph notation">
+            <li><i class="mark factor" aria-hidden="true"></i>Factor</li>
+            <li><i class="mark variable" aria-hidden="true"></i>Variable</li>
+            <li><i class="mark observed" aria-hidden="true"></i>Observed</li>
+            <li><i class="mark constraint" aria-hidden="true"></i>Constraint</li>
+          </ul>
+          <ul class="legend domain-legend" aria-label="Domain colors">
+            <li>Gaussian</li><li>Discrete</li><li title="Exponential family">EF</li><li>Mixed</li><li>Parameter</li>
+          </ul>
+        </div>
+        <div class="zoom-controls" role="group" aria-label="Canvas zoom">
+          <button class="icon-button" data-cmd="zoom-out" title="Zoom out" aria-label="Zoom out"><svg class="icon" aria-hidden="true"><use href="#i-minus"/></svg></button>
+          <output id="zoom" aria-label="Zoom level">100%</output>
+          <button class="icon-button" data-cmd="zoom-in" title="Zoom in" aria-label="Zoom in"><svg class="icon" aria-hidden="true"><use href="#i-new"/></svg></button>
+          <button class="icon-button" data-cmd="fit" title="Fit graph" aria-label="Fit graph"><svg class="icon" aria-hidden="true"><use href="#i-fit"/></svg></button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="inspector-pane" aria-labelledby="inspector-heading">
+      <div class="pane-bar"><h2 id="inspector-heading"><svg class="icon" aria-hidden="true"><use href="#i-inspector"/></svg>Inspector</h2></div>
+      <div id="inspector" tabindex="-1" class="detail-content">
+        <p class="empty">Select a graph element to inspect its properties.</p>
+      </div>
+    </aside>
+
+    <section class="activity-pane" aria-label="Model activity">
+      <div class="activity-bar">
+        <h2><svg class="icon" aria-hidden="true"><use href="#i-activity"/></svg>Activity</h2>
+        <nav class="activity-tools" aria-label="Review and experiments">
+          <button data-cmd="history"><svg class="icon" aria-hidden="true"><use href="#i-history"/></svg>History</button>
+          <button data-cmd="critiques"><svg class="icon" aria-hidden="true"><use href="#i-critiques"/></svg>Critiques</button>
+          <button data-cmd="profile"><svg class="icon" aria-hidden="true"><use href="#i-profile"/></svg>Profile</button>
+          <button data-cmd="simulator"><svg class="icon" aria-hidden="true"><use href="#i-simulator"/></svg>Simulator</button>
+        </nav>
+      </div>
+      <div id="activity" tabindex="-1" class="detail-content">
+        <p class="empty">Choose a model to inspect its history and experiments.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="status-bar">
+    <span id="status" role="status">Connecting to Studio…</span>
+    <button class="tool-button" data-cmd="keys"><svg class="icon" aria-hidden="true"><use href="#i-keys"/></svg>Keyboard shortcuts</button>
+  </footer>
+
+  <dialog id="palette" aria-labelledby="palette-heading">
+    <h2 id="palette-heading" class="visually-hidden">Command palette</h2>
+    <div class="palette-search"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+      <input id="palette-input" aria-label="Find a command" placeholder="Find a command…" autocomplete="off" spellcheck="false">
+    </div>
+    <div id="palette-list" aria-label="Commands"></div>
+    <div class="palette-footer"><kbd>Esc</kbd> Close</div>
+  </dialog>
+  <dialog id="form-dialog" aria-labelledby="form-title">
+    <form method="dialog">
+      <header class="form-header"><h2 id="form-title">Edit model</h2></header>
+      <div id="fields"></div>
+      <footer class="form-footer">
+        <button type="button" class="neutral-button" id="form-cancel">Cancel</button>
+        <button type="submit" class="accent-button" id="form-submit">Apply</button>
+      </footer>
+    </form>
+  </dialog>
+  <noscript>CFFG Studio requires JavaScript to open and edit models.</noscript>
+</body>
+</html>

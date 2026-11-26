@@ -114,6 +114,7 @@ EPIC_FILES = {
         "test_bundle_resume.py",
         "test_dashboard.py",
         "test_estimate.py",
+        "test_studio.py",
         "test_edit_codec.py",
         "test_ticket_dashboard.py",
         "test_ticket_rewrite_scheduler.py",
