@@ -127,6 +127,7 @@ and review context proportional to the change.
 | Derived component coordinate | Serialized explicit region/constraint semantics and approximation identity; D12 equations in `docs/DERIVATIONS.md` (production protocol deferred) | New IR field validation/JSON/hash/scoping/edits/composition; topology and specialized/registered ownership; compiler grouping, slots, parameter packing, resolution, assembly, `Arena` and `member_of`; component/boundary indexes and schedule stages; synchronous and scheduled local/batch/scan execution; lifecycle and host/JIT support/status checks; ledger region/separator/adapter ownership; readouts and `Learnables.replace`; learnable/executable/checkpoint/CFFGZ semantic identity and legacy rejection/migration; estimator and public exports | `tests/test_hybrid_separator_derivation.py` mathematical oracle; affected IR/serialize/plates/edits/topology/resolution/assembly, kernel/ledger/runtime/schedule, learnable/readout/checkpoint/bundle tests from the rows below; public composition fixtures and host/JIT, synchronous/scheduled, single/vmap, current/legacy parity | D12 derivation and anchors; ownership here; construction/migration in README; approximation and unsupported compositions in LIMITATIONS |
 | New IR field | `src/cffg/core/ir.py` (`Template` or its spec dataclass) | `src/cffg/core/validate.py`; `src/cffg/core/serialize.py` (`to_dict`, `from_dict`, `structure_hash`); `src/cffg/core/plates.py` scoping; `src/cffg/core/compose.py` and `src/cffg/core/edits.py` when editable; `src/cffg/topology.py` declaration snapshots/layout, `src/cffg/specialized/` semantic claims/drafts, `src/cffg/registered/` same-arena drafts, `src/cffg/resolution/` arrays/addresses, `src/cffg/assembly.py` arena assembly, and `src/cffg/compiled.py` values when executable; bundle and agent state when persisted | `tests/test_ir.py`, `tests/test_serialize.py`, `tests/test_plates.py`, `tests/test_topology.py`, `tests/test_registered.py`, `tests/test_resolution.py`, `tests/test_assembly.py`; add `tests/test_edit_codec.py`, `tests/test_edits.py`, `tests/test_agent_spec.py`, or `tests/test_bundle.py` only for the affected boundary | Contract in this document; public construction and migration in `README.md`; unsupported cases in `LIMITATIONS.md` |
 | New factor or rule family | `src/cffg/kernels.py:FactorKernel`, `kernel_bindings.py`, its `src/cffg/core/ir.py:FactorType`, and the family rule module; formal equations are authoritative in code docstrings and `DERIVATIONS.md` | `topology.py` declared role/slot facts; `specialized/` named family discovery/completion; `registered/` binding capabilities and same-arena structural lowering; common declarations in `array_requirements.py`; `registered/packing.py` and `specialized/packing.py` family adapters; `resolution/` parameter/observation resolution; `assembly.py`, `Arena`, and `member_of`; typed local updates in `execution/` and `ExecutionDelta`; registered mathematics/readouts/energy in `kernel_runtime.py`; objective assembly in `ledger.py` and specialized local terms in `ledger_terms.py`; `execution/synchronous.py:make_sweep`; `execution/transport.py` and `schedule_program.py` batch/registerized/flat scans; `lifecycle.py` observation binding and `mu3_lifecycle.py` functional state; `ledger.make_belief_energy`; support checks, assignment scoring, `readouts/` posterior/statistic adapters, schedule classification, serialization manifest, estimator, and public exports as applicable | `tests/test_kernels.py`, `tests/test_execution.py`, `tests/test_registered.py`, `tests/test_resolution.py`, `tests/test_assembly.py`, `tests/test_discrete_kernels.py`, `tests/test_gaussian_kernels.py`, `tests/test_gaussian_kernel_schedules.py`; `tests/test_ledger.py`, `tests/test_readout_owners.py`; family rule and engine-oracle tests; `tests/test_schedule.py`, `tests/test_schedule_program.py`; sparse-support, float32, and uncomfortable-scale cases | Derivation in `DERIVATIONS.md`; integration contract here; approximations in `LIMITATIONS.md`; public modeling API in `README.md` |
+| Studio model editing and experiments | Native template, bundle, learning-state and engine contracts | Browser and agent commands share compiler admission, revision checks, stable anchors and Git history. File imports and runs bind exact snapshots. The inspector distinguishes planned resources from process measurements. | `tests/test_studio.py`, `tests/test_estimate.py`, `tests/test_edit_codec.py`, `tests/test_viz_layout.py` | [Studio model workstation](#studio-model-workstation), README workstation and host guide |
 | Runtime numerical or status invariant | `AGENTS.md` numerical contract and `src/cffg/runtime_types.py` (state/result/status values) and `src/cffg/compiled_iteration.py` (deterministic iteration) and `iteration.py` (functional updates and host reference), `exact_strategy.py` and `outer_strategy.py` (distinct run control), and `run_results.py` (public results), plus `ledger.py` and `ledger_terms.py` (objectives) and `readouts/` (posteriors/statistics) | Flooding, colored/mixed, and exact schedules; host `runtime_checks.StateChecks` and `schedule_program.make_support_check`; `execution.synchronous.make_sweep`, `ScheduleProgram`, `make_exact_unit`, `make_propagate`, and `ledger.make_belief_energy`; `StateLifecycle`/`Mu3Lifecycle` initialization, preparation and status forwarding; inner-solver status; `RollingAgent`, `Colony`, estimator, benchmark, and dashboard consumers | `tests/test_runtime_status.py`, `tests/test_schedule.py`, `tests/test_schedule_program.py`, `tests/test_engine_contracts.py`, `tests/test_lifecycle.py`, `tests/test_iteration.py`, `tests/test_compiled_iteration.py`, `tests/test_iteration_checks.py`, `tests/test_iteration_tolerance.py`, `tests/test_ledger.py`, `tests/test_readout_owners.py`, `tests/test_run_strategies.py`, `tests/test_colony.py`, `tests/test_colony_failures.py`, `tests/test_constraint_data.py`, `tests/test_constraint_reconstruction.py`, plus the changed rule family's hostile-input tests | Runtime contract here and in `README.md`; any accepted failure mode or approximation in `LIMITATIONS.md` |
 | Learnable or checkpoint feature | `src/cffg/core/ir.py` (`LearnableSpec`, `AgentSpec`, `BeliefBinding`) and `src/cffg/learn.py` (`Family`, `Learnables`); neural point training in `training.py` and recognition in `amortization.py` | Validation, JSON/hash, plate scoping, specialized parameter/objective ownership, `resolution/addresses.py:resolve_learnables` and declared member/parameter requirements, `Arena.learn_plans`, `member_of`, `StateLifecycle` initial arrays and binding, `Mu3Lifecycle` functional parameter state, `readouts/` adapters and `StateLifecycle.with_goal_priors`, agent cadence, checkpoint encode/decode and legacy migration, and bundles | `tests/test_learnables.py`, `tests/test_readout_owners.py`, `tests/test_lifecycle.py`, `tests/test_constraint_reconstruction.py`, `tests/test_resolution.py`, `tests/test_assembly.py`, `tests/test_agent_spec.py`, `tests/test_agent.py`, and `tests/test_bundle.py`; add the contributing factor family's statistic test | Conjugate contract here; statistics beyond the papers in `DERIVATIONS.md`; public cadence/checkpoint API in `README.md`; remaining family gaps in `LIMITATIONS.md` |
 
@@ -2353,11 +2354,43 @@ and the environment/profile/raw-artifact manifest SHA-256 is
 
 ## Resource estimator
 
-Because shapes are static post-compile, memory is computable analytically from
-arena sizes. The estimator reports exact named byte counts for every persistent
-State arena (`messages`, Gaussian eta/Lambda/observations/masks, and EF
-messages/observations/masks) plus parameters. It does not currently provide a
-trustworthy XLA cost analysis; cff-j7mm records that limitation.
+The initialized State pytree owns persistent storage. `resource_analysis.state_storage`
+counts each named arena and parameter leaf in its actual dtype. A requested
+batch size scales integer byte counts with overflow checks before allocation.
+`executable_reports` lowers the full arguments for the flooding step, active
+two-pass/colored/mixed units and any priming executable. Backend cost and memory
+reports identify their units and availability. Planned device and host peak
+buffers use argument + output − alias + temporary bytes. `estimate` times
+completed, synchronized calls and distinguishes exact runs from iterative work.
+Empirical profiles and planned buffers answer separate resource questions.
+
+## Studio model workstation
+
+`cffg.studio.library.Library` publishes a fully staged Git tree using a
+conditional update of the central bare repository's main ref. Models occupy
+`models/<id>/`. A revision is the latest commit touching that model. Source
+JSON, array and learner members reconstruct a current-format bundle. Persistent
+identity covers model data and learning. The Studio sidecar owns stable
+selection anchors, annotations, review threads, recipe hints and grid offsets.
+Agents and the browser issue the same revision-checked commands. Metadata edits
+retain the accepted model bytes. Model edits serialize, reload and pass compiler
+admission before publication. Workspace archives contain the native bundle and a
+digest-bound sidecar. Git LFS hydrates large arrays on export.
+
+The server owns model snapshots, revision events and role-based local tokens.
+Tailscale Serve supplies the owner identity to a loopback listener. The file
+index is a rebuildable SQLite FTS5 projection of explicitly selected roots.
+Host search, subprocess jobs and solver execution run independently of browser
+drawing. The browser renders domain-colored `cffg.viz` scene items, culls large
+viewports, and uses the same element references in its outline and inspector.
+
+Each experiment directory pins a bundle, input contract and observations.
+Append-only events and job results survive browser disconnections. Fresh workers
+report JAX compilation durations, exact schedule status, backend-planned buffers,
+process peak RSS and synchronized warm samples. Budget traces replay the same
+input for each budget, keeping the engine's normal solver boundary. Generated
+simulators execute in a separate network-free, read-only, resource-limited OCI
+container. Their outputs must match declared DATA ports and pass engine binding.
 
 ## Diagram rendering (`cffg.viz`)
 
@@ -2432,8 +2465,6 @@ source of truth for readiness, scope, and status.
 - **Colony runtime (cff-wbhu, cff-rqqc).** Measure throughput across grouped
   controllers and extend stochastic evaluators with per-instance PRNG streams
   and particle state.
-- **Resource analysis (cff-j7mm).** Restore correct XLA lowering and calibrated
-  FLOP/byte reporting on top of the existing exact arena-byte estimate.
 - **Visualization clients (cff-jude).** Use the edit API as the model-editor
   boundary and add message-schedule overlays to the scene graph's wire
   references.
