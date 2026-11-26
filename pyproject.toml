@@ -18,6 +18,12 @@ dependencies = [
 viz = [
     "cairosvg>=2.9.0",
 ]
+studio = [
+    "fastapi>=0.165.0",
+    "httpx>=0.29.0",
+    "uvicorn>=0.51.0",
+    "watchfiles>=1.2.0",
+]
 
 [build-system]
 requires = ["uv_build>=0.11.16,<0.12.0"]
