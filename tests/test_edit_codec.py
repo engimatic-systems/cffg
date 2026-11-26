@@ -104,3 +104,10 @@ def test_branch_edit_codec_is_strict():
     ):
         with pytest.raises(EditError):
             action_from_dict(bad)
+
+
+def test_scalar_family_variable_survives_action_codec():
+    from cffg.core.edits import action_from_dict, action_to_dict
+
+    action = {"action": "add_variable", "spec": {"name": "rate", "ef": "gamma"}}
+    assert action_to_dict(action_from_dict(action)) == action
