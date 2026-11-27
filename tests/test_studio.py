@@ -284,13 +284,15 @@ def test_agent_tour_targets_survive_rename_project_exchange_and_revision_edits()
             {
                 "title": "The transition",
                 "text": "Inspect the transition matrix.",
-                "ref": "factor:trans1",
+                "refs": ["factor:trans1", "var:x0"],
             },
         ],
     }
     apply_commands(doc, [command], "agent", "base")
     stored = doc.meta["tours"]["dynamics"]
     assert stored["steps"][0]["anchor"] == doc.meta["anchors"]["var:x0"]
+    group = stored["steps"][1]
+    assert group["anchors"] == [doc.meta["anchors"][ref] for ref in group["refs"]]
     apply_commands(
         doc,
         [{"action": "rename_variable", "name": "x0", "to": "initial"}],
@@ -300,9 +302,19 @@ def test_agent_tour_targets_survive_rename_project_exchange_and_revision_edits()
     copied = Document.exchange(doc.project(doc.certify()))
     assert copied.meta["tours"]["dynamics"] == stored
     assert copied.meta["anchors"]["var:initial"] == stored["steps"][0]["anchor"]
+    assert copied.meta["anchors"]["var:initial"] == group["anchors"][1]
     with pytest.raises(ValueError, match="Tour stop 1"):
         apply_commands(copied, [command], "agent", "revision")
     assert copied.meta["tours"]["dynamics"] == stored
+    for targets in (
+        {"refs": ["var:initial", "var:gone"]},
+        {"refs": ["var:initial", "var:initial"]},
+        {"ref": "var:initial", "refs": ["factor:trans1"]},
+    ):
+        step = {"title": "Invalid group", "text": "This edit must fail.", **targets}
+        with pytest.raises(ValueError):
+            apply_commands(copied, [{**command, "steps": [step]}], "agent", "revision")
+        assert copied.meta["tours"]["dynamics"] == stored
     apply_commands(
         copied, [{"action": "remove_tour", "id": "dynamics"}], "agent", "revision"
     )
