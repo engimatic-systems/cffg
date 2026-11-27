@@ -184,7 +184,7 @@ if not lib.list():
             plist.write_bytes(old)
             restart()
         raise
-    url = "https://" + authority + "/"
+    url = "https://" + authority + "/?ui=" + release.name
     relative = args.share / "cffg-studio/index.html"
     relative.parent.mkdir(parents=True, exist_ok=True)
     escaped = html.escape(url, quote=True)

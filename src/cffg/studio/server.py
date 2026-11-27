@@ -16,7 +16,13 @@ from uuid import uuid4
 from zipfile import BadZipFile
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    Response,
+    StreamingResponse,
+)
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -141,6 +147,12 @@ def create_app(home=None, repository=None, roots=None):
     jobs = Jobs(home / "runs", library)
     search = Discovery(home, roots if roots is not None else [Path.home() / "projects"])
     static = Path(__file__).with_name("static")
+    asset_version = digest(
+        {p.name: file_digest(p) for p in static.iterdir() if p.is_file()}
+    )[:16]
+    shell = (static / "index.html").read_text().replace(
+        "/static/", f"/ui/{asset_version}/"
+    )
 
     watchers = {}
     loop = None
@@ -241,6 +253,8 @@ def create_app(home=None, repository=None, roots=None):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["X-Frame-Options"] = "DENY"
+        if request.url.path == "/" or request.url.path.startswith(("/static/", "/ui/")):
+            response.headers["Cache-Control"] = "private, no-cache"
         return response
 
     @app.exception_handler(Conflict)
@@ -278,8 +292,11 @@ def create_app(home=None, repository=None, roots=None):
 
     @app.get("/")
     def index():
-        return FileResponse(static / "index.html")
+        return HTMLResponse(shell)
 
+    # The prefix gives the entire ES module graph a new cache key on deployment.
+    # Older open tabs can still request late-loaded assets after the server restarts.
+    app.mount("/ui/{asset_version}", StaticFiles(directory=static), name="ui_assets")
     app.mount("/static", StaticFiles(directory=static), name="static")
 
     @app.get("/v1/capabilities")

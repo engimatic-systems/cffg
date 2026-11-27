@@ -2395,8 +2395,12 @@ to find related marks in the visible scope.
 Outside the canvas, controls and measurement readouts reference stable help IDs
 in `static/tooltips.json`. Each entry keeps its factual draft, Gemini Carbon's
 wording and its review decision. The browser loads the catalog once and displays
-approved entries on Option-hover or keyboard focus with Option held. Model
-names, values and observations stay out of tooltip authoring.
+approved entries on Option-hover or keyboard focus with Option held. The
+controller also reads Option from pointer events when the page missed the
+initial key press. The footer toggle keeps help available across controls and
+dialogs. Studio gives the shell's asset URLs a content-derived version and
+revalidates them on navigation. Model names, values and observations stay
+out of tooltip authoring.
 
 Each experiment directory pins a bundle, input contract and observations.
 Append-only events and job results survive browser disconnections. Fresh workers
