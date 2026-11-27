@@ -1,0 +1,872 @@
+{
+  "author": "gemini-4-carbon-high",
+  "entries": {
+    "command.palette": {
+      "draft": "Search registered Studio actions and run one available in the current context."
+    },
+    "command.tours": {
+      "draft": "Open the tour chooser for the built-in walkthrough and any tours attached to the open model."
+    },
+    "command.intro": {
+      "draft": "Start the built-in walkthrough of the Studio interface."
+    },
+    "command.keys": {
+      "draft": "Open the keyboard shortcut editor to change command bindings and import or export a shortcut profile."
+    },
+    "command.new": {
+      "draft": "Open a dialog to create a named library model from a blank graph, a linear Gaussian starter, or a recurrent switching linear dynamical system."
+    },
+    "command.open": {
+      "draft": "Search library models and indexed files on the Studio host or upload a local bundle for import."
+    },
+    "command.save": {
+      "draft": "Verify the displayed revision can be read from the library. Committed edits are already saved there."
+    },
+    "command.fork": {
+      "draft": "Make a separately named library model from the currently displayed revision."
+    },
+    "command.save-back": {
+      "draft": "Ask to replace the imported model's host source bundle with the current revision. Studio checks for source changes before writing."
+    },
+    "command.export": {
+      "draft": "Download this revision as a portable .cffgz model bundle, including its model data and any learning state."
+    },
+    "command.export-project": {
+      "draft": "Download a .cffgstudio project that also carries Studio information such as layout, annotations, reviews and tours."
+    },
+    "command.undo": {
+      "draft": "Restore the state before the most recent local edit as a new revision. The edit must still match the model's current history."
+    },
+    "command.redo": {
+      "draft": "Reapply a locally undone edit as a new revision if the head still matches."
+    },
+    "command.add": {
+      "draft": "Add a variable and a factor together. Start with a prior at an open boundary or extend an existing boundary with a transition."
+    },
+    "command.connect": {
+      "draft": "Join two matching boundary variables, keeping the variable on the chosen source side and removing both ports."
+    },
+    "command.rename": {
+      "draft": "Choose a new name for the selected variable and preview the edit before publishing."
+    },
+    "command.resize": {
+      "draft": "Change the selected Gaussian dimension or discrete state count, and preview how linked dimensions and parameters are affected."
+    },
+    "command.init": {
+      "draft": "Choose a preset to set the selected factor's stored parameters. Shared parameter arrays affect other users of the same array."
+    },
+    "command.constraint": {
+      "draft": "Attach a supported inference constraint to a selected variable or factor, subject to the compiler's checks."
+    },
+    "command.annotate": {
+      "draft": "Add a note to the selected graph element, or to the graph when no element is selected."
+    },
+    "command.critique": {
+      "draft": "Write a review comment on the selection or the whole model so collaborators can reply or resolve it."
+    },
+    "command.propose": {
+      "draft": "Submit graph-edit commands for review with a written explanation. Accepting the proposal applies the commands after validation."
+    },
+    "command.enter-plate": {
+      "draft": "Open the selected plate's repeated graph fragment to inspect or edit its shared definition."
+    },
+    "command.exit-plate": {
+      "draft": "Return from the plate's shared fragment to the enclosing whole model."
+    },
+    "command.factor": {
+      "draft": "Define a new factor by choosing its type and binding named roles to variables and parameters."
+    },
+    "command.bindings": {
+      "draft": "Edit the selected factor's type and the variables and parameters attached to its roles."
+    },
+    "command.position": {
+      "draft": "Set the selected factor's horizontal and vertical offset from the automatic layout."
+    },
+    "command.raw": {
+      "draft": "Preview an ordered list of graph-edit commands as one transaction. Committing the preview publishes them together."
+    },
+    "command.zoom-in": {
+      "draft": "Enlarge the graph around the center of the canvas."
+    },
+    "command.zoom-out": {
+      "draft": "Reduce graph magnification around the center of the canvas."
+    },
+    "command.fit": {
+      "draft": "Center and size the whole graph to fit in the canvas."
+    },
+    "command.history": {
+      "draft": "Browse saved revisions to compare a revision with the current one or restore it as a new revision."
+    },
+    "command.critiques": {
+      "draft": "Browse review comments, replies and proposed graph changes for this model."
+    },
+    "command.profile": {
+      "draft": "See storage counts for the initialized model and timing and peak memory measurements when a benchmark has finished for this revision."
+    },
+    "command.bench": {
+      "draft": "Start configuring a benchmark that times the first execution and repeated warm executions for this revision in a fresh worker."
+    },
+    "command.run": {
+      "draft": "Choose observations and solver settings, then start inference on this exact revision."
+    },
+    "command.trace": {
+      "draft": "Configure a trace that replays inference from the same initial state with increasing iteration budgets. Playback can be paused or advanced a step at a time."
+    },
+    "command.runs": {
+      "draft": "Open the model's recorded experiment jobs across revisions, including runs, benchmarks and simulator jobs."
+    },
+    "command.simulator": {
+      "draft": "Generate simulator source, run simulator code to produce observations or revisit saved experiments."
+    },
+    "command.share": {
+      "draft": "Copy a link to this model and its selected element when there is one."
+    },
+    "command.focus": {
+      "draft": "Move keyboard focus around the model library, outline, canvas, inspector and activity panels in order."
+    },
+    "command.forward": {
+      "draft": "Select the first connected variable of a selected factor, or the first connected factor of a selected variable, in binding or listing order."
+    },
+    "command.back": {
+      "draft": "Select the last connected variable of a selected factor, or the last connected factor of a selected variable, in binding or listing order."
+    },
+    "studio.document": {
+      "draft": "The name of the open graph, or the plate whose shared contents are currently on screen."
+    },
+    "studio.status": {
+      "draft": "The latest Studio status message. It may identify the saved revision, report the result of a command, or show an error."
+    },
+    "studio.zoom": {
+      "draft": "Current magnification relative to fitting the graph into this canvas. 100% is the fitted view."
+    },
+    "legend.factor": {
+      "draft": "A box represents a factor, a rule relating the variables on its connected wires."
+    },
+    "legend.variable": {
+      "draft": "A wire represents a model variable that carries information between factors or to an exposed port."
+    },
+    "legend.observed": {
+      "draft": "The observation color marks a data port or its variable, where an experiment can supply a value."
+    },
+    "legend.constraint": {
+      "draft": "A constraint mark signals an additional rule for inference on that variable or factor."
+    },
+    "legend.gaussian": {
+      "draft": "This color identifies Gaussian variables and factors whose ordinary variable edges are all Gaussian."
+    },
+    "legend.discrete": {
+      "draft": "This color identifies variables with a finite number of possible states and factors whose ordinary edges are all in that domain."
+    },
+    "legend.ef": {
+      "draft": "This color identifies variables declared with an explicit exponential-family type and factors whose ordinary edges all have that domain coloring."
+    },
+    "legend.mixed": {
+      "draft": "This color can mark a factor whose ordinary variable edges come from different domain categories."
+    },
+    "legend.parameter": {
+      "draft": "This legend mark identifies stored model parameters used by factors."
+    },
+    "library.model": {
+      "draft": "Open the saved library model named on this row."
+    },
+    "library.recipe": {
+      "draft": "The starter or source category recorded for this library model. The row opens the model."
+    },
+    "outline.search": {
+      "draft": "Filter the outline by element name or listed type. The canvas keeps showing the graph."
+    },
+    "outline.count": {
+      "draft": "The number of matching elements in this outline group, including matches beyond the displayed rows."
+    },
+    "outline.factor": {
+      "draft": "Select this factor to see its family and bindings in the inspector."
+    },
+    "outline.var": {
+      "draft": "Select this variable to inspect its domain, size and connected factors."
+    },
+    "outline.port": {
+      "draft": "Select this named model boundary to inspect its role and the variable it exposes."
+    },
+    "outline.blob": {
+      "draft": "Select this stored parameter array to inspect its shape, type, storage and a sample of values."
+    },
+    "outline.plate": {
+      "draft": "Select this repeated graph fragment to inspect its dimensions or open its shared contents."
+    },
+    "inspector.title": {
+      "draft": "Name of the selection being inspected, or the graph name when nothing is selected."
+    },
+    "inspector.domain": {
+      "draft": "The selected variable's distribution family, such as Gaussian, categorical or an explicit exponential-family type."
+    },
+    "inspector.dimension": {
+      "draft": "The number of coordinates for a Gaussian vector or states for a categorical variable. The inspector shows one when neither size is given."
+    },
+    "inspector.linkedFactor": {
+      "draft": "Select a factor that uses this variable, to inspect that factor and its other connections."
+    },
+    "inspector.family": {
+      "draft": "The factor type specifies the mathematical relationship implemented by this factor."
+    },
+    "inspector.boundVariable": {
+      "draft": "A named role on this factor and the variable bound to it. Select the row to inspect that variable."
+    },
+    "inspector.boundArray": {
+      "draft": "A named parameter role on this factor and the stored array it uses. Select the row to inspect the array."
+    },
+    "inspector.shape": {
+      "draft": "The length of each axis in this parameter array. A scalar holds a single number."
+    },
+    "inspector.dtype": {
+      "draft": "The numeric storage type of each entry in this parameter array."
+    },
+    "inspector.storage": {
+      "draft": "The data size of this one model parameter array, computed from its shape and numeric type."
+    },
+    "inspector.sample": {
+      "draft": "Up to the first eight flattened entries of this stored array, rounded for display."
+    },
+    "inspector.setValues": {
+      "draft": "Enter a full replacement numeric array for this named parameter and preview it before committing."
+    },
+    "inspector.portRole": {
+      "draft": "The role assigned to this boundary, such as a DATA port for observations or a GLUE port for connecting model parts."
+    },
+    "inspector.portVariable": {
+      "draft": "The name of the variable exposed at this boundary."
+    },
+    "inspector.selectVariable": {
+      "draft": "Select the variable exposed by this port and show its properties."
+    },
+    "inspector.extend": {
+      "draft": "Add a transition and new variable using this boundary as the starting port."
+    },
+    "inspector.plateDims": {
+      "draft": "The repeat counts along the axes of this plate."
+    },
+    "inspector.resizePlate": {
+      "draft": "Change how many times the plate repeats along each dimension."
+    },
+    "inspector.revision": {
+      "draft": "The shortened revision identifier for this saved version of the model."
+    },
+    "inspector.factors": {
+      "draft": "Number of factor definitions in the graph scope currently being inspected."
+    },
+    "inspector.variables": {
+      "draft": "Number of variable definitions in the graph scope currently being inspected."
+    },
+    "inspector.note": {
+      "draft": "A saved annotation attached to the selection or the graph."
+    },
+    "inspector.editNote": {
+      "draft": "Edit the wording of this saved annotation and preview the change."
+    },
+    "inspector.removeNote": {
+      "draft": "Preview removal of this annotation before committing it."
+    },
+    "form.feedback": {
+      "draft": "Status of the current form action, including errors or the changes returned by a compiled preview."
+    },
+    "form.cancel": {
+      "draft": "Close this dialog without submitting its current fields."
+    },
+    "form.close": {
+      "draft": "Close this read-only result view."
+    },
+    "form.preview": {
+      "draft": "Compile the proposed changes and show their effects before saving anything."
+    },
+    "form.commit": {
+      "draft": "Publish the reviewed changes as one revision. Changing the inputs first requests another preview."
+    },
+    "form.restore": {
+      "draft": "Publish the chosen historical state as a new revision of the current model."
+    },
+    "form.historyDiff": {
+      "draft": "Changes between the selected historical revision and the current saved model."
+    },
+    "form.beliefs": {
+      "draft": "The saved inference result's estimates for individual variables, grouped by name and family."
+    },
+    "form.result": {
+      "draft": "The stored result data for this particular experiment job in JSON form. Which fields appear depends on the job type."
+    },
+    "form.hint": {
+      "draft": "Context for the current action, such as the target of an edit, source being replaced or expected input format."
+    },
+    "form.create": {
+      "draft": "Create this named model in the library with the chosen starter settings and open it."
+    },
+    "form.fork": {
+      "draft": "Create and open a separate library copy with the entered name."
+    },
+    "form.replace": {
+      "draft": "Write the current revision to the imported host source bundle after checking it is still safe to replace."
+    },
+    "form.generate": {
+      "draft": "Send the dynamics prompt and chosen model context to the configured language model to request simulator code for inspection."
+    },
+    "form.simulate": {
+      "draft": "Execute the supplied simulator source in an isolated worker to make observations for this model's data ports."
+    },
+    "form.start": {
+      "draft": "Submit an experiment job with these settings pinned to the current revision."
+    },
+    "field.modelName": {
+      "draft": "Name shown for the new model in the shared library."
+    },
+    "field.starter": {
+      "draft": "Choose an empty graph, a linear Gaussian state-space model, or a recurrent switching linear dynamical system."
+    },
+    "field.timeSteps": {
+      "draft": "Number of model time slices in a generated starter. The switching model needs at least two, and a blank graph starts empty."
+    },
+    "field.latent": {
+      "draft": "Number of coordinates in each continuous hidden state of a generated state-space model."
+    },
+    "field.observed": {
+      "draft": "Number of coordinates in each observation vector of a generated state-space model."
+    },
+    "field.regimes": {
+      "draft": "Number of discrete regimes in the switching-model starter."
+    },
+    "field.modelSeed": {
+      "draft": "Seed for the random parameter values in the switching-model starter. Reusing it with the same settings reproduces them."
+    },
+    "field.channelName": {
+      "draft": "Enter the new variable's name. Studio derives names for its new factor and port."
+    },
+    "field.incoming": {
+      "draft": "Start with a prior, or extend the selected boundary with a transition to a new variable and data port."
+    },
+    "field.priorDomain": {
+      "draft": "Choose a Gaussian or discrete variable when starting with a prior. Extending a boundary inherits the source variable's domain."
+    },
+    "field.channelSize": {
+      "draft": "Number of continuous coordinates or discrete states for the new variable."
+    },
+    "field.rename": {
+      "draft": "Enter a new name for this existing variable."
+    },
+    "field.resize": {
+      "draft": "New coordinate count for the selected Gaussian variable, or new number of states for a categorical one."
+    },
+    "field.resizePolicy": {
+      "draft": "Choose how to treat affected values when resizing: preserve overlapping entries, reinitialize, or map specific old coordinates to new ones."
+    },
+    "field.coordinateMap": {
+      "draft": "In Map mode give one old zero-based index or null per new coordinate. Old indexes must be unique and null requests a fresh coordinate."
+    },
+    "field.resetLearning": {
+      "draft": "In Map mode choose whether to reset affected learning state, including recurrence sticks when applicable."
+    },
+    "field.paramRole": {
+      "draft": "Select a stored parameter of this factor. Single-array presets affect that binding, while Gaussian recipes initialize its stored parameters together."
+    },
+    "field.preset": {
+      "draft": "Choose a compatible initialization rule for this factor or parameter."
+    },
+    "field.initSeed": {
+      "draft": "Seed for random initialization choices. Using the same inputs and seed reproduces the random values."
+    },
+    "field.noise": {
+      "draft": "Positive variance used in Gaussian recipes to scale covariance and, for the noisy recipe, random perturbations."
+    },
+    "field.initOptions": {
+      "draft": "A JSON object of arguments for the selected single-array initializer, such as a constant value. Available arguments depend on the preset."
+    },
+    "field.column": {
+      "draft": "Horizontal displacement of this factor from its automatic position. Zero restores the automatic horizontal offset."
+    },
+    "field.row": {
+      "draft": "Vertical displacement of this factor from its automatic position. Zero restores the automatic vertical offset."
+    },
+    "field.factorName": {
+      "draft": "Name identifying the factor. When editing an existing factor's bindings, keep its current name."
+    },
+    "field.factorType": {
+      "draft": "Choose the factor's mathematical family. The form fills in the ordinary edge and stored parameter role names for that family."
+    },
+    "field.edges": {
+      "draft": "JSON map from a factor's ordinary edge roles to graph variable names."
+    },
+    "field.params": {
+      "draft": "JSON map from a factor's fixed parameter roles to the names of stored model arrays."
+    },
+    "field.paramEdges": {
+      "draft": "JSON map from uncertain parameter roles to graph variables, which can carry beliefs instead of fixed stored values."
+    },
+    "field.before": {
+      "draft": "Ordered JSON list of graph commands to apply before this factor in the same transaction, for example to create its dependencies."
+    },
+    "field.values": {
+      "draft": "Full replacement numeric values for the selected parameter array as JSON, including all its dimensions."
+    },
+    "field.sourcePort": {
+      "draft": "Choose the boundary whose variable's name will survive when joining two compatible ports."
+    },
+    "field.targetPort": {
+      "draft": "Choose the other matching boundary to join to the kept variable. The connection consumes both ports."
+    },
+    "field.constraint": {
+      "draft": "Choose the inference restriction to attach to the selection. Choices depend on whether it is a variable or factor."
+    },
+    "field.detail": {
+      "draft": "JSON object containing any additional settings required by the chosen constraint."
+    },
+    "field.commands": {
+      "draft": "Ordered list of edit commands in JSON. Studio previews their combined result before saving a single revision."
+    },
+    "field.note": {
+      "draft": "Text to store as an annotation on the selected element or the graph."
+    },
+    "field.review": {
+      "draft": "Explain a critique or proposed graph change for collaborators."
+    },
+    "field.proposal": {
+      "draft": "Ordered graph-edit commands attached to the proposal for later review and acceptance."
+    },
+    "field.reply": {
+      "draft": "Text of your reply to this review thread."
+    },
+    "field.dims": {
+      "draft": "Enter a JSON list of repeat counts, one per plate axis."
+    },
+    "field.runSeed": {
+      "draft": "Seed used to generate random observations when no tape is supplied and to prepare any supported stochastic inference state."
+    },
+    "field.iterations": {
+      "draft": "Maximum solver iteration budget for this experiment. In trace mode successive samples request progressively larger budgets."
+    },
+    "field.tolerance": {
+      "draft": "Numerical tolerance used by inference when checking convergence."
+    },
+    "field.tape": {
+      "draft": "Optionally reuse observations recorded by a previous run by entering its run ID, instead of generating random observations."
+    },
+    "field.playback": {
+      "draft": "Start a trace paused for stepping, or let it replay successive budgets continuously."
+    },
+    "field.repetitions": {
+      "draft": "How many timed warm repetitions to run after the first execution in this benchmark."
+    },
+    "field.prompt": {
+      "draft": "Describe the stochastic process the language model should express in simulator code, including how it generates observations."
+    },
+    "field.context": {
+      "draft": "Choose what to send with the prompt: observation port names and domains, optionally also factor bindings and parameter shapes."
+    },
+    "field.source": {
+      "draft": "Python defining simulate(seed, steps, parameters). Return observations keyed by DATA port and optionally ground truth."
+    },
+    "field.simSeed": {
+      "draft": "Seed passed to the simulator function so its source can reproduce random draws."
+    },
+    "field.simSteps": {
+      "draft": "The steps argument passed to the simulator function to control how much simulation it generates."
+    },
+    "field.simParams": {
+      "draft": "JSON object passed as the parameters argument of the simulator function."
+    },
+    "field.copyName": {
+      "draft": "Display name for the separate library copy of this model."
+    },
+    "keys.cancel": {
+      "draft": "Close the editor and discard the unsaved shortcut edits, including imported profiles and restored defaults."
+    },
+    "keys.command": {
+      "draft": "Select the command whose shortcut you want to edit. Its current draft binding appears beside its name. You can edit several commands before saving."
+    },
+    "keys.context": {
+      "draft": "Choose where this shortcut works. Global applies across the workspace. A panel name such as graph limits the shortcut to that panel while it has focus. Studio suspends these shortcuts inside text fields and open dialogs."
+    },
+    "keys.export": {
+      "draft": "Download the draft shortcut overrides as a JSON profile. You can import the file in another Studio browser. Export checks the draft for invalid or conflicting bindings."
+    },
+    "keys.feedback": {
+      "draft": "Check whether the draft imported or reset successfully, or which shortcut is invalid. Browser-reserved keys and overlapping bindings in the same context or globally must be resolved before saving."
+    },
+    "keys.import": {
+      "draft": "Choose a Studio shortcut profile in JSON format to replace the draft bindings. Review the assignments and select Save shortcuts to apply them."
+    },
+    "keys.restore": {
+      "draft": "Reset every command in this draft to its built-in shortcut and context. Select Save shortcuts to apply the defaults."
+    },
+    "keys.save": {
+      "draft": "Check the draft and apply the shortcuts to Studio. Studio stores them in this browser when local storage is available."
+    },
+    "keys.shortcut": {
+      "draft": "Enter a shortcut such as Mod+Shift+z, or separate two keystrokes with a space for a chord such as g g. Mod means Command on Mac and Ctrl elsewhere. Clear the field to unbind this command."
+    },
+    "palette.details": {
+      "draft": "The shortcut beside a command is its current binding. A panel name means the shortcut works while that panel has focus. Unavailable means Studio cannot run the command in the current state."
+    },
+    "palette.empty": {
+      "draft": "No command contains all the search terms. Clear a word or try the command name, ID, shortcut, or panel."
+    },
+    "palette.results": {
+      "draft": "Click a command to run it. The list includes commands that need a different selection or an open model. Arrow keys skip unavailable commands."
+    },
+    "palette.search": {
+      "draft": "Find a command by its name, ID, shortcut, or panel. Every search word must match. Use Up or Down to highlight an available command, then press Enter to run it."
+    },
+    "picker.close": {
+      "draft": "Close the picker. Edits to the host folder list take effect only after Save folders & scan."
+    },
+    "picker.compatible": {
+      "draft": "Hide host files whose indexed schema version differs from Studio’s supported version. Clear the box to inspect the reason a file cannot be opened. Studio remembers this filter in this browser."
+    },
+    "picker.diagnostic": {
+      "draft": "Compare the file’s detected schema version with the version Studio requires for this format. The file cannot be imported through this picker until they match."
+    },
+    "picker.divider-activity": {
+      "draft": "Resize the activity panel by dragging the divider or pressing Up or Down while it has focus. Hold Shift for larger steps. Double-click to restore the default height."
+    },
+    "picker.divider-inspector": {
+      "draft": "Resize the inspector by dragging the divider or pressing Left or Right while it has focus. Hold Shift for larger steps. Double-click to restore the default width."
+    },
+    "picker.divider-library": {
+      "draft": "Adjust how much of the navigation panel the library occupies by dragging or pressing Up or Down on the divider. Hold Shift for larger steps. Double-click to restore its default height."
+    },
+    "picker.divider-navigation": {
+      "draft": "Resize the left navigation panel by dragging the divider or pressing Left or Right while it has focus. Hold Shift for larger steps. Double-click to restore the default width."
+    },
+    "picker.error": {
+      "draft": "The message identifies what failed during search, scan, import, or opening. If import succeeded and opening failed, the new copy is already in the library."
+    },
+    "picker.families": {
+      "draft": "These are the distinct factor types found in the indexed model. You can search host files by these names."
+    },
+    "picker.format": {
+      "draft": "The index identifies the file as a template JSON file, a versioned model bundle, or a Studio project."
+    },
+    "picker.host-result": {
+      "draft": "Click to import this host file as a new library model and open it. You can also highlight it with the arrow keys and press Enter."
+    },
+    "picker.import": {
+      "draft": "Import the selected host file as a new Studio library model, then open the copy. A file with a compatibility diagnostic cannot be imported here."
+    },
+    "picker.incompatible-result": {
+      "draft": "Studio indexed this host file but cannot import its schema version. The diagnostic on the row shows the required and detected versions."
+    },
+    "picker.library-result": {
+      "draft": "Click to open the existing library model at its current revision. You can also highlight it with the arrow keys and press Enter."
+    },
+    "picker.open": {
+      "draft": "Open the selected model at its current library revision."
+    },
+    "picker.path": {
+      "draft": "This path identifies the indexed file on the machine running Studio. Use it to distinguish files with the same model name."
+    },
+    "picker.recipe": {
+      "draft": "This label identifies how the library model was created, such as a blank graph, a linear Gaussian starter, a switching dynamical system, or an import."
+    },
+    "picker.results": {
+      "draft": "Results are grouped by source. Click an entry or use the arrow keys and Enter. Library models open directly. Host files are imported into the library first."
+    },
+    "picker.roots": {
+      "draft": "Enter one existing directory on the Studio host per line. Studio accepts up to 64 directories. Save folders & scan applies this list."
+    },
+    "picker.save-roots": {
+      "draft": "Replace the host’s saved list of indexed folders with the paths above and start scanning them. This changes the search locations for the Studio server and requires owner access."
+    },
+    "picker.scan": {
+      "draft": "Refresh the file index for the currently saved host folders. Use Save folders & scan if you also want to apply edits to the folder list. Rescanning requires owner access."
+    },
+    "picker.search": {
+      "draft": "Search library models by name and indexed host files by model name, path, or factor family. Use Up or Down to select a result and Enter to open it."
+    },
+    "picker.settings": {
+      "draft": "Expand these settings to see which folders Studio indexes on the server and to start a scan. Changing or rescanning the folders requires owner access."
+    },
+    "picker.source-all": {
+      "draft": "Show matches from both the Studio model library and indexed folders on the server. Opening a host file creates a library model."
+    },
+    "picker.source-host": {
+      "draft": "Show model files indexed on the machine running Studio. Selecting a compatible file imports a new library copy and opens it."
+    },
+    "picker.source-library": {
+      "draft": "Show only models already saved in the Studio library. Selecting one opens its current revision."
+    },
+    "picker.status": {
+      "draft": "Shows the count for the selected source, whether a search or host scan is underway, and when Studio is importing or opening a model."
+    },
+    "picker.upload": {
+      "draft": "Choose a .cffgz model bundle or .cffgstudio project from your device. Studio uploads it, creates a library model, and opens the new copy."
+    },
+    "tour.back": {
+      "draft": "Return to the previous step and show its target again. Left Arrow also moves back."
+    },
+    "tour.close": {
+      "draft": "Close the tour picker and return to the workspace."
+    },
+    "tour.copy": {
+      "draft": "Copy a link to this model and tour. Opening the link starts the walkthrough at its first step."
+    },
+    "tour.count": {
+      "draft": "The number of steps in this walkthrough. Selecting it starts at step one."
+    },
+    "tour.end": {
+      "draft": "Leave this walkthrough at the current step. Starting the tour again takes you to its first step."
+    },
+    "tour.finish": {
+      "draft": "Close the walkthrough after the last step and return to the workspace."
+    },
+    "tour.intro": {
+      "draft": "Start the built-in introduction to Studio. It highlights the library, graph, outline, inspector, run command, and command palette."
+    },
+    "tour.list": {
+      "draft": "Choose the introductory guide to Studio or a walkthrough saved with the current model. Each choice starts at its first step."
+    },
+    "tour.missing": {
+      "draft": "The requested walkthrough is absent from the current model revision. Choose another tour from the list."
+    },
+    "tour.missing-target": {
+      "draft": "The current revision has no matching graph element or plate for this step. You can still read the step and continue."
+    },
+    "tour.model": {
+      "draft": "Start a walkthrough saved with this model. Steps can open a plate and select the graph element described by the author."
+    },
+    "tour.next": {
+      "draft": "Advance to the next step and show its target. Right Arrow also advances."
+    },
+    "tour.progress": {
+      "draft": "See the tour title, your current step, and the total number of steps. Use Left or Right to move between steps."
+    },
+    "tour.step": {
+      "draft": "The current step describes a Studio control or part of the model. The outline on the workspace marks its target when available."
+    },
+    "tour.target-error": {
+      "draft": "Studio could not display the target for this step. The step text remains available and you can continue with the tour controls."
+    },
+    "profile.state": {
+      "draft": "The total counts the bytes held in this model’s initialized message arrays, observation arrays and parameter arrays. It uses each array’s actual size and data type. Temporary workspace and Python process memory are measured separately."
+    },
+    "profile.parameters": {
+      "draft": "Bytes occupied by the parameter arrays in this revision’s initialized engine state. A compiled factor can store a different shape or representation from the array in the model file. These bytes are included in Persistent state."
+    },
+    "profile.arena.messages": {
+      "draft": "Storage for discrete messages in this model. Each directed message keeps one log weight per possible state, so larger category counts and more message slots use more bytes."
+    },
+    "profile.arena.g_eta": {
+      "draft": "Storage for Gaussian message information vectors. Each vector holds precision times mean and uses one number per dimension of its message."
+    },
+    "profile.arena.g_lam": {
+      "draft": "Storage for the precision matrices in Gaussian messages. A message with d dimensions stores d × d entries here, so this array can grow quickly with dimension."
+    },
+    "profile.arena.g_obs": {
+      "draft": "Storage reserved for observed Gaussian values on this model’s data ports. Each observed vector has one entry per coordinate. The separate g_mask records whether the vector has been supplied."
+    },
+    "profile.arena.g_mask": {
+      "draft": "Storage for Gaussian observation flags. Each observation row has a flag saying whether its vector is present, so an observed zero can be distinguished from a missing observation."
+    },
+    "profile.arena.ef_eta": {
+      "draft": "Storage for messages in the engine’s exponential-family array. Each message slot has two natural-parameter entries. These describe the message in the coordinates used to combine evidence."
+    },
+    "profile.arena.ef_obs": {
+      "draft": "Storage for observed values on exponential-family data ports, such as counts or binary outcomes. The matching ef_mask flag says whether to use each observation."
+    },
+    "profile.arena.ef_mask": {
+      "draft": "Storage for the flags that mark exponential-family observations as present or missing. An observed count of zero still has its present flag set."
+    },
+    "profile.arena.other": {
+      "draft": "Bytes held by this named array in the revision’s initialized engine state, measured from its shape and data type."
+    },
+    "profile.cold": {
+      "draft": "Elapsed time for the first inference call on this model revision and its bound observations, including JAX compilation triggered by that call. The worker waits for the resulting state to be ready. Worker startup and model setup have separate timers."
+    },
+    "profile.warm": {
+      "draft": "The middle elapsed time across repeat inference calls in the same worker. Every sample starts from the same initialized state and observations, can reuse compiled code, and ends once the resulting state is ready. For an even sample count, Studio averages the middle two."
+    },
+    "profile.rss": {
+      "draft": "The highest resident memory reported by the operating system for the experiment worker up to the end of timed inference. It includes the runtime, compiler and model. Device-buffer estimates appear separately in the executable breakdown."
+    },
+    "profile.schedule": {
+      "draft": "The message-update order selected for the measured model by its engine. Its topology determines whether the worker uses two-pass, colored, mixed or flooding updates."
+    },
+    "profile.device": {
+      "draft": "The first device reported by JAX in the worker that measured this model revision. Use the device identifier when comparing timings across machines."
+    },
+    "profile.open": {
+      "draft": "Open the latest finished benchmark for this revision to inspect its cold and warm times, worker memory, compilation phases and executable estimates."
+    },
+    "profile.empty": {
+      "draft": "This revision has no finished benchmark yet. Measuring it supplies timings on this worker and its peak resident memory. Studio can calculate persistent model storage as soon as it saves the revision."
+    },
+    "profile.details": {
+      "draft": "Expand the benchmark for this revision to see worker setup, cumulative JAX compilation timings and XLA estimates for each named schedule unit."
+    },
+    "profile.startup": {
+      "draft": "Wall time from the server launching the experiment worker until the worker begins loading the model. It includes starting Python and importing its runtime."
+    },
+    "profile.setup": {
+      "draft": "Time spent loading this revision’s bundle, reading its data-port contract, compiling its graph layout and initializing its engine state. The worker also prepares sampled messages when the model needs them. Observation binding and the first inference timer come afterward."
+    },
+    "profile.compile.jaxpr_trace_duration": {
+      "draft": "Total time JAX spent tracing functions into jaxpr, its representation of array operations, while setting up and running this model. The worker adds up all reported trace durations before the separate executable analysis."
+    },
+    "profile.compile.jaxpr_to_mlir_module_duration": {
+      "draft": "Total time JAX spent lowering jaxpr into MLIR compiler modules while setting up and running this model. This sums the durations reported for individual compilations before the separate executable analysis."
+    },
+    "profile.compile.backend_compile_duration": {
+      "draft": "Total time JAX attributed to backend compilation while setting up and running this model. The backend turns lowered programs into device executables. The worker records this total before the separate analysis of individual schedule units."
+    },
+    "profile.compile.other": {
+      "draft": "Total duration of this named JAX compilation stage while the worker set up and ran this revision. The value adds time across reported events, and can overlap the setup and inference timers."
+    },
+    "profile.executable.flooding_step": {
+      "draft": "XLA’s estimated floating-point operations and bytes accessed for one synchronous sweep of this model. All factors read the previous messages. Studio analyzes this unit even when the selected inference schedule uses a different update order."
+    },
+    "profile.executable.two_pass_exact": {
+      "draft": "XLA’s estimated floating-point operations and bytes accessed for this model’s exact tree calculation. It passes messages inward and outward, checks the result with a synchronous sweep, and includes support and applicable free-energy checks."
+    },
+    "profile.executable.colored_step": {
+      "draft": "XLA’s estimated floating-point operations and bytes accessed for one sweep over the model’s cyclic belief-propagation components. Independent factors update together within a color, and later colors see earlier updates."
+    },
+    "profile.executable.mixed_step": {
+      "draft": "XLA’s estimated floating-point operations and bytes accessed for one mixed sweep. It updates the iterative factors, then refreshes belief-propagation components with tree passes or a colored sweep."
+    },
+    "profile.executable.colored_prime": {
+      "draft": "XLA’s estimated floating-point operations and bytes accessed for priming the tree components before this model’s colored iteration begins. Priming passes messages in both directions through those trees."
+    },
+    "profile.executable.mixed_prime": {
+      "draft": "XLA’s estimated floating-point operations and bytes accessed for priming the belief-propagation components before mixed iteration. Tree components receive two passes and cyclic components a colored sweep."
+    },
+    "profile.executable.other": {
+      "draft": "XLA’s estimate of the floating-point operations and bytes accessed by one invocation of this named unit for the measured model. A diagnostic appears when the backend cannot supply the estimate."
+    },
+    "profile.lowerCompile": {
+      "draft": "The first time measures lowering this model’s named schedule unit into compiler IR. The second measures the call that produces its device executable. Studio times these calls during the separate executable analysis after benchmarking."
+    },
+    "profile.buffers": {
+      "draft": "XLA’s planned temporary workspace and peak device buffer bytes for this executable. The peak adds input, output and temporary bytes and subtracts storage shared by inputs and outputs. Both numbers describe the compiler’s plan for one unit."
+    },
+    "trace.title": {
+      "draft": "The saved timeline belongs to a single job on a pinned model revision. It shows the latest worker events and, for inference, the solver’s final outcome."
+    },
+    "trace.empty": {
+      "draft": "Start inference or open a saved job in Run history to see its timeline."
+    },
+    "trace.chart": {
+      "draft": "Free energy is the model’s scored objective for the recorded beliefs, including the contributions of its factors and shared variables. The chart shows finite values. Missing or undefined values leave gaps."
+    },
+    "trace.latest": {
+      "draft": "The most recent finite free-energy value in this run. An earlier sample stays visible here if a later sweep has no finite value."
+    },
+    "trace.axisSweep": {
+      "draft": "The horizontal axis follows sweep numbers. In an interactive trace each number is the iteration budget for a fresh replay from the same starting state. The line connects consecutive sweeps with finite energy."
+    },
+    "trace.axisSample": {
+      "draft": "The run recorded energy on fewer sweeps than it executed. These numbers count the energy samples in order, because the saved result does not identify their individual sweep numbers."
+    },
+    "trace.noEnergy": {
+      "draft": "A point appears only when the engine can assign a finite free energy to the beliefs. Early sweeps can lack a defined energy, and some jobs, such as generating observations, do not run inference."
+    },
+    "trace.recent": {
+      "draft": "The eight most recent recorded events appear newest first. They can include setup phases, trace replays, benchmark measurements, the final outcome or a worker error."
+    },
+    "trace.phase": {
+      "draft": "The worker reports what it is doing. These milestones mark steps such as loading the pinned model, binding observations and starting a measurement."
+    },
+    "trace.sweep": {
+      "draft": "The worker reruns inference from the same bound state with this iteration budget, then reports the final state of that replay. A replay can stop early if the solver converges."
+    },
+    "trace.fe": {
+      "draft": "The model’s free energy evaluated on the final state of this replay. A dash means the engine could not return a finite value for those beliefs."
+    },
+    "trace.delta": {
+      "draft": "The last recorded change in the solver’s messages for this replay. A small change indicates that the messages are settling. The solver status records whether its convergence checks passed."
+    },
+    "trace.replayTime": {
+      "draft": "Synchronized wall time for the entire replay from the initial state through this iteration budget. It can include compilation and time spent repeating earlier sweeps."
+    },
+    "trace.measurement": {
+      "draft": "A timed inference call in the benchmark worker. The first call supplies the cold timing. Repeated calls on the same starting state and data supply warm samples."
+    },
+    "trace.warmTime": {
+      "draft": "Elapsed time for this individual warm inference call, including the wait for its resulting state to be ready."
+    },
+    "trace.finish": {
+      "draft": "The worker finished writing the job result. For inference, the solver status records whether it converged, exhausted its budget, diverged or found the model infeasible."
+    },
+    "trace.iterations": {
+      "draft": "The number of iterations the solver reports for the final inference result. It can be smaller than the requested budget if the solver stops early."
+    },
+    "trace.residual": {
+      "draft": "The solver’s final numerical measure of what remains to settle. The measure depends on the solver, for example the change in free energy or a fixed-point error. Read it with the final status."
+    },
+    "trace.error": {
+      "draft": "The worker or service reports the reason it could not complete the requested operation. The timeline retains any earlier events for this job."
+    },
+    "trace.status.job": {
+      "draft": "The latest execution state recorded for this worker. A trace can pause between replays. When inference finishes, this badge shows the engine’s termination outcome."
+    },
+    "trace.status.converged": {
+      "draft": "The inference engine met the convergence checks for this model’s solver. Exact schedules can certify a solution after a single execution."
+    },
+    "trace.status.budget_exhausted": {
+      "draft": "The solver reached a work limit before it could certify convergence. The final beliefs and residual describe the state it reached."
+    },
+    "trace.status.diverged": {
+      "draft": "The solver reported numerical divergence, such as a non-finite update or objective. Inspect the final result for any recorded failure reason or factor."
+    },
+    "trace.status.infeasible": {
+      "draft": "The solver found incompatible evidence or constraints that left no feasible support. Inspect the failure details and the model’s observations."
+    },
+    "trace.pause": {
+      "draft": "Request a pause before the next replay. A replay already running can finish before the worker waits."
+    },
+    "trace.resume": {
+      "draft": "Allow the worker to replay successively larger iteration budgets from the same initial state until inference converges or the requested limit is reached."
+    },
+    "trace.step": {
+      "draft": "Permit one more replay with the next iteration budget, then leave playback paused unless the run has ended."
+    },
+    "trace.cancel": {
+      "draft": "End this job and terminate its worker if it is running. Events already written remain available in Run history."
+    },
+    "activity.revision": {
+      "draft": "This is the saved model revision you are viewing. Studio identifies it by the first eight characters of its revision hash."
+    },
+    "activity.history": {
+      "draft": "Open this revision’s changes relative to the current model. The dialog lets you restore the earlier contents in a new revision."
+    },
+    "activity.review": {
+      "draft": "This review thread records its author, whether it is a critique or a proposed edit, and whether it is open or closed. The text and replies belong to this saved model."
+    },
+    "activity.reply": {
+      "draft": "Add a signed reply to this review thread and preview it before saving the revision."
+    },
+    "activity.accept": {
+      "draft": "Preview the proposed graph edits against the current model. Committing the preview applies the commands and marks the proposal accepted."
+    },
+    "activity.decline": {
+      "draft": "Preview closing the proposal as declined. Committing records the decision and leaves its proposed graph edits unapplied."
+    },
+    "activity.resolve": {
+      "draft": "Preview marking this critique resolved. Committing records that outcome in the model’s review history."
+    },
+    "activity.job": {
+      "draft": "Open the timeline for this saved experiment. The row gives its kind, worker status, model revision and local creation time."
+    },
+    "activity.generate": {
+      "draft": "Describe stochastic observations to generate Python simulator source for this model’s data ports. You can inspect the generated source before running it."
+    },
+    "activity.simulate": {
+      "draft": "Open the source editor to run a NumPy simulator with a seed and parameters. Studio validates its observation tape against the pinned model’s data ports."
+    },
+    "activity.inspectSource": {
+      "draft": "Open this job’s generated Python source in the simulator editor. Review or edit the code, seed and parameters before running it to produce observations."
+    },
+    "activity.tape": {
+      "draft": "Open inference with this simulator job as its observation tape. The worker loads the recorded values and checks that they fit the selected model’s data ports."
+    },
+    "activity.beliefs": {
+      "draft": "Open the saved posterior summaries by variable for this result. Depending on the family, these include categorical weights, Gaussian means and marginal variances, or exponential-family and Dirichlet parameters."
+    },
+    "activity.measurement": {
+      "draft": "Inspect the full result JSON saved by this job. Inference results include the observation digest, seed, schedule, device, solver outcome and numerical traces."
+    }
+  }
+}
