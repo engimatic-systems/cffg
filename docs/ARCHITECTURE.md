@@ -2392,6 +2392,12 @@ of unrelated boxes. Existing hand-positioned diagrams keep their offsets on the 
 grid, with the original grid available when those positions would collide. Hover uses the topology of equality factors and shared blobs
 to find related marks in the visible scope.
 
+Outside the canvas, controls and measurement readouts reference stable help IDs
+in `static/tooltips.json`. Each entry keeps its factual draft, Gemini Carbon's
+wording and its review decision. The browser loads the catalog once and displays
+approved entries on Option-hover or keyboard focus with Option held. Model
+names, values and observations stay out of tooltip authoring.
+
 Each experiment directory pins a bundle, input contract and observations.
 Append-only events and job results survive browser disconnections. Fresh workers
 report JAX compilation durations, exact schedule status, backend-planned buffers,

@@ -10,9 +10,10 @@ const intro = {
   ],
 };
 
-const node = (tag, value) => {
+const node = (tag, value, help) => {
   const result = document.createElement(tag);
   if (value != null) result.textContent = value;
+  if (help) result.dataset.help = help;
   return result;
 };
 
@@ -24,7 +25,7 @@ export function setupTours({rootModel, showTarget, currentModel, report}) {
   const heading = node("h2");
   heading.id = "tour-title";
   heading.tabIndex = -1;
-  const progress = node("span");
+  const progress = node("span", undefined, "tour.progress");
   progress.className = "tour-progress";
   const body = node("div");
   const controls = node("footer");
@@ -36,8 +37,8 @@ export function setupTours({rootModel, showTarget, currentModel, report}) {
   dialog.append(ring, card);
   document.body.append(dialog);
   let owner, tour, index, target, trigger, generation = 0;
-  function action(label, fn, primary=false) {
-    const button = node("button", label);
+  function action(label, help, fn, primary=false) {
+    const button = node("button", label, help);
     button.type = "button";
     button.className = primary ? "accent-button" : "neutral-button";
     button.addEventListener("click", () => Promise.resolve(fn()).catch(error => report(error.message)));
@@ -67,15 +68,16 @@ export function setupTours({rootModel, showTarget, currentModel, report}) {
     card.removeAttribute("style");
     progress.textContent = "";
     heading.textContent = "Guided tours";
+    heading.dataset.help = "tour.list";
     body.replaceChildren();
     for (const entry of [intro,...Object.values(owner?.metadata.tours || {})]) {
-      const choice = action(entry.title, () => start(entry));
-      const count = node("small", entry.steps.length+" steps");
+      const choice = action(entry.title, entry === intro ? "tour.intro" : "tour.model", () => start(entry));
+      const count = node("small", entry.steps.length+" steps", "tour.count");
       choice.append(count);
       choice.classList.add("tour-choice");
       body.append(choice);
     }
-    controls.replaceChildren(action("Close", () => dialog.close()));
+    controls.replaceChildren(action("Close", "tour.close", () => dialog.close()));
     body.querySelector("button")?.focus();
   }
   async function step(next) {
@@ -85,14 +87,15 @@ export function setupTours({rootModel, showTarget, currentModel, report}) {
     const stop = tour.steps[index];
     progress.textContent = tour.title+" · "+(index+1)+" of "+tour.steps.length;
     heading.textContent = stop.title;
-    body.replaceChildren(node("p", stop.text));
-    const back = action("Back", () => step(index-1));
+    heading.dataset.help = "tour.step";
+    body.replaceChildren(node("p", stop.text, "tour.step"));
+    const back = action("Back", "tour.back", () => step(index-1));
     back.disabled = index === 0;
-    controls.replaceChildren(action("End tour", () => dialog.close()), back,
-      index === tour.steps.length-1 ? action("Finish", () => dialog.close(), true)
-                                    : action("Next", () => step(index+1), true));
+    controls.replaceChildren(action("End tour", "tour.end", () => dialog.close()), back,
+      index === tour.steps.length-1 ? action("Finish", "tour.finish", () => dialog.close(), true)
+                                    : action("Next", "tour.next", () => step(index+1), true));
     if (tour !== intro) {
-      const copy = action("Copy link", async () => {
+      const copy = action("Copy link", "tour.copy", async () => {
         const url = new URL(location.href);
         url.search = new URLSearchParams({model:owner.id,tour:tour.id}).toString();
         await navigator.clipboard.writeText(url.href);
@@ -108,11 +111,11 @@ export function setupTours({rootModel, showTarget, currentModel, report}) {
       result = tour === intro ? document.querySelector(stop.target)
                              : await showTarget(owner, stop);
     } catch (error) {
-      if (seq === generation) body.append(node("p", error.message));
+      if (seq === generation) body.append(node("p", error.message, "tour.target-error"));
     }
     if (seq !== generation || !dialog.open) return;
     target = result;
-    if (!target && tour !== intro) body.append(node("small", "This target is unavailable in the current revision."));
+    if (!target && tour !== intro) body.append(node("small", "This target is unavailable in the current revision.", "tour.missing-target"));
     if (target && !target.closest("svg")) target.scrollIntoView({block:"nearest",inline:"nearest"});
     position();
   }
@@ -129,7 +132,7 @@ export function setupTours({rootModel, showTarget, currentModel, report}) {
     if (entry) await start(entry);
     else {
       list();
-      if (id) body.prepend(node("p","This tour is unavailable in the current revision."));
+      if (id) body.prepend(node("p","This tour is unavailable in the current revision.", "tour.missing"));
     }
   }
   dialog.addEventListener("keydown", e => {
@@ -154,7 +157,7 @@ export function setupTours({rootModel, showTarget, currentModel, report}) {
     if (!tour) { list(); return; }
     if (tour !== intro) {
       tour = owner.metadata.tours?.[tour.id];
-      if (!tour) { list(); body.prepend(node("p", "This tour was removed in the current revision.")); return; }
+      if (!tour) { list(); body.prepend(node("p", "This tour was removed in the current revision.", "tour.missing")); return; }
     }
     await step(Math.min(index, tour.steps.length-1));
   }};

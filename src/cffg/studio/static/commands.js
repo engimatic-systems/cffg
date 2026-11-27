@@ -151,6 +151,8 @@ export function setupCommands(definitions, report = () => {}) {
   keyDialog.id = "keymap-dialog";
   keyDialog.setAttribute("aria-labelledby", "keymap-title");
   document.body.append(keyDialog);
+  input.dataset.help = "palette.search";
+  list.dataset.help = "palette.results";
   input.setAttribute("role", "combobox");
   input.setAttribute("aria-autocomplete", "list");
   input.setAttribute("aria-controls", list.id);
@@ -213,6 +215,7 @@ export function setupCommands(definitions, report = () => {}) {
     matches.forEach(({ command, context, keys }, i) => {
       const option = node("button");
       option.id = `command-option-${i}`;
+      option.dataset.help = "command." + command.id;
       option.type = "button";
       option.tabIndex = -1;
       option.setAttribute("role", "option");
@@ -222,13 +225,18 @@ export function setupCommands(definitions, report = () => {}) {
       if (option.disabled) details.push("Unavailable");
       if (context !== "global") details.push(context);
       if (keys) details.push(keys);
-      if (details.length) option.append(node("small", details.join(" · ")));
+      if (details.length) {
+        const detail = node("small", details.join(" · "));
+        detail.dataset.help = "palette.details";
+        option.append(detail);
+      }
       option.addEventListener("mousedown", event => event.preventDefault());
       option.addEventListener("click", () => runMatch(i));
       list.append(option);
     });
     if (!matches.length) {
       const empty = node("p", "No matching commands.", "empty");
+      empty.dataset.help = "palette.empty";
       empty.setAttribute("role", "status");
       list.append(empty);
     }
@@ -270,11 +278,14 @@ export function setupCommands(definitions, report = () => {}) {
     Object.assign(fields.style, { display: "grid", gap: "9px", maxHeight: "56dvh", overflowY: "auto" });
     const commandList = node("select");
     commandList.size = 6;
+    commandList.dataset.help = "keys.command";
     const bindingInput = node("input");
+    bindingInput.dataset.help = "keys.shortcut";
     bindingInput.placeholder = "Unbound";
     bindingInput.autocomplete = "off";
     bindingInput.spellcheck = false;
     const contextInput = node("input");
+    contextInput.dataset.help = "keys.context";
     contextInput.setAttribute("list", "keymap-contexts");
     const contexts = node("datalist");
     contexts.id = "keymap-contexts";
@@ -287,6 +298,7 @@ export function setupCommands(definitions, report = () => {}) {
       const wrap = node("div");
       const name = node("label", label);
       name.htmlFor = control.id = id;
+      name.dataset.help = control.dataset.help;
       name.style.display = "block";
       control.style.width = "100%";
       wrap.append(name, control);
@@ -294,8 +306,10 @@ export function setupCommands(definitions, report = () => {}) {
     }
     const hint = node("p", "Mod uses Command on Mac and Ctrl elsewhere. Use Mod+Shift+z for one shortcut or g g for a chord. Clear the shortcut to unbind it.", "empty");
     hint.id = "keymap-hint";
+    hint.dataset.help = "keys.shortcut";
     bindingInput.setAttribute("aria-describedby", hint.id);
     const feedback = node("p");
+    feedback.dataset.help = "keys.feedback";
     feedback.setAttribute("role", "status");
     function message(text, error = false) {
       feedback.textContent = text;
@@ -305,8 +319,9 @@ export function setupCommands(definitions, report = () => {}) {
       hint, field("Context", "keymap-context", contextInput), contexts);
     const tools = node("div", undefined, "tool-group");
     tools.style.flexWrap = "wrap";
-    function button(label, action, parent, className = "neutral-button") {
-      const control = node("button", label, className);
+    function button(label, help, action, parent) {
+      const control = node("button", label, "neutral-button");
+      control.dataset.help = help;
       control.type = "button";
       control.addEventListener("click", action);
       parent.append(control);
@@ -322,6 +337,7 @@ export function setupCommands(definitions, report = () => {}) {
       commandList.replaceChildren();
       for (const command of commands.values()) {
         const option = node("option", command.label + (config(command.id).keys ? " · " + config(command.id).keys : ""));
+        option.dataset.help = "command." + command.id;
         option.value = command.id;
         commandList.append(option);
       }
@@ -340,6 +356,7 @@ export function setupCommands(definitions, report = () => {}) {
     contextInput.addEventListener("input", updateDraft);
     const file = node("input");
     file.type = "file";
+    file.dataset.help = "keys.import";
     file.accept = ".json,application/json";
     file.hidden = true;
     file.addEventListener("change", async () => {
@@ -352,8 +369,8 @@ export function setupCommands(definitions, report = () => {}) {
       } catch (error) { message(error.message, true); }
       file.value = "";
     });
-    button("Import JSON", () => file.click(), tools);
-    button("Export JSON", () => {
+    button("Import JSON", "keys.import", () => file.click(), tools);
+    button("Export JSON", "keys.export", () => {
       try { keyBindings(commands, draft); } catch (error) { message(error.message, true); return; }
       const url = URL.createObjectURL(new Blob([profileText(draft)], { type: "application/json" }));
       const link = node("a");
@@ -362,16 +379,17 @@ export function setupCommands(definitions, report = () => {}) {
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     }, tools);
-    button("Restore defaults", () => {
+    button("Restore defaults", "keys.restore", () => {
       draft = Object.create(null);
       options(commandList.value);
       message("Defaults restored. Save to apply them.");
     }, tools);
     fields.append(tools, file, feedback);
     const footer = node("footer", undefined, "form-footer");
-    button("Cancel", () => close(keyDialog), footer);
+    button("Cancel", "keys.cancel", () => close(keyDialog), footer);
     const save = node("button", "Save shortcuts", "accent-button");
     save.type = "submit";
+    save.dataset.help = "keys.save";
     footer.append(save);
     form.addEventListener("submit", event => {
       event.preventDefault();

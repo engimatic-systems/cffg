@@ -12,40 +12,41 @@ function loadStyles() {
   document.head.append(link);
 }
 
-function node(tag, text, className) {
+function node(tag, text, className, help) {
   const el = document.createElement(tag);
   if (text !== undefined) el.textContent = text;
   if (className) el.className = className;
+  if (help) el.dataset.help = help;
   return el;
 }
 
 const dialogContents = `
-  <header class="lp-heading"><h2 id="lp-title">Open model</h2><button type="button" class="lp-close" aria-label="Close">×</button></header>
+  <header class="lp-heading"><h2 id="lp-title">Open model</h2><button type="button" data-help="picker.close" class="lp-close" aria-label="Close">×</button></header>
   <main class="lp-body">
     <div class="lp-search"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6.1"/><path d="m14.7 14.7 5.2 5.2"/></svg>
-      <input autofocus id="lp-query" type="search" role="combobox" aria-label="Search models and host files" aria-controls="lp-results" aria-expanded="true" aria-autocomplete="list" placeholder="Search models and host files" autocomplete="off">
+      <input autofocus id="lp-query" data-help="picker.search" type="search" role="combobox" aria-label="Search models and host files" aria-controls="lp-results" aria-expanded="true" aria-autocomplete="list" placeholder="Search models and host files" autocomplete="off">
     </div>
     <div class="lp-sources" role="group" aria-label="Search sources">
-      <button type="button" data-source="all" aria-pressed="true">All sources</button>
-      <button type="button" data-source="library" aria-pressed="false">Library</button>
-      <button type="button" data-source="host" aria-pressed="false">Host files</button>
+      <button type="button" data-source="all" data-help="picker.source-all" aria-pressed="true">All sources</button>
+      <button type="button" data-source="library" data-help="picker.source-library" aria-pressed="false">Library</button>
+      <button type="button" data-source="host" data-help="picker.source-host" aria-pressed="false">Host files</button>
     </div>
-    <label class="lp-compatible"><input type="checkbox" id="lp-compatible"> Hide incompatible files</label>
-    <div id="lp-results" class="lp-results" role="listbox" aria-label="Matching models and files" tabindex="0"></div>
-    <p class="lp-status" role="status" aria-live="polite"></p>
-    <p class="lp-error" role="alert" hidden></p>
+    <label class="lp-compatible" data-help="picker.compatible"><input type="checkbox" id="lp-compatible" data-help="picker.compatible"> Hide incompatible files</label>
+    <div id="lp-results" class="lp-results" role="listbox" aria-label="Matching models and files" tabindex="0" data-help="picker.results"></div>
+    <p class="lp-status" role="status" aria-live="polite" data-help="picker.status"></p>
+    <p class="lp-error" role="alert" data-help="picker.error" hidden></p>
     <details class="lp-settings">
-      <summary>Host search settings</summary>
-      <label for="lp-roots">Indexed folders on the host <span>(one path per line)</span></label>
-      <textarea id="lp-roots" rows="3" spellcheck="false" wrap="off"></textarea>
-      <div class="lp-root-actions"><button type="button" data-op="save-roots">Save folders &amp; scan</button><button type="button" data-op="scan">Rescan folders</button></div>
+      <summary data-help="picker.settings">Host search settings</summary>
+      <label for="lp-roots" data-help="picker.roots">Indexed folders on the host <span>(one path per line)</span></label>
+      <textarea id="lp-roots" data-help="picker.roots" rows="3" spellcheck="false" wrap="off"></textarea>
+      <div class="lp-root-actions"><button type="button" data-op="save-roots" data-help="picker.save-roots">Save folders &amp; scan</button><button type="button" data-op="scan" data-help="picker.scan">Rescan folders</button></div>
     </details>
   </main>
   <footer class="lp-footer">
-    <input id="lp-file" type="file" accept=".cffgz,.cffgstudio" hidden>
-    <button type="button" data-op="upload">Import bundle…</button>
-    <span class="lp-spacer"></span><button type="button" data-op="cancel">Cancel</button>
-    <button type="button" data-op="open" class="accent-button" disabled>Open</button>
+    <input id="lp-file" type="file" accept=".cffgz,.cffgstudio" data-help="picker.upload" hidden>
+    <button type="button" data-op="upload" data-help="picker.upload">Import bundle…</button>
+    <span class="lp-spacer"></span><button type="button" data-op="cancel" data-help="picker.close">Cancel</button>
+    <button type="button" data-op="open" data-help="picker.open" class="accent-button" disabled>Open</button>
   </footer>`;
 
 export async function openLibrary({api, openModel, refresh, report}) {
@@ -89,6 +90,7 @@ export async function openLibrary({api, openModel, refresh, report}) {
     }
     const host = visible[index]?.source === "host";
     open.textContent = host ? "Import & open" : "Open";
+    open.dataset.help = host ? "picker.import" : "picker.open";
     open.disabled = !row || Boolean(visible[index]?.diagnostic) || pending || working;
   }
   function render(previousKey) {
@@ -109,6 +111,8 @@ export async function openLibrary({api, openModel, refresh, report}) {
         content.append(group);
       }
       const option = node("div", undefined, "lp-option");
+      option.dataset.help = result.diagnostic ? "picker.incompatible-result" :
+        result.source === "host" ? "picker.host-result" : "picker.library-result";
       option.id = "lp-option-" + i;
       option.setAttribute("role","option");
       option.setAttribute("aria-selected","false");
@@ -118,12 +122,16 @@ export async function openLibrary({api, openModel, refresh, report}) {
       mark.setAttribute("aria-hidden","true");
       const info = node("span", undefined, "lp-info");
       info.append(node("strong",result.name));
-      if (result.path) info.append(node("small",result.path));
-      if (result.diagnostic) info.append(node("small",result.diagnostic));
+      if (result.path) info.append(node("small",result.path, undefined, "picker.path"));
+      if (result.families) {
+        const families = Array.isArray(result.families) ? result.families.join(", ") : result.families;
+        info.append(node("small", families, undefined, "picker.families"));
+      }
+      if (result.diagnostic) info.append(node("small",result.diagnostic, undefined, "picker.diagnostic"));
       const type = result.source === "host" ? (result.format || "Model file") :
         ({kalman:"Linear Gaussian",rslds:"rSLDS",blank:"Blank",import:"Imported"}[result.recipe] || "Model");
-      option.append(mark,info,node("span",type,"lp-kind"));
-      if (result.families) option.title = Array.isArray(result.families) ? result.families.join(", ") : result.families;
+      const kindHelp = result.source === "host" ? "picker.format" : "picker.recipe";
+      option.append(mark,info,node("span",type,"lp-kind",kindHelp));
       options.append(option);
     });
     list.replaceChildren(content);
@@ -365,11 +373,11 @@ export function installDockSizing() {
     const bar = node("div",undefined,"studio-splitter");
     bar.tabIndex=0;
     bar.dataset.dock=key;
+    bar.dataset.help="picker.divider-" + key;
     bar.setAttribute("role","separator");
     bar.setAttribute("aria-orientation",vertical ? "vertical" : "horizontal");
     const label = "Resize " + key + " panel";
     bar.setAttribute("aria-label",label);
-    bar.title=label+" · Double-click to reset";
     if (!panel.id) panel.id="studio-dock-"+key;
     bar.setAttribute("aria-controls",panel.id);
     bars.set(key,bar);

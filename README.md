@@ -35,6 +35,11 @@ factor or use **Position selected factor** to change its grid offset. **Keyboard
 shortcuts** edits bindings, checks conflicts, supports chords, and imports or
 exports a profile. Panel sizes persist in the browser.
 
+Hold **Option** (**Alt** on other keyboards) and hover over a control or value
+outside the canvas to read its explanation. Try the number beside **Persistent
+state** in **Profile**. You can also Tab to a control and hold Option. Release
+the key or press **Esc** to dismiss the tooltip.
+
 **Open** searches saved models and indexed directories on the host. The same
 dialog accepts file uploads and changes search roots. **Hide incompatible files**
 remembers your preference; turn it off to inspect schema diagnostics. **Export** writes a portable

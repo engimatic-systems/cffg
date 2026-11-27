@@ -83,7 +83,7 @@
       <div class="document-bar">
         <div class="document-name">
           <svg class="icon" aria-hidden="true"><use href="#i-graph"/></svg>
-          <h2 id="title">Graph editor</h2>
+          <h2 id="title" data-help="studio.document">Graph editor</h2>
         </div>
         <button class="tool-button" data-cmd="annotate" title="Annotate selection"><svg class="icon" aria-hidden="true"><use href="#i-annotate"/></svg><span>Annotate</span></button>
       </div>
@@ -103,18 +103,18 @@
       <div class="canvas-footer">
         <div class="legends">
           <ul class="legend" aria-label="Graph notation">
-            <li><i class="mark factor" aria-hidden="true"></i>Factor</li>
-            <li><i class="mark variable" aria-hidden="true"></i>Variable</li>
-            <li><i class="mark observed" aria-hidden="true"></i>Observed</li>
-            <li><i class="mark constraint" aria-hidden="true"></i>Constraint</li>
+            <li data-help="legend.factor"><i class="mark factor" aria-hidden="true"></i>Factor</li>
+            <li data-help="legend.variable"><i class="mark variable" aria-hidden="true"></i>Variable</li>
+            <li data-help="legend.observed"><i class="mark observed" aria-hidden="true"></i>Observed</li>
+            <li data-help="legend.constraint"><i class="mark constraint" aria-hidden="true"></i>Constraint</li>
           </ul>
           <ul class="legend domain-legend" aria-label="Domain colors">
-            <li>Gaussian</li><li>Discrete</li><li title="Exponential family">EF</li><li>Mixed</li><li>Parameter</li>
+            <li data-help="legend.gaussian">Gaussian</li><li data-help="legend.discrete">Discrete</li><li data-help="legend.ef">EF</li><li data-help="legend.mixed">Mixed</li><li data-help="legend.parameter">Parameter</li>
           </ul>
         </div>
         <div class="zoom-controls" role="group" aria-label="Canvas zoom">
           <button class="icon-button" data-cmd="zoom-out" title="Zoom out" aria-label="Zoom out"><svg class="icon" aria-hidden="true"><use href="#i-minus"/></svg></button>
-          <output id="zoom" aria-label="Zoom level">100%</output>
+          <output id="zoom" data-help="studio.zoom" aria-label="Zoom level">100%</output>
           <button class="icon-button" data-cmd="zoom-in" title="Zoom in" aria-label="Zoom in"><svg class="icon" aria-hidden="true"><use href="#i-new"/></svg></button>
           <button class="icon-button" data-cmd="fit" title="Fit graph" aria-label="Fit graph"><svg class="icon" aria-hidden="true"><use href="#i-fit"/></svg></button>
         </div>
@@ -145,7 +145,8 @@
   </main>
 
   <footer class="status-bar">
-    <span id="status" role="status">Connecting to Studio…</span>
+    <span id="status" data-help="studio.status" role="status">Connecting to Studio…</span>
+    <span id="help-gesture"></span>
     <button class="tool-button" data-cmd="keys"><svg class="icon" aria-hidden="true"><use href="#i-keys"/></svg>Keyboard shortcuts</button>
   </footer>
 
@@ -162,7 +163,7 @@
       <header class="form-header"><h2 id="form-title">Edit model</h2></header>
       <div id="fields"></div>
       <footer class="form-footer">
-        <button type="button" class="neutral-button" id="form-cancel">Cancel</button>
+        <button type="button" class="neutral-button" id="form-cancel" data-help="form.cancel">Cancel</button>
         <button type="submit" class="accent-button" id="form-submit">Apply</button>
       </footer>
     </form>

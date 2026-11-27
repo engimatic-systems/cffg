@@ -9,10 +9,19 @@ const statusGroups = {
   error: ["failed", "error", "diverged", "infeasible"],
 };
 
-function el(tag, className, text) {
+const compileStages = ["jaxpr_trace_duration", "jaxpr_to_mlir_module_duration", "backend_compile_duration"];
+const executableUnits = ["flooding_step", "two_pass_exact", "colored_step", "mixed_step", "colored_prime", "mixed_prime"];
+
+function statusHelp(status) {
+  return ["converged", "budget_exhausted", "diverged", "infeasible"].includes(status)
+    ? "trace.status." + status : "trace.status.job";
+}
+
+function el(tag, className, text, help) {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
+  if (help) node.dataset.help = help;
   return node;
 }
 
@@ -56,17 +65,17 @@ function energySeries(sweeps, result) {
 }
 
 function drawChart(series, terminal) {
-  const figure = el("figure", "trace-chart");
+  const figure = el("figure", "trace-chart", undefined, "trace.chart");
   const heading = el("figcaption", "", "Free energy");
   figure.append(heading);
   const finite = series.samples.filter(sample => Number.isFinite(sample.y));
   if (!finite.length) {
     const message = terminal ? "No finite free-energy samples were recorded." : "Waiting for a finite free-energy sample…";
-    figure.append(el("p", "empty", message));
+    figure.append(el("p", "empty", message, "trace.noEnergy"));
     return figure;
   }
   const latest = finite[finite.length - 1];
-  const latestLabel = el("span", "trace-latest", number(latest.y));
+  const latestLabel = el("span", "trace-latest", number(latest.y), "trace.latest");
   latestLabel.title = `Last finite sample at ${series.axis.toLowerCase()} ${latest.x}`;
   heading.append(latestLabel);
   const firstX = series.samples[0].x;
@@ -104,7 +113,7 @@ function drawChart(series, terminal) {
   }
   if (isolated) chart.append(svg("circle", isolated));
   chart.append(svg("path", { d: path.join(" "), class: "trace-line" }));
-  const axis = el("div", "trace-axis");
+  const axis = el("div", "trace-axis", undefined, series.axis === "Sweep" ? "trace.axisSweep" : "trace.axisSample");
   axis.append(el("span", "", `${series.axis} ${firstX}`));
   if (lastX !== firstX) axis.append(el("span", "", `${series.axis} ${lastX}`));
   figure.append(chart, axis);
@@ -126,12 +135,12 @@ function metrics(events, result) {
   const middle = Math.floor(samples.length / 2);
   const median = samples.length % 2 ? samples[middle] : samples[middle - 1] / 2 + samples[middle] / 2;
   const list = el("dl", "trace-metrics");
-  for (const [title, value] of [
-    ["Cold run", duration(values.cold_ms)],
-    ["Warm median", duration(median)],
-    ["Peak RSS", memory(values.peak_rss_bytes)],
+  for (const [title, value, help] of [
+    ["Cold run", duration(values.cold_ms), "profile.cold"],
+    ["Warm median", duration(median), "profile.warm"],
+    ["Peak RSS", memory(values.peak_rss_bytes), "profile.rss"],
   ]) {
-    const group = el("div");
+    const group = el("div", "", undefined, help);
     group.append(el("dt", "", title), el("dd", "", value));
     list.append(group);
   }
@@ -141,53 +150,57 @@ function metrics(events, result) {
 
 function profileDetails(result) {
   const details = el("details", "profile-breakdown");
-  details.append(el("summary", "", "Startup, compilation and executable costs"));
+  details.append(el("summary", "", "Startup, compilation and executable costs", "profile.details"));
   const list = el("dl", "profile-values");
-  const row = (title, value) => list.append(el("dt", "", title), el("dd", "", value));
-  row("Worker startup", duration(result.process_startup_ms));
-  row("Load and initialize graph", duration(result.setup_ms));
-  row("Persistent state", memory(result.storage?.state_bytes));
+  const row = (title, value, help) => list.append(el("dt", "", title, help), el("dd", "", value, help));
+  row("Worker startup", duration(result.process_startup_ms), "profile.startup");
+  row("Load and initialize graph", duration(result.setup_ms), "profile.setup");
+  row("Persistent state", memory(result.storage?.state_bytes), "profile.state");
   for (const [stage, ms] of Object.entries(result.compilation_ms ?? {})) {
-    row(stage.replaceAll("_", " "), duration(ms));
+    const help = "profile.compile." + (compileStages.includes(stage) ? stage : "other");
+    row(stage.replaceAll("_", " "), duration(ms), help);
   }
   for (const [name, unit] of Object.entries(result.executables ?? {})) {
     const device = unit.memory_bytes?.device;
+    const help = "profile.executable." + (executableUnits.includes(name) ? name : "other");
     row(name.replaceAll("_", " "), unit.cost
       ? number(unit.cost.flops) + " FLOPs · " + memory(unit.cost["bytes accessed"]) + " traffic"
-      : unit.cost_diagnostic?.message ?? "Cost unavailable");
-    row("Lower / compile", duration(unit.lowering_seconds * 1000) + " / " + duration(unit.compilation_seconds * 1000));
+      : unit.cost_diagnostic?.message ?? "Cost unavailable", help);
+    row("Lower / compile", duration(unit.lowering_seconds * 1000) + " / " + duration(unit.compilation_seconds * 1000), "profile.lowerCompile");
     row("Planned temporary / peak buffers", device
       ? memory(device.temp) + " / " + memory(device.planned_peak)
-      : unit.memory_diagnostic?.message ?? "Buffer information unavailable");
+      : unit.memory_diagnostic?.message ?? "Buffer information unavailable", "profile.buffers");
   }
   details.append(list);
   return details;
 }
 
 function eventRow(event) {
-  const row = el("li");
+  const row = el("li", "", undefined, "trace." + event.type);
   let title = label(event.type);
-  let detail = "";
+  const detail = el("span");
   if (event.type === "sweep") {
     title = `Sweep ${number(event.iteration)}`;
-    detail = `FE ${number(event.free_energy)} · Δ ${number(event.delta)}`;
+    detail.append(el("span", "", "FE " + number(event.free_energy), "trace.fe"), " · ",
+      el("span", "", "Δ " + number(event.delta), "trace.delta"));
   } else if (event.type === "phase") {
     title = "Phase";
-    detail = label(event.phase ?? event.name ?? event.message);
+    detail.textContent = label(event.phase ?? event.name ?? event.message);
   } else if (event.type === "measurement") {
     title = label(event.phase ?? event.name ?? "Measurement");
-    detail = label(event.message ?? event.metric);
+    detail.textContent = label(event.message ?? event.metric);
   } else if (event.type === "finish") {
     title = "Finished";
-    detail = label(event.status);
-    if (Number.isFinite(event.iterations)) detail += ` · ${number(event.iterations)} sweeps`;
-    if (Number.isFinite(event.residual)) detail += ` · residual ${number(event.residual)}`;
+    if (event.status) detail.append(el("span", "", label(event.status), statusHelp(event.status)));
+    if (Number.isFinite(event.iterations)) detail.append(" · ", el("span", "", `${number(event.iterations)} sweeps`, "trace.iterations"));
+    if (Number.isFinite(event.residual)) detail.append(" · ", el("span", "", "residual " + number(event.residual), "trace.residual"));
   } else if (event.type === "error") {
     row.classList.add("trace-error");
-    detail = label(event.message ?? event.error ?? event.detail);
+    detail.textContent = label(event.message ?? event.error ?? event.detail);
   }
-  row.append(el("strong", "", title), el("span", "", detail));
-  if (Number.isFinite(event.elapsed_ms)) row.append(el("small", "", duration(event.elapsed_ms)));
+  row.append(el("strong", "", title), detail);
+  if (Number.isFinite(event.elapsed_ms)) row.append(el("small", "", duration(event.elapsed_ms),
+    event.type === "sweep" ? "trace.replayTime" : "trace.warmTime"));
   return row;
 }
 
@@ -202,7 +215,7 @@ function controlActions(status) {
 export function renderTrace(container, job, controlCallback) {
   const focus = container.contains(document.activeElement) ? document.activeElement.dataset.traceAction : null;
   if (!job) {
-    container.replaceChildren(el("p", "empty", "Start a run to see its trace."));
+    container.replaceChildren(el("p", "empty", "Start a run to see its trace.", "trace.empty"));
     return;
   }
   const events = Array.isArray(job.events) ? job.events : [];
@@ -217,16 +230,16 @@ export function renderTrace(container, job, controlCallback) {
   const view = el("section", "run-trace");
   view.setAttribute("aria-label", "Run timeline");
   const header = el("header", "trace-header");
-  const title = el("h3", "", job.kind === "profile" ? "Resource profile" : "Run trace");
+  const title = el("h3", "", job.kind === "profile" ? "Resource profile" : "Run trace", "trace.title");
   if (job.id) title.title = String(job.id);
-  const badge = el("span", "trace-status", label(rawStatus));
+  const badge = el("span", "trace-status", label(rawStatus), statusHelp(rawStatus));
   badge.dataset.state = group;
   badge.tabIndex = -1;
   header.append(title, badge);
   if (job.kind === "trace" && typeof controlCallback === "function" && !terminal) {
     const controls = el("div", "trace-controls");
     for (const action of controlActions(rawStatus)) {
-      const button = el("button", "", action[0].toUpperCase() + action.slice(1));
+      const button = el("button", "", action[0].toUpperCase() + action.slice(1), "trace." + action);
       button.type = "button";
       button.dataset.traceAction = action;
       button.addEventListener("click", async () => {
@@ -234,7 +247,7 @@ export function renderTrace(container, job, controlCallback) {
         try {
           await controlCallback(action);
         } catch (cause) {
-          const message = el("p", "trace-error", cause instanceof Error ? cause.message : String(cause));
+          const message = el("p", "trace-error", cause instanceof Error ? cause.message : String(cause), "trace.error");
           message.setAttribute("role", "alert");
           view.append(message);
         } finally {
@@ -247,7 +260,7 @@ export function renderTrace(container, job, controlCallback) {
   }
   const body = el("div", "trace-body");
   const figure = drawChart(energySeries(events.filter(event => event.type === "sweep"), result), terminal);
-  const recent = el("div", "trace-events");
+  const recent = el("div", "trace-events", undefined, "trace.recent");
   recent.append(el("h4", "", "Recent events"));
   const rows = events.filter(event => ["phase", "sweep", "measurement", "finish", "error"].includes(event.type));
   if (!finish && job.result && terminal) rows.push({ ...result, type: "finish" });
@@ -261,7 +274,7 @@ export function renderTrace(container, job, controlCallback) {
   body.append(figure, recent);
   view.append(header, body, metrics(events, result));
   if (job.kind === "profile" && job.result) view.append(profileDetails(result));
-  if (job.detail && ["error", "stopped"].includes(group) && !error) view.append(el("p", "trace-error", job.detail));
+  if (job.detail && ["error", "stopped"].includes(group) && !error) view.append(el("p", "trace-error", job.detail, "trace.error"));
   container.replaceChildren(view);
   if (focus) (view.querySelector(`[data-trace-action="${focus}"]`) ?? badge).focus({ preventScroll: true });
 }

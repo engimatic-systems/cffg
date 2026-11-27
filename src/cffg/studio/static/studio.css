@@ -522,3 +522,23 @@ body {grid-template-columns:minmax(0,1fr)}
 
 .tour-launch { padding:4px 8px; color:var(--secondary); }
 #outline .graph-hover, #inspector .graph-hover { box-shadow:inset 2px 0 var(--accent); background:var(--accent-bg); color:var(--accent); }
+
+#help-gesture { margin-left:auto; color:var(--muted); font-size:10px; white-space:nowrap; }
+#studio-option-help {
+  position:fixed;
+  z-index:10000;
+  pointer-events:none;
+  width:max-content;
+  max-width:min(37ch,calc(100vw - 16px));
+  padding:9px 12px;
+  border:1px solid #636977;
+  border-radius:6px;
+  background:#252a32;
+  color:#f1f3f7;
+  box-shadow:0 4px 18px #0007;
+  font:normal 13px/1.45 var(--ui);
+  text-align:left;
+  overflow-wrap:anywhere;
+  white-space:normal;
+}
+@media (max-width:540px), (hover:none) { #help-gesture { display:none; } }
