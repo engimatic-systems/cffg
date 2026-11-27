@@ -17,12 +17,15 @@ the nearest free side. This module reproduces that convention:
   free side in (left, up, down, right) order — which reproduces where the
   papers put d, A, B, c, and e.
 
-Every decision is a pure function of names and topology — no global
-optimisation — so an edit to the template moves only the rows/columns it
-touches: the stability property the editing workflow needs.
+Indexed recurrence chains use fixed left-to-right time columns and a bounded
+spring relaxation of the vertical lanes. Wire routes leave both attachment
+sides outward and follow clear corridors around unrelated boxes.
 """
 
 from __future__ import annotations
+
+from .routing import WireRouter
+from .temporal_layout import temporal_grid
 
 import re
 from collections import deque
@@ -32,7 +35,6 @@ from cffg.viz.compress import Placement, Presentation
 from cffg.viz.diagram import (
     BeadShape,
     Diagram,
-    NodeEnd,
     TerminalEnd,
     TerminalKind,
     WireView,
@@ -66,6 +68,8 @@ class LayoutStyle:
     terminal_offset: float = 0.52  # of pitch, box center -> terminal center
     composite_pad: float = 13.0
 
+    temporal_flow: bool = True
+
     def sizes(self, compact: bool) -> tuple[float, float, float]:
         if compact:
             return self.compact_box, self.compact_pitch_x, self.compact_pitch_y
@@ -94,7 +98,7 @@ def layout(
 
 
 def _layout_connected(diagram, presentation, style, offsets=None) -> Scene:
-    grid, rail = _place_factors(diagram)
+    grid, rail = _place_factors(diagram, temporal_flow=style.temporal_flow)
     if offsets:
         grid = {name: (x + offsets.get(name, (0, 0))[0], y + offsets.get(name, (0, 0))[1])
                 for name, (x, y) in grid.items()}
@@ -199,8 +203,11 @@ def _rail(diagram: Diagram, adj) -> list[str]:
     return path if natural_key(path[0]) <= natural_key(path[-1]) else path[::-1]
 
 
-def _place_factors(diagram: Diagram) -> tuple[dict[str, tuple[int, int]], list[str]]:
+def _place_factors(diagram: Diagram, *, temporal_flow: bool = True) -> tuple[dict[str, tuple[int, int]], list[str]]:
     adj = _adjacency(diagram)
+    temporal = temporal_grid(diagram, adj) if temporal_flow else None
+    if temporal is not None:
+        return temporal, []
     rail = _rail(diagram, adj)
     grid: dict[str, tuple[int, int]] = {f: (i, 0) for i, f in enumerate(rail)}
     occupied = set(grid.values())
@@ -302,6 +309,7 @@ def _emit(
 
     anchors = _anchor_points(diagram, sides, centers, grid, box, (pitch_x, pitch_y))
 
+    router = WireRouter(grid, (pitch_x, pitch_y), box)
     wires: list[Path] = []
     beads: list[Bead] = []
     terminals: list[Terminal] = []
@@ -310,7 +318,7 @@ def _emit(
     for wire in diagram.wires.values():
         directive = presentation.wires[wire.id]
         pts, term_item, ellipsis_item = _wire_geometry(
-            wire, anchors, centers, sides, style, (pitch_x, pitch_y)
+            wire, anchors, style, (pitch_x, pitch_y), router
         )
         label_at = _label_pos(pts, style) if wire.label else None
         if wire.moment_endpoints:
@@ -401,26 +409,27 @@ def _anchor_points(diagram, sides, centers, grid, box, pitch):
     return anchors
 
 
-def _wire_geometry(wire, anchors, centers, sides, style, pitch):
+def _wire_geometry(wire, anchors, style, pitch, router):
     pitch_x, pitch_y = pitch
     pts: list[tuple[float, float]] = []
     terminal = None
     ellipsis = None
 
-    node_pts = []
-    for end in wire.ends:
-        if isinstance(end, NodeEnd):
-            x, y, _ = anchors[(end.factor, end.role)]
-            node_pts.append((x, y))
-    if len(node_pts) == 2:
-        pts = _route(node_pts[0], node_pts[1], _start_side(wire, anchors))
+    nodes = wire.node_ends()
+    if len(nodes) == 2:
+        a, b = nodes
+        pts = router.connect(
+            anchors[(a.factor, a.role)], anchors[(b.factor, b.role)], a.factor, b.factor
+        )
     else:
-        (node,) = wire.node_ends()
+        (node,) = nodes
         term = next(e for e in wire.ends if isinstance(e, TerminalEnd))
         x, y, side = anchors[(node.factor, node.role)]
         dx, dy = _DIRS[side]
-        tx = x + dx * pitch_x * style.terminal_offset
-        ty = y + dy * pitch_y * style.terminal_offset
+        length = router.terminal(
+            node.factor, (x, y), (pitch_x if dx else pitch_y) * style.terminal_offset, (dx, dy)
+        )
+        tx, ty = x + dx * length, y + dy * length
         pts = [(x, y), (tx, ty)]
         ref = term.ref or wire.id
         if term.kind is TerminalKind.ELLIPSIS:
@@ -432,19 +441,6 @@ def _wire_geometry(wire, anchors, centers, sides, style, pitch):
             label = "" if term.kind is TerminalKind.POINTMASS else term.label
             terminal = Terminal(ref, tx, ty, term.kind, label)
     return tuple(pts), terminal, ellipsis
-
-
-def _start_side(wire, anchors):
-    end = wire.node_ends()[0]
-    return anchors[(end.factor, end.role)][2]
-
-
-def _route(a, b, start_side) -> list[tuple[float, float]]:
-    (x1, y1), (x2, y2) = a, b
-    if abs(x1 - x2) < 0.5 or abs(y1 - y2) < 0.5:
-        return [a, b]
-    bend = (x2, y1) if start_side in ("left", "right") else (x1, y2)
-    return [a, bend, b]
 
 
 def _midpoint(pts) -> tuple[float, float]:

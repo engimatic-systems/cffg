@@ -2,7 +2,7 @@
 id: cff-xikb
 status: closed
 deps: [cff-cz82, cff-7noc, cff-w551, cff-5mf2, cff-fw2v]
-links: [cff-0266]
+links: [cff-0266, cff-1fr4]
 created: 2026-11-26T19:44:48Z
 type: epic
 priority: 1
