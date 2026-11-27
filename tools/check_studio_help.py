@@ -1,9 +1,11 @@
 """Check Option-hover in Studio's real shell with an empty, read-only test library.
 
 Run with `uv run --with playwright python tools/check_studio_help.py`.
-Install Chromium once with `uv run --with playwright playwright install chromium`.
+Use `--browser webkit` for WebKit. Install the required browser with
+`uv run --with playwright playwright install chromium webkit`.
 """
 
+import argparse
 import json
 import mimetypes
 from pathlib import Path
@@ -27,11 +29,16 @@ def serve(route):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--browser", choices=("chromium", "webkit"), default="chromium")
+    args = parser.parse_args()
     catalog = json.loads((STATIC / "tooltips.json").read_text())["entries"]
     assert all(row["review"] == "approved" and row["text"] for row in catalog.values())
-    with sync_playwright() as pw, pw.chromium.launch() as browser:
+    with sync_playwright() as pw, getattr(pw, args.browser).launch() as browser:
         page = browser.new_page()
         page.route("http://studio.test/**", serve)
+        # The document never receives keydown when Option was held before entry.
+        page.keyboard.down("Alt")
         page.goto("http://studio.test")
         tip = page.get_by_role("tooltip")
         status = page.locator("#status")
@@ -40,10 +47,43 @@ def main():
         def explains(key):
             expect(tip).to_have_text(catalog[key]["text"])
 
+        page.locator("#zoom").hover()
+        explains("studio.zoom")
+        page.keyboard.press("Escape")
+        status.hover()
+        expect(tip).to_have_count(0)
+        page.keyboard.up("Alt")
+
+        # A remote client can use the same hover/focus experience without modifiers.
+        toggle = page.get_by_role("button", name="Hover help")
+        toggle.click()
+        expect(toggle).to_have_attribute("aria-pressed", "true")
+        page.locator("#zoom").hover()
+        explains("studio.zoom")
+        page.locator("[data-cmd=keys]").click()
+        page.locator("#keymap-keys").focus()
+        page.keyboard.press("Tab")
+        context = page.locator("#keymap-context")
+        expect(context).to_be_focused()
+        explains("keys.context")
+        page.keyboard.press("Escape")
+        expect(toggle).to_have_attribute("aria-pressed", "false")
+        expect(tip).to_have_count(0)
+        expect(context).to_be_visible()
+        page.locator("dialog[open]").get_by_role("button", name="Cancel").click()
+
         # Option can be pressed after hovering and kept down across controls.
         status.hover()
         expect(tip).to_have_count(0)
         page.keyboard.down("Alt")
+        explains("studio.status")
+        # A live update can replace the element without any physical mouse motion.
+        status.evaluate("""node => {
+            const next = node.cloneNode(true);
+            next.removeAttribute('aria-describedby');
+            node.replaceWith(next);
+        }""")
+        expect(status).to_have_attribute("aria-describedby", "studio-option-help")
         explains("studio.status")
         page.locator("#zoom").hover()
         explains("studio.zoom")

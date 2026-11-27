@@ -523,7 +523,9 @@ body {grid-template-columns:minmax(0,1fr)}
 .tour-launch { padding:4px 8px; color:var(--secondary); }
 #outline .graph-hover, #inspector .graph-hover { box-shadow:inset 2px 0 var(--accent); background:var(--accent-bg); color:var(--accent); }
 
-#help-gesture { margin-left:auto; color:var(--muted); font-size:10px; white-space:nowrap; }
+#help-gesture { margin-left:auto; flex:none; gap:4px; white-space:nowrap; }
+#help-gesture kbd { font:inherit; }
+#help-gesture[aria-pressed="true"] { background:var(--accent); color:var(--desk); }
 #studio-option-help {
   position:fixed;
   z-index:10000;
@@ -541,4 +543,3 @@ body {grid-template-columns:minmax(0,1fr)}
   overflow-wrap:anywhere;
   white-space:normal;
 }
-@media (max-width:540px), (hover:none) { #help-gesture { display:none; } }
