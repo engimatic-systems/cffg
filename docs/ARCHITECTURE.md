@@ -2372,8 +2372,11 @@ conditional update of the central bare repository's main ref. Models occupy
 JSON, array and learner members reconstruct a current-format bundle. Persistent
 identity covers model data and learning. The Studio sidecar owns stable
 selection anchors, annotations, review threads, recipe hints, guided tours and
-grid offsets. Tours contain ordered plain-text stops anchored to a model or
-plate fragment. Native bundles retain the numerical model while Studio project
+grid offsets. A tour stop can frame its whole scope, a single anchor, or an
+ordered group of anchors from one model or plate fragment. The browser measures
+the surviving targets' SVG geometry, including offscreen marks and labels,
+then fits and highlights them together. Paging cancels pending camera movement
+and plate loads from the previous stop. Native bundles retain the numerical model while Studio project
 exchange and revision history carry its tours.
 Agents and the browser issue the same revision-checked commands. Metadata edits
 retain the accepted model bytes. Model edits serialize, reload and pass compiler

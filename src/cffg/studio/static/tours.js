@@ -17,7 +17,28 @@ const node = (tag, value, help) => {
   return result;
 };
 
-export function setupTours({rootModel, showTarget, currentModel, report}) {
+function modelLink(model, tour) {
+  const url = new URL(location.href);
+  url.search = new URLSearchParams(tour ? {model,tour} : {model});
+  url.hash = '';
+  return url.href;
+}
+
+function authorPrompt(model) {
+  const cli = 'uv run --extra studio cffg-studio';
+  return [
+    'Write and publish a guided tour of the CFFG Studio model '+JSON.stringify(model.template.name)+'.',
+    'Model ID: '+model.id+'\nModel link: '+modelLink(model.id),
+    'From the CFFG checkout, run '+cli+' show '+model.id+' to read the current revision, graph, and valid reference keys in metadata.anchors. Remote agents use their configured CFFG_STUDIO_URL and edit-scoped CFFG_STUDIO_TOKEN.',
+    'Explain what the model represents and trace one concrete path through its factors and variables. Base each explanation on the graph. Start with an overview, then alternate single elements with groups that show how they interact.',
+    'Write tour.json as an array containing one set_tour command with a new lowercase tour id, title, and ordered steps. Each step needs title and text. Omit targets for an overview, use "ref" for one reference, or "refs" for a group of up to 64 distinct references. List the inspector focus first. For stops inside a plate, set "plate" to its name and use references from GET /v1/models/'+model.id+'?plate=PLATE_NAME. Run '+cli+' capabilities for the tour schema.',
+    'Preview using the revision from show in place of REVISION:\n'+cli+' preview '+model.id+' --base REVISION --commands tour.json',
+    'After a successful preview, publish with the same base:\n'+cli+' apply '+model.id+' --base REVISION --commands tour.json\nIf the base has changed, read the latest graph, check the targets, and preview again before applying.',
+    'Return the playback link with your actual tour id in place of TOUR_ID: '+modelLink(model.id,'TOUR_ID'),
+  ].join('\n\n');
+}
+
+export function setupTours({rootModel, showTarget, clearTarget, currentModel, report}) {
   const dialog = node("dialog");
   dialog.id = "studio-tours";
   dialog.className = "tour-dialog";
@@ -46,8 +67,9 @@ export function setupTours({rootModel, showTarget, currentModel, report}) {
   }
   function position() {
     if (!dialog.open || !tour) return;
-    const bounds = target?.isConnected ? target.getBoundingClientRect() : null;
-    ring.hidden = !bounds || (bounds.width < 1 && bounds.height < 1);
+    const framed = target?.classList.contains('tour-frame');
+    const bounds = target?.isConnected ? (framed ? target.ownerSVGElement : target).getBoundingClientRect() : null;
+    ring.hidden = framed || !bounds || (bounds.width < 1 && bounds.height < 1);
     if (!ring.hidden) {
       const x = Math.max(3, bounds.left-4), y = Math.max(3, bounds.top-4);
       Object.assign(ring.style, {left:x+"px", top:y+"px",
@@ -60,9 +82,11 @@ export function setupTours({rootModel, showTarget, currentModel, report}) {
     card.style.right = leftHalf ? "auto" : "12px";
     card.style.top = upperHalf ? "12px" : "auto";
     card.style.bottom = upperHalf ? "auto" : "12px";
+    body.tabIndex = body.scrollHeight > body.clientHeight ? 0 : -1;
   }
   function list() {
     generation++;
+    clearTarget();
     tour = null; target = null; ring.hidden = true;
     dialog.classList.remove("playing");
     card.removeAttribute("style");
@@ -70,6 +94,7 @@ export function setupTours({rootModel, showTarget, currentModel, report}) {
     heading.textContent = "Guided tours";
     heading.dataset.help = "tour.list";
     body.replaceChildren();
+    body.removeAttribute("tabindex");
     for (const entry of [intro,...Object.values(owner?.metadata.tours || {})]) {
       const choice = action(entry.title, entry === intro ? "tour.intro" : "tour.model", () => start(entry));
       const count = node("small", entry.steps.length+" steps", "tour.count");
@@ -78,27 +103,56 @@ export function setupTours({rootModel, showTarget, currentModel, report}) {
       body.append(choice);
     }
     controls.replaceChildren(action("Close", "tour.close", () => dialog.close()));
+    if (owner) {
+      const copy = action("Copy agent prompt", "tour.author", async () => {
+        const prompt = authorPrompt(owner);
+        try {
+          await navigator.clipboard.writeText(prompt);
+          copy.textContent = "Copied agent prompt";
+        } catch {
+          let field = body.querySelector("textarea");
+          if (!field) {
+            field = node("textarea", undefined, "tour.prompt");
+            field.readOnly = true;
+            field.rows = 5;
+            field.setAttribute("aria-label","Agent prompt to copy");
+            body.append(field);
+          }
+          field.value = prompt;
+          field.focus();
+          field.select();
+        }
+      });
+      controls.prepend(copy);
+    }
     body.querySelector("button")?.focus();
   }
   async function step(next) {
     if (!tour || next < 0 || next >= tour.steps.length) return;
     const seq = ++generation;
+    clearTarget();
     index = next; target = null; ring.hidden = true;
     const stop = tour.steps[index];
     progress.textContent = tour.title+" · "+(index+1)+" of "+tour.steps.length;
     heading.textContent = stop.title;
     heading.dataset.help = "tour.step";
     body.replaceChildren(node("p", stop.text, "tour.step"));
+    body.scrollTop = 0;
     const back = action("Back", "tour.back", () => step(index-1));
     back.disabled = index === 0;
-    controls.replaceChildren(action("End tour", "tour.end", () => dialog.close()), back,
+    function hint(button, glyph, key) {
+      const kbd = node("kbd",glyph);
+      kbd.setAttribute("aria-hidden","true");
+      button.append(kbd);
+      button.setAttribute("aria-keyshortcuts",key);
+      return button;
+    }
+    controls.replaceChildren(action("End tour", "tour.end", () => dialog.close()), hint(back,"←","ArrowLeft"),
       index === tour.steps.length-1 ? action("Finish", "tour.finish", () => dialog.close(), true)
-                                    : action("Next", "tour.next", () => step(index+1), true));
+                                    : hint(action("Next", "tour.next", () => step(index+1), true),"→","ArrowRight"));
     if (tour !== intro) {
       const copy = action("Copy link", "tour.copy", async () => {
-        const url = new URL(location.href);
-        url.search = new URLSearchParams({model:owner.id,tour:tour.id}).toString();
-        await navigator.clipboard.writeText(url.href);
+        await navigator.clipboard.writeText(modelLink(owner.id,tour.id));
         report("Copied tour link");
       });
       controls.prepend(copy);
@@ -106,18 +160,31 @@ export function setupTours({rootModel, showTarget, currentModel, report}) {
     dialog.classList.add("playing");
     position();
     heading.focus({preventScroll:true});
+    const current = () => seq === generation && dialog.open;
     let result;
     try {
-      result = tour === intro ? document.querySelector(stop.target)
-                             : await showTarget(owner, stop);
+      result = tour === intro ? {target:document.querySelector(stop.target)}
+                             : await showTarget(owner, stop, current);
     } catch (error) {
       if (seq === generation) body.append(node("p", error.message, "tour.target-error"));
     }
-    if (seq !== generation || !dialog.open) return;
-    target = result;
-    if (!target && tour !== intro) body.append(node("small", "This target is unavailable in the current revision.", "tour.missing-target"));
-    if (target && !target.closest("svg")) target.scrollIntoView({block:"nearest",inline:"nearest"});
+    if (!current()) return;
+    target = result?.target;
+    if (result?.missing?.length)
+      body.append(node("small","Unavailable in this revision · "+result.missing.join(", "),"tour.unframed"));
+    if (result?.offCanvas?.length)
+      body.append(node("small","No canvas mark · "+result.offCanvas.join(", "),"tour.unframed"));
+    if (!target && !result?.missing?.length && tour !== intro && !body.querySelector('[data-help="tour.target-error"]')) {
+      body.append(node("small", "This target is unavailable in the current revision.", "tour.missing-target"));
+    }
+    const surface = target?.ownerSVGElement || target;
+    if (surface) {
+      const rect = surface.getBoundingClientRect();
+      if (rect.top < 0 || rect.left < 0 || rect.bottom > innerHeight || rect.right > innerWidth)
+        surface.scrollIntoView({block:"nearest",inline:"nearest"});
+    }
     position();
+    result?.focus?.(card);
   }
   function start(entry) { tour = entry; return step(0); }
   async function open(id) {
@@ -126,8 +193,9 @@ export function setupTours({rootModel, showTarget, currentModel, report}) {
       dialog.showModal();
     }
     const seq = ++generation;
-    owner = await rootModel();
+    const model = await rootModel();
     if (seq !== generation || !dialog.open) return;
+    owner = model;
     const entry = id === "intro" ? intro : owner?.metadata.tours?.[id];
     if (entry) await start(entry);
     else {
@@ -135,14 +203,16 @@ export function setupTours({rootModel, showTarget, currentModel, report}) {
       if (id) body.prepend(node("p","This tour is unavailable in the current revision.", "tour.missing"));
     }
   }
-  dialog.addEventListener("keydown", e => {
-    if (!tour || e.altKey || e.metaKey || e.ctrlKey) return;
+  document.addEventListener("keydown", e => {
+    if (!dialog.open || !tour || e.isComposing || e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return;
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     e.preventDefault();
+    e.stopPropagation();
     void step(index + (e.key === "ArrowRight" ? 1 : -1));
-  });
+  }, true);
   dialog.addEventListener("close", () => {
     ++generation; tour = null; target = null; ring.hidden = true;
+    clearTarget();
     if (trigger?.isConnected) trigger.focus({preventScroll:true});
   });
   addEventListener("resize", position);

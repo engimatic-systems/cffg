@@ -1,3 +1,5 @@
+import {createTourCamera} from './tour-camera.js';
+
 // The scene owns the Forney geometry. The template supplies the meaning of each mark.
 const NS = "http://www.w3.org/2000/svg";
 const colors = {
@@ -10,10 +12,10 @@ const style = `
   .graph-item.hovered { color: #fff1b5; }
   .graph-item.hovered .wire { stroke-width: 3.6; }
   .graph-item.hovered .caption { fill: currentColor; }
-  .graph-item.selected { color: var(--accent, #ffb18d); }
+  .graph-item:is(.selected,.tour-target) { color: var(--accent, #ffb18d); }
   .graph-item .face { fill: #252932; stroke: currentColor; stroke-width: 1.5; }
-  .graph-item.selected .face { fill: var(--accent-bg, #423329); stroke-width: 2.8; }
-  .graph-item.selected .wire { stroke-width: 3.8; }
+  .graph-item:is(.selected,.tour-target) .face { fill: var(--accent-bg, #423329); stroke-width: 2.8; }
+  .graph-item:is(.selected,.tour-target) .wire { stroke-width: 3.8; }
   .graph-item text { fill: currentColor; font-family: "IBM Plex Mono", ui-monospace, monospace;
      paint-order: stroke; stroke: #1c1e23; stroke-width: 3; stroke-linejoin: round; }
   .graph-canvas .glyph { font-family: "STIX Two Text", Georgia, serif; font-weight: 600; stroke: none; }
@@ -23,12 +25,12 @@ const style = `
   .graph-item .glyph-sub { font: 10px ui-monospace, monospace; }
   .graph-item .frame { stroke: currentColor; stroke-dasharray: 6 4; fill: none; }
   .graph-item .focus-ring { display: none; stroke: var(--accent, #ffb18d); fill: none; stroke-width: 1.3; }
-  .graph-item.selected .focus-ring { display: inline; }
+  .graph-item:is(.selected,.tour-target) .focus-ring { display: inline; }
   .graph-item .hit { stroke: transparent; stroke-width: 13; fill: none; pointer-events: stroke; }
   .graph-item .wire { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
-  .graph-canvas.low-detail .graph-item:not(.selected,.hovered) .param-name,
-  .graph-canvas.overview .graph-item:not(.selected,.hovered) :is(.caption,.wire-name),
-  .graph-canvas.low-detail.dense .graph-item:not(.selected,.hovered) :is(.caption,.wire-name) { display: none; }
+  .graph-canvas.low-detail .graph-item:not(.selected,.hovered,.tour-target) .param-name,
+  .graph-canvas.overview .graph-item:not(.selected,.hovered,.tour-target) :is(.caption,.wire-name),
+  .graph-canvas.low-detail.dense .graph-item:not(.selected,.hovered,.tour-target) :is(.caption,.wire-name) { display: none; }
 `;
 
 function element(tag, attrs = {}, value) {
@@ -402,6 +404,12 @@ export function mountGraph(container, snapshot, selectCallback) {
   const signal = new AbortController();
   const on = (name, fn, options = {}) => svg.addEventListener(name, fn, {...options,signal:signal.signal});
 
+  const camera = createTourCamera({
+    svg, layer:overlay, scene, byRef, drawRow:row => drawRecord(row,false,false),
+    view:() => ({width,height,left,top,scale}),
+    move(x,y,s) { left=x; top=y; scale=s; redraw(); notifyZoom(); }, redraw,
+  });
+
   function paint() {
     frame = 0;
     layer.setAttribute("transform", `translate(${left} ${top}) scale(${scale})`);
@@ -419,13 +427,15 @@ export function mountGraph(container, snapshot, selectCallback) {
     const cellSize = Math.max(12, Math.sqrt(width * height / 900));
     const cells = new Set();
     for (const row of candidates) {
-      if (overview && row.ref !== selectedRef && row.group !== hoveredGroup) {
+      if (overview && row.ref !== selectedRef && row.group !== hoveredGroup && !camera.targets.has(row)) {
         if (row.item.primitive !== "Box" && row.item.primitive !== "PlateBox") continue;
         const cell = Math.floor(row.box[0]*scale/cellSize) + ":" + Math.floor(row.box[1]*scale/cellSize);
         if (cells.has(cell)) continue;
         cells.add(cell);
       }
-      next.set(row.id, visible.get(row.id) || drawRecord(row,row.ref === selectedRef,row.group === hoveredGroup));
+      const node = visible.get(row.id) || drawRecord(row,row.ref === selectedRef,row.group === hoveredGroup);
+      node.classList.toggle("tour-target", camera.targets.has(row));
+      next.set(row.id, node);
     }
     for (const [key, node] of visible) if (!next.has(key)) node.remove();
     if (next.size !== visible.size || [...next.keys()].some(key => !visible.has(key))) {
@@ -481,26 +491,7 @@ export function mountGraph(container, snapshot, selectCallback) {
   function hover(ref) {
     setHover(ref || null, ref ? root.model.hoverGroup(ref) : null);
   }
-  function reveal(ref) {
-    const matches = byRef.get(ref);
-    if (!matches?.length) return null;
-    const row = matches.find(r => r.model === root.model && r.localRef === ref &&
-      ["Box","Terminal","PlateBox"].includes(r.item.primitive)) || matches[0];
-    const [l,t,r,b] = row.box;
-    const pad = Math.min(28, width/8, height/8);
-    const next = Math.min(Math.max(scale, 1.5), (width-2*pad)/Math.max(r-l,1), (height-2*pad)/Math.max(b-t,1));
-    if (next !== scale || left+l*scale < pad || top+t*scale < pad ||
-      left+r*scale > width-pad || top+b*scale > height-pad) {
-      scale = next;
-      left = (width - (l+r)*scale)/2;
-      top = (height - (t+b)*scale)/2;
-      notifyZoom();
-    }
-    cancelAnimationFrame(frame);
-    paint();
-    return visible.get(row.id) || null;
-  }
-  function select(ref) {
+  function select(ref, pan=true) {
     const old = selectedRef;
     selectedRef = ref || null;
     for (const key of [old,selectedRef]) for (const row of byRef.get(key) || []) {
@@ -509,7 +500,7 @@ export function mountGraph(container, snapshot, selectCallback) {
     const matches = byRef.get(selectedRef);
     if (!matches?.length) return;
     const view = [-left/scale,-top/scale,(width-left)/scale,(height-top)/scale];
-    if (!matches.some(row => intersects(row.box,view))) {
+    if (pan && !matches.some(row => intersects(row.box,view))) {
       const [l,t,r,b] = matches[0].box;
       left = (width - (l+r)*scale)/2;
       top = (height - (t+b)*scale)/2;
@@ -532,6 +523,7 @@ export function mountGraph(container, snapshot, selectCallback) {
       redraw();
       notifyZoom();
     }
+    camera.resize();
   }
 
   function modelPoint(e) {
@@ -628,8 +620,10 @@ export function mountGraph(container, snapshot, selectCallback) {
   }, {passive:false});
   const observer = new ResizeObserver(resize);
   observer.observe(svg);
+  window.addEventListener("scroll",camera.resize,{signal:signal.signal});
   resize();
-  return {select,hover,reveal,zoom,fit,destroy() {
+  return {select,hover,showTour:camera.show,clearTour:camera.clear,zoom,fit,destroy() {
+    camera.clear();
     hover(null);
     signal.abort();
     observer.disconnect();

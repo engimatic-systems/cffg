@@ -60,14 +60,21 @@ its hidden ground truth. Reuse the resulting tape to compare model revisions.
 
 ### Guided tours
 
-Choose **Tours → Getting started with CFFG Studio** for a keyboard walkthrough.
-Use **Next** and **Back** or the arrow keys. **Escape** ends the tour. Model tours
-in the same menu focus the graph on the referenced factor, variable, port or
-parameter. **Copy link** opens that model and tour together.
+To have a coding agent guide you through a model, open the model, choose
+**Tours → Copy agent prompt**, and paste it into the agent. Add what you want
+explained, such as “trace one observation back to the hidden state.” The prompt
+includes the model ID, its link, and instructions for publishing. A remote
+agent needs the Studio endpoint and its own edit token (see **Coding agents**
+below). Open the playback link the agent returns, or select its tour under
+**Tours**.
 
-A coding agent can publish a tour using the same preview and apply commands as
-any other revision. For example, save this command array as `tour.json` for
-the canonical rSLDS:
+Use **←** and **→** to page through stops and **Escape** to leave. The canvas
+pans and zooms to show each highlighted group together. With reduced motion
+enabled, it jumps directly there. **Copy link** shares the tour. For a walkthrough
+of the editor itself, choose **Tours → Getting started with CFFG Studio**.
+
+For example, an agent can save this command array as `tour.json` for the
+canonical rSLDS.
 
 ```json
 [{
@@ -75,19 +82,25 @@ the canonical rSLDS:
   "id": "switching-dynamics",
   "title": "Follow one switching transition",
   "steps": [
+    {"title": "The switching model", "text": "Follow how a discrete regime changes the continuous state and its next observation."},
     {"title": "Initial regime", "ref": "factor:z0_prior", "text": "This categorical prior supplies the starting regime."},
-    {"title": "State entering the dynamics", "ref": "var:x0_dynamics", "text": "This branch of x0 feeds the continuous transition to x1."},
+    {"title": "One transition", "refs": ["factor:dynamics1", "var:x0_dynamics", "factor:switch1"], "text": "Trace the previous state and the new regime into the first continuous transition."},
     {"title": "Next observation", "ref": "factor:emission1", "text": "The emission factor maps x1 to observation y1."}
   ]
 }]
 ```
 
+Run `uv run --extra studio cffg-studio show MODEL_ID` to get the current
+`revision` and valid reference names under `metadata.anchors`.
 Run `uv run --extra studio cffg-studio preview MODEL_ID --base REVISION --commands tour.json`,
-then substitute `apply` for `preview` to publish. Reuse the tour ID to revise
+then substitute `apply` for `preview` with the same base revision to publish. Reuse the tour ID to revise
 its steps or send `{"action":"remove_tour","id":"switching-dynamics"}` in a
-command array to remove it. A step can omit `ref` to introduce the graph or
-include `"plate":"name"` to target a fragment. Published stops follow renamed
-elements. A removed target is marked unavailable during playback. Studio
+command array to remove it. For an overview, omit both `ref` and `refs`.
+A group accepts up to 64 distinct references. The inspector opens on the first
+surviving member. Set `"plate":"name"` to frame that plate's contents and use
+reference keys from `GET /v1/models/MODEL_ID?plate=name`. Published stops follow
+renamed elements. If a member disappears, playback identifies it and still
+frames the surviving marks. Studio
 project exports include tours, and `/v1/capabilities` exposes the authoring schema.
 
 ### Coding agents

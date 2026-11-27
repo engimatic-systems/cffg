@@ -1562,6 +1562,21 @@
       "draft": "Toggle hover help for this tab. When on, moving over a control or value outside the canvas or using Tab to focus a control shows its explanation without holding Option. Click again or press Escape to turn it off. Holding Option (Alt) also works momentarily with the toggle off.",
       "text": "This element is a toggle for hover help in this tab. When on, moving the pointer over a control or value outside the canvas, or pressing Tab to focus a control, shows its explanation without holding Option. Click this toggle again or press Escape to turn it off, or hold Option (Alt) to show help momentarily while the toggle is off.",
       "review": "approved"
+    },
+    "tour.author": {
+      "draft": "Copy a model-specific request to paste into a coding agent. It includes the shared model link and ID, how to find valid references, group them, preview and publish a tour, and return its link. It contains no access token.",
+      "text": "This element is a button that copies a model-specific prompt to paste into a coding agent, containing no access token. The prompt includes the shared model link and ID, along with instructions on how to find valid references, group them, preview and publish a tour, and return its link.",
+      "review": "approved"
+    },
+    "tour.unframed": {
+      "draft": "Lists targets that this tour stop could not show on the canvas. A target may have been removed or may exist in the model without a visible mark. Available members are still shown and you can continue through the tour.",
+      "text": "This element is a list of targets that this tour stop could not display on the canvas. A target may have been removed or may exist in the model without a visible mark. Available members are still shown, and you can continue through the tour.",
+      "review": "approved"
+    },
+    "tour.prompt": {
+      "draft": "A read-only field with the selected tour request for this model. It appears when the browser cannot copy the request automatically. Use the normal Copy shortcut, then paste it into your coding agent.",
+      "text": "This element is a read-only text field showing the selected tour request for this model. It appears when your browser cannot copy the request automatically. Copy the text using your standard copy shortcut, then paste it into your coding agent.",
+      "review": "approved"
     }
   }
 }

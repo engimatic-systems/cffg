@@ -1,6 +1,6 @@
 ---
 id: cff-4kzc
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-11-27T21:33:54Z
@@ -27,3 +27,7 @@ A reference identifies a named graph item. A stable anchor lets the tour keep fi
 **2026-11-27T21:41:42Z**
 
 Agent tour commands can use ordered refs within a single scope. The focused Studio tour regression passed for group validation, rename, project exchange, and revision edits. The edit-scoped CLI also published and reimported a grouped tour in a disposable library.
+
+**2026-11-27T21:45:27Z**
+
+Shipped Tours → Copy agent prompt, keyboard paging, scoped group highlights and a camera that fits visible targets around the narration. Removed references are named and remaining members are shown. Reviewed and approved all three new Gemini Carbon tooltips against the implemented behavior. Targeted validation: Studio tour pytest passed, edit-scoped CLI preview/apply and project round-trip passed, Chromium and WebKit desktop/phone playback passed for rapid paging, reduced motion, plate scope, rename and partial deletion. Long narration and 3,276-row culling passed; a live agent edit updated an open plate stop over SSE. Private agent-share launcher, real rSLDS deep link and clipboard/fallback were exercised after installing release 8262031d0188fd65. The full suite was waived for this GUI session.
