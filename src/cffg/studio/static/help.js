@@ -48,7 +48,8 @@ export function installHelp() {
       const layer = target.closest('dialog[open]') || document.body;
       if (tip.parentNode !== layer) layer.append(tip);
     }
-    if (tip.textContent !== entry.text) tip.textContent = entry.text;
+    const text = entry.text.replace(/^This element is (\S)/, (_, first) => first.toUpperCase());
+    if (tip.textContent !== text) tip.textContent = text;
     if (tip.hidden) tip.hidden = false;
     const box = target.getBoundingClientRect();
     const [x, y] = !keyboard && pointer ? pointer : [box.left, box.bottom];

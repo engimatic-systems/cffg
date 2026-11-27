@@ -45,7 +45,11 @@ def main():
         expect(status).to_contain_text("create a blank model")
 
         def explains(key):
-            expect(tip).to_have_text(catalog[key]["text"])
+            text = catalog[key]["text"]
+            if text.startswith("This element is "):
+                completion = text.removeprefix("This element is ")
+                text = completion[:1].upper() + completion[1:]
+            expect(tip).to_have_text(text)
 
         page.locator("#zoom").hover()
         explains("studio.zoom")
