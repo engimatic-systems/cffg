@@ -7,15 +7,16 @@ const colors = {
 };
 const style = `
   .graph-item { cursor: pointer; color: var(--ink); }
-  .graph-item:hover { color: #fff; }
+  .graph-item.hovered { color: #fff1b5; }
+  .graph-item.hovered .wire { stroke-width: 3.6; }
+  .graph-item.hovered .caption { fill: currentColor; }
   .graph-item.selected { color: var(--accent, #ffb18d); }
   .graph-item .face { fill: #252932; stroke: currentColor; stroke-width: 1.5; }
   .graph-item.selected .face { fill: var(--accent-bg, #423329); stroke-width: 2.8; }
   .graph-item.selected .wire { stroke-width: 3.8; }
   .graph-item text { fill: currentColor; font-family: "IBM Plex Mono", ui-monospace, monospace;
      paint-order: stroke; stroke: #1c1e23; stroke-width: 3; stroke-linejoin: round; }
-  .graph-item .glyph { font-family: "STIX Two Text", Georgia, serif; font-weight: 600;
-     stroke: none; font-size: 16px; }
+  .graph-canvas .glyph { font-family: "STIX Two Text", Georgia, serif; font-weight: 600; stroke: none; }
   .graph-item .caption { fill: #d1d3da; font-size: 11px; }
   .graph-item .wire-name { font-size: 11px; }
   .graph-item .param-name { font-size: 10px; }
@@ -25,9 +26,9 @@ const style = `
   .graph-item.selected .focus-ring { display: inline; }
   .graph-item .hit { stroke: transparent; stroke-width: 13; fill: none; pointer-events: stroke; }
   .graph-item .wire { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
-  .graph-canvas.low-detail .graph-item:not(.selected) .param-name,
-  .graph-canvas.overview .graph-item:not(.selected) :is(.caption,.wire-name),
-  .graph-canvas.low-detail.dense .graph-item:not(.selected) :is(.caption,.wire-name) { display: none; }
+  .graph-canvas.low-detail .graph-item:not(.selected,.hovered) .param-name,
+  .graph-canvas.overview .graph-item:not(.selected,.hovered) :is(.caption,.wire-name),
+  .graph-canvas.low-detail.dense .graph-item:not(.selected,.hovered) :is(.caption,.wire-name) { display: none; }
 `;
 
 function element(tag, attrs = {}, value) {
@@ -44,8 +45,7 @@ function family(variable) {
   return "plain";
 }
 
-function semantics(snapshot) {
-  const template = snapshot.template;
+function semantics(template, plateRef = null) {
   const variables = template.variables || {};
   const factors = template.factors || {};
   const ports = template.ports || {};
@@ -54,7 +54,13 @@ function semantics(snapshot) {
   const descriptions = new Map();
   const constrained = new Set();
   const observed = new Set();
-  const notes = new Map();
+  const neighbors = new Map();
+  function link(a, b) {
+    if (!neighbors.has(a)) neighbors.set(a, []);
+    if (!neighbors.has(b)) neighbors.set(b, []);
+    neighbors.get(a).push(b);
+    neighbors.get(b).push(a);
+  }
   for (const [name, variable] of Object.entries(variables)) {
     const ref = "var:" + name;
     const domain = family(variable);
@@ -68,11 +74,15 @@ function semantics(snapshot) {
     const domains = new Set(Object.values(factor.edges).map(id => family(variables[id])));
     families.set(ref, domains.size === 1 ? [...domains][0] : "mixed");
     descriptions.set(ref, name + " · " + factor.type);
+    if (factor.type === "equality") {
+      for (const variable of Object.values(factor.edges)) link(ref, "var:" + variable);
+    }
     for (const [role, blob] of Object.entries(factor.param_blobs || {})) {
       aliases.set("blob:" + name + "." + role, "blob:" + blob);
     }
   }
   for (const [name, port] of Object.entries(ports)) {
+    link("port:" + name, "var:" + port.variable);
     families.set("port:" + name, family(variables[port.variable]));
     if (port.role === "data") {
       observed.add("var:" + port.variable);
@@ -83,13 +93,87 @@ function semantics(snapshot) {
   for (const c of template.constraints || []) {
     constrained.add((c.kind === "delta" ? "var:" : "factor:") + c.target);
   }
-  const meta = snapshot.metadata || {};
-  const anchorRefs = new Map(Object.entries(meta.anchors || {}).map(([ref, id]) => [id, ref]));
-  for (const note of meta.notes || []) {
-    const ref = anchorRefs.get(note.anchor) || note.ref;
-    if (ref) notes.set(ref, (notes.get(ref) || 0) + 1);
+  // An equality tree may span many differently named edges and exposed ports.
+  const groups = new Map();
+  function hoverGroup(ref) {
+    if (groups.has(ref)) return groups.get(ref);
+    const members = [ref];
+    const group = {refs: plateRef ? [plateRef] : members, rows: []};
+    groups.set(ref, group);
+    for (const member of members) for (const next of neighbors.get(member) || []) {
+      if (groups.has(next)) continue;
+      groups.set(next, group);
+      members.push(next);
+    }
+    return group;
   }
-  return {aliases, families, descriptions, constrained, observed, notes};
+  return {factors, aliases, families, descriptions, constrained, observed, hoverGroup};
+}
+
+function bindMarginalHover(rows) {
+  const marginals = rows.filter(({item,localRef}) => localRef.startsWith("factor:") &&
+    (item.kind === "internal" || item.primitive === "Bead" || item.primitive === "Dome"));
+  if (!marginals.length) return;
+  const ends = new Map();
+  function addEnd(point, wire) {
+    const key = point.join(",");
+    if (!ends.has(key)) ends.set(key, []);
+    ends.get(key).push(wire);
+  }
+  for (const wire of rows) if (wire.item.primitive === "Path" && wire.localRef.startsWith("var:")) {
+    addEnd(wire.item.points[0], wire);
+    addEnd(wire.item.points.at(-1), wire);
+  }
+  // Marginal marks belong to the factor for editing. Only associate a mark
+  // with one quantity when all its anchors carry that same declared edge family.
+  function match(row, points) {
+    const factor = row.model.factors[row.localRef.slice("factor:".length)];
+    if (!factor) return;
+    const variables = new Set(Object.values({...factor.edges, ...factor.param_edges}));
+    let found;
+    for (const point of points) {
+      const wires = (ends.get(point.join(",")) || []).filter(wire =>
+        wire.model === row.model && variables.has(wire.localRef.slice("var:".length)));
+      if (!wires.length) return;
+      for (const wire of wires) {
+        if (found && found.group !== wire.group) return;
+        found = wire;
+      }
+    }
+    return found;
+  }
+  for (const row of marginals) if (row.item.kind === "internal") {
+    const wire = match(row, [row.item.points[0]]);
+    if (wire) {
+      row.hoverRef = wire.ref;
+      row.group = wire.group;
+      addEnd(row.item.points.at(-1), wire);
+    }
+  }
+  for (const row of marginals) if (row.item.kind !== "internal") {
+    const wire = match(row, row.item.anchors || [[row.item.x, row.item.y]]);
+    if (wire) {
+      row.hoverRef = wire.ref;
+      row.group = wire.group;
+    }
+  }
+}
+
+const glyphWidths = new Map();
+function factorGlyph(item) {
+  const glyph = item.glyph.replace(/^𝒩/, "N");
+  const [givenX, gy] = item.glyph_at || [item.x, item.y];
+  const gx = [...glyph].length > 1 ? item.x : givenX;
+  if (!glyphWidths.has(glyph)) {
+    const context = document.createElement("canvas").getContext("2d");
+    context.font = '600 16px "STIX Two Text", Georgia, serif';
+    glyphWidths.set(glyph, context.measureText(glyph).width);
+  }
+  const availableWidth = item.w - 2 * Math.abs(gx - item.x) - 8;
+  const availableHeight = item.h - 2 * Math.abs(gy - item.y) - 4;
+  const size = Math.min(16, availableHeight, 16 * availableWidth / glyphWidths.get(glyph));
+  return element("text", {x:gx, y:gy, class:"glyph", "font-size":size,
+    "text-anchor":"middle", "dominant-baseline":"central"}, glyph);
 }
 
 function roundedPath(points) {
@@ -148,17 +232,19 @@ function spatialIndex(items) {
   };
 }
 
-function drawRecord(record, model, selected) {
-  const {item, ref} = record;
-  const constrained = model.constrained.has(ref);
-  const observed = model.observed.has(ref);
-  const param = ref.startsWith("blob:");
-  let domain = model.families.get(ref) || (param ? "parameter" : "plain");
+function drawRecord(record, selected, hovered) {
+  const {item, ref, localRef, model} = record;
+  const constrained = model.constrained.has(localRef);
+  const observed = model.observed.has(localRef);
+  const param = localRef.startsWith("blob:");
+  let domain = model.families.get(localRef) || (param ? "parameter" : "plain");
   if (observed) domain = "observed";
   if (item.primitive === "CompositeBox" || item.dashed) domain = "constraint";
-  const group = element("g", {"class": "graph-item" + (selected ? " selected" : ""), "data-ref": ref});
+  const group = element("g", {class:"graph-item", "data-ref":ref, "data-row":record.id});
+  group.classList.toggle("selected", selected);
+  group.classList.toggle("hovered", hovered);
   group.style.setProperty("--ink", colors[domain]);
-  group.append(element("title", {}, model.descriptions.get(ref) || ref));
+  group.append(element("title", {}, model.descriptions.get(localRef) || localRef));
   const add = (tag, attrs, text) => group.append(element(tag, attrs, text));
   const caption = (x, y, value, cls = "caption", anchor = "middle") =>
     add("text", {x, y, "class": cls, "text-anchor": anchor}, value);
@@ -168,10 +254,8 @@ function drawRecord(record, model, selected) {
       const left = x - w/2, top = y - h/2;
       add("rect", {x:left-3, y:top-3, width:w+6, height:h+6, rx:3, "class":"focus-ring"});
       add("rect", {x:left, y:top, width:w, height:h, rx:2, "class":"face"});
-      const [gx,gy] = item.glyph_at || [x,y];
-      const glyph = item.glyph.startsWith("𝒩") ? "N" + item.glyph.slice("𝒩".length) : item.glyph;
-      add("text", {x:gx, y:gy, "class":"glyph", "text-anchor":"middle", "dominant-baseline":"central"}, glyph);
-      if (glyph !== "=") caption(x, top+h+13, item.name);
+      group.append(factorGlyph(item));
+      if (item.glyph !== "=") caption(x, top+h+13, item.name);
       if (constrained) add("path", {d:`M${left+2} ${top+9}v-7h7`, stroke:colors.constraint, fill:"none", "stroke-width":3});
       break;
     }
@@ -244,7 +328,8 @@ function drawRecord(record, model, selected) {
 
 export function mountGraph(container, snapshot, selectCallback) {
   const scene = snapshot.scene;
-  const model = semantics(snapshot);
+  const root = {template:snapshot.template, model:semantics(snapshot.template)};
+  root.blobGroup = root.model.hoverGroup;
   const svg = element("svg", {class:"graph-canvas",width:"100%",height:"100%",role:"img",
     "aria-label":(snapshot.template.name || "Model") + " factor graph"});
   Object.assign(svg.style, {display:"block", width:"100%", height:"100%", touchAction:"none", cursor:"grab",
@@ -258,23 +343,48 @@ export function mountGraph(container, snapshot, selectCallback) {
       "font-size":14, "font-family":"system-ui, sans-serif"}, "No factors in this graph");
     svg.append(label);
   }
-  const plates = scene.items.filter(i => i.primitive === "PlateBox");
+  // The scene reuses fragment-local names inside compact plate frames.
+  const plates = scene.items.filter(i => i.primitive === "PlateBox").sort((a,b) => a.w*a.h - b.w*b.h);
+  const plateScopes = new Map();
+  function enclosingScope(box, item) {
+    const plate = plates.find(p => p !== item && box[0] >= p.x && box[1] >= p.y &&
+      box[2] <= p.x+p.w && box[3] <= p.y+p.h);
+    return plateScopes.get(plate) || root;
+  }
+  for (const plate of [...plates].reverse()) {
+    const parent = enclosingScope(bounds(plate), plate);
+    const spec = parent.template.plates?.[plate.ref.slice("plate:".length)];
+    const template = spec?.fragment || {};
+    const plateRef = parent.plateRef || plate.ref;
+    const model = semantics(template,plateRef);
+    const perCopy = new Set(spec?.per_copy_blobs);
+    const blobGroup = ref => perCopy.has(ref.slice("blob:".length)) ? model.hoverGroup(ref) : parent.blobGroup(ref);
+    plateScopes.set(plate, {template, plateRef, model, blobGroup});
+  }
   const rows = scene.items.map((item,id) => {
-    let ref = item.primitive === "Path" ? model.aliases.get(item.ref) || item.ref : item.ref;
-    if (ref.startsWith("gfe:")) ref = "factor:" + ref.slice(4);
     const box = bounds(item);
-    if (plates.length && item.primitive !== "PlateBox") {
-      const parent = plates.find(p => box[0] >= p.x && box[1] >= p.y && box[2] <= p.x+p.w && box[3] <= p.y+p.h);
-      if (parent) ref = parent.ref;
-    }
-    return {id, item, ref, box};
+    const {model, plateRef, blobGroup} = enclosingScope(box,item);
+    let localRef = item.ref;
+    if (item.primitive === "Path") localRef = model.aliases.get(localRef) || localRef;
+    if (localRef.startsWith("gfe:")) localRef = "factor:" + localRef.slice(4);
+    const group = localRef.startsWith("blob:") ? blobGroup(localRef) : model.hoverGroup(localRef);
+    return {id, item, model, group, localRef, ref:plateRef || localRef, box};
   });
+  bindMarginalHover(rows);
   const byRef = new Map();
   for (const row of rows) {
+    row.group.rows.push(row);
     if (!byRef.has(row.ref)) byRef.set(row.ref, []);
     byRef.get(row.ref).push(row);
   }
-  for (const [ref, count] of model.notes) {
+  const meta = snapshot.metadata || {};
+  const anchorRefs = new Map(Object.entries(meta.anchors || {}).map(([ref, id]) => [id, ref]));
+  const notes = new Map();
+  for (const note of meta.notes || []) {
+    const ref = anchorRefs.get(note.anchor) || note.ref;
+    if (ref) notes.set(ref, (notes.get(ref) || 0) + 1);
+  }
+  for (const [ref, count] of notes) {
     const matching = byRef.get(ref);
     if (!matching) continue;
     const row = matching.find(r => ["Box","Terminal","PlateBox"].includes(r.item.primitive)) || matching[0];
@@ -286,6 +396,7 @@ export function mountGraph(container, snapshot, selectCallback) {
   const pitchX = scene.pitch_x > 0 ? scene.pitch_x : 100;
   const pitchY = scene.pitch_y > 0 ? scene.pitch_y : 84;
   let visible = new Map(), selectedRef = null, frame = 0;
+  let hoveredGroup = null, hoveredRef = null, overview = false;
   let width = 1, height = 1, fitted = 1, scale = 1, left = 0, top = 0;
   let drag = null;
   const signal = new AbortController();
@@ -304,17 +415,17 @@ export function mountGraph(container, snapshot, selectCallback) {
     svg.classList.toggle("dense", candidates.length >= 1000);
     const next = new Map();
     // Keep whole-document overviews legible with one representative factor per screen cell.
-    const overview = candidates.length > 2500 && scale < .33;
+    overview = candidates.length > 2500 && scale < .33;
     const cellSize = Math.max(12, Math.sqrt(width * height / 900));
     const cells = new Set();
     for (const row of candidates) {
-      if (overview && row.ref !== selectedRef) {
+      if (overview && row.ref !== selectedRef && row.group !== hoveredGroup) {
         if (row.item.primitive !== "Box" && row.item.primitive !== "PlateBox") continue;
         const cell = Math.floor(row.box[0]*scale/cellSize) + ":" + Math.floor(row.box[1]*scale/cellSize);
         if (cells.has(cell)) continue;
         cells.add(cell);
       }
-      next.set(row.id, visible.get(row.id) || drawRecord(row,model,row.ref === selectedRef));
+      next.set(row.id, visible.get(row.id) || drawRecord(row,row.ref === selectedRef,row.group === hoveredGroup));
     }
     for (const [key, node] of visible) if (!next.has(key)) node.remove();
     if (next.size !== visible.size || [...next.keys()].some(key => !visible.has(key))) {
@@ -353,6 +464,41 @@ export function mountGraph(container, snapshot, selectCallback) {
     top = y - (y-top)*scale/previous;
     redraw();
     return notifyZoom();
+  }
+  function setHover(ref, group) {
+    if (ref === hoveredRef && group === hoveredGroup) return;
+    if (group !== hoveredGroup) {
+      for (const row of hoveredGroup?.rows || []) visible.get(row.id)?.classList.remove("hovered");
+      for (const row of group?.rows || []) visible.get(row.id)?.classList.add("hovered");
+      if (overview) redraw();
+    }
+    hoveredRef = ref;
+    hoveredGroup = group;
+    const refs = group?.refs || [];
+    container.dispatchEvent(new CustomEvent("graphhover", {bubbles:true,
+      detail:{ref, refs:ref && !refs.includes(ref) ? [...refs,ref] : refs}}));
+  }
+  function hover(ref) {
+    setHover(ref || null, ref ? root.model.hoverGroup(ref) : null);
+  }
+  function reveal(ref) {
+    const matches = byRef.get(ref);
+    if (!matches?.length) return null;
+    const row = matches.find(r => r.model === root.model && r.localRef === ref &&
+      ["Box","Terminal","PlateBox"].includes(r.item.primitive)) || matches[0];
+    const [l,t,r,b] = row.box;
+    const pad = Math.min(28, width/8, height/8);
+    const next = Math.min(Math.max(scale, 1.5), (width-2*pad)/Math.max(r-l,1), (height-2*pad)/Math.max(b-t,1));
+    if (next !== scale || left+l*scale < pad || top+t*scale < pad ||
+      left+r*scale > width-pad || top+b*scale > height-pad) {
+      scale = next;
+      left = (width - (l+r)*scale)/2;
+      top = (height - (t+b)*scale)/2;
+      notifyZoom();
+    }
+    cancelAnimationFrame(frame);
+    paint();
+    return visible.get(row.id) || null;
   }
   function select(ref) {
     const old = selectedRef;
@@ -398,7 +544,7 @@ export function mountGraph(container, snapshot, selectCallback) {
     return {ref:drag.ref, dx:round((x-drag.origin[0])/pitchX), dy:round((y-drag.origin[1])/pitchY)};
   }
   function showGhost(e) {
-    const {x,y,w,h,glyph} = drag.tile;
+    const {x,y,w,h} = drag.tile;
     const {dx,dy} = offset(e);
     const nx = x+dx*pitchX, ny = y+dy*pitchY;
     if (!overlay.firstChild) {
@@ -406,8 +552,10 @@ export function mountGraph(container, snapshot, selectCallback) {
       const ghost = element("g");
       ghost.append(element("rect",{x:-w/2,y:-h/2,width:w,height:h,rx:2,
         fill:"var(--accent-bg, #423329)",stroke:"var(--accent, #ffb18d)","stroke-width":2}));
-      ghost.append(element("text",{"text-anchor":"middle","dominant-baseline":"central",
-        "font-family":"Georgia, serif",fill:"var(--accent, #ffb18d)"},glyph));
+      const glyph = factorGlyph(drag.tile);
+      glyph.setAttribute("transform", `translate(${-x} ${-y})`);
+      glyph.setAttribute("fill","var(--accent, #ffb18d)");
+      ghost.append(glyph);
       overlay.append(line,ghost);
     }
     overlay.firstChild.setAttribute("x2",nx);
@@ -419,6 +567,13 @@ export function mountGraph(container, snapshot, selectCallback) {
     overlay.replaceChildren();
     svg.style.cursor = "grab";
   }
+  on("pointerover", e => {
+    if (drag || e.pointerType === "touch") return;
+    const id = e.target.closest?.("[data-row]")?.dataset.row;
+    const row = rows[id];
+    setHover(row?.hoverRef || row?.ref || null, row?.group || null);
+  });
+  on("pointerleave", () => hover(null));
   on("pointerdown", e => {
     if (drag || (e.button !== 0 && e.button !== 1)) return;
     container.closest("[tabindex]")?.focus({preventScroll:true});
@@ -440,6 +595,7 @@ export function mountGraph(container, snapshot, selectCallback) {
     if (!drag || drag.id !== e.pointerId) return;
     const dx = e.clientX-drag.x, dy = e.clientY-drag.y;
     if (!drag.moved && Math.hypot(dx,dy) < 4) return;
+    if (!drag.moved) hover(null);
     drag.moved = true;
     if (drag.tile) {
       svg.style.cursor = "move";
@@ -473,7 +629,8 @@ export function mountGraph(container, snapshot, selectCallback) {
   const observer = new ResizeObserver(resize);
   observer.observe(svg);
   resize();
-  return {select,zoom,fit,destroy() {
+  return {select,hover,reveal,zoom,fit,destroy() {
+    hover(null);
     signal.abort();
     observer.disconnect();
     cancelAnimationFrame(frame);

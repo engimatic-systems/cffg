@@ -170,8 +170,14 @@ function inspector() {
       actions.append(button(factor,()=>select('factor:'+factor)));
   } else if(kind==='factor' && t.factors[name]) {
     const f=t.factors[name]; entries(panel,[['Family',f.type]]);
-    for(const [r,v] of Object.entries({...f.edges,...f.param_edges})) actions.append(button(r+' · '+v,()=>select('var:'+v)));
-    for(const [r,v] of Object.entries(f.param_blobs)) actions.append(button(r+' · '+v,()=>select('blob:'+v)));
+    for(const [kind,bindings] of [['var',{...f.edges,...f.param_edges}],['blob',f.param_blobs]]) {
+      for(const [role,value] of Object.entries(bindings)) {
+        const ref=kind+':'+value;
+        const link=button(role+' · '+value,()=>select(ref));
+        link.dataset.ref=ref;
+        actions.append(link);
+      }
+    }
     actions.append(button('Edit factor',()=>factorForm(false)),button('Position',positionFactor));
     if(Object.keys(f.param_blobs).length) actions.append(button('Initialize parameters',initialize));
     actions.append(button('Add constraint',constraint));
@@ -521,4 +527,15 @@ async function boot() {
   const initial=state.models.find(m=>m.id===id) || state.models.find(m=>m.recipe==='rslds') || state.models[0];
   if(initial) {await openModel(initial.id);const ref=url.searchParams.get('ref');if(ref)select(ref);}else report('Ready · create a blank model or open a template');
 }
+for(const panel of [$('outline'),$('inspector')]) {
+  panel.addEventListener('pointerover',e=>state.graph?.hover(e.target.closest('[data-ref]')?.dataset.ref || null));
+  panel.addEventListener('pointerleave',()=>state.graph?.hover(null));
+}
+$('graph').addEventListener('graphhover',e=>{
+  const refs=new Set(e.detail?.refs || []);
+  for(const panel of [$('outline'),$('inspector')]) {
+    for(const row of panel.querySelectorAll('[data-ref]')) row.classList.toggle('graph-hover',refs.has(row.dataset.ref));
+  }
+});
 boot().catch(fail);
+

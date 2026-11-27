@@ -506,3 +506,5 @@ body {grid-template-columns:minmax(0,1fr)}
 .profile-values { display: grid; grid-template-columns: minmax(9rem, max-content) 1fr; gap: 4px 12px; }
 .profile-values dt { color: var(--muted); }
 .profile-values dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+#outline .graph-hover, #inspector .graph-hover { box-shadow:inset 2px 0 var(--accent); background:var(--accent-bg); color:var(--accent); }
