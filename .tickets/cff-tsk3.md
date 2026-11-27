@@ -27,3 +27,7 @@ Carbon is the Gemini model selected in the installed agy client. Option is the M
 **2026-11-27T04:35:39Z**
 
 Inventory complete. The single Studio catalog holds 289 explicit drafts covering toolbar commands, inspector and forms, picker, tours, review activity, run controls, eight storage arenas, compilation timings and executable budgets. The agy CLI verified gemini-4-carbon-high and is processing 15 entries per batch. Fields, shared controls and readouts use stable semantic identifiers.
+
+**2026-11-27T04:46:00Z**
+
+Gemini 4 Carbon via agy wrote the final text from the shared drafts in 20 batches using gemini-4-carbon-low. High mode passed the initial connection check but timed out on batch requests, so the authoring run used the low reasoning setting of the same Carbon family. Reviewed every first response against its rendered target and implementation. Approved 273. Returned 16 with specific corrections and reviewed Carbon’s rewrites in two more batches. Previous wording and reasons remain beside the affected entries. Compared all 289 final strings verbatim with successful CLI responses and checked the required prefix and 1–3 sentences.
