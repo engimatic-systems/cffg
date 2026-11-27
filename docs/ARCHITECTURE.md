@@ -2371,7 +2371,10 @@ conditional update of the central bare repository's main ref. Models occupy
 `models/<id>/`. A revision is the latest commit touching that model. Source
 JSON, array and learner members reconstruct a current-format bundle. Persistent
 identity covers model data and learning. The Studio sidecar owns stable
-selection anchors, annotations, review threads, recipe hints and grid offsets.
+selection anchors, annotations, review threads, recipe hints, guided tours and
+grid offsets. Tours contain ordered plain-text stops anchored to a model or
+plate fragment. Native bundles retain the numerical model while Studio project
+exchange and revision history carry its tours.
 Agents and the browser issue the same revision-checked commands. Metadata edits
 retain the accepted model bytes. Model edits serialize, reload and pass compiler
 admission before publication. Workspace archives contain the native bundle and a
@@ -2383,6 +2386,11 @@ index is a rebuildable SQLite FTS5 projection of explicitly selected roots.
 Host search, subprocess jobs and solver execution run independently of browser
 drawing. The browser renders domain-colored `cffg.viz` scene items, culls large
 viewports, and uses the same element references in its outline and inspector.
+The scene places identifiable unrolled recurrences in chronological columns.
+Spring forces relax vertical lanes, then orthogonal corridors keep wires clear
+of unrelated boxes. Existing hand-positioned diagrams retain their original
+reference grid. Hover uses the topology of equality factors and shared blobs
+to find related marks in the visible scope.
 
 Each experiment directory pins a bundle, input contract and observations.
 Append-only events and job results survive browser disconnections. Fresh workers

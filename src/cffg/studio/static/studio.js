@@ -1,3 +1,4 @@
+import {setupTours} from './tours.js';
 import {mountGraph} from './graph.js';
 import {renderTrace} from './trace.js';
 import {setupCommands} from './commands.js';
@@ -102,6 +103,7 @@ async function openModel(id,preserve=false) {
   }
   const oldAnchor=state.model?.metadata.anchors?.[state.ref];
   if(preserve && oldAnchor) state.ref=Object.keys(snap.metadata.anchors).find(ref=>snap.metadata.anchors[ref]===oldAnchor) || state.ref;
+  const newRevision=state.model?.revision!==snap.revision;
   state.model=snap; localStorage.setItem('studio.model',id);
   $('title').textContent=state.plate?state.plate+' · plate contents':snap.template.name;
   state.graph?.destroy();
@@ -123,6 +125,7 @@ async function openModel(id,preserve=false) {
     if(state.model?.revision!==next.revision) openModel(id,true).catch(fail);
   };
   report(snap.template.name+' · compiled · '+short(snap.revision));
+  if(newRevision) await tours.changed();
 }
 function outline() {
   const list=$('outline'),t=state.model.template;
@@ -463,9 +466,29 @@ function focusPanel() {
   const i=list.findIndex(id=>$(id).contains(document.activeElement));
   $(list[(i+1)%list.length]).focus();
 }
+const tours=setupTours({
+  report,
+  currentModel:()=>state.model?.id,
+  rootModel:()=>state.plate ? api(modelPath()) : state.model,
+  async showTarget(owner,stop) {
+    if (state.model?.id !== owner.id) return null;
+    const plateRef=stop.plate_anchor && Object.keys(owner.metadata.anchors)
+      .find(ref=>owner.metadata.anchors[ref]===stop.plate_anchor);
+    if (stop.plate_anchor && !plateRef) return null;
+    const scope=plateRef ? plateRef.slice(6) : '';
+    if ((state.plate || '') !== scope) await enterPlate(scope);
+    if (!stop.anchor) return $('graph');
+    const ref=Object.keys(state.model.metadata.anchors).find(ref=>state.model.metadata.anchors[ref]===stop.anchor);
+    if (!ref) return null;
+    select(ref);
+    return state.graph.reveal(ref) || $('inspector');
+  },
+});
 const commands=[];
 function cmd(id,label,run,keys='',enabled=()=>!!state.model) {commands.push({id,label,run,keys,enabled});}
 cmd('palette','Command palette',()=>manager.showPalette(),'Mod+k',()=>true);
+cmd('tours','Guided tours',()=>tours.open(),'',()=>true);
+cmd('intro','Take the introductory tour',()=>tours.open('intro'),'',()=>true);
 cmd('keys','Customize keyboard shortcuts',()=>manager.showKeys(),'',()=>true);
 cmd('new','New model',create,'Mod+Alt+n',()=>true);
 cmd('open','Open or import a model',()=>openLibrary({api,openModel,refresh,report}),'Mod+o',()=>true);
@@ -525,7 +548,7 @@ async function boot() {
   const url=new URL(location.href);
   const id=url.searchParams.get('model') || localStorage.getItem('studio.model');
   const initial=state.models.find(m=>m.id===id) || state.models.find(m=>m.recipe==='rslds') || state.models[0];
-  if(initial) {await openModel(initial.id);const ref=url.searchParams.get('ref');if(ref)select(ref);}else report('Ready · create a blank model or open a template');
+  if(initial) {await openModel(initial.id);const ref=url.searchParams.get('ref');if(ref)select(ref);const tour=url.searchParams.get('tour');if(tour)await tours.open(tour);}else report('Ready · create a blank model or open a template');
 }
 for(const panel of [$('outline'),$('inspector')]) {
   panel.addEventListener('pointerover',e=>state.graph?.hover(e.target.closest('[data-ref]')?.dataset.ref || null));
@@ -538,4 +561,3 @@ $('graph').addEventListener('graphhover',e=>{
   }
 });
 boot().catch(fail);
-

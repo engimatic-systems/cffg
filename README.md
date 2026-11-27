@@ -22,6 +22,8 @@ owner’s Tailscale account. Start with **Switching dynamics** to inspect an rSL
 Factors are boxes and variables are wires. Mint terminals mark observations,
 constraint beads carry their mathematical symbols, and selection has a separate
 outline. The inspector lists the roles and dimensions behind each mark.
+Hover a wire to highlight all occurrences of that quantity, including equality
+branches. Unrolled recurrences with identifiable time steps read left to right.
 Choose **Open selected plate** to enter a repeated fragment. Edits there apply
 to every copy, and annotations follow their variables through renames.
 
@@ -34,7 +36,8 @@ shortcuts** edits bindings, checks conflicts, supports chords, and imports or
 exports a profile. Panel sizes persist in the browser.
 
 **Open** searches saved models and indexed directories on the host. The same
-dialog accepts file uploads and changes search roots. **Export** writes a portable
+dialog accepts file uploads and changes search roots. **Hide incompatible files**
+remembers your preference; turn it off to inspect schema diagnostics. **Export** writes a portable
 `.cffgz` with graph data and learning state. **Export graph with Studio annotations**
 writes a `.cffgstudio` project including layout, notes and review threads.
 **Save as a new model** forks a named revision. Use **History** to inspect changes
@@ -48,6 +51,38 @@ Experiment history retains solver statuses and inputs by revision. **Simulator**
 can generate editable Python/NumPy source from a prompt or run supplied source.
 The isolated process returns one observation per named DATA port and optionally
 its hidden ground truth. Reuse the resulting tape to compare model revisions.
+
+### Guided tours
+
+Choose **Tours → Getting started with CFFG Studio** for a keyboard walkthrough.
+Use **Next** and **Back** or the arrow keys. **Escape** ends the tour. Model tours
+in the same menu focus the graph on the referenced factor, variable, port or
+parameter. **Copy link** opens that model and tour together.
+
+A coding agent can publish a tour using the same preview and apply commands as
+any other revision. For example, save this command array as `tour.json` for
+the canonical rSLDS:
+
+```json
+[{
+  "action": "set_tour",
+  "id": "switching-dynamics",
+  "title": "Follow one switching transition",
+  "steps": [
+    {"title": "Initial regime", "ref": "factor:z0_prior", "text": "This categorical prior supplies the starting regime."},
+    {"title": "State entering the dynamics", "ref": "var:x0_dynamics", "text": "This branch of x0 feeds the continuous transition to x1."},
+    {"title": "Next observation", "ref": "factor:emission1", "text": "The emission factor maps x1 to observation y1."}
+  ]
+}]
+```
+
+Run `uv run --extra studio cffg-studio preview MODEL_ID --base REVISION --commands tour.json`,
+then substitute `apply` for `preview` to publish. Reuse the tour ID to revise
+its steps or send `{"action":"remove_tour","id":"switching-dynamics"}` in a
+command array to remove it. A step can omit `ref` to introduce the graph or
+include `"plate":"name"` to target a fragment. Published stops follow renamed
+elements. A removed target is marked unavailable during playback. Studio
+project exports include tours, and `/v1/capabilities` exposes the authoring schema.
 
 ### Coding agents
 

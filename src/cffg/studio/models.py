@@ -20,7 +20,7 @@ from cffg.learn import Learnables
 from cffg.models.kalman import lgssm
 from cffg.models.rslds import rslds
 from cffg.models.rslds_fit import vague_rslds_fit_priors
-from cffg.viz import build_scene
+from cffg.viz import LayoutStyle, build_scene
 
 MAX_ARCHIVE_BYTES = 256 * 1024 * 1024
 
@@ -121,10 +121,16 @@ class Document:
                     "reviews",
                     "anchors",
                     "layout",
+                    "layout_version",
                     "scopes",
+                    "tours",
                 )
                 if k in meta
             }
+            if "tours" in document.meta:
+                from .tours import check_portable_tours
+
+                check_portable_tours(document.meta)
             return document
 
     def project(self, bundle):
@@ -138,7 +144,9 @@ class Document:
                 "reviews",
                 "anchors",
                 "layout",
+                "layout_version",
                 "scopes",
+                "tours",
             )
             if k in self.meta
         }
@@ -186,7 +194,11 @@ class Document:
 
     def describe(self):
         template = self.template
-        scene = build_scene(template, offsets=self.meta.get("layout"))
+        offsets = self.meta.get("layout")
+        style = LayoutStyle(
+            temporal_flow=not offsets or self.meta.get("layout_version") == 2
+        )
+        scene = build_scene(template, style=style, offsets=offsets)
         return {
             "template": to_dict(template),
             "metadata": self.meta,

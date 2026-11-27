@@ -114,6 +114,14 @@ def difference(a, b):
             out[group] = b["template"].get(group)
     if a["metadata"].get("layout", {}) != b["metadata"].get("layout", {}):
         out["layout"] = b["metadata"].get("layout", {})
+    old_tours = a["metadata"].get("tours", {})
+    new_tours = b["metadata"].get("tours", {})
+    if old_tours != new_tours:
+        out["tours"] = sorted(
+            k
+            for k in old_tours.keys() | new_tours.keys()
+            if old_tours.get(k) != new_tours.get(k)
+        )
     for group in ("notes", "reviews"):
         if a["metadata"].get(group, []) != b["metadata"].get(group, []):
             out[group] = len(b["metadata"].get(group, []))
@@ -276,12 +284,17 @@ def create_app(home=None, repository=None, roots=None):
 
     @app.get("/v1/capabilities")
     def capabilities():
+        from .tours import Tour
+
         return {
+            "tour_schema": Tour.model_json_schema(),
             "factors": {name: asdict(f) for name, f in FACTOR_TYPES.items()},
             "initializers": sorted(inits.INITIALIZERS),
             "recipes": ["blank", "kalman", "rslds"],
             "commands": [
                 "edit_plate",
+                "set_tour",
+                "remove_tour",
                 "rename_variable",
                 "resize_variable",
                 "initialize_factor",
@@ -391,6 +404,8 @@ def create_app(home=None, repository=None, roots=None):
             doc = library.get(model, current)
             apply_commands(doc, body.commands, actor, current)
         metadata_commands = {
+            "set_tour",
+            "remove_tour",
             "annotate",
             "critique",
             "propose",

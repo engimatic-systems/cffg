@@ -309,6 +309,10 @@ def apply_fragment(d, command, actor, base):
     name = command["plate"]
     plate = d.template.plates[name]
     commands = command["commands"]
+    if any(c.get("action") in ("set_tour", "remove_tour") for c in commands):
+        raise ValueError(
+            "Author tours on the whole model; use a step’s plate field to target its fragment"
+        )
     if any(c.get("action") == "edit_plate" for c in commands):
         raise ValueError("Nested plates are unsupported by the compiler")
     values_change = any(
@@ -365,6 +369,10 @@ def apply_commands(d, commands, actor, base):
             op = c["action"]
             if op == "edit_plate":
                 apply_fragment(d, c, actor, base)
+            elif op in ("set_tour", "remove_tour"):
+                from .tours import edit_tour
+
+                edit_tour(d, c)
             elif op == "rename_variable":
                 old = c["name"]
                 name = new_name(c["to"], t.variables)
@@ -413,6 +421,8 @@ def apply_commands(d, commands, actor, base):
                     raise ValueError(
                         "Choose a factor and two integer grid offsets within 1000 cells"
                     )
+                if not d.meta.get("layout"):
+                    d.meta["layout_version"] = 2
                 d.meta.setdefault("layout", {})[name] = c["offset"]
             elif op in ("edit_annotation", "remove_annotation"):
                 note = next(

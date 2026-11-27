@@ -267,6 +267,48 @@ def test_discovery_reconciles_root_change_and_same_mtime_rewrite(tmp_path, monke
     assert service.find("match") == []
 
 
+def test_agent_tour_targets_survive_rename_project_exchange_and_revision_edits():
+    pytest.importorskip("pydantic")
+    doc = starter("kalman", "A guided model")
+    doc.certify()
+    command = {
+        "action": "set_tour",
+        "id": "dynamics",
+        "title": "State dynamics",
+        "steps": [
+            {
+                "title": "The initial state",
+                "text": "Follow the state wire.",
+                "ref": "var:x0",
+            },
+            {
+                "title": "The transition",
+                "text": "Inspect the transition matrix.",
+                "ref": "factor:trans1",
+            },
+        ],
+    }
+    apply_commands(doc, [command], "agent", "base")
+    stored = doc.meta["tours"]["dynamics"]
+    assert stored["steps"][0]["anchor"] == doc.meta["anchors"]["var:x0"]
+    apply_commands(
+        doc,
+        [{"action": "rename_variable", "name": "x0", "to": "initial"}],
+        "human",
+        "revision",
+    )
+    copied = Document.exchange(doc.project(doc.certify()))
+    assert copied.meta["tours"]["dynamics"] == stored
+    assert copied.meta["anchors"]["var:initial"] == stored["steps"][0]["anchor"]
+    with pytest.raises(ValueError, match="Tour stop 1"):
+        apply_commands(copied, [command], "agent", "revision")
+    assert copied.meta["tours"]["dynamics"] == stored
+    apply_commands(
+        copied, [{"action": "remove_tour", "id": "dynamics"}], "agent", "revision"
+    )
+    assert copied.meta["tours"] == {}
+
+
 def test_discovery_excludes_incompatible_files_before_limiting(tmp_path):
     from cffg.studio.discovery import Discovery
 
