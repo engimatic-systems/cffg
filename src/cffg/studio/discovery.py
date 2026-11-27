@@ -230,7 +230,7 @@ class Discovery:
         except Exception as e:
             self.error = str(e)
 
-    def find(self, q):
+    def find(self, q, *, compatible_only=False):
         prefixes = [str(root).rstrip("/") + "/" for root in self.roots()]
         if not prefixes:
             return []
@@ -238,6 +238,8 @@ class Discovery:
         table = "search" if tokens else "files"
         root_filter = " OR ".join(f"instr({table}.path, ?) = 1" for _ in prefixes)
         clause = f"({root_filter})"
+        if compatible_only:
+            clause += " AND COALESCE(formats.diagnostic, '') = ''"
         params = prefixes
         order = "name"
         if tokens:

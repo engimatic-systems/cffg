@@ -265,3 +265,28 @@ def test_discovery_reconciles_root_change_and_same_mtime_rewrite(tmp_path, monke
     service.scan()
     idle()
     assert service.find("match") == []
+
+
+def test_discovery_excludes_incompatible_files_before_limiting(tmp_path):
+    from cffg.studio.discovery import Discovery
+
+    root = tmp_path / "sources"
+    root.mkdir()
+    index = Discovery(tmp_path, [root])
+    assert index.lock.acquire(timeout=10)
+    index.lock.release()
+    with index.connect() as db:
+        for number in range(125):
+            path = str(root / f"sample{number:03}.cffgz")
+            name = f"sample {number:03}"
+            db.execute("INSERT INTO files VALUES (?,1,1,?,'',1)", (path, name))
+            db.execute(
+                "INSERT INTO formats VALUES (?, 'Bundle', ?)",
+                (path, "Requires schema 2" if number < 124 else ""),
+            )
+        db.execute("INSERT INTO search SELECT path,name,terms FROM files")
+    for query in ("", "sample"):
+        assert [row["name"] for row in index.find(query, compatible_only=True)] == [
+            "sample 124"
+        ]
+        assert len(index.find(query)) == 120

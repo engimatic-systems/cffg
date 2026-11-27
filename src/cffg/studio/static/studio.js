@@ -229,7 +229,7 @@ function create() {
 }
 function addChannel() {
   const ports=Object.keys(state.model.template.ports);
-  editForm('Add variable and factor',[field('name','New variable'),field('source','Incoming boundary','select',kindRef()==='port'?nameRef():'',{choices:[['','Start with a prior'],...ports]}),
+  editForm('Add variable and factor',[field('name','New variable'),field('source','Incoming boundary','select',kindRef()==='port'?nameRef():'',{required:false,choices:[['','Start with a prior'],...ports]}),
     field('family','Prior domain','select','gaussian',{choices:['gaussian','discrete']}),field('size','Dimension or cardinality','number',2,{min:1,max:4096})],
     v=>[{action:'add_channel',...v}],'A prior creates an open boundary. Extend it with a transition to create a DATA port.');
 }

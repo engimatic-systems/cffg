@@ -72,3 +72,7 @@
   .library-picker .lp-body { padding:10px 11px; }
   .library-picker .lp-kind { display:none; }
 }
+
+.library-picker .lp-compatible { display:flex; align-items:center; gap:6px; font-size:12px; margin:7px 0; }
+.library-picker .lp-compatible input { width:auto; accent-color:var(--accent); }
+.library-picker .lp-option[aria-disabled="true"] { opacity:.72; }

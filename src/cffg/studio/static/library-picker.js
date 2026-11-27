@@ -30,6 +30,7 @@ const dialogContents = `
       <button type="button" data-source="library" aria-pressed="false">Library</button>
       <button type="button" data-source="host" aria-pressed="false">Host files</button>
     </div>
+    <label class="lp-compatible"><input type="checkbox" id="lp-compatible"> Hide incompatible files</label>
     <div id="lp-results" class="lp-results" role="listbox" aria-label="Matching models and files" tabindex="0"></div>
     <p class="lp-status" role="status" aria-live="polite"></p>
     <p class="lp-error" role="alert" hidden></p>
@@ -61,6 +62,8 @@ export async function openLibrary({api, openModel, refresh, report}) {
   const search = $("#lp-query"), list = $("#lp-results"), roots = $("#lp-roots");
   const open = $('[data-op="open"]'), status = $(".lp-status"), problem = $(".lp-error");
   const fileInput = $("#lp-file");
+  const compatible = $("#lp-compatible");
+  compatible.checked = localStorage.getItem("studio.hideIncompatible") !== "false";
   const sourceButtons = [...dialog.querySelectorAll("[data-source]")];
   const controller = new AbortController();
   let request, debounceTimer, scanTimer, generation = 0;
@@ -86,7 +89,7 @@ export async function openLibrary({api, openModel, refresh, report}) {
     }
     const host = visible[index]?.source === "host";
     open.textContent = host ? "Import & open" : "Open";
-    open.disabled = !row || pending || working;
+    open.disabled = !row || Boolean(visible[index]?.diagnostic) || pending || working;
   }
   function render(previousKey) {
     visible = matches.filter(row => source === "all" || row.source === source);
@@ -110,6 +113,7 @@ export async function openLibrary({api, openModel, refresh, report}) {
       option.setAttribute("role","option");
       option.setAttribute("aria-selected","false");
       option.dataset.index = i;
+      if (result.diagnostic) option.setAttribute("aria-disabled", "true");
       const mark = node("span", undefined, "lp-mark lp-mark-" + result.source);
       mark.setAttribute("aria-hidden","true");
       const info = node("span", undefined, "lp-info");
@@ -138,7 +142,7 @@ export async function openLibrary({api, openModel, refresh, report}) {
     const query = "?q=" + encodeURIComponent(search.value.trim());
     const responses = await Promise.allSettled([
       api("/v1/models"+query,{signal:request.signal}),
-      api("/v1/search"+query,{signal:request.signal}),
+      api("/v1/search"+query+"&compatible_only="+compatible.checked,{signal:request.signal}),
     ]);
     if (current !== generation || !dialog.open) return;
     const previous = visible[index]?.key;
@@ -183,6 +187,7 @@ export async function openLibrary({api, openModel, refresh, report}) {
   }
   async function openResult(result, upload) {
     if (working || !result && !upload) return;
+    if (result?.diagnostic) { setProblem(result.diagnostic); return; }
     setProblem();
     busy(true);
     clearTimeout(scanTimer);
@@ -242,6 +247,10 @@ export async function openLibrary({api, openModel, refresh, report}) {
     }
   }
   listen(search,"input",searchChanged);
+  listen(compatible,"change",() => {
+    localStorage.setItem("studio.hideIncompatible",String(compatible.checked));
+    searchChanged();
+  });
   listen(roots,"input",() => { dirtyRoots = true; });
   for (const button of sourceButtons) listen(button,"click",() => {
     source = button.dataset.source;

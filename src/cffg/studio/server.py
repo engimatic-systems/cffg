@@ -454,9 +454,9 @@ def create_app(home=None, repository=None, roots=None):
         )
 
     @app.get("/v1/search")
-    def find(q: str = ""):
+    def find(q: str = "", compatible_only: bool = False):
         return {
-            "files": search.find(q),
+            "files": search.find(q, compatible_only=compatible_only),
             "scanning": search.lock.locked(),
             "error": search.error,
             "roots": [str(p) for p in search.roots()],
