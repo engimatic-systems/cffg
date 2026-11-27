@@ -26,7 +26,10 @@ def main():
         help="Tailscale user login allowed to open the workstation",
     )
     parser.add_argument("--backend-port", type=int, default=8493)
-    parser.add_argument("--https-port", type=int, default=8494)
+    parser.add_argument(
+        "--https-port", type=int, default=8098,
+        help="Private HTTPS port allowed from the remote clients (default: 8098)",
+    )
     parser.add_argument("--share", type=Path, default=Path.home() / "agent-share")
     args = parser.parse_args()
     src = Path(__file__).resolve().parents[1]

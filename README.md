@@ -78,7 +78,10 @@ file for human review. `token issue NAME --scope read`, `token list`, and
 `uv run --extra studio python tools/install_studio.py --login OWNER_LOGIN`
 installs a wheel into a private release environment, starts a launchd agent,
 routes private Tailscale HTTPS to its loopback listener, and writes
-`~/agent-share/cffg-studio/index.html`. The central model repository is
+`~/agent-share/cffg-studio/index.html`. The launcher opens HTTPS port **8098**,
+within this host’s 8080–8100 Tailscale access rule for the owner's devices.
+On a different host, use `--https-port` to select a free port that its
+Tailscale policy permits from the intended clients. The central model repository is
 `~/projects/cffg-models`. Clone it to inspect ordinary Git history.
 Studio uses Git LFS when a model contains an array at least 1 MiB in size.
 Back up the repository including its LFS object store and the experiment data in
