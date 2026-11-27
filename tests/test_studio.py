@@ -332,3 +332,21 @@ def test_discovery_excludes_incompatible_files_before_limiting(tmp_path):
             "sample 124"
         ]
         assert len(index.find(query)) == 120
+
+
+def test_existing_positions_follow_the_new_time_grid_unless_they_collide():
+    doc = starter("rslds", "Hand-positioned model")
+    doc.meta["layout"] = {"switch2": [0, 0], "z0_prior": [1, -2]}
+    scene, version = doc.layout_scene()
+    assert version == 2
+    boxes = scene.boxes()
+    assert (
+        boxes["factor:x0_prior"].x
+        < boxes["factor:dynamics1"].x
+        < boxes["factor:dynamics2"].x
+    )
+    # On the new grid this puts z0_prior on x0_prior. The old grid has room.
+    doc.meta["layout"] = {"z0_prior": [0, 1]}
+    scene, version = doc.layout_scene()
+    assert version == 1
+    assert len(scene.boxes()) == len(doc.template.factors)

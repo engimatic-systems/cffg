@@ -2388,8 +2388,8 @@ drawing. The browser renders domain-colored `cffg.viz` scene items, culls large
 viewports, and uses the same element references in its outline and inspector.
 The scene places identifiable unrolled recurrences in chronological columns.
 Spring forces relax vertical lanes, then orthogonal corridors keep wires clear
-of unrelated boxes. Existing hand-positioned diagrams retain their original
-reference grid. Hover uses the topology of equality factors and shared blobs
+of unrelated boxes. Existing hand-positioned diagrams keep their offsets on the chronological
+grid, with the original grid available when those positions would collide. Hover uses the topology of equality factors and shared blobs
 to find related marks in the visible scope.
 
 Each experiment directory pins a bundle, input contract and observations.

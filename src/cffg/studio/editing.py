@@ -421,8 +421,10 @@ def apply_commands(d, commands, actor, base):
                     raise ValueError(
                         "Choose a factor and two integer grid offsets within 1000 cells"
                     )
-                if not d.meta.get("layout"):
-                    d.meta["layout_version"] = 2
+                if "layout_version" not in d.meta:
+                    d.meta["layout_version"] = (
+                        d.layout_scene()[1] if d.meta.get("layout") else 2
+                    )
                 d.meta.setdefault("layout", {})[name] = c["offset"]
             elif op in ("edit_annotation", "remove_annotation"):
                 note = next(

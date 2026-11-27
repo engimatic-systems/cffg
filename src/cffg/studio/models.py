@@ -21,6 +21,7 @@ from cffg.models.kalman import lgssm
 from cffg.models.rslds import rslds
 from cffg.models.rslds_fit import vague_rslds_fit_priors
 from cffg.viz import LayoutStyle, build_scene
+from cffg.viz.layout import OccupiedCell
 
 MAX_ARCHIVE_BYTES = 256 * 1024 * 1024
 
@@ -192,13 +193,24 @@ class Document:
         for name in self.template.plates:
             self.fragment(name).sync_anchors()
 
+    def layout_scene(self):
+        offsets = self.meta.get("layout")
+        version = self.meta.get("layout_version")
+        if version != 1:
+            try:
+                return build_scene(self.template, offsets=offsets), 2
+            except OccupiedCell:
+                if version is not None or not offsets:
+                    raise
+        # A preexisting offset can point to an occupied cell on the new grid.
+        scene = build_scene(
+            self.template, style=LayoutStyle(temporal_flow=False), offsets=offsets
+        )
+        return scene, 1
+
     def describe(self):
         template = self.template
-        offsets = self.meta.get("layout")
-        style = LayoutStyle(
-            temporal_flow=not offsets or self.meta.get("layout_version") == 2
-        )
-        scene = build_scene(template, style=style, offsets=offsets)
+        scene, _ = self.layout_scene()
         return {
             "template": to_dict(template),
             "metadata": self.meta,

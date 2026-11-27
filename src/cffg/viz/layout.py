@@ -55,6 +55,10 @@ _DIRS = {"left": (-1, 0), "right": (1, 0), "up": (0, -1), "down": (0, 1)}
 _TERMINAL_PREFERENCE = ("left", "up", "down", "right")
 
 
+class OccupiedCell(ValueError):
+    """Two positioned factors occupy the same grid cell."""
+
+
 @dataclass(frozen=True)
 class LayoutStyle:
     box: float = 58.0  # box side when beads live inside (levels 0-3)
@@ -103,7 +107,7 @@ def _layout_connected(diagram, presentation, style, offsets=None) -> Scene:
         grid = {name: (x + offsets.get(name, (0, 0))[0], y + offsets.get(name, (0, 0))[1])
                 for name, (x, y) in grid.items()}
         if len(set(grid.values())) != len(grid):
-            raise ValueError("Another factor occupies that grid cell")
+            raise OccupiedCell("Another factor occupies that grid cell")
     sides = _assign_sides(diagram, grid, rail)
     return _emit(diagram, presentation, style, grid, sides)
 
