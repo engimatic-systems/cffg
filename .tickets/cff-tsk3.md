@@ -1,6 +1,6 @@
 ---
 id: cff-tsk3
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-11-27T04:31:05Z
@@ -31,3 +31,7 @@ Inventory complete. The single Studio catalog holds 289 explicit drafts covering
 **2026-11-27T04:46:00Z**
 
 Gemini 4 Carbon via agy wrote the final text from the shared drafts in 20 batches using gemini-4-carbon-low. High mode passed the initial connection check but timed out on batch requests, so the authoring run used the low reasoning setting of the same Carbon family. Reviewed every first response against its rendered target and implementation. Approved 273. Returned 16 with specific corrections and reviewed Carbon’s rewrites in two more batches. Previous wording and reasons remain beside the affected entries. Compared all 289 final strings verbatim with successful CLI responses and checked the required prefix and 1–3 sentences.
+
+**2026-11-27T04:47:09Z**
+
+Landed and deployed Option/Alt hover and Tab-to-focus help on the shared Studio launcher. One preloaded catalog supplies approved copy to static controls, forms, dynamic jobs and native modal dialogs. Release of Alt, Escape or loss of window focus dismisses it. Targeted checks only, per Cooper. The checked-in tools/check_studio_help.py passed in Chromium and its equivalent passed in WebKit. Disposable Playwright runs physically displayed all 289 approved entries, including one real benchmark, a step-controlled inference trace, indexed file import, and fixtures for uncommon worker results. Files: /tmp/cffg-studio-qa/option-help-final.log and option-help-final-host.log. The live Chromium check followed the agent-share launcher to private HTTPS port 8098, matched the delivered catalog byte-for-byte, and verified a Profile value and picker tooltip. JavaScript syntax, tk dep cycle and git diff --check passed. No outstanding work.
