@@ -123,8 +123,8 @@ class RollingAgent:
         if learn_b:
             learn += ("B",) if "B" not in learn else ()
             priors.setdefault("B", initial_b_counts)
-        if epistemic_b and "B" not in learn:
-            raise ValueError("epistemic_b needs B counts to score novelty")
+        if epistemic_b and not learn:
+            raise ValueError("epistemic_b needs a transition learnable to score novelty")
         if learn_goal and "A" in learn:
             raise ValueError(
                 "learn_goal and learned A are separate composite coordinates for now"
@@ -176,6 +176,25 @@ class RollingAgent:
             mu3_min_ess_fraction=mu3_min_ess_fraction,
         )
         self.filter = Engine(compile_template(grounded_filter, arrays=filt_arrays))
+        if epistemic_b:
+            required = {
+                member
+                for group in self.plan.arena.gfe_tm_groups
+                if group.learned
+                for member in group.members
+            }
+            supplied = {
+                target.factor
+                for plan in self.plan.arena.learn_plans
+                if plan.name in learn and plan.ftype == "transition_mixture"
+                for target in plan.targets
+                if target.form == "counts"
+            }
+            if not required or required - supplied:
+                raise ValueError(
+                    "epistemic_b needs a declared transition learnable "
+                    "supplying counts to each learned planning transition"
+                )
         if self.filter.arena.mu3_groups:
             raise ValueError("perception graph must not declare a mu3 evaluator")
         if mu3 and not functional(self.plan):
