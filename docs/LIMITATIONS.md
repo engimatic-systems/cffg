@@ -445,6 +445,17 @@ decision makes the discarded precision material. Two finite words also
 have a finite range. The declared `component_niw` family uses a separate
 float64 host accumulator.
 
+A compiled component merge can report `NUMERICAL_RANGE` at ordinary scales.
+For example, a scalar donor with prior mean 1, mean weight 2 and scale 1
+receives one point at zero. The stored two-word approximations to its mean
+2/3 and scale 5/3 imply tiny nonzero changes to a receiver centered at
+zero with unit weight and scale. In float32 the exact mean transfer is
+about −8.88 × 10⁻¹⁶. The device guard checks the estimated arithmetic error
+against both the resulting value and the change. A host caller can retry
+that pair with `propose_merge_exact`, then apply its usual score. This retry
+synchronizes the selected rows and can still refuse an unrepresentable
+posterior.
+
 **S1e. Gaussian parameter learning is EM-rollover; flooding VMP is not
 strictly monotone.** Continuous conjugate learning (cff-7c5o, DERIVATIONS.md
 D4) has two honest edges. (1) NIW/MNIW updates run *between* trials from

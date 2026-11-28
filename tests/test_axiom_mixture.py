@@ -131,6 +131,46 @@ def test_scene_output_heads_change_training_assignment_but_are_hidden_in_predict
     same(leaked.bank, device.from_host(host))
 
 
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
+def test_two_contacts_account_for_all_six_categorical_heads(dtype):
+    cfg = InteractionConfig(actions=3, identities=3, motions=4)
+    widths = (3, 4, 2, 3, 3, 4)
+    source = bank([True, True, False], d=7, heads=widths, dtype=dtype)
+    current = device.from_host(source)
+    # Identical live rows give exactly half the evidence to each. The third row is vacant.
+    previous_bin = (0, 3, 1, 0, 1, 2)
+    excess = [2 * np.eye(w)[i] for w, i in zip(widths, previous_bin, strict=True)]
+    heads = tuple(head.at[:2].add(jnp.asarray(e, dtype))
+                  for head, e in zip(current.posterior.categories, excess, strict=True))
+    current = current._replace(posterior=current.posterior._replace(
+        alpha=current.posterior.alpha.at[:2].add(2), categories=heads))
+    slots = jnp.asarray([[0, 0, 0, 0, 0, 0, .01, .01],
+                         [.4, .3, 0, 0, 0, 0, .1, .1],
+                         [.42, .3, .05, 0, 0, 0, .1, .1]], dtype)
+    labels, tracked = jnp.arange(3), jnp.array([False, True, True])
+    absent = jnp.array([1.2, 1.21], dtype)
+    # Slot 1 sees slot 2 and is visible. Slot 2 sees slot 1 and has a nonzero unused clock.
+    for action, reward, switches in [(2, 1, (0, 3, 1)), (1, -1, (0, 2, 0))]:
+        context = interaction_batch(slots, labels, tracked, action, absent, config=cfg)
+        _, assignment, valid = score_context(current.posterior, context)
+        assert valid
+        np.testing.assert_array_equal(assignment, [[.5, .5, 0]] * 3)
+        observed = interaction_batch(slots, labels, tracked, action, absent, config=cfg,
+                                     reward=reward, switches=jnp.asarray(switches))
+        out = learn_interactions(current, observed, tracked, threshold=-1e5)
+        assert out.valid
+        expected_weights = [[0, 0, 0], [.5, .5, 0], [.5, .5, 0]]
+        np.testing.assert_array_equal(out.assignment, expected_weights)
+        np.testing.assert_array_equal(out.written, np.asarray(expected_weights) > 0)
+        for own, other, visible in [(1, 2, 1), (2, 1, 0)]:
+            bins = (own, other, visible, action, reward + 1, switches[own])
+            for i, (w, observed_bin) in enumerate(zip(widths, bins, strict=True)):
+                excess[i] = .5 * (excess[i] + np.eye(w)[observed_bin])
+        for counts, e in zip(out.bank.posterior.categories, excess, strict=True):
+            np.testing.assert_array_equal(counts, [1 + e, 1 + e, np.ones_like(e)])
+        current = out.bank
+
+
 def test_multi_point_reward_scores_zero_and_discounts_history_while_other_heads_learn():
     cfg = InteractionConfig(actions=2, identities=2, motions=2)
     base = bank([True, True], d=7, heads=(3,3,2,2,3,2), dtype=jnp.float32)

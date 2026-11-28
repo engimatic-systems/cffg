@@ -1779,7 +1779,13 @@ them. Four rules define the contract:
    records for its reset prior and posterior. The optional exact lifecycle v1
    envelope retains the original pair of v3 mixed records. Both codecs validate
    identity metadata and require dormant parameters to match the reset prior.
-   Device-to-host conversion uses the exact codec.
+   Device-to-host conversion uses the exact codec. Compiled component merges
+   subtract the donor's reset statistics in receiver-centered coordinates.
+   When both donor mean words equal their prior words, the shared Gaussian
+   moments use the excess count directly. A host-boundary retry on
+   `NUMERICAL_RANGE` transfers three selected rows for rational arithmetic,
+   validates the rounded posterior, and updates the two slots on device.
+   The caller scores the resulting candidate before adopting it.
 
    Frame-local appearance regression is owned by `frame_regression.py`.
    `score_pixels` evaluates the expected log likelihood for each pixel
@@ -1839,6 +1845,11 @@ them. Four rules define the contract:
    Motion and interaction writes use the current tracking mask. An observation
    with learning disabled advances the carry and closes both write masks. The
    scene integrator owns the learned banks and checkpoint envelope.
+   `Scene.identity_beliefs()` recomputes a probability for each observed
+   slot and type from the carried appearance and identity bank. Hidden slots
+   use their last stored appearance. All unused types share equal probability
+   when the bank is empty. Invalid evidence yields zero rows and a false
+   validity flag. Reading the probabilities takes no learning step.
 
    Reading is not evidence, so a learnable may restrict which instances
    supply statistics: `LearnableSpec.sources` is `None` for every reader, a

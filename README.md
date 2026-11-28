@@ -483,7 +483,9 @@ supplied two-object world model.
 The experimental Gameworld loop starts with `initialize_scene` and feeds
 `observe_scene` each new RGB frame, the action actually applied and its
 reward. The agent tracks objects and learns their identities, motions and
-interactions. Its planner queries a read-only snapshot of those learned
+interactions. Read `weights, valid = scene.identity_beliefs()` for the
+probability of each learned type per slot. A hidden slot uses its last
+observed appearance. The planner queries a read-only snapshot of the learned
 rules. The [fixed-action replay](tools/axiom/scene_replay.py) checks learning
 and restart on shared pixels. The [closed-loop smoke test](tools/axiom/acted_smoke.py)
 lets the model select the actions. Its 24-step Explode run used a reduced
@@ -777,6 +779,14 @@ prior and the learned posterior. Both modes save logical IDs, generations and
 occupancy. Pass `exact=True` when later updates or merges must reproduce the
 uninterrupted result. `ComponentBank.from_state_dict(snapshot)` also reads
 exact lifecycle snapshots created before the compact option was introduced.
+
+For a model-requested merge, a compiled `component_bank_device.propose_merge`
+can return `NUMERICAL_RANGE` when cancellation obscures a tiny change.
+At the host boundary, call `component_bank_device.propose_merge_exact` with
+the same bank and references. It transfers the two learned rows and the
+donor reset row, computes their exact rational combination, and returns a
+two-word candidate if the result is representable. Apply the model's usual
+acceptance score to an `OK` candidate.
 
 For fixed-structure parameter sweeps that are not declared learning,
 `set_params` updates named runtime parameters without recompiling. Shapes,

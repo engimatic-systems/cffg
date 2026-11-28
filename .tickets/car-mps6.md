@@ -1,6 +1,6 @@
 ---
 id: car-mps6
-status: open
+status: closed
 deps: [car-k6oi, car-8rgl, cff-pksr, cao-0pbk]
 links: [cff-du6m]
 created: 2026-11-23T21:48:38Z
@@ -40,3 +40,15 @@ An affine rule maps the previous state to a matrix times that state plus an offs
 **2026-11-24T06:00:54Z**
 
 Live frames now train all motion and interaction components, with delayed identity writes and actual applied action and reward. The learned sparse rollout bridge is separately qualified. The released scale calculation includes a global diagonal repair after sparsifying Gaussian evidence. Training, rollout and reduction must share its result across all components; sampling uses the distinct unshifted projection. The scheduled model reduction and its assembled integration remain their own gate.
+
+**2026-11-28T04:27:05Z**
+
+Published-main audit after #207, a774a54. AC1 has exact small motion and 500-row tests including ordered birth, reuse, exhaustion, fixed old maps and invalid rollback. AC2 has trained/context-only head wiring, default and fixed-radius neighbor tests, ordered 32-slot independent statistics, and strict responsibility/count boundaries. A literal independent trace covering every one of the six rMM head counts together remains to add. AC3 is implemented; after_action returns every proposed pair, scores, disposition and active counts. The archived Explode pilot retained 20 summaries plus pair-list digests. Across 10,000 actions its 2,000 records per pass grew to 40,000; 4,688 proposals included 1,107 accepted, 1,658 rejected, 1,909 inactive and 14 invalid posteriors. Individual per-pair scores cannot be recovered from those digests alone. Rechecked run/result/trace hashes and the 216 study source files against producer e741943. AC4 already has a supplied contact producing a learned reward/switch and a subsequent contextual prediction, post-merge rescoring and donor reset, both precisions, 5,000-row tests, exact checkpoint replay and failure handling. Bind the remaining six-head trace to repeated contact and show pre-observation reuse. Code path: experiment-owned learning atop the unchanged mixed bank. No model version, graph-rule, scheduling, checkpoint layout or game run change is needed.
+
+**2026-11-28T04:29:12Z**
+
+The independent count trace now covers two repeated contacts, both tracked slots per contact, all six categorical heads (own type, other type, visible, applied action, reward and motion switch), and a vacant component. Identical occupied rows give the hand-computed assignment one half to each. Starting from two previous observations per component, the oracle discounts old excess and adds the known bin in physical slot order, checking every bin after each frame. The outcomes are hidden in the next contextual query. The expected bins and counts are computed without calling a CFFG scorer or updater. Together with the positive/negative contact prediction in test_axiom_rollout and the verified reduction checks, this completes the module criteria. Both precisions passed the new targeted check in 18.08 s; the slow float64 variant remains available explicitly. Only synthetic inputs were used; the parent coordinates the final integrated short-suite gate.
+
+**2026-11-28T05:26:42Z**
+
+The canonical integrated gate on fd9a0f7 passed all 2,844 selected tests in 455.037 seconds with four workers. The opt-in float64 six-head trace also passed in the focused run recorded above.
