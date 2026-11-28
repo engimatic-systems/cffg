@@ -1,6 +1,6 @@
 ---
 id: cia12-ouzk
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-11-28T03:08:59Z
