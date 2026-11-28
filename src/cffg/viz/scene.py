@@ -43,6 +43,7 @@ class Path:
     label: str = ""
     label_at: tuple[float, float] | None = None
     dashed: bool = False
+    label_size: float = 13.0
 
 
 @dataclass(frozen=True)
@@ -78,6 +79,44 @@ class Terminal:
     y: float
     kind: TerminalKind
     label: str = ""
+    label_at: tuple[float, float] | None = None
+    label_size: float = 9.5
+
+
+def label_width(text: str, size: float) -> float:
+    # Leave room for italic overhang and full-size subscript characters.
+    return (len(text) + 0.35) * size
+
+
+@dataclass(frozen=True)
+class Label:
+    """A caption's SVG baseline, anchor and conservative headless text extent."""
+
+    ref: str
+    text: str
+    x: float
+    y: float
+    anchor: str
+    font_role: str
+    size: float
+
+    @property
+    def width(self) -> float:
+        return label_width(self.text, self.size)
+
+    @property
+    def bounds(self) -> tuple[float, float, float, float]:
+        left = self.x - (self.width / 2 if self.anchor == "middle" else self.size * 0.12)
+        # SVG includes the font ascent and the lowered run for trailing digits.
+        return left, self.y - 1.25 * self.size, left + self.width, self.y + 0.65 * self.size
+
+    @classmethod
+    def for_item(cls, item: Path | Terminal) -> Label | None:
+        if not item.label or item.label_at is None:
+            return None
+        terminal = isinstance(item, Terminal)
+        return cls(item.ref, item.label, *item.label_at, "middle" if terminal else "start",
+                   "terminal" if terminal else "wire", item.label_size)
 
 
 @dataclass(frozen=True)
@@ -135,6 +174,11 @@ class Scene:
 
     def by_ref(self, ref: str) -> list[SceneItem]:
         return [i for i in self.items if i.ref == ref]
+
+    def labels(self) -> list[Label]:
+        """Wire and terminal captions in drawing order, including repeated blob owners."""
+        return [caption for item in self.items if isinstance(item, (Path, Terminal))
+                if (caption := Label.for_item(item)) is not None]
 
     def boxes(self) -> dict[str, Box]:
         return {i.ref: i for i in self.items if isinstance(i, Box)}

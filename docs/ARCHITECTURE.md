@@ -2445,12 +2445,19 @@ four-stage pipeline, each stage importable on its own:
    natural factor name and stacked using their framed scene extents (including
    terminals and composite boxes). Component growth can move later components
    down; it does not change their internal layout. Empty diagrams produce an
-   empty margin-sized scene. Connected-model golden output is unchanged.
+   empty margin-sized scene.
 4. **`scene` / `svg`** — the layout emits a typed scene graph whose
    primitives carry template refs (`factor:`/`var:`/`port:`/`blob:`/`gfe:`)
    for GUI hit-testing; `svg.to_svg` serialises it dependency-free. PNG goes
    through the optional `viz` extra (cairosvg). Golden SVGs pin the pipeline
-   for the canonical models.
+   for the canonical models. Each variable wire owns its name and each
+   point-mass terminal owns its parameter name. The layout reserves structural
+   captions first. Terminals on one side receive successive extensions sized
+   from their caption widths and clearance. Where a box blocks an extension,
+   the terminal wire follows an open grid corridor. Captions move across the
+   wire direction to resolve collisions while retaining their position along
+   the extension. `Scene.labels()` exposes the same baseline, anchor, font
+   role and conservative text extent used to place and frame the captions.
 
 Message-schedule overlays (Figs 23/24/27 arrows) are not implemented; the
 current renderer stops at the typed scene graph.

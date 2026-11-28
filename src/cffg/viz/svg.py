@@ -53,9 +53,11 @@ def render_svg(
     *,
     level: int = FULL_COMPRESSION,
     layout_style: LayoutStyle = LayoutStyle(),
-    svg_style: SvgStyle = SvgStyle(),
+    svg_style: SvgStyle | None = None,
 ) -> str:
     """Template -> SVG string at the given compression level (0..4)."""
+    if svg_style is not None:
+        layout_style = replace(layout_style, label_size=svg_style.label_size, caption_size=svg_style.tiny_size)
     return to_svg(build_scene(template, level=level, style=layout_style), svg_style)
 
 
@@ -134,14 +136,14 @@ def save_png(
 # --------------------------------------------------------------------------
 
 
-def to_svg(scene: Scene, style: SvgStyle = SvgStyle()) -> str:
+def to_svg(scene: Scene, style: SvgStyle | None = None) -> str:
     """Serialize a laid-out Scene; use render_svg for a Template."""
     if not isinstance(scene, Scene):
         raise TypeError(
             "to_svg expects a Scene; use render_svg(template) or "
             "to_svg(build_scene(template)) for a Template"
         )
-    s = style
+    s = style or SvgStyle()
     if scene.wire_corner_limit is not None and s.corner_r > scene.wire_corner_limit:
         s = replace(s, corner_r=scene.wire_corner_limit)
     parts = [
@@ -158,7 +160,13 @@ def to_svg(scene: Scene, style: SvgStyle = SvgStyle()) -> str:
         ),
     ]
     for item in scene.items:
-        parts.append(_render_item(item, s))
+        item_style = s
+        if style is None:
+            if isinstance(item, Path) and item.label and s.label_size != item.label_size:
+                item_style = replace(s, label_size=item.label_size)
+            elif isinstance(item, Terminal) and item.label and s.tiny_size != item.label_size:
+                item_style = replace(s, tiny_size=item.label_size)
+        parts.append(_render_item(item, item_style))
     parts += ["</g>", "</svg>"]
     return "\n".join(p for p in parts if p) + "\n"
 
@@ -272,6 +280,8 @@ def _terminal(item: Terminal, s: SvgStyle) -> str:
             'fill="#ffffff"/>'
         )
         lx, ly = item.x, item.y + s.bead_r + 11
+    if item.label_at is not None:
+        lx, ly = item.label_at
     label = (
         f'<text x="{lx:.1f}" y="{ly:.1f}" font-size="{s.tiny_size}" stroke="none" '
         f'fill="{s.stroke}" text-anchor="middle" font-style="italic">'

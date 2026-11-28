@@ -6,15 +6,18 @@ observation/goal stack hangs below, and — the editing property — growing a
 model only adds rows/columns, never moves what was already there.
 """
 
+from dataclasses import replace
+from itertools import combinations
+
 import numpy as np
 import pytest
 
 from cffg.models.rollout import build_rollout
 from cffg.core import BlobRef, FactorSpec, PortRole, PortSpec, Template, VariableSpec, validate
 from cffg.core.compose import merge, scoped
-from cffg.viz import derive
+from cffg.viz import build_scene, derive, to_svg
 from cffg.viz.compress import present
-from cffg.viz.diagram import TerminalKind
+from cffg.viz.diagram import TerminalEnd, TerminalKind
 from cffg.viz.layout import LayoutStyle, layout
 from cffg.viz.layout import _item_points
 from cffg.viz.scene import Bead, Box, CompositeBox, EllipsisMark, Terminal
@@ -248,6 +251,145 @@ def gaussian_junction(kind):
     t.blobs = {name: BlobRef(name, name + ".npy") for name in sorted(names)}
     validate(t)
     return t
+
+
+_LONG_BLOB = "a" * 32
+
+
+def _long_caption_fixture():
+    from cffg.viz.layout import _place_factors
+
+    template = gaussian_junction("gaussian_mixture_linear")
+    junction = template.factors["junction"]
+    template.factors["junction"] = replace(
+        junction, param_blobs={**junction.param_blobs, "offset": _LONG_BLOB},
+    )
+    del template.blobs["b"]
+    template.blobs[_LONG_BLOB] = BlobRef(_LONG_BLOB, _LONG_BLOB + ".npy")
+    validate(template)
+    anchors = {"junction": (0, 0), "xprior": (-8, 0), "yprior": (2, 0), "zprior": (0, -2)}
+    grid, _ = _place_factors(derive(template))
+    offsets = {name: (anchors[name][0] - x, anchors[name][1] - y) for name, (x, y) in grid.items()}
+    return template, offsets
+
+
+def _assert_label_geometry(scene):
+    labels = scene.labels()
+    assert labels
+    for label in labels:
+        left, top, right, bottom = label.bounds
+        assert 0 <= left < right <= scene.width, label
+        assert 0 <= top < bottom <= scene.height, label
+        assert label.size > 0
+        assert label.font_role in ("terminal", "wire")
+        assert label.anchor in ("start", "middle", "end")
+    for first, second in combinations(labels, 2):
+        left, top, right, bottom = first.bounds
+        x, y, u, v = second.bounds
+        assert min(right, u) <= max(left, x) or min(bottom, v) <= max(top, y), (first, second)
+
+
+def _wire_and_terminal_labels(diagram, scene):
+    from cffg.viz.scene import Path
+
+    expected = []
+    for wire in diagram.wires.values():
+        paths = [item for item in scene.by_ref(wire.id) if isinstance(item, Path) and item.kind == "wire"]
+        assert paths, wire.id
+        terminal = next((end for end in wire.ends if isinstance(end, TerminalEnd)), None)
+        paths_with_labels = [path for path in paths if path.label]
+        if terminal and terminal.kind is TerminalKind.POINTMASS:
+            assert not paths_with_labels and all(path.label_at is None for path in paths), wire.id
+        elif wire.label:
+            path, = paths_with_labels
+            assert path.label == wire.label and path.label_at is not None
+            expected.append((path.ref, path.label, *path.label_at, "wire"))
+
+        if terminal and terminal.kind in (TerminalKind.POINTMASS, TerminalKind.DATA, TerminalKind.OPEN):
+            ref = terminal.ref or wire.id
+            endpoint = paths[0].points[0] if isinstance(wire.ends[0], TerminalEnd) else paths[-1].points[-1]
+            mark, = [item for item in scene.by_ref(ref) if isinstance(item, Terminal)
+                     and (item.x, item.y) == endpoint]
+            assert mark.kind is terminal.kind and mark.label == terminal.label
+            if terminal.label:
+                assert mark.label_at is not None
+                expected.append((mark.ref, mark.label, *mark.label_at, "terminal"))
+    assert sorted((label.ref, label.text, label.x, label.y, label.font_role)
+                  for label in scene.labels()) == sorted(expected)
+
+
+@pytest.mark.parametrize("name", ["hmm_slice", "tmaze", "lgssm", "five_degree", "six_degree", "long_caption"])
+def test_label_geometry_and_gallery_at_all_levels(name, hmm_slice, viz_gallery):
+    from cffg.models.tmaze import build_tmaze
+    from test_kalman import F, H, M0, P0, Q, R, lgssm
+
+    offsets = None
+    if name == "hmm_slice":
+        template = hmm_slice
+    elif name == "tmaze":
+        template, _ = build_tmaze()
+    elif name == "lgssm":
+        template, _ = lgssm(3, F, Q, H, R, M0, P0)
+    elif name == "long_caption":
+        template, offsets = _long_caption_fixture()
+    else:
+        kind = "gaussian_linear" if name == "five_degree" else "gaussian_mixture_linear"
+        template = gaussian_junction(kind)
+
+    diagram = derive(template)
+    for level in range(5):
+        scene = build_scene(template, level=level, offsets=offsets)
+        assert scene == build_scene(template, level=level, offsets=offsets)
+        _assert_label_geometry(scene)
+        _wire_and_terminal_labels(diagram, scene)
+        if level in (0, 4):
+            viz_gallery(to_svg(scene), tag=f"{name}, level {level}")
+
+
+def test_same_side_caption_centers_and_gaps_preserve_structural_routes():
+    from cffg.viz.scene import Path
+
+    style = LayoutStyle()
+    template, offsets = _long_caption_fixture()
+    short = gaussian_junction("gaussian_mixture_linear")
+    scene = build_scene(template, style=style, offsets=offsets)
+    reference = build_scene(short, style=style, offsets=offsets)
+
+    def route_points(s):
+        junction = s.boxes()["factor:junction"]
+        return {ref: tuple((x - junction.x, y - junction.y) for x, y in path.points)
+                for ref in ("var:x", "var:y", "var:z")
+                for path in s.by_ref(ref) if isinstance(path, Path)}
+
+    for ref, points in route_points(reference).items():
+        np.testing.assert_allclose(route_points(scene)[ref], points, atol=1e-9, rtol=0)
+
+    terminal_refs = ("blob:A", f"blob:{_LONG_BLOB}")
+    labels = {label.ref: label for label in scene.labels() if label.ref in terminal_refs}
+    terminal_rows = []
+    for role, ref in zip(("matrix", "offset"), terminal_refs, strict=True):
+        path, = [item for item in scene.by_ref(f"blob:junction.{role}") if isinstance(item, Path)]
+        terminal, = [item for item in scene.by_ref(ref) if isinstance(item, Terminal)]
+        (x, y), (u, v) = path.points
+        assert (u, v) == (terminal.x, terminal.y)
+        assert y == v and x > u
+        assert x == pytest.approx(scene.boxes()["factor:junction"].x - style.compact_box / 2)
+        terminal_rows.append((terminal.x, labels[ref]))
+
+    (outer_x, outer), (inner_x, _) = sorted(terminal_rows, key=lambda row: row[0])
+    assert outer.ref == f"blob:{_LONG_BLOB}"
+    left, _, right, _ = outer.bounds
+    assert inner_x - outer_x >= right - left + style.label_clearance - 1e-9
+    assert outer.x == pytest.approx((inner_x + outer_x) / 2)
+
+
+def test_open_terminal_keeps_both_structural_and_port_caption(hmm_slice):
+    port = hmm_slice.ports["sense"]
+    hmm_slice.ports["sense"] = replace(port, role=PortRole.PRIOR)
+    scene = build_scene(hmm_slice)
+    _assert_label_geometry(scene)
+    _wire_and_terminal_labels(derive(hmm_slice), scene)
+    assert any(label.ref == "port:sense" and label.font_role == "terminal" for label in scene.labels())
 
 
 def _wire_paths(template, scene):
