@@ -1,7 +1,7 @@
 ---
 id: cenc-luez
-status: open
-deps: [cff-u06e]
+status: in_progress
+deps: [cff-u06e, cei-k93f]
 links: []
 created: 2026-11-28T04:45:36Z
 type: feature
@@ -26,3 +26,7 @@ A serialized template declares positive left/right slopes, input and output knot
 **2026-11-28T04:47:00Z**
 
 Dependency tree (prerequisite --> dependent): cff-u06e [D13a derivation and oracle] --> cenc-luez [production support]. Ready after cff-u06e closes on a reviewed base. Positive-noise neural inference remains independent. Proposed consumer contract lives in D13a; the finite interval representation has to preserve complete supported cells, reject capacity overflow before committing updates, and name its support/energy behavior at every run status.
+
+**2026-11-28T06:18:24Z**
+
+D13a implementation requires a fourth domain: current VariableSpec chooses exactly one of cardinality, Gaussian dimension or scalar EF, and State/Arena allocate only those layouts. Split so the bounded numerical primitive is independently reviewable before generated schedules, state and codecs depend on it. Prerequisite --> dependent: [x] cff-u06e --> [ ] cei-6lc5 (complete finite-capacity messages) --> [ ] cei-k93f (declared domain, compiled graph, energy and bundle) --> [ ] cenc-luez. Existing stochastic neural inference uses Gaussian edges and can never reinterpret a missing or zero process covariance as an interval-domain model.
