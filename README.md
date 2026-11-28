@@ -851,6 +851,54 @@ is the exact MAP/Viterbi identity. On loops it retains the usual max-product
 caveats; `cffg.csp.decimate` is the explicit feasibility-oriented helper. See
 [examples/hard_constraint.py](examples/hard_constraint.py).
 
+## Restart the RGB world-model agent
+
+`cffg.axiom_agent.AxiomAgent` takes a 210 × 160 RGB reset frame, a game name,
+an action count and a model seed. Supply `SceneSettings` to choose capacities
+and tracking parameters. The standard scene has 32 slots and up to 5,000
+interaction components. The actor accepts the actual applied command and
+native integer reward for each proposed move.
+
+```python
+from cffg.axiom_agent import AxiomAgent
+
+actor = AxiomAgent(initial_rgb, "Explode", 3, 88101)
+plan = actor.propose()
+receipt = actor.observe_applied(plan, next_rgb, applied_action, native_reward)
+actor.checkpoint(path, metadata)
+resumed = AxiomAgent(initial_rgb, "Explode", 3, 88101)
+resumed.restore(path, metadata)
+```
+
+`metadata` contains `stage`, `game`, `model_seed`, `game_seed`, `goal_steps`,
+`tick`, `source_sha256` and `trace_sha256`. Supply the expected source and
+action-trace prefix independently when restoring. The file binds the frame
+encoding, scene settings, search and reduction settings, key implementations
+and regenerated priors. Use the same reset image and configuration in the
+restoring process. The loader also reads the original version-1 exact pilot
+files with their original factory. A simulator resumes from its own state or
+its retained action tape.
+
+A repeated `propose()` returns the pending decision. `abandon(plan)` discards
+it and keeps the planner's advanced key. `observe_applied` consumes the
+decision once. Pass `reset_rgb=` with terminal feedback to install the next
+reset image while preserving the learned banks and real-action clock.
+
+Exact files retain all learner remainders for bitwise continuation on a
+matching runtime. Explicit `exact=False` drops the two posterior banks'
+small floating-point remainders at this boundary. The next update resumes
+compensated arithmetic. Subsequent beliefs, threshold decisions and sampled
+policies can diverge after rounding. Both modes preserve the pending action,
+planner and reduction keys, row identities and accumulated reduction records.
+
+At action 9,500 of the retained Explode pilot, the interaction bank had 339
+live rows out of 5,000. Original exact, public exact and public compact files
+used 1,275,968, 1,227,185 and 1,183,171 bytes. Across six balanced warm
+comparisons on one CPU, median restore times were 94.9, 87.4 and 79.7 ms.
+Public exact reproduced the full sampled plan and its next key. Compact
+selected the same recorded action while changing the plan digest. The
+`tools/axiom/checkpoint_cost.py` probe checks both retained pilot snapshots.
+
 ## Batch, extend, render, and estimate
 
 `cffg.colony.Colony` caches one engine per structure hash and vmaps matching

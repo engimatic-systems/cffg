@@ -135,8 +135,10 @@ def acted(reference, output):
             if tick == 5:
                 path = Path(directory) / "checkpoint.npz"
                 sources = hashlib.sha256()
-                for name in ("evaluation_actor.py", "evaluation_planning.py"):
-                    sources.update(Path(__file__).with_name(name).read_bytes())
+                from cffg import axiom_agent
+                from cffg.experiments import axiom_cached_plan
+                for module in (axiom_agent, axiom_cached_plan):
+                    sources.update(Path(module.__file__).read_bytes())
                 metadata = dict(source_sha256=sources.hexdigest(), stage="development",
                                 game="Explode", model_seed=MODEL_SEED, game_seed=GAME_SEED,
                                 goal_steps=8, tick=tick, trace_sha256=tree_digest(rows))

@@ -154,5 +154,120 @@ def test_rejects_wrong_run_corruption_and_invalid_resigned_state_atomically(tmp_
         reject({k: v for k, v in fields.items() if k != "scene[0].tracks.use"}, header, resign=True)
 
 
+def small_public():
+    from cffg.axiom_agent import AxiomAgent
+
+    settings = SceneSettings(3, slots=2, banks=BankSettings(identities=2, motions=4, interactions_per_motion=1))
+    return AxiomAgent(frame(), "fixture", 3, 71, settings=settings, audit_plan=True)
+
+
+def test_public_pending_clock_applied_override_and_atomic_reset():
+    with jax.enable_x64(False):
+        actor = small_public()
+        old = actor.propose()
+        assert old == actor.propose()
+        before = actor.scene
+        actor.abandon(old)
+        assert before is actor.scene
+        plan = actor.propose()
+        assert plan.key != old.key
+        with pytest.raises(ValueError, match="stale"):
+            actor.observe_applied(old, frame(), old.action, 1)
+        applied = (plan.action + 1) % 3
+        with pytest.raises(ValueError, match="frames"):
+            actor.observe_applied(plan, frame(), applied, 1, reset_rgb=np.zeros((2, 2, 3), np.uint8))
+        assert actor.scene is before and actor.propose() == plan
+        receipt = actor.observe_applied(plan, frame(), applied, -2, reset_rgb=frame())
+        assert receipt["applied"] == applied and receipt["reward"] == -2
+        assert receipt["reset_observation"]["update"] is False
+        assert receipt["tick_after"] == receipt["reset_observation"]["tick_after"] == actor.tick == 1
+        with pytest.raises(ValueError, match="stale"):
+            actor.observe_applied(plan, frame(), applied, -2)
+
+
+def test_public_schema_checked_before_installing(tmp_path):
+    from cffg import axiom_checkpoint as codec
+
+    with jax.enable_x64(False):
+        actor = small_public()
+        at_first_reduction(actor)
+        path = tmp_path / "actor.npz"
+        actor.checkpoint(path, meta(499), exact=False)
+        with np.load(path, allow_pickle=False) as file:
+            header = json.loads(file["metadata"].item())
+            payload = {k: file[k] for k in file.files if k != "metadata"}
+        assert header["mode"] == "compact" and header["model"]["scene"]["slots"] == 2
+        assert header["model"]["reduction"]["period"] == 500
+        assert not any(".posterior.carry." in k or ".identity.prior." in k for k in payload)
+        source = small_public()
+        raw = actor.state_dict()
+        raw["scene[0].tracks.use"] = np.full_like(raw["scene[0].tracks.use"], np.nan)
+        with pytest.raises(ValueError, match="nonfinite"):
+            source.load_state_dict(raw)
+        before = source.scene, source.key, source.proposal, source.reduction
+        bad_models = [dict(header["model"], plan_key_impl="rbg"),
+                      dict(header["model"], scene=dict(header["model"]["scene"], slots=32))]
+        for h, fields in [
+            *((dict(header, model=m), payload) for m in bad_models),
+            (dict(header, fixed_sha256="0"*64), payload),
+            (dict(header, mode="exact"), payload),
+            (header, {k:v for k,v in payload.items() if k != "scene[0].tracks.use"}),
+            (header, dict(payload, **{"scene[0].identity.posterior.carry.mu": np.zeros(1)})),
+        ]:
+            h = dict(h)
+            h.pop("sha256")
+            h["sha256"] = codec._digest(h, fields)
+            write_artifact(path, h, fields)
+            with pytest.raises(ValueError):
+                source.restore(path, meta(499))
+            assert all(a is b for a, b in zip(before, (source.scene, source.key, source.proposal, source.reduction)))
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("exact", (True, False), ids=("exact", "compact"))
+def test_installed_actor_restart_matches_lifecycle_oracle_in_fresh_python(tmp_path, exact):
+    from cffg.component_bank import ComponentBank
+    from cffg.component_bank_device import from_host, to_host
+
+    with jax.enable_x64(False):
+        original = small_public()
+        at_first_reduction(original)
+        pending = original.propose()
+        original.checkpoint(tmp_path / "pending.npz", meta(499), exact=exact)
+        assert original.propose() == pending
+        assert np.any(original.scene.interaction.posterior.carry.alpha)
+        if not exact:
+            def rounded(device):
+                record = to_host(device).state_dict(exact=False)
+                return from_host(ComponentBank.from_state_dict(record))
+            original.scene = original.scene._replace(identity=rounded(original.scene.identity),
+                                                     interaction=rounded(original.scene.interaction))
+        expected = []
+        for tick in (500, 501):
+            expected.append(list(advance(original, tick)))
+            original.checkpoint(tmp_path / f"original-{tick}.npz", meta(tick))
+    out = subprocess.check_output([sys.executable, __file__, str(tmp_path), "public"], text=True)
+    assert json.loads(out) == expected
+    for tick in (500, 501):
+        with np.load(tmp_path / f"original-{tick}.npz") as a, np.load(tmp_path / f"resumed-{tick}.npz") as b:
+            assert set(a.files) == set(b.files)
+            for k in a.files:
+                assert (a[k].shape, a[k].dtype, a[k].tobytes()) == (b[k].shape, b[k].dtype, b[k].tobytes()), k
+
+
+def public_restarted(directory):
+    actions = []
+    with jax.enable_x64(False):
+        path = directory / "pending.npz"
+        for tick in (500, 501):
+            actor = small_public()
+            actor.restore(path, meta(tick-1))
+            actions.append(advance(actor, tick))
+            path = directory / f"resumed-{tick}.npz"
+            actor.checkpoint(path, meta(tick))
+    return actions
+
+
 if __name__ == "__main__":
-    print(json.dumps(restarted(Path(sys.argv[1]))))
+    run = public_restarted if sys.argv[2:] == ["public"] else restarted
+    print(json.dumps(run(Path(sys.argv[1]))))
