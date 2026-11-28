@@ -11,6 +11,7 @@ wire, a bead — changes the hash.
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
 import hashlib
 import json
 from pathlib import Path
@@ -37,8 +38,11 @@ from cffg.core.ir import (
     VariableSpec,
 )
 
+from cffg.core.recurrence_tree import RecurrenceTree
+
 SCHEMA_VERSION = "1"
 _SCOPED_PLATE_VERSION = "1.1"
+_TREE_VERSION = "1.2"
 
 
 def _bond_to_dict(rule: Any) -> dict[str, Any]:
@@ -100,11 +104,16 @@ def to_dict(t: Template) -> dict[str, Any]:
             f"cannot serialize {t.name!r}: P-substitution conflicts:\n  - "
             + "\n  - ".join(conflicts)
         )
+    trees = {f.name: f.resolved_recurrence_tree(t.variables) for f in t.factors.values()
+             if f.type == "recurrence_link" or f.recurrence_tree is not None}
+    plates = {name: _plate_to_dict(t.plates[name]) for name in sorted(t.plates)}
+    version = SCHEMA_VERSION
+    if trees or any(p["fragment"]["schema_version"] == _TREE_VERSION for p in plates.values()):
+        version = _TREE_VERSION
+    elif any(plate.shared_scope for plate in t.plates.values()):
+        version = _SCOPED_PLATE_VERSION
     d: dict[str, Any] = {
-        "schema_version": (
-            _SCOPED_PLATE_VERSION if any(plate.shared_scope for plate in t.plates.values())
-            else SCHEMA_VERSION
-        ),
+        "schema_version": version,
         "name": t.name,
         "variables": {
             v.name: (
@@ -117,6 +126,7 @@ def to_dict(t: Template) -> dict[str, Any]:
         "factors": {
             f.name: {
                 "type": f.type,
+                **({"recurrence_tree": trees[f.name].to_dict()} if f.name in trees else {}),
                 "edges": dict(sorted(f.edges.items())),
                 "param_edges": dict(sorted(f.param_edges.items())),
                 "param_blobs": dict(sorted(f.param_blobs.items())),
@@ -140,8 +150,8 @@ def to_dict(t: Template) -> dict[str, Any]:
         },
     }
     # Additive: templates without plates serialize byte-identically to before.
-    if t.plates:
-        d["plates"] = {name: _plate_to_dict(t.plates[name]) for name in sorted(t.plates)}
+    if plates:
+        d["plates"] = plates
     # Additive (cff-x0sv): declared learnables. Structure, not blob data — a
     # model that learns its transitions is a different model from one that
     # does not, so this participates in the structure hash.
@@ -241,34 +251,44 @@ def from_dict(d: dict[str, Any]) -> Template:
     if learning_version not in (None, "1"):
         raise ValueError(f"unknown learning schema version {learning_version!r}")
     version = d.get("schema_version")
-    if version not in (SCHEMA_VERSION, _SCOPED_PLATE_VERSION):
+    if version not in (SCHEMA_VERSION, _SCOPED_PLATE_VERSION, _TREE_VERSION):
         raise ValueError(f"unsupported schema version {version!r}")
     scoped_plates = any(plate.get("shared_scope") for plate in d.get("plates", {}).values())
-    if scoped_plates != (version == _SCOPED_PLATE_VERSION):
+    has_recurrence = any(f["type"] == "recurrence_link" for f in d["factors"].values())
+    nested_tree = any(p["fragment"].get("schema_version") == _TREE_VERSION for p in d.get("plates", {}).values())
+    if nested_tree and version != _TREE_VERSION:
+        raise ValueError("a plate containing a recurrence tree requires schema 1.2")
+    if version == _TREE_VERSION and not (has_recurrence or nested_tree):
+        raise ValueError("schema version 1.2 requires a recurrence tree")
+    if version != _TREE_VERSION and scoped_plates != (version == _SCOPED_PLATE_VERSION):
         raise ValueError("a shared plate scope requires schema version 1.1")
-    for factor in d.get("factors", {}).values():
+    for name, factor in d.get("factors", {}).items():
+        explicit = version == _TREE_VERSION and factor["type"] == "recurrence_link"
+        if ("recurrence_tree" in factor) != explicit:
+            raise ValueError(f"factor {name!r}: explicit recurrence trees require schema 1.2 and recurrence_link")
         if "function" in factor:
             resolve_mean_function(FunctionSpec.from_dict(factor["function"]))
     _check_kernel_requirements(d)
+    variables = {
+        name: VariableSpec(name, spec.get("cardinality", 0), spec.get("dim", 0), spec.get("ef", ""))
+        for name, spec in d["variables"].items()
+    }
+    factors = {}
+    for name, spec in d["factors"].items():
+        factor = FactorSpec(
+            name, spec["type"], edges=dict(spec["edges"]),
+            param_edges=dict(spec.get("param_edges", {})),
+            param_blobs=dict(spec.get("param_blobs", {})),
+            function=FunctionSpec.from_dict(spec["function"]) if "function" in spec else None,
+            recurrence_tree=RecurrenceTree.from_dict(spec["recurrence_tree"]) if "recurrence_tree" in spec else None,
+        )
+        if factor.type == "recurrence_link":
+            factor = replace(factor, recurrence_tree=factor.resolved_recurrence_tree(variables))
+        factors[name] = factor
     return Template(
         name=d["name"],
-        variables={
-            name: VariableSpec(
-                name, spec.get("cardinality", 0), spec.get("dim", 0), spec.get("ef", "")
-            )
-            for name, spec in d["variables"].items()
-        },
-        factors={
-            name: FactorSpec(
-                name,
-                spec["type"],
-                edges=dict(spec["edges"]),
-                param_edges=dict(spec.get("param_edges", {})),
-                param_blobs=dict(spec.get("param_blobs", {})),
-                function=FunctionSpec.from_dict(spec["function"]) if "function" in spec else None,
-            )
-            for name, spec in d["factors"].items()
-        },
+        variables=variables,
+        factors=factors,
         constraints=[
             ConstraintSpec(
                 ConstraintKind(c["kind"]),

@@ -47,6 +47,9 @@ def _declarations(template):
     # Compare the actual graph declarations before trusting a hash bucket.
     return replace(
         template,
+        factors={key: (replace(f, recurrence_tree=f.resolved_recurrence_tree(template.variables))
+                       if f.type == "recurrence_link" and f.recurrence_tree is None else f)
+                 for key, f in template.factors.items()},
         blobs={key: replace(ref, path="", init=()) for key, ref in template.blobs.items()},
         plates={key: replace(spec, fragment=_declarations(spec.fragment))
                 for key, spec in template.plates.items()},

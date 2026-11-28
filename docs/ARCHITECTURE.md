@@ -603,6 +603,18 @@ edge binding. Neither pass serializes those indexes or rescans the complete
 template for each variable. The incidence work is therefore `O(V + I + P)` in
 variables, factor endpoints, and ports.
 
+The generative destination tree lives on `FactorSpec.recurrence_tree`. Gate
+names are local to the factor and retain their identity under scoping,
+grounding and composition. Canonical preorder defines the rows of the
+source-specific coefficients. Schema 1.2 stores both ordered children of each
+gate and every destination label. Earlier recurrence records expand to a
+decision list on read. Stored bundle hashes are checked against the original
+document before migration. Topology-aware factor edit tags let older edit
+readers reject unsupported instructions. Programmatic defaults and the
+corresponding explicit trees share the same Colony structure key.
+The categorical component classification around a recurrence is separate
+from this within-factor tree.
+
 The repeated rSLDS slice has no private IR or rule path. Ordinary arena grouping
 lowers its `recurrence_link`, `gaussian_mixture_linear`, `gaussian_linear`, and
 equality members into a constant number of shape-batched operation bodies as

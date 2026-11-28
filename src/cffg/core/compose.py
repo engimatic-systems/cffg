@@ -21,7 +21,6 @@ from cffg.core.ir import (
     BeliefBinding,
     BlobRef,
     ConstraintSpec,
-    FactorSpec,
     LearnableSpec,
     PortRole,
     PortSpec,
@@ -89,13 +88,11 @@ def scoped(template: Template, prefix: str) -> Template:
         name=s(template.name),
         variables={s(v.name): dataclasses.replace(v, name=s(v.name)) for v in template.variables.values()},
         factors={
-            s(f.name): FactorSpec(
-                s(f.name),
-                f.type,
+            s(f.name): dataclasses.replace(
+                f, name=s(f.name),
                 edges={r: s(v) for r, v in f.edges.items()},
                 param_edges={r: s(v) for r, v in f.param_edges.items()},
                 param_blobs={r: s(b) for r, b in f.param_blobs.items()},
-                function=f.function,
             )
             for f in template.factors.values()
         },
@@ -203,13 +200,11 @@ def bond(t: Template, port_a: str, port_b: str) -> Template:
 
     # Keep a's variable; rewire every reference to b's variable onto it.
     for fname, f in t.factors.items():
-        t.factors[fname] = FactorSpec(
-            f.name,
-            f.type,
+        t.factors[fname] = dataclasses.replace(
+            f,
             edges={r: va.name if v == vb.name else v for r, v in f.edges.items()},
             param_edges={r: va.name if v == vb.name else v for r, v in f.param_edges.items()},
             param_blobs=dict(f.param_blobs),
-            function=f.function,
         )
     t.constraints = [
         dataclasses.replace(c, target=va.name) if c.target == vb.name else c

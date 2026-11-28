@@ -56,7 +56,12 @@ class LoadedBundle:
     template: Template
     arrays: dict[str, np.ndarray]
     manifest: dict
-    learnables: Learnables
+    learnables: Learnables | None
+
+    @property
+    def source_only(self) -> bool:
+        """The model is validated for storage and has no executable learning state."""
+        return self.learnables is None
 
     @property
     def resumable(self) -> bool:
@@ -193,6 +198,8 @@ def save_bundle(
     Public learner operations are excluded during snapshot capture. Callers
     must synchronize direct edits to their template, arrays or learner mappings.
     """
+    from cffg.compiler import _source_only_recurrence
+
     with learnables._lock if learnables is not None else nullcontext():
         template = copy.deepcopy(template)
         arrays = {name: np.asarray(value).copy() for name, value in arrays.items()}
@@ -200,6 +207,8 @@ def save_bundle(
         validate(expanded)
         _point_arrays(expanded, arrays)
         validate_learning_declarations(expanded, arrays)
+        if (expanded.learnables or learnables is not None) and _source_only_recurrence(expanded) is not None:
+            raise BundleError("source-only recurrence tree bundles require fixed parameters; execution awaits cff-lv65")
         if expanded.learnables and learnables is None:
             raise BundleError("declared learnables require complete prior and posterior learning state")
         learning, learning_arrays = _learning_snapshot(learnables)
@@ -321,8 +330,9 @@ def _restore_learning(document, values, arena):
 def load_bundle(path: str | Path) -> LoadedBundle:
     """Validate and load a complete schema-2 archive.
 
-    No caller-supplied priors are needed for schema 2. Compilation validates
-    point shapes and reconstructs logical learning plans; no inference runs.
+    Executable models restore their learning state from the archive. A fixed
+    model with a non-decision-list recurrence tree returns a source-only bundle
+    after validating its point parameters, with resumable=False.
     """
     try:
         with zipfile.ZipFile(path) as archive:
@@ -334,7 +344,7 @@ def load_bundle(path: str | Path) -> LoadedBundle:
 
 
 def _load_archive(archive):
-    from cffg.compiler import compile_template
+    from cffg.compiler import _source_only_recurrence, _validate_source_arrays, compile_template
 
     names = _check_members(archive)
     manifest = _json(archive.read("manifest.json"))
@@ -387,6 +397,12 @@ def _load_archive(archive):
     expected_members = {"model.json", "manifest.json", *paths.values(), *learning_members}
     if names != expected_members:
         raise BundleError(f"unexpected ZIP members {sorted(names - expected_members)}")
+    if _source_only_recurrence(expanded) is not None:
+        if expanded.learnables or inventory["learnables"]:
+            raise BundleError("source-only recurrence tree bundles cannot restore learning state; execution awaits cff-lv65")
+        validate_persistent_manifest(np.asarray(json.dumps(inventory)), ())
+        _validate_source_arrays(expanded, arrays)
+        return LoadedBundle(template, arrays, {**manifest, "resumable": False}, None)
     arena = compile_template(template, arrays=arrays)
     learning = _restore_learning(inventory, {
         member: _read_array(archive, member) for member in learning_members

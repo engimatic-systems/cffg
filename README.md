@@ -555,6 +555,32 @@ position alone in a position/velocity model can therefore produce a converged
 result whose first action ignores later goals. Convergence certifies the
 declared approximate updates, not useful lookahead; see LIMITATIONS S1d.
 
+#### Choosing a recurrence tree
+
+A `recurrence_link` chooses a destination by following binary logistic gates.
+Each gate has a name, an accepted child and a rejected child. An integer child
+selects a destination label. A string child points to another gate. Coefficient
+rows follow the root first, then its accepted subtree, then its rejected subtree.
+
+```python
+from cffg.core.recurrence_tree import Gate, RecurrenceTree
+
+# Accept label 0 at the first gate, label 1 at the second, and so on.
+decision_list = RecurrenceTree.decision_list(4)
+balanced = RecurrenceTree.balanced(4)
+custom = RecurrenceTree((Gate("choice", 2, "rest"), Gate("rest", 0, 1)))
+```
+
+Supply the tree as the `recurrence_tree` argument to `FactorSpec`, or set it
+with `dataclasses.replace` when editing a factor. The runtime executes decision lists in the original label order. Other valid
+trees can be edited and saved as JSON or as fixed-parameter source bundles.
+Loading a source-only bundle yields its template and arrays for inspection.
+Compilation reports the pending tree-execution capability. When loading
+an older model, the codec reconstructs its decision list from the regime count.
+New recurrence documents use template schema 1.2. Their structure hashes
+include the gates, so an external checkpoint keyed to the old hash can require
+its original software or a dedicated migration.
+
 ## Nonlinear and neural Gaussian models
 
 A `gaussian_nonlinear` factor references a serialized `FunctionSpec`.

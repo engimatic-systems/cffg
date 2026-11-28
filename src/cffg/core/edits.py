@@ -24,6 +24,7 @@ from cffg.core.ir import (
     Template,
     VariableSpec,
 )
+from cffg.core.recurrence_tree import RecurrenceTree
 from cffg.core.validate import validate
 
 
@@ -334,6 +335,7 @@ def _spec_to_dict(spec) -> dict:
             "param_edges": dict(spec.param_edges),
             "param_blobs": dict(spec.param_blobs),
             **({"function": spec.function.to_dict()} if spec.function is not None else {}),
+            **({"recurrence_tree": spec.recurrence_tree.to_dict()} if spec.recurrence_tree is not None else {}),
         }
     if isinstance(spec, ConstraintSpec):
         return {"kind": spec.kind.value, "target": spec.target, "detail": dict(spec.detail)}
@@ -350,6 +352,8 @@ def action_to_dict(action: EditAction) -> dict:
     name = _ACTION_NAMES[type(action)]
     if isinstance(action, (FanOut, ObserveInterior)):
         return {"action": name, **dataclasses.asdict(action)}
+    if isinstance(action, (AddFactor, ReplaceFactor)) and action.spec.recurrence_tree is not None:
+        name = "add_recurrence_factor" if isinstance(action, AddFactor) else "replace_recurrence_factor"
     if hasattr(action, "spec"):
         return {"action": name, "spec": _spec_to_dict(action.spec)}
     if hasattr(action, "ref"):
@@ -364,7 +368,9 @@ def action_to_dict(action: EditAction) -> dict:
 def action_from_dict(d: dict) -> EditAction:
     from cffg.core.ir import ConstraintKind, ConstraintSpec, PortRole, PortSpec, VariableSpec as VS
 
-    cls = _ACTIONS.get(d.get("action", ""))
+    tag = d.get("action", "")
+    tree_actions = {"add_recurrence_factor": AddFactor, "replace_recurrence_factor": ReplaceFactor}
+    cls = tree_actions.get(tag) or _ACTIONS.get(tag)
     if cls is None:
         raise EditError(f"unknown edit action {d.get('action')!r}")
     if cls in (FanOut, ObserveInterior):
@@ -382,6 +388,8 @@ def action_from_dict(d: dict) -> EditAction:
         from cffg.core.functions import FunctionSpec
 
         s = d["spec"]
+        if ("recurrence_tree" in s) != (tag in tree_actions):
+            raise EditError("explicit recurrence trees require a topology-aware factor action")
         return cls(
             FactorSpec(
                 s["name"], s["type"],
@@ -389,6 +397,7 @@ def action_from_dict(d: dict) -> EditAction:
                 param_edges=dict(s.get("param_edges", {})),
                 param_blobs=dict(s.get("param_blobs", {})),
                 function=FunctionSpec.from_dict(s["function"]) if "function" in s else None,
+                recurrence_tree=RecurrenceTree.from_dict(s["recurrence_tree"]) if tag in tree_actions else None,
             )
         )
     if cls in (AddConstraint, RemoveConstraint):

@@ -1,6 +1,6 @@
 ---
 id: cff-602p
-status: open
+status: in_progress
 deps: [cff-4sor]
 links: [cff-cz6v]
 created: 2026-08-10T02:58:17Z
@@ -118,3 +118,11 @@ Intelligible-ticket review: complete.
 Classification-note additions: intended=the contextual meaning assignments in
 this note; all=the complete topology-field set; only=the decision-list
 execution scope before cff-lv65.
+
+**2026-11-28T05:38:28Z**
+
+Mathematics prerequisite cff-4sor has passed and closed on open #215. Base this change on #217 so schema 1.1 scoped plates and parameter-only Colony cache semantics can be exercised before review. New IR field change path: source validation, JSON/hash, typed composition, transactional edits, compact/expanded plates, compile admission, CFFGZ and checkpoint identity, estimator/admission paths. The only executable topology in this ticket is the same ordered decision list. Verify JSON/CFFGZ reconstruction, single/vmap and scheduled/flood equivalence with the old representation. Balanced and arbitrary trees are source objects; compile must reject them before allocating message state. Rank/zero support and dtype of numerical messages follow the existing rule, which is not changed here.
+
+**2026-11-28T05:47:43Z**
+
+The source format now records gate names, signed branches and integer destinations, including recurrence trees inside compact plates. Old decision lists migrate on load after their original content hash has been checked. Fixed custom trees can round-trip through CFFGZ. Executing a non-decision-list tree is owned by cff-lv65. The final source, bundle, parity and serialization selection passed all 35 cases. The adjacent checkpoint, import, composition and plate selection passed 69, with 5 opt-in cases deselected. The previous reader rejected schema 1.2 and the new edit tag explicitly. The full short suite is the remaining review gate.

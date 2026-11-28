@@ -148,6 +148,23 @@ def _prepare_compilation(t: Template, semiring: str) -> tuple[Template, _Compila
         raise CompileError(f"semiring must be 'sum' or 'max', got {semiring!r}")
     t = expand_plates(t)
     validate(t)
+    unsupported = _source_only_recurrence(t)
+    if unsupported is not None:
+        raise CompileError(
+            f"factor {unsupported!r}: executing a non-decision-list recurrence tree requires cff-lv65"
+        )
+    return t, _lower_validated(t, semiring)
+
+
+def _source_only_recurrence(expanded: Template) -> str | None:
+    for factor in expanded.factors.values():
+        tree = factor.recurrence_tree
+        if tree is not None and not tree.is_decision_list():
+            return factor.name
+    return None
+
+
+def _lower_validated(t: Template, semiring: str) -> _CompilationPlan:
     topology = build_topology(t)
     try:
         registry = snapshot_registry(t)
@@ -157,7 +174,12 @@ def _prepare_compilation(t: Template, semiring: str) -> tuple[Template, _Compila
     validate_admission(t.name, claims)
     registered = lower_registered(t, topology, claims, semiring, registry)
     drafts = complete_specialized(claims, OrdinaryMembership(registered.bp_members))
-    return t, _CompilationPlan(topology, registered, drafts)
+    return _CompilationPlan(topology, registered, drafts)
+
+
+def _validate_source_arrays(expanded: Template, arrays: dict[str, np.ndarray]) -> None:
+    """Check the same parameter shapes and values for a validated, nonexecutable source."""
+    _lower_validated(expanded, "sum").resolve(expanded, arrays, None)
 
 
 def _dirichlet_shape(t: Template, likelihood_name: str) -> tuple[tuple[int, ...], int]:
