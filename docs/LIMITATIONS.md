@@ -880,15 +880,11 @@ DSL would still soften that boundary. Learned `c` and learned `A` coordinates
 are currently compiled separately rather than as one jointly uncertain
 composite.
 
-**S9. Fixed GFE probability validation is incomplete.** The categorical GFE
-packer currently accepts negative likelihood or goal entries when their checked
-sum is one. Conversion to log space maps those entries to zero probability,
-leaving invalid total mass; for example, `[-0.2, 1.2]` becomes mass `1.2`.
-Callers must supply finite, nonnegative, normalized fixed probabilities.
-This is an inherited input-validation defect, not a supported approximation.
-P2 ticket cff-34gi owns rejecting it and checking the analogous transition-GFE
-path. Positive Dirichlet concentrations have a different contract and need not
-sum to one.
+**S9. Fixed GFE probabilities.** Compilation requires finite, nonnegative
+entries in fixed likelihoods, goals and transition tables. The goal and each
+conditional distribution must sum to one within the compiler's normalization
+tolerance. Literal zeros retain their log-zero encoding. Learned parameters
+use positive Dirichlet concentrations, whose totals represent prior strength.
 
 Graph rendering is deterministic documentation of the declared template and
 supported constraint decorations. A successful SVG/PNG/scene render does not
@@ -909,8 +905,8 @@ and learns identities, motions and interactions within fixed-capacity banks.
 Its evaluation includes one 10,000-step Explode run. The usual LAIF controller
 replans at each tick. The separate categorical planner in S4 can commit to
 actions through one or two future readings. Loopy inference retains its
-convergence and accuracy caveats. Treat cff-34gi and cff-6n9c as input-
-validation defects, the estimator and stochastic Colony surfaces as partial,
+convergence and accuracy caveats. Treat cff-6n9c as an input-validation
+defect, the estimator and stochastic Colony surfaces as partial,
 alpha bundles as current-schema artifacts, and administratively closed research
 chains as non-capabilities. Its natural habitat remains experiments whose state
 ontology and local factor semantics can be designed and audited explicitly.

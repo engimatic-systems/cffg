@@ -82,7 +82,7 @@ def pack_gfe(draft, goals, goal_priors, resolved):
                 raise CompileError(f"factor {obs_name!r}: Dirichlet counts must be > 0")
             la.append(a)
         else:
-            _stochastic(obs_name, a)
+            _stochastic(obs_name, a, role="matrix")
             la.append(_log_of(a))
         if group.goal_learned:
             c_alpha0 = goal_priors[goal_name]
@@ -91,7 +91,7 @@ def pack_gfe(draft, goals, goal_priors, resolved):
         else:
             c = sources[goal_name, "statistic"]
             _expect(goal_name, c, (ko,))
-            _stochastic(goal_name, c[:, None])
+            _stochastic(goal_name, c[:, None], role="statistic")
             lc.append(_log_of(c))
     a_key, c_key = (destination.name for destination in draft.arrays.destinations)
     return {a_key: np.stack(la), c_key: np.stack(lc)}
@@ -111,7 +111,7 @@ def pack_transition_gfe(draft, resolved):
             stacked.append(arr)
         else:
             for u in range(ku):
-                _stochastic(f"{member}[u={u}]", arr[u])
+                _stochastic(member, arr[u], role=f"matrices[u={u}]")
             stacked.append(_log_of(arr))
     return {draft.arrays.destinations[0].name: np.stack(stacked)}
 
@@ -285,10 +285,14 @@ def _expect(name: str, arr: np.ndarray, shape: tuple[int, ...]) -> None:
         )
 
 
-def _stochastic(name: str, arr: np.ndarray) -> None:
+def _stochastic(name: str, arr: np.ndarray, *, role: str = "conditional") -> None:
+    if not np.all(np.isfinite(arr)) or np.any(arr < 0):
+        raise CompileError(
+            f"factor {name!r}: {role} must contain finite nonnegative probabilities"
+        )
     sums = arr.sum(axis=0)
     if not np.allclose(sums, 1.0, atol=1e-6):
         raise CompileError(
-            f"factor {name!r}: conditional not column-stochastic (col sums {sums}); "
+            f"factor {name!r}: {role} not column-stochastic (col sums {sums}); "
             "true-FE semantics require normalized factors"
         )
