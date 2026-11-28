@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from copy import deepcopy
 
 import numpy as np
 
-from cffg.array_identity import array_descriptor
+from cffg.array_identity import array_descriptor, json_digest
 from cffg.core import Template, expand_plates, validate
 from cffg.core.compose import compose
 from cffg.core.edits import (
@@ -22,11 +21,6 @@ from cffg.core.serialize import structure_hash
 
 class ProposalError(ValueError):
     """A proposal could not be reconstructed from its declared artifacts."""
-
-
-def _digest(value):
-    data = json.dumps(value, sort_keys=True, allow_nan=False, separators=(",", ":"))
-    return hashlib.sha256(data.encode()).hexdigest()
 
 
 def _id(value, field):
@@ -69,13 +63,14 @@ def _check_blobs(expected, arrays):
         raise ProposalError(f"unexpected numeric inputs for blobs {sorted(extra)}")
 
 
-def _model_identity(template, arrays):
+def model_identity(template, arrays):
+    """Identify a model structure and its explicitly resolved named arrays."""
     validate(template)
     _check_blobs(expand_plates(template).blobs, arrays)
     descriptors = {k: array_descriptor(_array(v)) for k, v in arrays.items()}
     return {
         "structure_sha256": structure_hash(template),
-        "arrays_sha256": _digest(descriptors),
+        "arrays_sha256": json_digest(descriptors),
     }
 
 
@@ -136,7 +131,7 @@ def _apply(source_id, steps, models, inputs, *, expected=None):
             template = deepcopy(template)
             arrays = {k: np.array(v, copy=True) for k, v in arrays.items()}
             try:
-                identities[key] = _model_identity(template, arrays)
+                identities[key] = model_identity(template, arrays)
             except ValueError as error:
                 raise ProposalError(f"model {key!r}: {error}") from error
             check("models", key, identities[key])
@@ -163,7 +158,7 @@ def _apply(source_id, steps, models, inputs, *, expected=None):
                 raise ProposalError(f"unknown operation {step['op']!r}")
         except (ValueError, KeyError, TypeError, AttributeError) as error:
             raise ProposalError(f"proposal step {i}: {error}") from error
-    return template, arrays, identities, parameters, _model_identity(template, arrays)
+    return template, arrays, identities, parameters, model_identity(template, arrays)
 
 
 def record_proposal(
@@ -191,7 +186,7 @@ def record_proposal(
         "inputs": parameters,
         "result": result,
     }
-    return {**record, "candidate_id": _digest(record)}
+    return {**record, "candidate_id": json_digest(record)}
 
 
 def replay_proposal(
@@ -202,7 +197,7 @@ def replay_proposal(
     candidate_id = data.pop("candidate_id", None)
     if type(data.get("version")) is not int or data["version"] != 1:
         raise ProposalError("unsupported proposal version")
-    if _digest(data) != candidate_id or (
+    if json_digest(data) != candidate_id or (
         expected_id is not None and expected_id != candidate_id
     ):
         raise ProposalError("candidate ID mismatch")
