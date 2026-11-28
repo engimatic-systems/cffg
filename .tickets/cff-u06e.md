@@ -1,6 +1,6 @@
 ---
 id: cff-u06e
-status: open
+status: closed
 deps: []
 links: [cff-1o72, cff-o7hs]
 created: 2026-09-15T15:31:47Z
@@ -45,3 +45,17 @@ Some models need the output to equal a neural network prediction exactly: `y = f
 - **Exact support:** The states allowed by the model, including its equality constraints.
 - **float32 / dtype:** A 32-bit floating-point number format / the active numerical representation.
 - **Host/JIT, flooding/scheduled, single-instance/vmap:** Ordinary/compiled execution, simultaneous/ordered message updates, and individual/batched model execution.
+
+## Notes
+
+**2026-11-28T04:45:13Z**
+
+New factor or rule family change path. Use an invertible, coordinatewise two-slope neural activation in equal input and output dimension. Positive slopes permit exact push-forward and likelihood pullback. Integrate finite interval densities on the graph of the map and compare the complete ordinary tree ledger to analytic event evidence. Include impossible support, vacuous and non-normalizable beliefs, rank loss, float32 and 32 dimensions. This is a derivation with an independent host oracle. Compiled/host, flood/exact, single/vmap and current/legacy codec obligations go in the linked production ticket; no new schema or factor in this PR.
+
+**2026-11-28T04:47:00Z**
+
+Research question: which sign and reference measure should an exact deterministic conditional use? The input-chart graph law dx δ_f(x)(dy) gives −H(q_x), independently of a chart rewrite in y including E log |det Df|. Part I Eq. 6 (notes/pt1.txt lines 220–237) and Part II Eq. 1 (notes/pt2.txt lines 295–305) give +H for each degree-two separator. The displayed sign in Part I Eq. 8 conflicts with its factorization; the complete two-unary oracle verifies the sign independently. Confidence high within the separable positive-slope interval family.
+
+**2026-11-28T05:42:07Z**
+
+D13a and its independent interval oracle establish forward density transport, backward likelihood composition, and the tree energy for separable invertible two-slope activations. Five focused examples cover both precisions, 32-dimensional product evidence and impossible support. The canonical four-worker suite on 0a1d307 passed all 2,843 selected tests in 436.343 seconds. The archived runtime receipt and the worktree record match byte for byte (SHA-256 113d9497902cb8c3ab3007bf02ac290538b167ae306025ad7ef952373555d276). cenc-luez tracks the production interval representation, compiler, energy and persistence checks.
