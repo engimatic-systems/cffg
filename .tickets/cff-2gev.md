@@ -1,7 +1,7 @@
 ---
 id: cff-2gev
-status: open
-deps: [cff-hp3y, cff-4oq8, cff-b47g]
+status: in_progress
+deps: [cff-hp3y, cff-4oq8, cff-b47g, ctcp-qodi]
 links: [cff-weff]
 created: 2026-07-10T03:34:54Z
 type: feature
@@ -497,3 +497,7 @@ Retained candidate meanings:
   without a version claim.
 
 Intelligible-ticket review: complete.
+
+**2026-11-28T04:50:57Z**
+
+Prerequisite --> dependent: ctcp-6msb (generative derivation and exact reference; ready) --> ctcp-w305 (runtime, serialized clock and stationary equivalence) --> ctcp-qodi (frozen three-arm comparison) --> cff-2gev (behavioral and numerical claims). The split keeps a derivation result distinct from a measured behavioral result. No comparative study cell has been executed.
