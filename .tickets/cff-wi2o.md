@@ -1,6 +1,6 @@
 ---
 id: cff-wi2o
-status: open
+status: in_progress
 deps: [cff-ees0]
 links: []
 created: 2026-09-25T03:46:26Z
@@ -47,3 +47,13 @@ These are suggestions; another method is acceptable if it satisfies the outcomes
 Particle: a weighted parameter hypothesis. Resampling: drawing particles according to weights. Rejuvenation: moving particles to improve coverage while respecting a target distribution. Effective sample size: a weight-concentration measure. Jacobian: the volume correction for a parameter transformation. Calibration: agreement between uncertainty claims and repeated outcomes.
 
 Shared terms: CFFG means constrained Forney-style factor graph; JAX is the numerical array/compiler library; dtype is a numeric storage type; free energy is the model's inference objective; host/JIT compares Python-side and compiled execution; single/vmap compares one instance with vectorized instances; N/A means not applicable.
+
+## Notes
+
+**2026-11-28T04:58:11Z**
+
+Change paths: Learnable or checkpoint feature and Runtime numerical or status invariant. This task is a mathematical contract with executable reference tests. The runtime ticket owns host/JIT, single/vmap, schedule likelihood parity, and versioned state. Before scoring: use a probability in (0,1) with a beta prior, a bounded nonlinear observation probability, exact polynomial integration, seeded repeated runs, vacuous observations, population collapse and 10× population size. No empirical PCGym search result is a posterior oracle.
+
+**2026-11-28T05:01:55Z**
+
+Question: does applying an invariant move only at low ESS preserve finite-population evidence? Independent review and a two-state exact enumeration give expected normalizer 1/4 instead of 1/2. The contract uses the same predetermined posterior-invariant kernel in both ESS branches; stratified draws have unbiased offspring counts. Sources: PCGym common/physics_agent.py _rejuvenate (elite plus jitter), D6d induction and test_static_particle_derivation.py. The zero estimate from an exhausted population is distinguished from analytic impossibility. Continuous runtime implementation remains cff-iplr.

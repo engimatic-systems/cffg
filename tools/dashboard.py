@@ -174,6 +174,7 @@ EPIC_FILES = {
     ],
     "M15 · Learning (Gaussian)": [
         "test_finite_hypotheses.py",
+        "test_static_particle_derivation.py",
         "test_conj.py",
         "test_gauss_vmp.py",
         "test_params.py",
