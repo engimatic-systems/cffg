@@ -1,7 +1,8 @@
 """Colony execution: many small graphs, one machine (ARCHITECTURE §5b).
 
 An instance is pure data — (structure key, State pytree). Engines are cached
-by structure hash; JAX specializes their programs to numeric shapes and dtypes.
+by graph declarations and executable bindings. JAX specializes their programs
+to numeric shapes and dtypes.
 Ordinary iterative plans stack compatible states and run one vmapped
 step-loop; mixed-GFE plans share the compiled numerical kernels but retain
 per-instance trust controllers until cff-wbhu. Instances couple only through
@@ -10,19 +11,22 @@ the host (bind_data / read marginals), never by merging graphs.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from copy import deepcopy
+from dataclasses import dataclass, replace
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 
 from cffg import run_results
-from cffg.compiler import compile_template
+from cffg.compiler import _CompilationPlan, _prepare_compilation
 from cffg.core.ir import Template
+from cffg.core.plates import expanded_blob_refs
 from cffg.core.serialize import structure_hash
-from cffg.engine import Engine, RunResult, State, _replace
+from cffg.engine import Engine, RunResult, State
 from cffg.compiled_iteration import controller_for
 from cffg.readouts.selection import EdgeSelection
+from cffg.resolution.contracts import ResolvedCompileData
 from cffg.runtime_types import RunStatus as RunStatus  # noqa: PLC0414
 
 
@@ -38,10 +42,59 @@ def _batch_signature(state: State) -> tuple:
     return structure, tuple((value.shape, value.dtype) for value in leaves)
 
 
+def _declarations(template):
+    # Serialization canonicalizes some declarations and erases source data.
+    # Compare the actual graph declarations before trusting a hash bucket.
+    return replace(
+        template,
+        blobs={key: replace(ref, path="", init=()) for key, ref in template.blobs.items()},
+        plates={key: replace(spec, fragment=_declarations(spec.fragment))
+                for key, spec in template.plates.items()},
+    )
+
+
+def _providers():
+    from cffg.core.ir import FACTOR_TYPES
+    from cffg.kernels import KERNELS
+    from cffg.learn import FAMILIES
+    from cffg.mean_functions import MEAN_IMPLEMENTATIONS
+
+    # Strong references make replacement detectable even when a callback is
+    # re-registered with the same advertised implementation and version.
+    return tuple((name, provider) for registry in
+                 (FACTOR_TYPES, KERNELS, FAMILIES, MEAN_IMPLEMENTATIONS)
+                 for name, provider in registry.items())
+
+
+@dataclass(frozen=True)
+class _SpawnStructure:
+    key: str
+    declarations: Template
+    providers: tuple
+    expanded: Template
+    plan: _CompilationPlan
+    resolved: ResolvedCompileData
+    x64: bool
+
+    def matches(self, declarations, providers):
+        return (
+            len(self.providers) == len(providers)
+            and all(a == b and x is y for (a, x), (b, y) in zip(self.providers, providers))
+            and self.x64 == jax.config.x64_enabled
+            and declarations == self.declarations
+        )
+
+    def resolve(self, incoming, arrays):
+        template = (replace(self.expanded, blobs=expanded_blob_refs(incoming))
+                    if incoming.plates else incoming)
+        return self.plan.resolve(template, arrays, None, reuse=self.resolved)
+
+
 class Colony:
     def __init__(self):
         self.engines: dict[str, Engine] = {}
         self.instances: dict[int, _Instance] = {}
+        self._spawn_structures: dict[str, list[_SpawnStructure]] = {}
         self._next_id = 0
         self.last_results: dict[int, RunResult] = {}
 
@@ -52,27 +105,53 @@ class Colony:
         *,
         observations: dict[str, object] | None = None,
     ) -> int:
-        """Add an instance; compiles only if this structure is new."""
-        key = structure_hash(template)
-        if key not in self.engines:
-            arena = compile_template(template, arrays=arrays)
+        """Validate current parameters and reuse the matching structural plan."""
+        fingerprint = structure_hash(template)
+        declarations, providers = _declarations(template), _providers()
+        bucket = self._spawn_structures.get(fingerprint, ())
+        matching = [
+            entry for entry in bucket
+            if entry.key in self.engines and entry.matches(declarations, providers)
+        ]
+        cached = matching[0] if matching else None
+        new = None
+        if cached is None:
+            expanded, plan = _prepare_compilation(template, "sum")
+            data = plan.resolve(expanded, arrays, None)
+            arena = plan.assemble(data)
             if arena.mu3_groups:
                 raise ValueError(
                     "Colony does not accept mu3 evaluators: their per-instance "
                     "explicit PRNG keys and stochastic statuses require "
                     "Engine.prepare_mu3/run"
                 )
-            self.engines[key] = Engine(arena)
-            state = self.engines[key].init_state()
-        else:
-            # Same structure, this instance's own parameters.
-            arena = compile_template(template, arrays=arrays)
-            state = _replace(
-                self.engines[key].init_state(),
-                params={k: jnp.asarray(v) for k, v in arena.log_params.items()},
+            key = fingerprint if not bucket else f"{fingerprint}:{len(bucket)}"
+            new = _SpawnStructure(
+                key, deepcopy(declarations), providers, deepcopy(expanded),
+                plan, data, jax.config.x64_enabled,
             )
+            engine = Engine(arena)
+        else:
+            data = cached.resolve(template, arrays)
+            compatible = next(
+                (entry for entry in matching if data.learn_plans == entry.resolved.learn_plans), None
+            )
+            if compatible is None:
+                # Learning schemas are part of the executable even when a
+                # custom packer admits another valid numeric source shape.
+                key = f"{fingerprint}:{len(bucket)}"
+                new = replace(cached, key=key, resolved=data, x64=jax.config.x64_enabled)
+                engine = Engine(cached.plan.assemble(data))
+            else:
+                key, engine = compatible.key, self.engines[compatible.key]
+
+        params = {name: jnp.asarray(value) for name, value in data.log_params.items()}
+        state = engine._state_lifecycle.init_state(params)
         if observations:
-            state = self.engines[key].bind_data(state, observations)
+            state = engine.bind_data(state, observations)
+        if new is not None:
+            self.engines[key] = engine
+            self._spawn_structures.setdefault(fingerprint, []).append(new)
         iid = self._next_id
         self._next_id += 1
         self.instances[iid] = _Instance(key, state)

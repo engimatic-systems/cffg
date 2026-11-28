@@ -2349,16 +2349,20 @@ the region entropy correction and its path-enumeration oracle.
 
 ### 5b. Colony execution (many small graphs, one machine)
 
-`Colony` owns an instance table of `(structure_hash, State)` pairs and caches one
-`Engine` per structure hash. Each `State` is an Equinox pytree containing
-messages, parameters, and conditioned observations; structure remains in the
-cached engine. Ordinary iterative instances are grouped by structure plus State
-pytree layout, array shapes and dtypes before stacking. Each compatible batch
-vectorizes the compiled controller with `jax.vmap`. Distinct structures or
-numeric layouts run as separate groups. Different allowed-tuple table lengths
-therefore cannot enter one stack, while same-shaped tables with different
-contents retain vectorized execution. One cached Engine can have several JAX
-shape/dtype specializations; numeric contents do not define its identity.
+`Colony` keeps each member's `State` separate and caches the Engine and
+lowered compiler plan for compatible declarations, executable registry
+bindings and the active JAX precision setting. Each spawn resolves the
+incoming template's current blob sources, validates and packs the arrays,
+and binds that member's observations. The cached plan supplies wiring,
+parameter addresses and observation rows. The compile-time abstract kernel
+checks run again when a packed parameter layout changes. A new learning
+schema uses its own Engine.
+
+Ordinary iterative instances are grouped by executable plan, State pytree
+layout, array shapes and dtypes before stacking. Each compatible batch
+vectorizes the compiled controller with `jax.vmap`. Different allowed-tuple
+table lengths therefore use separate batches. Same-shaped tables with
+different contents retain vectorized execution.
 Exact-eligible instances reuse `Engine.run` propagation and certification
 individually, including initial failure checks. Engine and Colony share the
 exact-dispatch predicate. A valid hardening request has no effect when there

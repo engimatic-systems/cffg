@@ -90,15 +90,45 @@ def _prefix(plate: str, idx: tuple[int, ...]) -> str:
     return plate + SCOPE_SEP + SCOPE_SEP.join(str(i) for i in idx)
 
 
+def _scoped(prefix: str, name: str) -> str:
+    return prefix + SCOPE_SEP + name
+
+
+def _scoped_blob_refs(fragment, prefix, index, per_copy):
+    return {
+        _scoped(prefix, b.name): BlobRef(
+            _scoped(prefix, b.name),
+            b.path.replace(PLATE_INDEX_TOKEN, SCOPE_SEP.join(map(str, index))),
+            b.init,
+        )
+        for b in fragment.blobs.values()
+        if b.name in per_copy
+    }
+
+
+def expanded_blob_refs(template):
+    """Resolve blob declarations from a structurally validated plate template.
+
+    Cached consumers already own the expanded wiring. They still use the
+    caller's current file paths and initializer data for every numeric bind.
+    """
+    blobs = _with_shared_owners(template).blobs
+    for name, spec in sorted(template.plates.items()):
+        per_copy = frozenset(spec.per_copy_blobs)
+        if per_copy:
+            for index in _indices(spec.dims):
+                blobs.update(_scoped_blob_refs(spec.fragment, _prefix(name, index), index, per_copy))
+    return blobs
+
+
 def _scope_copy(
     spec: PlateSpec, prefix: str, index: tuple[int, ...], per_copy: frozenset[str]
 ) -> tuple[dict, dict, list, dict, dict, dict]:
     """Scope copy-local declarations under the index and tied blobs under their owner."""
     frag = spec.fragment
-    p = prefix + SCOPE_SEP
 
     def s(name: str) -> str:
-        return p + name
+        return _scoped(prefix, name)
 
     def sb(bname: str) -> str:
         return s(bname) if bname in per_copy else spec.shared_name(bname)
@@ -121,15 +151,7 @@ def _scope_copy(
     ports = {
         s(pt.name): PortSpec(s(pt.name), s(pt.variable), pt.role) for pt in frag.ports.values()
     }
-    per_copy_blobs = {
-        s(b.name): BlobRef(
-            s(b.name),
-            b.path.replace(PLATE_INDEX_TOKEN, SCOPE_SEP.join(map(str, index))),
-            b.init,
-        )
-        for b in frag.blobs.values()
-        if b.name in per_copy
-    }
+    per_copy_blobs = _scoped_blob_refs(frag, prefix, index, per_copy)
     per_copy_learnables = {
         s(ln.name): LearnableSpec(
             s(ln.name),

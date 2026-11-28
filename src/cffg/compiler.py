@@ -12,6 +12,7 @@ Parameters remain per-instance inputs, not baked compiled constants.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -47,6 +48,7 @@ from cffg.core.ir import Template
 from cffg.core.plates import expand_plates
 from cffg.core.validate import validate
 from cffg.registered import packing as _registered_packing
+from cffg.registered.contracts import RegisteredPlanDrafts
 from cffg.registered.capabilities import snapshot_registry
 from cffg.registered.lowering import lower_registered
 from cffg.resolution import sources as _source_helpers
@@ -58,8 +60,9 @@ from cffg.specialized import (
     validate_admission,
 )
 from cffg.specialized import packing as _specialized_packing
+from cffg.specialized.contracts import SpecializedPlanDrafts
 from cffg.specialized.discovery import dirichlet_shape
-from cffg.topology import build_topology
+from cffg.topology import TopologyLayout, build_topology
 
 __all__ = [
     "NEG",
@@ -117,6 +120,30 @@ def compile_template(
     decoding; Engine.objective, not Engine.bfe). MAP semantics are defined in v1
     for discrete BP groups and hard constraints only — "max" REJECTS vmp/mean-
     field beads, P-substitution/GFE composites, and Gaussian/EF/hybrid groups."""
+    expanded, plan = _prepare_compilation(t, semiring)
+    data = plan.resolve(expanded, arrays, root)
+    return plan.assemble(data)
+
+
+@dataclass(frozen=True)
+class _CompilationPlan:
+    topology: TopologyLayout
+    registered: RegisteredPlanDrafts
+    specialized: SpecializedPlanDrafts
+
+    def resolve(self, template, arrays, root, **options):
+        return resolve_compile_data(
+            template, arrays, root, self.topology, self.registered, self.specialized, **options
+        )
+
+    def assemble(self, data):
+        return assemble_arena(
+            self.topology, self.registered, self.specialized, data, self.specialized.semiring
+        )
+
+
+def _prepare_compilation(t: Template, semiring: str) -> tuple[Template, _CompilationPlan]:
+    """Lower the graph and capture its current registered implementations."""
     if semiring not in ("sum", "max"):
         raise CompileError(f"semiring must be 'sum' or 'max', got {semiring!r}")
     t = expand_plates(t)
@@ -130,9 +157,7 @@ def compile_template(
     validate_admission(t.name, claims)
     registered = lower_registered(t, topology, claims, semiring, registry)
     drafts = complete_specialized(claims, OrdinaryMembership(registered.bp_members))
-    data = resolve_compile_data(t, arrays, root, topology, registered, drafts)
-
-    return assemble_arena(topology, registered, drafts, data, semiring)
+    return t, _CompilationPlan(topology, registered, drafts)
 
 
 def _dirichlet_shape(t: Template, likelihood_name: str) -> tuple[tuple[int, ...], int]:
