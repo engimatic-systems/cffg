@@ -537,6 +537,11 @@ its energy, or compare numeric parameter values to infer sharing. Mismatches
 raise `CompileError`. Indexes are built once per assembly; no whole-template
 scan is repeated for each plan or member.
 
+The JAX-free structural lint in `core/model_lint.py` reads validated, expanded
+factor roles, parameter edges, DATA ports and constraints. Compilation can
+emit those findings after assembly. The disabled-DELTA-hardening warning
+belongs to `Engine.run`, which knows the resolved sweep count.
+
 `compiler.py:compile_template` checks its public semiring argument, expands
 plates, runs core validation, captures one registry, and sequences topology,
 specialized discovery/admission, registered lowering, specialized completion,

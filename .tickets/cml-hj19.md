@@ -35,3 +35,9 @@ The ledger explanation and environment action-selection policy have separate tic
 
 P-substitution changes the observation objective. KL-control denotes the ordinary preference-based objective. Mean-field splits a joint belief into independent parts. DELTA hardening projects a categorical belief to a single outcome. DATA denotes an evidence port.
 
+
+## Notes
+
+**2026-11-28T04:33:46Z**
+
+Implementation and focused verification are complete. The structural pass reads expanded declarations in factor-name order. It names each individual goal/likelihood pair and skips unary likelihoods connected to a random Dirichlet parameter when diagnosing redundant mean-field splits. The compiler emits findings after successful assembly. Engine.run independently checks the resolved number of DELTA hardening sweeps when lint=True. All defaults remain quiet. Tests/test_model_lint.py, tests/test_core_imports.py and tests/test_readme.py passed all 12 selected checks, including the no-JAX subprocess, 256 scoped pairs, numeric parity, validation failures and all warning controls. Commands: PYTHONPATH=src uv run --frozen --no-sync pytest -q tests/test_model_lint.py tests/test_core_imports.py tests/test_readme.py; tk dep cycle; git diff --check. The parent coordinates the full short-suite gate before opening a review PR.

@@ -23,6 +23,7 @@ assert template_type is Template
 from cffg.core.serialize import from_json, structure_hash, to_json
 t = Template('empty')
 validate(t)
+assert cffg.core.lint(t) == ()
 restored = from_json(to_json(t))
 assert structure_hash(restored) == structure_hash(t)
 t = Template('nonlinear',

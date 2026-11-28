@@ -152,15 +152,15 @@ expose the specialized workflows named in the capability map.
 </details>
 
 <details>
-<summary><code>cffg.core</code> — serialized graph language (35)</summary>
+<summary><code>cffg.core</code> — serialized graph language and diagnostics (37)</summary>
 
 <!-- facade-core:start -->
 `FACTOR_TYPES`, `AgentSpec`, `BeliefBinding`, `BlobRef`, `BoundaryFactorization`,
 `Broadcast`, `Chain`, `ConstraintKind`, `ConstraintSpec`, `Expose`, `FactorSpec`,
 `FactorType`, `FanOut`, `ObserveInterior`, `FunctionSpec`, `GaussianFilterSpec`,
-`GaussianPlanSpec`, `LearnableSpec`, `ModelError`,
+`GaussianPlanSpec`, `LearnableSpec`, `LintFinding`, `ModelError`,
 `MomentMatchingEndpoint`, `MomentProjection`, `PlateSpec`, `PortRole`, `PortSpec`,
-`Template`, `VariableSpec`, `expand_plates`, `fan_out`, `observe_interior`, `plate_observations`,
+`Template`, `VariableSpec`, `expand_plates`, `fan_out`, `lint`, `observe_interior`, `plate_observations`,
 `migrate_moment_matching`, `moment_matching`, `moment_matching_endpoint`,
 `register_factor_type`, `validate`
 <!-- facade-core:end -->
@@ -289,6 +289,18 @@ To reproduce the registered cue-and-commit comparison, run
 The JSON includes the cue, true regime, posterior and action for each trial.
 
 ## Compile, run, and read results
+
+`cffg.core.lint(template)` checks a valid template using only its structure.
+It returns findings in factor-name order with a stable `code`, the `owner`
+factor name and a `message`. Names include expanded plate scopes.
+`missing_p_substitution` identifies an unclamped observation likelihood
+facing a categorical goal with the ordinary KL-control objective.
+`unary_mean_field` identifies a split of a single variable with fixed parameters.
+
+Use `compile_template(template, arrays=arrays, lint=True)` to receive the
+same findings as Python warnings after compilation. Separately,
+`engine.run(state, n_iters, lint=True)` warns when the run has DELTA
+constraints and zero hardening sweeps. Both options default to quiet.
 
 Compile once for a fixed template shape. Observations and same-shaped parameter
 values are runtime inputs; a changed horizon, cardinality, dimension, dtype, or

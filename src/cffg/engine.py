@@ -358,6 +358,7 @@ class Engine:
         damp: float = 0.0,
         harden_last: int | None = None,
         outer_solver: str = "auto",
+        lint: bool = False,
     ) -> RunResult:
         """Flood up to ``n_iters`` sweeps and return explicit termination data.
 
@@ -394,7 +395,8 @@ class Engine:
         `harden_last=k` (default: k = n_iters // 2 when δ edges exist), the
         first phase runs soft to coherence, then δ edges harden for the final
         k sweeps so decisions commit sequentially. Without delta constraints,
-        a valid ``harden_last`` request has no effect.
+        a valid ``harden_last`` request has no effect. Set ``lint=True`` to
+        warn if this run disables hardening on a DELTA-constrained arena.
 
         Two-pass schedules (cff-d56d): when the engine compiled an exact
         directed schedule and the call keeps its contract (``damp=0``, no
@@ -416,6 +418,14 @@ class Engine:
             harden_last = n_iters // 2 if len(self.arena.delta_pairs) else 0
         if not 0 <= harden_last <= n_iters:
             raise ValueError("harden_last must be between 0 and n_iters")
+        if lint and harden_last == 0 and len(self.arena.delta_pairs):
+            import warnings
+
+            warnings.warn(
+                f"[delta_hardening_disabled] Run on {self.arena.template_name!r} disables "
+                f"hardening for {len(self.arena.delta_pairs)} DELTA-constrained edge(s).",
+                UserWarning, stacklevel=2,
+            )
         if not len(self.arena.delta_pairs):
             harden_last = 0
         if self._can_run_exact(n_iters, damp, harden_last):

@@ -44,6 +44,7 @@ from cffg.compiled import (
 )
 from cffg.compiler_errors import CompileError
 from cffg.core.ir import Template
+from cffg.core.model_lint import _lint_validated
 from cffg.core.plates import expand_plates
 from cffg.core.validate import validate
 from cffg.registered import packing as _registered_packing
@@ -108,9 +109,11 @@ def compile_template(
     arrays: dict[str, np.ndarray] | None = None,
     root: str | Path | None = None,
     semiring: str = "sum",
+    lint: bool = False,
 ) -> Arena:
     """Ground `t` into an Arena. Blob data comes from `arrays` (name -> array,
-    wins) or is loaded from `root`/blob.path.
+    wins) or is loaded from `root`/blob.path. With `lint=True`, report the
+    structural findings from `cffg.core.lint` as warnings after assembly.
 
     `semiring` selects the inference algebra (cff-e8zk): "sum" is sum-product
     (the BFE ledger; -log Z on trees), "max" is min-sum / max-product (MAP
@@ -132,7 +135,13 @@ def compile_template(
     drafts = complete_specialized(claims, OrdinaryMembership(registered.bp_members))
     data = resolve_compile_data(t, arrays, root, topology, registered, drafts)
 
-    return assemble_arena(topology, registered, drafts, data, semiring)
+    arena = assemble_arena(topology, registered, drafts, data, semiring)
+    if lint:
+        import warnings
+
+        for finding in _lint_validated(t):
+            warnings.warn(f"[{finding.code}] {finding.message}", UserWarning, stacklevel=2)
+    return arena
 
 
 def _dirichlet_shape(t: Template, likelihood_name: str) -> tuple[tuple[int, ...], int]:
