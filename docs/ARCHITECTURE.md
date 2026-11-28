@@ -203,6 +203,15 @@ A pure-Python (dataclass) representation, independent of JAX:
   Gaussian predictor removes its input prior and retires unreferenced blobs.
   A rejected edit returns its reason before the incumbent model changes.
   Fitting and held-out evaluation consume independent replayed models.
+- **Fragment archives.** `cffg.structure_fragments` stores the canonical
+  Template document alongside source, declared observation meanings, typed
+  ports and a numeric content digest in a versioned NPZ. Numbered array
+  members address sorted logical blob names. The fragment ID covers the
+  manifest, including category order. The loader re-derives the port
+  inventory and verifies exact array contents. A fragment attaches through
+  the existing proposal composition step, preserving all DATA ports.
+  Contact and agency inputs are recorded external conditions. Their
+  exogenous frequencies are supplied by the application.
 - **Serialization**: versioned JSON is the canonical structure and constraint
   schema. Array data (A matrices, Dirichlet counts, goal statistics) stays
   outside JSON and is referenced by relative `.npy` or `.safetensors` paths.
