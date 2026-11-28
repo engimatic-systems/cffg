@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+from scipy.special import digamma
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
@@ -66,6 +67,30 @@ def verify_models(root):
             if sha(root / item["file"]) != item["sha256"]:
                 raise ValueError("model digest mismatch")
     return p, manifest
+
+
+def inputs(revision):
+    names = (
+        "src/cffg",
+        "uv.lock",
+        WORKER.relative_to(REPO),
+        PROTOCOL.relative_to(REPO),
+    )
+    return {str(name): git("rev-parse", f"{revision}:{name}") for name in names}
+
+
+def warm_facts(trace, p):
+    mode, action, source = p["observed_column"]
+    warm = trace[: p["warmup"]]
+    visits = sum((r["m"], r["u"], r["x"]) == (mode, action, source) for r in warm)
+    bits = []
+    for row in warm[-p["saturation_window"] :]:
+        a = np.asarray(row["forecast"])[3 * mode + action, :, source]
+        mu = a / a.sum()
+        bits.append(
+            float(-mu @ np.log(mu) + mu @ digamma(a + 1) - digamma(a.sum() + 1))
+        )
+    return visits, bits
 
 
 def qualify(root):
@@ -133,6 +158,19 @@ def qualify(root):
                 raise ValueError(
                     "first development policy action differs before changed-world observation"
                 )
+        visits, d1 = warm_facts(trace, p)
+        if result["status"] != "failed":
+            if visits != result["warm_visits"]:
+                raise ValueError("exposure count differs from the applied warm actions")
+            np.testing.assert_allclose(
+                result["warm_last_d1"], d1, atol=1e-13, rtol=1e-13
+            )
+        if result["status"] == "unsaturated":
+            if len(trace) != p["warmup"] or (
+                visits >= p["saturation_min_visits"]
+                and max(d1) <= p["saturation_max_d1"]
+            ):
+                raise ValueError("unjustified unsaturated development receipt")
         ready = result["status"] == "complete"
         if ready and (
             len(trace) != p["warmup"] + p["development_followup"]
@@ -153,19 +191,17 @@ def qualify(root):
         rows[key].update(
             json=sha(stem.with_suffix(".json")), jsonl=sha(stem.with_suffix(".jsonl"))
         )
+    qualified_inputs = inputs("HEAD")
     for head in dev_heads:
-        for name in (
-            "src/cffg",
-            "uv.lock",
-            WORKER.relative_to(REPO).as_posix(),
-            PROTOCOL.relative_to(REPO).as_posix(),
-        ):
-            if git("rev-parse", f"{head}:{name}") != git("rev-parse", f"HEAD:{name}"):
-                raise ValueError(f"development source differs for {name}")
+        if inputs(head) != qualified_inputs:
+            raise ValueError(
+                "development runtime or protocol differs from the current candidate"
+            )
     passed = all(r["status"] == "complete" for r in rows.values())
     record = dict(
         status="passed" if passed else "no_go",
         development_heads=sorted(dev_heads),
+        qualified_inputs=qualified_inputs,
         cells=rows,
         **common,
     )
@@ -179,6 +215,8 @@ def freeze(root):
     check = load(root / "qualification.json")
     if check["status"] != "passed" or (root / "cells").exists():
         raise ValueError("formal opening requires a passed development inventory")
+    if check["qualified_inputs"] != inputs("HEAD"):
+        raise ValueError("candidate inputs changed after development qualification")
     expected = {f"{s}/{a}-{w}" for s, a, w in cell_order(p, p["development_seeds"])}
     if set(check["cells"]) != expected:
         raise ValueError("incomplete development inventory")
