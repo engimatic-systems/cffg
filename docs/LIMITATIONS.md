@@ -112,6 +112,29 @@ and the behavioral value of this model require independent evaluation.
 More generally, a misspecified model can accumulate high confidence in an
 inaccurate prediction. Low evidence can indicate a poor fit.
 
+The two-position, two-mode changing-corridor study stopped at its
+pre-change readiness check in both preregistered development protocols.
+At least 16 real probe visits and forecast parameter novelty at or below
+0.08 nat on each of the last eight warmup ticks were required. The table
+shows the maximum over those eight ticks. The two worlds share the same
+physical trajectory before the scheduled change.
+
+| Warmup protocol | Development seed | Probe visits | Stationary maximum (nat) | Changing maximum (nat) | Development cells passed |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Alternating left/right | 19501 | 33 | 0.01476 | 0.08897 | 2/6 |
+| Observed-position/mode acquisition | 19511 | 45 | 0.01114 | 0.14709 | 2/6 |
+| Observed-position/mode acquisition | 19512 | 53 | 0.00948 | 0.05189 | 6/6 |
+
+The changing learner with ordinary planning transitions had the same
+warmup novelty as the changing learner with transition P-substitution.
+The shared actions and observations determine both posteriors. On tick 126
+of seed 19511 the probe stayed at the left endpoint, an outcome with
+probability 0.08 under the unchanged environment. Its forecast novelty rose
+from 0.0609 to 0.1471 nat at the next tick. All six formal seeds remained
+sealed. Post-change prediction, information seeking, task success and
+comparative compute therefore remain unmeasured. The source versions and
+replay commands are recorded in ctcp-qodi.
+
 **H8. Factors must have tractable local expectations.** Every node needs its
 average energy and entropy contributions computable (closed form, quadrature, or
 low-variance sampling) for the FE ledger to be exact. Factors without that —

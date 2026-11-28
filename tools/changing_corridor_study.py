@@ -210,6 +210,127 @@ def qualify(root):
     return passed
 
 
+def readiness(root):
+    """Independently replay the development gate on either archived protocol."""
+    p = load(root / "protocol.json")
+    result = load(root / "qualification.json")
+    if (
+        result["status"] != "no_go"
+        or (root / "freeze.json").exists()
+        or (root / "cells").exists()
+    ):
+        raise ValueError("this review covers development stops before held-out access")
+    manifests = load(root / "models.json")
+    protocol_hash = sha(root / "protocol.json")
+    if (
+        manifests["protocol_sha256"] != protocol_hash
+        or result["protocol_sha256"] != protocol_hash
+    ):
+        raise ValueError("development protocol digest mismatch")
+    for windows in manifests["arms"].values():
+        for window in windows.values():
+            if sha(root / window["file"]) != window["sha256"]:
+                raise ValueError("development model digest mismatch")
+    dev_seeds = (
+        p["development_seeds"] if "development_seeds" in p else [p["development_seed"]]
+    )
+    cells = {}
+    warm_by_seed = {}
+    for seed, arm, world in cell_order(p, dev_seeds):
+        key = f"{seed}/{arm}-{world}"
+        stem = root / "development" / "cells" / key
+        raw = load(stem.with_suffix(".json"))
+        tape = [
+            json.loads(line)
+            for line in stem.with_suffix(".jsonl").read_text().splitlines()
+        ]
+        version = subprocess.check_output(
+            [
+                "git",
+                "show",
+                raw["source_commit"] + ":tools/changing_corridor_protocol.json",
+            ],
+            cwd=REPO,
+        )
+        if (
+            hashlib.sha256(version).hexdigest() != protocol_hash
+            or (seed, arm, world) != (raw["seed"], raw["arm"], raw["world"])
+            or raw["protocol_sha256"] != protocol_hash
+            or raw["models_sha256"] != sha(root / "models.json")
+            or len(tape) != raw["completed_steps"]
+        ):
+            raise ValueError(f"incorrect development identity: {key}")
+        for kind in ("plan", "filter"):
+            if raw[kind + "_hash"] != manifests["arms"][arm][kind]["structure_hash"]:
+                raise ValueError(f"model mismatch: {key}")
+        visits, d1 = warm_facts(tape, p)
+        np.testing.assert_allclose(d1, raw["warm_last_d1"], rtol=1e-13, atol=1e-13)
+        if visits != raw["warm_visits"]:
+            raise ValueError(f"wrong exposure count: {key}")
+        warm = tape[: p["warmup"]]
+        signature = [
+            (r["t"], r["x"], r["m"], r["u"], r["x_next"], r["m_next"]) for r in warm
+        ]
+        if warm_by_seed.setdefault(seed, signature) != signature:
+            raise ValueError("development arms did not see the same warm trajectory")
+        for t, r in enumerate(warm):
+            expected = (
+                2 * (t % 2)
+                if p["version"] == 1
+                else (2 if r["m"] == 1 or r["x"] == 0 else 0)
+            )
+            if r["t"] != t or r["u"] != expected:
+                raise ValueError(f"incorrect acquisition action: {key} at {t}")
+        eligible_visits = visits >= p["saturation_min_visits"]
+        violations = sum(x > p["saturation_max_d1"] for x in d1)
+        ready = (
+            eligible_visits and len(d1) == p["saturation_window"] and violations == 0
+        )
+        if raw["status"] == "unsaturated" and (ready or len(tape) != p["warmup"]):
+            raise ValueError(f"wrong saturation stop: {key}")
+        if raw["status"] == "complete" and (
+            not ready or len(tape) != p["warmup"] + p["development_followup"]
+        ):
+            raise ValueError(f"incorrect completed cell: {key}")
+        cells[key] = dict(
+            seed=seed,
+            arm=arm,
+            world=world,
+            status=raw["status"],
+            reason=raw["reason"],
+            visits=visits,
+            preaction_novelty_nats=d1,
+            above_threshold_ticks=violations,
+            completed_steps=len(tape),
+            native_post_actions=max(0, len(tape) - p["warmup"]),
+            trace_sha256=sha(stem.with_suffix(".jsonl")),
+            receipt_sha256=sha(stem.with_suffix(".json")),
+        )
+    if all(row["status"] == "complete" for row in cells.values()):
+        raise ValueError("all development cells passed")
+    report = dict(
+        version=p["version"],
+        status="no_go",
+        scored_cells=0,
+        qualified=sum(row["status"] == "complete" for row in cells.values()),
+        total=len(cells),
+        protocol_sha256=protocol_hash,
+        models_sha256=sha(root / "models.json"),
+        qualification_sha256=sha(root / "qualification.json"),
+        cells=cells,
+    )
+    existing = root / "readiness.json"
+    if existing.exists():
+        if load(existing) != report:
+            raise ValueError("archived readiness report does not match the raw tapes")
+    else:
+        save(existing, report)
+    print(
+        f"version {report['version']}: {report['qualified']}/{report['total']} development cells passed, zero held-out cells opened"
+    )
+    return report
+
+
 def freeze(root):
     p, _ = verify_models(root)
     check = load(root / "qualification.json")
@@ -299,13 +420,17 @@ def campaign(root):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("qualify", "freeze", "campaign"))
+    parser.add_argument(
+        "command", choices=("qualify", "freeze", "campaign", "readiness")
+    )
     parser.add_argument("root", type=Path)
     args = parser.parse_args()
     with (args.root / "study.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         if args.command == "qualify":
             qualify(args.root)
+        elif args.command == "readiness":
+            readiness(args.root)
         elif args.command == "freeze":
             freeze(args.root)
         else:
