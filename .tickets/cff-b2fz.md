@@ -1,6 +1,6 @@
 ---
 id: cff-b2fz
-status: open
+status: closed
 deps: [cff-xabn]
 links: []
 created: 2026-09-13T00:02:42Z
@@ -32,3 +32,13 @@ This follows cff-xabn and removes its expand-before-composition limitation. No o
 ## Definitions
 
 A compact plate stores one fragment plus copy dimensions and wiring rules. Expansion materializes the individual copies. A tied blob is shared by copies; a per-copy blob is owned separately by each copy.
+
+## Notes
+
+**2026-11-28T04:18:18Z**
+
+Implementation handoff (New IR field row). Scope the plate key and its shared owner namespace. Keep fragment names, wiring, factor sources and per-copy blob paths local. Ground the parent hub as scoped-plate/hub, tied blobs and learners as scope/name, and private owners as scoped-plate/index/name. Check direct and generated cross-operand collisions before returning. Exercise JSON/hash, grounding, compiler learning descriptors and schema-2 bundle rewriting against flat-first composition. Keep the existing validation error for nested plate declarations. Local rules, JIT/host/batch execution, numerical guards, checkpoint format and edit operations receive the same grounded declarations and are N/A for implementation. Explicitly check repeated and multi-segment scopes, cross-operand conflicts, zero numeric parameter change, and a 64-copy case.
+
+**2026-11-28T04:27:24Z**
+
+Implementation complete. Compact scoping records shared_scope while leaving all fragment-local references intact. Disjoint merge checks declared and tied names without expanding; an overlapping plate prefix can require temporary grounding to verify exact collisions. The million-copy regression intercepts expansion. Declared host port bonds preserve compact plates. Generated copy and Broadcast ports require explicit expansion first; nested declarations remain under cff-6s31. Schema-1.1 JSON identifies the new shared scope, old schema-1 bytes and hashes are preserved, and the actual a774a54 parser rejected 1.1 before decoding. Schema-2 bundles preserve logical targets, sources, exact posterior/prior arrays and the compact model. Final focused uv pytest gate covered test_compose, test_serialize, scoped learned bundle and 64-owner checkpoints, HMM chain, frozen Broadcast JSON/bundle and nested guard: 40 passed in 2.21 seconds. git diff --check and tk dep cycle clean. Parent owns the required aggregate short-suite gate and PR integration.

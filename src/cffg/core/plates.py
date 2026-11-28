@@ -61,19 +61,24 @@ def expand_plates(t: Template) -> Template:
 
     validate(t)  # spec validation (includes _check_plates)
 
-    out = Template(
-        name=t.name,
+    out = dataclasses.replace(
+        _with_shared_owners(t),
         variables=dict(t.variables),
         factors=dict(t.factors),
         constraints=list(t.constraints),
         ports=dict(t.ports),
-        blobs=dict(t.blobs),
-        learnables=dict(t.learnables),
-        agent=t.agent,
-        schema_version=t.schema_version,
+        plates={},
     )
     for pname in sorted(t.plates):
         _expand_one(out, pname, t.plates[pname])
+    return out
+
+
+def _with_shared_owners(t: Template) -> Template:
+    """Expose tied owners in the parent without materializing any copies."""
+    out = dataclasses.replace(t, blobs=dict(t.blobs), learnables=dict(t.learnables))
+    for pname, spec in sorted(t.plates.items()):
+        _install_shared(out, pname, spec)
     return out
 
 
@@ -86,18 +91,17 @@ def _prefix(plate: str, idx: tuple[int, ...]) -> str:
 
 
 def _scope_copy(
-    frag: Template, prefix: str, index: tuple[int, ...], per_copy: frozenset[str]
-) -> tuple[dict, dict, list, dict, dict]:
-    """Scope one fragment copy under `prefix/`. Tied blob names stay unscoped
-    (copies reference the same parent blob entry); per-copy blob names are
-    scoped and given their own indexed parent entry."""
+    spec: PlateSpec, prefix: str, index: tuple[int, ...], per_copy: frozenset[str]
+) -> tuple[dict, dict, list, dict, dict, dict]:
+    """Scope copy-local declarations under the index and tied blobs under their owner."""
+    frag = spec.fragment
     p = prefix + SCOPE_SEP
 
     def s(name: str) -> str:
         return p + name
 
     def sb(bname: str) -> str:
-        return s(bname) if bname in per_copy else bname
+        return s(bname) if bname in per_copy else spec.shared_name(bname)
 
     variables = {
         s(v.name): dataclasses.replace(v, name=s(v.name)) for v in frag.variables.values()
@@ -140,15 +144,16 @@ def _scope_copy(
     return variables, factors, constraints, ports, per_copy_blobs, per_copy_learnables
 
 
-def _expand_one(out: Template, plate: str, spec: PlateSpec) -> None:
+def _install_shared(out: Template, plate: str, spec: PlateSpec) -> None:
     frag = spec.fragment
     per_copy = frozenset(spec.per_copy_blobs)
-    idxs = _indices(spec.dims)
-
-    # Tied blobs: one shared parent entry per fragment blob (name unscoped).
     for b in frag.blobs.values():
         if b.name not in per_copy:
-            out.blobs[b.name] = BlobRef(b.name, b.path, b.init)
+            name = spec.shared_name(b.name)
+            ref = dataclasses.replace(b, name=name)
+            if name in out.blobs and out.blobs[name] != ref:
+                raise ComposeError(f"plate {plate!r}: conflicting declarations for tied blob {name!r}")
+            out.blobs[name] = ref
 
     # A learnable over tied blobs stays ONE posterior for the whole plate:
     # every copy's factor instance reads the same blob, so every copy's
@@ -165,7 +170,13 @@ def _expand_one(out: Template, plate: str, spec: PlateSpec) -> None:
                 f"{sorted(ln.sources)}, which names one copy's factor and not the "
                 "others; a shared posterior accumulates over every copy"
             )
-        out.learnables[ln.name] = ln
+        name = spec.shared_name(ln.name)
+        learnable = dataclasses.replace(
+            ln, name=name, blobs=tuple(spec.shared_name(blob) for blob in ln.blobs)
+        )
+        if name in out.learnables and out.learnables[name] != learnable:
+            raise ComposeError(f"plate {plate!r}: conflicting declarations for tied learnable {name!r}")
+        out.learnables[name] = learnable
     split = [
         ln.name
         for ln in frag.learnables.values()
@@ -177,12 +188,13 @@ def _expand_one(out: Template, plate: str, spec: PlateSpec) -> None:
             "blobs; a posterior is either shared across copies or private to one"
         )
 
-    # Materialize every copy (disjoint union into `out`; scoping makes names
-    # disjoint, so a clash means the plate name collides with existing content).
-    for idx in idxs:
+
+def _expand_one(out: Template, plate: str, spec: PlateSpec) -> None:
+    per_copy = frozenset(spec.per_copy_blobs)
+    for idx in _indices(spec.dims):
         prefix = _prefix(plate, idx)
         variables, factors, constraints, ports, pblobs, plearn = _scope_copy(
-            frag, prefix, idx, per_copy
+            spec, prefix, idx, per_copy
         )
         for kind, new in (
             ("variables", variables),

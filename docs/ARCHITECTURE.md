@@ -1886,9 +1886,19 @@ these defaults. An unknown identity is rejected on JSON loading, validation,
 or compilation; numeric prior, posterior, and point values remain outside
 the structure hash. Scoping transports the identity unchanged, and compiling
 reconstructs its resolved descriptor from the scoped declarations.
-Composition currently requires flat operands: call `expand_plates` before
-`scoped` or `merge`. Compact operands are rejected with affected learnable
-names; `cff-b2fz` owns preserving compact plates through composition.
+Scoping prefixes the plate key and records the enclosing `PlateSpec.shared_scope`.
+Fragment names, wiring rules, initializer specs, file paths and per-copy source
+restrictions stay local. Grounding puts tied blobs and their posterior owners
+under the shared scope, private owners under the plate key and copy index, and
+Broadcast hubs under the plate key. A disjoint merge preserves each declaration.
+When another operand declares names under a plate prefix, merge checks generated
+names by grounding the union before returning the compact result.
+
+Template JSON uses version `1.1` when a plate carries a nonempty shared scope.
+Schema-1 readers reject that version before loading it. Unscoped declarations
+retain their schema-1 bytes and hashes. Serialize `expand_plates(model)` to
+give an older reader the equivalent flat model. Bundle schema 2 includes the
+compact template and encodes each expanded owner in its own archive path.
 
 `cffg.learning_schema.PersistentStateDescriptor`, returned by
 `Learnables.persistent_descriptors()`, binds each learnable's name, family,

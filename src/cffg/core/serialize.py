@@ -38,6 +38,7 @@ from cffg.core.ir import (
 )
 
 SCHEMA_VERSION = "1"
+_SCOPED_PLATE_VERSION = "1.1"
 
 
 def _bond_to_dict(rule: Any) -> dict[str, Any]:
@@ -73,6 +74,7 @@ def _plate_to_dict(spec: PlateSpec) -> dict[str, Any]:
         "dims": list(spec.dims),
         "bonds": [_bond_to_dict(b) for b in spec.bonds],
         "per_copy_blobs": list(spec.per_copy_blobs),
+        **({"shared_scope": spec.shared_scope} if spec.shared_scope else {}),
     }
 
 
@@ -82,6 +84,7 @@ def _plate_from_dict(d: dict[str, Any]) -> PlateSpec:
         dims=tuple(d["dims"]),
         bonds=tuple(_bond_from_dict(b) for b in d.get("bonds", [])),
         per_copy_blobs=tuple(d.get("per_copy_blobs", [])),
+        shared_scope=d.get("shared_scope", ""),
     )
 
 
@@ -98,7 +101,10 @@ def to_dict(t: Template) -> dict[str, Any]:
             + "\n  - ".join(conflicts)
         )
     d: dict[str, Any] = {
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": (
+            _SCOPED_PLATE_VERSION if any(plate.shared_scope for plate in t.plates.values())
+            else SCHEMA_VERSION
+        ),
         "name": t.name,
         "variables": {
             v.name: (
@@ -234,10 +240,12 @@ def from_dict(d: dict[str, Any]) -> Template:
     learning_version = d.get("learning_schema_version")
     if learning_version not in (None, "1"):
         raise ValueError(f"unknown learning schema version {learning_version!r}")
-    if d.get("schema_version") != SCHEMA_VERSION:
-        raise ValueError(
-            f"schema version {d.get('schema_version')!r} != supported {SCHEMA_VERSION!r}"
-        )
+    version = d.get("schema_version")
+    if version not in (SCHEMA_VERSION, _SCOPED_PLATE_VERSION):
+        raise ValueError(f"unsupported schema version {version!r}")
+    scoped_plates = any(plate.get("shared_scope") for plate in d.get("plates", {}).values())
+    if scoped_plates != (version == _SCOPED_PLATE_VERSION):
+        raise ValueError("a shared plate scope requires schema version 1.1")
     for factor in d.get("factors", {}).values():
         if "function" in factor:
             resolve_mean_function(FunctionSpec.from_dict(factor["function"]))
@@ -293,7 +301,6 @@ def from_dict(d: dict[str, Any]) -> Template:
             for name, spec in d.get("learnables", {}).items()
         },
         agent=_load_agent(d.get("agent")),
-        schema_version=d["schema_version"],
     )
 
 

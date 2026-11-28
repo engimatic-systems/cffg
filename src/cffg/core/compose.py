@@ -13,6 +13,7 @@ uniqueness instead.
 from __future__ import annotations
 
 import dataclasses
+from copy import deepcopy
 
 from cffg.core import gaussian_agent
 from cffg.core.ir import (
@@ -27,6 +28,7 @@ from cffg.core.ir import (
     Template,
     VariableSpec,
 )
+from cffg.core.learning_identity import check_scoped_name
 from cffg.core.validate import validate
 
 SCOPE_SEP = "/"
@@ -34,17 +36,6 @@ SCOPE_SEP = "/"
 
 class ComposeError(ValueError):
     pass
-
-
-def _require_flat(template: Template) -> None:
-    if template.plates:
-        names = sorted({
-            name for plate in template.plates.values() for name in plate.fragment.learnables
-        })
-        raise ComposeError(
-            f"compact plates cannot be composed directly (learnables {names}); "
-            "call expand_plates before scoping or merging"
-        )
 
 
 def _scope_agent(spec, s):
@@ -86,7 +77,9 @@ def _scope_agent(spec, s):
 def scoped(template: Template, prefix: str) -> Template:
     """A copy of `template` with every name under `prefix/`. Blob names are
     scoped too (their *paths* are not — two scopes may share a parameter file)."""
-    _require_flat(template)
+    if template.plates:
+        check_scoped_name(prefix)
+        validate(template)
     p = prefix + SCOPE_SEP
 
     def s(name: str) -> str:
@@ -109,6 +102,14 @@ def scoped(template: Template, prefix: str) -> Template:
         constraints=[dataclasses.replace(c, target=s(c.target)) for c in template.constraints],
         ports={s(pt.name): PortSpec(s(pt.name), s(pt.variable), pt.role) for pt in template.ports.values()},
         blobs={s(b.name): BlobRef(s(b.name), b.path, b.init) for b in template.blobs.values()},
+        plates={
+            s(name): dataclasses.replace(
+                spec,
+                fragment=deepcopy(spec.fragment),
+                shared_scope=s(spec.shared_scope) if spec.shared_scope else prefix,
+            )
+            for name, spec in template.plates.items()
+        },
         # Learnables scope with their blobs: two scoped copies learn separate
         # posteriors, matching the blob-name tying rule (cff-x0sv).
         learnables={
@@ -126,29 +127,57 @@ def scoped(template: Template, prefix: str) -> Template:
     )
 
 
-def merge(a: Template, b: Template, name: str) -> Template:
-    """Disjoint union; caller is responsible for prior scoping."""
-    _require_flat(a)
-    _require_flat(b)
-    for kind in ("variables", "factors", "ports", "blobs", "learnables"):
-        clash = set(getattr(a, kind)) & set(getattr(b, kind))
+def _check_union(a: Template, b: Template) -> bool:
+    """Reject colliding declarations. Return whether generated names also need checking."""
+    if a.plates or b.plates:
+        from cffg.core.plates import _with_shared_owners
+
+        a, b = _with_shared_owners(a), _with_shared_owners(b)
+    left, right = set(), set()
+    for kind in ("variables", "factors", "ports", "blobs", "learnables", "plates"):
+        a_names, b_names = getattr(a, kind).keys(), getattr(b, kind).keys()
+        clash = a_names & b_names
         if clash:
             raise ComposeError(f"{kind} name clash: {sorted(clash)} (scope the operands)")
+        if b.plates:
+            left.update(a_names)
+        if a.plates:
+            right.update(b_names)
+    return any(
+        name.startswith(plate + SCOPE_SEP)
+        for plates, names in ((a.plates, right), (b.plates, left))
+        for plate in plates for name in names
+    )
+
+
+def merge(a: Template, b: Template, name: str) -> Template:
+    """Disjoint union; caller is responsible for prior scoping."""
+    overlap = _check_union(a, b)
     if a.agent is not None and b.agent is not None:
         raise ComposeError(
             "cannot merge two AgentSpec declarations; compose one complete "
             "agent model with fragments that do not declare a runtime interface"
         )
-    return Template(
+    out = Template(
         name=name,
         variables={**a.variables, **b.variables},
         factors={**a.factors, **b.factors},
         constraints=[*a.constraints, *b.constraints],
         ports={**a.ports, **b.ports},
         blobs={**a.blobs, **b.blobs},
+        plates={**a.plates, **b.plates},
         learnables={**a.learnables, **b.learnables},
         agent=a.agent if a.agent is not None else b.agent,
     )
+    if out.plates:
+        validate(out)
+    if overlap:
+        # A chain can consume a name during grounding, hiding a collision
+        # from a comparison of the two finished operands alone.
+        from cffg.core.plates import expand_plates
+
+        expand_plates(out)
+    return out
 
 
 def bond(t: Template, port_a: str, port_b: str) -> Template:
@@ -156,6 +185,10 @@ def bond(t: Template, port_a: str, port_b: str) -> Template:
     returns the same object mutated (used inside compose/unroll pipelines)."""
     for name in (port_a, port_b):
         if name not in t.ports:
+            if any(name.startswith(plate + SCOPE_SEP) for plate in t.plates):
+                raise ComposeError(
+                    f"no declared port {name!r}; call expand_plates before bonding a generated plate port"
+                )
             raise ComposeError(f"no port {name!r}")
     if port_a == port_b:
         raise ComposeError(f"cannot bond port {port_a!r} to itself")

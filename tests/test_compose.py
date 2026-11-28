@@ -1,20 +1,28 @@
 """Composition and unrolling: gluing is port bonding, nothing more."""
 
+from dataclasses import replace
+
 import pytest
 
 from cffg.core import (
     BlobRef,
+    Broadcast,
+    Chain,
     ConstraintKind,
     ConstraintSpec,
     FactorSpec,
+    Expose,
+    LearnableSpec,
+    PlateSpec,
     PortRole,
     PortSpec,
     Template,
     VariableSpec,
     validate,
 )
-from cffg.core.compose import ComposeError, compose, merge, unroll
-from cffg.core.serialize import structure_hash
+from cffg.core.compose import ComposeError, compose, merge, scoped, unroll
+from cffg.core.plates import expand_plates
+from cffg.core.serialize import from_dict, from_json, structure_hash, to_dict, to_json
 from conftest import K, make_hmm_slice
 
 
@@ -110,3 +118,97 @@ def test_fanout_of_boundary_keeps_original_port_composable():
     validate(combined)
     assert "a/attach" in combined.ports
     assert "a/" + ports[-1] not in combined.ports
+
+
+def test_compact_scope_and_declared_port_composition_match_flat_wiring(hmm_slice):
+    hmm_slice.learnables = {
+        "shared": LearnableSpec("shared", "dirichlet", ("A",), ()),
+        "private": LearnableSpec("private", "dirichlet", ("B",), ("trans",)),
+    }
+    hmm_slice.blobs["B"] = replace(hmm_slice.blobs["B"], path="weights/{index}.npy")
+    host = make_state_prior()
+    host.plates["group/cells"] = PlateSpec(
+        hmm_slice, (2, 3), (Chain("tail", "head", axis=1), Broadcast("sense", "all"), Expose()), ("B",)
+    )
+    original = to_json(host)
+    compact = compose(host, host, {"attach": "attach"}, name="pair", scope_b="b/inner")
+    flat = expand_plates(host)
+    reference = compose(flat, flat, {"attach": "attach"}, name="pair", scope_b="b/inner")
+    assert set(compact.plates) == {"a/group/cells", "b/inner/group/cells"}
+    assert to_dict(expand_plates(compact)) == to_dict(reference)
+    assert "b/inner/group/cells/all" in reference.ports
+    assert reference.learnables["b/inner/shared"].sources == ()
+    assert reference.learnables["a/group/cells/1/2/private"].sources == ("a/group/cells/1/2/trans",)
+    assert reference.blobs["a/group/cells/1/2/B"].path == "weights/1/2.npy"
+    assert scoped(scoped(host, "inner"), "b") == scoped(host, "b/inner")
+    assert from_json(to_json(compact)) == compact
+    document = to_dict(compact)
+    assert document["schema_version"] == "1.1"
+    renamed = from_dict(document)
+    plate = renamed.plates["a/group/cells"]
+    renamed.plates["a/group/cells"] = replace(plate, shared_scope="new")
+    assert structure_hash(renamed) != structure_hash(compact)
+    document["schema_version"] = "1"
+    with pytest.raises(ValueError, match="shared plate scope"):
+        from_dict(document)
+    assert to_dict(host)["schema_version"] == "1"
+    assert "shared_scope" not in to_dict(host)["plates"]["group/cells"]
+    with pytest.raises(ComposeError, match="expand_plates.*generated plate port"):
+        compose(host, host, {"group/cells/0/0/head": "attach"}, name="bad")
+    assert to_json(host) == original
+
+
+@pytest.mark.parametrize("kind, name", [
+    ("plates", "p"), ("blobs", "A"), ("blobs", "p/1/B"), ("ports", "p/hub"),
+    ("factors", "p/_bcast/hub/eq1"), ("learnables", "shared"),
+])
+def test_compact_merge_rejects_owner_and_generated_collisions_atomically(hmm_slice, kind, name):
+    hmm_slice.learnables["shared"] = LearnableSpec("shared", "dirichlet", ("A",))
+    host = Template("grid", plates={
+        "p": PlateSpec(hmm_slice, (3,), (Broadcast("sense", "hub"),), ("B",))
+    })
+    other = make_state_prior()
+    if kind == "plates":
+        other.plates[name] = host.plates[name]
+    elif kind == "blobs":
+        other.blobs[name] = BlobRef(name, "overlap.npy")
+    elif kind == "learnables":
+        other.learnables[name] = LearnableSpec(name, "dirichlet", ("d",))
+    elif kind == "ports":
+        other.ports[name] = replace(other.ports.pop("attach"), name=name)
+    else:
+        other.factors[name] = replace(other.factors.pop("init"), name=name)
+    before = to_json(host), to_json(other)
+    for a, b in ((host, other), (other, host)):
+        with pytest.raises(ComposeError, match="clash|already exists"):
+            merge(a, b, "bad")
+    assert (to_json(host), to_json(other)) == before
+
+
+def test_disjoint_scoped_merge_does_not_materialize_large_plates(monkeypatch, hmm_slice):
+    host = Template("large", plates={"p": PlateSpec(hmm_slice, (1_000_000,))})
+    monkeypatch.setattr("cffg.core.plates.expand_plates", lambda t: pytest.fail("grounded compact operand"))
+    merged = merge(scoped(host, "left"), scoped(host, "right"), "pair")
+    assert all(spec.dims == (1_000_000,) for spec in merged.plates.values())
+
+
+def test_nested_fragment_fails_before_scoping_or_merging(hmm_slice):
+    inner = Template("inner", plates={"cell": PlateSpec(hmm_slice, (1,))})
+    outer = Template("outer", plates={"group": PlateSpec(inner, (2,))})
+    before = to_json(outer)
+    for operation in (lambda: scoped(outer, "a"), lambda: merge(outer, Template("b"), "c")):
+        with pytest.raises(ValueError, match="nested plate grounding"):
+            operation()
+    assert to_json(outer) == before
+
+
+def test_shared_owner_is_reserved_before_every_copy(hmm_slice):
+    cell = make_state_prior()
+    cell.blobs["p/0/B"] = BlobRef("p/0/B", "late.npy")
+    for name in ("before", "zz"):
+        host = Template("host", plates={
+            "p": PlateSpec(hmm_slice, (2,), per_copy_blobs=("B",)),
+            name: PlateSpec(cell, (1,)),
+        })
+        with pytest.raises(ComposeError, match="blobs name clash.*p/0/B"):
+            expand_plates(scoped(host, "scene"))
