@@ -69,6 +69,11 @@ explicit mean-field family and therefore cannot preserve posterior
 correlations between blocks. Use a joint `BeliefBinding` when those
 correlations are load-bearing, accepting its product-size boundary belief.
 
+Factored transition novelty currently uses a full-support Dirichlet prior for
+each selected column. A known impossible outcome in that transition rules out
+this option for the block. Fixed transitions and deterministic product couplings
+can retain structural zeros alongside other blocks that learn.
+
 **H5. Planning is finite-horizon inference; policies are factorized.** LAIF's win
 is linear-in-T policy inference, but T must be chosen, and a receding horizon is
 myopic beyond it: payoffs more than T steps out exert zero pull. Further, the

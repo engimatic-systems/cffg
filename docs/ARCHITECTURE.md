@@ -2101,8 +2101,10 @@ Lowering uses no `FactorType` or compiler special case:
    balanced tree of ternary equality factors, keeping every materialized
    FFG edge at degree two.
 
-One blob per block is shared by every time member, so blob identity provides
-parameter tying and `LearnableSpec.sources` names only past/data-bearing
+Each block shares its transition parameters across time. For a block selected by
+`epistemic_b` and `transition_counts`, future slices read raw Dirichlet counts
+via the existing P-substituted transition composite. Perception slices read the
+expected-parameter form. Both blobs belong to one declared learnable, and `LearnableSpec.sources` names only past/data-bearing
 members. A filter statistic can therefore update the posterior once and the
 next planning window writes that update to every tied slice without manual
 accumulation.

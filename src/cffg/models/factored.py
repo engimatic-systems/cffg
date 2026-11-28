@@ -15,9 +15,9 @@ their factored shapes even though product-valued message edges may exist.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
-from typing import Iterable
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -327,6 +327,7 @@ def build_factored_rollout(
     mu3: bool = False,
     learned_c: bool = False,
     epistemic_b: bool = False,
+    transition_counts: Mapping[str, np.ndarray] | None = None,
 ) -> tuple[Template, dict[str, np.ndarray]]:
     """Build a factored planning/perception window and its parameter arrays.
 
@@ -336,8 +337,11 @@ def build_factored_rollout(
 
     The boolean compatibility arguments are accepted because
     :class:`cffg.agent.RollingAgent` supplies them to every rollout builder.
-    Their parameter-uncertainty composites remain separate tickets and are
-    rejected when enabled here.
+    With `epistemic_b=True`, `transition_counts` supplies the initial
+    Dirichlet concentrations for each named transition learnable whose
+    future outcomes should contribute parameter novelty. Arrays follow the
+    corresponding block's unflattened transition shape. Executed slices
+    supply ordinary transition statistics to that owner.
     """
     if steps < 1:
         raise ValueError("factored rollout: steps must be >= 1")
@@ -345,14 +349,13 @@ def build_factored_rollout(
         raise ValueError(
             f"factored rollout: past must be between 0 and steps, got {past}"
         )
-    if learned_a or mu3 or learned_c or epistemic_b:
+    if learned_a or mu3 or learned_c:
         requested = [
             label
             for label, enabled in (
                 ("learned_a", learned_a),
                 ("mu3", mu3),
                 ("learned_c", learned_c),
-                ("epistemic_b", epistemic_b),
             )
             if enabled
         ]
@@ -522,6 +525,46 @@ def build_factored_rollout(
         for block in block_tuple
     }
 
+    count_blobs = {}
+    if epistemic_b:
+        owners = {
+            block.transition_learnable: block
+            for block in block_tuple
+            if block.transition_learnable is not None
+            and block.transition_learnable in learn
+        }
+        if not isinstance(transition_counts, Mapping) or not transition_counts:
+            raise ValueError(
+                "epistemic_b requires explicit transition_counts keyed by learnable name"
+            )
+        for owner, supplied in transition_counts.items():
+            if owner not in owners:
+                raise ValueError(
+                    f"transition_counts: {owner!r} needs an active transition learnable"
+                )
+            block = owners[owner]
+            counts = np.asarray(supplied)
+            shape = np.shape(block.transition)
+            if counts.dtype.kind not in "fiu" or counts.shape != shape:
+                raise ValueError(
+                    f"transition_counts for {owner!r} need numeric shape {shape}"
+                )
+            with np.errstate(over="ignore", under="ignore"):
+                packed_counts = counts.astype(dtype, copy=False)
+            if not np.isfinite(packed_counts).all() or not (packed_counts > 0).all():
+                raise ValueError(
+                    f"transition_counts for {owner!r} must be finite and positive in model dtype {dtype}"
+                )
+            if np.any(transitions[block.name] == 0):
+                raise ValueError(
+                    f"transition_counts for {owner!r} need a full-support transition table"
+                )
+            if past < steps:
+                count_blobs[block.name] = graph.blob(
+                    f"block/{block.name}/transition_counts",
+                    packed_counts.reshape(transitions[block.name].shape),
+                )
+
     state_nets = {
         (block.name, index): (f"state/{block.name}/{index}", cards[block.name])
         for block in block_tuple
@@ -614,7 +657,13 @@ def build_factored_rollout(
                     "in": state_nets[(block.name, index - 1)],
                     "selector": selector,
                 },
-                param_blobs={"matrices": transition_blobs[block.name]},
+                param_blobs={
+                    "matrices": (
+                        count_blobs[block.name]
+                        if index > past and block.name in count_blobs
+                        else transition_blobs[block.name]
+                    )
+                },
             )
             transition_factors[block.name].append(factor_name)
 
@@ -683,6 +732,19 @@ def build_factored_rollout(
             boundary_markers[block.name] = marker
 
     template, endpoint_var = graph.materialize()
+
+    for block_name in count_blobs:
+        for factor_name in transition_factors[block_name][past:]:
+            template.constraints.append(
+                ConstraintSpec(
+                    ConstraintKind.P_SUBSTITUTION,
+                    factor_name,
+                    (
+                        ("parameter_uncertainty", "dirichlet"),
+                        ("substituted_role", "out"),
+                    ),
+                )
+            )
 
     for index, factor_name in enumerate(observation_factors, start=1):
         if index > past and gfe:
@@ -775,13 +837,16 @@ def build_factored_rollout(
             block.transition_learnable is not None
             and block.transition_learnable in active_learn
         ):
-            sources = tuple(
-                transition_factors[block.name][:past]
-            )
+            sources = tuple(transition_factors[block.name][:past])
             template.learnables[block.transition_learnable] = LearnableSpec(
                 block.transition_learnable,
                 "dirichlet",
-                (transition_blobs[block.name],),
+                tuple(
+                    dict.fromkeys(
+                        template.factors[factor].param_blobs["matrices"]
+                        for factor in transition_factors[block.name]
+                    )
+                ),
                 sources,
             )
     if observation.learnable is not None and observation.learnable in active_learn:
@@ -843,6 +908,7 @@ def build_factored_corridor(
     mu3: bool = False,
     learned_c: bool = False,
     epistemic_b: bool = False,
+    transition_counts: Mapping[str, np.ndarray] | None = None,
 ) -> tuple[Template, dict[str, np.ndarray]]:
     """The canonical two-block corridor: position × persistent mode.
 
@@ -944,4 +1010,5 @@ def build_factored_corridor(
         mu3=mu3,
         learned_c=learned_c,
         epistemic_b=epistemic_b,
+        transition_counts=transition_counts,
     )

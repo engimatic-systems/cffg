@@ -409,6 +409,17 @@ a callback-style environment. `checkpoint` and `restore` preserve agent
 beliefs, learning state, cadence, RNG, and functional-mu3 state when configured.
 They intentionally do not serialize the environment.
 
+To value information about an uncertain transition in a factored model,
+give its block a `transition_learnable` name. Include that name in `learn`
+and pass the builder `transition_counts={name: alpha}`. Enable
+`epistemic_b=True` on the planning window or `RollingAgent`. For example,
+a valve with two commands and three states takes counts of shape
+`(2, 3, 3)` in command, next-state, previous-state order. A coupling's
+parent axes precede those three. Every entry in a selected table and its
+prior counts must be positive. Future slices use the prior and each
+committed observation updates the same owner for the next plan. Other
+blocks keep their declared transitions, including any exact zeros.
+
 Functional mu3 uses explicit JAX keys and fixed particles within one inference
 attempt. Record ESS and support facts, and use `score_mu3_epochs` only when the
 experiment deliberately averages refreshed particle epochs. Transition

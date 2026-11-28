@@ -344,3 +344,101 @@ def test_sparse_float32_and_32_by_4_keep_learned_tables_factored():
         ]
         assert product_tables
         assert all(np.count_nonzero(table == 0) > 0 for table in product_tables)
+
+
+def test_named_stationary_transition_novelty_and_observed_rollover(tmp_path):
+    from scipy.special import digamma, expit
+
+    counts = np.broadcast_to(np.array([1.0, 10.0])[:, None, None], (2, 2, 2)).copy()
+    builder = functools.partial(
+        build_factored_rollout,
+        "valve",
+        blocks=(
+            StateBlockSpec(
+                "phase",
+                np.array([1.0, 0.0]),
+                np.full((2, 2, 2), 0.5),
+                transition_learnable="motion",
+            ),
+        ),
+        actions=np.full(2, 0.5),
+        observation=ObservationSpec("mark", "phase", np.eye(2), np.full(2, 0.5)),
+        transition_counts={"motion": counts},
+    )
+    template, arrays = builder(past=0, steps=1, learn=("motion",), epistemic_b=True)
+    path = tmp_path / "named.cffgz"
+    initial = Learnables(Engine(compile_template(template, arrays=arrays)))
+    save_bundle(path, template, arrays, learnables=initial)
+    loaded, values, _ = load_bundle(path)
+    assert structure_hash(loaded) == structure_hash(from_json(to_json(template)))
+    assert loaded.learnables["motion"].sources == ()
+    engine, result, st = _converged(loaded, values)
+    # Both actions predict the same two equally likely outcomes. Only the
+    # conditional expected entropy differs between their Dirichlet columns.
+    uncertainty = digamma(2 * np.array([1.0, 10.0]) + 1) - digamma(
+        np.array([1.0, 10.0]) + 1
+    )
+    expected = expit(uncertainty[1] - uncertainty[0])
+    action_q = engine.marginals(st, edges=[loaded.agent.action])[loaded.agent.action]
+    np.testing.assert_allclose(action_q[0], expected, atol=1e-9, rtol=0)
+    assert np.isfinite(result.free_energies[-1])
+    agent = RollingAgent(builder, 1, learn=("motion",), epistemic_b=True, select="map")
+    assert agent.act() == 0
+    np.testing.assert_array_equal(agent.learnables.params["motion"]["alpha"], counts)
+    agent.observe(1, 1)
+    expected_counts = counts.copy()
+    expected_counts[1, 1, 0] += 1
+    np.testing.assert_array_equal(
+        agent.learnables.params["motion"]["alpha"], expected_counts
+    )
+    written = agent.learnables.write(agent.plan, agent.plan.init_state().params)
+    address = agent.plan.arena.member_of["transition/phase/1"].parameter("matrices")
+    np.testing.assert_array_equal(written[address.key][address.index], expected_counts)
+
+
+def test_product_selected_counts_keep_c_order_and_past_sources():
+    modes, actions, states = 10, 3, 4
+    shape = (modes, actions, states, states)
+    counts = 1 + np.arange(np.prod(shape), dtype=np.float32).reshape(shape)
+    kwargs = {
+        "length": states,
+        "modes": modes,
+        "position_transition": np.full(shape, 1 / states, np.float32),
+        "learn": ("position_transition",),
+        "epistemic_b": True,
+        "dtype": np.float32,
+    }
+    with jax.enable_x64(False):
+        template, arrays = build_factored_corridor(
+            past=1, steps=2, transition_counts={"position_transition": counts}, **kwargs
+        )
+        engine = Engine(compile_template(template, arrays=arrays))
+        state = engine.init_state()
+        (group,) = engine.arena.gfe_tm_groups
+        assert group.members == ("transition/position/2",)
+        address = engine.arena.member_of[group.members[0]].parameter("matrices")
+        native = np.asarray(state.params[address.key][address.index])
+        assert native.dtype == np.float32
+        np.testing.assert_array_equal(
+            native, counts.reshape(modes * actions, states, states)
+        )
+        assert template.learnables["position_transition"].sources == (
+            "transition/position/1",
+        )
+    for wrong in (
+        {"other": counts},
+        {"position_transition": counts[0]},
+        {"position_transition": counts * np.nan},
+        {"position_transition": 0 * counts},
+    ):
+        with pytest.raises(ValueError, match="transition_counts"):
+            build_factored_corridor(transition_counts=wrong, **kwargs)
+    with pytest.raises(ValueError, match="full-support"):
+        build_factored_corridor(
+            steps=1,
+            length=states,
+            modes=modes,
+            learn=("position_transition",),
+            epistemic_b=True,
+            transition_counts={"position_transition": counts},
+        )
