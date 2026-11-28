@@ -100,7 +100,7 @@ example.
 | [Batch matching structures](#batch-extend-render-and-estimate) | `cffg.colony.Colony` | Vmapped iterative states; per-instance exact schedules | One `RunResult` per instance | Each instance keeps its normal engine objective/status | [API pattern](#batch-extend-render-and-estimate) | **Ready/partial:** functional mu3 rejected; exact schedules are per-instance; deterministic mixed GFE offers compiled batching |
 | [Register an ordinary custom factor](#batch-extend-render-and-estimate) | `FactorKernel`; binding classes; `register_kernel` | Single-arena discrete BP/VMP, Gaussian, or scalar EF | Generic marginals, energy, optional `kernel_readouts` | Extension author supplies mathematically valid messages and ledger | [API pattern](#batch-extend-render-and-estimate) | **Pre-1.0 unstable:** specialized/multi-arena variational objects need dedicated engine paths |
 | [Render a model](#batch-extend-render-and-estimate) | `cffg.viz` | Deterministic scene, SVG, or PNG from a template | `Scene`, SVG text, image file | Visualization only; no compile or inference certificate | [API pattern](#batch-extend-render-and-estimate) | **Ready:** PNG needs the `viz` extra; legacy moment syntax is rejected |
-| [Estimate resources](#batch-extend-render-and-estimate) | `cffg.estimate.estimate` | Static state bytes, optional cost analysis and calibration | `Estimate`, summary, predicted seconds | Measurement/planning aid, not a probabilistic objective | [API pattern](#batch-extend-render-and-estimate) | **Partial:** persistent arena bytes are useful; current XLA FLOP/traffic analysis is defective |
+| [Estimate resources](#batch-extend-render-and-estimate) | `cffg.estimate.estimate` | Named state bytes, optional cost analysis and calibration | `Estimate`, summary, predicted seconds | Measurement/planning aid, not a probabilistic objective | [API pattern](#batch-extend-render-and-estimate) | Backend cost fields depend on compiler support |
 
 ## The mental model
 
@@ -924,12 +924,29 @@ scene = build_scene(template)        # Template -> positioned Scene
 assert to_svg(scene) == svg_text     # Scene -> SVG string
 ```
 
-`cffg.estimate.estimate(engine)` reports persistent arena bytes, a parameter
-total, optional backend cost analysis, and a short calibration extrapolation.
-Use the persistent byte inventory as a planning aid only. The current XLA
-analysis calls an obsolete execution signature, so FLOP and traffic fields may
-be absent; the summary is not peak RSS, compile time, or a reliable cross-model
-performance forecast.
+For a compact plate, inventory the expected array payloads before building the engine.
+
+```python
+from cffg.estimate import estimate_plate_storage
+
+storage = estimate_plate_storage(template, dtype="float32", source_dtype="float64")
+print(storage["state_bytes"], storage["arenas"], storage["parameter_leaves"])
+print(storage["source_bytes"], storage["source_blobs"], storage["topology"])
+```
+
+A tied source vector appears once under its logical owner. If 4,096 categorical
+factors use it, their compiled parameter group holds 4,096 rows. Specify
+`dtype` for the intended JAX execution precision and `source_dtype` for the
+common logical source representation. Both totals count numerical payloads
+in bytes. The estimate requires neither source files nor an expanded model.
+Optional `batch_size` multiplies every State leaf.
+
+The source estimator supports one level of fixed-layout categorical, affine
+Gaussian and scalar conjugate factors with equality, Chain and Broadcast.
+A packer without a known native layout raises `UnknownStorageLayout`. For a
+compiled instance, `cffg.estimate.estimate(engine)` can inventory actual State
+leaf shapes and request the backend's cost analysis or a timing calibration.
+Peak memory during compilation and executable runtime require separate measurements.
 
 ## Experiment checklist
 

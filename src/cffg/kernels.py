@@ -718,3 +718,7 @@ _install_nonlinear(
         scale="Only incident Gaussian matrices and member-batched parameters are stored; no whole-graph Jacobian.",
     ),
 )
+
+
+# Keep strong references so replacing a provider under the same name is visible.
+_builtin_kernels = dict(KERNELS)

@@ -1893,6 +1893,18 @@ binding stream coordinates in that same order. The compiler still creates the
 flat model before allocating inference arrays. The shape must fit a signed
 64-bit copy count before expansion begins.
 
+The preallocation estimator counts the host once and each fragment by its grid
+multiplicity. On an axis of length L and offset k, a Chain makes
+`(N // L) * max(L - k, 0)` connections, each consuming two ports and one edge.
+Broadcast ties N copies to a hub with N−1 ternary equality factors and N−1
+additional edges, replacing N exposed ports with one. N=1 is a rename.
+Logical source shapes and ownership determine the source inventory. The
+compiled parameter inventory uses the native packer's per-member row shape
+and its actual group address. Its keys and arena names match
+`resource_analysis.state_storage`. The estimator refuses a replacement
+registration even if it reuses a native factor name. Size-dependent packers
+can legally change trailing dimensions after reading the numerical sources.
+
 Scoping prefixes the plate key and records the enclosing `PlateSpec.shared_scope`.
 Fragment names, wiring rules, initializer specs, file paths and per-copy source
 restrictions stay local. Grounding puts tied blobs and their posterior owners

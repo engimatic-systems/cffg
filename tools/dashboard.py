@@ -189,7 +189,7 @@ EPIC_FILES = {
         "test_axiom_slots.py",
         "test_axiom_evidence.py",
     ],
-    "M16 · Plates": ["test_plates.py", "test_plate_grid.py"],
+    "M16 · Plates": ["test_plates.py", "test_plate_grid.py", "test_plate_storage.py"],
     "M17 · Constraints": ["test_csp.py"],
     "M14 · Hybrid": [
         "test_mixg.py",

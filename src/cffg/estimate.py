@@ -19,6 +19,8 @@ from dataclasses import dataclass, field
 import jax
 
 from cffg.engine import Engine, RunStatus, State
+from cffg.plate_storage import UnknownStorageLayout as UnknownStorageLayout
+from cffg.plate_storage import estimate_plate_storage as estimate_plate_storage
 from cffg.resource_analysis import executable_reports, state_storage
 
 
