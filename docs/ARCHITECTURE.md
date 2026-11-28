@@ -94,17 +94,6 @@ to that evaluator; `learn_a=True` alone retains the analytic-moment
 approximation.
 
 
-The bounded interval operations in `cffg.intervals` use disjoint half-open
-cells on each independent coordinate. Each live cell carries its absolute
-log height. The unit likelihood has one whole-line cell, and zero support
-has none. Every operation retains all supported cells or returns an
-explicit failure for the whole message. Structural zeros live between
-cells. A pushforward across a bend can add one cell; pulling back a
-constant-height likelihood moves only its endpoints. Multiplication of
-two nonempty lists of lengths $n,m$ yields at most $n+m-1$ intersections.
-Infinite normalizers, zero-volume evidence, transformed-endpoint collapse
-and exhausted storage have distinct results. See D13a for the unit-mass
-conditional and its graph measure.
 
 ## Implemented layers
 
@@ -276,6 +265,30 @@ A pure-Python (dataclass) representation, independent of JAX:
   version contracts. The facade resolves exports on first access, so importing
   `cffg.core` does not import JAX or Equinox. Fresh-process tests forbid those
   runtime imports while validating and round-tripping a template.
+
+**Exact interval forests.** the bounded interval operations in `cffg.intervals` use disjoint half-open
+cells on each independent coordinate. Each live cell carries its absolute
+log height. The unit likelihood has one whole-line cell, and zero support
+has none. Every operation retains all supported cells or returns an
+explicit failure for the whole message. Structural zeros live between
+cells. A pushforward across a bend can add one cell; pulling back a
+constant-height likelihood moves only its endpoints. Multiplication of
+two nonempty lists of lengths $n,m$ yields at most $n+m-1$ intersections.
+Infinite normalizers, zero-volume evidence, transformed-endpoint collapse
+and exhausted storage have distinct results. See D13a for the unit-mass
+conditional and its graph measure.
+
+`IntervalForest` is the compiled owner for a declared interval-only model.
+Its directed message dependencies determine admissible forests and a
+topological two-pass order. Its immutable source geometry and parameters
+remain separate from per-instance state. `Engine` selects the interval
+execution owner at construction, and `Colony` stacks states of a matching
+structure and numerical layout. The ordinary discrete, Gaussian and EF
+arenas keep their existing state layout. Each DATA boundary owns the unary
+term for its likelihood. Each edge owns one positive entropy correction,
+and each deterministic activation owns minus its input entropy in the
+graph chart. Complete propagation checks these signed terms against one
+normalizer per connected component.
 
 ### 2. Compiler (`cffg.compiler`)
 

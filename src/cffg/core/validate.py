@@ -101,7 +101,7 @@ def _check_factors(t: Template) -> list[str]:
                 problems.append(
                     f"factor {f.name!r}: type {f.type!r} requires one shared domain, got {sorted(domains)}"
                 )
-        if ft.family in ("discrete", "gaussian", "ef"):
+        if ft.family in ("discrete", "gaussian", "ef", "interval"):
             wrong = {
                 v: t.variables[v].family
                 for v in f.edges.values()

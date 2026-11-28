@@ -85,6 +85,16 @@ def _plate_from_dict(d: dict[str, Any]) -> PlateSpec:
     )
 
 
+def _variable_domain(v: VariableSpec):
+    if v.interval_dim:
+        return {"interval_dim": v.interval_dim, "interval_capacity": v.interval_capacity}
+    if v.dim:
+        return {"dim": v.dim}
+    if v.ef:
+        return {"ef": v.ef}
+    return {"cardinality": v.cardinality}
+
+
 def to_dict(t: Template) -> dict[str, Any]:
     from cffg.core.moment_matching import moment_matching_problems
 
@@ -100,14 +110,7 @@ def to_dict(t: Template) -> dict[str, Any]:
     d: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "name": t.name,
-        "variables": {
-            v.name: (
-                {"dim": v.dim}
-                if v.dim
-                else {"ef": v.ef} if v.ef else {"cardinality": v.cardinality}
-            )
-            for v in _sorted(t.variables)
-        },
+        "variables": {v.name: _variable_domain(v) for v in _sorted(t.variables)},
         "factors": {
             f.name: {
                 "type": f.type,
@@ -246,7 +249,8 @@ def from_dict(d: dict[str, Any]) -> Template:
         name=d["name"],
         variables={
             name: VariableSpec(
-                name, spec.get("cardinality", 0), spec.get("dim", 0), spec.get("ef", "")
+                name, spec.get("cardinality", 0), spec.get("dim", 0), spec.get("ef", ""),
+                spec.get("interval_dim", 0), spec.get("interval_capacity", 0),
             )
             for name, spec in d["variables"].items()
         },

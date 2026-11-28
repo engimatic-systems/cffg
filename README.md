@@ -691,6 +691,58 @@ These neural APIs do not provide zero-noise equality factors, minibatching,
 weight uncertainty, stochastic mu3 differentiation, or discrete point-decision
 gradients.
 
+### Exact interval activations
+
+For an invertible coordinatewise two-slope map, declare interval edges with
+`VariableSpec("x", interval_dim=d, interval_capacity=C)`. The factor
+`interval_activation` binds edges `in,out` and four real vectors of length
+$d$: `knot,offset,left,right`. Both slopes are positive. Each output equals
+`offset + slope * (x - knot)` on the corresponding side of the input knot.
+
+Declare an `interval_potential` unary on its `out` edge to supply a prior or
+likelihood. Its five blobs encode independent coordinates:
+
+| Blob | Shape | Meaning |
+|---|---|---|
+| `lower`, `upper` | $(d,C)$ | Ordered bounds of disjoint half-open cells |
+| `log_height` | $(d,C)$ | Absolute finite log potential inside each cell; omitted gaps have zero density |
+| `count` | $(d,)$ | Integer number of live cells at the front of each row |
+| `tails` | $(d,2)$ | Boolean flags for an unbounded left or right outer endpoint; place a finite zero in the flagged source slot |
+
+The usual template parser, array overrides, bundle reconstruction and
+`Engine(compile_template(template, arrays=arrays))` construct the plan.
+For example, for the activation with slopes 0.5 and 2, knots at zero, and a
+uniform input prior on $[-2,2)$, bind the output DATA likelihood on
+$[-0.5,1)$ using the declared capacity of three:
+
+```python
+import numpy as np
+from cffg.intervals import IntervalMessage
+
+window = IntervalMessage(np.array([[-0.5, 0, 0]]), np.array([[1., 0, 0]]),
+                         np.zeros((1, 3)), np.array([1], np.int32))
+state = engine.bind_data(engine.init_state(), {"read": window})
+result = engine.run(state, 4, tol=1e-6)
+posterior = result.require_converged()
+out = engine.interval_marginals(posterior, ["y"])["y"]
+ledger = engine.interval_ledger(posterior)  # total = -log(3/8)
+```
+
+Binding `None` supplies the whole-line unit likelihood. DATA interval messages
+may use infinite outer endpoints. `interval_ledger` reports signed node,
+boundary and separator terms. A proper `interval_marginals` readout returns
+normalized log heights and the complete supported cells in each coordinate.
+`Colony.spawn/bind/run/interval_marginals` accepts the same models and DATA bindings.
+
+The supported graphs are interval-only sum-product forests of these factors
+and three-way equality nodes. `auto` and `two_pass` execute the directional
+tree updates. `flood` uses simultaneous snapshots and can require as many
+sweeps as the longest message dependency. Choose capacity for every emitted
+message and posterior, including intermediate flooding updates. Insufficient
+capacity reports `interval_capacity`. Empty support reports `infeasible` with
+infinite free energy. An improper belief or unresolved geometry reports a
+diagnostic and leaves the finite energy trace empty.
+
 ## Learn and swap parameters
 
 `LearnableSpec` declares which serialized factors own persistent posterior

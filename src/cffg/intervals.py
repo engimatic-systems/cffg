@@ -103,6 +103,14 @@ def _compress(lower, upper, heights, active, capacity):
     )
 
 
+def _log_width(lo, hi):
+    # A finite interval crossing zero can be wider than the largest float.
+    crosses = (lo < 0) & (hi > 0)
+    return jnp.where(
+        crosses, jnp.logaddexp(jnp.log(-lo), jnp.log(hi)), jnp.log(hi - lo)
+    )
+
+
 def _transform(message, knot, offset, left, right, *, forward):
     live = _mask(message)
     lower, upper, height, _ = message
@@ -142,6 +150,21 @@ def _transform(message, knot, offset, left, right, *, forward):
         same_side = ((x < src) == (moved < dst)) & ((x > src) == (moved > dst))
         numeric &= jnp.all(~live | (left == right) | same_side)
     cut = live & (lower < src) & (upper > src) & (left != right)
+    # A positive rounded image can still have the wrong width. Test mass
+    # conservation on each finite affine piece in log coordinates before
+    # admitting it. Keep at least half the working significand in its width.
+    for l, u, y0, y1, slope in (
+        (lower, jnp.minimum(upper, src), lo, jnp.minimum(hi, dst), left),
+        (jnp.maximum(lower, src), upper, jnp.maximum(lo, dst), hi, right),
+    ):
+        bounded = live & (l < u) & jnp.isfinite(l) & jnp.isfinite(u)
+        log_slope = jnp.log(slope)
+        expected = _log_width(l, u) + (log_slope if forward else -log_slope)
+        measured = _log_width(y0, y1)
+        numeric &= jnp.all(
+            ~bounded
+            | (jnp.abs(measured - expected) <= jnp.sqrt(jnp.finfo(lower.dtype).eps))
+        )
     if forward:
         # One occupied interval may split into two different Jacobian heights.
         numeric &= jnp.all(~cut | ((lo < dst) & (dst < hi)))
@@ -255,18 +278,13 @@ def product(a, b):
     return _finish(out, status)
 
 
-def integral(message):
-    """Total log mass and differential entropy of the normalized product belief."""
+def _measure(message):
     live = _mask(message)
     valid = _valid(message, live)
     low, high, height, count = message
     finite = live & jnp.isfinite(low) & jnp.isfinite(high)
     lo, hi = jnp.where(finite, low, 0), jnp.where(finite, high, 1)
-    # On an interval crossing zero the physical width can exceed float max.
-    crosses = (lo < 0) & (hi > 0)
-    log_width = jnp.where(
-        crosses, jnp.logaddexp(jnp.log(-lo), jnp.log(hi)), jnp.log(hi - lo)
-    )
+    log_width = _log_width(lo, hi)
     peak = jnp.max(jnp.where(finite, height, -jnp.inf), axis=1, keepdims=True)
     peak = jnp.where(jnp.any(finite, axis=1, keepdims=True), peak, 0)
     terms = jnp.where(finite, (height - peak) + log_width, -jnp.inf)
@@ -297,4 +315,31 @@ def integral(message):
         [log_mass, -jnp.inf, jnp.inf],
         default=jnp.nan,
     )
-    return IntervalIntegral(log_mass, jnp.where(ok, entropy, jnp.nan), status)
+    stats = IntervalIntegral(log_mass, jnp.where(ok, entropy, jnp.nan), status)
+    normalized = message._replace(
+        log_height=jnp.where(finite, (height - peak) - relative, 0)
+    )
+    return stats, normalized, jnp.where(finite, jnp.exp(log_p), 0)
+
+
+def integral(message):
+    """Total log mass and differential entropy of the normalized product belief."""
+    return _measure(message)[0]
+
+
+def _expected_height(belief, mass, potential):
+    # Belief cells come from intersection, hence each belongs to one cell
+    # of the source. Look up by left boundary, including coincident endpoints.
+    lower = jnp.where(_mask(potential), potential.lower, jnp.inf)
+    owner = jax.vmap(
+        lambda bounds, query: jnp.searchsorted(bounds, query, side="right") - 1
+    )(lower, belief.lower)
+    index = jnp.maximum(owner, 0)
+    height = jnp.take_along_axis(potential.log_height, index, axis=1)
+    upper = jnp.take_along_axis(potential.upper, index, axis=1)
+    live = _mask(belief)
+    covered = jnp.all(
+        ~live
+        | ((owner >= 0) & (owner < potential.count[:, None]) & (belief.upper <= upper))
+    )
+    return jnp.where(covered, jnp.sum(jnp.where(live, mass * height, 0)), -jnp.inf)

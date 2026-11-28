@@ -33,9 +33,10 @@ class PortRole(str, Enum):
 class VariableSpec:
     """An edge in the FFG: a named random variable.
 
-    Three domain families, tagged by which field is set (exactly one):
+    Domain families are tagged by the field set (exactly one):
     discrete one-hot (`cardinality` = k), Gaussian (`dim` = d, a point in
-    R^d), or scalar exponential-family (`ef` = a family name, cff-8s6a).
+    R^d), independent intervals (`interval_dim` and `interval_capacity`),
+    or scalar exponential-family (`ef` = a family name, cff-8s6a).
     Messages, arenas, and rules dispatch on the family — a discrete edge
     lives in the log-probability arena, a Gaussian edge in the
     information-form (eta, Lambda) arena (cff-4e5z), an EF edge in the
@@ -56,22 +57,42 @@ class VariableSpec:
     cardinality: int = 0
     dim: int = 0
     ef: str = ""
+    interval_dim: int = 0
+    interval_capacity: int = 0
 
     def __post_init__(self):
-        if (self.cardinality > 0) + (self.dim > 0) + bool(self.ef) != 1:
+        if (
+            type(self.interval_dim) is not int
+            or type(self.interval_capacity) is not int
+            or self.interval_dim < 0
+            or self.interval_capacity < 0
+            or bool(self.interval_capacity) != bool(self.interval_dim)
+        ):
+            raise ValueError(
+                "interval dimension and cell capacity must both be positive integers"
+            )
+        if self.interval_dim and (self.cardinality or self.dim or self.ef):
+            raise ValueError("interval variables cannot also declare another domain")
+        if (self.cardinality > 0) + (self.dim > 0) + bool(self.ef) + bool(
+            self.interval_dim
+        ) != 1:
             raise ValueError(
                 f"variable {self.name!r}: exactly one of cardinality ({self.cardinality}), "
-                f"dim ({self.dim}), and ef ({self.ef!r}) must be set"
+                f"dim ({self.dim}), ef ({self.ef!r}), and interval_dim ({self.interval_dim}) must be set"
             )
 
     @property
     def family(self) -> str:
+        if self.interval_dim:
+            return "interval"
         return "gaussian" if self.dim else "ef" if self.ef else "discrete"
 
     @property
-    def domain_key(self) -> tuple[str, int]:
+    def domain_key(self) -> tuple[str, int] | tuple[str, int, int]:
         """Hashable domain identity: what must match across an equality node
         or a glue bond. EF domains are scalar; the family name is the key."""
+        if self.interval_dim:
+            return ("interval", self.interval_dim, self.interval_capacity)
         if self.ef:
             return (f"ef:{self.ef}", 1)
         return (self.family, self.dim or self.cardinality)
@@ -287,6 +308,22 @@ def register_factor_type(ft: FactorType) -> FactorType:
         raise ValueError(f"factor type {ft.name!r}: roles {sorted(overlap)} are both edge and param")
     FACTOR_TYPES[ft.name] = ft
     return ft
+
+
+register_factor_type(
+    FactorType(
+        "interval_potential",
+        ("out",),
+        ("lower", "upper", "log_height", "count", "tails"),
+        family="interval",
+    )
+)
+register_factor_type(
+    FactorType(
+        "interval_activation", ("in", "out"), ("knot", "offset", "left", "right"),
+        symmetric_domain=True, family="interval",
+    )
+)
 
 
 # The discrete vocabulary of the papers (Part II §5, Part I App. C).

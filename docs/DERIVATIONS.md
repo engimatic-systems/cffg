@@ -3493,8 +3493,12 @@ each affine interval of the opening example. It checks the output mean
 terms, an affine control, empty and improper supports, and a 32-dimensional
 product in float32 and float64. The oracle uses exact integration formulas
 evaluated in the source precision. The existing D13 positive-noise Gaussian
-factor remains a different model. Production interval-factor execution and
-serialization are tracked in `cenc-luez`.
+factor remains a different model. The bounded interval forest implementation admits the D13a model through
+serialized interval variables. Its public ledger returns the graph-node, boundary
+and separator contributions separately. Completed propagation also checks that
+all edge integrals agree within each tree and that their representative log
+masses sum to minus the ledger. See `tests/test_interval_messages.py` and
+`tests/test_interval_forest.py` for numerical and public reconstruction checks.
 
 ## D14 — Total derivatives of an adaptive neural fixed point
 

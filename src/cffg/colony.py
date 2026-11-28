@@ -22,6 +22,7 @@ from cffg.core.ir import Template
 from cffg.core.serialize import structure_hash
 from cffg.engine import Engine, RunResult, State, _replace
 from cffg.compiled_iteration import controller_for
+from cffg.interval_plan import IntervalForest
 from cffg.readouts.selection import EdgeSelection
 from cffg.runtime_types import RunStatus as RunStatus  # noqa: PLC0414
 
@@ -67,10 +68,13 @@ class Colony:
         else:
             # Same structure, this instance's own parameters.
             arena = compile_template(template, arrays=arrays)
-            state = _replace(
-                self.engines[key].init_state(),
-                params={k: jnp.asarray(v) for k, v in arena.log_params.items()},
-            )
+            if isinstance(arena, IntervalForest):
+                state = self.engines[key].init_from_arena(arena)
+            else:
+                state = _replace(
+                    self.engines[key].init_state(),
+                    params={k: jnp.asarray(v) for k, v in arena.log_params.items()},
+                )
         if observations:
             state = self.engines[key].bind_data(state, observations)
         iid = self._next_id
@@ -110,6 +114,12 @@ class Colony:
         for (key, _signature), iids in by_key.items():
             engine = self.engines[key]
             states = [self.instances[i].state for i in iids]
+            if isinstance(engine.arena, IntervalForest):
+                results = engine.run_batch(states, n_iters, tol=tol, damp=damp, outer_solver=outer_solver)
+                for iid, result in zip(iids, results, strict=True):
+                    self.instances[iid].state = result.state
+                    self.last_results[iid] = result
+                continue
             if (engine.arena.gfe_groups or engine.arena.gfe_tm_groups
                     or engine.arena.hybrid_gfe_groups or engine.has_adaptive_gaussian):
                 if damp != 0.0:
@@ -155,6 +165,10 @@ class Colony:
     def marginals(self, iid: int, edges: EdgeSelection = None) -> dict[str, np.ndarray]:
         inst = self.instances[iid]
         return self.engines[inst.key].marginals(inst.state, edges=edges)
+
+    def interval_marginals(self, iid: int, edges: EdgeSelection = None):
+        inst = self.instances[iid]
+        return self.engines[inst.key].interval_marginals(inst.state, edges=edges)
 
     def gaussian_marginals(
         self, iid: int, edges: EdgeSelection = None,
