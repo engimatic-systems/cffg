@@ -1,6 +1,6 @@
 ---
 id: cml-xdw1
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-11-28T04:28:22Z
@@ -44,3 +44,7 @@ Plan. The action-RNG owner selects among literal maxima only, drawing no random 
 **2026-11-28T05:37:19Z**
 
 Implemented uniform selection over the exact maximum set. A unique maximum leaves the RNG cursor untouched. RollingAgent uses its checkpointed generator; each experiment uses a seeded child generator so that tie draws cannot consume world randomness. The cue harness caches each reachable first-action/observation pair and uses the conditional for the action actually taken. Its displayed action remains a deterministic representative. The state format is unchanged. The final combined tree includes cml-6ba0 and removes the completed ergonomics todo note. Locked focused verification: 12 checks in tests/test_action_selection.py, test_model_lint.py and test_readme.py; four real simulations from test_tmaze_learning.py, test_behavioral_epistemics.py and test_hybrid_epistemics.py all passed in 23.16 s, including the original T-maze learning/ablation assertions. Full short gate and PR still pending.
+
+**2026-11-28T07:04:05Z**
+
+The four real simulation qualifications passed, and the combined final short suite at e6ad56d passed 2858 tests in 444.02 seconds. Current and legacy MAP checkpoint behavior is documented in README. Graph decoding and numerical hardening keep their deterministic conventions.

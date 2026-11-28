@@ -1,6 +1,6 @@
 ---
 id: cff-cj5h
-status: open
+status: closed
 deps: [cml-hj19, cml-6ba0, cml-xdw1]
 links: [cff-i45j, cff-gul8, cff-fxmj, cff-hp3y, cff-4oq8]
 created: 2026-07-06T00:37:22Z
@@ -338,3 +338,7 @@ Legend: prerequisite --> dependent
     +--> [cff-gul8] predictive DATA-port EIG
 
 Only the ledger breakdown blocks the sensor-value ticket. Reviewed tk dep tree --full for both dependents, tk ready and tk blocked. tk dep cycle found no cycles.
+
+**2026-11-28T07:04:05Z**
+
+All three child outcomes reached the combined review head. At e6ad56d, 2858 default tests passed in 444.02 seconds. Focused checks also covered the T-maze 30-trial ablation and cost-of-cue and hybrid simulations. The ergonomics todo note has been removed. cff-gul8 can proceed independently with predictive DATA-port EIG; it does not add a new term to the scored ledger.

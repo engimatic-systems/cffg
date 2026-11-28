@@ -1,6 +1,6 @@
 ---
 id: cml-hj19
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-11-28T04:28:22Z
@@ -41,3 +41,7 @@ P-substitution changes the observation objective. KL-control denotes the ordinar
 **2026-11-28T04:33:46Z**
 
 Implementation and focused verification are complete. The structural pass reads expanded declarations in factor-name order. It names each individual goal/likelihood pair and skips unary likelihoods connected to a random Dirichlet parameter when diagnosing redundant mean-field splits. The compiler emits findings after successful assembly. Engine.run independently checks the resolved number of DELTA hardening sweeps when lint=True. All defaults remain quiet. Tests/test_model_lint.py, tests/test_core_imports.py and tests/test_readme.py passed all 12 selected checks, including the no-JAX subprocess, 256 scoped pairs, numeric parity, validation failures and all warning controls. Commands: PYTHONPATH=src uv run --frozen --no-sync pytest -q tests/test_model_lint.py tests/test_core_imports.py tests/test_readme.py; tk dep cycle; git diff --check. The parent coordinates the full short-suite gate before opening a review PR.
+
+**2026-11-28T07:04:05Z**
+
+Combined short suite on code e6ad56d passed 2858 tests in 444.02 seconds. The JAX-free lint, shared ledger readout, and exact-tie selector are in dedicated commits for review.
