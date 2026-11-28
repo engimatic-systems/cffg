@@ -1,6 +1,6 @@
 ---
 id: cff-2gev
-status: in_progress
+status: closed
 deps: [cff-hp3y, cff-4oq8, cff-b47g, ctcp-qodi]
 links: [cff-weff]
 created: 2026-07-10T03:34:54Z
@@ -501,3 +501,7 @@ Intelligible-ticket review: complete.
 **2026-11-28T04:50:57Z**
 
 Prerequisite --> dependent: ctcp-6msb (generative derivation and exact reference; ready) --> ctcp-w305 (runtime, serialized clock and stationary equivalence) --> ctcp-qodi (frozen three-arm comparison) --> cff-2gev (behavioral and numerical claims). The split keeps a derivation result distinct from a measured behavioral result. No comparative study cell has been executed.
+
+**2026-11-28T14:10:13Z**
+
+Closed as stopped, not achieved. Cooper retained the requirement that curiosity settle before the environmental change and stopped this comparison after the frozen development checks failed. D1a, the stationary control and the opt-in changing-column learning implementation qualified independently (PRs #225, #230 and #245). The formal demonstration was not established: zero held-out cells ran and no post-change effect on curiosity, learning, behavior or task success was measured. V1 2/6 and V2 8/12 are development readiness counts only. See ctcp-qodi and notes/changing-corridor-readiness/v1 and v2 for the original artifacts. Unmet behavioral criteria stay unchecked as the record of this no-go.

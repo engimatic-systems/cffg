@@ -1,6 +1,6 @@
 ---
 id: ctcp-qodi
-status: open
+status: closed
 deps: [ctcp-w305]
 links: []
 created: 2026-11-28T04:50:36Z
@@ -39,3 +39,7 @@ Both preregistrations stopped before opening the six formal seeds. Recomputed fr
 **2026-11-28T14:01:45Z**
 
 Replay the original generation in clean checkouts with CPU/x64: v1 298943d, v2 50f177f. In each revision run uv run python tools/changing_corridor.py prepare ROOT in a fresh directory, then uv run python tools/changing_corridor.py development ROOT --seed SEED --arm ARM --world WORLD for every development seed (v1 19501, v2 19511/19512), each arm changing/stationary/no_epistemics, each world change/sham. Archived version 1 and 2 raw tapes, serialized model bundles, solver statuses and hash-checked readiness summaries are in ~/agent-share/changing-corridor-v1-gUpybO and ~/agent-share/changing-corridor-v2-hZmyRk. From the review branch run uv run python tools/changing_corridor_study.py readiness ARCHIVE to verify a preserved stop. V2 qualify independently checks model identity, pre-change histories, statuses and final eight forecasts before any freeze can be written. Formal campaign and scorer are exercised by synthetic checks only.
+
+**2026-11-28T14:10:13Z**
+
+Terminal disposition — stopped, readiness failed. Cooper decided: “Keep the requirement that curiosity settle first. Publish the failed readiness checks and stop this comparison.” V1 passed 2/6 and V2 passed 8/12 development cells. Zero of 36 formal cells opened, with all six held-out seeds sealed. The changing learner implementation is qualified. The required precondition failed on frozen development evidence, the formal demonstration was not established, and no post-change effect was measured. No follow-on protocol or tuning is authorized. Exact development archives, original qualification receipts and independently recomputed readiness reports are published under notes/changing-corridor-readiness/v1 and v2. To replay, copy one version directory, unzip development.zip into it, and run tools/changing_corridor_study.py readiness on that directory with uv run python from this review branch.

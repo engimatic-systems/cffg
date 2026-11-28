@@ -1,0 +1,150 @@
+{
+  "version": 1,
+  "status": "no_go",
+  "scored_cells": 0,
+  "qualified": 2,
+  "total": 6,
+  "protocol_sha256": "7661f63c389d50faee7f8ceb916c0a39b0570f254861da16c9de144ccb090c39",
+  "models_sha256": "7e7a4f179bd47a8de09c573878f62fcedb319ed25334f1bed5e9d3ba36ad032d",
+  "qualification_sha256": "133ff408c2d9ca163af601174962fe00118d22b36d947bd1749cd1e8a5b48666",
+  "cells": {
+    "19501/changing-change": {
+      "seed": 19501,
+      "arm": "changing",
+      "world": "change",
+      "status": "unsaturated",
+      "reason": "prespecified warmup diagnostic",
+      "visits": 33,
+      "preaction_novelty_nats": [
+        0.08213277731350654,
+        0.0844606007514288,
+        0.08673775671182415,
+        0.08896614952042858,
+        0.07519657998586782,
+        0.07805302827806049,
+        0.06781857114710688,
+        0.07125158143413812
+      ],
+      "above_threshold_ticks": 4,
+      "completed_steps": 128,
+      "native_post_actions": 0,
+      "trace_sha256": "8214ba5487ddbb7771126868c116dd58c5ed393c60ca31bd35fd55787669e8d4",
+      "receipt_sha256": "3ee4437cbb67cca5c3a0ea4fdd00e356e6dab19040ced31dfb1325f3669927da"
+    },
+    "19501/stationary-change": {
+      "seed": 19501,
+      "arm": "stationary",
+      "world": "change",
+      "status": "complete",
+      "reason": null,
+      "visits": 33,
+      "preaction_novelty_nats": [
+        0.014757713438600106,
+        0.014757713438600106,
+        0.014757713438600106,
+        0.014757713438600106,
+        0.014311020931255136,
+        0.014311020931255136,
+        0.013890559273324499,
+        0.013890559273324499
+      ],
+      "above_threshold_ticks": 0,
+      "completed_steps": 131,
+      "native_post_actions": 3,
+      "trace_sha256": "6b06661e3a2414fa9c42d2ac679d5228b63626358fbb4a4683ef3f058b0c2368",
+      "receipt_sha256": "6fe01204c2278582d81fb6e84f5aa45bf4ce8ea3449e9294cfcdaf5dd82862e2"
+    },
+    "19501/no_epistemics-change": {
+      "seed": 19501,
+      "arm": "no_epistemics",
+      "world": "change",
+      "status": "unsaturated",
+      "reason": "prespecified warmup diagnostic",
+      "visits": 33,
+      "preaction_novelty_nats": [
+        0.08213277731350654,
+        0.0844606007514288,
+        0.08673775671182415,
+        0.08896614952042858,
+        0.07519657998586782,
+        0.07805302827806049,
+        0.06781857114710688,
+        0.07125158143413812
+      ],
+      "above_threshold_ticks": 4,
+      "completed_steps": 128,
+      "native_post_actions": 0,
+      "trace_sha256": "809a16c2f51d150f7be4cef75cf3125a6b1b16a6b5e37cc3a23b74c7044208c7",
+      "receipt_sha256": "11cb1fd41c5f57e7b5adcc43bf2dc7f10addd3738c8f55925a10a340050140e2"
+    },
+    "19501/stationary-sham": {
+      "seed": 19501,
+      "arm": "stationary",
+      "world": "sham",
+      "status": "complete",
+      "reason": null,
+      "visits": 33,
+      "preaction_novelty_nats": [
+        0.014757713438600106,
+        0.014757713438600106,
+        0.014757713438600106,
+        0.014757713438600106,
+        0.014311020931255136,
+        0.014311020931255136,
+        0.013890559273324499,
+        0.013890559273324499
+      ],
+      "above_threshold_ticks": 0,
+      "completed_steps": 131,
+      "native_post_actions": 3,
+      "trace_sha256": "b547c51418ea64d58744759d908617ac904dee993a74db31a16033dfdda6a833",
+      "receipt_sha256": "171bbf8d2c7495ab47db6514245e566a89a3ade8405ae54c3457113a61a7cabf"
+    },
+    "19501/no_epistemics-sham": {
+      "seed": 19501,
+      "arm": "no_epistemics",
+      "world": "sham",
+      "status": "unsaturated",
+      "reason": "prespecified warmup diagnostic",
+      "visits": 33,
+      "preaction_novelty_nats": [
+        0.08213277731350654,
+        0.0844606007514288,
+        0.08673775671182415,
+        0.08896614952042858,
+        0.07519657998586782,
+        0.07805302827806049,
+        0.06781857114710688,
+        0.07125158143413812
+      ],
+      "above_threshold_ticks": 4,
+      "completed_steps": 128,
+      "native_post_actions": 0,
+      "trace_sha256": "ca9a6bde3ab4561c8992d2520d63702527a270419d7bfbc4f70eb15d65d7e7e0",
+      "receipt_sha256": "b618c5b9f1b0bf576122068e81aa0c16f57e9e3e9e9f934a0aa3bb10fd8457c9"
+    },
+    "19501/changing-sham": {
+      "seed": 19501,
+      "arm": "changing",
+      "world": "sham",
+      "status": "unsaturated",
+      "reason": "prespecified warmup diagnostic",
+      "visits": 33,
+      "preaction_novelty_nats": [
+        0.08213277731350654,
+        0.0844606007514288,
+        0.08673775671182415,
+        0.08896614952042858,
+        0.07519657998586782,
+        0.07805302827806049,
+        0.06781857114710688,
+        0.07125158143413812
+      ],
+      "above_threshold_ticks": 4,
+      "completed_steps": 128,
+      "native_post_actions": 0,
+      "trace_sha256": "b1baa891b85bb46d23939dcf3781138af0e2b15986ec68420c17760f86a1f939",
+      "receipt_sha256": "405044682f7bcce4b2683de456b56bd83990e986678f5e202dd508128bb525fd"
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "arms": {
+    "changing": {
+      "plan": {
+        "file": "models/changing-plan.cffgz",
+        "sha256": "a32536f21e887928d62e6c878c0ffe67dd5e056f645f4727d5db9af117bf5687",
+        "structure_hash": "5c523ca7916e41433ac835c1f849ace5b79d2ddcddbeae6a73201c7ceef9f93c"
+      },
+      "filter": {
+        "file": "models/changing-filter.cffgz",
+        "sha256": "e4278098bb4c51763418ad47500205446b10ddbed69a693e8138a2d02b722ef7",
+        "structure_hash": "937258d50d0b0756e987e0e36facebb0692b54656d20ef6174562dff468da335"
+      }
+    },
+    "stationary": {
+      "plan": {
+        "file": "models/stationary-plan.cffgz",
+        "sha256": "be931f0ab46d35ba4bcbddb50190321880c25477c311c0f12c20b99321a9d5bb",
+        "structure_hash": "51d9551918a38a20999b42240d311210336ec50c9a87ed062f686ae05949ee88"
+      },
+      "filter": {
+        "file": "models/stationary-filter.cffgz",
+        "sha256": "759144efb840a644d6fb9d61415784a9c13567d31ce52b268c7bd87c78085fac",
+        "structure_hash": "ced265eb89c267316f8df9ab5bf8602b110c4055f84ef51868e1d210c99e94c8"
+      }
+    },
+    "no_epistemics": {
+      "plan": {
+        "file": "models/no_epistemics-plan.cffgz",
+        "sha256": "23f04278cf998d2c6743c0ed090d87d65653e078962b2bb72dc5d5a0ce962b1e",
+        "structure_hash": "ac116bfa71e4ce2b18bc9f1545e9ef7f0ba3ae717a3e99acfc81725462ccbc35"
+      },
+      "filter": {
+        "file": "models/no_epistemics-filter.cffgz",
+        "sha256": "a28e3c9136595d941a2a93b06f211dfc30648ecc7225088e8783440c71e466cc",
+        "structure_hash": "937258d50d0b0756e987e0e36facebb0692b54656d20ef6174562dff468da335"
+      }
+    }
+  },
+  "protocol_sha256": "df84b1a8996c9f45c2d8a16e1a2b50bf70b4780c4afcada60eb35a7dba013f67"
+}

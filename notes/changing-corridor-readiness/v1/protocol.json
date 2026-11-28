@@ -1,0 +1,242 @@
+{
+  "version": 1,
+  "seeds": [
+    19701,
+    19702,
+    19703,
+    19704,
+    19705,
+    19706
+  ],
+  "development_seed": 19501,
+  "arms": [
+    "changing",
+    "stationary",
+    "no_epistemics"
+  ],
+  "worlds": [
+    "change",
+    "sham"
+  ],
+  "warmup": 128,
+  "followup": 48,
+  "development_followup": 3,
+  "saturation_window": 8,
+  "saturation_max_d1": 0.08,
+  "saturation_min_visits": 16,
+  "observed_column": [
+    0,
+    2,
+    0
+  ],
+  "old_position": [
+    [
+      [
+        [
+          0.92,
+          0.92
+        ],
+        [
+          0.08,
+          0.08
+        ]
+      ],
+      [
+        [
+          0.92,
+          0.08
+        ],
+        [
+          0.08,
+          0.92
+        ]
+      ],
+      [
+        [
+          0.08,
+          0.08
+        ],
+        [
+          0.92,
+          0.92
+        ]
+      ]
+    ],
+    [
+      [
+        [
+          0.08,
+          0.08
+        ],
+        [
+          0.92,
+          0.92
+        ]
+      ],
+      [
+        [
+          0.92,
+          0.08
+        ],
+        [
+          0.08,
+          0.92
+        ]
+      ],
+      [
+        [
+          0.92,
+          0.92
+        ],
+        [
+          0.08,
+          0.08
+        ]
+      ]
+    ]
+  ],
+  "new_position": [
+    [
+      [
+        [
+          0.92,
+          0.92
+        ],
+        [
+          0.08,
+          0.08
+        ]
+      ],
+      [
+        [
+          0.92,
+          0.08
+        ],
+        [
+          0.08,
+          0.92
+        ]
+      ],
+      [
+        [
+          0.88,
+          0.08
+        ],
+        [
+          0.12,
+          0.92
+        ]
+      ]
+    ],
+    [
+      [
+        [
+          0.08,
+          0.08
+        ],
+        [
+          0.92,
+          0.92
+        ]
+      ],
+      [
+        [
+          0.92,
+          0.08
+        ],
+        [
+          0.08,
+          0.92
+        ]
+      ],
+      [
+        [
+          0.92,
+          0.92
+        ],
+        [
+          0.08,
+          0.08
+        ]
+      ]
+    ]
+  ],
+  "mode_transition": [
+    [
+      [
+        0.93,
+        0.23
+      ],
+      [
+        0.07,
+        0.77
+      ]
+    ],
+    [
+      [
+        0.93,
+        0.23
+      ],
+      [
+        0.07,
+        0.77
+      ]
+    ],
+    [
+      [
+        0.93,
+        0.23
+      ],
+      [
+        0.07,
+        0.77
+      ]
+    ]
+  ],
+  "initial_state": [
+    0,
+    0
+  ],
+  "horizon": 1,
+  "goal_utility": 1.2,
+  "hazard": 0.005,
+  "reset_alpha": 1.0,
+  "action_prior": [
+    0.3333333333333333,
+    0.3333333333333333,
+    0.3333333333333333
+  ],
+  "precision": "CPU float64",
+  "planning": {
+    "sweeps": 400,
+    "tol": 1e-10,
+    "outer": "native default trust region",
+    "reason": "root_converged",
+    "policy": "native categorical sample"
+  },
+  "filter": {
+    "sweeps": 60,
+    "tol": 1e-12,
+    "solver": "native RollingAgent.observe"
+  },
+  "randomness": "NumPy PCG64. Policy uses seed directly. Environment uses SeedSequence([seed,871]), allocating two uniforms per scheduled tick for position and mode. Conditional on old x,m and applied u, draw both successors independently with categorical inverse CDF. Reveal only x_next*2+m_next.",
+  "warmup_policy": "Alternating left (0),right (2) starting with left. All three agents observe the same applied controls and identity-sensor evidence. No free planning during warmup.",
+  "arms_explanation": {
+    "changing": "Learned Dirichlet transition P-substitution, h=.005",
+    "stationary": "Same P-substitution, original stationary accumulating Dirichlet",
+    "no_epistemics": "Same changing transition posterior, ordinary BP transition in the planner, observation P-substitution retained. This removes the whole transition P-substitution and uses its expected-log parameter."
+  },
+  "model": "All start with a uniform position law and unit reset concentration per outcome of every (mode,action,source) column. Mode law is fixed and known. Every observation identifies position and mode. World old/new transition laws and switch time are withheld from agents.",
+  "gate_thresholds": {
+    "target_trace_gain": 0.002,
+    "target_d1_gain_nats": 0.005,
+    "probe_visit_fraction_advantage": 0.03,
+    "true_target_kl_advantage_nats": 0.03,
+    "goal_occupancy": 0.5
+  },
+  "estimands": "Per-seed averages, equal seed weights. First 16 post preaction ticks versus last 8 warm for changing-world target committed trace and forecast D1. All 48 post ticks for visitation and goal occupancy. Exact evaluator-only KL(true target column || next-event forecast) over first 24 for prediction; all 48 and mean over unchanged position columns separately. Recovery is first start of 3 consecutive post ticks with target KL<=.1. No imputation for invalid/incomplete grid.",
+  "compute": "Seconds elapsed in full native act, observe, and actual Learnables.accumulate nested within observe. Sample whole-process resident bytes at both boundaries and every 5ms during act/update. Native graph reuse only within a freshly started cell process. RSS is sampled absolute memory; no allocation attribution.",
+  "parity": "No optimized estimator or solver. All trials use public RollingAgent.act/observe. Against an optimized path the mandatory bounds would be 128*float64 epsilon on messages, 256*epsilon on node objectives and identical stable-index policy ranking; none is being compared.",
+  "dev_gate": "All six dev arm-world cells complete saturation plus 3 policy actions, filter/plan converge with finite energies and required planning root, model archives roundtrip and pairings agree up to switch and first post action. Failure is preserved and blocks held-out scoring on this protocol.",
+  "revision_policy": "Freeze a protocol, model artifacts and code digest before scored reads. Any change affecting a cell invalidates that cell for comparison and requires a new version and output directory."
+}

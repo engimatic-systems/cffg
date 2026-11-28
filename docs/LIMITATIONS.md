@@ -132,8 +132,10 @@ of seed 19511 the probe stayed at the left endpoint, an outcome with
 probability 0.08 under the unchanged environment. Its forecast novelty rose
 from 0.0609 to 0.1471 nat at the next tick. All six formal seeds remained
 sealed. Post-change prediction, information seeking, task success and
-comparative compute therefore remain unmeasured. The source versions and
-replay commands are recorded in ctcp-qodi.
+comparative compute therefore remain unmeasured. Cooper retained the
+sustained-settling requirement and stopped this comparison. The frozen
+development tapes and receipts are in `notes/changing-corridor-readiness`.
+Ticket ctcp-qodi records the source versions and replay commands.
 
 **H8. Factors must have tractable local expectations.** Every node needs its
 average energy and entropy contributions computable (closed form, quadrature, or

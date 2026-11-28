@@ -1,0 +1,234 @@
+{
+  "status": "no_go",
+  "development_heads": [
+    "50f177f4716428e9e5a940bfe8e942850a7e746c",
+    "5a8bf805ec447b8f8c50c96dc716ad3e389776ed",
+    "7af5b1b0f81a32aca7732eb90feaba13a4997cf8"
+  ],
+  "qualified_inputs": {
+    "src/cffg": "6e3ca53a147465a4a8ee6852bcd9bcb5bfc37b5c",
+    "uv.lock": "e3abe513b11e939970c8ac9ab75e9c9c44fef846",
+    "tools/changing_corridor.py": "64d32563526500d56fd46cb48e6e69965235f73d",
+    "tools/changing_corridor_protocol.json": "dafe8238402e140a8562e25a07523ba2162b7d44"
+  },
+  "cells": {
+    "19511/changing-change": {
+      "status": "unsaturated",
+      "reason": "prespecified warmup diagnostic",
+      "warm_visits": 45,
+      "warm_last_d1": [
+        0.06380144733655892,
+        0.0701604757125875,
+        0.05573869528674631,
+        0.0626775571498959,
+        0.06915651344935235,
+        0.053788130181256236,
+        0.060884517058511875,
+        0.1470896452344173
+      ],
+      "completed_steps": 128,
+      "json": "d6a6758cd2d8ff9353fb156ece0e5edb279cf65db0a6bdaa256bef15b6bc6d56",
+      "jsonl": "eea5eb9562eab326b5c464c91baf0eeec37a4c5385a668f58f7b1c00da11992e"
+    },
+    "19511/stationary-change": {
+      "status": "complete",
+      "reason": null,
+      "warm_visits": 45,
+      "warm_last_d1": [
+        0.011141732494437865,
+        0.011141732494437865,
+        0.010888724265328763,
+        0.010888724265328763,
+        0.010888724265328763,
+        0.010646946449410137,
+        0.010646946449410137,
+        0.010503867155402274
+      ],
+      "completed_steps": 131,
+      "json": "fa7a3d4ac5f49442257c3f5419b8d6a189553c0eccd124e6732edb59e2a65fa6",
+      "jsonl": "6c0ee606e6340a8fb7e7ab0c364554e3916b5c404986b2e052ab0a7b90381730"
+    },
+    "19511/no_epistemics-change": {
+      "status": "unsaturated",
+      "reason": "prespecified warmup diagnostic",
+      "warm_visits": 45,
+      "warm_last_d1": [
+        0.06380144733655892,
+        0.0701604757125875,
+        0.05573869528674631,
+        0.0626775571498959,
+        0.06915651344935235,
+        0.053788130181256236,
+        0.060884517058511875,
+        0.1470896452344173
+      ],
+      "completed_steps": 128,
+      "json": "01456ed131efab294b8ce666332642507939069a5909ff3bbc36c5a35c7c03b1",
+      "jsonl": "7e7c086b8096f374ab3986cecc542b0bdf2a83d7fd4ff0d3a183b081af5aa79e"
+    },
+    "19511/stationary-sham": {
+      "status": "complete",
+      "reason": null,
+      "warm_visits": 45,
+      "warm_last_d1": [
+        0.011141732494437865,
+        0.011141732494437865,
+        0.010888724265328763,
+        0.010888724265328763,
+        0.010888724265328763,
+        0.010646946449410137,
+        0.010646946449410137,
+        0.010503867155402274
+      ],
+      "completed_steps": 131,
+      "json": "cae092215ab0ec09dff209cc454a708bf6d62cda2377e548e1f1c6e4fa4c0e6f",
+      "jsonl": "362e40c86765ec9f23ce1e6affcefd705206a412ae0fa1ea4e36b250b37ced03"
+    },
+    "19511/no_epistemics-sham": {
+      "status": "unsaturated",
+      "reason": "prespecified warmup diagnostic",
+      "warm_visits": 45,
+      "warm_last_d1": [
+        0.06380144733655892,
+        0.0701604757125875,
+        0.05573869528674631,
+        0.0626775571498959,
+        0.06915651344935235,
+        0.053788130181256236,
+        0.060884517058511875,
+        0.1470896452344173
+      ],
+      "completed_steps": 128,
+      "json": "2895c44d2b3a8d2a32aa0e439b494ed140b1b79af7d34c18eb4e1d00990a580c",
+      "jsonl": "a93dd713612ad3daa62aa79e96db69a4889a9bb904f903851c30b69152d37c70"
+    },
+    "19511/changing-sham": {
+      "status": "unsaturated",
+      "reason": "prespecified warmup diagnostic",
+      "warm_visits": 45,
+      "warm_last_d1": [
+        0.06380144733655892,
+        0.0701604757125875,
+        0.05573869528674631,
+        0.0626775571498959,
+        0.06915651344935235,
+        0.053788130181256236,
+        0.060884517058511875,
+        0.1470896452344173
+      ],
+      "completed_steps": 128,
+      "json": "96e65550dadb3279123e26db295c3483773b37ecd15edb9a1ca996b76b4cf641",
+      "jsonl": "a93c4cfe45ce6d14359dd654e975dea5f92f03f7fd0c80ee79729dd97bac77e6"
+    },
+    "19512/stationary-sham": {
+      "status": "complete",
+      "reason": null,
+      "warm_visits": 53,
+      "warm_last_d1": [
+        0.009474925401932252,
+        0.009474925401932252,
+        0.009292852219946267,
+        0.009292852219946267,
+        0.009117641797976223,
+        0.009117641797976223,
+        0.008948913472177005,
+        0.008948913472177005
+      ],
+      "completed_steps": 131,
+      "json": "6df3f41d39c168aa80976339f14fa391b14bc4ebfef961473571a4410b83728b",
+      "jsonl": "0b21e96047df291bc71d1206b529acb713fa9ded2240ac13f138ccf7dbc3ab41"
+    },
+    "19512/no_epistemics-sham": {
+      "status": "complete",
+      "reason": null,
+      "warm_visits": 53,
+      "warm_last_d1": [
+        0.04853751074375952,
+        0.05145177186905976,
+        0.04790603991007995,
+        0.05113696250022359,
+        0.04776974525982042,
+        0.05131453867959496,
+        0.04802939818412731,
+        0.05188461131111689
+      ],
+      "completed_steps": 131,
+      "json": "fb2abb7ba5c0a6057e371724c32a58e7ca10656211f1e3d42e27e2af1e17ed16",
+      "jsonl": "4714d4cb8542e3469cfb0f4b95f3f32626f9abdbfc8a87c66fec8b505f6c9169"
+    },
+    "19512/changing-sham": {
+      "status": "complete",
+      "reason": null,
+      "warm_visits": 53,
+      "warm_last_d1": [
+        0.04853751074375952,
+        0.05145177186905976,
+        0.04790603991007995,
+        0.05113696250022359,
+        0.04776974525982042,
+        0.05131453867959496,
+        0.04802939818412731,
+        0.05188461131111689
+      ],
+      "completed_steps": 131,
+      "json": "0c5f08c353fb0e6c8e8a91d3de67b4495d316df184455583e916535bddc9aca1",
+      "jsonl": "17c6a5c49513de7ac02bf770b7ca7a18e03151816fb3fd8dcb006fcdbd4b0f60"
+    },
+    "19512/no_epistemics-change": {
+      "status": "complete",
+      "reason": null,
+      "warm_visits": 53,
+      "warm_last_d1": [
+        0.04853751074375952,
+        0.05145177186905976,
+        0.04790603991007995,
+        0.05113696250022359,
+        0.04776974525982042,
+        0.05131453867959496,
+        0.04802939818412731,
+        0.05188461131111689
+      ],
+      "completed_steps": 131,
+      "json": "54a332d839c6765d9eefcbbf6683622ba26af078b27d1ad7bcc9807887475754",
+      "jsonl": "c9a94debe53e870190bd5b509f8a35f4526c50ffd854e9465401396e95fb0af7"
+    },
+    "19512/changing-change": {
+      "status": "complete",
+      "reason": null,
+      "warm_visits": 53,
+      "warm_last_d1": [
+        0.04853751074375952,
+        0.05145177186905976,
+        0.04790603991007995,
+        0.05113696250022359,
+        0.04776974525982042,
+        0.05131453867959496,
+        0.04802939818412731,
+        0.05188461131111689
+      ],
+      "completed_steps": 131,
+      "json": "d76d23b8c50ecab608271c7e8dfd00e0fedaf65199f2cb7662cc7ac771111644",
+      "jsonl": "a0adab7a999b8953798166a369f5de8c818e814955d2cd9bfdeb56d77a87f284"
+    },
+    "19512/stationary-change": {
+      "status": "complete",
+      "reason": null,
+      "warm_visits": 53,
+      "warm_last_d1": [
+        0.009474925401932252,
+        0.009474925401932252,
+        0.009292852219946267,
+        0.009292852219946267,
+        0.009117641797976223,
+        0.009117641797976223,
+        0.008948913472177005,
+        0.008948913472177005
+      ],
+      "completed_steps": 131,
+      "json": "1c9d026fffdb53409d0cad6ac49864ba70b03640527304134c37de3c2189cdbd",
+      "jsonl": "1177e34ea8fa66e05aeb9a1fef1692c4fbaf88fd4f9108cf81ee81dcd2774b08"
+    }
+  },
+  "protocol_sha256": "df84b1a8996c9f45c2d8a16e1a2b50bf70b4780c4afcada60eb35a7dba013f67",
+  "models_sha256": "879b4b49660cd54b4eb18f09591e4dfbb22c92e09337205cb395fd6c1485f41e"
+}
