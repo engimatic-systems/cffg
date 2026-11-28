@@ -1,6 +1,6 @@
 ---
 id: cff-602p
-status: in_progress
+status: closed
 deps: [cff-4sor]
 links: [cff-cz6v]
 created: 2026-08-10T02:58:17Z
@@ -130,3 +130,7 @@ The source format now records gate names, signed branches and integer destinatio
 **2026-11-28T07:27:24Z**
 
 The full gate on a354676 passed 2,889 cases and found two stale serialized identity expectations for the recurrence chain and loop. Source schema 1.2 changes their hashes as specified. The original schema-1 document hashes remain pinned in an explicit migration test. Checking the complete reconstructed arenas, schedule kinds and prior schedule fingerprints on both versions passed. No runtime or codec bytes changed. Focused compiler contract, source, parity and bundle files passed all 71 tests in 15.71 s.
+
+**2026-11-28T13:49:04Z**
+
+Final source/identity gate passed all 2,893 required tests on 8e549c4. Pytest wall 411.70 s, canonical dashboard wall 412.484 s. Both legacy recurrence hashes and their new explicit source identities are checked; executable schedule fingerprints and full reconstructed arenas agree. Gate receipt path in /tmp/cffg-recurrence-source-second-gate-root. Combined compact-plate merge rehearsal is archived at ~/agent-share/plate-tree-integration-2feecc2-a354676. Fixed-weight execution of other topologies follows under cff-lv65.
