@@ -15,6 +15,8 @@ import cffg.viz
 REPO = Path(__file__).resolve().parents[1]
 README = REPO / "README.md"
 EXAMPLES = {
+    "examples/continuous_control.py",
+    "examples/hybrid_control.py",
     "examples/cstr_planning.py",
     "examples/discrete_agent.py",
     "examples/discrete_rollout.py",

@@ -287,6 +287,14 @@ most one such observation per equality-connected variable. Distinct latent
 variables can be observed at both ends of an affine factor. Partial-coordinate
 or noisy measurements use an affine emission with positive-definite noise.
 Nonlinear, hybrid and external endpoints have no interior-tap rule.
+When the applied command is known and the preceding state remains uncertain,
+an affine filter can place the command in the transition offset `b + B @ u`.
+Whole-vector taps after execution suit records where every coordinate of
+`[state; action]` is known. The hybrid learning recipe centers an input prior
+on the known regressor with a small positive covariance. The outcome can
+still move that regressor and alter the fitted coefficients. The exact
+categorical selector gates component responsibilities independently.
+[Continuous](../examples/continuous_control.py) · [Hybrid](../examples/hybrid_control.py)
 Gaussian mean-field and nonlinear rules are not delivered by this interface. Structural
 equality, hard constraints, Dirichlet parameter-edge composites, GFE
 composites and multi-arena factors remain separate plans. Registration alone
@@ -467,9 +475,12 @@ independent trial to the current posterior; `replace` recomputes one sequence
 coordinate from the immutable initial prior. Neither operation turns point-
 parameter inference into full joint VB. Generic registration also supports
 component-NIW/`gaussian_mixture`, component-MNIW/`gaussian_mixture_linear` and
-PG-weights/`recurrence_link`. Exact-zero mixture responsibilities retain the
-component prior; exact-zero structured recurrence exposure likewise retains
-the source/stick prior. The recurrence posterior keeps source-regime, stick,
+PG-weights/`recurrence_link`. A missing downstream sensor can leave a valid
+dynamics prediction and valid local statistics. Skip such records and
+goal-conditioned plans when accumulating observed transitions. Exact-zero
+mixture responsibilities retain the component prior. Exact-zero structured
+recurrence exposure likewise retains the source/stick prior. The recurrence
+posterior keeps source-regime, stick,
 and augmented drive-coordinate axes. Gamma precision and external EF-kernel
 adapters remain outside the declared-learning registry. (2) "VMP monotonically
 decreases free energy" holds for sequential coordinate updates; this engine

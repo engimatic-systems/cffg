@@ -14,6 +14,8 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 EXAMPLES = REPO / "examples"
 EXPECTED_OUTPUT = {
+    "continuous_control.py": "continuous control: proposed =",
+    "hybrid_control.py": "hybrid control: applied command =",
     "cstr_planning.py": "first planned coolant mean (K):",
     "discrete_agent.py": "discrete agent:",
     "discrete_rollout.py": "discrete rollout: action posterior =",
@@ -49,7 +51,11 @@ def test_example_has_a_documented_standalone_public_entrypoint(filename):
     ("filename", "expected"),
     [
         pytest.param(*item, marks=pytest.mark.slow)
-        if item[0] in {"hard_constraint.py", "learning_bundle.py", "cstr_planning.py", "discrete_rollout.py", "linear_gaussian.py", "nonlinear_gaussian.py", "hybrid_rslds.py"}
+        if item[0] in {
+            "continuous_control.py", "hybrid_control.py", "hard_constraint.py",
+            "learning_bundle.py", "cstr_planning.py", "discrete_rollout.py",
+            "linear_gaussian.py", "nonlinear_gaussian.py", "hybrid_rslds.py",
+        }
         else item
         for item in EXPECTED_OUTPUT.items()
         if item[0] != "discrete_agent.py"
