@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "base": "90850866969b749c31d73e72344ea3c58e68c31b",
+  "population": "Controlled same-exits synthetic tile loop from protocol.json at rotation zero. Each participant receives the current symbol, applied compass command and exact achieved displacement. Pose is accumulated from known start coordinates. No neighbor preview or privileged map.",
+  "layouts": {
+    "fit-loop": {"remove": [], "add": []},
+    "bent-west": {"remove": [[-2,2]], "add": [[-1,1,"amber"]]},
+    "bent-east-detour": {"remove": [[-2,8],[2,5]], "add": [[-1,9,"blue"],[3,4,"rope"],[3,5,"kiln"],[3,6,"valve"]]}
+  },
+  "layout_order": ["fit-loop","bent-west","bent-east-detour"],
+  "training": {
+    "layout": "fit-loop",
+    "survey_headings": ["N","S"],
+    "seeds": [8101,8102,8103,8104,8105,8106,8107,8108,8109,8110,8111,8112],
+    "steps": 320,
+    "probe_probability": 0.25,
+    "policy": "After two complete compass DFS surveys from home, collect twelve fresh home-start walks. Each picks uniformly from sorted known coordinates distinct from its position as a waypoint, follows a shortest path on the surveyed map (N,E,S,W ties), and takes a uniform random compass probe with probability .25 each step. Seed Python random.Random independently per walk. Every branch contributes once, even stays. Survey and all walks fit each arm. Never concatenate episodes."
+  },
+  "alphabet": "Sorted distinct symbol strings of the fit-loop geometry. Held-out worlds use the same alphabet.",
+  "history": "A two-transition context is (starting symbol, applied command, exact achieved displacement, next symbol, applied command, exact achieved displacement, current symbol). Keep keys seen at least twice in fitting and ending at a fit symbol seen at multiple odometric coordinates. At reset or for any missing key use current appearance. No coordinates in the retained key. Fit-only alias eligibility and fit location histograms may use the same odometry supplied to every arm.",
+  "models": "appearance: one state per symbol. history: appearance states plus retained context keys; record fallback rows for every appearance as well as rows for retained keys. For control, the actual next context determines the successor. tile: fit-only observed positions and probed links; reuses the pilot observed-map BFS planner, frozen even on new layouts.",
+  "prediction": "At each origin predict the endpoint symbol after the next 1 and 3 prescribed commands. Direct conditional frequency tables for (current state, ordered command string) trained only on fitting windows; no future observation or displacement at query time. A missing history row backs off to appearance, then uniform. Tile follows the prescribed commands on fit links from actual odometric position; if a link is unknown use uniform. For every empirical or deterministic forecast mix 0.01 uniform probability over the common alphabet (uniform remains uniform). Flat prior total probability is one. Score every complete window through native conditioned categorical tree BFE, crosschecked against -log assigned endpoint probability.",
+  "evaluation": {
+    "start": "home", "heading": "N",
+    "scripts": ["WNEENNSSEEEEEEWWWWWWSSNNWW","EEEEEEEENNSSWWWWWWSSWWEEEEEENN","EESS EEEEEE NN EE WW NN SS WWWWWW","EEEEEEEESSWWWWWWNNEEWWNNSSWW"],
+    "random_seeds": [9301,9302,9303,9304],
+    "random_steps": 72,
+    "generation": "Strip spaces from literals. Each random tape is an open-loop sequence of independent uniform N,E,S,W commands from its own Python random.Random. Use identical action strings on all layouts. No online updates or future conditioning."
+  },
+  "primary": "history minus appearance mean endpoint-symbol NLL at horizon 3, pooled over all full windows on the two unseen layouts (negative favors history). Report each layout and both horizons, both blocked and moved final-command strata, novelty and dictionary coverage. No winner selection, confidence interval, or optimization of this frozen fixture.",
+  "routing": {
+    "budget": 24,
+    "tasks": [["home","amber","N"],["home","blue","E"],["harbor","amber","W"],["harbor","blue","S"],["home","harbor","E"],["harbor","home","W"]],
+    "policy": "Same fixed training set for all arms. Appearance/history minimize one unit per attempted action plus budget+1 for failure, finite-horizon DP on empirical one-step successor counts. Unknown history-action row falls back to the appearance row, then self. Terminal state has cost zero for every representation of the goal symbol. Tile uses observed-link BFS to the fit location for the goal. Ties within 1e-12 favor current heading then clockwise. A real observation of the goal stops the episode. Any failed attempt consumes one tick. Record all applied moves, actual route and success, including budget failures. Closed-loop routes are separate from prescribed prediction tapes."
+  },
+  "measurement": "Report counts, retention and fit-position entropy; exact symbolic model payload bytes; process peak RSS (includes native runtime), incremental Python allocation in fit if collected; native tree construction plus first synchronized event and subsequent score time. Single development CPU run, no throughput claim. Include source and fit/freeze digests, raw transitions, model rows, predictions and routes for replay.",
+  "limits": "Exact local displacement and a common origin are supplied. Layouts are designed synthetic variants. The tile planner retains its fitting map under transfer. Direct three-command predictions do not infer a hierarchical time model. No new Craftax or Gameworld run."
+}

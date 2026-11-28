@@ -1,6 +1,6 @@
 ---
 id: ccrp-x8yx
-status: open
+status: in_progress
 deps: [cns-t0b9]
 links: []
 created: 2026-11-25T19:04:56Z
@@ -41,3 +41,7 @@ A history-conditioned place assignment can depend on recent observations or appl
 **2026-11-25T19:05:03Z**
 
 Prerequisite --> dependent. [closed] cff-du6m --> [pilot] cns-t0b9 --> [next] ccrp-x8yx. Parent cff-cynx owns general proposal operators. The immediate follow-up can use a controlled fixture and the already available engine.
+
+**2026-11-28T13:52:33Z**
+
+Bounded experiment on top of the published navigation pilot. Public model/inference interface: build a conditional categorical tree via the existing navigation evidence helper and use its native exact BFE. Movement encoding, history dictionaries, held-out generation, cost-to-go and replay records are experiment-owned. Message rules, duplicated JIT/host kernels, serialization schemas, checkpoint migration and production structural operators are N/A; numerical semantics do not change. The pilot and its archive stay intact. Freeze the concrete evaluation and route protocol before generating any held-out tape. Invalid/missing probability mass is rejected; both successful moves and literal blocked displacements are retained. Uniform prediction covers unknown rows. Native scoring and reference comparisons use float64 and dtype-relative tolerances; focused tests include f32 and exact movement reconstruction.
