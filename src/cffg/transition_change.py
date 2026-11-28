@@ -4,7 +4,9 @@ from typing import NamedTuple
 
 import jax
 import jax.numpy as jnp
-from jax.scipy.special import gammaln
+import numpy as np
+from jax.scipy import special as jax_special
+from scipy import special
 
 
 class ChangeUpdate(NamedTuple):
@@ -12,30 +14,152 @@ class ChangeUpdate(NamedTuple):
     valid: jax.Array
 
 
-def _log_rising(a, c):
+def _log_rising(a, c, xp, functions):
     """log Γ(a+c)/Γ(a), avoiding subtraction of log Γ at saturated counts."""
+
     # Subtract Stirling expansions algebraically before either log Gamma is
     # rounded. At a >= 16 the first omitted Bernoulli term is < 1e-17.
     def remainder(x):
         inv = 1 / x
         z = inv * inv
         polynomial = -691 / 360360
-        for coefficient in (1/1188, -1/1680, 1/1260, -1/360, 1/12):
+        for coefficient in (1 / 1188, -1 / 1680, 1 / 1260, -1 / 360, 1 / 12):
             polynomial = coefficient + z * polynomial
         return inv * polynomial
 
-    x = jnp.maximum(a, 16)
-    large = (c*jnp.log(x) + ((x + c - .5)*jnp.log1p(c/x) - c)
-             + (remainder(x+c) - remainder(x)))
-    ratio = jnp.where(a >= 16, large, gammaln(a+c) - gammaln(a))
-    return jnp.where(c == 0, 0, jnp.where(c == 1, jnp.log(a), ratio))
+    x = xp.maximum(a, 16)
+    large = (
+        c * xp.log(x)
+        + ((x + c - 0.5) * xp.log1p(c / x) - c)
+        + (remainder(x + c) - remainder(x))
+    )
+    ratio = xp.where(a >= 16, large, functions.gammaln(a + c) - functions.gammaln(a))
+    return xp.where(c == 0, 0, xp.where(c == 1, xp.log(a), ratio))
 
 
-def _trace(mean):
+def _log_ratio(reset, retain, counts, xp, functions):
+    """Log Bayes factor per gamma ratio; cancel a common large count first."""
+    lo = xp.minimum(reset, retain)
+    delta = xp.abs(reset - retain)
+    direct = _log_rising(reset, counts, xp, functions) - _log_rising(
+        retain, counts, xp, functions
+    )
+    shifted = _log_rising(lo + counts, delta, xp, functions) - _log_rising(
+        lo, delta, xp, functions
+    )
+    return xp.where(
+        counts > xp.maximum(reset, retain), xp.sign(reset - retain) * shifted, direct
+    )
+
+
+def _trace(mean, xp):
     # The complement of the dominant outcome can round out of 1 - mean.
-    dominant = jnp.arange(mean.size) == jnp.argmax(mean)
-    other = jnp.where(dominant, 0, mean)
-    return jnp.sum(other * (1 - other)) + jnp.sum(other) * jnp.sum(jnp.where(dominant, mean, 0))
+    dominant = xp.arange(mean.shape[-1]) == xp.argmax(mean, axis=-1, keepdims=True)
+    other = xp.where(dominant, 0, mean)
+    return xp.sum(other * (1 - other), axis=-1) + xp.max(mean, axis=-1) * xp.sum(
+        other, axis=-1
+    )
+
+
+def _classify(values):
+    """Identify bitwise zeros and positive finite normals, even with float32 FTZ."""
+    dtype = np.dtype(values.dtype)
+    uint = np.uint32 if dtype == np.float32 else np.uint64
+    bits = values.view(uint)
+    magnitude = np.asarray(np.iinfo(uint).max >> 1, dtype=uint)
+    minimum = np.asarray(np.finfo(dtype).tiny, dtype=dtype).view(uint)
+    maximum = np.asarray(np.finfo(dtype).max, dtype=dtype).view(uint)
+    # Use unsigned comparisons for both classes. Mixing a floating comparison
+    # with the zero-bit test lets CPU lowering fold it back to a flushed test.
+    return (bits & magnitude) == 0, (bits >= minimum) & (bits <= maximum)
+
+
+def _project(prior, carry, counts, allowed, h, xp, functions):
+    tiny = xp.finfo(carry.dtype).tiny
+    branches = xp.stack((carry, prior), axis=-2)
+    zero, normal = _classify(branches)
+    empty, positive = _classify(counts)
+    zero_hazard, positive_hazard = _classify(h)
+    valid = (
+        xp.any(allowed, axis=-1)
+        & xp.all(xp.where(allowed[..., None, :], normal, zero), axis=(-2, -1))
+        & xp.all(empty | (allowed & positive), axis=-1)
+        & (zero_hazard | positive_hazard)
+        & (h <= 1)
+    )
+    updated = branches + counts[..., None, :]
+    branch_totals = xp.sum(branches, axis=-1)
+    totals = xp.sum(updated, axis=-1)
+    valid &= xp.all(xp.isfinite(totals), axis=-1)
+    valid &= xp.all(
+        xp.where(
+            allowed[..., None, :], branches / branch_totals[..., None] >= tiny, True
+        ),
+        axis=(-2, -1),
+    )
+    means = updated / totals[..., None]
+    safe = xp.where(allowed[..., None, :], branches, 1)
+    log_bf = xp.sum(
+        _log_ratio(safe[..., 1, :], safe[..., 0, :], counts, xp, functions), axis=-1
+    ) - _log_ratio(
+        branch_totals[..., 1],
+        branch_totals[..., 0],
+        xp.sum(counts, axis=-1),
+        xp,
+        functions,
+    )
+    log_odds = xp.log(h) - xp.log1p(-h) + log_bf
+    # Separate logistic tails preserve a rare branch even when 1 - w rounds to zero.
+    weights = xp.stack((functions.expit(-log_odds), functions.expit(log_odds)), axis=-1)
+    mean = xp.sum(weights[..., None] * means, axis=-2)
+    traces = _trace(means, xp)
+    dominant = xp.arange(carry.shape[-1]) == xp.argmax(mean, axis=-1, keepdims=True)
+    contrast = means[..., 1, :] - means[..., 0, :]
+    contrast = xp.where(
+        dominant,
+        -xp.sum(xp.where(dominant, 0, contrast), axis=-1, keepdims=True),
+        contrast,
+    )
+    within = traces / (1 + totals)
+    variance = xp.sum(weights * within, axis=-1) + xp.prod(weights, axis=-1) * xp.sum(
+        xp.square(contrast), axis=-1
+    )
+    scale = xp.sum(weights * traces * (totals / (1 + totals)), axis=-1) / variance
+    result = mean * scale[..., None]
+    # At the hazard endpoints or identical updated laws, no projection is needed.
+    result = xp.where(
+        xp.all(carry == prior, axis=-1, keepdims=True), updated[..., 0, :], result
+    )
+    result = xp.where(xp.sum(allowed, axis=-1, keepdims=True) == 1, prior, result)
+    result = xp.where(
+        h == 0, updated[..., 0, :], xp.where(h == 1, updated[..., 1, :], result)
+    )
+    result_total = xp.sum(result, axis=-1, keepdims=True)
+    valid &= (
+        xp.all(xp.isfinite(result), axis=-1)
+        & xp.isfinite(result_total[..., 0])
+        & xp.all(
+            xp.where(
+                allowed, (result >= tiny) & (result / result_total >= tiny), result == 0
+            ),
+            axis=-1,
+        )
+    )
+    return ChangeUpdate(xp.where(valid[..., None], result, carry), valid)
+
+
+def host_columns(prior, carry, counts, allowed, hazard):
+    """Validated learner arrays with destination outcome last; keep their host dtype."""
+    with np.errstate(invalid="ignore", divide="ignore", over="ignore", under="ignore"):
+        return _project(
+            prior,
+            carry,
+            counts,
+            allowed,
+            np.asarray(hazard, dtype=carry.dtype),
+            np,
+            special,
+        )
 
 
 def update_column(prior, carry, counts, allowed, hazard):
@@ -46,41 +170,23 @@ def update_column(prior, carry, counts, allowed, hazard):
     With zero counts the result is the predicted law *before* the next event.
     """
     prior, carry, counts, allowed = map(jnp.asarray, (prior, carry, counts, allowed))
-    if carry.ndim != 1 or carry.size == 0 or any(x.shape != carry.shape for x in (prior, counts, allowed)):
+    if (
+        carry.ndim != 1
+        or carry.size == 0
+        or any(x.shape != carry.shape for x in (prior, counts, allowed))
+    ):
         raise ValueError("transition columns require nonempty vectors of one shape")
-    if (carry.dtype not in (jnp.float32, jnp.float64) or prior.dtype != carry.dtype
-            or counts.dtype != carry.dtype or allowed.dtype != jnp.bool_):
-        raise TypeError("concentrations and counts need a shared real dtype and a boolean support mask")
+    if (
+        carry.dtype not in (jnp.float32, jnp.float64)
+        or prior.dtype != carry.dtype
+        or counts.dtype != carry.dtype
+        or allowed.dtype != jnp.bool_
+    ):
+        raise TypeError(
+            "concentrations and counts need a shared real dtype and a boolean support mask"
+        )
     h = jnp.asarray(hazard, dtype=carry.dtype)
     if h.shape != ():
         raise ValueError("the transition-change hazard must be scalar")
 
-    branches = jnp.stack((carry, prior))
-    valid = (jnp.any(allowed) & jnp.all(jnp.isfinite(branches))
-             & jnp.all(jnp.where(allowed, branches > 0, branches == 0))
-             & jnp.all(jnp.isfinite(counts)) & jnp.all(jnp.where(allowed, counts >= 0, counts == 0))
-             & (h >= 0) & (h <= 1))
-    updated = branches + counts
-    branch_totals = jnp.sum(branches, axis=1)
-    totals = jnp.sum(updated, axis=1)
-    valid &= jnp.all(jnp.isfinite(totals))
-    means = updated / totals[:, None]
-    log_z = (jnp.sum(_log_rising(jnp.where(allowed, branches, 1), counts), axis=1)
-             - _log_rising(branch_totals, jnp.sum(counts)))
-    log_w = jnp.stack((jnp.log1p(-h), jnp.log(h))) + log_z
-    weights = jax.nn.softmax(log_w)
-    mean = weights @ means
-    dominant = jnp.arange(carry.size) == jnp.argmax(mean)
-    traces = jax.vmap(_trace)(means)
-    contrast = means[1] - means[0]
-    contrast = jnp.where(dominant, -jnp.sum(jnp.where(dominant, 0, contrast)), contrast)
-    within = traces / (1 + totals)
-    variance = weights @ within + jnp.prod(weights) * jnp.sum(jnp.square(contrast))
-    scale = (weights @ (traces * (totals / (1 + totals)))) / variance
-    result = mean * scale
-    # At the hazard endpoints or identical updated laws, no projection is needed.
-    result = jnp.where(jnp.all(carry == prior), updated[0], result)
-    result = jnp.where(jnp.sum(allowed) == 1, prior, result)
-    result = jnp.where(h == 0, updated[0], jnp.where(h == 1, updated[1], result))
-    valid &= jnp.all(jnp.isfinite(result)) & jnp.all(jnp.where(allowed, result > 0, result == 0))
-    return ChangeUpdate(jnp.where(valid, result, carry), valid)
+    return _project(prior, carry, counts, allowed, h, jnp, jax_special)

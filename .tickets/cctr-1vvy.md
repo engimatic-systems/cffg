@@ -31,3 +31,7 @@ Runtime numerical or status invariant. Arithmetic is deterministic with no solve
 **2026-11-28T06:42:48Z**
 
 Initial independent float64 saturation comparison failed: at a shape 12 and c=0.1 the available JAX betaln differed from SciPy by about 2.6e-8 even in double. Replaced that attempted ratio with a rearranged Stirling log-Gamma difference for large concentration and exact one/zero-count shortcuts. Independent integration of digamma across the increment checks large-argument differences. Four true f32/f64 eager/JIT/vmapped tests now pass, including 80x6 concentrations above 100,000. Both branch masses and the between-branch variance enter the bounded projection.
+
+**2026-11-28T07:02:44Z**
+
+Verified ordinary, eager, JIT, and vmapped float32/float64 against independent D1a examples and digamma quadrature. Six tests passed after the final source change. An excluded positive subnormal must fail even when XLA flushes its floating comparison to zero: classifying both zero and finite-normal by the IEEE representation makes the compiled check agree with the host. Invalid updates return the exact input carry. Work and temporary storage are linear in destination cardinality per column, independent of event history.
