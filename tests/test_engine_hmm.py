@@ -89,6 +89,7 @@ def test_smoothed_marginals_match_forward_backward():
     np.testing.assert_allclose(q["chain/t2/z_mid"], q["chain/t2/z_out"], atol=1e-12)
 
 
+@pytest.mark.slow
 def test_bfe_equals_negative_loglikelihood():
     obs = [1, 0, 1, 1]
     engine, state = run_case(obs)
