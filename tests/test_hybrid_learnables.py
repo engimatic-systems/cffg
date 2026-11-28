@@ -267,8 +267,16 @@ def _run_recurrence(regimes=3, dimension=2, dtype=np.float64, schedule="auto"):
     return template, arrays, sources, engine, result
 
 
-def test_pg_weights_pool_tied_sources_and_match_direct_oracle():
-    template, arrays, sources, engine, result = _run_recurrence()
+@pytest.fixture(scope="module")
+def recurrence_solution():
+    """Share the default inference result among readers with independent learners."""
+    _, _, _, engine, result = _run_recurrence()
+    return engine, result
+
+
+def test_pg_weights_pool_tied_sources_and_match_direct_oracle(recurrence_solution):
+    engine, result = recurrence_solution
+    template, arrays, sources = _recurrence_template()
     prior = conj.vague_pg_weights(3, 2)
     learnables = Learnables(engine, priors={"neutral_recurrence": prior})
     rows = engine.recurrence_weight_stats(result.state)
@@ -387,8 +395,9 @@ def test_pg_weights_pool_tied_sources_and_match_direct_oracle():
     )
 
 
-def test_pg_replace_is_idempotent_accumulate_adds_and_sources_are_explicit():
-    template, arrays, _sources, engine, result = _run_recurrence()
+def test_pg_replace_is_idempotent_accumulate_adds_and_sources_are_explicit(recurrence_solution):
+    engine, result = recurrence_solution
+    template, arrays, _sources = _recurrence_template()
     prior = conj.vague_pg_weights(3, 2)
     replacement = Learnables(engine, priors={"neutral_recurrence": prior})
     replacement.replace(engine, result, only=("neutral_recurrence",))
@@ -419,8 +428,8 @@ def test_pg_replace_is_idempotent_accumulate_adds_and_sources_are_explicit():
     )
 
 
-def test_restricted_runtime_and_public_rollover_use_declared_contract():
-    _template, _arrays, _sources, engine, result = _run_recurrence()
+def test_restricted_runtime_and_public_rollover_use_declared_contract(recurrence_solution):
+    engine, result = recurrence_solution
     prior = conj.vague_pg_weights(3, 2)
     learnables = Learnables(
         engine,

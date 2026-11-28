@@ -1,6 +1,6 @@
 ---
 id: cia12-ibdi
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-11-28T03:11:02Z
@@ -31,3 +31,13 @@ A specific high-risk coverage reduction or hardware dependency belongs in a sepa
 
 ## Definitions
 Wall time means elapsed time from starting the test command to its completion. A gate is the required validation for a change. A fixture is reusable test setup. An oracle supplies an independent expected answer. JUnit is the machine-readable test result.
+
+## Notes
+
+**2026-11-28T04:00:32Z**
+
+Baseline on Apple M2 Max with 64 GiB: full dashboard command 1,250.18s at 04bc4c5, 2,837 passing; subsequent opt-in adjustments retained all 3,316 IDs. A representative sealed 116-case trial at the same source used 79.336s/33.744s/28.544s for 1/3/4 workers, with 5.12/6.02/5.98 GiB peak aggregate RSS and zero swapouts. Four workers merit a full qualification, not a suite-wide performance claim. Duration data are in ~/agent-share/axiom-integration-4RQ0bP/ and /tmp/cia12-ibdi-probe/measured/summary.json. The restored Kalman assertions and read-only hybrid fixture pass 24 focused tests in reverse order; no short case was removed in this ticket.
+
+**2026-11-28T04:14:15Z**
+
+Qualified e7cb35c on the same Apple M2 Max/64 GiB host with the actual required command. Outer elapsed time 431.397s (7m11s) vs 1,250.18s (20m50s), a 65.5% reduction. Inner pytest subprocess 431.246s, all 2,838 selected cases passed. Sampled aggregate peak process-tree RSS was 32.08 GiB, all pressure samples normal and zero swap use before/after. The serial reference and fallback remain available. The debugger can read the result on process exit. Forty-three focused dashboard/inventory checks passed. Integrity compares every selected node ID with its recorded JUnit outcome and fails closed for interrupted or narrowed runs. A separate comparison to the actual earlier collection verified 2,806 identical IDs plus two renamed/expanded passing dashboard cases, covering all 2,808 required prior/restored cases. The older HTML summary had flattened 23 class-qualified names. Raw, unrevised receipts are at ~/agent-share/short-suite-ten/gate-e7cb35cd13d4/ and ~/agent-share/axiom-integration-4RQ0bP/. One measured gate on this host; elapsed time on other machines remains unmeasured.
