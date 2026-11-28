@@ -265,7 +265,7 @@ def test_independent_action_horizon_keeps_additive_free_energy(dtype, horizon):
         np.testing.assert_allclose(actual, expected, rtol=RELATIVE_ERROR_IN_EPS * np.finfo(dtype).eps, atol=0)
 
 
-@pytest.mark.parametrize("dtype", DTYPES)
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_public_tail_and_staged_independent_horizon(dtype):
     import jax
     from cffg.bounded_actions import BoundedGaussianPlan, BoundStatus
@@ -313,7 +313,7 @@ def test_public_wide_and_narrow_tail_quadrature(dtype, lo, hi, ref):
                                ref, rtol=128*np.finfo(dtype).eps)
 
 
-@pytest.mark.parametrize("dtype", DTYPES)
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_dense_covariance_accepts_roundoff_and_rejects_material_asymmetry(dtype):
     from cffg.bounded_actions import BoundedGaussianPlan, BoundStatus
 
@@ -364,7 +364,7 @@ def test_dense_conditional_variance_across_singularity(dtype):
                 np.testing.assert_allclose(lifted, conditional[i], atol=2 * eps * cov[1, 1])
 
 
-@pytest.mark.parametrize("dtype", DTYPES)
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_dense_correlated_nuisance_and_unrepresentable_lift(dtype):
     import jax
     from cffg.bounded_actions import BoundedGaussianPlan, BoundStatus
