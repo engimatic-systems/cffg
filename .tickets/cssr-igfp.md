@@ -1,6 +1,6 @@
 ---
 id: cssr-igfp
-status: open
+status: in_progress
 deps: [cssr-h31p]
 links: []
 created: 2026-11-28T05:28:14Z
@@ -21,3 +21,9 @@ Cover items 17.1–17.13 using the reviewed equations in cff-du6m. Reuse the AXI
 ## Acceptance Criteria
 
 On small independently scored fixtures, produce valid add-regime and split-state edits, prune a Dirichlet state, Gaussian edge and Gaussian regime, and merge two Dirichlet states. Report invalid input as a structured rejection. Check zero-support donors, improper priors, genuine f32 and 10× cardinality. Preserve observation alphabet across a comparison, track fitted arrays and reproduce each candidate from its record.
+
+## Notes
+
+**2026-11-28T06:38:00Z**
+
+Implementation handoff at b76ef27. For a hidden categorical selector connected to one ordinary emission factor, resize its prior and the matching emission axis together. Split and merge transport concentration mass and preserve the observed alphabet. Actual Gaussian predictor deletion must drop the dependence in the graph. Prior-only Bayes factors, held-out scores for edited likelihoods and parameter initialization have distinct meanings. Reuse the retained proposal inputs and immutable edit bundles. Architecture change paths: model construction and parameter ownership. Schedules, batched kernels and checkpoint formats consume ordinary replayed Templates and need no edits. Exercise sparse donors, nonpositive priors, native f32/f64, and at least 10x cardinality against hand-computed distributions.
