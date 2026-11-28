@@ -119,6 +119,7 @@ EPIC_FILES = {
         "test_constraint_data.py",
         "test_constraint_reconstruction.py",
         "test_agent.py",
+        "test_action_selection.py",
         "test_agent_mu3.py",
         "test_agent_spec.py",
         "test_gaussian_agent.py",

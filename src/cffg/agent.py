@@ -54,6 +54,7 @@ from cffg._agent_checkpoint import (
     static_parameter_hash,
 )
 from cffg._agent_mu3 import PlanningRuntime, functional
+from cffg.action_selection import choose_map_action
 from cffg.compiler import _log_of, compile_template
 from cffg.core.ir import AgentSpec, BeliefBinding, Template
 from cffg.core.plates import expand_plates
@@ -301,7 +302,7 @@ class RollingAgent:
             self._pending_goal_priors = self.plan.goal_prior_updates(st)
         q = np.asarray(self.plan.marginals(st)[self._plan_spec.action])
         if self.select == "map":
-            return int(np.argmax(q))
+            return choose_map_action(q, self.rng)
         return int(self.rng.choice(self.n_ctrl, p=q / q.sum()))
 
     def observe(

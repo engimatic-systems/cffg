@@ -1,6 +1,6 @@
 ---
 id: cml-xdw1
-status: open
+status: in_progress
 deps: []
 links: []
 created: 2026-11-28T04:28:22Z
@@ -34,3 +34,13 @@ No near-tie threshold, discrete solver change or stochastic inference schedule i
 
 MAP selects an action with the highest posterior probability. One ULP is one representable floating-point step. An RNG is a random number generator. CSP is constraint satisfaction.
 
+
+## Notes
+
+**2026-11-28T04:36:10Z**
+
+Plan. The action-RNG owner selects among literal maxima only, drawing no random value for a unique winner. RollingAgent and the three named experiment executors share a host NumPy helper. DecisionPlan.action remains the deterministic representative for display. For actual cue episodes, cache conditional inference by the executed first action and reading. Current checkpoints already carry rng_state; legacy restoration leaves the target seed state in place. Preserve both. Validate uniform four-way draws, 128 float32 ties, a one-ULP near tie, malformed/absent mass, exact cold continuation, and representative versus executed cue histories. Numeric solver, Colony, decoding, CSP and DELTA schedules are N/A.
+
+**2026-11-28T05:37:19Z**
+
+Implemented uniform selection over the exact maximum set. A unique maximum leaves the RNG cursor untouched. RollingAgent uses its checkpointed generator; each experiment uses a seeded child generator so that tie draws cannot consume world randomness. The cue harness caches each reachable first-action/observation pair and uses the conditional for the action actually taken. Its displayed action remains a deterministic representative. The state format is unchanged. The final combined tree includes cml-6ba0 and removes the completed ergonomics todo note. Locked focused verification: 12 checks in tests/test_action_selection.py, test_model_lint.py and test_readme.py; four real simulations from test_tmaze_learning.py, test_behavioral_epistemics.py and test_hybrid_epistemics.py all passed in 23.16 s, including the original T-maze learning/ablation assertions. Full short gate and PR still pending.

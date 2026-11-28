@@ -14,10 +14,11 @@ probabilities.  Neither reads engine messages or local GFE terms.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
+from cffg.action_selection import choose_map_action, map_indices
 from cffg.compiler import compile_template
 from cffg.core import Template
 from cffg.engine import Engine, RunStatus
@@ -240,7 +241,8 @@ class DecisionPlan:
 
     @property
     def action(self) -> int:
-        return int(np.argmax(self.action_probabilities))
+        """First maximizing index for deterministic display of this plan."""
+        return int(map_indices(self.action_probabilities)[0])
 
 
 def _engine(task: CueTask, *, past: int, gfe: bool, utility_offset: float = 0.0) -> Engine:
@@ -347,19 +349,21 @@ class BehavioralReport:
     realized_information_gain_by_seed: np.ndarray
     task_return_by_seed: np.ndarray
     regret_by_seed: np.ndarray
+    # All reachable (first action, first observation) replans, including ties.
+    conditional_by_history: dict[tuple[int, int], DecisionPlan] = field(default_factory=dict)
 
     @property
     def convergence_statuses(self) -> tuple[RunStatus, ...]:
         return (
             self.first_plan.status,
-            *(plan.status for plan in self.conditional_plans.values()),
+            *(plan.status for plan in (self.conditional_by_history or self.conditional_plans).values()),
         )
 
     @property
     def free_energies(self) -> tuple[float, ...]:
         return (
             self.first_plan.free_energy,
-            *(plan.free_energy for plan in self.conditional_plans.values()),
+            *(plan.free_energy for plan in (self.conditional_by_history or self.conditional_plans).values()),
         )
 
 
@@ -377,39 +381,37 @@ def run_benchmark(
         raise ValueError("episodes_per_seed must be positive")
 
     first = _solve(_engine(task, past=0, gfe=gfe), past=0)
-    first_position = ACTION_POSITION[first.action]
     matrix = observation_matrix(task)
-    columns = slice(
-        first_position * N_CONTEXT, (first_position + 1) * N_CONTEXT
-    )
-    reachable = np.flatnonzero(matrix[:, columns].sum(axis=1) > 0)
-
     conditional_engine = _engine(task, past=1, gfe=gfe)
-    conditional = {
-        int(observation): _solve(
-            conditional_engine,
-            past=1,
-            data={"act1": first.action, "obs1": int(observation)},
-        )
-        for observation in reachable
-    }
+    histories = {}
+    for action in map_indices(first.action_probabilities):
+        position = ACTION_POSITION[action]
+        columns = slice(position * N_CONTEXT, (position + 1) * N_CONTEXT)
+        for observation in np.flatnonzero(matrix[:, columns].sum(axis=1) > 0):
+            history = (int(action), int(observation))
+            histories[history] = _solve(conditional_engine, past=1,
+                                        data={"act1": history[0], "obs1": history[1]})
+    representative = first.action
 
     returns = []
     information_gains = []
     for seed in seeds:
         env = CueTaskEnv(task, np.random.default_rng(seed))
+        action_rng = env.rng.spawn(1)[0]
         seed_returns = []
         seed_information_gains = []
         for _ in range(episodes_per_seed):
             env.reset()
             prior = np.full(N_CONTEXT, 1.0 / N_CONTEXT)
-            observation1, return1 = env.step(first.action)
+            first_action = choose_map_action(first.action_probabilities, action_rng)
+            observation1, return1 = env.step(first_action)
             likelihood = matrix[
                 observation1,
                 env.position * N_CONTEXT : (env.position + 1) * N_CONTEXT,
             ]
             _, information_gain = _posterior_update(prior, likelihood)
-            second_action = conditional[observation1].action
+            replan = histories[first_action, observation1]
+            second_action = choose_map_action(replan.action_probabilities, action_rng)
             _, return2 = env.step(second_action)
             seed_returns.append(return1 + return2)
             seed_information_gains.append(information_gain)
@@ -420,7 +422,8 @@ def run_benchmark(
     return BehavioralReport(
         gfe=gfe,
         first_plan=first,
-        conditional_plans=conditional,
+        conditional_plans={obs: plan for (act, obs), plan in histories.items() if act == representative},
+        conditional_by_history=histories,
         candidate_posterior_mi=candidate_mutual_information(task),
         realized_information_gain_by_seed=np.asarray(information_gains),
         task_return_by_seed=task_return,

@@ -432,7 +432,15 @@ flags. `build_factored_rollout` keeps named hidden-state blocks separate until a
 declared coupling or observation needs their product.
 
 `RollingAgent` reconstructs finite planning and filtering windows around a
-fixed-size boundary. The usual loop is `act`, environment transition,
+fixed-size boundary. With `select="map"` it draws uniformly among exactly
+tied maxima of the first action posterior using the agent's seeded generator.
+A unique winner consumes no random draw. Earlier versions always executed
+the first maximizing index, so a trajectory can change at its first exact tie.
+Checkpoints include the generator state. Legacy MAP checkpoints without it use
+the receiving agent's generator state, initialized from its seed on a fresh
+agent. `select="sample"` samples the normalized posterior.
+
+The usual loop is `act`, environment transition,
 `observe`, and optional declared learning; `step` combines those operations for
 a callback-style environment. `checkpoint` and `restore` preserve agent
 beliefs, learning state, cadence, RNG, and functional-mu3 state when configured.
@@ -452,7 +460,10 @@ nonnegative probability tables. Some low-level paths do not yet reject every
 violation before it can corrupt the reported objective or moment.
 
 `cffg.experiments.behavioral_epistemics.run_benchmark` is the bounded costly-cue
-scientific oracle used to compare epistemic planning with a BFE ablation. It is
+scientific oracle used to compare epistemic planning with a BFE ablation.
+Its report displays the first maximizing index of each plan. During episodes,
+the simulator samples exact ties and looks up the second plan by executed
+first action and reading in `conditional_by_history`. It is
 a fixed research workload, not a general environment API. Other modules under
 `cffg.experiments` and `cffg.benchmarks` are derivation, diagnostic, or
 performance artifacts rather than supported newcomer facades.
