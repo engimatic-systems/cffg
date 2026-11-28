@@ -157,6 +157,7 @@ EPIC_FILES = {
         "test_bounded_action_derivation.py", "test_bounded_action_numerics.py", "test_bounded_chain.py",
         "test_nonlinear_rules.py", "test_nonlinear_schema.py", "test_nonlinear_engine.py",
         "test_neural.py",
+        "test_neural_delta_derivation.py",
         "test_fixed_point_gradients.py",
         "test_neural_training.py",
         "test_neural_gfe.py",

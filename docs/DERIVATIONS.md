@@ -3415,6 +3415,87 @@ Taylor fixture. The mutually changing cubic-sensor cavities in D13.5 violate
 the prefix dependency used by the proof. Automatic schedule selection and
 production execution retain the existing D13.5 path.
 
+## D13a — Exact zero-noise coordinatewise neural activations
+
+An exact sensor can stretch space unevenly. Suppose its input is uniform
+between −2 and 2. The sensor halves negative values and doubles positive
+ones. Half the probability then fits between −1 and 0, while the other half
+spreads between 0 and 4. There is no sensor noise. The output is uncertain
+because the input is uncertain. A reading between −0.5 and 1 tells us that
+the input lies between −1 and 0.5. This observation has probability 3/8.
+
+**Map and message family.** For equal finite input and output dimension
+\(d\), use one independently parameterized, two-slope activation per
+coordinate,
+
+\[
+f_i(x_i)=b_i+s_i^-\min(x_i-t_i,0)+s_i^+\max(x_i-t_i,0).
+\]
+
+All knots, offsets and slopes are finite. Both slopes are strictly positive.
+Each map is invertible, affine on each side of its knot, with positive
+Jacobian determinant \(J(x)=\prod_i s_i(x_i)\) almost everywhere. Ordinary
+affine scaling is the special case \(s_i^-=s_i^+\). Nonnegative, independent
+piecewise-constant interval potentials are closed under this map and
+multiplication after splitting intervals at knots and pulled-back
+boundaries. Absolute potential scale is retained for evidence.
+A constant unit potential may supply a vacuous message. Coordinate mixing,
+rank loss (including a zero ReLU slope), coupled beliefs and atomic point
+observations need separate message representations. An interval endpoint
+or knot alone has zero mass under the continuous laws admitted here.
+
+**Messages.** Use input Lebesgue measure and the directed conditional
+\(K(x,dy)=\delta_{f(x)}(dy)\). Given an input density or potential \(u\)
+and a likelihood \(v\) on the output, the factor sends
+
+\[
+m_{f\to y}(y)=u(f^{-1}(y))/J(f^{-1}(y)),\qquad
+m_{f\to x}(x)=v(f(x)).
+\]
+
+The first equality follows by changing variables in the mass of any output
+interval. The second follows by integrating the likelihood against the
+unit-mass conditional at fixed input. An uninformative output likelihood
+therefore sends a unit message backward. A unit input potential may send
+different densities on the two sides of a bend.
+
+**Beliefs, energy and support.** For \(0<Z=\int u(x)v(f(x))\,dx<\infty\),
+the input belief is \(q_x=u(v\circ f)/Z\), and the output belief is its
+pushforward. Use the reference measure \(dx\,K(x,dy)\) on the graph for
+the joint node belief. Its density in that chart is \(q_x\), giving the
+factor contribution \(-H(q_x)\). In the output chart the same contribution
+is \(-H(q_y)+E_{q_x}\log J\). Taking a joint differential entropy against
+ambient input–output Lebesgue measure would be undefined.
+
+In the tree with unary factors \(u,v\), their node terms are
+\(-H(q_x)-E\log u\) and \(-H(q_y)-E\log v\). Each degree-two Forney
+edge returns its entropy once, \(+H(q_x)+H(q_y)\). The result, using the
+graph node contribution above, is
+
+\[
+F[q_x]=\int q_x(x)\log\frac{q_x(x)}{u(x)v(f(x))}\,dx,
+\qquad F[q_x^*]=-\log Z .
+\]
+
+This sign follows from the Bethe factorization in Part I, Eq. 6, and the
+edge correction in Part II, Eq. 1. A prior normalized to unit mass gives
+the usual event probability for an indicator likelihood. A unit improper
+prior can still yield a proper posterior, with the stated potential scale
+fixing \(Z\). If support has zero volume, the model is infeasible and the
+energy is positive infinity. An infinite normalizer leaves the belief
+improper. An implementation must distinguish both from arithmetic failure
+when distinct transformed endpoints collapse at the working precision.
+Independent coordinates add their log normalizers and entropies.
+
+**Executable check.** `tests/test_neural_delta_derivation.py` integrates
+each affine interval of the opening example. It checks the output mean
+3/4 and variance 109/48, both outgoing messages, the five signed tree
+terms, an affine control, empty and improper supports, and a 32-dimensional
+product in float32 and float64. The oracle uses exact integration formulas
+evaluated in the source precision. The existing D13 positive-noise Gaussian
+factor remains a different model. Production interval-factor execution and
+serialization are tracked in `cenc-luez`.
+
 ## D14 — Total derivatives of an adaptive neural fixed point
 
 The network is the conditional mean in D13, with positive Gaussian output
