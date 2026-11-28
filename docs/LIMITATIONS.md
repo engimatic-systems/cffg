@@ -391,11 +391,14 @@ inform every input direction. In the retained PCGym position/velocity model,
 scalar position goals leave rank-one messages. The first action is exactly
 unchanged between horizons 1 and 15 and when only the distant goal changes,
 despite convergence and a changed terminal posterior/energy. This is a
-planning limitation, not a remaining damping problem. The retained NumPy
-moment/ledger oracle in `tests/hybrid_planning_fixture.py` and
-`tests/test_hybrid_planning.py` make that distinction executable. The deferred
-full-tilt EC work is not an available remedy; changing objectives to add
-artificial full-state preferences would change the experiment.
+planning limitation. In the two-step version, changing the final goal from 0
+to 2 switches the exact first choice from action 0 (98.87%) to action 2
+(97.02%). The converged solver gives action 0 78.69% in both cases.
+At 15 steps the exact first choice stays the same for these goals. The
+research comparison includes exact path enumeration and a Gaussian
+approximation that recovers the two-step action switch but overstates the
+15-step log evidence by 67.785 nats for final goal 2. The public planning
+contract remains D3. See [the derivation and executable comparison](DERIVATIONS.md#d33-when-the-goal-specifies-only-position).
 Numerical moment collapse checks its computed covariances and output, not just
 the input precisions. If an admitted component calculation overflows or loses
 propriety, it emits nonfinite messages and the run fails with local attribution;

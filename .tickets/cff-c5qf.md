@@ -1,7 +1,7 @@
 ---
 id: cff-c5qf
-status: open
-deps: [cff-u9un]
+status: closed
+deps: [cff-u9un, cpgh-tday]
 links: [cff-ulbz]
 created: 2026-09-25T09:19:45Z
 type: task
@@ -50,3 +50,14 @@ Dependency snapshot from tk dep tree --full, tk ready and tk blocked; no cycles.
           --> [blocked] cff-wt1c --> cff-xa6z
 
 Parallel ready roots include cff-7kpx nonlinear reproduction, cff-qu2j float32 exact certification, cff-ees0 finite hypothesis banks, and cff-nd1q bounded-action derivation. Historical cff-ulbz is a reference link only, not a completed prerequisite or an implicit revival.
+
+**2026-11-28T05:18:33Z**
+
+Cooper authorized a bounded derivation and comparison on the existing fixture before considering any runtime change on 2026-11-27. Historical cff-ulbz stays closed. The existing supported runtime remains D3, and certification alone cannot establish correct long-horizon policy response.
+
+**2026-11-28T05:24:45Z**
+
+Decision fulfilled with the bounded comparison. Keep the current D3 scope for downstream benchmarks. The two-step exact-reference result supports a real policy error and the H15 evidence error limits the Gaussian alternative. Full-tilt EC would define separate messages and an energy; the historical ticket supplies no implementation contract. Further algorithm choice is with Cooper in cpgh-81gw. Dependency excerpt (prerequisite --> dependent):
+  [closed] cpgh-tday --> [closed] cff-c5qf --> [blocked on other work] cff-wt1c --> cff-xa6z
+                     +-> [awaiting Cooper] cpgh-81gw
+  Parallel numeric/runtime prerequisites of cff-wt1c stay independently tracked.
