@@ -1,6 +1,6 @@
 ---
 id: cff-iplr
-status: in_progress
+status: closed
 deps: [cff-wi2o]
 links: []
 created: 2026-09-25T03:46:26Z
@@ -65,3 +65,7 @@ Implementation qualification. The standalone conditional evaluates the registere
 The initial direct Gaussian ensemble on seeds 0–47, ESS .8, one scale-1 move missed the f32/128 mean absolute limit (.045747 > .03) while within 6 SE. Other absolute metrics passed and f64/1280 passed. Qualification repeated with a separately declared policy: both modes are roughly 4 logit units apart, so use four scale-2.5 moves on both ESS branches and fresh seeds 20261128–20261175. Exact Gaussian quadrature Z=7.78985483; absolute f32/128 errors in Z, mean, second moment and positive-side mass: .228080, .003882, .000203, .002787. f64/1280: .009322, .003509, .000069, .002319. Both passed the unchanged limits and 6-SE criteria. The 128 prior-predictive data sets gave posterior rank mean .512822 and median .503215. Receipt /Users/ravd/agent-share/cffg-iplr/qualification.log. Public defaults remain one scale-1 move and ESS .5. Qualification is for the named seeded configurations.
 
 Focused and opt-in checks: 39 passed across public particles, independent D6d references and finite hypotheses, using uv run --frozen --no-sync pytest -q -s -m 'slow or not slow' tests/test_static_parameter_particles.py tests/test_static_particle_derivation.py tests/test_finite_hypotheses.py. An added stratified ancestor oracle then passed both f32/f64 with exact resumed continuation across history growth. The example worked with JAX_ENABLE_X64=0. The combined suite is pending at this commit.
+
+**2026-11-28T14:07:44Z**
+
+The first exact-head full suite at 7ff254a had 2,880 passes and one failing README example-catalogue expectation. The failed log and runtime-failed.json remain in /Users/ravd/agent-share/cffg-iplr/gate-7ff254a-UYuiqq. Commit 900768e registered the example in the catalogue; all five README checks and the x64-off example passed. Final dashboard short gate at 900768e passed 2,881 tests, zero failures, in 435.245 seconds. /Users/ravd/agent-share/cffg-iplr/gate-900768e-mGUBAJ/runtime.json is byte-identical to the tracked runtime history. Scoped diff and dependency-cycle checks passed.
