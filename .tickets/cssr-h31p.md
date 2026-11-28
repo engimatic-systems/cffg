@@ -1,6 +1,6 @@
 ---
 id: cssr-h31p
-status: open
+status: in_progress
 deps: [cff-du6m]
 links: []
 created: 2026-11-28T05:28:13Z
@@ -21,3 +21,9 @@ Cover epic items 3, 4 and 25. Reuse Template, the serialized edit bundle and typ
 ## Acceptance Criteria
 
 Reconstruct an edited and a composed candidate from saved inputs, verify source/result identities and identical evaluation arrays. Wrong sources, missing numeric inputs and invalid edits produce a specific failure without mutating the source. Existing models and edit bundles still round-trip. Demonstrate replay after load and at 10 times the smallest edit count.
+
+## Notes
+
+**2026-11-28T05:42:19Z**
+
+Architecture change path: New IR field, host proposal manifest only. Reuse core edit-bundle and compose interpreters and Template save/load; no change to the model IR, its schema, compiler or checkpoint. Preserve ordered operations and scope arrays with their owning models. Separate a source graph ID and parent candidate ID from the proposal producer, structure hashes and explicit numeric content. Wrong source, invalid edit and missing or changed inputs must fail before exposing a candidate. JIT/host, scheduled/flood and Colony/single execution are unchanged. Exact zeros and dtype/shape are recorded as input bytes; replay performs no probability arithmetic. Exercise at least ten edits.
