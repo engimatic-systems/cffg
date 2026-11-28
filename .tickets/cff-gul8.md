@@ -264,3 +264,7 @@ Implemented the public tree readout. A four-way oracle comparison (two schedules
 **2026-11-28T06:17:10Z**
 
 The component support check now checks finiteness in both message directions before admitting an edge. A single NaN in the outgoing message at a missing sensor is rejected and names the affected pair. All 87 focused checks pass. The preceding queued revision was withdrawn before pytest started.
+
+**2026-11-28T13:50:52Z**
+
+The canonical gate at 7dae3e6 loaded the declared worktree/venv and reported 15 failures. Fourteen arena reconstruction comparisons exposed insertion-order variation in the new incidence/port metadata after JSON round trip. The compatibility export check exposed the imported PortSpec class as an additional compiled dataclass. Publish both maps in sorted name order and reference the core IR module privately. Existing schedule and template fingerprints and compiler assertions remain in force. After replaying the EIG commits on published #233 metadata, all 103 tests across test_compiled.py, test_compiler_contracts.py, test_sensing_information.py and test_sensing_boundaries.py passed in 16.83 seconds. The failed gate receipt is archived at /Users/ravd/agent-share/tree-sensing-7dae3e6-VsWzcA.

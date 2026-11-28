@@ -14,7 +14,7 @@ import numpy as np
 
 from cffg import kernels
 from cffg._immutable import FrozenArray, ImmutableRecord
-from cffg.core.ir import PortSpec
+from cffg.core import ir as _ir
 
 NEG = -1.0e30  # Reserved log-space zero sentinel.
 
@@ -520,7 +520,7 @@ class Arena(ImmutableRecord):
 
     # Share immutable source incidence and boundary names with host readouts.
     endpoints: Mapping[str, tuple[tuple[str, str], ...]] = field(default_factory=dict)
-    ports: Mapping[str, PortSpec] = field(default_factory=dict)
+    ports: Mapping[str, _ir.PortSpec] = field(default_factory=dict)
 
     @property
     def interior_slot_pairs(self) -> np.ndarray:
