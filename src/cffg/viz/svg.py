@@ -9,7 +9,7 @@ extra (cairosvg) and fails with an actionable message without it.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from html import escape
 from math import hypot
 from pathlib import Path as FilePath
@@ -86,9 +86,13 @@ def _attach_plates(
     items = list(scene.items)
     y = scene.height + gap
     width = scene.width
+    corner_limit = scene.wire_corner_limit
     for name in sorted(template.plates):
         spec = template.plates[name]
         frag_scene = build_scene(spec.fragment, level=level, style=style)
+        if frag_scene.wire_corner_limit is not None:
+            corner_limit = (frag_scene.wire_corner_limit if corner_limit is None
+                            else min(corner_limit, frag_scene.wire_corner_limit))
         dx = style.margin + pad
         dy = y + pad + 14.0  # leave room for the label strip
         items += [_shift_item(it, dx, dy) for it in frag_scene.items]
@@ -100,7 +104,7 @@ def _attach_plates(
         )
         y += box_h + gap
         width = max(width, style.margin + box_w + style.margin)
-    return Scene(name=scene.name, width=width, height=y, items=items)
+    return Scene(name=scene.name, width=width, height=y, items=items, wire_corner_limit=corner_limit)
 
 
 def save_svg(template: Template, path: str | FilePath, **kw) -> FilePath:
@@ -138,6 +142,8 @@ def to_svg(scene: Scene, style: SvgStyle = SvgStyle()) -> str:
             "to_svg(build_scene(template)) for a Template"
         )
     s = style
+    if scene.wire_corner_limit is not None and s.corner_r > scene.wire_corner_limit:
+        s = replace(s, corner_r=scene.wire_corner_limit)
     parts = [
         (
             f'<svg xmlns="http://www.w3.org/2000/svg" width="{scene.width:.0f}" '

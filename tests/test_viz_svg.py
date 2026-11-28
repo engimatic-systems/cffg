@@ -91,14 +91,18 @@ def test_gridworld_renders(viz_gallery):
 
 @pytest.mark.parametrize(
     "name,level",
-    [("hmm_slice", 0), ("hmm_slice", 4), ("tmaze", 4)],
+    [("hmm_slice", 0), ("hmm_slice", 4), ("tmaze", 4),
+     ("gaussian_linear", 0), ("gaussian_linear", 4),
+     ("gaussian_mixture_linear", 0), ("gaussian_mixture_linear", 4)],
 )
 def test_golden(name, level, hmm_slice, tmaze, viz_gallery):
-    template = {"hmm_slice": hmm_slice, "tmaze": tmaze}[name]
+    from test_viz_layout import gaussian_junction
+
+    template = gaussian_junction(name) if name.startswith("gaussian") else {"hmm_slice": hmm_slice, "tmaze": tmaze}[name]
     svg = render_svg(template, level=level)
     viz_gallery(svg, tag=f"{name}, level {level}")
     path = GOLDEN / f"{name}_l{level}.svg"
-    if os.environ.get("CFFG_UPDATE_GOLDENS"):
+    if os.environ.get("CFFG_UPDATE_GOLDENS") == "1":
         path.parent.mkdir(exist_ok=True)
         path.write_text(svg)
     assert path.exists(), "golden missing; run with CFFG_UPDATE_GOLDENS=1"
@@ -106,3 +110,35 @@ def test_golden(name, level, hmm_slice, tmaze, viz_gallery):
         f"render drifted from {path.name}; if intended, regenerate with "
         "CFFG_UPDATE_GOLDENS=1"
     )
+
+
+def test_rounded_detour_clears_adjacent_box_even_at_large_radius():
+    """Each quadratic curve stays in the rectangle containing its control polygon."""
+    import re
+
+    from cffg.viz import LayoutStyle, SvgStyle, derive
+    from cffg.viz.layout import _place_factors
+    from test_viz_layout import _wire_paths, gaussian_junction
+
+    template = gaussian_junction("gaussian_linear")
+    grid, _ = _place_factors(derive(template))
+    columns = {"xprior": 0, "yprior": 1, "junction": 3}
+    offsets = {name: (columns[name] - x, -y) for name, (x, y) in grid.items()}
+    # Only 4px between boxes. The x wire has to pass the y prior.
+    style = LayoutStyle(compact_box=80, compact_pitch_x=84, compact_pitch_y=84)
+    scene = build_scene(template, level=4, style=style, offsets=offsets)
+    paths = _wire_paths(template, scene)
+    assert len(paths["var:x"].points) > 2
+    svg = to_svg(scene, SvgStyle(corner_r=1000))
+    group = ET.fromstring(svg).find("{*}g")
+    wire_svg = group.findall("{*}path")[list(paths).index("var:x")]
+    corners = re.findall(r"L([\d.,-]+) Q([\d.,-]+) ([\d.,-]+)", wire_svg.attrib["d"])
+    assert corners
+    rectangles = [g.find("{*}rect") for g in group.findall("{*}g")
+                  if g.findtext("{*}title") in template.factors]
+    assert len(rectangles) == len(template.factors)
+    for corner in corners:
+        xs, ys = zip(*(map(float, p.split(",")) for p in corner))
+        for rect in rectangles:
+            x, y, w, h = (float(rect.attrib[key]) for key in ("x", "y", "width", "height"))
+            assert max(xs) <= x or min(xs) >= x + w or max(ys) <= y or min(ys) >= y + h

@@ -2434,9 +2434,13 @@ four-stage pipeline, each stage importable on its own:
    pointmass edge keeps its beads at every level (the f_d case).
 3. **`layout.layout`** — deterministic rectilinear grid: glue-anchored rail
    left→right (time), selector branches above, obs/goal stacks below,
-   terminals on the first free side. Placement is a pure function of names
-   and topology, so edits move only the rows/columns they touch — the
-   stability property a template editor needs within a connected component.
+   with chronological columns for indexed recurrence chains. Factor-to-factor
+   wires claim facing sides along the dominant grid axis (horizontal on a tie).
+   Ports take free sides next, then blob terminals. Shared sides space their
+   anchors evenly in far-end coordinate order, with natural wire names breaking
+   ties. External wires leave each anchor perpendicularly and follow clear grid
+   lanes around factor interiors. The renderer limits bend rounding to the lane
+   clearance. Internal bead and dome leaders meet the same boundary anchors.
    Disconnected components use the same independent rail layout, ordered by
    natural factor name and stacked using their framed scene extents (including
    terminals and composite boxes). Component growth can move later components

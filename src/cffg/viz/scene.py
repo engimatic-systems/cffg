@@ -131,6 +131,7 @@ class Scene:
     width: float
     height: float
     items: list[SceneItem] = field(default_factory=list)
+    wire_corner_limit: float | None = None
 
     def by_ref(self, ref: str) -> list[SceneItem]:
         return [i for i in self.items if i.ref == ref]

@@ -98,7 +98,8 @@ def layout(
     for scene in scenes:
         items.extend(_shift(item, 0.0, height) for item in scene.items)
         height += scene.height
-    return Scene(diagram.name, max(scene.width for scene in scenes), height, items)
+    return Scene(diagram.name, max(scene.width for scene in scenes), height, items,
+                 wire_corner_limit=scenes[0].wire_corner_limit)
 
 
 def _layout_connected(diagram, presentation, style, offsets=None) -> Scene:
@@ -282,7 +283,8 @@ def _assign_sides(
         term = next(e for e in wire.ends if isinstance(e, TerminalEnd))
         col, row = grid[node.factor]
         if term.kind is TerminalKind.ELLIPSIS and node.factor in rail:
-            side = "left" if node.factor == rail[0] and "left" not in taken[node.factor] else "right"
+            horizontal = ("left", "right") if node.factor == rail[0] else ("right", "left")
+            side = first_free(node.factor, (*horizontal, "up", "down"))
         elif row < 0:
             side = first_free(node.factor, ("up", "left", "right", "down"))
         elif row > 0:
@@ -364,7 +366,11 @@ def _emit(
 
     # Boxes fill white, so anything drawn inside them must come later.
     items = [*composites, *wires, *boxes, *internal, *domes, *beads, *terminals, *ellipses]
-    return _framed(diagram.name, items, style)
+    scene = _framed(diagram.name, items, style)
+    # Each bend sits on a half-pitch lane. Its rounded corner fits inside
+    # this distance from the bend even when a caller requests a larger arc.
+    scene.wire_corner_limit = router.lane_clearance
+    return scene
 
 
 def _glyph_pos(directive, center, box) -> tuple[float, float] | None:
