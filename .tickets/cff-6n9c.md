@@ -1,6 +1,6 @@
 ---
 id: cff-6n9c
-status: in_progress
+status: closed
 deps: [cff-ny7f]
 links: [cff-ny7f]
 created: 2026-09-10T02:07:07Z
@@ -79,3 +79,7 @@ The numerical rule will validate each fixed table before masking zero support, u
 Implementation handoff. The fixed-table check runs for each particle before support masking. One NaN, infinity, negative cell, or non-unit column makes its bank diverge. Preparation and checkpoint restore use the same 128-epsilon column allowance in the particle dtype. Exact zeros and independent valid batch lanes retain their weights. The importance calculation subtracts a common log score before normalizing and evaluating KL, preserving the self-normalized objective even when the common score dwarfs the relative evidence. If the two saved scores lose their KL difference to rounding, restore verifies the KL against the saved weights as well as the roundoff bound. Engine keeps its existing divergence and low-ESS policies. Colony mu3 is unsupported.
 
 Focused verification with PYTHONPATH=src and the shared uv environment: uv run --frozen --no-sync pytest -q tests/test_mu3.py tests/test_mu3_derivation.py tests/test_agent_mu3.py tests/test_lifecycle.py tests/test_execution_specialized.py -k 'particle or importance or mu3 or functional' --tb=short. All 39 selected tests passed in 37.71 s. Tests cover direct and jitted float32/float64, mixed score precision, 4 and 40 particles, sparse support, uniform evidence, the quadrature oracle, Engine divergence, atomic rejection of corrupted checkpoint samples, and the centered KL ledger. Dependency cycles and diff whitespace checks are clean. Remains in progress for the parent’s combined short-suite gate, PR and closure.
+
+**2026-11-28T04:26:22Z**
+
+Integrated on a69f234. The complete short suite passed 2,858 tests in 462.94 seconds wall, including the sparse and malformed-particle input checks. The dedicated checkpoint and float32/float64 checks also passed. This branch is stacked on #208 for review.

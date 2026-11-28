@@ -1,6 +1,6 @@
 ---
 id: cff-34gi
-status: in_progress
+status: closed
 deps: [cff-bfr9]
 links: [cff-sf29, cff-ddsq]
 created: 2026-09-09T23:41:24Z
@@ -85,3 +85,7 @@ Handoff for the integration owner. Fixed probabilities now reject each negative 
 Compared against an unmodified a774a54 source archive. That compiler wrote and reopened three validly hashed but numerically invalid CFFGZ bundles, each with packed mass 1.2, for a likelihood column, goal and transition column at selector 1. Public load_bundle on the fixed compiler rejected all three with the expected factor and role. All packed arrays of the valid rollout matched exactly. The converged valid categorical GFE objective was bit-identical (0x1.079ab2e207e00p-1). Probe and baseline archives are in /tmp/cff-34gi-baseline.PekEfm.
 
 Focused validation: UV_PROJECT_ENVIRONMENT=/Users/ravd/projects/cffg/.venv PYTHONPATH=src uv run --frozen --no-sync pytest -q tests/test_specialized.py tests/test_resolution.py tests/test_engine_tree.py::test_compile_rejects_non_stochastic_params tests/test_b_epistemics.py::test_two_composite_chain_matches_constrained_objective tests/test_gfe.py::test_bfe_equals_local_objective_minimum tests/test_shared_goals.py::test_off_coordinate_energy_charges_one_shared_parameter_term passed all 68 tests. tk dep cycle and git diff --check passed. Ticket stays in progress for the combined default-suite gate, PR and closure by the integration owner.
+
+**2026-11-28T04:26:22Z**
+
+Integrated on a69f234. The complete four-worker short suite passed 2,858 tests in 462.94 seconds wall. The archive and JSON regressions check the actual fixed-input path. This branch is stacked on #208 for review.
