@@ -267,7 +267,12 @@ def compare(reference, candidate, decoder):
             a, b = np.asarray(a), np.asarray(b)
             if field == "messages" and not np.array_equal(a == NEG, b == NEG):
                 raise ValueError("the exact support of a directed message differs")
-            error = float(np.max(np.abs(a - b) / (1 + np.abs(a))))
+            finite = np.isfinite(a)
+            np.testing.assert_array_equal(b[~finite], a[~finite], err_msg=field)
+            if not np.isfinite(b[finite]).all():
+                raise ValueError(f"{field} became nonfinite")
+            a, b = a[finite], b[finite]
+            error = float(np.max(np.abs(a - b) / (1 + np.abs(a)), initial=0.0))
             if not np.isfinite(error) or error > 1e-10:
                 raise ValueError(f"{field} scaled difference {error:.4g}")
             worst[field] = max(worst.get(field, 0), error)
@@ -318,12 +323,13 @@ def main():
     probe = ColonyProbe()
     with patch.object(colony, "controller_for", probe.controller):
         indexed, candidate = run_arm("colony", args.repetitions, probe)
+    medians = [row["timings"][str(SWEEPS)]["median_s"] for row in (sequential, dense, indexed)]
+    print("Unverified 60-sweep warm medians (sequential, dense, indexed):", medians, flush=True)
     template, arrays, _ = hallway()
     decoder = Engine(compile_template(template, arrays=arrays))
     parity = {str(budget): {"dense_colony": compare(oracle[budget], reference[budget], decoder),
                             "indexed_colony": compare(oracle[budget], candidate[budget], decoder)}
               for budget in (1, SWEEPS)}
-    medians = [row["timings"][str(SWEEPS)]["median_s"] for row in (sequential, dense, indexed)]
     receipt = {
         "commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
         "probe_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
