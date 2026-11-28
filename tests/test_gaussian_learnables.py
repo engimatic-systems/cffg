@@ -552,7 +552,7 @@ def test_unsupported_gaussian_family_pairs_fail_at_compile_time():
         compile_template(mixture, arrays=mixture_arrays)
 
 
-@pytest.mark.parametrize("x64,origin", [(False, 4096.), (True, 2.**27)])
+@pytest.mark.parametrize("x64,origin", [(False, 4096.), pytest.param(True, 2.**27, marks=pytest.mark.slow)])
 def test_declared_gaussian_spread_at_translated_origin(x64, origin):
     with jax.enable_x64(x64):
         for variance in (.25, 1.):

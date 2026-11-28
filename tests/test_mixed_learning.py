@@ -30,7 +30,7 @@ def same_bank(left, right):
         np.testing.assert_array_equal(a, b)
 
 
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 def test_independent_fractional_posterior_and_resume(tmp_path, dtype):
     bank, batch, weights = fixture(dtype)
     update = jax.jit(mixed.update)

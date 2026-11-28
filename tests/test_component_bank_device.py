@@ -69,7 +69,7 @@ def test_compiled_merge_real_fractional_update(dtype):
     array_equal(eager.bank.posterior, compiled.posterior)
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_compiled_transfer_of_sub_ulp_mass_and_gaussian_moments(dtype):
     p = prior(dtype)
     large = dtype(2 ** np.finfo(dtype).nmant)

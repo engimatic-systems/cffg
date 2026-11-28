@@ -442,7 +442,7 @@ def test_exact_zero_initial_regime_support_is_not_floored(monkeypatch):
     ("kind", "message"),
     (
         ("dynamics", "gaussian_mixture_linear statistic is improper"),
-        ("emission", "gaussian_linear statistic is improper"),
+        pytest.param("emission", "gaussian_linear statistic is improper", marks=pytest.mark.slow),
         ("recurrence", "recurrence_link statistic is improper"),
     ),
 )

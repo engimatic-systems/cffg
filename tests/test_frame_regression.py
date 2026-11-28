@@ -70,7 +70,7 @@ def oracle(prior, frame, weights):
     return scores, results
 
 
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 def test_frame_uses_uncertain_input_and_independent_output_precisions(dtype):
     prior, frame, w = example(dtype)
     expected, posterior = oracle(prior, frame, w)

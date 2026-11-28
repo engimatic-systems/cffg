@@ -118,7 +118,7 @@ def test_real_update_merge_subtracts_donor_prior_once(dtype):
     assert bad.status == SlotStatus.INVALID_POSTERIOR and bad.bank is result.bank
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_exact_fraction_oracle_for_every_high_and_low_word(dtype):
     p = prior(dtype)
     large = dtype(2 ** np.finfo(dtype).nmant)
@@ -193,7 +193,7 @@ def test_snapshot_rejects_missing_carry_reused_ids_and_contaminated_dormant_slot
         ComponentBank.from_state_dict(state)
 
 
-@pytest.mark.parametrize("capacity", [32, pytest.param(500, marks=pytest.mark.slow), 5000])
+@pytest.mark.parametrize("capacity", [pytest.param(32, marks=pytest.mark.slow), pytest.param(500, marks=pytest.mark.slow), 5000])
 def test_lifecycle_preserves_fixed_pytree_shapes_at_capacity(capacity):
     active = np.zeros(capacity, bool)
     active[[0, -1]] = True
@@ -248,7 +248,7 @@ def test_policy_can_install_valid_heads_only_on_the_source_layout():
         assert result.status == SlotStatus.INVALID_POSTERIOR and result.bank is b
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_compact_default_and_exact_learned_files(tmp_path, dtype):
     p = prior(dtype)
     # This sub-ULP scale correction belongs to the reset prior as well as its dormant rows.

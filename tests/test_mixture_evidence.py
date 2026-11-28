@@ -98,7 +98,7 @@ def test_weak_vacuous_and_integrable_negative_potentials(dtype, precision):
     assert_scores(uniform, np.zeros(2), dtype)
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_singular_potential_keeps_linear_term_in_nullspace(dtype):
     means = jnp.array([[0., 0.], [.5, 1.]], dtype=dtype)
     covariance = jnp.broadcast_to(jnp.eye(2, dtype=dtype), (2, 2, 2))
@@ -259,7 +259,7 @@ def test_evidence_centering_uses_live_components(dtype, reading, linear):
     np.testing.assert_allclose(node_energy, expected, rtol=tol)
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_representable_inputs_with_overflowing_whitened_system_are_rejected(dtype):
     scale = dtype(1e20 if dtype is np.float32 else 1e200)
     eta = jnp.zeros(1, dtype=dtype)

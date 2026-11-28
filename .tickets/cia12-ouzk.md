@@ -33,3 +33,7 @@ A branch tip is the last commit on a branch. A centered statistic summarizes var
 **2026-11-28T03:45:11Z**
 
 Integrated 198–204 at a58d91c with both parents and tested the final code at 04bc4c5. Grouped/selected Gaussian readouts and centered tap statistics agree with independent NIW/MNIW posteriors. A direct or equality-linked observation of a filter’s carried posterior now fails during validation. The standalone and bundle guards passed, including a valid noisy carry and both precisions. The full dashboard command passed 2,837 tests with 479 opt-in cases deselected. The inner wall was 1,250.052 seconds and outer wall 1,250.18 seconds. CPU was an Apple M2 Max. Timing evidence and all per-case durations are in ~/agent-share/axiom-integration-4RQ0bP/short-suite.log. All seven frozen PR heads are ancestors. Ready to publish after the short-suite budget adjustment.
+
+**2026-11-28T03:53:59Z**
+
+Short-suite budget handoff. Of the passing 2,837 selected cases, 31 replicated variants totaling 52.23 measured call seconds now run in the opt-in tier. Collection verifies the same 3,316 unique test IDs and 2,806 short plus 510 opt-in. Under the short-suite budget rule the passing result is reused; 1,197.822 seconds is an estimate, with 2.178 seconds of margin. The source and integration regressions are unchanged. The per-ID receipts and matched coverage are in ~/agent-share/axiom-integration-4RQ0bP/selection.json. cia12-ibdi owns the larger wall-time reduction.

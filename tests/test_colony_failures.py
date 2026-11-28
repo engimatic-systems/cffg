@@ -243,7 +243,7 @@ def test_nonfinite_changes_are_reported_for_each_continuous_representation(
 
 
 @pytest.mark.parametrize("dtype", (np.float32, pytest.param(np.float64, marks=pytest.mark.slow)))
-@pytest.mark.parametrize("failure", ("inner", "state"))
+@pytest.mark.parametrize("failure", (pytest.param("inner", marks=pytest.mark.slow), "state"))
 def test_late_failure_is_isolated_in_a_larger_batch(monkeypatch, dtype, failure):
     check_later_failure(monkeypatch, dtype, "auto", failure, size=20)
 

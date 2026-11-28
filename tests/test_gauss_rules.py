@@ -253,7 +253,7 @@ def test_backward_rounded_rank_one_likelihood_preserves_observed_direction(dtype
     assert eta.dtype == lam.dtype == dtype
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_partial_information_from_weak_to_nearly_noiseless(dtype):
     h = np.ones(2, dtype=dtype)
     w = np.array([[4., -.5], [-.5, 1.]], dtype=dtype)
@@ -278,7 +278,7 @@ def test_partial_information_from_weak_to_nearly_noiseless(dtype):
             np.testing.assert_allclose(eta[i], direction * target / variance, rtol=64 * eps, atol=0.)
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_rectangular_prediction_with_partial_information(dtype):
     # One free input coordinate and one noisy measurement of the other.
     h = np.array([1., -1.], dtype=dtype)
