@@ -84,6 +84,8 @@ def shared_goal_energy(
     messages: jax.Array,
     params: Mapping[str, jax.Array],
     predictions: Mapping[str, jax.Array],
+    *,
+    report=None,
 ) -> jax.Array:
     """Charge D6c.5 once per owner, including its off-coordinate correction.
 
@@ -96,7 +98,8 @@ def shared_goal_energy(
         alpha0 = params[name + ":c_alpha0"][rows[0]]
         indices = arena.message_indices(plan.count_scatter[0], plan.cardinality)
         alpha = alpha0 + messages[indices]
-        total = total + goal_dirichlet_energy(
-            alpha, alpha0, pooled_prediction(plan, predictions)
-        )
+        value = goal_dirichlet_energy(alpha, alpha0, pooled_prediction(plan, predictions))
+        if report is not None:
+            report.add("goal_dirichlet_parameter", (plan.prior_blob,), value)
+        total = total + value
     return total

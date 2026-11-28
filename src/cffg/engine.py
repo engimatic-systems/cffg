@@ -35,6 +35,7 @@ Paired paths:
 from __future__ import annotations
 
 from dataclasses import replace
+from functools import cached_property
 from math import isfinite
 
 import equinox as eqx
@@ -63,6 +64,7 @@ from cffg.iteration import (
     IterationPolicy, IterationServices, allows_initial_undefined_energy, run_iterations,
 )
 from cffg.execution.failures import FailureIndex
+from cffg.readouts import energy as _energy_readout
 from cffg.ledger import ObjectiveLedger, constraint_satisfied
 from cffg.ledger import make_belief_energy as _make_bfe
 from cffg.lifecycle import StateLifecycle
@@ -358,6 +360,7 @@ class Engine:
         damp: float = 0.0,
         harden_last: int | None = None,
         outer_solver: str = "auto",
+        lint: bool = False,
     ) -> RunResult:
         """Flood up to ``n_iters`` sweeps and return explicit termination data.
 
@@ -394,7 +397,8 @@ class Engine:
         `harden_last=k` (default: k = n_iters // 2 when δ edges exist), the
         first phase runs soft to coherence, then δ edges harden for the final
         k sweeps so decisions commit sequentially. Without delta constraints,
-        a valid ``harden_last`` request has no effect.
+        a valid ``harden_last`` request has no effect. Set ``lint=True`` to
+        warn if this run disables hardening on a DELTA-constrained arena.
 
         Two-pass schedules (cff-d56d): when the engine compiled an exact
         directed schedule and the call keeps its contract (``damp=0``, no
@@ -416,6 +420,14 @@ class Engine:
             harden_last = n_iters // 2 if len(self.arena.delta_pairs) else 0
         if not 0 <= harden_last <= n_iters:
             raise ValueError("harden_last must be between 0 and n_iters")
+        if lint and harden_last == 0 and len(self.arena.delta_pairs):
+            import warnings
+
+            warnings.warn(
+                f"[delta_hardening_disabled] Run on {self.arena.template_name!r} disables "
+                f"hardening for {len(self.arena.delta_pairs)} DELTA-constrained edge(s).",
+                UserWarning, stacklevel=2,
+            )
         if not len(self.arena.delta_pairs):
             harden_last = 0
         if self._can_run_exact(n_iters, damp, harden_last):
@@ -747,6 +759,26 @@ class Engine:
             zero_support=self._has_zero_support,
             require_ready=self._require_mu3_ready,
         )
+
+    @cached_property
+    def _breakdown_kernel(self):
+        return eqx.filter_jit(_make_bfe(self.arena, detailed=True))
+
+    def fe_breakdown(self, state: State) -> _energy_readout.FreeEnergyBreakdown:
+        """Signed factor, composite, parameter and interior-edge contributions in nats."""
+        if self.arena.semiring == "max":
+            raise RuntimeError("min-sum uses Engine.objective, not a free-energy breakdown")
+        try:
+            self._require_mu3_ready(state)
+        except ValueError as exc:
+            raise RuntimeError(str(exc)) from exc
+        if self._has_zero_support(state):
+            return _energy_readout.infeasible()
+        total, blocks = self._breakdown_kernel(
+            state.messages, state.g_eta, state.g_lam, state.g_obs, state.g_mask,
+            state.ef_eta, state.ef_obs, state.ef_mask, state.params,
+        )
+        return _energy_readout.unpack(total, blocks)
 
     def decode(self, state: State) -> dict[str, int]:
         """MAP decode x-hat: the per-edge argmax of the (max-)marginals. Defined

@@ -30,6 +30,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from cffg.action_selection import choose_map_action
+
 LOG_2PI = float(np.log(2.0 * np.pi))
 
 
@@ -404,6 +406,7 @@ def run_probe_experiment(n_episodes: int = 200, seed: int = 0, epistemic: bool =
     """Perception-action loop; returns probe rate, success rate, satiation trace."""
     world = ProbeWorld()
     rng = np.random.default_rng(seed)
+    action_rng = rng.spawn(1)[0]
     probes = successes = 0
     post_probe_mi = []
     for _ in range(n_episodes):
@@ -421,7 +424,7 @@ def run_probe_experiment(n_episodes: int = 200, seed: int = 0, epistemic: bool =
             rho = posterior_regime(world, rho, action, x)
             ms, Ss = world.state_belief()
             post_probe_mi.append(mi_regime_hat(predictive(rho, ms, Ss, As, bs, Vs)))
-        commit = int(np.argmax(rho))
+        commit = choose_map_action(rho, action_rng)
         successes += int(commit == s_true)
     return {
         "probe_rate": probes / n_episodes,

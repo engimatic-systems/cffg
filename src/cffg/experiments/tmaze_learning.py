@@ -20,6 +20,7 @@ from dataclasses import dataclass
 import jax.numpy as jnp
 import numpy as np
 
+from cffg.action_selection import choose_map_action
 from cffg.compiler import compile_template
 from cffg.engine import Engine, State, _replace
 from cffg.models.tmaze import (
@@ -146,18 +147,18 @@ def run_learning(
     n_sweeps: int = 400,
     select: str = "map",
 ) -> LearningResult:
-    """`select`: "map" (argmax, default — exploration comes from the epistemic
-    objective itself, matching the paper's δ-selection) or "sample" (posterior
+    """`select`: "map" (uniform choice among exact posterior maxima) or "sample" (posterior
     sampling; injects so much action noise that soft control posteriors reduce
     to a random walk — kept for ablation)."""
     env = TMazeEnv(alpha, np.random.default_rng(seed))
+    action_rng = env.rng.spawn(1)[0]
     plan2 = _make_phase(0, 2, alpha, c_util, gfe)
     plan1 = _make_phase(1, 2, alpha, c_util, gfe)
     smooth = _make_phase(2, 2, alpha, c_util, gfe)
 
     def choose(q: np.ndarray) -> int:
         if select == "map":
-            return int(np.argmax(q))
+            return choose_map_action(q, action_rng)
         return int(env.rng.choice(N_POS, p=q / q.sum()))
 
     counts = initial_counts()

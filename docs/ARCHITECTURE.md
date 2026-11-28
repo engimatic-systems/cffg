@@ -537,6 +537,11 @@ its energy, or compare numeric parameter values to infer sharing. Mismatches
 raise `CompileError`. Indexes are built once per assembly; no whole-template
 scan is repeated for each plan or member.
 
+The JAX-free structural lint in `core/model_lint.py` reads validated, expanded
+factor roles, parameter edges, DATA ports and constraints. Compilation can
+emit those findings after assembly. The disabled-DELTA-hardening warning
+belongs to `Engine.run`, which knows the resolved sweep count.
+
 `compiler.py:compile_template` checks its public semiring argument, expands
 plates, runs core validation, captures one registry, and sequences topology,
 specialized discovery/admission, registered lowering, specialized completion,
@@ -1207,6 +1212,21 @@ candidate families share Jacobian products, and certified roots use diagnostic
 gradients without an unnecessary Krylov solve. The objective, stopping criteria
 and Gaussian factor formulas are unchanged. Training uses the same dynamic
 metric `RootProgram`; its certificate retains canonical successor decoding.
+
+`Engine.fe_breakdown(state)` traces the belief ledger with collection of
+per-member terms enabled. Each row carries the owner kind, the compiled
+factor/edge name or shared parameter identity, and its contribution in nats.
+Rows follow ledger traversal and compiled member order. Scalar scoring and
+the readout call the same mathematical kernels. The ordinary scalar route
+keeps the original group reduction order. The optional readout compiles on
+first use and returns immutable host records for one instance. Goal
+Dirichlet parameters and prepared importance-sampled parameters contribute
+once per shared owner. Discrete VMP combines the local Dirichlet parameter,
+likelihood and parameter-edge terms in one stable region. A proven empty
+support short-circuits both routes and appears as a single infinite support
+row. Other nonfinite contributions retain their owner. The diagnostic
+explains the existing objective. Predicting the value of a new observation
+would require a separate calculation for each candidate DATA port.
 
 `ledger.py:ObjectiveLedger` owns the two distinct objective operations.
 `free_energy` retains the host checks in their original order: reject

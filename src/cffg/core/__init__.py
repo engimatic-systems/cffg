@@ -31,6 +31,7 @@ from cffg.core.ir import (
 from cffg.core.edits import FanOut, ObserveInterior, fan_out, observe_interior
 from cffg.core.plates import expand_plates, plate_observations
 from cffg.core.functions import FunctionSpec
+from cffg.core.model_lint import LintFinding, lint
 from cffg.core.moment_matching import (
     MomentMatchingEndpoint,
     MomentProjection,
@@ -59,6 +60,7 @@ __all__ = [
     "GaussianFilterSpec",
     "GaussianPlanSpec",
     "LearnableSpec",
+    "LintFinding",
     "ModelError",
     "MomentMatchingEndpoint",
     "MomentProjection",
@@ -69,6 +71,7 @@ __all__ = [
     "VariableSpec",
     "expand_plates",
     "fan_out",
+    "lint",
     "observe_interior",
     "plate_observations",
     "migrate_moment_matching",
