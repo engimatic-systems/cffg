@@ -1,7 +1,7 @@
 ---
 id: cff-5edo
 status: in_progress
-deps: [cff-wbhu]
+deps: [cff-wbhu, clr-xtni]
 links: [cff-fxmj, cff-j4mu, cff-i45j, cff-wbhu, cff-d56d]
 created: 2026-07-10T03:31:09Z
 type: feature
@@ -140,6 +140,13 @@ Bounded resource assessment on a774a54 with the ec51aea Hallway Phase A builder,
 
 H5 float64 certified three actions and used 0.39 seconds at each of the two follow-up decisions. H20 float64 certified three actions in 168, 166 and 172 iterations. First action took 51.48 seconds and follow-up decisions took 32.24 and 22.84 seconds. Peak RSS was 1.50 GiB. An independent paired probe's cold follow-ups spent 31.95 and 20.69 seconds in the solver with zero solver compilations. An arithmetic extrapolation from the public follow-ups is about 63–90 hours of planning for 10,000 decisions on this CPU. This is a resource warning from two observations, not a steady-state estimate.
 
-H25 float64 at caps 120 and 400 repeatedly failed with local_budget at obs21 on soft iteration 4. Reported local residual was 1.7053025658242404e-13 against 512*eps=1.1368683772161603e-13. H25 float32 at cap 400 failed at obs14, soft iteration 73, with 6.151199340820312e-5 against 6.103515625e-5. H50 float64 at cap 400 failed local_budget at obs12 on soft iteration 4. All three returned budget_exhausted without an action and leave the exact tolerance unchanged. The stop is inside one GFE composite before any certifyable outer root, independently of the H25 outer cap.
+H25 float64 at caps 120 and 400 repeatedly failed with local_budget at obs21 on soft iteration 4. Reported local residual was 1.7053025658242404e-13 against 512*eps=1.1368683772161603e-13. H25 float32 at cap 400 failed at obs14, soft iteration 73, with 6.151199340820312e-5 against 6.103515625e-5. H50 float64 at cap 400 failed local_budget at obs12 on soft iteration 4. All three returned budget_exhausted without an action and leave the exact tolerance unchanged. The stop is inside one GFE composite before any certified outer root, independently of the H25 outer cap.
 
 The H20 shifted prototype copied only the 1,463 overlapping GFE scatter values and verified each copy element for element. The two matched cold trials certified and each shifted trial failed the local solver. A third shifted rejection was recorded before its cold mate reached the 115-second process deadline. No timing result can establish the 3x success criterion. The 100-seed behavior and 10,000-decision storage studies remain open. A bounded separate replay extracts the actual H25 failing cavity, holds the local threshold fixed, and checks whether solving the algebraically equivalent correction from the cavity removes roundoff independently of the outer solver.
+
+**2026-11-28T13:52:20Z**
+
+Bounded actual-cavity replay is complete. Both 57/60 support cases hit the same above-threshold residual at local caps 64 and 256. In the diagnostic, solving for the correction relative to the incoming cavity gave 6.22e-15 float64 and 1.67e-6 float32 in one update at unchanged 512*eps. Decimal recomputation of the centered active KKT residual on the returned float64 posterior gave 1.43e-14. An independent Decimal log-space root matched the materialized float64 log probabilities within 2.85e-14. Float32 materialized only one of 57 supported probabilities at this cavity, so preserve finite log support in future checks and report underflow independently. Source and evidence: /Users/ravd/agent-share/cffg-5edo-envelope/{cavity.py,cavity-f64.json,cavity-f32.json,cavity-oracle.py,independent-cavity-oracle.json}. This is an isolated local diagnostic. The full H25 planner and warm speed remain unqualified.
+
+Legend: prerequisite --> dependent
+[ ] clr-xtni local GFE residual (ready) --> [ ] cff-5edo public rollout budget and shifted start --> [ ] cff-t2g3 control benchmark
