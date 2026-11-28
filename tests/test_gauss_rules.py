@@ -5,6 +5,7 @@ proper inputs, and against exact vacuous propagation on improper ones — the
 property the information-form derivation was chosen for.
 """
 
+import jax
 import numpy as np
 import pytest
 
@@ -213,6 +214,52 @@ def test_invalid_factor_precision_cannot_produce_finite_energy():
     assert np.isposinf(np.asarray(prior)).all()
     assert np.isposinf(np.asarray(linear)).all()
     assert np.isposinf(np.asarray(observed)).all()
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_resolved_mean_solves_for_information_vector(dtype):
+    # The Cholesky entries and precision column are exactly representable.
+    root = np.array([[8., 0.], [7., 3/128]], dtype=dtype)
+    precision = root @ root.T
+    eta = precision[:, 1]
+    with jax.enable_x64(dtype is np.float64):
+        for moments in (gauss.moments, jax.jit(gauss.moments)):
+            mean, covariance = moments(eta, precision)
+            np.testing.assert_array_equal(mean, [0., 1.])
+            assert mean.dtype == covariance.dtype == dtype
+        # Two different natural vectors can share the same precision.
+        mean, covariance = gauss.GAUSSIAN.from_natural((precision.T, precision))
+        np.testing.assert_array_equal(mean, np.eye(2))
+        assert covariance.shape == precision.shape
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_affine_energy_requires_joint_support(dtype):
+    # One exact rank-one output likelihood cannot normalize two flat inputs.
+    # A complementary partial input likelihood makes the joint proper.
+    h = np.array([7., 11.], dtype=dtype)
+    a = np.array([[.75, .5], [-.25, 1.]], dtype=dtype)
+    b = np.array([.25, -.5], dtype=dtype)
+    w = np.eye(2, dtype=dtype) * 3.
+    lo = np.outer(h, h)
+    li = np.array([[2., 0.], [0., 0.]], dtype=dtype)
+    args = tuple(np.stack((v, v)) for v in (h, lo, np.zeros_like(h), li, a, b, w))
+    args[3][0] = 0.
+    with jax.enable_x64(dtype is np.float64):
+        energy = np.asarray(jax.jit(gauss.linear_energy)(*args))
+    assert np.isposinf(energy[0])
+    # Dense joint in (y,x), evaluated in higher precision than the f32 case.
+    a, b, w, h, lo, li = (v.astype(np.float64) for v in (a, b, w, h, lo, li))
+    precision = np.block([[w + lo, -w @ a], [-a.T @ w, li + a.T @ w @ a]])
+    natural = np.r_[w @ b + h, -a.T @ w @ b]
+    residual_map = np.c_[np.eye(2), -a]
+    residual = residual_map @ np.linalg.solve(precision, natural) - b
+    spread = residual_map @ np.linalg.solve(precision, residual_map.T)
+    expected = .5 * (
+        np.linalg.slogdet(precision)[1] - np.linalg.slogdet(w)[1] - 4
+        - 2*np.log(2*np.pi) + residual @ w @ residual + np.trace(w @ spread)
+    )
+    np.testing.assert_allclose(energy[1], expected, rtol=128*np.finfo(dtype).eps)
 
 
 @pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])

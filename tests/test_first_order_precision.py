@@ -12,10 +12,8 @@ from first_order_fixture import CANDIDATES, dense_reference, first_order_model
 
 
 def assert_moments(engine, result, mean, covariance, data, dtype):
-    # Accuracy targets are separate from the solver's message certificate:
-    # 1% of posterior standard deviation/covariance and 1 millinat per datum
-    # in f32; tighter comparisons require f64. These are fixture bounds only.
-    moment_target = .01 if dtype is np.float32 else 1e-8
+    # Check the independent posterior as well as the solver's certificate.
+    moment_target = min(np.sqrt(np.finfo(dtype).eps), .01 if dtype is np.float32 else 1e-8)
     actual = engine.gaussian_marginals(result.state)
     for index in range(len(data)):
         block = slice(3 * index, 3 * index + 3)
@@ -35,8 +33,9 @@ def assert_energy(engine, result, energy, data, dtype):
     energy_per_datum = .001 if dtype is np.float32 else 1e-9
     observed_dimensions = sum(np.size(value) for value in data.values() if value is not None)
     energy_target = energy_per_datum * max(1, observed_dimensions)
-    assert abs(float(engine.bfe(result.state)) - energy) <= energy_target
-    assert abs(result.free_energies[-1] - energy) <= energy_target
+    for actual in (float(engine.bfe(result.state)), result.free_energies[-1]):
+        assert abs(actual - energy) <= energy_target
+        assert abs(np.expm1(energy - actual)) <= np.sqrt(np.finfo(dtype).eps)
 
 
 def assert_reference(engine, result, arrays, data, dtype):
@@ -72,6 +71,26 @@ def test_retained_controller_certifies_without_relaxing_precision(dtype):
         input_target = 128 * np.finfo(dtype).eps
         np.testing.assert_allclose(rounded_mean, original_mean, atol=input_target, rtol=input_target)
         np.testing.assert_allclose(rounded_covariance, original_covariance, atol=input_target, rtol=input_target)
+
+        # Separate error already in the messages from rounding at readout.
+        actual = engine.gaussian_marginals(result.state)
+        h, p = np.asarray(result.state.g_eta), np.asarray(result.state.g_lam)
+        for i in range(len(data)):
+            name = f"s{i}"
+            edge = engine.arena.edges[name]
+            slots = (edge.slot0, edge.slot1)
+            eta = h[engine.arena.g_eta_indices(slots, 3)].sum(axis=0, dtype=np.float64)
+            precision = p[engine.arena.g_lam_indices(slots, 3)].sum(axis=0, dtype=np.float64)
+            message_mean = np.linalg.solve(precision, eta)
+            message_covariance = np.linalg.inv(precision)
+            block = slice(3*i, 3*i+3)
+            root = np.linalg.cholesky(rounded_covariance[block, block])
+            for mean, cov in ((message_mean - rounded_mean[block],
+                               message_covariance - rounded_covariance[block, block]),
+                              (actual[name][0] - message_mean, actual[name][1] - message_covariance)):
+                assert np.linalg.norm(np.linalg.solve(root, mean)) <= np.sqrt(np.finfo(dtype).eps)
+                scaled = np.linalg.solve(root, np.linalg.solve(root, cov).T)
+                assert np.linalg.norm(scaled, 2) <= np.sqrt(np.finfo(dtype).eps)
 
 
 def test_recipient_rounding_cannot_change_its_outgoing_cavity():
@@ -129,9 +148,14 @@ def test_all_retained_parameter_candidates(dtype):
 @pytest.mark.parametrize("horizon", [15, 150])
 def test_flooding_and_tenfold_horizon(dtype, horizon):
     with jax.enable_x64(dtype is np.float64):
-        run_model(dtype, horizon=horizon, schedule="auto")
+        engine, _, _, arrays, data = run_model(dtype, horizon=horizon, schedule="auto")
         if horizon == 15:
             run_model(dtype, horizon=horizon, schedule="flood")
+        else:
+            missing = dict.fromkeys(data)
+            result = engine.run(engine.bind_data(engine.init_state(), missing), 4, tol=1e-6)
+            result.require_converged()
+            assert_reference(engine, result, arrays, missing, dtype)
 
 
 @pytest.mark.slow
@@ -151,20 +175,7 @@ def test_missing_likelihoods_preserve_zero_information_and_improper_readouts(dty
         mean, covariance, energy = dense_reference(arrays, data, runtime_dtype=dtype)
         assert_moments(engine, result, mean, covariance, data, dtype)
         assert energy == 0. and np.isfinite(result.free_energies[-1])
-        if dtype is np.float64:
-            assert_energy(engine, result, energy, data, dtype)
-
-
-@pytest.mark.slow
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="cff-d63w: unobserved f32 tree energy loses cancellation accuracy")
-def test_unobserved_float32_tree_has_zero_energy():
-    with jax.enable_x64(False):
-        template, arrays, data = first_order_model()
-        data = {name: None for name in data}
-        engine = Engine(compile_template(template, arrays=arrays))
-        result = engine.run(engine.bind_data(engine.init_state(), data), 4, tol=1e-6)
-        result.require_converged()
-        assert_energy(engine, result, 0., data, np.float32)
+        assert_energy(engine, result, energy, data, dtype)
 
 
 @pytest.mark.slow

@@ -1,6 +1,6 @@
 ---
 id: cff-d63w
-status: open
+status: closed
 deps: [cff-qu2j]
 links: [cff-wt1c]
 created: 2026-09-30T21:28:34Z
@@ -56,3 +56,15 @@ Research question -> answer -> sources -> confidence: independent f32 Joseph Kal
 **2026-09-30T21:34:47Z**
 
 New hostile-case evidence, same accuracy scope before implementation: setting all20 DATA ports to None leaves a normalized Gaussian generative tree with exact -log Z=0. Both precisions certify; posterior-scaled moments pass. f32 current ledger gives -0.2046661376953125; f64 passes zero-energy accuracy. Added a strict expected-failure energy-only opt-in regression alongside a passing separate moment/vacuous/improper-readout check, so the issue is not hidden by a broadened tolerance or an entire-test expected failure. Completion must remove that marker and restore the analytical identity, including reported RunResult.free_energies. This discovered accuracy ticket remains separate from the cff-qu2j PR and is not closed with it.
+
+**2026-11-28T04:26:08Z**
+
+Start on published main a774a54. Review Factor rule or energy and Runtime numerical or status invariant. Trace affine and prior messages, Gaussian natural-to-moment conversion, node-local Gaussian energy, equality and edge entropy, exact/flood executors, full/selected host readouts and Colony. Retain strict sparse, vacuous, invalid and derivative behavior. Compare both dtypes to dense source-rounded and rounded-message controls, unobserved evidence zero, and the 10x horizon. No changes to statuses, tolerances, persistence, or IR planned.
+
+**2026-11-28T04:44:38Z**
+
+Integrated onto review base #208 (d07e8cf), whose Gaussian numerical sources match published main a774a54. On v3a2, present-main f32 already certifies with residual zero. Relative errors (whitened mean, spectral covariance, evidence weight) are (4.314e-4,2.043e-4,4.760e-4) conditioned and (3.015e-9,5.368e-5,0.21126) unobserved. Unobserved F is +0.237320. Replacing the forward or backward messages separately with a float64 oracle gives f32-backward-only wm=4.306e-4, forward-only 6.714e-6. Summing/solving the computed naturals in float64 gives wm=4.315e-4, so current host readout is no longer the principal error. With Cholesky channels, QR proper prediction, direct EF moment solves and conditional Gaussian KL ledger, conditioned errors are (1.044e-4,2.102e-5,1.236e-5); unobserved errors (6.55e-11,2.17e-6,3.05e-5). At horizon 150, wm/wc/weight conditioned (7.314e-5,3.090e-5,2.836e-4), unobserved (8.56e-10,5.842e-5,0). All pass sqrt(eps) in f32/f64. The rank guard checks whether input and projected output likelihoods span every input direction before accepting a partial joint. No rank floor enters a solved precision. Retained accuracy/certification suite including all slow checks: 15 passed. Gaussian rules, tap oracle, readiness, mixture and nonlinear local suites: 114 passed. Reproduce with uv run pytest -q -o addopts= tests/test_first_order_precision.py and the named test_gauss_rules.py, test_gaussian_tap_oracle.py, test_gaussian_readiness.py, test_mixg.py, test_nonlinear_rules.py files. Study artifacts live in ~/agent-share/cff-d63w. Queued A/B and final canonical gate pending; leave ticket in progress until gate.
+
+**2026-11-28T06:56:24Z**
+
+Qualified numerical commit 5b6a669 on the #208 review base. The final required dashboard gate passed all 2,842 tests (16 warnings, pytest 444.29 s, dashboard wall 445.427 s). The separate warm native float32 CPU comparison used 4 warmups and 15 alternating blocks of 16 synchronized JIT calls per arm, d=3. For one proper row, forward/backward/energy medians changed 48.1→51.1, 38.3→39.4, 35.3→39.6 µs. For 64 proper rows, medians changed 256.5→301.2, 211.6→228.0, 125.7→120.5 µs. Largest measured increase was 18.9% in partial forward at batch 64. The precision and vacuous-evidence checks pass the original thresholds. Full A/B in ~/agent-share/cff-d63w/cost.json and cost.log; gate receipt gate-5b6a669.log. This qualifies the retained and extended fixtures, with local kernel cost tradeoffs as measured. Follow-up end-to-end comparison belongs to cff-wt1c.
