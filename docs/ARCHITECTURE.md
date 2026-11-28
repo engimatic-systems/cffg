@@ -185,6 +185,18 @@ A pure-Python (dataclass) representation, independent of JAX:
   variable, boundary factorization, and optional episode-scale learnable.
   These names are model structure, round-trip through JSON/`.cffgz`, and
   participate in the structure hash; the compiled arena remains derived.
+- **Structure proposal replay.** `cffg.structure_proposals` verifies the
+  retained source and fragment models, applies ordered edit bundles and
+  typed-port compositions on host copies, and scopes the arrays with their
+  owning factors. Its versioned JSON record identifies the parent candidate,
+  proposal producer, model artifacts, input blobs and result. The candidate
+  ID hashes the whole recipe, including the order of operations. Each model
+  has a structure hash and a separate digest over its named blob shapes,
+  dtypes and exact C-order bytes. This permits relocating saved bundles.
+  Added and rebound blobs require explicit values, so replay never depends
+  on a file that happens to exist at execution time. Numerical admission
+  and scoring use the resulting Template and arrays through the usual
+  compiler and inference APIs.
 - **Serialization**: versioned JSON is the canonical structure and constraint
   schema. Array data (A matrices, Dirichlet counts, goal statistics) stays
   outside JSON and is referenced by relative `.npy` or `.safetensors` paths.

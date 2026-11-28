@@ -242,6 +242,31 @@ For reusable structure:
   compilation additionally checks executable factor/constraint ownership and
   numeric arrays.
 
+### Replay a proposed graph change
+
+Save the source and fragment models with their numeric arrays. Give each a
+stable artifact ID. An external proposer and a built-in operator can both
+emit the same JSON record. For example, given two loaded model bundles with
+compatible ports:
+
+```python
+from cffg.structure_proposals import compose_step, record_proposal, replay_proposal
+
+models = {"base": (base.template, base.arrays), "sensor": (sensor.template, sensor.arrays)}
+step = compose_step("sensor", {"attach": "state"}, name="with_sensor")
+record = record_proposal(source_id="base", parent_id=None, proposal_source="sensor-library",
+                         steps=[step], models=models)
+template, arrays = replay_proposal(record, models)
+```
+
+Keep the record as JSON and its `candidate_id` with the score. On reload, pass
+that ID as `expected_id` to verify the record and the retained inputs.
+`edit_step(actions, parameters={"A": "trained-A"})` refers to ordinary
+serialized edit actions and an externally stored replacement array. Pass
+`inputs={"trained-A": matrix}` when recording and replaying that step.
+Every declared blob needs an explicit value, including initializer-backed
+blobs. Replay returns independent arrays for fitting.
+
 ## Filter a slow regime and a fast state
 
 Use `cffg.hierarchy.Hierarchy` when a hidden regime selects the fast dynamics

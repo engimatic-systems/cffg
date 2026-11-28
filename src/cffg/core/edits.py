@@ -325,6 +325,8 @@ def _spec_to_dict(spec) -> dict:
     if isinstance(spec, VS):
         if spec.dim:
             return {"name": spec.name, "dim": spec.dim}
+        if spec.ef:
+            return {"name": spec.name, "ef": spec.ef}
         return {"name": spec.name, "cardinality": spec.cardinality}
     if isinstance(spec, FactorSpec):
         return {
@@ -377,7 +379,8 @@ def action_from_dict(d: dict) -> EditAction:
             return FanOut(d["target"], d["branch_count"])
         return ObserveInterior(d["target"])
     if cls is AddVariable:
-        return cls(VS(d["spec"]["name"], d["spec"].get("cardinality", 0), d["spec"].get("dim", 0)))
+        s = d["spec"]
+        return cls(VS(s["name"], s.get("cardinality", 0), s.get("dim", 0), s.get("ef", "")))
     if cls in (AddFactor, ReplaceFactor):
         from cffg.core.functions import FunctionSpec
 

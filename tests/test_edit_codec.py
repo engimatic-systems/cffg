@@ -51,6 +51,11 @@ def test_bundle_round_trips_through_json(hmm_slice):
     assert to_dict(direct) == to_dict(via_json)
 
 
+def test_exponential_family_variable_survives_edit_bundle():
+    actions = [AddVariable(VariableSpec("rate", ef="gamma"))]
+    assert bundle_from_json(bundle_to_json(actions)) == actions
+
+
 def test_check_edits_reports_without_raising(hmm_slice):
     before = to_dict(hmm_slice)
     problems = check_edits(hmm_slice, [AddVariable(VariableSpec("ghost", 3))])
