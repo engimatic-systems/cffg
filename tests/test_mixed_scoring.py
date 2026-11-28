@@ -56,7 +56,7 @@ def oracle(bank, batch, mixing):
     return absolute, softmax(logits, axis=-1)
 
 
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 def test_scores_match_absolute_oracle_and_masked_assignments(dtype):
     bank, batch = fixture(dtype)
     atol = 3e-6 if dtype == jnp.float32 else 2e-12

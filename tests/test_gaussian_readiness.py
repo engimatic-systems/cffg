@@ -49,7 +49,7 @@ def test_rotated_rank_one_information_survives_coordinate_units(dtype, units):
     assert input_readiness(incompatible, precision) == InputReadiness.INVALID
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_resolved_negative_curvature_and_mixed_unit_asymmetry_fail(dtype):
     matrix = jnp.array([[1., 1.1, 0.], [1.1, 1., 0.], [0., 0., 0.]], dtype=dtype)
     eta = jnp.zeros(3, dtype=dtype)
@@ -76,7 +76,7 @@ def test_subresolution_signed_perturbations_are_not_an_exact_psd_proof(dtype):
     assert input_readiness(clear_mismatch, base) == InputReadiness.INVALID
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_poorly_separated_noncoordinate_nullspace_is_refused(dtype):
     eps = np.finfo(dtype).eps
     # Rank two, but the weak positive direction is too close to the nullspace.
