@@ -1,6 +1,6 @@
 ---
 id: cff-6n9c
-status: open
+status: in_progress
 deps: [cff-ny7f]
 links: [cff-ny7f]
 created: 2026-09-10T02:07:07Z
@@ -67,3 +67,15 @@ feature and does not block the structural extraction in cff-ny7f.
 - NaN: A floating-point value meaning not a number.
 - Jitted batching: JAX compilation of the same numerical function over a batch.
 - Moment: A summary of a distribution, such as its mean.
+
+## Notes
+
+**2026-11-28T03:57:33Z**
+
+The numerical rule will validate each fixed table before masking zero support, using the particle dtype and the same unit-column allowance as Dirichlet preparation. One malformed sample fails its entire bank. Checkpoint restore will use the same particle-column bound while retaining its existing weight and moment tolerances. Direct and jitted lane tests will cover exact zeros, uniform incoming evidence, both dtypes, mixed good and bad banks, and tenfold sample count. Engine and checkpoint checks cover the public boundaries. The parent owns the final short-suite gate.
+
+**2026-11-28T04:04:33Z**
+
+Implementation handoff. The fixed-table check runs for each particle before support masking. One NaN, infinity, negative cell, or non-unit column makes its bank diverge. Preparation and checkpoint restore use the same 128-epsilon column allowance in the particle dtype. Exact zeros and independent valid batch lanes retain their weights. The importance calculation subtracts a common log score before normalizing and evaluating KL, preserving the self-normalized objective even when the common score dwarfs the relative evidence. If the two saved scores lose their KL difference to rounding, restore verifies the KL against the saved weights as well as the roundoff bound. Engine keeps its existing divergence and low-ESS policies. Colony mu3 is unsupported.
+
+Focused verification with PYTHONPATH=src and the shared uv environment: uv run --frozen --no-sync pytest -q tests/test_mu3.py tests/test_mu3_derivation.py tests/test_agent_mu3.py tests/test_lifecycle.py tests/test_execution_specialized.py -k 'particle or importance or mu3 or functional' --tb=short. All 39 selected tests passed in 37.71 s. Tests cover direct and jitted float32/float64, mixed score precision, 4 and 40 particles, sparse support, uniform evidence, the quadrature oracle, Engine divergence, atomic rejection of corrupted checkpoint samples, and the centered KL ledger. Dependency cycles and diff whitespace checks are clean. Remains in progress for the parent’s combined short-suite gate, PR and closure.
