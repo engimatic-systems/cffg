@@ -1,6 +1,6 @@
 ---
 id: ccpr-u190
-status: open
+status: in_progress
 deps: [ccpr-rl0k, cff-j7mm]
 links: []
 created: 2026-11-28T05:57:47Z
@@ -34,3 +34,9 @@ cff-6s31 owns the full cross-feature timing and parity report.
 ## Definitions
 
 Persistent storage is the byte count of arrays that survive compilation and belong to an inference state or its parameters. A leaf is one array in that inventory.
+
+## Notes
+
+**2026-11-28T07:24:08Z**
+
+Change path: resource estimate and persistent State layout. Count a compact source fragment once with PlateGrid multiplicities; debit one joined edge and two consumed ports per Chain bond, and add the balanced equality tree for Broadcast. Check the estimator against cff-j7mm state_storage (two dtypes, tied pixel grid and private mixture bank). Treat known native row layouts and arbitrary external pack callbacks separately; logical source owners and repeated packed rows have different byte totals. Never run a pack callback or open blob files to obtain an estimate. Malformed shape or overflowing intermediate counts must fail before allocation. Execution schedules, numerical rules, FE and serialization N/A. Nested parity awaits ccpr-m0bu.
