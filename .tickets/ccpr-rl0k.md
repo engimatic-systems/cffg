@@ -42,3 +42,7 @@ A copy number is its zero-based position in the ordered grid. A chain connects o
 **2026-11-28T05:58:13Z**
 
 Use the New IR field change-path index for structural validation and plate grounding; the serialized field set is unchanged. Check the materializing expansion path, parameter-only Colony binding, public observation fan-out, source validation, and compact edit replay. Grid addressing uses exact host integers; schedules, energy evaluation, JIT, message support and numerical dtype branches are unchanged. Keep the old one- and two-dimensional model admission boundary in this slice; the address calculations themselves handle additional axes for the later nesting ticket.
+
+**2026-11-28T06:02:57Z**
+
+The normal expansion and Colony per-copy parameter resolver now stream row-major coordinates. Direct lookups use one stride per axis. Independent small-grid enumeration and near-limit signed-64-bit lookups passed. Invalid grids and chain fields fail before a copied record is allocated; an invalid axis and offset are reported together. Across 64×64 and 256×256 grids, tracemalloc measured the coordinate iteration alone at 264,608 and 4,237,856 bytes for the previous list, versus 1,216 and 1,344 for the stream. These figures cover Python coordinate allocation, not total compiler memory or time. Final focused run of indexing, plate, composition, Colony spawn, edit, bundle and README tests: 99 passed, 4 opt-in deselected. The single complete short suite remains the review gate.

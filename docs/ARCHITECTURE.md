@@ -1886,6 +1886,13 @@ these defaults. An unknown identity is rejected on JSON loading, validation,
 or compilation; numeric prior, posterior, and point values remain outside
 the structure hash. Scoping transports the identity unchanged, and compiling
 reconstructs its resolved descriptor from the scoped declarations.
+Plate expansion uses row-major copy numbers, with the last coordinate varying
+fastest. `PlateGrid` computes a coordinate, copy number or chain neighbor
+from the dimensions and integer strides. Expansion and per-copy parameter
+binding stream coordinates in that same order. The compiler still creates the
+flat model before allocating inference arrays. The shape must fit a signed
+64-bit copy count before expansion begins.
+
 Scoping prefixes the plate key and records the enclosing `PlateSpec.shared_scope`.
 Fragment names, wiring rules, initializer specs, file paths and per-copy source
 restrictions stay local. Grounding puts tied blobs and their posterior owners
