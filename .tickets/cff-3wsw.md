@@ -1,6 +1,6 @@
 ---
 id: cff-3wsw
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-09-25T03:46:25Z
@@ -65,3 +65,7 @@ The full gate is queued on the shared physical-training and recipes review head.
 **2026-11-28T05:14:11Z**
 
 The first combined short suite exposed one omitted public-catalogue expectation in tests/test_public_api.py (2862 passing, one failing). Added the canonical MeanTrainer owner to the sorted facade assertion and ran that test plus all five README checks. All six passed. The next gate is on the corrected head.
+
+**2026-11-28T06:47:55Z**
+
+Combined final gate on b04186e: 2,863 passed in 440.55 s (441.357 s recorded wall time). Run via the exclusive CPU lock and uv run python tools/dashboard.py --run-suite. The passing review head includes both control recipes. Published for review over the parameter-inference branch; merge remains a reviewer decision.
