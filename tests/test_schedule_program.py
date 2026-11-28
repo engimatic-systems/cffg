@@ -69,7 +69,7 @@ def state_in_dtype(engine, dtype):
     )
 
 
-@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+@pytest.mark.parametrize("dtype", (np.float32, pytest.param(np.float64, marks=pytest.mark.slow)))
 @pytest.mark.parametrize("kind", ("flood", "two_pass", "colored", "mixed"))
 def test_program_composes_only_required_stages_and_preserves_facade(kind, dtype):
     arena = program_arena(kind)
@@ -116,7 +116,7 @@ def test_program_composes_only_required_stages_and_preserves_facade(kind, dtype)
         np.testing.assert_array_equal(left, right)
 
 
-@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+@pytest.mark.parametrize("dtype", (np.float32, pytest.param(np.float64, marks=pytest.mark.slow)))
 @pytest.mark.parametrize("semiring", ("sum", "max"))
 def test_exact_unit_uses_injected_ledger_only_when_defined(dtype, semiring):
     arena = program_arena("two_pass", semiring)
@@ -145,7 +145,7 @@ def test_exact_unit_uses_injected_ledger_only_when_defined(dtype, semiring):
         assert not calls and np.isnan(result[6])
 
 
-@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+@pytest.mark.parametrize("dtype", (np.float32, pytest.param(np.float64, marks=pytest.mark.slow)))
 def test_mixed_schedule_transports_inner_failure_facts_without_classifying(dtype):
     arena = program_arena("mixed")
     engine = Engine(arena)
