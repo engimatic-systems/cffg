@@ -1,6 +1,6 @@
 ---
 id: cff-rqqc
-status: open
+status: closed
 deps: [cff-iwgl]
 links: [cff-wbhu, cff-iwgl, cff-sj1w]
 created: 2026-07-28T18:06:35Z
@@ -428,3 +428,19 @@ found no unclear claim. The complete retained candidate-to-meaning map follows:
 - `read`: `Colony.marginals` retrieves marginal data from runtime state.
 
 Intelligible-ticket review: complete.
+
+**2026-11-28T05:20:28Z**
+
+Implementation on #217 cached spawn, with #210's cff-6n9c fixed-particle validator as a prerequisite. Architecture row Runtime numerical or status invariant. Engine.prepare_mu3 and Engine.run own all proposal and likelihood mathematics, Bethe objectives and RunResult diagnostics. Colony carries a typed or legacy JAX key per stochastic instance, initializes the incoming member's own parameters, explicitly refreshes that instance, and calls the same host controller per member. Compiled stochastic trust execution is unsupported and fails before updating any member. Deterministic batching/compilation unchanged; no new IR, sampler, checkpoint, estimator quantity or dashboard rendering status. Source dtype comparison tolerance 64 machine eps times max(1, magnitude); exact integer, key and sampled-bit assertions for replay. Invalid proposals, exact zeros, low ESS, all-nonfinite weights, float32 20x40x256 and 32/128 live members will receive focused or opt-in qualification.
+
+**2026-11-28T05:39:27Z**
+
+Change-path review. StateLifecycle builds each State from the incoming numeric parameters; Engine shares its existing Mu3Lifecycle initializer with Colony. Colony owns the host member/cursor/result association. Engine.prepare_mu3, Engine.run, Engine.mu3_diagnostics and RunResult remain the numerical and stopping references. Compiled iteration, synchronous and scheduled sweeps, exact propagation, inner and outer solvers, support checks, readouts and FE ledgers need no changes because the per-member operation calls the same Engine. Deterministic members retain their existing controller and return contract. RollingAgent, estimators, current/legacy checkpoint decoders and template serialization need no changes because this adds live Colony ownership only. Dashboard maps the new tests into the existing suite. The internal deterministic _Instance(key, state) construction used by the Broadcast benchmark keeps its default empty cursor.
+
+**2026-11-28T06:47:00Z**
+
+Focused numerical qualification passed: 87 tests, 46 unrelated opt-in tests deselected, 115.98 seconds. The selection included the complete test_colony_mu3 file and default cases in test_mu3, test_colony, test_colony_failures, test_colony_spawn, test_runtime_status and test_lifecycle. One homogeneous structure returned converged, low-ESS budget exhaustion and impossible-support divergence, each matching independent Engine states/diagnostics. True float32 20×40 with 256 particles and 32/128 live members passed. Equal typed and legacy key bits, scoped multi-group cursor advancement, atomic refresh and mixed deterministic/stochastic execution were checked. The integration ticket for cff-6n9c carries its original #210 qualification.
+
+**2026-11-28T13:49:10Z**
+
+Final canonical dashboard gate on d3cb51521602fed82be7f370e4709127f453c962 passed all 2,874 default cases with 16 warnings in 433.99 seconds pytest time (435.117 seconds for the full dashboard command). Raw receipt: ~/agent-share/cffg-backlog-gates/rqqc-YlnMiF/dashboard.log. No stochastic throughput measurement or Colony checkpoint was introduced.

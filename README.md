@@ -97,7 +97,7 @@ example.
 | [Use neural means and fixed-point gradients](#nonlinear-and-neural-gaussian-models) | `neural_mean`; `initialize_neural_parameters`; `FixedPointDifferentiator`; `fixed_point_gradient` | Dense MLP mean inside a positive-noise nonlinear Gaussian factor | Gradient status, adjoint/root residuals, parameter gradient | Local derivative of the certified adaptive root and surrogate ledger | [API pattern](#nonlinear-and-neural-gaussian-models) | **Bounded:** local isolated-root assumption; no weight uncertainty or stochastic mu3 |
 | [Train or amortize neural inference](#nonlinear-and-neural-gaussian-models) | `NeuralTrainer`; `TrainingConfig`; `GaussianAmortizer`; `PolynomialFeatures` | Deterministic full-batch Adam and Gaussian recognition initialization | Training/continuation state and proposed Gaussian messages | Optimizes the same approximate adaptive objective | [API pattern](#nonlinear-and-neural-gaussian-models) | **Bounded:** no minibatching, discrete point decisions, or universal speedup claim |
 | [Use hard constraints or MAP](#hard-constraints-and-map) | Constraint factors; `compile_template(..., semiring="max")`; `cffg.csp` | Sum-product CSP marginals or discrete max-product | Marginals/BFE, or `decode` and `objective` | Exact tree partition/MAP identities; loopy max-product is bounded | [hard_constraint.py](examples/hard_constraint.py) | **Ready:** max mode is discrete-only; `alldifferent` is capped at `n, K <= 10` |
-| [Batch matching structures](#batch-extend-render-and-estimate) | `cffg.colony.Colony` | Vmapped iterative states; per-instance exact schedules | One `RunResult` per instance | Each instance keeps its normal engine objective/status | [API pattern](#batch-extend-render-and-estimate) | **Ready/partial:** functional mu3 rejected; exact schedules are per-instance; deterministic mixed GFE offers compiled batching |
+| [Batch matching structures](#batch-extend-render-and-estimate) | `cffg.colony.Colony` | Vmapped iterative states; per-instance exact schedules | One `RunResult` per instance | Each instance keeps its normal engine objective/status | [API pattern](#batch-extend-render-and-estimate) | **Ready/partial:** explicit-key functional mu3 and exact schedules run per member; deterministic mixed GFE offers compiled batching |
 | [Register an ordinary custom factor](#batch-extend-render-and-estimate) | `FactorKernel`; binding classes; `register_kernel` | Single-arena discrete BP/VMP, Gaussian, or scalar EF | Generic marginals, energy, optional `kernel_readouts` | Extension author supplies mathematically valid messages and ledger | [API pattern](#batch-extend-render-and-estimate) | **Pre-1.0 unstable:** specialized/multi-arena variational objects need dedicated engine paths |
 | [Render a model](#batch-extend-render-and-estimate) | `cffg.viz` | Deterministic scene, SVG, or PNG from a template | `Scene`, SVG text, image file | Visualization only; no compile or inference certificate | [API pattern](#batch-extend-render-and-estimate) | **Ready:** PNG needs the `viz` extra; legacy moment syntax is rejected |
 | [Estimate resources](#batch-extend-render-and-estimate) | `cffg.estimate.estimate` | Static state bytes, optional cost analysis and calibration | `Estimate`, summary, predicted seconds | Measurement/planning aid, not a probabilistic objective | [API pattern](#batch-extend-render-and-estimate) | **Partial:** persistent arena bytes are useful; current XLA FLOP/traffic analysis is defective |
@@ -421,11 +421,11 @@ epistemics price latent next-state information optimistically; consult
 [Known Limitations](docs/LIMITATIONS.md#soft-limitations) before interpreting
 it as realizable information gain.
 
-Two current input hazards need caller-side checks: fixed GFE likelihoods and
-goals must be finite, nonnegative, and normalized along their documented
-probability axes; caller-supplied fixed mu3 particles must be finite,
-nonnegative probability tables. Some low-level paths do not yet reject every
-violation before it can corrupt the reported objective or moment.
+The compiler checks that fixed GFE likelihoods and goals are finite,
+nonnegative, and normalized along their documented probability axes.
+For fixed mu3 particles, the importance rule checks each probability table.
+One nonfinite entry, negative entry, or column sum outside the dtype tolerance
+makes that update diverge. Exact zero probabilities are supported.
 
 `cffg.experiments.behavioral_epistemics.run_benchmark` is the bounded costly-cue
 scientific oracle used to compare epistemic planning with a BFE ablation. It is
@@ -829,8 +829,26 @@ inside a compiled sweep loop and returns its own state, status and traces in a
 `RunResult`. A member that stops early keeps its final state while peers continue.
 Exact schedules use the same per-instance propagation and certification as
 `Engine.run`; they do not fall back to flooding just because they are in a colony.
-Different parameters do not create different structures. Functional mu3 is
-rejected because Colony does not yet own per-instance PRNG streams.
+For a template with a functional `mu3` evaluator, supply a JAX key at spawn.
+The member keeps one fixed set of particles across runs until you refresh it:
+
+```python
+import jax
+from cffg.engine import RunStatus
+
+iid = colony.spawn(template, arrays, mu3_key=jax.random.key(13))
+result = colony.run(80, tol=1e-7)[iid]
+diagnostics = colony.mu3_diagnostics(iid)  # ESS, weighted moments and status per group
+if result.status is RunStatus.CONVERGED:
+    marginals = colony.marginals(iid)
+next_key = colony.refresh_mu3(iid)  # begin a new particle epoch for this member
+```
+
+`mu3_key_cursor(iid)` returns the key available for the next refresh. Equal
+inputs and keys reproduce the draws. Give independent members distinct keys.
+The host runs each stochastic member through its own `Engine.run`. Inspect its
+status before using the result, since poor effective sample size (ESS) can
+exhaust the sampling budget and incompatible support can cause divergence.
 
 Mixed GFE uses the host trust controller by default. For repeated solves or a
 batch of deterministic GFE members, select the compiled controller explicitly:
