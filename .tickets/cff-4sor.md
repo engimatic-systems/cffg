@@ -1,6 +1,6 @@
 ---
 id: cff-4sor
-status: in_progress
+status: closed
 deps: [cff-k9ws]
 links: []
 created: 2026-08-10T02:58:17Z
@@ -128,3 +128,7 @@ Architecture handoff: New factor or rule family. D8 independent marginals and D9
 **2026-11-28T04:24:48Z**
 
 Frozen for the coordinated gate. D8.6 defines preorder accept/reject paths, conditional/PG identities, D8 product and D9 pair messages, Gaussian and tied-owner increments, literal support and node/edge entropy. Pure NumPy oracle tested on all 134 labeled ordered full binary trees for K=2,3,4 in each dtype, exact three-state chain entropy, uncertain-drive quadrature, shared-owner curvature, singular/improper inputs, and K=32 with d=16 without a cubic categorical tensor. Only the explicit cross-check imports the shipped D9 rule; runtime and model format have no changes. Focused command: uv run --frozen --no-sync pytest -q tests/test_tree_recurrence.py tests/test_recurrence_link.py::test_rule_matches_independent_numpy_coordinates tests/test_structured_recurrence_rule.py::test_pair_masses_and_gaussian_message_use_joint_responsibility. All 9 passed in 4.74 seconds. Ruff, staged diff and dependency-cycle checks pass. Await the coordinated full gate before closing.
+
+**2026-11-28T05:02:38Z**
+
+Combined reviewed source 9f3bc99 based on #208. Canonical uv run python tools/dashboard.py --run-suite passed 2,860 selected tests on four workers, 431.726 seconds elapsed (431.561 seconds in the dashboard runtime history). Final focused cross-ticket checks passed 22 tests in 8.33 seconds. Log and history: ~/agent-share/cffg-hybrid-math-9f3bc99/. The stacked PR contains the tree derivation and oracle, sparse entropy diagnostic fix, and destination-softmax derivation. Production softmax remains deferred in cds-1t47.

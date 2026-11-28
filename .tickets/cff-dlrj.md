@@ -1,6 +1,6 @@
 ---
 id: cff-dlrj
-status: in_progress
+status: closed
 deps: []
 links: [cff-0f3g, cff-nkbj]
 created: 2026-08-10T02:58:08Z
@@ -139,3 +139,7 @@ D18 derives a valid quadratic bound and all coordinate scores. Its K=32 duplicat
 Legend: prerequisite --> dependent
 [in progress] cff-dlrj --> [blocked] cds-1t47 (Gaussian softmax bound research under cff-ahps)
 [parallel] cff-4sor (binary-tree derivation under cff-0f3g)
+
+**2026-11-28T05:02:38Z**
+
+Combined reviewed source 9f3bc99 based on #208. Canonical uv run python tools/dashboard.py --run-suite passed 2,860 selected tests on four workers, 431.726 seconds elapsed (431.561 seconds in the dashboard runtime history). Final focused cross-ticket checks passed 22 tests in 8.33 seconds. Log and history: ~/agent-share/cffg-hybrid-math-9f3bc99/. The stacked PR contains the tree derivation and oracle, sparse entropy diagnostic fix, and destination-softmax derivation. Production softmax remains deferred in cds-1t47.
