@@ -1,5 +1,6 @@
 """Ordered compilation checkpoints over declared plans and array requirements."""
 
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -45,6 +46,8 @@ def resolve_compile_data(
     topology: TopologyLayout,
     registered: RegisteredPlanDrafts,
     specialized: SpecializedPlanDrafts,
+    *,
+    reuse: ResolvedCompileData | None = None,
 ) -> ResolvedCompileData:
     """Resolve once; publish no numeric output before the last validation gate."""
     resolved = sources.resolve_arrays(
@@ -54,8 +57,14 @@ def resolve_compile_data(
         sources=registered.sources,
         fallbacks=specialized.initializer_fallbacks,
     )
-    addresses = AddressBuilder()
-    observations = ObservationBuilder()
+    addresses = AddressBuilder() if reuse is None or template.learnables else None
+    observations = ObservationBuilder() if reuse is None else None
+    layout = {"validated": reuse.log_params} if reuse is not None else {}
+
+    def add(requirement):
+        if addresses is not None:
+            addresses.add(template, requirement)
+
     parameters = {}
     concentrations, goal_priors, problems = parameter_priors(
         template, specialized, resolved
@@ -77,10 +86,10 @@ def resolve_compile_data(
                 resolved,
             )
         )
-        addresses.add(template, draft.arrays)
+        add(draft.arrays)
     for draft in specialized.transition_gfe:
         parameters.update(pack_transition_gfe(draft, resolved))
-        addresses.add(template, draft.arrays)
+        add(draft.arrays)
     for draft in specialized.hybrid_gfe:
         parameters.update(pack_hybrid_gfe(template, draft, resolved))
 
@@ -92,7 +101,7 @@ def resolve_compile_data(
         for member in plan.members
     }
     gauss_groups, group_names = [], set()
-    for draft in registered.gaussian:
+    for index, draft in enumerate(registered.gaussian):
         equality = isinstance(draft, EqualityReference)
         name = equality_of[draft.members[0]].name if equality else draft.name
         if name in group_names:
@@ -101,28 +110,31 @@ def resolve_compile_data(
         if equality:
             gauss_groups.append(equality_of[draft.members[0]])
             continue
-        plan = observations.gaussian_plan(draft)
+        plan = observations.gaussian_plan(draft) if reuse is None else reuse.gauss_groups[index]
         gauss_groups.append(plan)
-        parameters.update(pack_gaussian(template, draft, plan, resolved))
-        addresses.add(template, draft.arrays)
+        parameters.update(pack_gaussian(template, draft, plan, resolved, **layout))
+        add(draft.arrays)
 
     for draft in specialized.mixtures:
         parameters.update(pack_mixture(template, draft, resolved))
-        addresses.add(template, draft.arrays)
+        add(draft.arrays)
     for draft in specialized.recurrence:
         parameters.update(pack_recurrence(template, draft, resolved))
-        addresses.add(template, draft.arrays)
+        add(draft.arrays)
     for draft in specialized.precision:
         parameters.update(pack_precision(template, draft, resolved))
-        addresses.add(template, draft.arrays)
+        add(draft.arrays)
 
     ef_groups = []
-    for draft in registered.ef:
+    for index, draft in enumerate(registered.ef):
         if isinstance(draft, EqualityReference):
             ef_groups.append(equality_of[draft.members[0]])
             continue
-        rows = observations.ef_rows(draft)
+        rows = observations.ef_rows(draft) if reuse is None else None
         parameters.update(pack_ef(template, draft, resolved))
+        if reuse is not None:
+            ef_groups.append(reuse.ef_groups[index])
+            continue
         ef_groups.append(
             EfGroupPlan(
                 draft.name,
@@ -142,10 +154,10 @@ def resolve_compile_data(
             groups.append(equality_of[draft.members[0]])
             continue
         parameters.update(
-            pack_discrete(template, draft, resolved, specialized.semiring)
+            pack_discrete(template, draft, resolved, specialized.semiring, **layout)
         )
         groups.append(draft.plan)
-        addresses.add(template, draft.arrays)
+        add(draft.arrays)
 
     constraint_groups = []
     for draft in specialized.constraints:
@@ -173,6 +185,12 @@ def resolve_compile_data(
         )
     if specialized.delta_problem:
         raise CompileError(specialized.delta_problem)
+    if reuse is not None:
+        # All earlier family checks still ran on live numeric sources. The prior
+        # assembly certified the shared structural ownership and addresses.
+        learn_plans = resolve_learnables(template, resolved, addresses) if addresses is not None else ()
+        return replace(reuse, log_params=parameters, learn_plans=learn_plans)
+
     gauss_groups, tap_edges = resolve_taps(topology, gauss_groups, observations)
     obs_lengths = observations.gaussian_lengths()
     if specialized.goal_parameter_problem:

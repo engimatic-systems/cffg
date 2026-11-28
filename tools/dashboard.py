@@ -123,7 +123,7 @@ EPIC_FILES = {
         "test_agent_spec.py",
         "test_gaussian_agent.py",
         "test_constraint_flip.py",
-        "test_colony.py",
+        "test_colony.py", "test_colony_spawn.py",
         "test_public_api.py",
         "test_runtime_status.py",
     ],

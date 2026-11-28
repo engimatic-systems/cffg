@@ -498,6 +498,16 @@ class PlateSpec:
     dims: tuple[int, ...]
     bonds: tuple[WiringRule, ...] = ()
     per_copy_blobs: tuple[str, ...] = ()
+    shared_scope: str = ""  # enclosing scope of tied blobs and learnables
+
+    def __post_init__(self):
+        if self.shared_scope != "":
+            from cffg.core.learning_identity import check_scoped_name
+
+            check_scoped_name(self.shared_scope)
+
+    def shared_name(self, name: str) -> str:
+        return f"{self.shared_scope}/{name}" if self.shared_scope else name
 
 
 @dataclass

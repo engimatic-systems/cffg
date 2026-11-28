@@ -15,8 +15,9 @@ from cffg import LoadedBundle, conj
 from cffg.bundle import BUNDLE_SCHEMA_VERSION, BundleError, load_bundle, save_bundle
 from cffg.compiler import compile_template
 from cffg.core import PlateSpec, Template
-from cffg.core.compose import scoped
+from cffg.core.compose import merge, scoped
 from cffg.core.plates import expand_plates
+from cffg.core.serialize import structure_hash
 from cffg.engine import Engine
 from cffg.learn import FAMILIES, Learnables
 
@@ -49,6 +50,42 @@ def _assert_state(actual, expected):
             assert value.dtype == other.dtype
             assert value.shape == other.shape
             assert value.tobytes() == other.tobytes()
+
+
+def test_composed_compact_archive_preserves_shared_and_private_learning(tmp_path):
+    shared, _ = _categorical()
+    private = scoped(shared, "side")
+    shared.learnables["q"] = replace(shared.learnables["q"], sources=None)
+    fragment = merge(shared, private, "cell")
+    host = Template("group", plates={"cells": PlateSpec(fragment, (2,), per_copy_blobs=("side/p",))})
+    # At scope "side", the shared concrete name matches the *local* private
+    # name. The private concrete owner still includes plate and copy index.
+    compact = merge(scoped(host, "side"), scoped(host, "other/side"), "combined")
+    flat = expand_plates(host)
+    reference = merge(scoped(flat, "side"), scoped(flat, "other/side"), "combined")
+    assert expand_plates(compact) == reference
+    arrays = {name: np.array([0.25 + i / 100, 0.75 - i / 100], dtype=np.float32)
+              for i, name in enumerate(sorted(reference.blobs))}
+    priors = {name: np.array([2., 3.]) for name in reference.learnables}
+    flat_engine = Engine(compile_template(reference, arrays=arrays))
+    initial = Learnables(flat_engine, priors=priors).initial_params
+    updated = {name: {"alpha": values["alpha"] + i}
+               for i, (name, values) in enumerate(sorted(initial.items()), 1)}
+    expected = Learnables.from_persistent_state(flat_engine, initial, updated)
+    compact_engine = Engine(compile_template(compact, arrays=arrays))
+    learning = Learnables.from_persistent_state(compact_engine, initial, updated)
+    assert learning.persistent_descriptors() == expected.persistent_descriptors()
+    path = tmp_path / "composed.cffgz"
+    save_bundle(path, compact, arrays, learnables=learning)
+    loaded = load_bundle(path)
+    assert set(loaded.template.plates) == set(compact.plates)
+    assert structure_hash(loaded.template) == structure_hash(compact)
+    assert loaded.learnables.persistent_descriptors() == expected.persistent_descriptors()
+    _assert_state(loaded.learnables.initial_params, learning.initial_params)
+    _assert_state(loaded.learnables.params, learning.params)
+    for name, blob in expand_plates(loaded.template).blobs.items():
+        assert blob.path == loaded.manifest["blob_paths"][name]
+        np.testing.assert_array_equal(loaded.arrays[name], arrays[name], strict=True)
 
 
 @pytest.mark.parametrize("dtype", (np.float32, np.float64))

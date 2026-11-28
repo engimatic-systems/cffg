@@ -238,12 +238,9 @@ def test_nested_scopes_plates_copy_edits_and_64_learnables():
     parent = Template(name="population", plates={
         "agents": PlateSpec(fragment, dims=(64,), per_copy_blobs=("inner/outer/p",)),
     })
-    for operation in (
-        lambda: scoped(parent, "scope"),
-        lambda: merge(parent, Template(name="empty"), "population"),
-    ):
-        with pytest.raises(ValueError, match="learnables.*inner/outer/q"):
-            operation()
+    flat = scoped(expand_plates(parent), "scope")
+    parent = merge(scoped(parent, "scope"), Template(name="empty"), flat.name)
+    assert expand_plates(parent) == flat
     parent = apply_edits(copy.deepcopy(from_json(to_json(parent))), [])
     expanded = merge(expand_plates(parent), Template(name="empty"), "population")
     arrays = {name: np.asarray([0.4, 0.6]) for name in expanded.blobs}

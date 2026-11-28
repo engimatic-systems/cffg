@@ -1,6 +1,6 @@
 ---
 id: cff-qtub
-status: open
+status: closed
 deps: [cff-v6th]
 links: []
 created: 2026-09-25T03:46:25Z
@@ -47,3 +47,25 @@ These are suggestions; another method is acceptable if it satisfies the outcomes
 Structure hash: identity derived from model declarations rather than parameter values. Parameter-only variant: identical executable graph with different allowed numeric arrays. Cache: reuse of a previously constructed artifact.
 
 Shared terms: CFFG means constrained Forney-style factor graph; JAX is the numerical array/compiler library; dtype is a numeric storage type; free energy is the model's inference objective; host/JIT compares Python-side and compiled execution; single/vmap compares one instance with vectorized instances; N/A means not applicable.
+
+## Notes
+
+**2026-11-28T04:25:12Z**
+
+Revalidated on published main a774a54. Colony still compiles topology, validates bindings and assembles an Arena for each same-structure spawn. Worktree perf/colony-parameter-spawn. Change paths are Runtime numerical or status invariant and New factor or rule family (resolution and assembly adapters only). Checked pairs: host numeric resolution and JAX kernel shape admission, flooding and scheduled, singleton and grouped variance, and exact Gaussian. Engine sweeps and ledger terms are reused. Serialized IR, checkpoints and bundle formats are N/A. Cached plans must preserve fresh source loading, covariance and family validation, owner isolation, kernel and nonlinear declaration identity, dynamic constraint table layouts, and exact zeros.
+
+**2026-11-28T04:33:30Z**
+
+Implemented the cached prepare/resolve split on the published main base. A successful first spawn publishes the validated compiler plan and Engine. Later spawns consume current source declarations and run existing numeric packers and validation. Topology, observation rows, address ownership and arena assembly are reused. Registry replacement or a different JAX precision context receives its own executable; dynamic parameter shapes continue to partition run batches. If a new abstract pack layout appears, the same registered shape validators run. Changed plate initializer specs and sparse overrides are resolved live. Failed validation leaves the cache and instance IDs unchanged. Focused regression selections: 169 passed in compiler/assembly/resolution/Colony/constraint/plate files and 16 passed in final test_colony_spawn.py. Timing and combined final gate follow.
+
+**2026-11-28T04:34:33Z**
+
+Combined with cff-b2fz on the #208 integration branch. Cached binding uses the same shared-ownership check and copy-specific BlobRef construction as fresh grounding. An integration regression restores a scoped compact template from JSON, changes its tied initializer, overrides one copy with sparse support and binds one sensor. It compares all packed parameters, observation messages and learning plans to fresh flat compilation, checks the original member remains independent and rejects inconsistent shared source paths on a cache hit.
+
+**2026-11-28T05:19:01Z**
+
+Combined gate on #208 code revision 34374ae passed. The canonical dashboard recorded 2,866 passing cases, zero failures, four workers, 451.364 s wall. Isolated follow-up 1908dd3 fixes a missing import in the standalone benchmark argument parser; its --help check passes. It changes no library code, pytest configuration or outcome interpretation. The source owner is running the comparative timings separately.
+
+**2026-11-28T06:03:19Z**
+
+The standalone comparison at a774a54 and 8cd52df ran three synchronized CPU x64 repetitions per size on the retained CSTR P4/H15 geometry with synthetic affine transitions. Topology and Arena assembly counts for 1, 40 and 400 members fell from 1, 40 and 400 to one each. All state, trace and residual digests matched. Median total spawn was 89.6 to 93.4 ms for one, 3.482 to 0.1457 s for 40 and 35.253 to 0.6681 s for 400. The latter two improvements were 23.9× and 52.8×. At 400, binding was 33.4 to 33.9 ms, first inference 4.482 to 4.666 s, and warmed exact inference 1.020 to 1.081 s. This comparison measures setup on the synthetic fixture. The complete samples and provenance are in ~/agent-share/cffg-backlog-gates/colony-spawn-8cd52df.json. The integrated #217 runtime at 34374ae passed the canonical dashboard gate with 2,866 passing cases and zero failures. The isolated parser correction changed only the benchmark tool.

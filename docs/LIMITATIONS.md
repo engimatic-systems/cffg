@@ -632,9 +632,9 @@ and any pending child goal counts. Load it with `Hierarchy.load_bundle`.
 The four unchanged nonrecurrence families
 have deterministic legacy posterior migration; unidentified recurrence
 posteriors have none.
-Scoping or merging a template with compact plates requires `expand_plates`
-first; direct compact composition is rejected to prevent declaration loss
-(`cff-b2fz`).
+Compact plate composition supports bonds between declared host ports.
+Bonding a generated copy port or Broadcast hub requires `expand_plates` on
+that operand first.
 
 The recurrence learning readout carries the Gaussian covariance computed
 directly from precision; it does not reconstruct covariance as
@@ -859,8 +859,9 @@ GPU-resident arenas, incremental recompilation, smarter (residual) schedules —
 ordinary optimization work, unbounded appetite.
 Plate fragments may not themselves declare plates in phase 1; validation rejects
 that unsupported grounding shape until recursive/index-table expansion in cff-6s31.
-Scoping or merging a compact plate is also rejected; call `expand_plates` before
-composition until cff-b2fz lands.
+Scoping and disjoint merging preserve compact storage. When declared names
+overlap another operand's plate prefix, collision checking can temporarily
+materialize the copies. Distinct top-level scopes avoid that cost.
 
 `cffg.estimate.estimate` is only a partial planning aid. Its named persistent
 arena byte counts come from the initialized JAX state, and calibration is an

@@ -1886,9 +1886,19 @@ these defaults. An unknown identity is rejected on JSON loading, validation,
 or compilation; numeric prior, posterior, and point values remain outside
 the structure hash. Scoping transports the identity unchanged, and compiling
 reconstructs its resolved descriptor from the scoped declarations.
-Composition currently requires flat operands: call `expand_plates` before
-`scoped` or `merge`. Compact operands are rejected with affected learnable
-names; `cff-b2fz` owns preserving compact plates through composition.
+Scoping prefixes the plate key and records the enclosing `PlateSpec.shared_scope`.
+Fragment names, wiring rules, initializer specs, file paths and per-copy source
+restrictions stay local. Grounding puts tied blobs and their posterior owners
+under the shared scope, private owners under the plate key and copy index, and
+Broadcast hubs under the plate key. A disjoint merge preserves each declaration.
+When another operand declares names under a plate prefix, merge checks generated
+names by grounding the union before returning the compact result.
+
+Template JSON uses version `1.1` when a plate carries a nonempty shared scope.
+Schema-1 readers reject that version before loading it. Unscoped declarations
+retain their schema-1 bytes and hashes. Serialize `expand_plates(model)` to
+give an older reader the equivalent flat model. Bundle schema 2 includes the
+compact template and encodes each expanded owner in its own archive path.
 
 `cffg.learning_schema.PersistentStateDescriptor`, returned by
 `Learnables.persistent_descriptors()`, binds each learnable's name, family,
@@ -2339,16 +2349,20 @@ the region entropy correction and its path-enumeration oracle.
 
 ### 5b. Colony execution (many small graphs, one machine)
 
-`Colony` owns an instance table of `(structure_hash, State)` pairs and caches one
-`Engine` per structure hash. Each `State` is an Equinox pytree containing
-messages, parameters, and conditioned observations; structure remains in the
-cached engine. Ordinary iterative instances are grouped by structure plus State
-pytree layout, array shapes and dtypes before stacking. Each compatible batch
-vectorizes the compiled controller with `jax.vmap`. Distinct structures or
-numeric layouts run as separate groups. Different allowed-tuple table lengths
-therefore cannot enter one stack, while same-shaped tables with different
-contents retain vectorized execution. One cached Engine can have several JAX
-shape/dtype specializations; numeric contents do not define its identity.
+`Colony` keeps each member's `State` separate and caches the Engine and
+lowered compiler plan for compatible declarations, executable registry
+bindings and the active JAX precision setting. Each spawn resolves the
+incoming template's current blob sources, validates and packs the arrays,
+and binds that member's observations. The cached plan supplies wiring,
+parameter addresses and observation rows. The compile-time abstract kernel
+checks run again when a packed parameter layout changes. A new learning
+schema uses its own Engine.
+
+Ordinary iterative instances are grouped by executable plan, State pytree
+layout, array shapes and dtypes before stacking. Each compatible batch
+vectorizes the compiled controller with `jax.vmap`. Different allowed-tuple
+table lengths therefore use separate batches. Same-shaped tables with
+different contents retain vectorized execution.
 Exact-eligible instances reuse `Engine.run` propagation and certification
 individually, including initial failure checks. Engine and Colony share the
 exact-dispatch predicate. A valid hardening request has no effect when there

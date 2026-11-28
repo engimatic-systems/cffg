@@ -79,7 +79,7 @@ example.
 
 | Task | Import or entry point | Model and mode | Primary result | Objective or approximation | Runnable example | Main limit |
 |---|---|---|---|---|---|---|
-| [Build the graph IR, compose, plate, and edit](#build-and-compose-models) | `cffg.core`; `cffg.core.compose`; `cffg.core.edits` | Typed variables, factors, ports, constraints, compact plates, transactions | Validated `Template` plus external arrays | Declaration only; compilation selects executable rules | [discrete_agent.py](examples/discrete_agent.py) | **Ready:** only registered factor/constraint combinations execute; expand compact plates before composition |
+| [Build the graph IR, compose, plate, and edit](#build-and-compose-models) | `cffg.core`; `cffg.core.compose`; `cffg.core.edits` | Typed variables, factors, ports, constraints, compact plates, transactions | Validated `Template` plus external arrays | Declaration only; compilation selects executable rules | [discrete_agent.py](examples/discrete_agent.py) | **Ready:** compact plates support scoping and merging. Expand to bond a generated copy or hub port. |
 | [Build a corridor agent](#discrete-planning-and-rolling-agents) | `cffg.build_gridworld`; `CorridorEnv` | Tabular discrete BP/GFE | State/action marginals, BFE/GFE, actions | Exact on eligible ordinary trees; declared GFE for P-substituted planning | [discrete_agent.py](examples/discrete_agent.py) | **Ready:** finite horizon, designed state space, fixed factorization |
 | [Build a general discrete rollout](#discrete-planning-and-rolling-agents) | `cffg.models.build_rollout`; `build_tmaze` | Finite-horizon POMDP/LAIF, fixed or learned A/C/B | `marginals`, `node_beliefs`, goal/parameter readouts | Bethe or declared GFE by construction | [discrete_rollout.py](examples/discrete_rollout.py) | **Ready/bounded:** functional mu3 and transition novelty require their diagnostics |
 | [Build a factored rollout](#discrete-planning-and-rolling-agents) | `build_factored_rollout`; `StateBlockSpec`; `CouplingSpec` | Mean-field state blocks with declared couplings | Per-block and joint-boundary marginals | Same BP/GFE contracts as the selected rollout | [discrete_rollout.py](examples/discrete_rollout.py) | **Ready:** couplings and joint sensors can still scale as Cartesian products |
@@ -219,8 +219,13 @@ For reusable structure:
 
 - `cffg.core.compose` scopes, merges, and chains templates.
 - `PlateSpec`, `expand_plates`, and `plate_observations` declare repeated
-  fragments. Plate fragments cannot nest, and compact plates must be expanded
-  before scoping or merging. For a hub shared by 49 copies, the outer
+  fragments. Scoping and merging retain the compact declaration. For example,
+  scoping plate `cell` under `left` gives its tied blob `A` the name `left/A`
+  and its private blob `B` in copy zero the name `left/cell/0/B`.
+  Compose through declared host ports directly. Call `expand_plates` on the
+  relevant operand first to bond a generated port such as `cell/0/head`
+  or a Broadcast hub. Phase 1 accepts one level of plates.
+  For a hub shared by 49 copies, the outer
   `Broadcast` has at most six equality factors from hub to copy and at most
   twelve between copies. Factors inside each copy add to the distance that
   evidence must travel under synchronous flooding. On an Apple M2 Max CPU,

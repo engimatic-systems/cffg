@@ -1,5 +1,7 @@
 """Registered packing adapters; numerical definitions stay in kernel owners."""
 
+from dataclasses import replace
+
 import numpy as np
 
 from cffg import kernels
@@ -7,37 +9,48 @@ from cffg.compiler_errors import CompileError
 from cffg.core.ir import Template
 
 
-def pack_discrete(template, draft, resolved, semiring):
+def _layout_matches(packed, paths, validated):
+    return validated is not None and all(
+        (previous := validated.get(paths[key])) is not None
+        and previous.shape == value.shape and previous.dtype == value.dtype
+        for key, value in packed.items()
+    )
+
+
+def pack_discrete(template, draft, resolved, semiring, *, validated=None):
     if draft.problem:
         raise CompileError(draft.problem)
     if draft.path_problem:
         raise ValueError(draft.path_problem)
     plan, kernel = draft.plan, draft.plan.kernel
+    paths = dict(plan.parameter_paths)
     try:
         packed = kernels.packed_parameters(
             kernel, template, list(plan.members), resolved
         )
         from cffg.kernel_runtime import validate_discrete_shapes
 
-        validate_discrete_shapes(plan, packed, semiring)
+        if not _layout_matches(packed, paths, validated):
+            validate_discrete_shapes(plan, packed, semiring)
     except (ValueError, TypeError, KeyError, AttributeError) as error:
         raise CompileError(f"kernel {kernel.impl_id!r}: {error}") from error
-    paths = dict(plan.parameter_paths)
     return {paths[key]: value for key, value in packed.items()}
 
 
-def pack_gaussian(template, draft, plan, resolved):
+def pack_gaussian(template, draft, plan, resolved, *, validated=None):
     kernel = draft.kernel
+    paths = dict(draft.parameter_paths)
     try:
         from cffg.kernel_runtime import validate_gaussian_shapes
 
         packed = kernels.packed_parameters(
             kernel, template, list(draft.members), resolved
         )
-        validate_gaussian_shapes(plan, packed)
+        if not _layout_matches(packed, paths, validated):
+            # Taps are attached after abstract kernel admission on the fresh path.
+            validate_gaussian_shapes(replace(plan, taps=()) if plan.taps else plan, packed)
     except (ValueError, TypeError, KeyError, AttributeError) as error:
         raise CompileError(f"kernel {kernel.impl_id!r}: {error}") from error
-    paths = dict(draft.parameter_paths)
     return {paths[key]: value for key, value in packed.items()}
 
 

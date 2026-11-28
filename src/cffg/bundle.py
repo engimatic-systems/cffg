@@ -25,7 +25,7 @@ from urllib.parse import quote
 
 import numpy as np
 
-from cffg.core.ir import Template
+from cffg.core.ir import PlateSpec, Template
 from cffg.core.plates import PLATE_INDEX_TOKEN, expand_plates
 from cffg.core.serialize import (
     document_structure_hash,
@@ -93,8 +93,8 @@ def _per_copy_pattern(plate_name: str, blob_name: str) -> str:
 def _rewrite_blob_paths(
     template: Template,
     *,
-    enclosing_plate: str | None = None,
-    per_copy: frozenset[str] = frozenset(),
+    plate_name: str = "",
+    owner: PlateSpec | None = None,
 ) -> Template:
     """Copy a template hierarchy and point every declaration into the ZIP.
 
@@ -104,10 +104,10 @@ def _rewrite_blob_paths(
     """
     blobs = {}
     for name, ref in template.blobs.items():
-        if enclosing_plate is not None and name in per_copy:
-            path = _per_copy_pattern(enclosing_plate, name)
+        if owner is not None and name in owner.per_copy_blobs:
+            path = _per_copy_pattern(plate_name, name)
         else:
-            path = _blob_member(name)
+            path = _blob_member(owner.shared_name(name) if owner is not None else name)
         blobs[name] = replace(ref, path=path)
 
     plates = {
@@ -115,8 +115,8 @@ def _rewrite_blob_paths(
             spec,
             fragment=_rewrite_blob_paths(
                 spec.fragment,
-                enclosing_plate=name,
-                per_copy=frozenset(spec.per_copy_blobs),
+                plate_name=name,
+                owner=spec,
             ),
         )
         for name, spec in template.plates.items()
