@@ -1889,9 +1889,19 @@ reconstructs its resolved descriptor from the scoped declarations.
 Plate expansion uses row-major copy numbers, with the last coordinate varying
 fastest. `PlateGrid` computes a coordinate, copy number or chain neighbor
 from the dimensions and integer strides. Expansion and per-copy parameter
-binding stream coordinates in that same order. The compiler still creates the
-flat model before allocating inference arrays. The shape must fit a signed
-64-bit copy count before expansion begins.
+binding stream coordinates in that same order. The shape must fit a signed
+64-bit copy count before expansion or compilation begins.
+
+For one-level plates the compiler validates each fragment, resolves Chain
+aliases and Broadcast equality addresses, and lays out final slots in the
+same lexical order as the public expansion. Copies share their fragment's
+domain and constraint declarations until the compiler assigns concrete
+addresses. Priming, energy accounting, status and learning use the existing
+compiled factor groups. A cached Colony spawn reuses these addresses and
+resolves the caller's current blob values and paths. A registered third-party
+packer or configuration callback can inspect concrete `Template` and
+`FactorSpec` objects. The compiler reconstructs those callback arguments
+when the model uses such an extension.
 
 Scoping prefixes the plate key and records the enclosing `PlateSpec.shared_scope`.
 Fragment names, wiring rules, initializer specs, file paths and per-copy source

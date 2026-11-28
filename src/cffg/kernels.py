@@ -718,3 +718,17 @@ _install_nonlinear(
         scale="Only incident Gaussian matrices and member-batched parameters are stored; no whole-graph Jacobian.",
     ),
 )
+
+
+# Keep strong references so replacing a provider under the same name is visible.
+_builtin_kernels = dict(KERNELS)
+
+
+def needs_source_template(factor_types):
+    """External pack/configure callbacks have a public contract over concrete IR records."""
+    for name in factor_types:
+        kernel = KERNELS.get(name)
+        if kernel is not None and kernel is not _builtin_kernels.get(name):
+            if kernel.pack_params is not None or getattr(kernel.binding, "configure", None) is not None:
+                return True
+    return False

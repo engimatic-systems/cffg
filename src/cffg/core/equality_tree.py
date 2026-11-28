@@ -34,6 +34,16 @@ def plan_equality_tree(hub: str, branches: Sequence[str], prefix: str) -> Equali
     A singleton aliases the hub. For N >= 2 the plan has N-1 equality factors,
     N-2 links and at most ceil(log2(N)) factors from the hub to any branch.
     """
+    branches, links, junctions = equality_wiring(hub, branches, prefix)
+    factors = tuple(
+        FactorSpec(name, "equality", {"a": inlet, "b": left, "c": right})
+        for name, inlet, left, right in junctions
+    )
+    return EqualityTree(hub, branches, links, factors)
+
+
+def equality_wiring(hub: str, branches: Sequence[str], prefix: str):
+    """Return leaf names, internal links and ordered (factor, inlet, left, right) addresses."""
     branches = tuple(branches)
     if not branches or len(set((hub, *branches))) != len(branches) + 1:
         raise ComposeError(f"equality tree for {hub!r} requires distinct endpoints and at least one branch")
@@ -54,7 +64,7 @@ def plan_equality_tree(hub: str, branches: Sequence[str], prefix: str) -> Equali
                 children.append(link)
                 intervals.append((lo, hi, link))
         factor = f"{prefix}/eq{len(factors)}"
-        factors.append(FactorSpec(factor, "equality", {"a": inlet, "b": children[0], "c": children[1]}))
+        factors.append((factor, inlet, *children))
         for lo, hi, link in intervals:
             subtree(lo, hi, link)
 
@@ -65,4 +75,4 @@ def plan_equality_tree(hub: str, branches: Sequence[str], prefix: str) -> Equali
         raise ComposeError(
             f"equality tree for {hub!r}: generated link collides with endpoint {min(clashes)!r}"
         )
-    return EqualityTree(hub, branches, tuple(links), tuple(factors))
+    return branches, tuple(links), tuple(factors)

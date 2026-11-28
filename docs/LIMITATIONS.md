@@ -634,7 +634,10 @@ have deterministic legacy posterior migration; unidentified recurrence
 posteriors have none.
 Compact plate composition supports bonds between declared host ports.
 Bonding a generated copy port or Broadcast hub requires `expand_plates` on
-that operand first.
+that operand first. Built-in factors compile directly to slot addresses.
+A model with a third-party parameter packer or configuration callback may
+also allocate concrete graph records for that callback. Compiled state,
+parameter arrays and public named slot tables still grow with copy count.
 
 The recurrence learning readout carries the Gaussian covariance computed
 directly from precision; it does not reconstruct covariance as

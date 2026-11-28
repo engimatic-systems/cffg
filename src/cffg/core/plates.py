@@ -1,7 +1,7 @@
 """Plate expansion: materialize a replicated fragment into a flat template.
 
-`expand_plates` is a pure function run at the top of the compiler's grounding
-phase (cff-cpxj phase 1): every plate's fragment is copied `dims` times with
+`expand_plates` returns an editable flat model. Every plate's fragment is copied
+once per grid cell with
 scoped names, parameters tied by name (per-copy blobs excepted), and the copies
 wired together by the plate's bonds. The wiring vocabulary:
 
@@ -13,9 +13,8 @@ wired together by the plate's bonds. The wiring vocabulary:
 - ``Expose``    — leftover ports stay exposed as ``plate/<i>/port`` (the
                   default in phase 1; the rule is the explicit marker).
 
-Phase 1 is deliberately naive: it materializes Python objects. Phase 2 targets
-index-table expansion into the group tensors without ever building the copies
-(the arena was designed for it).
+The compiler constructs slot addresses directly for one-level plates. This
+public expansion also provides a reference for checking those addresses.
 """
 
 from __future__ import annotations
@@ -28,6 +27,7 @@ from cffg.core.compose import SCOPE_SEP, ComposeError, bond
 from cffg.core.equality_tree import plan_equality_tree
 from cffg.core.plate_grid import PlateGrid
 from cffg.core.ir import (
+    EDGE_CONSTRAINTS,
     BlobRef,
     Broadcast,
     Chain,
@@ -149,18 +149,22 @@ def _scope_copy(
         s(pt.name): PortSpec(s(pt.name), s(pt.variable), pt.role) for pt in frag.ports.values()
     }
     per_copy_blobs = _scoped_blob_refs(frag, prefix, index, per_copy)
-    per_copy_learnables = {
-        s(ln.name): LearnableSpec(
-            s(ln.name),
+    per_copy_learnables = _scoped_learnables(frag, prefix, per_copy)
+    return variables, factors, constraints, ports, per_copy_blobs, per_copy_learnables
+
+
+def _scoped_learnables(fragment, prefix, per_copy):
+    return {
+        _scoped(prefix, ln.name): LearnableSpec(
+            _scoped(prefix, ln.name),
             ln.family,
-            tuple(sb(b) for b in ln.blobs),
-            None if ln.sources is None else tuple(s(f) for f in ln.sources),
+            tuple(_scoped(prefix, b) for b in ln.blobs),
+            None if ln.sources is None else tuple(_scoped(prefix, f) for f in ln.sources),
             ln.semantic_identity,
         )
-        for ln in frag.learnables.values()
+        for ln in fragment.learnables.values()
         if set(ln.blobs) <= per_copy
     }
-    return variables, factors, constraints, ports, per_copy_blobs, per_copy_learnables
 
 
 def _install_shared(out: Template, plate: str, spec: PlateSpec) -> None:
@@ -282,7 +286,7 @@ def _rename_variable(out: Template, old: str, new: str, proto: VariableSpec) -> 
             function=f.function,
         )
     out.constraints = [
-        dataclasses.replace(c, target=new) if c.target == old else c for c in out.constraints
+        dataclasses.replace(c, target=new) if c.kind in EDGE_CONSTRAINTS and c.target == old else c for c in out.constraints
     ]
 
 

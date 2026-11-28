@@ -59,8 +59,12 @@ def test_declarations_and_layout_do_not_retain_mutable_template_aliases():
 @pytest.mark.parametrize("name", ["hmm", "gaussian", "ef", "parameter_edge", "plate"])
 def test_declared_slots_survive_downstream_lowering(name, monkeypatch):
     template, arrays = model(name)
-    layout = topology(template)
-    monkeypatch.setattr(compiler, "build_topology", lambda _: layout)
+    if template.plates:
+        inputs, layout = compiler.lower_plates(template)
+        monkeypatch.setattr(compiler, "lower_plates", lambda _: (inputs, layout))
+    else:
+        layout = topology(template)
+        monkeypatch.setattr(compiler, "build_topology", lambda _: layout)
     arena = compiler.compile_template(template, arrays=arrays)
     assert (arena.n_slots, arena.n_gslots, arena.n_efslots) == (
         layout.n_slots, layout.n_gslots, layout.n_efslots,
