@@ -748,8 +748,12 @@ Resume on the same backend and numerical configuration for exact replay.
 Both snapshot modes occupy a fixed amount of uncompressed storage for a
 given bank shape and precision, regardless of episode count.
 
-For lower CPU and state-storage cost, select rounded-only arithmetic once
-before a sequence of public mixed-learning calls:
+### Tune mixed-learning speed
+
+`MixedBank` keeps the small remainder from each update and can add it back
+on a later observation. `RoundedBank` stores one floating-point word per
+parameter. Converting once before training can reduce time spent updating
+a bank. The same public functions support both representations.
 
 ```python
 from cffg.mixed_learning import RoundedBank, score, update
@@ -771,6 +775,44 @@ to continue using rounded arithmetic. A v3 input to that method is validated
 before its remainders are discarded. The choice applies to the standalone
 `score` and `update` functions, including compiled streams. Component lifecycle
 operations and the AXIOM agent use their own compensated banks.
+
+The table gives warm milliseconds per update on an Apple M2 Max CPU with
+JAX/jaxlib 0.10.2 and NumPy 2.5.1. The fixture has one record per update,
+32 slots (28 active), six continuous features and two categorical fields.
+The last column shows the median paired time ratio and its middle 50% range.
+For example, 0.59 means the rounded updates took 59% as long.
+
+| Precision | Work per tick | Compensated ms | Rounded ms | Rounded / compensated |
+| --- | --- | ---: | ---: | ---: |
+| float32 | Update with fixed weights | 0.057 | 0.034 | 0.59 (0.55–0.71) |
+| float32 | Score, then update | 0.165 | 0.102 | 0.62 (0.59–0.66) |
+| float64 | Update with fixed weights | 0.068 | 0.039 | 0.56 (0.51–0.60) |
+| float64 | Score, then update | 0.189 | 0.104 | 0.56 (0.54–0.57) |
+
+Each mode first learned from the same 32 batches. Three warm-up blocks
+preceded 12 alternating timed pairs. Each block ran eight updates on
+device and synchronized the outputs. The fixed-weight comparison reused
+identical assignments. The score-and-update comparison let each bank compute
+its own assignments from the observed features. Timing excludes compilation
+and training setup.
+
+Four observations with weight ¼ should increase the first component’s count
+by one. Starting at 16, both modes produced 17 in both precisions. Starting
+at 2²² in float32 or 2⁵¹ in float64, compensated learning still added one.
+Rounded learning added zero in each case. The initial count determines
+whether an individual increment fits between neighboring floating-point values.
+
+From the repository root, run the benchmark with your precision and a
+representative number of records and components. The JSON includes timing
+samples and count errors. Also check a learned quantity that matters for
+your data, such as variance at the largest feature offset you expect.
+
+```sh
+JAX_PLATFORMS=cpu uv run python tools/axiom/mixed_learning_speed.py float32
+JAX_PLATFORMS=cpu uv run python tools/axiom/mixed_learning_speed.py float64 --records 32 --components 500
+```
+
+For independent graph solves, see [CPU thread tuning](#independent-cpu-solves-with-host-threads).
 
 `ComponentBank.state_dict()` applies the same compact default to both the reset
 prior and the learned posterior. Both modes save logical IDs, generations and

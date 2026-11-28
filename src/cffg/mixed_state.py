@@ -52,6 +52,9 @@ class MixedBank(_BankFields):
     categorical head contains [K,C] Dirichlet concentrations. Inactive slots
     retain proper parameters. The primary fields hold rounded parameter
     values. The carry retains smaller corrections through subsequent updates.
+    Use as_rounded() to trade accumulation accuracy for speed on public
+    score/update calls. See "Tune mixed-learning speed" in the README for
+    timings and a count-accuracy example in both supported precisions.
     """
 
     __slots__ = ()
@@ -80,7 +83,13 @@ class MixedBank(_BankFields):
         return _snapshot(self, exact)
 
     def as_rounded(self) -> RoundedBank:
-        """Use the visible primary values and discard residuals from subsequent learning."""
+        """Return a one-word bank for faster score/update workloads.
+
+        The new bank starts from the visible values and discards the rounding
+        remainders of means, covariance scales, and counts. Small future
+        increments can disappear. Call as_compensated() on the result to
+        retain new remainders starting from zero.
+        """
         return RoundedBank(self.mu, self.kappa, self.psi, self.nu, self.alpha,
                            self.categories, self.active)
 
@@ -133,7 +142,12 @@ class MixedBank(_BankFields):
 
 
 class RoundedBank(NamedTuple):
-    """One-word posterior for the opt-in rounded score and update arithmetic."""
+    """One-word posterior for faster standalone mixed learning.
+
+    Each update rounds the posterior immediately. Check the error at the
+    largest count and feature offset in your data. The README section
+    "Tune mixed-learning speed" compares this choice with MixedBank.
+    """
 
     mu: jax.Array
     kappa: jax.Array
