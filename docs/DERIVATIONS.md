@@ -3610,8 +3610,10 @@ excluded regime. Independent re-solved energy differences agree with its total
 derivative. Local forward/reverse checks also cover float32 with 32 regimes
 and a transition-mixture output row with exactly zero predictive mass.
 Inactive logarithm operands are finite before masking; no mass is added.
-The optional pairwise entropy-bound diagnostic is outside this trained energy
-path; its separate sparse derivative follow-up is cff-1et5.
+The optional pairwise entropy bound uses the same fixed-support convention.
+`test_hybrid_gfe.py::test_sparse_pairwise_entropy_bound_derivatives` checks
+its value and derivatives against analytic Gaussian overlaps on the occupied
+labels, including derivatives with respect to weights, means and variances.
 
 The paired recognition authority is `test_amortization.py`. It learns an
 affine output layer over powers 0 through 7 of a scaled observation average,
