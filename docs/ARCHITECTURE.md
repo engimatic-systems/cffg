@@ -1026,7 +1026,10 @@ fresh root and original-adjoint residual certificates. A `MeanImplementation`
 advertises differentiable point parameters with `point_trainable=True`. The
 configured Gaussian binding carries this declaration into factor selection.
 `trainable.py` owns one coordinate per parameter blob element and differentiable
-injection into all tied readers. `MeanTrainer` and its compatible
+injection into all tied readers. Each packed parameter group receives its tied
+rows in one operation. The forward solver builds the current Gaussian chart
+metrics in equal-dimension batches, preserving the edge and slot order.
+`MeanTrainer` and its compatible
 `NeuralTrainer` name share the version 1 optimizer checkpoint.
 `FixedPointDifferentiator` reuses a fixed coordinate metric across training
 updates while passing all numerical context dynamically. `training.py` owns

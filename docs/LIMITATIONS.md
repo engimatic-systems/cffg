@@ -858,7 +858,9 @@ they do not prove nonsingularity in every direction, global uniqueness or a
 minimum. Stochastic mu3 and discrete point-mass decisions are rejected.
 Adam continuation is deterministic and full-batch; it binds the original
 training initialization and data. It does not provide weight uncertainty,
-minibatch scheduling or conjugate posterior learning.
+minibatch scheduling or conjugate posterior learning. Each changed weight vector
+still requires a forward solve, a fresh root certificate and an adjoint solve.
+The first step also pays the compilation cost of those derivative programs.
 
 A converged step can have a zero gradient for every value of a physical
 constant. For example, a temperature reading at zero elapsed time carries no

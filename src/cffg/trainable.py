@@ -1,9 +1,21 @@
 """Tied point-parameter blobs and differentiable injection into packed rows."""
 
 from dataclasses import dataclass
+from itertools import groupby
+from operator import itemgetter
 
 import jax.numpy as jnp
 import numpy as np
+
+
+def _packed_rows(rows, params):
+    """Canonical blob addresses are sorted by packed key, then row number."""
+    for key, members in groupby(rows, key=itemgetter(0)):
+        indices = np.fromiter((i for _, i in members), dtype=np.intp)
+        count = params[key].shape[0]
+        if indices[0] < 0 or indices[-1] >= count:
+            raise ValueError(f"trainable row outside packed parameter {key!r}")
+        yield key, None if len(indices) == count else indices
 
 
 @dataclass(frozen=True)
@@ -43,12 +55,16 @@ class MeanParameters:
                    for address in addresses):
                 raise ValueError(f"trainable blob {name!r} has an incompatible parameter reader")
             rows = tuple(sorted({(address.key, address.index) for address in addresses}))
-            values = [np.asarray(params[key][index]) for key, index in rows]
-            reference = values[0]
-            if reference.ndim != 1 or reference.size == 0 or not np.isfinite(reference).all():
-                raise ValueError(f"trainable blob {name!r} requires a nonempty finite flat vector")
-            if any(not np.array_equal(reference, value) for value in values[1:]):
-                raise ValueError(f"trainable blob {name!r} has inconsistent tied rows")
+            reference = None
+            for key, indices in _packed_rows(rows, params):
+                packed = params[key]
+                values = np.asarray(packed if indices is None else packed[indices])
+                if reference is None:
+                    reference = values[0]
+                    if reference.ndim != 1 or reference.size == 0 or not np.isfinite(reference).all():
+                        raise ValueError(f"trainable blob {name!r} requires a nonempty finite flat vector")
+                if values.shape[1:] != reference.shape or not (values == reference).all():
+                    raise ValueError(f"trainable blob {name!r} has inconsistent tied rows")
             blobs.append(WeightBlob(name, start, reference.size, rows))
             start += reference.size
         return cls(tuple(blobs))
@@ -62,8 +78,12 @@ class MeanParameters:
         result = dict(params)
         for blob in self.blobs:
             value = weights[blob.start:blob.start + blob.size]
-            for key, index in blob.rows:
-                result[key] = result[key].at[index].set(value)
+            for key, indices in _packed_rows(blob.rows, params):
+                packed = result[key]
+                if indices is None:
+                    result[key] = jnp.broadcast_to(value.astype(packed.dtype), packed.shape)
+                else:
+                    result[key] = packed.at[indices].set(value)
         return result
 
     def values(self, weights):

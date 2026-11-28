@@ -3,6 +3,7 @@
 from dataclasses import replace
 
 import jax
+import jax.numpy as jnp
 import numpy as np
 import pytest
 from nonlinear_fixture import adaptive_pair
@@ -13,7 +14,7 @@ from cffg.compiler import compile_template
 from cffg.engine import Engine, RunStatus
 from cffg.implicit import GradientStatus, fixed_point_gradient
 from cffg.runtime_types import _replace
-from cffg.trainable import NeuralParameters
+from cffg.trainable import NeuralParameters, WeightBlob
 
 
 def coupled_neural_model(method):
@@ -110,3 +111,32 @@ def test_float32_gradient_uses_dtype_scaled_certificates():
             energies.append(engine.bfe(settled))
         reference = (energies[0] - energies[1]) / (2 * step)
         np.testing.assert_allclose(gradient[0], reference, atol=64 * eps ** (2 / 3), rtol=64 * eps ** (2 / 3))
+
+
+def test_tied_parameter_writes_and_derivatives_across_packed_groups():
+    # One blob fills its own table and shares another table with a second blob.
+    rows = tuple(("all", i) for i in range(60)) + (("mixed", 0), ("mixed", 2))
+    params = NeuralParameters((WeightBlob("a", 0, 2, rows), WeightBlob("b", 2, 2, (("mixed", 1),))))
+    packed = {"all": jnp.zeros((60, 2)), "mixed": jnp.full((4, 2), 7.)}
+    weights = jnp.array([3., -1., 4., -5.])
+    updated = jax.jit(params.inject)(weights, packed)
+    np.testing.assert_array_equal(updated["all"], np.broadcast_to(weights[:2], (60, 2)))
+    np.testing.assert_array_equal(updated["mixed"], [[3., -1.], [4., -5.], [3., -1.], [7., 7.]])
+
+    def objective(w):
+        return sum(jnp.square(table).sum() for table in params.inject(w, packed).values())
+
+    np.testing.assert_array_equal(jax.jit(jax.grad(objective))(weights), 2*weights*np.array([62, 62, 1, 1]))
+    with pytest.raises(ValueError, match="outside packed parameter"):
+        params.inject(weights, {**packed, "all": packed["all"][:-1]})
+
+
+def test_derivative_rechecks_tied_values_in_current_packed_rows():
+    template, arrays = coupled_neural_model("linearization")
+    engine = Engine(compile_template(template, arrays=arrays))
+    packed = engine.init_state().params
+    plan = NeuralParameters.from_engine(engine, packed)
+    key, row = plan.blobs[0].rows[-1]
+    inconsistent = {**packed, key: packed[key].at[row].add(1.)}
+    with pytest.raises(ValueError, match="inconsistent tied rows"):
+        NeuralParameters.from_engine(engine, inconsistent)

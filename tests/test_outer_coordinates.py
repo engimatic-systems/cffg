@@ -8,8 +8,10 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
+from cffg.compiled import EdgeInfo
+from cffg.outer_structure import OuterStructure
 from cffg.outer_chart import (
-    OuterArrays, OuterChart, _CategoricalBlock, _PrecisionBlock, _VectorBlock,
+    OuterArrays, OuterChart, _CategoricalBlock, _PrecisionBlock, _VectorBlock, build_outer_chart,
 )
 from cffg.outer_coordinates import structural_signature
 from cffg.outer_kernels import OuterKernelProvider
@@ -149,3 +151,41 @@ def test_reused_kernel_binds_new_metrics_and_matches_independent_derivatives():
         np.testing.assert_allclose(gradient, jnp.linalg.norm(jax.grad(merit)(coordinates)), rtol=1e-12)
         assert plan.compiled is (index == 0)
     assert len(provider.cache) == 1
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_plated_gaussian_metrics_match_each_current_edge_in_canonical_order(dtype):
+    dims = [2, 1, 3, 2] * 8
+    edges = [EdgeInfo(f"g{i}", 0, 2*i, 2*i+1, True, dim=dim) for i, dim in enumerate(dims)]
+    widths = np.repeat(dims, 2)
+    arena = OuterStructure({e.name: e for e in reversed(edges)}, (), np.zeros(1, int),
+                           np.r_[0, widths.cumsum()], np.r_[0, (widths**2).cumsum()])
+    eliminated = {edges[0].slot0, edges[0].slot1, edges[-1].slot0}
+    rng = np.random.default_rng(379)
+    matrices = []
+    for dim in dims:
+        factor = rng.normal(size=(dim, dim)).astype(dtype)
+        matrices.append(factor @ factor.T + np.eye(dim, dtype=dtype))
+
+    for bad_edges in ((), (0,), (0, 2)):
+        current = [np.zeros_like(a) if i in bad_edges else a for i, a in enumerate(matrices)]
+        lam = np.concatenate([part.ravel() for a in current for part in (a, a * .5)])
+        empty = np.zeros(0, dtype)
+        arrays = OuterArrays(empty, np.zeros(widths.sum(), dtype), lam, empty)
+        chart = build_outer_chart(arena, arrays, {"gaussian": eliminated})
+        assert chart.proper_reference == (not bad_edges)
+        blocks = iter(zip(chart.vectors, chart.precisions, strict=True))
+        for edge in sorted(edges, key=lambda e: e.name):
+            for slot in (edge.slot0, edge.slot1):
+                if slot in eliminated:
+                    continue
+                vector, precision = next(blocks)
+                matrix = current[edge.slot0 // 2] * 1.5
+                white = np.linalg.cholesky(matrix) if matrix.any() else np.eye(edge.dim, dtype=dtype)
+                forward = np.linalg.inv(white)
+                np.testing.assert_array_equal(vector.indices, arena.g_eta_indices(slot, edge.dim))
+                np.testing.assert_array_equal(precision.indices, arena.g_lam_indices(slot, edge.dim))
+                np.testing.assert_array_equal(precision.whitening, white)
+                np.testing.assert_array_equal(vector.forward, forward)
+                np.testing.assert_array_equal(vector.inverse, np.linalg.inv(forward))
+        assert next(blocks, None) is None
