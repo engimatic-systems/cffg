@@ -405,6 +405,23 @@ Also inspect `proper` flags, support diagnostics, effective sample size, and
 specialized residuals when those fields exist. A finite scalar energy cannot
 override a failed status or improper readout.
 
+To see which model terms drove a decision, inspect the objective on its
+actual planning state. Values are signed contributions in nats.
+
+```python
+report = engine.fe_breakdown(state)
+for row in report.entries:
+    print(row.owner_kind, row.owner_name, row.total, dict(row.components))
+```
+
+The row totals add to `report.total`. For a fixed observation channel,
+`extrinsic` measures disagreement with the preferred outcome and `epistemic`
+is negative mutual information under the model’s current belief. The
+`state_negative_entropy` component completes that row. A learned channel
+uses the label `parameter_aware_epistemic`. The components explain their
+row and enter the total once. Max-product exposes its decoded assignment
+cost through `engine.objective(state)`.
+
 ## Discrete planning and rolling agents
 
 `build_rollout` and `build_tmaze` expose the general tabular path;

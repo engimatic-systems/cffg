@@ -220,3 +220,143 @@ def test_objective_owners_do_not_import_runtime_orchestration(module):
     )
     names = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
     assert not names.intersection({"Engine", "RunStatus", "RunResult"})
+
+
+def assert_reconciles(engine, state):
+    breakdown = engine.fe_breakdown(state)
+    scalar = engine.bfe(state)
+    if np.isfinite(scalar):
+        bound = (256 * np.finfo(state.messages.dtype).eps * max(1, len(breakdown.entries))
+                 * max(1, abs(scalar)))
+        np.testing.assert_allclose(breakdown.total, scalar, atol=bound, rtol=0)
+        np.testing.assert_allclose(sum(row.total for row in breakdown.entries), scalar,
+                                   atol=bound, rtol=0)
+    else:
+        assert not np.isfinite(breakdown.total)
+        assert any(not np.isfinite(row.total) for row in breakdown.entries)
+    return breakdown
+
+
+@pytest.mark.parametrize("states,enabled", [(2, True), (80, False)])
+def test_breakdown_charges_fixed_channel_negative_mutual_information(states, enabled):
+    from test_gfe import make_model
+
+    # The input prior is uniform. Each half maps deterministically to a
+    # distinct label; the third label has zero probability under every input.
+    with jax.enable_x64(enabled):
+        dtype = np.float64 if enabled else np.float32
+        channel = np.zeros((3, states), dtype=dtype)
+        channel[0, :states // 2] = 1
+        channel[1, states // 2:] = 1
+        prior = np.full(states, 1 / states, dtype=dtype)
+        goal = np.array([0.8, 0.2, 0.0], dtype=dtype)
+        template = make_model(channel, goal, prior)
+        template.variables.update(z=VariableSpec("z", states), x=VariableSpec("x", 3))
+        engine = Engine(compile_template(template, arrays={"A": channel, "c": goal, "d": prior}))
+        report = assert_reconciles(engine, engine.init_state())
+        entry, = [e for e in report.entries if e.owner_kind == "observation_gfe"]
+        assert entry.owner_name == "obs"
+
+        # For a disjoint deterministic channel, stationary output mass is
+        # proportional to sqrt(goal * prior output mass). Expand each label
+        # uniformly over its input states and enumerate the joint explicitly.
+        px = np.array([2/3, 1/3, 0])
+        pz = np.repeat(px[:2] / (states // 2), states // 2)
+        joint = channel * pz[None, :]
+        supported = joint > 0
+        mi = np.sum(joint[supported] * np.log(joint[supported] / (px[:, None] * pz)[supported]))
+        tol = 256 * np.finfo(dtype).eps * max(1, abs(entry.total))
+        expected = {
+            "extrinsic": -px[:2] @ np.log(goal[:2]),
+            "epistemic": -mi,
+            "state_negative_entropy": pz @ np.log(pz),
+        }
+        assert set(entry.components) == set(expected)
+        for label, value in expected.items():
+            np.testing.assert_allclose(entry.components[label], value, atol=tol, rtol=0)
+        np.testing.assert_allclose(sum(entry.components.values()), entry.total, atol=tol, rtol=0)
+
+
+def test_breakdown_names_shared_owners_and_checks_ledger_gates():
+    from test_goal_hyperprior import _arrays, _model
+
+    engine = Engine(compile_template(_model(slices=2), arrays=_arrays()))
+    report = assert_reconciles(engine, engine.init_state())
+    shared, = [e for e in report.entries if e.owner_kind == "goal_dirichlet_parameter"]
+    assert shared.owner_name == engine.arena.goal_parameter_plans[0].prior_blob
+    assert sum(e.owner_kind == "observation_gfe" for e in report.entries) == 2
+
+    engine = engine_for("mu3")
+    with pytest.raises(RuntimeError):
+        engine.fe_breakdown(engine.init_state())
+    state, _ = engine.prepare_mu3(engine.init_state(), jax.random.key(7))
+    report = assert_reconciles(engine, state)
+    kl, = [e for e in report.entries if e.owner_kind == "importance_sampled_parameter_kl"]
+    group, = engine.arena.mu3_groups
+    assert kl.owner_name == group.param_blob
+    np.testing.assert_allclose(kl.total, state.params[group.name + ":kl"])
+    assert all("parameter_aware_epistemic" in e.components for e in report.entries
+               if e.owner_kind == "observation_gfe")
+
+    template, arrays = model("hmm")
+    engine = Engine(compile_template(template, arrays=arrays, semiring="max"))
+    with pytest.raises(RuntimeError, match="objective"):
+        engine.fe_breakdown(engine.init_state())
+
+
+@pytest.mark.parametrize("schedule", ["flood", "two_pass"])
+def test_breakdown_ordinary_owner_names_and_missing_data(schedule):
+    template, arrays = model("gaussian")
+    engine = Engine(compile_template(template, arrays=arrays), schedule=schedule)
+    initial = engine.init_state()
+    assert_reconciles(engine, initial)
+    state = engine.run(initial, 100, tol=1e-8).require_converged()
+    entries = assert_reconciles(engine, state).entries
+    assert {e.owner_name for e in entries if e.owner_kind == "factor"} == set(template.factors)
+    assert {e.owner_name for e in entries if e.owner_kind == "edge_entropy"} == {
+        name for name, edge in engine.arena.edges.items() if edge.interior
+    }
+    assert engine.fe_breakdown(state).entries == entries
+
+
+@pytest.mark.parametrize("name,kind", [
+    ("parameter_edge", "dirichlet_region"), ("constraint", "constraint"),
+    ("ef", "factor"), ("mixture", "factor"), ("hybrid_gfe", "hybrid_gfe"),
+    ("recurrence", "factor"),
+])
+def test_detailed_ledger_includes_specialized_owners(name, kind):
+    engine = engine_for(name)
+    state = engine.init_state()
+    report = assert_reconciles(engine, state)
+    owners = [e for e in report.entries if e.owner_kind == kind]
+    assert owners
+    if name == "hybrid_gfe":
+        assert all(e.bound_direction == "reported_gfe_lower_bounds_exact" for e in owners)
+
+
+def test_transition_diagnostic_excludes_downstream_message_energy():
+    from cffg.models import build_rollout
+
+    template, arrays = build_rollout(
+        "tm", steps=2, past=0, d=np.full(4, 0.25), A=np.eye(4),
+        c=np.full(4, 0.25), e=np.full(2, 0.5), Bs=np.full((2, 4, 4), 0.25),
+        gfe=False, epistemic_b=True,
+    )
+    engine = Engine(compile_template(template, arrays=arrays))
+    report = assert_reconciles(engine, engine.init_state())
+    rows = [r for r in report.entries if r.owner_kind == "transition_gfe"]
+    assert [r.owner_name for r in rows] == ["tm1", "tm2"]
+    for row in rows:
+        assert "optimistic_transition_information_bound" in row.components
+        np.testing.assert_allclose(sum(row.components.values()), row.total)
+
+
+def test_empty_discrete_support_reports_infinite_named_guard():
+    from cffg import rules
+
+    engine = engine_for("hmm")
+    state = engine.init_state()
+    state = _replace(state, messages=jnp.full_like(state.messages, rules.NEG))
+    report = assert_reconciles(engine, state)
+    proof, = report.entries
+    assert proof.owner_name == "empty_exact_support" and proof.total == np.inf

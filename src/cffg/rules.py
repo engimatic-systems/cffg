@@ -676,19 +676,26 @@ def gfe_update(log_d, a_param, logc, k_max, learned=False, return_diagnostics=Fa
     )
 
 
-def gfe_energy_stats(log_d, abar, hbar, logc):
+def gfe_energy_stats(log_d, abar, hbar, logc, *, components=False):
     """Composite FE term from arbitrary ``E[A]``/``E[h(A)]`` moments."""
 
     def one(a_mean, h_mean, lc, ld):
         zbar = _gfe_solve(a_mean, h_mean, lc, ld)
         rho = _gfe_rho(a_mean, h_mean, lc, zbar)
         lz = _safe_log(zbar)
-        return -(zbar * rho).sum(-1) + (zbar * lz).sum(-1)
+        state_negative_entropy = (zbar * lz).sum(-1)
+        total = -(zbar * rho).sum(-1) + state_negative_entropy
+        if components:
+            qx = a_mean @ zbar
+            extrinsic = -(qx * lc).sum(-1)
+            epistemic = (qx * _safe_log(qx)).sum(-1) + zbar @ h_mean
+            return total, extrinsic, epistemic, state_negative_entropy
+        return total
 
     return jax.vmap(one)(abar, hbar, logc, log_d)
 
 
-def gfe_goal_structural_stats(log_d, abar, hbar, expected_log_c):
+def gfe_goal_structural_stats(log_d, abar, hbar, expected_log_c, *, components=False):
     """GFE structural term with the goal cross-entropy removed.
 
     The complete learned-goal ledger owns ``-qx·E[log c]`` together with the
@@ -702,8 +709,13 @@ def gfe_goal_structural_stats(log_d, abar, hbar, expected_log_c):
         qx = a_mean @ zbar
         rho = _gfe_rho(a_mean, h_mean, elog_c, zbar)
         lz = _safe_log(zbar)
-        full = -(zbar * rho).sum(-1) + (zbar * lz).sum(-1)
-        return full + (qx * elog_c).sum(-1), qx
+        state_negative_entropy = (zbar * lz).sum(-1)
+        full = -(zbar * rho).sum(-1) + state_negative_entropy
+        structural = full + (qx * elog_c).sum(-1)
+        if components:
+            epistemic = (qx * _safe_log(qx)).sum(-1) + zbar @ h_mean
+            return structural, qx, epistemic, state_negative_entropy
+        return structural, qx
 
     return jax.vmap(one)(abar, hbar, expected_log_c, log_d)
 
@@ -995,7 +1007,7 @@ def gfe_tm_update(
     return (*messages, residual, status) if return_diagnostics else messages
 
 
-def gfe_tm_energy(mu_in, mu_e, mu_down, b_param, learned=False):
+def gfe_tm_energy(mu_in, mu_e, mu_down, b_param, learned=False, *, components=False):
     """Node-local GFE per member.
 
     ``mu_down`` influences the stationary q̄ but its linear coupling is not
@@ -1011,6 +1023,10 @@ def gfe_tm_energy(mu_in, mu_e, mu_down, b_param, learned=False):
         qw = abar @ qj
         qw_log_qw = jnp.where(qw > 0, qw * _safe_log(qw), 0.0).sum(-1)
         qj_log_qj = jnp.where(qj > 0, qj * _safe_log(qj), 0.0).sum(-1)
-        return qw_log_qw + qj @ h + qj_log_qj
+        information = qw_log_qw + qj @ h
+        total = information + qj_log_qj
+        if components:
+            return total, information, qj_log_qj
+        return total
 
     return jax.vmap(one)(b_param, mu_in, mu_e, mu_down)

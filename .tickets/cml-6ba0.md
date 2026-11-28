@@ -1,6 +1,6 @@
 ---
 id: cml-6ba0
-status: open
+status: in_progress
 deps: []
 links: []
 created: 2026-11-28T04:28:22Z
@@ -33,3 +33,9 @@ cff-gul8 owns expected information gain from opening candidate DATA ports.
 
 A ledger owner is a node or correction contributing once to the stored objective. A nat measures information using natural logarithms. GFE is generalized free energy.
 
+
+## Notes
+
+**2026-11-28T04:37:05Z**
+
+Change path: Runtime numerical or status invariant and factor energy. Factor/edge row values come from the existing scalar ledger before group reduction. A separate opt-in compiled readout returns values, signs and stable owner labels. Flood/scheduled consume the same state and kernel; scalar/vmap solver math is unchanged; public breakdown accepts one state; serialization and checkpoint forms are unchanged. Qualify ordinary and composite owners, sparse and unsupported cases, mu3 preparation, nonfinite local terms, f32/f64, and 80-state channel plus independent mutual information.

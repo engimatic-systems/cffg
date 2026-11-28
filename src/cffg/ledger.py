@@ -7,6 +7,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from cffg.readouts.energy import EnergyRows, sum_nodes
 from cffg import efrules
 from cffg import ledger_terms as terms
 from cffg.compiled import Arena, ConstraintPlan
@@ -147,7 +148,7 @@ def constraint_satisfied(
     )
 
 
-def make_belief_energy(arena: Arena) -> FreeEnergy:
+def make_belief_energy(arena: Arena, *, detailed=False):
     """Build the existing ordered BFE/GFE sum for raw JIT and schedule use."""
     groups = arena.groups
 
@@ -162,44 +163,47 @@ def make_belief_energy(arena: Arena) -> FreeEnergy:
         ef_mask: jax.Array,
         params: dict[str, jax.Array],
     ) -> jax.Array:
+        report = EnergyRows(arena) if detailed else None
         total = jnp.asarray(0.0, dtype=messages.dtype)
         # prec_groups included so the interior-edge entropy tables run even for
         # a prec-only model: terms.gaussian_energy owns gauss_interior (the out edges),
         # terms.ef_energy owns ef_interior (the prec edges), both EdgeInfo-driven.
         if arena.gauss_groups or arena.prec_groups or arena.recurrence_groups:
             total = total + terms.gaussian_energy(
-                arena, g_eta, g_lam, g_obs, g_mask, params
+                arena, g_eta, g_lam, g_obs, g_mask, params, report
             )
         if arena.mix_groups:
-            total = total + terms.mixture_energy(arena, messages, g_eta, g_lam, params)
+            total = total + terms.mixture_energy(arena, messages, g_eta, g_lam, params, report)
         if arena.recurrence_groups:
             total = total + terms.recurrence_energy(
-                arena, messages, g_eta, g_lam, params
+                arena, messages, g_eta, g_lam, params, report
             )
         if arena.hybrid_gfe_groups:
             total = total + terms.hybrid_gfe_energy(
-                arena, messages, g_eta, g_lam, params
+                arena, messages, g_eta, g_lam, params, report
             )
         if arena.ef_groups or arena.prec_groups:
-            total = total + terms.ef_energy(arena, ef_eta, ef_obs, ef_mask, params)
+            total = total + terms.ef_energy(arena, ef_eta, ef_obs, ef_mask, params, report)
         if arena.prec_groups:
-            total = total + terms.precision_energy(arena, g_eta, g_lam, ef_eta, params)
-        total = terms.add_dirichlet_terms(total, arena, messages, params)
+            total = total + terms.precision_energy(arena, g_eta, g_lam, ef_eta, params, report)
+        total = terms.add_dirichlet_terms(total, arena, messages, params, report)
         for g in groups:
             if g.mode == "vmp":
                 inc = _disc_both(arena, messages, g.gather_both, g.cards)
             else:
                 inc = _disc_rows(arena, messages, g.gather, g.cards)
-            total = total + _disc_energy(g, inc, _kernel_params(g, params)).sum()
-        total = terms.add_constraint_terms(total, arena, messages, params)
-        total = terms.add_gfe_terms(total, arena, messages, params)
-        total = terms.add_transition_gfe_terms(total, arena, messages, params)
+            total = total + sum_nodes(g, _disc_energy(g, inc, _kernel_params(g, params)), report)
+        total = terms.add_constraint_terms(total, arena, messages, params, report)
+        total = terms.add_gfe_terms(total, arena, messages, params, report)
+        total = terms.add_transition_gfe_terms(total, arena, messages, params, report)
         for card, pairs in arena.interior_slot_groups:
             lq = efrules.CATEGORICAL.product(
                 messages[arena.message_indices(pairs[:, 0], card)],
                 messages[arena.message_indices(pairs[:, 1], card)],
             )
+            if report is not None:
+                report.edges("categorical", pairs, efrules.CATEGORICAL.entropy(lq))
             total = total + efrules.CATEGORICAL.entropy_total(lq)
-        return total
+        return (total, report.blocks) if detailed else total
 
     return bfe

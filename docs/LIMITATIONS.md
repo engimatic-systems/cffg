@@ -345,6 +345,16 @@ The fully unobserved variant also loses the zero-energy identity in float32
 is a strict expected failure tracked by cff-d63w. The conditioned fixture's
 evidence bound must not be extended to that variant.
 
+The free-energy breakdown labels the fixed observation term `epistemic`
+because it equals negative mutual information for a known channel. For
+uncertain parameters, `parameter_aware_epistemic` also includes the model’s
+parameter uncertainty. For a learned goal, the structural row and shared
+Dirichlet row retain the stable accounting in D6c. The transition component
+`optimistic_transition_information_bound` assumes the next state is
+observable. Hybrid GFE rows carry the direction
+`reported_gfe_lower_bounds_exact` under the mixture approximation described
+in D5. A component value describes the state passed to the readout.
+
 **S1c. Dynamics curiosity is an optimistic bound.** The GFE-TM composite
 (cff-fk2u, `epistemic_b=True`; derivation in docs/DERIVATIONS.md D1) gives
 transition learning an epistemic channel: the parameter-novelty term is
