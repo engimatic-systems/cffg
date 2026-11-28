@@ -244,8 +244,14 @@ A pure-Python (dataclass) representation, independent of JAX:
   `Engine`; extracted point blobs also work with `root=extracted_directory`.
   During alpha only the current bundle schema is accepted. Older versions
   fail explicitly; no point estimate supplies missing posterior provenance.
-  A stable compatibility and migration contract remains future work. No
-  third-party interchange format is implied.
+  The first stable bundle writer establishes the compatibility floor. Its
+  release identifies the producer and pins representative archives from that
+  writer. Subsequent stable readers load those models directly or through a
+  versioned migration in the bundle loader. Public-loader checks compare
+  model structure, named point arrays, learning identities and owners,
+  immutable priors and posterior values with their original shapes and
+  dtypes. Alpha imports are best effort. Agent checkpoint versioning is
+  governed by its own loader.
 - **Edit actions**: `check_edits` validates a sequence of typed actions and
   `apply_edits` commits it atomically to a copy. `AddVariable`, `AddFactor`,
   `RemoveFactor`, `RemoveVariable`, `ReplaceFactor`, `AddConstraint`,

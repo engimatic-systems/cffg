@@ -74,3 +74,11 @@ Cooper's decision before adopting any stable contract:
 3. Name the stable release boundary and how long its supported versions remain readable. Keep version refusal explicit for unsupported archive, model or learning identities. Archive migration must verify the original inventories and preserve the supported named data and its owners.
 
 The README matrix describes current alpha behavior. The loader and stable support policy are unchanged. Retain this ticket in progress for Cooper's decision. The five focused cases for authentic recurrence refusal, flat refusal, complete f32/f64 restore and empty learning inventory passed in 1.28 s. No full-suite run applies to this documentation and ticket change.
+
+**2026-11-28T05:17:06Z**
+
+Cooper chose the first stable writer as the guaranteed floor on 2026-11-27. Every alpha import, including schema 2, is best effort. The current schema-1 refusals stand. Prior/ownership history cannot be reconstructed from point arrays. README, ARCHITECTURE and LIMITATIONS now record this policy and the bundle loader owns migration. The historical audit above remains evidence for those eight particular inputs. The remaining gate is release-bound: identify the actual first stable producer, archive immutable fixtures from it and verify their model and learning inventories through the public loader. No stable writer exists in this tree yet; no alpha producer is promoted. No further floor decision is pending.
+
+**2026-11-28T05:17:52Z**
+
+Post-decision validation: 5 README checks passed, tk dep cycle reports no cycles, and git diff --check passes. Documentation and ticket changes only.

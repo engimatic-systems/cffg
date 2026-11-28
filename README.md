@@ -807,8 +807,13 @@ be `"1"` inside a schema-`"2"` bundle.
 
 Recompile the returned template and point arrays for inference. For declared
 learning, use the returned `learnables` to continue from the saved update.
-Schema 1 stored no learning history to resume. Historical support for the
-first stable release is still an open decision.
+Schema 1 stored no learning history to resume.
+
+**The compatibility guarantee starts with the first stable bundle writer.**
+Its single-template archives form the baseline for later stable readers.
+Imports from every alpha writer are best effort, including alpha files
+marked schema 2. The release that designates the first stable writer will
+identify the producer and publish its reference fixtures.
 
 ## Hard constraints and MAP
 

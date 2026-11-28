@@ -612,7 +612,9 @@ Pre-manifest D8 and early unidentified D9 posterior arrays share the same keys
 and shapes, so both are conservatively rejected instead of silently resumed.
 Alpha CFFGZ loading accepts only the current schema. Older model-only bundles
 are rejected, and missing learning history is never inferred from point values.
-A compatibility and migration promise is deferred until the format stabilizes.
+The stable compatibility floor is the first stable bundle writer. All alpha
+imports are best effort, including alpha schema 2. The first stable release
+must supply reference archives from its actual writer.
 Flooding and mixed scheduling solve the same coordinates,
 but neither guarantees monotone progress on every loopy hybrid graph.
 
