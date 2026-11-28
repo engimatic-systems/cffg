@@ -1912,6 +1912,28 @@ has all enclosing plate names and coordinates in its identity. On disk,
 A nested bundle records `{index:0}`, `{index:1}`, and subsequent levels
 separately so that plate names can appear between coordinates.
 
+The preallocation estimator counts the host once and each fragment by its grid
+multiplicity. On an axis of length L and offset k, a Chain makes
+`(N // L) * max(L - k, 0)` connections, each consuming two ports and one edge.
+Broadcast ties N copies to a hub with N−1 ternary equality factors and N−1
+additional edges, replacing N exposed ports with one. N=1 is a rename.
+Enclosing copy counts multiply these topology changes. An outer bond to a
+generated child port resolves through its explicit coordinates to the leaf's
+domain. If it consumes a Gaussian DATA port, only the affected members move
+from the conditioned parameter group to the ordinary group.
+
+Logical source shapes and ownership determine the source inventory.
+Each source name moves outward through its enclosing plate scopes. Private
+owners use the indexed namespace and multiply the owner count. A source
+introduced by a child also becomes private to each enclosing copy unless it
+matches a direct enclosing declaration. Shared sources are deduplicated
+after scoping. The
+compiled parameter inventory uses the native packer's per-member row shape
+and its actual group address. Its keys and arena names match
+`resource_analysis.state_storage`. The estimator refuses a replacement
+registration even if it reuses a native factor name. Size-dependent packers
+can legally change trailing dimensions after reading the numerical sources.
+
 Scoping prefixes the plate key and records the enclosing `PlateSpec.shared_scope`.
 Fragment names, wiring rules, initializer specs, file paths and per-copy source
 restrictions stay local. Grounding puts tied blobs and their posterior owners
