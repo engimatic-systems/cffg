@@ -1799,6 +1799,19 @@ them. Four rules define the contract:
    template, candidate order, covariance, reset prior, posterior, support,
    number of observed readings and accumulated log evidence.
 
+   `static_parameter_particles.StaticParameterParticles` owns the bounded
+   continuous beta–Gaussian target in D6d. A compiled vectorized call
+   evaluates the registered mean with each physical parameter and uses the
+   same observed Gaussian density as the finite bank. The host owns the
+   normalized log weights, evidence, stratified ancestry, and transaction.
+   The fixed Metropolis kernel runs on both ESS branches and replays applied
+   inputs and readings in chronological order. The replay uses dynamic length
+   inside a geometrically growing history buffer so each new reading can
+   reuse the compiled kernel. The versioned numeric checkpoint binds the
+   registered implementation and exact version, prior, covariance, precision,
+   policy, history, and transformed carry. The callback and compiled kernel
+   are reconstructed locally.
+
    Frame-local appearance regression is owned by `frame_regression.py`.
    `score_pixels` evaluates the expected log likelihood for each pixel
    under each occupied slot. `fit_frame` takes one immutable regression prior,

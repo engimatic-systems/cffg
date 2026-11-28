@@ -832,6 +832,32 @@ or bundling one candidate's Gaussian density. The pendulum example computes
 fresh means from measured angles and candidate lengths.
 [Runnable example](examples/finite_hypotheses.py)
 
+### Continuous static parameter particles
+
+`cffg.static_parameter_particles.StaticParameterParticles` approximates a
+posterior over a static parameter vector. Give it a registered `FunctionSpec`,
+one `[lower, upper]` interval and two positive beta shape parameters per
+coefficient, a known positive-definite Gaussian sensor covariance, and a
+typed JAX key. The registered mean takes the applied input and a candidate
+parameter. Call `update(applied_input, reading)` once for each real reading.
+Use `reading=None` for a missing observation. The model conditions on the
+applied inputs and assumes independent sensor noise across readings.
+
+The update reports the log predictive density estimate, the effective
+sample size before any resampling, ancestry when resampled, and move accept
+counts. Use `particles` and `exp(log_weights)` together for posterior summaries.
+The weighted samples and the per-run evidence estimate have Monte Carlo
+error. Posterior rank checks on simulated data with known parameters can
+assess calibration. Distinct parameter values that predict the same readings
+remain indistinguishable, as the squared-gain example illustrates.
+
+`save(path)` and `StaticParameterParticles.load(path)` retain the target,
+applied history, particles, log weights, evidence, and random key. Restoration
+requires the same registered mean version. Each Metropolis move reevaluates
+the entire observed history. Memory grows with the number of particles and
+readings, and the work per move grows with their product.
+[Runnable example](examples/static_parameter_particles.py)
+
 ## Persist and resume
 
 Choose the artifact by what must continue:
@@ -1011,6 +1037,7 @@ unfinished result and asserts the quantity an experiment should inspect.
 | [cstr_planning.py](examples/cstr_planning.py) | Registered reactor physics, partial goals, status-bearing plans, portable source bundle | Declared short-horizon Gaussian approximation; no hard actuator bounds |
 | [learning_bundle.py](examples/learning_bundle.py) | Declared learning, save/load, later-trial continuation | Current-schema immutable prior plus posterior state |
 | [finite_hypotheses.py](examples/finite_hypotheses.py) | Pendulum length inference from noisy velocity readings | Exact posterior on three specified lengths |
+| [static_parameter_particles.py](examples/static_parameter_particles.py) | Nonlinear gain inference with an ambiguous sign | Finite-particle posterior and evidence estimate |
 | [hybrid_rslds.py](examples/hybrid_rslds.py) | Small recurrent switching LDS | Declared mixture/JJ approximation |
 
 Run one from the repository checkout with, for example:

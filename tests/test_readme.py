@@ -26,6 +26,7 @@ EXAMPLES = {
     "examples/learning_bundle.py",
     "examples/linear_gaussian.py",
     "examples/nonlinear_gaussian.py",
+    "examples/static_parameter_particles.py",
 }
 CAPABILITIES = (
     "Build the graph IR, compose, plate, and edit",

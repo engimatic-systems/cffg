@@ -453,6 +453,17 @@ requires a separate inference rule. The Gaussian update takes one complete
 reading or an explicitly missing row. Correlated readings need a joint
 likelihood or the correct sequential conditional densities.
 
+The continuous static particle implementation in
+`cffg.static_parameter_particles` supports independent beta priors on finite
+intervals and a registered, deterministic Gaussian conditional with known
+covariance. The posterior and single-run evidence are finite-population
+estimates. Sensor ambiguities persist and low effective sample size can
+require more particles. Each fixed Metropolis move replays all readings.
+An arithmetic overflow or a parameter that rounds onto a bound rejects
+initialization or leaves the last committed update intact. This can occur
+with a prior concentrated very close to an interval endpoint. The Gaussian
+conditional has positive density throughout the target's support.
+
 **S1e. Gaussian parameter learning is EM-rollover; flooding VMP is not
 strictly monotone.** Continuous conjugate learning (cff-7c5o, DERIVATIONS.md
 D4) has two honest edges. (1) NIW/MNIW updates run *between* trials from
