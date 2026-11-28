@@ -267,6 +267,53 @@ serialized edit actions and an externally stored replacement array. Pass
 Every declared blob needs an explicit value, including initializer-backed
 blobs. Replay returns independent arrays for fitting.
 
+### Propose an edit to a hidden state
+
+Suppose two hidden room types produce the same signs. You can try merging them,
+run the resulting model on the same recorded signs, and compare its predictions.
+The sign alphabet stays fixed. The edit changes the hidden states and their
+connections to those observations.
+
+```python
+from cffg.structure_operators import MergeStates, RejectedEdit, propose_operator
+from cffg.structure_proposals import replay_proposal
+
+models = {"training-fit": (template, fitted_arrays)}
+edit = MergeStates(selector="place", recipient=0, donor=2)
+proposal = propose_operator("training-fit", models, edit)
+if isinstance(proposal, RejectedEdit):
+    print(proposal.code, proposal.detail)
+else:
+    candidate, arrays = replay_proposal(proposal.record, models, inputs=proposal.inputs)
+```
+
+For this operator, the hidden state has a categorical prior and one fixed
+categorical emission table. The prior may instead receive its mixing weights
+from an in-graph Dirichlet. A merge adds the two masses and averages the
+emission columns in proportion to those masses. Identical columns preserve
+the observable law. Distinct columns can preserve the prediction for a single
+draw while changing the probability of repeated observations with common
+uncertain weights. Compare both models on held-out observations after the edit.
+
+`SplitState` divides the chosen mass and accepts two optional emission
+columns. `PruneState` removes a state and its emission, including a component
+of a Gaussian mixture. Fixed probabilities are renormalized. A Dirichlet
+keeps the surviving concentrations. `AddRegime` tests a training observation
+against the occupied fixed Gaussian components. When their best log density
+falls strictly below the supplied log base density plus log concentration, it
+appends a Gaussian centered at the observation with the supplied covariance.
+An optional capacity bounds the number of components. The concentration gives the new component's mass relative to the previous
+mixing masses (total one for a fixed probability vector).
+
+`PruneGaussianInput` removes an affine factor's input and its independent
+Gaussian prior. The output keeps its offset and noise covariance. This is the
+graph for a zero slope. A finite shrinkage of a regression prior leaves the
+original edge in place and answers a different evidence question. The
+operators consume fixed parameter arrays or the explicit Dirichlet mixing
+prior. An affected external learner requires an explicit fitted point-model
+snapshot before editing. Save the returned record together with its numeric
+inputs to replay the candidate.
+
 ## Filter a slow regime and a fast state
 
 Use `cffg.hierarchy.Hierarchy` when a hidden regime selects the fast dynamics

@@ -124,6 +124,18 @@ class AddBlob:
 
 
 @dataclass(frozen=True)
+class RemoveBlob:
+    """Drop a parameter declaration. Final template validation checks surviving readers."""
+
+    name: str
+
+    def apply(self, t: Template) -> None:
+        if self.name not in t.blobs:
+            raise EditError(f"blob {self.name!r} does not exist")
+        del t.blobs[self.name]
+
+
+@dataclass(frozen=True)
 class RebindBlobPath:
     """Point an existing blob at a new file. Structure hash is unaffected."""
 
@@ -264,6 +276,7 @@ EditAction = (
     | DeclarePort
     | RemovePort
     | AddBlob
+    | RemoveBlob
     | RebindBlobPath
     | SetPlateDims
     | FanOut
@@ -311,6 +324,7 @@ _ACTIONS: dict[str, type] = {
     "declare_port": DeclarePort,
     "remove_port": RemovePort,
     "add_blob": AddBlob,
+    "remove_blob": RemoveBlob,
     "rebind_blob_path": RebindBlobPath,
     "set_plate_dims": SetPlateDims,
     "fan_out": FanOut,

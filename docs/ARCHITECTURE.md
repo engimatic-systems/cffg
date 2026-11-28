@@ -197,6 +197,12 @@ A pure-Python (dataclass) representation, independent of JAX:
   on a file that happens to exist at execution time. Numerical admission
   and scoring use the resulting Template and arrays through the usual
   compiler and inference APIs.
+  The local operators in `structure_operators.py` identify the owner of a
+  hidden selector, resize its categorical or Gaussian emission parameters
+  alongside the selector, and compile both sides of the edit. Deleting a
+  Gaussian predictor removes its input prior and retires unreferenced blobs.
+  A rejected edit returns its reason before the incumbent model changes.
+  Fitting and held-out evaluation consume independent replayed models.
 - **Serialization**: versioned JSON is the canonical structure and constraint
   schema. Array data (A matrices, Dirichlet counts, goal statistics) stays
   outside JSON and is referenced by relative `.npy` or `.safetensors` paths.
