@@ -307,7 +307,7 @@ def _check_agent(t: Template) -> list[str]:
         return []
 
     spec = t.agent
-    if isinstance(spec, (gaussian_agent.GaussianPlanSpec, gaussian_agent.GaussianFilterSpec)):
+    if isinstance(spec, gaussian_agent.GAUSSIAN_WINDOW_SPECS):
         return gaussian_agent.validate_window(t, spec)
     problems: list[str] = []
     action = t.variables.get(spec.action)

@@ -67,11 +67,15 @@ Builder = Callable[..., tuple]  # build_rollout-style: (past, steps) -> (Templat
 
 class RollingAgent:
     @staticmethod
-    def from_gaussian_bundles(plan_path, filter_path, *, n_sweeps=100, tol=1e-7):
-        """Open a fixed affine controller with a serialized joint Gaussian boundary."""
+    def from_gaussian_bundles(plan_path, filter_path, *, n_sweeps=100, tol=1e-7,
+                              select="map", seed=0, on_failure="raise", initial_command=None):
+        """Open affine or known-selector windows with a serialized Gaussian boundary."""
         from cffg.gaussian_agent import GaussianRollingAgent
 
-        return GaussianRollingAgent(plan_path, filter_path, n_sweeps=n_sweeps, tol=tol)
+        return GaussianRollingAgent(
+            plan_path, filter_path, n_sweeps=n_sweeps, tol=tol, select=select,
+            seed=seed, on_failure=on_failure, initial_command=initial_command,
+        )
 
     def __init__(
         self,
