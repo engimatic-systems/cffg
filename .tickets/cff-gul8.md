@@ -1,6 +1,6 @@
 ---
 id: cff-gul8
-status: open
+status: in_progress
 deps: [cml-6ba0]
 links: [cff-cj5h, cff-fxmj, cff-hp3y, cff-4oq8]
 created: 2026-07-10T03:31:28Z
@@ -252,3 +252,11 @@ Intelligible-ticket review: complete.
 **2026-11-28T04:28:29Z**
 
 After splitting cff-cj5h, the concrete dependency is its ledger breakdown child cml-6ba0. The structural lint and MAP tie-policy siblings do not block the predictive DATA-port readout.
+
+**2026-11-28T06:06:46Z**
+
+The names and numerical ownership of the GFE ledger have been implemented at 04e3aca. This separate review branch starts on e6ad56d, the ledger/lint/tie integration submitted for its own suite. Use the host readout change path: retain the existing compiled endpoint and port maps, leave model JSON, saved state and numerical kernels intact. Compare tree flooding and exact schedules, float32/64, fixed support and 64-query-label/64-sensor fanout. A selected single State is the interface; Colony can supply that state. Explicitly reject unsupported paths before computing probabilities.
+
+**2026-11-28T06:14:23Z**
+
+Implemented the public tree readout. A four-way oracle comparison (two schedules and both precisions) agreed with direct enumeration. With 64 class labels and 64 sensors the complete score ordering matched independent naive Bayes. Tests also cover contradictory side observations, absence of support, malformed messages, singleton missing versus observed data, and a damped five-category sensor. The 86 focused readout, compiler assembly and README checks passed on the final source. The full short-suite gate and open review PR remain.

@@ -34,6 +34,15 @@ certificate telling you which happened. Damping and good schedules mitigate;
 nothing eliminates. Every interesting agent model (loops through time, shared
 parameters) is loopy.
 
+`Engine.eig` scores one missing categorical sensor at a time on an acyclic
+sum-product component. Both endpoints must represent categorical random
+variables. The path must use ordinary BP factors or categorical equality.
+Requests involving a loop, a continuous endpoint, max-product inference,
+a parameter carrier, or a path through a constrained update such as VMP or
+P-substitution raise an error. The supplied state carries the evidence from
+branches off the path. After binding a reading, run inference to convergence
+before scoring the other sensors.
+
 **H2. The posterior family is bounded by the constraint vocabulary.** The
 papers' mean-field and structured factorizations discard posterior correlations
 across beads by construction. This runtime executes registered naive

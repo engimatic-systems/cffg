@@ -114,6 +114,8 @@ EPIC_FILES = {
         "test_run_strategies.py",
         "test_ledger.py",
         "test_readout_owners.py",
+        "test_sensing_information.py",
+        "test_sensing_boundaries.py",
         "test_extension_ownership.py",
         "test_colony_failures.py",
         "test_constraint_data.py",

@@ -52,6 +52,8 @@ def assemble_arena(
         n_slots=topology.n_slots,
         message_starts=data.message_starts,
         edges=edges,
+        endpoints=topology.endpoints,
+        ports=topology.ports,
         groups=data.groups,
         data_slots=registered.data_slots,
         semiring=semiring,

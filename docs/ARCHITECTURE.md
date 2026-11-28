@@ -1263,6 +1263,7 @@ layout protocols, so readouts do not duplicate segment-index arithmetic.
 | Readout surface | Owner |
 | --- | --- |
 | Categorical edge marginals, BP/VMP node beliefs and decoding | `readouts/discrete.py` |
+| Predictive information between a categorical query and missing DATA ports | `readouts/sensing.py` |
 | Dirichlet parameter/goal beliefs and next-trial prior readout | `readouts/parameters.py` |
 | Gaussian marginals, node statistics and mixture predictives | `readouts/gaussian.py` |
 | Recurrence pair beliefs and coefficient-learning statistics | `readouts/recurrence.py`, using the existing `cffg.recurrence` algebra |
@@ -1270,6 +1271,15 @@ layout protocols, so readouts do not duplicate segment-index arithmetic.
 | Hybrid GFE diagnostic channels | `readouts/hybrid.py`, using the existing D5 diagnostic rules |
 | Optional declared kernel readouts | `readouts/registered.py` |
 | Public readout value records and named readout dependencies | `readouts/types.py` |
+
+The sensing readout uses the compiled incidence and port maps to find each
+unique path from the query to a sensor. Each factor contributes its potential
+and incoming messages from side branches. The two end messages complete the
+joint. Summing over the internal categories in log space counts each factor
+once. An equality factor carries one shared category across the path. A
+component-wide support check accounts for conflicting observations on side
+branches even when a failed solver has returned locally uniform messages.
+The normalized joint gives the expected reduction in query entropy in nats.
 
 Engine retains its public signatures, docstrings and value-type import aliases.
 Its readout methods are delegates, with current public readout callbacks passed

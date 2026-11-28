@@ -366,12 +366,39 @@ Readouts are family-specific on purpose:
 
 | Model family | Readouts to inspect |
 |---|---|
-| Discrete | `marginals`, `node_beliefs`, `dirichlet_marginals`, `goal_marginals`, `goal_prior_updates` |
+| Discrete | `marginals`, `node_beliefs`, `eig`, `dirichlet_marginals`, `goal_marginals`, `goal_prior_updates` |
 | Gaussian | `gaussian_marginals`, `gaussian_node_stats` |
 | Exponential family | `ef_marginals`; check every marginal's `proper` field before using its mean |
 | Hybrid recurrence/mixture | `recurrence_pair_beliefs`, `recurrence_weight_stats`, `gaussian_mixture_predictives`, `hybrid_gfe_diagnostics` |
 | Registered extension | `kernel_readouts` when the binding declares one |
 | Discrete max-product | `decode` plus `objective`; BFE is deliberately undefined |
+
+### Which sensor would tell me the most?
+
+Suppose a hidden variable is the room you are in. Two sensors can tell you the
+wall color and whether a door is open. For each sensor, `Engine.eig` asks how
+much uncertainty about the room you would expect to resolve by reading it.
+A sensor that gives the same reading in every room scores zero. A sensor that
+distinguishes two equally likely rooms perfectly scores `log(2)`, about 0.693 nats.
+
+With a model whose query edge is named `room` and whose missing DATA ports are
+`color` and `door`, the call is
+
+```python
+state = engine.run(state, 80).require_converged()
+information = engine.eig(state, "room", ["color", "door"])
+```
+
+The result maps each port name, in request order, to its mutual information
+with the query in nats. Re-run inference after changing the evidence so the
+messages include that evidence. Each sensor is scored separately. The caller
+chooses how to account for the cost of reading it.
+
+This readout supports missing discrete DATA ports in acyclic sum-product
+components. It rejects continuous variables, parameter carriers, loopy
+components, max-product inference, and paths through VMP factors, GFE
+composites or unsupported constraints. For the epistemic term already charged
+to a planning objective, use `engine.fe_breakdown(state)`.
 
 For a `gaussian_mixture` learner, call
 `engine.gaussian_node_stats(state, centered_mixtures=True)`. Each component

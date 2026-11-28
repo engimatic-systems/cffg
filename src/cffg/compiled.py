@@ -14,6 +14,7 @@ import numpy as np
 
 from cffg import kernels
 from cffg._immutable import FrozenArray, ImmutableRecord
+from cffg.core.ir import PortSpec
 
 NEG = -1.0e30  # Reserved log-space zero sentinel.
 
@@ -516,6 +517,10 @@ class Arena(ImmutableRecord):
     learn_plans: tuple[LearnPlan, ...] = field(default_factory=tuple)
     # Declared learnables resolved to stat sources and write targets (cff-x0sv).
     gaussian_taps: Mapping[str, int] = field(default_factory=dict)  # equality leg -> observation row
+
+    # Share immutable source incidence and boundary names with host readouts.
+    endpoints: Mapping[str, tuple[tuple[str, str], ...]] = field(default_factory=dict)
+    ports: Mapping[str, PortSpec] = field(default_factory=dict)
 
     @property
     def interior_slot_pairs(self) -> np.ndarray:
