@@ -11,6 +11,7 @@ import numpy as np
 
 from cffg._immutable import ImmutableRecord, freeze
 from cffg.compiled import EdgeInfo
+from cffg.compiler_errors import CompileError
 from cffg.core.ir import (
     ConstraintSpec,
     PortRole,
@@ -98,6 +99,37 @@ class TopologyLayout(ImmutableRecord):
     g_lam_lengths: tuple[int, ...]
     data_candidates: tuple[DataCandidate, ...]
     port_problems: tuple[str, ...]
+
+
+def validate_slot_addresses(layout: TopologyLayout) -> None:
+    """Check generated bindings against the domain's layout before packing arrays."""
+    if len(layout.message_lengths) != layout.n_slots:
+        raise CompileError("discrete slot count differs from the message layout")
+    if len(layout.g_eta_lengths) != layout.n_gslots or len(layout.g_lam_lengths) != layout.n_gslots:
+        raise CompileError("Gaussian slot count differs from the natural parameter layout")
+    for name, edge in layout.edges.items():
+        count = layout.n_slots
+        if edge.dim:
+            count = layout.n_gslots
+        elif edge.ef:
+            count = layout.n_efslots
+        if not (0 <= edge.slot0 < count and 0 <= edge.slot1 < count) or edge.slot0 == edge.slot1:
+            raise CompileError(f"edge {name!r} has invalid slots {(edge.slot0, edge.slot1)} for {count} slots")
+        for index, endpoint in enumerate(layout.endpoints[name]):
+            outgoing = edge.slot0 if index == 0 else edge.slot1
+            incoming = edge.slot1 if index == 0 else edge.slot0
+            if layout.slot_of.get(endpoint) != outgoing or layout.opposite.get(endpoint) != incoming:
+                raise CompileError(f"endpoint {endpoint!r} does not address its edge {name!r}")
+    for candidate in layout.data_candidates:
+        declared = layout.ports.get(candidate.port)
+        edge = layout.edges.get(candidate.variable)
+        if (declared is None or declared.role is not PortRole.DATA or declared.variable != candidate.variable or edge is None
+                or layout.endpoints[candidate.variable] != (candidate.endpoint,)
+                or candidate.external_slot != edge.slot1):
+            raise CompileError(
+                f"DATA port {candidate.port!r} has invalid external slot {candidate.external_slot} "
+                f"for edge {candidate.variable!r}"
+            )
 
 
 def prefix_offsets(lengths: tuple[int, ...] | np.ndarray) -> np.ndarray:

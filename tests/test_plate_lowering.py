@@ -139,3 +139,26 @@ def test_registered_callback_receives_concrete_source_records():
         assert seen == [("p/0/interaction", "p/1/interaction")] * 2
     finally:
         kernels.unregister_kernel(kernel.factor_type.name)
+
+
+@pytest.mark.parametrize("fault", ["negative", "past_end", "different_port", "gather", "edge"])
+def test_compile_rejects_invalid_generated_slot(monkeypatch, fault):
+    from cffg import plate_lowering
+    from cffg.compiler_errors import CompileError
+
+    real_layout = plate_lowering.layout_addresses
+
+    def wrong_address(*args, **kwargs):
+        plan = real_layout(*args, **kwargs)
+        first, second = plan.data_candidates
+        if fault == "gather":
+            return replace(plan, opposite={**plan.opposite, first.endpoint: -1})
+        if fault == "edge":
+            edge = plan.edges[first.variable]
+            return replace(plan, edges={**plan.edges, first.variable: replace(edge, slot1=plan.n_slots)})
+        bad = {"negative": -1, "past_end": plan.n_slots + 1, "different_port": second.external_slot}[fault]
+        return replace(plan, data_candidates=(replace(first, external_slot=bad), second))
+
+    monkeypatch.setattr(plate_lowering, "layout_addresses", wrong_address)
+    with pytest.raises(CompileError, match="p/0/"):
+        compile_template(plate(pixel_fragment(), (2,)), arrays={})
