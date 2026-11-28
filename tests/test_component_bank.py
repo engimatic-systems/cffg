@@ -37,6 +37,27 @@ def words(bank, field, i):
     return exact(getattr(bank, field)[i], getattr(bank.carry, field)[i])
 
 
+def rational_merge(s, receiver, donor):
+    """Sum raw natural parameters before recovering the centered scale."""
+    rows = [(s.posterior, receiver), (s.posterior, donor), (s.reset_prior, donor)]
+
+    def combine(items):
+        kept, added, reset = items
+        return kept + added - reset
+
+    def totals(field):
+        return combine(words(bank, field, i) for bank, i in rows)
+
+    kappa = np.asarray(totals("kappa"), dtype=object).item()
+    mean = combine(words(bank, "kappa", i) * words(bank, "mu", i) for bank, i in rows) / kappa
+    second = combine(words(bank, "psi", i) + words(bank, "kappa", i) * np.outer(
+        words(bank, "mu", i), words(bank, "mu", i)) for bank, i in rows)
+    categories = tuple(combine(exact(bank.categories[h][i], bank.carry.categories[h][i])
+                               for bank, i in rows) for h in range(len(s.posterior.categories)))
+    return MixedCarry(mean, kappa, second - kappa * np.outer(mean, mean),
+                      totals("nu"), totals("alpha"), categories)
+
+
 def test_empty_full_and_donor_generation_after_replay(tmp_path):
     p = prior(active=(False, False))
     empty = ComponentBank(p)
@@ -143,22 +164,7 @@ def test_exact_fraction_oracle_for_every_high_and_low_word(dtype):
     result = restored.propose_merge(restored.reference(0), restored.reference(1))
     assert result.status == SlotStatus.OK
     post = result.bank.posterior
-    # Independent raw natural-coordinate oracle using rational numbers.
-    triplet = [(s.posterior, 0), (s.posterior, 1), (s.reset_prior, 1)]
-    def combine(items):
-        a, b, c = items
-        return a + b - c
-    def totals(field):
-        return combine(words(b, field, i) for b, i in triplet)
-    def scalar(value):
-        return np.asarray(value, dtype=object).item()
-    k = scalar(totals("kappa"))
-    m = combine(words(b, "kappa", i) * words(b, "mu", i) for b, i in triplet) / k
-    moment = combine(words(b, "psi", i) + words(b, "kappa", i) * np.outer(
-        words(b, "mu", i), words(b, "mu", i)) for b, i in triplet)
-    expected = MixedCarry(m, k, moment - k * np.outer(m, m), totals("nu"), totals("alpha"),
-                          tuple(combine(exact(b.categories[h][i], b.carry.categories[h][i])
-                                        for b, i in triplet) for h in range(len(p.categories))))
+    expected = rational_merge(s, 0, 1)
     row = jax.tree.map(lambda a: a[0], post)
     primary = MixedCarry(*(getattr(row, name) for name in MixedCarry._fields))
     for hi, lo, target in zip(jax.tree.leaves(primary), jax.tree.leaves(row.carry),

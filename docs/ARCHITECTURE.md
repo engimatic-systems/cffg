@@ -1779,7 +1779,13 @@ them. Four rules define the contract:
    records for its reset prior and posterior. The optional exact lifecycle v1
    envelope retains the original pair of v3 mixed records. Both codecs validate
    identity metadata and require dormant parameters to match the reset prior.
-   Device-to-host conversion uses the exact codec.
+   Device-to-host conversion uses the exact codec. Compiled component merges
+   subtract the donor's reset statistics in receiver-centered coordinates.
+   When both donor mean words equal their prior words, the shared Gaussian
+   moments use the excess count directly. A host-boundary retry on
+   `NUMERICAL_RANGE` transfers three selected rows for rational arithmetic,
+   validates the rounded posterior, and updates the two slots on device.
+   The caller scores the resulting candidate before adopting it.
 
    Frame-local appearance regression is owned by `frame_regression.py`.
    `score_pixels` evaluates the expected log likelihood for each pixel
