@@ -506,3 +506,145 @@ def test_centered_mniw_rejects_rank_loss_in_stored_precision():
     mean[0, 1:] = 2.**27
     with pytest.raises(ValueError, match="column precision unresolved at stored precision"):
         prior.update_centered(mean, covariance, [1.])
+
+
+@pytest.mark.parametrize("regression", [False, True])
+def test_joint_samples_match_covariance_precision_logdet_and_conditional_laws(regression):
+    from jax import random
+    from scipy.special import digamma, multigammaln
+    from scipy.stats import chi2, invwishart
+
+    psi = np.array([[3., -.9], [-.9, 1.5]])
+    nu, kappa, n = 11.5, 2.5, 8192
+    if regression:
+        center = np.array([[2., -1., .5], [.3, 4., 1.]])
+        lam = np.array([[3., 1., -.4], [1., 2., .5], [-.4, .5, 1.]])
+        post = conj.MNIW(center, lam, psi, nu)
+    else:
+        center = np.array([2., -.5])
+        post = conj.NIW(center, kappa, psi, nu)
+
+    parameters, sigma = post.sample(random.key(9183), n)
+
+    def check_mean(values, expected):
+        error = np.abs(values.mean(axis=0) - expected)
+        assert np.all(error <= 7 * values.std(axis=0, ddof=1) / np.sqrt(len(values)))
+
+    # Sigma^-1 has the Wishart law with scale inv(psi).
+    check_mean(sigma, psi / (nu - 3))
+    check_mean(np.linalg.inv(sigma), nu * np.linalg.inv(psi))
+    d = len(psi)
+    log_scale = np.linalg.slogdet(psi)[1]
+    logdet = log_scale - d * np.log(2) - digamma((nu - np.arange(d)) / 2).sum()
+    check_mean(np.linalg.slogdet(sigma)[1], logdet)
+    # The trace term in the inverse-Wishart log density has expectation nu*d.
+    log_normalizer = nu * (log_scale - d * np.log(2)) / 2 - multigammaln(nu / 2, d)
+    entropy = -log_normalizer + (nu + d + 1) * logdet / 2 + nu * d / 2
+    check_mean(-invwishart.logpdf(sigma.transpose(1, 2, 0), df=nu, scale=psi), entropy)
+    check_mean(parameters, center)
+    delta = parameters - center
+    if regression:
+        unit = np.linalg.solve(np.linalg.cholesky(sigma), delta) @ np.linalg.cholesky(lam)
+    else:
+        unit = np.linalg.solve(np.linalg.cholesky(sigma), delta[..., None]) * np.sqrt(kappa)
+    unit = unit.reshape(n, -1)
+    # The conditional residual is standard normal in either covariance stratum.
+    upper = sigma[:, 0, 0] > np.median(sigma[:, 0, 0])
+    for group in (unit[upper], unit[~upper]):
+        check_mean(group, np.zeros(unit.shape[1]))
+        check_mean(group[:, :, None] * group[:, None, :], np.eye(unit.shape[1]))
+        qs = np.array([.1, .5, .9])
+        squared_radius = (group**2).sum(axis=1)
+        below_quantile = squared_radius[:, None] <= chi2.ppf(qs, unit.shape[1])
+        check_mean(below_quantile.astype(float), qs)
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_joint_samples_shape_replay_independent_keys_and_units(dtype):
+    from jax import enable_x64, random
+
+    d = 32
+    sd = np.geomspace(1e-9, 1e9, d).astype(dtype)
+    psi = sd[:, None] * ((np.eye(d, dtype=dtype) + dtype(.1)) * sd)
+    left, right = random.split(random.key(714))
+    for post in (conj.NIW(np.zeros(d, dtype), 1., psi, d + 4.),
+                 conj.MNIW(np.ones((d, 3), dtype), np.eye(3, dtype=dtype), psi, d + 4.)):
+        with enable_x64(False):
+            params, cov = post.sample(left)
+        again = post.sample(left, (1,))
+        other = post.sample(right)
+        for a, b, c in zip((params, cov), again, other, strict=True):
+            np.testing.assert_array_equal(a, b[0])
+            assert a.dtype == dtype and np.isfinite(a).all() and not np.array_equal(a, c)
+        for shape in [(2, 3), (0,)]:
+            draws, covs = post.sample(left, shape)
+            assert draws.shape == shape + params.shape
+            assert covs.shape == shape + (d, d)
+            np.linalg.cholesky(covs / sd[:, None] / sd)
+        assert params.shape == ((d, 3) if isinstance(post, conj.MNIW) else (d,))
+
+
+def test_joint_samples_accept_fractional_heavy_tails_and_scalar_covariance():
+    from jax import random
+    from scipy.stats import chi2
+
+    # Degrees between d-1 and d are proper. For d=1, psi / Sigma is chi-square.
+    post = conj.NIW(np.array([1.]), 2., np.array([[3.]]), .75)
+    with pytest.raises(ValueError, match="undefined"):
+        post.mean_cov()
+    mu, sigma = post.sample(random.key(86), 4096)
+    assert mu.shape == (4096, 1) and sigma.shape == (4096, 1, 1)
+    qs = np.array([.1, .5, .9])
+    fractions = (3. / sigma[:, 0, 0, None] <= chi2.ppf(qs, .75)).mean(axis=0)
+    np.testing.assert_array_less(np.abs(fractions - qs), 7 * np.sqrt(qs * (1 - qs) / len(mu)))
+
+
+def test_joint_samples_reject_bad_parameters_and_unrepresentable_draws():
+    from jax import random
+
+    key = random.key(19)
+    psi = np.eye(2, dtype=np.float32)
+    for bad in (np.inf, np.nan):
+        with pytest.raises(ValueError, match="nu"):
+            conj.NIW(np.zeros(2), 1., psi, bad).sample(key)
+        with pytest.raises(ValueError, match="kappa"):
+            conj.NIW(np.zeros(2), bad, psi, 4).sample(key)
+    for make in (lambda: conj.NIW(np.zeros(2), 0., psi, 3),
+                 lambda: conj.MNIW(np.ones((2, 3)), np.eye(3), psi, 1),
+                 lambda: conj.MNIW(np.ones((2, 3)), np.eye(2), psi, 3),
+                 lambda: conj.NIW(np.zeros((2, 1)), 1., psi, 3),
+                 lambda: conj.NIW(np.array([0., np.nan]), 1., psi, 3)):
+        with pytest.raises(ValueError):
+            make().sample(key)
+    post = conj.MNIW(np.zeros((2, 2)), psi.copy(), psi.copy(), 4.)
+    for matrix in (post.psi, post.lam):
+        for bad in ([[1., 1.], [1., 1.]], [[1., np.inf], [np.inf, 1.]],
+                    [[1., .8], [.2, 1.]], [[1., .99999994], [.99999994, 1.]]):
+            matrix[:] = bad
+            with pytest.raises(ValueError, match="positive definite"):
+                post.sample(key)
+        matrix[:] = psi
+    for shape in (-1, 1.5, True):
+        with pytest.raises((ValueError, TypeError)):
+            post.sample(key, shape)
+    with pytest.raises((TypeError, ValueError)):
+        post.sample(random.split(key, 2))
+    heavy = conj.NIW(np.zeros(1), 1., np.eye(1), np.finfo(float).tiny)
+    with pytest.raises(FloatingPointError):
+        heavy.sample(key)
+
+
+def test_joint_sample_fails_when_a_returned_float32_covariance_loses_rank():
+    from jax import random
+
+    # The law is proper. In this keyed batch the largest and smallest sample
+    # variances along principal axes can no longer both be resolved in float32.
+    key = random.key(35)
+    post64 = conj.NIW(np.zeros(2), 1., np.eye(2), 1.5)
+    _, cov = post64.sample(key, 256)
+    sd = np.sqrt(np.diagonal(cov, axis1=1, axis2=2))
+    corr = cov / sd[..., None] / sd[:, None, :]
+    assert np.linalg.eigvalsh(corr)[:, 0].min() < 2 * np.finfo(np.float32).eps
+    post32 = conj.NIW(post64.mu.astype(np.float32), 1., post64.psi.astype(np.float32), post64.nu)
+    with pytest.raises(FloatingPointError, match="unresolved"):
+        post32.sample(key, 256)

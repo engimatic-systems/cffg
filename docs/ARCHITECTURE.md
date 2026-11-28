@@ -1706,6 +1706,11 @@ them. Four rules define the contract:
    `niw/gaussian`; ordinary `MNIW` serves `mniw/gaussian_linear`, including the
    conditioned runtime group used by observed outputs. The rSLDS declares its
    shared emission this way and pools every tied time slice.
+   The public `cffg.NIW` and `cffg.MNIW` value objects can also draw joint
+   parameters on the host. Each call uses its explicit JAX key to seed a local
+   NumPy PCG64 generator and uses the same sampled covariance factor to
+   generate its paired conditional mean or regression coefficients. The caller
+   owns the keys and the sampled values. D4.2 gives the factorization.
    `component_mniw/gaussian_mixture_linear` adds one MNIW posterior per
    selector state, and `pg_weights/recurrence_link` adds one Gaussian natural-
    parameter posterior per source regime and stick. Precision and EF factors

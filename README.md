@@ -714,6 +714,26 @@ the continuous/hybrid cadence is empirical Bayes rather than full joint
 variational Bayes. See
 [examples/learning_bundle.py](examples/learning_bundle.py).
 
+`NIW.sample(key)` returns one mean vector and its covariance.
+`MNIW.sample(key)` returns the full regression matrix `[A b]` and its
+noise covariance. The location or coefficients are conditional on the same
+covariance draw. Pass `sample_shape=20` or a tuple such as `(4, 5)` to
+prepend batch dimensions to both arrays. A single draw retains every event
+axis, including a one-dimensional covariance's `(1, 1)` shape.
+
+Use a scalar JAX random key, splitting it for independent calls. The same
+key, posterior, batch shape, and software environment reproduce the same
+pair of NumPy arrays. Call the method outside `jax.jit` and `jax.vmap`,
+using `sample_shape` for a batch. Sampling runs between trials with
+float64 working arithmetic and the common dtype of the location and scale
+matrices for both outputs. A proper inverse-Wishart law requires
+`nu > d - 1`. Its average covariance exists for `nu > d + 1`.
+If a draw overflows
+or loses covariance rank at output precision, the call raises
+`FloatingPointError`. The example compares a draw with the covariance used
+by `rollover()` and the posterior average reported by `mean_cov()`.
+[Joint Gaussian draws](examples/joint_gaussian_draws.py)
+
 A declared `component_niw` learns the means and full covariances of a
 `gaussian_mixture` from its centered conditional moments. When a record
 also contains categorical evidence, use `cffg.mixed_learning` to update all
