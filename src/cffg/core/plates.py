@@ -149,18 +149,22 @@ def _scope_copy(
         s(pt.name): PortSpec(s(pt.name), s(pt.variable), pt.role) for pt in frag.ports.values()
     }
     per_copy_blobs = _scoped_blob_refs(frag, prefix, index, per_copy)
-    per_copy_learnables = {
-        s(ln.name): LearnableSpec(
-            s(ln.name),
+    per_copy_learnables = _scoped_learnables(frag, prefix, per_copy)
+    return variables, factors, constraints, ports, per_copy_blobs, per_copy_learnables
+
+
+def _scoped_learnables(fragment, prefix, per_copy):
+    return {
+        _scoped(prefix, ln.name): LearnableSpec(
+            _scoped(prefix, ln.name),
             ln.family,
-            tuple(sb(b) for b in ln.blobs),
-            None if ln.sources is None else tuple(s(f) for f in ln.sources),
+            tuple(_scoped(prefix, b) for b in ln.blobs),
+            None if ln.sources is None else tuple(_scoped(prefix, f) for f in ln.sources),
             ln.semantic_identity,
         )
-        for ln in frag.learnables.values()
+        for ln in fragment.learnables.values()
         if set(ln.blobs) <= per_copy
     }
-    return variables, factors, constraints, ports, per_copy_blobs, per_copy_learnables
 
 
 def _install_shared(out: Template, plate: str, spec: PlateSpec) -> None:
