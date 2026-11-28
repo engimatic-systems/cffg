@@ -591,7 +591,7 @@ def build_schedule(arena: Arena, mode: str = "auto") -> Schedule:
                 prime_stages=forest_passes,
             )
         )
-    island_stages = forest_passes + colored_sweep
+    island_stages = forest_passes + colored_sweep if colored_sweep else forest_passes
     return sealed(
         Schedule(
             kind="mixed",

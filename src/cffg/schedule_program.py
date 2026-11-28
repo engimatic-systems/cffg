@@ -95,15 +95,17 @@ def build_schedule_program(
     if schedule.prime_stages:
         prime_raw = (
             island
-            if schedule.prime_stages == schedule.stages
+            if schedule.prime_stages is schedule.stages
             else make_propagate(arena, schedule.prime_stages, executors)
         )
         prime = eqx.filter_jit(prime_raw)
     if schedule.kind == "mixed":
         phase_step = make_sweep(arena, True)
         if schedule.forest_stages:
-            reconstruct = eqx.filter_jit(
-                make_propagate(arena, schedule.forest_stages, executors)
+            # Forest-only priming and reconstruction use the same stage tuple.
+            reconstruct = (
+                prime if schedule.forest_stages is schedule.prime_stages
+                else eqx.filter_jit(make_propagate(arena, schedule.forest_stages, executors))
             )
 
         def iter_step(
