@@ -1,7 +1,7 @@
 ---
 id: ctcp-w305
 status: open
-deps: [ctcp-6msb]
+deps: [ctcp-6msb, ctcl-p70e]
 links: []
 created: 2026-11-28T04:50:36Z
 type: feature
