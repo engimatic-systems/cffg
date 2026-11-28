@@ -1,6 +1,6 @@
 ---
 id: cssr-5izj
-status: in_progress
+status: closed
 deps: [cssr-h31p]
 links: []
 created: 2026-11-28T05:28:14Z
@@ -31,3 +31,7 @@ Host archive layer using existing Template, typed-port composition, model bundle
 **2026-11-28T06:50:52Z**
 
 The three fixed binary examples, portable archive and GLUE attachment API are implemented in cffg.structure_fragments. IDs include complete Template, source, description, named ports with ordered outcomes and exact numeric content. All three loaded and composed in a fresh interpreter. Native posterior and ordinary Bethe evidence matched independent probabilities for hit, miss and missing readings and both selector values. A ten-slice persistence graph retained all ten sensors and an unrelated host DATA port. Swapped numeric contents, altered dtype, reversed labels, incompatible role/domain and wrong expected ID were exercised. 39 focused fragment, proposal, edit, compose and serialization tests passed. No application or scoring campaign ran.
+
+**2026-11-28T13:53:01Z**
+
+Implemented at 1354a21. All 39 focused checks passed, including fresh-process restore, ten composable copies, and native posterior and energy checks for each of the three fragments. The serial dashboard gate passed all 2,820 selected tests in 1,202.498 s. The shared 18 opt-in marks from d71952b (local fc35a77) cover 14.691 measured case seconds, giving an estimated 1,187.807 s. Collection verified 2,802 short plus 528 slow, all 3,330 IDs retained. Dashboard and per-ID durations are in ~/agent-share/cffg-backlog-gates/cssr-5izj/.
