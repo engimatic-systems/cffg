@@ -260,7 +260,6 @@ def make_sweep(arena: Arena, skip_scheduled: bool = False, *,
     )
     op = jnp.max if arena.semiring == "max" else logsumexp
     failures = FailureIndex(arena)
-    local_discrete = discrete_executor or _execute_discrete
 
     def step(
         messages: jax.Array,
@@ -284,7 +283,8 @@ def make_sweep(arena: Arena, skip_scheduled: bool = False, *,
                 inc = _disc_both(arena, messages, g.gather_both, g.cards)
             else:
                 inc = _disc_rows(arena, messages, g.gather, g.cards)
-            delta = local_discrete(g, inc, _kernel_params(g, params), op)
+            local = (g, inc, _kernel_params(g, params), op)
+            delta = (_execute_discrete(*local) if discrete_executor is None else discrete_executor(*local))
             failure = simultaneous_failure(failure, failures.delta(g, delta, "disc", discrete_dtype=messages.dtype))
             out = delta.outgoing
             new = _set_disc_rows(arena, new, g.scatter, g.cards, out)
