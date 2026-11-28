@@ -159,6 +159,7 @@ EPIC_FILES = {
         "test_neural.py",
         "test_fixed_point_gradients.py",
         "test_neural_training.py",
+        "test_physical_mean_training.py",
         "test_neural_gfe.py",
         "test_amortization.py",
         "test_gaussian_kernel_schedules.py",

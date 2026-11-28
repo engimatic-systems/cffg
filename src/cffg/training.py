@@ -1,4 +1,4 @@
-"""Deterministic full-batch Adam training of certified neural Gaussian means."""
+"""Deterministic full-batch Adam training of registered Gaussian mean functions."""
 
 from dataclasses import asdict, dataclass
 import json
@@ -17,7 +17,7 @@ from cffg.implicit import FixedPointDifferentiator, FixedPointGradient, Gradient
 from cffg.neural_artifacts import array_digest, read_artifact, write_artifact
 from cffg.resolution.sources import resolve_arrays
 from cffg.runtime_types import RunResult, RunStatus, _replace
-from cffg.trainable import NeuralParameters
+from cffg.trainable import MeanParameters
 
 
 @dataclass(frozen=True)
@@ -70,11 +70,11 @@ class TrainingStep:
 
     def require_applied(self):
         if not self.applied:
-            raise ValueError(f"neural update refused: {self.message}")
+            raise ValueError(f"mean parameter update refused: {self.message}")
         return self.state
 
 
-class NeuralTrainer:
+class MeanTrainer:
     """A fixed training problem with explicit, immutable optimizer state.
 
     Recreate with the original template, initial blobs, observations and settings
@@ -98,9 +98,9 @@ class NeuralTrainer:
         self.engine = Engine(compile_template(expanded, arrays=self.arrays))
         if (self.engine.arena.semiring != "sum" or self.engine.arena.mu3_groups
                 or len(self.engine.arena.delta_pairs)):
-            raise ValueError("neural training requires a deterministic smooth sum-product graph")
+            raise ValueError("mean training requires a deterministic smooth sum-product graph")
         state = self.engine.bind_data(self.engine.init_state(), observations)
-        self.parameters = NeuralParameters.from_engine(self.engine, state.params, factors)
+        self.parameters = MeanParameters.from_engine(self.engine, state.params, factors)
         self.initial_weights = self.parameters.extract(state.params)
         self.dtype = np.asarray(self.initial_weights).dtype
         self.reference = self.engine.run(state, self.config.inference_iterations,
@@ -184,7 +184,7 @@ class NeuralTrainer:
         metadata, arrays = read_artifact(path, format_name="cffg.neural.adam",
                                          fields=("weights", "first_moment", "second_moment", "step"))
         if metadata != self._metadata:
-            raise ValueError("neural checkpoint model, data, parameter layout or configuration mismatch")
+            raise ValueError("training checkpoint model, data, parameter layout or configuration mismatch")
         step = arrays["step"]
         if step.shape != () or step.dtype != np.dtype("int64"):
             raise ValueError("optimizer step must be a scalar int64")
@@ -200,3 +200,7 @@ class NeuralTrainer:
         self._validate(state)
         arrays = {**self.arrays, **self.parameters.values(state.weights)}
         save_bundle(path, self.template, arrays)
+
+
+class NeuralTrainer(MeanTrainer):
+    """Compatible name for the full-batch point trainer used by neural means."""

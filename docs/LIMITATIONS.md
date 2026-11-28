@@ -839,14 +839,21 @@ need not make the total reported energy stationary, and that energy has no
 established nonlinear evidence bound. Exact zero noise remains cff-u06e;
 arbitrary nonlinear P-substitution and Gaussian-only GFE are unsupported.
 
-Neural training differentiates the complete adaptive root and approximate
-ledger under a local isolated differentiable-root assumption (D14). Root and
+Point training for registered physical and neural means differentiates the
+complete adaptive root and approximate ledger under a local isolated
+differentiable-root assumption (D14). Root and
 original-adjoint residual checks detect failed or exhausted numerical solves;
 they do not prove nonsingularity in every direction, global uniqueness or a
 minimum. Stochastic mu3 and discrete point-mass decisions are rejected.
 Adam continuation is deterministic and full-batch; it binds the original
 training initialization and data. It does not provide weight uncertainty,
 minibatch scheduling or conjugate posterior learning.
+
+A converged step can have a zero gradient for every value of a physical
+constant. For example, a temperature reading at zero elapsed time carries no
+information about the cooling rate. The trainer reports a point estimate and
+Adam moments. The separate finite parameter bank computes posterior weights
+over the supplied candidates using their declared likelihoods.
 
 The learned initializer is an affine recognition output layer over declared
 polynomial features of scalar Gaussian observations. It predicts Gaussian

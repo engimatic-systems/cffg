@@ -96,7 +96,7 @@ example.
 | [Build or fit an rSLDS](#continuous-exponential-family-and-hybrid-models) | `rslds`; `fit_rslds`; `PCAARHMMInitializer`; rSLDS learning classes | Recurrent switching LDS inference, learning, observed-only fitting | Fit status, attempts, marginals, FE/residual traces | Empirical-Bayes variational fit with declared hybrid/JJ approximations | [hybrid_rslds.py](examples/hybrid_rslds.py) | **Bounded:** budget exhaustion is preserved; no broad recovery-superiority claim |
 | [Use nonlinear Gaussian factors](#nonlinear-and-neural-gaussian-models) | `FunctionSpec`; `register_mean_function`; `moment_matching` | Taylor or fixed sigma-point positive-noise Gaussian factors | Gaussian marginals, `objective_metadata`, `objective_contract` | Frozen-Gaussian surrogate; adaptive consistency is not an evidence bound | [Sensor](examples/nonlinear_gaussian.py), [reactor planning](examples/cstr_planning.py) | **Bounded:** declared reactor inputs; zero noise, nonlinear GFE, and continuous-to-discrete means are unsupported |
 | [Use neural means and fixed-point gradients](#nonlinear-and-neural-gaussian-models) | `neural_mean`; `initialize_neural_parameters`; `FixedPointDifferentiator`; `fixed_point_gradient` | Dense MLP mean inside a positive-noise nonlinear Gaussian factor | Gradient status, adjoint/root residuals, parameter gradient | Local derivative of the certified adaptive root and surrogate ledger | [API pattern](#nonlinear-and-neural-gaussian-models) | **Bounded:** local isolated-root assumption; no weight uncertainty or stochastic mu3 |
-| [Train or amortize neural inference](#nonlinear-and-neural-gaussian-models) | `NeuralTrainer`; `TrainingConfig`; `GaussianAmortizer`; `PolynomialFeatures` | Deterministic full-batch Adam and Gaussian recognition initialization | Training/continuation state and proposed Gaussian messages | Optimizes the same approximate adaptive objective | [API pattern](#nonlinear-and-neural-gaussian-models) | **Bounded:** no minibatching, discrete point decisions, or universal speedup claim |
+| [Train physical or neural means and amortize inference](#nonlinear-and-neural-gaussian-models) | `MeanTrainer`, `NeuralTrainer`, `TrainingConfig`, `GaussianAmortizer`, `PolynomialFeatures` | Full-batch Adam point training and Gaussian recognition initialization | Fitted values, optimizer state and proposed Gaussian messages | Differentiates the certified adaptive objective | [Cooling rate](examples/physical_mean_training.py) | **Bounded:** deterministic point estimates and local gradient certificates |
 | [Use hard constraints or MAP](#hard-constraints-and-map) | Constraint factors; `compile_template(..., semiring="max")`; `cffg.csp` | Sum-product CSP marginals or discrete max-product | Marginals/BFE, or `decode` and `objective` | Exact tree partition/MAP identities; loopy max-product is bounded | [hard_constraint.py](examples/hard_constraint.py) | **Ready:** max mode is discrete-only; `alldifferent` is capped at `n, K <= 10` |
 | [Batch matching structures](#batch-extend-render-and-estimate) | `cffg.colony.Colony` | Vmapped iterative states; per-instance exact schedules | One `RunResult` per instance | Each instance keeps its normal engine objective/status | [API pattern](#batch-extend-render-and-estimate) | **Ready/partial:** functional mu3 rejected; exact schedules are per-instance; deterministic mixed GFE offers compiled batching |
 | [Register an ordinary custom factor](#batch-extend-render-and-estimate) | `FactorKernel`; binding classes; `register_kernel` | Single-arena discrete BP/VMP, Gaussian, or scalar EF | Generic marginals, energy, optional `kernel_readouts` | Extension author supplies mathematically valid messages and ledger | [API pattern](#batch-extend-render-and-estimate) | **Pre-1.0 unstable:** specialized/multi-arena variational objects need dedicated engine paths |
@@ -135,13 +135,13 @@ as `cffg.learn`, `cffg.conj`, `cffg.colony`, `cffg.csp`, and `cffg.estimate`
 expose the specialized workflows named in the capability map.
 
 <details>
-<summary><code>cffg</code> — daily workflow and extension primitives (40)</summary>
+<summary><code>cffg</code> — daily workflow and extension primitives (41)</summary>
 
 <!-- facade-cffg:start -->
 `CorridorEnv`, `DiscreteBinding`, `DiscreteMode`, `EFBinding`, `Engine`,
 `FactorKernel`, `FailureDiagnostic`, `FixedPointDifferentiator`, `FixedPointGradient`, `FunctionSpec`,
 `GaussianAmortizer`, `GaussianBinding`, `GaussianConditioning`, `GradientStatus`,
-`HostileInputs`, `LoadedBundle`, `MNIW`, `MeanImplementation`, `NIW`, `NeuralTrainer`,
+`HostileInputs`, `LoadedBundle`, `MNIW`, `MeanImplementation`, `MeanTrainer`, `NIW`, `NeuralTrainer`,
 `ParameterSpec`, `PersistentArray`, `PersistentParameter`,
 `PersistentStateDescriptor`, `PersistentTarget`, `PolynomialFeatures`,
 `RollingAgent`, `RunStatus`, `TrainingConfig`, `build_gridworld`,
@@ -560,6 +560,24 @@ moment matching. Noise covariance must be positive definite. The runtime checks
 the complete adaptive residual and energy change, while
 `objective_metadata` labels the surrogate's narrower meaning. See
 [examples/nonlinear_gaussian.py](examples/nonlinear_gaussian.py).
+
+To fit physical constants, register a mean with
+`MeanImplementation(id, version, parameter_shape, evaluate, point_trainable=True)`.
+`parameter_shape(input_dim, output_dim, config)` declares a nonempty flat
+parameter vector. `evaluate(x, parameters, config)` must support JAX
+differentiation in both array arguments. Pass `point_trainable=False` to
+exclude a mean from training-target selection. Existing mean registrations that omit
+the flag retain their legacy `network_parameters` work declaration behavior.
+
+`MeanTrainer(template, arrays, observations)` fits one point value per
+selected parameter coordinate. Repeated factors reading the same blob share
+one update. Call `trainer.step(state).require_applied()` to advance only
+after inference and its derivative certify. The step reports the objective
+at the input parameters. Evaluate the updated state with `trainer.infer(state)`.
+`save_checkpoint` and `load_checkpoint` resume deterministic Adam from
+the original model, initial arrays, data, and configuration. The checkpoint
+moments summarize gradients. For posterior probabilities over a declared
+set of candidate constants, see [finite parameter hypotheses](#finite-parameter-hypotheses).
 
 For a CPU Taylor chain with a Gaussian prior and a linear DATA emission at
 each time, the default engine can solve both message directions in one pass
@@ -1008,6 +1026,7 @@ unfinished result and asserts the quantity an experiment should inspect.
 | [exponential_family.py](examples/exponential_family.py) | Gamma–Poisson conjugate inference | Exact registered tree posterior and BFE |
 | [hard_constraint.py](examples/hard_constraint.py) | All-different marginals and max-product MAP | Exact bounded tree CSP identities |
 | [nonlinear_gaussian.py](examples/nonlinear_gaussian.py) | Sigma-point nonlinear Gaussian inference | Declared approximate objective metadata |
+| [physical_mean_training.py](examples/physical_mean_training.py) | Fit one cooling rate across repeated measurements | Certified point updates and objective before and after training |
 | [cstr_planning.py](examples/cstr_planning.py) | Registered reactor physics, partial goals, status-bearing plans, portable source bundle | Declared short-horizon Gaussian approximation; no hard actuator bounds |
 | [learning_bundle.py](examples/learning_bundle.py) | Declared learning, save/load, later-trial continuation | Current-schema immutable prior plus posterior state |
 | [finite_hypotheses.py](examples/finite_hypotheses.py) | Pendulum length inference from noisy velocity readings | Exact posterior on three specified lengths |

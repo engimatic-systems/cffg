@@ -24,11 +24,19 @@ class MeanShapeError(ValueError):
 
 @dataclass(frozen=True)
 class MeanImplementation:
+    """Trusted implementation of a serialized mean function.
+
+    Set `point_trainable=True` to fit the flat parameters with MeanTrainer.
+    Evaluation must support JAX derivatives in both inputs and parameters.
+    Omitting the flag preserves legacy network work declarations.
+    """
+
     impl_id: str
     version: str
     parameter_shape: Callable
     evaluate: Callable
     work: Callable | None = None
+    point_trainable: bool | None = None
 
 
 MEAN_IMPLEMENTATIONS: dict[str, MeanImplementation] = {}
@@ -40,6 +48,8 @@ def register_mean_function(implementation: MeanImplementation):
         raise TypeError("mean implementation requires shape and evaluation callbacks")
     if implementation.work is not None and not callable(implementation.work):
         raise TypeError("mean work declaration must be callable")
+    if implementation.point_trainable is not None and type(implementation.point_trainable) is not bool:
+        raise TypeError("mean point_trainable declaration must be a boolean")
     if implementation.impl_id in MEAN_IMPLEMENTATIONS:
         raise ValueError(f"mean implementation {implementation.impl_id!r} is already registered")
     MEAN_IMPLEMENTATIONS[implementation.impl_id] = implementation
@@ -89,5 +99,5 @@ from cffg import neural_schema as _neural_schema
 
 register_mean_function(MeanImplementation(
     "cffg.mean.mlp", "1.0.0", _neural_schema.parameter_shape, _neural_schema.evaluate,
-    _neural_schema.work,
+    _neural_schema.work, point_trainable=True,
 ))

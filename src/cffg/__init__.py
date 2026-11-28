@@ -23,6 +23,7 @@ _EXPORTS = {
     "LoadedBundle": "bundle",
     "MNIW": "conj",
     "MeanImplementation": "mean_functions",
+    "MeanTrainer": "training",
     "NIW": "conj",
     "NeuralTrainer": "training",
     "ParameterSpec": "kernel_bindings",

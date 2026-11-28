@@ -148,6 +148,7 @@ def configure(factor, sizes):
         moment_projections=frozenset({"gaussian_first_second"}), iterative=True,
         objective=f"{spec.method}_frozen_gaussian_bethe",
         work=work,
+        point_trainable=implementation.point_trainable,
         admission=admission,
         taylor_linearize=(jax.jit(jax.jacfwd(value_with_aux, has_aux=True))
                          if spec.method == "linearization" else None),
