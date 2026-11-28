@@ -453,6 +453,84 @@ point's collapsed forward moments and local joint-mixture Bethe terms;
 `tests/test_hybrid_planning.py` checks both numerical convergence and the absence
 of distant-goal influence. No exact smoothing or useful-lookahead claim follows.
 
+### D3.3 When the goal specifies only position
+
+The retained PCGym model tracks position and velocity. At each step it can choose
+one of three actions, each giving the system a different push. The experiment
+starts from the same uncertain position and velocity every time. Each desired
+position is entered as a noisy observation. We ask which first push is most
+consistent with *all* those observations. At two steps we can answer by trying
+all nine pairs of pushes. Changing only the second desired position from 0 to
+2 switches the answer from action 0 to action 2. The current solver gives
+exactly the same first-action distribution both times.
+
+| Steps | Last desired position | Current first choice | Exact first choice | Gaussian approximation to future pushes |
+|---:|---:|---:|---:|---:|
+| 1 | 0 | 0 (78.6921%) | 0 (78.6921%) | 0 (78.6921%) |
+| 1 | 2 | 2 (84.2798%) | 2 (84.2798%) | 2 (84.2798%) |
+| 2 | 0 | 0 (78.6921%) | 0 (98.8740%) | 0 (98.8711%) |
+| 2 | 2 | 0 (78.6921%) | 2 (97.0204%) | 2 (96.9940%) |
+| 15 | 0 | 0 (78.6921%) | 0 (99.999673%) | 0 (99.997686%) |
+| 15 | 2 | 0 (78.6921%) | 0 (99.999608%) | 0 (99.998143%) |
+
+**What the current update loses.** For action $s$, the next state has mean
+$Ax+b_s$ and covariance $Q$. The goal observes $Cx'+d$ with variance $R$.
+Integrating out the next state gives the backward likelihood
+$N(g;hx+Cb_s+d,S)$, where $h=CA=(0.98722946,0.08338833)$
+and $S=R+CQC^T=0.00261554$. It tells us something about one combination
+of position and velocity. Moving perpendicular to $h$ leaves the predicted
+goal unchanged. D3 requires a normalized component over the whole input
+state for its mixture collapse. This likelihood is flat along that perpendicular
+direction, so D3 sends a constant message and loses the informative direction
+as well. The public solver reaches its declared fixed point in 2, 3 and 16
+sweeps at the three horizons.
+
+**A bounded alternative.** Here the actions share $A$ and $Q$. For the last
+goal, write the mixture in the scalar coordinate $v=hx$. Component $s$ has
+mean $g-Cb_s-d$ and variance $S$. With action probabilities $p_s$, a Gaussian
+with the same two moments has mean $m=g-d-E_p[Cb_s]$ and variance
+$V=S+\mathrm{Var}_p(Cb_s)$. Its precision on the original state is
+$h^T h/V$ and its information vector is $h^T m/V$. It assigns exactly zero
+precision perpendicular to $h$. At the preceding state, the local goal also
+contributes information along $C=(1,0)$. Together $C$ and $CA$ span both
+dimensions on this fixture. A calculation that assumes every goal across time
+shares one null direction would lose that information.
+
+For the numerical comparison we keep each possible first action explicit.
+At every *later* step, we replace the independent random push $b_s$ by Gaussian
+noise with mean $E_p[b_s]$ and covariance $\mathrm{Cov}_p(b_s)$, added to
+the existing process noise. Three Gaussian filters then give all first-action
+weights in work linear in the horizon. This preserves the common-direction
+terminal moments above. Different action-dependent dynamics, noise or
+informative directions require their own derivation. The deferred full-tilt
+expectation-consistency proposal would include the incoming state belief
+before matching moments. That would define a different approximation and
+require its own energy calculation.
+
+**How we checked.** For the exact answer we enumerate every action sequence
+with positive prior mass. For each sequence we multiply its prior probability
+by the normalized Gaussian density of each successive goal conditional on the
+preceding goals. Summing those quantities by first action and normalizing gives
+the first-action distribution. Their total is the goal evidence $Z$. The tool
+accumulates log densities and counts all 14,348,907 sequences at 15 steps.
+A second calculation constructs the joint Gaussian for the entire vector of
+goals for each short sequence and checks its density directly.
+
+Agreement on an action can hide a large error in how well the model explains
+the goals. At two steps with final goal 2, the exact log evidence is −422.725
+nats and the Gaussian approximation gives −422.439. At 15 steps they are
+−938.724 and −870.939. The approximation overstates the log evidence by
+67.785 nats and predicts the opposite direction of the tiny change in the
+first-action probability. The current solver reports its own local Bethe
+free energy. Each of those three scores has a separate field in the results.
+
+Reproduce all six rows and their three-action distributions with
+`uv run python tools/partial_goal_comparison.py --native`. The independent
+density, exact-zero action support, singleton, rank and consumer-float32
+checks run with `uv run pytest -q tools/partial_goal_comparison_check.py`.
+The fixture measures inference for specified goals. Closed-loop control
+performance needs a separate experiment.
+
 ---
 
 ## D4 — Gaussian conjugate learning: sufficient stats, NIW/MNIW/Gamma, gaussian_prec (cff-7c5o)
