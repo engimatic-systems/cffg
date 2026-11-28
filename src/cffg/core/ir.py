@@ -29,8 +29,24 @@ class PortRole(str, Enum):
     GLUE = "glue"  # bonds to another template instance (unrolling, composition)
 
 
+class VariableDomain:
+    """Domain facts shared by source variables and compiled edge addresses."""
+
+    @property
+    def family(self) -> str:
+        return "gaussian" if self.dim else "ef" if self.ef else "discrete"
+
+    @property
+    def domain_key(self) -> tuple[str, int]:
+        """Hashable domain identity: what must match across an equality node
+        or a glue bond. EF domains are scalar; the family name is the key."""
+        if self.ef:
+            return (f"ef:{self.ef}", 1)
+        return (self.family, self.dim or self.cardinality)
+
+
 @dataclass(frozen=True)
-class VariableSpec:
+class VariableSpec(VariableDomain):
     """An edge in the FFG: a named random variable.
 
     Three domain families, tagged by which field is set (exactly one):
@@ -64,17 +80,6 @@ class VariableSpec:
                 f"dim ({self.dim}), and ef ({self.ef!r}) must be set"
             )
 
-    @property
-    def family(self) -> str:
-        return "gaussian" if self.dim else "ef" if self.ef else "discrete"
-
-    @property
-    def domain_key(self) -> tuple[str, int]:
-        """Hashable domain identity: what must match across an equality node
-        or a glue bond. EF domains are scalar; the family name is the key."""
-        if self.ef:
-            return (f"ef:{self.ef}", 1)
-        return (self.family, self.dim or self.cardinality)
 
 
 @dataclass(frozen=True)

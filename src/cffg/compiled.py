@@ -13,13 +13,14 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from cffg import kernels
+from cffg.core.ir import VariableDomain
 from cffg._immutable import FrozenArray, ImmutableRecord
 
 NEG = -1.0e30  # Reserved log-space zero sentinel.
 
 
 @dataclass(frozen=True)
-class EdgeInfo(ImmutableRecord):
+class EdgeInfo(ImmutableRecord, VariableDomain):
     name: str
     card: int
     slot0: int  # side-0 message: into the edge from its first endpoint
@@ -36,6 +37,10 @@ class EdgeInfo(ImmutableRecord):
     # categorical log messages and are excluded from discrete normalization,
     # exact-support checks, decoding and the ordinary edge-entropy ledger.
     param_axis: int = 0  # output/concentration axis inside param_shape
+
+    @property
+    def cardinality(self) -> int:
+        return self.card
 
 
 @dataclass(frozen=True)

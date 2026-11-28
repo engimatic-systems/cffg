@@ -102,14 +102,19 @@ def build_topology(template: Template) -> TopologyLayout:
         replace(constraint, detail=freeze(constraint.detail))
         for constraint in template.constraints
     )
-    endpoints: dict[str, list[Endpoint]] = {name: [] for name in template.variables}
+    return layout_addresses(template.variables, factors, constraints, template.ports)
+
+
+def layout_addresses(domains, factors, constraints, ports, *, use_edge_domains=False):
+    """Assign slots in lexical order to resolved, fully connected factor declarations."""
+    endpoints: dict[str, list[Endpoint]] = {name: [] for name in domains}
     for factor in sorted(factors.values(), key=lambda factor: factor.name):
         for role, variable in sorted(factor.all_edges().items()):
             endpoints[variable].append((factor.name, role))
     degrees = {name: len(ends) for name, ends in endpoints.items()}
-    ports_by_variable: dict[str, list[PortSpec]] = {name: [] for name in template.variables}
+    ports_by_variable: dict[str, list[PortSpec]] = {name: [] for name in domains}
     port_problems = []
-    for port in template.ports.values():
+    for port in ports.values():
         ports_by_variable[port.variable].append(port)
         if port.role in (PortRole.PRIOR, PortRole.GOAL):
             port_problems.append(
@@ -120,8 +125,8 @@ def build_topology(template: Template) -> TopologyLayout:
     edges, slot_of, opposite = {}, {}, {}
     data_candidates = []
     next_slot = next_gslot = next_efslot = 0
-    for name in sorted(template.variables):
-        variable, ends = template.variables[name], endpoints[name]
+    for name in sorted(domains):
+        variable, ends = domains[name], endpoints[name]
         if variable.dim:
             s0, s1 = next_gslot, next_gslot + 1
             next_gslot += 2
@@ -159,8 +164,8 @@ def build_topology(template: Template) -> TopologyLayout:
             message_lengths.extend((edge.card, edge.card))
 
     return TopologyLayout(
-        variables=template.variables, factors=factors, constraints=constraints,
-        ports=template.ports, endpoints=endpoints, degrees=degrees,
+        variables=edges if use_edge_domains else domains, factors=factors, constraints=constraints,
+        ports=ports, endpoints=endpoints, degrees=degrees,
         ports_by_variable=ports_by_variable, edges=edges, slot_of=slot_of,
         opposite=opposite, n_slots=next_slot, n_gslots=next_gslot,
         n_efslots=next_efslot, message_lengths=message_lengths,
