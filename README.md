@@ -947,8 +947,14 @@ common logical source representation. Both totals count numerical payloads
 in bytes. The estimate requires neither source files nor an expanded model.
 Optional `batch_size` multiplies every State leaf.
 
-The source estimator supports one level of fixed-layout categorical, affine
-Gaussian and scalar conjugate factors with equality, Chain and Broadcast.
+For nested plates a child source belongs to each enclosing copy unless the
+enclosing fragment declares that source directly. A matching declaration then
+follows the enclosing plate's tying rule. For example, two cameras in each
+of four rooms can use eight private priors, four room-specific calibrations,
+or one calibration shared across rooms.
+
+The source estimator supports fixed-layout categorical, affine Gaussian and
+scalar conjugate factors with equality, Chain and Broadcast at each level.
 A packer without a known native layout raises `UnknownStorageLayout`. For a
 compiled instance, `cffg.estimate.estimate(engine)` can inventory actual State
 leaf shapes and request the backend's cost analysis or a timing calibration.

@@ -109,3 +109,69 @@ def test_conflicting_tie_and_reused_ports():
     bad = PlateSpec(selector_fragment(), (7,), (Broadcast("s", "x"), Broadcast("s", "y")))
     with pytest.raises(ValueError, match="consume"):
         estimate_plate_storage(Template("duplicate", plates={"b": bad}))
+
+
+@pytest.mark.parametrize("owner", ["implicit", "outer-private", "outer-tied"])
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_nested_storage_matches_compiled_state_and_bundle_inventory(owner, dtype):
+    from test_nested_plate_bundle import rooms
+
+    template, arrays, *_ = rooms(owner, learned=True)
+    with jax.enable_x64(dtype is np.float64):
+        report = estimate_plate_storage(template, dtype=dtype)
+        inventory(template, report, arrays)
+    sources = report["source_blobs"]
+    assert sources["room/{index}/sensor/{index}/d"]["copies"] == 8
+    matrix = "school/A" if owner == "outer-tied" else "room/{index}/A"
+    assert sources[matrix]["copies"] == (1 if owner == "outer-tied" else 4)
+    assert set(sources) == {matrix, "room/{index}/sensor/{index}/d"}
+    assert report["source_bytes"] == sum(array.nbytes for array in arrays.values())
+    assert report["parameter_bytes"] == 8 * (4 + 2) * np.dtype(dtype).itemsize
+
+
+def test_outer_wiring_can_consume_a_generated_port(hmm_slice):
+    # Four slices per batch, one outer chain joins two already-joined inner pairs.
+    block = Template("block", plates={"t": PlateSpec(hmm_slice, (2,), (Chain("tail", "head"),))})
+    model = Template("sequence", plates={"b": PlateSpec(
+        block, (2,), (Chain("t/1/tail", "t/0/head"),)
+    )})
+    arrays = {f"b/{i}/{name}": np.ones((rows, K)) / rows
+              for i in range(2) for name, rows in (("A", M), ("B", K))}
+    report = estimate_plate_storage(model)
+    assert report["topology"]["chain_bonds"] == 3
+    inventory(model, report, arrays)
+
+    room = Template("room", plates={"sensor": PlateSpec(sensor_fragment(2), (3,))})
+    model = Template("building", plates={"room": PlateSpec(
+        room, (2,), (Broadcast("sensor/0/y", "hub"),)
+    )})
+    # Just the first sensor in each room loses its DATA clamp. There are four
+    # observed rows and two ordinary rows, still reading the same three blobs.
+    report = estimate_plate_storage(model)
+    assert report["arenas"]["g_mask"] == 4 * 8
+    for kind, n in (("gaussian_linear", 2), ("gaussian_linear_obs", 4)):
+        assert report["parameter_leaves"][f"['gauss:{kind}:2x2:A']"] == n * 4 * 8
+    inventory(model, report)
+
+    vote = Template("voters", plates={"v": PlateSpec(
+        selector_fragment(), (3,), (Broadcast("s", "winner"),)
+    )})
+    nested = Template("poll", plates={"g": PlateSpec(
+        vote, (4,), (Broadcast("v/winner", "winner"),)
+    )})
+    report = estimate_plate_storage(nested)
+    assert report["topology"]["broadcast_equalities"] == 11
+    assert report["topology"]["ports"] == 1
+    inventory(nested, report)
+
+
+def test_huge_nested_owner_counts_visit_no_coordinates(monkeypatch):
+    from test_nested_plates import rooms
+
+    def forbidden(*args):
+        raise AssertionError("unexpected plate copy traversal")
+    monkeypatch.setattr(PlateGrid, "__iter__", forbidden)
+    report = estimate_plate_storage(rooms((10**4, 10**4)), dtype="float32")
+    assert report["source_blobs"]["room/{index}/A"]["copies"] == 10**8
+    assert report["source_blobs"]["room/{index}/sensor/{index}/d"]["copies"] == 2 * 10**8
+    assert report["parameter_bytes"] == 2 * 10**8 * (K + M*K) * 4

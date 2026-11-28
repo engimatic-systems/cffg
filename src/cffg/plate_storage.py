@@ -12,7 +12,7 @@ from cffg import kernels
 from cffg.core.ir import Broadcast, Chain, ConstraintKind, PortRole
 from cffg.core.plate_grid import PlateGrid
 from cffg.core.plates import _with_shared_owners
-from cffg.core.validate import validate
+from cffg.core.validate import _copy_port, validate
 from cffg.resource_analysis import STATE_ARRAYS
 
 
@@ -47,11 +47,34 @@ def _widths(variable):
     return {"messages": 2 * _dimension(variable.cardinality)}
 
 
-def _wiring(spec, grid, edges, topology):
-    """Count rectangular Chain endpoint sets and balanced ternary trees."""
+def _port_origin(fragment, path):
+    """Find the domain and leaf declaration behind one validated boundary path."""
+    port = fragment.ports.get(path)
+    if port is not None:
+        return port.role, fragment.variables[port.variable], (path,)
+    for name, spec in fragment.plates.items():
+        prefix = name + "/"
+        if not path.startswith(prefix):
+            continue
+        suffix = path[len(prefix):]
+        grid = PlateGrid(spec.dims)
+        role, _ = _copy_port(spec, grid, suffix)
+        if role is None:
+            continue
+        for bond in spec.bonds:
+            if isinstance(bond, Broadcast) and suffix == bond.hub:
+                _, variable, _ = _port_origin(spec.fragment, bond.port)
+                return PortRole.GLUE, variable, ()
+        child_path = suffix.split("/", len(grid.dims))[-1]
+        _, variable, leaf = _port_origin(spec.fragment, child_path)
+        return role, variable, (name, *leaf)
+    raise ValueError(f"unknown boundary port {path!r}")
+
+
+def _wiring(spec, grid, parents, path, arenas, topology, consumed):
+    """Count repeated Chain endpoint sets and balanced ternary trees."""
     used = {}
     hubs = set()
-    removed = set()
     fragment = spec.fragment
 
     def consume(name, box):
@@ -67,15 +90,15 @@ def _wiring(spec, grid, edges, topology):
             length = grid.dims[axis]
             if offset >= length:
                 continue
-            a, b = (fragment.variables[fragment.ports[p].variable]
-                    for p in (rule.port_a, rule.port_b))
+            _, a, _ = _port_origin(fragment, rule.port_a)
+            _, b, _ = _port_origin(fragment, rule.port_b)
             if a.domain_key != b.domain_key:
                 raise ValueError(f"Chain ports must have equal domains: {a.name}, {b.name}")
             box[axis] = (0, length - offset)
             consume(rule.port_a, box.copy())
             box[axis] = (offset, length)
             consume(rule.port_b, box)
-            pairs = (grid.count // length) * (length - offset)
+            pairs = parents * (grid.count // length) * (length - offset)
             topology["chain_bonds"] += pairs
             topology["ports"] -= 2 * pairs
             added_edges = -pairs
@@ -85,11 +108,11 @@ def _wiring(spec, grid, edges, topology):
             if rule.hub in hubs:
                 raise ValueError(f"duplicate Broadcast hub {rule.hub!r}")
             hubs.add(rule.hub)
-            port = fragment.ports[rule.port]
-            removed.add(port.variable)
-            variable = fragment.variables[port.variable]
+            role, variable, leaf = _port_origin(fragment, rule.port)
+            if role is not PortRole.GLUE:
+                consumed[path + leaf] += parents * grid.count
             # N=1 renames the branch. Otherwise add N-2 internal edges plus the hub.
-            added_edges = grid.count - 1
+            added_edges = parents * (grid.count - 1)
             topology["broadcast_equalities"] += added_edges
             topology["factors"] += added_edges
             topology["ports"] -= added_edges
@@ -97,15 +120,14 @@ def _wiring(spec, grid, edges, topology):
             continue
         topology["edges"] += added_edges
         for name, width in _widths(variable).items():
-            edges[name] += width * added_edges
-    return removed
+            arenas[name] += width * added_edges
 
 
 def _factor_rows(factor, fragment, n, data, mean_field, arenas, leaves):
     """Count physical packed rows and yield (source owner, shape) for logical storage."""
     variables = {r: fragment.variables[v] for r, v in factor.edges.items()}
     if factor.type == "equality":
-        if any(v.dim and v.name in data for v in variables.values()):
+        if any(v.dim and data.get(v.name, 0) for v in variables.values()):
             raise UnknownStorageLayout("Gaussian DATA taps on equalities require compilation")
         return
     kernel = kernels.kernel_for(factor.type)
@@ -119,7 +141,7 @@ def _factor_rows(factor, fragment, n, data, mean_field, arenas, leaves):
         for key in kernel.param_keys:
             leaves[f"ef:{factor.type}:{kernel.family}:{key}"] += 2 * n
         if kernel.observed_out:
-            if factor.edges["out"] not in data:
+            if data.get(factor.edges["out"], 0) != n:
                 raise ValueError(f"observation factor {factor.name!r} needs a DATA output")
             arenas["ef_mask"] += n
             arenas["ef_obs"] += n
@@ -129,22 +151,42 @@ def _factor_rows(factor, fragment, n, data, mean_field, arenas, leaves):
     shape_id = "x".join(str(sizes[role]) for role in binding.roles)
     if kernel.arena == "discrete":
         mode = "vmp" if factor.name in mean_field else "bp"
-        group = f"{mode}:{factor.type}:{shape_id}"
+        groups = {f"{mode}:{factor.type}:{shape_id}": n}
     else:
-        kind = factor.type
+        conditioned = 0
+        groups = {}
         for role, variable in variables.items():
-            if variable.name in data:
+            rows = data.get(variable.name, 0)
+            if rows:
                 if binding.conditioning is None or role != binding.conditioning.role:
                     raise ValueError(f"unsupported Gaussian DATA on {factor.name}/{role}")
+                conditioned = rows
                 kind = binding.conditioning.plan_type
-                arenas["g_mask"] += n
-                arenas["g_obs"] += n * sizes[role]
-        group = f"gauss:{kind}:{shape_id}"
-    paths = kernels.parameter_paths(kernel, group)
+                groups[f"gauss:{kind}:{shape_id}"] = rows
+                arenas["g_mask"] += rows
+                arenas["g_obs"] += rows * sizes[role]
+        if n > conditioned:
+            groups[f"gauss:{factor.type}:{shape_id}"] = n - conditioned
     for role, param in binding.parameters.items():
         shape = tuple(_dimension(s) for s in param.shape(sizes))
         yield factor.param_blobs[role], shape
-        leaves[paths[param.key]] += n * prod(shape)
+        for group, rows in groups.items():
+            paths = kernels.parameter_paths(kernel, group)
+            leaves[paths[param.key]] += rows * prod(shape)
+
+
+def _source_owner(name, scopes):
+    """Lift a logical owner through its enclosing lexical scopes, inside out."""
+    copies = 1
+    private = False
+    for plate, spec, grid in reversed(scopes):
+        if name in spec.per_copy_blobs or name not in spec.fragment.blobs:
+            private = True
+            copies *= grid.count
+            name = f"{plate}/{{index}}/{name}"
+        else:
+            name = spec.shared_name(name)
+    return name, private, copies
 
 
 def estimate_plate_storage(template, *, dtype=None, source_dtype=np.float64, batch_size=1):
@@ -168,25 +210,29 @@ def estimate_plate_storage(template, *, dtype=None, source_dtype=np.float64, bat
         raise ValueError("logical source dtype must be a real numeric type")
     batch_size = _checked(_dimension(batch_size), "batch size")
     validate(template)
-    if any(spec.fragment.plates for spec in template.plates.values()):
-        raise UnknownStorageLayout("nested plate storage needs lexical owner counts")
     _with_shared_owners(template)
     arenas = Counter({name: 0 for name in STATE_ARRAYS})
     leaves = Counter()
     blobs = {}
     topology = dict(edges=0, factors=0, ports=0, chain_bonds=0, broadcast_equalities=0)
 
-    def fragment_counts(fragment, n, plate="", spec=None, grid=None):
+    consumed = Counter()
+
+    def fragment_counts(fragment, n, scopes, path):
         topology["edges"] += n * len(fragment.variables)
         topology["factors"] += n * len(fragment.factors)
         topology["ports"] += n * len(fragment.ports)
         for variable in fragment.variables.values():
             for name, width in _widths(variable).items():
                 arenas[name] += n * width
-        removed = _wiring(spec, grid, arenas, topology) if spec else set()
-        data = {p.variable for p in fragment.ports.values() if p.role is PortRole.DATA} - removed
-        for port in fragment.ports.values():
-            if port.role in (PortRole.PRIOR, PortRole.GOAL) and port.variable not in removed:
+        data = {}
+        for name, port in fragment.ports.items():
+            remaining = n - consumed[path + (name,)]
+            if not 0 <= remaining <= n:
+                raise ValueError(f"overlapping plate bonds on {name!r}")
+            if port.role is PortRole.DATA:
+                data[port.variable] = remaining
+            if port.role in (PortRole.PRIOR, PortRole.GOAL) and remaining:
                 raise ValueError(f"unterminated {port.role.value} port {port.name!r}")
         if any(c.kind not in (ConstraintKind.MEAN_FIELD, ConstraintKind.DELTA)
                for c in fragment.constraints):
@@ -195,11 +241,7 @@ def estimate_plate_storage(template, *, dtype=None, source_dtype=np.float64, bat
 
         for factor in fragment.factors.values():
             for name, shape in _factor_rows(factor, fragment, n, data, mean_field, arenas, leaves):
-                private = spec is not None and name in spec.per_copy_blobs
-                owner = spec.shared_name(name) if spec else name
-                if private:
-                    owner = f"{plate}/{{index}}/{name}"
-                copies = n if private else 1
+                owner, private, copies = _source_owner(name, scopes)
                 entry = {
                     "shape": shape, "copies": copies, "per_copy": private,
                     "bytes": _checked(prod(shape) * copies * source_dtype.itemsize, owner),
@@ -208,10 +250,14 @@ def estimate_plate_storage(template, *, dtype=None, source_dtype=np.float64, bat
                     raise ValueError(f"source owner {owner!r} has incompatible shapes or multiplicity")
                 blobs[owner] = entry
 
-    fragment_counts(template, 1)
-    for plate, spec in template.plates.items():
-        grid = PlateGrid(spec.dims)
-        fragment_counts(spec.fragment, grid.count, plate, spec, grid)
+        for name, spec in fragment.plates.items():
+            grid = PlateGrid(spec.dims)
+            child_path = (*path, name)
+            _wiring(spec, grid, n, child_path, arenas, topology, consumed)
+            child_scopes = (*scopes, (name, spec, grid))
+            fragment_counts(spec.fragment, n * grid.count, child_scopes, child_path)
+
+    fragment_counts(template, 1, (), ())
     for name, number in topology.items():
         _checked(number, name)
     multiplier = dtype.itemsize * batch_size

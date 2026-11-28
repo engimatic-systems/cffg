@@ -40,3 +40,7 @@ Persistent storage is the byte count of arrays that survive compilation and belo
 **2026-11-28T07:24:08Z**
 
 Change path: resource estimate and persistent State layout. Count a compact source fragment once with PlateGrid multiplicities; debit one joined edge and two consumed ports per Chain bond, and add the balanced equality tree for Broadcast. Check the estimator against cff-j7mm state_storage (two dtypes, tied pixel grid and private mixture bank). Treat known native row layouts and arbitrary external pack callbacks separately; logical source owners and repeated packed rows have different byte totals. Never run a pack callback or open blob files to obtain an estimate. Malformed shape or overflowing intermediate counts must fail before allocation. Execution schedules, numerical rules, FE and serialization N/A. Nested parity awaits ccpr-m0bu.
+
+**2026-11-28T13:50:21Z**
+
+The isolated one-level source is a8f1f68 after cff-j7mm. Fifteen focused tests passed (one deselected) in 15.98 s, including comparison of actual initialized State leaf byte counts on a 64x64 grid in both dtypes. With the #239 compiler available, this extension follows enclosing owner multiplicities, direct parent declarations, and generated DATA/GLUE ports. Verify two-level compilation against independent fixtures, including partial rerouting of conditioned rows. Parent is joining the disjoint generated-slot fix for one combined estimator gate.
