@@ -2347,6 +2347,24 @@ statistics and clocks after a successful joint certificate. A supplied budget
 of zero returns the corresponding unfinished stage. See DERIVATIONS D16 for
 the region entropy correction and its path-enumeration oracle.
 
+### AXIOM observation and restart boundary
+
+`cffg.axiom_agent.AxiomAgent` owns the observed scene, sampled proposal,
+pending action, planning key and scheduled reduction history. A proposed
+action carries its tick and key. The feedback boundary validates that token
+and stages both the actual transition and optional reset before publication.
+The executable Gameworld tools delegate to this installed implementation.
+
+`cffg.axiom_checkpoint` binds the version-2 actor file to an independent
+trace prefix, selected scene settings, planner and key configuration, and a
+digest of the fixed priors reconstructed at initialization. Exact is the
+default. Compact saves use the factory's zero-remainder priors and omit
+only posterior low words in the two component banks. Both modes validate
+complete inventory, layout, lifecycle IDs, numeric state, keys, clock and
+reduction tape before replacing live state. The original version-1 evaluation
+reader and writer preserve the historical exact format. The simulator has
+its own restart contract.
+
 ### 5b. Colony execution (many small graphs, one machine)
 
 `Colony` owns an instance table of `(structure_hash, State)` pairs and caches one

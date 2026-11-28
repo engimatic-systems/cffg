@@ -11,7 +11,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-import evaluation_reduction as boundary
+from cffg.experiments import axiom_reduction_schedule as boundary
 from cffg.component_bank_device import from_host, to_host
 from cffg.experiments import _axiom_reduction_scores as scoring
 from cffg.experiments.axiom_banks import BankSettings, initial_banks, seeded_dormant

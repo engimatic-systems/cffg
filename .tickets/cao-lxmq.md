@@ -1,6 +1,6 @@
 ---
 id: cao-lxmq
-status: open
+status: in_progress
 deps: [cao-36dd, car-ne0a, cao-fs5s, cff-wdhj]
 links: []
 created: 2026-11-24T06:03:43Z
@@ -43,3 +43,11 @@ Evaluation checkpoint slice on experiment/axiom-10000. The controller factory ow
 **2026-11-24T15:00:12Z**
 
 Exact evaluation codec landed at 382e0f9. The caller supplies source and trace digests, stage, game, both seeds, action budget and completed tick. The fixed Actor factory also identifies reset pixels and action cardinality. Restore checks the SHA-256 across names, dtypes, shapes, values and metadata, reduction generator and tape, fixed priors, bank lifecycle, spatial belief and planner support before installing. The positive check uses a two-slot synthetic actor with a live interaction and a nonzero float32 remainder at action 499. A separate interpreter restores the pending plan, takes the observed transition and actual 2,000-draw reduction, restores again at 500 and takes the next decision. Candidate/score/key digests and every archived byte agree at 500 and 501. Incompatible metadata, version, dtype, key, lifecycle, missing field and altered content fail without changing the destination. uv run --frozen --no-sync pytest -q -m "slow or not slow" tests/test_axiom_evaluation_checkpoint.py passed both checks in 30.17 s. The durable evaluation runner owns native simulator replay and full-capacity prequalification. The public agent facade, compact export and its size/restore tradeoff remain open on this ticket.
+
+**2026-11-28T06:22:31Z**
+
+Begin from #223 and the committed evaluation actor/codec from #204. The Learnable or checkpoint feature and Runtime numerical or status invariant change paths apply. Verify the two sealed Explode snapshots, reset image, identity and trace SHA before promoting the single implementation. Preserve the schema-1 exact reader and default, pending action clock, native reward, PRNG stream and accumulated reduction tape. Exercise fresh-process exact and explicitly rounded compact restore, invalid/partial/foreign file rejection without mutation, f32 and conjugate remainder checks, unchanged categorical and Gaussian facades. The same JAX kernels serve host/compiled, planner schedules and packed actors; no new numeric rules or engine schedule changes are needed. Use the original retained full-size state and timed read/write comparisons only; no game run.
+
+**2026-11-28T06:32:22Z**
+
+Rechecked original pilot provenance and both native archives before promotion. The real reset image from development/Explode/base.npz matches the pilot hash. Tick 9500 has 339 live interaction rows of 5,000 and 1,275,968 bytes. Tick 10000 has 344 live rows and 1,334,882 bytes. Both content digests and trace prefixes recompute, and the final file and state digest agree with the published result. Original evidence is read-only. The installed AxiomAgent reuses the existing planner and reducer. Six focused legacy and public checks passed in 84.54 s, including fresh interpreters crossing a real 2,000-record reduction at action 500, compact agreement with the independent lifecycle codec, and rollback on malformed state. After binding the global JAX precision flag in the header the schema check passed again. The four relocated implementation modules imported from the built wheel.
