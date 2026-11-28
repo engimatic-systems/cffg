@@ -309,3 +309,54 @@ def test_reconstruction_origin_precedes_downstream_nan(monkeypatch):
     assert result.status is RunStatus.DIVERGED
     assert result.failure == FailureDiagnostic(
         "improper_cavity", engine._failure_names[rank], "reconstruction", 1)
+
+
+@pytest.mark.parametrize(("x64", "size"), [(False, 1), (True, 32)])
+def test_root_with_undefined_merit_derivative_diverges(scalar_chart, x64, size):
+    def mapping(arrays):
+        value = jnp.sqrt(jnp.abs(arrays.messages))
+        return arrays._replace(messages=value), jnp.asarray(0.), jnp.int32(0), empty_failure()
+
+    with jax.enable_x64(x64):
+        values = jnp.zeros(size)
+        result = outer.solve_outer(
+            scalar_arrays(values), SimpleNamespace(edges={}), mapping,
+            lambda _: 0., lambda _: False, n_iters=4, tol=1e-6,
+        )
+    assert result.reason is Reason.NONFINITE_EVALUATION
+    assert result.outer_residual == result.merit == 0.
+    assert np.isnan(result.gradient_norm)
+    np.testing.assert_array_equal(result.arrays.messages, values)
+
+
+@pytest.mark.parametrize("path", ["trust", "shadow"])
+def test_nonfinite_recomputed_merit_cannot_certify_trial(scalar_chart, path):
+    def mapping(arrays):
+        x = arrays.messages
+        value = jnp.where((x > .25) & (x < .75), x, x + 1) if path == "shadow" else x
+        return arrays._replace(messages=value), jnp.asarray(0.), jnp.int32(0), empty_failure()
+
+    bad = plan()._replace(root_diagnostics=lambda *args: (float("inf"), 0.))
+    result = outer.solve_outer(
+        scalar_arrays(0.), SimpleNamespace(edges={}), mapping,
+        lambda _: 0., lambda _: False, n_iters=8, tol=1e-6, candidate_limit=0,
+        kernel_factory=lambda _: bad,
+    )
+    assert result.reason is Reason.NONFINITE_EVALUATION
+    assert result.iterations == (1 if path == "shadow" else 0)
+    assert result.outer_residual == 0.
+
+
+@pytest.mark.parametrize("mode", ["trust_region", "compiled_trust_region"])
+def test_public_controller_reports_divergence_for_unusable_root_diagnostic(monkeypatch, mode):
+    from cffg import outer_kernels
+
+    monkeypatch.setattr(outer_kernels, "_make_root_diagnostics",
+                        lambda residual: lambda *args: (0., float("nan")))
+    engine = engine_for("gfe")
+    result = engine.run(engine.init_state(), 128, tol=1e-8, outer_solver=mode)
+    assert result.status is RunStatus.DIVERGED
+    assert result.termination_reason is Reason.NONFINITE_EVALUATION
+    assert np.isnan(result.outer_gradient_norm)
+    assert np.isfinite(result.outer_residual)
+    assert np.isfinite(result.free_energies[-1])
