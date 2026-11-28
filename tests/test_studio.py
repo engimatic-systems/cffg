@@ -1,5 +1,6 @@
 """The graph accepted by Studio must survive persistence, concurrency and replay."""
 
+from dataclasses import replace
 from io import BytesIO
 from uuid import uuid4
 from zipfile import ZipFile
@@ -10,6 +11,42 @@ import pytest
 from cffg.studio.editing import apply_commands
 from cffg.studio.library import Conflict, Library
 from cffg.studio.models import Document, starter
+from cffg.viz.scene import Label, Path, Terminal
+
+
+def test_studio_snapshot_preserves_scene_label_placement_and_full_blob_name():
+    doc = starter("kalman", "Caption positions", steps=2)
+    blob = "prior.long_descriptive_mean.parameter"
+    doc.template.blobs[blob] = replace(doc.template.blobs.pop("m0"), name=blob)
+    prior = doc.template.factors["prior"]
+    doc.template.factors["prior"] = replace(
+        prior, param_blobs={**prior.param_blobs, "mean": blob}
+    )
+    doc.arrays[blob] = doc.arrays.pop("m0")
+
+    scene, _ = doc.layout_scene()
+    records = doc.describe()["scene"]["items"]
+    assert [(r["primitive"], r["ref"]) for r in records] == [
+        (type(item).__name__, item.ref) for item in scene.items
+    ]
+    named = [record for record in records if record.get("label") == blob]
+    assert len(named) == 1
+    assert named[0]["primitive"] == "Terminal"
+    assert named[0]["ref"] == f"blob:{blob}"
+
+    roles = set()
+    for item, record in zip(scene.items, records, strict=True):
+        label = Label.for_item(item) if isinstance(item, (Path, Terminal)) else None
+        if label is None:
+            assert "label_bounds" not in record
+            continue
+        assert record["label_at"] == (label.x, label.y)
+        assert record["label_bounds"] == label.bounds
+        assert record["label_size"] == label.size
+        assert record["label_anchor"] == label.anchor
+        assert record["label_font_role"] == label.font_role
+        roles.add((label.font_role, label.anchor))
+    assert roles == {("wire", "start"), ("terminal", "middle")}
 
 
 def test_portable_rslds_recovers_ties_and_resizes_learning_state():

@@ -203,6 +203,12 @@ function bounds(item) {
   return [item.x-8, item.y-8, item.x+8, item.y+8];
 }
 
+function viewBounds(box, label) {
+  if (!label) return box;
+  return [Math.min(box[0], label[0]), Math.min(box[1], label[1]),
+    Math.max(box[2], label[2]), Math.max(box[3], label[3])];
+}
+
 function intersects(a, b) {
   return a[2] >= b[0] && a[0] <= b[2] && a[3] >= b[1] && a[1] <= b[3];
 }
@@ -212,7 +218,7 @@ function spatialIndex(items) {
   const cell = 256;
   const bucket = value => Math.floor(value / cell);
   for (const record of items) {
-    const [l, t, r, b] = record.box.map(bucket);
+    const [l, t, r, b] = record.viewBox.map(bucket);
     if ((r-l+1)*(b-t+1) > 64) {
       wide.push(record);
       continue;
@@ -225,12 +231,12 @@ function spatialIndex(items) {
   }
   return view => {
     const [l,t,r,b] = view.map(bucket);
-    if ((r-l+1)*(b-t+1) > bins.size) return items.filter(row => intersects(row.box, view));
+    if ((r-l+1)*(b-t+1) > bins.size) return items.filter(row => intersects(row.viewBox, view));
     const found = new Set(wide);
     for (let y = t; y <= b; y++) for (let x = l; x <= r; x++) {
       for (const row of bins.get(x + ":" + y) || []) found.add(row);
     }
-    return [...found].filter(row => intersects(row.box, view)).sort((a,b) => a.id-b.id);
+    return [...found].filter(row => intersects(row.viewBox, view)).sort((a,b) => a.id-b.id);
   };
 }
 
@@ -250,6 +256,13 @@ function drawRecord(record, selected, hovered) {
   const add = (tag, attrs, text) => group.append(element(tag, attrs, text));
   const caption = (x, y, value, cls = "caption", anchor = "middle") =>
     add("text", {x, y, "class": cls, "text-anchor": anchor}, value);
+  function placedCaption() {
+    if (!item.label || !item.label_at) return;
+    const [x, y] = item.label_at;
+    const role = item.label_font_role === "wire" ? "wire-name" : "caption";
+    add("text", {x, y, class: param ? role + " param-name" : role,
+      "text-anchor": item.label_anchor, style: `font-size: ${item.label_size}px`}, item.label);
+  }
   const {x, y, w, h} = item;
   switch (item.primitive) {
     case "Box": {
@@ -267,11 +280,7 @@ function drawRecord(record, selected, hovered) {
       const attrs = {d, "class":"wire", "stroke-width": item.kind === "internal" ? 1.1 : param ? 1.15 : 2};
       if (item.dashed || constrained) attrs["stroke-dasharray"] = "5 3";
       add("path", attrs);
-      if (item.label && item.label_at) {
-        const [lx, ly] = item.label_at;
-        const label = param ? item.ref.split(".").at(-1) : item.label;
-        caption(lx, ly, label, param ? "wire-name param-name" : "wire-name", "start");
-      }
+      placedCaption();
       break;
     }
     case "Terminal":
@@ -282,7 +291,7 @@ function drawRecord(record, selected, hovered) {
           fill:item.kind === "data" ? "currentColor" : "#24272d"});
         if (item.kind === "data") add("path", {d:`M${x-2.5} ${y}h5`, stroke:"#332613","stroke-width":1.5});
       }
-      if (item.label) caption(x,y+16,item.label);
+      placedCaption();
       break;
     case "Bead": {
       const mark = item.symbol || item.shape === "square";
@@ -370,7 +379,8 @@ export function mountGraph(container, snapshot, selectCallback) {
     if (item.primitive === "Path") localRef = model.aliases.get(localRef) || localRef;
     if (localRef.startsWith("gfe:")) localRef = "factor:" + localRef.slice(4);
     const group = localRef.startsWith("blob:") ? blobGroup(localRef) : model.hoverGroup(localRef);
-    return {id, item, model, group, localRef, ref:plateRef || localRef, box};
+    return {id, item, model, group, localRef, ref:plateRef || localRef,
+      box, viewBox: viewBounds(box, item.label_bounds)};
   });
   bindMarginalHover(rows);
   const byRef = new Map();
