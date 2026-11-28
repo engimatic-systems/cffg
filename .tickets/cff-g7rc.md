@@ -1,7 +1,7 @@
 ---
 id: cff-g7rc
 status: open
-deps: [cff-lv2w]
+deps: [cff-lv2w, codg-0sy5]
 links: [cff-wbhu]
 created: 2026-08-01T02:19:45Z
 type: feature

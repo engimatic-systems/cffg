@@ -64,6 +64,12 @@ class OuterSolveResult:
     failure: FailureAt = field(default_factory=empty_failure_at)
 
 
+def _root_reason(*diagnostics: float) -> OuterTerminationReason:
+    if all(np.isfinite(value) for value in diagnostics):
+        return OuterTerminationReason.ROOT_CONVERGED
+    return OuterTerminationReason.NONFINITE_EVALUATION
+
+
 def _finite(arrays: OuterArrays) -> bool:
     return all(
         bool(np.isfinite(np.asarray(value)).all()) for value in arrays
@@ -302,10 +308,6 @@ def outer_phases(
                 and ledger_stationary
                 and chart.proper_reference
             ):
-                scaled_residual = residual / residual_scale
-                merit = 0.5 * float(
-                    jnp.vdot(scaled_residual, scaled_residual).real
-                )
                 if kernel_factory is None:
                     root_diagnostics = _make_root_diagnostics(residual_fn)
                     root_merit, root_gradient = root_diagnostics(
@@ -324,7 +326,7 @@ def outer_phases(
                 if not energies or energies[-1] != current_energy:
                     energies.append(current_energy)
                 return OuterSolveResult(
-                    current, OuterTerminationReason.ROOT_CONVERGED,
+                    current, _root_reason(merit, gradient_norm),
                     candidate_iterations, tuple(deltas), tuple(energies),
                     outer_residual, merit, gradient_norm, radius, accepted,
                     rejected, inner_residual, inner_code,
@@ -592,7 +594,7 @@ def outer_phases(
             merit = 0.5 * float(
                 jnp.vdot(scaled_residual, scaled_residual).real
             )
-            _, root_gradient = plan.root_diagnostics(
+            root_merit, root_gradient = plan.root_diagnostics(
                 coordinates,
                 residual_scale,
                 plan.context,
@@ -603,7 +605,7 @@ def outer_phases(
             if not energies or energies[-1] != current_energy:
                 energies.append(current_energy)
             return OuterSolveResult(
-                current, OuterTerminationReason.ROOT_CONVERGED,
+                current, _root_reason(merit, float(root_merit), gradient_norm),
                 candidate_iterations + iteration,
                 tuple(deltas), tuple(energies), outer_residual, merit,
                 gradient_norm,
@@ -654,7 +656,7 @@ def outer_phases(
             shadow_merit = 0.5 * float(
                 jnp.vdot(shadow_scaled, shadow_scaled).real
             )
-            _, shadow_gradient = plan.root_diagnostics(
+            diagnostic_merit, shadow_gradient = plan.root_diagnostics(
                 jnp.asarray(shadow_coordinates),
                 residual_scale,
                 plan.context,
@@ -664,7 +666,7 @@ def outer_phases(
             energies.append(shadow_energy)
             return OuterSolveResult(
                 shadow_arrays,
-                OuterTerminationReason.ROOT_CONVERGED,
+                _root_reason(shadow_merit, float(diagnostic_merit), float(shadow_gradient)),
                 candidate_iterations + iteration,
                 tuple(deltas),
                 tuple(energies),

@@ -1761,7 +1761,9 @@ The cff-weff production implementation follows the
   accepted/rejected steps, outer-map/trial/Krylov counts, solver compilations,
   and a termination reason distinguishing root, stationary-nonroot/stagnation,
   trust/Krylov budget exhaustion, rejected improper trials, infeasibility, and
-  divergence. `require_converged` continues to reject every non-root outcome.
+  divergence. A terminal root check also requires finite merit and merit-gradient
+  norm. An undefined derivative returns `nonfinite_evaluation` even when the
+  forward residual is zero. `require_converged` continues to reject every non-root outcome.
 - Host/JIT implementations share one residual, packing, support, and
   acceptance kernel. Flooding and mixed schedules have different maps but
   the same fixed-point equations under Theorem 1; both need parity tests.
