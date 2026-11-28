@@ -8,6 +8,7 @@ visual change, regenerate with:
 
 import os
 import xml.etree.ElementTree as ET
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -93,13 +94,37 @@ def test_gridworld_renders(viz_gallery):
     "name,level",
     [("hmm_slice", 0), ("hmm_slice", 4), ("tmaze", 4),
      ("gaussian_linear", 0), ("gaussian_linear", 4),
-     ("gaussian_mixture_linear", 0), ("gaussian_mixture_linear", 4)],
+     ("gaussian_mixture_linear", 0), ("gaussian_mixture_linear", 4),
+     ("fig23_overlay", 4), ("fig24_overlay", 4), ("fig27_overlay", 4)],
 )
 def test_golden(name, level, hmm_slice, tmaze, viz_gallery):
     from test_viz_layout import gaussian_junction
 
-    template = gaussian_junction(name) if name.startswith("gaussian") else {"hmm_slice": hmm_slice, "tmaze": tmaze}[name]
-    svg = render_svg(template, level=level)
+    overlay = None
+    if name.endswith("_overlay"):
+        from cffg import Engine, compile_template
+        from cffg.viz import derive_schedule_overlay
+
+        template, arrays = build_tmaze(steps=2, past=int(name == "fig24_overlay"))
+        if name == "fig23_overlay":
+            arrays["e"] = arrays["e"].copy()
+            arrays["e"][:] = [1, 0, 0, 0]  # Fix both future commands.
+        overlay = derive_schedule_overlay(template, Engine(compile_template(template, arrays=arrays)))
+        if name == "fig23_overlay":
+            # Project the priming pass onto the forward prediction path for a fixed policy.
+            forward_roles = {"categorical": {"out"}, "transition_mixture": {"out"}, "equality": {"b", "c"}}
+            forward = tuple(
+                e for e in overlay.events if e.phase == "prime"
+                and e.source_role in forward_roles.get(template.factors[e.source_ref[7:]].type, ())
+            )
+            assert forward and all(not e.gfe for e in forward)
+            overlay = replace(overlay, events=forward)
+        elif name == "fig24_overlay":
+            step = next(e.step for e in overlay.events if e.gfe and e.source_role == "in")
+            overlay = overlay.select_step(step)
+    else:
+        template = gaussian_junction(name) if name.startswith("gaussian") else {"hmm_slice": hmm_slice, "tmaze": tmaze}[name]
+    svg = render_svg(template, level=level, overlay=overlay)
     viz_gallery(svg, tag=f"{name}, level {level}")
     path = GOLDEN / f"{name}_l{level}.svg"
     if os.environ.get("CFFG_UPDATE_GOLDENS") == "1":
