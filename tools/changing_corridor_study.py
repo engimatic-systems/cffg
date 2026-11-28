@@ -213,18 +213,18 @@ def qualify(root):
 def readiness(root):
     """Independently replay the development gate on either archived protocol."""
     p = load(root / "protocol.json")
-    result = load(root / "qualification.json")
+    qualification = root / "qualification.json"
+    result = load(qualification) if qualification.exists() else None
     if (
-        result["status"] != "no_go"
+        (result is not None and result["status"] != "no_go")
         or (root / "freeze.json").exists()
         or (root / "cells").exists()
     ):
         raise ValueError("this review covers development stops before held-out access")
     manifests = load(root / "models.json")
     protocol_hash = sha(root / "protocol.json")
-    if (
-        manifests["protocol_sha256"] != protocol_hash
-        or result["protocol_sha256"] != protocol_hash
+    if manifests["protocol_sha256"] != protocol_hash or (
+        result is not None and result["protocol_sha256"] != protocol_hash
     ):
         raise ValueError("development protocol digest mismatch")
     for windows in manifests["arms"].values():
@@ -281,6 +281,21 @@ def readiness(root):
             )
             if r["t"] != t or r["u"] != expected:
                 raise ValueError(f"incorrect acquisition action: {key} at {t}")
+        for t, r in enumerate(tape):
+            for fact in [r["filter"]] + ([r["plan"]] if r["plan"] else []):
+                if (
+                    fact["status"] != "converged"
+                    or fact["inner_status"] != "converged"
+                    or not np.isfinite(fact["free_energy"])
+                ):
+                    raise ValueError(
+                        f"uncertified successful development step: {key} at {t}"
+                    )
+            if t >= p["warmup"] and (
+                r["plan"]["reason"] != "root_converged"
+                or r["plan"]["outer_residual"] is None
+            ):
+                raise ValueError(f"missing native planning root: {key} at {t}")
         eligible_visits = visits >= p["saturation_min_visits"]
         violations = sum(x > p["saturation_max_d1"] for x in d1)
         ready = (
@@ -316,7 +331,7 @@ def readiness(root):
         total=len(cells),
         protocol_sha256=protocol_hash,
         models_sha256=sha(root / "models.json"),
-        qualification_sha256=sha(root / "qualification.json"),
+        qualification_sha256=sha(qualification) if qualification.exists() else None,
         cells=cells,
     )
     existing = root / "readiness.json"
