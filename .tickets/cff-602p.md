@@ -126,3 +126,7 @@ Mathematics prerequisite cff-4sor has passed and closed on open #215. Base this 
 **2026-11-28T05:47:43Z**
 
 The source format now records gate names, signed branches and integer destinations, including recurrence trees inside compact plates. Old decision lists migrate on load after their original content hash has been checked. Fixed custom trees can round-trip through CFFGZ. Executing a non-decision-list tree is owned by cff-lv65. The final source, bundle, parity and serialization selection passed all 35 cases. The adjacent checkpoint, import, composition and plate selection passed 69, with 5 opt-in cases deselected. The previous reader rejected schema 1.2 and the new edit tag explicitly. The full short suite is the remaining review gate.
+
+**2026-11-28T07:27:24Z**
+
+The full gate on a354676 passed 2,889 cases and found two stale serialized identity expectations for the recurrence chain and loop. Source schema 1.2 changes their hashes as specified. The original schema-1 document hashes remain pinned in an explicit migration test. Checking the complete reconstructed arenas, schedule kinds and prior schedule fingerprints on both versions passed. No runtime or codec bytes changed. Focused compiler contract, source, parity and bundle files passed all 71 tests in 15.71 s.
