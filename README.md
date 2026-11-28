@@ -267,6 +267,36 @@ serialized edit actions and an externally stored replacement array. Pass
 Every declared blob needs an explicit value, including initializer-backed
 blobs. Replay returns independent arrays for fitting.
 
+### Reuse a typed fragment
+
+`cffg.structure_fragments` supplies three binary conditional models. Each
+has `previous` and `current` GLUE ports for its latent state.
+
+| Builder | Observed DATA | Assumption |
+| --- | --- | --- |
+| `object_persistence()` | `detection` (miss, hit) | An object can persist through a detector miss. A missing reading supplies no detection evidence. |
+| `contact_causality()` | `contact` (absent, present), `motion` (still, moving) | Recorded contact selects a motion transition. Motion is observed with sensor error. |
+| `agency()` | `applied_action` (left, right), `position_reading` (left, right) | The executed command selects a stochastic position transition. The position sensor can be wrong. |
+
+```python
+from cffg.structure_fragments import load_fragment, object_persistence, save_fragment
+
+key = save_fragment("persistence.npz", object_persistence())
+fragment = load_fragment("persistence.npz", expected_id=key)
+models = {"base": (base.template, base.arrays), key: (fragment.template, fragment.arrays)}
+step = fragment.compose_step(base.template, {"latent": "previous"}, name="with_detection")
+record = record_proposal(source_id="base", parent_id=None, proposal_source="fragment-library",
+                         steps=[step], models=models)
+```
+
+Here `base` supplies a binary `latent` GLUE port ordered absent, present.
+Check `fragment.ports` for the role, domain and ordered labels of every port.
+The fragment helper checks label order when both operands carry fragment
+metadata. A plain Template supplies the role and domain. Standard composition
+scopes existing host readings as `a/<name>` and fragment readings as
+`b/<name>`. Compare candidates using identical physical readings under
+the same scoped names and category order.
+
 ## Filter a slow regime and a fast state
 
 Use `cffg.hierarchy.Hierarchy` when a hidden regime selects the fast dynamics
