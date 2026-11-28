@@ -2,7 +2,7 @@
 id: cff-gnpn
 status: closed
 deps: [cff-q0ep]
-links: []
+links: [cff-1xig, cff-x6c0]
 created: 2026-07-05T22:12:45Z
 type: task
 priority: 1

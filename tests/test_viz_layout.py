@@ -191,3 +191,37 @@ def test_empty_direct_layout_has_a_defined_frame():
     scene = scene_of(Template("empty"))
     assert scene.items == []
     assert scene.width == scene.height == 2 * LayoutStyle().margin
+
+
+@pytest.mark.parametrize("steps, level", [(3, 0), (6, 4)])
+def test_rslds_time_slices_and_routed_wire_clearance(steps, level):
+    import re
+
+    from cffg.studio.models import starter
+    from cffg.viz import build_scene
+    from cffg.viz.scene import Path
+
+    template = starter("rslds", "Switching", steps=steps).template
+    for offsets in (None, {"z0_prior": [0, -1]}):
+        scene = build_scene(template, level=level, offsets=offsets)
+        boxes = scene.boxes()
+        by_time = [[] for _ in range(steps)]
+        for box in boxes.values():
+            by_time[int(re.search(r"\d+", box.name)[0])].append(box.x)
+        assert all(max(a) < min(b) for a, b in zip(by_time, by_time[1:]))
+        wires = derive(template).wires
+        for segment in scene.items:
+            if not isinstance(segment, Path) or segment.kind != "wire":
+                continue
+            connected = {end.factor for end in wires[segment.ref].node_ends()}
+            for (x, y), (u, v) in zip(segment.points, segment.points[1:]):
+                assert x == u or y == v
+                for name, box in boxes.items():
+                    if box.name in connected:
+                        continue
+                    assert (
+                        max(x, u) < box.x - box.w / 2 - 3
+                        or min(x, u) > box.x + box.w / 2 + 3
+                        or max(y, v) < box.y - box.h / 2 - 3
+                        or min(y, v) > box.y + box.h / 2 + 3
+                    ), (segment.ref, name)

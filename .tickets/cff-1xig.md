@@ -2,7 +2,7 @@
 id: cff-1xig
 status: open
 deps: [cff-jilz]
-links: []
+links: [cff-gnpn, cff-x6c0]
 created: 2026-09-13T15:23:02Z
 type: task
 priority: 2

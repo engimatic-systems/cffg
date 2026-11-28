@@ -2,7 +2,7 @@
 id: cff-6s31
 status: open
 deps: [cff-cpxj, cff-d56d, cff-j7mm]
-links: [cff-9xmq]
+links: [cff-9xmq, cff-5mf2]
 created: 2026-07-09T22:04:18Z
 type: feature
 priority: 3

@@ -119,7 +119,7 @@ The implemented surface includes discrete BP/VMP/GFE, linear Gaussian and
 exponential-family inference, hard constraints and discrete MAP, assumed-density
 hybrid and recurrent models, positive-noise nonlinear/neural Gaussian factors,
 declared between-trial learning, current-schema persistence, rolling agents,
-ordinary Colony batching, graph rendering, and a partial resource estimator.
+ordinary Colony batching, graph rendering, and compiled resource estimates.
 The sections below state the exactness, objective, persistence, input, and scale
 boundaries for those capabilities.
 
@@ -840,14 +840,24 @@ that unsupported grounding shape until recursive/index-table expansion in cff-6s
 Scoping or merging a compact plate is also rejected; call `expand_plates` before
 composition until cff-b2fz lands.
 
-`cffg.estimate.estimate` is only a partial planning aid. Its named persistent
-arena byte counts come from the initialized JAX state, and calibration is an
-approximate extrapolation for the selected run. The XLA cost path still calls an
-obsolete step signature and silently returns no FLOP or byte-traffic figures;
-parameter detail, backend temporary storage, compilation, first execution, and
-scheduled work units are not a trustworthy complete report. Ticket cff-j7mm
-owns that repair. Do not use the current summary as a memory limit, process-RSS
-measurement, or cross-model performance prediction.
+Resource estimates use the initialized array dtype and the selected backend.
+XLA executable reports are backend-dependent. An unavailable cost model or a
+malformed result carries a diagnostic. Planned temporary buffers omit runtime
+allocator overhead and other applications. Measure peak process RSS and device
+memory on the intended host. The Studio trace replays increasing iteration
+budgets with hardening disabled and has different timing overhead from the
+synchronized benchmark. Profiles apply to the model revision, seed, cache and
+hardware they record.
+
+Studio indexes supported template JSON, native bundles and Studio projects in
+enabled roots. Learning models require a complete bundle for portable import.
+Open a compact plate to edit its shared fragment. The inspector displays the
+first copy’s values. Resizing a fragment with declared learning owners requires
+a replacement bundle containing the updated learning state.
+Explicit coordinate maps and reinitialization work for supported parameter
+roles. Families with additional shape or learning constraints can require a
+user-supplied complete learning state or a replacement model. Private simulator
+execution uses the pinned arm64 Linux runtime on the Studio host.
 
 **S8. Goal-specification ergonomics.** Goals are prior distributions over future
 observations; translating task intent into calibrated `c` vectors (the softmax

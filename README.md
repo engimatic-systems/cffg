@@ -14,6 +14,147 @@ use [Known Limitations](docs/LIMITATIONS.md) to qualify experiment claims.
 
 CFFG is currently version 0.1 and requires Python 3.12 or newer.
 
+## CFFG Studio
+
+Open the **CFFG Studio** launcher in agent-share from a computer signed into the
+owner’s Tailscale account. Start with **Switching dynamics** to inspect an rSLDS,
+**Linear Gaussian tracker** for a Kalman model, or **New model → Blank graph**.
+Factors are boxes and variables are wires. Mint terminals mark observations,
+constraint beads carry their mathematical symbols, and selection has a separate
+outline. The inspector lists the roles and dimensions behind each mark.
+Hover a wire to highlight all occurrences of that quantity, including equality
+branches. Unrolled recurrences with identifiable time steps read left to right.
+Choose **Open selected plate** to enter a repeated fragment. Edits there apply
+to every copy, and annotations follow their variables through renames.
+
+Press **⌘K** on macOS or **Ctrl+K** elsewhere to find any command. **F6** moves
+between panels. From the outline, press **F2** to rename a variable or **Shift+R**
+to resize it. The preview lists affected arrays, shapes, learning owners and
+the factors sharing them. **Commit change** publishes a revision. Shift-drag a
+factor or use **Position selected factor** to change its grid offset. **Keyboard
+shortcuts** edits bindings, checks conflicts, supports chords, and imports or
+exports a profile. Panel sizes persist in the browser.
+
+Hold **Option** (**Alt** on other keyboards) and hover over a control or value
+outside the canvas to read its explanation. Try the number beside **Persistent
+state** in **Profile**. You can also Tab to a control and hold Option.
+Click **Hover help** in the bottom bar to keep explanations on as you move
+or Tab between controls. Click it again or press **Esc** to turn it off.
+
+**Open** searches saved models and indexed directories on the host. The same
+dialog accepts file uploads and changes search roots. **Hide incompatible files**
+remembers your preference; turn it off to inspect schema diagnostics. **Export** writes a portable
+`.cffgz` with graph data and learning state. **Export graph with Studio annotations**
+writes a `.cffgstudio` project including layout, notes and review threads.
+**Save as a new model** forks a named revision. Use **History** to inspect changes
+or restore an earlier graph as a new revision.
+
+**Run** binds seeded observations or a saved tape. **Step through inference**
+plays progressively larger solver budgets from the same initial state and can
+pause after each sample. **Resource profile** distinguishes initialized-state
+storage from measured peak RSS, first execution and synchronized warm latency.
+Experiment history retains solver statuses and inputs by revision. **Simulator**
+can generate editable Python/NumPy source from a prompt or run supplied source.
+The isolated process returns one observation per named DATA port and optionally
+its hidden ground truth. Reuse the resulting tape to compare model revisions.
+
+### Guided tours
+
+To have a coding agent guide you through a model, open the model, choose
+**Tours → Copy agent prompt**, and paste it into the agent. Add what you want
+explained, such as “trace one observation back to the hidden state.” The prompt
+includes the model ID, its link, and instructions for publishing. A remote
+agent needs the Studio endpoint and its own edit token (see **Coding agents**
+below). Open the playback link the agent returns, or select its tour under
+**Tours**.
+
+Use **←** and **→** to page through stops and **Escape** to leave. With
+**Animations** on, the camera pulls back to show both stops, pans across the
+graph, then zooms in on the next highlighted group. Crossing into or out of a
+plate takes you through its box on the parent graph. Turn **Animations** off to
+jump directly to each stop. Studio remembers your choice in this browser.
+Animations start on unless your system requests reduced motion.
+**Copy link** shares the tour. For a walkthrough
+of the editor itself, choose **Tours → Getting started with CFFG Studio**.
+
+For example, an agent can save this command array as `tour.json` for the
+canonical rSLDS.
+
+```json
+[{
+  "action": "set_tour",
+  "id": "switching-dynamics",
+  "title": "Follow one switching transition",
+  "steps": [
+    {"title": "The switching model", "text": "Follow how a discrete regime changes the continuous state and its next observation."},
+    {"title": "Initial regime", "ref": "factor:z0_prior", "text": "This categorical prior supplies the starting regime."},
+    {"title": "One transition", "refs": ["factor:dynamics1", "var:x0_dynamics", "factor:switch1"], "text": "Trace the previous state and the new regime into the first continuous transition."},
+    {"title": "Next observation", "ref": "factor:emission1", "text": "The emission factor maps x1 to observation y1."}
+  ]
+}]
+```
+
+Run `uv run --extra studio cffg-studio show MODEL_ID` to get the current
+`revision` and valid reference names under `metadata.anchors`.
+Run `uv run --extra studio cffg-studio preview MODEL_ID --base REVISION --commands tour.json`,
+then substitute `apply` for `preview` with the same base revision to publish. Reuse the tour ID to revise
+its steps or send `{"action":"remove_tour","id":"switching-dynamics"}` in a
+command array to remove it. For an overview, omit both `ref` and `refs`.
+A group accepts up to 64 distinct references. The inspector opens on the first
+surviving member. Set `"plate":"name"` to frame that plate's contents and use
+reference keys from `GET /v1/models/MODEL_ID?plate=name`. Published stops follow
+renamed elements. If a member disappears, playback identifies it and still
+frames the surviving marks. Studio
+project exports include tours, and `/v1/capabilities` exposes the authoring schema.
+
+### Coding agents
+
+The application exposes OpenAPI at `/openapi.json`. The CLI reads the local owner
+credential on the Studio host. Issue a separate token for each remote agent and
+supply its private HTTPS endpoint in `CFFG_STUDIO_URL` and its token in
+`CFFG_STUDIO_TOKEN`. Treat issued token output as a secret.
+
+```sh
+uv run --extra studio cffg-studio models
+uv run --extra studio cffg-studio capabilities
+uv run --extra studio cffg-studio show MODEL_ID
+uv run --extra studio cffg-studio preview MODEL_ID --base REVISION --commands edits.json
+uv run --extra studio cffg-studio apply MODEL_ID --base REVISION --commands edits.json
+uv run --extra studio cffg-studio critique MODEL_ID --base REVISION --ref var:x1 --text "Check process noise against the observed trajectory."
+uv run --extra studio cffg-studio events MODEL_ID
+```
+
+`edits.json` contains an ordered array such as
+`[{"action":"rename_variable","name":"x1","to":"position_1"}]`.
+Reuse a transaction's `--request-id` when retrying. A concurrent edit returns
+HTTP 409 with the current revision. `propose` accepts a comment and a command
+file for human review. `token issue NAME --scope read`, `token list`, and
+`token revoke ID` manage access on the host.
+
+### Host installation
+
+`uv run --extra studio python tools/install_studio.py --login OWNER_LOGIN`
+installs a wheel into a private release environment, starts a launchd agent,
+routes private Tailscale HTTPS to its loopback listener, and writes
+`~/agent-share/cffg-studio/index.html`. The launcher opens HTTPS port **8098**,
+within this host’s 8080–8100 Tailscale access rule for the owner's devices.
+On a different host, use `--https-port` to select a free port that its
+Tailscale policy permits from the intended clients. The central model repository is
+`~/projects/cffg-models`. Clone it to inspect ordinary Git history.
+Studio uses Git LFS when a model contains an array at least 1 MiB in size.
+Back up the repository including its LFS object store and the experiment data in
+`~/.local/share/cffg-studio/runs`. Publishing an edit goes through the Studio API.
+
+The simulator uses a configured OpenAI API key or the signed-in host Codex CLI.
+Executing generated source requires Docker with the `colima` context and the
+Studio NumPy image. The pinned arm64 image can be built from the repository root:
+
+```sh
+cd tools/studio-simulator
+uv pip install --target packages --python-version 3.12 --python-platform aarch64-manylinux_2_28 --only-binary :all: --no-deps --require-hashes --link-mode copy -r requirements.txt
+docker --context colima build --network=none -t cffg-studio-simulator:py312-numpy2.5.1-arm64 .
+```
+
 ## Install from a sibling experiment
 
 The repository is not published as a package yet. From an experiment project
@@ -100,7 +241,7 @@ example.
 | [Batch matching structures](#batch-extend-render-and-estimate) | `cffg.colony.Colony` | Vmapped iterative states; per-instance exact schedules | One `RunResult` per instance | Each instance keeps its normal engine objective/status | [API pattern](#batch-extend-render-and-estimate) | **Ready/partial:** functional mu3 rejected; exact schedules are per-instance; deterministic mixed GFE offers compiled batching |
 | [Register an ordinary custom factor](#batch-extend-render-and-estimate) | `FactorKernel`; binding classes; `register_kernel` | Single-arena discrete BP/VMP, Gaussian, or scalar EF | Generic marginals, energy, optional `kernel_readouts` | Extension author supplies mathematically valid messages and ledger | [API pattern](#batch-extend-render-and-estimate) | **Pre-1.0 unstable:** specialized/multi-arena variational objects need dedicated engine paths |
 | [Render a model](#batch-extend-render-and-estimate) | `cffg.viz` | Deterministic scene, SVG, or PNG from a template | `Scene`, SVG text, image file | Visualization only; no compile or inference certificate | [API pattern](#batch-extend-render-and-estimate) | **Ready:** PNG needs the `viz` extra; legacy moment syntax is rejected |
-| [Estimate resources](#batch-extend-render-and-estimate) | `cffg.estimate.estimate` | Static state bytes, optional cost analysis and calibration | `Estimate`, summary, predicted seconds | Measurement/planning aid, not a probabilistic objective | [API pattern](#batch-extend-render-and-estimate) | **Partial:** persistent arena bytes are useful; current XLA FLOP/traffic analysis is defective |
+| [Estimate resources](#batch-extend-render-and-estimate) | `cffg.estimate.estimate` | Static state bytes, optional cost analysis and calibration | `Estimate`, summary, predicted seconds | Measurement/planning aid, not a probabilistic objective | [API pattern](#batch-extend-render-and-estimate) | Exact persistent bytes, backend-reported executable costs, and empirical schedule timing |
 
 ## The mental model
 
@@ -794,12 +935,16 @@ scene = build_scene(template)        # Template -> positioned Scene
 assert to_svg(scene) == svg_text     # Scene -> SVG string
 ```
 
-`cffg.estimate.estimate(engine)` reports persistent arena bytes, a parameter
-total, optional backend cost analysis, and a short calibration extrapolation.
-Use the persistent byte inventory as a planning aid only. The current XLA
-analysis calls an obsolete execution signature, so FLOP and traffic fields may
-be absent; the summary is not peak RSS, compile time, or a reliable cross-model
-performance forecast.
+`cffg.estimate.estimate(engine)` reports exact bytes per persistent arena and parameter
+leaf. Its named XLA executables expose backend-reported FLOPs, byte traffic and
+planned buffers where supported. For example, `report.executables["flooding_step"]["cost_diagnostic"]`
+gives the backend, exception type and message when cost analysis is unavailable.
+Each compiled unit has separate lowering, compilation and first-execution times.
+Calibration also times the first end-to-end run, including any lazy controller
+compilation, and at least five synchronized warm runs. `report.prediction_unit`
+identifies the active schedule used by `predict_seconds`. Exact two-pass solves have a
+one-run timing. Studio's fresh-process profile also measures startup, compilation
+events and peak resident memory.
 
 ## Experiment checklist
 
