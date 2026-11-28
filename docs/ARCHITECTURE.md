@@ -1712,6 +1712,17 @@ them. Four rules define the contract:
    graph supplies the statistics and writes
    `E[log θ] = ψ(α) − ψ(α₀)`.
 
+   The `component_niw` family reads centered per-component moments from
+   `gaussian_mixture`. It shares the existing declared-learning transaction,
+   rollover and bundle machinery. The batched mixed-data API in
+   `mixed_learning.py` performs a caller-driven update between observations.
+   Its Gaussian block and categorical heads share one responsibility matrix.
+   A component with zero mass keeps its parameters. The update returns the
+   input bank on numerical failure. Versioned host snapshots preserve the
+   component axis, categorical head order, precision and occupancy mask.
+   These arrays describe a finite bank whose semantic fields and category
+   order are supplied by the model.
+
    Reading is not evidence, so a learnable may restrict which instances
    supply statistics: `LearnableSpec.sources` is `None` for every reader, a
    tuple for exactly those, and an empty tuple for none. Habits are the case

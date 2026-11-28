@@ -85,6 +85,9 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 READOUTS = {
     "node_beliefs": lambda engine, state: engine.node_beliefs(state),
     "gaussian_node_stats": lambda engine, state: engine.gaussian_node_stats(state),
+    "centered_mixture_stats": lambda engine, state: engine.gaussian_node_stats(
+        state, centered_mixtures=True
+    ),
     "recurrence_weight_stats": lambda engine, state: engine.recurrence_weight_stats(
         state
     ),
@@ -299,6 +302,7 @@ class Dirichlet:
         return {"alpha": np.asarray(prior, dtype=float).copy()}
 
 
+from cffg.component_niw_learning import ComponentNIWFamily
 from cffg.gaussian_learning import MNIWFamily, NIWFamily
 from cffg.hybrid_learning import ComponentMNIWFamily, PGWeightsFamily
 
@@ -306,6 +310,7 @@ from cffg.hybrid_learning import ComponentMNIWFamily, PGWeightsFamily
 FAMILIES: dict[str, Family] = {
     "dirichlet": Dirichlet(),
     "niw": NIWFamily(),
+    "component_niw": ComponentNIWFamily(),
     "mniw": MNIWFamily(),
     "component_mniw": ComponentMNIWFamily(),
     "pg_weights": PGWeightsFamily(),

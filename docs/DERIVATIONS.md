@@ -533,6 +533,29 @@ posterior equals the prior. `NIW.update_centered` consumes this representation.
 `tests/test_conj.py` exercises the update and `tests/test_hybrid_readouts.py`
 checks the source of the component covariances.
 
+**Shared assignments for mixed observations.** For component `k`, let `m`,
+`κ`, `Ψ`, and `ν` be its NIW parameters and let `a_h` be the Dirichlet
+concentrations of categorical field `h`. A continuous observation with mean
+`x` and covariance `V` contributes the following expected log likelihood in
+dimension `d`, with ψ denoting the digamma function:
+
+    E log |Λ| = Σ_i ψ((ν+1−i)/2) + d log 2 − log |Ψ|,  i = 1,…,d
+    L_G = (E log |Λ| − d log(2π) − d/κ
+           − ν [(x−m)ᵀ Ψ⁻¹ (x−m) + tr(Ψ⁻¹ V)]) / 2.
+
+An observed category `c` adds `ψ(a_h[c]) − ψ(Σ a_h)`. Missing fields
+contribute zero. Softmax the sum over active components, optionally adding
+the expected log mixing probability before softmax. Keep the observed score
+itself available for a caller that tests absolute fit. The same assignment
+then weights each observed field. Each informative record adds its
+responsibility once to the mixing count, regardless of the number of fields.
+The update above receives the Gaussian mass; each present categorical head
+adds a weighted one-hot vector. This is an additive posterior update for
+fixed responsibilities. Recomputing the responsibilities after an individual
+record can change later assignments. The small independent score and
+posterior oracles are in `tests/test_mixed_scoring.py` and
+`tests/test_mixed_learning.py`.
+
 **MNIW update** (gaussian_linear node, x̃ = [x; 1], prior (M0 [dy,di+1],
 Λ0 [di+1,di+1] column precision, Ψ0, ν0), per-trial stats Syy = E[yyᵀ],
 Syx̃ = E[yx̃ᵀ], Sx̃x̃ = E[x̃x̃ᵀ], summed over the trial's node occurrences,

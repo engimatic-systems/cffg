@@ -127,6 +127,7 @@ def test_region_rejects_open_ports_and_mutated_parameter_bindings(monkeypatch):
             region.evaluate(engine, result)
 
 
+@pytest.mark.slow
 def test_reactor_comparison_reads_selected_edges_and_times_both_arms(monkeypatch):
     import sys
     from pathlib import Path

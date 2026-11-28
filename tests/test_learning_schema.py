@@ -20,13 +20,14 @@ from cffg.core.serialize import (
     from_dict, from_json, legacy_learning_structure_hash, structure_hash, to_dict, to_json,
 )
 from cffg.engine import Engine
-from cffg.learn import FAMILIES, Learnables
+from cffg.learn import FAMILIES, Learnables, _encode_state_key
 from cffg.learning_schema import (
     PERSISTENT_MANIFEST_KEY, PersistentParameter, encode_persistent_manifest,
     persistent_schema, resolve_persistent_state, validate_persistent_manifest,
 )
 
 from test_agent import fresh
+from test_component_niw_learning import component_model
 from test_gaussian_learnables import _learning_template
 from test_hybrid_learnables import _mixture_template, _recurrence_template
 
@@ -45,7 +46,7 @@ def _categorical():
 
 @pytest.fixture(scope="module")
 def families():
-    fixtures = []
+    fixtures = [component_model()]
     t, arrays = _categorical()
     fixtures.append((t, arrays, {"q": np.ones(2)}))
     t, arrays = _learning_template(2)
@@ -78,7 +79,7 @@ def test_every_family_describes_and_restores_exact_arrays(families, family_name,
     assert {t.blob for t in descriptor.targets} == set(plan.shapes)
     # Use a different destination prior dtype to exercise persistence without casting.
     destination = Learnables(engine, priors={plan.name: dict(prior)}, only=(plan.name,))
-    checkpoint = {f"v2:{plan.name}:{key}": value for key, value in state.items()}
+    checkpoint = {_encode_state_key(plan.name, key): value for key, value in state.items()}
     checkpoint[PERSISTENT_MANIFEST_KEY] = encode_persistent_manifest((descriptor,))
     destination.load_state_dict(checkpoint, exact=True)
     for key, value in state.items():
