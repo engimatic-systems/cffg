@@ -147,9 +147,10 @@ def constraint_satisfied(
     )
 
 
-def make_belief_energy(arena: Arena) -> FreeEnergy:
+def make_belief_energy(arena: Arena, *, discrete_energy=None) -> FreeEnergy:
     """Build the existing ordered BFE/GFE sum for raw JIT and schedule use."""
     groups = arena.groups
+    local_discrete = discrete_energy or _disc_energy
 
     def bfe(
         messages: jax.Array,
@@ -190,7 +191,7 @@ def make_belief_energy(arena: Arena) -> FreeEnergy:
                 inc = _disc_both(arena, messages, g.gather_both, g.cards)
             else:
                 inc = _disc_rows(arena, messages, g.gather, g.cards)
-            total = total + _disc_energy(g, inc, _kernel_params(g, params)).sum()
+            total = total + local_discrete(g, inc, _kernel_params(g, params)).sum()
         total = terms.add_constraint_terms(total, arena, messages, params)
         total = terms.add_gfe_terms(total, arena, messages, params)
         total = terms.add_transition_gfe_terms(total, arena, messages, params)

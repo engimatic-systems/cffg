@@ -248,7 +248,7 @@ def _constraint_writes(arena: Arena, messages: jax.Array, params, op, failures):
 
 
 def make_sweep(arena: Arena, skip_scheduled: bool = False, *,
-               _gaussian_executor=_execute_gaussian) -> Sweep:
+               _gaussian_executor=_execute_gaussian, discrete_executor=None) -> Sweep:
     """The synchronous sweep. With ``skip_scheduled=True`` (the mixed-mode
     phase step) the plain BP discrete groups, Gaussian groups, and
     EF groups are omitted — the directed island passes own them — while
@@ -283,7 +283,8 @@ def make_sweep(arena: Arena, skip_scheduled: bool = False, *,
                 inc = _disc_both(arena, messages, g.gather_both, g.cards)
             else:
                 inc = _disc_rows(arena, messages, g.gather, g.cards)
-            delta = _execute_discrete(g, inc, _kernel_params(g, params), op)
+            local = (g, inc, _kernel_params(g, params), op)
+            delta = (_execute_discrete(*local) if discrete_executor is None else discrete_executor(*local))
             failure = simultaneous_failure(failure, failures.delta(g, delta, "disc", discrete_dtype=messages.dtype))
             out = delta.outgoing
             new = _set_disc_rows(arena, new, g.scatter, g.cards, out)

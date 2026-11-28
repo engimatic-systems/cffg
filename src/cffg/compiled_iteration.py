@@ -1,5 +1,6 @@
 """Compiled control flow for deterministic scheduled iteration."""
 
+from dataclasses import replace
 from functools import partial
 from typing import NamedTuple
 
@@ -8,10 +9,14 @@ import jax.numpy as jnp
 import numpy as np
 
 from cffg.failure_facts import FailureAt, FailurePhase, empty_failure, empty_failure_at, record_failure
+from cffg.execution.indexed_transition import IndexedTransitions, has_indexable_transition
+from cffg.execution.owners import SCHEDULED_EXECUTORS
+from cffg.execution.synchronous import make_sweep
 from cffg.iteration import allows_initial_undefined_energy
 from cffg.iteration_checks import make_iteration_support
 from cffg.iteration_tolerance import energy_within, tolerance
 from cffg.iteration_types import IterationOutcome, IterationReason as Reason
+from cffg.ledger import make_belief_energy
 from cffg.runtime_types import State, _replace
 
 
@@ -36,6 +41,7 @@ class _Progress(NamedTuple):
 
 
 _BLOCKS = ("messages", "g_eta", "g_lam", "ef_eta")
+_MIN_INDEXED_BATCH = 8
 
 
 def _state_finite(state):
@@ -74,10 +80,10 @@ def _host_outcome(state, p):
 class CompiledIteration:
     """One cached scalar loop, vectorized over independent Colony members."""
 
-    def __init__(self, engine, hooks):
+    def __init__(self, engine, hooks, *, executors=SCHEDULED_EXECUTORS, allow_indexed=True):
         self.hooks = hooks
         self.step, self.prime, energy, override_energy, _ = hooks
-        self.bad_support = make_iteration_support(engine.arena)
+        self.bad_support = make_iteration_support(engine.arena, executors)
         self.energy = override_energy or (lambda s: energy(
             s.messages, s.g_eta, s.g_lam, s.g_obs, s.g_mask,
             s.ef_eta, s.ef_obs, s.ef_mask, s.params,
@@ -85,6 +91,8 @@ class CompiledIteration:
         self.is_max = engine.arena.semiring == "max"
         self.objective = engine.objective if self.is_max else None
         self.allow_undefined = allows_initial_undefined_energy(engine.arena)
+        self._index_engine = engine if allow_indexed else None
+        self._indexed = None
         controls = ("n_iters", "harden_last", "defer_hard", "damp")
         self.single = jax.jit(self._single, static_argnames=controls)
         self.batch = jax.jit(self._batch, static_argnames=controls)
@@ -279,10 +287,52 @@ class CompiledIteration:
                                      n_iters, harden_last, batched=False)
         return _host_outcome(state, facts)
 
+    def _indexed_batch(self, states):
+        dtype = states[0].messages.dtype
+        if (dtype not in (np.dtype(np.float32), np.dtype(np.float64))
+                or getattr(states[0].messages.device, "platform", None) != "cpu"):
+            return None
+        if self._index_engine is not None:
+            engine, self._index_engine = self._index_engine, None
+            arena = engine.arena
+            native_hooks = all(a is b for a, b in zip(self.hooks[:3], engine._ordinary_hooks, strict=True))
+            if (native_hooks and self.hooks[3:] == (None, None) and not self.is_max
+                    and not self.allow_undefined and not arena.constraint_groups
+                    and engine.schedule.kind in ("flood", "two_pass")
+                    and all(group.mode == "bp" for group in arena.groups)
+                    and not arena.dirichlet_groups and not arena.gfe_groups and not arena.gfe_tm_groups
+                    and has_indexable_transition(arena)):
+                indexed = IndexedTransitions(arena, dtype)
+                if indexed:
+                    hooks = (make_sweep(arena, discrete_executor=indexed.message), None,
+                             make_belief_energy(arena, discrete_energy=indexed.energy), None, None)
+                    executors = replace(SCHEDULED_EXECUTORS, discrete_zero_support=indexed.zero_support)
+                    self._indexed = (indexed, CompiledIteration(
+                        engine, hooks, executors=executors, allow_indexed=False,
+                    ))
+        if self._indexed is not None:
+            indexed, runner = self._indexed
+            if indexed.matches(states):
+                return runner
+        return None
+
     def run_batch(self, states, *, n_iters, damp, harden_last, tol):
         stacked = jax.tree.map(lambda *xs: jnp.stack(xs), *states)
-        state, facts = self._execute(stacked, tolerance(states[0].messages.dtype, tol), damp,
-                                     n_iters, harden_last, batched=True)
+        controls = (tolerance(states[0].messages.dtype, tol), damp, n_iters, harden_last)
+        runner = None
+        if (tol is None and len(states) >= _MIN_INDEXED_BATCH and n_iters > 0
+                and harden_last == 0 and 0 <= damp <= 1):
+            runner = self._indexed_batch(states)
+        if runner is not None:
+            state, facts = runner._execute(stacked, *controls, batched=True)
+            # A failed numerical guard uses the same terminal machinery as
+            # an ordinary failed step. Replay from the original state before
+            # returning any status or partial trace to the caller.
+            if not (np.all(facts.reason == Reason.BUDGET) and np.all(facts.count == n_iters)
+                    and np.all(facts.energy_count == n_iters)):
+                runner = None
+        if runner is None:
+            state, facts = self._execute(stacked, *controls, batched=True)
         # Observations and parameters are immutable for the entire run.
         updated = {name: tuple(getattr(state, name)) for name in _BLOCKS
                    if getattr(states[0], name).size}

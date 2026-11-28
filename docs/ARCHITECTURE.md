@@ -2387,6 +2387,27 @@ truncates the trace buffers to each member’s recorded counts. Trace storage sc
 with batch width times sweep budget. `tools/benchmark_ordinary_iteration.py`
 compares the two public entry points on 32 distinct Hallway priors and 60
 ordinary sweeps, including synchronized wall time and device submissions.
+
+The ordinary CPU sum-product controller can index the supported atoms of a large
+built-in transition table when a batch of at least eight members shares that
+table. This applies to fixed-sweep flooding, including damped runs of a
+two-pass graph. Each table keeps its original potential and role order. The
+controller checks live parameter arrays before reusing a table and caches the
+check for each immutable array. The three outgoing contractions, exact local
+support test and atom-level Bethe term consume the same indexed support.
+Only the indexed path uses the admission limits for minimum table size and
+work reduction.
+
+The indexed message rule retains the rounding behavior of the finite log-zero
+sentinel when an outgoing category has no supported contribution. Its range
+checks cover nonpositive log messages and require a supported joint score that
+forces omitted weights to underflow. The objective keeps the ordinary
+per-atom cutoff. Near the cutoff or outside the range of the indexed rule,
+the controller replays the batch through the dense rule from the original
+states before returning any trace or status. The scalar Engine and other
+schedules continue to use their existing rules. The matched public runtime
+probe is `tools/probe_sparse_transition.py`.
+
 Stochastic `mu3` evaluators are rejected by `Colony`: explicit PRNG preparation,
 particle state, and stochastic statuses exist on `Engine`, but Colony does not
 yet carry them per instance. Per-instance structure changes also fragment

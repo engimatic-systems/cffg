@@ -693,6 +693,7 @@ _install_discrete(
         scale="Local cardinality padding only; tested at cardinality 128 and above.",
     ),
 )
+_BUILTIN_TRANSITION_KERNEL = KERNELS["transition_mixture"]
 
 from cffg.gaussian_kernels import install as _install_gaussian
 

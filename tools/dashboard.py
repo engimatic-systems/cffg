@@ -100,6 +100,7 @@ EPIC_FILES = {
         "test_lifecycle.py",
         "test_iteration.py",
         "test_compiled_iteration.py",
+        "test_indexed_transition.py",
         "test_iteration_checks.py",
         "test_iteration_tolerance.py",
         "test_mixed_controller.py",

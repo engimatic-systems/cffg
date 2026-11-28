@@ -36,7 +36,8 @@ def registered():
 
 @pytest.mark.parametrize("schedule", ["auto", pytest.param("flood", marks=pytest.mark.slow)])
 @pytest.mark.parametrize(
-    "conditioned,present", [(False, False), (True, False), (True, True)]
+    "conditioned,present",
+    [pytest.param(False, False, marks=pytest.mark.slow), (True, False), (True, True)],
 )
 def test_external_joint_and_middle_role_conditioning(
     registered, schedule, conditioned, present
