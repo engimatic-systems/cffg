@@ -189,16 +189,19 @@ def gaussian_energy(group, eta, precision, params, observation=None, mask=None):
 
 
 def gaussian_readout(
-    group, eta, precision, params, observation=None, mask=None, *, statistics=False
+    group, eta, precision, params, observation=None, mask=None, *, statistics=False, centered=False
 ):
     binding = group.kernel.binding
     callback = binding.statistics if statistics else binding.readout
+    use_centered = statistics and centered and binding.centered_statistics is not None
+    if use_centered:
+        callback = binding.centered_statistics
     values = callback(
         eta, precision, params, group.dims, group.observed_role, observation, mask
     )
     if group.taps and statistics:
         from cffg.gaussian_taps import statistics as point_statistics
-        values = point_statistics(group, values, eta, precision, params, observation, mask)
+        values = point_statistics(group, values, eta, precision, params, observation, mask, centered=use_centered)
     for key, value in values.items():
         if not value.shape or value.shape[0] != eta.shape[0]:
             raise ValueError(

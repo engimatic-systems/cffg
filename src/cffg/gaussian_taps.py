@@ -79,23 +79,35 @@ def energy(group, ordinary, eta, precision, p, observation, mask):
     return ordinary
 
 
-def statistics(group, values, eta, precision, p, observation, mask):
+def statistics(group, values, eta, precision, p, observation, mask, *, centered=False):
     """Moments of a joint with a known coordinate have zero covariance in that coordinate."""
     from cffg.gaussian_kernels import linear_statistics
+
+    # The centered kernels return immutable device arrays. Substitute only in an owned copy.
+    if centered:
+        values = {name: np.array(value) for name, value in values.items()}
 
     if group.type == "gaussian":
         bound = np.asarray(p["bound0"]) & np.asarray(gauss.is_proper_precision(p["W"]))
         mean = np.asarray(p["point0"])[bound]
         values["mean"][bound] = mean
-        values["second"][bound] = mean[..., None] * mean[:, None, :]
+        if centered:
+            values["covariance"][bound] = 0
+        else:
+            values["second"][bound] = mean[..., None] * mean[:, None, :]
         values["proper"][bound] = True
         return values
 
     if "point0" in p:
         bound = np.asarray(p["bound0"])
-        fixed = linear_statistics(eta, precision, p, group.dims, 0, p["point0"], np.ones(len(bound)))
+        read = group.kernel.binding.centered_statistics if centered else linear_statistics
+        fixed = read(eta, precision, p, group.dims, 0, p["point0"], np.ones(bound.shape, dtype=eta.dtype))
         for name in values:
-            values[name][bound] = fixed[name][bound]
+            if name in ("cov_yy", "cov_yx"):
+                # An interior tap keeps its latent row schema, with zero output dispersion.
+                values[name][bound] = np.where(np.asarray(fixed["proper"])[bound, None, None], 0., np.nan)
+            else:
+                values[name][bound] = np.asarray(fixed[name])[bound]
         observation, mask = p["point0"], bound
     if "point1" in p:
         out_dim = group.dims[0]
@@ -110,9 +122,17 @@ def statistics(group, values, eta, precision, p, observation, mask):
                 h = w @ (a @ x + b) + eta[i, 0, :out_dim]
                 proper &= bool(gauss.is_proper_precision(l))
                 y, cov = map(np.asarray, gauss.moments(h, l))
-            xt = np.append(x, 1)
-            values["Syy"][i] = cov + np.outer(y, y) if proper else np.nan
-            values["Syx"][i] = np.outer(y, xt) if proper else np.nan
-            values["Sxx"][i] = np.outer(xt, xt) if proper else np.nan
+            if centered:
+                proper &= bool(np.isfinite(y).all() and np.isfinite(cov).all())
+                values["mean"][i] = np.concatenate((y, x)) if proper else np.nan
+                values["cov_xx"][i] = 0. if proper else np.nan
+                if "cov_yy" in values:
+                    values["cov_yy"][i] = cov if proper else np.nan
+                    values["cov_yx"][i] = 0. if proper else np.nan
+            else:
+                xt = np.append(x, 1)
+                values["Syy"][i] = cov + np.outer(y, y) if proper else np.nan
+                values["Syx"][i] = np.outer(y, xt) if proper else np.nan
+                values["Sxx"][i] = np.outer(xt, xt) if proper else np.nan
             values["proper"][i] = proper
     return values

@@ -235,7 +235,7 @@ def _incoming_gaussian(arena, state, group, role, dimension):
     return eta, precision
 
 
-def _numpy_linear_stats(engine, state):
+def _numpy_linear_stats(engine, state, *, centered=False):
     group = engine.arena.mix_groups[0]
     dimension = group.dims[0]
     eta_y, precision_y = _incoming_gaussian(
@@ -285,6 +285,8 @@ def _numpy_linear_stats(engine, state):
         scores.append(log_selector[regime] + log_z + node_constant)
     responsibility = np.exp(np.asarray(scores) - np.max(scores))
     responsibility /= responsibility.sum()
+    if centered:
+        return responsibility, np.stack(means), np.stack(covariances)
     syy = []
     syx = []
     sxx = []
@@ -316,6 +318,14 @@ def test_linear_mixture_stats_match_independent_d3_joint():
     engine, state = _converge(template, arrays)
     actual = engine.gaussian_node_stats(state)["transition"]
     responsibility, syy, syx, sxx = _numpy_linear_stats(engine, state)
+    conditional = engine.gaussian_node_stats(state, centered=True)["transition"]
+    _, mean, cov = _numpy_linear_stats(engine, state, centered=True)
+    np.testing.assert_allclose(conditional["mean"], mean, atol=1e-11)
+    np.testing.assert_allclose(conditional["cov_yy"], cov[:, :2, :2], atol=1e-11)
+    np.testing.assert_allclose(conditional["cov_yx"], cov[:, :2, 2:], atol=1e-11)
+    np.testing.assert_allclose(conditional["cov_xx"], cov[:, 2:, 2:], atol=1e-11)
+    np.testing.assert_allclose(conditional["responsibility"], responsibility, atol=1e-11)
+
 
     assert bool(actual["proper"])
     np.testing.assert_allclose(
@@ -452,6 +462,7 @@ def test_linear_predictive_matches_components_and_forward_message():
     )
 
 
+@pytest.mark.slow
 def test_scalar_predictive_matches_dense_gauss_hermite_quadrature():
     template, arrays = _linear_template(regimes=3, dimension=1)
     engine, state = _converge(template, arrays)
@@ -513,8 +524,43 @@ def test_prior_mixture_stats_and_predictive_name_weighting_explicitly():
     )
 
 
+@pytest.mark.parametrize(("x64", "schedule"), [(False, "auto"), pytest.param(True, "flood", marks=pytest.mark.slow)])
+def test_centered_mixture_readout_preserves_uncertainty_at_displaced_origin(x64, schedule):
+    template, arrays = _prior_mixture_template(regimes=3, dimension=1)
+    template.ports.clear()
+    template.factors["sensor"] = FactorSpec(
+        "sensor", "gaussian", {"out": "y"},
+        param_blobs={"mean": "sensor_mean", "cov": "sensor_covariance"},
+    )
+    template.blobs.update(_blobs("sensor_mean", "sensor_covariance"))
+    means = np.array([10000., 10000.125, 10001.])
+    variances = np.array([0.5, 1., 0.25])
+    arrays.update(mean=means[:, None], covariance=variances[:, None, None],
+                  sensor_mean=np.array([10001.]), sensor_covariance=np.array([[0.25]]),
+                  probability=np.array([0.5, 0.5, 0.]))
+    with jax.enable_x64(x64):
+        engine = Engine(compile_template(template, arrays=arrays), schedule=schedule)
+        state = engine.step(engine.init_state())
+        raw = engine.gaussian_node_stats(state)["mixture"]
+        centered = engine.gaussian_node_stats(state, centered_mixtures=True)["mixture"]
+
+    assert raw["proper"] and centered["proper"]
+    np.testing.assert_array_equal(centered["responsibility"], raw["responsibility"])
+    assert centered["responsibility"][-1] == 0.
+    covariance = 1 / (1 / variances + 4.)
+    expected_mean = means + 4 * covariance * (10001. - means)
+    dtype = state.g_eta.dtype
+    np.testing.assert_allclose(centered["component_covariance"][:, 0, 0], covariance,
+                               atol=0, rtol=8 * np.finfo(dtype).eps)
+    np.testing.assert_allclose(centered["component_mean"][:, 0], expected_mean,
+                               atol=np.spacing(dtype.type(10001.)), rtol=0)
+    assert sum(value.nbytes for value in centered.values()) == sum(
+        value.nbytes for value in raw.values()
+    )
+
+
 @pytest.mark.parametrize(("linear", "schedule", "prior"), [
-    (False, "auto", [0.5, 0.5]),
+    pytest.param(False, "auto", [0.5, 0.5], marks=pytest.mark.slow),
     (True, "flood", [0.2, 0., 0.8]),
 ])
 def test_far_observation_preserves_selector_odds_and_certified_energy(linear, schedule, prior):

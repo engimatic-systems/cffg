@@ -2,7 +2,7 @@
 id: cff-cynx
 status: open
 deps: [cff-izjd, cff-du6m]
-links: []
+links: [cff-xa6z, car-zieb]
 created: 2026-07-13T03:51:42Z
 type: epic
 priority: 2

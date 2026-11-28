@@ -369,9 +369,9 @@ def test_scheduled_and_flooded_gaussian_updates_match():
     ("corrupt", "match"),
     [
         (lambda row: row.update(proper=np.asarray(False)), "improper"),
-        (lambda row: row.update(Syy=np.full_like(row["Syy"], np.nan)), "finite"),
-        (lambda row: row.update(Syx=np.zeros((1, 1))), "statistic shapes"),
-        (lambda row: row.update(Syy=np.eye(2) * -100.0), "positive definite"),
+        (lambda row: row.update(cov_yy=np.full_like(row["cov_yy"], np.nan)), "finite"),
+        (lambda row: row.update(cov_yx=np.zeros((1, 1))), "statistic shapes"),
+        (lambda row: row.update(cov_yy=np.eye(2) * -100.0), "positive semidefinite"),
     ],
 )
 def test_selected_updates_are_atomic_on_hostile_mniw_statistics(
@@ -384,8 +384,9 @@ def test_selected_updates_are_atomic_on_hostile_mniw_statistics(
     )
     before = learnables.state_dict()
     readout = engine.gaussian_node_stats(result.state)
-    corrupt(readout["transition"])
-    monkeypatch.setattr(engine, "gaussian_node_stats", lambda state: readout)
+    centered = engine.gaussian_node_stats(result.state, centered=True)
+    corrupt(centered["transition"])
+    monkeypatch.setattr(engine, "gaussian_node_stats", lambda state, **kw: centered if kw else readout)
 
     with pytest.raises((ValueError, KeyError), match=match):
         learnables.replace(engine, result)
@@ -549,3 +550,71 @@ def test_unsupported_gaussian_family_pairs_fail_at_compile_time():
     )
     with pytest.raises(CompileError, match="learnable 'bad'.*mniw/gaussian_linear"):
         compile_template(mixture, arrays=mixture_arrays)
+
+
+@pytest.mark.parametrize("x64,origin", [(False, 4096.), (True, 2.**27)])
+def test_declared_gaussian_spread_at_translated_origin(x64, origin):
+    with jax.enable_x64(x64):
+        for variance in (.25, 1.):
+            template, arrays = _learning_template(1)
+            arrays.update(m0=np.array([origin]), P0=np.array([[variance]]),
+                          A=np.zeros((1, 1)), b=np.array([origin]), Q=np.array([[variance]]),
+                          H=np.zeros((1, 1)))
+            engine = Engine(compile_template(template, arrays=arrays))
+            result = engine.run(engine.bind_data(engine.init_state(), {"observation": [0.]}),
+                                20, tol=1e-6)
+            learner = Learnables(engine, priors={
+                "a_state": conj.NIW(np.array([origin]), 2., np.array([[3.]]), 4.),
+                "z_dynamics": conj.MNIW(np.array([[0., origin]]), np.eye(2), np.array([[3.]]), 4.),
+            })
+            learner.accumulate(engine, result)
+            assert engine.gaussian_marginal(result.state, "x0")[1].item() == variance
+            for name in ("a_state", "z_dynamics"):
+                np.testing.assert_allclose(learner.params[name]["psi"], [[3. + variance]])
+
+
+def test_observed_centered_regression_retains_input_spread_and_skips_missing():
+    with jax.enable_x64(False):
+        t, arrays = _tied_emissions(2, 1)
+        x = 4096.
+        arrays.update(input_mean=np.array([x]), input_cov=np.array([[.25]]),
+                      R=np.array([[.25]]))
+        engine = Engine(compile_template(t, arrays=arrays))
+        state = engine.bind_data(engine.init_state(), {"observation0": [x]})
+        result = engine.run(state, 40, tol=1e-6)
+        prior = conj.MNIW(np.array([[1., 0.]]), np.eye(2), np.array([[3.]]), 4.)
+        learner = Learnables(engine, {"emission": prior})
+        learner.accumulate(engine, result)
+        # One observed row has input variance v and zero mean prediction error.
+        # Integrating the two coefficient increments subtracts 2*v²/det(Lambda).
+        v = .125
+        expected = 3. + v - 2 * v**2 / (x*x + 2. + 2.*v)
+        np.testing.assert_allclose(learner.params["emission"]["psi"], [[expected]],
+                                   rtol=0, atol=np.spacing(np.float32(v)))
+        assert learner.params["emission"]["nu"] == 5.
+        row = engine.gaussian_node_stats(result.state)["emission0"]
+        raw = prior.update(row["Syy"], row["Syx"], row["Sxx"], 1.)
+        np.testing.assert_allclose(raw.psi, [[3.]], atol=1e-8)
+
+
+def test_centered_linear_callback_matches_eager_singletons_across_batch():
+    import jax.numpy as jnp
+    from cffg.gaussian_kernels import centered_linear_statistics
+
+    dims = (1, 2)
+    eta = jnp.array([[[.2, 0.], [-1., .5]], [[-.3, 0.], [1., -.25]]])
+    precision = jnp.broadcast_to(jnp.eye(2), (2, 2, 2, 2))
+    params = {"A": jnp.array([[[.7, -.3]], [[-.5, .2]]]),
+              "b": jnp.array([[.25], [-.5]]), "W": jnp.array([[[1.]], [[2.]]])}
+    compiled = jax.jit(centered_linear_statistics, static_argnums=(3, 4))
+    for role in (None, 0):
+        y, mask = (None, None) if role is None else (jnp.array([[2.], [0.]]), jnp.array([1., 0.]))
+        result = compiled(eta, precision, params, dims, role, y, mask)
+        for i in range(2):
+            subset = lambda a: a[i:i+1]
+            single = centered_linear_statistics(
+                subset(eta), subset(precision), jax.tree.map(subset, params), dims, role,
+                None if y is None else subset(y), None if mask is None else subset(mask),
+            )
+            for key in result:
+                np.testing.assert_allclose(result[key][i], single[key][0], rtol=1e-12, atol=1e-12)

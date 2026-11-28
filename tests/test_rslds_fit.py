@@ -479,8 +479,8 @@ def test_improper_statistics_diverge_before_parameter_write(
     else:
         original_readout = Engine.gaussian_node_stats
 
-        def improper_readout(self, state):
-            rows = original_readout(self, state)
+        def improper_readout(self, state, **kwargs):
+            rows = original_readout(self, state, **kwargs)
             name = next(name for name in rows if name.startswith(kind))
             rows[name] = {**rows[name], "proper": np.asarray(False)}
             return rows
@@ -601,6 +601,7 @@ def test_inner_retry_schedule_retries_finite_exhaustion():
     ]
 
 
+@pytest.mark.slow
 def test_float32_fitter_survives_tenfold_horizon():
     result = _fit(
         _observations(80),

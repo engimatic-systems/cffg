@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import dataclasses
 
+from cffg.core import gaussian_agent
 from cffg.core.ir import (
     AgentSpec,
     BeliefBinding,
@@ -44,6 +45,42 @@ def _require_flat(template: Template) -> None:
             f"compact plates cannot be composed directly (learnables {names}); "
             "call expand_plates before scoping or merging"
         )
+
+
+def _scope_agent(spec, s):
+    if spec is None:
+        return None
+    if not isinstance(spec, AgentSpec):
+        return gaussian_agent.scoped(spec, s)
+    return AgentSpec(
+        action=s(spec.action),
+        action_port=(
+            s(spec.action_port)
+            if spec.action_port is not None
+            else None
+        ),
+        observation_port=(
+            s(spec.observation_port)
+            if spec.observation_port is not None
+            else None
+        ),
+        beliefs=tuple(
+            BeliefBinding(
+                name=s(belief.name),
+                blocks=tuple(s(block) for block in belief.blocks),
+                prior=s(belief.prior),
+                posterior=s(belief.posterior),
+                factorization=belief.factorization,
+                constraints=tuple(s(c) for c in belief.constraints),
+                episode_learnable=(
+                    s(belief.episode_learnable)
+                    if belief.episode_learnable is not None
+                    else None
+                ),
+            )
+            for belief in spec.beliefs
+        ),
+    )
 
 
 def scoped(template: Template, prefix: str) -> Template:
@@ -84,39 +121,7 @@ def scoped(template: Template, prefix: str) -> Template:
             )
             for ln in template.learnables.values()
         },
-        agent=(
-            AgentSpec(
-                action=s(template.agent.action),
-                action_port=(
-                    s(template.agent.action_port)
-                    if template.agent.action_port is not None
-                    else None
-                ),
-                observation_port=(
-                    s(template.agent.observation_port)
-                    if template.agent.observation_port is not None
-                    else None
-                ),
-                beliefs=tuple(
-                    BeliefBinding(
-                        name=s(belief.name),
-                        blocks=tuple(s(block) for block in belief.blocks),
-                        prior=s(belief.prior),
-                        posterior=s(belief.posterior),
-                        factorization=belief.factorization,
-                        constraints=tuple(s(c) for c in belief.constraints),
-                        episode_learnable=(
-                            s(belief.episode_learnable)
-                            if belief.episode_learnable is not None
-                            else None
-                        ),
-                    )
-                    for belief in template.agent.beliefs
-                ),
-            )
-            if template.agent is not None
-            else None
-        ),
+        agent=_scope_agent(template.agent, s),
         schema_version=template.schema_version,
     )
 

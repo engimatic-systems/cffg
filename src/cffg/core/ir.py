@@ -17,6 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from cffg.core.functions import FunctionSpec
+from cffg.core.gaussian_agent import GaussianFilterSpec, GaussianPlanSpec
 
 
 class PortRole(str, Enum):
@@ -511,7 +512,7 @@ class Template:
     blobs: dict[str, BlobRef] = field(default_factory=dict)
     plates: dict[str, PlateSpec] = field(default_factory=dict)
     learnables: dict[str, LearnableSpec] = field(default_factory=dict)
-    agent: AgentSpec | None = None
+    agent: AgentSpec | GaussianPlanSpec | GaussianFilterSpec | None = None
     schema_version: str = "1"
 
     def degree(self, variable: str) -> int:

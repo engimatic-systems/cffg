@@ -134,7 +134,7 @@ def test_product_statistics_differ_from_correlated_joint_statistics():
     assert np.max(np.abs(exact_stats["linear"] - product_stats["linear"])) > 1e-4
 
 
-def test_mean_field_rejects_nonfinite_and_report_is_manifested(tmp_path):
+def test_mean_field_rejects_nonfinite_transitions():
     initial, evidence, drives, weights, offsets = _case(2)
     log_potentials = np.stack([np.log(stick_transition(drive, weights, offsets)) for drive in drives])
     broken = log_potentials.copy()
@@ -142,6 +142,9 @@ def test_mean_field_rejects_nonfinite_and_report_is_manifested(tmp_path):
     with pytest.raises(ValueError, match="transitions must be finite|log potentials must be finite"):
         mean_field_chain(initial, evidence, broken)
 
+
+@pytest.mark.slow
+def test_recurrence_report_is_manifested(tmp_path):
     output = tmp_path / "results.json"
     write_report(output, Path(__file__).resolve().parents[1])
     document = json.loads(output.read_text())

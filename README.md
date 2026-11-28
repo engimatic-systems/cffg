@@ -87,7 +87,7 @@ example.
 | [Use GFE and parameter epistemics](#discrete-planning-and-rolling-agents) | `ConstraintKind.P_SUBSTITUTION`; `prepare_mu3`; `score_mu3_epochs`; builder flags | Observation epistemics, learned goals, finite-sample mu3(A), transition novelty | Policy posterior, ESS/support facts, specialized diagnostics | GFE; transition novelty is an optimistic bound | [discrete_rollout.py](examples/discrete_rollout.py) | **Bounded:** explicit PRNG keys; open validation defects are listed in `LIMITATIONS.md` |
 | [Run a receding-horizon agent](#discrete-planning-and-rolling-agents) | `RollingAgent` | Plan, act, observe, learn, roll a fixed-memory boundary | Action, beliefs, learning state, checkpoint | Replans a finite-horizon factorized policy each tick | [discrete_agent.py](examples/discrete_agent.py) | **Ready:** environment state is external; deep plans need status/trace checks |
 | [Run the costly-cue behavioral oracle](#discrete-planning-and-rolling-agents) | `cffg.experiments.behavioral_epistemics.run_benchmark` | Fixed active-inference versus BFE-ablation task | `BehavioralReport` | Bounded scientific regression, not a general inference objective | [API pattern](#discrete-planning-and-rolling-agents) | **Research-only:** fixed task and no supported package facade or reuse guarantee |
-| [Learn declared parameters](#learn-and-swap-parameters) | `cffg.learn.Learnables`; `cffg.conj`; `LearnableSpec` | Dirichlet, NIW, MNIW, component-MNIW, Pólya–Gamma | `expected`, `rollover`, persistent posterior state | Between-trial conjugate or empirical-Bayes updates | [learning_bundle.py](examples/learning_bundle.py) | **Ready:** `accumulate` and `replace` have different trial semantics; not full joint VB |
+| [Learn declared parameters](#learn-and-swap-parameters) | `cffg.learn.Learnables`; `cffg.conj`; `LearnableSpec` | Dirichlet, NIW, MNIW, component-NIW, component-MNIW, Pólya–Gamma | `expected`, `rollover`, persistent posterior state | Between-trial conjugate or empirical-Bayes updates | [learning_bundle.py](examples/learning_bundle.py) | **Ready:** `accumulate` and `replace` have different trial semantics; not full joint VB |
 | [Persist and continue](#persist-and-resume) | `save_bundle`; `load_bundle`; agent checkpoints | Template, arrays, declared learning, or rolling-agent runtime | `LoadedBundle`, restored agent | Serialization preserves declared identity; no inference objective | [learning_bundle.py](examples/learning_bundle.py) | **Ready/current schema:** a bundle is not a mid-run snapshot; stable historical migration is open |
 | [Run linear-Gaussian inference](#continuous-exponential-family-and-hybrid-models) | `cffg.models.lgssm` | Gaussian and linear-Gaussian BP with missing observations | `gaussian_marginals`, node statistics, BFE | Exact Kalman/RTS marginals and evidence identity on a tree | [linear_gaussian.py](examples/linear_gaussian.py) | **Ready:** positive-definite covariance contract; scaled readout is still host-loop bound |
 | [Run scalar exponential-family inference](#continuous-exponential-family-and-hybrid-models) | `gamma`, `beta`, `poisson_obs`, `bernoulli_obs`; `ef_marginals` | Conjugate Gamma–Poisson and Beta–Bernoulli BP | Standard parameters, mean, `proper`, BFE | Exact registered tree messages and ledger | [exponential_family.py](examples/exponential_family.py) | **Ready:** conditioned observations only; predictive outputs leave the shipped family |
@@ -152,12 +152,13 @@ expose the specialized workflows named in the capability map.
 </details>
 
 <details>
-<summary><code>cffg.core</code> — serialized graph language (33)</summary>
+<summary><code>cffg.core</code> — serialized graph language (35)</summary>
 
 <!-- facade-core:start -->
 `FACTOR_TYPES`, `AgentSpec`, `BeliefBinding`, `BlobRef`, `BoundaryFactorization`,
 `Broadcast`, `Chain`, `ConstraintKind`, `ConstraintSpec`, `Expose`, `FactorSpec`,
-`FactorType`, `FanOut`, `ObserveInterior`, `FunctionSpec`, `LearnableSpec`, `ModelError`,
+`FactorType`, `FanOut`, `ObserveInterior`, `FunctionSpec`, `GaussianFilterSpec`,
+`GaussianPlanSpec`, `LearnableSpec`, `ModelError`,
 `MomentMatchingEndpoint`, `MomentProjection`, `PlateSpec`, `PortRole`, `PortSpec`,
 `Template`, `VariableSpec`, `expand_plates`, `fan_out`, `observe_interior`, `plate_observations`,
 `migrate_moment_matching`, `moment_matching`, `moment_matching_endpoint`,
@@ -360,6 +361,19 @@ Readouts are family-specific on purpose:
 | Registered extension | `kernel_readouts` when the binding declares one |
 | Discrete max-product | `decode` plus `objective`; BFE is deliberately undefined |
 
+For a `gaussian_mixture` learner, call
+`engine.gaussian_node_stats(state, centered_mixtures=True)`. Each component
+has a `responsibility`, `component_mean` and `component_covariance`. The mean
+and covariance are conditional on that component. Apply its responsibility
+once when updating the learner. This preserves small variances even when the
+feature coordinates have a large offset.
+
+Declared NIW and MNIW learners request centered moments automatically.
+For your own regression update, `engine.gaussian_node_stats(state, centered=True)`
+returns the joint (output, input) mean and the distinct covariance blocks
+`cov_yy`, `cov_yx` and `cov_xx`. A fixed observed output needs only `cov_xx`.
+A switching linear factor also returns each component's responsibility.
+
 The common `engine.bfe(state)` accessor reports the graph's declared variational
 ledger; the name does not make every value an exact Bethe evidence identity.
 Interpret it with `engine.objective_contract` and per-factor
@@ -455,12 +469,59 @@ took another 0.29 s. Once warm, solving again took a median of 14.57 ms.
 Executing an already chosen branch is a lookup. See D17 in
 [the derivations](docs/DERIVATIONS.md#d17-committing-to-a-categorical-action-after-each-reading).
 
+### Plan with sampled action sequences
+
+For explicit stochastic action sequences, `cffg.rollout_planning.sample_action_sequences`
+takes a pure transition function, a read-only parameter snapshot, the current
+belief, a policy batch and a random key. The AXIOM experiment builds candidate
+action sequences with `cffg.experiments.axiom_planning.plan`. Its refit ranks
+sequences by discounted reward and novelty. The agent executes the first action
+of the best undiscounted sequence. `SearchSettings(novelty_weight=0.)` runs
+the same search without the count bonus. The reference-budget test uses a
+supplied two-object world model.
+
+The experimental Gameworld loop starts with `initialize_scene` and feeds
+`observe_scene` each new RGB frame, the action actually applied and its
+reward. The agent tracks objects and learns their identities, motions and
+interactions. Its planner queries a read-only snapshot of those learned
+rules. The [fixed-action replay](tools/axiom/scene_replay.py) checks learning
+and restart on shared pixels. The [closed-loop smoke test](tools/axiom/acted_smoke.py)
+lets the model select the actions. Its 24-step Explode run used a reduced
+search budget and received zero reward. A separate [10,000-step Explode
+evaluation](tools/axiom/explode_report.py) scored +157 on one seed. The full
+ten-game, ten-seed comparison remains open.
+
 ## Continuous, exponential-family, and hybrid models
 
 `lgssm` constructs a linear-Gaussian state-space model with DATA ports for
 conditioning and missing observations. On its tree, Gaussian marginals match
 Kalman/RTS inference and the ledger has the exact negative-log-evidence
 identity. See [examples/linear_gaussian.py](examples/linear_gaussian.py).
+
+For fixed affine control, save a planning template with a
+`cffg.core.GaussianPlanSpec` and a one-transition filter with a
+`cffg.core.GaussianFilterSpec` using `save_bundle`. The two declarations
+name the same ordered state and command coordinates. The filter applies
+`b + B @ applied` and carries the full filtered covariance to the next plan.
+With those two bundles, the same public interface handles a control step and restart.
+
+```python
+from cffg import RollingAgent
+
+agent = RollingAgent.from_gaussian_bundles("plan.cffgz", "filter.cffgz")
+decision = agent.propose({"target": [2.0]})
+applied = [-0.5]  # the command the actuator actually executed
+agent.observe(applied, [0.5], tick=decision.tick)
+agent.checkpoint("controller.npz")
+
+resumed = RollingAgent.from_gaussian_bundles("plan.cffgz", "filter.cffgz")
+resumed.restore("controller.npz")
+```
+
+The sensor argument can be `None` for a missing reading. A failed solve
+raises before advancing the tick. A checkpoint taken after `propose` also
+retains the outstanding decision. The numerical fixture includes both bundle
+declarations. [Gaussian agent fixture](tests/test_gaussian_agent.py)
 
 An exact-tree certificate checks message consistency, not posterior accuracy.
 Choose float64 for tight moment or evidence comparisons, especially with widely
@@ -646,12 +707,76 @@ then choose the cadence deliberately:
 - `rollover(name)` returns the family-specific state carried across a declared
   trial boundary.
 
-Dirichlet, NIW, MNIW, component-MNIW, and recurrence Pólya–Gamma families have
+Dirichlet, NIW, MNIW, component-NIW, component-MNIW, and recurrence Pólya–Gamma families have
 versioned persistent descriptors. Their expected point parameters feed the next
 state; parameter uncertainty generally does not enter all state messages, so
 the continuous/hybrid cadence is empirical Bayes rather than full joint
 variational Bayes. See
 [examples/learning_bundle.py](examples/learning_bundle.py).
+
+A declared `component_niw` learns the means and full covariances of a
+`gaussian_mixture` from its centered conditional moments. When a record
+also contains categorical evidence, use `cffg.mixed_learning` to update all
+observed fields with one set of responsibilities. For example, an object with
+an uncertain position and an observed type can teach several components in
+proportion to how well each explains the record.
+
+```python
+import jax
+from cffg.mixed_learning import score, update
+
+@jax.jit
+def learn_batch(bank, observations):
+    log_likelihood, weights, scored = score(bank, observations, include_mixing=True)
+    posterior, updated = update(bank, observations, weights)
+    return posterior, log_likelihood, scored & updated
+```
+
+`MixedBank` stores component priors and their active mask. `MixedBatch` holds
+a mean and covariance for each continuous observation, a boolean presence
+mask and one integer array per categorical field. Use zero covariance for a
+known point and category index `-1` for a missing field. Scores are absolute
+expected log likelihoods in nats. Set `include_mixing=False` to assign
+components by observed features alone. Inspect the returned validity flag
+before using the result. `bank.state_dict()` saves a compact snapshot of
+the rounded parameters using the existing v2 layout. Saving leaves the live
+learner intact. Reloading with `MixedBank.from_state_dict(snapshot)` starts
+from the saved values with zero rounding remainders. For experiments that
+need to continue exactly across a restart, use `bank.state_dict(exact=True)`.
+The v3 snapshot includes the corrections needed for subsequent updates.
+Resume on the same backend and numerical configuration for exact replay.
+Both snapshot modes occupy a fixed amount of uncompressed storage for a
+given bank shape and precision, regardless of episode count.
+
+For lower CPU and state-storage cost, select rounded-only arithmetic once
+before a sequence of public mixed-learning calls:
+
+```python
+from cffg.mixed_learning import RoundedBank, score, update
+
+rounded = bank.as_rounded()
+scores, weights, valid = score(rounded, batch)
+rounded, updated = update(rounded, batch, weights)
+saved = rounded.state_dict()
+resumed = RoundedBank.from_state_dict(saved)
+```
+
+The conversion discards any accumulated rounding remainders. A rounded bank
+stores one word per parameter and rounds each update immediately. For example,
+four float32 increments of 0.25 at a count of 2²² can all disappear while the
+update reports valid. To resume compensation, call `rounded.as_compensated()`;
+the new residuals start at zero. Both `state_dict()` and `state_dict(exact=True)`
+on a rounded bank write all its state in v2. Select `RoundedBank.from_state_dict`
+to continue using rounded arithmetic. A v3 input to that method is validated
+before its remainders are discarded. The choice applies to the standalone
+`score` and `update` functions, including compiled streams. Component lifecycle
+operations and the AXIOM agent use their own compensated banks.
+
+`ComponentBank.state_dict()` applies the same compact default to both the reset
+prior and the learned posterior. Both modes save logical IDs, generations and
+occupancy. Pass `exact=True` when later updates or merges must reproduce the
+uninterrupted result. `ComponentBank.from_state_dict(snapshot)` also reads
+exact lifecycle snapshots created before the compact option was introduced.
 
 For fixed-structure parameter sweeps that are not declared learning,
 `set_params` updates named runtime parameters without recompiling. Shapes,

@@ -82,6 +82,7 @@ def test_neural_bundle_reconstruction_and_schedule_parity(tmp_path, method):
     np.testing.assert_allclose(results[0][1], results[1][1], atol=1e-7)
 
 
+@pytest.mark.slow
 def test_tenfold_parameter_scale_has_exact_memory_and_declared_work():
     template, arrays = neural_model(width=32)
     assert arrays["theta"].size >= 10 * 7

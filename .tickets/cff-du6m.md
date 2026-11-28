@@ -2,7 +2,7 @@
 id: cff-du6m
 status: open
 deps: []
-links: []
+links: [car-8rgl, car-mps6]
 created: 2026-07-13T03:51:58Z
 type: task
 priority: 2

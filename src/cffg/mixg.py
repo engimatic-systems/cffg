@@ -53,12 +53,32 @@ class LinearMixtureStats(NamedTuple):
     proper: jax.Array
 
 
+class CenteredLinearStats(NamedTuple):
+    """Conditional joint means (output, input) and distinct covariance blocks."""
+
+    responsibility: jax.Array
+    mean: jax.Array
+    cov_yy: jax.Array
+    cov_yx: jax.Array
+    cov_xx: jax.Array
+    proper: jax.Array
+
+
 class MixtureStats(NamedTuple):
     """Prior-mixture factor-belief responsibilities and weighted moments."""
 
     responsibility: jax.Array
     weighted_mean: jax.Array
     weighted_second: jax.Array
+    proper: jax.Array
+
+
+class CenteredMixtureStats(NamedTuple):
+    """Conditional moments before weighting, including zero-weight components."""
+
+    responsibility: jax.Array
+    component_mean: jax.Array
+    component_covariance: jax.Array
     proper: jax.Array
 
 
@@ -169,6 +189,16 @@ def mixlin_stats(eta_o, lam_o, eta_i, lam_i, log_mu_e, a, b, w):
     by shape-preserving NaNs and ``proper=False``.
     """
 
+    return _mixlin_stats(eta_o, lam_o, eta_i, lam_i, log_mu_e, a, b, w, centered=False)
+
+
+@jax.jit
+def mixlin_centered_stats(eta_o, lam_o, eta_i, lam_i, log_mu_e, a, b, w):
+    """Read conditional joint spread before forming weighted raw products."""
+    return _mixlin_stats(eta_o, lam_o, eta_i, lam_i, log_mu_e, a, b, w, centered=True)
+
+
+def _mixlin_stats(eta_o, lam_o, eta_i, lam_i, log_mu_e, a, b, w, *, centered):
     def one(eo, lo, ei, li, le, A, bb, W):
         w_ok = gauss._pd_ok(W)
         safe_w = jnp.where(
@@ -190,6 +220,14 @@ def mixlin_stats(eta_o, lam_o, eta_i, lam_i, log_mu_e, a, b, w):
         covariance = gauss._pd_inverse(safe_lam)
         mean = jnp.einsum("kij,kj->ki", covariance, eta_j)
         out_dim = bb.shape[-1]
+        if centered:
+            proper &= jnp.all(jnp.isfinite(mean)) & jnp.all(jnp.isfinite(covariance))
+            mean = _nan_unless(proper, mean)
+            covariance = _nan_unless(proper, covariance)
+            return CenteredLinearStats(
+                _nan_unless(proper, responsibility), mean, covariance[:, :out_dim, :out_dim],
+                covariance[:, :out_dim, out_dim:], covariance[:, out_dim:, out_dim:], proper,
+            )
         out_mean = mean[:, :out_dim]
         in_mean = mean[:, out_dim:]
         syy = covariance[:, :out_dim, :out_dim]
@@ -379,7 +417,16 @@ def mixlin_energy(eta_o, lam_o, eta_i, lam_i, log_mu_e, a, b, w):
 
 
 def mix_stats(eta_o, lam_o, log_mu_e, mean, w):
-    """Read prior-mixture factor-belief responsibilities and moments."""
+    """Read prior-mixture factor-belief responsibilities and weighted raw moments."""
+    return _prior_mixture_stats(eta_o, lam_o, log_mu_e, mean, w, centered=False)
+
+
+def mix_centered_stats(eta_o, lam_o, log_mu_e, mean, w):
+    """Read each conditional covariance directly from its posterior precision."""
+    return _prior_mixture_stats(eta_o, lam_o, log_mu_e, mean, w, centered=True)
+
+
+def _prior_mixture_stats(eta_o, lam_o, log_mu_e, mean, w, *, centered):
 
     def one(eo, lo, le, component_mean, W):
         w_ok = gauss._pd_ok(W)
@@ -388,7 +435,6 @@ def mix_stats(eta_o, lam_o, log_mu_e, mean, w):
             W,
             jnp.eye(W.shape[-1], dtype=W.dtype)[None],
         )
-        eta_q = jnp.einsum("kij,kj->ki", safe_w, component_mean) + eo[None]
         lam_q = safe_w + lo[None]
         belief_ok = gauss._pd_ok(lam_q)
         safe_lam = jnp.where(
@@ -399,20 +445,30 @@ def mix_stats(eta_o, lam_o, log_mu_e, mean, w):
         evidence = prior_evidence(eo, lo, component_mean, safe_w)
         responsibility, selector_ok = _exact_probability(le, evidence.score)
         covariance = gauss._pd_inverse(safe_lam)
+        proper = selector_ok & evidence.valid & jnp.all(w_ok) & jnp.all(belief_ok)
+        eta_q = jnp.einsum("kij,kj->ki", safe_w, component_mean) + eo[None]
+        if centered:
+            # Solve about the prior mean when the cavity agrees with it. Use
+            # the zero origin when subtracting a distant prior would cancel.
+            residual = eo - component_mean @ lo.T
+            near_prior = (jnp.max(jnp.abs(residual), axis=-1, keepdims=True)
+                          < jnp.max(jnp.abs(eta_q), axis=-1, keepdims=True))
+            origin = jnp.where(near_prior, component_mean, 0)
+            rhs = jnp.where(near_prior, residual, eta_q)
+            belief_mean = origin + jnp.einsum("kij,kj->ki", covariance, rhs)
+            proper &= jnp.all(jnp.isfinite(belief_mean)) & jnp.all(gauss._pd_ok(covariance))
+            return CenteredMixtureStats(
+                _nan_unless(proper, responsibility),
+                _nan_unless(proper, belief_mean),
+                _nan_unless(proper, covariance),
+                proper,
+            )
+
         belief_mean = jnp.einsum("kij,kj->ki", covariance, eta_q)
-        second = covariance + jnp.einsum(
-            "ki,kj->kij", belief_mean, belief_mean
-        )
+        second = covariance + jnp.einsum("ki,kj->kij", belief_mean, belief_mean)
         weighted_mean = responsibility[:, None] * belief_mean
         weighted_second = responsibility[:, None, None] * second
-        proper = (
-            selector_ok
-            & evidence.valid
-            & jnp.all(w_ok)
-            & jnp.all(belief_ok)
-            & jnp.all(jnp.isfinite(weighted_mean))
-            & jnp.all(jnp.isfinite(weighted_second))
-        )
+        proper &= jnp.all(jnp.isfinite(weighted_mean)) & jnp.all(jnp.isfinite(weighted_second))
         return MixtureStats(
             _nan_unless(proper, responsibility),
             _nan_unless(proper, weighted_mean),

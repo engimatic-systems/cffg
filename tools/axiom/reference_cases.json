@@ -1,0 +1,96 @@
+{
+  "format": 1,
+  "origin": "Independent constructed inputs and analytic checkpoints. Values tagged paper describe a separate mathematical variant. These records have no upstream run provenance.",
+  "tolerance": {"exact": "labels, masks, indices, counts of rows and pixel bytes", "analytic_float64": {"atol": 1e-10, "rtol": 1e-10}, "candidate_float32": {"atol": 2e-6, "rtol": 2e-5}},
+  "component_prior": {
+    "source": ["axiom/vi/models/slot_mixture_model.py#L67-L75", "paper Appendix A.2"],
+    "slot_alpha": [1,1,1], "illustrative_mean_breaks": [0.5,0.5],
+    "expected_finite": [0.3333333333333333,0.3333333333333333,0.3333333333333333], "expected_ordered_breaks": [0.5,0.25,0.25],
+    "meaning": "Finite slot Dirichlet initialization. A three-slot truncated stick with independent uniform breaks supplies an illustrative paper variant."
+  },
+  "spatial_sweep": {
+    "source": ["axiom/models/smm.py#L316-L400", "axiom/models/smm.py#L479-L505", "axiom/vi/exponential/mvn.py#L113-L122", "axiom/vi/models/slot_mixture_model.py#L315-L333"],
+    "meaning": "One coordinate of two independent unit-variance latent slots. Inject fixed prior means and unit observation variance with identity transform. Compare one E sweep from a supplied previous qx; this is an analytic fixture.",
+    "prior_means": [0,2], "previous_means": [1,1], "previous_variances": [1,1], "tokens": [0,2], "mix_alpha": [1,1],
+    "expected_qz": [[0.5,0.5],[0.5,0.5]], "expected_qx_means": [0.5,1.5], "expected_qx_variances": [0.5,0.5],
+    "second_axis": "All token and prior second coordinates are zero. Both backward and prior precisions are diagonal before the release adjustment.",
+    "release_precision_scalar_added_to_every_entry": 1e-8,
+    "expected_release_covariance": [[0.4999999975000000,-2.499999975e-9],[-2.499999975e-9,0.4999999975000000]],
+    "expected_release_means": [[0.4999999975000000,-2.499999975e-9],[1.4999999925000001,-7.499999925e-9]],
+    "expected_hard_used": [true,false], "expected_positive_mass": [true,true]
+  },
+  "birth": {
+    "source": ["defaults.py#L294-L300", "defaults.py#L311-L340", "axiom/models/utils_hybrid.py#L127-L153", "paper §2.1 and Appendix B"],
+    "occupied_scores": [-200, -220], "log_predictive_prior": -180, "concentration": 0.1,
+    "thresholds": {"release_identity": -500, "paper_identity_table": -100},
+    "expected": {"release_identity_birth": false, "paper_table_birth": true, "paper_predictive_birth": true}
+  },
+  "assignment": {
+    "source": ["axiom/models/utils_hybrid.py#L127-L153", "paper Appendix A.9 equations 48 and 52"],
+    "alpha": [2, 5, 0.1], "active": [true, true, false], "log_likelihood": [0, 0, 10],
+    "expected": {"release": [0.5, 0.5, 0], "paper": [0.25287573272933045, 0.7471242672706695, 0]}
+  },
+  "soft_update": {
+    "source": ["axiom/vi/models/hybrid_mixture_model.py#L109-L147", "axiom/vi/models/hybrid_mixture_model.py#L229-L238", "car-8rgl development handoff"],
+    "prior_count": 0.1, "old_observations": [[1,0],[1,0]], "new_observation": [3,1], "weight": 0.5,
+    "expected": {"release": [1.6, 1.5, 2.5, 5.5, 1, 0.5], "additive": [2.6, 2.5, 3.5, 6.5, 2, 0.5]},
+    "columns": ["mixing_count", "gaussian_mass", "first_sum", "second_sum", "category_A_excess", "category_B_excess"],
+    "write_gate": {"weight": [0.25, 0.26, 1], "proposed_count": [2, 2, 32], "expected": [false, true, false]}
+  },
+  "slot_growth": {
+    "source": ["axiom/models/smm.py#L532-L647"],
+    "threshold": 5.7, "cases": [
+      {"best_token_scores": [6, 5.7], "winners": [0, 1], "capacity": 3, "expected_forced_token_slot": null},
+      {"best_token_scores": [4, 3], "winners": [0, 2], "capacity": 3, "expected_forced_token_slot": [1, 1]},
+      {"best_token_scores": [4, 3], "winners": [0, 1], "capacity": 2, "expected_forced_token_slot": null}
+    ],
+    "meaning": "After frame E-steps, any winning pixel occupies its slot. A forced growth assignment triggers an M-step. An ordinary well-explained frame only refreshes beliefs."
+  },
+  "full_bank": {
+    "source": ["axiom/models/utils_hybrid.py#L127-L153", "axiom/models/tmm.py#L188-L208", "axiom/models/smm.py#L575-L626"],
+    "active": [true, true], "score": -600, "expected": {"identity_or_recurrent_selected": 0, "transition_allocated": null, "slot_allocated": null},
+    "meaning": "Row zero can be selected by the release on an identity/recurrent miss in a full bank. This is assignment before the write gate; a bounded API may explicitly report capacity exhaustion as a variant."
+  },
+  "track_gates": {
+    "source": ["axiom/infer.py#L360-L399", "axiom/infer.py#L411-L434", "axiom/infer.py#L515-L576"],
+    "columns": ["background", "visible_previous", "foreground_current", "moving_ema", "used_ema", "unused_coordinate", "update"],
+    "rows": [[true,true,false,0.01,1,0,true],[false,true,true,0,1,0,true],[false,true,true,0.01,0.3,0,true],[false,false,true,0.01,0.3,0.5,true],[false,true,true,0.01,0.3,0,false]],
+    "expected": {"identity_update": [false,true,true,false,false], "motion_update": [false,false,true,false,false]}
+  },
+  "motion": {
+    "source": ["axiom/models/tmm.py#L61-L129", "axiom/models/tmm.py#L248-L288", "axiom/models/tmm.py#L361-L410", "axiom/models/tmm.py#L435-L455"],
+    "state_order": ["x","y","unused","vx","vy","v_unused"],
+    "state": [0.1,0.2,0.1,0.125,-0.0625,0], "dt": 1, "unused_increment": 0.05,
+    "variance": 2, "raw_log_threshold": -0.00001, "squared_residual": [0,0.0001], "expected_birth": [false,true],
+    "expected_initial_predictions": [[0.225,0.1375,0,0.125,-0.0625,0],[0.1,0.2,0.15,0.125,-0.0625,0],[0.1,0.2,0.05,0,0,0],[0.1,0.2,0,0,0,0]],
+    "novel_displacements": [0.05,0.3], "previous_vx": 0.02, "threshold": 0.2, "expected_kind": ["velocity_offset","absolute_target"], "expected_first_velocity_offset": 0.03
+  },
+  "relation": {
+    "source": ["defaults.py#L446-L483", "axiom/models/rmm.py#L337-L425"],
+    "own": [0.1,0.2,0,0.02,-0.03], "neighbor_displacement_feature": [0.03,0.04], "velocity_scale": 10,
+    "stationary_circles": {"center_separation":2.4,"unscaled_radius":1,"scale":[0.8,1.25],"overlap":[false,true],"grid_width":30,"neighbor_index":2},
+    "expected": {"default_features": [0.1,0.2,0,0.2,-0.3,0.03,0.04], "fixed_features": [0.1,0.2,0,0.2,-0.3], "fixed_default_switch_neighbor": null, "fixed_nondefault_switch_neighbor": 2}
+  },
+  "reduction": {
+    "source": ["axiom/models/rmm.py#L789-L890", "axiom/vi/models/hybrid_mixture_model.py#L202-L227", "axiom/infer.py#L677-L694"],
+    "meaning": "Two live components, matching modal own/other identity, reward and switch. Two fixed generated records select rows 0 and 1 on context alone. Reward and switch are separate binary heads, identical in both rows. Unit priors simplify exact Dirichlet arithmetic. Merge into row 0 and restore donor priors.",
+    "context_scores": [[3,0],[0,2]], "mix_before": [2,2], "mix_prior": [1,1], "head_before": [2,1], "head_prior": [1,1],
+    "expected_mix_after": [3,1], "expected_head_after": [3,1], "expected_donor_head": [1,1],
+    "cases": [
+      {"heldout_reward_and_switch": [0,0], "expected_delta": 0.0264805138932786, "accepted": true},
+      {"heldout_reward_and_switch": [1,1], "expected_delta": -0.9735194861067214, "accepted": false}
+    ],
+    "eligibility": {"same_modes": [true,true,true,false], "both_live": [true,true,false,true], "score_delta": [0,-0.1,0.1,0.1], "accepted": [true,false,false,false]}
+  },
+  "novelty": {
+    "source": ["axiom/models/rmm.py#L717-L777", "axiom/planner.py#L127-L176", "paper §2.2 and Appendix A.11"],
+    "alpha": [1,1], "assignment": [0.5,0.5], "slots": ["matched","untracked"], "bonus_weight": 0.1, "predicted_xy": [1.11,0],
+    "expected": {"matched": 0.5, "novel": 0.5, "out_of_frame": -1, "mean_over_slots": 0.25, "score_at_zero_reward": 0.025, "exact_one_count_KL": 0.1931471805599453},
+    "novel_override": {"alpha": [2,3], "assignment": [1,0], "matched": 0.3, "novel": 0.8}
+  },
+  "planner": {
+    "source": ["axiom/planner.py#L119-L178", "axiom/planner.py#L193-L215", "paper Appendix A.11"],
+    "gamma": 0.99, "first_actions": [0,1], "step_scores": [[1,0],[0,1.005]],
+    "expected": {"discounted": [1,0.99495], "undiscounted": [1,1.005], "elite_first_action": 0, "executed_first_action": 1}
+  }
+}
