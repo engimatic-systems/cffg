@@ -1,6 +1,6 @@
 ---
 id: chr-d4dl
-status: open
+status: in_progress
 deps: []
 links: [cff-wbhu]
 created: 2026-11-25T06:41:38Z
@@ -41,3 +41,7 @@ Legend: prerequisite --> dependent; parallel branches have no dependency on each
 [x] cff-mjku --> [ready] cff-pyy9 (M7)
 
 The existing wbhu prerequisites are resolved. The linked performance target introduces no blocking edge into the roadmap or M7. Verify with tk dep tree --full, tk ready, tk blocked and tk dep cycle.
+
+**2026-11-28T05:01:20Z**
+
+Architecture change path: Runtime numerical or status invariant. The isolated timing probe reuses public Engine and Colony, the existing synchronous compiled loop, result reconstruction, and decoded marginal readouts. It changes the local transition contraction, atom-level Bethe term and device support predicate together for the candidate. The stock scalar and scheduled executors and host support checks remain the comparators. Serialization and checkpoints are outside the experiment. The frozen Hallway transition has 495 supported atoms of 18,000 per slice. Keep the finite log-zero floor for outgoing rows and the existing probability cutoff for every joint atom. Qualify float32 and float64, and retry through the unmodified dense controller if the guarded input range or terminal checks fail. No default runtime change is proposed before results and control-shape qualification.
