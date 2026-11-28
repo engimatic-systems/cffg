@@ -158,6 +158,8 @@ EPIC_FILES = {
         "test_nonlinear_rules.py", "test_nonlinear_schema.py", "test_nonlinear_engine.py",
         "test_neural.py",
         "test_neural_delta_derivation.py",
+        "test_interval_messages.py",
+        "test_interval_forest.py",
         "test_fixed_point_gradients.py",
         "test_neural_training.py",
         "test_neural_gfe.py",

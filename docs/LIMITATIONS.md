@@ -822,6 +822,18 @@ precision for joint MAP and has no guarantee of resolving sub-ulp policy
 differences. A positive source mass below working precision or a positive
 weighted cost that rounds to zero during construction raises an error.
 
+**Exact interval activations.** D13a admits fixed coordinatewise invertible
+two-slope maps on product interval potentials, within an interval-only
+sum-product forest. Working parameter blobs are fixed per instance, and
+external DATA binds interval likelihoods. Point evidence, coupled coordinates,
+cycles, zero slopes and bridges to Gaussian messages require other
+representations. There is no parameter-learning rule for the exact factor.
+The interval-count limit applies per coordinate and per materialized message.
+Crossed knots can split cells, and intersecting a prior with a likelihood can
+increase the count again. A failed update leaves the caller's complete state
+available. Improper evidence and a zero-volume event have different results.
+Positive-noise neural factors continue to use D13.
+
 **S5. Neural Gaussian means and recognition.** Dense neural means now enter
 positive-noise Gaussian conditionals through Taylor linearization or fixed
 sigma points (DERIVATIONS D13). Their labeled frozen Gaussian Bethe terms

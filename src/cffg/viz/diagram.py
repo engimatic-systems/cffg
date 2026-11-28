@@ -49,6 +49,8 @@ GLYPHS = {
     "transition_mixture": "TM",
     "equality": "=",
     "dirichlet": "Dir",
+    "interval_potential": "φ",
+    "interval_activation": "f",
     "gaussian": "𝒩",
     "gaussian_linear": "𝒩A",
     "gaussian_nonlinear": "𝒩g",

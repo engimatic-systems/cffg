@@ -46,6 +46,7 @@ from cffg.compiler_errors import CompileError
 from cffg.core.ir import Template
 from cffg.core.plates import expand_plates
 from cffg.core.validate import validate
+from cffg.interval_plan import IntervalForest, compile_interval_forest
 from cffg.registered import packing as _registered_packing
 from cffg.registered.capabilities import snapshot_registry
 from cffg.registered.lowering import lower_registered
@@ -108,7 +109,7 @@ def compile_template(
     arrays: dict[str, np.ndarray] | None = None,
     root: str | Path | None = None,
     semiring: str = "sum",
-) -> Arena:
+) -> Arena | IntervalForest:
     """Ground `t` into an Arena. Blob data comes from `arrays` (name -> array,
     wins) or is loaded from `root`/blob.path.
 
@@ -121,6 +122,8 @@ def compile_template(
         raise CompileError(f"semiring must be 'sum' or 'max', got {semiring!r}")
     t = expand_plates(t)
     validate(t)
+    if any(v.interval_dim for v in t.variables.values()):
+        return compile_interval_forest(t, arrays, root, semiring)
     topology = build_topology(t)
     try:
         registry = snapshot_registry(t)

@@ -121,6 +121,16 @@ class Engine:
     :class:`~cffg.schedule.Schedule` is validated against this arena's
     structure fingerprint and rejected on mismatch."""
 
+    def __new__(cls, *args, **kwargs):
+        from cffg.interval_plan import IntervalForest
+
+        arena = args[0] if args else kwargs.get("arena")
+        if cls is Engine and isinstance(arena, IntervalForest):
+            from cffg.interval_engine import IntervalEngine
+
+            cls = IntervalEngine
+        return super().__new__(cls)
+
     def __init__(
         self,
         arena: Arena,
@@ -570,6 +580,13 @@ class Engine:
     def marginals(self, state: State, edges: EdgeSelection = None) -> dict[str, np.ndarray]:
         """Categorical probabilities for all edges or the named subset, in first-occurrence order."""
         return _discrete_readouts.marginals(self.arena, state, edges=edges)
+
+    def interval_marginals(self, state, edges: EdgeSelection = None):
+        """Normalized cells on interval edges, in their declared coordinates."""
+        from cffg.readouts.selection import selected_edges
+
+        selected_edges(self.arena, edges, "interval", lambda _: 0)
+        return {}
 
     def node_beliefs(self, state: State) -> dict[str, np.ndarray]:
         """Factor name -> the node belief q_a, the object conjugate updates
