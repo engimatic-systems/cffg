@@ -1,6 +1,6 @@
 ---
 id: codg-0sy5
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-11-28T06:21:03Z
@@ -38,3 +38,7 @@ A fixed point is a state that one undamped solver update maps to itself. The res
 **2026-11-28T06:24:45Z**
 
 On the original code a real differentiated scalar map returned root_converged with residual 0, merit 0 and gradient norm NaN. All three terminal checks now classify a nonfinite diagnostic as nonfinite_evaluation. Both public controller modes return DIVERGED. Six new regressions passed. The outer formalism, failure and strategy files passed 63 checks, including their opt-in cases, with the older adaptive chart-capture test replaced in a separate focused invocation by its corrected #210 version (one pass on these runtime bytes). No model data, inference tolerance or finite certificate changed. The required repository gate is pending.
+
+**2026-11-28T08:29:16Z**
+
+The canonical short suite passed 2,844 cases in 428.620 seconds at 69e1f48bf690. The invalid-certificate ticket is closed. The measured cold-start improvement remains open in cff-g7rc.
