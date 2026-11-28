@@ -1,6 +1,6 @@
 ---
 id: cff-yl0a
-status: in_progress
+status: closed
 deps: [cff-d56d]
 links: [cff-wbhu, cff-r6bl]
 created: 2026-07-27T05:44:29Z
@@ -137,3 +137,7 @@ Intelligible-ticket review: complete.
 **2026-11-28T05:03:45Z**
 
 Implementation scope at #208. Runtime numerical or status invariant: select only built-in sum-product HMM registerized ScanStages with full role/dependency/cardinality/slot-layout proof. Scheduled propagation changes; generic registerized and flat scans, flooding and the exact-unit support/BFE/certificate are independent comparison surfaces. Verify single and transformed execution, gradients and one public Colony path. Current/legacy checkpoint decoding N/A because no schema is changed. Required hostile cases and performance targets are in AC3-5. All measurements and the canonical gate use the shared CPU queue.
+
+**2026-11-28T13:49:58Z**
+
+Qualified 17d21dc on Apple M2 Max CPU in x64. T=32/64/128/256 generic medians 0.1873/0.2584/0.3961/0.7046 ms and fused 0.1174/0.1531/0.1769/0.2630 ms, retaining every directed row and the failure fact. At T=256 the public exact run took 0.5917 ms, the marginal readout 0.9791 ms and flooding 51.2224 ms in 514 sweeps. Live strict smoother 0.01858 ms (14.15x), full-posterior smoother 0.04540 ms, max posterior error zero. Both declared latency bounds pass. Fresh artifact ~/agent-share/hmm-fusion-17d21dc-e2QCoU/metrics.json contains all phases, hardware and output definitions. Sparse T=1024 opt-in passed; focused compatibility passed, original dashboard gate 2843/2843 in 427.050 s, four workers. The flat/registerized fallback, maximum-product route and exact-unit certificate retain their original contracts.
