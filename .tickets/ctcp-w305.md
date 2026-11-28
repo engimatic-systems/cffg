@@ -1,6 +1,6 @@
 ---
 id: ctcp-w305
-status: in_progress
+status: closed
 deps: [ctcp-6msb, ctcl-p70e, cctr-1vvy]
 links: []
 created: 2026-11-28T04:50:36Z
@@ -39,3 +39,7 @@ Before running the stationary parity comparison: use two binary-action valve fix
 **2026-11-28T07:04:07Z**
 
 Integrated declaration and hash, copied/scoped ownership, immutable face lookup, real-event fold and predicted parameters, named writes, checkpoint and bundle restore. The 10 integration cases passed, including matching all directed messages, node-local GFE and complete action ordering at h=0 in real float32 and float64. Tied readers pool once and independently selected blocks advance separately. Candidate-only subnormal mass outside the face is rejected before a cast can erase it. The 6 pure-update tests cover eager, compiled and batched arithmetic. No rule, objective, stopping criterion, schedule or key changed. The canonical short gate and named compatibility files remain for closure. The study stays on ctcp-qodi.
+
+**2026-11-28T13:50:00Z**
+
+Candidate e00efdf passed all 220 focused cases including the named compatibility files and 2,861/2,861 in the original four-worker dashboard gate (434.896 s). Raw logs and tested revision are in ~/agent-share/changing-transition-runtime-B6kHv0/. The branch exposes committed vs next-event parameters, preserves structural exclusions on source casts and named writes, and restores the immutable reset prior and hazard. D1a explains the loss of higher moments from fractional data and projection. ctcp-qodi owns behavioral comparisons independently of these runtime checks.

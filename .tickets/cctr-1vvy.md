@@ -1,6 +1,6 @@
 ---
 id: cctr-1vvy
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-11-28T06:39:11Z
@@ -35,3 +35,7 @@ Initial independent float64 saturation comparison failed: at a shape 12 and c=0.
 **2026-11-28T07:02:44Z**
 
 Verified ordinary, eager, JIT, and vmapped float32/float64 against independent D1a examples and digamma quadrature. Six tests passed after the final source change. An excluded positive subnormal must fail even when XLA flushes its floating comparison to zero: classifying both zero and finite-normal by the IEEE representation makes the compiled check agree with the host. Invalid updates return the exact input carry. Work and temporary storage are linear in destination cardinality per column, independent of event history.
+
+**2026-11-28T13:50:00Z**
+
+Integrated with the real learner in e00efdf. Compatibility selection 220 passed. The original dashboard gate passed all 2,861 in 434.896 seconds, four workers. Receipt ~/agent-share/changing-transition-runtime-B6kHv0/runtime.json.
