@@ -1,6 +1,6 @@
 ---
 id: car-kwjj
-status: open
+status: in_progress
 deps: [car-k6oi, car-8rgl, cff-cpxj, cff-zpk8, cff-961d, cff-vsn3, cat-825z]
 links: []
 created: 2026-11-23T21:48:38Z
@@ -40,3 +40,7 @@ A pixel assignment expresses how strongly a pixel belongs to a slot. A type grou
 **2026-11-24T06:00:54Z**
 
 The first image layer, hard-winner births, soft updates, frame-to-frame tracks and identity learning are implemented on the evaluation branch. The actual observations from three games produced finite updates in float32 and float64. All six halfway reloads reproduce the final arrays, including a real episode reset. Correctness evidence is mathematical, synthetic and fixed-action. The seeded absent-neighbor value is an explicit per-run JAX draw; the author release drew it from NumPy at trace time. A direct paired trace of the authors’ own solver would need separately authorized outputs (car-ozw0).
+
+**2026-11-28T04:27:05Z**
+
+Published-main audit after #207, a774a54. The frame regression and spatial/slot/tracking tests cover AC1, the small-scene equations and growth gates, and the static/disappearing/reused-slot clocks. The archived 12 full frames give 403,200 hard assignments with zero f32/f64 disagreements from a common start. The 33,600-pixel oracle checks position updates conditional on the production assignments. The six real 48-action scene streams (three games × two dtypes) restore exactly from action 24. These are candidate precision and restart checks. We still need an independent full-size expectation for pixel membership, position, visibility and birth on the same input. The scene carries the identity bank and appearance features; the public identity helper returns only the first maximum. Complete AC4 with a derived probability readout from the saved scene, including empty-bank and failed-read behavior, and a labeled persistence/permutation check. Independent synthetic frames suffice. Under the Learnable or checkpoint feature change path, exercise eager/JIT, f32/f64, sparse/empty support and checkpoint replay. The derived readout needs no new IR, inference schedule, serialized field or schema migration.

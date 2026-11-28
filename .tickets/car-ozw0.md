@@ -1,6 +1,6 @@
 ---
 id: car-ozw0
-status: open
+status: closed
 deps: []
 links: [car-8rgl]
 created: 2026-11-24T05:32:46Z
@@ -41,3 +41,12 @@ A native reference is an output of the authors' implementation. A historical ref
 **2026-11-24T05:33:37Z**
 
 Direct native parity and historical seed-level comparisons remain unverified as of the car-8rgl reference freeze. Start with the source and rights inventory when the study owner requests either comparison.
+
+**2026-11-28T04:27:04Z**
+
+Disposition at published main a774a54 on 2026-11-27: direct author output unavailable for a permitted matched comparison.
+
+1. The frozen inventory identifies the authors' release b99f62599e73294639f1944827bf427909f6c698 and its academic/nonprofit license (Git blob bff389091d718f454c5bec3d5da4eb4451ffbf24). No documented authorization for a named operator, purpose and shareable output, or separately supplied author trace with terms, was found in the project evidence. Source inspection and independent fixtures are the recorded route. The separately MIT-licensed Gameworld at 85493c477004ecfd3299b0b053884f23d59a5ec5 supplies simulator observations.
+2. The historical numerical reference is arXiv:2505.24784v1, Table 1, 60 mean/SD pairs over ten seeds and 10,000 native reward increments per run. The untuned, tuned and ablated configurations are named in the frozen protocol. Exact historical model and simulator seeds, CLI/configuration, dtype, initial checkpoint, action/reward/frame records and corresponding file digests are unavailable. The source tag of the comparison implementation is not a proven tag for each paper run. No fresh reference-agent run was supplied.
+3. Verified the bytes under ~/agent-share/axiom-gameworld-reference/reference-v1: protocol.json SHA-256 ef5141f70e4ef6792a40e7ade7086109fc9e04b68afed19764294f9b53282caf, final-intermediates/checks.json 27755723842ab2910fc5b75584326975a055ce88902cef27b478a595e5033cd1, its four files and the 30 simulator NPZ hashes in tapes/manifest.json. The manifest names each game, condition, simulator and action seeds and dtype (uint8 RGB); 48 independent scalar checks and eight labeled synthetic frames supplement the MIT tapes. The simulator records the reward following the applied action. These files and the CFFG model checkpoints have identifiable producers, clocks and digests. None contains author-agent inference outputs. In particular explode-native-replay.json verifies Gameworld observations under the CFFG pilot's actions.
+4. There are zero eligible pairs of author and CFFG trajectories. Per-frame belief error, action agreement, original per-seed deviations and paired reward uncertainty are unmeasured. The publication's aggregates can be quoted as historical aggregates. No external contact, agent execution or game campaign took place in this audit. Revisit if an appropriately documented file or separate execution authorization becomes available.
