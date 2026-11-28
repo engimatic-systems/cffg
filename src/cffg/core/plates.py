@@ -26,6 +26,7 @@ import numpy as np
 
 from cffg.core.compose import SCOPE_SEP, ComposeError, bond
 from cffg.core.equality_tree import plan_equality_tree
+from cffg.core.plate_grid import PlateGrid
 from cffg.core.ir import (
     BlobRef,
     Broadcast,
@@ -82,10 +83,6 @@ def _with_shared_owners(t: Template) -> Template:
     return out
 
 
-def _indices(dims: tuple[int, ...]) -> list[tuple[int, ...]]:
-    return [tuple(int(i) for i in idx) for idx in np.ndindex(*dims)]
-
-
 def _prefix(plate: str, idx: tuple[int, ...]) -> str:
     return plate + SCOPE_SEP + SCOPE_SEP.join(str(i) for i in idx)
 
@@ -116,7 +113,7 @@ def expanded_blob_refs(template):
     for name, spec in sorted(template.plates.items()):
         per_copy = frozenset(spec.per_copy_blobs)
         if per_copy:
-            for index in _indices(spec.dims):
+            for index in PlateGrid(spec.dims):
                 blobs.update(_scoped_blob_refs(spec.fragment, _prefix(name, index), index, per_copy))
     return blobs
 
@@ -213,7 +210,7 @@ def _install_shared(out: Template, plate: str, spec: PlateSpec) -> None:
 
 def _expand_one(out: Template, plate: str, spec: PlateSpec) -> None:
     per_copy = frozenset(spec.per_copy_blobs)
-    for idx in _indices(spec.dims):
+    for idx in PlateGrid(spec.dims):
         prefix = _prefix(plate, idx)
         variables, factors, constraints, ports, pblobs, plearn = _scope_copy(
             spec, prefix, idx, per_copy
@@ -245,15 +242,9 @@ def _expand_one(out: Template, plate: str, spec: PlateSpec) -> None:
 
 def _apply_chain(out: Template, plate: str, spec: PlateSpec, rule: Chain) -> None:
     """Bond copy i's port_a to copy (i+offset)'s port_b along `rule.axis`."""
-    dims = spec.dims
-    axis = rule.axis
-    for idx in _indices(dims):
-        nxt = list(idx)
-        nxt[axis] += rule.offset
-        if nxt[axis] >= dims[axis]:
-            continue  # boundary copy: its chain port stays exposed
+    for idx, nxt in PlateGrid(spec.dims).chain(rule.axis, rule.offset):
         pa = _prefix(plate, idx) + SCOPE_SEP + rule.port_a
-        pb = _prefix(plate, tuple(nxt)) + SCOPE_SEP + rule.port_b
+        pb = _prefix(plate, nxt) + SCOPE_SEP + rule.port_b
         bond(out, pa, pb)
 
 
@@ -262,7 +253,7 @@ def _apply_broadcast(out: Template, plate: str, spec: PlateSpec, rule: Broadcast
     tree. N copies + hub = N+1 edges, connected by N-1 ternary equality
     factors (N==1: hub IS the single branch; N==2: one equality)."""
     hub = f"{plate}/{rule.hub}"
-    ports = [f"{_prefix(plate, i)}/{rule.port}" for i in _indices(spec.dims)]
+    ports = [f"{_prefix(plate, i)}/{rule.port}" for i in PlateGrid(spec.dims)]
     branches = [out.ports[name].variable for name in ports]
     if hub in out.variables or hub in out.ports:
         raise ComposeError(f"plate {plate!r}: generated Broadcast hub {hub!r} already exists")

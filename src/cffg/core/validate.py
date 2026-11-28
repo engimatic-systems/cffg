@@ -12,6 +12,7 @@ from __future__ import annotations
 from cffg.core.constraint_details import p_substitution_conflicts
 from cffg.core.moment_matching import moment_matching_problems
 from cffg.core.functions import FunctionSpec
+from cffg.core.plate_grid import PlateGrid
 from cffg.core import gaussian_agent
 from cffg.core.ir import (
     EDGE_CONSTRAINTS,
@@ -192,12 +193,13 @@ def _check_plates(t: Template) -> list[str]:
     dims arity (1-D/2-D in phase 1), and each wiring rule's references."""
     problems: list[str] = []
     for name, spec in sorted(t.plates.items()):
-        if not 1 <= len(spec.dims) <= 2:
-            problems.append(
-                f"plate {name!r}: dims {spec.dims} must be 1-D or 2-D in phase 1"
-            )
-        if any(d < 1 for d in spec.dims):
-            problems.append(f"plate {name!r}: dims {spec.dims} must all be >= 1")
+        try:
+            grid = PlateGrid(spec.dims)
+        except (TypeError, ValueError) as err:
+            problems.append(f"plate {name!r}: {err}")
+            grid = None
+        if grid is not None and len(grid.dims) > 2:
+            problems.append(f"plate {name!r}: dims {spec.dims} must be 1-D or 2-D in phase 1")
         frag = spec.fragment
         try:
             validate(frag)
@@ -219,12 +221,9 @@ def _check_plates(t: Template) -> list[str]:
                 problems.append(f"plate {name!r}: per_copy_blob {b!r} is not a fragment blob")
         for rule in spec.bonds:
             if isinstance(rule, Chain):
-                if not 0 <= rule.axis < len(spec.dims):
-                    problems.append(
-                        f"plate {name!r}: chain axis {rule.axis} out of range for dims {spec.dims}"
-                    )
-                if rule.offset < 1:
-                    problems.append(f"plate {name!r}: chain offset {rule.offset} must be >= 1")
+                if grid is not None:
+                    problems.extend(f"plate {name!r}: {reason}"
+                                    for reason in grid.chain_problems(rule.axis, rule.offset))
                 for role, pname in (("port_a", rule.port_a), ("port_b", rule.port_b)):
                     port = frag.ports.get(pname)
                     if port is None:
