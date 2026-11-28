@@ -1,6 +1,6 @@
 ---
 id: cei-6lc5
-status: in_progress
+status: closed
 deps: [cff-u06e]
 links: []
 created: 2026-11-28T06:17:51Z
@@ -32,3 +32,7 @@ Design before kernel: per coordinate at most C sorted disjoint half-open cells w
 **2026-11-28T06:22:19Z**
 
 Implemented the immutable JAX interval message, exact multiplication, two-slope pushforward and likelihood pullback, plus log mass and entropy. The API returns an explicit status and empty sentinel after parameter, endpoint or storage failure; a graph caller must commit only OK updates. Pullbacks need no split when a constant likelihood spans the output bend. JIT/vmap checks pass on both precisions, 32-coordinate independent oracle, erased gaps, overflow across peers, separate zeros/tails and very large finite or translated cell scales (5 parameterized tests in 7.48 s). Graph dispatch, typed persistent source and ledger are independently assigned to cei-k93f. Canonical gate will qualify both in the integrated head.
+
+**2026-11-28T14:13:40Z**
+
+Implemented the complete bounded interval algebra in 54e036c. Explicit support, capacity, improper and precision failures, local graph entropy and pushforward Jacobian tests passed. Final integrated short suite on 94df674 passed 2,858 tests in 421.89 s.

@@ -1,6 +1,6 @@
 ---
 id: cei-k93f
-status: in_progress
+status: closed
 deps: [cei-6lc5]
 links: []
 created: 2026-11-28T06:17:51Z
@@ -32,3 +32,7 @@ Parent approved an interval-only sum-product forest specialization through norma
 **2026-11-28T06:39:16Z**
 
 Implemented interval-only forest admission through Template/compile_template/Engine/Colony. New variables persist interval_dim and interval_capacity; interval_activation binds knot/offset/left/right; interval_potential binds finite lower/upper/log-height/count with explicit outer tails flags. Normal JSON, shape hashes, .npy arrays and CFFGZ reconstruct without weakening existing finite-blob checks. Per-instance raw chart metadata distinguishes merged boundaries on narrowing; the legacy runtime State has no additional storage. Topological directed messages implement exact two-pass; synchronous flood solves from simultaneous snapshots, with exact stationarity support for repeated small budgets. The JAX path and independent D13a oracle agree on the two-chart Jacobian, all five signed contributions, 3/8 event, separate component normalizers and the 32D product. Capacity and invalid geometry roll back per member. Proper finite, infeasible +inf, improper and numerical outcomes have separate diagnostics. Focused command on interval messages/forest, D13a, IR, serialization, plates, bundle, compiler contracts, README, Colony and readout ownership: 183 passed, 7 deselected. Final JSON/IR/bundle focused rerun after source-format cleanup: 38 passed. Canonical closure follows.
+
+**2026-11-28T14:13:40Z**
+
+Implemented the interval-only forest, normal template/compiler/Engine and Colony admission, model reconstruction, two boolean outer-tail flags for finite serialized source arrays, per-member failure isolation and both schedules. ff95806 contains the graph integration. Final diagram registration 94df674 and its focused regression passed. Integrated short suite passed 2,858 tests in 421.89 s.
