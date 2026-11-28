@@ -1,6 +1,6 @@
 ---
 id: ctcl-p70e
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-11-28T05:05:52Z
@@ -31,3 +31,7 @@ Change paths: template builder and learned parameter declaration. Host/JIT, floo
 **2026-11-28T05:13:29Z**
 
 Native D1 stationary implementation complete. With equal outcome probabilities and counts (1,1) vs (10,10), the action posterior matched the independent digamma expression (about .54209 on the less familiar action); planning added zero counts and the next applied action/observation added one count to the corresponding entry. Checked 30 product selectors in actual f32, separate owners, sparse fixed support and learned CFFGZ. All 37 tests in the focused factored_rollout, b_epistemics, agent and README files including slow passed. The two new cases passed again on final formatted code. Full suite pending. Research limitation: selected stationary block requires full support. ctcp-w305 must qualify declared sparse faces separately.
+
+**2026-11-28T06:37:45Z**
+
+The original canonical dashboard run on 12ac41c5a9f717352660153296efba4d1a6248ee passed 2,845/2,845 with four workers, zero failures, 440.37 s pytest, 441.225 s recorded dashboard wall and 441.397 s command wall. Receipt and log: ~/agent-share/factored-transition-control-8EU4wh/{runtime.json,gate.log}. The 37 focused tests included both ordinary and opt-in cases. The stationary prerequisite is complete; ctcp-w305 owns the changing model and validation on a structural face.
