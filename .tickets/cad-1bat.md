@@ -1,6 +1,6 @@
 ---
 id: cad-1bat
-status: in_progress
+status: closed
 deps: []
 links: [cff-6wpk]
 created: 2026-11-24T05:24:57Z
@@ -55,3 +55,7 @@ For three augmented coefficients the dense, root and common-origin state payload
 **2026-11-28T05:11:34Z**
 
 The opt-in SquareRootMNIW posterior and declared sqrt_mniw/component_sqrt_mniw families retain a canonical upper root, including across host sampling, per-component folds and CFFGZ bundle resume. Existing dense families keep their persistent keys and identities. Public .lam rejects rounded dense precision with unresolved quadratic forms. Independent rational oracle plus real JAX x64-off Engine/Learnables: ordinary unnormalized contrast is 4; the two active mixture contrasts are 4.32033014 and 3.67966998, with dormant contrast 2. Source inputs may be float32; host centered folds store float64. Focused validation includes translated 4096 and 2^27, inverse-precision draws, rank/units, legacy conversion, original APIs and new family identity. Production timings and the short suite will use the shared CPU lock.
+
+**2026-11-28T06:14:58Z**
+
+Qualified production ac220a7. The numerical short gate passed 2,873 tests (16 warnings, pytest 440.16 s); the research/solver focused suites and x64-off ordinary and component probes passed. Frozen 101-sample warm CPU timer, d=2/d=20 predictors: dense setup 21.04/23.71 µs, root setup 40.83/45.04, dense-to-root conversion 64.00/73.04. One centered update dense 127.04/155.83 vs root 124.50/156.58 µs. Array payload sizes identical (112 and 3,712 bytes); root NPZ adds 10 bytes (1,090 vs 1,080; 4,690 vs 4,680). These are host float64 posterior measurements. They do not measure a whole graph solve. Raw 101 interleaved samples, complete timing method and gate log are in ~/agent-share/cffg-backlog-gates/cad-1bat/qualified.json and gate.log. Exploratory ordered_cost.json compares the rejected common-origin form (144.75/184.25 µs warm update). The resolved opt-in family supports ordinary and per-component registered centered MNIW and the joint sampler, and refuses an unrepresentable dense accessor. Preserve the original dense descriptor when resuming an unchanged legacy model.
