@@ -112,6 +112,7 @@ def audit(root):
         expected_geometry.update({(r, c): label for r, c, label in patch["add"]})
         cells = coords(case["layout"])
         require(cells == expected_geometry, "geometry mismatch")
+        by_stratum = defaultdict(list)
         events = {(r["tape"], r["t"], r["horizon"]): r for r in case["predictions"]}
         require(len(events) == len(case["predictions"]), "duplicated forecast")
         require([t["id"] for t in case["tapes"]] == list(scripts_by_id), "evaluation tape inventory")
@@ -153,9 +154,20 @@ def audit(root):
                         energies[arm] = score
                         worst = max(worst, abs(actual["bfe"] - score))
                         n_score += 1
+                    movement = "blocked" if suffix[-1]["displacement"] == [0, 0] else "moved"
+                    for label in ("all", movement):
+                        by_stratum[str(lead), label].append(energies)
                     if lead == 3 and name != training_name:
                         primary.append(energies["history"] - energies["appearance"])
         require(not events, "unexpected predictions")
+        reported = summary["layouts"][name]
+        for (lead, label), values in by_stratum.items():
+            subset = reported["scores"][lead][label]
+            require(subset["n"] == len(values), "movement-stratum denominator")
+            for arm in ("appearance", "history", "tile"):
+                mean = math.fsum(row[arm] for row in values) / len(values)
+                require(abs(mean - subset["mean_nll"][arm]) < 1e-12, "stratified mean NLL")
+        route_totals = defaultdict(Counter)
         tasks = protocol["routing"]["tasks"]
         require(len(case["routes"]) == len(tasks)*3, "route inventory length")
         seen = set()
@@ -171,8 +183,11 @@ def audit(root):
                     and (len(steps) <= tape["budget"] if tape["success"] else len(steps) == tape["budget"])
                     and sum(r["displacement"] == [0, 0] for r in steps) == tape["blocked"],
                     "invalid route termination or movement")
+            route_totals[tape["arm"]].update(total=1, successes=int(tape["success"]),
+                                              blocked=tape["blocked"], actions=len(steps))
             n_routes += 1
             n_actions += len(steps)
+        require(dict(route_totals) == reported["routes"], "route totals mismatch")
         require(seen == {(*task, arm) for task in tasks for arm in ("appearance","history","tile")},
                 "unknown route")
     delta = math.fsum(primary)/len(primary)
