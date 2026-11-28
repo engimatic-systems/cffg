@@ -293,7 +293,7 @@ def test_compact_default_and_exact_learned_files(tmp_path, dtype):
     assert_same(source.state_dict(exact=True), full)
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_legacy_opposite_midpoints_keep_zero_excess_in_compact_counts(dtype):
     p = prior(dtype)
     # Recreate the earlier format directly, independently of ComponentBank.state_dict.
