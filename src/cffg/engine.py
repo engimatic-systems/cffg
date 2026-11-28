@@ -169,6 +169,7 @@ class Engine:
         self._iter_step = program.iter_step
         self._propagate = program.propagate
         self._prime = program.prime
+        self._ordinary_hooks = (program.iter_step, program.prime, self._bfe)
         self._reconstruct = program.reconstruct
         self._exact_unit = program.exact_unit
         self.scan_registerized = program.scan_registerized
