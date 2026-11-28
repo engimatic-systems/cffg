@@ -2000,6 +2000,134 @@ Using Pólya–Gamma Latent Variables* (2013); Linderman, Johnson, and Adams,
 Pólya–Gamma Augmentation* (2015); Durante and Rigon, *Conditionally Conjugate
 Mean-Field Variational Bayes for Logistic Models* (2019).
 
+### D8.6 Binary trees of logistic gates
+
+A destination can require several binary choices. For example, in the tree
+`((2,0),(3,1))`, accepting the root reaches the choice between labels 2 and
+0. Rejecting the root reaches the choice between 3 and 1. Observing label 0
+gives the root one acceptance and the left child one rejection. It gives the
+right child zero trials. With uncertain regimes, each path carries its
+posterior probability instead of a whole trial. This section derives that
+extension for D8's independent regimes and D9's structured regime pair.
+The shipped recurrence implements the decision list.
+
+**Model and labels.** Fix one rooted, connected, acyclic full binary tree for
+all sources. Each non-root node has one parent. The two children of every
+internal gate are ordered `(accept, reject)`, and each label `0,...,K-1` occurs
+on exactly one leaf, with `K >= 2`. With `G` gates there are both `2G` and
+`G+K-1` edges, so `G=K-1`. Number gates in root/accept-subtree/reject-subtree
+preorder for the oracle. An explicit model ordering would index its coefficient
+rows in that same declared order. Leaf labels index destination columns.
+
+For source `i`, gate `g` has point coefficients `R[i,g,:]`, `r[i,g]` and affine
+logit `psi_ig(x)=R_ig^T x+r_ig`. Let `P(j)` be the root-to-leaf path to label
+`j`. Its sign `s_jg` is +1 on an accept branch, −1 on a reject branch and
+zero off the path. Write `b_jg=|s_jg|`, `a_jg=1[s_jg=+1]` and
+`k_jg=a_jg-b_jg/2=s_jg/2`. Then
+
+    p(j | i,x) = product over g in P(j) of sigma(s_jg psi_ig(x)).
+
+Every leaf inherits exactly one path from its unique parents. At each split
+the two sigmoid probabilities sum to one, so induction from the root
+partitions unit mass among the distinct labels. In the decision list
+`(0,(1,(...,(K-2,K-1))))`, gate `g` accepts label `g`. Thus
+`b_jg=1[j>=g]` and `a_jg=1[j=g]`, including the final all-reject leaf.
+The source-major `R[K,K-1,d]` and `r[K,K-1]` arrays and the resulting
+probabilities reduce exactly to (D8.1–2).
+
+**Local bound.** A visited branch of sign `s` has the exact PG identity
+
+    sigma(s psi) = exp(s psi/2)/2 E_{omega ~ PG(1,0)}[exp(-omega psi²/2)].
+
+An unvisited branch contributes the multiplicative identity and has no
+auxiliary cost. For an independent Gaussian drive with mean `m` and covariance
+`S`, let `mu=R^T m+r` and `xi²=mu²+R^T S R` for this source/gate. The
+variational optimum for a visited branch tilts the base PG density by
+`exp(-omega xi²/2)`, yielding `PG(1,xi)`. Its mean is
+`w=tanh(xi/2)/(2xi)`, with limit 1/4 at zero. Before optimizing the tilt
+`c>=0`, the bound at a particular drive value is
+
+    log sigma(s psi) >= s psi/2 - log(2 cosh(c/2)) - w(c)(psi²-c²)/2.
+
+Averaging and choosing `c=xi` cancels the last term. For each source and
+destination this gives the pair potential
+
+    L_ij = sum over g in P(j) of [s_jg mu_ig/2 - log(2 cosh(xi_ig/2))]
+         <= E_x log p(j | i,x).
+
+A gate with zero posterior exposure contributes zero at every tilt. A fixed
+drive gives equality, including for a zero logit. With uncertain drives the
+rows of `exp(L)` can sum to less than one. Row normalization would add a
+source-dependent term to both messages and the objective. The PG integral is
+Theorem 1 of [Polson, Scott and Windle (2013)](https://arxiv.org/abs/1205.0310).
+
+**Messages and sufficient statistics.** For D9, let `l_i` and `d_j` be the
+incoming source and destination log cavities. Sum-product gives
+
+    log m_out(j) = logsumexp_i (l_i + L_ij) + const,
+    log m_in(i)  = logsumexp_j (L_ij + d_j) + const,
+    rho_ij       = exp(l_i + L_ij + d_j - log Z).
+
+The D8 product restriction uses `rho_ij=alpha_i beta_j` and the VMP messages
+`log m_out(j)=sum_i alpha_i L_ij+const` and
+`log m_in(i)=sum_j beta_j L_ij+const`. In each family use its own `rho`
+consistently. One source/destination pair contributes `rho_ij b_jg` trials
+and `rho_ij k_jg` signed successes to gate `(i,g)`. Summing gives
+
+    B_ig = sum_j rho_ij b_jg,       C_ig = sum_j rho_ij s_jg/2.
+
+At fixed auxiliary coordinates the log message to the drive has quadratic
+part `sum_ig [C_ig psi_ig - B_ig w_ig psi_ig²/2]`. Expanding in `x` gives
+
+    Lambda_x = sum_ig B_ig w_ig R_ig R_ig^T,
+    eta_x    = sum_ig (C_ig - B_ig w_ig r_ig) R_ig.
+
+For coefficient learning put `h=E[(x,1)]` and `M=hh^T+blockdiag(S,0)`.
+Expanding that same quadratic in `theta_ig=(R_ig,r_ig)` gives
+`Delta_eta_ig=C_ig h` and `Delta_Lambda_ig=B_ig w_ig M`. If one parameter
+identity owns multiple source/gate rows, or reappears at other times, sum
+these natural increments over its occurrences, then add its Gaussian prior
+once. Each occurrence uses its own drive moments, exposure and tilt at the
+installed common coefficient. Zero total exposure leaves that owner's prior
+unchanged in a fresh update. This follows D8.4's point rollover. A variational
+posterior over coefficients inside the inference loop would also enter `xi²`.
+
+**Entropy and support.** For a proper continuous drive, the D9 local term is
+
+    F_node = -sum_ij rho_ij L_ij - H(rho) - H(N(m,S)).
+
+There is one categorical pair entropy and one Gaussian differential entropy.
+On D8's product family this pair entropy becomes `H(alpha)+H(beta)`.
+A known drive can be conditioned on directly with no integrated drive entropy.
+Internal decision gates and eliminated PG auxiliaries add no separate graph
+edge entropies. Ordinary interior-edge corrections still add each duplicated
+edge entropy once (D9.15–16). With the same feasible beliefs, coefficients,
+and other terms, the JJ ledger is greater than or equal to the corresponding
+exact-transition variational ledger. An evidence bound for an entire hybrid
+model would additionally require bounds on its other approximations.
+P-substitution, max-product and GFE semantics for this tree are unsupported.
+
+Finite coefficients give positive probability to each leaf in exact arithmetic.
+Incoming zero probabilities exclude just their rows or columns of `rho`;
+a forbidden destination can share a visited ancestor with a possible one.
+Use `0 log 0=0` for entropy and preserve literal zero mass in the gate sums.
+All-empty support, nonfinite logits and improper final Gaussian beliefs fail.
+A fixed drive with zero covariance is a conditioning case. The oracle accepts
+finite symmetric covariance with resolved nonnegative eigenvalues for moment
+calculations. A balanced tree stores at most `ceil(log2 K)` path entries per
+leaf when built by recursively splitting the leaf counts as evenly as possible.
+Enumerating paths one destination at a time requires a pair table and
+source-by-gate statistics, with no source-by-destination-by-gate tensor.
+
+**Executable checks.** `tests/tree_recurrence_oracle.py` enumerates the paths
+without CFFG kernels. `tests/test_tree_recurrence.py` checks every ordered tree
+shape and label permutation for `K=2,3,4` against root-down probability splits,
+the decision-list prefix formulas, the shipped D9 pair/drive rule, the
+uncertain-drive bound against Gaussian quadrature, tied-owner curvature,
+chain entropy against direct enumeration, literal-zero support, and a balanced
+`K=32,d=16` case. Numerical comparisons allow 32 machine epsilons in absolute
+and relative error at the tested dtype. Structural zeros are tested exactly.
+
 ---
 
 ## D9 — Structured categorical smoothing for recurrent transitions (cff-s6yy)
@@ -2065,8 +2193,8 @@ For transition `t`, source `i`, and stick `l`, define
     c_til^2 = mu_til^2 + R_il^T S_t R_il,
     omega_bar_til = tanh(c_til/2) / (2 c_til),                (D9.2)
 
-with the analytic `1/4` limit at zero. Reuse D8.6's success and failure
-scores with `(mu_il,xi_il)` replaced by `(mu_til,c_til)`. Their decision-list
+with the analytic `1/4` limit at zero. Use the success and failure
+scores in (D8.6) with `(mu_il,xi_il)` replaced by `(mu_til,c_til)`. Their decision-list
 prefix gives the bounded expected log pair potential
 
     ell_t(i,j) = sum_l b_jl s_til^- + a_jl (s_til^+ - s_til^-),

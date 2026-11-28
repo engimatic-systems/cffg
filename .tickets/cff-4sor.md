@@ -1,6 +1,6 @@
 ---
 id: cff-4sor
-status: open
+status: in_progress
 deps: [cff-k9ws]
 links: []
 created: 2026-08-10T02:58:17Z
@@ -120,3 +120,11 @@ or production execution. Intelligible-ticket review: complete.
 Classification-note additions: check=the oracle or derivation comparison;
 scale=the `K=32`, drive-dimension-16 oracle case; intended=the contextual
 assignments in this note; later=the downstream production implementation.
+
+**2026-11-28T04:19:31Z**
+
+Architecture handoff: New factor or rule family. D8 independent marginals and D9 pair-region coordinates, support, edge entropy and tied statistics are specified and tested by a pure oracle. IR/packing, Engine/Colony, synchronous/compiled schedules, runtime ledger/readouts, learning, serialization, public exports N/A for this derivation-only change. Hostile cases include structural zeros and empty support, improper Gaussian drives, float32 precision and K=32/d=16. Coordinated full gate is owned by integration.
+
+**2026-11-28T04:24:48Z**
+
+Frozen for the coordinated gate. D8.6 defines preorder accept/reject paths, conditional/PG identities, D8 product and D9 pair messages, Gaussian and tied-owner increments, literal support and node/edge entropy. Pure NumPy oracle tested on all 134 labeled ordered full binary trees for K=2,3,4 in each dtype, exact three-state chain entropy, uncertain-drive quadrature, shared-owner curvature, singular/improper inputs, and K=32 with d=16 without a cubic categorical tensor. Only the explicit cross-check imports the shipped D9 rule; runtime and model format have no changes. Focused command: uv run --frozen --no-sync pytest -q tests/test_tree_recurrence.py tests/test_recurrence_link.py::test_rule_matches_independent_numpy_coordinates tests/test_structured_recurrence_rule.py::test_pair_masses_and_gaussian_message_use_joint_responsibility. All 9 passed in 4.74 seconds. Ruff, staged diff and dependency-cycle checks pass. Await the coordinated full gate before closing.

@@ -204,6 +204,7 @@ EPIC_FILES = {
         "test_recurrence_learning_numerics.py",
         "test_recurrence_checkpoint.py",
         "test_recurrence_link.py",
+        "test_tree_recurrence.py",
         "test_structured_recurrence.py",
         "test_regime_pair_derivation.py",
         "test_hybrid_separator_derivation.py",
