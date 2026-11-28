@@ -19,6 +19,7 @@ import pytest
 
 import cffg
 from cffg import RollingAgent, build_gridworld
+from cffg.training import MeanTrainer as CanonicalMeanTrainer
 from cffg.agent import RollingAgent as CanonicalRollingAgent
 from cffg.bundle import load_bundle as canonical_load_bundle
 from cffg.bundle import save_bundle as canonical_save_bundle
@@ -173,6 +174,7 @@ def test_top_level_facade_reexports_only_canonical_owners():
         "LoadedBundle": cffg.bundle.LoadedBundle,
         "MNIW": MNIW,
         "MeanImplementation": cffg.MeanImplementation,
+        "MeanTrainer": CanonicalMeanTrainer,
         "NIW": NIW,
         "NeuralTrainer": cffg.NeuralTrainer,
         "ParameterSpec": cffg.kernel_bindings.ParameterSpec,
