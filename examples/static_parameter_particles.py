@@ -30,6 +30,8 @@ def main():
 
     gain = learner.particles[:, 0]
     weights = np.exp(learner.log_weights)
+    assert learner.n_observed == 4
+    np.testing.assert_allclose(weights.sum(), 1.)
     # The likelihood is symmetric in gain. The two signs remain plausible.
     print(f"E[|gain|] ≈ {weights @ abs(gain):.3f}")
     print(f"P(gain > 0) ≈ {weights @ (gain > 0):.3f}")

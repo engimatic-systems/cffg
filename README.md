@@ -1037,6 +1037,7 @@ unfinished result and asserts the quantity an experiment should inspect.
 | [cstr_planning.py](examples/cstr_planning.py) | Registered reactor physics, partial goals, status-bearing plans, portable source bundle | Declared short-horizon Gaussian approximation; no hard actuator bounds |
 | [learning_bundle.py](examples/learning_bundle.py) | Declared learning, save/load, later-trial continuation | Current-schema immutable prior plus posterior state |
 | [finite_hypotheses.py](examples/finite_hypotheses.py) | Pendulum length inference from noisy velocity readings | Exact posterior on three specified lengths |
+| [static_parameter_particles.py](examples/static_parameter_particles.py) | Nonlinear gain inference with an ambiguous sign | Finite-particle posterior and evidence estimate |
 | [hybrid_rslds.py](examples/hybrid_rslds.py) | Small recurrent switching LDS | Declared mixture/JJ approximation |
 
 Run one from the repository checkout with, for example:
