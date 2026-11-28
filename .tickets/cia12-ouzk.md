@@ -27,3 +27,9 @@ The full AXIOM benchmark remains deferred per Cooper’s previous decision. Inde
 
 ## Definitions
 A branch tip is the last commit on a branch. A centered statistic summarizes variation around a mean without subtracting two large raw moments.
+
+## Notes
+
+**2026-11-28T03:45:11Z**
+
+Integrated 198–204 at a58d91c with both parents and tested the final code at 04bc4c5. Grouped/selected Gaussian readouts and centered tap statistics agree with independent NIW/MNIW posteriors. A direct or equality-linked observation of a filter’s carried posterior now fails during validation. The standalone and bundle guards passed, including a valid noisy carry and both precisions. The full dashboard command passed 2,837 tests with 479 opt-in cases deselected. The inner wall was 1,250.052 seconds and outer wall 1,250.18 seconds. CPU was an Apple M2 Max. Timing evidence and all per-case durations are in ~/agent-share/axiom-integration-4RQ0bP/short-suite.log. All seven frozen PR heads are ancestors. Ready to publish after the short-suite budget adjustment.
