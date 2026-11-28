@@ -1,6 +1,6 @@
 ---
 id: cds-1t47
-status: in_progress
+status: closed
 deps: [cff-dlrj]
 links: []
 created: 2026-11-28T04:23:32Z
@@ -49,3 +49,7 @@ D18 follow-up on #215. New factor or rule family and BFE or GFE objective are th
 **2026-11-28T05:39:57Z**
 
 D18.6 and the independent oracle now cover the common shift, its strictly convex Newton subproblem, source/destination and Gaussian coordinates, both entropies, a convex joint Gaussian-Cholesky/shift coordinate, exact zeros and explicit failure. Resetting the shift optimally fixes label replication but cannot qualify unrestricted fixed inference: at unit amplitude the source mass is 0.377541 vs exact 0.407438 for 2, 4 and 32 labels; at amplitude four it is 0.000335 vs exact 0.070501, Gaussian coordinate precision 8 vs 1.556806 and 1D absolute node energy 1.887914 vs -0.822580. The source log-odds error grows quadratically. Hold fixed inference, learning and integration; no downstream production tickets. Quadrature, finite differences, two-start stationarity, f32/f64 and K32/d16 tests pass. Change affects a canonical scientific oracle, so use the short-suite gate.
+
+**2026-11-28T07:15:19Z**
+
+Validated ce909f2 against #215. Twenty focused D18 tests passed in 7.69 s. The canonical short suite passed 2,867 tests in 426.49 s. All seven shifted-bound regressions ran. Keep the bound as a derivation and oracle; replication invariance holds, and strong-drive evidence and curvature errors rule out a general inference or learning feature.
