@@ -17,6 +17,7 @@ from cffg import efrules
 from cffg._immutable import FrozenArray, FrozenMap, ImmutableRecord
 from cffg.compiled import Mu3Plan
 from cffg.execution import functional as _functional
+from cffg.rules import mu3_particle_tolerance
 from cffg.runtime_types import Mu3ScoreResult, RunResult, RunStatus, State
 
 
@@ -121,12 +122,7 @@ class Mu3Lifecycle:
             if (
                 not np.isfinite(np.asarray(particles)).all()
                 or np.any(np.asarray(particles) < 0)
-                or not np.allclose(
-                    sample_sums,
-                    1.0,
-                    rtol=64.0 * np.finfo(dtype).eps,
-                    atol=64.0 * np.finfo(dtype).eps,
-                )
+                or np.any(np.abs(sample_sums - 1) > mu3_particle_tolerance(dtype))
             ):
                 raise FloatingPointError(
                     f"{plan.name}: Dirichlet particle generation diverged "

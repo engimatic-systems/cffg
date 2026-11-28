@@ -1,6 +1,6 @@
 ---
 id: cff-34gi
-status: open
+status: closed
 deps: [cff-bfr9]
 links: [cff-sf29, cff-ddsq]
 created: 2026-09-09T23:41:24Z
@@ -73,3 +73,19 @@ audit is included. Existing scientific oracle tests remain authoritative.
 **2026-09-09T23:42:33Z**
 
 Reproduction: tests/test_compiler_contracts.py:model("gfe"); replace arrays["A"][:, 0] or arrays["c"] with [-0.2, 1.2], then compile_template. Both inputs are accepted. Exponentiating the affected packed values yields first A-column mass 1.2 or goal mass 1.2. The same two inputs compile under the pre-extraction compiler loaded from 0bcda82. Source: specialized/packing.py:pack_gfe, _stochastic, _log_of at 707c31b. Confidence high for these two confirmed paths; transition-GFE shares the helper but awaits its own mechanism regression. This ticket depends on the completed array-resolution extraction for its named owner path and is linked to assembly/engine characterization for traceability, not as a blocker of the architecture epic.
+
+**2026-11-28T03:56:48Z**
+
+Pre-implementation trace. Architecture row “New factor or rule family” applies at the numeric packing checkpoint. Both fixed paths call _stochastic before _log_of. A fixed transition checks each selector slice of its matrices; the epistemic_b builder normally emits Dirichlet counts, so the regression will explicitly declare a fixed transition. Registered categorical packing also calls this helper. Flooding/scheduled and direct/vmap consume the same compiled arrays. Host/JIT and incoming messages are N/A. Check source float32/64, signed malformed mass summing to one, NaN/infinities, exact zeros, a 32-outcome vector, and JSON+NPY/CFFGZ reconstruction. Keep the existing sum tolerance and learned concentration semantics.
+
+**2026-11-28T03:59:41Z**
+
+Handoff for the integration owner. Fixed probabilities now reject each negative or non-finite entry before log packing. Diagnostics name the factor and parameter role, including the transition selector slice. Tests cover in-memory compilation, JSON with physical NPY files, and validation by the bundle reader. Float32 and float64 inputs with 32 outcomes retain the expected sparse log tables, accept rounded thirds and reject even the smallest negative subnormal. The existing concentration and column-sum paths retain their original meaning.
+
+Compared against an unmodified a774a54 source archive. That compiler wrote and reopened three validly hashed but numerically invalid CFFGZ bundles, each with packed mass 1.2, for a likelihood column, goal and transition column at selector 1. Public load_bundle on the fixed compiler rejected all three with the expected factor and role. All packed arrays of the valid rollout matched exactly. The converged valid categorical GFE objective was bit-identical (0x1.079ab2e207e00p-1). Probe and baseline archives are in /tmp/cff-34gi-baseline.PekEfm.
+
+Focused validation: UV_PROJECT_ENVIRONMENT=/Users/ravd/projects/cffg/.venv PYTHONPATH=src uv run --frozen --no-sync pytest -q tests/test_specialized.py tests/test_resolution.py tests/test_engine_tree.py::test_compile_rejects_non_stochastic_params tests/test_b_epistemics.py::test_two_composite_chain_matches_constrained_objective tests/test_gfe.py::test_bfe_equals_local_objective_minimum tests/test_shared_goals.py::test_off_coordinate_energy_charges_one_shared_parameter_term passed all 68 tests. tk dep cycle and git diff --check passed. Ticket stays in progress for the combined default-suite gate, PR and closure by the integration owner.
+
+**2026-11-28T04:26:22Z**
+
+Integrated on a69f234. The complete four-worker short suite passed 2,858 tests in 462.94 seconds wall. The archive and JSON regressions check the actual fixed-input path. This branch is stacked on #208 for review.

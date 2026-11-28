@@ -45,6 +45,12 @@ x-navigation:
   repository_policy: Audit instances are generated artifacts and are ignored by Git.
   candidate_lexicon: tools/wiggle_words/ticket-wiggle-words-v2.yaml
   query_tool: tools/wiggle_words/query_ticket_wiggle_audit.py
+  review_output: >-
+    Scan and slice print compact text grouped by ticket line. Repeated labels
+    show their counts. Scan shows the matched source line. Slice shows the
+    archived section, classification and rationale. Append --detail to either
+    command for the full YAML records. For structured output, pass --format json
+    or --format yaml before the command. Summary and validate default to YAML.
   context_rule: >-
     Do not read the complete audit to refine one ticket. Produce a bounded
     slice, and place only that slice plus the assigned ticket and necessary

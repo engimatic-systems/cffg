@@ -110,21 +110,24 @@ def test_float32_reactor_returned_state_satisfies_its_frozen_chart_certificate(m
     from cffg.outer_chart import chart_coordinates
     from cffg.runtime_types import _replace
 
-    charts = []
-    original = outer.build_outer_chart
+    accepted = []
+    certify = outer_strategy.certify_adaptive_proposal
 
     def capture(*args, **kwargs):
-        chart = original(*args, **kwargs)
-        charts.append(chart)
-        return chart
+        attempt = certify(*args, **kwargs)
+        if attempt.result is not None:
+            accepted.append(attempt)
+        return attempt
 
-    monkeypatch.setattr(outer, "build_outer_chart", capture)
+    monkeypatch.setattr(outer_strategy, "certify_adaptive_proposal", capture)
     with jax.enable_x64(False):
         template, arrays, data = planning_fixture("sigma_point", past=0, horizon=2, dtype=np.float32)
         arrays["P0"] = np.diag(np.array([.01, .001, 1e-4, .1], dtype=np.float32))
         engine = Engine(compile_template(template, arrays=arrays), schedule="flood")
         result = engine.run(engine.bind_data(engine.init_state(), data), 60, tol=1e-6)
         state = result.require_converged()
+        assert len(accepted) == 1, f"expected one certified adaptive reactor proposal, got {len(accepted)}"
+        (attempt,) = accepted
         values = engine._iter_step(
             state.messages, state.g_eta, state.g_lam, state.g_obs, state.g_mask,
             state.ef_eta, state.ef_obs, state.ef_mask, state.params, 0., False,
@@ -133,7 +136,9 @@ def test_float32_reactor_returned_state_satisfies_its_frozen_chart_certificate(m
         mapped = _replace(state, messages=values[0], g_eta=values[1], g_lam=values[2], ef_eta=values[3])
         before = OuterArrays(state.messages, state.g_eta, state.g_lam, state.ef_eta)
         after = OuterArrays(mapped.messages, mapped.g_eta, mapped.g_lam, mapped.ef_eta)
-        u, v = np.asarray(chart_coordinates(charts[-1], before)), np.asarray(chart_coordinates(charts[-1], after))
+        u = np.asarray(chart_coordinates(attempt.chart, before))
+        v = np.asarray(chart_coordinates(attempt.chart, after))
+        np.testing.assert_array_equal(u, chart_coordinates(attempt.chart, attempt.result.arrays))
         tolerance = 64 * np.finfo(np.float32).eps
         residual = np.max(np.abs(v - u) / (1 + np.abs(u)))
         assert result.outer_residual <= tolerance and residual <= tolerance

@@ -567,16 +567,22 @@ def test_nonconverged_checkpoint_rejects_invalid_particles_before_mutation(tmp_p
     source.checkpoint(good)
     arrays = checkpoint_arrays(good)
     particle_field = next(name for name in arrays if name.endswith(":samples"))
-    arrays[particle_field] = np.full_like(arrays[particle_field], -1.0)
-    corrupt = tmp_path / "functional-exhausted-negative-particles.npz"
-    write_checkpoint(corrupt, arrays)
-
     target = make_agent(n_sweeps=0)
     target.observe(0, 1)
     snapshot = used_agent_snapshot(target)
-    with pytest.raises(ValueError, match="invalid particles or weights"):
-        target.restore(corrupt)
-    assert_used_agent_unchanged(target, snapshot)
+    samples = arrays[particle_field]
+    perturbation = 256 * np.finfo(samples.dtype).eps
+    for value, message in (
+        (-1, "invalid particles or weights"),
+        (np.nan, "non-finite"),
+        (samples[0, 0, 0] + perturbation, "invalid particles or weights"),
+    ):
+        samples[0, 0, 0] = value
+        corrupt = tmp_path / "functional-exhausted-invalid-particle.npz"
+        write_checkpoint(corrupt, arrays)
+        with pytest.raises(ValueError, match=message):
+            target.restore(corrupt)
+        assert_used_agent_unchanged(target, snapshot)
 
 
 def test_sampling_failure_returns_no_action_and_preserves_diagnostics():

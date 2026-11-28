@@ -306,23 +306,62 @@ def audit_summary(audit_path: Path) -> dict[str, Any]:
     }
 
 
+def compact_review(report: dict[str, Any]) -> str:
+    """Show each matched line once. Use only the pinned record for archived slices."""
+    query = report["query"]
+    scan = query["mode"] == "scan"
+    summary = report["summary"]
+    heading = f'{query["ticket"]} · matches {summary["occurrences"]} · candidates {summary["candidates"]}'
+    if query["candidate"]:
+        heading += f' · candidate {query["candidate"]}'
+    if query.get("problems_only"):
+        heading += " · problems only"
+    if scan:
+        info = "Mechanical matches. Review in context and check omitted ownership separately."
+    else:
+        revision = report["source"]["ticket_corpus_git_commit"]
+        info = f'Archived classifications at {revision} · problem matches {summary["problem_occurrences"]}.'
+    rows = [heading, info, "Definitions and per-occurrence details omitted. Append --detail for the full YAML report."]
+
+    grouped: dict[int, tuple[str, Counter[str]]] = {}
+    for candidate in report["candidates"]:
+        for hit in candidate["occurrences"]:
+            line = hit["line"]
+            context = hit["line_text"] if scan else hit["section"]
+            label = candidate["id"]
+            if not scan:
+                meaning = hit["meaning"]
+                if hit.get("observed_meaning"):
+                    meaning += f' ({hit["observed_meaning"]})'
+                label += f' “{hit["matched_text"]}” → {meaning} — {hit["rationale"]}'
+            _, matches = grouped.setdefault(line, (context, Counter()))
+            matches[label] += 1
+    for line, (context, matches) in sorted(grouped.items()):
+        labels = ", ".join(key if count == 1 else f"{key} ×{count}" for key, count in matches.items())
+        rows.append(f"L{line} [{labels}] {context}")
+    return "\n".join(rows)
+
+
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
     result.add_argument("--audit", type=Path, default=DEFAULT_AUDIT)
     result.add_argument("--lexicon", type=Path, default=DEFAULT_LEXICON)
-    result.add_argument("--format", choices=("yaml", "json"), default="yaml")
+    result.add_argument("--format", choices=("yaml", "json"),
+                        help="emit the full structured report (default for scan and slice: compact text)")
     commands = result.add_subparsers(dest="command", required=True)
 
     slice_parser = commands.add_parser("slice", help="project classified audit records for one ticket")
     slice_parser.add_argument("ticket")
     slice_parser.add_argument("--candidate")
     slice_parser.add_argument("--problems-only", action="store_true")
+    slice_parser.add_argument("--detail", action="store_true", help="show full occurrence records and definitions")
 
     scan_parser = commands.add_parser(
         "scan", help="mechanically scan one current ticket using the v2 lexicon"
     )
     scan_parser.add_argument("ticket")
     scan_parser.add_argument("--candidate")
+    scan_parser.add_argument("--detail", action="store_true", help="show full occurrence records and definitions")
 
     commands.add_parser("summary", help="print report-level metadata and counts")
     commands.add_parser("validate", help="check cross-file and count invariants")
@@ -342,14 +381,15 @@ def main() -> int:
             output = audit_summary(audit_path)
         else:
             output = validate_audit(audit_path)
+        if args.command in ("scan", "slice") and args.format is None and not args.detail:
+            print(compact_review(output))
+        elif args.format == "json":
+            print(json.dumps(output, indent=2, ensure_ascii=False))
+        else:
+            yaml.safe_dump(output, sys.stdout, sort_keys=False, allow_unicode=True, width=110)
     except (KeyError, OSError, TypeError, ValueError, yaml.YAMLError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-
-    if args.format == "json":
-        print(json.dumps(output, indent=2, ensure_ascii=False))
-    else:
-        yaml.safe_dump(output, sys.stdout, sort_keys=False, allow_unicode=True, width=110)
     return 0 if output.get("valid", True) else 1
 
 

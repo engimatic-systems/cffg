@@ -768,14 +768,10 @@ multiple refreshed policy-score epochs automatically: callers may explicitly
 refresh, while `Engine.score_mu3_epochs` remains the averaging API. Arbitrary
 stochastic factor families and batched per-agent keys remain future work.
 
-**S2a. Fixed mu3 particle validation has a known hole.** The low-level
-importance rule can treat a NaN inside a caller-supplied fixed particle as
-absent support and report success with a NaN returned moment. Public
-`Engine.run` separately rejects non-finite initial state leaves, so no false
-public convergence path has been demonstrated, but direct rule consumers must
-prevalidate particles as finite, nonnegative probability tables. Ticket
-cff-6n9c owns the direct and jitted rule-level repair. This is a defect, not a
-supported sparse-support convention.
+Fixed mu3 particles must contain finite, nonnegative probabilities. Preparation,
+the importance rule, and checkpoint restore require each outcome column to sum
+to one within 128 machine epsilons of the particle dtype. Exact zeros are valid.
+A malformed particle makes its entire importance update diverge.
 
 The agent's fixed-memory trial loop likewise uses separate immutable planning
 and filtering templates. It does not mutate the paper's literal graph when an
@@ -880,15 +876,11 @@ DSL would still soften that boundary. Learned `c` and learned `A` coordinates
 are currently compiled separately rather than as one jointly uncertain
 composite.
 
-**S9. Fixed GFE probability validation is incomplete.** The categorical GFE
-packer currently accepts negative likelihood or goal entries when their checked
-sum is one. Conversion to log space maps those entries to zero probability,
-leaving invalid total mass; for example, `[-0.2, 1.2]` becomes mass `1.2`.
-Callers must supply finite, nonnegative, normalized fixed probabilities.
-This is an inherited input-validation defect, not a supported approximation.
-P2 ticket cff-34gi owns rejecting it and checking the analogous transition-GFE
-path. Positive Dirichlet concentrations have a different contract and need not
-sum to one.
+**S9. Fixed GFE probabilities.** Compilation requires finite, nonnegative
+entries in fixed likelihoods, goals and transition tables. The goal and each
+conditional distribution must sum to one within the compiler's normalization
+tolerance. Literal zeros retain their log-zero encoding. Learned parameters
+use positive Dirichlet concentrations, whose totals represent prior strength.
 
 Graph rendering is deterministic documentation of the declared template and
 supported constraint decorations. A successful SVG/PNG/scene render does not
@@ -909,8 +901,7 @@ and learns identities, motions and interactions within fixed-capacity banks.
 Its evaluation includes one 10,000-step Explode run. The usual LAIF controller
 replans at each tick. The separate categorical planner in S4 can commit to
 actions through one or two future readings. Loopy inference retains its
-convergence and accuracy caveats. Treat cff-34gi and cff-6n9c as input-
-validation defects, the estimator and stochastic Colony surfaces as partial,
+convergence and accuracy caveats. Treat the estimator and stochastic Colony surfaces as partial,
 alpha bundles as current-schema artifacts, and administratively closed research
 chains as non-capabilities. Its natural habitat remains experiments whose state
 ontology and local factor semantics can be designed and audited explicitly.

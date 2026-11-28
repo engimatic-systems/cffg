@@ -11,6 +11,8 @@ from test_shared_goals import mixed_goals
 
 from cffg import compiler, kernels
 from cffg.array_requirements import ArrayRecipe
+from cffg.bundle import BundleError, save_bundle
+from cffg.compiled import NEG
 from cffg.core import ConstraintKind, ConstraintSpec
 from cffg.core.plates import expand_plates
 from cffg.core.serialize import from_json, structure_hash, to_json
@@ -228,6 +230,74 @@ def test_transition_gfe_retains_facing_factors_and_output_entropy():
     assert {"zm1", "zm2"} <= {
         name for name, edge in arena.edges.items() if edge.interior
     }
+
+
+def fixed_gfe_rollout(size=2, dtype=np.float64):
+    identity = np.eye(size, dtype=dtype)
+    uniform = np.full(size, 1 / size, dtype=dtype)
+    template, arrays = build_rollout(
+        "fixed-gfe", steps=1, d=uniform, A=identity, c=uniform.copy(),
+        e=np.array([0.5, 0.5], dtype=dtype), Bs=np.stack((identity, identity[::-1])),
+    )
+    template.constraints.append(
+        ConstraintSpec(ConstraintKind.P_SUBSTITUTION, "tm1", (("substituted_role", "out"),))
+    )
+    return template, arrays
+
+
+@pytest.mark.parametrize(
+    "blob,column,diagnostic",
+    [
+        ("A", (slice(None), 0), "factor 'obs1': matrix"),
+        ("c", slice(None), "factor 'goal1': statistic"),
+        ("Bs", (1, slice(None), 0), r"factor 'tm1': matrices\[u=1\]"),
+        ("d", slice(None), "factor 'prior': statistic"),
+    ],
+)
+@pytest.mark.parametrize("pair", [(-0.2, 1.2), (np.nan, 1.0), (np.inf, -np.inf)])
+def test_fixed_probability_packing_rejects_invalid_entries(blob, column, diagnostic, pair):
+    template, arrays = fixed_gfe_rollout()
+    arrays[blob][column] = pair
+    with pytest.raises(compiler.CompileError, match=diagnostic + ".*finite nonnegative"):
+        compiler.compile_template(template, arrays=arrays)
+
+
+def test_persisted_fixed_goal_rejects_negative_mass(tmp_path):
+    template, arrays = model("gfe")
+    arrays["c"] = np.array([-0.2, 1.2], dtype=np.float32)
+    for name, ref in template.blobs.items():
+        np.save(tmp_path / ref.path, arrays[name])
+    diagnostic = "factor 'goal': statistic.*finite nonnegative"
+    with pytest.raises(compiler.CompileError, match=diagnostic):
+        compiler.compile_template(from_json(to_json(template)), root=tmp_path)
+    # Saving validates the complete archive through the public bundle reader.
+    path = tmp_path / "invalid.cffgz"
+    with pytest.raises(BundleError, match=diagnostic):
+        save_bundle(path, template, arrays)
+    assert not path.exists()
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_fixed_gfe_large_sparse_probabilities_preserve_log_support(dtype):
+    template, arrays = fixed_gfe_rollout(32, dtype)
+    arrays["A"][:3, 0] = dtype(1 / 3)
+    arrays["c"][:] = 0
+    arrays["c"][:3] = dtype(1 / 3)
+    arena = compiler.compile_template(template, arrays=arrays)
+    for blob, key in (
+        ("A", "gfe:32x32:A"),
+        ("c", "gfe:32x32:c"),
+        ("Bs", "gfeTM:32x32x2:B"),
+    ):
+        values = arrays[blob].astype(np.float64)
+        expected = np.full_like(values, NEG)
+        np.log(values, out=expected, where=values > 0)
+        np.testing.assert_array_equal(arena.log_params[key][0], expected)
+
+    # Even negative mass too small to affect the rounded total is invalid.
+    arrays["c"][-1] = np.nextafter(dtype(0), dtype(-1))
+    with pytest.raises(compiler.CompileError, match="factor 'goal1': statistic.*nonnegative"):
+        compiler.compile_template(template, arrays=arrays)
 
 
 def test_precision_requirements_and_specialized_conditioning_rejection():

@@ -32,7 +32,7 @@ def _pack(role, spec):
             columns = np.moveaxis(value, spec.probability_axis, 0).reshape(
                 value.shape[spec.probability_axis], -1
             )
-            _stochastic(name, columns)
+            _stochastic(name, columns, role=role)
             if spec.permutation:
                 value = value.transpose(spec.permutation)
             rows.append(_log_of(value))
