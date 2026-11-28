@@ -206,6 +206,16 @@ def _merged_row(receiver, donor, reset):
     return MixedBank(*fields, receiver.active, carry=layout.unflatten(lo))
 
 
+def _validated_merge(receiver, donor, reset):
+    try:
+        merged = _merged_row(receiver, donor, reset)
+    except ArithmeticError:
+        return None
+    if not bool(validate_bank(jax.tree.map(lambda a: a[None], merged))):
+        return None
+    return merged
+
+
 @dataclass(frozen=True, slots=True, init=False, eq=False)
 class ComponentBank:
     """An immutable mixed posterior, reset priors and slot identities.
@@ -310,11 +320,8 @@ class ComponentBank:
         r = jax.tree.map(lambda a: a[i], self.posterior)
         d = jax.tree.map(lambda a: a[j], self.posterior)
         reset = jax.tree.map(lambda a: a[j], self.reset_prior)
-        try:
-            merged = _merged_row(r, d, reset)
-        except ArithmeticError:
-            return SlotResult(self, SlotStatus.INVALID_POSTERIOR, None)
-        if not bool(validate_bank(jax.tree.map(lambda a: a[None], merged))):
+        merged = _validated_merge(r, d, reset)
+        if merged is None:
             return SlotResult(self, SlotStatus.INVALID_POSTERIOR, None)
         dormant = reset._replace(active=jnp.asarray(False))
         posterior = jax.tree.map(lambda a, b, c: a.at[i].set(b).at[j].set(c),

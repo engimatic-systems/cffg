@@ -11,7 +11,7 @@ from cffg import component_bank_device as device
 from cffg.component_bank import ComponentBank, SlotStatus
 from cffg.mixed_learning import MixedBank, MixedBatch
 from cffg.mixed_state import MixedCarry
-from test_component_bank import assert_same, exact, prior
+from test_component_bank import assert_same, exact, prior, rational_merge
 
 
 _merge = jax.jit(device.propose_merge)
@@ -196,30 +196,140 @@ def test_vmap_birth_keeps_full_or_contaminated_bank_unchanged():
         array_equal(jax.tree.map(lambda x: x[i], result.bank), expected)
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
-def test_unresolved_prior_subtraction_uses_explicit_range_status(dtype):
-    # Donor prior m=1, kappa=2 and one point at zero give true posterior
-    # m=2/3 and psi=5/3. The receiver is already centered at that datum.
-    # Source pairs for the two repeating fractions have independent tails.
-    p = MixedBank(np.array([[0], [1]], dtype), np.array([1, 2], dtype),
-                  np.ones((2, 1, 1), dtype), np.array([4, 4], dtype),
-                  np.ones(2, dtype), (), np.ones(2, bool))
-    record = ComponentBank(p).state_dict(exact=True)
-    for name, location, value in (("mu", (1, 0), Fraction(2, 3)),
-                                  ("psi", (1, 0, 0), Fraction(5, 3))):
+def proposal_bank(dtype, *, shared_center=False, offset=0):
+    """Four occupied scalar interaction rules, with six categorical heads."""
+    p = MixedBank(np.array([[offset], [offset + 1], [offset], [offset]], dtype),
+                  np.array([1, 2, 1, 1], dtype), np.ones((4, 1, 1), dtype),
+                  np.full(4, 4, dtype), np.ones(4, dtype),
+                  tuple(np.ones((4, 2), dtype) for _ in range(6)), np.ones(4, bool))
+    state = ComponentBank(p).state_dict(exact=True)
+    def set_value(name, loc, value):
         high = dtype(float(value))
-        record["posterior/" + name][location] = high
-        record["posterior/carry_" + name][location] = dtype(float(value - Fraction(float(high))))
-    for name in ("kappa", "nu", "alpha"):
-        record["posterior/" + name][1] += 1
-    host = ComponentBank.from_state_dict(record)
-    assert host.propose_merge(host.reference(0), host.reference(1)).status == SlotStatus.OK
-    b = device.from_host(host)
-    result = merge(b)
-    assert result.status == device.Status.NUMERICAL_RANGE
-    array_equal(result.bank, b)
-    original = device.to_host(result.bank)
-    retry = original.propose_merge(original.reference(0), original.reference(1))
-    assert retry.status == SlotStatus.OK
-    expected = host.propose_merge(host.reference(0), host.reference(1)).bank
-    assert_same(retry.bank.state_dict(exact=True), expected.state_dict(exact=True))
+        state["posterior/" + name][loc] = high
+        state["posterior/carry_" + name][loc] = dtype(float(value - Fraction(float(high))))
+
+    if shared_center:
+        # A tiny responsibility at the prior center leaves the mean fixed.
+        # The non-dyadic displacement also exercises error in the outer product.
+        prior_mean = dtype(offset + 0.3)
+        state["prior/mu"][1] = state["posterior/mu"][1] = prior_mean
+        mass = Fraction(float(np.finfo(dtype).eps)) / 512
+        for name in ("kappa", "nu", "alpha"):
+            state["posterior/carry_" + name][1] = dtype(float(mass))
+    else:
+        # Prior mean 1, kappa 2, scale 1 and a point at zero.
+        set_value("mu", (1, 0), offset + Fraction(2, 3))
+        set_value("psi", (1, 0, 0), Fraction(5, 3))
+        mass = Fraction(1)
+        for name in ("kappa", "nu", "alpha"):
+            state["posterior/" + name][1] += 1
+    # A subset of observed categorical heads, unequal donor and receiver counts.
+    for h in (0, 1, 3, 4, 5):
+        set_value(f"category_{h}", (1, int(h == 3)), 1 + mass)
+        state[f"posterior/category_{h}"][0, 0] += 1
+    state["posterior/alpha"][0] += 1
+    return ComponentBank.from_state_dict(state)
+
+
+def assert_rational_result(source, result, receiver=0, donor=1):
+    assert result.status == device.Status.OK
+    post = result.bank.posterior
+    before = source.posterior
+    target = rational_merge(source, receiver, donor)
+    eps = Fraction(float(np.finfo(post.mu.dtype).eps))
+    fields = lambda b: MixedCarry(*(getattr(b, field) for field in MixedCarry._fields))
+    for hi, lo, old_hi, old_lo, want in zip(
+            jax.tree.leaves(fields(post)), jax.tree.leaves(post.carry),
+            jax.tree.leaves(fields(before)), jax.tree.leaves(before.carry),
+            jax.tree.leaves(target), strict=True):
+        got = exact(hi[receiver], lo[receiver])
+        original = exact(old_hi[receiver], old_lo[receiver])
+        magnitude = np.minimum(abs(want), abs(want - original))
+        assert np.all(abs(got - want) <= 4 * eps * magnitude)
+    exact_host = source.propose_merge(source.reference(receiver), source.reference(donor))
+    assert exact_host.status == SlotStatus.OK
+    # Both donor words, all unaffected parameters, identity metadata and priors.
+    rest = [i for i in range(len(source.logical_ids)) if i != receiver]
+    expected = device.from_host(exact_host.bank)
+    array_equal(jax.tree.map(lambda x: x[np.array(rest)], post),
+                jax.tree.map(lambda x: x[np.array(rest)], expected.posterior))
+    array_equal(result.bank._replace(posterior=expected.posterior), expected)
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_compiled_batch_and_exact_selected_pair_against_rational(dtype):
+    hosts = [proposal_bank(dtype, offset=32, shared_center=True), proposal_bank(dtype)]
+    banks = [device.from_host(h) for h in hosts]
+    refs = [(device.reference(b, 0), device.reference(b, 1)) for b in banks]
+    stack = lambda xs: jax.tree.map(lambda *parts: jnp.stack(parts), *xs)
+    together = jax.jit(jax.vmap(device.propose_merge))(
+        stack(banks), stack([r for r, d in refs]), stack([d for r, d in refs]))
+    np.testing.assert_array_equal(together.status, [device.Status.OK, device.Status.NUMERICAL_RANGE])
+    for n, (host, bank, (receiver, donor)) in enumerate(zip(hosts, banks, refs, strict=True)):
+        single = _merge(bank, receiver, donor)
+        array_equal(single, jax.tree.map(lambda x: x[n], together))
+        if single.status == device.Status.NUMERICAL_RANGE:
+            array_equal(single.bank, bank)
+            assert single.component.slot == -1
+            single = device.propose_merge_exact(bank, receiver, donor)
+            expected = host.propose_merge(host.reference(0), host.reference(1)).bank
+            array_equal(single.bank, device.from_host(expected))
+            # These small nonzero transfers are properties of the two stored words.
+            target = rational_merge(host, 0, 1)
+            assert target.mu.item() != 0 and target.psi.item() != 1
+        assert_rational_result(host, single)
+
+
+def test_exact_selected_pair_refuses_stale_and_invalid_candidate():
+    bank = device.from_host(proposal_bank(np.float32))
+    receiver, donor = device.reference(bank, 0), device.reference(bank, 1)
+    stale = donor._replace(generation=donor.generation + 1)
+    for ref, status in ((receiver, device.Status.SAME_COMPONENT), (stale, device.Status.STALE_REFERENCE)):
+        declined = device.propose_merge_exact(bank, receiver, ref)
+        assert declined.status == status and declined.component.slot == -1
+        array_equal(declined.bank, bank)
+    # Proper source rows, but subtracting the large donor prior scale yields
+    # a negative proposed receiver scale.
+    bad = bank._replace(prior=bank.prior._replace(psi=bank.prior.psi.at[1, 0, 0].set(16)))
+    declined = device.propose_merge_exact(bad, receiver, donor)
+    assert declined.status == device.Status.INVALID_POSTERIOR and declined.component.slot == -1
+    array_equal(declined.bank, bad)
+
+
+@pytest.mark.parametrize(("outcome", "expected", "retries"), [
+    (0, ["accepted", "accepted", "inactive"], 1),
+    (1, ["rejected", "accepted", "rejected"], 2),
+])
+def test_scientific_sequence_scores_exact_retry(outcome, expected, retries):
+    from test_axiom_reduction import bmr, scalar_score, tape
+
+    host = proposal_bank(np.float32)
+    data = tape(outcome, np.float32)
+    pairs = np.array([[0, 1], [2, 3], [0, 1]])
+    final, _, _, decisions = bmr.reduce_on_tape(host, data, pairs)
+    assert [d.status for d in decisions] == expected
+    bank = device.from_host(host)
+    used = 0
+    for decision in decisions:
+        i, j = decision.receiver, decision.donor
+        r, d = device.reference(bank, i), device.reference(bank, j)
+        if r.slot < 0 or d.slot < 0:
+            assert decision.status == "inactive"
+            continue
+        trial = _merge(bank, r, d)
+        if trial.status == device.Status.NUMERICAL_RANGE:
+            array_equal(trial.bank, bank)
+            used += 1
+            trial = device.propose_merge_exact(bank, r, d)
+        assert trial.status == device.Status.OK
+        before, _ = scalar_score(device.to_host(bank), data)
+        proposed, _ = scalar_score(device.to_host(trial.bank), data)
+        np.testing.assert_allclose([before, proposed], [decision.before, decision.proposed],
+                                   atol=2e-12, rtol=0)
+        if proposed >= before:
+            assert decision.status == "accepted"
+            bank = trial.bank
+        else:
+            assert decision.status == "rejected"
+    assert used == retries
+    array_equal(bank, device.from_host(final))

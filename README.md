@@ -778,6 +778,14 @@ occupancy. Pass `exact=True` when later updates or merges must reproduce the
 uninterrupted result. `ComponentBank.from_state_dict(snapshot)` also reads
 exact lifecycle snapshots created before the compact option was introduced.
 
+For a model-requested merge, a compiled `component_bank_device.propose_merge`
+can return `NUMERICAL_RANGE` when cancellation obscures a tiny change.
+At the host boundary, call `component_bank_device.propose_merge_exact` with
+the same bank and references. It transfers the two learned rows and the
+donor reset row, computes their exact rational combination, and returns a
+two-word candidate if the result is representable. Apply the model's usual
+acceptance score to an `OK` candidate.
+
 For fixed-structure parameter sweeps that are not declared learning,
 `set_params` updates named runtime parameters without recompiling. Shapes,
 factor roles, probability normalization, covariance validity, and tied blobs

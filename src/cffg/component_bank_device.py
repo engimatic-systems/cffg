@@ -17,17 +17,12 @@ exact host operation on the unchanged snapshot. At the host boundary::
 
     proposal = propose_merge(bank, receiver, donor)
     if int(proposal.status) == Status.NUMERICAL_RANGE:
-        original = to_host(proposal.bank)
-        retry = original.propose_merge(original.reference(int(receiver.slot)),
-                                       original.reference(int(donor.slot)))
-        if retry.status == SlotStatus.OK and model_accepts(retry.bank):
-            bank = from_host(retry.bank)
+        proposal = propose_merge_exact(bank, receiver, donor)
+    if int(proposal.status) == Status.OK and model_accepts(proposal.bank):
+        bank = proposal.bank
 
-Here SlotStatus comes from cffg.component_bank and model_accepts is the
-caller's ordinary acceptance test. A host-only model can call the exact
-ComponentBank.propose_merge directly. The exact conversion preserves both
-parameter words and all identity metadata. The retry crosses the host
-boundary for the bank; its merger arithmetic uses just the selected rows.
+The host retry reads the receiver, donor and donor reset rows. The other
+rows stay on device. A host-only model can use ComponentBank.propose_merge.
 """
 
 from __future__ import annotations
@@ -40,7 +35,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from cffg._compensated import _two_sum
-from cffg.component_bank import ComponentBank, _snapshot
+from cffg.component_bank import ComponentBank, _snapshot, _validated_merge
 from cffg.mixed_scoring import validate_bank
 from cffg.mixed_state import MixedBank, MixedCarry
 
@@ -273,24 +268,29 @@ def _merge_rows(receiver, donor, reset):
     r, d, p = map(_row_fields, (receiver, donor, reset))
     def count(a, b, c):
         value, increment = _transfer(a, b, c)
-        return value, (_resolved(value, increment)
+        return value, increment, (_resolved(value, increment)
                        & jnp.all((increment.hi > 0) | ((increment.hi == 0) & (increment.lo >= 0))))
 
-    k, ok_k = count(r.kappa, d.kappa, p.kappa)
-    nu, ok_n = count(r.nu, d.nu, p.nu)
-    alpha, ok_a = count(r.alpha, d.alpha, p.alpha)
+    k, excess_k, ok_k = count(r.kappa, d.kappa, p.kappa)
+    nu, _, ok_n = count(r.nu, d.nu, p.nu)
+    alpha, _, ok_a = count(r.alpha, d.alpha, p.alpha)
     ok = ok_k & ok_n & ok_a
     categories = []
     for three in zip(r.categories, d.categories, p.categories, strict=True):
-        value, valid = count(*three)
+        value, _, valid = count(*three)
         categories.append(value)
         ok &= valid
 
     dd = _sub(d.mu, r.mu)
     pd = _sub(p.mu, r.mu)
-    delta = _div(_sub(_mul(d.kappa, dd), _mul(p.kappa, pd)), k)
+    # Equal donor/prior centers share the same outer product. Subtract the
+    # weights first so a small fractional count survives the transfer.
+    same_center = jnp.all(d.mu.hi == p.mu.hi) & jnp.all(d.mu.lo == p.mu.lo)
+    donor_weight = jax.tree.map(lambda e, w: jnp.where(same_center, e, w), excess_k, d.kappa)
+    prior_weight = jax.tree.map(lambda w: jnp.where(same_center, 0, w), p.kappa)
+    delta = _div(_sub(_mul(donor_weight, dd), _mul(prior_weight, pd)), k)
     mu = _add(r.mu, delta)
-    scatter = _sub(_mul(d.kappa, _outer(dd)), _mul(p.kappa, _outer(pd)))
+    scatter = _sub(_mul(donor_weight, _outer(dd)), _mul(prior_weight, _outer(pd)))
     increment = _add(_sub(d.psi, p.psi), _sub(scatter, _mul(k, _outer(delta))))
     psi = _add(r.psi, increment)
     gaussian_unchanged = jnp.asarray(True)
@@ -324,6 +324,48 @@ def _live(bank, ref):
             & jnp.all(ref.generation == current.generation))
 
 
+@jax.jit
+def _pair_status(bank, receiver, donor):
+    live = _live(bank, receiver) & _live(bank, donor)
+    return jnp.where(~live, Status.STALE_REFERENCE,
+                     jnp.where(receiver.slot == donor.slot, Status.SAME_COMPONENT, Status.OK)).astype(jnp.int32)
+
+
+@jax.jit
+def _selected_rows(bank, i, j):
+    return (jax.tree.map(lambda x: x[i], bank.posterior),
+            jax.tree.map(lambda x: x[j], bank.posterior),
+            jax.tree.map(lambda x: x[j], bank.prior))
+
+
+@jax.jit
+def _install(bank, i, j, merged, reset):
+    dormant = reset._replace(active=jnp.asarray(False))
+    post = jax.tree.map(lambda x, a, b: x.at[i].set(a).at[j].set(b),
+                        bank.posterior, merged, dormant)
+    return bank._replace(posterior=post, logical_ids=bank.logical_ids.at[j].set(0))
+
+
+def propose_merge_exact(bank: DeviceBank, receiver: Reference, donor: Reference) -> Result:
+    """Host-boundary retry for a requested pair, using both words of three rows.
+
+    The result has the same identity and rollback semantics as propose_merge.
+    The caller applies its ordinary model score to the candidate. In batched
+    use, retry only the members whose compiled status is NUMERICAL_RANGE.
+    """
+    status = _pair_status(bank, receiver, donor)
+    if int(status) != Status.OK:
+        return Result(bank, status, _missing())
+    i, j = receiver.slot, donor.slot
+    rows = _selected_rows(bank, i, j)
+    inputs = jax.tree.map(lambda *xs: jnp.stack(xs), *rows)
+    if bool(validate_bank(inputs._replace(active=jnp.ones(3, bool)), for_checkpoint=True)):
+        merged = _validated_merge(*jax.device_get(rows))
+        if merged is not None:
+            return Result(_install(bank, i, j, merged, rows[2]), status, receiver)
+    return Result(bank, jnp.int32(Status.INVALID_POSTERIOR), _missing())
+
+
 def propose_merge(bank: DeviceBank, receiver: Reference, donor: Reference) -> Result:
     """Propose a prior-subtracted NIW/Dirichlet merge, or return the original state.
 
@@ -333,22 +375,14 @@ def propose_merge(bank: DeviceBank, receiver: Reference, donor: Reference) -> Re
     The exact selected-row host merge remains available for these inputs.
     INVALID_POSTERIOR identifies invalid component parameters.
     """
-    live = _live(bank, receiver) & _live(bank, donor)
-    status = jnp.where(~live, Status.STALE_REFERENCE,
-                       jnp.where(receiver.slot == donor.slot, Status.SAME_COMPONENT, Status.OK)).astype(jnp.int32)
+    status = _pair_status(bank, receiver, donor)
     def calculate():
         i, j = receiver.slot, donor.slot
-        r = jax.tree.map(lambda x: x[i], bank.posterior)
-        d = jax.tree.map(lambda x: x[j], bank.posterior)
-        p = jax.tree.map(lambda x: x[j], bank.prior)
+        r, d, p = _selected_rows(bank, i, j)
         merged, outcome = _merge_rows(r, d, p)
 
         def accept():
-            dormant = p._replace(active=jnp.asarray(False))
-            post = jax.tree.map(lambda x, a, b: x.at[i].set(a).at[j].set(b),
-                                bank.posterior, merged, dormant)
-            new = bank._replace(posterior=post, logical_ids=bank.logical_ids.at[j].set(0))
-            return Result(new, outcome, receiver)
+            return Result(_install(bank, i, j, merged, p), outcome, receiver)
 
         return jax.lax.cond(outcome == Status.OK, accept, lambda: Result(bank, outcome, _missing()))
     return jax.lax.cond(status == Status.OK, calculate, lambda: Result(bank, status, _missing()))
