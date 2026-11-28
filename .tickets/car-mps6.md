@@ -48,3 +48,7 @@ Published-main audit after #207, a774a54. AC1 has exact small motion and 500-row
 **2026-11-28T04:29:12Z**
 
 The independent count trace now covers two repeated contacts, both tracked slots per contact, all six categorical heads (own type, other type, visible, applied action, reward and motion switch), and a vacant component. Identical occupied rows give the hand-computed assignment one half to each. Starting from two previous observations per component, the oracle discounts old excess and adds the known bin in physical slot order, checking every bin after each frame. The outcomes are hidden in the next contextual query. The expected bins and counts are computed without calling a CFFG scorer or updater. Together with the positive/negative contact prediction in test_axiom_rollout and the verified reduction checks, this completes the module criteria. Both precisions passed the new targeted check in 18.08 s; the slow float64 variant remains available explicitly. Only synthetic inputs were used; the parent coordinates the final integrated short-suite gate.
+
+**2026-11-28T05:26:42Z**
+
+The canonical integrated gate on fd9a0f7 passed all 2,844 selected tests in 455.037 seconds with four workers. The opt-in float64 six-head trace also passed in the focused run recorded above.
