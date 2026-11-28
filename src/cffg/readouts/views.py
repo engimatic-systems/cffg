@@ -3,12 +3,16 @@
 from collections.abc import Mapping
 from typing import Protocol
 
+from cffg._immutable import FrozenArray
+from cffg.core.ir import PortSpec
 from cffg.compiled import (
+    ConstraintPlan,
     DirichletGroupPlan,
     EdgeInfo,
     EfGroupPlan,
     GaussGroupPlan,
     GfePlan,
+    GfeTmPlan,
     GoalParameterPlan,
     GroupPlan,
     HybridGfePlan,
@@ -33,6 +37,38 @@ class NodeView(MessageLayout, Protocol):
 
     @property
     def dirichlet_groups(self) -> tuple[DirichletGroupPlan, ...]: ...
+
+
+class SensingView(EdgesView, NodeView, Protocol):
+    @property
+    def endpoints(self) -> Mapping[str, tuple[tuple[str, str], ...]]: ...
+
+    @property
+    def ports(self) -> Mapping[str, PortSpec]: ...
+
+    @property
+    def data_slots(self) -> Mapping[str, int]: ...
+
+    @property
+    def message_starts(self) -> FrozenArray: ...
+
+    @property
+    def semiring(self) -> str: ...
+
+    @property
+    def gfe_groups(self) -> tuple[GfePlan, ...]: ...
+
+    @property
+    def gfe_tm_groups(self) -> tuple[GfeTmPlan, ...]: ...
+
+    @property
+    def hybrid_gfe_groups(self) -> tuple[HybridGfePlan, ...]: ...
+
+    @property
+    def constraint_groups(self) -> tuple[ConstraintPlan, ...]: ...
+
+    @property
+    def delta_pairs(self) -> FrozenArray: ...
 
 
 class GoalView(Protocol):

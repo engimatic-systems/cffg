@@ -34,6 +34,7 @@ Paired paths:
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import replace
 from functools import cached_property
 from math import isfinite
@@ -84,6 +85,7 @@ from cffg.readouts import hybrid as _hybrid_readouts
 from cffg.readouts import parameters as _parameters_readouts
 from cffg.readouts import recurrence as _recurrence_readouts
 from cffg.readouts import registered as _registered_readouts
+from cffg.readouts import sensing as _sensing_readouts
 from cffg.readouts.selection import EdgeSelection
 from cffg.readouts.types import DirichletMarginal as DirichletMarginal  # noqa: PLC0414
 from cffg.readouts.types import EfMarginal as EfMarginal  # noqa: PLC0414
@@ -582,6 +584,10 @@ class Engine:
     def marginals(self, state: State, edges: EdgeSelection = None) -> dict[str, np.ndarray]:
         """Categorical probabilities for all edges or the named subset, in first-occurrence order."""
         return _discrete_readouts.marginals(self.arena, state, edges=edges)
+
+    def eig(self, state: State, query_edge: str, ports: Iterable[str] | str) -> dict[str, float]:
+        """Mutual information in nats between a categorical query and each missing DATA port."""
+        return _sensing_readouts.information_gain(self.arena, state, query_edge, ports)
 
     def node_beliefs(self, state: State) -> dict[str, np.ndarray]:
         """Factor name -> the node belief q_a, the object conjugate updates
