@@ -47,3 +47,9 @@ These are suggestions; another method is acceptable if it satisfies the outcomes
 Target: the declared posterior distribution. Degenerate weights: probability mass concentrated on too few or no valid particles. Continuation: subsequent learning after restoring saved state.
 
 Shared terms: CFFG means constrained Forney-style factor graph; JAX is the numerical array/compiler library; dtype is a numeric storage type; free energy is the model's inference objective; host/JIT compares Python-side and compiled execution; single/vmap compares one instance with vectorized instances; N/A means not applicable.
+
+## Notes
+
+**2026-11-28T05:01:55Z**
+
+Bounded v1 from D6d: independent positive beta shapes on finite box intervals, identifiable versioned mean implementation, known SPD Gaussian observation covariance, explicit applied inputs, missing event is a no-op. Carry normalized host log weights; calculate source-dtype native normalized likelihood, deterministic-policy ESS stratified sampling and a fixed transformed-space MH kernel on BOTH paths. Retain all observed events and the complete key/counter; any unsupported target fails before consuming the key. Freeze continuation bit parity under same backend. Gaussian 64-node reference absolute budget 64 dtype eps; two-mode 128/1280 particle checks on 48 declared seeds use <=6 empirical SE and abs bounds [.05 times Z,.03,.03,.05] for Z, mean, second moment and side mass. 128 newly simulated data sets check 4-SE calibration of median and mean posterior rank. Include zero finite population vs provable impossibility, cross-method support, corrupted covariance/model/version/keys and a restart across a resampling event. Exact posterior or evidence is not claimed for a single continuous run.

@@ -1394,6 +1394,120 @@ production local solver.
 
 ---
 
+## D6d. Static nonlinear parameter inference with particles
+
+Suppose a sensor measures an effect of an unknown physical parameter.
+`FiniteHypotheses` answers an exact question when the prior itself has
+only the listed possibilities. A continuous parameter can have values
+between them. Drawing sample values from its prior represents that
+continuum approximately. Resampling copies plausible draws. A proposed
+move to a new value needs to explain **all** the readings acquired so far.
+
+**Target.** The first continuous contract uses independent proper beta
+priors on declared finite intervals, and normalized Gaussian observations
+with known positive-definite covariance. A deterministic, versioned
+model maps each physical parameter vector and recorded input to the
+conditional observation mean. Inputs, actions and missingness are
+conditioned upon. An observation interval that is itself informative
+would require an explicit sampling model. For observations through event
+t, write
+
+    L_t(θ) = Normal(y_t | f(θ,x_t), R_t)
+    γ_t(θ) = p_0(θ) × product of observed L_s(θ) through t
+    Z_t = integral γ_t(θ) dθ,    π_t = γ_t / Z_t.
+
+The Gaussian normalization contributes to evidence, including when it
+cancels in posterior odds. A general approximate graph free energy cannot
+replace the conditional log likelihood in this identity. A missing reading
+has likelihood one and consumes no event or random draw in this contract.
+
+For each coordinate use θ_j = l_j + (u_j−l_j) sigmoid(z_j), with
+u_j > l_j. Define the beta prior on the unit fraction. In z coordinates
+the interval width in the Jacobian cancels the inverse width of its
+physical prior density. The log prior plus Jacobian then contributes
+a_j log sigmoid(z_j) + b_j log sigmoid(−z_j) − log Beta(a_j,b_j).
+This admits only the declared open interval and includes the volume
+correction once. External clipping would change the target.
+
+**One observation.** Initialize independent draws from the prior with
+weights 1/N and evidence 1. Use the existing normalized weights W_i to
+compute c_t = Σ_i W_i L_t(θ_i) by log-sum-exp. Accumulate log c_t once,
+then weight each draw by W_i L_t(θ_i)/c_t. Compute ESS = 1/Σ_i W_i².
+If ESS falls below a declared fraction of N, draw one independent uniform
+in each stratum [j/N,(j+1)/N), look it up in the cumulative weights and
+give each selected child weight 1/N. Its expected offspring counts,
+conditional on those weights, are N W_i. Otherwise retain the weighted
+population. Saving a special place for the best draw changes those counts.
+
+After either branch apply the **same** Metropolis kernel to each draw.
+Use a symmetric Gaussian random walk in z whose scale and number of
+proposals were set before seeing the population. Accept with probability
+
+    min(1, γ_t(θ') |dθ'/dz'| / [γ_t(θ) |dθ/dz|]).
+
+Rejection keeps the previous parameter. The accepted and rejected outcomes
+both retain their incoming weight. Symmetry gives detailed balance because
+each direction transports the smaller of the two unnormalized target
+densities times the common proposal density. A move must reevaluate the
+likelihood of the retained observations or an exactly sufficient summary.
+Reusing the old proposal's cached likelihood evaluates a different target.
+
+**Which evidence is unbiased?** Let M_t be this data-defined kernel and
+let η_t^N denote the weighted empirical measure after the move. Conditional
+on the previous particles, in *both* resampling branches the expectation
+of the new unnormalized estimate on any test function g is
+
+    Zhat_(t−1) η_(t−1)^N [ L_t M_t g ].
+
+Induction from independent prior draws, and π_t M_t = π_t, give
+E[Zhat_t η_t^N(g)] = ∫ γ_t g. In particular E[Zhat_t] = Z_t in exact
+arithmetic. Self-normalized posterior estimates and individual evidence
+ratios can be biased at finite N. Jensen gives E[log Zhat_t] ≤ log Z_t.
+Neither resampling nor a move adds a second evidence increment.
+
+Even a valid Metropolis move can break this proof if applied only when
+the sampled ESS is low. With two particles, prior P(1)=1/4, first
+likelihood potentials (1,2), then (0,1), the true normalizer is 1/2.
+A symmetric flip at the first posterior accepts with probabilities
+2/3 from 0 and 1 from 1. Using that flip in both branches preserves the
+expected estimate of 1/2. Moving only mixed initial samples, the only
+ones resampled at ESS < 1.9, gives 1/4. The historical PCGym prototype
+keeps an elite and jitters the other resampled parameters. Its resultant
+ensemble has a distinct search interpretation.
+
+**Failure and restart.** Exact log zero denotes an excluded outcome.
+When all sampled likelihoods vanish, the estimated evidence is zero.
+This establishes a lack of sample support. Claiming true impossibility
+requires a separate support proof. Keep zero estimates in ensemble
+evidence averages. Invalid NaN or positive infinite evaluations, malformed
+covariance and unrepresentable finite log densities fail atomically.
+Retain the last committed state on failure and expose the failed step and
+its reason. Keep log weights even when a probability readout rounds to
+zero. Rejecting an out-of-support proposal leaves its parent in place.
+
+A checkpoint binds the prior, transformation, registered mean identity
+and version, covariance, observation dtype, population size and kernel
+configuration. It retains the applied input/observation history, particles
+in z, normalized log weights, accumulated log evidence, event counter and
+the explicit random key. A restored run on the same backend must reproduce
+the next ancestors, proposals and accepted particles. Use separate keys
+for prior draws, stratified positions, proposals and acceptance uniforms.
+With t observations and N particles, a move costs O(Nt) likelihood
+evaluations without an exact sufficient statistic. A bounded history that
+drops old observations changes this target.
+
+**Executable reference.** `tests/test_static_particle_derivation.py` checks
+nonlinear Gaussian evidence against numerical integration and the existing
+finite-bank likelihood. A second likelihood, 4θ(1−θ) for a binary
+success, gives an exact polynomial integration oracle and two
+indistinguishable parameter values. It checks the transformed density,
+finite-population means and evidence with 128 and 1,280 particles, and
+rank calibration on 128 simulated prior-predictive data sets. These
+experiments establish tolerances for this fixture. The proof above gives
+the evidence result under the stated assumptions.
+
+---
+
 ## D7 — Mixed-GFE outer stationarity and globalization (cff-wafy, cff-weff)
 
 ### D7.1 The plain-English version
