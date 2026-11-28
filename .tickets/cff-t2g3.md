@@ -15,7 +15,7 @@ parent: cff-21ta
 
 This task owns the CFFG-controlled simglucose experiment tracked by parent epic `cff-21ta`. The reference benchmark in `src/cffg/benchmarks/glucose.py` uses ten adults, three scheduled meals, and 24-hour episodes. Its ReactiveController recorded 87.6% time in range and 1.7% time below range. That result is useful for the reference protocol, but it does not measure Cooper's requested experiment.
 
-Cooper's experiment uses adults and adolescents, eight-hour episodes, and meals that are not announced to the controller. The evaluated controller adjusts basal insulin and does not administer bolus insulin. Cooper's earlier hand-tuned work recorded 67% time in range with zero critical episodes on this protocol. This task must beat that time-in-range result without introducing a critical episode. The numeric critical-episode threshold and required duration remain undefined, so Cooper must confirm them before the final evaluation protocol is encoded.
+Cooper's experiment uses adults and adolescents, eight-hour episodes, and meals that are not announced to the controller. The evaluated controller adjusts basal insulin and does not administer bolus insulin. Cooper's earlier hand-tuned work recorded 67% time in range with zero critical episodes on this protocol. This task must beat that time-in-range result without introducing a critical episode. Cooper recalled the simulator signalling an extreme on either side and referred us to its source for the values. The prospective benchmark will use the native simglucose termination rule. The historical 67% result and zero critical episodes remain user-reported; the old scoring code has not been verified.
 
 The controller must demonstrate continual learning through an inspectable CFFG model and a modular physiological model. The reference benchmark lacks the adolescent cohort, eight-hour evaluation protocol, and critical-episode counter, so this task owns those benchmark extensions as well as the controller.
 
@@ -28,7 +28,7 @@ The task depends on `cff-5edo`, which owns convergence and cost for planning bey
    1.2. Each scored episode lasts eight virtual hours, and the recorded evaluation set states its start times, meal timing and amounts, and simulator seeds.
    1.3. The controller receives glucose-sensor observations without meal events, meal amounts, or future meal schedules.
    1.4. The controller's permitted insulin actions adjust basal delivery; every scored bolus action is zero.
-   1.5. Cooper's confirmed critical-episode threshold and duration are recorded in this ticket before final evaluation, then encoded in the benchmark counter and tests.
+   1.5. Count a started episode once at the first native simglucose termination: interval-average model glucose strictly below 10 or strictly above 600 mg/dL. One violating step suffices. Record the step, direction and glucose value. Ordinary eight-hour completion contributes zero critical episodes. Keep every started episode in the outcome denominator. Include boundary and signal-selection tests.
    1.6. The benchmark records simulator blood glucose from 70 through 180 mg/dL as time in range and separately records time below range, time above range, and critical episodes.
 2. The evaluated controller satisfies the declared white-box continual-learning contract.
    2.1. The controller is a continual-learning CFFG agent with separately inspectable insulin-response and meal-response model components.
@@ -56,7 +56,7 @@ The task depends on `cff-5edo`, which owns convergence and cost for planning bey
 
 The implementer may choose another sound method. The following approach is a starting point:
 
-- Confirm the critical-episode definition with Cooper before changing the metric. Freeze and record the scored patient, episode, meal, seed, and random-key set before the final tuning round.
+- Use the pinned native environment's step.done and step.info['bg'] for this endpoint. The present adult 24-hour reference loop records the last model substep for its time-in-range metric and does not honor the native done flag. Use an explicit endpoint in the eight-hour evaluator. Freeze and record the scored patient, episode, meal, seed, and random-key set before the final tuning round.
 - Extend `src/cffg/benchmarks/glucose.py` and `tests/test_glucose.py` from the reference protocol instead of silently changing the historical 24-hour result. Keep reference and comparison protocols separately named.
 - Represent a compact physiological state with factored blood-glucose level and trend, insulin on board, and carbohydrates on board. Keep insulin-response and meal-response parameters separate and update each component from its relevant observations.
 - Consider a receding-horizon `RollingAgent` at the sensor cadence, one checkpointed agent state per patient, and `Colony` for cohort execution. Use the declared-learnables API from `cff-x0sv` for patient-specific updates.
@@ -82,7 +82,7 @@ Parent epic `cff-21ta` owns the project-level closure record after this task clo
 - **Checkpoint:** Saved per-patient agent state used to resume inference and learning.
 - **Colony:** The repository component that coordinates multiple agent instances with compatible structures.
 - **Continual learning:** Updating model parameters from new observations collected as the controller operates.
-- **Critical episode:** A serious low- or high-glucose event. Cooper must define its numeric threshold and required duration for this experiment.
+- **Critical episode:** In this simulated benchmark, an episode with a native low or high termination. The simulator evaluates its model glucose averaged over one sensor interval (three minutes with the pinned Dexcom configuration). Exactly 10 and 600 mg/dL are inside the termination bounds. The controller's noisy CGM reading is a separate signal.
 - **Epistemic planning:** Choosing actions partly for the information they are expected to reveal.
 - **Exact zero support:** A prohibited state or action represented with literal zero probability rather than a positive numeric floor.
 - **Free energy:** The CFFG objective reported by inference and used to assess convergence and policies.
@@ -110,3 +110,11 @@ THE BAR (from Cooper, 2026-07-05): his VERSES-era hand-tuned experiments = 67% T
 Bounded scan classifications: integrate=internal_component_wiring; implement=external_harness_or_planned_work_or_component_integration; provide=internal_mechanism; support=literal_probability_support; deliver=physical_insulin_administration; done=historical_implementation_complete; remaining=unfinished_required_work; close=work_item_completion; check=automated_check; converge=runtime_status_criterion; exact=literal_zero_or_identifier_precision; match=tolerance_agreement; reproduce=exact_result_and_rerunnable_artifact; sound=optional_method_choice; test=automated_execution_or_test_artifact; validate=scientific_validation; infer=state_or_policy_posterior; learn=new_evidence_accumulation_or_integrated_learning_workflow; learnable=integrated_fitting_surface; expected=mathematical_expectation; may=optional_requirement; explicit_owner=current_or_named_ticket_owner; named_ticket_handoff=concrete_current_or_future_owner; every=named_class_distributive; only=historical_hard_exclusion; current=historical_latest_evidence; complete=component_complete.
 
 Intelligible-ticket review: complete.
+
+**2026-11-28T05:33:27Z**
+
+Source verification, November 27. The lockfile selects simglucose 0.2.11 at a6f6777586c860457a2a1e6cce6d0bd3fd33d1cc. T1DSimEnv.step takes true model Gsub after each minute, separately takes a noisy CGM measurement, then compares the interval-average Gsub to its two strict termination limits. Use the native done flag and its matching info["bg"] for the prospective critical-episode count. A single endpoint excursion on either side ends that episode; no additional required duration. At 70–180 mg/dL the existing in-range metric answers a different question. Cooper described historical intent, not an exact old implementation. The earlier note mentioning 54 or 40 was a suggestion. Original historical parity remains unverified. Sources: https://github.com/jxx123/simglucose/blob/a6f6777586c860457a2a1e6cce6d0bd3fd33d1cc/simglucose/simulation/env.py#L60-L115 and https://github.com/jxx123/simglucose/blob/a6f6777586c860457a2a1e6cce6d0bd3fd33d1cc/simglucose/params/sensor_params.csv#L1-L2 . The full eight-hour study remains dependent on cff-5edo.
+
+**2026-11-28T05:33:46Z**
+
+Verified seven cases on the pinned T1DSimEnv.step using scripted minute readings and sensor CGM held at 100 mg/dL. Means 9 and 601 terminated; exact 10 and 600 did not. Minute values [4,25,25] averaged 18 and continued, [4,4,19] averaged 9 and terminated, [590,590,650] averaged 610 and terminated. Evidence ~/agent-share/cffg-glucose-endpoint/native.json. This exercises the upstream flag, without controller tuning or a scored episode.
