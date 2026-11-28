@@ -1,7 +1,7 @@
 ---
 id: cff-6s31
 status: open
-deps: [cff-cpxj, cff-d56d, cff-j7mm]
+deps: [cff-cpxj, cff-d56d, cff-j7mm, ccpr-m0bu, ccpr-u190]
 links: [cff-9xmq]
 created: 2026-07-09T22:04:18Z
 type: feature
@@ -17,7 +17,7 @@ Plate specifications keep repeated models compact on disk, but the phase-1 compi
 
 The compact path must keep phase-1 names and numerical meaning. The pixel grid, mixture bank, sensor array, resize edit, homogeneous HMM chain, tied parameters, per-copy parameters, constraints, schedules, serialization, and free-energy ledger must behave as they do after `expand_plates`. Remove the phase-1 nested-plate guard after recursive namespaces, blob inventories, compiled structure, and free energy work at nesting depth two or greater.
 
-This ticket does not redesign plate wiring. `Broadcast` continues to emit the phase-1 equality chain recorded by cff-cpxj; cff-9xmq owns the balanced-tree replacement. Unrolling also remains separate because its time slices need not be homogeneous.
+This ticket does not redesign plate wiring. `Broadcast` uses the balanced equality tree shipped by cff-9xmq. The current public expansion is the reference for names, connections and schedule depth. Unrolling also remains separate because its time slices need not be homogeneous.
 
 ## Outcomes / Acceptance Criteria
 
@@ -44,7 +44,7 @@ This ticket does not redesign plate wiring. `Broadcast` continues to emit the ph
    2.16. A `Chain` bond leaves its phase-1 boundary ports exposed.
    2.17. A `Broadcast` with one copy derives the phase-1 direct hub edge.
    2.18. A `Broadcast` with two copies derives the phase-1 ternary equality node.
-   2.19. A `Broadcast` with three or more copies derives the phase-1 linear equality chain.
+   2.19. A `Broadcast` with three or more copies derives the balanced equality tree produced by the current public expansion, including its branch order and generated names.
    2.20. `Expose` derives the same indexed parent ports as phase 1.
    2.21. A generated-name collision fails before arena allocation.
    2.22. The generated-name collision diagnostic names the colliding namespace.
@@ -169,7 +169,7 @@ This ticket does not redesign plate wiring. `Broadcast` continues to emit the ph
    9.3. `README.md` documents the unchanged plate modeling API.
    9.4. `README.md` documents the 64-by-64 compact-compilation benchmark result.
    9.5. `docs/LIMITATIONS.md` removes the phase-1 nested-plate restriction after recursive evidence passes.
-   9.6. `docs/LIMITATIONS.md` continues to identify linear `Broadcast` expansion as cff-9xmq work.
+   9.6. `docs/LIMITATIONS.md` describes the compact compiler's measured scope and the balanced `Broadcast` topology shipped by cff-9xmq.
    9.7. Focused plate, compiler, bundle, estimator, schedule, serialization, learning, runtime-status, and hostile-input tests pass.
    9.8. The dashboard-backed short suite passes after the final code change.
 
@@ -188,7 +188,7 @@ These suggestions are optional. Another method is acceptable if it satisfies the
 
 ## Future work
 
-- cff-9xmq owns replacement of the phase-1 linear `Broadcast` equality chain with a balanced tree after its cff-wbhu prerequisite.
+- cff-9xmq shipped the balanced Broadcast tree. Preserve its topology during compact compilation.
 - cff-ahps consumes compact plate compilation as part of the universal-factor-library roadmap.
 - Unrolling remains a separate mechanism under the decision recorded in cff-cpxj; no migration ticket is identified.
 - No other future work is identified.
@@ -225,3 +225,22 @@ Follow-up from cff-vamy/PR #18: phase-1 validation now rejects any PlateSpec who
 Intelligible-ticket review retained 38 scan candidates because their local meanings are bounded: `preserve` means exact serialized/value identity or the named unchanged behavior; `reusable` means a repeated fragment or shared helper; `same` means value or artifact equality under the stated comparison; `expose` means the `Expose` wiring rule or a derived parent port; `implement` means the work required by this ticket or the preserved historical plan; `support` means feasible probability states; `complete` means an exhaustive namespace/index or acceptance completion; `remaining` means a named preserved or excluded behavior; `close` means ticket closure after the listed prerequisites and outcomes; `check` means the named execution-pair or artifact comparison; `converge` means the explicit runtime status; `equivalent` means acceptance artifacts that prove the numbered outcome; `estimate` means the resource estimator; `evidence` means named tests, projections, hashes, or benchmark output; `exact` means literal sentinel/value identity or exact byte accounting; `match` means equality with the phase-1 reference; `oracle` means the test-only phase-1 expansion path; `parity` means tolerance or structural equality in the preserved note; `pass` means automated test success or message-passing terminology; `reproduce` means equal pre-save arena structure; `robust` means the repository numerical-robustness contract; `test` means a named automated fixture, trap, oracle, or selection; `validate` means PlateSpec input validation; `accumulate` means statistics from distinct plate copies entering one tied posterior; `learn` refers to the focused learning test surface; `learnable` means the declared parameter artifact and its compiled plan; `performance` means measured compile wall time; `scale` means increasing plate copy count; `speed` means row-major index ordering; `explicit_owner` identifies cff-9xmq or the complete host Template as stated; `follow_up` identifies the completed cff-vamy review note; `named_ticket_handoff` assigns balanced Broadcast work to cff-9xmq; `any` is the universal quantifier in the preserved historical note; `every` distributes over the locally named copies or arena leaves; `only` marks the test-oracle scope or the guard-lifting condition; `current` means the schema, checkpoint, or base-revision compiler path active when this ticket was rewritten; `existing` means the base-revision PlateSpec or arena builder; and `read` is part of `read-only`, meaning the suggested compiler view does not mutate its source. Capability ownership was checked separately: cff-6s31 owns compact plate compilation, recursive and N-dimensional plate grounding, analytic plate resource counts, and phase-1 parity; cff-j7mm owns the prerequisite exact compiled-arena estimator; cff-9xmq owns balanced Broadcast topology; cff-ahps owns the downstream roadmap; unrolling stays separate under cff-cpxj's recorded decision.
 
 Intelligible-ticket review: complete.
+
+**2026-11-28T05:57:48Z**
+
+The current public expansion on #217 already contains the balanced Broadcast from cff-9xmq. The implementation must preserve the actual tree and its generated names. #206 supplies the separately reviewed named-byte estimator for cff-j7mm. It is a prerequisite for storage reporting, while direct addressing can proceed on #217 now.
+
+Prerequisite --> dependent. The parent still owns every numbered acceptance item.
+
+    cff-cpxj [closed] --> ccpr-rl0k [ready: grid addressing]
+                            +--> ccpr-ojza [one-level compiler] --> ccpr-m0bu [nested models]
+                            |       ^                           |
+                            |       |                           +--> cff-6s31
+                            |  cff-d56d / cff-9xmq / cff-b2fz         |
+                            |                                         +--> cff-ahps
+                            +--> ccpr-u190 [storage counts] --------------> cff-6s31
+                                  ^
+                                  |
+                              cff-j7mm (#206)
+
+The address ticket covers 2.4–2.10, 2.15–2.16 and 7.10–7.14 together with later compiler integration. One-level compilation covers sections 2–4, applicable items of 7–8 and the compile-time measurement in 6.11–6.14. Nesting covers section 5 and the related persistence checks. Storage estimation covers 6.1–6.10, including the nested case at integration. The parent verifies documentation, final timing and the full matrix before closure.

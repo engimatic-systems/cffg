@@ -1,0 +1,44 @@
+---
+id: ccpr-rl0k
+status: in_progress
+deps: [cff-cpxj]
+links: []
+created: 2026-11-28T05:57:47Z
+type: feature
+priority: 3
+assignee: coopwilliams
+parent: cff-6s31
+tags: [plates, compiler]
+---
+# Address plate copies and neighbors without constructing an index list
+
+## Background in Plain English
+
+A plate repeats one model fragment over a grid. The current compiler first builds a list containing every coordinate. Large grids need a way to address a copy or its neighbor directly. This also gives parameter binding and the compiler one definition of copy order.
+
+## Outcomes / Acceptance Criteria
+
+1. Convert between a copy number and its complete coordinate in row-major order. The last axis varies fastest.
+2. Resolve chain neighbors for each declared axis and positive offset. Preserve the exposed ports at both ends.
+3. The standard one-level expansion and at least one other existing consumer use the same addressing rules. Looking up one address allocates space proportional to the number of axes.
+4. Reject nonpositive or nonintegral dimensions, an invalid axis or offset, and a shape whose product exceeds signed 64-bit range before enumerating or allocating copies. Include the bad dimensions in an overflow error.
+5. Compare every address and boundary on small one-, two-, and three-dimensional grids against direct enumeration. Test single lookups on a grid too large to materialize. Existing plate declarations, paths, and bindings round-trip.
+
+## Methodological Suggestions
+
+Use exact integer arithmetic. Check the existing integer types admitted by the source format and cover NumPy integers where that contract allows them.
+
+## Future work
+
+The compact compiler and resource estimator will consume these addresses. The parent cff-6s31 owns their integration.
+
+## Definitions
+
+A copy number is its zero-based position in the ordered grid. A chain connects one copy's exit port to another copy's entry port.
+
+
+## Notes
+
+**2026-11-28T05:58:13Z**
+
+Use the New IR field change-path index for structural validation and plate grounding; the serialized field set is unchanged. Check the materializing expansion path, parameter-only Colony binding, public observation fan-out, source validation, and compact edit replay. Grid addressing uses exact host integers; schedules, energy evaluation, JIT, message support and numerical dtype branches are unchanged. Keep the old one- and two-dimensional model admission boundary in this slice; the address calculations themselves handle additional axes for the later nesting ticket.
