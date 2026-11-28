@@ -200,6 +200,100 @@ GFE contribution (no −log Z identity is claimed for models containing it).
 sweep. Fine at planning scale; a structure-exploitation ticket if colonies
 ever need it at hundreds of states × many actions.
 
+### D1a. Learning a transition that can change
+
+A door that always opened yesterday may be locked today. One surprising
+failure can mean an unlucky outcome under the familiar rule, or a change
+to the rule itself. The probability of the failure under each explanation
+determines how much evidence to keep. This is a proposed extension to
+transition learning. D1 remains the planner's objective.
+
+**Event and clock.** Let θ be one column of a named transition table. On
+each physically committed observation boundary for that block, draw an
+independent Bernoulli change indicator for each column. With probability
+\(h\) replace θ by a fresh draw from its original Dirichlet prior;
+otherwise keep θ. All columns of the declared block share this clock.
+A column with no observation advances in *prediction* at that boundary.
+Other blocks keep their previous clock. A planning query can read a
+prediction any number of times without advancing it. Tied factors at a
+single boundary share one change draw per column and pool their counts.
+Separate physical transitions require separate boundaries.
+
+This model assumes each reset draws a new law independent of the past.
+A persistent latent regime could instead recover an earlier rule when
+conditions recur. A fixed discount erodes previous counts even when
+observations confirm the old rule. The event model gives confirmation
+and contradiction different effects through the likelihood of the data.
+
+**One update.** Write \(a\) for the carried concentration vector,
+\(a_0\) for its immutable reset prior and \(C\) for this event's outcome
+counts. Both concentrations must be positive and finite on the same
+declared support. Work on that simplex face, keeping all excluded entries
+exactly zero. A positive count outside the face is impossible. An empty
+face, an invalid hazard or a nonfinite count cannot define this update.
+
+Set \(a_b\) to \(a\) or \(a_0\) with prior branch weights \(1-h,h\).
+For ordered categorical observations with counts \(C\), integrating the
+likelihood \(\prod_j\theta_j^{C_j}\) under each prior gives
+
+    Z_b = Beta(a_b + C) / Beta(a_b)
+    w_b = prior_weight_b Z_b / Σ_c prior_weight_c Z_c
+    posterior = Σ_b w_b Dir(a_b + C).
+
+Here Beta is the multivariate beta function. The common multinomial
+coefficient for unordered observations cancels from the weights.
+An unobserved outcome contributes likelihood one. With fractional
+expected counts this derives a *power likelihood* update. Its normalizer
+does not give the marginal probability of observations with hidden paths.
+
+**Bounded carry.** An exact filter can retain a component for each
+possible last reset. Its storage grows with the number of events. To keep
+one vector per column, project the mixture to the Dirichlet that matches
+its mean and total variance (the sum of the per-outcome variances). For
+component concentrations \(d_b=a_b+C\), define
+
+    A_b = Σ_j d_bj,    m_b = d_b/A_b,    m = Σ_b w_b m_b
+    T_b = Σ_j m_bj (1 − m_bj)
+    V = Σ_b w_b [ T_b/(A_b+1) + ||m_b − m||² ]
+    κ = [Σ_b w_b A_b T_b/(A_b+1)] / V,    a_new = κ m.
+
+The within- and between-component variances add to \(V\). For a Dirichlet
+with mean \(m\), the variance trace is \(\sum_j m_j(1-m_j)/(\kappa+1)\).
+Equating the two traces and expanding the variance of the component means
+gives the displayed positive ratio. A singleton face is a deterministic
+outcome with zero novelty for every concentration. Use the prior's
+concentration as its canonical interior-hazard representative. At \(h=0\)
+return \(a+C\) directly, recovering the existing stationary update. At
+\(h=1\) return \(a_0+C\) directly. With \(C=0\) this same formula predicts
+the *next* event from committed carry. Posterior updates start from
+committed carry so the hazard applies exactly once. A rollout reusing
+one such forecast across future slices freezes learning over its horizon.
+The work and storage per projection are linear in the allowed outcomes.
+
+**What the planner learns.** D1 evaluates next-outcome novelty for the
+projected column. The reference under the full mixture is
+\(H(m)-\sum_b w_b E_{Dir(d_b)}H(\theta)\). Trace matching preserves the
+one-step mean of that mixture and can lose information about higher
+moments, multimodality and the last reset. The projected novelty has no
+general upper or lower guarantee relative to the reference. Information
+about today's law also need not persist through tomorrow's reset.
+
+For example, start with reset prior (1,1), carry (8,2) and hazard 1/4.
+Observing the second outcome raises reset probability from 1/4 to 5/11.
+Exact and projected posteriors both predict 0.54821 for the first outcome
+under the current law. Their current-law novelty is 0.16490 and 0.16721
+nats respectively. After outcomes 2,1,2,2 the means for the first outcome
+are 0.35271 and 0.34612, and novelty is 0.12688 and 0.10978 nats.
+Repeated projection can change both the mean and the sign of the novelty
+error. These numbers describe parameter inference on a fixed sequence.
+The behavioral corridor comparison has its own protocol.
+
+**Executable checks.** `tests/test_transition_change_derivation.py`
+enumerates complete reset histories with rational categorical probabilities,
+checks mixture entropy and fractional observations by beta-density
+quadrature, and exercises both hazard endpoints, exact zeros, a singleton
+face, a missing observation and a 64-outcome column.
+
 ---
 
 ## D2 — The exponential-family message contract (cff-8s6a)
