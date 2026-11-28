@@ -1,6 +1,6 @@
 ---
 id: cff-cynx
-status: open
+status: closed
 deps: [cff-izjd, cff-du6m, cssr-bdzr]
 links: [cff-xa6z, car-zieb]
 created: 2026-07-13T03:51:42Z
@@ -231,3 +231,7 @@ The replay record and scoring fixtures can proceed in parallel. Joining proposal
 **2026-11-28T07:35:29Z**
 
 Acceptance audit on the integrated source 0e0ec3d. Criteria 1–16 and 18–20: structure_proposals identifies each input and result; structure_scoring fits on the training partition, runs ordinary engine scores on the shared held-out events and ranks completed candidates. test_structure_scoring.py independently checks the tree likelihood, latent relabeling, grouped versus individual loopy runs and the handling of divergent, exhausted, infeasible and missing evidence. test_structure_search.py checks the threshold, consecutive evaluations and change of incumbent. Criteria 17.1–17.13: test_structure_operators.py checks valid and invalid growth, split, prune, merge, and affine-input deletion against the concentration convention and independent observation laws. Criteria 21–27: test_structure_fragments.py loads the three typed fragment archives in a fresh interpreter. test_structure_search.py compares built-in and caller-supplied proposals using the same lineage and replays the D5-selected measurement in two ordinary candidate models. Criteria 28–38: the scorer cases cover native failures, vacuity, real f32/f64, 40 candidates and 20 labels; the end-to-end test replays 20 distinct prunes on 20 labels and preserves each native status. Criteria 39–41: README shows how to run the comparison, ARCHITECTURE identifies the outer-loop boundary, and LIMITATIONS records dependence on the candidate family, fixed data partition and Bethe approximation. Publication awaits the prerequisite receipts and the final integrated short suite.
+
+**2026-11-28T15:50:42Z**
+
+Closeout: all eight child tickets are closed. The criterion-to-source map in 889de7c covers AC1–41, including all thirteen operator subcriteria. Integrated runtime 010a03b passed 37 focused tests and 2,822 short tests on PR #257. On four synthetic sensor readings, adding a third regime lowered held-out Bethe free energy from 22.08 to 4.43 nats. The separate movement-history study on PR #259 (6b504a1) found slightly worse predictions on the two unseen layouts: 1.85744 nats per three-command endpoint with history and 1.84176 with appearance (difference +0.01568, 764 windows). Each learned planner reached 2 of 12 goals; the observed-map planner reached 8. The independent navigation audit replayed 7,020 arm scores and 54 actual routes. The exact closed navigation ticket is synchronized here; its implementation and evidence remain on #259. This closure changes only the two tickets and reuses both qualified runs.
