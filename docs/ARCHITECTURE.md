@@ -2452,8 +2452,20 @@ four-stage pipeline, each stage importable on its own:
    through the optional `viz` extra (cairosvg). Golden SVGs pin the pipeline
    for the canonical models.
 
-Message-schedule overlays (Figs 23/24/27 arrows) are not implemented; the
-current renderer stops at the typed scene graph.
+An optional `derive_schedule_overlay(template, engine)` bridges the sealed
+arena and schedule to the diagram. It checks each compiled scatter slot
+against the template incidence in its own arena. Ordered `MessageEvent`s
+expand staged batches and scans, identify one-time priming, and include the
+simultaneous writes of a flooding sweep or a mixed iteration before its island
+refresh. A DATA binding or hardening step supplies no factor-owned write.
+The full scene coalesces repeated writes into one `MessageArrow` per
+direction, retaining their step numbers. `select_step(i)` restricts the scene
+to one batch. GFE color and titles follow the compiled composite that writes
+the slot. The Figure 23 companion selects actual forward prediction writes with a
+fixed control prior. Figure 24 shows the synchronous GFE step with one past
+and one future slice. Figure 27 shows the full T-maze plan. EFE policy
+comparison, convergence and alternative solver dispatch require separate
+runtime evidence.
 
 ## Dependency policy
 

@@ -326,8 +326,8 @@ expose the specialized workflows named in the capability map.
 
 <!-- facade-viz:start -->
 `BeadGroup`, `BeadShape`, `CompositeView`, `Diagram`, `FULL_COMPRESSION`,
-`LayoutStyle`, `NodeEnd`, `NodeView`, `Presentation`, `Scene`, `SvgStyle`,
-`TerminalEnd`, `TerminalKind`, `WireView`, `build_scene`, `derive`, `layout`,
+`LayoutStyle`, `MessageArrow`, `MessageEvent`, `NodeEnd`, `NodeView`, `Presentation`, `Scene`, `ScheduleOverlay`, `SvgStyle`,
+`TerminalEnd`, `TerminalKind`, `WireView`, `build_scene`, `derive`, `derive_schedule_overlay`, `layout`,
 `present`, `render_svg`, `save_png`, `save_svg`, `to_svg`
 <!-- facade-viz:end -->
 
@@ -936,6 +936,25 @@ svg_text = render_svg(template)       # Template -> SVG string
 scene = build_scene(template)        # Template -> positioned Scene
 assert to_svg(scene) == svg_text     # Scene -> SVG string
 ```
+
+To inspect the message-passing plan for a compiled engine, add a schedule overlay.
+
+```python
+from cffg.viz import derive_schedule_overlay
+
+overlay = derive_schedule_overlay(template, engine)
+full_svg = render_svg(template, overlay=overlay)
+first_batch_svg = render_svg(template, overlay=overlay.select_step(0))
+```
+
+Each arrow points from the factor that writes a message toward its recipient.
+Its title lists the zero-based steps in which the same write occurs. Red arrows
+identify compiled GFE updates. For an iterative schedule, the plan shows
+priming followed by one repeatable iteration. Actual iteration counts, solver
+shortcuts and convergence belong to the run result. For a compact plate,
+pass `expand_plates(template)` to both overlay derivation and rendering to see
+the individual copies. If custom spacing leaves no straight segment clear of
+a bead, label or terminal, increase the layout pitch to make room for the arrow.
 
 `cffg.estimate.estimate(engine)` reports exact bytes per persistent arena and parameter
 leaf. Its named XLA executables expose backend-reported FLOPs, byte traffic and

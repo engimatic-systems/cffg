@@ -19,12 +19,14 @@ from cffg.viz.compress import FULL_COMPRESSION, present
 from cffg.viz.diagram import BeadShape, TerminalKind, derive
 from cffg.viz.layout import LayoutStyle, layout
 from cffg.viz.layout import _shift as _shift_item
+from cffg.viz.overlay import ScheduleOverlay
 from cffg.viz.scene import (
     Bead,
     Box,
     CompositeBox,
     Dome,
     EllipsisMark,
+    MessageArrow,
     Path,
     PlateBox,
     Scene,
@@ -54,13 +56,16 @@ def render_svg(
     level: int = FULL_COMPRESSION,
     layout_style: LayoutStyle = LayoutStyle(),
     svg_style: SvgStyle = SvgStyle(),
+    overlay: ScheduleOverlay | None = None,
 ) -> str:
     """Template -> SVG string at the given compression level (0..4)."""
-    return to_svg(build_scene(template, level=level, style=layout_style), svg_style)
+    scene = build_scene(template, level=level, style=layout_style, overlay=overlay, svg_style=svg_style)
+    return to_svg(scene, svg_style)
 
 
 def build_scene(
-    template: Template, *, level: int = FULL_COMPRESSION, style: LayoutStyle = LayoutStyle(), offsets=None
+    template: Template, *, level: int = FULL_COMPRESSION, style: LayoutStyle = LayoutStyle(),
+    offsets=None, overlay: ScheduleOverlay | None = None, svg_style: SvgStyle = SvgStyle(),
 ) -> Scene:
     """Lay out a Template; use to_svg to serialize the resulting Scene."""
     if not isinstance(template, Template):
@@ -71,6 +76,13 @@ def build_scene(
     else:  # a pure plate host has no top-level factors to lay out
         m = style.margin
         scene = Scene(name=template.name, width=2 * m, height=2 * m, items=[])
+    if overlay is not None:
+        from cffg.core.serialize import structure_hash
+        from cffg.viz.arrow_layout import add_arrows
+
+        if structure_hash(template) != overlay.structure:
+            raise ValueError("schedule overlay belongs to a different template structure")
+        scene = add_arrows(scene, diagram, overlay, svg_style)
     if template.plates:
         scene = _attach_plates(template, scene, level, style)
     return scene
@@ -157,6 +169,17 @@ def to_svg(scene: Scene, style: SvgStyle = SvgStyle()) -> str:
             'stroke-linecap="round">'
         ),
     ]
+    arrow_kinds = {item.gfe for item in scene.items if isinstance(item, MessageArrow)}
+    if arrow_kinds:
+        parts.append("<defs>")
+        for gfe in sorted(arrow_kinds):
+            name, color = ("gfe", "#c62828") if gfe else ("ordinary", s.stroke)
+            parts.append(
+                f'<marker id="cffg-message-{name}" markerUnits="userSpaceOnUse" '
+                'markerWidth="1" markerHeight="1" viewBox="0 -0.5 1 1" refX="1" refY="0" '
+                f'orient="auto"><path d="M0,-0.5 L1,0 L0,0.5 Z" fill="{color}" stroke="none"/></marker>'
+            )
+        parts.append("</defs>")
     for item in scene.items:
         parts.append(_render_item(item, s))
     parts += ["</g>", "</svg>"]
@@ -176,6 +199,17 @@ def _render_item(item, s: SvgStyle) -> str:
             f'font-size="{s.label_size}" stroke="none" fill="{s.stroke}" '
             f'text-anchor="end">{escape(item.badge)}</text></g>'
         )
+    if isinstance(item, MessageArrow):
+        x, y = item.tip
+        dx, dy = item.direction
+        name = "gfe" if item.gfe else "ordinary"
+        label = "GFE" if item.gfe else "Ordinary"
+        steps = ", ".join(str(step) for step in item.steps)
+        title = escape(f"{label} message {item.source_ref}.{item.source_role} → {item.target_ref}; "
+                       f"{item.ref}; steps {steps}")
+        return (f'<g transform="translate({x:.2f} {y:.2f}) scale({item.size:g})">'
+                f'<title>{title}</title><path d="M{-dx}, {-dy} L0,0" stroke="none" '
+                f'marker-end="url(#cffg-message-{name})"/></g>')
     if isinstance(item, CompositeBox):
         return (
             f'<rect x="{item.x:.1f}" y="{item.y:.1f}" width="{item.w:.1f}" '

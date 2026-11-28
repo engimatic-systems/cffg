@@ -46,6 +46,21 @@ class Path:
 
 
 @dataclass(frozen=True)
+class MessageArrow:
+    """A directed schedule annotation. The tip lies on the referenced wire."""
+
+    ref: str
+    source_ref: str
+    target_ref: str
+    source_role: str
+    steps: tuple[int, ...]
+    gfe: bool
+    tip: tuple[float, float]
+    direction: tuple[int, int]
+    size: float
+
+
+@dataclass(frozen=True)
 class Bead:
     """A q-marginal bead: on a wire, inside a box, or straddling its border."""
 
@@ -120,7 +135,7 @@ class ItemKind(str, Enum):
     pass  # reserved: scenes are heterogeneous lists, discriminated by type
 
 
-SceneItem = Box | Path | Bead | Dome | Terminal | EllipsisMark | CompositeBox | PlateBox
+SceneItem = Box | Path | MessageArrow | Bead | Dome | Terminal | EllipsisMark | CompositeBox | PlateBox
 
 
 @dataclass

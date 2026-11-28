@@ -128,6 +128,7 @@ EPIC_FILES = {
         "test_viz_diagram.py",
         "test_viz_compress.py",
         "test_viz_layout.py",
+        "test_viz_overlay.py",
         "test_viz_svg.py",
     ],
     "M9 · Gaussian": [

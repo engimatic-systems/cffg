@@ -19,7 +19,8 @@ from cffg.viz.diagram import (
     derive,
 )
 from cffg.viz.layout import LayoutStyle, layout
-from cffg.viz.scene import Scene
+from cffg.viz.overlay import MessageEvent, ScheduleOverlay, derive_schedule_overlay
+from cffg.viz.scene import MessageArrow, Scene
 from cffg.viz.svg import SvgStyle, build_scene, render_svg, save_png, save_svg, to_svg
 
 __all__ = [
@@ -29,16 +30,20 @@ __all__ = [
     "Diagram",
     "FULL_COMPRESSION",
     "LayoutStyle",
+    "MessageArrow",
+    "MessageEvent",
     "NodeEnd",
     "NodeView",
     "Presentation",
     "Scene",
+    "ScheduleOverlay",
     "SvgStyle",
     "TerminalEnd",
     "TerminalKind",
     "WireView",
     "build_scene",
     "derive",
+    "derive_schedule_overlay",
     "layout",
     "present",
     "render_svg",
