@@ -498,7 +498,7 @@ WiringRule = Chain | Broadcast | Expose
 
 @dataclass(frozen=True)
 class PlateSpec:
-    """A replicated fragment: `dims` copies (1-D or 2-D in phase 1) of
+    """A replicated fragment: a row-major grid of `dims` copies of
     `fragment`, wired by `bonds`. Parameters are TIED by default (copies share
     the fragment's blob names); `per_copy_blobs` opts specific blobs out into
     per-copy indexed names."""

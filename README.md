@@ -224,8 +224,13 @@ For reusable structure:
   and its private blob `B` in copy zero the name `left/cell/0/B`.
   Compose through declared host ports directly. Call `expand_plates` on the
   relevant operand first to bond a generated port such as `cell/0/head`
-  or a Broadcast hub. The compiler accepts one level of plates and can build
-  the message arrays directly from the fragment and its wiring rules.
+  or a Broadcast hub. A plate may contain another plate. For example,
+  `room/2/sensor/4/x` is the reading from sensor 4 in room 2. Sensors
+  in room 2 can share one calibration (`room/2/A`) and each have a
+  private prior (`room/2/sensor/4/d`). A calibration declared on the
+  room fragment itself follows the room plate’s tying rule.
+  Each level accepts a tuple of positive dimensions. Its `Chain` axis
+  refers to that tuple, and its `Broadcast` hub can feed an outer bond.
   For a hub shared by 49 copies, the outer
   `Broadcast` has at most six equality factors from hub to copy and at most
   twelve between copies. Factors inside each copy add to the distance that

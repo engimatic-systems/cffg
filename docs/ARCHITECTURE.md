@@ -217,7 +217,7 @@ A pure-Python (dataclass) representation, independent of JAX:
   owner and key are encoded independently, including scoped slash characters.
   Blob members use reversible per-segment encoding under `blobs/`, a separate
   namespace. Plate fragments stay compact in `model.json`; grounding resolves
-  the `{index}` marker in per-copy blob paths and enumerates every concrete
+  per-level index markers in nested bundle paths and enumerates every concrete
   learnable and point array. Compiler plans reconstruct logical ownership;
   no arena address or executable callback is serialized.
   `load_bundle` returns a `LoadedBundle` with template, point arrays, manifest,
@@ -1892,8 +1892,9 @@ from the dimensions and integer strides. Expansion and per-copy parameter
 binding stream coordinates in that same order. The shape must fit a signed
 64-bit copy count before expansion or compilation begins.
 
-For one-level plates the compiler validates each fragment, resolves Chain
-aliases and Broadcast equality addresses, and lays out final slots in the
+The compiler resolves the inner fragment’s Chain aliases and Broadcast
+equality addresses once before binding them in each enclosing copy.
+It then lays out final slots in the
 same lexical order as the public expansion. Copies share their fragment's
 domain and constraint declarations until the compiler assigns concrete
 addresses. Priming, energy accounting, status and learning use the existing
@@ -1902,6 +1903,14 @@ resolves the caller's current blob values and paths. A registered third-party
 packer or configuration callback can inspect concrete `Template` and
 `FactorSpec` objects. The compiler reconstructs those callback arguments
 when the model uses such an extension.
+
+Within a nested plate, an inner tied blob and its posterior belong to
+the enclosing copy. A direct declaration of that blob on the enclosing
+fragment applies the enclosing plate's tying rule. A private inner owner
+has all enclosing plate names and coordinates in its identity. On disk,
+`{index}` addresses the full numeric coordinate of a private source file.
+A nested bundle records `{index:0}`, `{index:1}`, and subsequent levels
+separately so that plate names can appear between coordinates.
 
 Scoping prefixes the plate key and records the enclosing `PlateSpec.shared_scope`.
 Fragment names, wiring rules, initializer specs, file paths and per-copy source

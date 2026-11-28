@@ -25,7 +25,7 @@ from urllib.parse import quote
 
 import numpy as np
 
-from cffg.core.ir import PlateSpec, Template
+from cffg.core.ir import Template
 from cffg.core.plates import PLATE_INDEX_TOKEN, expand_plates
 from cffg.core.serialize import (
     document_structure_hash,
@@ -79,48 +79,49 @@ def _path_segment(value: str) -> str:
     return quote(value, safe="-_")
 
 
-def _blob_member(name: str) -> str:
-    """Collision-free member path for an expanded blob/array key."""
-    return "blobs/" + "/".join(_path_segment(p) for p in name.split("/")) + ".npy"
+def _path_segments(name: str) -> tuple[str, ...]:
+    return tuple(_path_segment(part) for part in name.split("/"))
 
 
-def _per_copy_pattern(plate_name: str, blob_name: str) -> str:
-    plate = "/".join(_path_segment(p) for p in plate_name.split("/"))
-    blob = "/".join(_path_segment(p) for p in blob_name.split("/"))
-    return f"blobs/{plate}/{PLATE_INDEX_TOKEN}/{blob}.npy"
+def _blob_member(name: str, *, prefix: tuple[str, ...] = ()) -> str:
+    """Collision-free member path, with optional encoded plate scope."""
+    return "blobs/" + "/".join((*prefix, *_path_segments(name))) + ".npy"
 
 
 def _rewrite_blob_paths(
     template: Template,
     *,
-    plate_name: str = "",
-    owner: PlateSpec | None = None,
+    prefix: tuple[str, ...] = (),
+    paths: dict[str, str] | None = None,
+    depth: int = 0,
 ) -> Template:
     """Copy a template hierarchy and point every declaration into the ZIP.
 
-    A tied fragment blob resolves to its expanded array name.  A per-copy
-    declaration retains one compact path containing ``{index}``; plate
-    grounding replaces that marker with the concrete 1-D/2-D copy index.
+    A tied blob uses a direct parent declaration when one exists, otherwise
+    its file lives in the parent copy. A private blob adds its own plate
+    index. A shallow plate keeps the original ``{index}`` spelling.
     """
-    blobs = {}
-    for name, ref in template.blobs.items():
-        if owner is not None and name in owner.per_copy_blobs:
-            path = _per_copy_pattern(plate_name, name)
-        else:
-            path = _blob_member(owner.shared_name(name) if owner is not None else name)
-        blobs[name] = replace(ref, path=path)
-
-    plates = {
-        name: replace(
-            spec,
-            fragment=_rewrite_blob_paths(
-                spec.fragment,
-                plate_name=name,
-                owner=spec,
-            ),
-        )
-        for name, spec in template.plates.items()
+    blobs = {
+        name: replace(ref, path=_blob_member(name) if paths is None else paths[name])
+        for name, ref in template.blobs.items()
     }
+    plates = {}
+    for name, spec in template.plates.items():
+        token = PLATE_INDEX_TOKEN if depth == 0 and not spec.fragment.plates else f"{{index:{depth}}}"
+        child_prefix = (*prefix, *_path_segments(name), token)
+        child_paths = {}
+        private = set(spec.per_copy_blobs)
+        for blob in spec.fragment.blobs:
+            if blob in private:
+                child_paths[blob] = _blob_member(blob, prefix=child_prefix)
+                continue
+            shared_name = spec.shared_name(blob)
+            binding = blobs.get(shared_name)
+            child_paths[blob] = binding.path if binding else _blob_member(shared_name, prefix=prefix)
+        fragment = _rewrite_blob_paths(
+            spec.fragment, prefix=child_prefix, paths=child_paths, depth=depth + 1,
+        )
+        plates[name] = replace(spec, fragment=fragment)
     return Template(
         name=template.name,
         variables=dict(template.variables),

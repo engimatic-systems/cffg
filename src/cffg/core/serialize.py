@@ -68,9 +68,9 @@ def _bond_from_dict(d: dict[str, Any]) -> Any:
     raise ValueError(f"unknown wiring rule kind {kind!r}")
 
 
-def _plate_to_dict(spec: PlateSpec) -> dict[str, Any]:
+def _plate_to_dict(spec: PlateSpec, ancestors: frozenset[int]) -> dict[str, Any]:
     return {
-        "fragment": to_dict(spec.fragment),
+        "fragment": _template_to_dict(spec.fragment, ancestors),
         "dims": list(spec.dims),
         "bonds": [_bond_to_dict(b) for b in spec.bonds],
         "per_copy_blobs": list(spec.per_copy_blobs),
@@ -89,6 +89,10 @@ def _plate_from_dict(d: dict[str, Any]) -> PlateSpec:
 
 
 def to_dict(t: Template) -> dict[str, Any]:
+    return _template_to_dict(t, frozenset())
+
+
+def _template_to_dict(t: Template, ancestors: frozenset[int]) -> dict[str, Any]:
     from cffg.core.moment_matching import moment_matching_problems
 
     problems = moment_matching_problems(t)
@@ -141,7 +145,10 @@ def to_dict(t: Template) -> dict[str, Any]:
     }
     # Additive: templates without plates serialize byte-identically to before.
     if t.plates:
-        d["plates"] = {name: _plate_to_dict(t.plates[name]) for name in sorted(t.plates)}
+        if id(t) in ancestors:
+            raise ValueError(f"cyclic plate fragment reference to {t.name!r}")
+        parents = ancestors | {id(t)}
+        d["plates"] = {name: _plate_to_dict(t.plates[name], parents) for name in sorted(t.plates)}
     # Additive (cff-x0sv): declared learnables. Structure, not blob data — a
     # model that learns its transitions is a different model from one that
     # does not, so this participates in the structure hash.
