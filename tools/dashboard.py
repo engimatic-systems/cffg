@@ -26,6 +26,8 @@ import datetime
 import html
 import json
 import math
+import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -33,6 +35,11 @@ import tempfile
 import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+if __package__:
+    from .suite_selection import validate_junit
+else:
+    from suite_selection import validate_junit
 
 REPO = Path(__file__).resolve().parents[1]
 SHARE = Path.home() / "agent-share"
@@ -125,6 +132,7 @@ EPIC_FILES = {
         "test_bundle_learning.py",
         "test_bundle_resume.py",
         "test_dashboard.py",
+        "test_suite_selection.py",
         "test_estimate.py",
         "test_edit_codec.py",
         "test_ticket_dashboard.py",
@@ -213,13 +221,31 @@ class DashboardError(ValueError):
     """A JUnit report cannot truthfully certify the current default suite."""
 
 
-def run_suite() -> tuple[Path, int, float]:
+def default_worker_count() -> int:
+    """Use the qualified parallel configuration on large Apple silicon hosts."""
+    if sys.platform != "darwin" or platform.machine() != "arm64" or (os.cpu_count() or 1) < 12:
+        return 1
+    try:
+        memory = os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE")
+    except (OSError, ValueError):
+        return 1
+    return 4 if memory >= 64 * 1024**3 else 1
+
+
+def run_suite(workers: int | None = None) -> tuple[Path, int, float]:
     """Run the default short suite; return its report, status, and wall time."""
+    if workers is None:
+        workers = default_worker_count()
+    if workers < 1:
+        raise ValueError("the suite requires at least one worker")
+    command = ["uv", "run", "pytest", "-q", "-m", SUITE_SELECTION]
+    if workers > 1:
+        command.extend(["-n", str(workers), "--dist", "loadfile", "--max-worker-restart", "0"])
     with tempfile.NamedTemporaryFile(suffix=".xml", delete=False) as tmp:
         xml_path = Path(tmp.name)
     started = time.monotonic()
     result = subprocess.run(
-        ["uv", "run", "pytest", "-q", f"--junitxml={xml_path}"], cwd=REPO
+        [*command, f"--junitxml={xml_path}"], cwd=REPO
     )
     return xml_path, result.returncode, time.monotonic() - started
 
@@ -303,6 +329,7 @@ def load_junit(
                 "name": case.get("name"),
                 "ms": milliseconds,
                 "ok": not failure,
+                "skipped": case.find("skipped") is not None,
                 "epic": FILE_TO_EPIC.get(file, "Unassigned"),
             }
         )
@@ -363,6 +390,7 @@ def record_suite_runtime(
     *,
     wall_seconds: float,
     pytest_code: int,
+    workers: int = 1,
 ) -> dict:
     """Persist measured wall-clock history for future agent wait budgets.
 
@@ -407,6 +435,7 @@ def record_suite_runtime(
         "pytest_exit_code": pytest_code,
         "result": "passed" if pytest_code == 0 and failed == 0 else "failed",
         "selection": SUITE_SELECTION,
+        "workers": workers,
         "wall_seconds": round(float(wall_seconds), 3),
         "case_seconds": round(sum(test["ms"] for test in tests) / 1000, 3),
     }
@@ -416,7 +445,7 @@ def record_suite_runtime(
     # poison the default suite's wait budget.
     comparable = [
         entry for entry in previous
-        if entry.get("selection") == SUITE_SELECTION
+        if entry.get("selection") == SUITE_SELECTION and entry.get("workers", 1) == workers
     ]
     observed = [entry["wall_seconds"] for entry in comparable]
     # Use the slowest comparable measurement, add 25% headroom, and round
@@ -458,12 +487,14 @@ def trend_svg(history: list[dict]) -> str:
 
 
 def test_row(t: dict, new_ids: set[str], gallery: dict[str, list[dict]]) -> str:
+    if not t["ok"]:
+        status = '<span class="st bad">✗ FAIL</span>'
+    elif t.get("skipped"):
+        status = '<span class="st">skipped</span>'
+    else:
+        status = '<span class="st ok">✓</span>'
     inner = (
-        (
-            '<span class="st ok">✓</span>'
-            if t["ok"]
-            else '<span class="st bad">✗ FAIL</span>'
-        )
+        status
         + f'<span class="tn">{html.escape(t["name"])}</span>'
         + ('<span class="new">NEW</span>' if t["id"] in new_ids else "")
     )
@@ -507,11 +538,13 @@ def render(
             f'<div class="tile-v">{value}</div><div class="tile-l">{label}</div></div>'
         )
 
-    status = (
-        '<span class="pill ok">✓ all passing</span>'
-        if not failed
-        else f'<span class="pill bad">✗ {len(failed)} failing</span>'
-    )
+    skipped = sum(bool(t.get("skipped")) for t in tests)
+    if failed:
+        status = f'<span class="pill bad">✗ {len(failed)} failing</span>'
+    elif skipped:
+        status = f'<span class="pill ok">{len(tests) - skipped} passed, {skipped} skipped</span>'
+    else:
+        status = '<span class="pill ok">✓ all passing</span>'
     sections = []
     for epic in EPIC_ORDER:
         ts = by_epic.get(epic)
@@ -612,7 +645,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--run-suite", action="store_true",
         help="run the default short suite once, then render its report",
     )
-    return parser.parse_args(argv)
+    parser.add_argument("--workers", type=int, help="pytest workers for --run-suite (1 for serial)")
+    args = parser.parse_args(argv)
+    if args.workers is not None and (not args.run_suite or args.workers < 1):
+        parser.error("--workers requires --run-suite and a positive count")
+    return args
 
 
 def publish(tests: list[dict]) -> int:
@@ -650,7 +687,8 @@ def main(argv: list[str] | None = None) -> None:
     pytest_code = 0
     wall_seconds = None
     if args.run_suite:
-        generated_report, pytest_code, wall_seconds = run_suite()
+        workers = args.workers if args.workers is not None else default_worker_count()
+        generated_report, pytest_code, wall_seconds = run_suite(workers)
         xml_path = generated_report
     else:
         xml_path = args.junitxml
@@ -661,12 +699,22 @@ def main(argv: list[str] | None = None) -> None:
             expected_files=repository_test_files(),
             newest_input=newest_test_input(exclude=xml_path),
         )
+        try:
+            receipt = validate_junit(xml_path, require_pass=False)
+        except ValueError as error:
+            raise DashboardError(str(error)) from error
+        if args.run_suite and (pytest_code != receipt["exitstatus"] or workers != receipt["workers"]):
+            raise DashboardError("pytest status or worker count differs from the JUnit record")
+        pytest_code = receipt["exitstatus"]
+        if pytest_code and all(test["ok"] for test in tests):
+            raise DashboardError(f"pytest exited {pytest_code} without a recorded failing case")
         failed = publish(tests)
         if wall_seconds is not None:
             record_suite_runtime(
                 tests,
                 wall_seconds=wall_seconds,
                 pytest_code=pytest_code,
+                workers=workers,
             )
     except DashboardError as error:
         sys.exit(str(error))

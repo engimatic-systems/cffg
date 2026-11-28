@@ -985,5 +985,7 @@ uv run python examples/linear_gaussian.py
 - `src/cffg/readouts/` — family-owned result interpretation.
 - `tests/` — executable contracts and numerical oracles.
 
-Contributing changes to the library? Read [AGENTS.md](AGENTS.md) for the uv,
-ticket, commit, numerical-robustness, and validation protocols.
+For development, run the tests for the component you changed. For final
+validation, run `uv run python tools/dashboard.py --run-suite`. The dashboard
+selects the worker count for the host. Add `--workers 1` to run the same short
+suite serially. See the project’s [validation and contribution guidelines](AGENTS.md).

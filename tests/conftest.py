@@ -13,6 +13,7 @@ slices; the data port awaits an observation clamp.
 import json
 import re
 import shutil
+import sys
 from pathlib import Path
 
 import jax
@@ -32,10 +33,20 @@ from cffg.core import (
 # Rendered-diagram gallery: tests record SVGs here (gitignored); the dashboard
 # (tools/dashboard.py) picks them up and shows them under the matching test row.
 VIZ_ARTIFACTS = Path(__file__).parent / ".artifacts"
+REPOSITORY = Path(__file__).resolve().parents[1]
+sys.path.append(str(REPOSITORY / "tools"))
 
 
+def pytest_configure(config):
+    from suite_selection import register
+
+    register(config, REPOSITORY)
+
+
+@pytest.hookimpl(tryfirst=True)
 def pytest_sessionstart(session):
-    shutil.rmtree(VIZ_ARTIFACTS, ignore_errors=True)
+    if not hasattr(session.config, "workerinput"):
+        shutil.rmtree(VIZ_ARTIFACTS, ignore_errors=True)
 
 
 @pytest.fixture
