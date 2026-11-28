@@ -63,6 +63,7 @@ def test_k1_reduces_to_linear_rules():
     np.testing.assert_allclose(f, f_ref, rtol=1e-9)
 
 
+@pytest.mark.slow
 def test_identical_components_collapse_exactly():
     a = np.repeat(A2[:, :1], 2, axis=1)
     b = np.repeat(B2[:, :1], 2, axis=1)
@@ -280,6 +281,7 @@ def test_vacuous_inputs_fall_back_not_nan():
     assert float(f[0]) == np.inf
 
 
+@pytest.mark.slow
 def test_float32_finite_and_close():
     args64 = (ETA_O, LAM_O, ETA_I, LAM_I, MU_E, A2, B2, W2)
     args32 = tuple(jnp.asarray(a, dtype=jnp.float32) for a in args64)

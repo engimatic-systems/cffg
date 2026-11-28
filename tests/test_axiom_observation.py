@@ -52,7 +52,12 @@ def test_observed_scene_is_atomic_and_skips_fictitious_transitions():
     next_rgb = jnp.roll(rgb, 1, axis=0)
     first = step(initial, next_rgb, jnp.int32(2), jnp.float32(-1), jnp.int32(0))
     assert first.valid and int(first.state.tick) == 1
-    for action, reward, tick in [(2, -1, 0), (3, 0, 1), (0, 9, 1)]:
+    hunt = first.state
+    for tick, reward in [(1, 2), (2, -2)]:
+        receipt = step(hunt, rgb, jnp.int32(0), jnp.float32(reward), jnp.int32(tick))
+        assert receipt.valid and int(receipt.state.tick) == tick + 1
+        hunt = receipt.state
+    for action, reward, tick in [(2, -1, 0), (3, 0, 1), (0, 1.5, 1), (0, np.nan, 1), (0, np.inf, 1)]:
         failed = step(first.state, rgb, jnp.int32(action), jnp.float32(reward), jnp.int32(tick))
         assert not failed.valid
         same(failed.state, first.state)

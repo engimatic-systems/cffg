@@ -225,3 +225,55 @@ def test_checkpoint_preserves_eager_scale_validation_at_rank_boundary():
                     candidate.state_dict()
                 with pytest.raises(ValueError, match="invalid mixed-learning snapshot"):
                     mixed.MixedBank.from_state_dict(snapshot)
+
+
+def test_rounded_handoff_scores_primary_values_and_resumes_in_selected_mode():
+    bank, batch, weights = fixture(jnp.float32)
+    # A small scale makes a half-ULP carried mean observable in the odds.
+    h = np.spacing(np.float32(4096))
+    mean = jnp.full_like(bank.mu, 4096)
+    scale = jnp.broadcast_to(jnp.eye(2, dtype=mean.dtype)*h**2, bank.psi.shape)
+    bank = bank._replace(mu=mean, psi=scale)
+    bank = bank._replace(carry=bank.carry._replace(mu=bank.carry.mu.at[0, 0].set(h/2)))
+    batch = batch._replace(mean=mean[:2].at[:, 0].add(h), covariance=jnp.zeros_like(batch.covariance),
+                           categories=tuple(jnp.full_like(index, -1) for index in batch.categories))
+    rounded = bank.as_rounded()
+    _, live_weights, live_ok = mixed.score(bank, batch)
+    _, primary_weights, ok = jax.jit(mixed.score)(rounded, batch)
+    assert live_ok and ok and np.all(np.asarray(live_weights)[:, 0] > .5)
+    np.testing.assert_array_equal(primary_weights, [[.5, .5, 0], [.5, .5, 0]])
+
+    compact, exact = bank.state_dict(), bank.state_dict(exact=True)
+    legacy = {k: v for k, v in compact.items() if k != "category_cardinalities"}
+    legacy["version"] = np.int32(1)
+    expected, ok = mixed.update(rounded, batch, weights)
+    assert ok and isinstance(expected, mixed.RoundedBank)
+    for snapshot in (legacy, compact, exact):
+        restored = mixed.RoundedBank.from_state_dict(snapshot)
+        same_bank(rounded, restored)
+        resumed, ok = mixed.update(restored, batch, weights)
+        assert ok
+        same_bank(expected, resumed)
+    for saved in (expected.state_dict(), expected.state_dict(exact=True)):
+        assert saved["version"] == 2 and "carry_mu" not in saved
+        same_bank(mixed.RoundedBank.from_state_dict(saved), expected)
+        same_bank(mixed.MixedBank.from_state_dict(saved), expected.as_compensated())
+    with pytest.raises(ValueError, match="invalid mixed-learning snapshot"):
+        mixed.RoundedBank.from_state_dict({**exact, "carry_mu": np.full_like(exact["mu"], np.nan)})
+
+
+def test_rounded_update_masks_missing_fields_and_rejects_invalid_weights_under_vmap():
+    bank, batch, weights = fixture(jnp.float32)
+    rounded = bank.as_rounded()
+    empty = jax.tree.map(lambda v: v[:0], batch)
+    seen, ok = mixed.update(rounded, empty, weights[:0])
+    assert ok
+    same_bank(seen, rounded)
+    batch = batch._replace(gaussian_observed=jnp.zeros(2, bool), mean=jnp.full_like(batch.mean, jnp.nan),
+                           covariance=jnp.full_like(batch.covariance, jnp.nan))
+    mapped = jax.jit(jax.vmap(mixed.update, in_axes=(None, None, 0)))
+    result, status = mapped(rounded, batch, jnp.stack([weights, weights.at[0, 0].set(jnp.nan)]))
+    np.testing.assert_array_equal(status, [True, False])
+    same_bank(jax.tree.map(lambda a: a[1], result), rounded)
+    np.testing.assert_array_equal(result.psi[0], rounded.psi)
+    np.testing.assert_array_equal(result.categories[0][0, :, 0], rounded.categories[0][:, 0]+weights[0])

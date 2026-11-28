@@ -85,7 +85,7 @@ def mixed_chart(dtype, members):
 
 
 @pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
-@pytest.mark.parametrize("members", [2, 200])
+@pytest.mark.parametrize("members", [pytest.param(2, marks=pytest.mark.slow), 200])
 def test_batched_geometry_preserves_primal_support_aliases_and_jvp(dtype, members):
     with jax.enable_x64(dtype is np.float64):
         chart = mixed_chart(dtype, members)

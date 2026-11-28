@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import NamedTuple
+from typing import NamedTuple, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -11,7 +11,10 @@ import numpy as np
 from cffg import _compensated, mixed_scoring
 
 
-from cffg.mixed_state import MixedBank, MixedCarry
+from cffg.mixed_state import MixedBank, MixedCarry, RoundedBank
+
+
+_Bank = TypeVar("_Bank", MixedBank, RoundedBank)
 
 
 class MixedBatch(NamedTuple):
@@ -28,16 +31,23 @@ class MixedBatch(NamedTuple):
     categories: tuple[jax.Array, ...]
 
 
-def score(bank: MixedBank, batch: MixedBatch, *, include_mixing: bool = False):
+def score(bank: MixedBank | RoundedBank, batch: MixedBatch, *, include_mixing: bool = False):
     """Return absolute observed log-likelihood scores, responsibilities and validity.
 
     Only the normalized responsibilities incorporate optional expected log
     mixing weights. Unsupported components receive score -inf and zero mass.
+    A RoundedBank scores only the primary fields.
     """
     return mixed_scoring.score(bank, batch, include_mixing=include_mixing)
 
 
-def update(bank: MixedBank, batch: MixedBatch, weights: jax.Array) -> tuple[MixedBank, jax.Array]:
+def _add_count(value, low, count):
+    if low is None:
+        return jnp.where(count > 0, value + count, value), None, jnp.asarray(True)
+    return _compensated.add(value, low, count, count=True)
+
+
+def update(bank: _Bank, batch: MixedBatch, weights: jax.Array) -> tuple[_Bank, jax.Array]:
     """Add a batch with fixed responsibilities; return (new bank, valid).
 
     Every observed field uses the same [N,K] probability matrix. A partially
@@ -49,6 +59,8 @@ def update(bank: MixedBank, batch: MixedBatch, weights: jax.Array) -> tuple[Mixe
     retain their rounded increments across calls; neither word extends the
     dtype's exponent range. Counts report exhaustion if an increment loses
     mass and the low word can no longer resolve even a whole observation.
+    A RoundedBank instead rounds each update to a single word. A fractional
+    change can disappear at a large mean or count while validity remains true.
     """
     valid = mixed_scoring.validate_inputs(bank, batch)
     n = batch.mean.shape[0]
@@ -68,7 +80,8 @@ def update(bank: MixedBank, batch: MixedBatch, weights: jax.Array) -> tuple[Mixe
         observed = batch.gaussian_observed
         gaussian_weights = jnp.where(observed[:, None], weights, 0)
         mass = gaussian_weights.sum(axis=0)
-        kn, kappa_low, ok = _compensated.add(bank.kappa, bank.carry.kappa, mass, count=True)
+        carry = None if isinstance(bank, RoundedBank) else bank.carry
+        kn, kappa_low, ok = _add_count(bank.kappa, None if carry is None else carry.kappa, mass)
         mean = jnp.where(observed[:, None], batch.mean, 0)
         cov = jnp.where(observed[:, None, None], batch.covariance, 0)
         cov = 0.5 * cov + 0.5 * jnp.swapaxes(cov, -1, -2)
@@ -78,47 +91,59 @@ def update(bank: MixedBank, batch: MixedBatch, weights: jax.Array) -> tuple[Mixe
         use_data = (mass >= bank.kappa)[:, None]
         anchor = jnp.where(use_data,
                            mean[jnp.argmax(gaussian_weights, axis=0)], bank.mu)
-        anchor_low = jnp.where(use_data, 0, bank.carry.mu)
-        delta = jnp.where(gaussian_weights[:, :, None] > 0,
-                          (mean[:, None, :] - anchor) - anchor_low, 0)
-        prior_delta = (bank.mu - anchor) + (bank.carry.mu - anchor_low)
+        diff = mean[:, None, :] - anchor
+        prior_delta = bank.mu - anchor
         precision = jax.lax.Precision.HIGHEST
-        data_sum = jnp.einsum("nk,nkd->kd", gaussian_weights, delta, precision=precision)
-        data_center = data_sum / kn[:, None]
-        center = (bank.kappa / kn)[:, None] * prior_delta + data_center
-        mu, mu_low, representable = _compensated.add(anchor, anchor_low, center)
-        ok &= representable
+        if carry is None:
+            delta = jnp.where(gaussian_weights[:, :, None] > 0, diff, 0)
+            center = ((bank.kappa / kn)[:, None] * prior_delta
+                      + jnp.einsum("nk,nkd->kd", gaussian_weights / kn, delta, precision=precision))
+            mu = jnp.where(mass[:, None] > 0, anchor + center, bank.mu)
+        else:
+            anchor_low = jnp.where(use_data, 0, carry.mu)
+            delta = jnp.where(gaussian_weights[:, :, None] > 0, diff - anchor_low, 0)
+            prior_delta += carry.mu - anchor_low
+            data_sum = jnp.einsum("nk,nkd->kd", gaussian_weights, delta, precision=precision)
+            center = (bank.kappa / kn)[:, None] * prior_delta + data_sum / kn[:, None]
+            mu, mu_low, representable = _compensated.add(anchor, anchor_low, center)
+            ok &= representable
         residual = jnp.where(gaussian_weights[:, :, None] > 0, delta - center, 0)
         scaled = jnp.sqrt(gaussian_weights)[:, :, None] * residual
         prior_residual = jnp.sqrt(bank.kappa)[:, None] * (prior_delta - center)
         within = jnp.einsum("nk,nij->kij", gaussian_weights, cov, precision=precision)
         scatter = jnp.einsum("nki,nkj->kij", scaled, scaled, precision=precision)
-        increment = within + scatter + prior_residual[:, :, None] * prior_residual[:, None, :]
-        psi, psi_low, representable = _compensated.add(bank.psi, bank.carry.psi, increment)
-        ok &= representable
+        prior_scatter = prior_residual[:, :, None] * prior_residual[:, None, :]
+        if carry is None:
+            psi = jnp.where(mass[:, None, None] > 0,
+                            bank.psi + within + scatter + prior_scatter, bank.psi)
+        else:
+            increment = within + scatter + prior_scatter
+            psi, psi_low, representable = _compensated.add(bank.psi, carry.psi, increment)
+            ok &= representable
         present = observed
         heads, head_lows = [], []
-        for index, alpha, low in zip(batch.categories, bank.categories, bank.carry.categories, strict=True):
+        for i, (index, alpha) in enumerate(zip(batch.categories, bank.categories, strict=True)):
             index = mixed_scoring.category_indices(index)
             observed_category = index >= 0
             present = present | observed_category
             hot = jax.nn.one_hot(index, alpha.shape[1], dtype=weights.dtype)
             hot = jnp.where(observed_category[:, None], hot, 0)
             counts = jnp.matmul(weights.T, hot, precision=precision)
-            head, head_low, representable = _compensated.add(alpha, low, counts, count=True)
+            head, head_low, representable = _add_count(alpha, None if carry is None else carry.categories[i], counts)
             ok &= representable
             heads.append(head)
             head_lows.append(head_low)
         seen_mass = jnp.where(present[:, None], weights, 0).sum(axis=0)
-        alpha, alpha_low, representable = _compensated.add(bank.alpha, bank.carry.alpha, seen_mass,
-                                                          count=True)
+        alpha, alpha_low, representable = _add_count(bank.alpha, None if carry is None else carry.alpha, seen_mass)
         ok &= representable
-        nu, nu_low, representable = _compensated.add(bank.nu, bank.carry.nu, mass, count=True)
+        nu, nu_low, representable = _add_count(bank.nu, None if carry is None else carry.nu, mass)
         ok &= representable
-        candidate = MixedBank(
-            mu, kn, psi, nu, alpha, tuple(heads), bank.active,
-            MixedCarry(mu_low, kappa_low, psi_low, nu_low, alpha_low, tuple(head_lows)),
-        )
+        fields = mu, kn, psi, nu, alpha, tuple(heads), bank.active
+        if carry is None:
+            candidate = RoundedBank(*fields)
+        else:
+            candidate = MixedBank(*fields, MixedCarry(mu_low, kappa_low, psi_low, nu_low,
+                                                      alpha_low, tuple(head_lows)))
         proper = ok & mixed_scoring.validate_bank(candidate)
         return jax.tree.map(lambda new, old: jnp.where(proper, new, old), candidate, bank), proper
 

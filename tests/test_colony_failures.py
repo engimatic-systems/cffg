@@ -19,7 +19,7 @@ from cffg.engine import Engine, RunStatus, _replace
 
 
 @pytest.mark.parametrize("dtype", (np.float32, pytest.param(np.float64, marks=pytest.mark.slow)))
-@pytest.mark.parametrize("schedule", ("auto", "flood"))
+@pytest.mark.parametrize("schedule", ("auto", pytest.param("flood", marks=pytest.mark.slow)))
 @pytest.mark.parametrize("budget", (0, 8))
 @pytest.mark.parametrize("failure", ("nan", "infinity", "empty_support"))
 def test_initial_failure_preserves_state_and_healthy_peer(
@@ -237,7 +237,7 @@ def check_later_failure(
 
 
 @pytest.mark.parametrize("dtype", (np.float32, pytest.param(np.float64, marks=pytest.mark.slow)))
-@pytest.mark.parametrize("schedule", ("auto", "flood"))
+@pytest.mark.parametrize("schedule", ("auto", pytest.param("flood", marks=pytest.mark.slow)))
 @pytest.mark.parametrize(
     "failure", ("inner", "inner_budget", "energy", "support", "state")
 )

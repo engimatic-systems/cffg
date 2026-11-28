@@ -1741,7 +1741,14 @@ them. Four rules define the contract:
    These arrays describe a finite bank whose semantic fields and category
    order are supplied by the model. Compact mixed snapshots save the rounded
    parameters; exact snapshots also save the corrections carried into the
-   next update. The component lifecycle v2 envelope holds compact v2 mixed
+   next update. Public mixed scoring and updating select arithmetic from the
+   bank pytree's type at trace time. `MixedBank.as_rounded()` projects to the
+   seven primary fields of `RoundedBank`. Its update follows the single-word
+   weighted NIW and categorical operations, with the same masking and validity
+   checks on those fields. `RoundedBank.as_compensated()` allocates zero
+   residuals. The v2 snapshot represents every bit of a rounded bank, and
+   the caller selects the arithmetic by choosing the bank class at restore.
+   The component lifecycle v2 envelope holds compact v2 mixed
    records for its reset prior and posterior. The optional exact lifecycle v1
    envelope retains the original pair of v3 mixed records. Both codecs validate
    identity metadata and require dormant parameters to match the reset prior.

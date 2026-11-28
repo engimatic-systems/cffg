@@ -174,7 +174,7 @@ def test_assignment_scoring_uses_current_parameters_and_decodes_only_at_facade(
         assert len(calls) == 1 and calls[0] is supplied
 
 
-@pytest.mark.parametrize("enabled", (False, True))
+@pytest.mark.parametrize("enabled", (False, pytest.param(True, marks=pytest.mark.slow)))
 def test_two_slice_functional_ledger_charges_one_shared_kl_without_updating(
     monkeypatch, enabled
 ):

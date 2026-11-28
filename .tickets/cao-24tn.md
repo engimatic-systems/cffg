@@ -1,6 +1,6 @@
 ---
 id: cao-24tn
-status: in_progress
+status: closed
 deps: [cao-0cla, car-9ccf]
 links: []
 created: 2026-11-24T05:21:34Z
@@ -65,3 +65,7 @@ The device can decline very small products and cancellation at ordinary scales; 
 **2026-11-24T07:18:58Z**
 
 The aggregate short suite passed at f74543f, including the device lifecycle cases in its default selection. The separate 17 focused and scale cases cover 32, 500 and 5000 slots. The remaining prerequisite for this ticket is adoption of car-9ccf. cao-ar2d tracks device cancellation refusals and the qualified host retry.
+
+**2026-11-24T14:57:37Z**
+
+The remaining car-9ccf prerequisite is closed after the default decision. The device and host results and the exact retry case are recorded above. The narrower compiled range remains tracked separately under cao-ar2d.

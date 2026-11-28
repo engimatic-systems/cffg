@@ -69,7 +69,7 @@ def input_blocks(engine, group, state, precisions, etas=None):
     return _replace(state, g_eta=e, g_lam=p)
 
 
-@pytest.mark.parametrize("method", ["linearization", "sigma_point"])
+@pytest.mark.parametrize("method", [pytest.param("linearization", marks=pytest.mark.slow), "sigma_point"])
 @pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_only_ready_members_evaluate_even_under_an_outer_vmap(monkeypatch, method, dtype):
     with jax.enable_x64(dtype is np.float64):

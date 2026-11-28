@@ -49,7 +49,7 @@ def test_forward_vacuous_propagates():
     assert np.abs(lam).max() < 1e-6 and np.abs(eta).max() < 1e-6
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_forward_vacuous_is_scale_and_coordinate_invariant(dtype):
     """Regression cff-3hgi: no absolute ridge may manufacture precision.
 
@@ -215,7 +215,7 @@ def test_invalid_factor_precision_cannot_produce_finite_energy():
     assert np.isposinf(np.asarray(observed)).all()
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_mixed_scale_d100_readout_survives(dtype):
     """Hostile scale/dimension contract: d>=100 remains proper and finite."""
     d = 100

@@ -107,6 +107,7 @@ def test_observed_custom_chain_scan_transport_and_trace_reuse(registered):
     assert initial.g_eta.shape not in carries and initial.g_lam.shape not in carries
 
 
+@pytest.mark.slow
 def test_colony_shares_one_engine_for_distinct_parameters_and_observations(registered):
     t, arrays = model(observed=True)
     variants = [arrays, {**arrays, "center": arrays["center"] + 0.3}]

@@ -251,7 +251,7 @@ def shifting_bank(dtype, k=4, d=3):
     return ComponentBank.from_state_dict(state)
 
 
-@pytest.mark.parametrize("dtype", [np.float64, np.float32])
+@pytest.mark.parametrize("dtype", [pytest.param(np.float64, marks=pytest.mark.slow), np.float32])
 @pytest.mark.parametrize("outcome, verdict", [(0, "rejected"), (1, "accepted")])
 def test_global_repair_changes_untouched_winner_and_merge_decision(dtype, outcome, verdict):
     bank = shifting_bank(dtype)

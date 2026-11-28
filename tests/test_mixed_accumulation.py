@@ -197,3 +197,23 @@ def test_canonical_low_word_matches_directed_spacing_at_binade_edges(dtype):
                 normal = abs(gap) / 2 > info.tiny
                 expected = np.isfinite(high + low) & (abs(low) <= abs(gap) / 2)
                 np.testing.assert_array_equal(np.asarray(got)[normal], expected[normal])
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_rounded_stream_reproduces_the_two_record_precision_boundary(dtype):
+    from cffg.mixed_learning import RoundedBank
+
+    with jax.enable_x64(dtype == np.float64):
+        origin = dtype(4096)
+        h = np.spacing(origin)
+        x = one(dtype, origin + h, 0)
+        weights = jnp.ones((1, 1), dtype)
+        prior = scalar_bank(dtype, origin, 1, h*h)
+        rounded, ok = stream(prior.as_rounded(), x, weights, 2)
+        assert ok and isinstance(rounded, RoundedBank)
+        assert rounded.mu.item() == origin
+        # The first rounded mean loses h/2, inflating the second scatter.
+        np.testing.assert_allclose(rounded.psi.item()/h**2, 13/6, rtol=4*np.finfo(dtype).eps)
+        compensated, ok = stream(prior, x, weights, 2)
+        assert ok
+        np.testing.assert_allclose(compensated.psi.item()/h**2, 5/3, rtol=4*np.finfo(dtype).eps)

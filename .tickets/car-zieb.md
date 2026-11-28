@@ -101,3 +101,7 @@ Selected dependencies, prerequisite --> dependent. car-8rgl supplies the frozen 
     car-ne0a + cao-fs5s + cff-wdhj --> cao-lxmq --> car-zieb
 
 The reviewed measurements, scripts and raw records are linked from ~/agent-share/axiom-online-precision/index.html. The 10,000-step evaluation is pending.
+
+**2026-11-25T00:36:12Z**
+
+Cooper paused AXIOM after the Explode confidence gate. Preserve the measured agent at e741943, the full 10000-action archive and replay at ~/agent-share/axiom-10000, and the implementation on PR 204. The single run scored +157; no further evaluation seeds were opened. The open module and campaign tickets carry their existing handoffs for a future resume.

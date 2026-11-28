@@ -163,6 +163,7 @@ def test_missing_observation(viz_gallery):
     np.testing.assert_allclose(means, ref.state_mean, atol=1e-6)
 
 
+@pytest.mark.slow
 def test_bfe_finite_and_near_evidence():
     """The reported BFE is a *bounded* ledger (LIMITATIONS S1d), not the
     tree identity: assert it is finite, loud-free, and lands within a

@@ -32,7 +32,7 @@ def same(a, b):
         np.testing.assert_array_equal(x, y)
 
 
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 def test_masks_motion_and_separate_evidence_clocks(dtype):
     start = frame([[0, 0], [0, 0], [0, 0]], [1, 1, 1], dtype=dtype)
     state = initial_tracks(start).state

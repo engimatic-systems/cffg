@@ -158,13 +158,69 @@ def _unite(one, two):
                  np.concatenate((one.ids, two.ids), axis=1))
 
 
+def _fixed_bounds(tables, tape, ids):
+    """Bound context scores of fixed diagonal Gaussians in the working arithmetic."""
+    # Every term of a diagonal squared deviation is nonnegative. Limit the
+    # operand magnitudes so the eager finite-score check can never overflow
+    # in the quadratic or the four score additions on rows we skip.
+    limit = np.finfo(np.float64).max ** .25
+    if not len(ids) or np.max(np.abs(tape.features), initial=0.) >= limit:
+        return np.zeros(len(ids), bool), -np.inf
+    precision = tables.precision[ids]
+    d = precision.shape[-1]
+    diag = np.diagonal(precision, axis1=-2, axis2=-1)
+    eligible = (precision[:, ~np.eye(d, dtype=bool)] == 0).all(axis=1)
+    eligible &= ((diag > 0) & (diag < limit)).all(axis=1)
+    eligible &= (np.abs(tables.mean[ids]) < limit).all(axis=1)
+    bound = tables.constant[ids].copy()
+    eligible &= np.abs(bound) < limit
+    for head in tables.log_heads[:4]:
+        logs = head[ids]
+        eligible &= (np.abs(logs) < limit).all(axis=1)
+        bound += logs.max(axis=1)
+    return eligible, bound[eligible].max(initial=-np.inf)
+
+
+class _FixedWinners:
+    """Remember the best dormant row for each record that ever needs it."""
+
+    def __init__(self, ids, upper, tables, tape, block):
+        self.ids, self.upper, self.tables, self.tape, self.block = ids, upper, tables, tape, block
+        n = len(tape.features)
+        self.score = np.full(n, -np.inf)
+        self.winner = np.full(n, -1, dtype=np.intp)
+
+    def resolve(self, scores, ids):
+        if not len(self.ids):
+            return ids
+        missing = np.flatnonzero((scores <= self.upper) & (self.winner < 0))
+        for n in range(0, len(missing), 512):
+            rows = missing[n:n+512]
+            tape = Records(self.tape.features[rows], self.tape.categories[rows])
+            for start in range(0, len(self.ids), self.block):
+                slots = self.ids[start:start+self.block]
+                context = self.tables.context(tape, slots)
+                local = context.argmax(axis=1)
+                highest = context[np.arange(len(rows)), local]
+                better = highest > self.score[rows]
+                self.score[rows[better]] = highest[better]
+                self.winner[rows[better]] = slots[local[better]]
+        wins = (self.score > scores) | ((self.score == scores) & (self.winner < ids))
+        return np.where(wins, self.winner, ids)
+
+
 class Competition:
     """Keep the top three so replacing two columns cannot hide the best untouched row."""
 
-    def __init__(self, tables, tape, mutable_ids, block=64):
+    def __init__(self, tables, tape, mutable_ids, *, active, block=64):
         self.tables, self.tape = tables, tape
         mutable = np.asarray(sorted(set(map(int, mutable_ids))), dtype=np.intp)
         fixed = np.setdiff1d(np.arange(len(tables.mean)), mutable)
+        dormant = fixed[~active[fixed]]
+        eligible, upper = _fixed_bounds(tables, tape, dormant)
+        deferred = dormant[eligible]
+        self.dormant = _FixedWinners(deferred, upper, tables, tape, block)
+        fixed = np.setdiff1d(fixed, deferred, assume_unique=True)
         self.fixed = None
         for start in range(0, len(fixed), block):
             self.fixed = _unite(self.fixed, self._block(fixed[start:start+block]))
@@ -190,6 +246,12 @@ class Competition:
             best = _unite(best, top)
         self.best = best
 
+    def winners(self):
+        if self.best is None:
+            return self.dormant.resolve(np.full(len(self.tape.features), -np.inf),
+                                        np.zeros(len(self.tape.features), dtype=np.intp))
+        return self.dormant.resolve(self.best.scores[:, 0], self.best.ids[:, 0])
+
     def trial_winners(self, pair, new):
         keep = ~np.isin(self.best.ids, pair)
         # At most two rows were replaced, so one of the first three survives
@@ -200,7 +262,8 @@ class Competition:
         other_id = self.best.ids[row, col]
         scores = new.context(self.tape, np.arange(2))
         choices = np.column_stack((other_id, np.broadcast_to(pair, scores.shape)))
-        return _rank(np.column_stack((other, scores)), choices, 1).ids[:, 0]
+        best = _rank(np.column_stack((other, scores)), choices, 1)
+        return self.dormant.resolve(best.scores[:, 0], best.ids[:, 0])
 
     def accept(self, pair, new):
         self.tables.install(pair, new)

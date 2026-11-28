@@ -1,6 +1,6 @@
 ---
 id: caoc-0dvd
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-11-24T05:39:58Z
@@ -41,3 +41,7 @@ A low word stores the fraction lost when a number rounds in its working precisio
 **2026-11-24T05:50:46Z**
 
 Qualified candidate 089f377 preserved all frozen accuracy tests and recovered 30–47% of elapsed time against the first compensated implementation. All twelve original/optimized comparisons remain above the human decision boundary. The paired compute scan costs +21.7% to +54.2%, public returned-array calls +22.5% to +50.2%. Exact numbers and 95% intervals in ~/agent-share/axiom-online-precision/compute-confirmation/summary.json. A request to Cooper to choose the default is pending. Continue independent AXIOM design and fixed-action validation on the evaluation branch.
+
+**2026-11-24T14:50:52Z**
+
+Cooper accepted the measured 21.7–54.2% additional recurring CPU time for the corrected default. Keep compact checkpoints default and exact continuation optional. A separately selectable rounded update will be documented as a speed option. Use the corrected default throughout the 10,000-step evaluation.

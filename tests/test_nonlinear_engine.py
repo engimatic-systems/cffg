@@ -80,6 +80,7 @@ def test_affine_limit_matches_full_analytic_energy(method, observed):
                                analytic.gaussian_marginals(states[1])["x"][0], atol=1e-8)
 
 
+@pytest.mark.slow
 def test_distinct_observations_and_parameters_follow_vmap_and_host():
     from cffg import set_params
     from cffg.runtime_types import _replace
@@ -125,7 +126,7 @@ def test_improper_runtime_cavity_is_a_machine_readable_failure():
     assert engine.run(state, 5, tol=1e-8).status == RunStatus.DIVERGED
 
 
-@pytest.mark.parametrize("schedule", ["auto", "flood"])
+@pytest.mark.parametrize("schedule", ["auto", pytest.param("flood", marks=pytest.mark.slow)])
 def test_solver_reports_direction_lost_to_float32_sigma_point_rounding(schedule):
     with jax.enable_x64(False):
         template, arrays = model("sigma_point", affine=True, dim=2)

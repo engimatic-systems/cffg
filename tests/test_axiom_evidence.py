@@ -28,7 +28,7 @@ def observation(x):
     return MixedBatch(x[None], jnp.zeros((1, d, d), x.dtype), jnp.ones(1, bool), ())
 
 
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 def test_default_interaction_scale_changes_novelty_decision(dtype):
     d = 7
     bank = posterior(np.eye(d)[None] / 75**2, np.zeros((1, d)), dtype)

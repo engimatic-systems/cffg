@@ -131,6 +131,49 @@ def test_scene_output_heads_change_training_assignment_but_are_hidden_in_predict
     same(leaked.bank, device.from_host(host))
 
 
+def test_multi_point_reward_scores_zero_and_discounts_history_while_other_heads_learn():
+    cfg = InteractionConfig(actions=2, identities=2, motions=2)
+    base = bank([True, True], d=7, heads=(3,3,2,2,3,2), dtype=jnp.float32)
+    initial = base.posterior
+    reward_counts = jnp.array([[9,1,1], [1,1,9]], jnp.float32)
+    heads = (*initial.categories[:-2], reward_counts, initial.categories[-1])
+    old = initial._replace(alpha=jnp.full(2, 2.1, jnp.float32), categories=heads)
+    host = base.replace_posterior(old, previous=initial).bank
+    scene = jnp.array([[.25,0,0,0,0,0,.1,.1]], jnp.float32)
+    tracked = jnp.array([True])
+    args = scene, jnp.array([1]), tracked, 0, jnp.array([1.201,1.207], jnp.float32)
+    for reward in (-2, 2):
+        observed = interaction_batch(*args, config=cfg, reward=reward, switches=jnp.array([1]))
+        assert observed.valid and not score_context(old, observed)[-1]
+        records = observed.records
+        fields = records.categories
+        scores, _, ok = score(old, records)
+        oracle, _, proper = score(old._replace(categories=heads[:-2] + heads[-1:]),
+                                  records._replace(categories=fields[:-2] + fields[-1:]))
+        assert ok and proper
+        np.testing.assert_array_equal(scores, oracle)
+
+        receipt = learn_interactions(device.from_host(host), observed, tracked, threshold=-1000.)
+        assert receipt.valid and (receipt.status == S.MATCHED).all() and receipt.written.all()
+        np.testing.assert_array_equal(receipt.assignment, [[.5, .5]])
+        post = receipt.bank.posterior
+        # Each written row keeps half its old excess and gains no new reward count.
+        np.testing.assert_array_equal(post.categories[-2], [[5,1,1], [1,1,5]])
+        np.testing.assert_array_equal(post.categories[-1], [[1,1.5], [1,1.5]])
+        np.testing.assert_array_equal(post.categories[-3], [[1.5,1], [1.5,1]])
+        np.testing.assert_allclose(post.alpha, 1.6)
+        np.testing.assert_allclose(post.kappa, 1.5)
+
+    host_result = learn_observation(host, records, threshold=-1000., zero_count_head=4)
+    assert host_result.valid
+    same(device.from_host(host_result.bank), receipt.bank)
+    missing_action = records._replace(categories=fields[:3] + (jnp.array([-1]),) + fields[4:])
+    rejected = learn_interactions(device.from_host(host), observed._replace(records=missing_action),
+                                  tracked, threshold=-1000.)
+    assert not rejected.valid and not rejected.written.any()
+    same(rejected.bank, device.from_host(host))
+
+
 def test_ordered_32_slot_frame_matches_independent_natural_statistics():
     # Two identically initialized components keep equal likelihoods. An external
     # oracle can therefore propagate all raw statistics without calling a scorer.

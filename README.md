@@ -633,6 +633,30 @@ Resume on the same backend and numerical configuration for exact replay.
 Both snapshot modes occupy a fixed amount of uncompressed storage for a
 given bank shape and precision, regardless of episode count.
 
+For lower CPU and state-storage cost, select rounded-only arithmetic once
+before a sequence of public mixed-learning calls:
+
+```python
+from cffg.mixed_learning import RoundedBank, score, update
+
+rounded = bank.as_rounded()
+scores, weights, valid = score(rounded, batch)
+rounded, updated = update(rounded, batch, weights)
+saved = rounded.state_dict()
+resumed = RoundedBank.from_state_dict(saved)
+```
+
+The conversion discards any accumulated rounding remainders. A rounded bank
+stores one word per parameter and rounds each update immediately. For example,
+four float32 increments of 0.25 at a count of 2²² can all disappear while the
+update reports valid. To resume compensation, call `rounded.as_compensated()`;
+the new residuals start at zero. Both `state_dict()` and `state_dict(exact=True)`
+on a rounded bank write all its state in v2. Select `RoundedBank.from_state_dict`
+to continue using rounded arithmetic. A v3 input to that method is validated
+before its remainders are discarded. The choice applies to the standalone
+`score` and `update` functions, including compiled streams. Component lifecycle
+operations and the AXIOM agent use their own compensated banks.
+
 `ComponentBank.state_dict()` applies the same compact default to both the reset
 prior and the learned posterior. Both modes save logical IDs, generations and
 occupancy. Pass `exact=True` when later updates or merges must reproduce the
