@@ -1,6 +1,6 @@
 ---
 id: ccpr-u190
-status: in_progress
+status: closed
 deps: [ccpr-rl0k, cff-j7mm]
 links: []
 created: 2026-11-28T05:57:47Z
@@ -44,3 +44,7 @@ Change path: resource estimate and persistent State layout. Count a compact sour
 **2026-11-28T13:50:21Z**
 
 The isolated one-level source is a8f1f68 after cff-j7mm. Fifteen focused tests passed (one deselected) in 15.98 s, including comparison of actual initialized State leaf byte counts on a 64x64 grid in both dtypes. With the #239 compiler available, this extension follows enclosing owner multiplicities, direct parent declarations, and generated DATA/GLUE ports. Verify two-level compilation against independent fixtures, including partial rerouting of conditioned rows. Parent is joining the disjoint generated-slot fix for one combined estimator gate.
+
+**2026-11-28T15:16:57Z**
+
+Complete on 8b826f9. The isolated one-level inventory passed 15 tests; the joined estimator, nested fixtures and compiled leaf checks passed 40 (one deselected). The canonical short suite passed 2,918 tests in 435.25 s. At 64x64 the initialized f64 State held 327,680 message and 294,912 packed bytes while the two logical f64 sources required 72 bytes. Implicit, outer-private and outer-tied calibration fixtures match every named initialized State leaf in both precisions. Arbitrary unclassified packers raise UnknownStorageLayout before invoking callbacks. The separate matched compile profile on the same head measured 0.737124 s warm median, 4,096 DATA ports and 40,960 message values. Both depth-two accounting criteria are covered.
