@@ -1,6 +1,6 @@
 ---
 id: cff-wi2o
-status: in_progress
+status: closed
 deps: [cff-ees0]
 links: []
 created: 2026-09-25T03:46:26Z
@@ -57,3 +57,7 @@ Change paths: Learnable or checkpoint feature and Runtime numerical or status in
 **2026-11-28T05:01:55Z**
 
 Question: does applying an invariant move only at low ESS preserve finite-population evidence? Independent review and a two-state exact enumeration give expected normalizer 1/4 instead of 1/2. The contract uses the same predetermined posterior-invariant kernel in both ESS branches; stratified draws have unbiased offspring counts. Sources: PCGym common/physics_agent.py _rejuvenate (elite plus jitter), D6d induction and test_static_particle_derivation.py. The zero estimate from an exhausted population is distinguished from analytic impossibility. Continuous runtime implementation remains cff-iplr.
+
+**2026-11-28T05:57:49Z**
+
+Final gate on 6e515ab1954eff90b7b69c8d7bb455c5b1e500d7 passed: 2,863 tests (not slow), 438.269 seconds on four workers, zero failures. The receipt is /Users/ravd/agent-share/particle-target-contract-ywMwwd/runtime.json and is byte-identical to the tracked runtime history. Eight new tests and the adjacent finite-hypothesis checks passed in the 18-test focused run. D6d includes the conditional-expectation proof for the same invariant move on both ESS branches and the two-state counterexample with normalizer 1/4 instead of 1/2. The v1 runtime implementation remains in cff-iplr.
