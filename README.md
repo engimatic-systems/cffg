@@ -926,6 +926,8 @@ optional `viz` dependencies. Rendering explains declared structure and
 constraints but does not compile or validate numerical inference.
 External wires follow deterministic routes around factor boxes. At crowded
 factors, ports and parameter terminals use the free sides before sharing one.
+A variable name sits beside its wire. A parameter name sits at its square terminal.
+Terminals that share a side extend different distances so each caption has room.
 Disconnected components are laid out independently and stacked without overlap.
 Use `render_svg` for a template, or `to_svg` after constructing a scene:
 
@@ -935,7 +937,14 @@ from cffg.viz import build_scene, render_svg, to_svg
 svg_text = render_svg(template)       # Template -> SVG string
 scene = build_scene(template)        # Template -> positioned Scene
 assert to_svg(scene) == svg_text     # Scene -> SVG string
+for label in scene.labels():
+    print(label.ref, label.text, label.bounds)
 ```
+
+Each caption gives its template reference, baseline in pixels, horizontal anchor,
+font role, and bounding box as `(left, top, right, bottom)`. Bounds use a
+deterministic estimate that works without installed fonts. `render_svg` lays out
+captions using the requested SVG font sizes.
 
 `cffg.estimate.estimate(engine)` reports exact bytes per persistent arena and parameter
 leaf. Its named XLA executables expose backend-reported FLOPs, byte traffic and

@@ -1,6 +1,6 @@
 ---
 id: cff-x5lv
-status: open
+status: closed
 deps: [cff-9bex]
 links: [cff-bxk4]
 created: 2026-07-09T02:46:53Z
@@ -111,3 +111,15 @@ Place scene-level collision and ownership checks in `tests/test_viz_layout.py`, 
 Retained wiggle candidates after the bounded current scan (candidate -> selected sense): fixed -> a model parameter supplied by a blob; preserve -> ref, semantic-label, or factor-coordinate invariance; public -> documented build_scene consumer contract; reusable -> reuse of routed fixtures or scene geometry; same -> spatial identity, shared-side membership, or one text-extent rule as named; expose -> typed-scene geometry callable by consumers and tests; implement -> named repository function or planned code change; provide -> an exclusive geometric interval created by added wire length; support -> the explicitly supported headless SVG text style; complete -> side-assignment execution_finished; deliver -> cff-9bex fixture artifact supplied by its prerequisite work; land -> cff-9bex work-item completion before this implementation; remaining -> preserved scene refs or headless collision contract; check -> automated ownership, collision, golden, or focused test check as named; equivalent -> equal acceptance artifacts and evidence; estimate -> deterministic conservative text-width model; evidence -> named scene property, golden, dashboard artifact, or automated check; exact -> one SVG text-element count for a named owner; oracle -> automated scene-level collision calculation; pass -> automated tests_succeed; reproduce -> byte identity between a golden and a normal render; test -> automated test artifact or execution; can -> demonstrated consumer capability or theoretical implementation capability as named; expected -> committed comparison artifact in the Golden SVG definition; may -> implementation permission or future GUI option as named; explicit_owner -> cff-x5lv owns label geometry while named prerequisite and linked tickets own routing and Gaussian notation; named_ticket_handoff -> cff-9bex and cff-bxk4 are concrete owners; scope_exclusion -> Gaussian notation, GUI font measurement, semantic IR, compiler, runtime, persistence, and checkpoint changes are outside this ticket; any -> universal negative scope over structural-route movement or installed-font dependence; at_least -> inclusive terminal-extension or conservative-bound lower limit; every -> each member of the locally named label, golden, level, or test set; current -> the named current/legacy checkpoint review pair; existing -> HMM-slice and T-maze goldens that predate this change; later -> a subsequent terminal in deterministic order or a future interactive GUI. Each retained occurrence is bounded by its sentence, symbol, fixture, metric, commit, or named artifact.
 
 Intelligible-ticket review: complete.
+
+**2026-11-28T05:49:02Z**
+
+Base #214 at d718480 supplies the obstacle-aware routes. Follow the Visualization change path in ARCHITECTURE, checking semantic diagram, scene, SVG, Studio consumer, compression levels and rollout coordinate invariance. Rendering is host-only, with no numerical rule, schedule, learning or checkpoint changes. Validate all supported fixture levels and parameter captions, including a long name.
+
+**2026-11-28T05:55:25Z**
+
+The 30 recorded layouts cover six fixtures at compression levels 0 through 4. On the routing prerequisite a separate SVG audit found 17 caption collisions and five out-of-canvas captions. The updated layouts had zero. Chromium measured all 445 rendered captions within the headless scene bounds. Twelve gallery images cover levels 0 and 4. A 32-character parameter caption stayed centered in its own extension. Seven SVG goldens were regenerated once and passed a normal comparison. Independent Studio checks cover selection and culling when only a caption is visible. The final focused selection passed 90 cases, 11 unrelated or slow cases deselected. The certified short suite remains the review gate.
+
+**2026-11-28T13:49:29Z**
+
+The existing canonical dashboard gate on 12b4986 passed 2,668 short tests with zero failures in 1,098.078 wall seconds. It recorded 46 diagrams in 33 galleries, including all six requested fixture pairs at levels 0 and 4. The scoped extent audit found 17 overlaps and five out-of-canvas captions on #214 across 30 renders. The candidate has zero of each. All nine focused caption checks passed. The layout, SVG and Studio work was tested together. The full receipt and tested head are in ~/agent-share/viz-terminal-labels-gate-B2iRYu. No second suite or golden write was needed for closure. Gaussian domain labels and continuous terminal rings are tracked separately in cff-bxk4.

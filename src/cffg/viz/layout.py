@@ -24,12 +24,14 @@ sides outward and follow clear corridors around unrelated boxes.
 
 from __future__ import annotations
 
-from .routing import WireRouter
+from .labels import CaptionSpace, terminal_layout
+from .routing import DIRECTIONS, WireRouter
 from .temporal_layout import temporal_grid
 
 import re
 from collections import deque
 from dataclasses import dataclass, replace
+from math import isfinite
 
 from cffg.viz.compress import Placement, Presentation
 from cffg.viz.diagram import (
@@ -45,13 +47,12 @@ from cffg.viz.scene import (
     CompositeBox,
     Dome,
     EllipsisMark,
+    Label,
     Path,
     Scene,
     Terminal,
 )
 
-# Unit direction vectors, y-down.
-_DIRS = {"left": (-1, 0), "right": (1, 0), "up": (0, -1), "down": (0, 1)}
 _TERMINAL_PREFERENCE = ("left", "up", "down", "right")
 
 
@@ -73,6 +74,15 @@ class LayoutStyle:
     composite_pad: float = 13.0
 
     temporal_flow: bool = True
+    label_size: float = 13.0
+    caption_size: float = 9.5
+    label_clearance: float = 5.0
+
+    def __post_init__(self):
+        for name in ("label_size", "caption_size", "label_clearance"):
+            value = getattr(self, name)
+            if not isfinite(value) or value <= 0:
+                raise ValueError(f"{name} must be finite and positive")
 
     def sizes(self, compact: bool) -> tuple[float, float, float]:
         if compact:
@@ -316,29 +326,31 @@ def _emit(
     anchors = _anchor_points(diagram, sides, centers, grid, box, (pitch_x, pitch_y))
 
     router = WireRouter(grid, (pitch_x, pitch_y), box)
+    terminal_plans = terminal_layout(diagram.wires.values(), anchors, router, style, natural_key)
     wires: list[Path] = []
     beads: list[Bead] = []
-    terminals: list[Terminal] = []
+    terminals = []
     ellipses: list[EllipsisMark] = []
 
     for wire in diagram.wires.values():
         directive = presentation.wires[wire.id]
         pts, term_item, ellipsis_item = _wire_geometry(
-            wire, anchors, style, (pitch_x, pitch_y), router
+            wire, anchors, router, terminal_plans, style.caption_size
         )
-        label_at = _label_pos(pts, style) if wire.label else None
+        label = "" if term_item and term_item.kind is TerminalKind.POINTMASS else wire.label
+        label_at = _label_pos(pts, style) if label else None
         if wire.moment_endpoints:
             selected = {end for end, _ in wire.moment_endpoints}
             left, right = _split_at_bead(pts)
             wires.extend((
-                Path(wire.id, left, label=wire.label, label_at=label_at,
+                Path(wire.id, left, label=label, label_at=label_at, label_size=style.label_size,
                      dashed=wire.ends[0] in selected),
                 Path(wire.id, right, dashed=wire.ends[1] in selected),
             ))
         else:
-            wires.append(Path(wire.id, pts, label=wire.label, label_at=label_at))
+            wires.append(Path(wire.id, pts, label=label, label_at=label_at, label_size=style.label_size))
         if term_item:
-            terminals.append(term_item)
+            terminals.append((term_item, terminal_plans[wire.id][2]))
         if ellipsis_item:
             ellipses.append(ellipsis_item)
         if directive.bead:
@@ -363,6 +375,21 @@ def _emit(
     composites = [
         _composite_box(c, centers, box, style) for c in diagram.composites
     ]
+
+    captions = CaptionSpace(style.label_clearance)
+    for node_box in boxes:
+        captions.reserve((node_box.x - box / 2, node_box.y - box / 2,
+                          node_box.x + box / 2, node_box.y + box / 2))
+    for terminal, _ in terminals:
+        captions.reserve((terminal.x - 6, terminal.y - 6, terminal.x + 6, terminal.y + 6))
+
+    for i in sorted(range(len(wires)), key=lambda n: natural_key(wires[n].ref)):
+        wire_path = wires[i]
+        if wire_path.label_at is not None:
+            p, q = max(zip(wire_path.points, wire_path.points[1:]),
+                       key=lambda pair: sum(abs(a - b) for a, b in zip(*pair)))
+            wires[i] = captions.place(wire_path, 1 if p[1] == q[1] else 0)
+    terminals = [captions.place(terminal, 1 - axis) for terminal, axis in terminals]
 
     # Boxes fill white, so anything drawn inside them must come later.
     items = [*composites, *wires, *boxes, *internal, *domes, *beads, *terminals, *ellipses]
@@ -419,8 +446,7 @@ def _anchor_points(diagram, sides, centers, grid, box, pitch):
     return anchors
 
 
-def _wire_geometry(wire, anchors, style, pitch, router):
-    pitch_x, pitch_y = pitch
+def _wire_geometry(wire, anchors, router, terminal_plans, caption_size):
     pts: list[tuple[float, float]] = []
     terminal = None
     ellipsis = None
@@ -435,21 +461,14 @@ def _wire_geometry(wire, anchors, style, pitch, router):
         (node,) = nodes
         term = next(e for e in wire.ends if isinstance(e, TerminalEnd))
         x, y, side = anchors[(node.factor, node.role)]
-        dx, dy = _DIRS[side]
-        length = router.terminal(
-            node.factor, (x, y), (pitch_x if dx else pitch_y) * style.terminal_offset, (dx, dy)
-        )
-        tx, ty = x + dx * length, y + dy * length
-        pts = [(x, y), (tx, ty)]
+        pts, baseline, _ = terminal_plans[wire.id]
+        tx, ty = pts[-1]
         ref = term.ref or wire.id
         if term.kind is TerminalKind.ELLIPSIS:
             angle = 0.0 if side in ("left", "right") else 90.0
             ellipsis = EllipsisMark(ref, tx, ty, angle)
         else:
-            # Pointmass parameters are labeled on their wire (like any edge);
-            # port terminals keep their name as a caption.
-            label = "" if term.kind is TerminalKind.POINTMASS else term.label
-            terminal = Terminal(ref, tx, ty, term.kind, label)
+            terminal = Terminal(ref, tx, ty, term.kind, term.label, baseline, caption_size)
     return tuple(pts), terminal, ellipsis
 
 
@@ -514,7 +533,7 @@ def _node_marginals(name, node, directive, anchors, center, style):
         else:
             if len(pts) == 1:
                 x, y, side = pts[0]
-                dx, dy = _DIRS[side]
+                dx, dy = DIRECTIONS[side]
                 bx, by = x - dx * style.bead_r * 1.9, y - dy * style.bead_r * 1.9
                 beads.append(Bead(ref, bx, by, group.shape, group.symbol))
                 if directive.internal_edges:
@@ -567,13 +586,19 @@ def _item_points(item):
                 (item.x + item.w / 2 + 20, item.y + item.h / 2 + 20)]
     if isinstance(item, Path):
         pts = list(item.points)
-        if item.label_at:
-            pts.append(item.label_at)
+        caption = Label.for_item(item)
+        if caption:
+            x, y, u, v = caption.bounds
+            pts.extend(((x, y), (u, v)))
         return pts
     if isinstance(item, (Bead,)):
         return [(item.x - 10, item.y - 10), (item.x + 10, item.y + 10)]
     if isinstance(item, (Terminal, EllipsisMark)):
-        return [(item.x - 26, item.y - 16), (item.x + 26, item.y + 16)]
+        points = [(item.x - 26, item.y - 16), (item.x + 26, item.y + 16)]
+        if isinstance(item, Terminal) and (caption := Label.for_item(item)):
+            x, y, u, v = caption.bounds
+            points.extend(((x, y), (u, v)))
+        return points
     if isinstance(item, Dome):
         return list(item.anchors)
     if isinstance(item, CompositeBox):
@@ -588,6 +613,9 @@ def _shift(item, dx: float, dy: float):
             (item.label_at[0] + dx, item.label_at[1] + dy) if item.label_at else None
         )
         return replace(item, points=pts, label_at=label_at)
+    if isinstance(item, Terminal) and item.label_at is not None:
+        x, y = item.label_at
+        return replace(item, x=item.x + dx, y=item.y + dy, label_at=(x + dx, y + dy))
     if isinstance(item, Dome):
         return replace(
             item,

@@ -22,8 +22,20 @@ from cffg.models.rslds import rslds
 from cffg.models.rslds_fit import vague_rslds_fit_priors
 from cffg.viz import LayoutStyle, build_scene
 from cffg.viz.layout import OccupiedCell
+from cffg.viz.scene import Label, Path as ScenePath, Terminal
 
 MAX_ARCHIVE_BYTES = 256 * 1024 * 1024
+
+
+def _describe_scene_item(item):
+    record = dict(asdict(item), primitive=type(item).__name__)
+    if isinstance(item, (ScenePath, Terminal)) and (label := Label.for_item(item)):
+        record.update(
+            label_bounds=label.bounds,
+            label_font_role=label.font_role,
+            label_anchor=label.anchor,
+        )
+    return record
 
 
 def check_archive(blob):
@@ -242,9 +254,7 @@ class Document:
             "scene": {
                 "width": scene.width,
                 "height": scene.height,
-                "items": [
-                    dict(asdict(i), primitive=type(i).__name__) for i in scene.items
-                ],
+                "items": [_describe_scene_item(item) for item in scene.items],
             },
             "resources": self.meta.get("resources", {}),
         }

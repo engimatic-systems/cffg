@@ -6,6 +6,7 @@ visual change, regenerate with:
     CFFG_UPDATE_GOLDENS=1 uv run pytest tests/test_viz_svg.py
 """
 
+from collections import Counter
 import os
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -61,6 +62,25 @@ def test_save_svg(tmaze, tmp_path):
 
 def test_render_is_deterministic(tmaze):
     assert render_svg(tmaze) == render_svg(tmaze)
+
+
+def test_svg_uses_each_scene_caption_once_including_repeated_blob_refs():
+    from test_kalman import F, H, M0, P0, Q, R, lgssm
+
+    template, _ = lgssm(3, F, Q, H, R, M0, P0)
+    scene = build_scene(template, level=4)
+    labels = scene.labels()
+    blob_refs = Counter(label.ref for label in labels if label.ref.startswith("blob:"))
+    assert any(count > 1 for count in blob_refs.values())
+
+    expected = Counter((label.text, f"{label.x:.1f}", f"{label.y:.1f}", label.size, label.anchor)
+                       for label in labels)
+    texts = elements(to_svg(scene), "text")
+    actual = Counter(("".join(node.itertext()), node.get("x"), node.get("y"),
+                      float(node.get("font-size")), node.get("text-anchor", "start"))
+                     for node in texts if node.get("font-style") == "italic"
+                     and node.get("dominant-baseline") is None)
+    assert actual == expected
 
 
 def test_svg_entrypoints_explain_template_and_scene_inputs(tmaze):
