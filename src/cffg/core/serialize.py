@@ -154,7 +154,7 @@ def to_dict(t: Template) -> dict[str, Any]:
     # Additive (cff-nhxf): the serialized model/runtime interface. These are
     # structural names and variational-family declarations, so changing any
     # binding changes the structure hash.
-    if isinstance(t.agent, (gaussian_agent.GaussianPlanSpec, gaussian_agent.GaussianFilterSpec)):
+    if isinstance(t.agent, gaussian_agent.GAUSSIAN_WINDOW_SPECS):
         d["agent"] = gaussian_agent.to_document(t.agent)
     elif t.agent is not None:
         belief_names = [belief.name for belief in t.agent.beliefs]

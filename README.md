@@ -158,7 +158,7 @@ expose the specialized workflows named in the capability map.
 `FACTOR_TYPES`, `AgentSpec`, `BeliefBinding`, `BlobRef`, `BoundaryFactorization`,
 `Broadcast`, `Chain`, `ConstraintKind`, `ConstraintSpec`, `Expose`, `FactorSpec`,
 `FactorType`, `FanOut`, `ObserveInterior`, `FunctionSpec`, `GaussianFilterSpec`,
-`GaussianPlanSpec`, `LearnableSpec`, `ModelError`,
+`GaussianPlanSpec`, `HybridFilterSpec`, `HybridPlanSpec`, `LearnableSpec`, `ModelError`,
 `MomentMatchingEndpoint`, `MomentProjection`, `PlateSpec`, `PortRole`, `PortSpec`,
 `Template`, `VariableSpec`, `expand_plates`, `fan_out`, `observe_interior`, `plate_observations`,
 `migrate_moment_matching`, `moment_matching`, `moment_matching_endpoint`,
@@ -522,6 +522,41 @@ The sensor argument can be `None` for a missing reading. A failed solve
 raises before advancing the tick. A checkpoint taken after `propose` also
 retains the outstanding decision. The numerical fixture includes both bundle
 declarations. [Gaussian agent fixture](tests/test_gaussian_agent.py)
+
+With an executed categorical command and a continuous state, use the same
+factory with `cffg.core.HybridPlanSpec` and `cffg.core.HybridFilterSpec`.
+The plan names a categorical action edge. The filter puts the applied selector
+on a categorical DATA port of one switching Gaussian transition. Its sensor
+uses a separate affine DATA emission.
+
+```python
+from cffg import RollingAgent
+
+agent = RollingAgent.from_gaussian_bundles(
+    "hybrid-plan.cffgz", "hybrid-filter.cffgz", select="sample", seed=17,
+    on_failure="hold", initial_command=0,
+)
+decision = agent.propose({"goal": [0.4]})
+# Send the proposed command to the plant and read back what it actually applied.
+applied, reading = plant_step(decision.command)
+agent.observe(applied, reading, tick=decision.tick)
+agent.checkpoint("hybrid-controller.npz")
+```
+
+A held decision carries its failure status and diagnostic in `decision.failure`
+and uses the last applied command. The default failure policy raises. A
+repeated proposal with the same preview returns the outstanding decision.
+Restore on a controller opened with the same bundles and settings, then
+resume the pending action or continue the committed tick. The caller tracks
+physical execution. A retry after a failed filter or learning step uses the
+same applied command and reading. [Hybrid agent fixture](tests/test_hybrid_rolling_agent.py)
+
+The filter bundle owns the starting learning posterior. Its observed sources
+update once per committed transition. A missing reading advances the state
+prediction and skips learning. Compatible declarations in the planning bundle
+use the current learning posterior. The hybrid filter carries one joint
+Gaussian after the executed selector is observed. A hidden regime coupled to
+the state across ticks requires a different boundary.
 
 An exact-tree certificate checks message consistency, not posterior accuracy.
 Choose float64 for tight moment or evidence comparisons, especially with widely

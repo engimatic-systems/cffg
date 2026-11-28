@@ -87,3 +87,15 @@ Focused validation at the proposed implementation bytes: all seven cases in test
 **2026-11-24T06:09:02Z**
 
 The cumulative branch renamed the covariance-rank helper. Integration first exposed five facade imports that failed. The agent now uses the shared ef.resolved_correlation entry point. The original unresolved float32 covariance regression and the combined public-agent and reducer tests passed on the integrated source.
+
+**2026-11-28T04:44:37Z**
+
+The hybrid and learned-affine slice continues from #208 (d07e8cf). The architecture change paths are New IR field, Learnable or checkpoint feature, and Runtime numerical or status invariant. Affected pairs are declaration validation/JSON/hash/scoping and bundle load, fixed-affine/extended v2 and unchanged categorical checkpoints, host carry over ordinary/scheduled Engine runs, and separately interleaved agents. The stateful Python controller has no vmapped execution surface. Factor registration, assembly and compiled message rules have no new owner or layout in this slice.
+
+Can the filter learn from a known switch without dropping state/selector dependence? The Engine binds the applied categorical DATA as exactly one selector, uses a separate affine sensor and exposes the selected transition joint to component MNIW. See lifecycle.py bind_data, specialized/discovery.py hybrid endpoints and mixg.py component joint readout. This is a code-level finding independently checked against the single-transition Kalman and MNIW oracle. A hidden persistent regime would require a different carry.
+
+Can the plan use the learner without consuming planning targets as evidence? Learnables.write and accumulate use compiled target roles and Engine source statistics separately (src/cffg/learn.py). The filter is the only update owner, and compatible planner declarations consume current rollover parameters. The controlled affine offset has a distinct per-transition writer, so the continuous fixture learns a separately owned sensor. This is a code-level finding checked against a conjugate oracle and exact restart.
+
+**2026-11-28T04:45:30Z**
+
+Focused gate passed 57 cases across tests/test_gaussian_agent.py, tests/test_hybrid_rolling_agent.py, tests/test_agent_spec.py, tests/test_agent.py, tests/test_bundle.py and tests/test_readme.py, including opt-in cases (uv run --frozen --no-sync pytest -q -o addopts='' -n 0). After adding the affine H=10 analytical witness, its complete file passed all 11 cases. The hybrid H=10 test restored both pending and committed cuts in a fresh interpreter, then produced identical complete archives. The two-type fixtures bind the actual override, skip missing-observation learning, qualify f32/f64 and reject unresolved boundaries. Retry after failed learning, held-command restart, synchronized duplicate feedback, malformed RNG and same-layout/different-prior rejection have independent checks. The final short dashboard gate follows on the committed code.

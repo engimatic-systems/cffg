@@ -1980,16 +1980,14 @@ joint-boundary case. It does not turn the two immutable templates into a
 literal mutable graph or establish the transformation for mean-field,
 continuous, hybrid, or hierarchical boundaries.
 
-##### Continuous and hybrid rolling boundaries (design for `cff-wdhj`)
+##### Continuous and hybrid rolling boundaries
 
-The first extension carries **one joint Gaussian** between a planning template
-and a one-transition perception template. The implemented slice is
-`RollingAgent.from_gaussian_bundles` for fixed affine Gaussian windows, a
-deterministic mean command and raise-on-failure planning. Its declarations
-are `GaussianPlanSpec` and `GaussianFilterSpec`. Their JSON names the window
-and orders the state coordinates, command components and first-action indices.
-The known-selector hybrid, marked hold policy and online learning below are
-the remaining design for `cff-wdhj`.
+`RollingAgent.from_gaussian_bundles` carries **one joint Gaussian** between
+a planning template and a one-transition perception template.
+`GaussianPlanSpec` and `GaussianFilterSpec` declare affine vector commands
+with deterministic mean selection. `HybridPlanSpec` and `HybridFilterSpec`
+declare a categorical command that selects a Gaussian transition. The
+controller owns its selection RNG and the configured failure policy.
 
 **Model declaration.** Opt in with `agent.version = 2`. Both templates name
 the same logical state coordinates in the same order and units. Each binds
@@ -2038,11 +2036,17 @@ and new sensor value, check convergence and the complete boundary, and stage
 the declared per-transition learning from that filter result. Planning goals
 and model-generated observations supply no learning statistics. A fully
 missing sensor tick advances the prediction and skips the learning update.
+The filter's bundle supplies the starting learner. A shared planning
+declaration must have the same immutable prior and compatible learned parameter
+roles and shapes. Affine command injection owns the effective transition offset.
+A sensor with independent parameters can learn from the filtered state. In the
+hybrid case the transition itself can teach component MNIW because its actual
+selector is bound before filtering.
 Advance belief, learning, last applied command and tick together. Reject
-duplicate or out-of-order feedback. A filter or learning failure leaves the transition pending for
-retry with the same evidence. An episode starts from its declared initial
-belief, clears pending work and the previous command, and retains the declared
-learning history. The legacy categorical episode and learned-goal cadence
+duplicate or out-of-order feedback. A filter or learning failure leaves the
+transition pending for retry with the same evidence. Reset an episode after
+resolving any outstanding decision. Reset restores the initial belief and
+clears the previous command while retaining the learning history. The legacy categorical episode and learned-goal cadence
 continue to use their existing rules.
 
 **Reconstruction and restart.** Store each template and its numeric blobs in
@@ -2054,6 +2058,12 @@ with a checked inventory of typed arrays. It stores the joint moments,
 current learning state, global and episode ticks, last applied command and
 owned RNG state. Between proposal and feedback it also stores the pending
 tick, preview identity, proposed command, status and objective/diagnostic.
+If the filter or learner failed after valid feedback arrived, the pending
+record also binds that feedback to the same tick. The base fixed-affine v2
+inventory remains readable and is used for default fixed-affine checkpoints
+unless a submitted feedback needs to be saved. The extended v2 inventory
+contains a controller mode, typed action and belief arrays, selection RNG,
+and versioned learner state.
 Resuming this phase returns the recorded decision without drawing again or
 repeating an external action. The caller owns the plant, observation stream
 and the record of whether a physical command actually ran. Restore validates

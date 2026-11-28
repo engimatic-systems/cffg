@@ -386,6 +386,12 @@ mixture-Bethe value at the same moments (bound direction pinned in
 are rejected at compile time in v1 — route observations through a plain
 `gaussian_linear` emission node; (5) rank-deficient per-regime backward
 messages have no well-defined normalized collapse and fall back to vacuous.
+The known-selector rolling agent carries a full Gaussian state after binding
+the applied categorical selector. A persistent hidden regime would need a
+joint regime/state boundary. For affine vector commands, the runtime owns
+the effective transition offset `b + B @ applied` and requires its own blob.
+Configure a separately parameterized filter source, such as the observation
+model, when learning in that affine controller.
 Full-rank A_s alone is not sufficient: each supported backward component must
 inform every input direction. In the retained PCGym position/velocity model,
 scalar position goals leave rank-one messages. The first action is exactly

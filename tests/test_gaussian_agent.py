@@ -15,16 +15,22 @@ from cffg.core.serialize import from_json, structure_hash, to_json
 from cffg.runtime_types import InferenceError, RunResult
 
 
-def window(plan):
+def window(plan, *, horizon=1):
     port = "target" if plan else "reading"
     t = Template(name=port)
     t.variables = {n: VariableSpec(n, dim=d) for n, d in (("x", 3), ("next", 3), ("y", 1))}
     def factor(name, kind, edges, **blobs):
         t.factors[name] = FactorSpec(name, kind, edges=edges, param_blobs=blobs)
     factor("prior", "gaussian", {"out": "x"}, mean="m", cov="P")
-    factor("motion", "gaussian_linear", {"in": "x", "out": "next"},
-           matrix="A", offset="b", cov="Q")
-    factor("sensor", "gaussian_linear", {"in": "next", "out": "y"},
+    previous = "x"
+    for step in range(horizon):
+        current = "next" if step == 0 else f"future{step}"
+        motion = "motion" if step == 0 else f"motion{step}"
+        t.variables[current] = VariableSpec(current, dim=3)
+        factor(motion, "gaussian_linear", {"in": previous, "out": current},
+               matrix="A", offset="b", cov="Q")
+        previous = current
+    factor("sensor", "gaussian_linear", {"in": previous, "out": "y"},
            matrix="H", offset="z", cov="R")
     arrays = dict(m=np.zeros(3), P=np.array([[1., .6, 0], [.6, 1., 0], [0, 0, 1.]]),
                   A=np.diag([1., 1., 0.]), b=np.zeros(3), Q=np.diag([.2, .2, 1.]),
@@ -201,6 +207,22 @@ def test_exhausted_plan_preserves_the_boundary_and_rejects_feedback(tmp_path, mo
     for current, expected in zip(agent.belief, before, strict=True):
         np.testing.assert_array_equal(current, expected)
     assert agent.tick == 0
+
+
+@pytest.mark.slow
+def test_terminal_affine_plan_at_horizon_ten(tmp_path):
+    with jax.enable_x64():
+        plan, filt = tmp_path / "plan.cffgz", tmp_path / "filter.cffgz"
+        save_bundle(plan, *window(True, horizon=10))
+        save_bundle(filt, *window(False))
+        agent = RollingAgent.from_gaussian_bundles(plan, filt)
+        decision = agent.propose({"target": [2.]})
+        # The terminal observation integrates the initial state, ten unit
+        # command variances, ten process variances and the terminal sensor.
+        variance = 1. + 10 * (1. + .2) + .3
+        expected_energy = .5 * (np.log(2. * np.pi * variance) + 4. / variance)
+        np.testing.assert_allclose(decision.command, [2. / variance], rtol=1e-10)
+        np.testing.assert_allclose(decision.free_energy, expected_energy, rtol=1e-10)
 
 
 @pytest.mark.slow
