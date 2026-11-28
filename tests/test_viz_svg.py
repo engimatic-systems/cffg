@@ -83,6 +83,53 @@ def test_svg_uses_each_scene_caption_once_including_repeated_blob_refs():
     assert actual == expected
 
 
+@pytest.mark.parametrize("role", ["prior", "goal", None])
+def test_continuous_open_ring_and_full_dimension_scale(role):
+    from cffg.core import BlobRef, FactorSpec, PortRole, PortSpec, Template, VariableSpec
+    from cffg.viz import derive
+    from cffg.viz.diagram import TerminalKind
+    from cffg.viz.scene import Path, Terminal
+    from test_kalman import _check_domain_geometry
+
+    template = Template("gaussian-open-domains")
+    for name, dimension in (("x", 1), ("latent", 128)):
+        template.variables[name] = VariableSpec(name, dim=dimension)
+        blobs = {role: f"{role}_{name}" for role in ("mean", "cov")}
+        template.factors[name] = FactorSpec(name, "gaussian", {"out": name}, param_blobs=blobs)
+        template.blobs.update({blob: BlobRef(blob, f"{blob}.npy") for blob in blobs.values()})
+        if role is not None:
+            template.ports[name] = PortSpec(name, name, PortRole(role))
+    for name in template.variables:
+        assert derive(template).wires[f"var:{name}"].label == name
+
+    for level in range(5):
+        scene = build_scene(template, level=level)
+        assert _finite_scene_points(scene)
+        svg = to_svg(scene)
+        texts = Counter("".join(node.itertext()) for node in elements(svg, "text"))
+        groups = {g.findtext("{*}title"): g for g in elements(svg, "g")}
+        for name, dimension, value in (("x", 1, "ℝ¹"), ("latent", 128, "ℝ¹²⁸")):
+            ref = f"var:{name}"
+            path, = [item for item in scene.by_ref(ref) if isinstance(item, Path)]
+            assert path.label == name and path.domain_label.text == value and texts[value] == 1
+            _check_domain_geometry(scene, path)
+            end = f"port:{name}" if role is not None else ref
+            terminal, = [item for item in scene.by_ref(end) if isinstance(item, Terminal)]
+            assert (terminal.kind, terminal.dimension) == (TerminalKind.OPEN, dimension)
+            group = groups[end]
+            outer, inner = group.findall("{*}circle")
+            assert outer.get("fill") == "none" and inner.get("fill") == "#ffffff"
+            assert float(outer.get("r")) == terminal.ring_radius > float(inner.get("r"))
+            assert (outer.get("cx"), outer.get("cy")) == (inner.get("cx"), inner.get("cy"))
+
+
+def _finite_scene_points(scene):
+    from math import isfinite
+    from cffg.viz.layout import _item_points
+
+    return all(isfinite(coordinate) for item in scene.items for point in _item_points(item) for coordinate in point)
+
+
 def test_svg_entrypoints_explain_template_and_scene_inputs(tmaze):
     scene = build_scene(tmaze)
     assert to_svg(scene) == render_svg(tmaze)
@@ -112,13 +159,20 @@ def test_gridworld_renders(viz_gallery):
 @pytest.mark.parametrize(
     "name,level",
     [("hmm_slice", 0), ("hmm_slice", 4), ("tmaze", 4),
+     ("lgssm_domain", 0), ("lgssm_domain", 4),
      ("gaussian_linear", 0), ("gaussian_linear", 4),
      ("gaussian_mixture_linear", 0), ("gaussian_mixture_linear", 4)],
 )
 def test_golden(name, level, hmm_slice, tmaze, viz_gallery):
+    from test_kalman import domain_lgssm
     from test_viz_layout import gaussian_junction
 
-    template = gaussian_junction(name) if name.startswith("gaussian") else {"hmm_slice": hmm_slice, "tmaze": tmaze}[name]
+    if name.startswith("gaussian"):
+        template = gaussian_junction(name)
+    elif name == "lgssm_domain":
+        template = domain_lgssm()
+    else:
+        template = {"hmm_slice": hmm_slice, "tmaze": tmaze}[name]
     svg = render_svg(template, level=level)
     viz_gallery(svg, tag=f"{name}, level {level}")
     path = GOLDEN / f"{name}_l{level}.svg"

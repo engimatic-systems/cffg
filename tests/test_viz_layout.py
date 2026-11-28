@@ -304,6 +304,9 @@ def _wire_and_terminal_labels(diagram, scene):
             path, = paths_with_labels
             assert path.label == wire.label and path.label_at is not None
             expected.append((path.ref, path.label, *path.label_at, "wire"))
+        for path in paths:
+            if caption := path.domain_label:
+                expected.append((path.ref, caption.text, caption.x, caption.y, "wire"))
 
         if terminal and terminal.kind in (TerminalKind.POINTMASS, TerminalKind.DATA, TerminalKind.OPEN):
             ref = terminal.ref or wire.id

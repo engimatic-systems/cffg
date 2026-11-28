@@ -2459,6 +2459,14 @@ four-stage pipeline, each stage importable on its own:
    the extension. `Scene.labels()` exposes the same baseline, anchor, font
    role and conservative text extent used to place and frame the captions.
 
+`VariableSpec.dim` supplies Gaussian wire dimensions. The semantic diagram
+keeps the variable name and dimension distinct. Layout places a second
+`ℝᵈ` caption outside the wire stroke and factor boxes, and forwards the
+dimension to DATA and OPEN terminals. SVG and the Studio scene show an outer
+ring around these terminals. The dimension caption describes the variable's
+domain. Part I's Gaussian form-constraint bead describes a constraint on
+its marginal distribution.
+
 Message-schedule overlays (Figs 23/24/27 arrows) are not implemented; the
 current renderer stops at the typed scene graph.
 

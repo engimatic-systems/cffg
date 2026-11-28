@@ -105,6 +105,8 @@ class WireView:
     ends: tuple[NodeEnd | TerminalEnd, NodeEnd | TerminalEnd]
     bead: str | None = None  # None: no bead in q (pointmass wires); "": empty
     moment_endpoints: tuple[tuple[NodeEnd, str], ...] = ()
+    family: str = ""
+    dimension: int = 0
     # bead symbols: "" (default normalisation), "delta" (point mass)
 
     def node_ends(self) -> list[NodeEnd]:
@@ -301,9 +303,11 @@ def _variable_wire(
         raise ValueError(f"variable {var!r} is connected to no factor")
     if moment_endpoints:
         symbol, bead = "E", ""
+    variable = template.variables[var]
     return WireView(
         id=f"var:{var}", label=var, ends=pair, bead=symbol if bead == "" else bead,
         moment_endpoints=tuple(moment_endpoints),
+        family=variable.family, dimension=variable.dim,
     )
 
 

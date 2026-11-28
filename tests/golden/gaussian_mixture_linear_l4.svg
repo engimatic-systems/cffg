@@ -2,8 +2,8 @@
 <title>gaussian_mixture_linear</title>
 <rect width="100%" height="100%" fill="#ffffff"/>
 <g stroke="#1a1a1a" stroke-width="1.3" fill="none" stroke-linecap="round">
-<path d="M238.0,190.3 L238.0,142.3"/><text x="246.0" y="170.3" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">x</text>
-<path d="M156.0,124.3 L183.5,124.3 Q188.0,124.3 188.0,128.8 L188.0,128.8 Q188.0,133.3 192.5,133.3 L220.0,133.3"/><text x="174.0" y="95.9" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">y</text>
+<path d="M238.0,190.3 L238.0,142.3"/><text x="246.0" y="170.3" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">x</text><text x="221.8" y="169.2" font-size="9.5" font-style="italic" stroke="none" fill="#1a1a1a" text-anchor="middle">ℝ¹</text>
+<path d="M156.0,124.3 L183.5,124.3 Q188.0,124.3 188.0,128.8 L188.0,128.8 Q188.0,133.3 192.5,133.3 L220.0,133.3"/><text x="174.0" y="95.9" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">y</text><text x="172.0" y="161.3" font-size="9.5" font-style="italic" stroke="none" fill="#1a1a1a" text-anchor="middle">ℝ¹</text>
 <path d="M320.0,124.3 L256.0,124.3"/><text x="290.0" y="117.3" font-size="13.0" font-style="italic" stroke="none" fill="#1a1a1a">z</text>
 <path d="M220.0,208.3 L168.0,208.3"/>
 <path d="M238.0,226.3 L238.0,270.0"/>

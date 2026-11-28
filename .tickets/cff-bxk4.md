@@ -1,6 +1,6 @@
 ---
 id: cff-bxk4
-status: open
+status: closed
 deps: [cff-4e5z, cff-9bex]
 links: [cff-9bex, cff-x5lv]
 created: 2026-07-08T16:50:10Z
@@ -209,3 +209,15 @@ Final current-scan totals after consolidation: 41 candidates and 209 occurrences
 Each retained occurrence is bounded by a named type, field, role, dimension, level, fixture, file, command, commit, coordinate projection, ticket, or scope exclusion. Capability owners: cff-bxk4 owns Gaussian captions and continuous terminal semantics; cff-9bex owns routing; cff-x5lv owns general label extent, terminal staggering, and collision bounds; core IR owns validation; SVG owns final marks.
 
 Intelligible-ticket review: complete.
+
+**2026-11-28T13:52:41Z**
+
+Start from the published caption branch #243 at 592eaf2. Use the Diagram rendering change path. Compare domain declarations, placed label and ring geometry, SVG, and the Studio scene consumer. Compare levels 0 through 4 and three- versus four-step LGSSM coordinates. Host/JIT, schedules, vmap and checkpoints are outside this rendering change. Existing categorical SVGs use the newly qualified caption revision as their byte reference. Attribute the #214 to #243 caption changes separately.
+
+**2026-11-28T14:01:41Z**
+
+The native scene resolves Gaussian dimensions from VariableSpec and places each domain caption separately from the wire name. DATA and OPEN marks use the ordinary inner bead and one concentric outer ring. The Studio payload uses the same caption bounds. Focused diagram, compression, layout, SVG, Kalman and Studio tests passed, 86 cases. Checks include levels 0–4, dimensions 1 and 128, static handle references, collision geometry, and the early three-to-four-step LGSSM coordinates. Regenerated only six Gaussian golden cases with CFFG_UPDATE_GOLDENS=1 uv run --frozen --no-sync pytest -q tests/test_viz_svg.py -k "golden and (gaussian or lgssm_domain)". Normal rendering matches every golden. All three categorical goldens changed between routing #214 and captions #243 and are byte-identical from #243 through this domain-only change. The SHA-256 comparisons are in ~/agent-share/cffg-viz-gaussian-domains/golden-parity.json.
+
+**2026-11-28T15:58:15Z**
+
+The canonical dashboard gate at 8a45484 passed in 1,104.659 s. Pytest recorded 2,676 passed, one skipped and 455 deselected. The dashboard rendered 50 diagrams across 36 galleries and recorded no failure. CFFG_UPDATE_GOLDENS=0 forced the read-only golden checks. The archived source receipt, dashboard, log and matching runtime-history file are under ~/agent-share/cffg-viz-gaussian-domains/gate-8a45484/. The review is stacked on the qualified caption source at 592eaf2 (#243).

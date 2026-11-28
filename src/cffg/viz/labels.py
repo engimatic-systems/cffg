@@ -65,11 +65,48 @@ class CaptionSpace:
         label = Label.for_item(item)
         if label is None:
             return item
+        label = self.place_label(label, axis)
+        return replace(item, label_at=(label.x, label.y))
+
+    def place_label(self, label, axis):
         if self.overlaps(label.bounds):
             options = [self._free(label, axis, sign) for sign in (-1, 1)]
             _, label = min(options, key=lambda option: abs(option[0]))
         self.reserve(label.bounds)
-        return replace(item, label_at=(label.x, label.y))
+        return label
+
+
+_SUPERSCRIPT = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
+
+
+def place_domains(captions, wires, domains, style, corner_limit):
+    """Place domain captions after ordinary names, with wire strokes reserved."""
+    if not domains:
+        return
+    # Reserve straight strokes and every rounded corner's control rectangle.
+    stroke = max(1.0, style.label_clearance / 2)
+    for wire in wires:
+        for (x, y), (u, v) in zip(wire.points, wire.points[1:]):
+            captions.reserve((min(x, u) - stroke, min(y, v) - stroke,
+                              max(x, u) + stroke, max(y, v) + stroke))
+        for p, (x, y), q in zip(wire.points, wire.points[1:], wire.points[2:]):
+            radius = min(corner_limit, sum(abs(a - b) for a, b in zip(p, (x, y))) / 2,
+                         sum(abs(a - b) for a, b in zip(q, (x, y))) / 2) + stroke
+            captions.reserve((x - radius, y - radius, x + radius, y + radius))
+    for index, dimension, points in domains:
+        p, q = max(zip(points, points[1:]), key=lambda pair: sum(abs(a - b) for a, b in zip(*pair)))
+        x, y = (p[0] + q[0]) / 2, (p[1] + q[1]) / 2
+        text = "ℝ" + str(dimension).translate(_SUPERSCRIPT)
+        size = style.caption_size
+        label = Label(wires[index].ref, text, x, y, "middle", "wire", size)
+        if p[1] == q[1]:
+            ascent = y - label.bounds[1]
+            label = replace(label, y=y + ascent + style.label_clearance)
+            axis = 1
+        else:
+            label = replace(label, x=x - label.width / 2 - style.label_clearance, y=y + 0.3 * size)
+            axis = 0
+        wires[index] = replace(wires[index], domain_label=captions.place_label(label, axis))
 
 
 def terminal_layout(wires, anchors, router, style, natural_key):

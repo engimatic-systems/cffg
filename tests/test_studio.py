@@ -47,6 +47,14 @@ def test_studio_snapshot_preserves_scene_label_placement_and_full_blob_name():
         assert record["label_font_role"] == label.font_role
         roles.add((label.font_role, label.anchor))
     assert roles == {("wire", "start"), ("terminal", "middle")}
+    path = next(item for item in scene.by_ref("var:y0") if isinstance(item, Path))
+    terminal = next(item for item in scene.by_ref("port:y0") if isinstance(item, Terminal))
+    native_path = next(record for record in records if record["ref"] == path.ref and record["primitive"] == "Path")
+    native_terminal = next(record for record in records if record["ref"] == terminal.ref)
+    assert native_path["domain_label"]["text"] == "ℝ¹"
+    assert native_path["domain_label_bounds"] == path.domain_label.bounds
+    assert native_terminal["dimension"] == 1
+    assert native_terminal["ring_radius"] == terminal.ring_radius
 
 
 def test_portable_rslds_recovers_ties_and_resizes_learning_state():

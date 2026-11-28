@@ -167,3 +167,19 @@ def test_gaussian_boxes_use_script_n():
     d = derive(t)
     assert d.nodes["prior"].glyph == "𝒩"
     assert d.nodes["emis0"].glyph == "𝒩A"
+
+
+def test_discrete_exponential_family_and_blob_wires_have_no_gaussian_dimension(hmm_slice):
+    from cffg.viz import build_scene
+    from cffg.viz.scene import Path, Terminal
+    from test_ef_engine import gamma_poisson
+
+    for template, family in ((hmm_slice, "discrete"), (gamma_poisson(1)[0], "ef")):
+        for wire in derive(template).wires.values():
+            assert wire.dimension == 0
+            assert wire.family == (family if wire.id.startswith("var:") else "")
+        for item in build_scene(template).items:
+            if isinstance(item, Path):
+                assert item.domain_label is None
+            if isinstance(item, Terminal):
+                assert item.ring_radius is None

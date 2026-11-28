@@ -44,6 +44,7 @@ class Path:
     label_at: tuple[float, float] | None = None
     dashed: bool = False
     label_size: float = 13.0
+    domain_label: Label | None = None
 
 
 @dataclass(frozen=True)
@@ -81,6 +82,14 @@ class Terminal:
     label: str = ""
     label_at: tuple[float, float] | None = None
     label_size: float = 9.5
+    dimension: int = 0
+    radius: float = 6.0
+
+    @property
+    def ring_radius(self) -> float | None:
+        if self.dimension and self.kind in (TerminalKind.DATA, TerminalKind.OPEN):
+            return self.radius + 3.0
+        return None
 
 
 def label_width(text: str, size: float) -> float:
@@ -177,8 +186,13 @@ class Scene:
 
     def labels(self) -> list[Label]:
         """Wire and terminal captions in drawing order, including repeated blob owners."""
-        return [caption for item in self.items if isinstance(item, (Path, Terminal))
-                if (caption := Label.for_item(item)) is not None]
+        labels = []
+        for item in self.items:
+            if isinstance(item, (Path, Terminal)) and (caption := Label.for_item(item)):
+                labels.append(caption)
+            if isinstance(item, Path) and item.domain_label:
+                labels.append(item.domain_label)
+        return labels
 
     def boxes(self) -> dict[str, Box]:
         return {i.ref: i for i in self.items if isinstance(i, Box)}

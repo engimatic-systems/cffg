@@ -24,7 +24,7 @@ sides outward and follow clear corridors around unrelated boxes.
 
 from __future__ import annotations
 
-from .labels import CaptionSpace, terminal_layout
+from .labels import CaptionSpace, place_domains, terminal_layout
 from .routing import DIRECTIONS, WireRouter
 from .temporal_layout import temporal_grid
 
@@ -77,6 +77,7 @@ class LayoutStyle:
     label_size: float = 13.0
     caption_size: float = 9.5
     label_clearance: float = 5.0
+    continuous_terminal_radius: float = 6.0
 
     def __post_init__(self):
         for name in ("label_size", "caption_size", "label_clearance"):
@@ -328,6 +329,7 @@ def _emit(
     router = WireRouter(grid, (pitch_x, pitch_y), box)
     terminal_plans = terminal_layout(diagram.wires.values(), anchors, router, style, natural_key)
     wires: list[Path] = []
+    domains = []
     beads: list[Bead] = []
     terminals = []
     ellipses: list[EllipsisMark] = []
@@ -335,8 +337,10 @@ def _emit(
     for wire in diagram.wires.values():
         directive = presentation.wires[wire.id]
         pts, term_item, ellipsis_item = _wire_geometry(
-            wire, anchors, router, terminal_plans, style.caption_size
+            wire, anchors, router, terminal_plans, style
         )
+        if wire.family == "gaussian":
+            domains.append((len(wires), wire.dimension, pts))
         label = "" if term_item and term_item.kind is TerminalKind.POINTMASS else wire.label
         label_at = _label_pos(pts, style) if label else None
         if wire.moment_endpoints:
@@ -381,7 +385,9 @@ def _emit(
         captions.reserve((node_box.x - box / 2, node_box.y - box / 2,
                           node_box.x + box / 2, node_box.y + box / 2))
     for terminal, _ in terminals:
-        captions.reserve((terminal.x - 6, terminal.y - 6, terminal.x + 6, terminal.y + 6))
+        radius = terminal.ring_radius + 1 if terminal.ring_radius is not None else 6
+        captions.reserve((terminal.x - radius, terminal.y - radius,
+                          terminal.x + radius, terminal.y + radius))
 
     for i in sorted(range(len(wires)), key=lambda n: natural_key(wires[n].ref)):
         wire_path = wires[i]
@@ -390,6 +396,7 @@ def _emit(
                        key=lambda pair: sum(abs(a - b) for a, b in zip(*pair)))
             wires[i] = captions.place(wire_path, 1 if p[1] == q[1] else 0)
     terminals = [captions.place(terminal, 1 - axis) for terminal, axis in terminals]
+    place_domains(captions, wires, domains, style, router.lane_clearance)
 
     # Boxes fill white, so anything drawn inside them must come later.
     items = [*composites, *wires, *boxes, *internal, *domes, *beads, *terminals, *ellipses]
@@ -446,7 +453,7 @@ def _anchor_points(diagram, sides, centers, grid, box, pitch):
     return anchors
 
 
-def _wire_geometry(wire, anchors, router, terminal_plans, caption_size):
+def _wire_geometry(wire, anchors, router, terminal_plans, style):
     pts: list[tuple[float, float]] = []
     terminal = None
     ellipsis = None
@@ -468,7 +475,8 @@ def _wire_geometry(wire, anchors, router, terminal_plans, caption_size):
             angle = 0.0 if side in ("left", "right") else 90.0
             ellipsis = EllipsisMark(ref, tx, ty, angle)
         else:
-            terminal = Terminal(ref, tx, ty, term.kind, term.label, baseline, caption_size)
+            terminal = Terminal(ref, tx, ty, term.kind, term.label, baseline, style.caption_size,
+                                dimension=wire.dimension, radius=style.continuous_terminal_radius)
     return tuple(pts), terminal, ellipsis
 
 
@@ -586,18 +594,22 @@ def _item_points(item):
                 (item.x + item.w / 2 + 20, item.y + item.h / 2 + 20)]
     if isinstance(item, Path):
         pts = list(item.points)
-        caption = Label.for_item(item)
-        if caption:
-            x, y, u, v = caption.bounds
-            pts.extend(((x, y), (u, v)))
+        for caption in (Label.for_item(item), item.domain_label):
+            if caption:
+                x, y, u, v = caption.bounds
+                pts.extend(((x, y), (u, v)))
         return pts
     if isinstance(item, (Bead,)):
         return [(item.x - 10, item.y - 10), (item.x + 10, item.y + 10)]
     if isinstance(item, (Terminal, EllipsisMark)):
         points = [(item.x - 26, item.y - 16), (item.x + 26, item.y + 16)]
-        if isinstance(item, Terminal) and (caption := Label.for_item(item)):
-            x, y, u, v = caption.bounds
-            points.extend(((x, y), (u, v)))
+        if isinstance(item, Terminal):
+            if (radius := item.ring_radius) is not None:
+                points.extend(((item.x - radius - 1, item.y - radius - 1),
+                               (item.x + radius + 1, item.y + radius + 1)))
+            if caption := Label.for_item(item):
+                x, y, u, v = caption.bounds
+                points.extend(((x, y), (u, v)))
         return points
     if isinstance(item, Dome):
         return list(item.anchors)
@@ -612,7 +624,10 @@ def _shift(item, dx: float, dy: float):
         label_at = (
             (item.label_at[0] + dx, item.label_at[1] + dy) if item.label_at else None
         )
-        return replace(item, points=pts, label_at=label_at)
+        domain = item.domain_label
+        if domain:
+            domain = replace(domain, x=domain.x + dx, y=domain.y + dy)
+        return replace(item, points=pts, label_at=label_at, domain_label=domain)
     if isinstance(item, Terminal) and item.label_at is not None:
         x, y = item.label_at
         return replace(item, x=item.x + dx, y=item.y + dy, label_at=(x + dx, y + dy))
