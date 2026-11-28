@@ -150,3 +150,7 @@ Bounded actual-cavity replay is complete. Both 57/60 support cases hit the same 
 
 Legend: prerequisite --> dependent
 [ ] clr-xtni local GFE residual (ready) --> [ ] cff-5edo public rollout budget and shifted start --> [ ] cff-t2g3 control benchmark
+
+**2026-11-28T15:18:58Z**
+
+Local-fix candidate 561ba37 now certifies the bounded H25 startup witness, where published a774a54 withheld action. The same frozen ec51aea corridor, seed 0 and start 47 were used. At cap 400 and requested tol=1e-10, float64 took 57.85 seconds for the first decision and certified the outer root in 194 iterations (outer 3.55e-11, local 4.55e-14). Float32 took 27.94 seconds and certified in 166 iterations (outer 2.72e-6, local 5.77e-5). Both chose and actually applied action 1, observed 2, and left the MAP RNG untouched. The separate raw-precision cavity witness has 57/60 semantic support in both dtypes; 56 supported probabilities underflow in float32. Raw records: /Users/ravd/agent-share/cffg-5edo-envelope/production-correction. The branch has a separate local-solver review. One startup per dtype establishes neither warm equivalence nor a per-step latency distribution. Keep the horizon-20/25 behavioral comparison and 10,000-decision continuation pending a resource decision and a stable matched pilot.
