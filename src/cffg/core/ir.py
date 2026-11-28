@@ -32,6 +32,10 @@ class PortRole(str, Enum):
 class VariableDomain:
     """Domain facts shared by source variables and compiled edge addresses."""
 
+    cardinality: int
+    dim: int
+    ef: str
+
     @property
     def family(self) -> str:
         return "gaussian" if self.dim else "ef" if self.ef else "discrete"

@@ -718,3 +718,10 @@ def test_variable_alias_preserves_same_named_factor_constraint(hmm_slice, rule, 
     validate(flat)
     assert ConstraintSpec(ConstraintKind.MEAN_FIELD, f"p/{copy}/z_in") in flat.constraints
     assert ConstraintSpec(ConstraintKind.DELTA, kept) in flat.constraints
+
+    from cffg.plate_lowering import lower_plates
+
+    _, layout = lower_plates(model)
+    assert [(c.kind, c.target) for c in layout.constraints] == [
+        (c.kind, c.target) for c in flat.constraints
+    ]

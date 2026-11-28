@@ -100,7 +100,7 @@ def test_plated_initializers_are_read_again_without_rebuilding_the_graph(monkeyp
     def forbidden(*args, **kwargs):
         pytest.fail("same-structure plate expanded twice")
 
-    monkeypatch.setattr(compiler, "expand_plates", forbidden)
+    monkeypatch.setattr(compiler, "lower_plates", forbidden)
     second = colony.spawn(changed, override)
     params_equal(colony.instances[first].state, original)
     params_equal(colony.instances[second].state, fresh)

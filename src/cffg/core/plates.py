@@ -1,7 +1,7 @@
 """Plate expansion: materialize a replicated fragment into a flat template.
 
-`expand_plates` is a pure function run at the top of the compiler's grounding
-phase (cff-cpxj phase 1): every plate's fragment is copied `dims` times with
+`expand_plates` returns an editable flat model. Every plate's fragment is copied
+once per grid cell with
 scoped names, parameters tied by name (per-copy blobs excepted), and the copies
 wired together by the plate's bonds. The wiring vocabulary:
 
@@ -13,9 +13,8 @@ wired together by the plate's bonds. The wiring vocabulary:
 - ``Expose``    — leftover ports stay exposed as ``plate/<i>/port`` (the
                   default in phase 1; the rule is the explicit marker).
 
-Phase 1 is deliberately naive: it materializes Python objects. Phase 2 targets
-index-table expansion into the group tensors without ever building the copies
-(the arena was designed for it).
+The compiler constructs slot addresses directly for one-level plates. This
+public expansion also provides a reference for checking those addresses.
 """
 
 from __future__ import annotations

@@ -1,8 +1,7 @@
 """Declared graph incidence and storage layout, before factor interpretation.
 
-The caller expands plates and performs core validation. This owner records
-declared domains and wiring, not conditioning, parameter-table meaning,
-factor admission, or free-energy ownership.
+Flat templates and compact plates supply resolved endpoints to the same slot
+allocator. Factor admission, conditioning and parameter layout run afterward.
 """
 
 from collections.abc import Mapping
@@ -49,6 +48,30 @@ class DataCandidate(ImmutableRecord):
 
 
 @dataclass(frozen=True)
+class ExteriorPort:
+    name: str
+    variable: str
+    role: PortRole
+
+
+@dataclass(frozen=True)
+class BoundConstraint:
+    declaration: ConstraintSpec
+    target: str
+
+    @property
+    def kind(self):
+        return self.declaration.kind
+
+    @property
+    def detail(self):
+        return self.declaration.detail
+
+    def detail_dict(self):
+        return self.declaration.detail_dict()
+
+
+@dataclass(frozen=True)
 class TopologyLayout(ImmutableRecord):
     """Immutable declaration snapshot and three independent logical layouts.
 
@@ -57,13 +80,13 @@ class TopologyLayout(ImmutableRecord):
     snapshot never acquires those tags or observation-row assignments.
     """
 
-    variables: Mapping[str, VariableSpec]
+    variables: Mapping[str, VariableSpec | EdgeInfo]
     factors: Mapping[str, FactorDeclaration]
-    constraints: tuple[ConstraintSpec, ...]
-    ports: Mapping[str, PortSpec]
+    constraints: tuple[ConstraintSpec | BoundConstraint, ...]
+    ports: Mapping[str, PortSpec | ExteriorPort]
     endpoints: Mapping[str, tuple[Endpoint, ...]]
     degrees: Mapping[str, int]
-    ports_by_variable: Mapping[str, tuple[PortSpec, ...]]
+    ports_by_variable: Mapping[str, tuple[PortSpec | ExteriorPort, ...]]
     edges: Mapping[str, EdgeInfo]
     slot_of: Mapping[Endpoint, int]
     opposite: Mapping[Endpoint, int]
@@ -112,7 +135,7 @@ def layout_addresses(domains, factors, constraints, ports, *, use_edge_domains=F
         for role, variable in sorted(factor.all_edges().items()):
             endpoints[variable].append((factor.name, role))
     degrees = {name: len(ends) for name, ends in endpoints.items()}
-    ports_by_variable: dict[str, list[PortSpec]] = {name: [] for name in domains}
+    ports_by_variable: dict[str, list[PortSpec | ExteriorPort]] = {name: [] for name in domains}
     port_problems = []
     for port in ports.values():
         ports_by_variable[port.variable].append(port)
@@ -163,6 +186,8 @@ def layout_addresses(domains, factors, constraints, ports, *, use_edge_domains=F
         elif not edge.ef:
             message_lengths.extend((edge.card, edge.card))
 
+    if use_edge_domains:
+        edges = freeze(edges)
     return TopologyLayout(
         variables=edges if use_edge_domains else domains, factors=factors, constraints=constraints,
         ports=ports, endpoints=endpoints, degrees=degrees,

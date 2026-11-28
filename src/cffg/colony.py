@@ -20,6 +20,7 @@ import numpy as np
 
 from cffg import run_results
 from cffg.compiler import _CompilationPlan, _prepare_compilation
+from cffg.plate_lowering import PlateInputs
 from cffg.core.ir import Template
 from cffg.core.plates import expanded_blob_refs
 from cffg.core.serialize import structure_hash
@@ -71,7 +72,7 @@ class _SpawnStructure:
     key: str
     declarations: Template
     providers: tuple
-    expanded: Template
+    expanded: Template | PlateInputs
     plan: _CompilationPlan
     resolved: ResolvedCompileData
     x64: bool

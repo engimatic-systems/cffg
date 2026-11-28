@@ -45,7 +45,8 @@ from cffg.compiled import (
 )
 from cffg.compiler_errors import CompileError
 from cffg.core.ir import Template
-from cffg.core.plates import expand_plates
+from cffg.core.plates import expand_plates as expand_plates
+from cffg.plate_lowering import PlateInputs, lower_plates
 from cffg.core.validate import validate
 from cffg.registered import packing as _registered_packing
 from cffg.registered.contracts import RegisteredPlanDrafts
@@ -142,13 +143,15 @@ class _CompilationPlan:
         )
 
 
-def _prepare_compilation(t: Template, semiring: str) -> tuple[Template, _CompilationPlan]:
+def _prepare_compilation(t: Template, semiring: str) -> tuple[Template | PlateInputs, _CompilationPlan]:
     """Lower the graph and capture its current registered implementations."""
     if semiring not in ("sum", "max"):
         raise CompileError(f"semiring must be 'sum' or 'max', got {semiring!r}")
-    t = expand_plates(t)
-    validate(t)
-    topology = build_topology(t)
+    if t.plates:
+        t, topology = lower_plates(t)
+    else:
+        validate(t)
+        topology = build_topology(t)
     try:
         registry = snapshot_registry(t)
     except (ValueError, TypeError, KeyError) as error:
