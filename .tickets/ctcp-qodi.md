@@ -27,3 +27,7 @@ Meet cff-2gev sections 3 and 7. Freeze every model and threshold, per-arm budget
 **2026-11-28T13:54:06Z**
 
 Preregister a 2-position, 2-mode corridor. The changed world reverses one position column at a known scorer tick while mode dynamics stay fixed. All arms share the scripted exposure prefix, goal, sensor, action prior and random-number streams. The changing BP control removes the full transition P-substitution. The observation goal stays in every planner. Architecture change path is isolated experiment use of existing public model, solver, learning and bundle surfaces. No core equation or scheduler change. Runtime status and result interpretation require a fresh short suite. Development evidence is disjoint and cannot establish a comparative outcome.
+
+**2026-11-28T13:57:12Z**
+
+Version 1 stopped on disjoint development 19501. All arms received 33 probe visits. Four of six cells failed the requirement D1<=0.08 on every one of the final eight warm pre-action forecasts (largest changing forecast 0.08897). Both stationary cells passed. Full cells and failure receipt preserved in ~/agent-share/changing-corridor-v1-gUpybO. No held-out outcomes were opened. Version 2 retains the world, hazard, timing, thresholds and formal seeds. Its shared physical acquisition uses only the last jointly observed position and mode to target the probe and otherwise return to position zero. It must qualify on both fresh development seeds 19511 and 19512 before formal access.

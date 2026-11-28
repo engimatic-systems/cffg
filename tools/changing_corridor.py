@@ -234,7 +234,7 @@ def worker(root, arm, world, seed, development):
         "protocol_sha256"
     ] != digest(PROTOCOL):
         raise ValueError("protocol source or model manifest mismatch")
-    seeds = [config["development_seed"]] if development else config["seeds"]
+    seeds = config["development_seeds"] if development else config["seeds"]
     if seed not in seeds or arm not in config["arms"] or world not in config["worlds"]:
         raise ValueError("cell outside registered inventory")
     fingerprint = dict(
@@ -279,6 +279,7 @@ def worker(root, arm, world, seed, development):
     recent = []
     visits = 0
     x, m = config["initial_state"]
+    reading = 2 * x + m
     phase = "setup"
     attempt = {}
     meter = Measurements()
@@ -314,7 +315,8 @@ def worker(root, arm, world, seed, development):
                     plan = None
                     plan_measure = {}
                     if t < warm:
-                        u = 2 * (t % 2)
+                        visible_x, visible_mode = divmod(reading, 2)
+                        u = 2 if visible_mode == 1 or visible_x == 0 else 0
                         recent.append(novelty(forecast[2, :, 0]))
                         visits += int((m, x, u) == (0, 0, 2))
                     else:
@@ -331,7 +333,8 @@ def worker(root, arm, world, seed, development):
                     phase = "filtering"
                     update_measure.clear()
                     start = time.perf_counter()
-                    learner.observe(u, 2 * nx + nm)
+                    reading = 2 * nx + nm
+                    learner.observe(u, reading)
                     observe_s = time.perf_counter() - start
                     filt = receipt(learner._last_filter_result)
                     attempt["filter"] = filt

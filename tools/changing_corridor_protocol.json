@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "seeds": [
     19701,
     19702,
@@ -8,7 +8,6 @@
     19705,
     19706
   ],
-  "development_seed": 19501,
   "arms": [
     "changing",
     "stationary",
@@ -220,7 +219,7 @@
     "solver": "native RollingAgent.observe"
   },
   "randomness": "NumPy PCG64. Policy uses seed directly. Environment uses SeedSequence([seed,871]), allocating two uniforms per scheduled tick for position and mode. Conditional on old x,m and applied u, draw both successors independently with categorical inverse CDF. Reveal only x_next*2+m_next.",
-  "warmup_policy": "Alternating left (0),right (2) starting with left. All three agents observe the same applied controls and identity-sensor evidence. No free planning during warmup.",
+  "warmup_policy": "Use the last publicly observed product sensor x*2+m (reset 0). Select right/2 if m==1 or x==0, else left/0. This visits the measured column whenever its public context holds and otherwise aims to return to position 0.",
   "arms_explanation": {
     "changing": "Learned Dirichlet transition P-substitution, h=.005",
     "stationary": "Same P-substitution, original stationary accumulating Dirichlet",
@@ -237,6 +236,11 @@
   "estimands": "Per-seed averages, equal seed weights. First 16 post preaction ticks versus last 8 warm for changing-world target committed trace and forecast D1. All 48 post ticks for visitation and goal occupancy. Exact evaluator-only KL(true target column || next-event forecast) over first 24 for prediction; all 48 and mean over unchanged position columns separately. Recovery is first start of 3 consecutive post ticks with target KL<=.1. No imputation for invalid/incomplete grid.",
   "compute": "Seconds elapsed in full native act, observe, and actual Learnables.accumulate nested within observe. Sample whole-process resident bytes at both boundaries and every 5ms during act/update. Native graph reuse only within a freshly started cell process. RSS is sampled absolute memory; no allocation attribution.",
   "parity": "No optimized estimator or solver. All trials use public RollingAgent.act/observe. Against an optimized path the mandatory bounds would be 128*float64 epsilon on messages, 256*epsilon on node objectives and identical stable-index policy ranking; none is being compared.",
-  "dev_gate": "All six dev arm-world cells complete saturation plus 3 policy actions, filter/plan converge with finite energies and required planning root, model archives roundtrip and pairings agree up to switch and first post action. Failure is preserved and blocks held-out scoring on this protocol.",
-  "revision_policy": "Freeze a protocol, model artifacts and code digest before scored reads. Any change affecting a cell invalidates that cell for comparison and requires a new version and output directory."
+  "dev_gate": "All twelve dev arm-world cells complete saturation plus 3 policy actions, filter/plan converge with finite energies and required planning root, model archives roundtrip and pairings agree up to switch and first post action. Failure is preserved and blocks held-out scoring on this protocol.",
+  "revision_policy": "Freeze a protocol, model artifacts and code digest before scored reads. Any change affecting a cell invalidates that cell for comparison and requires a new version and output directory.",
+  "development_seeds": [
+    19511,
+    19512
+  ],
+  "prior_version": "Version 1 used alternating actions, development seed 19501 and the same thresholds. Four of six cells failed the saturation diagnostic and no scored cell was opened. Version 2 changes only the shared acquisition policy, disjoint development seeds and qualification bookkeeping."
 }
