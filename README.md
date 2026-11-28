@@ -794,11 +794,21 @@ Choose the artifact by what must continue:
 | `RollingAgent` `.npz` checkpoint | Structure-bound rolling beliefs, learning state, cadence, selection RNG, configured functional-mu3 lifecycle | Environment state or a portable replacement for the model bundle |
 | Neural training continuation | Versioned parameters and deterministic optimizer/training state for its bound initialization and data | General model/agent state or minibatch cursor |
 
-`save_bundle` and `load_bundle` are the source-of-truth model exchange path.
-Recompiling the loaded template and arrays must reconstruct the engine. The
-current alpha loader supports the current schema and refuses older or
-provenance-poor learning archives rather than inventing resumability. A stable
-historical migration contract is future work.
+`save_bundle` and `load_bundle` write and read a single-template `.cffgz`.
+The `schema_version` in `manifest.json` identifies its bundle format.
+The separate version in `model.json` identifies the template format and can
+be `"1"` inside a schema-`"2"` bundle.
+
+| Bundle manifest | Stored data | Current alpha `load_bundle` |
+|---|---|---|
+| `"1"`, original flat layout | Model and named point arrays under `blobs/` | Raises `BundleError` for unsupported schema |
+| `"1"`, with `blob_paths` | Model and point arrays with explicit member paths, including support for plates | Raises `BundleError` for unsupported schema |
+| `"2"` | Model, point arrays, and each declared learner's identity, immutable prior and current posterior | Loads after validation. Missing or inconsistent learning records raise `BundleError`. A model without declared learners has an explicit empty inventory. |
+
+Recompile the returned template and point arrays for inference. For declared
+learning, use the returned `learnables` to continue from the saved update.
+Schema 1 stored no learning history to resume. Historical support for the
+first stable release is still an open decision.
 
 ## Hard constraints and MAP
 
