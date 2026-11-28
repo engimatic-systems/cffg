@@ -14,6 +14,7 @@ from cffg.core import (
 from cffg.core.edits import (
     AddConstraint,
     RemoveVariable,
+    RemoveBlob,
     AddFactor,
     AddVariable,
     DeclarePort,
@@ -88,6 +89,14 @@ def test_replace_missing_factor_refused(hmm_slice):
             hmm_slice,
             [ReplaceFactor(FactorSpec("nope", "categorical", edges={"out": "z_in"}))],
         )
+
+
+def test_remove_blob_roundtrip_rejects_surviving_reader(hmm_slice):
+    actions = [RemoveBlob("A")]
+    assert bundle_from_json(bundle_to_json(actions)) == actions
+    assert check_edits(hmm_slice, actions)
+    assert "A" in hmm_slice.blobs
+    assert check_edits(hmm_slice, [RemoveBlob("missing")])
 
 
 def test_unknown_action_name_refused():
