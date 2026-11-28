@@ -24,7 +24,10 @@ class WireRouter:
         self.grid = grid
         self.pitch = pitch
         self.occupied = {cell: name for name, cell in grid.items()}
-        self.radius = box / 2 + min(10.0, (min(pitch) - box) / 4)
+        self.lane_clearance = (min(pitch) - box) / 2
+        if box <= 0 or self.lane_clearance <= 0:
+            raise ValueError("wire routing requires positive box size and pitch larger than the box")
+        self.radius = box / 2 + min(10.0, self.lane_clearance / 2)
 
     def clear(self, points, ends):
         px, py = self.pitch
@@ -60,7 +63,7 @@ class WireRouter:
             distance = sum(
                 abs(x - u) + abs(y - v) for (x, y), (u, v) in zip(path, path[1:])
             )
-            return distance + 8 * len(path), len(path), path
+            return distance, len(path), path
 
         # Enforce the outward normal at both anchors, even on short direct paths.
         def leaves(point, nxt, side):
@@ -95,7 +98,11 @@ class WireRouter:
                 ):
                     candidates.append(path)
         if candidates:
-            return min(candidates, key=score)
+            best = min(candidates, key=score)
+            # A monotone route already attains the Manhattan lower bound.
+            if score(best)[0] == abs(start[0] - stop[0]) + abs(start[1] - stop[1]):
+                return best
+        # Corner pairs run on the clear lanes halfway between rows and columns.
         for ca in corners_a:
             for cb in corners_b:
                 for corner in ((ca[0], cb[1]), (cb[0], ca[1])):
@@ -106,11 +113,23 @@ class WireRouter:
     def terminal(self, factor, anchor, desired, direction):
         col, row = self.grid[factor]
         dx, dy = direction
-        neighbor = (col + dx, row + dy)
-        if neighbor not in self.occupied:
-            return desired
+        if desired <= 0:
+            raise ValueError("terminal_offset must be positive")
         axis = 0 if dx else 1
-        available = (
-            abs(neighbor[axis] * self.pitch[axis] - anchor[axis]) - self.radius - 2.0
-        )
-        return min(desired, max(0.0, available))
+        pitch = self.pitch[axis]
+        cell = (col, row)
+        steps = 1
+        if (col + dx, row + dy) not in self.occupied:
+            if desired <= pitch:
+                return desired
+            # A longer terminal may reach a box across one or more empty cells.
+            distances = (
+                (other[axis] - cell[axis]) * direction[axis]
+                for other in self.occupied if other[1 - axis] == cell[1 - axis]
+            )
+            steps = min((distance for distance in distances if distance > 0), default=None)
+            if steps is None:
+                return desired
+        offset = abs(anchor[axis] - cell[axis] * pitch)
+        available = steps * pitch - offset - self.radius
+        return min(desired, available - min(2.0, self.lane_clearance / 2))

@@ -1,6 +1,6 @@
 ---
 id: cff-9bex
-status: open
+status: closed
 deps: []
 links: [cff-bxk4, cff-cz82]
 created: 2026-07-09T02:46:53Z
@@ -221,3 +221,15 @@ Complete candidate mapping: end_to_end -> component_chain; fixed -> pinned_artif
 Each retained occurrence is bounded by a named side, endpoint class, role, factor signature, coordinate, rectangle predicate, compression level, fixture, golden, file, command, commit, ticket, or scope exclusion. Capability owners: cff-9bex owns side assignment, anchors, and external paths; cff-bxk4 owns Gaussian notation and continuous terminal marks; cff-x5lv owns parameter-label text, extents, staggering, and label-collision bounds; core IR owns model structure; SVG owns final path serialization.
 
 Intelligible-ticket review: complete.
+
+**2026-11-28T04:17:53Z**
+
+Studio #206 (59865c4) contains the native WireRouter in da84279. This follow-up uses that implementation. Diagram rendering in docs/ARCHITECTURE.md is the change path. Review surfaces are side assignment, the native scene, and rounded SVG output; compiler, JIT, schedules, vmap and checkpoint decoding do not participate. Exercise the two Gaussian signatures, obstacle and degree-32 crowding, and compare the existing goldens.
+
+**2026-11-28T04:25:20Z**
+
+The #206 baseline served three failing reproductions: the first four GLUE ports used only two sides, a custom 250-pixel terminal traversed the next-but-one box, and a large SVG bend rounded into the middle box of a four-pixel corridor. The fix retains Studio’s router, prioritizes Manhattan distance before bends and limits the SVG radius to a clear half-pitch lane. The new five- and six-connection goldens cover the registered Gaussian signatures at levels 0 and 4. Generated only those four with CFFG_UPDATE_GOLDENS=1 uv run pytest tests/test_viz_svg.py -k "golden and gaussian". The three original SVG files match 59865c4 byte for byte. Focused layout (27), SVG (16), Kalman rendering (2), and hybrid rendering (1) all passed in one 46-test run. tk dep cycle and git diff --check passed. Full gate queued separately with Cooper.
+
+**2026-11-28T04:58:15Z**
+
+Implementation cbd3f30 is stacked on Studio #206 at 59865c4. The single dashboard gate on cbd3f30 passed 2,776 tests with 337 deselected and refreshed ~/agent-share/cffg-tests.html (34 diagrams, 27 galleries). Dashboard wall 1,317.389 s exceeded the 1,200 s budget. Reused 118 parameterized variants already opt-in on main a774a54, worth 131.233 measured seconds, for an estimated 1,186.156 s. Collection verified full union identity of 3,113 node IDs, new split 2,658 short / 455 slow, all formerly short test functions retain a selected case. All new routing and Kalman/hybrid display checks remain short. No test bodies changed in the selection adjustment. The passing run is reused under the selection-only policy. Timing HTML, raw log and before/after ID lists are in ~/agent-share/cffg-backlog-gates/cff-9bex/.

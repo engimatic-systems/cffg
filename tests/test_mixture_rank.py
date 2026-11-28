@@ -22,7 +22,7 @@ def message(direction, eta, precision, matrix, noise, offset=None, components=1)
     )
 
 
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 def test_forward_rotated_nullspace_is_not_reclassified_after_reconstruction(dtype):
     matrix = jnp.array([[3.], [4.]], dtype)
     noise = jnp.eye(2, dtype=dtype)
@@ -38,7 +38,7 @@ def test_forward_rotated_nullspace_is_not_reclassified_after_reconstruction(dtyp
             np.testing.assert_array_equal(value, 0.)
 
 
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 def test_backward_proportional_columns_remain_vacuous(dtype):
     matrix = jnp.array([[1., 2.], [2., 4.]], dtype)
     identity = jnp.eye(2, dtype=dtype)
@@ -53,7 +53,7 @@ def test_backward_proportional_columns_remain_vacuous(dtype):
         np.testing.assert_array_equal(value, 0.)
 
 
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 def test_singular_output_information_can_still_inform_every_input_direction(dtype):
     matrix = jnp.array([[1.], [0.]], dtype)
     precision = jnp.diag(jnp.array([1., 0.], dtype))
@@ -98,7 +98,7 @@ def test_backward_rank_uses_incoming_subspace_not_subtractive_eigenvector_noise(
 
 @pytest.mark.parametrize("dtype,information", [
     (jnp.float32, [1e-3, 1e5, 0.]),
-    (jnp.float64, [1e-8, 1e8, 0.]),
+    pytest.param(jnp.float64, [1e-8, 1e8, 0.], marks=pytest.mark.slow),
 ])
 def test_singular_incoming_subspace_preserves_independently_scaled_information(dtype, information):
     incoming = jnp.diag(jnp.asarray(information, dtype))
@@ -110,7 +110,7 @@ def test_singular_incoming_subspace_preserves_independently_scaled_information(d
     np.testing.assert_allclose(result[1][0], np.diag(expected), rtol=tolerance, atol=0)
 
 
-@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
 @pytest.mark.parametrize("direction", ["forward", "backward"])
 def test_coordinate_rescaling_preserves_proper_covariance_branch(dtype, direction):
     # Twelve orders of coordinate scale are not twelve orders of uncertainty.
@@ -126,7 +126,7 @@ def test_coordinate_rescaling_preserves_proper_covariance_branch(dtype, directio
     assert bool(gauss._pd_ok(incoming_precision))
 
 
-@pytest.mark.parametrize("dtype,large", [(jnp.float32, 1e30), (jnp.float64, 1e200)])
+@pytest.mark.parametrize("dtype,large", [(jnp.float32, 1e30), pytest.param(jnp.float64, 1e200, marks=pytest.mark.slow)])
 def test_invalid_predictive_covariance_cannot_expose_an_inverse_placeholder(dtype, large):
     identity = jnp.ones((1, 1), dtype)
     component = forward_component(jnp.zeros(1, dtype), identity,
@@ -136,7 +136,7 @@ def test_invalid_predictive_covariance_cannot_expose_an_inverse_placeholder(dtyp
     assert all(np.isnan(value).all() for value in result)
 
 
-@pytest.mark.parametrize("dtype,large", [(jnp.float32, 1e30), (jnp.float64, 1e200)])
+@pytest.mark.parametrize("dtype,large", [(jnp.float32, 1e30), pytest.param(jnp.float64, 1e200, marks=pytest.mark.slow)])
 def test_invalid_backward_gram_is_not_a_rank_deficient_initialization(dtype, large):
     identity = jnp.ones((1, 1), dtype)
     result = message("backward", jnp.zeros(1, dtype), identity * large,

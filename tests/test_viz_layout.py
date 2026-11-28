@@ -225,3 +225,144 @@ def test_rslds_time_slices_and_routed_wire_clearance(steps, level):
                         or max(y, v) < box.y - box.h / 2 - 3
                         or min(y, v) > box.y + box.h / 2 + 3
                     ), (segment.ref, name)
+
+
+def gaussian_junction(kind):
+    """Registered Gaussian factor with a neighbor on each variable and three fixed parameters."""
+    t = Template(kind)
+    roles = {"in": "x", "out": "y"}
+    if kind == "gaussian_mixture_linear":
+        roles["selector"] = "z"
+    for role, var in roles.items():
+        name = var + "prior"
+        if role == "selector":
+            t.variables[var] = VariableSpec(var, cardinality=2)
+            prior = FactorSpec(name, "categorical", edges={"out": var}, param_blobs={"statistic": "p"})
+        else:
+            t.variables[var] = VariableSpec(var, dim=1)
+            prior = FactorSpec(name, "gaussian", edges={"out": var}, param_blobs={"mean": "m", "cov": "V"})
+        t.factors[name] = prior
+    t.factors["junction"] = FactorSpec("junction", kind, edges=roles,
+                                       param_blobs={"matrix": "A", "offset": "b", "cov": "Q"})
+    names = {name for factor in t.factors.values() for name in factor.param_blobs.values()}
+    t.blobs = {name: BlobRef(name, name + ".npy") for name in sorted(names)}
+    validate(t)
+    return t
+
+
+def _wire_paths(template, scene):
+    """Check scene refs, endpoint normals, and every open box against each segment."""
+    from cffg.viz.scene import Path
+
+    wires = derive(template).wires
+    boxes = scene.boxes()
+    paths = {p.ref: p for p in scene.items if isinstance(p, Path) and p.kind == "wire"}
+    assert paths.keys() == wires.keys()
+    for ref, path in paths.items():
+        points = path.points
+        for (x, y), (u, v) in zip(points, points[1:]):
+            assert (x == u) != (y == v)
+            for box in boxes.values():
+                assert (max(x, u) <= box.x - box.w / 2 or min(x, u) >= box.x + box.w / 2
+                        or max(y, v) <= box.y - box.h / 2 or min(y, v) >= box.y + box.h / 2), (ref, box.name)
+        for end, (x, y), (u, v) in zip(wires[ref].node_ends(), (points[0], points[-1]),
+                                        (points[1], points[-2])):
+            box = boxes[f"factor:{end.factor}"]
+            assert ((abs(x - box.x) == box.w / 2 and abs(y - box.y) < box.h / 2 and (u - x) * (x - box.x) > 0)
+                    or (abs(y - box.y) == box.h / 2 and abs(x - box.x) < box.w / 2 and (v - y) * (y - box.y) > 0))
+    return paths
+
+
+@pytest.mark.parametrize("kind,degree", [("gaussian_linear", 5), ("gaussian_mixture_linear", 6)])
+def test_gaussian_junction_wires_at_every_level(kind, degree):
+    from cffg.viz import build_scene, render_svg
+    from cffg.viz.scene import Dome, Path
+
+    t = gaussian_junction(kind)
+    wires = derive(t).wires_of("junction")
+    assert len(wires) == degree
+    assert sum(len(w.node_ends()) == 1 for w in wires) == 3
+    for level in range(5):
+        scene = build_scene(t, level=level)
+        paths = _wire_paths(t, scene)
+        anchors = {
+            paths[w.id].points[0 if w.ends[0].factor == "junction" else -1]
+            for w in wires if len(w.node_ends()) == 2
+        }
+        items = scene.by_ref("factor:junction")
+        if level == 4:
+            dome, = [item for item in items if isinstance(item, Dome)]
+            assert set(dome.anchors) == anchors
+        else:
+            assert {item.points[0] for item in items if isinstance(item, Path)} == anchors
+    assert render_svg(t) == render_svg(t)
+
+
+def test_structural_sides_and_anchors_have_priority_over_elastic_terminals():
+    from cffg.viz.diagram import NodeEnd, TerminalEnd, WireView
+    from cffg.viz.layout import _anchor_points, _assign_sides
+
+    d = derive(gaussian_junction("gaussian_mixture_linear"))
+    grid = {"junction": (0, 0), "xprior": (-2, 1), "yprior": (-1, -1), "zprior": (0, -2)}
+    before = _assign_sides(d, grid, [])
+    wid = "var:extra"
+    d.wires[wid] = WireView(wid, "extra", (NodeEnd("junction", "port"), TerminalEnd(TerminalKind.OPEN)))
+    after = _assign_sides(d, grid, [])
+    for role, side in (("in", "left"), ("out", "left"), ("selector", "up")):
+        assert before["junction", role] == after["junction", role] == side
+    assert after["junction", "port"] == "down"
+    assert after["junction", "cov"] == "right"  # port precedes first blob
+    centers = {name: (100 * col, 84 * row) for name, (col, row) in grid.items()}
+    anchors = _anchor_points(d, after, centers, grid, 36, (100, 84))
+    assert anchors["junction", "out"][1] < anchors["junction", "in"][1]
+
+
+def test_32_glue_ports_use_free_sides_before_sharing():
+    from cffg.viz import build_scene
+
+    t = Template("crowded")
+    roles = {f"x{i}": f"x{i}" for i in range(32)}
+    t.factors["constraint"] = FactorSpec("constraint", "alldifferent", edges=roles)
+    for v in roles:
+        t.variables[v] = VariableSpec(v, cardinality=32)
+        t.ports[v] = PortSpec(v, v, PortRole.GLUE)
+    validate(t)
+    scene = build_scene(t)
+    paths = _wire_paths(t, scene)
+    box = scene.boxes()["factor:constraint"]
+    by_side = {}
+    for v in roles:  # natural order, including x2 before x10
+        x, y = paths[f"var:{v}"].points[0]
+        if abs(x - box.x) == box.w / 2:
+            side = "left" if x < box.x else "right"
+            fraction = (y - box.y) / box.h + 0.5
+        else:
+            side = "up" if y < box.y else "down"
+            fraction = (x - box.x) / box.w + 0.5
+        by_side.setdefault(side, []).append(fraction)
+        if v == "x3":
+            assert len(by_side) == 4
+    for fractions in by_side.values():
+        n = len(fractions)
+        assert fractions == pytest.approx([(i + 1) / (n + 1) for i in range(n)])
+
+
+def test_obstructed_wire_uses_shorter_clear_corridor():
+    from cffg.viz.routing import WireRouter
+
+    router = WireRouter({"left": (0, 0), "middle": (1, 0), "right": (3, 0)}, (100, 84), 36)
+    def route(y):
+        return router.connect((18, y, "right"), (282, y, "left"), "left", "right")
+    # Above the centreline, the upper half-pitch lane saves 4 * 7 pixels.
+    assert min(y for _, y in route(-7)) == -42
+    assert max(y for _, y in route(7)) == 42
+    assert min(y for _, y in route(0)) == -42  # coordinate-order tie break
+
+
+def test_long_terminal_stops_before_next_occupied_cell():
+    from cffg.viz.routing import WireRouter
+
+    router = WireRouter({"source": (0, 0), "distant": (0, -2)}, (100, 84), 36)
+    length = router.terminal("source", (0, -18), 250, (0, -1))
+    assert 84 < length < 2 * 84 - 36
+    assert router.terminal("source", (0, 18), 250, (0, 1)) == 250

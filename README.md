@@ -924,6 +924,8 @@ implementation failure are supported.
 `cffg.viz` derives a deterministic scene and renders SVG directly; PNG uses the
 optional `viz` dependencies. Rendering explains declared structure and
 constraints but does not compile or validate numerical inference.
+External wires follow deterministic routes around factor boxes. At crowded
+factors, ports and parameter terminals use the free sides before sharing one.
 Disconnected components are laid out independently and stacked without overlap.
 Use `render_svg` for a template, or `to_svg` after constructing a scene:
 

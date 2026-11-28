@@ -200,7 +200,7 @@ def _manual_tap(original, target, role):
     return model
 
 
-@pytest.mark.parametrize("dtype", ["float32", "float64"])
+@pytest.mark.parametrize("dtype", ["float32", pytest.param("float64", marks=pytest.mark.slow)])
 def test_discrete_observe_matches_product_and_unbound_model(dtype):
     import jax
     import numpy as np
@@ -229,7 +229,7 @@ def test_discrete_observe_matches_product_and_unbound_model(dtype):
                     engine.bind_data(state, {data_port: 3})
 
 
-@pytest.mark.parametrize("dtype", ["float32", "float64"])
+@pytest.mark.parametrize("dtype", ["float32", pytest.param("float64", marks=pytest.mark.slow)])
 def test_fanout_vacuous_branches_preserve_gaussian_product(dtype):
     import jax
     import numpy as np

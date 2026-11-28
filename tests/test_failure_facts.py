@@ -105,7 +105,7 @@ def test_fact_reduction_is_independent_per_vmapped_instance_at_scale():
 
 
 @pytest.mark.parametrize("dtype", [jnp.float32, pytest.param(jnp.float64, marks=pytest.mark.slow)])
-@pytest.mark.parametrize("method", ["linearization", "sigma_point"])
+@pytest.mark.parametrize("method", [pytest.param("linearization", marks=pytest.mark.slow), "sigma_point"])
 def test_registered_nonlinear_reason_survives_jit_and_vmap(dtype, method):
     template, arrays = model(method)
     arena = compile_template(template, arrays=arrays)

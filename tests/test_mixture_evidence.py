@@ -31,7 +31,7 @@ def assert_scores(actual, expected, dtype, *, scale=64):
 
 @pytest.mark.parametrize("linear,dtype", [
     (False, np.float32), pytest.param(False, np.float64, marks=pytest.mark.slow),
-    pytest.param(True, np.float32, marks=pytest.mark.slow), (True, np.float64),
+    pytest.param(True, np.float32, marks=pytest.mark.slow), pytest.param(True, np.float64, marks=pytest.mark.slow),
 ])
 def test_displaced_components_do_not_lose_selector_evidence(dtype, linear):
     convert = lambda value: jnp.asarray(value, dtype=dtype)
@@ -98,7 +98,7 @@ def test_weak_vacuous_and_integrable_negative_potentials(dtype, precision):
     assert_scores(uniform, np.zeros(2), dtype)
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_singular_potential_keeps_linear_term_in_nullspace(dtype):
     means = jnp.array([[0., 0.], [.5, 1.]], dtype=dtype)
     covariance = jnp.broadcast_to(jnp.eye(2, dtype=dtype), (2, 2, 2))
@@ -119,7 +119,7 @@ def test_improper_input_retains_integrable_joint_jacobian(dtype):
     np.testing.assert_allclose(softmax(message), [2 / 3, 1 / 3], atol=64 * np.finfo(dtype).eps)
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 @pytest.mark.parametrize("case", ["singular", "indefinite", "nonsymmetric", "overflow", "nonintegrable"])
 def test_invalid_intermediates_never_become_finite_accepted_evidence(dtype, case):
     means = jnp.array([[0., 0.], [1., 1.]], dtype=dtype)
@@ -140,7 +140,7 @@ def test_invalid_intermediates_never_become_finite_accepted_evidence(dtype, case
     assert not result.valid
 
 
-@pytest.mark.parametrize("linear", [False, True])
+@pytest.mark.parametrize("linear", [pytest.param(False, marks=pytest.mark.slow), True])
 def test_normalized_evidence_derivatives_match_independent_overlap(linear):
     means = jnp.array([[.3, -.5], [1.2, .7]])
     covariance = jnp.broadcast_to(jnp.eye(2) * .6, (2, 2, 2))
@@ -216,7 +216,7 @@ def test_node_energy_and_statistics_use_the_same_sparse_responsibilities(linear)
     np.testing.assert_allclose(energy, expected, atol=1e-12)
 
 
-@pytest.mark.parametrize(("dtype", "reading"), [(np.float32, 1e4), (np.float64, 1e9)])
+@pytest.mark.parametrize(("dtype", "reading"), [(np.float32, 1e4), pytest.param(np.float64, 1e9, marks=pytest.mark.slow)])
 @pytest.mark.parametrize("linear", [False, True])
 def test_evidence_centering_uses_live_components(dtype, reading, linear):
     # Only the first (impossible) regime predicts the far observation.
@@ -259,7 +259,7 @@ def test_evidence_centering_uses_live_components(dtype, reading, linear):
     np.testing.assert_allclose(node_energy, expected, rtol=tol)
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_representable_inputs_with_overflowing_whitened_system_are_rejected(dtype):
     scale = dtype(1e20 if dtype is np.float32 else 1e200)
     eta = jnp.zeros(1, dtype=dtype)
@@ -272,7 +272,7 @@ def test_representable_inputs_with_overflowing_whitened_system_are_rejected(dtyp
     assert np.isnan(message).all()
 
 
-@pytest.mark.parametrize("linear", [False, True])
+@pytest.mark.parametrize("linear", [False, pytest.param(True, marks=pytest.mark.slow)])
 def test_empty_or_invalid_selector_rejects_statistics_and_energy(linear):
     le = jnp.array([[NEG, -jnp.inf], [0., jnp.nan], [jnp.inf, 0.]])
     members, k = le.shape

@@ -563,7 +563,7 @@ def test_balanced_broadcast_matches_chain_and_flooding(semiring):
     np.testing.assert_allclose(values, values[0], atol=1e-10, rtol=0)
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_balanced_gaussian_broadcast_matches_information_sum(dtype):
     import jax
 

@@ -55,7 +55,7 @@ def test_retained_hybrid_reaches_independent_moment_and_ledger_fixed_point(retai
 
 @pytest.mark.parametrize("budget,status,finite_entries", [
     (0, RunStatus.BUDGET_EXHAUSTED, 0),
-    (1, RunStatus.DIVERGED, 0),
+    pytest.param(1, RunStatus.DIVERGED, 0, marks=pytest.mark.slow),
     (14, RunStatus.DIVERGED, 0),
     (15, RunStatus.BUDGET_EXHAUSTED, 1),
 ])

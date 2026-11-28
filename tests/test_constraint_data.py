@@ -48,10 +48,12 @@ def cast_state(state, dtype):
 
 
 @pytest.mark.parametrize("kind", ("exactly_k", "at_most_k", "table"))
-@pytest.mark.parametrize("reverse", (False, True))
-@pytest.mark.parametrize("observed", (False, True))
+@pytest.mark.parametrize("observed,reverse", [
+    (False, False), pytest.param(False, True, marks=pytest.mark.slow),
+    pytest.param(True, False, marks=pytest.mark.slow), (True, True),
+])
 @pytest.mark.parametrize("dtype", (np.float32, pytest.param(np.float64, marks=pytest.mark.slow)))
-@pytest.mark.parametrize("schedule", ("auto", "flood"))
+@pytest.mark.parametrize("schedule", ("auto", pytest.param("flood", marks=pytest.mark.slow)))
 def test_distinct_constraint_instances_match_solo_in_both_orders(
     kind, reverse, observed, dtype, schedule, monkeypatch
 ):
