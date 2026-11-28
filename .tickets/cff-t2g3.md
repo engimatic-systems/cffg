@@ -29,7 +29,7 @@ The task depends on `cff-5edo`, which owns convergence and cost for planning bey
    1.3. The controller receives glucose-sensor observations without meal events, meal amounts, or future meal schedules.
    1.4. The controller's permitted insulin actions adjust basal delivery; every scored bolus action is zero.
    1.5. Count a started episode once at the first native simglucose termination: interval-average model glucose strictly below 10 or strictly above 600 mg/dL. One violating step suffices. Record the step, direction and glucose value. Ordinary eight-hour completion contributes zero critical episodes. Keep every started episode in the outcome denominator. Include boundary and signal-selection tests.
-   1.6. The benchmark records simulator blood glucose from 70 through 180 mg/dL as time in range and separately records time below range, time above range, and critical episodes.
+   1.6. The benchmark records simulator blood glucose from 70 through 180 mg/dL as time in range and separately records time below range, time above range, and critical episodes. Also report the number of samples below 54 or above 250 mg/dL and how many started episodes contain such an excursion. These reproduce the stricter CFFG experiment diagnostic and expose excursions even when the simulator runs to completion.
 2. The evaluated controller satisfies the declared white-box continual-learning contract.
    2.1. The controller is a continual-learning CFFG agent with separately inspectable insulin-response and meal-response model components.
    2.2. A neural-network action policy does not choose insulin actions.
@@ -118,3 +118,7 @@ Source verification, November 27. The lockfile selects simglucose 0.2.11 at a6f6
 **2026-11-28T05:33:46Z**
 
 Verified seven cases on the pinned T1DSimEnv.step using scripted minute readings and sensor CGM held at 100 mg/dL. Means 9 and 601 terminated; exact 10 and 600 did not. Minute values [4,25,25] averaged 18 and continued, [4,4,19] averaged 9 and terminated, [590,590,650] averaged 610 and terminated. Evidence ~/agent-share/cffg-glucose-endpoint/native.json. This exercises the upstream flag, without controller tuning or a scored episode.
+
+**2026-11-28T05:35:03Z**
+
+Historical cross-check: CFFG branch sim-glucose, commit 5427d48, ran eight-hour trials with a separate per-sample diagnostic below 54 or above 250 mg/dL. It saved native step.info["bg"] but continued through its fixed loop. On archived run 014, independent read-only replay of all 32,000 BG records across 200 episodes reproduced the 998 originally reported excursion samples; 48 episodes had one or more excursions. Zero episodes met the upstream terminal condition. Thus both measures are informative and both should be named in the new report. This is a later CFFG experiment, distinct from the historical VERSES controller and its original scorer. Source https://github.com/engimatic-systems/cffg/blob/5427d48e779de50a167dde5c2815b8b2bcbee62f/src/cffg/experiments/simglucose_basal.py#L154-L160 . Receipt ~/agent-share/cffg-glucose-endpoint/archived-014.json.
