@@ -97,11 +97,21 @@ def identity_records(scene, *, color_only=False):
     return MixedBatch(features, jnp.zeros((n, d, d), scene.dtype), jnp.ones(n, bool), ())
 
 
-def identity_labels(bank, records):
-    """Read first-maximum identity per slot, including the all-unused uniform case."""
+def identity_probabilities(bank, records):
+    """Return per-slot assignments and scalar validity for observed identity features.
+
+    The empty bank gives each type equal probability. Invalid evidence yields
+    zero rows and a false status, including when the bank is empty.
+    """
     empty = ~jnp.any(bank.active)
     model = release_view(bank)
     supported = model._replace(active=model.active.at[0].set(model.active[0] | empty))
     _, weights, proper = score(supported, records)
-    labels = jnp.where(empty, 0, weights.argmax(axis=1)).astype(jnp.int32)
-    return labels, proper
+    weights = jnp.where(empty, jnp.full_like(weights, 1 / bank.active.size), weights)
+    return jnp.where(proper, weights, 0), proper
+
+
+def identity_labels(bank, records):
+    """Read the first maximum of each slot's identity distribution."""
+    weights, proper = identity_probabilities(bank, records)
+    return weights.argmax(axis=1).astype(jnp.int32), proper

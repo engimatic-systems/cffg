@@ -10,6 +10,7 @@ from cffg.component_bank_device import DeviceBank
 from cffg.experiments.axiom_banks import (
     BankSettings,
     identity_labels,
+    identity_probabilities,
     identity_records,
     initial_banks,
 )
@@ -73,6 +74,16 @@ class Scene(NamedTuple):
     absent_distance: jax.Array
     tick: jax.Array
     can_reset: jax.Array
+
+    def identity_beliefs(self):
+        """Read [slot, type] probabilities and a validity flag from the observed scene.
+
+        Hidden slots use their last stored appearance. The trained bank's
+        feature dimension distinguishes color-only from size-and-color models.
+        """
+        posterior = self.identity.posterior
+        records = identity_records(self.tracks.scene, color_only=posterior.mu.shape[1] == 3)
+        return identity_probabilities(posterior, records)
 
 
 class ObservationResult(NamedTuple):
