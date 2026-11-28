@@ -51,7 +51,7 @@ Child ticket `cff-t2g3` owns the remaining implementation and evaluation work fo
 
 - build a continual-learning, white-box CFFG controller with a modular physiological model;
 - extend the benchmark to adults and adolescents over eight-hour episodes with unannounced meals;
-- confirm the critical-episode definition with Cooper before encoding that metric;
+- implement the pinned simulator's low/high termination flag for the eight-hour protocol and verify both boundaries;
 - evaluate safety and time in range under the common comparison protocol; and
 - address patient-specific low-glucose behavior, including the historical adult #006 finding, through evidence from the common protocol rather than tuning against the 24-hour reference alone.
 
@@ -66,7 +66,7 @@ No additional future work is identified by this epic.
 - **Cohort:** The named set of simulated patients included in one aggregate result.
 - **Continuous glucose monitor (CGM):** A sensor that supplies glucose readings to the controller.
 - **Continual learning:** Updating a model from observations collected while the controller operates.
-- **Critical episode:** A serious low- or high-glucose event. `cff-t2g3` must confirm its specific threshold and duration with Cooper before implementation.
+- **Critical episode:** An eight-hour benchmark episode ending on the native simglucose extreme-glucose flag. The pinned implementation uses one sensor interval with mean simulated glucose below 10 or above 600 mg/dL; cff-t2g3 records the source and the historical comparison caveat.
 - **FDA:** U.S. Food and Drug Administration.
 - **Hypoglycemia:** Blood glucose below the accepted range; this ticket's reference below-range threshold is 70 mg/dL.
 - **Insulet:** The simulated insulin pump selected for the reference scenario.
