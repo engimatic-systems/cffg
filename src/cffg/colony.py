@@ -39,7 +39,8 @@ def _batch_signature(state: State) -> tuple:
 
 
 class Colony:
-    def __init__(self):
+    def __init__(self, *, schedule: str = "auto"):
+        self.schedule = schedule
         self.engines: dict[str, Engine] = {}
         self.instances: dict[int, _Instance] = {}
         self._next_id = 0
@@ -62,7 +63,7 @@ class Colony:
                     "explicit PRNG keys and stochastic statuses require "
                     "Engine.prepare_mu3/run"
                 )
-            self.engines[key] = Engine(arena)
+            self.engines[key] = Engine(arena, schedule=self.schedule)
             state = self.engines[key].init_state()
         else:
             # Same structure, this instance's own parameters.

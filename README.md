@@ -314,6 +314,36 @@ prior. An affected external learner requires an explicit fitted point-model
 snapshot before editing. Save the returned record together with its numeric
 inputs to replay the candidate.
 
+### Reuse a typed fragment
+
+`cffg.structure_fragments` supplies three binary conditional models. Each
+has `previous` and `current` GLUE ports for its latent state.
+
+| Builder | Observed DATA | Assumption |
+| --- | --- | --- |
+| `object_persistence()` | `detection` (miss, hit) | An object can persist through a detector miss. A missing reading supplies no detection evidence. |
+| `contact_causality()` | `contact` (absent, present), `motion` (still, moving) | Recorded contact selects a motion transition. Motion is observed with sensor error. |
+| `agency()` | `applied_action` (left, right), `position_reading` (left, right) | The executed command selects a stochastic position transition. The position sensor can be wrong. |
+
+```python
+from cffg.structure_fragments import load_fragment, object_persistence, save_fragment
+
+key = save_fragment("persistence.npz", object_persistence())
+fragment = load_fragment("persistence.npz", expected_id=key)
+models = {"base": (base.template, base.arrays), key: (fragment.template, fragment.arrays)}
+step = fragment.compose_step(base.template, {"latent": "previous"}, name="with_detection")
+record = record_proposal(source_id="base", parent_id=None, proposal_source="fragment-library",
+                         steps=[step], models=models)
+```
+
+Here `base` supplies a binary `latent` GLUE port ordered absent, present.
+Check `fragment.ports` for the role, domain and ordered labels of every port.
+The fragment helper checks label order when both operands carry fragment
+metadata. A plain Template supplies the role and domain. Standard composition
+scopes existing host readings as `a/<name>` and fragment readings as
+`b/<name>`. Compare candidates using identical physical readings under
+the same scoped names and category order.
+
 ## Filter a slow regime and a fast state
 
 Use `cffg.hierarchy.Hierarchy` when a hidden regime selects the fast dynamics
@@ -887,6 +917,77 @@ run, call `decode(state)`, and score it with `objective(state)`. On a tree this
 is the exact MAP/Viterbi identity. On loops it retains the usual max-product
 caveats; `cffg.csp.decimate` is the explicit feasibility-oriented helper. See
 [examples/hard_constraint.py](examples/hard_constraint.py).
+
+## Compare fitted candidates on held-out evidence
+
+Use stable IDs for the original data artifacts. Choose a common observed
+alphabet and measurement units for every candidate. Each binding below
+represents an independent inference problem. To score observations jointly,
+put them on different DATA ports of one unrolled graph in a single binding.
+
+```python
+from cffg.structure_scoring import Candidate, Partition, compare_candidates
+
+candidates = [Candidate("small", small_template, small_arrays, small_priors),
+              Candidate("split", split_template, split_arrays, split_priors)]
+fit = Partition("train", {"episode-4": [{"sensor": 0}, {"sensor": 1}]})
+heldout = Partition("test", {"episode-9": [{"sensor": 1}]})
+reports = compare_candidates(candidates, fit, heldout)
+for name, row in reports.items():
+    print(name, row.status, row.total_bfe, row.rank)
+```
+
+Each declared learnable updates only during fitting. A fixed candidate can
+omit priors. Dirichlet rollover uses the engine's expected log parameters.
+The total is the sum of the final ordinary Bethe ledger values in nats.
+Raw traces and per-event statuses are available in `row.evaluation_events`.
+Only a complete set of converged, finite scores earns a rank. Lower totals
+rank first. At working precision, totals tie when their difference fits
+within the two candidates' combined rounding allowances. Each allowance is
+eight machine epsilons times the sum of `max(1, abs(event_energy))`. The
+raw totals keep their original values. Loopy models carry an approximation
+notice. A planning graph with goal ports or P-substitution needs a separate
+ordinary evaluation graph. Use `grouped=False` for the single-Engine path.
+
+### Decide when to try a different model
+
+A search round tests a specific change to the current model. For example,
+suppose a model has three hidden room types. You suspect it could explain
+the same readings with two. Fit both versions on the same training records,
+then ask which one better predicts a separate set of readings. A tie lets
+you keep the current model.
+
+```python
+from cffg.structure_operators import PruneState
+from cffg.structure_search import search_round
+
+models = {"rooms": (template, fitted_arrays)}
+result = search_round("rooms", models, [PruneState("place", 2)], fit, heldout)
+for key, row in result.scores.items():
+    print(key, row.status, row.total_bfe, row.rank)
+print(result.reason, result.selected_id)
+```
+
+Each proposal records its parent and its edits. `result.failures` lists edits
+that could not produce a candidate. A model that ran and failed inference
+has its own status in `result.scores`. A unique best challenger wins. The
+incumbent wins a tie for first. Tied challengers ahead of the incumbent, or
+a round with no usable scores, leave `selected_id` empty.
+
+To request a round only after repeated poor predictions, keep one
+`trigger = ProposalTrigger(threshold=3.0, consecutive=2)` from
+`cffg.structure_search`. Call `trigger.observe(score)` once per completed
+monitoring evaluation of the incumbent. It returns true on the second
+consecutive total above three nats. Changing the model, recovering to the
+threshold or below, or failing inference resets the count. Use comparable
+amounts of data per evaluation since the threshold applies to a sum.
+
+An external proposer can use `source_candidate("rooms", models)` to get the
+incumbent's record, then pass a `StructuralCandidate` identifying that parent
+alongside the built-in edits. Keep the selected record, its numeric inputs,
+and all referenced models. For another round, replay that record, register
+the resulting source under a new key, and supply the record as `incumbent`.
+Keep the training data and priors to reproduce a fitted score.
 
 ## Batch, extend, render, and estimate
 

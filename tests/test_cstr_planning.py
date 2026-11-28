@@ -253,7 +253,7 @@ def test_tenfold_horizon_preserves_strict_partial_input_validation():
     assert result.iterations == 1
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_directed_certificate_checks_every_packed_site_and_successor_ledger(dtype):
     """One identity transition with unit noises and two observed terminal coordinates."""
     from cffg.directed_chain_certificate import certify

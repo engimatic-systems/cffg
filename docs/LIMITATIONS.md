@@ -44,12 +44,10 @@ variables, symmetric modes) cannot be represented, only projected onto the
 chosen executable family. Richer constraints widen the mathematical family,
 but each needs its own syntax, update, and ledger before the runtime can use it.
 
-**H3. No structure learning inside the objective.** Continual learning updates
-*parameters* (conjugate posterior → next prior). The graph topology, state-space
-cardinalities, and factorization are fixed by the template. The framework has no
-gradient that adds a latent variable, splits a state, or discovers a new factor.
-(An outer loop scoring candidate structures by free energy is possible — see S6 —
-but that is model *comparison* wrapped around the engine, not learning within it.)
+**H3. Fixed structure during inference.** Each engine works on one template
+with a fixed graph, state count and factorization. Continual learning updates
+its parameters. The host-side search in S6 can propose a different template
+and compare both models on held-out observations.
 
 **H4. Tabular representation → combinatorial state walls.** Discrete variables are
 one-hot; joint states are Kronecker products. The T-maze is 4 positions × 2 reward
@@ -848,11 +846,15 @@ checks matching roots and a positive work-reduction confidence interval;
 there is no universal speedup or same-root theorem for multiple-root models.
 This deterministic API has no particles or importance sampling.
 
-**S6. Structure search is not a library capability.** Free energy can be used by
-application code to compare explicitly constructed candidate models, but the
-library exposes no topology-search algorithm, candidate generator, or validated
-search workflow. Earlier roadmap discussion of propose-and-score loops is a
-design possibility, not delivered structure learning.
+**S6. Scope of structural search.** The host can try the supplied mixture
+and affine edits or replay an externally proposed edit or fragment. Each
+candidate explains the same held-out data through an ordinary Bethe ledger.
+Loops use the Bethe approximation, and constraints such as mean-field
+factorization can also affect evidence accuracy on trees. A high score
+can reflect noisy data, parameter error or a poor model structure. The
+threshold only requests a comparison of the proposed alternatives. Their
+ranking uses the evaluation partition for selection. A claim about future
+performance requires independently reserved data.
 
 **S7. Scale engineering.** Sparse A/B matrices, factored transition tensors,
 GPU-resident arenas, incremental recompilation, smarter (residual) schedules —
