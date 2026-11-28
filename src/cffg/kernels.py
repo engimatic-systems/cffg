@@ -694,6 +694,9 @@ _install_discrete(
     ),
 )
 
+# A replacement registration must use its own executor, even under the same type name.
+BUILTIN_MATRIX_CAT = KERNELS["matrix_cat"]
+
 from cffg.gaussian_kernels import install as _install_gaussian
 
 _install_gaussian(

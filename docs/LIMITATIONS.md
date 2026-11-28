@@ -745,8 +745,12 @@ the exact certificate is elementwise,
 `max(|new-old| / (1+|old|)) <= 64 eps`, so neither graph depth nor an
 unrelated large-magnitude block can widen it. Gaussian readouts now group
 same-dimension edges and allow a named subset. Quoted inference timings
-above retain their original output contracts. Slice-fused composite kernels
-(cff-yl0a) remain a possible improvement to the inference step.
+above retain their original output contracts. The HMM slice lowering covers
+one square transition and emission of the same cardinality with a ternary
+equality in the recognized port order. Rectangular emissions, max-product,
+other phase groupings, and Gaussian chains use the generic schedule.
+Run `uv run --group bench python tools/benchmark_hmm_scan.py --output FILE`
+to compare both propagation kernels and the two live Dynamax references.
 
 **S2. Importance-sampling noise in parameter messages.** The message to A is a
 non-conjugate log-message evaluated by importance sampling; variance grows with

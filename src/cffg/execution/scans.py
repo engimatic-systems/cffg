@@ -3,10 +3,12 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
+from jax.scipy.special import logsumexp
 
 from cffg.execution.transport import gaussian_tap_parameters as _tap_parameters
 from cffg.compiled import NEG, Arena
 from cffg.execution.failures import FailureIndex
+from cffg.execution.hmm_scan import make_hmm_scan
 from cffg.failure_facts import empty_failure, first_failure
 from cffg.execution.owners import SCHEDULED_EXECUTORS
 
@@ -334,15 +336,21 @@ def _registerized_scan_fn(
     return fn
 
 
-def _scan_stage_fn(arena: Arena, stage, op, executors=SCHEDULED_EXECUTORS):
+def _scan_stage_fn(arena: Arena, stage, op, executors=SCHEDULED_EXECUTORS, *, fuse_hmm=True):
     """Pick the ScanStage executor: registerized when the dependency
     analysis succeeds (chains always do), flat-carry otherwise."""
     plans = _classify_scan(arena, stage)
     if plans is not None:
-        fn = _registerized_scan_fn(arena, stage, plans, op, executors)
+        specialized = fuse_hmm and op is logsumexp and executors is SCHEDULED_EXECUTORS
+        fn = make_hmm_scan(arena, stage, plans) if specialized else None
+        fused = fn is not None
+        if not fused:
+            fn = _registerized_scan_fn(arena, stage, plans, op, executors)
+        fn.hmm_fused = fused
         fn.registerized = True
         return fn
     fn = _flat_scan_fn(arena, stage, op, executors)
+    fn.hmm_fused = False
     fn.registerized = False
     return fn
 

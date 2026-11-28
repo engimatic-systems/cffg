@@ -228,6 +228,10 @@ For reusable structure:
   36.2 images/s singly or 47.7 images/s in batches of 128. For an acyclic
   ordinary BP model, the exact two-pass schedule is also available. It
   processed 263.9 and 273.1 images/s on this classifier.
+- The exact schedule recognizes repeated discrete HMM slices with square transition
+  and emission matrices, ternary state equalities, and DATA emission ports. Its
+  forward and backward scans return every directed message for the usual
+  marginal readout, support checks, fixed-point certificate, and Bethe energy.
 - `cffg.core.fan_out(template, edge, branch_count)` returns a validated
   template and ordered GLUE ports for attaching new factors. Its endpoints
   keep their roles. `observe_interior(template, edge)` returns a template and
