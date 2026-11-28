@@ -63,7 +63,7 @@ def test_singular_output_information_can_still_inform_every_input_direction(dtyp
     np.testing.assert_allclose(result[1], [[[.5]]], rtol=32 * np.finfo(dtype).eps)
 
 
-@pytest.mark.parametrize("dtype,vector", [(jnp.float32, [2., 3.]), (jnp.float64, [3., 4.])])
+@pytest.mark.parametrize("dtype,vector", [(jnp.float32, [2., 3.]), pytest.param(jnp.float64, [3., 4.], marks=pytest.mark.slow)])
 def test_equilibration_does_not_amplify_an_annihilated_input_direction(dtype, vector):
     matrix = jnp.asarray(vector, dtype)[:, None]
     perpendicular = jnp.array([vector[1], -vector[0]], dtype)

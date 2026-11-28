@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Can two moves tell you where you are? · CFFG navigation</title>
+<style>
+:root{color-scheme:light;--bg:#f5f3eb;--card:#fffef8;--ink:#19302a;--sub:#4c6258;--line:#c5cec1;--green:#17664f;--dark:#152d29;--trail:#efbb74}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.52 system-ui,sans-serif}button,select,input{font:inherit;color:inherit}
+a{color:var(--green);text-underline-offset:.2em}button,select{cursor:pointer;background:var(--card);border:1px solid #96aa9a;border-radius:5px;padding:.42em .7em;min-height:39px}
+button:hover,select:hover{border-color:var(--green)}button:disabled{opacity:.5;cursor:default}:focus-visible{outline:3px solid #08798d;outline-offset:3px}
+.wrap{max-width:1160px;margin:auto;padding:0 clamp(16px,4vw,54px)}header{border-bottom:1px solid var(--line)}header .wrap,nav,.section-title,.buttons,.legend,.map-title,.seek{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+header .wrap{min-height:55px;justify-content:space-between}header span{font-weight:700;font-size:.94rem}nav{gap:18px;font-size:.88rem}nav a{text-decoration:none}
+h1,h2,h3,p,figure,dl{margin:0}h1,h2{font:400 clamp(2.15rem,4.2vw,3.1rem)/1.08 Georgia,serif;letter-spacing:-.04em}h1{font-size:clamp(2.8rem,6.1vw,4.8rem);max-width:20ch}
+.intro{padding:clamp(25px,4vw,48px) 0 30px}.lead{font-size:1.13rem;max-width:72ch;color:var(--sub);margin:.7rem 0}
+.finding{max-width:85ch;border-left:3px solid #679c83;padding-left:12px}.jump{display:inline-block;margin-top:.3rem}
+section[id]{scroll-margin-top:15px}h3{font-size:1.02rem;line-height:1.35}.section-title{justify-content:space-between;margin-bottom:12px}
+.sub,figcaption,.note{color:var(--sub);font-size:.89rem}.controls{display:grid;grid-template-columns:1.2fr 1.25fr 1.25fr 1.15fr .8fr;gap:10px;margin-bottom:12px}
+label{display:block;font-size:.8rem;color:var(--sub);font-weight:650}label select{display:block;width:100%;font-size:.93rem;margin-top:3px}
+.workbench{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(255px,1fr);gap:13px}.panel{min-width:0;background:var(--card);border:1px solid var(--line);border-radius:9px}
+.board{overflow:hidden}.map-box{background:var(--dark);color:#f0f4e9;padding:12px}.map-title{justify-content:space-between}.map-title h3{font-size:.98rem}
+.map-title select{font-size:.83rem;min-height:34px}.map-scroll{overflow:auto}#map{display:block;width:100%;height:clamp(180px,23vw,258px);margin:.3rem 0}#map.enlarged{width:840px;height:auto}.map-options{display:flex;align-items:center;gap:6px}.map-options button{color:var(--ink);font-size:.83rem;min-height:34px}
+.legend{font-size:.75rem;color:#dce5df;gap:5px 16px}.legend span:before{content:"";display:inline-block;vertical-align:middle;margin-right:5px;width:12px;height:4px;background:var(--trail)}
+.legend .agent:before{width:9px;height:9px;border:2px solid white;border-radius:50%}.legend .goal:before{width:9px;height:9px;border:2px solid #94d8ba;transform:rotate(45deg);background:none}
+.transport,.readouts,.results{padding:clamp(12px,1.5vw,20px)}.seek{flex-wrap:nowrap;justify-content:space-between}.seek input{flex:1;min-width:0;accent-color:var(--green)}output{font-variant-numeric:tabular-nums;white-space:nowrap}
+.buttons{margin:7px 0;gap:6px}.buttons button{font-size:.87rem;font-weight:650}.play{background:var(--green);color:white}.readouts h3{margin:0 0 .4rem}
+.readouts dl{display:grid;grid-template-columns:minmax(86px,.78fr) minmax(0,1.22fr);font-size:.88rem}.readouts dd,.readouts dt{margin:0;padding:6px 0;border-top:1px solid var(--line)}.readouts dt{color:var(--sub)}.readouts dd{overflow-wrap:anywhere;font-weight:570}
+.memory{margin-top:12px;background:#eaf1e9;border-radius:5px;padding:9px 12px;font-size:.87rem}.memory ol{margin:.3rem 0;padding-left:20px}
+.note{margin-top:8px}.evidence{margin:clamp(32px,5vw,62px) 0}.results{margin-top:12px}.results h3~h3{margin-top:1.5rem}.scroll{overflow:auto}
+table{width:100%;border-collapse:collapse;text-align:left;font-size:.88rem;font-variant-numeric:tabular-nums}th,td{padding:7px 9px;border-bottom:1px solid var(--line)}th{font-weight:640}th:first-child,td:first-child{padding-left:0}
+thead{color:var(--sub)}caption{text-align:left;color:var(--sub);padding:.65rem 0;font-size:.83rem}.results p{max-width:84ch}
+details{margin-top:12px}summary{font-weight:650;cursor:pointer}.skip,.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.skip:focus{z-index:3;width:auto;height:auto;clip-path:none;background:white;padding:.5rem}
+[hidden]{display:none!important}footer{border-top:1px solid var(--line);padding:16px 0;color:var(--sub);font-size:.82rem}
+@media(max-width:740px){.workbench{grid-template-columns:1fr}.controls{grid-template-columns:repeat(2,minmax(0,1fr))}.intro{padding-top:26px}header .wrap{padding-block:8px;gap:4px}nav{gap:12px}button,select{min-height:42px}}
+</style>
+</head>
+<body>
+<a class="skip" href="#replay">Skip to replay</a>
+<header><div class="wrap"><span>CFFG navigation study</span><nav aria-label="Sections"><a href="#replay">Replay</a><a href="#results">Results</a><a href="#method">Method</a></nav></div></header>
+<main class="wrap">
+<section class="intro"><h1>Can two moves tell you where you are?</h1>
+<p class="lead">Two junctions and their exits look alike. A navigator that remembers what it saw and how far it actually moved may recognise which junction it reached. This study tests that idea on a familiar map and on two changed maps.</p>
+<p class="finding" id="finding"></p><a class="jump" id="example" hidden></a> <span id="second-link" hidden> · <a id="forecast-example"></a></span></section>
+<section id="replay" aria-labelledby="replay-title"><div class="section-title"><h2 id="replay-title">Walk the record</h2></div>
+<div class="controls">
+<label>Layout<select id="layout"></select></label>
+<label>Task<select id="phase"><option value="route">Navigate to a goal</option><option value="forecast">Predict an endpoint</option></select></label>
+<label>Model<select id="arm"></select></label><label>Recording<select id="tape"></select></label>
+<label id="horizon-label">Look ahead<select id="horizon"><option value="1">1 move</option><option value="3">3 moves</option></select></label>
+</div>
+<div class="workbench"><figure class="panel board">
+<div class="map-box"><div class="map-title"><h3>Position and travelled path</h3><div class="map-options"><label><span class="sr">Map background</span><select id="view"><option value="actual">Actual layout</option><option value="fit">Map learned during fit</option></select></label><button type="button" id="zoom" aria-pressed="false">Enlarge</button></div></div>
+<div class="map-scroll" tabindex="0" role="region" aria-label="Scrollable route map"><svg id="map" role="img" aria-labelledby="map-description"></svg></div>
+<div class="legend"><span class="agent">Current position</span><span>Completed moves</span><span class="goal" id="goal-key">Goal</span></div></div>
+<div class="transport"><div class="seek"><label class="sr" for="scrub">Completed moves</label><input type="range" min="0" max="0" id="scrub" value="0"><output id="step" for="scrub"></output></div>
+<div class="buttons"><button type="button" id="prev">← Previous</button><button type="button" class="play" id="play">Play</button><button type="button" id="next">Next →</button></div>
+<figcaption id="caption"></figcaption></div></figure>
+<aside class="panel readouts"><h3 id="inspector"></h3><dl id="readings"></dl><div class="memory"><b>Last two completed moves</b><ol id="past"></ol><p id="state"></p></div><p class="note" id="outcome"></p></aside></div>
+</section>
+<section id="results" class="evidence"><h2>What happened?</h2>
+<div class="panel results"><h3>Predicting the endpoint symbol</h3><p class="note">All three models get the same upcoming commands. They predict the symbol after one or three moves using only information available at the starting point. Lower mean log loss means the model gave more probability to what was actually seen.</p>
+<div class="scroll" id="scores"></div>
+<h3>Reaching a goal</h3><p class="note">Here each model picks its own next move after seeing the last one play out. Every attempted move uses one unit of budget, including a push against a wall. Select a route outcome to replay its finish.</p><div class="scroll" id="routes"></div>
+<details><summary>Where did the history model use its memory?</summary><p id="coverage-note" class="note"></p><div class="scroll" id="coverage"></div></details>
+</div></section>
+<section id="method" class="evidence"><h2>What each model knows</h2><div class="panel results">
+<h3>One move can remove one kind of uncertainty</h3><p>Every model receives the current symbol, the applied compass command and the measured change in position. An east command with displacement (0, 0) tells the navigator it stayed put. Adding the measured displacements to a known start gives its position. The same symbol can still refer to more than one place in the learned model.</p>
+<h3>Three uses of the same experience</h3><p>The immediate model pools all visits bearing the same symbol. The history model can also use the last two completed commands, their displacements and the three symbols they connect. It retains a sequence seen at least twice during fitting if the final symbol occurred at several positions. Missing sequences fall back to the current symbol. The tile model keeps the positions and directed links it experienced. All three learn from the same exploration, then stay frozen as the map changes.</p>
+<h3>Reading one and three moves ahead</h3><p>The fitted tables count which symbol followed each prescribed command string. A missing history forecast uses the appearance row if available. With no matching row, the model assigns equal probability to each symbol. The tile model follows its fitted links and also returns equal probabilities for an unknown link. A 1% uniform mixture keeps every endpoint possible. On this categorical tree, the native Bethe free energy equals the negative natural logarithm of the probability assigned to the observed endpoint.</p>
+<details><summary>Data collection and measured cost</summary><p id="cost" class="note"></p></details></div></section>
+</main><footer><div class="wrap">Recorded movement-history experiment · Offline replay</div></footer>
+<script type="application/json" id="study">__MOVEMENT_STUDY_JSON__</script>
+<script>
+'use strict';
+const study=JSON.parse(document.getElementById('study').textContent), $=id=>document.getElementById(id);
+const arms={appearance:'Immediate symbol',history:'Two-move history',tile:'Observed tile map'};
+const labels={'fit-loop':'Original loop','bent-west':'West bend','bent-east-detour':'East bend and detour'};
+const directions={N:'north',E:'east',S:'south',W:'west'};
+const sources={appearance:'Appearance row',history:'Two-move history row',map:'Fitted map links',uniform:'Uniform fallback'};
+const fmt=(n,d=3)=>n==null?'—':n.toFixed(d), coords=p=>'('+p.join(', ')+')';
+const layoutLabel=k=>labels[k]||k;
+const keys=new Map(study.history_keys.map((key,i)=>[JSON.stringify(key),i]));
+const fitLocations=new Map();
+for(const [id,r,c,count] of study.locations){
+  if(!fitLocations.has(id))fitLocations.set(id,[]);
+  fitLocations.get(id).push({pos:[r,c],count});
+}
+function el(name,text){
+  const node=document.createElement(name);
+  if(text!==undefined)node.textContent=text;
+  return node;
+}
+function choices(id,items,desired){
+  const select=$(id);
+  select.replaceChildren(...items.map(([key,title])=>new Option(title,key)));
+  if(items.some(([key])=>key===desired))select.value=desired;
+}
+function table(id,caption,head,rows){
+  const node=el('table');node.append(el('caption',caption));
+  const tr=node.createTHead().insertRow();
+  for(const label of head){const th=el('th',label);th.scope='col';tr.append(th)}
+  const body=node.createTBody();
+  for(const row of rows){
+    const tr=body.insertRow();
+    row.forEach((v,i)=>{
+      const td=el(i===0?'th':'td');if(i===0)td.scope='row';
+      if(v instanceof Node)td.append(v);else td.textContent=v;
+      tr.append(td);
+    });
+  }
+  $(id).replaceChildren(node);
+}
+function receipt(label,value){$('readings').append(el('dt',label),el('dd',value))}
+function pathFor(layout,arm,tape,t,phase='route'){
+  return '?'+new URLSearchParams({layout,phase,arm,tape,step:String(t)})+'#replay';
+}
+function routeLink(layout,tape){
+  const a=el('a',tape.id+' · '+tape.steps.length+' moves');
+  a.href=pathFor(layout,tape.arm,tape.id,tape.steps.length);
+  return a;
+}
+function results(){
+  const s=study.summary,d=s.primary_delta_nats,p=s.primary_unseen_h3;
+  const history=p.mean_nll.history,appearance=p.mean_nll.appearance;
+  const equal=d===0;
+  $('finding').textContent='Across '+p.n+' three-move forecasts on the two changed maps, the history model scored '+fmt(history)+' nats of log loss per forecast and the immediate model scored '+fmt(appearance)+'. '+(equal?'Their scores matched.':('History was '+fmt(Math.abs(d))+' nats '+(d<0?'better':'worse')+' per forecast.'));
+  const changed=study.order.filter(n=>n!==study.training_layout);
+  const totals=Object.keys(arms).map(a=>changed.reduce(([wins,all],k)=>{
+    const r=s.layouts[k].routes[a];return [wins+r.successes,all+r.total];
+  },[0,0]));
+  $('finding').append(' On those same maps the models reached '+totals.map(([wins,n],i)=>wins+' of '+n+' goals ('+Object.values(arms)[i].toLowerCase()+')').join(', ')+'.');
+  const used=p.history_forecast_sources;
+  $('coverage-note').textContent='Of the '+p.n+' three-move predictions on changed maps, '+(used.history||0)+' used a sequence-specific probability row, '+(used.appearance||0)+' used the symbol row and '+(used.uniform||0)+' used uniform probabilities. Even a recognised sequence can lack fitting examples for the requested commands.';
+  const predictions=[],routes=[],coverage=[];
+  for(const name of study.order){
+    const m=s.layouts[name],label=layoutLabel(name)+(name===study.training_layout?' · fit layout':' · unseen');
+    for(const lead of [1,3]){
+      const group=m.scores[lead],r=group.all;
+      predictions.push([label,lead,r.n,...Object.keys(arms).map(a=>fmt(r.mean_nll[a]))]);
+      coverage.push([label,lead,r.complete_history,r.novel_history,r.retained_history,group.blocked.n,group.moved.n]);
+    }
+    for(const [arm,title] of Object.entries(arms)){
+      const r=m.routes[arm],examples=study.cases[name].routes.filter(t=>t.arm===arm);
+      const links=el('div');
+      for(const win of [false,true]){
+        const tape=examples.find(t=>t.success===win);
+        if(tape){const line=el('div',win?'Reached · ':'Missed · ');line.append(routeLink(name,tape));links.append(line)}
+      }
+      routes.push([label,title,r.successes+' / '+r.total,r.actions,r.blocked,links]);
+    }
+  }
+  table('scores','Held-out mean log loss in nats per complete window. Lower is better.',['Layout','Moves ahead','Windows',...Object.values(arms)],predictions);
+  table('routes','Executed routes and attempted actions, including all failures.',['Layout','Model','Reached','Actions','Blocked','Replay examples'],routes);
+  table('coverage','Novel and retained counts refer to forecast origins with two completed moves. Blocked or moved refers to the final prescribed command.',['Layout','Lead','Full histories','Unseen in fit','Retained','Blocked','Moved'],coverage);
+  $('cost').textContent=s.fit_steps+' fitting moves. The immediate model has '+s.dictionary.appearance+' states and the history model has '+s.dictionary.history+' including its symbol states. The tile map contains '+s.tile_cells+' observed positions. Serialized model sizes in bytes were '+Object.keys(arms).map(a=>arms[a]+' '+s.serialized_bytes[a].toLocaleString('en-US')).join(', ')+'. Native tree setup and first score took '+fmt(s.native_cold_s)+' s. The evaluation process peaked at '+fmt(s.process_peak_rss_bytes/1048576,1)+' MiB. Maximum difference from the independent log score was '+s.oracle_max_abs_nats.toExponential(2)+' nats.';
+  for(const name of changed){
+    const event=study.cases[name].predictions.find(e=>e.horizon===3&&e.arms.history.source==='history');
+    if(event){
+      const link=$('forecast-example');link.href=pathFor(name,'history',event.tape,event.t,'forecast').replace('#replay','&horizon=3#replay');
+      link.textContent='Inspect a three-move forecast →';$('second-link').hidden=false;break;
+    }
+  }
+  for(const name of changed){
+    const miss=study.cases[name].routes.find(t=>t.arm==='history'&&!t.success);
+    if(miss){
+      const link=$('example');link.href=pathFor(name,miss.arm,miss.id,miss.steps.length);
+      link.textContent='Replay a missed goal on '+layoutLabel(name)+' →';link.hidden=false;break;
+    }
+  }
+}
+let tape,index=0,events,timer;
+const current=()=>study.cases[$('layout').value];
+const navigating=()=>$('phase').value==='route';
+function stop(){clearInterval(timer);timer=null;$('play').textContent='Play'}
+function selectTape(id,step){
+  stop();
+  const route=navigating(),arm=$('arm').value;
+  const tapes=route?current().routes.filter(t=>t.arm===arm):current().tapes;
+  choices('tape',tapes.map(t=>[t.id,route?t.start.symbol+' → '+t.goal:t.id]),id);
+  tape=tapes.find(t=>t.id===$('tape').value);
+  events=new Map(current().predictions.filter(e=>e.tape===tape.id).map(e=>[e.t+'/'+e.horizon,e]));
+  $('horizon-label').hidden=route;$('goal-key').hidden=!route;
+  $('scrub').max=tape.steps.length;setStep(step);
+}
+function setStep(value){
+  index=Math.max(0,Math.min(Math.trunc(Number(value)||0),tape.steps.length));
+  $('scrub').value=index;$('step').textContent=index+' / '+tape.steps.length;
+  $('prev').disabled=index===0;$('next').disabled=index===tape.steps.length;
+  frame();
+}
+function svg(parent,tag,attrs,text){
+  const n=document.createElementNS('http://www.w3.org/2000/svg',tag);
+  for(const [k,v] of Object.entries(attrs))n.setAttribute(k,v);
+  if(text!==undefined)n.textContent=text;
+  parent.append(n);return n;
+}
+function map(pos,symbol){
+  const actual=$('view').value==='actual';
+  const tiles=(actual?current().layout:study.tile).tiles;
+  const trail=[tape.start.position,...tape.steps.slice(0,index).map(r=>r.next_position)];
+  const all=[...current().layout.tiles,...study.tile.tiles].map(v=>v.position);
+  const rs=all.map(p=>p[0]),cs=all.map(p=>p[1]);
+  const r0=Math.min(...rs),c0=Math.min(...cs),pitch=60,margin=30;
+  const xy=([r,c])=>[margin+(c-c0)*pitch,margin+(r-r0)*pitch];
+  const board=$('map');board.replaceChildren();
+  board.setAttribute('viewBox',[0,0,2*margin+(Math.max(...cs)-c0)*pitch,2*margin+(Math.max(...rs)-r0)*pitch].join(' '));
+  svg(board,'title',{id:'map-description'},symbol+' at '+coords(pos)+' after '+index+' moves. '+(actual?'Actual layout.':'Original fitted map.'));
+  function line(p,q,color,width){
+    const [x1,y1]=xy(p),[x2,y2]=xy(q);
+    svg(board,'line',{x1,y1,x2,y2,stroke:color,'stroke-width':width,'stroke-linecap':'round'});
+  }
+  const present=new Set(tiles.map(v=>v.position.join(',')));
+  if(actual){
+    for(const {position:[r,c]} of tiles){
+      for(const q of [[r+1,c],[r,c+1]])if(present.has(q.join(',')))line([r,c],q,'#729486',4);
+    }
+  }else{
+    for(const {source,target} of study.tile.links)line(source,target,'#729486',4);
+  }
+  for(const [i,p] of trail.entries())if(i)line(trail[i-1],p,'#efbb74',6);
+  for(const v of tiles){
+    const [x,y]=xy(v.position);
+    svg(board,'rect',{x:x-25,y:y-10,width:50,height:20,rx:4,fill:'#203e36',stroke:'#90b5a1'});
+    svg(board,'text',{x,y:y+3.7,'text-anchor':'middle','font-size':10,'font-family':'system-ui, sans-serif',fill:'#f1f4e9'},v.symbol);
+    if(navigating()&&v.symbol===tape.goal){
+      svg(board,'path',{d:'M '+x+' '+(y-24)+' l 6 6 -6 6 -6 -6 z',fill:'#94d8ba'});
+    }
+  }
+  const [x,y]=xy(pos);
+  svg(board,'circle',{cx:x,cy:y+14,r:6,fill:'#f0b464',stroke:'white','stroke-width':2});
+  $('caption').textContent=actual?'The background shows the true layout for inspection. The navigator learned its connections only from the original exploration.':'The background shows the original learned tiles and links. The trail follows measured moves on the selected layout, including any departures from that old map.';
+}
+function moveText(row){
+  const blocked=row.displacement.every(x=>x===0);
+  return row.symbol+' → '+directions[row.action]+' '+(blocked?'blocked':'moved')+' '+coords(row.displacement)+' → '+row.next_symbol;
+}
+function state(symbol,past,pos){
+  $('past').replaceChildren(...past.map(s=>el('li',moveText(s))));
+  let key=[];
+  if(past.length===2){
+    const [a,b]=past;key=[a.symbol,a.action,...a.displacement,a.next_symbol,b.action,...b.displacement,b.next_symbol];
+  }
+  const arm=$('arm').value,retained=keys.get(JSON.stringify(key)),base=keys.get(JSON.stringify([symbol]));
+  const locs=fitLocations.get(arm==='history'&&retained!==undefined?retained:base)||[];
+  if(arm==='tile'){
+    $('state').textContent='The tile model uses '+coords(pos)+', accumulated from the known start and actual displacements.';
+  }else{
+    const name=arm==='appearance'?'The immediate model uses the symbol “'+symbol+'”.':retained!==undefined?'The fitted dictionary recognises this two-move sequence.':'The history model uses “'+symbol+'” because '+(past.length<2?'fewer than two moves are available.':'this sequence has no retained entry.');
+    $('state').textContent=name+' This state occurred at '+locs.length+' fit position'+(locs.length===1?'':'s')+'.';
+  }
+}
+function frame(){
+  const r=index?tape.steps[index-1]:null,here=r?r.next_symbol:tape.start.symbol,pos=r?r.next_position:tape.start.position;
+  map(pos,here);state(here,tape.steps.slice(Math.max(0,index-2),index),pos);
+  $('readings').replaceChildren();receipt('Observed now',here+' · '+coords(pos));
+  receipt('Last movement',r?directions[r.action]+' · '+coords(r.displacement)+(r.displacement.every(x=>x===0)?' · blocked':' · moved'):'Start of recording');
+  if(navigating()){
+    $('inspector').textContent='Executed route';
+    receipt('Goal',tape.goal);receipt('Next action',index<tape.steps.length?directions[tape.steps[index].action]:'Recording finished');
+    receipt('Budget',tape.budget+' moves');
+    $('outcome').textContent=index===tape.steps.length?(tape.success?'Goal reached in '+index+' moves.':'Goal missed after '+index+' moves. The navigator finished at '+here+'.'):'This replay shows the actions actually chosen by '+arms[$('arm').value]+'.';
+  }else{
+    $('inspector').textContent='Forecast at this position';
+    const lead=Number($('horizon').value),e=events.get(index+'/'+lead);
+    if(!e){$('outcome').textContent='Fewer than '+lead+' prescribed move'+(lead===1?' remains':'s remain')+' in this recording. There is no complete forecast window here.';return}
+    const score=e.arms[$('arm').value];
+    receipt('Given commands',Array.from(e.commands,a=>directions[a]).join(' → '));
+    receipt('Forecast source',sources[score.source]||score.source);
+    receipt('Observed endpoint',e.endpoint+' · move '+(index+lead));
+    receipt('Probability assigned',fmt(100*score.probability,2)+'%');
+    receipt('Bethe free energy',fmt(score.bfe)+' nats');
+    $('outcome').textContent='The endpoint and score were recorded after these commands ran. The forecast used the information available at move '+index+'.';
+  }
+}
+function loadLocation(){
+  const q=new URLSearchParams(location.search);
+  choices('layout',study.order.map(k=>[k,layoutLabel(k)]),q.get('layout'));
+  choices('arm',Object.entries(arms),q.get('arm')||'history');
+  $('phase').value=q.get('phase')==='forecast'?'forecast':'route';$('horizon').value=q.get('horizon')==='3'?'3':'1';
+  selectTape(q.get('tape'),q.get('step'));
+}
+for(const id of ['arm','layout','phase'])$(id).onchange=()=>selectTape($('tape').value,index);
+$('tape').onchange=()=>selectTape($('tape').value,0);
+$('view').onchange=$('horizon').onchange=frame;
+$('zoom').onclick=()=>{const on=$('map').classList.toggle('enlarged');$('zoom').setAttribute('aria-pressed',String(on));$('zoom').textContent=on?'Fit map':'Enlarge'};
+$('prev').onclick=()=>{stop();setStep(index-1)};$('next').onclick=()=>{stop();setStep(index+1)};
+$('scrub').oninput=e=>{stop();setStep(e.target.value)};
+$('play').onclick=()=>{
+  if(timer){stop();return}
+  if(index===tape.steps.length)setStep(0);
+  $('play').textContent='Pause';
+  timer=setInterval(()=>{setStep(index+1);if(index===tape.steps.length)stop()},650);
+};
+document.addEventListener('visibilitychange',()=>{if(document.hidden)stop()});
+document.addEventListener('click',e=>{
+  const a=e.target.closest('a[href^="?"]');
+  if(!a||e.button||e.ctrlKey||e.metaKey||e.shiftKey||e.altKey)return;
+  e.preventDefault();history.pushState(null,'',a.href);loadLocation();$('replay').scrollIntoView();
+});
+window.addEventListener('popstate',loadLocation);
+results();loadLocation();
+</script></body></html>

@@ -984,6 +984,30 @@ uv run --frozen python tools/navigation/audit.py --root navigation-run
 Open `navigation-run/index.html` for the standalone guide. The adjacent
 `study.json` contains every recorded step and both candidates' scores.
 
+### Predict movement sequences on new layouts
+
+The movement-history study fits three models to the same 4,128 exploration
+actions. One pools tiles by their current symbol. Another also learns
+two-transition observation and displacement histories. The tile-map baseline
+retains the links visited during exploration. All three receive exact achieved
+movement, including blocked attempts.
+
+```sh
+uv run --frozen python tools/navigation/history_study.py fit movement-run
+JAX_PLATFORMS=cpu uv run --frozen python tools/navigation/history_study.py evaluate movement-run
+uv run --frozen python tools/navigation/history_audit.py movement-run
+uv run --frozen python tools/navigation/history_guide.py movement-run
+```
+
+Open `movement-run/index.html` to replay the forecasts and the actions each
+planner took. The fit stage requires an empty output directory and seals the
+models before evaluation. On two previously unseen layouts, the history model
+used a matching fitted row for 93 of 764 three-command predictions. Mean
+endpoint surprise was 1.857 nats with history, 1.842 with appearance, and
+0.761 with the tile map. Both learned place models reached 2 of 12 goals,
+and the map reached 8. These results describe two designed layout changes
+with a shared origin and fixed training maps.
+
 ## Reference map
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — owners, execution paths, and
