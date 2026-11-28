@@ -1,7 +1,7 @@
 ---
 id: cff-cynx
 status: open
-deps: [cff-izjd, cff-du6m]
+deps: [cff-izjd, cff-du6m, cssr-bdzr]
 links: [cff-xa6z, car-zieb]
 created: 2026-07-13T03:51:42Z
 type: epic
@@ -215,3 +215,15 @@ Current ambiguity scan, candidate -> intended meaning:
 - `read` -> `docs/READING.md` identifies the document whose content supplies context.
 
 Intelligible-ticket review: complete.
+
+**2026-11-28T05:28:14Z**
+
+Review plan after publication of the evidence review and navigation pilot. Arrow direction is prerequisite --> dependent.
+
+[closed] cff-du6m --> cssr-h31p (replayable graph proposals)
+                          +--> cssr-igfp (actual graph edits) --+
+                          +--> cssr-5izj (typed fragments) --------+--> cssr-bdzr --> cff-cynx
+[ready] cssr-aw99 (held-out ordinary Bethe scores) -----------------+
+[closed] cff-izjd (D5 experiment selection) ----------------------+
+
+The replay record and scoring fixtures can proceed in parallel. Joining proposals to fitted scores waits for the three contracts. The separate navigation follow-up ccrp-x8yx can use the existing fixture independently. Study scores on the hand-built loops establish neither general structure recovery nor a need to infer position when displacement is exact. Existing AXIOM growth and reduction are implementation inputs to the operator ticket; the generic operator still has to produce a replayable graph with the original observable vocabulary.
