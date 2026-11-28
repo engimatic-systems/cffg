@@ -1,6 +1,6 @@
 ---
 id: ccpr-rl0k
-status: in_progress
+status: closed
 deps: [cff-cpxj]
 links: []
 created: 2026-11-28T05:57:47Z
@@ -46,3 +46,7 @@ Use the New IR field change-path index for structural validation and plate groun
 **2026-11-28T06:02:57Z**
 
 The normal expansion and Colony per-copy parameter resolver now stream row-major coordinates. Direct lookups use one stride per axis. Independent small-grid enumeration and near-limit signed-64-bit lookups passed. Invalid grids and chain fields fail before a copied record is allocated; an invalid axis and offset are reported together. Across 64×64 and 256×256 grids, tracemalloc measured the coordinate iteration alone at 264,608 and 4,237,856 bytes for the previous list, versus 1,216 and 1,344 for the stream. These figures cover Python coordinate allocation, not total compiler memory or time. Final focused run of indexing, plate, composition, Colony spawn, edit, bundle and README tests: 99 passed, 4 opt-in deselected. The single complete short suite remains the review gate.
+
+**2026-11-28T08:06:50Z**
+
+Canonical short suite passed at 15c720f1471c: 2,869 cases in 428.032 seconds. The source allocation and addressing ticket is complete. ccpr-ojza owns inference-array compilation, ccpr-m0bu owns nested models and ccpr-u190 owns the estimator. cff-6s31 remains open.
