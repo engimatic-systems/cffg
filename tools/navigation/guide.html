@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Two junctions with the same name · Navigation study</title>
+<style>
+:root{color-scheme:light;--paper:#f5f3eb;--ink:#192e29;--muted:#51635a;--line:#c5cdc1;--panel:#fcfbf6;--map:#152d29;--trail:#f2bc68;--seen:#99cabb;--active:#ef9f54;--teal:#146352;--sans:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--serif:Georgia,"Times New Roman",serif;--mono:ui-monospace,SFMono-Regular,Consolas,monospace}
+*{box-sizing:border-box}
+html{scroll-padding-top:1rem}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 var(--sans);-webkit-text-size-adjust:100%}
+a{color:var(--teal);text-underline-offset:.18em}a:hover{text-decoration-thickness:2px}
+button,select,input{font:inherit;color:inherit}button,select,summary,input[type=range]{cursor:pointer}
+button,select{min-height:40px;border:1px solid #aebcb0;border-radius:5px;background:var(--panel);padding:.4rem .75rem}
+button:hover,select:hover{border-color:var(--teal)}button:disabled{cursor:default;opacity:.5}
+:focus-visible{outline:3px solid #08798d;outline-offset:3px}button[aria-pressed=true],.play{background:var(--teal);border-color:var(--teal);color:white}
+[hidden]{display:none!important}
+.skip{position:fixed;left:1rem;top:-100px;z-index:2;background:white;padding:.6rem}.skip:focus{top:1rem}
+.wrap{max-width:1220px;margin:0 auto;padding:0 clamp(16px,4.8vw,66px)}
+.mast{border-bottom:1px solid var(--line);padding:18px 0}
+.mast .wrap{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:.65rem;font-weight:700;letter-spacing:-.02em}
+.brand i{display:grid;grid-template-columns:repeat(2,6px);gap:3px;transform:rotate(-8deg)}
+.brand i b{height:6px;background:var(--teal)}.brand i b:nth-child(2){background:#be7b3a}
+nav{display:flex;gap:clamp(12px,2vw,24px);font-size:.86rem}nav a{color:var(--muted);font-weight:620;text-decoration:none}nav a:hover{text-decoration:underline}
+.intro{padding:clamp(30px,5vw,64px) 0 clamp(24px,3.8vw,48px)}
+h1,h2,h3,p,figure,ol,dl{margin:0}h1,h2{font-family:var(--serif);font-weight:400;letter-spacing:-.045em;line-height:1.07}
+h1{font-size:clamp(3rem,6.6vw,5.35rem);max-width:1000px}h2{font-size:clamp(2rem,4vw,3.05rem)}
+h3{font-size:1.08rem;line-height:1.3;letter-spacing:-.02em}
+.lead{font-size:clamp(1.02rem,1.65vw,1.23rem);max-width:72ch;color:var(--muted);margin-top:15px}
+.intro h2{font-size:clamp(1.7rem,3.1vw,2.45rem);margin:1.25em 0 .4em}.intro p,.intro li{max-width:74ch}.intro ol{padding-left:1.4em}.intro li{margin:.5em 0}.intro p+p{margin-top:.65em}.intro .replay-links{display:flex;gap:.4em 1.4em;flex-wrap:wrap}
+.finding{border-left:3px solid #6d9986;padding-left:13px;margin-top:16px;max-width:83ch;font-size:.94rem}
+.section-head{display:flex;align-items:baseline;justify-content:space-between;gap:.7rem 2rem;flex-wrap:wrap;margin-bottom:16px}
+.section-note,figcaption,.sub,.note{color:var(--muted);font-size:.88rem}
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,145px),1fr));gap:8px 14px;margin:12px 0 16px}
+.controls label,.view-choice{min-width:0;color:var(--muted);font:650 .78rem/1.4 var(--sans)}
+.controls select{display:block;width:100%;margin-top:3px;font-size:.91rem;font-weight:560}
+.workbench{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(235px,.85fr);gap:14px}
+.board,.inspector,.scores,.methods,.connect{min-width:0;border:1px solid var(--line);border-radius:9px;background:var(--panel)}
+.board{overflow:hidden}.map-box{position:relative;background:var(--map);color:#f5f5ea;padding:15px}
+.map-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.map-top h3{font-weight:600}.view-choice select,.map-top button{color:var(--ink);font-size:.83rem;min-height:36px}.map-top button[aria-pressed=true]{color:white}
+.map-options{display:flex;align-items:center;gap:5px}.map-scroll{max-height:62vh;overflow:auto}.map-scroll.enlarged .map-svg{width:var(--map-width);height:var(--map-height);max-width:none}
+svg{display:block;width:100%;height:auto}.map-svg{height:clamp(200px,29vw,340px);margin:8px auto 6px;overflow:visible}
+.legend{display:flex;align-items:center;flex-wrap:wrap;gap:6px 16px;color:#dce5df;font-size:.76rem;line-height:1.3}
+.legend span{display:inline-flex;align-items:center;gap:5px}.legend i{width:14px;height:4px;border-radius:3px;background:var(--trail)}.legend .agent{width:9px;height:9px;border:2px solid white;background:var(--active);border-radius:50%}.legend .goal{width:10px;height:10px;border:2px solid var(--seen);transform:rotate(45deg);background:none}.legend .known{background:#adc2b2}
+.transport{padding:12px 15px 10px}.seek{display:flex;align-items:center;gap:12px}
+.seek output{font:600 .84rem var(--mono);white-space:nowrap;min-width:75px;text-align:right}.seek input{flex:1;min-width:0;accent-color:var(--teal);height:28px}
+.buttons{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:5px}.buttons button{font-weight:620;font-size:.88rem}.buttons .play{min-width:76px}
+.board figcaption{padding:0 15px 14px}.inspector{padding:16px 18px}.inspector h3{margin-bottom:12px}
+.readings{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);font-size:.9rem;line-height:1.4}
+.readings dt,.readings dd{padding:7px 0;border-top:1px solid #d8ded4}.readings dt{color:var(--muted)}.readings dd{margin:0;overflow-wrap:anywhere;font-weight:570}
+.connect{margin-top:14px;padding:15px 18px}.connect summary,.methods summary{font-weight:650}.scroll{overflow:auto;max-width:100%}
+table{width:100%;border-collapse:collapse;font-size:.88rem;text-align:left}caption{text-align:left;font-size:.83rem;color:var(--muted);padding:8px 0}thead{color:var(--muted);font-size:.78rem}td,th{padding:9px 11px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}tbody th{font-weight:580}tbody tr:last-child>*{border-bottom:none}
+td:first-child,th:first-child{padding-left:0}td:last-child,th:last-child{padding-right:0}
+.content-section{margin:clamp(36px,6vw,72px) 0}.scores,.methods{padding:clamp(14px,2.2vw,24px)}
+.scores h3:not(:first-child){margin-top:25px}.scores .note,.connect .note,.inspector .note{margin-top:10px}.scores p,.methods p{max-width:80ch}
+.methods{display:grid;gap:16px}.stages{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px;list-style:none;padding:0}
+.stages li{border-top:2px solid #82ac9b;padding-top:10px}.stages li p{color:var(--muted);font-size:.92rem;margin-top:5px}
+.method-text{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px}.method-text h3{margin-bottom:5px}.method-text p{font-size:.94rem}
+.sources{border-top:1px solid var(--line);padding-top:12px}.sources p{margin:8px 0}.sources a{overflow-wrap:anywhere}
+.error{color:#832818}.sr{position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden;white-space:nowrap}
+@media(max-width:700px){.workbench{grid-template-columns:1fr}.intro{padding-top:32px}.stages,.method-text{grid-template-columns:1fr}.map-svg{height:245px}.controls{grid-template-columns:repeat(2,minmax(0,1fr))}.brand{font-size:.95rem}.mast nav{font-size:.8rem}.wrap{padding:0 14px}.section-head{gap:.3rem}td,th{padding:7px}}
+@media(max-width:400px){.mast .wrap{gap:.45rem}.map-top{gap:4px}.transport,.inspector,.connect{padding:12px}.buttons button{padding:.4rem .62rem}}
+@media(print){nav,.controls,.transport,.view-choice,.skip{display:none}.wrap{max-width:none;padding:0}.board,.inspector,.scores,.connect,.methods{break-inside:avoid}}
+</style>
+</head>
+<body>
+<a class="skip" href="#replay">Skip to replay</a>
+<header class="mast"><div class="wrap"><span class="brand"><i aria-hidden="true"><b></b><b></b><b></b><b></b></i>CFFG navigation study</span><nav aria-label="Sections"><a href="#replay">Replay</a><a href="#scores">Scores</a><a href="#method">Method</a></nav></div></header>
+<main class="wrap">
+<section class="intro" aria-labelledby="title">
+<h1 id="title">Two junctions with the same name</h1>
+<p class="lead">Imagine starting on a square marked <strong>Amber</strong> and being asked to find a square marked <strong>Blue</strong>. You can move north, south, east or west. Two different crossroads along the way both have the sign <strong>junction</strong>.</p>
+<p>Our traveler is a computer program. It gets two practice walks around the same 24 squares. At each step it can read the sign underfoot and tell whether its move succeeded. It starts at a known spot and can count how many squares it has moved in each direction. That tells it exactly where it is. Later, it gets six trips to make, with at most 24 moves per trip.</p>
+<h2>What should the traveler remember?</h2>
+<p>Think of a model as a notebook of directions. During practice the traveler writes down where each turn takes it. We gave it three ways to organize those notes.</p>
+<ol>
+<li><strong>One entry per sign.</strong> Both crossroads go on the page marked “junction.” In the first layout, the traveler went north from a junction eight times. Four times it arrived at Brass. Four times it arrived at Slate. Later, whenever it reads “junction,” it consults that same page, wherever it is standing.</li>
+<li><strong>Separate junction entries.</strong> The traveler uses its position to keep one junction page for the western crossroads and another for the eastern one. Now the notes say that north from the western junction leads to Brass, and north from the eastern junction leads to Slate. All the other signs are filed just as before.</li>
+<li><strong>One entry per square.</strong> This traveler records the position of every square it visits and which steps connect them. It can then find the shortest route along the connections it has walked, even if it has never walked that whole route in one go.</li>
+</ol>
+<h2>One trip explains the difference</h2>
+<p>From Amber, all three travelers go south through Brass and arrive at the western junction on move two. At the <em>eastern</em> junction, two steps north would take it through Slate to Blue. The traveler with a single “junction” page tries north and finds itself back at Brass. It keeps doubling back and runs out of moves. The traveler with two junction pages heads east, crosses to the other junction, then turns north through Slate. It reaches Blue in ten moves.</p>
+<p class="replay-links"><a href="?case=aliased&amp;phase=navigation&amp;policy=appearance&amp;route=amber-to-blue&amp;step=2#replay">Watch the traveler turn back</a><a href="?case=aliased&amp;phase=navigation&amp;policy=split&amp;route=amber-to-blue&amp;step=2#replay">Watch it find Blue</a></p>
+<h2>What did the program learn?</h2>
+<p>We supplied the movement rules and the idea of giving the junctions separate pages. The traveler learned what to write on those pages from its walks. Our software, CFFG, compared the first two notebooks by asking each one to predict the next sign on two fresh walks after practice. The more often a notebook put a high chance on the sign that actually appeared, the better it scored. A separate route planner used each notebook to choose turns. We counted how often those choices got the traveler to its destination.</p>
+<p class="finding" id="finding"></p>
+</section>
+<p id="error" class="error" role="alert" hidden></p>
+<section id="replay" aria-labelledby="replay-title">
+<div class="section-head"><h2 id="replay-title">Watch a trip</h2><p id="case-summary" class="section-note"></p></div>
+<div class="controls">
+<label>Layout<select id="fixture"></select></label>
+<label>Map rotation<select id="orientation"></select></label>
+<label>Which walk<select id="phase"></select></label>
+<label>Notebook<select id="policy"></select></label>
+<label>Route<select id="route"></select></label>
+</div>
+<div class="workbench">
+<figure class="board"><div class="map-box"><div class="map-top"><h3 id="map-title">Route map</h3>
+<div class="map-options"><label class="view-choice"><span class="sr">Map view</span><select id="view"><option value="observed">Map explored so far</option><option value="actual">Full map</option></select></label><button type="button" id="zoom" aria-pressed="false">Enlarge</button></div></div>
+<div class="map-scroll" id="map-scroll" tabindex="0" role="region" aria-label="Route map, scroll when enlarged"><svg id="map" class="map-svg" role="img" aria-labelledby="map-desc"><title id="map-desc">Selected route map</title></svg></div>
+<div class="legend"><span><i class="agent"></i>Current position</span><span><i></i>Replay trail</span><span><i class="goal"></i>Goal</span><span><i class="known"></i>Known connection</span></div>
+</div><div class="transport"><div class="seek"><label class="sr" for="scrub">Replay step</label><input id="scrub" type="range" min="0" max="0" value="0"><output id="step" for="scrub"></output></div>
+<div class="buttons"><button id="prev" type="button">← Previous</button><button id="play" class="play" type="button">Play</button><button id="next" type="button">Next →</button></div></div>
+<figcaption id="map-caption"></figcaption></figure>
+<aside class="inspector" aria-labelledby="step-title"><h3 id="step-title">What the traveler knows here</h3><dl id="readings" class="readings"></dl><p id="outcome" class="note"></p></aside></div>
+<details id="connect" class="connect" open><summary>Where did each move lead during practice?</summary>
+<label class="view-choice">Starting place <select id="origin"></select></label><p id="connection-summary" class="note"></p><div id="edge-table" class="scroll"></div></details>
+</section>
+<section id="scores" class="content-section" aria-labelledby="scores-title"><div class="section-head"><h2 id="scores-title">How the notebooks did</h2></div>
+<div class="scores"><h3>Could it predict the next sign?</h3><p id="score-text" class="note"></p><div id="score-table" class="scroll"></div>
+<h3>Did the traveler reach its destination?</h3><p id="route-text" class="note"></p><div id="route-table" class="scroll"></div></div></section>
+<section id="scale" class="content-section" aria-labelledby="scale-title" hidden><div class="section-head"><h2 id="scale-title">How much time and memory did larger maps take?</h2></div><div class="scores"><p class="note" id="scale-note"></p><div id="scale-table" class="scroll"></div><a id="scale-download" download="scale.json">Download scale measurements (JSON)</a></div></section>
+<section id="method" class="content-section" aria-labelledby="method-title"><div class="section-head"><h2 id="method-title">How the study works</h2></div>
+<div class="methods"><ol class="stages"><li><h3>Learn from two practice walks</h3><p>The traveler starts at Home and follows a rule we wrote for exploring. It tries every direction at each square and records the outcome, including attempts to walk through a wall.</p></li><li><h3>Choose a notebook</h3><p>On two more walks we supply the turns. Both notebooks get exactly the same questions, such as “From this junction, what sign will I see if I go north?” We choose the one with the better prediction score. A tie goes to the simpler notebook.</p></li><li><h3>Try the notebooks out</h3><p>We check predictions on four further walks. Then we give each traveler six destinations and let it choose its own turns. Each traveler keeps the notes it made during practice.</p></li></ol>
+<div class="method-text"><section><h3>Why change the signs?</h3><p id="inputs"></p></section><section><h3>What the score measures</h3><p id="metrics"></p></section></div>
+<details class="sources"><summary>Where the research question came from</summary>
+<p>One research group taught a computer to recognize short sequences that repeat. That suggests trying a traveler that remembers its last few turns. That history might help it distinguish two junctions even when their exits look alike. <a href="https://arxiv.org/pdf/2407.20292#page=26">Read the RGM paper</a> · <a href="https://arxiv.org/pdf/2407.20292#page=50">See its Pong example</a></p>
+<p>Another group built a robot that uses what it senses to add places to a map. As it moves, it learns which places it can travel between. That inspired our question about when it helps to record two places separately. <a href="https://arxiv.org/html/2510.09574v2#S3.SS5">Read how AIMAPP builds its map</a> · <a href="https://arxiv.org/html/2510.09574v2#S4.SS4">See the robot’s route test</a></p>
+</details></div></section>
+</main>
+<script id="study" type="application/json">__NAVIGATION_STUDY_JSON__</script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const ui = Object.fromEntries(['fixture','orientation','phase','policy','route','view','scrub','play','prev','next'].map(k=>[k,$(k)]));
+const policies = {appearance:'One entry per sign',split:'Separate junction entries',tile:'One entry per square'};
+const phases = {navigation:'Find a destination',fit:'Practice walks',selection:'Choose a notebook',final:'Check its predictions'};
+const labels = {'aliased':'Different exit signs','same-exits':'Matching exit signs'};
+const compass = {N:'North',E:'East',S:'South',W:'West'};
+const posKey = pos => pos.join(',');
+const loc = pos => '(' + pos.join(', ') + ')';
+const same = (a,b) => a[0] === b[0] && a[1] === b[1];
+const fixed = n => Number.isFinite(n) ? n.toFixed(3) : '—';
+function element(tag,text) {
+  const el = document.createElement(tag);
+  if (text !== undefined) el.textContent = text;
+  return el;
+}
+function svg(tag, attrs, parent, text) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg',tag);
+  for (const [k,v] of Object.entries(attrs)) el.setAttribute(k,v);
+  if (text !== undefined) el.textContent = text;
+  parent.append(el);
+  return el;
+}
+function options(select, pairs, value) {
+  select.replaceChildren(...pairs.map(([key,text])=>new Option(text,key)));
+  if (pairs.some(([key])=>key === value)) select.value = value;
+}
+function table(host, caption, columns, rows) {
+  const tbl = element('table');
+  tbl.createCaption().textContent = caption;
+  const tr = tbl.createTHead().insertRow();
+  for (const title of columns) { const th = element('th',title); th.scope='col'; tr.append(th); }
+  const body = tbl.createTBody();
+  for (const values of rows) {
+    const row = body.insertRow(), th = element('th',values[0]); th.scope='row'; row.append(th);
+    for (const v of values.slice(1)) row.insertCell().textContent = v;
+  }
+  $(host).replaceChildren(tbl);
+}
+let study, selectedCase, finding, tapes, tape, t=0, timer=null;
+function modelKey() {return ui.policy.value === 'selected' ? finding.selection.selected : ui.policy.value;}
+function caseName(c) {return (labels[c.condition] || c.condition)+' · '+c.rotation+'°';}
+function stop() {
+  clearInterval(timer); timer=null; ui.play.textContent='Play'; ui.play.setAttribute('aria-label','Play route replay');
+}
+function go(step) { t = Math.max(0, Math.min(tape.steps.length,step)); frame(); }
+function begin() {
+  if (timer !== null) { stop(); return; }
+  if (!tape.steps.length) return;
+  if (t >= tape.steps.length) go(0);
+  ui.play.textContent='Pause'; ui.play.setAttribute('aria-label','Pause route replay');
+  timer = setInterval(()=>{go(t+1); if(t === tape.steps.length) stop();},650);
+}
+function setCase() {
+  const variants=study.cases.filter(c=>c.condition===ui.fixture.value);
+  options(ui.orientation,variants.map(c=>[String(c.rotation),c.rotation===0?'Original · 0°':'Rotated · '+c.rotation+'°']),ui.orientation.value);
+  selectedCase = variants.find(c=>String(c.rotation)===ui.orientation.value);
+  finding = study.findings.find(f=>f.id===selectedCase.id);
+  if (!finding) throw Error('Missing finding for '+selectedCase.id);
+  $('case-summary').textContent = selectedCase.condition === 'same-exits' ? 'The signs one step from each junction match.' :
+    'The signs one step from each junction differ.';
+  options(ui.phase,Object.entries(phases),ui.phase.value || 'navigation');
+  setPhase();
+}
+function setPhase() {
+  const nav = ui.phase.value === 'navigation';
+  const names = [['selected','Chosen notebook · '+policies[finding.selection.selected]],...Object.entries(policies)];
+  options(ui.policy,names.filter(([k])=>nav || k!=='tile'),ui.policy.value || 'selected');
+  setPolicy();
+}
+function setPolicy(keepStep=false) {
+  const nav = ui.phase.value === 'navigation';
+  const previousId=ui.route.value, previousStep=t;
+  tapes = nav ? selectedCase.routes[modelKey()] : selectedCase.traversals[ui.phase.value];
+  options(ui.route,tapes.map(x=>[x.id,x.id.replaceAll('-', ' ')]),ui.route.value);
+  setTape();
+  if(keepStep && tape.id===previousId) go(previousStep);
+}
+function setTape() {
+  stop();
+  $('origin').replaceChildren();
+  tape = tapes.find(x=>x.id===ui.route.value);
+  if (!tape) throw Error('A route recording is missing.');
+  ui.scrub.max = tape.steps.length;
+  ui.scrub.disabled = ui.play.disabled = !tape.steps.length;
+  go(0);
+}
+function history() {
+  const result = {tiles:new Map(), links:new Map(), moves:[]};
+  // Only completed fit steps provide learned connectivity. Other phases also show
+  // their recorded trail, without adding navigation or evaluation moves to the fit.
+  for (const fit of selectedCase.traversals.fit) {
+    const here = ui.phase.value === 'fit' && fit === tape;
+    result.tiles.set(posKey(fit.start.position),fit.start);
+    for (const s of (here ? fit.steps.slice(0,t) : fit.steps)) {
+      result.moves.push(s);
+      result.tiles.set(posKey(s.next_position),{position:s.next_position,symbol:s.next_symbol});
+      if (!same(s.position,s.next_position)) {
+        const key = [posKey(s.position),posKey(s.next_position)].sort().join('/');
+        result.links.set(key,[s.position,s.next_position]);
+      }
+    }
+    if (here) break;
+  }
+  return result;
+}
+function drawMap(h, pos, symbol) {
+  const actual = ui.view.value === 'actual', board=$('map');
+  board.replaceChildren();
+  const tiles = new Map(actual ? selectedCase.layout.tiles.map(v=>[posKey(v.position),v]) : h.tiles);
+  const visited = [tape.start.position,...tape.steps.slice(0,t).map(s=>s.next_position)];
+  if (!actual) {
+    tiles.set(posKey(tape.start.position),tape.start);
+    for (const s of tape.steps.slice(0,t)) tiles.set(posKey(s.next_position),{position:s.next_position,symbol:s.next_symbol});
+  }
+  const [r0,c0,r1,c1] = selectedCase.layout.bounds, stride=68, pad=36;
+  const width = 2*pad+(c1-c0)*stride, height = 2*pad+(r1-r0)*stride;
+  board.style.setProperty('--map-width',width+'px');
+  board.style.setProperty('--map-height',height+'px');
+  const xy = p => [pad+(p[1]-c0)*stride,pad+(p[0]-r0)*stride];
+  board.setAttribute('viewBox','0 0 '+width+' '+height);
+  svg('title',{id:'map-desc'},board,(actual?'Actual layout':'Observed map')+'. '+symbol+' at '+loc(pos)+', step '+t+' of '+tape.steps.length+'.');
+  const paths = svg('g',{'stroke-linecap':'round'},board);
+  function line(p,q,color,sw) {
+    const [x1,y1] = xy(p), [x2,y2]=xy(q);
+    svg('line',{x1,y1,x2,y2,stroke:color,'stroke-width':sw},paths);
+  }
+  if (actual) for (const v of tiles.values()) {
+    const [r,c]=v.position;
+    for (const q of [[r+1,c],[r,c+1]]) if (tiles.has(posKey(q))) line(v.position,q,'#536c64',5);
+  }
+  for (const [p,q] of h.links.values()) line(p,q,'#adc2b2',5);
+  for (const [i,p] of visited.entries()) if(i) line(visited[i-1],p,'#f2bc68',5);
+  const nodes=svg('g',{},board);
+  for (const v of tiles.values()) {
+    const [x,y]=xy(v.position), current=same(pos,v.position), goal=tape.goal===v.symbol;
+    const cell=svg('g',{},nodes);
+    svg('title',{},cell,v.symbol+' '+loc(v.position)+(goal?' · goal':'')+(current?' · current position':''));
+    const seen=h.tiles.has(posKey(v.position));
+    svg('rect',{x:x-24,y:y-19,width:48,height:38,rx:6,fill:seen?'#304e44':'#253e37',stroke:seen?'#7c9f8f':'#577266','stroke-width':1.5},cell);
+    const font = Math.min(13, 71/Math.max(1,v.symbol.length));
+    svg('text',{x,y:y+4,'text-anchor':'middle','font-family':'system-ui,sans-serif','font-weight':600,'font-size':font,fill:'#f0f4e8'},cell,v.symbol);
+    if(goal) svg('path',{d:'M '+(x-21)+' '+(y-23)+' l 5 5 -5 5 -5 -5 Z',fill:'#152d29',stroke:'#99cabb','stroke-width':2.4},cell);
+    if(current) svg('circle',{id:'agent-position',cx:x+19,cy:y-17,r:7,fill:'#ef9f54',stroke:'white','stroke-width':2},cell);
+  }
+  $('map-title').textContent = tape.goal ? tape.start.symbol+' → '+tape.goal : 'Recorded walk';
+  $('map-caption').textContent = actual?'This view lets you see the whole layout. Pale lines show paths the traveler has walked during practice. Darker lines show where it could also walk.':
+    ui.phase.value === 'fit' ? 'Squares and paths appear as the traveler discovers them. The trail ends where it is standing now.':
+    'Pale lines show paths the traveler learned during practice. The gold trail shows where it has walked on this trip.';
+}
+function placeOf(symbol,pos,arm) {
+  if (arm==='tile') return symbol+' '+loc(pos);
+  const split = arm==='split' && symbol===selectedCase.proposal.symbol &&
+    selectedCase.proposal.positions.some(p=>same(p,pos));
+  return split ? symbol+' '+loc(pos) : symbol;
+}
+function showConnectivity(h,pos,symbol) {
+  const arm = modelKey(), select=$('origin');
+  const current=placeOf(symbol,pos,arm);
+  const origins=[...new Set([...h.tiles.values()].map(v=>placeOf(v.symbol,v.position,arm)))].sort();
+  options(select,[['','Replay position · '+current],...origins.map(v=>[v,v])],select.value);
+  const place=select.value || current;
+  $('connection-summary').textContent = (arm==='tile'?'This notebook has a page for every square.':arm==='split'?
+    'This notebook has a separate page for each junction.':'This notebook puts every visit to the same sign on one page.')+
+    ' Here is what happened when the traveler tried each direction from '+place+' during practice.';
+  if (ui.phase.value!=='fit' && arm!=='tile') {
+    const candidate=selectedCase.candidates[arm];
+    const names=new Map(candidate.places.map(p=>[p.id,p.position ? p.symbol+' '+loc(p.position) : p.symbol]));
+    const edges=candidate.transitions.filter(s=>names.get(s.source)===place);
+    const count=new Map();
+    for (const edge of edges) count.set(edge.action,(count.get(edge.action)||0)+edge.count);
+    table('edge-table','The last column gives the share of attempts in that direction that ended at the named place.',
+      ['Direction','Where it ended up','Times seen','Share of attempts'],
+      edges.map(e=>[compass[e.action],names.get(e.target),e.count,(100*e.count/count.get(e.action)).toFixed(1)+'%']));
+    return;
+  }
+  const exits = new Map();
+  for (const s of h.moves) {
+    if (placeOf(s.symbol,s.position,arm)!==place) continue;
+    const dest=placeOf(s.next_symbol,s.next_position,arm), blocked=same(s.position,s.next_position);
+    const key=JSON.stringify([s.action,dest,blocked]);
+    const row=exits.get(key) || [compass[s.action],dest,blocked?'Blocked':'Moved',0];
+    row[3]++; exits.set(key,row);
+  }
+  const rows = [...exits.values()];
+  if (rows.length) table('edge-table','Practice moves from '+place,['Command','Destination','Movement','Count'],rows);
+  else $('edge-table').replaceChildren(element('p','The traveler has yet to try a move from here.'));
+}
+function frame() {
+  const step = t ? tape.steps[t-1] : null, pos=step?step.next_position:tape.start.position;
+  const symbol=step?step.next_symbol:tape.start.symbol;
+  const h=history(), arm=modelKey();
+  drawMap(h,pos,symbol); showConnectivity(h,pos,symbol);
+  $('step').value=t+' / '+tape.steps.length;
+  ui.scrub.value=t; ui.scrub.setAttribute('aria-valuetext','Step '+t+' of '+tape.steps.length);
+  ui.prev.disabled=t===0; ui.next.disabled=t===tape.steps.length;
+  const items = [['Sign underfoot',symbol],['Square (row, column)',loc(pos)],['Notebook entry',placeOf(symbol,pos,arm)]];
+  if(ui.phase.value==='navigation' && t<tape.steps.length) items.push(['Next turn',compass[tape.steps[t].action]]);
+  if(step) items.push(['Last move',compass[step.action]],['From',step.symbol+' '+loc(step.position)],['Change in row and column',loc(step.displacement)]);
+  else items.push(['Initial heading',compass[tape.heading]]);
+  if(tape.goal) items.push(['Destination sign',tape.goal],['Move limit',tape.budget]);
+  // Energies use the concatenated tape order within a partition.
+  if(step && (ui.phase.value==='selection' || ui.phase.value==='final')) {
+    const k=tapes.slice(0,tapes.indexOf(tape)).reduce((n,x)=>n+x.steps.length,0)+t-1;
+    const energy=finding.scores[arm][ui.phase.value].energies[k];
+    items.push(['Surprise at this sign',fixed(energy)+' nats']);
+  }
+  $('readings').replaceChildren(...items.flatMap(([k,v])=>[element('dt',k),element('dd',v)]));
+  $('outcome').textContent=ui.phase.value==='navigation' && t===tape.steps.length ?
+    (tape.success?'Goal reached':'Move limit reached')+' · '+t+' moves.' :
+    step && same(step.position,step.next_position) ? 'A wall blocked this move.' :
+    !step ? 'The traveler is at its starting square.' : '';
+}
+function renderScores() {
+  const stats=[], nav=[];
+  for (const c of study.cases) {
+    const f=study.findings.find(x=>x.id===c.id);
+    for(const arm of ['appearance','split']) {
+      const m=f.scores[arm], chosen=f.selection.selected===arm;
+      stats.push([caseName(c),policies[arm],chosen?'Selected':'—',fixed(m.selection.total_bfe),
+        m.final.n_events,fixed(m.final.total_bfe),fixed(m.final.mean_bfe)]);
+    }
+    for(const arm of ['appearance','split','tile']) {
+      const r=f.routes[arm];
+      nav.push([caseName(c),policies[arm],r.completed+' / '+r.attempted,r.actions]);
+    }
+  }
+  table('score-table','A lower score means the notebook gave more weight to the signs that appeared. Each pair of rows covers the same walks.',
+    ['Layout','Notebook','Chosen?','Score to choose','Test moves','Test score','Score per test move'],stats);
+  table('route-table','Each notebook gets the same six trips. Every attempted move counts, even if a wall blocks it.',
+    ['Layout','Notebook','Goals reached','Total moves'],nav);
+  $('score-text').textContent='We used two walks to choose between the first two notebooks. The test score comes from four other walks, so each notebook gets to make a fresh set of predictions. The 90° rows show the same layouts turned sideways.';
+  $('route-text').textContent='For this test the traveler gets a destination and makes its own decisions. For the first two notebooks, the route planner uses the recorded turns to choose a way through in as few moves as it expects to need, with a penalty for missing the goal. The square-by-square notebook can trace a shortest path through the squares it explored.';
+  const main=study.findings.find(x=>x.id==='aliased'), control=study.findings.find(x=>x.id==='same-exits');
+  if (main && control) {
+    const result=(f,arm)=>f.routes[arm].completed+' of '+f.routes[arm].attempted;
+    $('finding').textContent='With different signs on the exits, separate junction entries got the traveler to '+result(main,'split')+
+      ' destinations. Using one entry per sign got it to '+result(main,'appearance')+
+      '. We then gave each pair of neighboring exits matching signs as well. On that layout both of those notebooks reached '+
+      result(control,'split')+' destinations. The square-by-square map still reached '+result(control,'tile')+
+      '. Only that map kept a separate entry for each of the squares beyond the junctions.';
+  }
+}
+function init() {
+  study=JSON.parse($('study').textContent);
+  if(!study.cases?.length || !study.findings?.length) throw Error('No study cases or scores.');
+  const conditions=[...new Set(study.cases.map(c=>c.condition))];
+  options(ui.fixture,conditions.map(k=>[k,labels[k]||k]),'aliased');
+  $('inputs').textContent='In the second layout we kept the paths and changed four signs. For example, going north from either junction now leads to a square marked Brass. Even with two junction pages, the traveler still has just one Brass page. When it lands there, it mixes up what comes next. The square-by-square notebook can tell the two Brass squares apart.';
+  $('metrics').textContent='A notebook makes a list of possible next signs and gives each a chance based on its practice counts. We give each possibility one extra count so an unseen sign still gets a chance. When the actual sign appears, a confident correct forecast earns a small score. An unexpected sign earns a large score. We add those scores across a walk. The technical name for this score here is Bethe free energy, measured in nats.';
+  renderScores(); setCase();
+  const query=new URLSearchParams(location.search);
+  const linked=study.cases.find(c=>c.id===query.get('case'));
+  if(linked) {ui.fixture.value=linked.condition; setCase(); ui.orientation.value=String(linked.rotation); setCase();}
+  for(const [key,refresh] of [['phase',setPhase],['policy',setPolicy],['route',setTape]]) {
+    const pick=query.get(key);
+    if(pick && [...ui[key].options].some(o=>o.value===pick)) {ui[key].value=pick;refresh();}
+  }
+  const step=query.get('step');
+  if(step && /^\d+$/.test(step)) go(Number(step));
+  if (study.scale?.status==='complete' && study.scale.rows?.length) {
+    const rows=study.scale.rows;
+    $('scale').hidden=false;
+    $('scale-note').textContent='Separate synthetic loops on '+(study.scale.hardware?.cpu || 'CPU')+
+      '. For each map size we timed predictions for the same 24 moves, first on a fresh start and then five more times. The first time includes preparing the probability table. The repeat time is the middle of the five later measurements. The last column is the most memory the whole program used.';
+    table('scale-table','The program stores a probability for each possible next sign after each move from each place. It also stores a count table of the same size.',
+      ['Squares','Notebook','Paths walked, by direction','Table entries','Table size (KiB)','First run (s)','Repeat (ms)','Most memory (MiB)'],
+      rows.map(r=>[r.tiles,policies[r.assignment],r.observed_directed_transitions,r.dense_entries,(r.cpt_bytes/1024).toFixed(1),fixed(r.cold_s),(1000*r.warm_s.median).toFixed(2),r.peak_rss_mib.toFixed(1)]));
+    $('scale-download').href=URL.createObjectURL(new Blob([JSON.stringify(study.scale,null,2)],{type:'application/json'}));
+  }
+}
+ui.fixture.onchange=ui.orientation.onchange=setCase; ui.phase.onchange=setPhase; ui.policy.onchange=()=>setPolicy(true); ui.route.onchange=setTape;
+ui.view.onchange=()=>frame(); ui.prev.onclick=()=>{stop();go(t-1);}; ui.next.onclick=()=>{stop();go(t+1);};
+ui.play.onclick=begin; ui.scrub.oninput=()=>{stop();go(Number(ui.scrub.value));};
+$('origin').onchange=()=>frame();
+$('zoom').onclick=()=>{
+  const large=$('map-scroll').classList.toggle('enlarged');
+  $('zoom').setAttribute('aria-pressed',String(large));
+  if (large) {
+    const region=$('map-scroll'), dot=$('agent-position').getBoundingClientRect(), box=region.getBoundingClientRect();
+    region.scrollLeft+=dot.left-box.left-box.width/2;
+    region.scrollTop+=dot.top-box.top-box.height/2;
+  }
+};
+document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});
+try{init();}catch(e){stop();$('error').textContent='The replay data could not be displayed. '+e.message;$('error').hidden=false;}
+</script>
+</body></html>
