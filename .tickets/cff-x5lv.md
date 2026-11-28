@@ -1,6 +1,6 @@
 ---
 id: cff-x5lv
-status: in_progress
+status: closed
 deps: [cff-9bex]
 links: [cff-bxk4]
 created: 2026-07-09T02:46:53Z
@@ -119,3 +119,7 @@ Base #214 at d718480 supplies the obstacle-aware routes. Follow the Visualizatio
 **2026-11-28T05:55:25Z**
 
 The 30 recorded layouts cover six fixtures at compression levels 0 through 4. On the routing prerequisite a separate SVG audit found 17 caption collisions and five out-of-canvas captions. The updated layouts had zero. Chromium measured all 445 rendered captions within the headless scene bounds. Twelve gallery images cover levels 0 and 4. A 32-character parameter caption stayed centered in its own extension. Seven SVG goldens were regenerated once and passed a normal comparison. Independent Studio checks cover selection and culling when only a caption is visible. The final focused selection passed 90 cases, 11 unrelated or slow cases deselected. The certified short suite remains the review gate.
+
+**2026-11-28T13:49:29Z**
+
+The existing canonical dashboard gate on 12b4986 passed 2,668 short tests with zero failures in 1,098.078 wall seconds. It recorded 46 diagrams in 33 galleries, including all six requested fixture pairs at levels 0 and 4. The scoped extent audit found 17 overlaps and five out-of-canvas captions on #214 across 30 renders. The candidate has zero of each. All nine focused caption checks passed. The layout, SVG and Studio work was tested together. The full receipt and tested head are in ~/agent-share/viz-terminal-labels-gate-B2iRYu. No second suite or golden write was needed for closure. Gaussian domain labels and continuous terminal rings are tracked separately in cff-bxk4.
