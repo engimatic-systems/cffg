@@ -4040,8 +4040,8 @@ coordinate assigns one source probability **0.40744**. The quadratic coordinate
 assigns it **0.000335**. Both use the same drive, observations and external
 messages. Splitting equivalent destination labels accounts for the discrepancy.
 
-**Decision.** Qualify an alternative bound under cds-1t47 before proposing a
-runtime factor. The following equations and executable oracle are a research
+**Decision.** D18.6 qualifies a replication-invariant alternative and records
+the strong-drive counterexample that limits it. The following equations and executable oracle are a research
 contract for ordinary sum-product VMP. The implemented decision-list
 recurrence uses D8's gate bound and D9's structured categorical pair.
 D18 considers a factorized source and destination at the local node.
@@ -4220,13 +4220,6 @@ changes that source's updated mass from 0.40744 to 0.000335. These are
 stationary **source coordinates at the stated beliefs**, not frequencies of
 simulated transitions.
 
-Ticket cds-1t47 will qualify a bound invariant under equal replication of
-all labels. One candidate upper-bounds $\mathbb E f(z)$ by
-$\log\sum_j\mathbb E e^{z_j}$ after removing the common affine logit.
-For fixed coefficients the Gaussian exponential moments are analytic.
-Its Gaussian coordinate and curvature require a new derivation. Fixed
-inference, learning and integration should follow an accuracy decision there.
-
 The independent oracle exercises $K=2,3,4$ conditionals, the binary-tree
 counterexamples, Gaussian quadrature, entropy accounting and finite-difference
 checks of each coordinate, including tied coefficient scores. The 32-label
@@ -4237,3 +4230,126 @@ infinity. A zero destination belief still leaves that category in the
 conditional's softmax normalizer. Empty support, invalid required moments
 and nonfinite energies are failures. An improper or vacuous Gaussian cavity alone cannot supply an
 expected score. [Executable oracle](../tests/test_destination_softmax_derivation.py)
+
+### D18.6 Equal-label replication and the shifted Jensen bound (cds-1t47)
+
+**Plain English.** Splitting each outcome into equally likely copies leaves
+the evidence for its parent outcome unchanged. The construction below
+preserves this property. A second test varies how strongly the Gaussian
+state moves the logits. At high drive amplitude even the best shared shift
+can assign a source over 200 times too little probability.
+
+**Bound and scope.** Keep D18's fixed coefficient rows, factorized source
+and destination beliefs, and proper Gaussian drive. Suppress the source
+index briefly. Write $a_j=w_j^\top m+b_j$, $x=m+e$ and $e\sim N(0,S)$.
+Remove the shared random logit $u^\top e$, whose expectation is zero.
+Concavity of log and the exact Gaussian exponential moment give
+$$
+ f(a)\ \leq\ \mathbb E f(Wx+b)\ \leq\
+ U(u)=\log\sum_j\exp\{a_j+\tfrac12(w_j-u)^\top S(w_j-u)\}.
+$$
+The lower inequality follows from convexity of log-sum-exp. Thus
+$U(u)-f(a)$ is a computable upper bound on the error in a source's
+normalizer, even for a feasible, partially optimized shift.
+
+Let $LL^\top=S$ with positive-diagonal lower $L$, $h_j=L^\top w_j$ and
+$v=L^\top u$. Let $p_j$ be the softmax of the corrected logits in $U$.
+The gradient in $v$ is $v-\sum_j p_j h_j$, and its Hessian is
+$I+\mathrm{Cov}_p(h)$. There is a unique minimizing shift, satisfying
+$u=\sum_j p_jw_j$. The undamped iteration that substitutes this right-hand
+side can oscillate. A line search and a stationarity check distinguish a
+resolved shift from an exhausted iteration budget. Adding a common affine
+logit shifts $u$ by its slope and $U$ by its value at $m$, leaving the
+bounded table $T_{ij}=a_{ij}-U_i$ invariant.
+
+**Coordinate messages and energy.** The source and destination log messages
+are $Ts$ and $r^\top T$. Add the incoming log cavities on their support
+and normalize there. Their zeros stay exact. A destination with zero
+belief still contributes to its source's conditional denominator. The
+local bounded free energy is
+$-H(r)-H(s)-H(q_x)-r^\top T s$. The bound raises the exact node energy
+at the *same beliefs*. Ordinary edge entropy accounting still follows
+D18.4. Each source may be scored even at zero current source mass.
+An absent or improper drive cannot supply these Gaussian expectations.
+
+For an optimized shift the envelope theorem gives $\partial_m U_i=W_i^\top
+p_i$ and $2\partial_S U_i=\sum_jp_{ij}(w_{ij}-u_i)(w_{ij}-u_i)^\top$.
+Call the latter matrix $J_i$. The Gaussian factor's precision and
+linear natural parameter at stationarity are
+$$
+ J=\sum_i r_i J_i,\qquad
+ h=Jm+\sum_i r_i W_i^\top(s-p_i).
+$$
+The factor can have a singular precision on drive directions that leave
+all logits unchanged. For a proper Gaussian cavity with natural parameters
+$(J_0,h_0)$, the coordinate equations are
+$S^{-1}=J_0+J$ and $S^{-1}m=h_0+h$. These equations require a
+nonconjugate solve because $p_i$ depends on the sought moments.
+
+There is a convex formulation of the **joint** Gaussian coordinate.
+With $r,s$ fixed, minimize the sum of $\sum_i r_i[U_i-a_i^\top s]$
+and
+$$
+ \tfrac12m^\top J_0m-h_0^\top m+
+ \tfrac12\mathrm{tr}(J_0 LL^\top)-\sum_j\log L_{jj}
+$$
+over $m$, lower $L$ with positive diagonal, and one $v_i$ per live source.
+Each corrected logit is affine in $m$ plus the squared norm of the
+affine expression $L^\top w_{ij}-v_i$, divided by two. Log-sum-exp
+preserves convexity of these arguments. The proper cavity supplies
+strict curvature in $m,L$ and the logarithm keeps the optimum inside the
+cone. The positive-mass shift subproblems are strictly convex, so the
+minimizer is unique. Globalized optimization can check the objective
+and both natural-coordinate residuals there. This local result gives no
+global convergence guarantee for graph schedules.
+
+**Replication.** With $n$ identical copies per destination, replicating
+the original logits adds $\log n$ to each normalizer. Alternatively,
+subtracting $\log n$ from each copied intercept preserves the normalizer.
+Both conventions subtract $\log n$ from each copied log probability.
+Splitting the destination belief evenly increases its entropy by exactly
+$\log n$. With the original source belief held fixed, the absolute node
+energy, source log odds, grouped destination probabilities (with equally
+split incoming mass within each group), optimal shifts and Gaussian
+message are invariant. Include the destination entropy to test the absolute
+ledger. A source-independent constant alone establishes only an odds check.
+
+**Accuracy decision.** These values use one standard-normal coordinate,
+two active sources of equal mass and a uniform destination belief. One
+source alternates $+a x,-a x$ and the other is flat. The exact penalty
+relative to the flat source is $\mathbb E\log\cosh(a x)$. Symmetry makes
+the optimized shift zero, giving the penalty $a^2/2$. The exact Gaussian
+message precision follows by differentiating the Gaussian expectation
+(Price's identity), yielding $a^2\mathbb E[\mathrm{sech}^2(a x)]/2$
+after averaging over the two sources. Every cell lists exact quadrature
+followed by the shifted bound. Energies are absolute nats for a
+one-dimensional drive.
+
+| Amplitude | Mass of driven source | Node free energy | Gaussian precision |
+|---:|---:|---:|---:|
+| 0.1 | 0.498756 / 0.498750 | −2.109598 / −2.109586 | 0.004951 / 0.005000 |
+| 1 | 0.407438 / 0.377541 | −1.924802 / −1.862086 | 0.302853 / 0.500000 |
+| 4 | 0.070501 / 0.000335 | −0.822580 / 1.887914 | 1.556806 / 8.000000 |
+
+These discrepancies can grow without bound in **log odds**:
+$\mathbb E\log\cosh(a x)\leq |a|\sqrt{2/\pi}$. Replication invariance
+solves D18.5's label-count problem, but fixed inference under this bound
+does not qualify as a general destination-softmax factor. We defer
+production inference, coefficient learning and integration. The bound
+remains an upper certificate for the node objective.
+
+For $I$ sources, $K$ destinations and drive dimension $d$, a dense
+covariance factorization costs $O(d^3)$. Computing all $W_iL$ costs
+$O(IKd^2)$. A damped Newton shift iteration per source costs
+$O(Kd^2+d^3)$ plus $O(Kd)$ per line-search trial. Grouped scalar and
+Gaussian message contractions cost $O(IKd^2)$. Streaming source rows
+needs $O(Kd+d^2)$ working storage in addition to the inputs and optional
+$I\times K$ table. The joint Cholesky formulation uses $O(d^2+Id)$
+unknowns. Its iteration count depends on conditioning and the solver.
+A dense Hessian in all of those variables would require quadratic
+storage in that count; the convexity proof does not require building it.
+
+The [numerical checks](../tests/test_shifted_softmax_derivation.py)
+compare quadrature and finite differences, solve the joint Gaussian
+coordinate from two starting points, and retain the full entropy with
+16 drive coordinates at 2, 4 and 32 labels in both working precisions.
