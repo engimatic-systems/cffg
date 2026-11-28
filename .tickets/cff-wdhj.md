@@ -1,6 +1,6 @@
 ---
 id: cff-wdhj
-status: in_progress
+status: closed
 deps: [cff-3nr4, cff-v6th, cff-ectw]
 links: [cff-fj4v]
 created: 2026-09-25T03:46:26Z
@@ -99,3 +99,7 @@ Can the plan use the learner without consuming planning targets as evidence? Lea
 **2026-11-28T04:45:30Z**
 
 Focused gate passed 57 cases across tests/test_gaussian_agent.py, tests/test_hybrid_rolling_agent.py, tests/test_agent_spec.py, tests/test_agent.py, tests/test_bundle.py and tests/test_readme.py, including opt-in cases (uv run --frozen --no-sync pytest -q -o addopts='' -n 0). After adding the affine H=10 analytical witness, its complete file passed all 11 cases. The hybrid H=10 test restored both pending and committed cuts in a fresh interpreter, then produced identical complete archives. The two-type fixtures bind the actual override, skip missing-observation learning, qualify f32/f64 and reject unresolved boundaries. Retry after failed learning, held-command restart, synchronized duplicate feedback, malformed RNG and same-layout/different-prior rejection have independent checks. The final short dashboard gate follows on the committed code.
+
+**2026-11-28T05:35:12Z**
+
+Final short-suite gate passed on ba02eac with 2,844 passing tests, zero failing, and 443.282 seconds measured wall time. The dashboard command was run under the shared CPU lock. The runtime history and ticket closure are the only changes after the qualified code commit. The PR is separate and depends on #208. Hidden-regime state, vmapped controller execution and application-specific AXIOM checkpoints remain outside this facade.
