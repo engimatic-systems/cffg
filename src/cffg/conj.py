@@ -15,6 +15,7 @@ from dataclasses import dataclass, replace
 import numpy as np
 
 from cffg import ef
+from cffg._conj_sampling import sample_joint as _sample_joint
 
 
 def _spd(name: str, mat: np.ndarray) -> np.ndarray:
@@ -201,6 +202,15 @@ class NIW:
             raise ValueError("posterior-mean covariance undefined for nu <= d+1")
         return self.psi / (self.nu - d - 1)
 
+    def sample(self, key, sample_shape=()) -> tuple[np.ndarray, np.ndarray]:
+        """Draw (location, covariance) on the host using one explicit JAX key.
+
+        For batch shape S (an integer or tuple), the arrays have shapes
+        S + (d,) and S + (d,d). The default returns one draw. Conditional on
+        Sigma ~ IW(psi, nu), the location is N(mu, Sigma/kappa).
+        """
+        return _sample_joint(key, sample_shape, self.mu, self.psi, self.nu, kappa=self.kappa)
+
 
 @dataclass(frozen=True)
 class MNIW:
@@ -314,6 +324,16 @@ class MNIW:
         if self.nu <= dimension + 1:
             raise ValueError("posterior-mean covariance undefined for nu <= d+1")
         return self.psi / (self.nu - dimension - 1)
+
+    def sample(self, key, sample_shape=()) -> tuple[np.ndarray, np.ndarray]:
+        """Draw (regression matrix including offset, noise covariance) on the host.
+
+        One explicit JAX key produces batch shape S (an integer or tuple),
+        with output shapes S + (dy,dx+1) and S + (dy,dy). The default draws
+        one pair. Given Sigma ~ IW(psi, nu), the matrix is matrix-normal
+        with center m, row covariance Sigma and column covariance inv(lam).
+        """
+        return _sample_joint(key, sample_shape, self.m, self.psi, self.nu, column_precision=self.lam)
 
 
 def _numpy_symmetry_ok(matrices: np.ndarray) -> np.ndarray:

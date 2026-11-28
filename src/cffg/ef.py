@@ -81,21 +81,23 @@ gammaln = _vectorized(math.lgamma)
 
 
 def resolved_correlation(matrix):
-    """Check positive definiteness at the stored precision, independently of coordinate units."""
-    scale = np.sqrt(matrix.diagonal().astype(np.float64))
-    correlation = (matrix / scale[:, None]) / scale[None, :]
+    """Check each matrix at its stored precision, independently of coordinate units."""
+    scale = np.sqrt(np.diagonal(matrix, axis1=-2, axis2=-1).astype(np.float64))
+    correlation = (matrix / scale[..., :, None]) / scale[..., None, :]
     if not np.isfinite(correlation).all():
         raise FloatingPointError
-    dim = len(scale)
+    dim = matrix.shape[-1]
     eps = np.finfo(matrix.dtype).eps
-    asymmetry = np.max(np.abs(correlation - correlation.T))
-    if asymmetry > 16 * dim * eps * np.max(np.abs(correlation)):
+    transpose = correlation.swapaxes(-1, -2)
+    asymmetry = np.max(np.abs(correlation - transpose), axis=(-2, -1))
+    if np.any(asymmetry > 16 * dim * eps * np.max(np.abs(correlation), axis=(-2, -1))):
         raise np.linalg.LinAlgError
-    correlation = (correlation + correlation.T) / 2
+    correlation = (correlation + transpose) / 2
     # A Cholesky pivot subtracts up to dim products from a unit diagonal.
     # Reserve that source-dtype roundoff for admission; solve the unshifted system.
     guarded = correlation.copy()
-    np.fill_diagonal(guarded, 1 - dim * eps)
+    diagonal = np.arange(dim)
+    guarded[..., diagonal, diagonal] = 1 - dim * eps
     np.linalg.cholesky(guarded)
     return correlation, scale
 

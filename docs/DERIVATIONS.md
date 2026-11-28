@@ -615,6 +615,23 @@ the joint covariance is singular. A fixed observed output has zero deviation.
 `test_centered_mniw_correlated_rows_match_independent_raw_oracle` checks
 this expression against direct integration on a translated example.
 
+**Joint NIW and MNIW draws.** To simulate a possible model, first draw its
+noise covariance. Conditional uncertainty about the mean or coefficients
+inherits that same noise scale. Let `L Lᵀ = Ψ`. Construct a lower triangular
+`T` with independent standard normal entries below the diagonal and, for
+zero-based `i`, diagonal `Tii = sqrt(χ²(ν − d + 1 + i))`. The reversed
+Bartlett decomposition gives `TᵀT ~ Wishart(I, ν)`, so `S = L T⁻¹` gives
+`Σ = S Sᵀ ~ IW(Ψ, ν)`. The implementation obtains the factors by solving
+linear systems. [Axen, 2023](https://arxiv.org/abs/2310.15884)
+
+With independent standard normal noise `z` or `Z`, draw the NIW location
+as `μ + S z / sqrt(κ)`. For MNIW, let `C Cᵀ = Λ` and draw the full
+regression matrix as `M + S Z C⁻¹`. Its column covariance is `Λ⁻¹`,
+its row covariance is the sampled `Σ`, and its final column is the offset.
+The independent checks in `tests/test_conj.py` cover the mean covariance,
+mean precision, expected log determinant, and whitened conditional moments
+in two strata of the sampled covariance.
+
 **Gamma precision update** (gaussian_prec nodes sharing a τ edge):
 αn = α0 + n/2, βn = β0 + Σ s_t / 2 — but note this one usually needs no
 trial loop at all: it is the exact in-loop conjugate posterior the τ edge

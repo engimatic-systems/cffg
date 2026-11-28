@@ -1706,6 +1706,11 @@ them. Four rules define the contract:
    `niw/gaussian`; ordinary `MNIW` serves `mniw/gaussian_linear`, including the
    conditioned runtime group used by observed outputs. The rSLDS declares its
    shared emission this way and pools every tied time slice.
+   The public `cffg.NIW` and `cffg.MNIW` value objects can also draw joint
+   parameters on the host. Each call uses its explicit JAX key to seed a local
+   NumPy PCG64 generator and uses the same sampled covariance factor to
+   generate its paired conditional mean or regression coefficients. The caller
+   owns the keys and the sampled values. D4.2 gives the factorization.
    `component_mniw/gaussian_mixture_linear` adds one MNIW posterior per
    selector state, and `pg_weights/recurrence_link` adds one Gaussian natural-
    parameter posterior per source regime and stick. Precision and EF factors
@@ -1780,6 +1785,19 @@ them. Four rules define the contract:
    envelope retains the original pair of v3 mixed records. Both codecs validate
    identity metadata and require dormant parameters to match the reset prior.
    Device-to-host conversion uses the exact codec.
+
+   `finite_hypotheses.FiniteHypotheses` updates a categorical distribution
+   over fixed parameter vectors. Its conditional template attaches a DATA
+   equality tap to a Gaussian prediction. Given a reading, only the
+   normalized Gaussian point density contributes to that template's ledger.
+   The facade evaluates that same node energy across candidates and readings.
+   With previous normalized log weights `w` and a row of log likelihoods
+   `l`, the increment is `z = logsumexp(w + l)` and the new log weights are
+   `w + l - z`. Removing common offsets before addition preserves prior odds.
+   A missing row contributes zero log evidence. The host commits the whole
+   batch after validation. A versioned numeric checkpoint binds the conditional
+   template, candidate order, covariance, reset prior, posterior, support,
+   number of observed readings and accumulated log evidence.
 
    Frame-local appearance regression is owned by `frame_regression.py`.
    `score_pixels` evaluates the expected log likelihood for each pixel

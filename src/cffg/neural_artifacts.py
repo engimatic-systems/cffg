@@ -42,15 +42,15 @@ def write_artifact(path, metadata, arrays):
 def read_artifact(path, *, format_name, fields):
     with np.load(path, allow_pickle=False) as archive:
         if "metadata" not in archive.files:
-            raise ValueError("incompatible neural checkpoint: missing versioned metadata; legacy migration required")
+            raise ValueError(f"incompatible {format_name} checkpoint: missing versioned metadata; legacy migration required")
         if len(archive.files) != len(set(archive.files)) or set(archive.files) != {"metadata", *fields}:
-            raise ValueError("neural checkpoint array inventory mismatch")
+            raise ValueError(f"{format_name} checkpoint array inventory mismatch")
         raw = archive["metadata"]
         if raw.shape != () or raw.dtype.kind != "U":
-            raise ValueError("neural checkpoint metadata must be a scalar JSON string")
+            raise ValueError(f"{format_name} checkpoint metadata must be a scalar JSON string")
         metadata = json.loads(str(raw))
         if (not isinstance(metadata, dict) or metadata.get("format") != format_name
                 or type(metadata.get("version")) is not int or metadata["version"] != 1):
-            raise ValueError("incompatible neural checkpoint format or version")
+            raise ValueError(f"incompatible {format_name} checkpoint format or version")
         arrays = {name: archive[name].copy() for name in fields}
     return metadata, arrays

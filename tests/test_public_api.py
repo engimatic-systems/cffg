@@ -23,6 +23,7 @@ from cffg.agent import RollingAgent as CanonicalRollingAgent
 from cffg.bundle import load_bundle as canonical_load_bundle
 from cffg.bundle import save_bundle as canonical_save_bundle
 from cffg.compiler import compile_template as canonical_compile_template
+from cffg.conj import MNIW, NIW
 from cffg.core import BlobRef, FactorSpec, PlateSpec, Template, VariableSpec
 from cffg.engine import Engine as CanonicalEngine
 from cffg.engine import RunStatus as CanonicalRunStatus
@@ -170,7 +171,9 @@ def test_top_level_facade_reexports_only_canonical_owners():
         "GradientStatus": cffg.GradientStatus,
         "HostileInputs": cffg.kernels.HostileInputs,
         "LoadedBundle": cffg.bundle.LoadedBundle,
+        "MNIW": MNIW,
         "MeanImplementation": cffg.MeanImplementation,
+        "NIW": NIW,
         "NeuralTrainer": cffg.NeuralTrainer,
         "ParameterSpec": cffg.kernel_bindings.ParameterSpec,
         "PersistentArray": cffg.learning_schema.PersistentArray,
