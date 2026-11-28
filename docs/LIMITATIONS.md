@@ -848,11 +848,11 @@ checks matching roots and a positive work-reduction confidence interval;
 there is no universal speedup or same-root theorem for multiple-root models.
 This deterministic API has no particles or importance sampling.
 
-**S6. Structure search is not a library capability.** Free energy can be used by
-application code to compare explicitly constructed candidate models, but the
-library exposes no topology-search algorithm, candidate generator, or validated
-search workflow. Earlier roadmap discussion of propose-and-score loops is a
-design possibility, not delivered structure learning.
+**S6. Held-out comparison of supplied structures.** The host can fit and
+score explicitly supplied ordinary candidate graphs on disjoint artifacts
+with `cffg.structure_scoring.compare_candidates`. On loops the result is
+a Bethe approximation. Automatic proposal generation, acceptance policies
+and fragment reuse remain roadmap work in cff-cynx.
 
 **S7. Scale engineering.** Sparse A/B matrices, factored transition tensors,
 GPU-resident arenas, incremental recompilation, smarter (residual) schedules —

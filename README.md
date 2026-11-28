@@ -816,6 +816,37 @@ is the exact MAP/Viterbi identity. On loops it retains the usual max-product
 caveats; `cffg.csp.decimate` is the explicit feasibility-oriented helper. See
 [examples/hard_constraint.py](examples/hard_constraint.py).
 
+## Compare fitted candidates on held-out evidence
+
+Use stable IDs for the original data artifacts. Choose a common observed
+alphabet and measurement units for every candidate. Each binding below
+represents an independent inference problem. To score observations jointly,
+put them on different DATA ports of one unrolled graph in a single binding.
+
+```python
+from cffg.structure_scoring import Candidate, Partition, compare_candidates
+
+candidates = [Candidate("small", small_template, small_arrays, small_priors),
+              Candidate("split", split_template, split_arrays, split_priors)]
+fit = Partition("train", {"episode-4": [{"sensor": 0}, {"sensor": 1}]})
+heldout = Partition("test", {"episode-9": [{"sensor": 1}]})
+reports = compare_candidates(candidates, fit, heldout)
+for name, row in reports.items():
+    print(name, row.status, row.total_bfe, row.rank)
+```
+
+Each declared learnable updates only during fitting. A fixed candidate can
+omit priors. Dirichlet rollover uses the engine's expected log parameters.
+The total is the sum of the final ordinary Bethe ledger values in nats.
+Raw traces and per-event statuses are available in `row.evaluation_events`.
+Only a complete set of converged, finite scores earns a rank. Lower totals
+rank first. At working precision, totals tie when their difference fits
+within the two candidates' combined rounding allowances. Each allowance is
+eight machine epsilons times the sum of `max(1, abs(event_energy))`. The
+raw totals keep their original values. Loopy models carry an approximation
+notice. A planning graph with goal ports or P-substitution needs a separate
+ordinary evaluation graph. Use `grouped=False` for the single-Engine path.
+
 ## Batch, extend, render, and estimate
 
 `cffg.colony.Colony` caches one engine per structure hash and vmaps matching
