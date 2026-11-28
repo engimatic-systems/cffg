@@ -1,6 +1,6 @@
 ---
 id: cao-8blp
-status: open
+status: closed
 deps: [cao-avog]
 links: []
 created: 2026-11-24T22:49:07Z
@@ -37,3 +37,13 @@ No downstream implementation is required. Changing defaults or expanding rounded
 ## Definitions
 
 Float32 and float64 store each floating-point number in 32 or 64 bits. A bank stores the parameters for a set of mixture components. An assignment weight is the fraction of an observation counted toward a component. Compensated updates carry rounding remainders forward. Rounded updates store the nearest representable result at each step. Warm time measures recurring work after compilation.
+
+## Notes
+
+**2026-11-28T04:19:30Z**
+
+Change path: runtime numerical or status invariant (public mixed-learning option and measurement only). Both PyTree representations use public score/update under a compiled scan. Flood versus scheduled inference, parameter dispatch and checkpoint changes are inapplicable. Reuse the retained seeded data and measure matched fixed assignments and score plus update. Check ordinary and high-count streams against exact sums of the represented weights.
+
+**2026-11-28T04:34:03Z**
+
+Ran tools/axiom/mixed_learning_speed.py float32 and float64 in separate CPU processes on the M2 Max. JAX/jaxlib 0.10.2, NumPy 2.5.1, one record/32 slots, d=6, 12 paired blocks. Rounded/compensated paired median time ratios for fixed updates and score+update were .589/.618 in f32 and .556/.556 in f64. Four quarter-count increments recovered +1 from 16 in every mode. At 2^22 (f32) or 2^51 (f64), compensated gained one and rounded gained zero. Raw timings and checks are in ~/agent-share/mixed-learning-speed-HQQA0I/{float32,float64}.json. These are workload-specific measurements. Updated public docstrings and README. Isolation: the benchmark lives under tools, the only package changes are class/method docstrings, and the executable AST of mixed_state.py matches a774a54 exactly. Public help and both benchmark invocations passed.
