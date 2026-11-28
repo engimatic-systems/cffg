@@ -1,6 +1,6 @@
 ---
 id: cao-ar2d
-status: in_progress
+status: closed
 deps: [cao-24tn]
 links: []
 created: 2026-11-24T05:42:38Z
@@ -57,3 +57,7 @@ Ran uv run --frozen --no-sync pytest -q -m "slow or not slow" -k "not 5000_rows_
 **2026-11-28T04:37:16Z**
 
 With JAX_ENABLE_X64=0, jax.disable_jit and jax.jit returned identical status and every result field for both the shared-center transfer and the 2/3 refusal. Both selected candidates passed the rational oracle.
+
+**2026-11-28T06:48:22Z**
+
+The canonical integrated gate at fd9a0f7 passed all 2,844 selected tests in 455.037 s on four workers. The four code and test hashes in warm_cost.json match this reviewed branch. In 17 synchronized warmed host retries, the median selected-row vs full-snapshot costs were 3.347 vs 10.343 ms (4 slots, float32), 3.345 vs 10.298 ms (4 slots, float64), and 3.828 vs 11.459 ms (500 slots, float32). At 500 slots the corrected same-center device attempt took 219.17 µs vs 202.46 µs previously and now accepts the tiny transfer. The 2/3 range refusal took 211.71 vs 208.00 µs. Each device median uses 129 calls. Ordinary control timings varied by block. These data quantify the cost of the safeguarded attempt and the selected exact retry on these examples. Reproduction harness and raw blocks: ~/agent-share/cffg-backlog-gates/cao-ar2d/{warm_cost.py,warm_cost.json}, receipt SHA-256 1ea5f56f7f97c4faec82a783fec317c65d86c43e29f6ed8e6a53be3190e23745.
