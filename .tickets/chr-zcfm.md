@@ -1,6 +1,6 @@
 ---
 id: chr-zcfm
-status: open
+status: closed
 deps: [cff-pyy9, cff-4yr6, cff-3kdk]
 links: []
 created: 2026-11-25T06:04:34Z
@@ -19,17 +19,17 @@ The first-descent controller on experiment/craftax-live entered the dungeon in s
 1. Resume only after the M7 hierarchy, batched observation binding and selective posterior readout dependencies are complete and Cooper resumes the experiment.
 2. Compare a slow readiness or regional navigation model driving a fast movement and survival model against a flat controller using matched observations, actions, environments and compute budgets. Freeze the primary outcome before inspecting results. Count every starting lane and handle episode cutoffs explicitly.
 3. Identify which location, hazard and resource beliefs the graph actually infers, which action consequences are learned or specified, and which policy decisions still use game-specific code.
-4. Scope a weighted local transition for uncertain player position before choosing its implementation. Specify the directed support for each action (legal moves, blocked attempts, staying put, collisions, boundaries and teleports when applicable); how a viewport and terrain evidence update pose; how to represent multiple possible positions and uncertain walkability; and when the map grows or changes floor. Specify probability normalization, zero-support behavior, duplicates, updates to weights or topology, learnable versus fixed rows, and what the factor must return in both directions, to the action selector, and to the free-energy ledger. Determine when an existing factorization suffices and when a neighbor-indexed weighted transition is required.
-5. Define a small dense reference including ambiguous motion, obstacles, impossible destinations and sparse support. Measure posterior, action and ledger parity, scaling in allowed moves, peak memory, artifact size and warm decision time at fixed precision before choosing a public sparse-factor API. Report output equivalence to the dense table and the impact of coupling pose to uncertain tiles.
+4. Give both arms the same rule-based navigation proxy. Read visible interaction geometry from the player-centered symbolic observation. Use exact overworld tile coordinates and exact displacements relative to the first landing on a lit floor. Carry known ladder endpoints across revisits. If a move is unobservable, report the loss of a map coordinate and keep using visible offsets. Keep native simulator coordinates confined to independent verification.
+5. Check the positioning proxy against native movement on the frozen Experiment 2 action tapes, including blocked moves, floor changes and episode resets. Report coverage and discrepancies separately for each floor. Keep the agent observation and action spaces identical across arms.
 6. Give the resumed experiment a short goal/change description, native graph visualization, frame-level replay and a report that distinguishes dungeon entry, survival and return.
 
 ## Methodological Suggestions — HOW
 
-The previous probe measured a connected 860-factor tree on an M2 Max. Bulk loading 99 tile bits and requesting two beliefs reduced median model time from about 37 ms to 3.58 ms in the research prototype. Use the public replacements. One candidate primary endpoint is first dungeon entry plus 200 further actions alive within a fixed lane budget. Keep survival after entry as a secondary outcome. For sparse movement compare a dense action-by-source-by-destination table with a bounded list of destinations and weights per action and source, including reverse lookup or segmented reductions. Benchmark a small patch and a whole floor.
+The previous probe measured a connected 860-factor tree on an M2 Max. Bulk loading 99 tile bits and requesting two beliefs reduced median model time from about 37 ms to 3.58 ms in the research prototype. Use the public replacements. One candidate primary endpoint is first dungeon entry plus 200 further actions alive within a fixed lane budget. Keep survival after entry as a secondary outcome. The local navigator may route to observed targets with breadth-first search. The hierarchical and flat controllers can then be compared on readiness, supplies and danger using identical movement assistance.
 
 ## Future work
 
-The M7 and input/output tickets below own reusable library changes. Decide whether a general weighted sparse transition merits a separate implementation ticket from this scoping evidence. This ticket preserves a paused experiment and does not authorize new Craftax training runs.
+All three library prerequisites are complete. A probabilistic spatial model is optional research for tasks where hidden movement changes the decision. If it becomes useful, first define the directed moves per action, including blocked moves, stay, collisions, boundaries and floor changes. Specify what is uncertain about pose and terrain, how to normalize weights and handle duplicate or zero-probability destinations, and whether connectivity or weights can change or be learned. Check messages to the previous position, next position and action, plus the free-energy term, against a small dense reference. Compare time, peak memory and artifact size as the map grows before proposing a public sparse-factor API. Cooper has authorized positioning work. A new scored survival experiment is a separate step.
 
 ## Definitions
 
@@ -58,3 +58,15 @@ Prerequisite --> dependent
 [x] cff-wbhu --> [x] cff-9xmq --> [x] cff-mjku --> [x] cff-pyy9 --+
 [x] cff-4yr6 -------------------------------------------------------+--> [ ] chr-zcfm (ready, parked)
 [x] cff-3kdk -------------------------------------------------------+
+
+**2026-11-25T14:05:52Z**
+
+Cooper chose a navigation proxy for the survival comparison. Outcomes 4–5 now supersede the earlier proposal to make sparse transition scoping the first experiment. Full Craftax-Symbolic-v1 exposes visible tile offsets and facing. Default reset fixes the overworld origin at (24,24). A cardinal move checks the destination before mobs move. The first dungeon lands at a generated ladder, so its map uses entry-relative coordinates. Dark destinations can hide collisions on later floors. The unchanged three hard prerequisites are closed.
+
+**2026-11-25T14:07:35Z**
+
+Positioning is ready for the next controller. Experiment branch experiment/craftax-live commit ea90752 (ticket ccl-n8rp) provides tools/craftax_live/position.py and an independent native scorer. Every archived action and reset matched: 45,353 absolute overworld steps plus 116 resets, and 3,799 first-dungeon steps in entry-relative coordinates. All 24 descents were included. A later unobservable move can make the floor position unknown while visible offsets remain exact. Receipt ~/agent-share/craftax-experiment2-verification/position-TkxfoH/positions.json. This replay reused Experiment 2 actions; it does not measure policy improvement.
+
+**2026-11-25T15:17:12Z**
+
+Resolved by Experiment 3 on local branch experiment/craftax-survival at 34189b1. The source-frozen runtime dd4128b used the public M7 hierarchy in Craftax against a matched flat joint filter. Both policies used the same observation-only navigation and action graph. Eight paired lanes of 2,048 real actions per arm yielded 5 vs 6 first dungeon entries and 0 vs 1 lanes surviving another 200 actions. Independent replay checked every action, recorded position, native frame and lane outcome. The report, raw evidence and all episode replays are accessible at http://localhost:8080/craftax-live/dungeon-survival/results.html. Project validation passed 2,751 default tests, with 335 deselected and 1,178.203 s wall time. The experiment branch carries the full qualification and implementation.

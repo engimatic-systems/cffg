@@ -969,6 +969,21 @@ Run one from the repository checkout with, for example:
 uv run python examples/linear_gaussian.py
 ```
 
+### Replay the learned-place navigation test
+
+This pilot compares two assignments of observed map tiles to places. A CFFG
+scores each assignment on reserved movements. You can replay both place-based
+policies and a planner using the observed tile map. Run the study from the
+repository into a new directory, then verify its tapes and scores.
+
+```sh
+JAX_PLATFORMS=cpu JAX_ENABLE_X64=1 uv run --frozen python tools/navigation/study.py navigation-run
+uv run --frozen python tools/navigation/audit.py --root navigation-run
+```
+
+Open `navigation-run/index.html` for the standalone guide. The adjacent
+`study.json` contains every recorded step and both candidates' scores.
+
 ## Reference map
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — owners, execution paths, and

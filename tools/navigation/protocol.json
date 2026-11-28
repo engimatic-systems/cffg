@@ -1,0 +1,50 @@
+{
+  "study": "Two junctions on a tile loop",
+  "version": 1,
+  "actions": ["N", "E", "S", "W"],
+  "origin": "home",
+  "conditions": ["aliased", "same-exits"],
+  "rotations": [0, 90],
+  "rotation_rule": "Rotate the entire layout, each traversal's compass actions and its initial heading clockwise about home. These are deterministic coordinate transformations of two designed layouts, not four independently drawn worlds.",
+  "geometry": [
+    [0, 0, "home"], [0, 1, "cedar"], [0, 2, "junction"], [0, 3, "arch"],
+    [0, 4, "bench"], [0, 5, "clock"], [0, 6, "porch"], [0, 7, "cairn"],
+    [0, 8, "junction"], [0, 9, "pier"], [0, 10, "harbor"],
+    [-1, 2, "brass"], [-2, 2, "amber"], [-1, 8, "slate"], [-2, 8, "blue"],
+    [1, 2, "fern"], [1, 8, "reed"], [2, 2, "pump"], [2, 3, "rope"],
+    [2, 4, "mill"], [2, 5, "kiln"], [2, 6, "pool"], [2, 7, "valve"], [2, 8, "wheel"]
+  ],
+  "same_exit_replacements": {"slate": "brass", "pier": "arch", "reed": "fern", "cairn": "cedar"},
+  "symbol_alphabet": "Lexicographically sorted distinct symbol strings from geometry; fixed across conditions and candidates. In the positive layout all ordinary tiles are distinct. In the negative control the immediate N/E/S/W neighbors of the two junctions have pairwise identical labels. Both junctions have four open exits.",
+  "observation": "Every real step returns the tile symbol and exact achieved displacement, even for blocked attempts. Coordinates are accumulated relative to the initial home landmark. On route resets a specified, uniquely labeled landmark localizes the start from fit memory. Compass commands are always available. Facing becomes the attempted direction even on a blocked move. There is no view of neighboring tiles, true-coordinate sensor, global map input or action preview.",
+  "fit": {
+    "headings": ["N", "S"],
+    "policy": "Two fresh depth-first surveys starting at home. At each newly visited coordinate try all four compass directions clockwise beginning with the survey's initial heading, including blocked moves. For each successful attempt recursively survey an unseen coordinate, then take the reverse action to return. Stop after probing all four directions of home and returning from its children. Exploration uses its own observed positions and displacements only."
+  },
+  "candidate": "Appearance assigns one place per observed symbol. The sole eligible symbol, junction, is named in advance. Split assigns a separate place to each distinct exploration coordinate at which that symbol occurred; all other assignments are unchanged. If fewer than two coordinates are found, retain appearance. Names, route rewards, hidden geometry, selection and final outcomes do not propose places. Place IDs enumerate observed symbols in alphabet order, then junction coordinates in row/column order.",
+  "scoring": "One prequential next-symbol prediction for every primitive traversal step, including stays, with counts fixed after the fit partition. Row is place ID times four plus compass action ID. Each row uses a Dirichlet prior of one per alphabet symbol. Select on total native float64 negative log predictive evidence. Choose split only if its total is smaller by more than the summed numerical error bounds (64 times machine epsilon times max(1,event surprise) per event per candidate); ties choose appearance. Report both frozen candidates on final traversals and navigation with the selection label preserved.",
+  "selection": [
+    {"id": "west-spur-loop", "heading": "N", "legs": ["EE", "NN", "SS", "EEEEEE", "SS", "WWWWWW", "NN", "WW"]},
+    {"id": "east-spur-loop", "heading": "W", "legs": ["EEEEEEEE", "NN", "SS", "WWWWWW", "SS", "EEEEEE", "NN", "EE"]}
+  ],
+  "final": [
+    {"id": "west-lower-east", "heading": "E", "legs": ["EE", "SS", "EEEEEE", "NN", "NN", "SS", "EE", "WW", "WWWWWW", "WW"]},
+    {"id": "harbor-lower-home", "heading": "S", "legs": ["EEEEEEEEEE", "WW", "SS", "WWWWWW", "NN", "NN", "SS", "WW"]},
+    {"id": "two-spurs-return", "heading": "W", "legs": ["EE", "NN", "SS", "EEEEEE", "NN", "SS", "WWWWWW", "WW"]},
+    {"id": "home-loop-return", "heading": "N", "legs": ["W", "EE", "EEEEEE", "SS", "WWWWWW", "NN", "WW", "N"]}
+  ],
+  "navigation": {
+    "budget": 24,
+    "tasks": [
+      {"id": "amber-to-blue", "start": "amber", "goal": "blue", "heading": "S"},
+      {"id": "blue-to-amber", "start": "blue", "goal": "amber", "heading": "S"},
+      {"id": "home-to-harbor", "start": "home", "goal": "harbor", "heading": "E"},
+      {"id": "harbor-to-home", "start": "harbor", "goal": "home", "heading": "W"},
+      {"id": "blue-to-home", "start": "blue", "goal": "home", "heading": "N"},
+      {"id": "amber-to-harbor", "start": "amber", "goal": "harbor", "heading": "W"}
+    ],
+    "policy": "All three controllers see the same current symbol, compass direction and relative position. Fit-only successful and blocked transitions give a frozen empirical next-place distribution per place/action, using observed frequencies without smoothing. An untried action stays in place. Set zero cost at the goal and terminal failure cost budget+1 elsewhere, then back up unit action costs over the remaining primitive steps. Replan each tick using that remaining horizon. For appearance, the policy indexes only the symbol; split uses pose only to disambiguate eligible junctions. Tile BFS chooses a shortest route over observed directed coordinate links. Choose the first equally good action in forward/right/back/left order (absolute cost tolerance 1e-12). No online topology updates, exploratory fallback, or privileged route repair. Stop at the first goal observation or after budget actions.",
+    "readouts": "For each controller and task report success, all actual actions including blocked attempts, final stop reason and path. Compare selected candidate, prespecified appearance and observed-tile BFS; retain the unselected candidate for diagnosis. No confidence intervals for these designed, deterministic tasks."
+  },
+  "scope": "Acquisition, structural eligibility, action and observation vocabularies, smoothing, finite-budget control, start localization and exact displacement are supplied. Evaluation revisits the same layouts on separate tapes; it does not measure transfer to a new maze or discovery from pixels."
+}

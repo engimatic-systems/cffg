@@ -31,10 +31,10 @@ structure, scores it by evidence, and grows a fragment library. One line of
 
 - **Friston, Parr & Zeidman (2019), "Bayesian Model Reduction".**
   <https://arxiv.org/abs/1805.07092>
-  The cheapest useful structure operator: score edge/parameter *removals* in
-  closed form from an already-fitted posterior, no refit. For our conjugate
-  (Dirichlet/NIW) beliefs this is near-free algebra — the natural v1
-  prune/merge scorer for the epic.
+  Score a change of prior under a shared likelihood from the full model's
+  posterior. Equations 9–10 give the evidence ratio and the reduced posterior.
+  Merging two latent places can also change their emissions and transitions.
+  Such a merge needs its own evidence comparison on common observations.
 
 - **Friston et al. (2023), "Supervised Structure Learning".**
   <https://arxiv.org/abs/2311.10300>
@@ -53,6 +53,20 @@ structure, scores it by evidence, and grows a fragment library. One line of
   hybrid factors implement. The epic's literature-pass ticket extracts its
   growth/merge criteria. (Its "core priors" are also a worked example of
   section 3's ideas.)
+
+- **Friston et al. (2024), “From pixels to planning: scale-free active inference.”**
+  Algorithm 1 groups recurring observations and latent transition patterns
+  across prescribed spatial and temporal scales. For navigation this suggests
+  learning multi-step events and testing which future observations they predict.
+  [Algorithm 1](https://arxiv.org/pdf/2407.20292#page=26)
+
+- **de Tinguy et al. (2026 revision), “Online Structure Learning and Planning
+  for Autonomous Robot Navigation using Active Inference.”** AIMAPP proposes
+  places from sensed free space and updates connectivity from movement.
+  Its goal-reaching evaluation starts at a known position on a previously
+  explored map, a useful protocol for testing a learned route separately
+  from localization. [Map expansion](https://arxiv.org/html/2510.09574v2#S3.SS5)
+  · [Goal-reaching protocol](https://arxiv.org/html/2510.09574v2#S4.SS4)
 
 ## 3. Core knowledge & theory learning — where proposals come from
 
