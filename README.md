@@ -141,7 +141,7 @@ expose the specialized workflows named in the capability map.
 `CorridorEnv`, `DiscreteBinding`, `DiscreteMode`, `EFBinding`, `Engine`,
 `FactorKernel`, `FailureDiagnostic`, `FixedPointDifferentiator`, `FixedPointGradient`, `FunctionSpec`,
 `GaussianAmortizer`, `GaussianBinding`, `GaussianConditioning`, `GradientStatus`,
-`HostileInputs`, `LoadedBundle`, `MNIW`, `MeanImplementation`, `NIW`, `NeuralTrainer`,
+`HostileInputs`, `LoadedBundle`, `MNIW`, `SquareRootMNIW`, `MeanImplementation`, `NIW`, `NeuralTrainer`,
 `ParameterSpec`, `PersistentArray`, `PersistentParameter`,
 `PersistentStateDescriptor`, `PersistentTarget`, `PolynomialFeatures`,
 `RollingAgent`, `RunStatus`, `TrainingConfig`, `build_gridworld`,
@@ -714,6 +714,40 @@ state; parameter uncertainty generally does not enter all state messages, so
 the continuous/hybrid cadence is empirical Bayes rather than full joint
 variational Bayes. See
 [examples/learning_bundle.py](examples/learning_bundle.py).
+
+For highly correlated or translated predictors, opt in to square-root
+regression. The upper triangular root represents the physical column
+precision as `R.T @ R`. Learn, draw, and evaluate contrasts directly
+from this root.
+
+```python
+import numpy as np
+from cffg import SquareRootMNIW
+from cffg.conj import vague_mniw
+
+prior = SquareRootMNIW.from_dense(vague_mniw(dy=1, dx=2))
+means = np.array([[0., 2.**27, 2.**27]])  # output followed by its predictors
+post = prior.update_centered(means, np.eye(3)[None, :, :], [1.])
+precision = post.precision_quadratic([1., -1., 0.])
+```
+
+For a declared linear factor use `family="sqrt_mniw"` and supply a
+`SquareRootMNIW` prior. For a linear mixture use
+`family="component_sqrt_mniw"` and supply one such prior per component.
+These families persist `m, lam_root, psi, nu`. Their `rollover` and
+`sample` methods use the usual physical matrix, offset, and noise units.
+`solve_precision(rhs)` solves a column-precision system without forming
+the dense Gram matrix. Reading `post.lam` raises `ValueError` when
+forming a dense array loses a resolved direction. Use centered observations
+for this case. A nonempty raw-moment `update` requires both prior and
+updated dense precisions to be representable.
+
+Existing `mniw` and `component_mniw` declarations continue to store
+`lam`. To migrate an existing run, load the original checkpoint under its
+original declaration and convert each resolved dense prior and posterior
+with `SquareRootMNIW.from_dense`. Preserve both when resuming a learner
+that uses `replace`. A legacy file can recover only the precision present
+in its stored words.
 
 `NIW.sample(key)` returns one mean vector and its covariance.
 `MNIW.sample(key)` returns the full regression matrix `[A b]` and its

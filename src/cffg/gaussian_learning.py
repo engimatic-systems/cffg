@@ -175,6 +175,8 @@ class MNIWFamily:
     """Matrix-normal-inverse-Wishart learning for Gaussian-linear factors."""
 
     name = "mniw"
+    precision_key = "lam"
+    posterior_type = conj.MNIW
     readout = "centered_gaussian_stats"
     _PARAMS = {"m", "lam", "psi", "nu"}
     semantic_identity = LEARNING_IDENTITIES["mniw"]
@@ -185,7 +187,7 @@ class MNIWFamily:
         augmented = inputs + 1
         return (
             PersistentParameter("m", (output, augmented)),
-            PersistentParameter("lam", (augmented, augmented)),
+            PersistentParameter(self.precision_key, (augmented, augmented)),
             PersistentParameter("psi", (output, output)),
             PersistentParameter("nu", ()),
         )
@@ -194,11 +196,11 @@ class MNIWFamily:
         if ftype != "gaussian_linear":
             raise ValueError(
                 f"learnable {learnable!r}: MNIW does not support factor type "
-                f"{ftype!r}; supported pair is mniw/gaussian_linear"
+                f"{ftype!r}; supported pair is {self.name}/gaussian_linear"
             )
         if set(roles.values()) != {"matrix", "offset", "cov"}:
             raise ValueError(
-                f"learnable {learnable!r}: mniw/gaussian_linear requires matrix, "
+                f"learnable {learnable!r}: {self.name}/gaussian_linear requires matrix, "
                 f"offset, and cov roles, got {sorted(roles.values())}"
             )
         by_role = {role: shapes[blob] for blob, role in roles.items()}
@@ -293,15 +295,15 @@ class MNIWFamily:
         }
 
     def as_params(self, prior) -> dict[str, np.ndarray]:
-        if isinstance(prior, conj.MNIW):
+        if isinstance(prior, self.posterior_type):
             return {
                 "m": np.asarray(prior.m).copy(),
-                "lam": np.asarray(prior.lam).copy(),
+                self.precision_key: np.asarray(getattr(prior, self.precision_key)).copy(),
                 "psi": np.asarray(prior.psi).copy(),
                 "nu": np.asarray(prior.nu).copy(),
             }
         if not isinstance(prior, Mapping):
-            raise TypeError("an MNIW prior must be cffg.conj.MNIW or a parameter mapping")
+            raise TypeError(f"a {self.name} prior must be {self.posterior_type.__name__} or a parameter mapping")
         return _copy_params(prior)
 
     def validate_prior(self, learnable, params, shapes) -> None:
@@ -318,10 +320,10 @@ class MNIWFamily:
                 f"does not match blobs {sorted(shapes.values())}"
             )
 
-    def _posterior(self, learnable, params) -> conj.MNIW:
+    def _posterior(self, learnable, params) -> conj.MNIW | conj.SquareRootMNIW:
         _require_keys(learnable, params, self._PARAMS, "MNIW")
         m = np.asarray(params["m"])
-        lam = np.asarray(params["lam"])
+        lam = np.asarray(params[self.precision_key])
         psi = np.asarray(params["psi"])
         if (
             not np.all(np.isfinite(m))
@@ -331,9 +333,18 @@ class MNIWFamily:
             raise ValueError(f"learnable {learnable!r}: MNIW arrays must be finite")
         if m.ndim != 2:
             raise ValueError(f"learnable {learnable!r}: MNIW m must be rank 2")
-        return conj.MNIW(
+        return self.posterior_type(
             m.copy(),
             lam.copy(),
             psi.copy(),
             _scalar(learnable, "nu", params["nu"]),
         )
+
+
+class SquareRootMNIWFamily(MNIWFamily):
+    """Declared centered regression with an explicitly rooted checkpoint."""
+    name = "sqrt_mniw"
+    precision_key = "lam_root"
+    posterior_type = conj.SquareRootMNIW
+    _PARAMS = {"m", "lam_root", "psi", "nu"}
+    semantic_identity = LEARNING_IDENTITIES[name]

@@ -304,8 +304,8 @@ class Dirichlet:
 
 
 from cffg.component_niw_learning import ComponentNIWFamily
-from cffg.gaussian_learning import MNIWFamily, NIWFamily
-from cffg.hybrid_learning import ComponentMNIWFamily, PGWeightsFamily
+from cffg.gaussian_learning import MNIWFamily, NIWFamily, SquareRootMNIWFamily
+from cffg.hybrid_learning import ComponentMNIWFamily, ComponentSquareRootMNIWFamily, PGWeightsFamily
 
 
 FAMILIES: dict[str, Family] = {
@@ -313,6 +313,8 @@ FAMILIES: dict[str, Family] = {
     "niw": NIWFamily(),
     "component_niw": ComponentNIWFamily(),
     "mniw": MNIWFamily(),
+    "sqrt_mniw": SquareRootMNIWFamily(),
+    "component_sqrt_mniw": ComponentSquareRootMNIWFamily(),
     "component_mniw": ComponentMNIWFamily(),
     "pg_weights": PGWeightsFamily(),
 }

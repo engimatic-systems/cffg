@@ -25,10 +25,10 @@ def _diagnostic_scalar(readout: Mapping[str, object], key: str) -> str:
     return format(float(value), ".17g")
 
 
-def _stack_mniw(posteriors: Sequence[conj.MNIW]) -> dict[str, np.ndarray]:
+def _stack_mniw(posteriors, precision_key) -> dict[str, np.ndarray]:
     return {
         "m": np.stack([posterior.m for posterior in posteriors]),
-        "lam": np.stack([posterior.lam for posterior in posteriors]),
+        precision_key: np.stack([getattr(posterior, precision_key) for posterior in posteriors]),
         "psi": np.stack([posterior.psi for posterior in posteriors]),
         "nu": np.asarray([posterior.nu for posterior in posteriors]),
     }
@@ -67,6 +67,8 @@ class ComponentMNIWFamily:
     """One MNIW posterior per Gaussian-mixture selector component."""
 
     name = "component_mniw"
+    precision_key = "lam"
+    posterior_type = conj.MNIW
     readout = "centered_gaussian_stats"
     _PARAMS = {"m", "lam", "psi", "nu"}
     semantic_identity = LEARNING_IDENTITIES["component_mniw"]
@@ -77,7 +79,7 @@ class ComponentMNIWFamily:
         augmented = inputs + 1
         return (
             PersistentParameter("m", (components, output, augmented)),
-            PersistentParameter("lam", (components, augmented, augmented)),
+            PersistentParameter(self.precision_key, (components, augmented, augmented)),
             PersistentParameter("psi", (components, output, output)),
             PersistentParameter("nu", (components,)),
         )
@@ -87,12 +89,12 @@ class ComponentMNIWFamily:
             raise ValueError(
                 f"learnable {learnable!r}: component MNIW does not support "
                 f"factor type {ftype!r}; supported pair is "
-                "component_mniw/gaussian_mixture_linear"
+                f"{self.name}/gaussian_mixture_linear"
             )
         if set(roles.values()) != {"matrix", "offset", "cov"}:
             raise ValueError(
                 f"learnable {learnable!r}: "
-                "component_mniw/gaussian_mixture_linear requires matrix, "
+                f"{self.name}/gaussian_mixture_linear requires matrix, "
                 f"offset, and cov roles, got {sorted(roles.values())}"
             )
         by_role = {role: shapes[blob] for blob, role in roles.items()}
@@ -152,8 +154,11 @@ class ComponentMNIWFamily:
             result = _stack_mniw([
                 prior.update_centered(means[:, k], covs[:, k], weights[:, k])
                 for k, prior in enumerate(priors)
-            ])
-            for key in ("m", "lam", "psi"):
+            ], self.precision_key)
+            # Updated roots retain their working precision. The dense family's
+            # narrowing test applies only to symmetric matrix increments.
+            keys = ("m", "lam", "psi") if self.precision_key == "lam" else ("m", "psi")
+            for key in keys:
                 result[key] = _retain_component_dtype(params[key], result[key], matrix=key != "m")
             return result
         syy = np.asarray(stats["Syy"])
@@ -205,7 +210,7 @@ class ComponentMNIWFamily:
                     float(count[component]),
                 )
             )
-        return _stack_mniw(posteriors)
+        return _stack_mniw(posteriors, self.precision_key)
 
     def rollover(self, params, ftype) -> dict[str, np.ndarray]:
         values = [posterior.rollover() for posterior in self._posteriors("posterior", params)]
@@ -230,16 +235,16 @@ class ComponentMNIWFamily:
         if isinstance(prior, Sequence) and not isinstance(prior, (str, bytes, Mapping)):
             posteriors = tuple(prior)
             if not posteriors or not all(
-                isinstance(posterior, conj.MNIW) for posterior in posteriors
+                isinstance(posterior, self.posterior_type) for posterior in posteriors
             ):
                 raise TypeError(
                     "a component MNIW prior must be a nonempty sequence of "
-                    "cffg.conj.MNIW values"
+                    f"{self.posterior_type.__name__} values"
                 )
-            return _stack_mniw(posteriors)
+            return _stack_mniw(posteriors, self.precision_key)
         if not isinstance(prior, Mapping):
             raise TypeError(
-                "a component MNIW prior must be a sequence of cffg.conj.MNIW "
+                f"a component MNIW prior must be a sequence of {self.posterior_type.__name__} "
                 "values or a parameter mapping"
             )
         return _copy_params(prior)
@@ -259,10 +264,10 @@ class ComponentMNIWFamily:
                 f"match blobs {sorted(shapes.values())}"
             )
 
-    def _posteriors(self, learnable, params) -> tuple[conj.MNIW, ...]:
+    def _posteriors(self, learnable, params) -> tuple[conj.MNIW | conj.SquareRootMNIW, ...]:
         _require_keys(learnable, params, self._PARAMS, "component MNIW")
         m = np.asarray(params["m"])
-        lam = np.asarray(params["lam"])
+        lam = np.asarray(params[self.precision_key])
         psi = np.asarray(params["psi"])
         nu = np.asarray(params["nu"])
         if m.ndim != 3:
@@ -285,9 +290,18 @@ class ComponentMNIWFamily:
                 f"learnable {learnable!r}: component MNIW values must be finite"
             )
         return tuple(
-            conj.MNIW(m[index], lam[index], psi[index], float(nu[index]))
+            self.posterior_type(m[index], lam[index], psi[index], float(nu[index]))
             for index in range(components)
         )
+
+
+class ComponentSquareRootMNIWFamily(ComponentMNIWFamily):
+    """One square-root regression posterior per mixture component."""
+    name = "component_sqrt_mniw"
+    precision_key = "lam_root"
+    posterior_type = conj.SquareRootMNIW
+    _PARAMS = {"m", "lam_root", "psi", "nu"}
+    semantic_identity = LEARNING_IDENTITIES[name]
 
 
 class PGWeightsFamily:

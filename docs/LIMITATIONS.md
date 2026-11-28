@@ -426,12 +426,15 @@ repair the partial-goal planning limitation above.
 
 Default raw Gaussian statistics can round different conditional variances
 to the same second moment. Declared NIW, ordinary MNIW and component MNIW
-consume centered statistics. MNIW stores a dense coefficient precision.
-Even in float64, two unit-variance predictors both centered at 2²⁷ can
-lose the small variance of their difference in that matrix. The centered update raises a precision error
-before committing it. Center input coordinates at a fixed origin when the
-stored precision would otherwise be unresolved. `cad-1bat` tracks a
-representation that retains this information across checkpoints.
+consume centered statistics. Default MNIW families store dense coefficient
+precision. With two unit-variance predictors at 2²⁷ and identity prior,
+rounding the updated diagonal loses the precision of their difference.
+The dense centered fold raises before committing. The opt-in square-root
+families retain that contrast at 4, and at 6 within 4 × 10⁻¹⁵ after
+checkpoint recovery and a second update. A dense float64 accessor still
+fails on that example. The root can itself become numerically rank
+deficient, particularly when stored in float32. Raw second moments and
+legacy checkpoints cannot recover information lost before conversion.
 
 The mixed learner carries a second word for means, counts and Gaussian scale
 in the caller's dtype. In the translated float32 test (1,024 observations at

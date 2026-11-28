@@ -26,6 +26,7 @@ from cffg.learning_schema import (
     persistent_schema, resolve_persistent_state, validate_persistent_manifest,
 )
 
+from test_square_root_mniw import rooted_fixture
 from test_agent import fresh
 from test_component_niw_learning import component_model
 from test_gaussian_learnables import _learning_template
@@ -55,12 +56,13 @@ def families():
     fixtures.append((t, arrays, {"neutral_dynamics": tuple(conj.vague_mniw(2, 2) for _ in range(3))}))
     t, arrays, _ = _recurrence_template()
     fixtures.append((t, arrays, {"neutral_recurrence": conj.vague_pg_weights(3, 2)}))
+    fixtures.extend(rooted_fixture(c) for c in (False, True))
     result = {}
     for template, arrays, priors in fixtures:
         engine = Engine(compile_template(template, arrays=arrays))
         learning = Learnables(engine, priors=priors)
         for plan in learning.plans.values():
-            result[plan.family] = (template, arrays, engine, plan, learning.initial_params[plan.name])
+            result.setdefault(plan.family, (template, arrays, engine, plan, learning.initial_params[plan.name]))
     return result
 
 
@@ -160,6 +162,10 @@ def test_pre_ticket_declarations_migrate_only_known_unchanged_semantics(families
         spec.pop("semantic_identity")
     if family_name == "pg_weights":
         with pytest.raises(ValueError, match=f"{plan.name}.*D8.*D9"):
+            from_dict(document)
+        assert legacy_learning_structure_hash(template) is None
+    elif family_name in ("sqrt_mniw", "component_sqrt_mniw"):
+        with pytest.raises(ValueError, match="no safe semantic migration"):
             from_dict(document)
         assert legacy_learning_structure_hash(template) is None
     else:

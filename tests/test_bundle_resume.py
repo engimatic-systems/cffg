@@ -26,6 +26,7 @@ from test_gaussian_learnables import _learning_template
 from test_hybrid_learnables import _mixture_template
 from test_learning_schema import _categorical
 from test_recurrence_checkpoint import _model
+from test_square_root_mniw import rooted_fixture
 
 
 def _same_arrays(actual, expected):
@@ -140,6 +141,9 @@ def test_workflow_fixtures_cover_the_runtime_family_registry():
     for kind in ("rslds", "gaussian"):
         _, _, _, learning, _, _ = _fixture(kind, np.float64)
         covered.update(plan.family for plan in learning.plans.values())
+    for component in (False, True):
+        template, arrays, _ = rooted_fixture(component)
+        covered.update(plan.family for plan in compile_template(template, arrays=arrays).learn_plans)
     assert covered == set(FAMILIES)
 
 
