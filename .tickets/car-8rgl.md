@@ -1,6 +1,6 @@
 ---
 id: car-8rgl
-status: open
+status: in_progress
 deps: []
 links: [cff-du6m]
 created: 2026-11-23T21:48:38Z
@@ -34,3 +34,13 @@ Full campaign execution belongs to car-zieb. Authorization to run or redistribut
 ## Definitions
 
 A reference tape is a sequence of inputs held fixed for both implementations. An ablation reruns a system with one mechanism disabled. A practical margin is the largest score difference the study will call close enough.
+
+## Notes
+
+**2026-11-24T01:37:58Z**
+
+First reference checkpoint, pinned release b99f625. Does a soft assignment simply accumulate observations? With mixture prior (0.1, 0.1), give each component two hard observations (x=1, category A). Both counts are 2.1. Feed x=3, category B, with equal responsibility, growth disabled. Release stores counts (1.6,1.6); the additive conjugate learner should return (2.6,2.6). For either component the release Gaussian mass/first/second sums become (1.5,2.5,5.5); additive gives (2.5,3.5,6.5). Category excess counts are (1,0.5) vs (2,0.5). Both pass the write gate. The released M-step weights the old excess statistics by the current responsibility when the winning component previously had alpha above one. Preserve both as separately named oracle cases. Source: pinned axiom/vi/models/hybrid_mixture_model.py lines 109–147 and 229–238. High confidence from a direct two-component development probe. Gameworld fixtures and full protocol still pending.
+
+**2026-11-24T01:37:58Z**
+
+Independent additive oracle. Identical active 2D Gaussian priors m=(1,-1), kappa=2, nu=4, psi=((2,1),(1,2)); category priors A=(2,3), B=(1,2,1). Record one: x=(2,0), zero observation covariance, A=0, B missing. Absolute mixed expected log likelihood -4.381065542. Record two: x=(0,0), covariance ((0.5,-0.25),(-0.25,0.5)), A=1, B=1; score -9.047732209. Fixed component weights (1/4,3/4,0) then (1/2,1/2,0) give first and second posterior mean (10,-8)/11 and (14,-8)/13, scales ((262,61),(61,246))/88 and ((362,107),(107,314))/104. Dormant component remains at prior. Independent intercept-only component-MNIW check agreed within 5.6e-7 in float32 and 1.4e-15 in float64. Use with source precision, mask and split-batch tests when work resumes.
