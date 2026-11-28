@@ -185,7 +185,10 @@ class Engine:
     # -- state construction ---------------------------------------------
 
     def init_state(self) -> State:
-        params = self._state_lifecycle.initial_parameters()
+        return self._init_state_with_params(self._state_lifecycle.initial_parameters())
+
+    def _init_state_with_params(self, params: dict[str, jax.Array]) -> State:
+        """Initialize a member from its own resolved parameters, including functional overlays."""
         if self._mu3_lifecycle is not None:
             params = self._mu3_lifecycle.initialize_parameters(
                 params, samples=self.mu3_samples

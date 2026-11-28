@@ -1,11 +1,11 @@
 """Colony execution: many small graphs, one machine (ARCHITECTURE §5b).
 
-An instance is pure data — (structure key, State pytree). Engines are cached
+Each instance owns a structure key, a State pytree and an optional PRNG cursor.
+Engines are cached
 by graph declarations and executable bindings. JAX specializes their programs
 to numeric shapes and dtypes.
 Ordinary iterative plans stack compatible states and run one vmapped
-step-loop; mixed-GFE plans share the compiled numerical kernels but retain
-per-instance trust controllers until cff-wbhu. Instances couple only through
+step-loop. Functional μ3 members use the host mixed-GFE controller per instance. Instances couple only through
 the host (bind_data / read marginals), never by merging graphs.
 """
 
@@ -34,6 +34,7 @@ from cffg.runtime_types import RunStatus as RunStatus  # noqa: PLC0414
 class _Instance:
     key: str  # structure hash
     state: State
+    key_cursor: jax.Array | None = None
 
 
 def _batch_signature(state: State) -> tuple:
@@ -104,8 +105,9 @@ class Colony:
         arrays: dict[str, np.ndarray],
         *,
         observations: dict[str, object] | None = None,
+        mu3_key: jax.Array | None = None,
     ) -> int:
-        """Validate current parameters and reuse the matching structural plan."""
+        """Spawn a member, preparing its fixed μ3 particles from its explicit key."""
         fingerprint = structure_hash(template)
         declarations, providers = _declarations(template), _providers()
         bucket = self._spawn_structures.get(fingerprint, ())
@@ -119,12 +121,6 @@ class Colony:
             expanded, plan = _prepare_compilation(template, "sum")
             data = plan.resolve(expanded, arrays, None)
             arena = plan.assemble(data)
-            if arena.mu3_groups:
-                raise ValueError(
-                    "Colony does not accept mu3 evaluators: their per-instance "
-                    "explicit PRNG keys and stochastic statuses require "
-                    "Engine.prepare_mu3/run"
-                )
             key = fingerprint if not bucket else f"{fingerprint}:{len(bucket)}"
             new = _SpawnStructure(
                 key, deepcopy(declarations), providers, deepcopy(expanded),
@@ -145,16 +141,22 @@ class Colony:
             else:
                 key, engine = compatible.key, self.engines[compatible.key]
 
+        if engine.arena.mu3_groups and mu3_key is None:
+            raise ValueError(
+                "Colony mu3 evaluators require per-instance explicit PRNG keys via mu3_key"
+            )
         params = {name: jnp.asarray(value) for name, value in data.log_params.items()}
-        state = engine._state_lifecycle.init_state(params)
+        state = engine._init_state_with_params(params)
         if observations:
             state = engine.bind_data(state, observations)
+        if engine.arena.mu3_groups:
+            state, mu3_key = engine.prepare_mu3(state, mu3_key)
         if new is not None:
             self.engines[key] = engine
             self._spawn_structures.setdefault(fingerprint, []).append(new)
         iid = self._next_id
         self._next_id += 1
-        self.instances[iid] = _Instance(key, state)
+        self.instances[iid] = _Instance(key, state, mu3_key)
         return iid
 
     def kill(self, iid: int) -> None:
@@ -165,6 +167,24 @@ class Colony:
         """Apply Engine.bind_data's partial update to this instance only."""
         inst = self.instances[iid]
         inst.state = self.engines[inst.key].bind_data(inst.state, observations)
+
+    def mu3_key_cursor(self, iid: int) -> jax.Array | None:
+        """Return the member's next key. Deterministic members leave their key untouched."""
+        return self.instances[iid].key_cursor
+
+    def refresh_mu3(self, iid: int) -> jax.Array | None:
+        """Draw a new particle set and advance only this member's cursor."""
+        inst = self.instances[iid]
+        engine = self.engines[inst.key]
+        if engine.arena.mu3_groups:
+            inst.state, inst.key_cursor = engine.prepare_mu3(inst.state, inst.key_cursor)
+            self.last_results.pop(iid, None)
+        return inst.key_cursor
+
+    def mu3_diagnostics(self, iid: int) -> dict:
+        """Read this member's weighted moments, ESS and per-evaluator status."""
+        inst = self.instances[iid]
+        return self.engines[inst.key].mu3_diagnostics(inst.state)
 
     def run(
         self, n_iters: int, *, damp: float = 0.0, tol: float | None = None,
@@ -184,6 +204,8 @@ class Colony:
             raise ValueError("Colony outer_solver must be 'auto', 'trust_region', or 'compiled_trust_region'")
         by_key: dict[tuple, list[int]] = {}
         for iid, inst in self.instances.items():
+            if outer_solver == "compiled_trust_region" and self.engines[inst.key].arena.mu3_groups:
+                raise ValueError("compiled_trust_region requires deterministic GFE; Colony has a mu3 member")
             by_key.setdefault((inst.key, _batch_signature(inst.state)), []).append(iid)
 
         for (key, _signature), iids in by_key.items():

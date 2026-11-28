@@ -756,9 +756,9 @@ score epochs still vary and therefore support burn-in averaging. Low ESS is
 reported as budget exhaustion rather than silently accepted. Better estimators
 (Laplace approximation of the message, quadrature, reparameterized control
 variates) are incremental research that would directly improve learning
-stability. Colony batching does not yet accept `mu3` models because it has no
-per-instance explicit-key interface; `Colony.spawn` rejects them rather than
-running the analytic base moments as though the functional update had fired.
+stability. Colony runs functional `mu3` through the host controller once per
+member. Keys, particle sets and outcomes are member-local. Large populations
+therefore pay for one sampling allocation and solve per member.
 `RollingAgent` supports one functional evaluator lifecycle with explicit keys,
 fixed epochs, loud status, posterior rollover, and exact checkpoint replay.
 Its default `learn_a` workflow remains an analytic Dirichlet-moment
@@ -766,7 +766,7 @@ approximation; only a planning template whose serialized constraints compile
 to `cffg.mu3_is.v1` is evidence that `mu3(A)` ran. The agent does not average
 multiple refreshed policy-score epochs automatically: callers may explicitly
 refresh, while `Engine.score_mu3_epochs` remains the averaging API. Arbitrary
-stochastic factor families and batched per-agent keys remain future work.
+stochastic factor families and vectorized stochastic solves remain future work.
 
 Fixed mu3 particles must contain finite, nonnegative probabilities. Preparation,
 the importance rule, and checkpoint restore require each outcome column to sum
