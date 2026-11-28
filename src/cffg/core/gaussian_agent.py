@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass, fields, replace
+from itertools import pairwise
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -71,6 +73,28 @@ def scoped(spec, name):
                    observation_port=name(spec.observation_port))
 
 
+def _same_equality_class(t: Template, left: str, right: str) -> bool:
+    """A bound Gaussian tap fixes every variable connected through equalities."""
+    neighbors = defaultdict(list)
+    for factor in t.factors.values():
+        if factor.type == "equality":
+            for a, b in pairwise(factor.edges.values()):
+                neighbors[a].append(b)
+                neighbors[b].append(a)
+
+    pending = [left]
+    seen = {left}
+    while pending:
+        edge = pending.pop()
+        if edge == right:
+            return True
+        for neighbor in neighbors.get(edge, ()):
+            if neighbor not in seen:
+                seen.add(neighbor)
+                pending.append(neighbor)
+    return False
+
+
 def validate_window(t: Template, spec) -> list[str]:
     from cffg.core.ir import PortRole
 
@@ -124,6 +148,11 @@ def validate_window(t: Template, spec) -> list[str]:
     readout = spec.action if isinstance(spec, GaussianPlanSpec) else spec.posterior
     if any(t.ports[p].variable == readout for p in data_ports):
         errors.append("Gaussian agent readout cannot be a DATA edge with a cavity predictive")
+    elif isinstance(spec, GaussianFilterSpec) and spec.observation_port in data_ports:
+        observed = t.ports[spec.observation_port].variable
+        if _same_equality_class(t, observed, spec.posterior):
+            errors.append(f"Gaussian filter observation {spec.observation_port!r} clamps posterior "
+                          f"{spec.posterior!r} through equality and gives it zero carry covariance")
     readers = [blob for factor in t.factors.values() for blob in factor.param_blobs.values()]
     if len(set(dynamic)) != len(dynamic) or any(readers.count(blob) != 1 for blob in dynamic):
         errors.append("Gaussian agent effective offset and boundary prior need dedicated blobs")

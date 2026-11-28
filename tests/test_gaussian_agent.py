@@ -8,7 +8,8 @@ import pytest
 
 from cffg import RollingAgent, RunStatus, save_bundle
 from cffg.core import (BlobRef, FactorSpec, GaussianFilterSpec, GaussianPlanSpec,
-                       ModelError, PortRole, PortSpec, Template, VariableSpec, validate)
+                       ModelError, PortRole, PortSpec, Template, VariableSpec,
+                       fan_out, observe_interior, validate)
 from cffg.core.compose import scoped
 from cffg.core.serialize import from_json, structure_hash, to_json
 from cffg.runtime_types import InferenceError, RunResult
@@ -69,6 +70,52 @@ def test_declaration_identity_scoping_and_dedicated_parameters():
             t.factors["motion"].param_blobs["offset"] = "m"
             with pytest.raises(ModelError, match="dedicated"):
                 validate(t)
+
+
+def tapped_window(plan, edge, *, indirect=False):
+    t, arrays = window(plan)
+    spec, t.agent = t.agent, None
+    t.ports.clear()
+    # Close the old noisy sensor with N(0, R), then observe the specified state exactly.
+    t.factors["terminal"] = FactorSpec("terminal", "gaussian", {"out": "y"},
+                                       param_blobs={"mean": "z", "cov": "R"})
+    t, port = observe_interior(t, edge)
+    if indirect:
+        t, (branch,) = fan_out(t, port, 1)
+        del t.ports[branch]
+        t.blobs["mu_end"] = BlobRef("mu_end", "mu_end.npy")
+        arrays["mu_end"] = np.zeros(3)
+        t.factors["end"] = FactorSpec("end", "gaussian", {"out": branch},
+                                      param_blobs={"mean": "mu_end", "cov": "Q"})
+        for name, factor in t.factors.items():
+            if factor.type == "equality":
+                a, b, c = factor.edges.values()
+                t.factors[name] = replace(factor, edges={"b": a, "c": b, "a": c})
+    t.ports["context"] = replace(t.ports.pop(port), name="context")
+    t.agent = (replace(spec, preview_ports=("context",)) if plan else
+               replace(spec, observation_port="context"))
+    return t, arrays
+
+
+@pytest.mark.parametrize("indirect", [False, True])
+def test_filter_rejects_a_tap_that_clamps_the_carried_posterior(indirect):
+    t, _ = tapped_window(False, "next", indirect=indirect)
+    for candidate in (t, from_json(to_json(t))):
+        with pytest.raises(ModelError, match="observation 'context' clamps posterior 'next'"):
+            validate(candidate)
+
+
+def test_filter_carries_process_uncertainty_after_a_tap_on_the_previous_state(tmp_path):
+    plan, filt = tmp_path / "plan.cffgz", tmp_path / "filter.cffgz"
+    save_bundle(plan, *tapped_window(True, "x"))
+    save_bundle(filt, *tapped_window(False, "x"))
+    agent = RollingAgent.from_gaussian_bundles(plan, filt)
+    decision = agent.propose({"context": [1., 2., .5]})
+    np.testing.assert_array_equal(decision.command, [.5])
+    mean, cov = agent.observe(decision.command, [1., 2., .5], tick=0)
+    # After Q, the terminal scalar likelihood has variance R + R = .6.
+    np.testing.assert_allclose(mean, [1.125, 2.25, 0], atol=2e-6)
+    np.testing.assert_allclose(cov, np.diag([.15, .2, 1.]), atol=2e-6)
 
 
 @pytest.mark.parametrize("x64", [pytest.param(True, marks=pytest.mark.slow), False])
