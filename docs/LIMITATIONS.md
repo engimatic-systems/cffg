@@ -565,6 +565,11 @@ the exact-transition variational VFE at the same Gaussian belief; dense
 one-dimensional quadrature measures this gap in
 `tests/test_recurrence_link.py`. D9 preserves the source/destination pair and
 uses it for categorical and Gaussian messages plus the pair-region entropy.
+An explicit destination tree can be stored and edited. Execution currently
+supports the ordered decision list. A fixed-parameter source bundle with
+another valid tree can be opened for inspection; scheduling and message
+updates for that tree depend on cff-lv65. Learning with other gate assignments
+also requires the ownership contract in cff-4c7t.
 On a compiler-classified acyclic ordinary categorical component, this is exact
 sum-product for the bounded transition tables. On a categorical loop, the
 same time-local rules are Bethe pseudomarginals and do not define one exact

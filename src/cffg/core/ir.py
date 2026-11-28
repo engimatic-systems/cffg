@@ -17,6 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from cffg.core.functions import FunctionSpec
+from cffg.core.recurrence_tree import RecurrenceTree
 from cffg.core.gaussian_agent import GaussianFilterSpec, GaussianPlanSpec
 
 
@@ -214,6 +215,24 @@ class FactorSpec:
     param_edges: dict[str, str] = field(default_factory=dict)  # role -> variable
     param_blobs: dict[str, str] = field(default_factory=dict)  # role -> blob name
     function: FunctionSpec | None = None
+    recurrence_tree: RecurrenceTree | None = None
+
+    def resolved_recurrence_tree(self, variables: dict[str, VariableSpec]) -> RecurrenceTree | None:
+        """Resolve the legacy decision list and validate its regime edge sizes."""
+        if self.type != "recurrence_link":
+            if self.recurrence_tree is not None:
+                raise ValueError(f"factor {self.name!r} does not accept a recurrence tree")
+            return None
+        source = variables.get(self.edges.get("in"))
+        dest = variables.get(self.edges.get("out"))
+        if source is None or dest is None or source.cardinality != dest.cardinality:
+            raise ValueError(f"factor {self.name!r}: recurrence tree requires equal categorical edge sizes")
+        tree = self.recurrence_tree
+        if tree is None:
+            return RecurrenceTree.decision_list(dest.cardinality)
+        if not isinstance(tree, RecurrenceTree) or tree.cardinality != dest.cardinality:
+            raise ValueError(f"factor {self.name!r}: recurrence tree disagrees with the edge cardinality")
+        return tree
 
     def all_edges(self) -> dict[str, str]:
         """All connected variables by role, structural and parameter alike."""

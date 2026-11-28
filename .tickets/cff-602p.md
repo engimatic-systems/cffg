@@ -1,6 +1,6 @@
 ---
 id: cff-602p
-status: open
+status: closed
 deps: [cff-4sor]
 links: [cff-cz6v]
 created: 2026-08-10T02:58:17Z
@@ -118,3 +118,19 @@ Intelligible-ticket review: complete.
 Classification-note additions: intended=the contextual meaning assignments in
 this note; all=the complete topology-field set; only=the decision-list
 execution scope before cff-lv65.
+
+**2026-11-28T05:38:28Z**
+
+Mathematics prerequisite cff-4sor has passed and closed on open #215. Base this change on #217 so schema 1.1 scoped plates and parameter-only Colony cache semantics can be exercised before review. New IR field change path: source validation, JSON/hash, typed composition, transactional edits, compact/expanded plates, compile admission, CFFGZ and checkpoint identity, estimator/admission paths. The only executable topology in this ticket is the same ordered decision list. Verify JSON/CFFGZ reconstruction, single/vmap and scheduled/flood equivalence with the old representation. Balanced and arbitrary trees are source objects; compile must reject them before allocating message state. Rank/zero support and dtype of numerical messages follow the existing rule, which is not changed here.
+
+**2026-11-28T05:47:43Z**
+
+The source format now records gate names, signed branches and integer destinations, including recurrence trees inside compact plates. Old decision lists migrate on load after their original content hash has been checked. Fixed custom trees can round-trip through CFFGZ. Executing a non-decision-list tree is owned by cff-lv65. The final source, bundle, parity and serialization selection passed all 35 cases. The adjacent checkpoint, import, composition and plate selection passed 69, with 5 opt-in cases deselected. The previous reader rejected schema 1.2 and the new edit tag explicitly. The full short suite is the remaining review gate.
+
+**2026-11-28T07:27:24Z**
+
+The full gate on a354676 passed 2,889 cases and found two stale serialized identity expectations for the recurrence chain and loop. Source schema 1.2 changes their hashes as specified. The original schema-1 document hashes remain pinned in an explicit migration test. Checking the complete reconstructed arenas, schedule kinds and prior schedule fingerprints on both versions passed. No runtime or codec bytes changed. Focused compiler contract, source, parity and bundle files passed all 71 tests in 15.71 s.
+
+**2026-11-28T13:49:04Z**
+
+Final source/identity gate passed all 2,893 required tests on 8e549c4. Pytest wall 411.70 s, canonical dashboard wall 412.484 s. Both legacy recurrence hashes and their new explicit source identities are checked; executable schedule fingerprints and full reconstructed arenas agree. Gate receipt path in /tmp/cffg-recurrence-source-second-gate-root. Combined compact-plate merge rehearsal is archived at ~/agent-share/plate-tree-integration-2feecc2-a354676. Fixed-weight execution of other topologies follows under cff-lv65.

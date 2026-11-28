@@ -59,6 +59,11 @@ def _check_factors(t: Template) -> list[str]:
         if ft is None:
             problems.append(f"factor {f.name!r}: unknown type {f.type!r}")
             continue
+        if f.recurrence_tree is not None:
+            try:
+                f.resolved_recurrence_tree(t.variables)
+            except ValueError as exc:
+                problems.append(str(exc))
         if ft.requires_function and not isinstance(f.function, FunctionSpec):
             problems.append(f"factor {f.name!r}: requires a portable mean FunctionSpec")
         if not ft.requires_function and f.function is not None:

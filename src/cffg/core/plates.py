@@ -31,7 +31,6 @@ from cffg.core.ir import (
     Broadcast,
     Chain,
     Expose,
-    FactorSpec,
     LearnableSpec,
     PlateSpec,
     PortRole,
@@ -137,13 +136,11 @@ def _scope_copy(
         s(v.name): dataclasses.replace(v, name=s(v.name)) for v in frag.variables.values()
     }
     factors = {
-        s(f.name): FactorSpec(
-            s(f.name),
-            f.type,
+        s(f.name): dataclasses.replace(
+            f, name=s(f.name),
             edges={r: s(v) for r, v in f.edges.items()},
             param_edges={r: s(v) for r, v in f.param_edges.items()},
             param_blobs={r: sb(b) for r, b in f.param_blobs.items()},
-            function=f.function,
         )
         for f in frag.factors.values()
     }
@@ -282,13 +279,11 @@ def _rename_variable(out: Template, old: str, new: str, proto: VariableSpec) -> 
     out.variables.pop(old, None)
     out.variables[new] = dataclasses.replace(proto, name=new)
     for fname, f in out.factors.items():
-        out.factors[fname] = FactorSpec(
-            f.name,
-            f.type,
+        out.factors[fname] = dataclasses.replace(
+            f,
             edges={r: new if v == old else v for r, v in f.edges.items()},
             param_edges={r: new if v == old else v for r, v in f.param_edges.items()},
             param_blobs=dict(f.param_blobs),
-            function=f.function,
         )
     out.constraints = [
         dataclasses.replace(c, target=new) if c.target == old else c for c in out.constraints

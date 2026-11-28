@@ -4,7 +4,8 @@ These small existing models pin structure before compiler extraction, not new
 mathematics. Literal addresses are paired with readable role/member assertions;
 hashes seal serialized identity and the schedule that consumes those addresses.
 Learning and agent fixture hashes include versioned learning semantics;
-their schedule fingerprints and execution layouts remain unchanged.
+their schedule fingerprints and execution layouts remain unchanged. Recurrence
+fixtures also pin the original document hash across the schema 1.2 migration.
 """
 
 from collections.abc import Mapping
@@ -48,7 +49,7 @@ from cffg.core import (
     Template,
     VariableSpec,
 )
-from cffg.core.serialize import from_json, structure_hash, to_dict, to_json
+from cffg.core.serialize import document_structure_hash, from_dict, from_json, structure_hash, to_dict, to_json
 from cffg.engine import Engine
 from cffg.models.kalman import lgssm
 from cffg.models.rollout import build_rollout
@@ -87,12 +88,12 @@ IDENTITIES = {
         "63d7530caf57d326c30f64e59a8416cc3e1a32d8de83fbb94d0043e27f700eb2",
     ),
     "recurrence": (
-        "2b34a6a06d116d335db9fd1926a737720eeeccf4deb97bfe23f7a575a0a539c6",
+        "574d952943d705a3c6e7735912041f19077820cd0af14f7ce6835ca166c89914",
         "mixed",
         "93fd9ef32ace50b1620c0058297c08d394145d3164a6fe1eca29b92d662efb99",
     ),
     "recurrence_loop": (
-        "e5f04735e7042fffb109a1cde7d139eda8e50aff2b90d3ed6a7e3611e24ff7c4",
+        "741be06f281d5fce976363f2724ae4f27b569ca1ff21ff11a38bd3ff80ce3c76",
         "mixed",
         "81d94a6ed87815a29eefea3bbeea645bec54cafc0381c0fef06cdce0f4710154",
     ),
@@ -245,6 +246,24 @@ def test_baseline_identity_and_complete_reconstructed_plans(name):
     assert_same(schedule, build_schedule(rebuilt))
     assert build_schedule(arena, "flood").kind == "flood"
     assert_same(arena, rebuilt)
+
+
+@pytest.mark.parametrize(("name", "raw_hash"), [
+    ("recurrence", "2b34a6a06d116d335db9fd1926a737720eeeccf4deb97bfe23f7a575a0a539c6"),
+    ("recurrence_loop", "e5f04735e7042fffb109a1cde7d139eda8e50aff2b90d3ed6a7e3611e24ff7c4"),
+])
+def test_migrated_recurrence_retains_baseline_execution(name, raw_hash):
+    template, arrays = model(name)
+    document = to_dict(template)
+    assert document["schema_version"] == "1.2"
+    document["schema_version"] = "1"
+    for factor in document["factors"].values():
+        if factor["type"] == "recurrence_link":
+            del factor["recurrence_tree"]
+    assert document_structure_hash(document) == raw_hash
+    restored = from_dict(document)
+    assert structure_hash(restored) == IDENTITIES[name][0] != raw_hash
+    assert_same(compile_template(restored, arrays=arrays), compile_template(template, arrays=arrays))
 
 
 @pytest.mark.parametrize("name", ["hmm", "gaussian", "ef", "mixture", "learning"])
