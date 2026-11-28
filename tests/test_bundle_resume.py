@@ -21,6 +21,7 @@ from cffg.learn import FAMILIES, Learnables
 from cffg.models.rslds_fit import vague_rslds_fit_priors
 
 from test_bundle import _write_zip, _zip_contents
+from test_component_niw_learning import component_model
 from test_gaussian_learnables import _learning_template
 from test_hybrid_learnables import _mixture_template
 from test_learning_schema import _categorical
@@ -134,7 +135,8 @@ def test_all_families_resume_identical_next_update(tmp_path, kind, dtype, cadenc
 
 
 def test_workflow_fixtures_cover_the_runtime_family_registry():
-    covered = set()
+    template, arrays, _ = component_model()
+    covered = {plan.family for plan in compile_template(template, arrays=arrays).learn_plans}
     for kind in ("rslds", "gaussian"):
         _, _, _, learning, _, _ = _fixture(kind, np.float64)
         covered.update(plan.family for plan in learning.plans.values())

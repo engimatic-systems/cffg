@@ -60,7 +60,7 @@ def test_rejected_trial_can_backtrack_to_a_root_from_the_last_valid_point():
     np.testing.assert_array_equal(recovered.coordinates, [1.5])
 
 
-@pytest.mark.parametrize("dtype,stress", [(np.float32, 1e20), (np.float64, 1e200)])
+@pytest.mark.parametrize("dtype,stress", [(np.float32, 1e20), pytest.param(np.float64, 1e200, marks=pytest.mark.slow)])
 def test_first_invalid_cubic_proposal_preserves_fallback_attempt_and_budget(
     monkeypatch, dtype, stress,
 ):
@@ -134,7 +134,8 @@ def test_small_budgets_skip_proposal_execution_and_remain_bounded():
         assert all(plan[2]._cache_size() == 0 for plan in engine._outer_kernel_cache.values())
 
 
-@pytest.mark.parametrize("dtype,dimension", [pytest.param(np.float64, 1, marks=pytest.mark.slow), (np.float32, 10)])
+@pytest.mark.slow
+@pytest.mark.parametrize("dtype,dimension", [(np.float64, 1), (np.float32, 10)])
 def test_generic_cubic_proposals_and_forced_trust_fallback_agree(monkeypatch, dtype, dimension):
     with jax.enable_x64(dtype is np.float64):
         template, arrays = model(dim=dimension)

@@ -660,20 +660,28 @@ class Engine:
             self.arena, state,
         )
 
-    def gaussian_node_stats(self, state: State) -> dict[str, dict[str, np.ndarray]]:
+    def gaussian_node_stats(
+        self, state: State, *, centered_mixtures: bool = False, centered: bool = False
+    ) -> dict[str, dict[str, np.ndarray]]:
         """Factor name -> expected sufficient statistics of the node belief
         (cff-7c5o, D4): the continuous analog of node_beliefs, feeding the
         NIW/MNIW conjugate updates in cffg.conj.
 
-        gaussian:            {"mean" E[x], "second" E[xxᵀ]}
+        gaussian:            {"mean" E[x], "second" E[xxᵀ]}, or mean and
+                             covariance with `centered=True`.
         gaussian_linear:     {"Syy" E[yyᵀ], "Syx" E[yx̃ᵀ], "Sxx" E[x̃x̃ᵀ]}
                              with x̃ = [x; 1] (offset column absorbed)
         gaussian_linear_obs: same keys with y fixed at the bound observation,
                              plus "mask" (0.0 = missing: skip the occurrence).
         gaussian_mixture_linear: soft ``responsibility`` plus responsibility-
                              weighted ``Syy``, ``Syx``, and ``Sxx``.
+        Linear factors with ``centered=True`` give a joint (out, in) mean,
+        cov_xx, and (when out is latent) cov_yy and cov_yx. Mixtures keep
+        the component axis and return unweighted conditional moments.
         gaussian_mixture: soft ``responsibility``, ``weighted_mean``, and
-                             ``weighted_second``.
+                             ``weighted_second``. With ``centered_mixtures=True``
+                             return unweighted ``component_mean`` and
+                             ``component_covariance`` alongside responsibility.
         recurrence_link: normalized source/destination pair, its marginals and
                              literal support, plus shared D9 masses and direct
                              continuous drive moments.
@@ -682,6 +690,7 @@ class Engine:
         equality nodes are skipped."""
         return _gaussian_readouts.gaussian_node_stats(
             self.arena, state, pair_beliefs=self.recurrence_pair_beliefs,
+            centered_mixtures=centered_mixtures, centered=centered,
         )
 
     def recurrence_weight_stats(

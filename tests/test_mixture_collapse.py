@@ -12,7 +12,7 @@ from cffg.compiled import NEG
 
 
 @pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
-@pytest.mark.parametrize("components,dimension", [(2, 3), (32, 30)])
+@pytest.mark.parametrize("components,dimension", [pytest.param(2, 3, marks=pytest.mark.slow), (32, 30)])
 def test_checked_collapse_matches_independent_multidimensional_moments(dtype, components, dimension):
     rng = np.random.default_rng(11)
     mean = rng.normal(size=(components, dimension)).astype(dtype)
@@ -152,7 +152,7 @@ def test_inactive_rank_deficient_backward_component_does_not_erase_active_inform
     np.testing.assert_allclose(precision, .5, rtol=1e-12)
 
 
-@pytest.mark.parametrize("schedule", ["auto", "flood"])
+@pytest.mark.parametrize("schedule", ["auto", pytest.param("flood", marks=pytest.mark.slow)])
 def test_actual_failed_factor_has_public_attribution(schedule):
     with jax.enable_x64(False):
         template, arrays = mixlin_template()

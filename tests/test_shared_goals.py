@@ -103,7 +103,7 @@ def test_equal_prior_values_do_not_tie_different_blob_names():
 
 
 @pytest.mark.parametrize("schedule", [pytest.param("flood", marks=pytest.mark.slow), "auto"])
-@pytest.mark.parametrize("solver", ["picard", "trust_region"])
+@pytest.mark.parametrize("solver", [pytest.param("picard", marks=pytest.mark.slow), "trust_region"])
 def test_mixed_goal_convergence_and_rollover(schedule, solver):
     template, arrays = mixed_goals()
     engine = Engine(compile_template(template, arrays=arrays), schedule=schedule)

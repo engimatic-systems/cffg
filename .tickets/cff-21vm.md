@@ -2,7 +2,7 @@
 id: cff-21vm
 status: open
 deps: []
-links: []
+links: [car-ne0a, cff-pyy9]
 created: 2026-09-25T03:46:26Z
 type: feature
 priority: 2

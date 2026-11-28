@@ -54,7 +54,7 @@ class NIWFamily:
     """Normal-inverse-Wishart learning for a Gaussian prior factor."""
 
     name = "niw"
-    readout = "gaussian_node_stats"
+    readout = "centered_gaussian_stats"
     _PARAMS = {"mu", "kappa", "psi", "nu"}
     semantic_identity = LEARNING_IDENTITIES["niw"]
     parameter_forms = ("expected",)
@@ -89,34 +89,20 @@ class NIWFamily:
 
     def stats(self, ftype, readout) -> dict[str, np.ndarray]:
         _proper(readout, ftype)
-        return {
-            "mean": _finite_stat(readout, "mean", ftype),
-            "second": _finite_stat(readout, "second", ftype),
-        }
+        spread = "covariance" if "covariance" in readout else "second"
+        return {"mean": _finite_stat(readout, "mean", ftype),
+                spread: _finite_stat(readout, spread, ftype)}
 
     def pool(self, records) -> dict[str, np.ndarray]:
-        return {
-            "mean": np.stack([record["mean"] for record in records]),
-            "second": np.stack([record["second"] for record in records]),
-        }
+        return {key: np.stack([row[key] for row in records]) for key in records[0]}
 
     def fold(self, params, stats) -> dict[str, np.ndarray]:
         prior = self._posterior("posterior", params)
         means = np.asarray(stats["mean"])
-        seconds = np.asarray(stats["second"])
-        if means.ndim != 2 or means.shape[1:] != prior.mu.shape:
-            raise ValueError(
-                f"NIW mean statistics must have shape [n,{prior.mu.shape[0]}], "
-                f"got {means.shape}"
-            )
-        if seconds.shape != (means.shape[0], *prior.psi.shape):
-            raise ValueError(
-                f"NIW second statistics shape {seconds.shape} != "
-                f"{(means.shape[0], *prior.psi.shape)}"
-            )
-        if not np.all(np.isfinite(means)) or not np.all(np.isfinite(seconds)):
-            raise ValueError("NIW statistics must be finite")
-        return self.as_params(prior.update(means, seconds))
+        if "second" in stats:
+            return self.as_params(prior.update(means, stats["second"]))
+        posterior = prior.update_centered(means, stats["covariance"], np.ones(len(means)))
+        return self.as_params(posterior)
 
     def rollover(self, params, ftype) -> dict[str, np.ndarray]:
         mean, cov = self._posterior("posterior", params).rollover()
@@ -165,11 +151,31 @@ class NIWFamily:
         )
 
 
+def _regression_record(readout, weights):
+    mean = np.asarray(readout["mean"])
+    cov_xx = np.asarray(readout["cov_xx"])
+    dx = cov_xx.shape[-1]
+    dy = mean.shape[-1] - dx
+    shape = mean.shape[:-1]
+    if dy < 1 or cov_xx.shape != (*shape, dx, dx) or np.shape(weights) != shape:
+        raise ValueError("incompatible centered regression statistic shapes")
+    joint = np.zeros((*shape, dy + dx, dy + dx), dtype=cov_xx.dtype)
+    joint[..., dy:, dy:] = cov_xx
+    if "mask" not in readout:
+        yy, yx = np.asarray(readout["cov_yy"]), np.asarray(readout["cov_yx"])
+        if yy.shape != (*shape, dy, dy) or yx.shape != (*shape, dy, dx):
+            raise ValueError("incompatible centered regression statistic shapes")
+        joint[..., :dy, :dy] = yy
+        joint[..., :dy, dy:] = yx
+        joint[..., dy:, :dy] = yx.swapaxes(-1, -2)
+    return {"mean": mean, "covariance": joint, "weight": weights}
+
+
 class MNIWFamily:
     """Matrix-normal-inverse-Wishart learning for Gaussian-linear factors."""
 
     name = "mniw"
-    readout = "gaussian_node_stats"
+    readout = "centered_gaussian_stats"
     _PARAMS = {"m", "lam", "psi", "nu"}
     semantic_identity = LEARNING_IDENTITIES["mniw"]
     parameter_forms = ("expected",)
@@ -215,6 +221,10 @@ class MNIWFamily:
         mask = np.asarray(readout.get("mask", 1.0))
         if mask.shape != () or not np.isfinite(mask) or float(mask) not in (0.0, 1.0):
             raise ValueError(f"{ftype} statistic mask must be scalar zero or one")
+        if "cov_xx" in readout:
+            if mask:
+                _proper(readout, ftype)
+            return _regression_record(readout, mask)
         if float(mask) == 0.0:
             return {
                 "Syy": np.zeros_like(np.asarray(readout["Syy"])),
@@ -231,6 +241,8 @@ class MNIWFamily:
         }
 
     def pool(self, records) -> dict[str, np.ndarray]:
+        if "covariance" in records[0]:
+            return {key: np.stack([r[key] for r in records]) for key in records[0]}
         return {
             key: np.sum(np.stack([record[key] for record in records]), axis=0)
             for key in ("Syy", "Syx", "Sxx", "n")
@@ -238,6 +250,8 @@ class MNIWFamily:
 
     def fold(self, params, stats) -> dict[str, np.ndarray]:
         prior = self._posterior("posterior", params)
+        if "covariance" in stats:
+            return self.as_params(prior.update_centered(stats["mean"], stats["covariance"], stats["weight"]))
         syy = np.asarray(stats["Syy"])
         syx = np.asarray(stats["Syx"])
         sxx = np.asarray(stats["Sxx"])

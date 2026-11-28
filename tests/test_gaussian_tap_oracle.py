@@ -68,8 +68,10 @@ def fixture(steps, dtype):
     return template, {key: value.astype(dtype) for key, value in arrays.items()}
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
-@pytest.mark.parametrize("schedule", ["two_pass", "flood"])
+@pytest.mark.parametrize("schedule,dtype", [
+    ("two_pass", np.float32), pytest.param("two_pass", np.float64, marks=pytest.mark.slow),
+    pytest.param("flood", np.float32, marks=pytest.mark.slow), ("flood", np.float64),
+])
 def test_adjacent_taps_match_joint_density_after_rebinding(tmp_path, dtype, schedule):
     template, arrays = fixture(2, dtype)
     joint = dense_joint(2, arrays)

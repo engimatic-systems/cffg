@@ -121,7 +121,7 @@ def record_compiled_batches(monkeypatch):
     return batches
 
 
-@pytest.mark.parametrize("budget", [1, 20])
+@pytest.mark.parametrize("budget", [1, pytest.param(20, marks=pytest.mark.slow)])
 def test_iterative_colony_results_match_distinct_standalone_instances(
     budget, monkeypatch
 ):

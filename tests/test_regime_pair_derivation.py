@@ -345,7 +345,7 @@ def test_vacuous_cavity_requires_a_proper_tilt_and_budget_is_not_convergence():
     assert result.status == "budget_exhausted"
 
 
-@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+@pytest.mark.parametrize("dtype", (np.float32, pytest.param(np.float64, marks=pytest.mark.slow)))
 def test_horizon_100_and_multivariate_regimes_use_only_local_arrays(dtype):
     time, card = 100, 8
     unary = np.zeros((time, card), dtype=dtype)

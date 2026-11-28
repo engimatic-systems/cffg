@@ -49,7 +49,7 @@ def test_forward_vacuous_propagates():
     assert np.abs(lam).max() < 1e-6 and np.abs(eta).max() < 1e-6
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_forward_vacuous_is_scale_and_coordinate_invariant(dtype):
     """Regression cff-3hgi: no absolute ridge may manufacture precision.
 
@@ -215,7 +215,7 @@ def test_invalid_factor_precision_cannot_produce_finite_energy():
     assert np.isposinf(np.asarray(observed)).all()
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_mixed_scale_d100_readout_survives(dtype):
     """Hostile scale/dimension contract: d>=100 remains proper and finite."""
     d = 100
@@ -253,7 +253,7 @@ def test_backward_rounded_rank_one_likelihood_preserves_observed_direction(dtype
     assert eta.dtype == lam.dtype == dtype
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_partial_information_from_weak_to_nearly_noiseless(dtype):
     h = np.ones(2, dtype=dtype)
     w = np.array([[4., -.5], [-.5, 1.]], dtype=dtype)
@@ -278,7 +278,7 @@ def test_partial_information_from_weak_to_nearly_noiseless(dtype):
             np.testing.assert_allclose(eta[i], direction * target / variance, rtol=64 * eps, atol=0.)
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_rectangular_prediction_with_partial_information(dtype):
     # One free input coordinate and one noisy measurement of the other.
     h = np.array([1., -1.], dtype=dtype)

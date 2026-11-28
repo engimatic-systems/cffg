@@ -49,7 +49,7 @@ def test_example_has_a_documented_standalone_public_entrypoint(filename):
     ("filename", "expected"),
     [
         pytest.param(*item, marks=pytest.mark.slow)
-        if item[0] in {"cstr_planning.py", "discrete_rollout.py", "linear_gaussian.py", "nonlinear_gaussian.py", "hybrid_rslds.py"}
+        if item[0] in {"hard_constraint.py", "learning_bundle.py", "cstr_planning.py", "discrete_rollout.py", "linear_gaussian.py", "nonlinear_gaussian.py", "hybrid_rslds.py"}
         else item
         for item in EXPECTED_OUTPUT.items()
         if item[0] != "discrete_agent.py"

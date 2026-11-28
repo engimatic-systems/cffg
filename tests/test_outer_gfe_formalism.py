@@ -165,6 +165,7 @@ def test_matrix_free_trust_kernel_has_single_and_vmap_parity():
     )
 
 
+@pytest.mark.slow
 def test_benign_candidate_path_keeps_the_full_root_certificate():
     template, arrays = build_tmaze()
     engine = Engine(compile_template(template, arrays=arrays))

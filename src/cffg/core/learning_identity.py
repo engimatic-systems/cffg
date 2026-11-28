@@ -11,6 +11,7 @@ from types import MappingProxyType
 LEARNING_IDENTITIES = MappingProxyType({
     "dirichlet": "cffg.learning.dirichlet/1.0.0",
     "niw": "cffg.learning.niw/1.0.0",
+    "component_niw": "cffg.learning.component-niw/1.0.0",
     "mniw": "cffg.learning.mniw/1.0.0",
     "component_mniw": "cffg.learning.component-mniw/1.0.0",
     "pg_weights": "cffg.recurrence.d9-structured-pair/1.0.0",

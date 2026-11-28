@@ -519,6 +519,72 @@ edge (its message is a proper constant).
 here; with point observations it vanishes into the scatter term.)
 Rollover: mean μn, precision E[W] = νn Ψn⁻¹.
 
+For fractional responsibilities `w_t`, let `n = Σ w_t`, `m` be the
+weighted mean of the conditional means `m_t`, and `C_t` their conditional
+covariances. Grouping the preceding sums about `m` gives
+
+    κn = κ0 + n,  νn = ν0 + n,  μn = μ0 + (n/κn)(m − μ0),
+    Ψn = Ψ0 + Σ w_t [C_t + (m_t − m)(m_t − m)ᵀ]
+            + κ0 (n/κn)(m − μ0)(m − μ0)ᵀ.
+
+Each term adds the spread inside one observation or the separation of two
+means. Translating all means leaves these terms unchanged. At zero mass the
+posterior equals the prior. `NIW.update_centered` consumes this representation.
+`tests/test_conj.py` exercises the update and `tests/test_hybrid_readouts.py`
+checks the source of the component covariances.
+
+**Shared assignments for mixed observations.** For component `k`, let `m`,
+`κ`, `Ψ`, and `ν` be its NIW parameters and let `a_h` be the Dirichlet
+concentrations of categorical field `h`. A continuous observation with mean
+`x` and covariance `V` contributes the following expected log likelihood in
+dimension `d`, with ψ denoting the digamma function:
+
+    E log |Λ| = Σ_i ψ((ν+1−i)/2) + d log 2 − log |Ψ|,  i = 1,…,d
+    L_G = (E log |Λ| − d log(2π) − d/κ
+           − ν [(x−m)ᵀ Ψ⁻¹ (x−m) + tr(Ψ⁻¹ V)]) / 2.
+
+An observed category `c` adds `ψ(a_h[c]) − ψ(Σ a_h)`. Missing fields
+contribute zero. Softmax the sum over active components, optionally adding
+the expected log mixing probability before softmax. Keep the observed score
+itself available for a caller that tests absolute fit. The same assignment
+then weights each observed field. Each informative record adds its
+responsibility once to the mixing count, regardless of the number of fields.
+The update above receives the Gaussian mass; each present categorical head
+adds a weighted one-hot vector. This is an additive posterior update for
+fixed responsibilities. Recomputing the responsibilities after an individual
+record can change later assignments. The small independent score and
+posterior oracles are in `tests/test_mixed_scoring.py` and
+`tests/test_mixed_learning.py`.
+
+**Frame-local appearance regression.** Pixels partly assigned to the same
+slot share an uncertain input position. Each pixel channel has a separate
+noise precision. For a channel with coefficients distributed as
+`N(m, inv(P)/tau)` and `tau ~ Gamma(a,b)` (shape and rate), take input
+mean `x`, covariance `C`, and `S = C + x xᵀ`. Its expected log likelihood
+is half of `digamma(a) - log(2πb) - (a/b)((y-mx)² + m C mᵀ) - tr(inv(P) S)`.
+Let `h` be the sum of this slot's pixel weights. The new precision is
+`P' = P + h S`, and the weighted normal equations give the posterior
+coefficient mean `m'`. Add `h/2` to the shape. The rate increment is half
+the sum of the weighted squared residuals at `m'`, the input-noise term
+`h m' C m'ᵀ`, and the prior penalty `(m'-m) P (m'-m)ᵀ`. Every term is a
+squared distance. Computing them this way preserves small within-frame
+spread around large predictions. A bias uses a constant input with zero
+variance. `tests/test_frame_regression.py` checks these equations against
+augmented least squares and exact second-order integration.
+
+The reverse update infers the spatial input from the assigned pixels.
+With an augmented design consisting of position and a final constant,
+write `G = O inv(P) + Mᵀ diag(a/b) M` where O is the number of output
+channels. Let `u` denote the spatial indices and `c` the bias. Start from
+the same frame prior precision and linear parameter on each sweep. A
+weighted pixel contributes `w G_uu` to precision and
+`w (M_uᵀ diag(a/b) y − G_uc)` to the linear parameter. The AXIOM spatial model adds the rank-one precision
+`1e-8 × ones` once per position update, with zero linear parameter. An unused slot
+retains its previous position in the spatial coordinate loop. An
+independent evaluation of the quadratic log joint checks both coordinates
+in `tests/test_axiom_spatial.py`.
+
+
 **MNIW update** (gaussian_linear node, x̃ = [x; 1], prior (M0 [dy,di+1],
 Λ0 [di+1,di+1] column precision, Ψ0, ν0), per-trial stats Syy = E[yyᵀ],
 Syx̃ = E[yx̃ᵀ], Sx̃x̃ = E[x̃x̃ᵀ], summed over the trial's node occurrences,
@@ -530,6 +596,24 @@ n = total occurrences):
 Rollover: [Ā b̄] = Mn, E[W] = νn Ψn⁻¹. Ψn ≻ 0 is guaranteed in exact
 arithmetic (Schur complement of a PSD block matrix); the implementation
 asserts it rather than ridging — a violation means broken stats, not noise.
+
+The declared regression learner evaluates the same update from a conditional
+mean and covariance for the joint vector (y, x). Factor each covariance as
+`F Fᵀ` and multiply its columns and its mean row by the square root of the
+occurrence weight. The design matrix D stacks the input deviations with a
+zero intercept column and the mean inputs with a unit intercept. The paired
+output rows minus the predictions of M0 form E. Include a row block
+`chol(Λ0)ᵀ` in D with zero paired residual. Thin QR solves the least-squares
+problem `D T ≈ E`. Its normal equations give the same Mn above. Completing
+the square gives
+
+    Mn = M0 + Tᵀ,  Λn = Dᵀ D,  Ψn = Ψ0 + (E − D T)ᵀ (E − D T).
+
+In ordinary terms, the scale adds the squared spread left after predicting
+the output. Paired deviations retain input-output correlation, including when
+the joint covariance is singular. A fixed observed output has zero deviation.
+`test_centered_mniw_correlated_rows_match_independent_raw_oracle` checks
+this expression against direct integration on a translated example.
 
 **Gamma precision update** (gaussian_prec nodes sharing a τ edge):
 αn = α0 + n/2, βn = β0 + Σ s_t / 2 — but note this one usually needs no

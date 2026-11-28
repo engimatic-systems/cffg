@@ -38,6 +38,7 @@ def run_engine(ys):
     return engine, state
 
 
+@pytest.mark.slow
 def test_smoothed_marginals_match_rts():
     engine, state = run_engine(YS)
     means, covs, _ = kalman_smoother(YS, F, Q, H, R, M0, P0)
@@ -68,6 +69,7 @@ def test_missing_observation():
     np.testing.assert_allclose(engine.bfe(state), -loglik, atol=1e-7)
 
 
+@pytest.mark.slow
 def test_predictive_readout_on_observed_edge():
     # The observed edge's exterior marginal is the *cavity* predictive: the
     # forward message excludes y0's own likelihood (BP semantics), i.e. the

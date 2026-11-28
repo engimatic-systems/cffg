@@ -12,6 +12,7 @@ from __future__ import annotations
 from cffg.core.constraint_details import p_substitution_conflicts
 from cffg.core.moment_matching import moment_matching_problems
 from cffg.core.functions import FunctionSpec
+from cffg.core import gaussian_agent
 from cffg.core.ir import (
     EDGE_CONSTRAINTS,
     EF_EDGE_FAMILIES,
@@ -306,6 +307,8 @@ def _check_agent(t: Template) -> list[str]:
         return []
 
     spec = t.agent
+    if isinstance(spec, (gaussian_agent.GaussianPlanSpec, gaussian_agent.GaussianFilterSpec)):
+        return gaussian_agent.validate_window(t, spec)
     problems: list[str] = []
     action = t.variables.get(spec.action)
     if action is None:
