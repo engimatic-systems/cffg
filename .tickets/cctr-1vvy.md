@@ -27,3 +27,7 @@ Check both hazard endpoints, unvisited and singleton columns, missing and fracti
 **2026-11-28T06:39:29Z**
 
 Runtime numerical or status invariant. Arithmetic is deterministic with no solver iterations. Freeze tests before integration: ordered and fractional oracle traces at unit scale compare with 128 dtype eps absolute/relative, repeated projections with 512 eps. Compare the stationary endpoints directly in the input dtype. Extend to rare allowed outcomes, structural zeros, one active entry and saturated concentration totals without inferring support from tiny positive values. No FE or planner score changes in this child.
+
+**2026-11-28T06:42:48Z**
+
+Initial independent float64 saturation comparison failed: at a shape 12 and c=0.1 the available JAX betaln differed from SciPy by about 2.6e-8 even in double. Replaced that attempted ratio with a rearranged Stirling log-Gamma difference for large concentration and exact one/zero-count shortcuts. Independent integration of digamma across the increment checks large-argument differences. Four true f32/f64 eager/JIT/vmapped tests now pass, including 80x6 concentrations above 100,000. Both branch masses and the between-branch variance enter the bounded projection.
