@@ -619,8 +619,9 @@ but neither guarantees monotone progress on every loopy hybrid graph.
 D18 derives a separate destination-softmax bound for factorized source
 and destination beliefs. In its 32-label replicated example, the source
 probability is 0.000335 under the quadratic bound and 0.40744 under the
-quadrature reference. Qualification of a replication-invariant alternative
-is tracked in cds-1t47. The shipped recurrence uses stick-breaking gates.
+quadrature reference. D18.6’s shifted Jensen bound gives 0.37754 for
+2, 4 and 32 replicated labels. At four times the drive amplitude it gives
+0.000335 against the exact 0.07050. Both are research bounds. The shipped recurrence uses stick-breaking gates.
 
 All declared-learning families supply versioned persistent-state
 descriptors. The generic checkpoint inventory describes immutable priors and
