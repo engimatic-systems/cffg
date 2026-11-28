@@ -1,6 +1,6 @@
 ---
 id: cao-lxmq
-status: in_progress
+status: closed
 deps: [cao-36dd, car-ne0a, cao-fs5s, cff-wdhj]
 links: []
 created: 2026-11-24T06:03:43Z
@@ -51,3 +51,7 @@ Begin from #223 and the committed evaluation actor/codec from #204. The Learnabl
 **2026-11-28T06:32:22Z**
 
 Rechecked original pilot provenance and both native archives before promotion. The real reset image from development/Explode/base.npz matches the pilot hash. Tick 9500 has 339 live interaction rows of 5,000 and 1,275,968 bytes. Tick 10000 has 344 live rows and 1,334,882 bytes. Both content digests and trace prefixes recompute, and the final file and state digest agree with the published result. Original evidence is read-only. The installed AxiomAgent reuses the existing planner and reducer. Six focused legacy and public checks passed in 84.54 s, including fresh interpreters crossing a real 2,000-record reduction at action 500, compact agreement with the independent lifecycle codec, and rollback on malformed state. After binding the global JAX precision flag in the header the schema check passed again. The four relocated implementation modules imported from the built wheel.
+
+**2026-11-28T14:18:48Z**
+
+Both 5,000-slot pilot checkpoints passed a fresh-process 3-format comparison on 608c1fa. The public exact reader reproduced every state byte. At tick 9,500 it also matched the original complete plan/key digest and recorded next action 2. Compact selected the same command with a different digest after omitting 7,838 nonzero low words. The completed snapshot has 8,004 nonzero low words omitted in compact. The six balanced warm orders yielded the following original/public exact/compact medians: at 9,500 actions write 217.4/154.7/121.4 ms and restore 94.9/87.4/79.7 ms; at 10,000 write 211.3/152.5/119.0 ms and restore 91.7/83.9/76.3 ms. Public exact files used 1,227,185 and 1,286,098 bytes, compact used 1,183,171 and 1,241,637. The public exact write-time change passed the 10% disclosure threshold favorably, with paired reductions of 28.28% and 27.59% against original exact. Restore reductions were 8.63% and 9.21%, and file size reductions were 3.82% and 3.65%. These results went to Cooper before closure. Existing evaluation defaults still write exact v1. The raw receipt is ~/agent-share/cffg-backlog-gates/cao-lxmq/608c1fa.json (SHA-256 2a1f67f5aa16e3ec671dbb5a56900bb5fee14f9defc64dfa9d50253264707534). No simulator stepped or new game data was generated. Final dashboard at 608c1fa passed all 2,846 selected tests on four workers in 458.917 seconds.

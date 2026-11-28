@@ -891,6 +891,14 @@ compensated arithmetic. Subsequent beliefs, threshold decisions and sampled
 policies can diverge after rounding. Both modes preserve the pending action,
 planner and reduction keys, row identities and accumulated reduction records.
 
+At action 9,500 of the retained Explode pilot, the interaction bank had 339
+live rows out of 5,000. Original exact, public exact and public compact files
+used 1,275,968, 1,227,185 and 1,183,171 bytes. Across six balanced warm
+comparisons on one CPU, median restore times were 94.9, 87.4 and 79.7 ms.
+Public exact reproduced the full sampled plan and its next key. Compact
+selected the same recorded action while changing the plan digest. The
+`tools/axiom/checkpoint_cost.py` probe checks both retained pilot snapshots.
+
 ## Batch, extend, render, and estimate
 
 `cffg.colony.Colony` caches one engine per structure hash and vmaps matching
