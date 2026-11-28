@@ -11,7 +11,7 @@ from cffg.core.ir import EDGE_CONSTRAINTS, AgentSpec, GaussianFilterSpec, Gaussi
 from cffg.core.equality_tree import equality_wiring
 from cffg.core.plate_grid import PlateGrid
 from cffg.core.plates import _owner_template, _prefix, _prepared_plates, _scoped_blob_refs, _scoped_learnables
-from cffg.topology import BoundConstraint, ExteriorPort, FactorDeclaration, TopologyLayout, layout_addresses
+from cffg.topology import BoundConstraint, ExteriorPort, FactorDeclaration, TopologyLayout, layout_addresses, validate_slot_addresses
 
 
 @dataclass(frozen=True)
@@ -192,6 +192,7 @@ def lower_plates(template):
     topology = layout_addresses(
         wiring.domains, wiring.factors, tuple(wiring.constraints), wiring.ports, use_edge_domains=True,
     )
+    validate_slot_addresses(topology)
     inputs = PlateInputs(template.name, topology, wiring.blobs, wiring.learnables, template.agent)
     validate(inputs)
     from cffg.kernels import needs_source_template

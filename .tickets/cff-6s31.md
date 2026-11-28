@@ -1,7 +1,7 @@
 ---
 id: cff-6s31
 status: open
-deps: [cff-cpxj, cff-d56d, cff-j7mm, ccpr-m0bu, ccpr-u190]
+deps: [cff-cpxj, cff-d56d, cff-j7mm, ccpr-m0bu, ccpr-u190, cpsa-kghq]
 links: [cff-9xmq]
 created: 2026-07-09T22:04:18Z
 type: feature
