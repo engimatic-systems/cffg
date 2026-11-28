@@ -1296,7 +1296,7 @@ boundaries, precision/settings timing, atomic binding and epoch failure forwardi
 
 `execution/registered.py` owns the typed local-update boundary for registered
 discrete, Gaussian and exponential-family plans. Flooding, batch stages,
-registerized scans and fallback scans all use these owners, including the
+generic registerized scans and fallback scans use these owners, including the
 exponential-family equality and observed-message calls. Inputs are local
 blocks and selected numeric parameters/observations, never a whole arena or
 Engine. Transport retains its existing gather, prefetched carry and scatter.
@@ -1401,6 +1401,14 @@ trusted host handles, never serialized model or runtime-State data.
 
 `execution/transport.py` supplies shared shape-local gathers and scatters.
 `execution/scans.py` owns registerized and flat scan execution.
+`execution/hmm_scan.py` specializes sum-product stages with one shipped square
+matrix group (transition plus DATA emission) and one ternary equality per slice.
+It verifies both stage order and the source, role, column and delay of every
+input. The recurrence calls the same role-wise matrix reductions and categorical
+normalization as ordinary BP. It carries one state vector and writes seven
+directed vectors per slice. Failures retain the first step, then the first
+element and its lowest failing factor rank. Explicitly supplied executors,
+replacement kernels and unsupported wiring use the generic scans.
 Registerized scans still prefetch inputs, carry only cross-step local blocks
 plus three scalar integer failure fields,
 and scatter once after the scan; flat scans remain the fallback. EF parameter

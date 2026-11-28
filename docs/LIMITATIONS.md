@@ -733,9 +733,8 @@ reference smoother through T=256 (kernel 9-13x; flooding was
 1,400-6,500x) — the reference denominator is 14-40 µs, so a few µs of
 run-to-run jitter swings that ratio several x; ordinary K=8 chains at
 7-8x; LGSSM d=4/m=2 at 15-18x (kernel 13-17x). That straddles the
-ticket's 20x envelope with no margin; per the operator's 2026-07-27 call
-the remaining performance gap is deferred (cff-yl0a is the lever), and
-correctness/scheduling work proceeds independently. The earlier recorded
+original 20x envelope with little margin. These July measurements used
+the generic scheduled executor. The earlier recorded
 minimal-output reference (0.0171-0.0198 ms at T=256) projected only the
 requested smoother output inside JIT (and supplied precomputed HMM
 likelihoods), allowing XLA to eliminate the rest of the posterior work; it
@@ -745,8 +744,18 @@ the exact certificate is elementwise,
 `max(|new-old| / (1+|old|)) <= 64 eps`, so neither graph depth nor an
 unrelated large-magnitude block can widen it. Gaussian readouts now group
 same-dimension edges and allow a named subset. Quoted inference timings
-above retain their original output contracts. Slice-fused composite kernels
-(cff-yl0a) remain a possible improvement to the inference step.
+above retain their original output contracts. The HMM slice lowering covers
+one square transition and emission of the same cardinality with a ternary
+equality in the recognized port order. Rectangular emissions, max-product,
+other phase groupings, and Gaussian chains use the generic schedule.
+On the M2 Max CPU in x64, the T=256, K=2 fused kernel took 0.263 ms
+for all 4,100 message values, compared with 0.705 ms for the generic
+kernel. The strict smoother took 0.0186 ms and the full-posterior smoother
+0.0454 ms. The public CFFG solve including certification took 0.592 ms.
+These are medians of 40 synchronized calls after 20 warmups.
+
+Run `uv run --group bench python tools/benchmark_hmm_scan.py --output FILE`
+to compare both propagation kernels and the two live Dynamax references.
 
 **S2. Importance-sampling noise in parameter messages.** The message to A is a
 non-conjugate log-message evaluated by importance sampling; variance grows with

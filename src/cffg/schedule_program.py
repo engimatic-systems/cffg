@@ -348,7 +348,8 @@ def make_exact_unit(
 
 
 def make_propagate(
-    arena: Arena, stages: tuple, executors: ScheduledExecutors = SCHEDULED_EXECUTORS
+    arena: Arena, stages: tuple, executors: ScheduledExecutors = SCHEDULED_EXECUTORS, *,
+    fuse_hmm: bool = True,
 ):
     """Compile a stage list into one jittable propagation function.
 
@@ -361,7 +362,7 @@ def make_propagate(
     stage_fns = [
         _batch_stage_fn(arena, s, op, executors)
         if isinstance(s, BatchStage)
-        else _scan_stage_fn(arena, s, op, executors)
+        else _scan_stage_fn(arena, s, op, executors, fuse_hmm=fuse_hmm)
         for s in stages
     ]
 
@@ -379,4 +380,5 @@ def make_propagate(
     propagate.scan_registerized = tuple(
         fn.registerized for fn in stage_fns if hasattr(fn, "registerized")
     )
+    propagate.hmm_fused = tuple(fn.hmm_fused for fn in stage_fns if hasattr(fn, "hmm_fused"))
     return propagate

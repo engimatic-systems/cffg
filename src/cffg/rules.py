@@ -46,11 +46,19 @@ def bp_categorical(inc, logf, cards, k_max, op=logsumexp):
     return _norm_pad(logf, k, k_max)[:, None, :]
 
 
+def matrix_to_out(logf, incoming, op=logsumexp):
+    return op(logf + incoming[..., None, :], axis=-1)
+
+
+def matrix_to_in(logf, incoming, op=logsumexp):
+    return op(logf + incoming[..., :, None], axis=-2)
+
+
 def bp_matrix_cat(inc, logf, cards, k_max, op=logsumexp):
     ko, ki = cards
     m_out, m_in = inc[:, 0, :ko], inc[:, 1, :ki]
-    to_out = op(logf + m_in[:, None, :], axis=2)
-    to_in = op(logf + m_out[:, :, None], axis=1)
+    to_out = matrix_to_out(logf, m_in, op)
+    to_in = matrix_to_in(logf, m_out, op)
     return jnp.stack([_norm_pad(to_out, ko, k_max), _norm_pad(to_in, ki, k_max)], axis=1)
 
 
