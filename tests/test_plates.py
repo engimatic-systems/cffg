@@ -698,3 +698,23 @@ def test_broadcast_compiles_784_leaves_at_domain_size_32(domain):
     groups = (*arena.groups, *arena.gauss_groups)
     assert sum(name.startswith("p/_bcast/hub/eq") for group in groups for name in group.members) == 783
     assert len([name for name in arena.edges if name.startswith("p/_bcast/hub/link")]) == 782
+
+
+@pytest.mark.parametrize(("rule", "size", "kept", "copy"), [
+    (Broadcast("head", "hub"), 1, "p/hub", 0),
+    (Chain("tail", "head"), 2, "p/0/z_out", 1),
+])
+def test_variable_alias_preserves_same_named_factor_constraint(hmm_slice, rule, size, kept, copy):
+    from dataclasses import replace
+    from cffg.core import ConstraintKind, ConstraintSpec
+
+    hmm_slice.factors["z_in"] = replace(hmm_slice.factors.pop("trans"), name="z_in")
+    hmm_slice.constraints = [
+        ConstraintSpec(ConstraintKind.MEAN_FIELD, "z_in"),
+        ConstraintSpec(ConstraintKind.DELTA, "z_in"),
+    ]
+    model = Template("aliases", plates={"p": PlateSpec(hmm_slice, (size,), (rule,))})
+    flat = expand_plates(model)
+    validate(flat)
+    assert ConstraintSpec(ConstraintKind.MEAN_FIELD, f"p/{copy}/z_in") in flat.constraints
+    assert ConstraintSpec(ConstraintKind.DELTA, kept) in flat.constraints

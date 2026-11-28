@@ -17,6 +17,7 @@ from copy import deepcopy
 
 from cffg.core import gaussian_agent
 from cffg.core.ir import (
+    EDGE_CONSTRAINTS,
     AgentSpec,
     BeliefBinding,
     BlobRef,
@@ -212,7 +213,7 @@ def bond(t: Template, port_a: str, port_b: str) -> Template:
             function=f.function,
         )
     t.constraints = [
-        dataclasses.replace(c, target=va.name) if c.target == vb.name else c
+        dataclasses.replace(c, target=va.name) if c.kind in EDGE_CONSTRAINTS and c.target == vb.name else c
         for c in t.constraints
     ]
     del t.variables[vb.name]

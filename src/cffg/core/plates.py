@@ -28,6 +28,7 @@ from cffg.core.compose import SCOPE_SEP, ComposeError, bond
 from cffg.core.equality_tree import plan_equality_tree
 from cffg.core.plate_grid import PlateGrid
 from cffg.core.ir import (
+    EDGE_CONSTRAINTS,
     BlobRef,
     Broadcast,
     Chain,
@@ -286,7 +287,7 @@ def _rename_variable(out: Template, old: str, new: str, proto: VariableSpec) -> 
             function=f.function,
         )
     out.constraints = [
-        dataclasses.replace(c, target=new) if c.target == old else c for c in out.constraints
+        dataclasses.replace(c, target=new) if c.kind in EDGE_CONSTRAINTS and c.target == old else c for c in out.constraints
     ]
 
 
