@@ -48,7 +48,8 @@ def messages(group, outputs, p):
     return (forward_e, forward_l), (backward_e, backward_l)
 
 
-def _negative_log_density(value, mean, precision):
+def negative_log_density(value, mean, precision):
+    """Normalized Gaussian node energy with its output fixed to a point."""
     residual = value - mean
     d = residual.shape[-1]
     nll = (d * efrules.LOG2PI - efrules._pd_logdet(precision)
@@ -60,7 +61,7 @@ def energy(group, ordinary, eta, precision, p, observation, mask):
     if group.type == "equality":
         return jnp.where(p["bound0"], 0., ordinary)
     if group.type == "gaussian":
-        return jnp.where(p["bound0"], _negative_log_density(p["point0"], p["m"], p["W"]), ordinary)
+        return jnp.where(p["bound0"], negative_log_density(p["point0"], p["m"], p["W"]), ordinary)
 
     do, di = group.dims
     if "point0" in p:
@@ -74,7 +75,7 @@ def energy(group, ordinary, eta, precision, p, observation, mask):
         shift = _mv(p["A"], p["point1"]) + p["b"]
         fixed_in = gauss.prior_energy(eta[:, 0, :do], precision[:, 0, :do, :do], shift, p["W"])
         if observation is not None:
-            fixed_in = jnp.where(mask != 0, _negative_log_density(observation, shift, p["W"]), fixed_in)
+            fixed_in = jnp.where(mask != 0, negative_log_density(observation, shift, p["W"]), fixed_in)
         ordinary = jnp.where(p["bound1"], fixed_in, ordinary)
     return ordinary
 

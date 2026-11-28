@@ -88,6 +88,7 @@ example.
 | [Run a receding-horizon agent](#discrete-planning-and-rolling-agents) | `RollingAgent` | Plan, act, observe, learn, roll a fixed-memory boundary | Action, beliefs, learning state, checkpoint | Replans a finite-horizon factorized policy each tick | [discrete_agent.py](examples/discrete_agent.py) | **Ready:** environment state is external; deep plans need status/trace checks |
 | [Run the costly-cue behavioral oracle](#discrete-planning-and-rolling-agents) | `cffg.experiments.behavioral_epistemics.run_benchmark` | Fixed active-inference versus BFE-ablation task | `BehavioralReport` | Bounded scientific regression, not a general inference objective | [API pattern](#discrete-planning-and-rolling-agents) | **Research-only:** fixed task and no supported package facade or reuse guarantee |
 | [Learn declared parameters](#learn-and-swap-parameters) | `cffg.learn.Learnables`; `cffg.conj`; `LearnableSpec` | Dirichlet, NIW, MNIW, component-NIW, component-MNIW, Pólya–Gamma | `expected`, `rollover`, persistent posterior state | Between-trial conjugate or empirical-Bayes updates | [learning_bundle.py](examples/learning_bundle.py) | **Ready:** `accumulate` and `replace` have different trial semantics; not full joint VB |
+| [Update a finite parameter bank](#finite-parameter-hypotheses) | `cffg.finite_hypotheses.FiniteHypotheses` | Fixed candidate rows and observed Gaussian factors | Posterior log weights and cumulative log evidence | Exact sum over the declared candidates | [finite_hypotheses.py](examples/finite_hypotheses.py) | **Ready:** requires a conditional likelihood for each candidate |
 | [Persist and continue](#persist-and-resume) | `save_bundle`; `load_bundle`; agent checkpoints | Template, arrays, declared learning, or rolling-agent runtime | `LoadedBundle`, restored agent | Serialization preserves declared identity; no inference objective | [learning_bundle.py](examples/learning_bundle.py) | **Ready/current schema:** a bundle is not a mid-run snapshot; stable historical migration is open |
 | [Run linear-Gaussian inference](#continuous-exponential-family-and-hybrid-models) | `cffg.models.lgssm` | Gaussian and linear-Gaussian BP with missing observations | `gaussian_marginals`, node statistics, BFE | Exact Kalman/RTS marginals and evidence identity on a tree | [linear_gaussian.py](examples/linear_gaussian.py) | **Ready:** positive-definite covariance contract; scaled readout is still host-loop bound |
 | [Run scalar exponential-family inference](#continuous-exponential-family-and-hybrid-models) | `gamma`, `beta`, `poisson_obs`, `bernoulli_obs`; `ef_marginals` | Conjugate Gamma–Poisson and Beta–Bernoulli BP | Standard parameters, mean, `proper`, BFE | Exact registered tree messages and ledger | [exponential_family.py](examples/exponential_family.py) | **Ready:** conditioned observations only; predictive outputs leave the shipped family |
@@ -803,6 +804,34 @@ For fixed-structure parameter sweeps that are not declared learning,
 factor roles, probability normalization, covariance validity, and tied blobs
 are validated.
 
+### Finite parameter hypotheses
+
+`cffg.finite_hypotheses.FiniteHypotheses(candidates, covariance, prior=masses)`
+assigns mass to each row of a fixed `[K,P]` parameter array. Each reading has
+`D` coordinates. Supply total observation covariance `[D,D]` or a covariance
+per candidate `[K,D,D]`. The bank owns both arrays. For each reading, compute a
+predicted mean under every candidate and call `bank.update(means, reading)`
+with shapes `[K,D]` and `[D]`. A batch adds a leading observation axis to both.
+Use `observed=boolean_mask` to omit entire readings, or pass `None` for a
+wholly missing batch. Each call consumes its observed readings once.
+
+The return value is the conditional log evidence for that call.
+`bank.log_evidence` accumulates the evidence in log units.
+`bank.log_weights` and `bank.support` preserve live hypotheses even when
+`bank.weights` rounds their probabilities to zero. For another sensor model,
+`update_log_likelihood` accepts absolute log likelihoods in candidate order.
+Exact zero likelihood is `-inf`. An observation that excludes every live
+candidate raises `ImpossibleEvidence` and leaves the batch uncommitted.
+
+`reset()` restores the prior and clears accumulated evidence.
+`reset(prior=masses)` starts with a replacement prior. `save(path)` and
+`FiniteHypotheses.load(path)` round-trip the fixed model and its carry in one
+versioned NPZ. Supply future means in the restored `candidates` row order.
+`conditional_model(index, mean)` returns a template and arrays for inspecting
+or bundling one candidate's Gaussian density. The pendulum example computes
+fresh means from measured angles and candidate lengths.
+[Runnable example](examples/finite_hypotheses.py)
+
 ## Persist and resume
 
 Choose the artifact by what must continue:
@@ -981,6 +1010,7 @@ unfinished result and asserts the quantity an experiment should inspect.
 | [nonlinear_gaussian.py](examples/nonlinear_gaussian.py) | Sigma-point nonlinear Gaussian inference | Declared approximate objective metadata |
 | [cstr_planning.py](examples/cstr_planning.py) | Registered reactor physics, partial goals, status-bearing plans, portable source bundle | Declared short-horizon Gaussian approximation; no hard actuator bounds |
 | [learning_bundle.py](examples/learning_bundle.py) | Declared learning, save/load, later-trial continuation | Current-schema immutable prior plus posterior state |
+| [finite_hypotheses.py](examples/finite_hypotheses.py) | Pendulum length inference from noisy velocity readings | Exact posterior on three specified lengths |
 | [hybrid_rslds.py](examples/hybrid_rslds.py) | Small recurrent switching LDS | Declared mixture/JJ approximation |
 
 Run one from the repository checkout with, for example:

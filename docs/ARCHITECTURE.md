@@ -1786,6 +1786,19 @@ them. Four rules define the contract:
    identity metadata and require dormant parameters to match the reset prior.
    Device-to-host conversion uses the exact codec.
 
+   `finite_hypotheses.FiniteHypotheses` updates a categorical distribution
+   over fixed parameter vectors. Its conditional template attaches a DATA
+   equality tap to a Gaussian prediction. Given a reading, only the
+   normalized Gaussian point density contributes to that template's ledger.
+   The facade evaluates that same node energy across candidates and readings.
+   With previous normalized log weights `w` and a row of log likelihoods
+   `l`, the increment is `z = logsumexp(w + l)` and the new log weights are
+   `w + l - z`. Removing common offsets before addition preserves prior odds.
+   A missing row contributes zero log evidence. The host commits the whole
+   batch after validation. A versioned numeric checkpoint binds the conditional
+   template, candidate order, covariance, reset prior, posterior, support,
+   number of observed readings and accumulated log evidence.
+
    Frame-local appearance regression is owned by `frame_regression.py`.
    `score_pixels` evaluates the expected log likelihood for each pixel
    under each occupied slot. `fit_frame` takes one immutable regression prior,

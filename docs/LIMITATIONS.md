@@ -445,6 +445,14 @@ decision makes the discarded precision material. Two finite words also
 have a finite range. The declared `component_niw` family uses a separate
 float64 host accumulator.
 
+The finite parameter bank in `cffg.finite_hypotheses` sums normalized
+conditional likelihoods over its declared candidates. Exactness applies to
+that discrete model and the supplied predictions. A continuous parameter
+posterior needs a justified approximation, and moving or jittering candidates
+requires a separate inference rule. The Gaussian update takes one complete
+reading or an explicitly missing row. Correlated readings need a joint
+likelihood or the correct sequential conditional densities.
+
 **S1e. Gaussian parameter learning is EM-rollover; flooding VMP is not
 strictly monotone.** Continuous conjugate learning (cff-7c5o, DERIVATIONS.md
 D4) has two honest edges. (1) NIW/MNIW updates run *between* trials from
