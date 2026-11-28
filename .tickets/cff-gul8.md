@@ -1,6 +1,6 @@
 ---
 id: cff-gul8
-status: in_progress
+status: closed
 deps: [cml-6ba0]
 links: [cff-cj5h, cff-fxmj, cff-hp3y, cff-4oq8]
 created: 2026-07-10T03:31:28Z
@@ -268,3 +268,7 @@ The component support check now checks finiteness in both message directions bef
 **2026-11-28T13:50:52Z**
 
 The canonical gate at 7dae3e6 loaded the declared worktree/venv and reported 15 failures. Fourteen arena reconstruction comparisons exposed insertion-order variation in the new incidence/port metadata after JSON round trip. The compatibility export check exposed the imported PortSpec class as an additional compiled dataclass. Publish both maps in sorted name order and reference the core IR module privately. Existing schedule and template fingerprints and compiler assertions remain in force. After replaying the EIG commits on published #233 metadata, all 103 tests across test_compiled.py, test_compiler_contracts.py, test_sensing_information.py and test_sensing_boundaries.py passed in 16.83 seconds. The failed gate receipt is archived at /Users/ravd/agent-share/tree-sensing-7dae3e6-VsWzcA.
+
+**2026-11-28T14:48:45Z**
+
+Final short-suite gate passed on c44582b in the declared editable worktree. Shared CPU lock and the canonical dashboard command reported 2,876 tests, zero failures and 422.201 seconds measured wall time. Receipt and archive are at /Users/ravd/agent-share/tree-sensing-final-Fuk0p9. The short gate reran only after canonicalizing the compiler metadata and restoring export ownership. Published #233 is the prerequisite, with code e6ad56d and metadata tip dd68def. No production or test source changed after the passing gate.
