@@ -1,6 +1,6 @@
 ---
 id: cff-jude
-status: in_progress
+status: closed
 deps: [cff-t6ec, cff-d56d]
 links: []
 created: 2026-07-08T02:57:59Z
@@ -336,3 +336,7 @@ Studio #206 shows schedule kind and executable profiles; neither Studio nor #214
 **2026-11-28T05:13:15Z**
 
 Implemented a read-only schedule plan overlay in cffg.viz. Tests traced real scheduled and synchronous scatter calls, checked scan expansion on a 256-step HMM (3,586 writes), GFE ownership across arenas, obstacle clearance and distinct opposing tips. The focused visualization, README facade and five schedule checks passed (77). Seven base goldens matched #214 byte-for-byte. A real save_png export produced a 676 × 412 image with 48 exact GFE-red pixels at scale 1. Figure 23 selects native forward prediction writes under fixed controls; this diagram does not calculate policy EFE. Compact plates can be explicitly expanded to show per-copy writes. The full gate follows on this implementation.
+
+**2026-11-28T06:30:11Z**
+
+Implementation 927fa41. Final canonical dashboard: 2,671 passed, 455 slow deselected, 0 failed; 1,141.492 s measured on the serial #214 stack, under the 1,200 s budget. Dashboard refreshed ~/agent-share/cffg-tests.html with 37 diagrams in 30 galleries; snapshot ~/agent-share/cffg-backlog-gates/cff-jude/dashboard-927fa41.html. The focused command covered all test_viz_overlay, test_viz_layout, test_viz_diagram and test_viz_svg tests (including HMM, rollout and T-maze galleries and new SVG golden files), the README facade, and five schedule anchors; 77 passed. Refresh the new goldens with CFFG_UPDATE_GOLDENS=1 uv run pytest tests/test_viz_svg.py -k "golden and overlay". Existing goldens byte-identical, Cairo PNG verified, tk dep cycle and git diff --check clean.
