@@ -2355,6 +2355,19 @@ statistics and clocks after a successful joint certificate. A supplied budget
 of zero returns the corresponding unfinished stage. See DERIVATIONS D16 for
 the region entropy correction and its path-enumeration oracle.
 
+### Held-out comparison of explicit candidates
+
+`structure_scoring.compare_candidates` fits declared conjugate parameters in
+training artifact order through `Learnables.accumulate` and `write`. It then
+reuses the fitted parameters and fresh message state for each independent
+held-out binding. Each candidate receives the same observations. The report
+retains partition and artifact IDs, template and fitted parameter hashes,
+the schedule, and the native status and raw energy sequence for each run.
+The grouped path uses Colony. The single path uses Engine with the same
+schedule and hardening budget. Both preserve the underlying ledger. Only
+complete, finite ordinary Bethe results enter the ranking. Loops carry an
+explicit approximation notice. Template and checkpoint formats are unchanged.
+
 ### 5b. Colony execution (many small graphs, one machine)
 
 `Colony` owns an instance table of `(structure_hash, State)` pairs and caches one
