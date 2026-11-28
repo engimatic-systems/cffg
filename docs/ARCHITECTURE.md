@@ -93,6 +93,19 @@ declared `cffg.mu3_is.v1` evaluator carries the Figure 5 `mu3(A)` update.
 to that evaluator; `learn_a=True` alone retains the analytic-moment
 approximation.
 
+
+The bounded interval operations in `cffg.intervals` use disjoint half-open
+cells on each independent coordinate. Each live cell carries its absolute
+log height. The unit likelihood has one whole-line cell, and zero support
+has none. Every operation retains all supported cells or returns an
+explicit failure for the whole message. Structural zeros live between
+cells. A pushforward across a bend can add one cell; pulling back a
+constant-height likelihood moves only its endpoints. Multiplication of
+two nonempty lists of lengths $n,m$ yields at most $n+m-1$ intersections.
+Infinite normalizers, zero-volume evidence, transformed-endpoint collapse
+and exhausted storage have distinct results. See D13a for the unit-mass
+conditional and its graph measure.
+
 ## Implemented layers
 
 ```
