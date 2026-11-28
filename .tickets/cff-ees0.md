@@ -1,6 +1,6 @@
 ---
 id: cff-ees0
-status: in_progress
+status: closed
 deps: []
 links: [cpc-7tbv, car-k6oi]
 created: 2026-09-25T03:46:25Z
@@ -67,3 +67,7 @@ Pre-implementation. Architecture row Learnable or checkpoint feature. The PCGym 
 Ready for the combined gate. cffg.finite_hypotheses.FiniteHypotheses owns an ordered candidate matrix, shared or per-candidate total observation covariance, reset prior, normalized log weights and cumulative log evidence. Its Gaussian update runs the same normalized point-density primitive as a CFFG Gaussian factor bound at an equality DATA tap. conditional_model exposes the executable conditional tree. The bank sums across candidates explicitly. Rows flagged missing contribute zero. Impossible evidence raises its own exception, and invalid batches leave the full carry intact. save/load write an atomic, digest-checked version-1 NPZ containing the conditional Template, all candidate values, covariance, prior, support, posterior and evidence. Individual conditional templates also round-trip through ordinary CFFGZ. The supplied prediction function remains the caller’s responsibility on resume. No jitter, resampling or continuous-parameter inference.
 
 Validation on this branch with UV_PROJECT_ENVIRONMENT=/Users/ravd/projects/cffg/.venv PYTHONPATH=src uv run --frozen --no-sync: pytest -q tests/test_finite_hypotheses.py tests/test_readme.py passed 15. Full-density SciPy enumeration agreed in f32/f64 for correlated, unequal covariances. Separate native Engine flood and two_pass ledgers agreed with the absolute per-candidate log density. Compiled batch and eager sequential updates agreed. In a 200-row bank, 198 live alternatives underflowed at the weight readout and recovered after opposite evidence, with the exact zero still excluded, both uninterrupted and after restart. The PCGym two-candidate case returned posterior [.07963637612143895,.9203636238785611] and NLL 2.47262703346254 in f64 (f32 NLL error 8.64e-8). The standalone pendulum example selected the 1.0 m candidate. pytest -q tests/test_gaussian_tap_oracle.py tests/test_amortization.py tests/test_neural_training.py::test_bundle_exports_initializers_overrides_and_trained_weights passed 4 with 5 existing slow checks deselected. Whole-bank transactions are host-side; vmap and JIT batch the per-reading/per-candidate density, and separate host bank instances own separate posteriors. tk dep cycle and git diff --check passed. Parent owns the final short suite, combined PR and ticket closure.
+
+**2026-11-28T04:33:20Z**
+
+At 2bfe84b the final four-worker short suite passed all 2,855 tests in 484.55 seconds wall. This includes the restored log-weight evidence, sparse support, Gaussian tree and restart cases. The review branch is based on #208.
